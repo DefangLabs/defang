@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/modes"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -32,7 +32,6 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				cli := &DefaultToolCLI{}
 				output, err := handleLoginTool(ctx, request, cluster, authPort, &LoginCLIAdapter{DefaultToolCLI: cli})
 				if err != nil {
-					term.Errorf("Login tool failed: %v", err)
 					return mcp.NewToolResultErrorFromErr("Failed to login", err), err
 				}
 				return mcp.NewToolResultText(output), nil
@@ -45,10 +44,13 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				multipleComposeFilesOptions,
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				var cli CLIInterface = &DefaultToolCLI{}
-				output, err := handleServicesTool(ctx, request, providerId, cluster, cli)
+				loader, err := common.ConfigureLoader(request)
 				if err != nil {
-					term.Errorf("Services tool failed: %v", err)
+					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
+				}
+				var cli CLIInterface = &DefaultToolCLI{}
+				output, err := handleServicesTool(ctx, loader, providerId, cluster, cli)
+				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to list services", err), err
 				}
 				return mcp.NewToolResultText(output), nil
@@ -61,10 +63,13 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				multipleComposeFilesOptions,
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				cli := &DefaultToolCLI{}
-				output, err := handleDeployTool(ctx, request, providerId, cluster, cli)
+				loader, err := common.ConfigureLoader(request)
 				if err != nil {
-					term.Errorf("Deploy tool failed: %v", err)
+					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
+				}
+				cli := &DefaultToolCLI{}
+				output, err := handleDeployTool(ctx, loader, providerId, cluster, cli)
+				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to deploy services", err), err
 				}
 				return mcp.NewToolResultText(output), nil
@@ -77,10 +82,13 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				multipleComposeFilesOptions,
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				cli := &DefaultToolCLI{}
-				output, err := handleDestroyTool(ctx, request, providerId, cluster, cli)
+				loader, err := common.ConfigureLoader(request)
 				if err != nil {
-					term.Errorf("Destroy tool failed: %v", err)
+					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
+				}
+				cli := &DefaultToolCLI{}
+				output, err := handleDestroyTool(ctx, loader, providerId, cluster, cli)
+				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to destroy services", err), err
 				}
 				return mcp.NewToolResultText(output), nil
@@ -105,10 +113,13 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				),
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				cli := &DefaultToolCLI{}
-				output, err := handleLogsTool(ctx, request, cluster, providerId, cli)
+				loader, err := common.ConfigureLoader(request)
 				if err != nil {
-					term.Errorf("Logs tool failed: %v", err)
+					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
+				}
+				cli := &DefaultToolCLI{}
+				output, err := handleLogsTool(ctx, loader, request, cluster, providerId, cli)
+				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to fetch logs", err), err
 				}
 				return mcp.NewToolResultText(output), nil
@@ -131,10 +142,13 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				),
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				cli := &DefaultToolCLI{}
-				output, err := handleEstimateTool(ctx, request, providerId, cluster, cli)
+				loader, err := common.ConfigureLoader(request)
 				if err != nil {
-					term.Errorf("Estimate tool failed: %v", err)
+					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
+				}
+				cli := &DefaultToolCLI{}
+				output, err := handleEstimateTool(ctx, loader, request, providerId, cluster, cli)
+				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to estimate costs", err), err
 				}
 				return mcp.NewToolResultText(output), nil
@@ -153,11 +167,14 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				),
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				loader, err := common.ConfigureLoader(request)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
+				}
 				cli := &DefaultToolCLI{}
 				adapter := &SetConfigCLIAdapter{DefaultToolCLI: cli}
-				output, err := handleSetConfig(ctx, request, providerId, cluster, adapter)
+				output, err := handleSetConfig(ctx, loader, request, providerId, cluster, adapter)
 				if err != nil {
-					term.Errorf("Set config tool failed: %v", err)
 					return mcp.NewToolResultErrorFromErr("Failed to set config", err), err
 				}
 				return mcp.NewToolResultText(output), nil
@@ -173,10 +190,13 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				),
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				cli := &DefaultToolCLI{}
-				output, err := handleRemoveConfigTool(ctx, request, providerId, cluster, &RemoveConfigCLIAdapter{DefaultToolCLI: cli})
+				loader, err := common.ConfigureLoader(request)
 				if err != nil {
-					term.Errorf("Remove config tool failed: %v", err)
+					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
+				}
+				cli := &DefaultToolCLI{}
+				output, err := handleRemoveConfigTool(ctx, loader, request, providerId, cluster, &RemoveConfigCLIAdapter{DefaultToolCLI: cli})
+				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to remove config", err), err
 				}
 				return mcp.NewToolResultText(output), nil
@@ -189,10 +209,13 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				multipleComposeFilesOptions,
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				cli := &DefaultToolCLI{}
-				output, err := handleListConfigTool(ctx, request, providerId, cluster, &ListConfigCLIAdapter{DefaultToolCLI: cli})
+				loader, err := common.ConfigureLoader(request)
 				if err != nil {
-					term.Errorf("List config tool failed: %v", err)
+					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
+				}
+				cli := &DefaultToolCLI{}
+				output, err := handleListConfigTool(ctx, loader, request, providerId, cluster, &ListConfigCLIAdapter{DefaultToolCLI: cli})
+				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to list config", err), err
 				}
 				return mcp.NewToolResultText(output), nil
@@ -215,7 +238,6 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				output, err := handleSetAWSProvider(ctx, request, providerId, cluster)
 				if err != nil {
-					term.Errorf("Set AWS provider tool failed: %v", err)
 					return mcp.NewToolResultErrorFromErr("Failed to set AWS provider", err), err
 				}
 				return mcp.NewToolResultText(output), nil
@@ -232,7 +254,6 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				output, err := handleSetGCPProvider(ctx, request, providerId, cluster)
 				if err != nil {
-					term.Errorf("Set GCP provider tool failed: %v", err)
 					return mcp.NewToolResultErrorFromErr("Failed to set GCP provider", err), err
 				}
 				return mcp.NewToolResultText(output), nil
@@ -246,7 +267,6 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				output, err := handleSetPlaygroundProvider(providerId)
 				if err != nil {
-					term.Errorf("Set Playground provider tool failed: %v", err)
 					return mcp.NewToolResultErrorFromErr("Failed to set Playground provider", err), err
 				}
 				return mcp.NewToolResultText(output), nil

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -31,12 +32,22 @@ func GetStringArg(args map[string]string, key, defaultValue string) string {
 	return defaultValue
 }
 
-func ConfigureLoader(request mcp.CallToolRequest) *compose.Loader {
+func ConfigureLoader(request mcp.CallToolRequest) (*compose.Loader, error) {
+	wd, err := request.RequireString("working_directory")
+	if err != nil || wd == "" {
+		return nil, fmt.Errorf("invalid working directory: %w", err)
+	}
+
+	err = os.Chdir(wd)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to change working directory: %w", err)
+	}
+
 	projectName, err := request.RequireString("project_name")
 	if err == nil {
 		term.Debugf("Project name provided: %s", projectName)
 		term.Debug("Function invoked: compose.NewLoader")
-		return compose.NewLoader(compose.WithProjectName(projectName))
+		return compose.NewLoader(compose.WithProjectName(projectName)), nil
 	}
 	arguments := request.GetArguments()
 	composeFilePathsArgs, ok := arguments["compose_file_paths"]
@@ -45,18 +56,18 @@ func ConfigureLoader(request mcp.CallToolRequest) *compose.Loader {
 		if ok {
 			term.Debugf("Compose file paths provided: %s", composeFilePaths)
 			term.Debug("Function invoked: compose.NewLoader")
-			return compose.NewLoader(compose.WithPath(composeFilePaths...))
+			return compose.NewLoader(compose.WithPath(composeFilePaths...)), nil
 		}
 	}
 
 	//TODO: Talk about using both project name and compose file paths
 	// if projectNameOK && composeFilePathOK {
 	// 	term.Infof("Compose file paths and project name provided: %s, %s", composeFilePaths, projectName)
-	// 	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(composeFilePaths...))
+	// 	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(composeFilePaths...)), nil
 	// }
 
 	term.Debug("Function invoked: compose.NewLoader")
-	return compose.NewLoader()
+	return compose.NewLoader(), nil
 }
 
 func FixupConfigError(err error) error {

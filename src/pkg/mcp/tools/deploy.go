@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -12,29 +11,13 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/mark3labs/mcp-go/mcp"
 )
 
-func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli DeployCLIInterface) (string, error) {
+func handleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli DeployCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", err
 	}
-
-	// Get compose path
-	term.Debug("Compose up tool called - deploying services")
-
-	wd, err := request.RequireString("working_directory")
-	if err != nil || wd == "" {
-		return "", fmt.Errorf("invalid working directory: %w", err)
-	}
-
-	err = os.Chdir(wd)
-	if err != nil {
-		return "", fmt.Errorf("failed to change working directory: %w", err)
-	}
-
-	loader := cli.ConfigureLoader(request)
 
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)

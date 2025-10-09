@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -14,22 +13,10 @@ import (
 )
 
 // handleListConfigTool handles the list config tool logic
-func handleListConfigTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli ListConfigCLIInterface) (string, error) {
-	term.Debug("List Config tool called")
-
+func handleListConfigTool(ctx context.Context, loader cliClient.ProjectLoader, _ mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli ListConfigCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", err
-	}
-
-	wd, err := request.RequireString("working_directory")
-	if err != nil || wd == "" {
-		return "", fmt.Errorf("Invalid working directory: %w", err)
-	}
-
-	err = os.Chdir(wd)
-	if err != nil {
-		return "", fmt.Errorf("Failed to change working directory: %w", err)
 	}
 
 	term.Debug("Function invoked: cli.Connect")
@@ -43,8 +30,6 @@ func handleListConfigTool(ctx context.Context, request mcp.CallToolRequest, prov
 	if err != nil {
 		return "", fmt.Errorf("Failed to get new provider: %w", err)
 	}
-
-	loader := cli.ConfigureLoader(request)
 
 	term.Debug("Function invoked: cliClient.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)

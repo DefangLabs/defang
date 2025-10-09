@@ -4,17 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/bufbuild/connect-go"
-	"github.com/mark3labs/mcp-go/mcp"
 )
 
-func handleDestroyTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli DestroyCLIInterface) (string, error) {
-	term.Debug("Compose down tool called - removing services")
+func handleDestroyTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli DestroyCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", err
@@ -31,18 +28,6 @@ func handleDestroyTool(ctx context.Context, request mcp.CallToolRequest, provide
 	if err != nil {
 		return "", fmt.Errorf("Failed to get new provider: %w", err)
 	}
-
-	wd, err := request.RequireString("working_directory")
-	if err != nil || wd == "" {
-		return "", fmt.Errorf("Invalid working directory: %w", errors.New("working_directory is required"))
-	}
-
-	err = os.Chdir(wd)
-	if err != nil {
-		return "", fmt.Errorf("Failed to change working directory: %w", err)
-	}
-
-	loader := cli.ConfigureLoader(request)
 
 	term.Debug("Function invoked: cliClient.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)

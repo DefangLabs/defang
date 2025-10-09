@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
@@ -13,28 +12,13 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/bufbuild/connect-go"
-	"github.com/mark3labs/mcp-go/mcp"
 )
 
-func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (string, error) {
-	term.Debug("Services tool called - fetching services from Defang")
-
+func handleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", err
 	}
-
-	wd, err := request.RequireString("working_directory")
-	if err != nil || wd == "" {
-		return "", fmt.Errorf("invalid working directory: %w", err)
-	}
-
-	err = os.Chdir(wd)
-	if err != nil {
-		return "", fmt.Errorf("failed to change working directory: %w", err)
-	}
-
-	loader := common.ConfigureLoader(request)
 
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, cluster)
