@@ -14,8 +14,6 @@ import (
 
 // handleSetConfig handles the set config MCP tool request
 func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli SetConfigCLIInterface) (string, error) {
-	term.Debug("Set Config tool called")
-
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", fmt.Errorf("No provider configured: %w", err)

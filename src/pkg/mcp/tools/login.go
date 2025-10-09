@@ -8,10 +8,7 @@ import (
 )
 
 // handleLoginTool handles the login tool logic
-func handleLoginTool(ctx context.Context, request mcp.CallToolRequest, cluster string, authPort int, cli LoginCLIInterface) (string, error) {
-	term.Debug("Login tool called")
-	term.Debugf("mcp.CallToolRequest %+v", request)
-
+func handleLoginTool(ctx context.Context, _ mcp.CallToolRequest, cluster string, authPort int, cli LoginCLIInterface) (string, error) {
 	// Test token
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, cluster)
