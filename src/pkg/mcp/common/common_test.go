@@ -40,16 +40,40 @@ func (m *mockGrpcClient) CanIUse(ctx context.Context, req *defangv1.CanIUseReque
 }
 
 // --- Tests ---
-func TestConfigureLoaderBranches(t *testing.T) {
+func TestConfigureLoaderWithProjectName(t *testing.T) {
 	makeReq := func(args map[string]any) mcp.CallToolRequest {
 		return mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: args}}
 	}
-	loader1 := ConfigureLoader(makeReq(map[string]any{"project_name": "myproj"}))
-	assert.NotNil(t, loader1)
-	loader2 := ConfigureLoader(makeReq(map[string]any{"compose_file_paths": []string{"a.yml", "b.yml"}}))
-	assert.NotNil(t, loader2)
-	loader3 := ConfigureLoader(makeReq(map[string]any{}))
-	assert.NotNil(t, loader3)
+	loader, err := ConfigureLoader(makeReq(map[string]any{"working_directory": ".", "project_name": "myproj"}))
+	assert.NoError(t, err)
+	assert.NotNil(t, loader)
+}
+
+func TestConfigureLoaderWithComposeFilePaths(t *testing.T) {
+	makeReq := func(args map[string]any) mcp.CallToolRequest {
+		return mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: args}}
+	}
+	loader, err := ConfigureLoader(makeReq(map[string]any{"working_directory": ".", "compose_file_paths": []string{"a.yml", "b.yml"}}))
+	assert.NoError(t, err)
+	assert.NotNil(t, loader)
+}
+
+func TestConfigureLoaderWithWorkingDirectoryOnly(t *testing.T) {
+	makeReq := func(args map[string]any) mcp.CallToolRequest {
+		return mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: args}}
+	}
+	loader, err := ConfigureLoader(makeReq(map[string]any{"working_directory": "."}))
+	assert.NoError(t, err)
+	assert.NotNil(t, loader)
+}
+
+func TestConfigureLoaderWithInvalidWorkingDirectory(t *testing.T) {
+	makeReq := func(args map[string]any) mcp.CallToolRequest {
+		return mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: args}}
+	}
+	loader, err := ConfigureLoader(makeReq(map[string]any{"working_directory": "/nonexistent"}))
+	assert.Error(t, err)
+	assert.Nil(t, loader)
 }
 
 func TestFixupConfigError(t *testing.T) {

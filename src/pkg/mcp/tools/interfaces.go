@@ -9,7 +9,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/mark3labs/mcp-go/mcp"
 )
 
 // --- Common method sets ---
@@ -19,10 +18,6 @@ type Connecter interface {
 
 type ProviderFactory interface {
 	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error)
-}
-
-type LoaderConfigurator interface {
-	ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader
 }
 
 type ProjectNameLoader interface {

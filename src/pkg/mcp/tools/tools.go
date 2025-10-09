@@ -2,15 +2,12 @@ package tools
 
 import (
 	"context"
-	"errors"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/modes"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -47,17 +44,10 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				multipleComposeFilesOptions,
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				wd, err := request.RequireString("working_directory")
-				if err != nil || wd == "" {
-					return mcp.NewToolResultErrorFromErr("invalid working directory", err), err
-				}
-
-				err = os.Chdir(wd)
+				loader, err := common.ConfigureLoader(request)
 				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
+					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
-
-				loader := common.ConfigureLoader(request)
 				var cli CLIInterface = &DefaultToolCLI{}
 				output, err := handleServicesTool(ctx, loader, providerId, cluster, cli)
 				if err != nil {
@@ -73,17 +63,10 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				multipleComposeFilesOptions,
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				wd, err := request.RequireString("working_directory")
-				if err != nil || wd == "" {
-					return mcp.NewToolResultErrorFromErr("invalid working directory", err), err
-				}
-
-				err = os.Chdir(wd)
+				loader, err := common.ConfigureLoader(request)
 				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
+					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
-
-				loader := common.ConfigureLoader(request)
 				cli := &DefaultToolCLI{}
 				output, err := handleDeployTool(ctx, loader, providerId, cluster, cli)
 				if err != nil {
@@ -99,18 +82,10 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				multipleComposeFilesOptions,
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				wd, err := request.RequireString("working_directory")
-				if err != nil || wd == "" {
-					return mcp.NewToolResultErrorFromErr("invalid working directory", err), err
-				}
-
-				err = os.Chdir(wd)
+				loader, err := common.ConfigureLoader(request)
 				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
+					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
-
-				loader := common.ConfigureLoader(request)
-
 				cli := &DefaultToolCLI{}
 				output, err := handleDestroyTool(ctx, loader, providerId, cluster, cli)
 				if err != nil {
@@ -138,16 +113,10 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				),
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				wd, err := request.RequireString("working_directory")
-				if err != nil || wd == "" {
-					return mcp.NewToolResultErrorFromErr("invalid working directory", err), err
-				}
-				err = os.Chdir(wd)
+				loader, err := common.ConfigureLoader(request)
 				if err != nil {
-					return mcp.NewToolResultErrorFromErr("failed to change working directory", err), err
+					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
-
-				loader := common.ConfigureLoader(request)
 				cli := &DefaultToolCLI{}
 				output, err := handleLogsTool(ctx, loader, request, cluster, providerId, cli)
 				if err != nil {
@@ -173,18 +142,10 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				),
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				wd, err := request.RequireString("working_directory")
-				if err != nil || wd == "" {
-					term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
-					return mcp.NewToolResultErrorFromErr("invalid working directory", err), err
-				}
-
-				err = os.Chdir(wd)
+				loader, err := common.ConfigureLoader(request)
 				if err != nil {
-					term.Error("Failed to change working directory", "error", err)
-					return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
+					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
-				loader := common.ConfigureLoader(request)
 				cli := &DefaultToolCLI{}
 				output, err := handleEstimateTool(ctx, loader, request, providerId, cluster, cli)
 				if err != nil {
@@ -206,18 +167,10 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				),
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				wd, err := request.RequireString("working_directory")
-				if err != nil || wd == "" {
-					term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
-					return mcp.NewToolResultErrorFromErr("invalid working directory", err), err
-				}
-
-				err = os.Chdir(wd)
+				loader, err := common.ConfigureLoader(request)
 				if err != nil {
-					term.Error("Failed to change working directory", "error", err)
-					return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
+					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
-				loader := common.ConfigureLoader(request)
 				cli := &DefaultToolCLI{}
 				adapter := &SetConfigCLIAdapter{DefaultToolCLI: cli}
 				output, err := handleSetConfig(ctx, loader, request, providerId, cluster, adapter)
@@ -237,18 +190,10 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				),
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				wd, err := request.RequireString("working_directory")
-				if err != nil || wd == "" {
-					term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
-					return mcp.NewToolResultErrorFromErr("invalid working directory", err), err
-				}
-
-				err = os.Chdir(wd)
+				loader, err := common.ConfigureLoader(request)
 				if err != nil {
-					term.Error("Failed to change working directory", "error", err)
-					return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
+					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
-				loader := common.ConfigureLoader(request)
 				cli := &DefaultToolCLI{}
 				output, err := handleRemoveConfigTool(ctx, loader, request, providerId, cluster, &RemoveConfigCLIAdapter{DefaultToolCLI: cli})
 				if err != nil {
@@ -264,16 +209,10 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				multipleComposeFilesOptions,
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				wd, err := request.RequireString("working_directory")
-				if err != nil || wd == "" {
-					return mcp.NewToolResultErrorFromErr("invalid working directory", err), err
-				}
-
-				err = os.Chdir(wd)
+				loader, err := common.ConfigureLoader(request)
 				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
+					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
-				loader := common.ConfigureLoader(request)
 				cli := &DefaultToolCLI{}
 				output, err := handleListConfigTool(ctx, loader, request, providerId, cluster, &ListConfigCLIAdapter{DefaultToolCLI: cli})
 				if err != nil {

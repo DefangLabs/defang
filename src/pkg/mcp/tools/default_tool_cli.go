@@ -15,7 +15,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/pkg/browser"
 )
 
@@ -58,10 +57,6 @@ func (DefaultToolCLI) ComposeUp(ctx context.Context, project *compose.Project, c
 
 func (c *DefaultToolCLI) Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cli.TailOptions) error {
 	return cli.Tail(ctx, provider, project.Name, options)
-}
-
-func (DefaultToolCLI) ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader {
-	return common.ConfigureLoader(request)
 }
 
 func (DefaultToolCLI) ComposeDown(ctx context.Context, projectName string, client *cliClient.GrpcClient, provider cliClient.Provider) (string, error) {
