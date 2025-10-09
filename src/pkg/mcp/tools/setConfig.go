@@ -18,7 +18,7 @@ func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, providerI
 
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
-		return "", fmt.Errorf("No provider configured: %w", err)
+		return "", err
 	}
 
 	wd, err := request.RequireString("working_directory")

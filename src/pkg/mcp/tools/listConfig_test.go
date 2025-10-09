@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
@@ -88,7 +89,7 @@ func TestHandleListConfigTool(t *testing.T) {
 			workingDirectory: ".",
 			providerID:       client.ProviderAuto,
 			setupMock:        func(m *MockListConfigCLI) {},
-			expectedError:    "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
+			expectedError:    common.PromptError.Error(),
 		},
 		{
 			name:             "connect_error",

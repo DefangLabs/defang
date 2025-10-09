@@ -17,7 +17,7 @@ func handleDestroyTool(ctx context.Context, request mcp.CallToolRequest, provide
 	term.Debug("Compose down tool called - removing services")
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
-		return "", fmt.Errorf("No provider configured: %w", err)
+		return "", err
 	}
 
 	term.Debug("Function invoked: cli.Connect")

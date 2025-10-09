@@ -22,6 +22,8 @@ var MCPDevelopmentClient = ""
 
 const PostPrompt = "Please deploy my application with Defang now."
 
+var PromptError = errors.New("No cloud provider is configured. To continue, please set up a provider:\n- For AWS: /defang.AWS_Setup or set_aws_provider\n- For GCP: /defang.GCP_Setup or set_gcp_provider\n- For Playground: /defang.Playground_Setup or set_playground_provider\nIf your IDE supports prompts, you can use the commands above directly in chat.")
+
 func GetStringArg(args map[string]string, key, defaultValue string) string {
 	if val, exists := args[key]; exists {
 		return val
@@ -83,7 +85,7 @@ func CanIUseProvider(ctx context.Context, grpcClient client.FabricClient, provid
 
 func ProviderNotConfiguredError(providerId client.ProviderID) error {
 	if providerId == client.ProviderAuto {
-		return errors.New("No cloud provider is configured. To continue, please set up a provider:\n- For AWS: /defang.AWS_Setup or set_aws_provider\n- For GCP: /defang.GCP_Setup or set_gcp_provider\n- For Playground: /defang.Playground_Setup or set_playground_provider\nIf your IDE supports prompts, you can use the commands above directly in chat.")
+		return PromptError
 	}
 	return nil
 }

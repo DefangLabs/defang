@@ -18,7 +18,7 @@ import (
 func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli DeployCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
-		return "", fmt.Errorf("no provider configured: %w", err)
+		return "", err
 	}
 
 	// Get compose path
