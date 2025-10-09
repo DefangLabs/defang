@@ -244,6 +244,9 @@ func (gcp Gcp) EnsureUserHasServiceAccountRoles(ctx context.Context, user, servi
 
 	resource := fmt.Sprintf("projects/%s/serviceAccounts/%s", gcp.ProjectId, serviceAccount)
 	member := "user:" + user
+	if strings.HasSuffix(serviceAccount, ".iam.gserviceaccount.com") {
+		member = "serviceAccount:" + serviceAccount
+	}
 
 	policy, err := client.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{Resource: resource})
 	if err != nil {
