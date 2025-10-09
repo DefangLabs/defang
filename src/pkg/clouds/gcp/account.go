@@ -15,7 +15,7 @@ import (
 
 var FindGoogleDefaultCredentials func(ctx context.Context, scopes ...string) (*google.Credentials, error) = google.FindDefaultCredentials
 
-func (gcp Gcp) GetCurrentAccountEmail(ctx context.Context) (string, error) {
+func (gcp Gcp) GetCurrentPrincipal(ctx context.Context) (string, error) {
 	creds, err := FindGoogleDefaultCredentials(ctx)
 	if err != nil {
 		return "", err

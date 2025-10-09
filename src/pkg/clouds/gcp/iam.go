@@ -235,7 +235,7 @@ func (gcp Gcp) EnsureServiceAccountHasArtifactRegistryRoles(ctx context.Context,
 }
 
 // TODO: Investigate if this can be merged with EnsureServiceAccountHasRoles
-func (gcp Gcp) EnsureUserHasServiceAccountRoles(ctx context.Context, user, serviceAccount string, roles []string) error {
+func (gcp Gcp) EnsurePrincipalHasServiceAccountRoles(ctx context.Context, user, serviceAccount string, roles []string) error {
 	client, err := iamadm.NewIamClient(ctx)
 	if err != nil {
 		log.Fatalf("unable to ensure user service account role, failed to create artifact registry client: %v", err)
