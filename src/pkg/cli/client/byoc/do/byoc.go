@@ -791,7 +791,7 @@ func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, erro
 	return nil, fmt.Errorf("app not found: %s", appName)
 }
 
-func (b *ByocDo) ServicePublicDNS(name string, projectName string) string {
+func (b *ByocDo) ServicePublicDNS(ctx context.Context, name string, projectName string) string {
 	return dns.SafeLabel(name) + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(b.TenantName) + ".defang.app"
 }
 

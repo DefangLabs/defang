@@ -55,7 +55,7 @@ type Provider interface {
 	QueryLogs(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	RemoteProjectName(context.Context) (string, error)
 	ServicePrivateDNS(string) string
-	ServicePublicDNS(string, string) string
+	ServicePublicDNS(context.Context, string, string) string
 	SetCanIUseConfig(*defangv1.CanIUseResponse)
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)
 	TearDown(context.Context) error

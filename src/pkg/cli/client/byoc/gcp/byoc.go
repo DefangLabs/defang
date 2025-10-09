@@ -942,6 +942,6 @@ func (b *ByocGcp) StackName(projectName, name string) string {
 	return fmt.Sprintf("%s_%s_%s_%s", byoc.DefangPrefix, projectName, b.PulumiStack, name)
 }
 
-func (b *ByocGcp) ServicePublicDNS(name string, projectName string) string {
+func (b *ByocGcp) ServicePublicDNS(ctx context.Context, name string, projectName string) string {
 	return dns.SafeLabel(name) + "." + b.PulumiStack + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(b.TenantName) + ".defang.app"
 }
