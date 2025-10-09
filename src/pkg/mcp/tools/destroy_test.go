@@ -8,7 +8,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/bufbuild/connect-go"
-	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -58,65 +57,41 @@ func (m *MockDestroyCLI) CanIUseProvider(ctx context.Context, grpcClient *client
 	return m.CanIUseProviderError
 }
 
-func (m *MockDestroyCLI) ConfigureLoader(request mcp.CallToolRequest) client.Loader {
-	m.CallLog = append(m.CallLog, "ConfigureLoader")
-	return nil
-}
-
 func TestHandleDestroyTool(t *testing.T) {
 	tests := []struct {
 		name                 string
-		workingDirectory     string
 		providerID           client.ProviderID
 		setupMock            func(*MockDestroyCLI)
 		expectedTextContains string
 		expectedError        string
 	}{
 		{
-			name:             "missing_working_directory",
-			workingDirectory: "",
-			providerID:       client.ProviderAWS,
-			setupMock:        func(m *MockDestroyCLI) {},
-			expectedError:    "Invalid working directory: working_directory is required",
-		},
-		{
-			name:             "invalid_working_directory",
-			workingDirectory: "/nonexistent/directory",
-			providerID:       client.ProviderAWS,
-			setupMock:        func(m *MockDestroyCLI) {},
-			expectedError:    "Failed to change working directory: chdir /nonexistent/directory: no such file or directory",
-		},
-		{
-			name:             "connect_error",
-			workingDirectory: ".",
-			providerID:       client.ProviderAWS,
+			name:       "connect_error",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockDestroyCLI) {
 				m.ConnectError = errors.New("connection failed")
 			},
 			expectedError: "Could not connect: connection failed",
 		},
 		{
-			name:             "new_provider_error",
-			workingDirectory: ".",
-			providerID:       client.ProviderAWS,
+			name:       "new_provider_error",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockDestroyCLI) {
 				m.NewProviderError = errors.New("provider creation failed")
 			},
 			expectedError: "Failed to get new provider: provider creation failed",
 		},
 		{
-			name:             "load_project_name_error",
-			workingDirectory: ".",
-			providerID:       client.ProviderAWS,
+			name:       "load_project_name_error",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockDestroyCLI) {
 				m.LoadProjectNameWithFallbackError = errors.New("failed to load project name")
 			},
 			expectedError: "Failed to load project name: failed to load project name",
 		},
 		{
-			name:             "can_i_use_provider_error",
-			workingDirectory: ".",
-			providerID:       client.ProviderAWS,
+			name:       "can_i_use_provider_error",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockDestroyCLI) {
 				m.ProjectName = "test-project"
 				m.CanIUseProviderError = errors.New("provider not available")
@@ -124,9 +99,8 @@ func TestHandleDestroyTool(t *testing.T) {
 			expectedError: "Failed to use provider: provider not available",
 		},
 		{
-			name:             "compose_down_project_not_found",
-			workingDirectory: ".",
-			providerID:       client.ProviderAWS,
+			name:       "compose_down_project_not_found",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockDestroyCLI) {
 				m.ProjectName = "test-project"
 				m.ComposeDownError = connect.NewError(connect.CodeNotFound, errors.New("project not found"))
@@ -134,9 +108,8 @@ func TestHandleDestroyTool(t *testing.T) {
 			expectedError: "Project not found, nothing to destroy. Please use a valid project name, compose file path or project directory.",
 		},
 		{
-			name:             "compose_down_generic_error",
-			workingDirectory: ".",
-			providerID:       client.ProviderAWS,
+			name:       "compose_down_generic_error",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockDestroyCLI) {
 				m.ProjectName = "test-project"
 				m.ComposeDownError = errors.New("destroy failed")
@@ -144,9 +117,8 @@ func TestHandleDestroyTool(t *testing.T) {
 			expectedError: "Failed to send destroy request: destroy failed",
 		},
 		{
-			name:             "successful_destroy",
-			workingDirectory: ".",
-			providerID:       client.ProviderAWS,
+			name:       "successful_destroy",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockDestroyCLI) {
 				m.ProjectName = "test-project"
 				m.ComposeDownResult = "deployment-123"
@@ -154,11 +126,10 @@ func TestHandleDestroyTool(t *testing.T) {
 			expectedTextContains: "The project is in the process of being destroyed: test-project",
 		},
 		{
-			name:             "provider_auto_not_configured",
-			workingDirectory: ".",
-			providerID:       client.ProviderAuto,
-			setupMock:        func(m *MockDestroyCLI) {},
-			expectedError:    "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
+			name:          "provider_auto_not_configured",
+			providerID:    client.ProviderAuto,
+			setupMock:     func(m *MockDestroyCLI) {},
+			expectedError: "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
 		},
 	}
 
@@ -170,18 +141,9 @@ func TestHandleDestroyTool(t *testing.T) {
 			}
 			tt.setupMock(mockCLI)
 
-			// Create request
-			request := mcp.CallToolRequest{
-				Params: mcp.CallToolParams{
-					Name: "destroy",
-					Arguments: map[string]interface{}{
-						"working_directory": tt.workingDirectory,
-					},
-				},
-			}
-
 			// Call the function
-			result, err := handleDestroyTool(t.Context(), request, &tt.providerID, "test-cluster", mockCLI)
+			loader := &client.MockLoader{}
+			result, err := handleDestroyTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI)
 
 			// Verify error expectations
 			if tt.expectedError != "" {
@@ -194,11 +156,10 @@ func TestHandleDestroyTool(t *testing.T) {
 			}
 
 			// For successful cases, verify CLI methods were called in order
-			if tt.expectedError == "" && tt.workingDirectory != "" && tt.name == "successful_destroy" {
+			if tt.expectedError == "" && tt.name == "successful_destroy" {
 				expectedCalls := []string{
 					"Connect(test-cluster)",
 					"NewProvider(aws)",
-					"ConfigureLoader",
 					"LoadProjectNameWithFallback",
 					"CanIUseProvider(aws, test-project, 0)",
 					"ComposeDown(test-project)",

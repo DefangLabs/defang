@@ -9,7 +9,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/bufbuild/connect-go"
-	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -63,15 +62,6 @@ func (m *MockCLI) GetServices(ctx context.Context, projectName string, provider 
 	return m.MockServices, nil
 }
 
-func createServicesCallToolRequest(args map[string]interface{}) mcp.CallToolRequest {
-	return mcp.CallToolRequest{
-		Params: mcp.CallToolParams{
-			Name:      "services",
-			Arguments: args,
-		},
-	}
-}
-
 // createConnectError creates a connect error with the specified code and message
 func createConnectError(code connect.Code, message string) error {
 	return connect.NewError(code, errors.New(message))
@@ -100,9 +90,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 		{
 			name:       "connect_error",
 			providerId: client.ProviderDefang,
-			requestArgs: map[string]interface{}{
-				"working_directory": ".",
-			},
 			mockCLI: &MockCLI{
 				ConnectError: errors.New("connection failed"),
 			},
@@ -114,9 +101,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 		{
 			name:       "provider_creation_error",
 			providerId: client.ProviderDefang,
-			requestArgs: map[string]interface{}{
-				"working_directory": ".",
-			},
 			mockCLI: &MockCLI{
 				MockClient:       &client.GrpcClient{},
 				NewProviderError: errors.New("provider creation failed"),
@@ -129,9 +113,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 		{
 			name:       "auto_provider_not_configured",
 			providerId: client.ProviderAuto,
-			requestArgs: map[string]interface{}{
-				"working_directory": ".",
-			},
 			mockCLI: &MockCLI{
 				MockClient: &client.GrpcClient{},
 			},
@@ -141,25 +122,8 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			expectedGetServices: false,
 		},
 		{
-			name:       "invalid_working_directory",
-			providerId: client.ProviderDefang,
-			requestArgs: map[string]interface{}{
-				"working_directory": "/nonexistent/directory",
-			},
-			mockCLI: &MockCLI{
-				MockClient: &client.GrpcClient{},
-			},
-
-			expectedError:       true,
-			errorMessage:        "no such file or directory",
-			expectedGetServices: false,
-		},
-		{
 			name:       "load_project_name_error",
 			providerId: client.ProviderDefang,
-			requestArgs: map[string]interface{}{
-				"working_directory": ".",
-			},
 			mockCLI: &MockCLI{
 				MockClient:                       &client.GrpcClient{},
 				MockProvider:                     &client.PlaygroundProvider{},
@@ -175,9 +139,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 		{
 			name:       "get_services_no_services_error",
 			providerId: client.ProviderDefang,
-			requestArgs: map[string]interface{}{
-				"working_directory": ".",
-			},
 			mockCLI: &MockCLI{
 				MockClient:       &client.GrpcClient{},
 				MockProvider:     &client.PlaygroundProvider{},
@@ -192,9 +153,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 		{
 			name:       "get_services_project_not_deployed",
 			providerId: client.ProviderDefang,
-			requestArgs: map[string]interface{}{
-				"working_directory": ".",
-			},
 			mockCLI: &MockCLI{
 				MockClient:       &client.GrpcClient{},
 				MockProvider:     &client.PlaygroundProvider{},
@@ -209,9 +167,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 		{
 			name:       "get_services_generic_error",
 			providerId: client.ProviderDefang,
-			requestArgs: map[string]interface{}{
-				"working_directory": ".",
-			},
 			mockCLI: &MockCLI{
 				MockClient:       &client.GrpcClient{},
 				MockProvider:     &client.PlaygroundProvider{},
@@ -227,9 +182,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 		{
 			name:       "successful_cli_operations_until_get_services",
 			providerId: client.ProviderDefang,
-			requestArgs: map[string]interface{}{
-				"working_directory": ".",
-			},
 			mockCLI: &MockCLI{
 				MockClient:      &client.GrpcClient{},
 				MockProvider:    &client.PlaygroundProvider{},
@@ -252,8 +204,8 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			request := createServicesCallToolRequest(tt.requestArgs)
-			result, err := handleServicesTool(ctx, request, &tt.providerId, testCluster, tt.mockCLI)
+			loader := &client.MockLoader{}
+			result, err := handleServicesTool(ctx, loader, &tt.providerId, testCluster, tt.mockCLI)
 
 			// Check Go error expectation
 			if tt.expectedError {

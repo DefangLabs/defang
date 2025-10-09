@@ -39,11 +39,6 @@ func (m *MockListConfigCLI) NewProvider(ctx context.Context, providerId client.P
 	return nil, nil // Mock provider
 }
 
-func (m *MockListConfigCLI) ConfigureLoader(request mcp.CallToolRequest) client.Loader {
-	m.CallLog = append(m.CallLog, "ConfigureLoader")
-	return nil
-}
-
 func (m *MockListConfigCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
 	m.CallLog = append(m.CallLog, "LoadProjectNameWithFallback")
 	if m.LoadProjectNameError != nil {
@@ -63,64 +58,44 @@ func (m *MockListConfigCLI) ListConfig(ctx context.Context, provider client.Prov
 func TestHandleListConfigTool(t *testing.T) {
 	tests := []struct {
 		name                 string
-		workingDirectory     string
 		providerID           client.ProviderID
 		setupMock            func(*MockListConfigCLI)
 		expectedTextContains string
 		expectedError        string
 	}{
 		{
-			name:             "missing_working_directory",
-			workingDirectory: "",
-			providerID:       client.ProviderAWS,
-			setupMock:        func(m *MockListConfigCLI) {},
-			expectedError:    "Invalid working directory: %!w(<nil>)",
+			name:          "provider_auto_not_configured",
+			providerID:    client.ProviderAuto,
+			setupMock:     func(m *MockListConfigCLI) {},
+			expectedError: "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
 		},
 		{
-			name:             "invalid_working_directory",
-			workingDirectory: "/nonexistent/directory",
-			providerID:       client.ProviderAWS,
-			setupMock:        func(m *MockListConfigCLI) {},
-			expectedError:    "Failed to change working directory: chdir /nonexistent/directory: no such file or directory",
-		},
-		{
-			name:             "provider_auto_not_configured",
-			workingDirectory: ".",
-			providerID:       client.ProviderAuto,
-			setupMock:        func(m *MockListConfigCLI) {},
-			expectedError:    "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
-		},
-		{
-			name:             "connect_error",
-			workingDirectory: ".",
-			providerID:       client.ProviderAWS,
+			name:       "connect_error",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockListConfigCLI) {
 				m.ConnectError = errors.New("connection failed")
 			},
 			expectedError: "Could not connect: connection failed",
 		},
 		{
-			name:             "new_provider_error",
-			workingDirectory: ".",
-			providerID:       client.ProviderAWS,
+			name:       "new_provider_error",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockListConfigCLI) {
 				m.NewProviderError = errors.New("provider creation failed")
 			},
 			expectedError: "Failed to get new provider: provider creation failed",
 		},
 		{
-			name:             "load_project_name_error",
-			workingDirectory: ".",
-			providerID:       client.ProviderAWS,
+			name:       "load_project_name_error",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockListConfigCLI) {
 				m.LoadProjectNameError = errors.New("failed to load project name")
 			},
 			expectedError: "Failed to load project name: failed to load project name",
 		},
 		{
-			name:             "list_config_error",
-			workingDirectory: ".",
-			providerID:       client.ProviderAWS,
+			name:       "list_config_error",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockListConfigCLI) {
 				m.ProjectName = "test-project"
 				m.ListConfigError = errors.New("failed to list configs")
@@ -128,9 +103,8 @@ func TestHandleListConfigTool(t *testing.T) {
 			expectedError: "Failed to list config variables: failed to list configs",
 		},
 		{
-			name:             "no_config_variables_found",
-			workingDirectory: ".",
-			providerID:       client.ProviderAWS,
+			name:       "no_config_variables_found",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockListConfigCLI) {
 				m.ProjectName = "test-project"
 				m.ConfigResponse = &defangv1.Secrets{
@@ -140,9 +114,8 @@ func TestHandleListConfigTool(t *testing.T) {
 			expectedTextContains: "No config variables found for the project \"test-project\"",
 		},
 		{
-			name:             "successful_list_single_config",
-			workingDirectory: ".",
-			providerID:       client.ProviderAWS,
+			name:       "successful_list_single_config",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockListConfigCLI) {
 				m.ProjectName = "test-project"
 				m.ConfigResponse = &defangv1.Secrets{
@@ -162,9 +135,7 @@ func TestHandleListConfigTool(t *testing.T) {
 			tt.setupMock(mockCLI)
 
 			// Create request
-			args := map[string]interface{}{
-				"working_directory": tt.workingDirectory,
-			}
+			args := map[string]interface{}{}
 
 			request := mcp.CallToolRequest{
 				Params: mcp.CallToolParams{
@@ -174,7 +145,8 @@ func TestHandleListConfigTool(t *testing.T) {
 			}
 
 			// Call the function
-			result, err := handleListConfigTool(t.Context(), request, &tt.providerID, "test-cluster", mockCLI)
+			loader := &client.MockLoader{}
+			result, err := handleListConfigTool(t.Context(), loader, request, &tt.providerID, "test-cluster", mockCLI)
 
 			// Verify error expectations
 			if tt.expectedError != "" {
@@ -187,11 +159,10 @@ func TestHandleListConfigTool(t *testing.T) {
 			}
 
 			// For successful cases, verify CLI methods were called in order
-			if tt.expectedError == "" && tt.workingDirectory != "" && tt.name == "successful_list_single_config" {
+			if tt.expectedError == "" && tt.name == "successful_list_single_config" {
 				expectedCalls := []string{
 					"Connect(test-cluster)",
 					"NewProvider(aws)",
-					"ConfigureLoader",
 					"LoadProjectNameWithFallback",
 					"ListConfig(test-project)",
 				}

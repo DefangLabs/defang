@@ -2,9 +2,7 @@ package tools
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -14,19 +12,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-func handleEstimateTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli EstimateCLIInterface) (string, error) {
-	wd, err := request.RequireString("working_directory")
-	if err != nil || wd == "" {
-		term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
-		return "", fmt.Errorf("working_directory is required: %w", err)
-	}
-
-	err = os.Chdir(wd)
-	if err != nil {
-		term.Error("Failed to change working directory", "error", err)
-		return "", fmt.Errorf("Failed to change working directory: %w", err)
-	}
-
+func handleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli EstimateCLIInterface) (string, error) {
 	modeString, err := request.RequireString("deployment_mode")
 	if err != nil {
 		modeString = "AFFORDABLE" // Default to AFFORDABLE if not provided
@@ -54,8 +40,6 @@ func handleEstimateTool(ctx context.Context, request mcp.CallToolRequest, provid
 	}
 
 	term.Debugf("Deployment mode set to: %s", mode.String())
-
-	loader := cli.ConfigureLoader(request)
 
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
