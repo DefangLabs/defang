@@ -15,8 +15,6 @@ import (
 )
 
 func handleEstimateTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli EstimateCLIInterface) (string, error) {
-	term.Debug("Estimate tool called")
-
 	wd, err := request.RequireString("working_directory")
 	if err != nil || wd == "" {
 		term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
