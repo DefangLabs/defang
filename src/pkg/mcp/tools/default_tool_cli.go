@@ -151,9 +151,6 @@ func (a *SetConfigCLIAdapter) LoadProjectNameWithFallback(ctx context.Context, l
 }
 
 // --- RemoveConfigCLIInterface ---
-func (RemoveConfigCLIAdapter) ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader {
-	return common.ConfigureLoader(request)
-}
 func (RemoveConfigCLIAdapter) LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error) {
 	return cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
 }

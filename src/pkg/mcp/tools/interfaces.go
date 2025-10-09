@@ -89,7 +89,6 @@ type LoginCLIInterface interface {
 type RemoveConfigCLIInterface interface {
 	Connecter
 	ProviderFactory
-	LoaderConfigurator
 	ProjectNameLoader
 	// Unique methods
 	ConfigDelete(ctx context.Context, projectName string, provider cliClient.Provider, name string) error

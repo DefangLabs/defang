@@ -39,11 +39,6 @@ func (m *MockRemoveConfigCLI) NewProvider(ctx context.Context, providerId client
 	return nil, nil // Mock provider
 }
 
-func (m *MockRemoveConfigCLI) ConfigureLoader(request mcp.CallToolRequest) client.Loader {
-	m.CallLog = append(m.CallLog, "ConfigureLoader")
-	return nil
-}
-
 func (m *MockRemoveConfigCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
 	m.CallLog = append(m.CallLog, "LoadProjectNameWithFallback")
 	if m.LoadProjectNameError != nil {
@@ -63,7 +58,6 @@ func (m *MockRemoveConfigCLI) ConfigDelete(ctx context.Context, projectName stri
 func TestHandleRemoveConfigTool(t *testing.T) {
 	tests := []struct {
 		name                 string
-		workingDirectory     string
 		configName           string
 		providerID           client.ProviderID
 		setupMock            func(*MockRemoveConfigCLI)
@@ -72,46 +66,25 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 		expectedError        string
 	}{
 		{
-			name:             "provider_auto_not_configured",
-			workingDirectory: ".",
-			configName:       "DATABASE_URL",
-			providerID:       client.ProviderAuto,
-			setupMock:        func(m *MockRemoveConfigCLI) {},
-			expectError:      true,
-			expectedError:    "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
+			name:          "provider_auto_not_configured",
+			configName:    "DATABASE_URL",
+			providerID:    client.ProviderAuto,
+			setupMock:     func(m *MockRemoveConfigCLI) {},
+			expectError:   true,
+			expectedError: "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
 		},
 		{
-			name:             "missing_working_directory",
-			workingDirectory: "",
-			configName:       "DATABASE_URL",
-			providerID:       client.ProviderAWS,
-			setupMock:        func(m *MockRemoveConfigCLI) {},
-			expectError:      true,
-			expectedError:    "Invalid working directory: working_directory is required",
+			name:          "missing_config_name",
+			configName:    "",
+			providerID:    client.ProviderAWS,
+			setupMock:     func(m *MockRemoveConfigCLI) {},
+			expectError:   true,
+			expectedError: "Invalid config `name`: required argument \"name\" not found",
 		},
 		{
-			name:             "invalid_working_directory",
-			workingDirectory: "/nonexistent/directory",
-			configName:       "DATABASE_URL",
-			providerID:       client.ProviderAWS,
-			setupMock:        func(m *MockRemoveConfigCLI) {},
-			expectError:      true,
-			expectedError:    "Failed to change working directory: chdir /nonexistent/directory: no such file or directory",
-		},
-		{
-			name:             "missing_config_name",
-			workingDirectory: ".",
-			configName:       "",
-			providerID:       client.ProviderAWS,
-			setupMock:        func(m *MockRemoveConfigCLI) {},
-			expectError:      true,
-			expectedError:    "Invalid config `name`: required argument \"name\" not found",
-		},
-		{
-			name:             "connect_error",
-			workingDirectory: ".",
-			configName:       "DATABASE_URL",
-			providerID:       client.ProviderAWS,
+			name:       "connect_error",
+			configName: "DATABASE_URL",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockRemoveConfigCLI) {
 				m.ConnectError = errors.New("connection failed")
 			},
@@ -119,10 +92,9 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			expectedError: "Could not connect: connection failed",
 		},
 		{
-			name:             "new_provider_error",
-			workingDirectory: ".",
-			configName:       "DATABASE_URL",
-			providerID:       client.ProviderAWS,
+			name:       "new_provider_error",
+			configName: "DATABASE_URL",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockRemoveConfigCLI) {
 				m.NewProviderError = errors.New("provider creation failed")
 			},
@@ -130,10 +102,9 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			expectedError: "Failed to get new provider: provider creation failed",
 		},
 		{
-			name:             "load_project_name_error",
-			workingDirectory: ".",
-			configName:       "DATABASE_URL",
-			providerID:       client.ProviderAWS,
+			name:       "load_project_name_error",
+			configName: "DATABASE_URL",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockRemoveConfigCLI) {
 				m.LoadProjectNameError = errors.New("failed to load project name")
 			},
@@ -141,10 +112,9 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			expectedError: "Failed to load project name: failed to load project name",
 		},
 		{
-			name:             "config_not_found",
-			workingDirectory: ".",
-			configName:       "NONEXISTENT_CONFIG",
-			providerID:       client.ProviderAWS,
+			name:       "config_not_found",
+			configName: "NONEXISTENT_CONFIG",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockRemoveConfigCLI) {
 				m.ProjectName = "test-project"
 				m.ConfigDeleteNotFoundError = true
@@ -153,10 +123,9 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			expectedTextContains: "Config variable \"NONEXISTENT_CONFIG\" not found in project \"test-project\"",
 		},
 		{
-			name:             "config_delete_error",
-			workingDirectory: ".",
-			configName:       "DATABASE_URL",
-			providerID:       client.ProviderAWS,
+			name:       "config_delete_error",
+			configName: "DATABASE_URL",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockRemoveConfigCLI) {
 				m.ProjectName = "test-project"
 				m.ConfigDeleteError = errors.New("failed to delete config")
@@ -165,10 +134,9 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			expectedError: "Failed to remove config variable \"DATABASE_URL\" from project \"test-project\": failed to delete config",
 		},
 		{
-			name:             "successful_config_removal",
-			workingDirectory: ".",
-			configName:       "DATABASE_URL",
-			providerID:       client.ProviderAWS,
+			name:       "successful_config_removal",
+			configName: "DATABASE_URL",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockRemoveConfigCLI) {
 				m.ProjectName = "test-project"
 				// No errors, successful removal
@@ -187,9 +155,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			tt.setupMock(mockCLI)
 
 			// Create request
-			args := map[string]interface{}{
-				"working_directory": tt.workingDirectory,
-			}
+			args := map[string]interface{}{}
 			if tt.configName != "" {
 				args["name"] = tt.configName
 			}
@@ -202,7 +168,8 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			}
 
 			// Call the function
-			result, err := handleRemoveConfigTool(t.Context(), request, &tt.providerID, "test-cluster", mockCLI)
+			loader := &client.MockLoader{}
+			result, err := handleRemoveConfigTool(t.Context(), loader, request, &tt.providerID, "test-cluster", mockCLI)
 
 			// Verify error expectations
 			if tt.expectError {
@@ -218,11 +185,10 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			}
 
 			// For successful cases, verify CLI methods were called in order
-			if !tt.expectError && tt.workingDirectory != "" && tt.name == "successful_config_removal" {
+			if !tt.expectError && tt.name == "successful_config_removal" {
 				expectedCalls := []string{
 					"Connect(test-cluster)",
 					"NewProvider(aws)",
-					"ConfigureLoader",
 					"LoadProjectNameWithFallback",
 					"ConfigDelete(test-project, DATABASE_URL)",
 				}

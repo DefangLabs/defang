@@ -237,8 +237,20 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				),
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				wd, err := request.RequireString("working_directory")
+				if err != nil || wd == "" {
+					term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
+					return mcp.NewToolResultErrorFromErr("invalid working directory", err), err
+				}
+
+				err = os.Chdir(wd)
+				if err != nil {
+					term.Error("Failed to change working directory", "error", err)
+					return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
+				}
+				loader := common.ConfigureLoader(request)
 				cli := &DefaultToolCLI{}
-				output, err := handleRemoveConfigTool(ctx, request, providerId, cluster, &RemoveConfigCLIAdapter{DefaultToolCLI: cli})
+				output, err := handleRemoveConfigTool(ctx, loader, request, providerId, cluster, &RemoveConfigCLIAdapter{DefaultToolCLI: cli})
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to remove config", err), err
 				}
