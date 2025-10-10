@@ -59,8 +59,8 @@ func (g GrpcClient) GetTenantName() types.TenantName {
 	return g.TenantName
 }
 
-func (g GrpcClient) GetShard(ctx context.Context) (*defangv1.GetShardResponse, error) {
-	return getMsg(g.client.GetShard(ctx, &connect.Request[emptypb.Empty]{}))
+func (g GrpcClient) GetProjectDomain(ctx context.Context) (*defangv1.GetProjectDomainResponse, error) {
+	return getMsg(g.client.GetProjectDomain(ctx, &connect.Request[emptypb.Empty]{}))
 }
 
 func (g *GrpcClient) SetClient(client defangv1connect.FabricControllerClient) {

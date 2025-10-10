@@ -115,8 +115,8 @@ func (m MockFabricClient) GetDelegateSubdomainZone(context.Context, *defangv1.Ge
 	return &defangv1.DelegateSubdomainZoneResponse{Zone: m.DelegateDomain}, nil
 }
 
-func (m MockFabricClient) GetShard(context.Context) (*defangv1.GetShardResponse, error) {
-	return &defangv1.GetShardResponse{Shard: "prod1example"}, nil
+func (m MockFabricClient) GetProjectDomain(context.Context) (*defangv1.GetProjectDomainResponse, error) {
+	return &defangv1.GetProjectDomainResponse{Domain: "prod1example"}, nil
 }
 
 func (m MockFabricClient) DeleteSubdomainZone(context.Context, *defangv1.DeleteSubdomainZoneRequest) error {

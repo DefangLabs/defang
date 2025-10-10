@@ -26,7 +26,7 @@ type FabricClient interface {
 	GenerateFiles(context.Context, *defangv1.GenerateFilesRequest) (*defangv1.GenerateFilesResponse, error)
 	GetController() defangv1connect.FabricControllerClient
 	GetDelegateSubdomainZone(context.Context, *defangv1.GetDelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
-	GetShard(context.Context) (*defangv1.GetShardResponse, error)
+	GetProjectDomain(context.Context) (*defangv1.GetProjectDomainResponse, error)
 	GetSelectedProvider(context.Context, *defangv1.GetSelectedProviderRequest) (*defangv1.GetSelectedProviderResponse, error)
 	GetTenantName() types.TenantName
 	GetVersions(context.Context) (*defangv1.Version, error)

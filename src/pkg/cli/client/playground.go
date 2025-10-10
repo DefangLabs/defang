@@ -106,11 +106,11 @@ func (g PlaygroundProvider) ServicePrivateDNS(name string) string {
 }
 
 func (g PlaygroundProvider) ServicePublicDNS(ctx context.Context, name string, projectName string) string {
-	shard, err := g.GetShard(ctx)
+	domain, err := g.GetProjectDomain(ctx)
 	if err != nil {
 		return ""
 	}
-	return dns.SafeLabel(string(g.GetTenantName())) + "-" + dns.SafeLabel(name) + "." + dns.SafeLabel(shard.GetShard()) + ".defang.dev"
+	return dns.SafeLabel(string(g.GetTenantName())) + "-" + dns.SafeLabel(name) + "." + dns.SafeLabel(domain.GetDomain())
 }
 
 func (g PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, error) {

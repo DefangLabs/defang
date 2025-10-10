@@ -25,7 +25,8 @@ service FabricController {
     option deprecated = true;
   }; // used by pulumi-defang provider; should use Deploy
   rpc Deploy(DeployRequest) returns (DeployResponse);
-  rpc GetShard(google.protobuf.Empty) returns (GetShardResponse);
+  rpc GetProjectDomain(google.protobuf.Empty)
+      returns (GetProjectDomainResponse);
   rpc Get(GetRequest) returns (ServiceInfo) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // should be GetService
@@ -427,7 +428,7 @@ enum DeploymentAction {
   DEPLOYMENT_ACTION_PREVIEW = 3;
 }
 
-message GetShardResponse { string shard = 1; }
+message GetProjectDomainResponse { string domain = 1; }
 
 message Deployment {
   string id = 1; // aka etag
