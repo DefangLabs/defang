@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 )
@@ -33,7 +34,7 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 	for {
 		select {
 		case e := <-es.Events(): // blocking
-			events, err := GetLogEvents(e)
+			events, err := cw.GetLogEvents(e)
 			// Print before checking for errors, so we don't lose any logs in case of EOF
 			for _, event := range events {
 				fmt.Println(*event.Message)
@@ -57,13 +58,13 @@ func (a *AwsEcs) GetTaskArn(taskID string) (TaskArn, error) {
 	return &taskArn, nil
 }
 
-func (a *AwsEcs) TailTaskID(ctx context.Context, taskID string) (LiveTailStream, error) {
+func (a *AwsEcs) TailTaskID(ctx context.Context, taskID string) (cw.LiveTailStream, error) {
 	if taskID == "" {
 		return nil, errors.New("taskID is empty")
 	}
-	lgi := LogGroupInput{LogGroupARN: a.LogGroupARN, LogStreamNames: []string{GetCDLogStreamForTaskID(taskID)}}
+	lgi := cw.LogGroupInput{LogGroupARN: a.LogGroupARN, LogStreamNames: []string{GetCDLogStreamForTaskID(taskID)}}
 	for {
-		stream, err := TailLogGroup(ctx, lgi)
+		stream, err := cw.TailLogGroup(ctx, lgi)
 		if err != nil {
 			var resourceNotFound *types.ResourceNotFoundException
 			if !errors.As(err, &resourceNotFound) {
