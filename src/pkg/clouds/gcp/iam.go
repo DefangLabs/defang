@@ -178,8 +178,8 @@ func (gcp Gcp) EnsureServiceAccountHasBucketRoles(ctx context.Context, bucketNam
 	needUpdate := false
 	for _, roleStr := range roles {
 		role := iam.RoleName(roleStr)
-		memebers := policy.Members(role)
-		if !slices.Contains(memebers, serviceAccountMember) {
+		members := policy.Members(role)
+		if !slices.Contains(members, serviceAccountMember) {
 			policy.Add(serviceAccountMember, role)
 			needUpdate = true
 		}
@@ -212,8 +212,8 @@ func (gcp Gcp) EnsureServiceAccountHasBucketRoles(ctx context.Context, bucketNam
 
 		for _, roleStr := range roles {
 			role := iam.RoleName(roleStr)
-			memebers := vp.Members(role)
-			if !slices.Contains(memebers, serviceAccountMember) {
+			members := vp.Members(role)
+			if !slices.Contains(members, serviceAccountMember) {
 				pkg.SleepWithContext(ctx, 3*time.Second)
 				continue
 			}
@@ -251,8 +251,8 @@ func (gcp Gcp) EnsurePrincipalHasServiceAccountRoles(ctx context.Context, princi
 	needUpdate := false
 	for _, roleStr := range roles {
 		role := iam.RoleName(roleStr)
-		memebers := policy.Members(role)
-		if !slices.Contains(memebers, principal) {
+		members := policy.Members(role)
+		if !slices.Contains(members, principal) {
 			policy.Add(principal, role)
 			needUpdate = true
 		}
@@ -277,8 +277,8 @@ func (gcp Gcp) EnsurePrincipalHasServiceAccountRoles(ctx context.Context, princi
 		}
 		for _, roleStr := range roles {
 			role := iam.RoleName(roleStr)
-			memebers := vp.Members(role)
-			if !slices.Contains(memebers, principal) {
+			members := vp.Members(role)
+			if !slices.Contains(members, principal) {
 				pkg.SleepWithContext(ctx, 3*time.Second)
 				continue
 			}
