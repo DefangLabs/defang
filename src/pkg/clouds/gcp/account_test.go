@@ -19,7 +19,7 @@ func (m *MockTokenSource) Token() (*oauth2.Token, error) {
 	return m.token, nil
 }
 
-func TestGetCurrentAccountEmail(t *testing.T) {
+func TestGetCurrentAccountPrincipal(t *testing.T) {
 	t.Run("Email in credentials", func(t *testing.T) {
 		FindGoogleDefaultCredentials = func(ctx context.Context, scopes ...string) (*google.Credentials, error) {
 			return &google.Credentials{
@@ -27,13 +27,13 @@ func TestGetCurrentAccountEmail(t *testing.T) {
 			}, nil
 		}
 		var gcp Gcp
-		email, err := gcp.GetCurrentAccountEmail(t.Context())
+		principal, err := gcp.GetCurrentPrincipal(t.Context())
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		expected := "test@email.com"
-		if email != expected {
-			t.Errorf("expected email to be %s, got %s", expected, email)
+		expected := "user:test@email.com"
+		if principal != expected {
+			t.Errorf("expected principal to be %s, got %s", expected, principal)
 		}
 	})
 
@@ -49,13 +49,13 @@ func TestGetCurrentAccountEmail(t *testing.T) {
 			}, nil
 		}
 		var gcp Gcp
-		email, err := gcp.GetCurrentAccountEmail(t.Context())
+		principal, err := gcp.GetCurrentPrincipal(t.Context())
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		expected := "test@email.com"
-		if email != expected {
-			t.Errorf("expected email to be %s, got %s", expected, email)
+		if principal != expected {
+			t.Errorf("expected principal to be %s, got %s", expected, principal)
 		}
 	})
 
@@ -64,18 +64,18 @@ func TestGetCurrentAccountEmail(t *testing.T) {
 			return &google.Credentials{
 				JSON: []byte(`{
 				"type": "external_account",
-				"service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/1234567890/serviceAccounts/test@project.iam.gserviceaccount.com:generateAccessToken"
+				"audience": "//iam.googleapis.com/projects/123456789012/locations/global/workloadIdentityPools/github/providers/defang-github-provider"
 			}`),
 			}, nil
 		}
 		var gcp Gcp
-		email, err := gcp.GetCurrentAccountEmail(context.Background())
+		principal, err := gcp.GetCurrentPrincipal(context.Background())
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		expected := "test@project.iam.gserviceaccount.com"
-		if email != expected {
-			t.Errorf("expected email to be %s, got %s", expected, email)
+		expected := "principalSet://iam.googleapis.com/projects/123456789012/locations/global/workloadIdentityPools/github/*"
+		if principal != expected {
+			t.Errorf("expected principal to be %s, got %s", expected, principal)
 		}
 	})
 
@@ -84,7 +84,7 @@ func TestGetCurrentAccountEmail(t *testing.T) {
 			return nil, errors.New("no credentials found")
 		}
 		var gcp Gcp
-		_, err := gcp.GetCurrentAccountEmail(context.Background())
+		_, err := gcp.GetCurrentPrincipal(context.Background())
 		if err == nil {
 			t.Error("expected error but got none")
 		}
@@ -98,7 +98,7 @@ func TestGetCurrentAccountEmail(t *testing.T) {
 			}, nil
 		}
 		var gcp Gcp
-		_, err := gcp.GetCurrentAccountEmail(context.Background())
+		_, err := gcp.GetCurrentPrincipal(context.Background())
 		if err == nil {
 			t.Error("expected error but got none")
 		}
@@ -113,7 +113,7 @@ func TestGetCurrentAccountEmail(t *testing.T) {
 			}, nil
 		}
 		var gcp Gcp
-		_, err := gcp.GetCurrentAccountEmail(context.Background())
+		_, err := gcp.GetCurrentPrincipal(context.Background())
 		if err == nil {
 			t.Error("expected error but got none")
 		}
@@ -183,13 +183,13 @@ func TestExtractEmailFromIDToken(t *testing.T) {
 func TestParseServiceAccountFromURL(t *testing.T) {
 	t.Run("Valid service account URL", func(t *testing.T) {
 		url := "https://iamcredentials.googleapis.com/v1/projects/123456789/serviceAccounts/test@project.iam.gserviceaccount.com:generateAccessToken"
-		email, err := parseServiceAccountFromURL(url)
+		principal, err := parseServiceAccountFromURL(url)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		expected := "test@project.iam.gserviceaccount.com"
-		if email != expected {
-			t.Errorf("expected email to be %s, got %s", expected, email)
+		if principal != expected {
+			t.Errorf("expected principal to be %s, got %s", expected, principal)
 		}
 	})
 

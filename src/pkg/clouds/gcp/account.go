@@ -15,7 +15,7 @@ import (
 
 var FindGoogleDefaultCredentials func(ctx context.Context, scopes ...string) (*google.Credentials, error) = google.FindDefaultCredentials
 
-func (gcp Gcp) GetCurrentAccountEmail(ctx context.Context) (string, error) {
+func (gcp Gcp) GetCurrentPrincipal(ctx context.Context) (string, error) {
 	creds, err := FindGoogleDefaultCredentials(ctx)
 	if err != nil {
 		return "", err
@@ -25,18 +25,23 @@ func (gcp Gcp) GetCurrentAccountEmail(ctx context.Context) (string, error) {
 	var key struct {
 		ClientEmail                    string `json:"client_email"`
 		Type                           string `json:"type"`
+		Audience                       string `json:"audience"`
 		ServiceAccountImpersonationURL string `json:"service_account_impersonation_url"`
 	}
 	err = json.Unmarshal(creds.JSON, &key)
 	if err == nil {
 		if key.Type == "external_account" {
-			return parseServiceAccountFromURL(key.ServiceAccountImpersonationURL)
+			return removeProvider("principalSet:" + key.Audience), nil
 		}
 		if key.Type == "impersonated_service_account" {
-			return parseServiceAccountFromURL(key.ServiceAccountImpersonationURL)
+			serviceAccount, err := parseServiceAccountFromURL(key.ServiceAccountImpersonationURL)
+			if err != nil {
+				return "", err
+			}
+			return "serviceAccount:" + serviceAccount, nil
 		}
 		if key.ClientEmail != "" {
-			return key.ClientEmail, nil
+			return "user:" + key.ClientEmail, nil
 		}
 	}
 
@@ -118,4 +123,17 @@ func getEmailFromToken(ctx context.Context, accessToken string) (string, error) 
 	}
 
 	return tokenInfo.Email, nil
+}
+
+func removeProvider(principalSet string) string {
+	// Find the position of "/providers/"
+	providersIndex := strings.Index(principalSet, "/providers/")
+	if providersIndex == -1 {
+		// No providers path, return as-is
+		return principalSet
+	}
+
+	// Extract everything before "/providers/" and append "/*"
+	base := principalSet[:providersIndex]
+	return base + "/*"
 }
