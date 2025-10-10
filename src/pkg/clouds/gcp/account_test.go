@@ -73,7 +73,7 @@ func TestGetCurrentAccountPrincipal(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		expected := "principalSet://iam.googleapis.com/projects/123456789012/locations/global/workloadIdentityPools/github/providers/defang-github-provider"
+		expected := "principalSet://iam.googleapis.com/projects/123456789012/locations/global/workloadIdentityPools/github/*"
 		if principal != expected {
 			t.Errorf("expected principal to be %s, got %s", expected, principal)
 		}

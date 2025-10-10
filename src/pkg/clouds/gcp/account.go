@@ -31,7 +31,7 @@ func (gcp Gcp) GetCurrentPrincipal(ctx context.Context) (string, error) {
 	err = json.Unmarshal(creds.JSON, &key)
 	if err == nil {
 		if key.Type == "external_account" {
-			return "principalSet:" + key.Audience, nil
+			return removeProvider("principalSet:" + key.Audience), nil
 		}
 		if key.Type == "impersonated_service_account" {
 			serviceAccount, err := parseServiceAccountFromURL(key.ServiceAccountImpersonationURL)
@@ -123,4 +123,17 @@ func getEmailFromToken(ctx context.Context, accessToken string) (string, error) 
 	}
 
 	return tokenInfo.Email, nil
+}
+
+func removeProvider(principalSet string) string {
+	// Find the position of "/providers/"
+	providersIndex := strings.Index(principalSet, "/providers/")
+	if providersIndex == -1 {
+		// No providers path, return as-is
+		return principalSet
+	}
+
+	// Extract everything before "/providers/" and append "/*"
+	base := principalSet[:providersIndex]
+	return base + "/*"
 }
