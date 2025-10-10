@@ -129,7 +129,7 @@ func PrintEstimate(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResp
 		term.Println("Estimate for Deployment Mode: HIGH_AVAILABILITY")
 		term.Println(highAvailabilityModeEstimateSummary)
 	default:
-		panic("unexpected mode")
+		term.Println("Unexpected mode")
 	}
 
 	term.Table(tableItems, []string{"Cost", "Quantity", "Service", "Description"})
