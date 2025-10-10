@@ -15,7 +15,7 @@ import (
 func handleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli RemoveConfigCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
-		return "", fmt.Errorf("No provider configured: %w", err)
+		return "", err
 	}
 
 	name, err := request.RequireString("name")

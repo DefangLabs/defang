@@ -8,6 +8,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
 )
@@ -162,7 +163,7 @@ func TestHandleDeployTool(t *testing.T) {
 			name:          "provider_auto_not_configured",
 			providerID:    client.ProviderAuto,
 			setupMock:     func(m *MockDeployCLI) {},
-			expectedError: "no provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
+			expectedError: common.ErrNoProviderSet.Error(),
 		},
 	}
 
