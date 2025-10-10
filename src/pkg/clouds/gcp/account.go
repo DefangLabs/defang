@@ -34,10 +34,14 @@ func (gcp Gcp) GetCurrentPrincipal(ctx context.Context) (string, error) {
 			return "principalSet:" + key.Audience, nil
 		}
 		if key.Type == "impersonated_service_account" {
-			return parseServiceAccountFromURL(key.ServiceAccountImpersonationURL)
+			serviceAccount, err := parseServiceAccountFromURL(key.ServiceAccountImpersonationURL)
+			if err != nil {
+				return "", err
+			}
+			return "serviceAccount:" + serviceAccount, nil
 		}
 		if key.ClientEmail != "" {
-			return key.ClientEmail, nil
+			return "user:" + key.ClientEmail, nil
 		}
 	}
 

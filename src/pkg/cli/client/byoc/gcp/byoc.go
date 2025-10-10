@@ -165,7 +165,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		b.cdServiceAccount = path.Base(cdServiceAccount)
 	}
 	//   3.2 Give CD service account roles needed
-	if err := b.driver.EnsureServiceAccountHasRoles(ctx, b.cdServiceAccount, []string{
+	if err := b.driver.EnsureServiceAccountHasRoles(ctx, "serviceAccount:"+b.cdServiceAccount, []string{
 		"roles/run.admin",                       // For creating and running cloudrun jobs and services (admin needed for `setIamPolicy` permission)
 		"roles/iam.serviceAccountAdmin",         // For creating service accounts
 		"roles/iam.serviceAccountUser",          // For impersonating service accounts

@@ -31,7 +31,7 @@ func TestGetCurrentAccountPrincipal(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		expected := "test@email.com"
+		expected := "user:test@email.com"
 		if principal != expected {
 			t.Errorf("expected principal to be %s, got %s", expected, principal)
 		}
@@ -64,7 +64,7 @@ func TestGetCurrentAccountPrincipal(t *testing.T) {
 			return &google.Credentials{
 				JSON: []byte(`{
 				"type": "external_account",
-				"audience": "//iam.googleapis.com/projects/123456789012/locations/global/workloadIdentityPools/github/providers/defang-github-provider",
+				"audience": "//iam.googleapis.com/projects/123456789012/locations/global/workloadIdentityPools/github/providers/defang-github-provider"
 			}`),
 			}, nil
 		}
