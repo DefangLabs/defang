@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"context"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/dns"
@@ -15,7 +16,7 @@ func (m serviceNameReplacerMockProvider) ServicePrivateDNS(name string) string {
 	return "override-" + name
 }
 
-func (m serviceNameReplacerMockProvider) ServicePublicDNS(name string, projectName string) string {
+func (m serviceNameReplacerMockProvider) ServicePublicDNS(ctx context.Context, name string, projectName string) string {
 	return dns.SafeLabel(name) + "." + dns.SafeLabel(projectName) + ".tenant2.defang.app"
 }
 
@@ -94,7 +95,7 @@ func TestServiceNameReplacer(t *testing.T) {
 	replacer := setup()
 
 	for _, tc := range testCases {
-		got := replacer.ReplaceServiceNameWithDNS(tc.service, tc.key, tc.value, tc.fixUpTarget)
+		got := replacer.ReplaceServiceNameWithDNS(context.Background(), tc.service, tc.key, tc.value, tc.fixUpTarget)
 		if got != tc.expected {
 			t.Errorf("Expected %q, got %q", tc.expected, got)
 		}
@@ -141,7 +142,7 @@ func TestMakeServiceNameRegex(t *testing.T) {
 		{"ingress-service", "ingress-service.project1.tenant2.defang.app"},
 	}
 	for _, tt := range tdt {
-		if got := s.replaceServiceNameWithDNS(tt.value); got != tt.expected {
+		if got := s.replaceServiceNameWithDNS(context.Background(), tt.value); got != tt.expected {
 			t.Errorf("makeServiceNameRegex(%q) expected %s, got %s", tt.value, tt.expected, got)
 		}
 	}

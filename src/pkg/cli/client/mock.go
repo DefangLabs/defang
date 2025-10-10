@@ -26,7 +26,7 @@ func (m MockProvider) ServicePrivateDNS(service string) string {
 	return "mock-" + service
 }
 
-func (m MockProvider) ServicePublicDNS(service string, projectName string) string {
+func (m MockProvider) ServicePublicDNS(ctx context.Context, service string, projectName string) string {
 	return dns.SafeLabel(service) + "." + dns.SafeLabel(projectName) + ".tenant2.defang.app"
 }
 
@@ -113,6 +113,10 @@ func (m MockFabricClient) CanIUse(ctx context.Context, req *defangv1.CanIUseRequ
 
 func (m MockFabricClient) GetDelegateSubdomainZone(context.Context, *defangv1.GetDelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error) {
 	return &defangv1.DelegateSubdomainZoneResponse{Zone: m.DelegateDomain}, nil
+}
+
+func (m MockFabricClient) GetShard(context.Context) (*defangv1.GetShardResponse, error) {
+	return &defangv1.GetShardResponse{Shard: "prod1example"}, nil
 }
 
 func (m MockFabricClient) DeleteSubdomainZone(context.Context, *defangv1.DeleteSubdomainZoneRequest) error {

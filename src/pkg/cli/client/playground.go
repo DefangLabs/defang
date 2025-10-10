@@ -105,9 +105,12 @@ func (g PlaygroundProvider) ServicePrivateDNS(name string) string {
 	return string(g.GetTenantName()) + "-" + name
 }
 
-func (g PlaygroundProvider) ServicePublicDNS(name string, projectName string) string {
-	// TODO: Move this to fabric since we do not know what shard was assigned, placeholder for now
-	return dns.SafeLabel(string(g.GetTenantName())) + "-" + dns.SafeLabel(name) + "." + "prod1b" + ".defang.dev"
+func (g PlaygroundProvider) ServicePublicDNS(ctx context.Context, name string, projectName string) string {
+	shard, err := g.GetShard(ctx)
+	if err != nil {
+		return ""
+	}
+	return dns.SafeLabel(string(g.GetTenantName())) + "-" + dns.SafeLabel(name) + "." + dns.SafeLabel(shard.GetShard()) + ".defang.dev"
 }
 
 func (g PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, error) {
