@@ -20,7 +20,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func RunEstimate(ctx context.Context, project *compose.Project, client client.FabricClient, previewProvider client.Provider, estimateProviderID client.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
+func RunEstimate(ctx context.Context, project *compose.Project, client client.FabricClient, previewProvider client.Provider, estimateProviderID client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
 	term.Debugf("Running estimate for project %s in region %s with mode %s", project.Name, region, mode)
 	preview, err := GeneratePreview(ctx, project, client, previewProvider, estimateProviderID, mode, region)
 	if err != nil {
@@ -40,7 +40,7 @@ func RunEstimate(ctx context.Context, project *compose.Project, client client.Fa
 	return estimate, nil
 }
 
-func GeneratePreview(ctx context.Context, project *compose.Project, client client.FabricClient, previewProvider client.Provider, estimateProviderID client.ProviderID, mode defangv1.DeploymentMode, region string) (string, error) {
+func GeneratePreview(ctx context.Context, project *compose.Project, client client.FabricClient, previewProvider client.Provider, estimateProviderID client.ProviderID, mode modes.Mode, region string) (string, error) {
 	os.Setenv("DEFANG_JSON", "1")             // HACK: always show JSON output for estimate
 	since := time.Now().Add(-1 * time.Minute) // fetch logs since one minute ago to account for clock drift
 
@@ -58,7 +58,7 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 
 	resp, err := client.Preview(ctx, &defangv1.PreviewRequest{
 		Provider:    estimateProviderID.Value(),
-		Mode:        mode,
+		Mode:        defangv1.DeploymentMode(mode),
 		Region:      region,
 		Compose:     composeData,
 		ProjectName: project.Name,
@@ -114,11 +114,11 @@ Databases will be provisioned using resources optimized for production.
 Services in the "internal" network will be deployed to a private subnet with a
 NAT gateway for outbound internet access.`
 
-func PrintEstimate(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) {
+func PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) {
 	subtotal := (*money.Money)(estimate.Subtotal)
 	tableItems := prepareEstimateLineItemTableItems(estimate.LineItems)
 	term.Println("")
-	switch mode {
+	switch defangv1.DeploymentMode(mode) {
 	case defangv1.DeploymentMode_DEVELOPMENT, defangv1.DeploymentMode_MODE_UNSPECIFIED:
 		term.Println("Estimate for Deployment Mode: AFFORDABLE")
 		term.Println(affordableModeEstimateSummary)

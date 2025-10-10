@@ -13,6 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
@@ -98,7 +99,7 @@ func TestComposeUp(t *testing.T) {
 
 	mc := client.MockFabricClient{DelegateDomain: "example.com"}
 	mp := &mockDeployProvider{MockProvider: client.MockProvider{UploadUrl: server.URL + "/"}}
-	d, project, err := ComposeUp(t.Context(), proj, mc, mp, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
+	d, project, err := ComposeUp(t.Context(), proj, mc, mp, compose.UploadModeDigest, modes.Mode(defangv1.DeploymentMode_DEVELOPMENT))
 	if err != nil {
 		t.Fatalf("ComposeUp() failed: %v", err)
 	}
@@ -282,7 +283,7 @@ func TestComposeUpStops(t *testing.T) {
 				deploymentStatus: tt.cdStatus,
 			}
 
-			resp, project, err := ComposeUp(ctx, project, fabric, provider, compose.UploadModeDigest, defangv1.DeploymentMode_MODE_UNSPECIFIED)
+			resp, project, err := ComposeUp(ctx, project, fabric, provider, compose.UploadModeDigest, modes.Mode(defangv1.DeploymentMode_MODE_UNSPECIFIED))
 			if err != nil {
 				t.Fatalf("ComposeUp() failed: %v", err)
 			}

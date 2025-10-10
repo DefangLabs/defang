@@ -46,7 +46,7 @@ func (m *MockEstimateCLI) LoadProject(ctx context.Context, loader client.Loader)
 	return m.Project, nil
 }
 
-func (m *MockEstimateCLI) RunEstimate(ctx context.Context, project *compose.Project, grpcClient *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
+func (m *MockEstimateCLI) RunEstimate(ctx context.Context, project *compose.Project, grpcClient *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
 	projectName := ""
 	if project != nil {
 		projectName = project.Name
@@ -58,7 +58,7 @@ func (m *MockEstimateCLI) RunEstimate(ctx context.Context, project *compose.Proj
 	return m.EstimateResponse, nil
 }
 
-func (m *MockEstimateCLI) PrintEstimate(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) {
+func (m *MockEstimateCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("PrintEstimate(%s)", mode.String()))
 }
 
@@ -96,7 +96,7 @@ func (m *MockEstimateCLI) SetProviderID(providerId *client.ProviderID, providerS
 	return nil
 }
 
-func (m *MockEstimateCLI) CaptureTermOutput(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) string {
+func (m *MockEstimateCLI) CaptureTermOutput(mode modes.Mode, estimate *defangv1.EstimateResponse) string {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("CaptureTermOutput(%s)", mode.String()))
 	return m.CapturedOutput
 }
@@ -128,7 +128,7 @@ func TestHandleEstimateTool(t *testing.T) {
 				}
 				m.CapturedOutput = "Estimated cost: $15.00/month"
 			},
-			expectedError: "Unknown deployment mode \"UNKNOWN-MODE\", please use one of " + strings.Join(modes.AllDeploymentModes(), ", "),
+			expectedError: "Unknown deployment mode \"unknown-mode\", please use one of " + strings.Join(modes.AllDeploymentModes(), ", "),
 		},
 		{
 			name:       "load_project_error",
@@ -254,8 +254,8 @@ func TestHandleEstimateTool(t *testing.T) {
 					"CreatePlaygroundProvider",
 					"SetProviderID(aws)",
 					"GetRegion(aws)",
-					"RunEstimate(test-project, aws, DEVELOPMENT)",
-					"CaptureTermOutput(DEVELOPMENT)",
+					"RunEstimate(test-project, aws, AFFORDABLE)",
+					"CaptureTermOutput(AFFORDABLE)",
 				}
 				assert.Equal(t, expectedCalls, mockCLI.CallLog)
 			}

@@ -8,7 +8,6 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -25,16 +24,8 @@ func handleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, req
 
 	// This logic is replicated from src/cmd/cli/command/mode.go
 	// I couldn't figure out how to import it without circular dependencies
-	modeString = strings.ToUpper(modeString)
-	var mode defangv1.DeploymentMode
-	switch modeString {
-	case "AFFORDABLE":
-		mode = defangv1.DeploymentMode_DEVELOPMENT
-	case "BALANCED":
-		mode = defangv1.DeploymentMode_STAGING
-	case "HIGH_AVAILABILITY":
-		mode = defangv1.DeploymentMode_PRODUCTION
-	default:
+	mode, err := modes.Parse(modeString) // Validate the mode string
+	if err != nil {
 		term.Warnf("Unknown deployment mode provided - %q", modeString)
 		return "", fmt.Errorf("Unknown deployment mode %q, please use one of %s", modeString, strings.Join(modes.AllDeploymentModes(), ", "))
 	}
