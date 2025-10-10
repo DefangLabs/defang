@@ -134,7 +134,12 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 }
 
 func (a *AwsEcs) SetUp(ctx context.Context, containers []types.Container) error {
-	template, err := createTemplate(a.stackName, containers, TemplateOverrides{VpcID: a.VpcID, Spot: a.Spot}).YAML()
+	tmpl, err := createTemplate(a.stackName, containers, TemplateOverrides{VpcID: a.VpcID, Spot: a.Spot})
+	if err != nil {
+		return err
+	}
+
+	template, err := tmpl.YAML()
 	if err != nil {
 		return err
 	}
