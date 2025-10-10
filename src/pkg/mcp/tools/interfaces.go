@@ -8,6 +8,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
@@ -29,7 +30,7 @@ type DeployCLIInterface interface {
 	Connecter
 	ProviderFactory
 	// Unique methods
-	ComposeUp(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, uploadMode compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error)
+	ComposeUp(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, uploadMode compose.UploadMode, mode modes.Mode) (*defangv1.DeployResponse, *compose.Project, error)
 	CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error)
 	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
 	OpenBrowser(url string) error
@@ -57,10 +58,10 @@ type EstimateCLIInterface interface {
 	Connecter
 	// Unique methods
 	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
-	RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error)
-	PrintEstimate(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse)
+	RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error)
+	PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse)
 	CreatePlaygroundProvider(client *cliClient.GrpcClient) cliClient.Provider
-	CaptureTermOutput(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) string
+	CaptureTermOutput(mode modes.Mode, estimate *defangv1.EstimateResponse) string
 }
 
 type ListConfigCLIInterface interface {

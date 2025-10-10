@@ -24,6 +24,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -261,7 +262,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 	}
 
 	cdCommand := cdCmd{
-		mode:            req.Mode,
+		mode:            modes.Mode(req.Mode),
 		project:         project.Name,
 		delegateDomain:  req.DelegateDomain,
 		delegationSetId: req.DelegationSetId,
@@ -407,7 +408,7 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 }
 
 type cdCmd struct {
-	mode            defangv1.DeploymentMode
+	mode            modes.Mode
 	project         string
 	delegateDomain  string
 	delegationSetId string
@@ -455,7 +456,7 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
 	cmd := cdCmd{
-		mode:           defangv1.DeploymentMode_MODE_UNSPECIFIED,
+		mode:           modes.Mode(defangv1.DeploymentMode_MODE_UNSPECIFIED),
 		project:        req.Project,
 		delegateDomain: req.DelegateDomain,
 		cmd:            []string{"up", ""}, // 2nd empty string is a empty payload
@@ -781,7 +782,7 @@ func (b *ByocAws) BootstrapCommand(ctx context.Context, req client.BootstrapComm
 		return "", err
 	}
 	cmd := cdCmd{
-		mode:    defangv1.DeploymentMode_MODE_UNSPECIFIED,
+		mode:    modes.Mode(defangv1.DeploymentMode_MODE_UNSPECIFIED),
 		project: req.Project,
 		cmd:     []string{req.Command},
 	}
