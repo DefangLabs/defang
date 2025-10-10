@@ -61,7 +61,6 @@ type EstimateCLIInterface interface {
 	PrintEstimate(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse)
 	GetRegion(providerId cliClient.ProviderID) string
 	CreatePlaygroundProvider(client *cliClient.GrpcClient) cliClient.Provider
-	SetProviderID(providerId *cliClient.ProviderID, providerString string) error
 	CaptureTermOutput(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) string
 }
 

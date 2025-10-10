@@ -119,10 +119,6 @@ func (DefaultToolCLI) OpenBrowser(url string) error {
 	return errors.New("no browser function defined")
 }
 
-func (DefaultToolCLI) SetProviderID(providerId *cliClient.ProviderID, providerString string) error {
-	return providerId.Set(providerString)
-}
-
 // --- Adapter types for tool interfaces ---
 // The following adapter types embed DefaultToolCLI to implement specific tool interfaces.
 type DeployCLIAdapter struct{ *DefaultToolCLI }

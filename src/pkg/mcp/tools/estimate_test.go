@@ -21,7 +21,6 @@ type MockEstimateCLI struct {
 	ConnectError       error
 	LoadProjectError   error
 	RunEstimateError   error
-	SetProviderIDError error
 	EstimateResponse   *defangv1.EstimateResponse
 	Project            *compose.Project
 	Region             string
@@ -74,25 +73,6 @@ func (m *MockEstimateCLI) GetRegion(providerId client.ProviderID) string {
 
 func (m *MockEstimateCLI) CreatePlaygroundProvider(grpcClient *client.GrpcClient) client.Provider {
 	m.CallLog = append(m.CallLog, "CreatePlaygroundProvider")
-	return nil
-}
-
-func (m *MockEstimateCLI) SetProviderID(providerId *client.ProviderID, providerString string) error {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("SetProviderID(%s)", providerString))
-	if m.SetProviderIDError != nil {
-		return m.SetProviderIDError
-	}
-	// Simulate the actual setting of the provider ID
-	switch providerString {
-	case "":
-		*providerId = m.ProviderIDAfterSet
-	case "AWS", "aws":
-		*providerId = client.ProviderAWS
-	case "GCP", "gcp":
-		*providerId = client.ProviderGCP
-	default:
-		*providerId = client.ProviderAuto
-	}
 	return nil
 }
 
@@ -150,7 +130,7 @@ func TestHandleEstimateTool(t *testing.T) {
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
 			},
-			// expectedError: "Invalid provider specified: provider not one of [auto defang aws digitalocean gcp]",
+			expectedError: "Invalid provider specified: provider not one of [auto defang aws digitalocean gcp]",
 		},
 		{
 			name:     "run_estimate_error",
@@ -248,7 +228,6 @@ func TestHandleEstimateTool(t *testing.T) {
 					"LoadProject",
 					"Connect(test-cluster)",
 					"CreatePlaygroundProvider",
-					"SetProviderID(aws)",
 					"GetRegion(aws)",
 					"RunEstimate(test-project, aws, DEVELOPMENT)",
 					"CaptureTermOutput(DEVELOPMENT)",

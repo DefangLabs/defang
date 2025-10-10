@@ -20,7 +20,7 @@ func handleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, req
 
 	providerString, err := request.RequireString("provider")
 	if err != nil {
-		providerString = providerId.String()
+		providerString = "auto" // Default to auto if not provided
 	}
 
 	// This logic is replicated from src/cmd/cli/command/mode.go
@@ -55,21 +55,18 @@ func handleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, req
 	}
 
 	defangProvider := cli.CreatePlaygroundProvider(client)
-
-	var providerID cliClient.ProviderID
-	err = cli.SetProviderID(&providerID, providerString)
+	err = providerId.Set(providerString)
 	if err != nil {
-		term.Error("Invalid provider specified", "error", err)
 		return "", fmt.Errorf("Invalid provider specified: %w", err)
 	}
 
 	term.Debug("Function invoked: cli.RunEstimate")
 	var region string
 	if region == "" {
-		region = cli.GetRegion(providerID) // This sets the default region based on the provider
+		region = cli.GetRegion(*providerId) // This sets the default region based on the provider
 	}
 
-	estimate, err := cli.RunEstimate(ctx, project, client, defangProvider, providerID, region, mode)
+	estimate, err := cli.RunEstimate(ctx, project, client, defangProvider, *providerId, region, mode)
 	if err != nil {
 		return "", fmt.Errorf("Failed to run estimate: %w", err)
 	}
@@ -77,5 +74,5 @@ func handleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, req
 
 	estimateText := cli.CaptureTermOutput(mode, estimate)
 
-	return "Successfully estimated the cost of the project to " + providerID.Name() + ":\n" + estimateText, nil
+	return "Successfully estimated the cost of the project to " + providerId.Name() + ":\n" + estimateText, nil
 }
