@@ -117,8 +117,12 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
+				params, err := parseLogsParams(request)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to parse logs parameters", err), err
+				}
 				cli := &DefaultToolCLI{}
-				output, err := handleLogsTool(ctx, loader, request, cluster, providerId, cli)
+				output, err := handleLogsTool(ctx, loader, params, cluster, providerId, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to fetch logs", err), err
 				}
