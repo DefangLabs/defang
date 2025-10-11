@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -26,20 +27,14 @@ func parseRemoveConfigParams(request mcp.CallToolRequest) (RemoveConfigParams, e
 }
 
 // handleRemoveConfigTool handles the remove config tool logic
-func handleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader, params RemoveConfigParams, providerId *cliClient.ProviderID, cluster string, cli RemoveConfigCLIInterface) (string, error) {
+func handleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader, params RemoveConfigParams, providerId *cliClient.ProviderID, fabric client.FabricClient, cli RemoveConfigCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", fmt.Errorf("No provider configured: %w", err)
 	}
 
-	term.Debug("Function invoked: cli.Connect")
-	client, err := cli.Connect(ctx, cluster)
-	if err != nil {
-		return "", fmt.Errorf("Could not connect: %w", err)
-	}
-
 	term.Debug("Function invoked: cli.NewProvider")
-	provider, err := cli.NewProvider(ctx, *providerId, client)
+	provider, err := cli.NewProvider(ctx, *providerId, fabric)
 	if err != nil {
 		return "", fmt.Errorf("Failed to get new provider: %w", err)
 	}

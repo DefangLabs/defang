@@ -23,7 +23,7 @@ type MockDestroyCLI struct {
 	CallLog                          []string
 }
 
-func (m *MockDestroyCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
+func (m *MockDestroyCLI) Connect(ctx context.Context, cluster string) (client.FabricClient, error) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("Connect(%s)", cluster))
 	if m.ConnectError != nil {
 		return nil, m.ConnectError
@@ -31,12 +31,12 @@ func (m *MockDestroyCLI) Connect(ctx context.Context, cluster string) (*client.G
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockDestroyCLI) NewProvider(ctx context.Context, providerId client.ProviderID, grpcClient client.FabricClient) (client.Provider, error) {
+func (m *MockDestroyCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabric client.FabricClient) (client.Provider, error) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
 	return nil, m.NewProviderError
 }
 
-func (m *MockDestroyCLI) ComposeDown(ctx context.Context, projectName string, grpcClient *client.GrpcClient, provider client.Provider) (string, error) {
+func (m *MockDestroyCLI) ComposeDown(ctx context.Context, projectName string, fabric client.FabricClient, provider client.Provider) (string, error) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("ComposeDown(%s)", projectName))
 	if m.ComposeDownError != nil {
 		return "", m.ComposeDownError
@@ -52,7 +52,7 @@ func (m *MockDestroyCLI) LoadProjectNameWithFallback(ctx context.Context, loader
 	return m.ProjectName, nil
 }
 
-func (m *MockDestroyCLI) CanIUseProvider(ctx context.Context, grpcClient *client.GrpcClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {
+func (m *MockDestroyCLI) CanIUseProvider(ctx context.Context, fabric client.FabricClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("CanIUseProvider(%s, %s, %d)", providerId, projectName, serviceCount))
 	return m.CanIUseProviderError
 }
@@ -65,14 +65,6 @@ func TestHandleDestroyTool(t *testing.T) {
 		expectedTextContains string
 		expectedError        string
 	}{
-		{
-			name:       "connect_error",
-			providerID: client.ProviderAWS,
-			setupMock: func(m *MockDestroyCLI) {
-				m.ConnectError = errors.New("connection failed")
-			},
-			expectedError: "Could not connect: connection failed",
-		},
 		{
 			name:       "new_provider_error",
 			providerID: client.ProviderAWS,
@@ -143,7 +135,8 @@ func TestHandleDestroyTool(t *testing.T) {
 
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := handleDestroyTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI)
+			fabric := &MockGrpcClient{}
+			result, err := handleDestroyTool(t.Context(), loader, &tt.providerID, fabric, mockCLI)
 
 			// Verify error expectations
 			if tt.expectedError != "" {
@@ -158,7 +151,6 @@ func TestHandleDestroyTool(t *testing.T) {
 			// For successful cases, verify CLI methods were called in order
 			if tt.expectedError == "" && tt.name == "successful_destroy" {
 				expectedCalls := []string{
-					"Connect(test-cluster)",
 					"NewProvider(aws)",
 					"LoadProjectNameWithFallback",
 					"CanIUseProvider(aws, test-project, 0)",

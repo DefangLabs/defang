@@ -61,7 +61,7 @@ func parseEstimateParams(request mcp.CallToolRequest, providerId *cliClient.Prov
 	}, nil
 }
 
-func handleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, params EstimateParams, cluster string, cli EstimateCLIInterface) (string, error) {
+func handleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, params EstimateParams, fabric cliClient.FabricClient, cli EstimateCLIInterface) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
@@ -69,17 +69,11 @@ func handleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, par
 		return "", fmt.Errorf("failed to parse compose file: %w", err)
 	}
 
-	term.Debug("Function invoked: cli.Connect")
-	client, err := cli.Connect(ctx, cluster)
-	if err != nil {
-		return "", fmt.Errorf("Could not connect: %w", err)
-	}
-
-	defangProvider := cli.CreatePlaygroundProvider(client)
+	defangProvider := cli.CreatePlaygroundProvider(fabric)
 
 	term.Debug("Function invoked: cli.RunEstimate")
 
-	estimate, err := cli.RunEstimate(ctx, project, client, defangProvider, params.Provider, params.Region, params.DeploymentMode)
+	estimate, err := cli.RunEstimate(ctx, project, fabric, defangProvider, params.Provider, params.Region, params.DeploymentMode)
 	if err != nil {
 		return "", fmt.Errorf("Failed to run estimate: %w", err)
 	}

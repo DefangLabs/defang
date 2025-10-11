@@ -28,7 +28,7 @@ type MockEstimateCLI struct {
 	ProviderIDAfterSet client.ProviderID // Track the providerID that gets set
 }
 
-func (m *MockEstimateCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
+func (m *MockEstimateCLI) Connect(ctx context.Context, cluster string) (client.FabricClient, error) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("Connect(%s)", cluster))
 	if m.ConnectError != nil {
 		return nil, m.ConnectError
@@ -44,7 +44,7 @@ func (m *MockEstimateCLI) LoadProject(ctx context.Context, loader client.Loader)
 	return m.Project, nil
 }
 
-func (m *MockEstimateCLI) RunEstimate(ctx context.Context, project *compose.Project, grpcClient *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
+func (m *MockEstimateCLI) RunEstimate(ctx context.Context, project *compose.Project, fabric client.FabricClient, provider client.Provider, providerId client.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
 	projectName := ""
 	if project != nil {
 		projectName = project.Name
@@ -65,7 +65,7 @@ func (m *MockEstimateCLI) ConfigureLoader(request mcp.CallToolRequest) client.Lo
 	return nil
 }
 
-func (m *MockEstimateCLI) CreatePlaygroundProvider(grpcClient *client.GrpcClient) client.Provider {
+func (m *MockEstimateCLI) CreatePlaygroundProvider(fabric client.FabricClient) client.Provider {
 	m.CallLog = append(m.CallLog, "CreatePlaygroundProvider")
 	return nil
 }
@@ -109,17 +109,6 @@ func TestHandleEstimateTool(t *testing.T) {
 				m.LoadProjectError = errors.New("failed to parse compose file")
 			},
 			expectedError: "failed to parse compose file: failed to parse compose file: failed to parse compose file",
-		},
-		{
-			name: "connect_error",
-			arguments: map[string]interface{}{
-				"provider": "aws",
-			},
-			setupMock: func(m *MockEstimateCLI) {
-				m.Project = &compose.Project{Name: "test-project"}
-				m.ConnectError = errors.New("connection failed")
-			},
-			expectedError: "Could not connect: connection failed",
 		},
 		{
 			name: "set_provider_id_error",
@@ -215,7 +204,8 @@ func TestHandleEstimateTool(t *testing.T) {
 					assert.NoError(t, err)
 				}
 			}
-			result, err := handleEstimateTool(t.Context(), loader, params, "test-cluster", mockCLI)
+			fabric := &MockGrpcClient{}
+			result, err := handleEstimateTool(t.Context(), loader, params, fabric, mockCLI)
 
 			// Verify error expectations
 			if tt.expectedError != "" {
@@ -231,7 +221,6 @@ func TestHandleEstimateTool(t *testing.T) {
 			if tt.expectedError == "" && tt.name == "successful_estimate_default_mode" {
 				expectedCalls := []string{
 					"LoadProject",
-					"Connect(test-cluster)",
 					"CreatePlaygroundProvider",
 					"RunEstimate(test-project, aws, DEVELOPMENT)",
 					"CaptureTermOutput(DEVELOPMENT)",

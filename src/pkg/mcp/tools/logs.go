@@ -47,7 +47,7 @@ func parseLogsParams(request mcp.CallToolRequest) (LogsParams, error) {
 	}, nil
 }
 
-func handleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, cluster string, providerId *cliClient.ProviderID, cli LogsCLIInterface) (string, error) {
+func handleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, fabric cliClient.FabricClient, providerId *cliClient.ProviderID, cli LogsCLIInterface) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
@@ -57,15 +57,9 @@ func handleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 		return "", fmt.Errorf("local deployment failed: %v. Please provide a valid compose file path.", err)
 	}
 
-	term.Debug("Function invoked: cli.Connect")
-	client, err := cli.Connect(ctx, cluster)
-	if err != nil {
-		return "", fmt.Errorf("could not connect: %w", err)
-	}
-
 	term.Debug("Function invoked: cli.NewProvider")
 
-	provider, err := cli.CheckProviderConfigured(ctx, client, *providerId, project.Name, len(project.Services))
+	provider, err := cli.CheckProviderConfigured(ctx, fabric, *providerId, project.Name, len(project.Services))
 	if err != nil {
 		return "", fmt.Errorf("provider not configured correctly: %w", err)
 	}

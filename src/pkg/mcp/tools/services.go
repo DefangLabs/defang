@@ -14,21 +14,15 @@ import (
 	"github.com/bufbuild/connect-go"
 )
 
-func handleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (string, error) {
+func handleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, fabric cliClient.FabricClient, cli CLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", fmt.Errorf("no provider configured: %w", err)
 	}
 
-	term.Debug("Function invoked: cli.Connect")
-	client, err := cli.Connect(ctx, cluster)
-	if err != nil {
-		return "", fmt.Errorf("could not connect: %w", err)
-	}
-
 	// Create a Defang client
 	term.Debug("Function invoked: cli.NewProvider")
-	provider, err := cli.NewProvider(ctx, *providerId, client)
+	provider, err := cli.NewProvider(ctx, *providerId, fabric)
 	if err != nil {
 		return "", fmt.Errorf("failed to create provider: %w", err)
 	}

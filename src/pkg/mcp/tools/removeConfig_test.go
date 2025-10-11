@@ -14,7 +14,6 @@ import (
 
 // MockRemoveConfigCLI implements RemoveConfigCLIInterface for testing
 type MockRemoveConfigCLI struct {
-	ConnectError              error
 	NewProviderError          error
 	LoadProjectNameError      error
 	ConfigDeleteError         error
@@ -23,15 +22,7 @@ type MockRemoveConfigCLI struct {
 	CallLog                   []string
 }
 
-func (m *MockRemoveConfigCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("Connect(%s)", cluster))
-	if m.ConnectError != nil {
-		return nil, m.ConnectError
-	}
-	return &client.GrpcClient{}, nil
-}
-
-func (m *MockRemoveConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) (client.Provider, error) {
+func (m *MockRemoveConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabric client.FabricClient) (client.Provider, error) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
 	if m.NewProviderError != nil {
 		return nil, m.NewProviderError
@@ -80,16 +71,6 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			setupMock:     func(m *MockRemoveConfigCLI) {},
 			expectError:   true,
 			expectedError: "missing config `name`: required argument \"name\" not found",
-		},
-		{
-			name:       "connect_error",
-			configName: "DATABASE_URL",
-			providerID: client.ProviderAWS,
-			setupMock: func(m *MockRemoveConfigCLI) {
-				m.ConnectError = errors.New("connection failed")
-			},
-			expectError:   true,
-			expectedError: "Could not connect: connection failed",
 		},
 		{
 			name:       "new_provider_error",
@@ -179,7 +160,8 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := handleRemoveConfigTool(t.Context(), loader, params, &tt.providerID, "test-cluster", mockCLI)
+			fabric := &MockGrpcClient{}
+			result, err := handleRemoveConfigTool(t.Context(), loader, params, &tt.providerID, fabric, mockCLI)
 
 			// Verify error expectations
 			if tt.expectError {
@@ -197,7 +179,6 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			// For successful cases, verify CLI methods were called in order
 			if !tt.expectError && tt.name == "successful_config_removal" {
 				expectedCalls := []string{
-					"Connect(test-cluster)",
 					"NewProvider(aws)",
 					"LoadProjectNameWithFallback",
 					"ConfigDelete(test-project, DATABASE_URL)",

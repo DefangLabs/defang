@@ -9,6 +9,9 @@ import (
 // handleLoginTool handles the login tool logic
 func handleLoginTool(ctx context.Context, cluster string, authPort int, cli LoginCLIInterface) (string, error) {
 	// Test token
+	// TODO: consider using this "login" logic in the place of fabric "Connect"
+	// for every tool. I think that would remove the need for the login tool
+	// altogether, because any tool would automatically trigger login if needed.
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, cluster)
 	if err != nil {

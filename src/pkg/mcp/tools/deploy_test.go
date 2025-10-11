@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,7 @@ type MockGrpcClient struct {
 	*client.GrpcClient
 }
 
-func (m *MockGrpcClient) Track(event string, props ...interface{}) error {
+func (m *MockGrpcClient) Track(event string, props ...client.Property) error {
 	// Mock implementation that doesn't panic
 	return nil
 }
@@ -35,21 +36,12 @@ type MockDeployCLI struct {
 	CallLog                      []string
 }
 
-func (m *MockDeployCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("Connect(%s)", cluster))
-	if m.ConnectError != nil {
-		return nil, m.ConnectError
-	}
-	// Return a base GrpcClient - we need to handle Track method differently
-	return &client.GrpcClient{}, nil
-}
-
-func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) (client.Provider, error) {
+func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabric client.FabricClient) (client.Provider, error) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
 	return nil, m.NewProviderError
 }
 
-func (m *MockDeployCLI) ComposeUp(ctx context.Context, project *compose.Project, grpcClient *client.GrpcClient, provider client.Provider, uploadMode compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error) {
+func (m *MockDeployCLI) ComposeUp(ctx context.Context, project *compose.Project, fabric cliClient.FabricClient, provider client.Provider, uploadMode compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error) {
 	m.CallLog = append(m.CallLog, "ComposeUp")
 	if m.ComposeUpError != nil {
 		return nil, nil, m.ComposeUpError
@@ -57,7 +49,7 @@ func (m *MockDeployCLI) ComposeUp(ctx context.Context, project *compose.Project,
 	return m.ComposeUpResponse, m.Project, nil
 }
 
-func (m *MockDeployCLI) CheckProviderConfigured(ctx context.Context, grpcClient *client.GrpcClient, providerId client.ProviderID, projectName string, serviceCount int) (client.Provider, error) {
+func (m *MockDeployCLI) CheckProviderConfigured(ctx context.Context, fabric cliClient.FabricClient, providerId client.ProviderID, projectName string, serviceCount int) (client.Provider, error) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("CheckProviderConfigured(%s, %s, %d)", providerId, projectName, serviceCount))
 	return nil, m.CheckProviderConfiguredError
 }
@@ -90,15 +82,6 @@ func TestHandleDeployTool(t *testing.T) {
 				m.LoadProjectError = errors.New("failed to parse compose file")
 			},
 			expectedError: "local deployment failed: failed to parse compose file: failed to parse compose file. Please provide a valid compose file path.",
-		},
-		{
-			name:       "connect_error",
-			providerID: client.ProviderAWS,
-			setupMock: func(m *MockDeployCLI) {
-				m.Project = &compose.Project{Name: "test-project"}
-				m.ConnectError = errors.New("connection failed")
-			},
-			expectedError: "could not connect: connection failed",
 		},
 		{
 			name:       "check_provider_configured_error",
@@ -176,7 +159,8 @@ func TestHandleDeployTool(t *testing.T) {
 
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := handleDeployTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI)
+			fabric := &MockGrpcClient{}
+			result, err := handleDeployTool(t.Context(), loader, &tt.providerID, fabric, mockCLI)
 
 			// Verify error expectations
 			if tt.expectedError != "" {
@@ -192,7 +176,6 @@ func TestHandleDeployTool(t *testing.T) {
 			if tt.expectedError == "" && tt.name == "successful_deploy_defang_provider" {
 				expectedCalls := []string{
 					"LoadProject",
-					"Connect(test-cluster)",
 					"CheckProviderConfigured(defang, test-project, 0)",
 					"ComposeUp",
 					// Note: OpenBrowser is called in a goroutine, so it may not be tracked in time

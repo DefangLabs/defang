@@ -12,33 +12,18 @@ import (
 
 // MockSetConfigCLI implements SetConfigCLIInterface for testing
 type MockSetConfigCLI struct {
-	ConnectError          error
 	NewProviderError      error
 	LoadProjectNameError  error
 	ConfigSetError        error
-	ConnectCalled         bool
 	NewProviderCalled     bool
 	LoadProjectNameCalled bool
 	ConfigSetCalled       bool
-	ReturnedGrpcClient    *client.GrpcClient
 	ReturnedProvider      client.Provider
 	ReturnedProjectName   string
 	ConfigSetProjectName  string
 	ConfigSetProvider     client.Provider
 	ConfigSetName         string
 	ConfigSetValue        string
-}
-
-func (m *MockSetConfigCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
-	m.ConnectCalled = true
-	if m.ConnectError != nil {
-		return nil, m.ConnectError
-	}
-	if m.ReturnedGrpcClient == nil {
-		// Return a non-nil client to avoid nil pointer issues
-		m.ReturnedGrpcClient = &client.GrpcClient{}
-	}
-	return m.ReturnedGrpcClient, nil
 }
 
 func (m *MockSetConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabricClient client.FabricClient) (client.Provider, error) {
@@ -110,7 +95,6 @@ func TestHandleSetConfig(t *testing.T) {
 		expectedError            bool
 		errorMessage             string
 		expectedProjectName      string
-		expectedConnectCalls     bool
 		expectedProviderCalls    bool
 		expectedProjectNameCalls bool
 		expectedConfigSetCalls   bool
@@ -155,16 +139,6 @@ func TestHandleSetConfig(t *testing.T) {
 
 		// CLI operation error tests
 		{
-			name:                 "connect error",
-			cluster:              testCluster,
-			providerId:           client.ProviderID(""),
-			requestArgs:          map[string]interface{}{"name": testConfigName, "value": testValue},
-			mockCLI:              &MockSetConfigCLI{ConnectError: errors.New("connection failed")},
-			expectedError:        true,
-			errorMessage:         "Could not connect: connection failed",
-			expectedConnectCalls: true,
-		},
-		{
 			name:                  "provider error",
 			cluster:               testCluster,
 			providerId:            client.ProviderID(""),
@@ -172,7 +146,6 @@ func TestHandleSetConfig(t *testing.T) {
 			mockCLI:               &MockSetConfigCLI{NewProviderError: errors.New("provider initialization failed")},
 			expectedError:         true,
 			errorMessage:          "Failed to get new provider: provider initialization failed",
-			expectedConnectCalls:  true,
 			expectedProviderCalls: true,
 		},
 		{
@@ -183,7 +156,6 @@ func TestHandleSetConfig(t *testing.T) {
 			mockCLI:                  &MockSetConfigCLI{LoadProjectNameError: errors.New("project loading failed")},
 			expectedError:            true,
 			errorMessage:             "Failed to load project name: project loading failed",
-			expectedConnectCalls:     true,
 			expectedProviderCalls:    true,
 			expectedProjectNameCalls: true,
 		},
@@ -195,7 +167,6 @@ func TestHandleSetConfig(t *testing.T) {
 			mockCLI:                  &MockSetConfigCLI{ConfigSetError: errors.New("config set failed")},
 			expectedError:            true,
 			errorMessage:             "Failed to set config: config set failed",
-			expectedConnectCalls:     true,
 			expectedProviderCalls:    true,
 			expectedProjectNameCalls: true,
 			expectedConfigSetCalls:   true,
@@ -212,7 +183,6 @@ func TestHandleSetConfig(t *testing.T) {
 			},
 			expectedError:         true,
 			errorMessage:          "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
-			expectedConnectCalls:  false, // Early return in providerNotConfiguredError
 			expectedProviderCalls: false, // Early return in providerNotConfiguredError
 		},
 
@@ -224,7 +194,6 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:              map[string]interface{}{"name": "valid_config_name", "value": testValue},
 			mockCLI:                  &MockSetConfigCLI{},
 			expectedError:            false,
-			expectedConnectCalls:     true,
 			expectedProviderCalls:    true,
 			expectedProjectNameCalls: true,
 			expectedConfigSetCalls:   true,
@@ -237,7 +206,6 @@ func TestHandleSetConfig(t *testing.T) {
 			mockCLI:                  &MockSetConfigCLI{ReturnedProjectName: "test-project"},
 			expectedError:            false,
 			expectedProjectName:      "test-project",
-			expectedConnectCalls:     true,
 			expectedProviderCalls:    true,
 			expectedProjectNameCalls: true,
 			expectedConfigSetCalls:   true,
@@ -257,7 +225,8 @@ func TestHandleSetConfig(t *testing.T) {
 					assert.NoError(t, err)
 				}
 			}
-			result, err := handleSetConfig(testContext, loader, params, &tt.providerId, tt.cluster, tt.mockCLI)
+			fabric := &MockGrpcClient{}
+			result, err := handleSetConfig(testContext, loader, params, &tt.providerId, fabric, tt.mockCLI)
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -270,7 +239,6 @@ func TestHandleSetConfig(t *testing.T) {
 			}
 
 			// Verify expected CLI method calls
-			assert.Equal(t, tt.expectedConnectCalls, tt.mockCLI.ConnectCalled, "Connect call expectation")
 			assert.Equal(t, tt.expectedProviderCalls, tt.mockCLI.NewProviderCalled, "NewProvider call expectation")
 			assert.Equal(t, tt.expectedProjectNameCalls, tt.mockCLI.LoadProjectNameCalled, "LoadProjectName call expectation")
 			assert.Equal(t, tt.expectedConfigSetCalls, tt.mockCLI.ConfigSetCalled, "ConfigSet call expectation")

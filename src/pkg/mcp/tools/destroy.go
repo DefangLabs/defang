@@ -11,20 +11,14 @@ import (
 	"github.com/bufbuild/connect-go"
 )
 
-func handleDestroyTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli DestroyCLIInterface) (string, error) {
+func handleDestroyTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, fabric cliClient.FabricClient, cli DestroyCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", fmt.Errorf("No provider configured: %w", err)
 	}
 
-	term.Debug("Function invoked: cli.Connect")
-	client, err := cli.Connect(ctx, cluster)
-	if err != nil {
-		return "", fmt.Errorf("Could not connect: %w", err)
-	}
-
 	term.Debug("Function invoked: cli.NewProvider")
-	provider, err := cli.NewProvider(ctx, *providerId, client)
+	provider, err := cli.NewProvider(ctx, *providerId, fabric)
 	if err != nil {
 		return "", fmt.Errorf("Failed to get new provider: %w", err)
 	}
@@ -35,13 +29,13 @@ func handleDestroyTool(ctx context.Context, loader cliClient.ProjectLoader, prov
 		return "", fmt.Errorf("Failed to load project name: %w", err)
 	}
 
-	err = cli.CanIUseProvider(ctx, client, *providerId, projectName, provider, 0)
+	err = cli.CanIUseProvider(ctx, fabric, *providerId, projectName, provider, 0)
 	if err != nil {
 		return "", fmt.Errorf("Failed to use provider: %w", err)
 	}
 
 	term.Debug("Function invoked: cli.ComposeDown")
-	deployment, err := cli.ComposeDown(ctx, projectName, client, provider)
+	deployment, err := cli.ComposeDown(ctx, projectName, fabric, provider)
 	if err != nil {
 		if connect.CodeOf(err) == connect.CodeNotFound {
 			// Show a warning (not an error) if the service was not found

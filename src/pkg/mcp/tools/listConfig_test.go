@@ -13,7 +13,6 @@ import (
 
 // MockListConfigCLI implements ListConfigCLIInterface for testing
 type MockListConfigCLI struct {
-	ConnectError         error
 	NewProviderError     error
 	LoadProjectNameError error
 	ListConfigError      error
@@ -22,15 +21,7 @@ type MockListConfigCLI struct {
 	CallLog              []string
 }
 
-func (m *MockListConfigCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("Connect(%s)", cluster))
-	if m.ConnectError != nil {
-		return nil, m.ConnectError
-	}
-	return &client.GrpcClient{}, nil
-}
-
-func (m *MockListConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) (client.Provider, error) {
+func (m *MockListConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabric client.FabricClient) (client.Provider, error) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
 	if m.NewProviderError != nil {
 		return nil, m.NewProviderError
@@ -67,14 +58,6 @@ func TestHandleListConfigTool(t *testing.T) {
 			providerID:    client.ProviderAuto,
 			setupMock:     func(m *MockListConfigCLI) {},
 			expectedError: "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
-		},
-		{
-			name:       "connect_error",
-			providerID: client.ProviderAWS,
-			setupMock: func(m *MockListConfigCLI) {
-				m.ConnectError = errors.New("connection failed")
-			},
-			expectedError: "Could not connect: connection failed",
 		},
 		{
 			name:       "new_provider_error",
@@ -135,7 +118,8 @@ func TestHandleListConfigTool(t *testing.T) {
 
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := handleListConfigTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI)
+			fabric := &MockGrpcClient{}
+			result, err := handleListConfigTool(t.Context(), loader, &tt.providerID, fabric, mockCLI)
 
 			// Verify error expectations
 			if tt.expectedError != "" {
@@ -150,7 +134,6 @@ func TestHandleListConfigTool(t *testing.T) {
 			// For successful cases, verify CLI methods were called in order
 			if tt.expectedError == "" && tt.name == "successful_list_single_config" {
 				expectedCalls := []string{
-					"Connect(test-cluster)",
 					"NewProvider(aws)",
 					"LoadProjectNameWithFallback",
 					"ListConfig(test-project)",

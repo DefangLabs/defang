@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/modes"
@@ -48,8 +49,12 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
+				fabric, err := cli.Connect(ctx, cluster)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to connect to Defang", err), err
+				}
 				var cli CLIInterface = &DefaultToolCLI{}
-				output, err := handleServicesTool(ctx, loader, providerId, cluster, cli)
+				output, err := handleServicesTool(ctx, loader, providerId, fabric, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to list services", err), err
 				}
@@ -67,8 +72,12 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
+				fabric, err := cli.Connect(ctx, cluster)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to connect to Defang", err), err
+				}
 				cli := &DefaultToolCLI{}
-				output, err := handleDeployTool(ctx, loader, providerId, cluster, cli)
+				output, err := handleDeployTool(ctx, loader, providerId, fabric, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to deploy services", err), err
 				}
@@ -86,8 +95,12 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
+				fabric, err := cli.Connect(ctx, cluster)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to connect to Defang", err), err
+				}
 				cli := &DefaultToolCLI{}
-				output, err := handleDestroyTool(ctx, loader, providerId, cluster, cli)
+				output, err := handleDestroyTool(ctx, loader, providerId, fabric, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to destroy services", err), err
 				}
@@ -121,8 +134,12 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to parse logs parameters", err), err
 				}
+				fabric, err := cli.Connect(ctx, cluster)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to connect to Defang", err), err
+				}
 				cli := &DefaultToolCLI{}
-				output, err := handleLogsTool(ctx, loader, params, cluster, providerId, cli)
+				output, err := handleLogsTool(ctx, loader, params, fabric, providerId, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to fetch logs", err), err
 				}
@@ -154,8 +171,12 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to parse estimate parameters", err), err
 				}
+				fabric, err := cli.Connect(ctx, cluster)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to connect to Defang", err), err
+				}
 				cli := &DefaultToolCLI{}
-				output, err := handleEstimateTool(ctx, loader, params, cluster, cli)
+				output, err := handleEstimateTool(ctx, loader, params, fabric, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to estimate costs", err), err
 				}
@@ -179,13 +200,17 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
+				fabric, err := cli.Connect(ctx, cluster)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to connect to Defang", err), err
+				}
 				cli := &DefaultToolCLI{}
 				adapter := &SetConfigCLIAdapter{DefaultToolCLI: cli}
 				params, err := parseSetConfigParams(request)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to parse set config parameters", err), err
 				}
-				output, err := handleSetConfig(ctx, loader, params, providerId, cluster, adapter)
+				output, err := handleSetConfig(ctx, loader, params, providerId, fabric, adapter)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to set config", err), err
 				}
@@ -206,12 +231,16 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
+				fabric, err := cli.Connect(ctx, cluster)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to connect to Defang", err), err
+				}
 				cli := &DefaultToolCLI{}
 				params, err := parseRemoveConfigParams(request)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to parse remove config parameters", err), err
 				}
-				output, err := handleRemoveConfigTool(ctx, loader, params, providerId, cluster, &RemoveConfigCLIAdapter{DefaultToolCLI: cli})
+				output, err := handleRemoveConfigTool(ctx, loader, params, providerId, fabric, &RemoveConfigCLIAdapter{DefaultToolCLI: cli})
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to remove config", err), err
 				}
@@ -229,8 +258,12 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
+				fabric, err := cli.Connect(ctx, cluster)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to connect to Defang", err), err
+				}
 				cli := &DefaultToolCLI{}
-				output, err := handleListConfigTool(ctx, loader, providerId, cluster, &ListConfigCLIAdapter{DefaultToolCLI: cli})
+				output, err := handleListConfigTool(ctx, loader, providerId, fabric, &ListConfigCLIAdapter{DefaultToolCLI: cli})
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to list config", err), err
 				}

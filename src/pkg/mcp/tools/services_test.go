@@ -17,7 +17,7 @@ type MockCLI struct {
 	ConnectError                     error
 	NewProviderError                 error
 	LoadProjectNameWithFallbackError error
-	MockClient                       *client.GrpcClient
+	MockClient                       client.FabricClient
 	MockProvider                     client.Provider
 	MockProjectName                  string
 
@@ -28,7 +28,7 @@ type MockCLI struct {
 	GetServicesProvider client.Provider
 }
 
-func (m *MockCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
+func (m *MockCLI) Connect(ctx context.Context, cluster string) (client.FabricClient, error) {
 	if m.ConnectError != nil {
 		return nil, m.ConnectError
 	}
@@ -70,11 +70,6 @@ func createConnectError(code connect.Code, message string) error {
 func TestHandleServicesToolWithMockCLI(t *testing.T) {
 	ctx := t.Context()
 
-	// Common test data
-	const (
-		testCluster = "test-cluster"
-	)
-
 	tests := []struct {
 		name                string
 		providerId          client.ProviderID
@@ -87,17 +82,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 		expectedProjectName string
 	}{
 		// Error cases
-		{
-			name:       "connect_error",
-			providerId: client.ProviderDefang,
-			mockCLI: &MockCLI{
-				ConnectError: errors.New("connection failed"),
-			},
-
-			expectedError:       true,
-			errorMessage:        "connection failed",
-			expectedGetServices: false,
-		},
 		{
 			name:       "provider_creation_error",
 			providerId: client.ProviderDefang,
@@ -205,7 +189,8 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			loader := &client.MockLoader{}
-			result, err := handleServicesTool(ctx, loader, &tt.providerId, testCluster, tt.mockCLI)
+			fabric := &MockGrpcClient{}
+			result, err := handleServicesTool(ctx, loader, &tt.providerId, fabric, tt.mockCLI)
 
 			// Check Go error expectation
 			if tt.expectedError {

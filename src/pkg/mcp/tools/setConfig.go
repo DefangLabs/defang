@@ -32,20 +32,14 @@ func parseSetConfigParams(request mcp.CallToolRequest) (SetConfigParams, error) 
 }
 
 // handleSetConfig handles the set config MCP tool request
-func handleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params SetConfigParams, providerId *cliClient.ProviderID, cluster string, cli SetConfigCLIInterface) (string, error) {
+func handleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params SetConfigParams, providerId *cliClient.ProviderID, fabric cliClient.FabricClient, cli SetConfigCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", fmt.Errorf("No provider configured: %w", err)
 	}
 
-	term.Debug("Function invoked: cli.Connect")
-	client, err := cli.Connect(ctx, cluster)
-	if err != nil {
-		return "", fmt.Errorf("Could not connect: %w", err)
-	}
-
 	term.Debug("Function invoked: cli.NewProvider")
-	provider, err := cli.NewProvider(ctx, *providerId, client)
+	provider, err := cli.NewProvider(ctx, *providerId, fabric)
 	if err != nil {
 		return "", fmt.Errorf("Failed to get new provider: %w", err)
 	}

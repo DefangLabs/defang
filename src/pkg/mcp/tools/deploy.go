@@ -13,7 +13,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func handleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli DeployCLIInterface) (string, error) {
+func handleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, fabric cliClient.FabricClient, cli DeployCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", fmt.Errorf("no provider configured: %w", err)
@@ -27,15 +27,9 @@ func handleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, provi
 		return "", fmt.Errorf("local deployment failed: %v. Please provide a valid compose file path.", err)
 	}
 
-	term.Debug("Function invoked: cli.Connect")
-	client, err := cli.Connect(ctx, cluster)
-	if err != nil {
-		return "", fmt.Errorf("could not connect: %w", err)
-	}
-
 	term.Debug("Function invoked: cli.NewProvider")
 
-	provider, err := cli.CheckProviderConfigured(ctx, client, *providerId, project.Name, len(project.Services))
+	provider, err := cli.CheckProviderConfigured(ctx, fabric, *providerId, project.Name, len(project.Services))
 	if err != nil {
 		return "", fmt.Errorf("provider not configured correctly: %w", err)
 	}
@@ -45,7 +39,7 @@ func handleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, provi
 
 	term.Debug("Function invoked: cli.ComposeUp")
 	// Use ComposeUp to deploy the services
-	deployResp, project, err := cli.ComposeUp(ctx, project, client, provider, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
+	deployResp, project, err := cli.ComposeUp(ctx, project, fabric, provider, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
 	if err != nil {
 		err = fmt.Errorf("failed to compose up services: %w", err)
 

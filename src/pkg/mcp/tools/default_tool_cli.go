@@ -26,7 +26,7 @@ type DefaultToolCLI struct{}
 
 var OpenBrowserFunc = browser.OpenURL
 
-func (DefaultToolCLI) CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, provider cliClient.Provider, serviceCount int) error {
+func (DefaultToolCLI) CanIUseProvider(ctx context.Context, fabric cliClient.FabricClient, providerId cliClient.ProviderID, projectName string, provider cliClient.Provider, serviceCount int) error {
 	// If there is a real implementation, call it; otherwise, return nil or a stub error
 	return nil
 }
@@ -35,8 +35,8 @@ func (DefaultToolCLI) ConfigSet(ctx context.Context, projectName string, provide
 	return cli.ConfigSet(ctx, projectName, provider, name, value)
 }
 
-func (DefaultToolCLI) RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
-	return cli.RunEstimate(ctx, project, client, provider, providerId, region, mode)
+func (DefaultToolCLI) RunEstimate(ctx context.Context, project *compose.Project, fabric cliClient.FabricClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
+	return cli.RunEstimate(ctx, project, fabric, provider, providerId, region, mode)
 }
 func (DefaultToolCLI) PrintEstimate(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) {
 	cli.PrintEstimate(mode, estimate)
@@ -47,20 +47,20 @@ func (DefaultToolCLI) ListConfig(ctx context.Context, provider cliClient.Provide
 	return provider.ListConfig(ctx, req)
 }
 
-func (DefaultToolCLI) Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error) {
+func (DefaultToolCLI) Connect(ctx context.Context, cluster string) (cliClient.FabricClient, error) {
 	return cli.Connect(ctx, cluster)
 }
 
-func (DefaultToolCLI) ComposeUp(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, uploadMode compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error) {
-	return cli.ComposeUp(ctx, project, client, provider, uploadMode, mode)
+func (DefaultToolCLI) ComposeUp(ctx context.Context, project *compose.Project, fabric cliClient.FabricClient, provider cliClient.Provider, uploadMode compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error) {
+	return cli.ComposeUp(ctx, project, fabric, provider, uploadMode, mode)
 }
 
 func (c *DefaultToolCLI) Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cli.TailOptions) error {
 	return cli.Tail(ctx, provider, project.Name, options)
 }
 
-func (DefaultToolCLI) ComposeDown(ctx context.Context, projectName string, client *cliClient.GrpcClient, provider cliClient.Provider) (string, error) {
-	return cli.ComposeDown(ctx, projectName, client, provider)
+func (DefaultToolCLI) ComposeDown(ctx context.Context, projectName string, fabric cliClient.FabricClient, provider cliClient.Provider) (string, error) {
+	return cli.ComposeDown(ctx, projectName, fabric, provider)
 }
 
 func (DefaultToolCLI) LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error) {
@@ -75,8 +75,8 @@ func (DefaultToolCLI) GetServices(ctx context.Context, projectName string, provi
 	return deployment_info.GetServices(ctx, projectName, provider)
 }
 
-func (DefaultToolCLI) CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error) {
-	return common.CheckProviderConfigured(ctx, client, providerId, projectName, serviceCount)
+func (DefaultToolCLI) CheckProviderConfigured(ctx context.Context, fabric cliClient.FabricClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error) {
+	return common.CheckProviderConfigured(ctx, fabric, providerId, projectName, serviceCount)
 }
 
 func (DefaultToolCLI) CaptureTermOutput(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) string {
@@ -99,8 +99,8 @@ func (DefaultToolCLI) LoadProject(ctx context.Context, loader cliClient.Loader) 
 	return loader.LoadProject(ctx)
 }
 
-func (DefaultToolCLI) CreatePlaygroundProvider(client *cliClient.GrpcClient) cliClient.Provider {
-	return &cliClient.PlaygroundProvider{FabricClient: client}
+func (DefaultToolCLI) CreatePlaygroundProvider(fabric cliClient.FabricClient) cliClient.Provider {
+	return &cliClient.PlaygroundProvider{FabricClient: fabric}
 }
 
 func (DefaultToolCLI) NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error) {
@@ -151,9 +151,9 @@ func (a *ListConfigCLIAdapter) ListConfig(ctx context.Context, provider cliClien
 }
 
 // --- LoginCLIInterface ---
-func (LoginCLIAdapter) InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string) error {
+func (LoginCLIAdapter) InteractiveLoginMCP(ctx context.Context, fabric cliClient.FabricClient, cluster string) error {
 	// Delegate to login.InteractiveLoginMCP from the login package
-	return login.InteractiveLoginMCP(ctx, client, cluster)
+	return login.InteractiveLoginMCP(ctx, fabric, cluster)
 }
 
 func (LoginCLIAdapter) GenerateAuthURL(authPort int) string {
