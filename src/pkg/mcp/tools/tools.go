@@ -30,7 +30,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
-				output, err := handleLoginTool(ctx, request, cluster, authPort, &LoginCLIAdapter{DefaultToolCLI: cli})
+				output, err := handleLoginTool(ctx, cluster, authPort, &LoginCLIAdapter{DefaultToolCLI: cli})
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to login", err), err
 				}
@@ -117,8 +117,12 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
+				params, err := parseLogsParams(request)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to parse logs parameters", err), err
+				}
 				cli := &DefaultToolCLI{}
-				output, err := handleLogsTool(ctx, loader, request, cluster, providerId, cli)
+				output, err := handleLogsTool(ctx, loader, params, cluster, providerId, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to fetch logs", err), err
 				}
@@ -146,8 +150,12 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
+				params, err := parseEstimateParams(request, providerId)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to parse estimate parameters", err), err
+				}
 				cli := &DefaultToolCLI{}
-				output, err := handleEstimateTool(ctx, loader, request, providerId, cluster, cli)
+				output, err := handleEstimateTool(ctx, loader, params, cluster, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to estimate costs", err), err
 				}
@@ -173,7 +181,11 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				}
 				cli := &DefaultToolCLI{}
 				adapter := &SetConfigCLIAdapter{DefaultToolCLI: cli}
-				output, err := handleSetConfig(ctx, loader, request, providerId, cluster, adapter)
+				params, err := parseSetConfigParams(request)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to parse set config parameters", err), err
+				}
+				output, err := handleSetConfig(ctx, loader, params, providerId, cluster, adapter)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to set config", err), err
 				}
@@ -195,7 +207,11 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
 				cli := &DefaultToolCLI{}
-				output, err := handleRemoveConfigTool(ctx, loader, request, providerId, cluster, &RemoveConfigCLIAdapter{DefaultToolCLI: cli})
+				params, err := parseRemoveConfigParams(request)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to parse remove config parameters", err), err
+				}
+				output, err := handleRemoveConfigTool(ctx, loader, params, providerId, cluster, &RemoveConfigCLIAdapter{DefaultToolCLI: cli})
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to remove config", err), err
 				}
@@ -214,7 +230,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
 				cli := &DefaultToolCLI{}
-				output, err := handleListConfigTool(ctx, loader, request, providerId, cluster, &ListConfigCLIAdapter{DefaultToolCLI: cli})
+				output, err := handleListConfigTool(ctx, loader, providerId, cluster, &ListConfigCLIAdapter{DefaultToolCLI: cli})
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to list config", err), err
 				}

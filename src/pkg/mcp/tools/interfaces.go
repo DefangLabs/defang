@@ -59,9 +59,7 @@ type EstimateCLIInterface interface {
 	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
 	RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error)
 	PrintEstimate(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse)
-	GetRegion(providerId cliClient.ProviderID) string
 	CreatePlaygroundProvider(client *cliClient.GrpcClient) cliClient.Provider
-	SetProviderID(providerId *cliClient.ProviderID, providerString string) error
 	CaptureTermOutput(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) string
 }
 

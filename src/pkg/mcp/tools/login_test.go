@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -110,17 +109,9 @@ func TestHandleLoginTool(t *testing.T) {
 				tt.setupMock(mockCLI)
 			}
 
-			// Create request (login tool doesn't require any parameters)
-			request := mcp.CallToolRequest{
-				Params: mcp.CallToolParams{
-					Name:      "login",
-					Arguments: map[string]interface{}{},
-				},
-			}
-
 			// Call the function
 			var err error
-			result, err := handleLoginTool(context.Background(), request, tt.cluster, tt.authPort, mockCLI)
+			result, err := handleLoginTool(context.Background(), tt.cluster, tt.authPort, mockCLI)
 			if tt.expectedError != "" {
 				assert.EqualError(t, err, tt.expectedError)
 			} else {
