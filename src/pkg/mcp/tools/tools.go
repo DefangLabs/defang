@@ -146,8 +146,12 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
+				params, err := parseEstimateParams(request, providerId)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to parse estimate parameters", err), err
+				}
 				cli := &DefaultToolCLI{}
-				output, err := handleEstimateTool(ctx, loader, request, providerId, cluster, cli)
+				output, err := handleEstimateTool(ctx, loader, params, cluster, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to estimate costs", err), err
 				}

@@ -107,10 +107,6 @@ func (DefaultToolCLI) NewProvider(ctx context.Context, providerId cliClient.Prov
 	return cli.NewProvider(ctx, providerId, client)
 }
 
-func (DefaultToolCLI) GetRegion(providerId cliClient.ProviderID) string {
-	return cliClient.GetRegion(providerId)
-}
-
 func (DefaultToolCLI) OpenBrowser(url string) error {
 	if OpenBrowserFunc != nil {
 		return OpenBrowserFunc(url)
