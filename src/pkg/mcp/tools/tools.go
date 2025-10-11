@@ -230,7 +230,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
 				cli := &DefaultToolCLI{}
-				output, err := handleListConfigTool(ctx, loader, request, providerId, cluster, &ListConfigCLIAdapter{DefaultToolCLI: cli})
+				output, err := handleListConfigTool(ctx, loader, providerId, cluster, &ListConfigCLIAdapter{DefaultToolCLI: cli})
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to list config", err), err
 				}
