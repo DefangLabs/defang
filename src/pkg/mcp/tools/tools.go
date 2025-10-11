@@ -181,7 +181,11 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				}
 				cli := &DefaultToolCLI{}
 				adapter := &SetConfigCLIAdapter{DefaultToolCLI: cli}
-				output, err := handleSetConfig(ctx, loader, request, providerId, cluster, adapter)
+				params, err := parseSetConfigParams(request)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to parse set config parameters", err), err
+				}
+				output, err := handleSetConfig(ctx, loader, params, providerId, cluster, adapter)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to set config", err), err
 				}
