@@ -207,7 +207,11 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
 				cli := &DefaultToolCLI{}
-				output, err := handleRemoveConfigTool(ctx, loader, request, providerId, cluster, &RemoveConfigCLIAdapter{DefaultToolCLI: cli})
+				params, err := parseRemoveConfigParams(request)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to parse remove config parameters", err), err
+				}
+				output, err := handleRemoveConfigTool(ctx, loader, params, providerId, cluster, &RemoveConfigCLIAdapter{DefaultToolCLI: cli})
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to remove config", err), err
 				}
