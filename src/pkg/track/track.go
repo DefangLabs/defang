@@ -1,6 +1,7 @@
 package track
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
@@ -56,6 +57,27 @@ func FlushAllTracking() {
 	trackWG.Wait()
 }
 
+// function to break a set of messages into smaller chunks for tracking
+// There is a set size limit per property for tracking
+var M = func(name string, message []string) []Property {
+	const maxMessagePerProperty = 3
+
+	var trackMsg []Property
+	for i := 0; i < len(message); i += maxMessagePerProperty {
+		end := min(i+maxMessagePerProperty, len(message))
+		propName := fmt.Sprintf("%s-%d", name, i/maxMessagePerProperty+1)
+		trackMsg = append(trackMsg, P(propName, message[i:end]))
+	}
+	return trackMsg
+}
+
+func EvtWithTerm(eventName string, extraProps ...Property) {
+	messages := term.DefaultTerm.GetAllMessages()
+	logProps := M("logs", messages)
+	allProps := append(extraProps, logProps...)
+	Evt(eventName, allProps...)
+}
+
 func isCompletionCommand(cmd *cobra.Command) bool {
 	return cmd.Name() == cobra.ShellCompRequestCmd || (cmd.Parent() != nil && cmd.Parent().Name() == "completion")
 }
@@ -76,10 +98,12 @@ func Cmd(cmd *cobra.Command, verb string, props ...Property) {
 				command = c.Name() + "-" + command
 			}
 		})
+
 		props = append(props,
 			P("CalledAs", calledAs),
 			P("version", cmd.Root().Version),
 		)
+
 		cmd.Flags().Visit(func(f *pflag.Flag) {
 			props = append(props, P(f.Name, f.Value))
 		})

@@ -350,11 +350,20 @@ var RootCmd = &cobra.Command{
 		// Use "defer" to track any errors that occur during the command
 		defer func() {
 			var errString = ""
+			logProps := []track.Property{}
 			if err != nil {
 				errString = err.Error()
+
+				// on error, also log the recent terminal messages
+				messages := term.DefaultTerm.GetAllMessages()
+				logProps = append(logProps, track.M("logs", messages)...)
 			}
 
-			track.Cmd(cmd, "Invoked", P("args", args), P("err", errString), P("non-interactive", nonInteractive), P("provider", providerID))
+			props := []track.Property{
+				P("args", args), P("err", errString), P("non-interactive", nonInteractive), P("provider", providerID),
+			}
+			props = append(props, logProps...)
+			track.Cmd(cmd, "Invoked", props...)
 		}()
 
 		// Do this first, since any errors will be printed to the console
