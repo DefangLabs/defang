@@ -12,6 +12,10 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// maxMessagePerProperty is the maximum number of messages to include in a single tracking property.
+// 3 seems to be a reasonable number to avoid exceeding size limits.
+const maxMessagePerProperty = 3
+
 var disableAnalytics = pkg.GetenvBool("DEFANG_DISABLE_ANALYTICS")
 
 type Property = cliClient.Property
@@ -59,9 +63,7 @@ func FlushAllTracking() {
 
 // function to break a set of messages into smaller chunks for tracking
 // There is a set size limit per property for tracking
-var M = func(name string, message []string) []Property {
-	const maxMessagePerProperty = 3
-
+func ChunkMessages(name string, message []string) []Property {
 	var trackMsg []Property
 	for i := 0; i < len(message); i += maxMessagePerProperty {
 		end := min(i+maxMessagePerProperty, len(message))
@@ -73,7 +75,7 @@ var M = func(name string, message []string) []Property {
 
 func EvtWithTerm(eventName string, extraProps ...Property) {
 	messages := term.DefaultTerm.GetAllMessages()
-	logProps := M("logs", messages)
+	logProps := ChunkMessages("logs", messages)
 	allProps := append(extraProps, logProps...)
 	Evt(eventName, allProps...)
 }

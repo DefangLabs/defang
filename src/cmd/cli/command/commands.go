@@ -356,7 +356,7 @@ var RootCmd = &cobra.Command{
 
 				// on error, also log the recent terminal messages
 				messages := term.DefaultTerm.GetAllMessages()
-				logProps = append(logProps, track.M("logs", messages)...)
+				logProps = append(logProps, track.ChunkMessages("logs", messages)...)
 			}
 
 			props := []track.Property{
