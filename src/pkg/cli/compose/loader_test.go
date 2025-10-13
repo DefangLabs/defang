@@ -10,7 +10,7 @@ import (
 )
 
 func TestLoader(t *testing.T) {
-	testRunCompose(t, func(t *testing.T, path string) {
+	testAllComposeFiles(t, func(t *testing.T, path string) {
 		loader := NewLoader(WithPath(path))
 		proj, err := loader.LoadProject(t.Context())
 		if err != nil {
@@ -29,7 +29,7 @@ func TestLoader(t *testing.T) {
 	})
 }
 
-func testRunCompose(t *testing.T, f func(t *testing.T, path string)) {
+func testAllComposeFiles(t *testing.T, f func(t *testing.T, path string)) {
 	t.Helper()
 
 	composeRegex := regexp.MustCompile(`^(?i)(docker-)?compose.ya?ml$`)
