@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -90,5 +91,19 @@ func TestHasSubstitution(t *testing.T) {
 				t.Errorf("expected %v, got %v", tt.expected, !tt.expected)
 			}
 		})
+	}
+}
+
+func TestWithSuppressedConfigWarning(t *testing.T) {
+	// Test that the context key is set correctly
+	ctx := WithSuppressedConfigWarning(context.Background(), "TEST_VAR")
+	
+	suppressedVar, ok := ctx.Value(suppressConfigWarningKey).(string)
+	if !ok {
+		t.Fatal("suppressed config warning context value should be a string")
+	}
+	
+	if suppressedVar != "TEST_VAR" {
+		t.Errorf("expected suppressed variable to be 'TEST_VAR', got %q", suppressedVar)
 	}
 }

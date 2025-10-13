@@ -651,16 +651,19 @@ var configSetCmd = &cobra.Command{
 			return err
 		}
 
-		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
-		if err != nil {
-			return err
-		}
-
 		parts := strings.SplitN(args[0], "=", 2)
 		name := parts[0]
 
 		if !pkg.IsValidSecretName(name) {
 			return fmt.Errorf("invalid config name: %q", name)
+		}
+
+		// Create a context that suppresses warnings for the config being set
+		ctx := compose.WithSuppressedConfigWarning(cmd.Context(), name)
+		
+		projectName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
+		if err != nil {
+			return err
 		}
 
 		var value string

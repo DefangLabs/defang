@@ -28,8 +28,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func createProjectForDebug(loader *compose.Loader) (*compose.Project, error) {
-	projOpts, err := loader.NewProjectOptions()
+func createProjectForDebug(ctx context.Context, loader *compose.Loader) (*compose.Project, error) {
+	projOpts, err := loader.NewProjectOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 
 				term.Error("Cannot load project:", loadErr)
-				project, err := createProjectForDebug(loader)
+				project, err := createProjectForDebug(ctx, loader)
 				if err != nil {
 					return err
 				}
@@ -451,7 +451,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}
 
 				term.Error("Cannot load project:", loadErr)
-				project, err := createProjectForDebug(loader)
+				project, err := createProjectForDebug(ctx, loader)
 				if err != nil {
 					return err
 				}

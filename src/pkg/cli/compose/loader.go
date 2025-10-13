@@ -19,6 +19,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Context key for suppressing warnings for specific config variables
+type contextKey string
+
+const suppressConfigWarningKey contextKey = "suppress_config_warning"
+
 type Project = composeTypes.Project
 
 type ServiceConfig = composeTypes.ServiceConfig
@@ -36,6 +41,13 @@ type Loader struct {
 }
 
 type LoaderOption func(*LoaderOptions)
+
+// WithSuppressedConfigWarning returns a context that suppresses environment variable warnings
+// for the specified config name. This is useful when setting a config to avoid warning about
+// the environment variable that's being configured.
+func WithSuppressedConfigWarning(ctx context.Context, configName string) context.Context {
+	return context.WithValue(ctx, suppressConfigWarningKey, configName)
+}
 
 func WithPath(paths ...string) LoaderOption {
 	return func(o *LoaderOptions) {
@@ -87,7 +99,7 @@ func (c *Loader) LoadProject(ctx context.Context) (*Project, error) {
 		return c.cached, nil
 	}
 
-	projOpts, err := c.NewProjectOptions()
+	projOpts, err := c.NewProjectOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +122,7 @@ func (c *Loader) LoadProject(ctx context.Context) (*Project, error) {
 	return project, nil
 }
 
-func (c *Loader) NewProjectOptions() (*cli.ProjectOptions, error) {
+func (c *Loader) NewProjectOptions(ctx context.Context) (*cli.ProjectOptions, error) {
 	// Set logrus send logs via the term package
 	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
 	logrus.SetFormatter(termLogger)
@@ -151,20 +163,25 @@ func (c *Loader) NewProjectOptions() (*cli.ProjectOptions, error) {
 					if v, ok := mapping(key); ok {
 						return v, true
 					}
+					
+					// Check if we should suppress warnings for this config variable
+					suppressedConfig, _ := ctx.Value(suppressConfigWarningKey).(string)
+					shouldSuppressWarning := suppressedConfig == key
+					
 					// Check if the variable is defined in the environment to warn the user that it's not used
 					_, inEnv := os.LookupEnv(key)
 					if hasSubstitution(templ, key) {
 						// We don't (yet) support substitution patterns during deployment
-						if inEnv {
+						if inEnv && !shouldSuppressWarning {
 							term.Warnf("Environment variable %q is ignored; add it to `.env` if needed", key)
-						} else {
+						} else if !shouldSuppressWarning {
 							term.Debugf("Unresolved environment variable %q", key)
 						}
 						return "", false
 					}
-					if inEnv {
+					if inEnv && !shouldSuppressWarning {
 						term.Warnf("Environment variable %q is ignored; add it to `.env` or it may be resolved from config during deployment", key)
-					} else {
+					} else if !shouldSuppressWarning {
 						term.Debugf("Environment variable %q was not resolved locally. It may be resolved from config during deployment", key)
 					}
 					// Leave unresolved variables as-is for resolution later by CD
