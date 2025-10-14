@@ -57,5 +57,16 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				return tools.HandleDeployTool(ctx.Context, loader, providerId, cluster, cli)
 			},
 		),
+		ai.NewTool("destroy",
+			"Destroy the deployed application defined in the docker-compose files in the current working directory",
+			func(ctx *ai.ToolContext, params tools.DestroyParams) (string, error) {
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
+				if err != nil {
+					return "Failed to configure loader", err
+				}
+				cli := &tools.DefaultToolCLI{}
+				return tools.HandleDestroyTool(ctx.Context, loader, providerId, cluster, cli)
+			},
+		),
 	}
 }
