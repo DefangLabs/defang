@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/agent"
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/mark3labs/mcp-go/mcp"
