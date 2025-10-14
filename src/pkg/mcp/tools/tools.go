@@ -88,25 +88,6 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 
 	return append(translatedTools, []server.ServerTool{
 		{
-			Tool: mcp.NewTool("deploy",
-				mcp.WithDescription("Deploy services using defang"),
-				workingDirectoryOption,
-				multipleComposeFilesOptions,
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				loader, err := common.ConfigureLoader(request)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
-				}
-				cli := &agentTools.DefaultToolCLI{}
-				output, err := agentTools.HandleDeployTool(ctx, loader, providerId, cluster, cli)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to deploy services", err), err
-				}
-				return mcp.NewToolResultText(output), nil
-			},
-		},
-		{
 			Tool: mcp.NewTool("destroy",
 				mcp.WithDescription("Destroy deployed services for the project in the current working directory"),
 				workingDirectoryOption,
