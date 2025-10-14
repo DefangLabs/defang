@@ -5,10 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
-	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -138,12 +136,10 @@ func ServeAuthCodeFlowServer(ctx context.Context, authPort int, tenant types.Ten
 }
 
 func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, error) {
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
-	// Use the remote server endpoint
-	remoteAuthServer := "https://auth.defang.io"
-	redirectUri := remoteAuthServer + "/auth"
+	redirectUri := openAuthClient.GetPollRedirectURI()
 
 	opts := []AuthorizeOption{
 		WithPkce(),
@@ -189,61 +185,16 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, er
 		}
 	}()
 
-	// Poll the server for the auth result
-	pollUrl := fmt.Sprintf("%s/auth/poll?state=%s", remoteAuthServer, state)
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-
 	for {
-		select {
-		case <-ctx.Done():
-			return AuthCodeFlow{}, ctx.Err()
-		case <-ticker.C:
-			req, err := http.NewRequestWithContext(ctx, "POST", pollUrl, nil)
-			if err != nil {
-				return AuthCodeFlow{}, fmt.Errorf("failed to create poll request: %w", err)
+		code, err := openAuthClient.Poll(ctx, state)
+		if err != nil {
+			if errors.Is(err, ErrPollTimeout) {
+				term.Debug("poll timed out, retrying...")
+				continue // just retry
 			}
-
-			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				term.Debug("poll request failed:", err)
-				continue
-			}
-
-			if resp.StatusCode == http.StatusRequestTimeout {
-				resp.Body.Close()
-				continue // timeout, continue polling
-			}
-
-			if resp.StatusCode != http.StatusOK {
-				resp.Body.Close()
-				term.Debug("unexpected status code:", resp.StatusCode)
-				continue
-			}
-
-			// Parse the response body as form-urlencoded
-			body, err := io.ReadAll(resp.Body)
-			resp.Body.Close()
-			if err != nil {
-				return AuthCodeFlow{}, fmt.Errorf("failed to read response: %w", err)
-			}
-
-			query, err := url.ParseQuery(string(body))
-			if err != nil {
-				return AuthCodeFlow{}, fmt.Errorf("failed to parse response: %w", err)
-			}
-
-			if errorMsg := query.Get("error"); errorMsg != "" {
-				return AuthCodeFlow{}, fmt.Errorf("authentication failed: %s", query.Get("error_description"))
-			}
-
-			code := query.Get("code")
-			if code == "" {
-				return AuthCodeFlow{}, errors.New("no code received from auth server")
-			}
-
-			return AuthCodeFlow{code: code, redirectUri: redirectUri, verifier: ar.verifier}, nil
+			return AuthCodeFlow{}, err
 		}
+		return AuthCodeFlow{code: code, redirectUri: redirectUri, verifier: ar.verifier}, nil
 	}
 }
 
