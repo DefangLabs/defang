@@ -85,36 +85,6 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 
 	return append(translatedTools, []server.ServerTool{
 		{
-			Tool: mcp.NewTool("set_config",
-				mcp.WithDescription("Tail logs for a deployment."),
-				workingDirectoryOption,
-				multipleComposeFilesOptions,
-				mcp.WithString("key",
-					mcp.Description("The config key to set"),
-				),
-				mcp.WithString("value",
-					mcp.Description("The config value to set"),
-				),
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				loader, err := common.ConfigureLoader(request)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
-				}
-				cli := &agentTools.DefaultToolCLI{}
-				adapter := &agentTools.SetConfigCLIAdapter{DefaultToolCLI: cli}
-				params, err := agentTools.ParseSetConfigParams(request)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to parse set config parameters", err), err
-				}
-				output, err := agentTools.HandleSetConfig(ctx, loader, params, providerId, cluster, adapter)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to set config", err), err
-				}
-				return mcp.NewToolResultText(output), nil
-			},
-		},
-		{
 			Tool: mcp.NewTool("remove_config",
 				mcp.WithDescription("Remove a config variable from the defang project"),
 				workingDirectoryOption,
