@@ -70,7 +70,6 @@ func (a *Agent) handleMessage(msg string) error {
 	resp, err := genkit.Generate(a.ctx, a.g,
 		ai.WithPrompt(msg),
 		ai.WithTools(a.tools...),
-		ai.WithReturnToolRequests(true),
 	)
 	if err != nil {
 		return fmt.Errorf("generation error: %w", err)
