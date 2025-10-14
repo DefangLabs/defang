@@ -5,7 +5,7 @@ import (
 )
 
 func TestRoundTrip(t *testing.T) {
-	testRunCompose(t, func(t *testing.T, path string) {
+	testAllComposeFiles(t, func(t *testing.T, path string) {
 		loader := NewLoader(WithPath(path))
 		p, err := loader.LoadProject(t.Context())
 		if err != nil {

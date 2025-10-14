@@ -35,7 +35,7 @@ func TestValidationAndConvert(t *testing.T) {
 		return configs.Names, nil
 	}
 
-	testRunCompose(t, func(t *testing.T, path string) {
+	testAllComposeFiles(t, func(t *testing.T, path string) {
 		logs := new(bytes.Buffer)
 		term.DefaultTerm = term.NewTerm(os.Stdin, logs, logs)
 

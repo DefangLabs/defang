@@ -10,7 +10,7 @@ import (
 )
 
 func TestFixup(t *testing.T) {
-	testRunCompose(t, func(t *testing.T, path string) {
+	testAllComposeFiles(t, func(t *testing.T, path string) {
 		loader := NewLoader(WithPath(path))
 		proj, err := loader.LoadProject(t.Context())
 		if err != nil {
