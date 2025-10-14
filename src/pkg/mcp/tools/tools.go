@@ -85,32 +85,6 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 
 	return append(translatedTools, []server.ServerTool{
 		{
-			Tool: mcp.NewTool("remove_config",
-				mcp.WithDescription("Remove a config variable from the defang project"),
-				workingDirectoryOption,
-				multipleComposeFilesOptions,
-				mcp.WithString("key",
-					mcp.Description("The config key to remove"),
-				),
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				loader, err := common.ConfigureLoader(request)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
-				}
-				cli := &agentTools.DefaultToolCLI{}
-				params, err := agentTools.ParseRemoveConfigParams(request)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to parse remove config parameters", err), err
-				}
-				output, err := agentTools.HandleRemoveConfigTool(ctx, loader, params, providerId, cluster, &agentTools.RemoveConfigCLIAdapter{DefaultToolCLI: cli})
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to remove config", err), err
-				}
-				return mcp.NewToolResultText(output), nil
-			},
-		},
-		{
 			Tool: mcp.NewTool("list_configs",
 				mcp.WithDescription("List config variables for the defang project"),
 				workingDirectoryOption,
