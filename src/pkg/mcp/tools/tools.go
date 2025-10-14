@@ -2,14 +2,11 @@ package tools
 
 import (
 	"context"
-	"strings"
-	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/agent"
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	agentTools "github.com/DefangLabs/defang/src/pkg/agent/tools"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -87,74 +84,6 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 	translatedTools := translateGenKitToolsToMCP(genkitTools)
 
 	return append(translatedTools, []server.ServerTool{
-		{
-			Tool: mcp.NewTool("logs",
-				mcp.WithDescription("Fetch logs for a deployment."),
-				workingDirectoryOption,
-				mcp.WithString("deployment_id",
-					mcp.Description("The deployment ID for which to fetch logs"),
-				),
-				mcp.WithString("since",
-					mcp.Description("The start time in RFC3339 format (e.g., 2006-01-02T15:04:05Z07:00)"),
-					mcp.Required(),
-					mcp.DefaultString(time.Now().Add(-1*time.Hour).Format(time.RFC3339)),
-				),
-				mcp.WithString("until",
-					mcp.Description("The end time in RFC3339 format (e.g., 2006-01-02T15:04:05Z07:00)"),
-					mcp.Required(),
-					mcp.DefaultString(time.Now().Format(time.RFC3339)),
-				),
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				loader, err := common.ConfigureLoader(request)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
-				}
-				params, err := agentTools.ParseLogsParams(request)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to parse logs parameters", err), err
-				}
-				cli := &agentTools.DefaultToolCLI{}
-				output, err := agentTools.HandleLogsTool(ctx, loader, params, cluster, providerId, cli)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to fetch logs", err), err
-				}
-				return mcp.NewToolResultText(output), nil
-			},
-		},
-		{
-			Tool: mcp.NewTool("estimate",
-				mcp.WithDescription("Estimate the cost of deployed a Defang project."),
-				workingDirectoryOption,
-				multipleComposeFilesOptions,
-				mcp.WithString("provider",
-					mcp.Description("The cloud provider to estimate costs for. Supported options are AWS or GCP"),
-					mcp.DefaultString(strings.ToUpper(providerId.String())),
-					mcp.Enum("AWS", "GCP"),
-				),
-				mcp.WithString("deployment_mode",
-					mcp.Description("The deployment mode for the estimate. Options are: "+strings.Join(modes.AllDeploymentModes(), ", ")),
-					mcp.DefaultString("AFFORDABLE"),
-					mcp.Enum(modes.AllDeploymentModes()...),
-				),
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				loader, err := common.ConfigureLoader(request)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
-				}
-				params, err := agentTools.ParseEstimateParams(request, providerId)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to parse estimate parameters", err), err
-				}
-				cli := &agentTools.DefaultToolCLI{}
-				output, err := agentTools.HandleEstimateTool(ctx, loader, params, cluster, cli)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to estimate costs", err), err
-				}
-				return mcp.NewToolResultText(output), nil
-			},
-		},
 		{
 			Tool: mcp.NewTool("set_config",
 				mcp.WithDescription("Tail logs for a deployment."),
