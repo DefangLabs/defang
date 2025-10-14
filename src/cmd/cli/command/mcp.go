@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
+	agentTools "github.com/DefangLabs/defang/src/pkg/agent/tools"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
-	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
@@ -50,7 +50,7 @@ var mcpServerCmd = &cobra.Command{
 
 		// Create a new MCP server
 		term.Debug("Creating MCP server")
-		s, err := mcp.NewDefangMCPServer(RootCmd.Version, cluster, &providerID, mcpClient, tools.DefaultToolCLI{})
+		s, err := mcp.NewDefangMCPServer(RootCmd.Version, cluster, &providerID, mcpClient, agentTools.DefaultToolCLI{})
 		if err != nil {
 			return fmt.Errorf("failed to create MCP server: %w", err)
 		}

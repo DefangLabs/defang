@@ -17,7 +17,7 @@ type EstimateParams struct {
 	Region         string               `json:"region"`
 }
 
-func parseEstimateParams(request mcp.CallToolRequest, providerId *cliClient.ProviderID) (EstimateParams, error) {
+func ParseEstimateParams(request mcp.CallToolRequest, providerId *cliClient.ProviderID) (EstimateParams, error) {
 	modeString, err := request.RequireString("deployment_mode")
 	if err != nil {
 		modeString = "AFFORDABLE" // Default to AFFORDABLE if not provided
@@ -50,7 +50,7 @@ func parseEstimateParams(request mcp.CallToolRequest, providerId *cliClient.Prov
 	}, nil
 }
 
-func handleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, params EstimateParams, cluster string, cli CLIInterface) (string, error) {
+func HandleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, params EstimateParams, cluster string, cli CLIInterface) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
