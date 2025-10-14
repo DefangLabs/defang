@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -12,6 +13,7 @@ import (
 )
 
 type LogsParams struct {
+	common.LoaderParams
 	DeploymentID string
 	Since        time.Time
 	Until        time.Time
