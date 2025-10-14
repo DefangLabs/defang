@@ -88,25 +88,6 @@ func CollectTools(cluster string, providerId *client.ProviderID, cli agentTools.
 
 	return append(translatedTools, []server.ServerTool{
 		{
-			Tool: mcp.NewTool("destroy",
-				mcp.WithDescription("Destroy deployed services for the project in the current working directory"),
-				workingDirectoryOption,
-				multipleComposeFilesOptions,
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				loader, err := common.ConfigureLoader(request)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
-				}
-				cli := &agentTools.DefaultToolCLI{}
-				output, err := agentTools.HandleDestroyTool(ctx, loader, providerId, cluster, cli)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to destroy services", err), err
-				}
-				return mcp.NewToolResultText(output), nil
-			},
-		},
-		{
 			Tool: mcp.NewTool("logs",
 				mcp.WithDescription("Fetch logs for a deployment."),
 				workingDirectoryOption,
