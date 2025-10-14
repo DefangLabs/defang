@@ -18,6 +18,9 @@ type LoginParams struct{}
 type ServicesParams struct {
 	common.LoaderParams
 }
+type DeployParams struct {
+	common.LoaderParams
+}
 
 func CollectTools(cluster string, providerId *client.ProviderID) []ai.Tool {
 	// loginHandler := MakeLoginToolHandler(cluster, authPort, &LoginCLIAdapter{DefaultToolCLI: &DefaultToolCLI{}})
@@ -40,6 +43,18 @@ func CollectTools(cluster string, providerId *client.ProviderID) []ai.Tool {
 				}
 				var cli tools.CLIInterface = &tools.DefaultToolCLI{}
 				return tools.HandleServicesTool(ctx.Context, loader, providerId, cluster, cli)
+			},
+		),
+
+		ai.NewTool("deploy",
+			"Deploy the application defined in the docker-compose files in the current working directory",
+			func(ctx *ai.ToolContext, params DeployParams) (string, error) {
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
+				if err != nil {
+					return "Failed to configure loader", err
+				}
+				cli := &tools.DefaultToolCLI{}
+				return tools.HandleDeployTool(ctx.Context, loader, providerId, cluster, cli)
 			},
 		),
 	}
