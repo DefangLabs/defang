@@ -68,5 +68,16 @@ func CollectTools(cluster string, providerId *client.ProviderID) []ai.Tool {
 				return tools.HandleDestroyTool(ctx.Context, loader, providerId, cluster, cli)
 			},
 		),
+		ai.NewTool("logs",
+			"Fetch logs for the deployed application defined in the docker-compose files in the current working directory",
+			func(ctx *ai.ToolContext, params tools.LogsParams) (string, error) {
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
+				if err != nil {
+					return "Failed to configure loader", err
+				}
+				cli := &tools.DefaultToolCLI{}
+				return tools.HandleLogsTool(ctx.Context, loader, params, cluster, providerId, cli)
+			},
+		),
 	}
 }

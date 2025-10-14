@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"strings"
-	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/agent"
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
@@ -87,41 +86,6 @@ func CollectTools(cluster string, providerId *client.ProviderID, cli agentTools.
 	translatedTools := translateGenKitToolsToMCP(genkitTools)
 
 	return append(translatedTools, []server.ServerTool{
-		{
-			Tool: mcp.NewTool("logs",
-				mcp.WithDescription("Fetch logs for a deployment."),
-				workingDirectoryOption,
-				mcp.WithString("deployment_id",
-					mcp.Description("The deployment ID for which to fetch logs"),
-				),
-				mcp.WithString("since",
-					mcp.Description("The start time in RFC3339 format (e.g., 2006-01-02T15:04:05Z07:00)"),
-					mcp.Required(),
-					mcp.DefaultString(time.Now().Add(-1*time.Hour).Format(time.RFC3339)),
-				),
-				mcp.WithString("until",
-					mcp.Description("The end time in RFC3339 format (e.g., 2006-01-02T15:04:05Z07:00)"),
-					mcp.Required(),
-					mcp.DefaultString(time.Now().Format(time.RFC3339)),
-				),
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				loader, err := common.ConfigureLoader(request)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
-				}
-				params, err := agentTools.ParseLogsParams(request)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to parse logs parameters", err), err
-				}
-				cli := &agentTools.DefaultToolCLI{}
-				output, err := agentTools.HandleLogsTool(ctx, loader, params, cluster, providerId, cli)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to fetch logs", err), err
-				}
-				return mcp.NewToolResultText(output), nil
-			},
-		},
 		{
 			Tool: mcp.NewTool("estimate",
 				mcp.WithDescription("Estimate the cost of deployed a Defang project."),
