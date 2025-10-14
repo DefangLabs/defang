@@ -86,20 +86,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 	genkitTools := agent.CollectTools(cluster, authPort)
 	translatedTools := translateGenKitToolsToMCP(genkitTools)
 
-	tools := []server.ServerTool{
-		{
-			Tool: mcp.NewTool("login",
-				mcp.WithDescription("Login to Defang"),
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				cli := &agentTools.DefaultToolCLI{}
-				output, err := agentTools.HandleLoginTool(ctx, cluster, authPort, &agentTools.LoginCLIAdapter{DefaultToolCLI: cli})
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to login", err), err
-				}
-				return mcp.NewToolResultText(output), nil
-			},
-		},
+	return append(translatedTools, []server.ServerTool{
 		{
 			Tool: mcp.NewTool("services",
 				mcp.WithDescription("List deployed services for the project in the current working directory"),
@@ -351,7 +338,5 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				return mcp.NewToolResultText(output), nil
 			},
 		},
-	}
-
-	return append(tools, translatedTools...)
+	}...)
 }

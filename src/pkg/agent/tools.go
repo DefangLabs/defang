@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/tools"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/firebase/genkit/go/ai"
 )
@@ -18,8 +19,8 @@ func CollectTools(cluster string, authPort int) []ai.Tool {
 		ai.NewTool[LoginParams, string](
 			"login",
 			"Login into Defang",
-			func(ctx *ai.ToolContext, params LoginParams) (string, error) {
-				return loginHandler(ctx.Context, params)
+			func(ctx *ai.ToolContext, _ LoginParams) (string, error) {
+				return tools.HandleLoginTool(ctx.Context, cluster, authPort, &tools.LoginCLIAdapter{DefaultToolCLI: &tools.DefaultToolCLI{}})
 			},
 		),
 	}
