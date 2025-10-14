@@ -12,6 +12,7 @@ import (
 )
 
 type SetConfigParams struct {
+	common.LoaderParams
 	Name  string
 	Value string
 }
