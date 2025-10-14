@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
+	agentTools "github.com/DefangLabs/defang/src/pkg/agent/tools"
 	"github.com/DefangLabs/defang/src/pkg/mcp/prompts"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
@@ -47,7 +48,7 @@ func (t *ToolTracker) TrackTool(name string, handler server.ToolHandlerFunc) ser
 	}
 }
 
-func NewDefangMCPServer(version string, cluster string, providerID *cliClient.ProviderID, client MCPClient, cli tools.CLIInterface) (*server.MCPServer, error) {
+func NewDefangMCPServer(version string, cluster string, providerID *cliClient.ProviderID, client MCPClient, cli agentTools.CLIInterface) (*server.MCPServer, error) {
 	// Setup knowledge base
 	if err := SetupKnowledgeBase(); err != nil {
 		return nil, fmt.Errorf("failed to setup knowledge base: %w", err)

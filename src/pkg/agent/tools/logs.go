@@ -17,7 +17,7 @@ type LogsParams struct {
 	Until        time.Time
 }
 
-func parseLogsParams(request mcp.CallToolRequest) (LogsParams, error) {
+func ParseLogsParams(request mcp.CallToolRequest) (LogsParams, error) {
 	deploymentId := request.GetString("deployment_id", "")
 	since, err := request.RequireString("since")
 	if err != nil {
@@ -47,7 +47,7 @@ func parseLogsParams(request mcp.CallToolRequest) (LogsParams, error) {
 	}, nil
 }
 
-func handleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, cluster string, providerId *cliClient.ProviderID, cli CLIInterface) (string, error) {
+func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, cluster string, providerId *cliClient.ProviderID, cli CLIInterface) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {

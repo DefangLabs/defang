@@ -25,7 +25,7 @@ func New(ctx context.Context, cluster string, authPort int) *Agent {
 		genkit.WithDefaultModel("googleai/gemini-2.5-flash"),
 	)
 
-	tools := CollectTools(cluster, authPort)
+	tools := CollectTools(cluster)
 	toolRefs := make([]ai.ToolRef, len(tools))
 	for i, t := range tools {
 		toolRefs[i] = ai.ToolRef(t)

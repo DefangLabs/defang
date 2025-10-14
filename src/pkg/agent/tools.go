@@ -13,7 +13,7 @@ type Connecter interface {
 
 type LoginParams struct{}
 
-func CollectTools(cluster string, authPort int) []ai.Tool {
+func CollectTools(cluster string) []ai.Tool {
 	// loginHandler := MakeLoginToolHandler(cluster, authPort, &LoginCLIAdapter{DefaultToolCLI: &DefaultToolCLI{}})
 
 	return []ai.Tool{
