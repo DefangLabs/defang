@@ -90,5 +90,16 @@ func CollectTools(cluster string, providerId *client.ProviderID) []ai.Tool {
 				return tools.HandleEstimateTool(ctx.Context, loader, params, cluster, cli)
 			},
 		),
+		ai.NewTool("set_config",
+			"Set a config variable for the defang project",
+			func(ctx *ai.ToolContext, params tools.SetConfigParams) (string, error) {
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
+				if err != nil {
+					return "Failed to configure loader", err
+				}
+				cli := &tools.DefaultToolCLI{}
+				return tools.HandleSetConfig(ctx.Context, loader, params, providerId, cluster, cli)
+			},
+		),
 	}
 }
