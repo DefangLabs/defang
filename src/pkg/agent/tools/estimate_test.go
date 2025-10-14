@@ -205,7 +205,7 @@ func TestHandleEstimateTool(t *testing.T) {
 
 			// Call the function
 			loader := &client.MockLoader{}
-			params, err := parseEstimateParams(request, &providerID)
+			params, err := ParseEstimateParams(request, &providerID)
 			if err != nil {
 				// If parsing params fails, check if this was the expected error
 				if tt.expectedError != "" {
@@ -215,7 +215,7 @@ func TestHandleEstimateTool(t *testing.T) {
 					assert.NoError(t, err)
 				}
 			}
-			result, err := handleEstimateTool(t.Context(), loader, params, "test-cluster", mockCLI)
+			result, err := HandleEstimateTool(t.Context(), loader, params, "test-cluster", mockCLI)
 
 			// Verify error expectations
 			if tt.expectedError != "" {

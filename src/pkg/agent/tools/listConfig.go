@@ -10,8 +10,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-// handleListConfigTool handles the list config tool logic
-func handleListConfigTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli ListConfigCLIInterface) (string, error) {
+// HandleListConfigTool handles the list config tool logic
+func HandleListConfigTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli ListConfigCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", fmt.Errorf("No provider configured: %w", err)

@@ -176,7 +176,7 @@ func TestHandleDeployTool(t *testing.T) {
 
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := handleDeployTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI)
+			result, err := HandleDeployTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI)
 
 			// Verify error expectations
 			if tt.expectedError != "" {
