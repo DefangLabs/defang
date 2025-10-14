@@ -4,12 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/modes"
 	_type "github.com/DefangLabs/defang/src/protos/google/type"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -101,7 +99,7 @@ func TestHandleEstimateTool(t *testing.T) {
 				}
 				m.CapturedOutput = "Estimated cost: $15.00/month"
 			},
-			expectedError: "Unknown deployment mode \"UNKNOWN-MODE\", please use one of " + strings.Join(modes.AllDeploymentModes(), ", "),
+			expectedError: "invalid mode: unknown-mode, not one of [AFFORDABLE BALANCED HIGH_AVAILABILITY]",
 		},
 		{
 			name: "load_project_error",
