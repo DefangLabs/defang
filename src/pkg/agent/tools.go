@@ -112,5 +112,34 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				return tools.HandleRemoveConfigTool(ctx.Context, loader, params, providerId, cluster, cli)
 			},
 		),
+		ai.NewTool("list_configs",
+			"List config variables for the defang project",
+			func(ctx *ai.ToolContext, params tools.ListConfigsParams) (string, error) {
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
+				if err != nil {
+					return "Failed to configure loader", err
+				}
+				cli := &tools.DefaultToolCLI{}
+				return tools.HandleListConfigTool(ctx.Context, loader, providerId, cluster, cli)
+			},
+		),
+		ai.NewTool("set_aws_provider",
+			"Set the AWS provider for the defang project",
+			func(ctx *ai.ToolContext, params tools.SetAWSProviderParams) (string, error) {
+				return tools.HandleSetAWSProvider(ctx.Context, params, providerId, cluster)
+			},
+		),
+		ai.NewTool("set_gcp_provider",
+			"Set the GCP provider for the defang project",
+			func(ctx *ai.ToolContext, params tools.SetGCPProviderParams) (string, error) {
+				return tools.HandleSetGCPProvider(ctx.Context, params, providerId, cluster)
+			},
+		),
+		ai.NewTool("set_playground_provider",
+			"Set the Playground provider for the defang project",
+			func(ctx *ai.ToolContext, params tools.SetPlaygroundProviderParams) (string, error) {
+				return tools.HandleSetPlaygroundProvider(providerId)
+			},
+		),
 	}
 }
