@@ -4,8 +4,8 @@ import (
 	"context"
 	"os"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 )
 
 func SetGCPByocProvider(ctx context.Context, providerId *client.ProviderID, cluster string, projectID string) error {

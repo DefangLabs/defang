@@ -5,8 +5,8 @@ import (
 	"errors"
 	"os"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 )
 
 // Check if the provided AWS access key ID is valid
