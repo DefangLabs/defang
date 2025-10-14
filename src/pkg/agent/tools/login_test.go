@@ -111,7 +111,7 @@ func TestHandleLoginTool(t *testing.T) {
 
 			// Call the function
 			var err error
-			result, err := handleLoginTool(context.Background(), tt.cluster, tt.authPort, mockCLI)
+			result, err := HandleLoginTool(context.Background(), tt.cluster, tt.authPort, mockCLI)
 			if tt.expectedError != "" {
 				assert.EqualError(t, err, tt.expectedError)
 			} else {

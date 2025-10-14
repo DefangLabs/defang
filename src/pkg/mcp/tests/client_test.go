@@ -15,9 +15,9 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
+	agentTools "github.com/DefangLabs/defang/src/pkg/agent/tools"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
-	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
 	typepb "github.com/DefangLabs/defang/src/protos/google/type"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
@@ -530,11 +530,11 @@ func TestInProcessMCPServer(t *testing.T) {
 	}
 
 	TestInProcessMCPServer_DeployAndDestroy := func(t *testing.T) {
-		var origBrowser = tools.OpenBrowserFunc
+		var origBrowser = agentTools.OpenBrowserFunc
 		t.Cleanup(func() {
-			tools.OpenBrowserFunc = origBrowser
+			agentTools.OpenBrowserFunc = origBrowser
 		})
-		tools.OpenBrowserFunc = func(url string) error {
+		agentTools.OpenBrowserFunc = func(url string) error {
 			// no-op to avoid opening a browser during tests
 			return nil
 		}
