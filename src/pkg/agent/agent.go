@@ -108,6 +108,9 @@ func (a *Agent) handleMessage(msg string) error {
 	}
 
 	for _, msg := range resp.History() {
+		if msg.Role == ai.RoleUser {
+			continue
+		}
 		for _, part := range msg.Content {
 			if part.Kind == ai.PartText {
 				fmt.Println(part.Text)
