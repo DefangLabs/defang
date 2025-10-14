@@ -5,49 +5,49 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
 type LogsParams struct {
-	common.LoaderParams
-	DeploymentID string `json:"deployment_id,omitempty" jsonschema:"description=Optional: Retrieve logs from a specific deployment."`
-	Since        string `json:"since,omitempty" jsonschema:"description=Optional: Retrieve logs written after this time. Format as RFC3339 or duration (e.g., '2023-10-01T15:04:05Z' or '1h')."`
-	Until        string `json:"until,omitempty" jsonschema:"description=Optional: Retrieve logs written before this time. Format as RFC3339 or duration (e.g., '2023-10-01T15:04:05Z' or '1h')."`
+	DeploymentID string
+	Since        time.Time
+	Until        time.Time
 }
 
 func ParseLogsParams(request mcp.CallToolRequest) (LogsParams, error) {
 	deploymentId := request.GetString("deployment_id", "")
-	since := request.GetString("since", "")
-	until := request.GetString("until", "")
+	since, err := request.RequireString("since")
+	if err != nil {
+		return LogsParams{}, fmt.Errorf("missing required parameter 'since': %w", err)
+	}
+	until, err := request.RequireString("until")
+	if err != nil {
+		return LogsParams{}, fmt.Errorf("missing required parameter 'until': %w", err)
+	}
+	var sinceTime, untilTime time.Time
+	if since != "" {
+		sinceTime, err = time.Parse(time.RFC3339, since)
+		if err != nil {
+			return LogsParams{}, fmt.Errorf("invalid parameter 'since', must be in RFC3339 format: %w", err)
+		}
+	}
+	if until != "" {
+		untilTime, err = time.Parse(time.RFC3339, until)
+		if err != nil {
+			return LogsParams{}, fmt.Errorf("invalid parameter 'until', must be in RFC3339 format: %w", err)
+		}
+	}
 	return LogsParams{
 		DeploymentID: deploymentId,
-		Since:        since,
-		Until:        until,
+		Since:        sinceTime,
+		Until:        untilTime,
 	}, nil
 }
 
-func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, cluster string, providerId *cliClient.ProviderID, cli CLIInterface) (string, error) {
-	var sinceTime, untilTime time.Time
-	var err error
-	now := time.Now()
-	if params.Since != "" {
-		sinceTime, err = timeutils.ParseTimeOrDuration(params.Since, now)
-		if err != nil {
-			return "", fmt.Errorf("invalid parameter 'since', must be in RFC3339 format: %w", err)
-		}
-	}
-	if params.Until != "" {
-		untilTime, err = timeutils.ParseTimeOrDuration(params.Until, now)
-		if err != nil {
-			return "", fmt.Errorf("invalid parameter 'until', must be in RFC3339 format: %w", err)
-		}
-	}
-
+func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, cluster string, providerId *cliClient.ProviderID, cli LogsCLIInterface) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
@@ -65,15 +65,15 @@ func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 
 	term.Debug("Function invoked: cli.NewProvider")
 
-	provider, err := cli.CheckProviderConfigured(ctx, client, *providerId, project.Name, "", len(project.Services))
+	provider, err := cli.CheckProviderConfigured(ctx, client, *providerId, project.Name, len(project.Services))
 	if err != nil {
 		return "", fmt.Errorf("provider not configured correctly: %w", err)
 	}
 
 	err = cli.Tail(ctx, provider, project, cliTypes.TailOptions{
 		Deployment: params.DeploymentID,
-		Since:      sinceTime,
-		Until:      untilTime,
+		Since:      params.Since,
+		Until:      params.Until,
 	})
 
 	if err != nil {
