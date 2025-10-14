@@ -141,7 +141,7 @@ func (a *AwsEcs) SetUp(ctx context.Context, containers []types.Container) error 
 
 	template, err := tmpl.YAML()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal Cloud Formation template as YAML: %w", err)
 	}
 
 	// Upsert
