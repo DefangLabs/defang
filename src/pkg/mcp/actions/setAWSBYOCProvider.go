@@ -6,9 +6,40 @@ import (
 	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 )
+
+// Check if the provided AWS access key ID is valid
+// https://medium.com/@TalBeerySec/a-short-note-on-aws-key-id-f88cc4317489
+func IsValidAWSKey(key string) bool {
+	// Define accepted AWS access key prefixes
+	acceptedPrefixes := map[string]bool{
+		"ABIA": true,
+		"ACCA": true,
+		"AGPA": true,
+		"AIDA": true,
+		"AKPA": true,
+		"AKIA": true,
+		"ANPA": true,
+		"ANVA": true,
+		"APKA": true,
+		"AROA": true,
+		"ASCA": true,
+		"ASIA": true,
+	}
+
+	if len(key) < 16 {
+		return false
+	}
+
+	prefix := key[:4]
+	_, ok := acceptedPrefixes[prefix]
+	if !ok {
+		return false
+	}
+
+	return true
+}
 
 func SetAWSByocProvider(ctx context.Context, providerId *client.ProviderID, cluster string, accessKeyId string, secretKey string, region string) error {
 	// Can never be nil or empty due to RequiredArgument
@@ -49,12 +80,12 @@ func SetAWSByocProvider(ctx context.Context, providerId *client.ProviderID, clus
 		}
 	}
 
-	fabric, err := cli.Connect(ctx, cluster)
+	fabric, err := common.Connect(ctx, cluster)
 	if err != nil {
 		return err
 	}
 
-	_, err = common.CheckProviderConfigured(ctx, fabric, client.ProviderAWS, "", "", 0)
+	_, err = common.CheckProviderConfigured(ctx, fabric, client.ProviderAWS, "", 0)
 	if err != nil {
 		return err
 	}

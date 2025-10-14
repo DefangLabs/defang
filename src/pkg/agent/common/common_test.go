@@ -1,34 +1,79 @@
 package common
 
 import (
+	"context"
 	"errors"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestConfigureLoaderBranches(t *testing.T) {
+// --- Structs and Types ---
+type mockGrpcClientProvider struct {
+	client.MockProvider
+	setCanIUseConfigCalled bool
+	setCanIUseConfigArg    *defangv1.CanIUseResponse
+	err                    error
+}
+
+type mockGrpcClient struct {
+	*cliClient.GrpcClient
+	err error
+}
+
+// --- Helper Functions ---
+func (m *mockGrpcClientProvider) SetCanIUseConfig(resp *defangv1.CanIUseResponse) {
+	m.setCanIUseConfigCalled = true
+	m.setCanIUseConfigArg = resp
+}
+
+func (m *mockGrpcClientProvider) AccountInfo(context.Context) (*cliClient.AccountInfo, error) {
+	return &cliClient.AccountInfo{}, m.err
+}
+
+func (m *mockGrpcClient) CanIUse(ctx context.Context, req *defangv1.CanIUseRequest) (*defangv1.CanIUseResponse, error) {
+	return &defangv1.CanIUseResponse{}, m.err
+}
+
+// --- Tests ---
+func TestConfigureLoaderWithProjectName(t *testing.T) {
 	makeReq := func(args map[string]any) mcp.CallToolRequest {
 		return mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: args}}
 	}
+	loader, err := ConfigureLoader(makeReq(map[string]any{"working_directory": ".", "project_name": "myproj"}))
+	assert.NoError(t, err)
+	assert.NotNil(t, loader)
+}
 
-	// project_name path
-	loader1, err := ConfigureLoader(makeReq(map[string]any{"working_directory": "/tmp", "project_name": "myproj"}))
-	require.NoError(t, err)
-	assert.NotNil(t, loader1)
+func TestConfigureLoaderWithComposeFilePaths(t *testing.T) {
+	makeReq := func(args map[string]any) mcp.CallToolRequest {
+		return mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: args}}
+	}
+	loader, err := ConfigureLoader(makeReq(map[string]any{"working_directory": ".", "compose_file_paths": []string{"a.yml", "b.yml"}}))
+	assert.NoError(t, err)
+	assert.NotNil(t, loader)
+}
 
-	// compose_file_paths path
-	loader2, err := ConfigureLoader(makeReq(map[string]any{"working_directory": "/tmp", "compose_file_paths": []string{"a.yml", "b.yml"}}))
-	require.NoError(t, err)
-	assert.NotNil(t, loader2)
+func TestConfigureLoaderWithWorkingDirectoryOnly(t *testing.T) {
+	makeReq := func(args map[string]any) mcp.CallToolRequest {
+		return mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: args}}
+	}
+	loader, err := ConfigureLoader(makeReq(map[string]any{"working_directory": "."}))
+	assert.NoError(t, err)
+	assert.NotNil(t, loader)
+}
 
-	// default path (no working_directory)
-	loader3, err := ConfigureLoader(makeReq(map[string]any{}))
-	require.Error(t, err)
-	assert.Nil(t, loader3)
+func TestConfigureLoaderWithInvalidWorkingDirectory(t *testing.T) {
+	makeReq := func(args map[string]any) mcp.CallToolRequest {
+		return mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: args}}
+	}
+	loader, err := ConfigureLoader(makeReq(map[string]any{"working_directory": "/nonexistent"}))
+	assert.Error(t, err)
+	assert.Nil(t, loader)
 }
 
 func TestFixupConfigError(t *testing.T) {
@@ -42,13 +87,93 @@ func TestFixupConfigError(t *testing.T) {
 }
 
 func TestProviderNotConfiguredError(t *testing.T) {
-	// provider auto should error
 	err := ProviderNotConfiguredError(client.ProviderAuto)
 	assert.Error(t, err)
-
-	// a real provider (simulate AWS value 'aws') should not error
 	var pid client.ProviderID
 	_ = pid.Set("aws")
 	err2 := ProviderNotConfiguredError(pid)
-	require.NoError(t, err2)
+	assert.NoError(t, err2)
+}
+
+// --- Test for CanIUseProvider ---
+
+func TestCanIUseProvider(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success", func(t *testing.T) {
+		grpc := &mockGrpcClient{GrpcClient: &cliClient.GrpcClient{}}
+		prov := &mockGrpcClientProvider{}
+		err := CanIUseProvider(t.Context(), grpc, client.ProviderAWS, "proj", prov, 2)
+		assert.NoError(t, err)
+		// No way to check grpc.canIUseCalled since mockGrpcClient does not track it
+		// But we can check provider
+		assert.True(t, prov.setCanIUseConfigCalled)
+	})
+
+	t.Run("grpc error", func(t *testing.T) {
+		grpc := &mockGrpcClient{GrpcClient: &cliClient.GrpcClient{}, err: errors.New("fail grpc")}
+		prov := &mockGrpcClientProvider{}
+		err := CanIUseProvider(t.Context(), grpc, client.ProviderAWS, "proj", prov, 2)
+		assert.Error(t, err)
+		// No way to check grpc.canIUseCalled since mockGrpcClient does not track it
+		assert.False(t, prov.setCanIUseConfigCalled)
+	})
+}
+
+// Helper to temporarily override newProvider in tests
+func withMockedNewProvider(t *testing.T, providerErr error, testFunc func()) {
+	originalNewProvider := newProvider
+	newProvider = func(_ context.Context, _ cliClient.ProviderID, _ cliClient.FabricClient) (cliClient.Provider, error) {
+		return &mockGrpcClientProvider{err: providerErr}, nil
+	}
+	t.Cleanup(func() { newProvider = originalNewProvider })
+	testFunc()
+}
+
+func TestCheckProviderConfigured(t *testing.T) {
+	t.Parallel()
+
+	type testCase struct {
+		name        string
+		providerErr error
+		grpcErr     error
+		wantErr     bool
+	}
+	testCases := []testCase{
+		{
+			name:        "success",
+			providerErr: nil,
+			grpcErr:     nil,
+			wantErr:     false,
+		},
+		{
+			name:        "AccountInfo err",
+			providerErr: errors.New("account info error"),
+			grpcErr:     nil,
+			wantErr:     true,
+		},
+		{
+			name:        "CanIUse error",
+			providerErr: nil,
+			grpcErr:     errors.New("CanIUse error"),
+			wantErr:     true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			withMockedNewProvider(t, tc.providerErr, func() {
+				grpc := &mockGrpcClient{GrpcClient: &cliClient.GrpcClient{}, err: tc.grpcErr}
+				pid := client.ProviderAWS
+				prov, err := CheckProviderConfigured(t.Context(), grpc, pid, "proj", 2)
+				if tc.wantErr {
+					assert.Error(t, err)
+					assert.Nil(t, prov)
+				} else {
+					assert.NoError(t, err)
+					assert.NotNil(t, prov)
+				}
+			})
+		})
+	}
 }
