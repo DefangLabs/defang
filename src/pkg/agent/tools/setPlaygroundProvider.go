@@ -7,6 +7,9 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/mcp/actions"
 )
 
+type SetPlaygroundProviderParams struct {
+}
+
 // HandleSetPlaygroundProvider handles the set Playground provider MCP tool request
 func HandleSetPlaygroundProvider(providerId *cliClient.ProviderID) (string, error) {
 	if err := actions.SetPlaygroundProvider(providerId); err != nil {
