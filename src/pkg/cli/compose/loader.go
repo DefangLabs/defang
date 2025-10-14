@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -66,12 +67,12 @@ func NewLoader(opts ...LoaderOption) *Loader {
 	return &Loader{options: options}
 }
 
-func (c *Loader) LoadProjectName(ctx context.Context) (string, error) {
-	if c.options.ProjectName != "" {
-		return c.options.ProjectName, nil
+func (l *Loader) LoadProjectName(ctx context.Context) (string, error) {
+	if l.options.ProjectName != "" {
+		return l.options.ProjectName, nil
 	}
 
-	project, err := c.LoadProject(ctx)
+	project, err := l.loadProject(ctx, true)
 	if err != nil {
 		if errors.Is(err, types.ErrComposeFileNotFound) {
 			return "", fmt.Errorf("no --project-name specified and %w", err)
@@ -82,12 +83,16 @@ func (c *Loader) LoadProjectName(ctx context.Context) (string, error) {
 	return project.Name, nil
 }
 
-func (c *Loader) LoadProject(ctx context.Context) (*Project, error) {
-	if c.cached != nil {
-		return c.cached, nil
+func (l *Loader) LoadProject(ctx context.Context) (*Project, error) {
+	return l.loadProject(ctx, false)
+}
+
+func (l *Loader) loadProject(ctx context.Context, suppressWarn bool) (*Project, error) {
+	if l.cached != nil {
+		return l.cached, nil
 	}
 
-	projOpts, err := c.NewProjectOptions()
+	projOpts, err := l.newProjectOptions(suppressWarn)
 	if err != nil {
 		return nil, err
 	}
@@ -106,18 +111,18 @@ func (c *Loader) LoadProject(ctx context.Context) (*Project, error) {
 		fmt.Println(string(b))
 	}
 
-	c.cached = project
+	l.cached = project
 	return project, nil
 }
 
-func (c *Loader) NewProjectOptions() (*cli.ProjectOptions, error) {
+func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, error) {
 	// Set logrus send logs via the term package
 	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
 	logrus.SetFormatter(termLogger)
 
 	// Based on how docker compose setup its own project options
 	// https://github.com/docker/compose/blob/1a14fcb1e6645dd92f5a4f2da00071bd59c2e887/cmd/compose/compose.go#L326-L346
-	return cli.NewProjectOptions(c.options.ConfigPaths,
+	return cli.NewProjectOptions(l.options.ConfigPaths,
 		cli.WithEnv([]string{"COMPOSE_PROFILES=defang"}),
 		// First apply os.Environment, always win
 		// -- DISABLED FOR DEFANG -- cli.WithOsEnv,
@@ -135,7 +140,7 @@ func (c *Loader) NewProjectOptions() (*cli.ProjectOptions, error) {
 		cli.WithDotEnv,
 		// eventually COMPOSE_PROFILES should have been set
 		// cli.WithDefaultProfiles(c.Profiles...), TODO: Support --profile to be added as param to this call
-		cli.WithName(c.options.ProjectName),
+		cli.WithName(l.options.ProjectName),
 		// DEFANG SPECIFIC OPTIONS
 		cli.WithDefaultProfiles("defang"),
 		cli.WithDiscardEnvFile,
@@ -155,14 +160,14 @@ func (c *Loader) NewProjectOptions() (*cli.ProjectOptions, error) {
 					_, inEnv := os.LookupEnv(key)
 					if hasSubstitution(templ, key) {
 						// We don't (yet) support substitution patterns during deployment
-						if inEnv {
+						if inEnv && !suppressWarn {
 							term.Warnf("Environment variable %q is ignored; add it to `.env` if needed", key)
 						} else {
 							term.Debugf("Unresolved environment variable %q", key)
 						}
 						return "", false
 					}
-					if inEnv {
+					if inEnv && !suppressWarn {
 						term.Warnf("Environment variable %q is ignored; add it to `.env` or it may be resolved from config during deployment", key)
 					} else {
 						term.Debugf("Environment variable %q was not resolved locally. It may be resolved from config during deployment", key)
@@ -179,4 +184,29 @@ func hasSubstitution(s, key string) bool {
 	// Check in the original `templ` string if the variable uses any substitution patterns like - :- + :+ ? :?
 	pattern := regexp.MustCompile(`(^|[^$])\$\{` + regexp.QuoteMeta(key) + `:?[-+?]`)
 	return pattern.MatchString(s)
+}
+
+func (l *Loader) CreateProjectForDebug() (*Project, error) {
+	projOpts, err := l.newProjectOptions(true)
+	if err != nil {
+		return nil, err
+	}
+
+	// get the project name
+	if projOpts.Name == "" {
+		dir, err := os.Getwd()
+		if err != nil {
+			return nil, err
+		}
+
+		projOpts.Name = filepath.Base(dir)
+	}
+	project := &Project{
+		Name:         projOpts.Name,
+		WorkingDir:   projOpts.WorkingDir,
+		Environment:  projOpts.Environment,
+		ComposeFiles: projOpts.ConfigPaths,
+	}
+
+	return project, nil
 }
