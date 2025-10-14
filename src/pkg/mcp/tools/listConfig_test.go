@@ -8,7 +8,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -134,19 +133,9 @@ func TestHandleListConfigTool(t *testing.T) {
 			}
 			tt.setupMock(mockCLI)
 
-			// Create request
-			args := map[string]interface{}{}
-
-			request := mcp.CallToolRequest{
-				Params: mcp.CallToolParams{
-					Name:      "list_configs",
-					Arguments: args,
-				},
-			}
-
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := handleListConfigTool(t.Context(), loader, request, &tt.providerID, "test-cluster", mockCLI)
+			result, err := handleListConfigTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI)
 
 			// Verify error expectations
 			if tt.expectedError != "" {
