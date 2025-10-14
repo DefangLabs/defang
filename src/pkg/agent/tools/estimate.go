@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -12,6 +13,7 @@ import (
 )
 
 type EstimateParams struct {
+	common.LoaderParams
 	DeploymentMode modes.Mode           `json:"deployment_mode"`
 	Provider       cliClient.ProviderID `json:"provider"`
 	Region         string               `json:"region"`

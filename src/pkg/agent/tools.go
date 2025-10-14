@@ -79,5 +79,16 @@ func CollectTools(cluster string, providerId *client.ProviderID) []ai.Tool {
 				return tools.HandleLogsTool(ctx.Context, loader, params, cluster, providerId, cli)
 			},
 		),
+		ai.NewTool("estimate",
+			"Estimate the cost of deployed a Defang project to AWS or GCP",
+			func(ctx *ai.ToolContext, params tools.EstimateParams) (string, error) {
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
+				if err != nil {
+					return "Failed to configure loader", err
+				}
+				cli := &tools.DefaultToolCLI{}
+				return tools.HandleEstimateTool(ctx.Context, loader, params, cluster, cli)
+			},
+		),
 	}
 }
