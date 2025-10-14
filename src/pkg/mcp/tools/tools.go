@@ -83,29 +83,10 @@ func translateGenKitToolsToMCP(genkitTools []ai.Tool) []server.ServerTool {
 }
 
 func CollectTools(cluster string, authPort int, providerId *client.ProviderID) []server.ServerTool {
-	genkitTools := agent.CollectTools(cluster, authPort)
+	genkitTools := agent.CollectTools(cluster, authPort, providerId)
 	translatedTools := translateGenKitToolsToMCP(genkitTools)
 
 	return append(translatedTools, []server.ServerTool{
-		{
-			Tool: mcp.NewTool("services",
-				mcp.WithDescription("List deployed services for the project in the current working directory"),
-				workingDirectoryOption,
-				multipleComposeFilesOptions,
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				loader, err := common.ConfigureLoader(request)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
-				}
-				var cli agentTools.CLIInterface = &agentTools.DefaultToolCLI{}
-				output, err := agentTools.HandleServicesTool(ctx, loader, providerId, cluster, cli)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to list services", err), err
-				}
-				return mcp.NewToolResultText(output), nil
-			},
-		},
 		{
 			Tool: mcp.NewTool("deploy",
 				mcp.WithDescription("Deploy services using defang"),

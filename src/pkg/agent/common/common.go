@@ -30,21 +30,19 @@ func GetStringArg(args map[string]string, key, defaultValue string) string {
 }
 
 type LoaderParams struct {
-	WorkingDirectory string   `json:"working_directory" jsonschema:"description=The working directory containing the compose files. Usually the current directory."`
-	ProjectName      string   `json:"project_name,omitempty" jsonschema:"description=Optional: The name of the project. Useful when working with projects that are not in the current directory."`
-	ComposeFilePaths []string `json:"compose_file_paths,omitempty" jsonschema:"description=Optional: Paths to the compose files to use for the project. If not provided, defaults to the compose file in the working directory."`
+	WorkingDirectory string   `json:"working_directory" json_schema:"required"`
+	ProjectName      string   `json:"project_name,omitempty" json_schema:"required"`
+	ComposeFilePaths []string `json:"compose_file_paths,omitempty"`
 }
 
 func ConfigureAgentLoader(params LoaderParams) (*compose.Loader, error) {
 	if params.WorkingDirectory == "" {
-		params.WorkingDirectory = "."
+		return nil, errors.New("working directory cannot be empty")
 	}
 
-	if params.WorkingDirectory != "." {
-		err := os.Chdir(params.WorkingDirectory)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to change working directory: %w", err)
-		}
+	err := os.Chdir(params.WorkingDirectory)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to change working directory: %w", err)
 	}
 
 	projectName := params.ProjectName
