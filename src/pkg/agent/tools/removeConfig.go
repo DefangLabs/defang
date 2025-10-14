@@ -15,7 +15,7 @@ type RemoveConfigParams struct {
 	Name string
 }
 
-func parseRemoveConfigParams(request mcp.CallToolRequest) (RemoveConfigParams, error) {
+func ParseRemoveConfigParams(request mcp.CallToolRequest) (RemoveConfigParams, error) {
 	name, err := request.RequireString("name")
 	if err != nil || name == "" {
 		return RemoveConfigParams{}, fmt.Errorf("missing config `name`: %w", err)
@@ -25,8 +25,8 @@ func parseRemoveConfigParams(request mcp.CallToolRequest) (RemoveConfigParams, e
 	}, nil
 }
 
-// handleRemoveConfigTool handles the remove config tool logic
-func handleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader, params RemoveConfigParams, providerId *cliClient.ProviderID, cluster string, cli RemoveConfigCLIInterface) (string, error) {
+// HandleRemoveConfigTool handles the remove config tool logic
+func HandleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader, params RemoveConfigParams, providerId *cliClient.ProviderID, cluster string, cli RemoveConfigCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", fmt.Errorf("No provider configured: %w", err)

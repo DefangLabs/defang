@@ -7,8 +7,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/mcp/actions"
 )
 
-// handleSetPlaygroundProvider handles the set Playground provider MCP tool request
-func handleSetPlaygroundProvider(providerId *cliClient.ProviderID) (string, error) {
+// HandleSetPlaygroundProvider handles the set Playground provider MCP tool request
+func HandleSetPlaygroundProvider(providerId *cliClient.ProviderID) (string, error) {
 	if err := actions.SetPlaygroundProvider(providerId); err != nil {
 		return "", fmt.Errorf("Failed to set Playground provider: %w", err)
 	}

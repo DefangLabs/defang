@@ -9,8 +9,8 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-// handleSetAWSProvider handles the set AWS provider MCP tool request
-func handleSetAWSProvider(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string) (string, error) {
+// HandleSetAWSProvider handles the set AWS provider MCP tool request
+func HandleSetAWSProvider(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string) (string, error) {
 	awsId, err := request.RequireString("accessKeyId")
 	if err != nil {
 		return "", fmt.Errorf("Invalid AWS access key Id: %w", err)
