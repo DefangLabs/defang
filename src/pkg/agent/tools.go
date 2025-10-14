@@ -101,5 +101,16 @@ func CollectTools(cluster string, providerId *client.ProviderID) []ai.Tool {
 				return tools.HandleSetConfig(ctx.Context, loader, params, providerId, cluster, cli)
 			},
 		),
+		ai.NewTool("remove_config",
+			"Remove a config variable from the defang project",
+			func(ctx *ai.ToolContext, params tools.RemoveConfigParams) (string, error) {
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
+				if err != nil {
+					return "Failed to configure loader", err
+				}
+				cli := &tools.DefaultToolCLI{}
+				return tools.HandleRemoveConfigTool(ctx.Context, loader, params, providerId, cluster, cli)
+			},
+		),
 	}
 }
