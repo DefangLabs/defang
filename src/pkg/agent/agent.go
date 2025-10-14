@@ -1,11 +1,11 @@
 package agent
 
 import (
-	"bufio"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log"
-	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/firebase/genkit/go/ai"
@@ -39,32 +39,34 @@ func New(ctx context.Context, cluster string, authPort int, providerId *client.P
 }
 
 func (a *Agent) Start() error {
-	// prompt the user for input
-	scanner := bufio.NewScanner(os.Stdin)
+	reader := NewInputReader()
+	defer reader.Close()
+
 	fmt.Println("Type 'exit' to quit.")
+
 	for {
 		fmt.Print("> ")
-		if !scanner.Scan() {
-			break
-		}
 
-		input := scanner.Text()
-		if input == "exit" {
-			break
-		}
-
-		err := a.handleMessage(input)
+		input, err := reader.ReadLine()
 		if err != nil {
+			if errors.Is(err, ErrInterrupted) {
+				fmt.Println("\nReceived termination signal, shutting down...")
+				return nil
+			}
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			return fmt.Errorf("error reading input: %w", err)
+		}
+
+		if input == "exit" {
+			return nil
+		}
+
+		if err := a.handleMessage(input); err != nil {
 			log.Printf("Error handling message: %v", err)
-			continue
 		}
 	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error reading input: %w", err)
-	}
-
-	return nil
 }
 
 func (a *Agent) handleMessage(msg string) error {
