@@ -54,7 +54,7 @@ func NewDefangMCPServer(version string, cluster string, providerID *cliClient.Pr
 		return nil, fmt.Errorf("failed to setup knowledge base: %w", err)
 	}
 
-	defangTools := tools.CollectTools(cluster, providerID, cli)
+	defangTools := tools.CollectTools(cluster, providerID)
 	s := server.NewMCPServer(
 		"Deploy with Defang",
 		version,
