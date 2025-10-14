@@ -2,13 +2,11 @@ package tools
 
 import (
 	"context"
-	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/agent"
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	agentTools "github.com/DefangLabs/defang/src/pkg/agent/tools"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -86,39 +84,6 @@ func CollectTools(cluster string, providerId *client.ProviderID, cli agentTools.
 	translatedTools := translateGenKitToolsToMCP(genkitTools)
 
 	return append(translatedTools, []server.ServerTool{
-		{
-			Tool: mcp.NewTool("estimate",
-				mcp.WithDescription("Estimate the cost of deployed a Defang project."),
-				workingDirectoryOption,
-				multipleComposeFilesOptions,
-				mcp.WithString("provider",
-					mcp.Description("The cloud provider to estimate costs for. Supported options are AWS or GCP"),
-					mcp.DefaultString(strings.ToUpper(providerId.String())),
-					mcp.Enum("AWS", "GCP"),
-				),
-				mcp.WithString("deployment_mode",
-					mcp.Description("The deployment mode for the estimate. Options are: "+strings.Join(modes.AllDeploymentModes(), ", ")),
-					mcp.DefaultString("AFFORDABLE"),
-					mcp.Enum(modes.AllDeploymentModes()...),
-				),
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				loader, err := common.ConfigureLoader(request)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
-				}
-				params, err := agentTools.ParseEstimateParams(request, providerId)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to parse estimate parameters", err), err
-				}
-				cli := &agentTools.DefaultToolCLI{}
-				output, err := agentTools.HandleEstimateTool(ctx, loader, params, cluster, cli)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to estimate costs", err), err
-				}
-				return mcp.NewToolResultText(output), nil
-			},
-		},
 		{
 			Tool: mcp.NewTool("set_config",
 				mcp.WithDescription("Tail logs for a deployment."),
