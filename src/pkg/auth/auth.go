@@ -2,11 +2,11 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"html/template"
 	"log/slog"
 	"net/http"
-	"net/http/httptest"
 	"strconv"
 	"strings"
 	"time"
@@ -136,44 +136,11 @@ func ServeAuthCodeFlowServer(ctx context.Context, authPort int, tenant types.Ten
 }
 
 func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, error) {
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
-	// Generate random state
-	var state string
+	redirectUri := openAuthClient.GetPollRedirectURI()
 
-	// Create a channel to wait for the server to finish
-	ch := make(chan string)
-	defer close(ch)
-
-	var authorizeUrl string
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" {
-			http.Redirect(w, r, authorizeUrl, http.StatusFound)
-			return
-		}
-		if r.URL.Path != "/auth" {
-			http.NotFound(w, r)
-			return
-		}
-		var msg string
-		query := r.URL.Query()
-		switch {
-		case query.Get("error") != "":
-			msg = "Authentication failed: " + query.Get("error_description")
-		case query.Get("state") != state:
-			msg = "Authentication error: state mismatch"
-		default:
-			msg = "Authentication successful"
-			ch <- query.Get("code")
-		}
-		authTemplate.Execute(w, struct{ StatusMessage string }{msg})
-	})
-
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	redirectUri := server.URL + "/auth"
 	opts := []AuthorizeOption{
 		WithPkce(),
 	}
@@ -182,16 +149,16 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, er
 		return AuthCodeFlow{}, err
 	}
 
-	state = ar.state
-	authorizeUrl = ar.url.String()
+	state := ar.state
+	authorizeUrl := ar.url.String()
 	term.Debug("Authorization URL:", authorizeUrl)
 
-	n, _ := term.Printf("Please visit %s and log in. (Right click the URL or press ENTER to open browser)\r", server.URL)
+	n, _ := term.Printf("Please visit the authorization URL to log in. (Right click the URL or press ENTER to open browser)\r")
 	defer term.Print(strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
 
 	// TODO:This is used to open the browser for GitHub Auth before blocking
 	if mcpFlow {
-		err := browser.OpenURL(server.URL)
+		err := browser.OpenURL(authorizeUrl)
 		if err != nil {
 			return AuthCodeFlow{}, fmt.Errorf("failed to open browser: %w", err)
 		}
@@ -209,7 +176,7 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, er
 			case 3: // Ctrl-C
 				cancel()
 			case 10, 13: // Enter or Return
-				err := browser.OpenURL(server.URL)
+				err := browser.OpenURL(authorizeUrl)
 				if err != nil {
 					term.Errorf("failed to open browser: %v", err)
 				}
@@ -218,10 +185,15 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, er
 		}
 	}()
 
-	select {
-	case <-ctx.Done():
-		return AuthCodeFlow{}, ctx.Err()
-	case code := <-ch:
+	for {
+		code, err := openAuthClient.Poll(ctx, state)
+		if err != nil {
+			if errors.Is(err, ErrPollTimeout) {
+				term.Debug("poll timed out, retrying...")
+				continue // just retry
+			}
+			return AuthCodeFlow{}, err
+		}
 		return AuthCodeFlow{code: code, redirectUri: redirectUri, verifier: ar.verifier}, nil
 	}
 }
