@@ -108,8 +108,8 @@ var windsurfConfig = ClientInfo{
 }
 
 var vscodeCodespacesConfig = ClientInfo{
-	configFile: ".vscode/mcp.json",
-	useHomeDir: true,
+	configFile: "/root/.vscode-remote/data/User",
+	useHomeDir: false,
 }
 
 var vscodeConfig = ClientInfo{
