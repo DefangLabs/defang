@@ -30,7 +30,9 @@ type OpenAuthService struct{}
 func (g OpenAuthService) login(ctx context.Context, client client.FabricClient, fabric string, flow LoginFlow) (string, error) {
 	term.Debug("Logging in to", fabric)
 
-	code, err := auth.StartAuthCodeFlow(ctx, flow)
+	code, err := auth.StartAuthCodeFlow(ctx, flow, func(token string) {
+		cluster.SaveAccessToken(fabric, token)
+	})
 	if err != nil {
 		return "", err
 	}

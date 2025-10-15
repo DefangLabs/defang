@@ -18,12 +18,14 @@ func Token(ctx context.Context, client client.FabricClient, tenant types.TenantN
 		return dryrun.ErrDryRun
 	}
 
-	code, err := auth.StartAuthCodeFlow(ctx, true)
+	code, err := auth.StartAuthCodeFlow(ctx, true, func(token string) {
+		panic("should not be called here")
+	})
 	if err != nil {
 		return err
 	}
 
-	at, err := auth.ExchangeCodeForToken(ctx, code, tenant, dur, s)
+	at, err := auth.ExchangeCodeForToken(ctx, code, s)
 	if err != nil {
 		return err
 	}

@@ -118,7 +118,7 @@ func ServeAuthCodeFlowServer(ctx context.Context, authPort int, tenant types.Ten
 			slog.Error("authentication error: state mismatch", "state", query.Get("state"), "expected", ar.state)
 		default:
 			msg = "Authentication successful"
-			token, err := ExchangeCodeForToken(ctx, AuthCodeFlow{code: query.Get("code"), redirectUri: redirectUri, verifier: ar.verifier}, tenant, 0)
+			token, err := ExchangeCodeForToken(ctx, AuthCodeFlow{code: query.Get("code"), redirectUri: redirectUri, verifier: ar.verifier})
 			if err != nil {
 				slog.Error("failed to exchange code for token", "error", err)
 				msg = "Authentication failed: " + err.Error()
@@ -144,7 +144,7 @@ func ServeAuthCodeFlowServer(ctx context.Context, authPort int, tenant types.Ten
 	return nil
 }
 
-func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, error) {
+func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(string)) (AuthCodeFlow, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
@@ -169,6 +169,20 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, er
 	if mcpFlow {
 		err := browser.OpenURL(authorizeUrl)
 		if err != nil {
+			go func() {
+				 code, err := PollForAuthCode(ctx, state)
+				 if err != nil {
+					 term.Errorf("failed to poll for auth code: %v", err)
+					 return
+				 }
+				 
+				 token, err := ExchangeCodeForToken(ctx, AuthCodeFlow{code: code, redirectUri: redirectUri, verifier: ar.verifier})
+				 if err != nil {
+					 term.Errorf("failed to exchange code for token: %v", err)
+					 return
+				 }
+				 saveToken(token)
+			}()
 			return AuthCodeFlow{}, ErrNoBrowser{Err: err, URL: authorizeUrl}
 		}
 	} else {
@@ -193,7 +207,15 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, er
 			}
 		}()
 	}
+	
+	code, err := PollForAuthCode(ctx, state)
+	if err != nil {
+		return AuthCodeFlow{}, err
+	}
+	return AuthCodeFlow{code: code, redirectUri: redirectUri, verifier: ar.verifier}, nil
+}
 
+func PollForAuthCode(ctx context.Context, state string) (string, error) {
 	for {
 		code, err := openAuthClient.Poll(ctx, state)
 		if err != nil {
@@ -201,13 +223,13 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, er
 				term.Debug("poll timed out, retrying...")
 				continue // just retry
 			}
-			return AuthCodeFlow{}, err
+			return "", err
 		}
-		return AuthCodeFlow{code: code, redirectUri: redirectUri, verifier: ar.verifier}, nil
+		return code, nil
 	}
 }
 
-func ExchangeCodeForToken(ctx context.Context, code AuthCodeFlow, tenant types.TenantName, ttl time.Duration, ss ...scope.Scope) (string, error) {
+func ExchangeCodeForToken(ctx context.Context, code AuthCodeFlow, ss ...scope.Scope) (string, error) {
 	var scopes []string
 	for _, s := range ss {
 		if s == scope.Admin {
@@ -217,7 +239,7 @@ func ExchangeCodeForToken(ctx context.Context, code AuthCodeFlow, tenant types.T
 		scopes = append(scopes, s.String())
 	}
 
-	term.Debugf("Generating token for tenant %q with scopes %v", tenant, scopes)
+	term.Debugf("Generating token with scopes %v", scopes)
 
 	token, err := openAuthClient.Exchange(code.code, code.redirectUri, code.verifier) // TODO: scopes, TTL
 	if err != nil {
