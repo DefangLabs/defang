@@ -136,12 +136,12 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 func (a *AwsEcs) SetUp(ctx context.Context, containers []types.Container) error {
 	tmpl, err := createTemplate(a.stackName, containers, TemplateOverrides{VpcID: a.VpcID, Spot: a.Spot})
 	if err != nil {
-		return fmt.Errorf("failed to create cloud formation template: %w", err)
+		return fmt.Errorf("failed to create CloudFormation template: %w", err)
 	}
 
 	template, err := tmpl.YAML()
 	if err != nil {
-		return fmt.Errorf("failed to marshal Cloud Formation template as YAML: %w", err)
+		return fmt.Errorf("failed to marshal CloudFormation template as YAML: %w", err)
 	}
 
 	// Upsert
