@@ -18,8 +18,8 @@ func Token(ctx context.Context, client client.FabricClient, tenant types.TenantN
 		return dryrun.ErrDryRun
 	}
 
-	code, err := auth.StartAuthCodeFlow(ctx, true, func(token string) {
-		panic("should not be called here")
+	code, err := auth.StartAuthCodeFlow(ctx, false, func(token string) {
+		term.Debug("Getting access token for scope:", s)
 	})
 	if err != nil {
 		return err
