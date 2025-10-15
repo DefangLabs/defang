@@ -69,6 +69,11 @@ type AuthCodeFlow struct {
 	verifier    string
 }
 
+type authResult struct {
+	authCodeFlow AuthCodeFlow
+	err          error
+}
+
 type LoginFlow bool
 
 const (
@@ -135,10 +140,7 @@ func ServeAuthCodeFlowServer(ctx context.Context, authPort int, tenant types.Ten
 	return nil
 }
 
-func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-	defer cancel()
-
+func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (string, <-chan authResult, error) {
 	redirectUri := openAuthClient.GetPollRedirectURI()
 
 	opts := []AuthorizeOption{
@@ -146,7 +148,7 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, er
 	}
 	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, opts...)
 	if err != nil {
-		return AuthCodeFlow{}, err
+		return "", nil, err
 	}
 
 	state := ar.state
@@ -160,9 +162,12 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, er
 	if mcpFlow {
 		err := browser.OpenURL(authorizeUrl)
 		if err != nil {
-			return AuthCodeFlow{}, fmt.Errorf("failed to open browser: %w", err)
+			return "", nil, fmt.Errorf("failed to open browser: %w", err)
 		}
 	}
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
 
 	input := term.NewNonBlockingStdin()
 	defer input.Close() // abort the read
@@ -185,17 +190,53 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, er
 		}
 	}()
 
-	for {
-		code, err := openAuthClient.Poll(ctx, state)
-		if err != nil {
-			if errors.Is(err, ErrPollTimeout) {
-				term.Debug("poll timed out, retrying...")
-				continue // just retry
-			}
-			return AuthCodeFlow{}, err
-		}
-		return AuthCodeFlow{code: code, redirectUri: redirectUri, verifier: ar.verifier}, nil
+	ch := startAuthPolling(ctx, state, redirectUri, ar.verifier)
+
+	result := <-ch
+	if result.err != nil {
+		return "", nil, result.err
 	}
+	return ar.url.String(), ch, nil
+}
+
+func startAuthPolling(ctx context.Context, state, redirectUri, verifier string) <-chan authResult {
+	ch := make(chan authResult, 1) // buffered channel
+
+	go func() {
+		defer close(ch)
+
+		for {
+			select {
+			case <-ctx.Done():
+				ch <- authResult{err: ctx.Err()}
+				return
+			default:
+				code, err := openAuthClient.Poll(ctx, state)
+				if err != nil {
+					if errors.Is(err, ErrPollTimeout) {
+						term.Debug("poll timed out, retrying...")
+						continue // just retry
+					}
+					if errors.Is(err, context.DeadlineExceeded) {
+						ch <- authResult{err: errors.New("timed out waiting for authorization")}
+						return
+					}
+					ch <- authResult{err: err}
+					return
+				}
+				ch <- authResult{
+					authCodeFlow: AuthCodeFlow{
+						code:        code,
+						redirectUri: redirectUri,
+						verifier:    verifier,
+					},
+				}
+				return
+			}
+		}
+	}()
+
+	return ch
 }
 
 func ExchangeCodeForToken(ctx context.Context, code AuthCodeFlow, tenant types.TenantName, ttl time.Duration, ss ...scope.Scope) (string, error) {
