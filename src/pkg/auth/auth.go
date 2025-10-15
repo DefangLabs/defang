@@ -76,11 +76,27 @@ const (
 	McpFlow LoginFlow = true
 )
 
-// ServeAuthCodeFlowServer serves the auth code flow server and will save the auth token to the file when it has been received.
-// The server will run on the port that is specified by authPort. The server will continue to run indefinitely.
+// buildRedirectUri constructs the appropriate redirect URI based on the environment
+func buildRedirectUri(authPort int) string {
+	// Check if we're running in GitHub Codespaces
+	if codespaceURL := pkg.Getenv("CODESPACE_NAME", ""); codespaceURL != "" {
+		// In Codespaces, construct the public URL
+		// Format: https://{codespace-name}-{port}.app.github.dev
+		redirectUri := fmt.Sprintf("https://%s-%d.app.github.dev/auth", codespaceURL, authPort)
+		term.Debug("Detected GitHub Codespaces environment, using redirect URI:", redirectUri)
+		return redirectUri
+	}
+
+	// Default to localhost for local development
+	redirectUri := fmt.Sprintf("http://127.0.0.1:%d/auth", authPort)
+	term.Debug("Using local development redirect URI:", redirectUri)
+	return redirectUri
+}
+
 // TODO: make the server stop once we have the code
 func ServeAuthCodeFlowServer(ctx context.Context, authPort int, tenant types.TenantName, saveToken func(string)) error {
-	redirectUri := "http://127.0.0.1:" + strconv.Itoa(authPort) + "/auth"
+	// Detect if we're running in GitHub Codespaces
+	redirectUri := buildRedirectUri(authPort)
 
 	// Get the authorization URL before setting up the handler
 	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, WithPkce())
@@ -98,6 +114,17 @@ func ServeAuthCodeFlowServer(ctx context.Context, authPort int, tenant types.Ten
 			http.NotFound(w, r)
 			return
 		}
+
+		// Handle forwarded headers (for reverse proxies like Codespaces)
+		if scheme := r.Header.Get("X-Forwarded-Proto"); scheme != "" {
+			r.URL.Scheme = scheme
+		}
+
+		if host := r.Header.Get("X-Forwarded-Host"); host != "" {
+			r.Host = host
+			r.URL.Host = host
+		}
+
 		var msg string
 		query := r.URL.Query()
 		switch {
