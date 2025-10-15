@@ -2,7 +2,9 @@ package tools
 
 import (
 	"context"
+	"errors"
 
+	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
@@ -18,7 +20,10 @@ func handleLoginTool(ctx context.Context, cluster string, authPort int, cli Logi
 		term.Debug("Function invoked: cli.InteractiveLoginPrompt")
 		err = cli.InteractiveLoginMCP(ctx, client, cluster)
 		if err != nil {
-			return "", err
+			var noBrowserErr auth.ErrNoBrowser
+			if errors.As(err, &noBrowserErr) {
+				return noBrowserErr.Error(), nil
+			}
 		}
 	}
 

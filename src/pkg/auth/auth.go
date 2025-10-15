@@ -63,6 +63,15 @@ var (
 	authTemplate = template.Must(template.New("auth").Parse(authTemplateString))
 )
 
+type ErrNoBrowser struct {
+	Err error
+	URL string
+}
+
+func (e ErrNoBrowser) Error() string {
+	return fmt.Sprintf("failed to open browser: %v. Please open the following URL in your browser: %s", e.Err, e.URL)
+}
+
 type AuthCodeFlow struct {
 	code        string
 	redirectUri string
@@ -160,30 +169,30 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, er
 	if mcpFlow {
 		err := browser.OpenURL(authorizeUrl)
 		if err != nil {
-			return AuthCodeFlow{}, fmt.Errorf("failed to open browser: %w", err)
+			return AuthCodeFlow{}, ErrNoBrowser{Err: err, URL: authorizeUrl}
 		}
-	}
-
-	input := term.NewNonBlockingStdin()
-	defer input.Close() // abort the read
-	go func() {
-		var b [1]byte
-		for {
-			if _, err := input.Read(b[:]); err != nil {
-				return // exit goroutine
-			}
-			switch b[0] {
-			case 3: // Ctrl-C
-				cancel()
-			case 10, 13: // Enter or Return
-				err := browser.OpenURL(authorizeUrl)
-				if err != nil {
-					term.Errorf("failed to open browser: %v", err)
+	} else {
+		input := term.NewNonBlockingStdin()
+		defer input.Close() // abort the read
+		go func() {
+			var b [1]byte
+			for {
+				if _, err := input.Read(b[:]); err != nil {
+					return // exit goroutine
 				}
-			default:
+				switch b[0] {
+				case 3: // Ctrl-C
+					cancel()
+				case 10, 13: // Enter or Return
+					err := browser.OpenURL(authorizeUrl)
+					if err != nil {
+						term.Errorf("failed to open browser: %v", err)
+					}
+				default:
+				}
 			}
-		}
-	}()
+		}()
+	}
 
 	for {
 		code, err := openAuthClient.Poll(ctx, state)
