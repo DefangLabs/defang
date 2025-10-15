@@ -167,7 +167,7 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 	// TODO:This is used to open the browser for GitHub Auth before blocking
 	if mcpFlow {
 		err := browser.OpenURL(authorizeUrl)
-		if err == nil {
+		if err != nil {
 			go func() {
 				ctx := context.Background()
 				term.Debug("Function invoked: PollForAuthCode")
