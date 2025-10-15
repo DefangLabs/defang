@@ -24,6 +24,7 @@ func handleLoginTool(ctx context.Context, cluster string, authPort int, cli Logi
 			if errors.As(err, &noBrowserErr) {
 				return noBrowserErr.Error(), nil
 			}
+			return "", err
 		}
 	}
 
