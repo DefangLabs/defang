@@ -60,6 +60,7 @@ func NewDefangMCPServer(version string, cluster string, authPort int, providerID
 		server.WithResourceCapabilities(true, true),
 		server.WithPromptCapabilities(true),
 		server.WithToolCapabilities(true),
+		server.WithLogging(),
 		server.WithInstructions(prepareInstructions(defangTools)),
 	)
 

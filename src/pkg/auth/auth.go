@@ -145,9 +145,8 @@ func ServeAuthCodeFlowServer(ctx context.Context, authPort int, tenant types.Ten
 }
 
 func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(string)) (AuthCodeFlow, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-
 	redirectUri := openAuthClient.GetPollRedirectURI()
 
 	opts := []AuthorizeOption{
@@ -168,20 +167,26 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 	// TODO:This is used to open the browser for GitHub Auth before blocking
 	if mcpFlow {
 		err := browser.OpenURL(authorizeUrl)
-		if err != nil {
+		if err == nil {
 			go func() {
-				 code, err := PollForAuthCode(ctx, state)
-				 if err != nil {
-					 term.Errorf("failed to poll for auth code: %v", err)
-					 return
-				 }
-				 
-				 token, err := ExchangeCodeForToken(ctx, AuthCodeFlow{code: code, redirectUri: redirectUri, verifier: ar.verifier})
-				 if err != nil {
-					 term.Errorf("failed to exchange code for token: %v", err)
-					 return
-				 }
-				 saveToken(token)
+				ctx := context.Background()
+				term.Debug("Function invoked: PollForAuthCode")
+				code, err := PollForAuthCode(ctx, state)
+				term.Debug("Polled auth code:", code)
+				if err != nil {
+					term.Errorf("failed to poll for auth code: %v", err)
+					return
+				}
+
+				term.Debug("Function invoked: ExchangeCodeForToken")
+				token, err := ExchangeCodeForToken(ctx, AuthCodeFlow{code: code, redirectUri: redirectUri, verifier: ar.verifier})
+				term.Debug("Exchanged token:", token)
+				if err != nil {
+					term.Errorf("failed to exchange code for token: %v", err)
+					return
+				}
+				term.Debug("Function invoked: SaveToken")
+				saveToken(token)
 			}()
 			return AuthCodeFlow{}, ErrNoBrowser{Err: err, URL: authorizeUrl}
 		}
@@ -207,7 +212,7 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 			}
 		}()
 	}
-	
+
 	code, err := PollForAuthCode(ctx, state)
 	if err != nil {
 		return AuthCodeFlow{}, err
@@ -216,6 +221,9 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 }
 
 func PollForAuthCode(ctx context.Context, state string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+
 	for {
 		code, err := openAuthClient.Poll(ctx, state)
 		if err != nil {
