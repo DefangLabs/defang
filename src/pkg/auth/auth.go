@@ -69,7 +69,7 @@ type ErrNoBrowser struct {
 }
 
 func (e ErrNoBrowser) Error() string {
-	return fmt.Sprintf("failed to open browser: %v. Please open the following URL in your browser: %s", e.Err, e.URL)
+	return fmt.Sprintf("failed to open browser: %v. Please open the following URL in a browser to login: %s", e.Err, e.URL)
 }
 
 type AuthCodeFlow struct {
