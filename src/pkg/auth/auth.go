@@ -63,6 +63,15 @@ var (
 	authTemplate = template.Must(template.New("auth").Parse(authTemplateString))
 )
 
+type ErrNoBrowser struct {
+	Err error
+	URL string
+}
+
+func (e ErrNoBrowser) Error() string {
+	return fmt.Sprintf("failed to open browser: %v. Please open the following URL in a browser to login: %s", e.Err, e.URL)
+}
+
 type AuthCodeFlow struct {
 	code        string
 	redirectUri string
@@ -109,7 +118,7 @@ func ServeAuthCodeFlowServer(ctx context.Context, authPort int, tenant types.Ten
 			slog.Error("authentication error: state mismatch", "state", query.Get("state"), "expected", ar.state)
 		default:
 			msg = "Authentication successful"
-			token, err := ExchangeCodeForToken(ctx, AuthCodeFlow{code: query.Get("code"), redirectUri: redirectUri, verifier: ar.verifier}, tenant, 0)
+			token, err := ExchangeCodeForToken(ctx, AuthCodeFlow{code: query.Get("code"), redirectUri: redirectUri, verifier: ar.verifier})
 			if err != nil {
 				slog.Error("failed to exchange code for token", "error", err)
 				msg = "Authentication failed: " + err.Error()
@@ -135,10 +144,9 @@ func ServeAuthCodeFlowServer(ctx context.Context, authPort int, tenant types.Ten
 	return nil
 }
 
-func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(string)) (AuthCodeFlow, error) {
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-
 	redirectUri := openAuthClient.GetPollRedirectURI()
 
 	opts := []AuthorizeOption{
@@ -153,37 +161,64 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, er
 	authorizeUrl := ar.url.String()
 	term.Debug("Authorization URL:", authorizeUrl)
 
-	n, _ := term.Printf("Please visit the authorization URL to log in. (Right click the URL or press ENTER to open browser)\r")
+	n, _ := term.Printf("Please visit %s to log in. (Right click the URL or press ENTER to open browser)\r", authorizeUrl)
 	defer term.Print(strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
 
 	// TODO:This is used to open the browser for GitHub Auth before blocking
 	if mcpFlow {
 		err := browser.OpenURL(authorizeUrl)
 		if err != nil {
-			return AuthCodeFlow{}, fmt.Errorf("failed to open browser: %w", err)
+			go func() {
+				ctx := context.Background()
+				code, err := PollForAuthCode(ctx, state)
+				if err != nil {
+					term.Errorf("failed to poll for auth code: %v", err)
+					return
+				}
+
+				token, err := ExchangeCodeForToken(ctx, AuthCodeFlow{code: code, redirectUri: redirectUri, verifier: ar.verifier})
+				if err != nil {
+					term.Errorf("failed to exchange code for token: %v", err)
+					return
+				}
+
+				saveToken(token)
+			}()
+			return AuthCodeFlow{}, ErrNoBrowser{Err: err, URL: authorizeUrl}
 		}
+	} else {
+		input := term.NewNonBlockingStdin()
+		defer input.Close() // abort the read
+		go func() {
+			var b [1]byte
+			for {
+				if _, err := input.Read(b[:]); err != nil {
+					return // exit goroutine
+				}
+				switch b[0] {
+				case 3: // Ctrl-C
+					cancel()
+				case 10, 13: // Enter or Return
+					err := browser.OpenURL(authorizeUrl)
+					if err != nil {
+						term.Errorf("failed to open browser: %v", err)
+					}
+				default:
+				}
+			}
+		}()
 	}
 
-	input := term.NewNonBlockingStdin()
-	defer input.Close() // abort the read
-	go func() {
-		var b [1]byte
-		for {
-			if _, err := input.Read(b[:]); err != nil {
-				return // exit goroutine
-			}
-			switch b[0] {
-			case 3: // Ctrl-C
-				cancel()
-			case 10, 13: // Enter or Return
-				err := browser.OpenURL(authorizeUrl)
-				if err != nil {
-					term.Errorf("failed to open browser: %v", err)
-				}
-			default:
-			}
-		}
-	}()
+	code, err := PollForAuthCode(ctx, state)
+	if err != nil {
+		return AuthCodeFlow{}, err
+	}
+	return AuthCodeFlow{code: code, redirectUri: redirectUri, verifier: ar.verifier}, nil
+}
+
+func PollForAuthCode(ctx context.Context, state string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
 
 	for {
 		code, err := openAuthClient.Poll(ctx, state)
@@ -192,13 +227,14 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, er
 				term.Debug("poll timed out, retrying...")
 				continue // just retry
 			}
-			return AuthCodeFlow{}, err
+			return "", err
 		}
-		return AuthCodeFlow{code: code, redirectUri: redirectUri, verifier: ar.verifier}, nil
+
+		return code, nil
 	}
 }
 
-func ExchangeCodeForToken(ctx context.Context, code AuthCodeFlow, tenant types.TenantName, ttl time.Duration, ss ...scope.Scope) (string, error) {
+func ExchangeCodeForToken(ctx context.Context, code AuthCodeFlow, ss ...scope.Scope) (string, error) {
 	var scopes []string
 	for _, s := range ss {
 		if s == scope.Admin {
@@ -208,7 +244,7 @@ func ExchangeCodeForToken(ctx context.Context, code AuthCodeFlow, tenant types.T
 		scopes = append(scopes, s.String())
 	}
 
-	term.Debugf("Generating token for tenant %q with scopes %v", tenant, scopes)
+	term.Debugf("Generating token with scopes %v", scopes)
 
 	token, err := openAuthClient.Exchange(code.code, code.redirectUri, code.verifier) // TODO: scopes, TTL
 	if err != nil {

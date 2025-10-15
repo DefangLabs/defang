@@ -30,13 +30,14 @@ type OpenAuthService struct{}
 func (g OpenAuthService) login(ctx context.Context, client client.FabricClient, fabric string, flow LoginFlow) (string, error) {
 	term.Debug("Logging in to", fabric)
 
-	code, err := auth.StartAuthCodeFlow(ctx, flow)
+	code, err := auth.StartAuthCodeFlow(ctx, flow, func(token string) {
+		cluster.SaveAccessToken(fabric, token)
+	})
 	if err != nil {
 		return "", err
 	}
 
-	tenant, _ := cluster.SplitTenantHost(fabric)
-	return auth.ExchangeCodeForToken(ctx, code, tenant, 0) // no scopes = unrestricted
+	return auth.ExchangeCodeForToken(ctx, code) // no scopes = unrestricted
 }
 
 func (g OpenAuthService) serveAuthServer(ctx context.Context, fabric string, authPort int) error {

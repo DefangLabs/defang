@@ -152,7 +152,7 @@ func NewClient(clientID, issuer string) *client {
 }
 
 func (c client) GetPollRedirectURI() string {
-	return fmt.Sprintf("%s/clients/auth", c.issuer)
+	return c.issuer + "/clients/auth"
 }
 
 func (c client) Poll(ctx context.Context, state string) (string, error) {
