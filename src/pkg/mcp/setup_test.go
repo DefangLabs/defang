@@ -231,12 +231,12 @@ func TestGetClientConfigPath(t *testing.T) {
 			expectedPath:  filepath.Join("/home/testuser/.config", "Code - Insiders/User/mcp.json"),
 		},
 
-		// VSCode Codespaces tests - Darwin
+		// VSCode Codespaces tests
 		{
 			name:         "vscode_codespaces_darwin",
 			client:       MCPClientVSCodeCodespaces,
-			goos:         "darwin",
-			expectedPath: filepath.Join(homeDir, ".vscode/mcp.json"),
+			goos:         "linux",
+			expectedPath: filepath.Join(homeDir, ".vscode-remote/data/User/mcp.json"),
 		},
 
 		// Error cases

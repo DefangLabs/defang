@@ -108,8 +108,8 @@ var windsurfConfig = ClientInfo{
 }
 
 var vscodeCodespacesConfig = ClientInfo{
-	configFile: "/root/.vscode-remote/data/User",
-	useHomeDir: false,
+	configFile: ".vscode-remote/data/User/mcp.json",
+	useHomeDir: true,
 }
 
 var vscodeConfig = ClientInfo{
@@ -284,7 +284,7 @@ func configureDefangMCPServer(configPath string, client MCPClient) error {
 
 	var key string
 	switch client {
-	case MCPClientVSCode, MCPClientVSCodeInsiders:
+	case MCPClientVSCode, MCPClientVSCodeInsiders, MCPClientVSCodeCodespaces:
 		key = "servers"
 	case MCPClientCodex:
 		// Codex uses TOML format and a different key
