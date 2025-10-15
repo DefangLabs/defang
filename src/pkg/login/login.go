@@ -37,8 +37,7 @@ func (g OpenAuthService) login(ctx context.Context, client client.FabricClient, 
 		return "", err
 	}
 
-	tenant, _ := cluster.SplitTenantHost(fabric)
-	return auth.ExchangeCodeForToken(ctx, code, tenant, 0) // no scopes = unrestricted
+	return auth.ExchangeCodeForToken(ctx, code) // no scopes = unrestricted
 }
 
 func (g OpenAuthService) serveAuthServer(ctx context.Context, fabric string, authPort int) error {
