@@ -170,22 +170,18 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 		if err != nil {
 			go func() {
 				ctx := context.Background()
-				term.Debug("Function invoked: PollForAuthCode")
 				code, err := PollForAuthCode(ctx, state)
-				term.Debug("Polled auth code:", code)
 				if err != nil {
 					term.Errorf("failed to poll for auth code: %v", err)
 					return
 				}
 
-				term.Debug("Function invoked: ExchangeCodeForToken")
 				token, err := ExchangeCodeForToken(ctx, AuthCodeFlow{code: code, redirectUri: redirectUri, verifier: ar.verifier})
-				term.Debug("Exchanged token:", token)
 				if err != nil {
 					term.Errorf("failed to exchange code for token: %v", err)
 					return
 				}
-				term.Debug("Function invoked: SaveToken")
+
 				saveToken(token)
 			}()
 			return AuthCodeFlow{}, ErrNoBrowser{Err: err, URL: authorizeUrl}
