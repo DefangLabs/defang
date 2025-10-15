@@ -161,7 +161,7 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 	authorizeUrl := ar.url.String()
 	term.Debug("Authorization URL:", authorizeUrl)
 
-	n, _ := term.Printf("Please visit the authorization URL to log in. (Right click the URL or press ENTER to open browser)\r")
+	n, _ := term.Printf("Please visit the authorization URL: %s to log in. (Right click the URL or press ENTER to open browser)\r", authorizeUrl)
 	defer term.Print(strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
 
 	// TODO:This is used to open the browser for GitHub Auth before blocking
