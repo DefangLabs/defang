@@ -229,6 +229,10 @@ func PollForAuthCode(ctx context.Context, state string) (string, error) {
 			}
 			return "", err
 		}
+
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
 		return code, nil
 	}
 }
