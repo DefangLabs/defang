@@ -30,7 +30,6 @@ var mcpServerCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		authPort, _ := cmd.Flags().GetInt("auth-server")
 		ideClient, _ := cmd.Flags().GetString("client")
-		term.SetDebug(true)
 
 		mcpClient, err := mcp.ParseMCPClient(ideClient)
 		if err != nil {
@@ -45,6 +44,7 @@ var mcpServerCmd = &cobra.Command{
 		} else {
 			defer logFile.Close()
 			term.DefaultTerm = term.NewTerm(os.Stdin, logFile, logFile)
+			term.SetDebug(true)
 		}
 
 		cluster := getCluster()
