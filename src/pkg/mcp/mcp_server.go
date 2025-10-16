@@ -66,6 +66,8 @@ func NewDefangMCPServer(version string, cluster string, authPort int, providerID
 	resources.SetupResources(s)
 	prompts.SetupPrompts(s, cluster, providerID)
 
+	common.MCPDevelopmentClient = string(client)
+
 	toolTracker := ToolTracker{
 		providerId: string(*providerID),
 		cluster:    cluster,
