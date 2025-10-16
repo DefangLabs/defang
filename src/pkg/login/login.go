@@ -27,7 +27,7 @@ type AuthService interface {
 
 type OpenAuthService struct{}
 
-func (g OpenAuthService) login(ctx context.Context, client client.FabricClient, fabric string, flow LoginFlow) (string, error) {
+func (OpenAuthService) login(ctx context.Context, client client.FabricClient, fabric string, flow LoginFlow) (string, error) {
 	term.Debug("Logging in to", fabric)
 
 	code, err := auth.StartAuthCodeFlow(ctx, flow, func(token string) {
@@ -40,7 +40,7 @@ func (g OpenAuthService) login(ctx context.Context, client client.FabricClient, 
 	return auth.ExchangeCodeForToken(ctx, code) // no scopes = unrestricted
 }
 
-func (g OpenAuthService) serveAuthServer(ctx context.Context, fabric string, authPort int) error {
+func (OpenAuthService) serveAuthServer(ctx context.Context, fabric string, authPort int) error {
 	term.Debug("Logging in to", fabric)
 
 	tenant, _ := cluster.SplitTenantHost(fabric)
