@@ -1,0 +1,5 @@
+ ! service "autoscaled": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "default": high-availability mode requires at least 2 replicas or x-defang-autoscaling
+ ! service "default": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "deploy": high-availability mode requires at least 2 replicas or x-defang-autoscaling
+ ! service "replicated": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
