@@ -20,6 +20,7 @@ import (
 
 var openAuthClient = NewClient("defang-cli", pkg.Getenv("DEFANG_ISSUER", "https://auth.defang.io"))
 
+// TODO: Remove
 const (
 	authTemplateString = `<!DOCTYPE html>
 <html>
@@ -85,6 +86,7 @@ const (
 	McpFlow LoginFlow = true
 )
 
+// TODO: Remove
 // ServeAuthCodeFlowServer serves the auth code flow server and will save the auth token to the file when it has been received.
 // The server will run on the port that is specified by authPort. The server will continue to run indefinitely.
 // TODO: make the server stop once we have the code
@@ -231,6 +233,7 @@ func pollForAuthCode(ctx context.Context, state string) (string, error) {
 			var unexpectedError ErrUnexpectedStatus
 			if errors.As(err, &unexpectedError) && unexpectedError.StatusCode >= 500 {
 				term.Debug("received server error, retrying...")
+				// TODO: replace with Hashicorp HTTP client from our own http package and remove all the old Docker Auth code; https://github.com/DefangLabs/defang/pull/1536/files#r2436696774
 				pkg.SleepWithContext(ctx, time.Second)
 				continue // retry
 			}
