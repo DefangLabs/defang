@@ -5,18 +5,19 @@ import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
 type SetConfigParams struct {
+	common.LoaderParams
 	Name  string
 	Value string
 }
 
-func parseSetConfigParams(request mcp.CallToolRequest) (SetConfigParams, error) {
+func ParseSetConfigParams(request mcp.CallToolRequest) (SetConfigParams, error) {
 	name, err := request.RequireString("name")
 	if err != nil || name == "" {
 		return SetConfigParams{}, fmt.Errorf("missing 'name' parameter: %w", err)
@@ -31,8 +32,8 @@ func parseSetConfigParams(request mcp.CallToolRequest) (SetConfigParams, error) 
 	}, nil
 }
 
-// handleSetConfig handles the set config MCP tool request
-func handleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params SetConfigParams, providerId *cliClient.ProviderID, cluster string, cli SetConfigCLIInterface) (string, error) {
+// HandleSetConfig handles the set config MCP tool request
+func HandleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params SetConfigParams, providerId *cliClient.ProviderID, cluster string, cli SetConfigCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", fmt.Errorf("No provider configured: %w", err)

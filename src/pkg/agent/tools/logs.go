@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -12,12 +13,13 @@ import (
 )
 
 type LogsParams struct {
+	common.LoaderParams
 	DeploymentID string
 	Since        time.Time
 	Until        time.Time
 }
 
-func parseLogsParams(request mcp.CallToolRequest) (LogsParams, error) {
+func ParseLogsParams(request mcp.CallToolRequest) (LogsParams, error) {
 	deploymentId := request.GetString("deployment_id", "")
 	since, err := request.RequireString("since")
 	if err != nil {
@@ -47,7 +49,7 @@ func parseLogsParams(request mcp.CallToolRequest) (LogsParams, error) {
 	}, nil
 }
 
-func handleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, cluster string, providerId *cliClient.ProviderID, cli LogsCLIInterface) (string, error) {
+func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, cluster string, providerId *cliClient.ProviderID, cli LogsCLIInterface) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {

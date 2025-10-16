@@ -248,7 +248,7 @@ func TestHandleSetConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			request := createCallToolRequest(tt.requestArgs)
 			loader := &client.MockLoader{}
-			params, err := parseSetConfigParams(request)
+			params, err := ParseSetConfigParams(request)
 			if err != nil {
 				if tt.expectedError {
 					assert.EqualError(t, err, tt.errorMessage)
@@ -257,7 +257,7 @@ func TestHandleSetConfig(t *testing.T) {
 					assert.NoError(t, err)
 				}
 			}
-			result, err := handleSetConfig(testContext, loader, params, &tt.providerId, tt.cluster, tt.mockCLI)
+			result, err := HandleSetConfig(testContext, loader, params, &tt.providerId, tt.cluster, tt.mockCLI)
 
 			if tt.expectedError {
 				assert.Error(t, err)

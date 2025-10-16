@@ -3,9 +3,9 @@ package prompts
 import (
 	"context"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/actions"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )

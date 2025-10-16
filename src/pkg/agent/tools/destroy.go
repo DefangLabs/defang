@@ -5,13 +5,17 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/bufbuild/connect-go"
 )
 
-func handleDestroyTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli DestroyCLIInterface) (string, error) {
+type DestroyParams struct {
+	common.LoaderParams
+}
+
+func HandleDestroyTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli DestroyCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", fmt.Errorf("No provider configured: %w", err)
