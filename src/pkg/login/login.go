@@ -21,18 +21,18 @@ import (
 type LoginFlow = auth.LoginFlow
 
 type AuthService interface {
-	login(ctx context.Context, client client.FabricClient, fabric string, flow LoginFlow) (string, error)
+	login(ctx context.Context, client client.FabricClient, fabric string, flow LoginFlow, mcpClient string) (string, error)
 	serveAuthServer(ctx context.Context, fabric string, authPort int) error
 }
 
 type OpenAuthService struct{}
 
-func (OpenAuthService) login(ctx context.Context, client client.FabricClient, fabric string, flow LoginFlow) (string, error) {
+func (OpenAuthService) login(ctx context.Context, client client.FabricClient, fabric string, flow LoginFlow, mcpClient string) (string, error) {
 	term.Debug("Logging in to", fabric)
 
 	code, err := auth.StartAuthCodeFlow(ctx, flow, func(token string) {
 		cluster.SaveAccessToken(fabric, token)
-	})
+	}, mcpClient)
 	if err != nil {
 		return "", err
 	}
@@ -57,19 +57,19 @@ func (OpenAuthService) serveAuthServer(ctx context.Context, fabric string, authP
 var authService AuthService = OpenAuthService{}
 
 func InteractiveLogin(ctx context.Context, client client.FabricClient, fabric string) error {
-	return interactiveLogin(ctx, client, fabric, auth.CliFlow)
+	return interactiveLogin(ctx, client, fabric, auth.CliFlow, "CLI-Flow")
 }
 
-func InteractiveLoginMCP(ctx context.Context, client client.FabricClient, fabric string) error {
-	return interactiveLogin(ctx, client, fabric, auth.McpFlow)
+func InteractiveLoginMCP(ctx context.Context, client client.FabricClient, fabric string, mcpClient string) error {
+	return interactiveLogin(ctx, client, fabric, auth.McpFlow, mcpClient)
 }
 
 func InteractiveLoginInsideDocker(ctx context.Context, fabric string, authPort int) error {
 	return authService.serveAuthServer(ctx, fabric, authPort)
 }
 
-func interactiveLogin(ctx context.Context, client client.FabricClient, fabric string, flow LoginFlow) error {
-	token, err := authService.login(ctx, client, fabric, flow)
+func interactiveLogin(ctx context.Context, client client.FabricClient, fabric string, flow LoginFlow, mcpClient string) error {
+	token, err := authService.login(ctx, client, fabric, flow, mcpClient)
 	if err != nil {
 		return err
 	}
