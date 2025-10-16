@@ -36,6 +36,8 @@ func Token(ctx context.Context, client client.FabricClient, tenant types.TenantN
 		scopes = []string{string(s)}
 	}
 
+	term.Debugf("Generating token for tenant %q with scopes %v", tenant, scopes)
+
 	resp, err := client.Token(ctx, &defangv1.TokenRequest{
 		Assertion: at,
 		ExpiresIn: uint32(dur.Seconds()),

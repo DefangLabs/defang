@@ -71,13 +71,6 @@ type ListConfigCLIInterface interface {
 	ListConfig(ctx context.Context, provider cliClient.Provider, projectName string) (*defangv1.Secrets, error)
 }
 
-type LoginCLIInterface interface {
-	Connecter
-	// Unique methods
-	InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string) error
-	GenerateAuthURL(authPort int) string
-}
-
 type RemoveConfigCLIInterface interface {
 	Connecter
 	ProviderFactory

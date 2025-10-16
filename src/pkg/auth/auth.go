@@ -170,7 +170,7 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 		if err != nil {
 			go func() {
 				ctx := context.Background()
-				code, err := PollForAuthCode(ctx, state)
+				code, err := pollForAuthCode(ctx, state)
 				if err != nil {
 					term.Errorf("failed to poll for auth code: %v", err)
 					return
@@ -184,6 +184,7 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 
 				saveToken(token)
 			}()
+			// If we can't open the browser, just print the URL and let the user open it themselves
 			return AuthCodeFlow{}, ErrNoBrowser{Err: err, URL: authorizeUrl}
 		}
 	} else {
@@ -209,14 +210,14 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 		}()
 	}
 
-	code, err := PollForAuthCode(ctx, state)
+	code, err := pollForAuthCode(ctx, state)
 	if err != nil {
 		return AuthCodeFlow{}, err
 	}
 	return AuthCodeFlow{code: code, redirectUri: redirectUri, verifier: ar.verifier}, nil
 }
 
-func PollForAuthCode(ctx context.Context, state string) (string, error) {
+func pollForAuthCode(ctx context.Context, state string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
@@ -225,7 +226,13 @@ func PollForAuthCode(ctx context.Context, state string) (string, error) {
 		if err != nil {
 			if errors.Is(err, ErrPollTimeout) {
 				term.Debug("poll timed out, retrying...")
-				continue // just retry
+				continue // retry immediately
+			}
+			var unexpectedError ErrUnexpectedStatus
+			if errors.As(err, &unexpectedError) && unexpectedError.StatusCode >= 500 {
+				term.Debug("received server error, retrying...")
+				pkg.SleepWithContext(ctx, time.Second)
+				continue // retry
 			}
 			return "", err
 		}
@@ -244,9 +251,9 @@ func ExchangeCodeForToken(ctx context.Context, code AuthCodeFlow, ss ...scope.Sc
 		scopes = append(scopes, s.String())
 	}
 
-	term.Debugf("Generating token with scopes %v", scopes)
+	term.Debugf("Generating access token with scopes %v", scopes)
 
-	token, err := openAuthClient.Exchange(code.code, code.redirectUri, code.verifier) // TODO: scopes, TTL
+	token, err := openAuthClient.Exchange(code.code, code.redirectUri, code.verifier) // TODO: scope
 	if err != nil {
 		return "", err
 	}
