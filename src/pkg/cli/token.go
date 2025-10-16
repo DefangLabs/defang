@@ -20,7 +20,7 @@ func Token(ctx context.Context, client client.FabricClient, tenant types.TenantN
 
 	code, err := auth.StartAuthCodeFlow(ctx, false, func(token string) {
 		term.Debug("Getting access token for scope:", s)
-	})
+	}, "token-cli")
 	if err != nil {
 		return err
 	}

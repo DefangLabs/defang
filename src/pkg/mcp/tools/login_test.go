@@ -26,7 +26,7 @@ func (m *MockLoginCLI) Connect(ctx context.Context, cluster string) (*client.Grp
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockLoginCLI) InteractiveLoginMCP(ctx context.Context, grpcClient *client.GrpcClient, cluster string) error {
+func (m *MockLoginCLI) InteractiveLoginMCP(ctx context.Context, grpcClient *client.GrpcClient, cluster string, mcpClient string) error {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("InteractiveLoginMCP(%s)", cluster))
 	return m.InteractiveLoginError
 }

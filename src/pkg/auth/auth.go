@@ -146,7 +146,7 @@ func ServeAuthCodeFlowServer(ctx context.Context, authPort int, tenant types.Ten
 	return nil
 }
 
-func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(string)) (AuthCodeFlow, error) {
+func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(string), mcpClient string) (AuthCodeFlow, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	redirectUri := openAuthClient.GetPollRedirectURI()
@@ -168,7 +168,10 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 
 	// TODO:This is used to open the browser for GitHub Auth before blocking
 	if mcpFlow {
-		err := browser.OpenURL(authorizeUrl)
+		err := errors.New("no browser found in codespaces")
+		if mcpClient != "vscode-codespaces" {
+			err = browser.OpenURL(authorizeUrl)
+		}
 		if err != nil {
 			go func() {
 				ctx := context.Background()
