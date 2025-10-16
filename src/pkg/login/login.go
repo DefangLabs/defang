@@ -57,7 +57,7 @@ func (OpenAuthService) serveAuthServer(ctx context.Context, fabric string, authP
 var authService AuthService = OpenAuthService{}
 
 func InteractiveLogin(ctx context.Context, client client.FabricClient, fabric string) error {
-	return interactiveLogin(ctx, client, fabric, auth.CliFlow, "hello")
+	return interactiveLogin(ctx, client, fabric, auth.CliFlow, "CLI-Flow")
 }
 
 func InteractiveLoginMCP(ctx context.Context, client client.FabricClient, fabric string, mcpClient string) error {
