@@ -6,13 +6,14 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 type LoginCLIInterface interface {
 	Connecter
 	// Unique methods
-	InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string) error
+	InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string, mcpClient string) error
 	GenerateAuthURL(authPort int) string
 }
 
@@ -25,7 +26,7 @@ func handleLoginTool(ctx context.Context, cluster string, authPort int, cli Logi
 			return cli.GenerateAuthURL(authPort), nil
 		}
 		term.Debug("Function invoked: cli.InteractiveLoginPrompt")
-		err = cli.InteractiveLoginMCP(ctx, client, cluster)
+		err = cli.InteractiveLoginMCP(ctx, client, cluster, common.MCPDevelopmentClient)
 		if err != nil {
 			var noBrowserErr auth.ErrNoBrowser
 			if errors.As(err, &noBrowserErr) {

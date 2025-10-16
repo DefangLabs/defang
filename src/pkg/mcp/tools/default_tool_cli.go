@@ -151,9 +151,9 @@ func (a *ListConfigCLIAdapter) ListConfig(ctx context.Context, provider cliClien
 }
 
 // --- LoginCLIInterface ---
-func (LoginCLIAdapter) InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string) error {
+func (LoginCLIAdapter) InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string, mcpClient string) error {
 	// Delegate to login.InteractiveLoginMCP from the login package
-	return login.InteractiveLoginMCP(ctx, client, cluster)
+	return login.InteractiveLoginMCP(ctx, client, cluster, mcpClient)
 }
 
 func (LoginCLIAdapter) GenerateAuthURL(authPort int) string {
