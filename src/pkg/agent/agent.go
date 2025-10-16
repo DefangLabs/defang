@@ -7,10 +7,11 @@ import (
 	"io"
 	"log"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/plugins/gateway"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
-	"github.com/firebase/genkit/go/plugins/googlegenai"
+	"github.com/openai/openai-go/option"
 )
 
 type Agent struct {
@@ -20,10 +21,16 @@ type Agent struct {
 }
 
 func New(ctx context.Context, cluster string, authPort int, providerId *client.ProviderID) *Agent {
-	// Initialize Genkit with the Google AI plugin
+	oai := &gateway.OpenAI{
+		APIKey: "FAKE_TOKEN",
+		Opts: []option.RequestOption{
+			option.WithBaseURL("http://localhost:8080/api/v1"),
+		},
+	}
+
 	g := genkit.Init(ctx,
-		genkit.WithPlugins(&googlegenai.GoogleAI{}),
-		genkit.WithDefaultModel("googleai/gemini-2.5-flash"),
+		genkit.WithDefaultModel("gateway/publishers/google/models/gemini-2.5-flash"),
+		genkit.WithPlugins(oai),
 	)
 
 	tools := CollectTools(cluster, authPort, providerId)
