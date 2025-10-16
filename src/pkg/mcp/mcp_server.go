@@ -66,7 +66,7 @@ func NewDefangMCPServer(version string, cluster string, authPort int, providerID
 	resources.SetupResources(s)
 	prompts.SetupPrompts(s, cluster, providerID)
 
-	// Used to set the MCP client
+	// This is used to pass down information of what MCP client we are using
 	common.MCPDevelopmentClient = string(client)
 
 	toolTracker := ToolTracker{
