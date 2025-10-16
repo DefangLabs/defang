@@ -5,12 +5,19 @@ import (
 	"errors"
 
 	"github.com/DefangLabs/defang/src/pkg/auth"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
+type LoginCLIInterface interface {
+	Connecter
+	// Unique methods
+	InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string) error
+	GenerateAuthURL(authPort int) string
+}
+
 // handleLoginTool handles the login tool logic
 func handleLoginTool(ctx context.Context, cluster string, authPort int, cli LoginCLIInterface) (string, error) {
-	// Test token
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, cluster)
 	if err != nil {
