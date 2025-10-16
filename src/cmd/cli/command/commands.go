@@ -391,8 +391,17 @@ var RootCmd = &cobra.Command{
 	},
 
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if nonInteractive {
+			return nil
+		}
+
+		ctx := cmd.Context()
 		authPort, _ := cmd.Flags().GetInt("auth-server")
-		return agent.New(cmd.Context(), cluster, authPort, &providerID).Start()
+		err := login.InteractiveRequireLoginAndToS(ctx, client, getCluster())
+		if err != nil {
+			return err
+		}
+		return agent.New(ctx, cluster, authPort, &providerID).Start()
 	},
 }
 
