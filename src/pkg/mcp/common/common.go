@@ -23,7 +23,7 @@ var MCPDevelopmentClient = ""
 
 const PostPrompt = "Please deploy my application with Defang now."
 
-var ErrNoProviderSet = errors.New("No cloud provider is configured. Use / to open prompts and use the 3 Defang setup prompts, or use tools: set_aws_provider, set_gcp_provider, or set_playground_provider.")
+var ErrNoProviderSet = errors.New("No cloud provider is configured. Use `/` to open prompts and use the 3 Defang setup prompts, or use tools: set_aws_provider, set_gcp_provider, or set_playground_provider.")
 
 func GetStringArg(args map[string]string, key, defaultValue string) string {
 	if val, exists := args[key]; exists {
