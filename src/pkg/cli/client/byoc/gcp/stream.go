@@ -26,12 +26,13 @@ type LogParser[T any] func(*loggingpb.LogEntry) ([]*T, error)
 type LogFilter[T any] func(entry T) T
 
 type ServerStream[T any] struct {
-	ctx     context.Context
-	gcp     *gcp.Gcp
-	parse   LogParser[T]
-	filters []LogFilter[*T]
-	query   *Query
-	tailer  *gcp.Tailer
+	ctx        context.Context
+	gcp        *gcp.Gcp
+	parse      LogParser[T]
+	filters    []LogFilter[*T]
+	query      *Query
+	tailer     *gcp.Tailer
+	projectIds []string
 
 	lastResp *T
 	lastErr  error
@@ -47,11 +48,12 @@ func NewServerStream[T any](ctx context.Context, gcp *gcp.Gcp, parse LogParser[T
 	}
 	streamCtx, cancel := context.WithCancel(ctx)
 	return &ServerStream[T]{
-		ctx:     streamCtx,
-		gcp:     gcp,
-		parse:   parse,
-		filters: filters,
-		tailer:  tailer,
+		ctx:        streamCtx,
+		gcp:        gcp,
+		parse:      parse,
+		filters:    filters,
+		tailer:     tailer,
+		projectIds: projectIds,
 
 		respCh: make(chan *T),
 		errCh:  make(chan error),
@@ -97,7 +99,7 @@ func (s *ServerStream[T]) Start(start time.Time) {
 	go func() {
 		// Only query older logs if start time is more than 10ms ago
 		if !start.IsZero() && start.Unix() > 0 && time.Since(start) > 10*time.Millisecond {
-			lister, err := s.gcp.ListLogEntries(s.ctx, query)
+			lister, err := s.gcp.ListLogEntries(s.ctx, query, s.projectIds...)
 			if err != nil {
 				s.errCh <- err
 				return

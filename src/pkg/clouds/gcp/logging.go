@@ -88,14 +88,20 @@ type Lister struct {
 	client *logging.Client
 }
 
-func (gcp Gcp) ListLogEntries(ctx context.Context, query string) (*Lister, error) {
+func (gcp Gcp) ListLogEntries(ctx context.Context, query string, projectIds ...string) (*Lister, error) {
 	client, err := logging.NewClient(ctx)
 	if err != nil {
 		return nil, err
 	}
-
+	projectIds = append([]string{gcp.ProjectId}, projectIds...)
+	slices.Sort(projectIds)
+	projectIds = slices.Compact(projectIds)
+	resourceNames := make([]string, len(projectIds))
+	for i, projectId := range projectIds {
+		resourceNames[i] = "projects/" + projectId
+	}
 	req := &loggingpb.ListLogEntriesRequest{
-		ResourceNames: []string{"projects/" + gcp.ProjectId},
+		ResourceNames: resourceNames,
 		Filter:        query,
 	}
 	it := client.ListLogEntries(ctx, req)
