@@ -18,7 +18,7 @@ var FindGoogleDefaultCredentials func(ctx context.Context, scopes ...string) (*g
 // TODO: Possibly need to support google groups and domains type of principals
 // Currently we only support:
 // - Google Accounts (user:email)
-// - Service Accounts (serviceAccount:xxx@xxx.gsserviceaccount.com)
+// - Service Accounts (serviceAccount:xxx@xxx.gserviceaccount.com)
 // - Principal Sets, i.e. Workload Identity Federation (principalSet:...)
 //
 // Whole list of possible principal types:
@@ -98,7 +98,7 @@ func extractEmailFromIDToken(idToken string) (string, error) {
 }
 
 func getPrincipalFromEmail(email string) string {
-	if strings.HasSuffix(email, "gserviceaccount.com") {
+	if strings.HasSuffix(email, ".gserviceaccount.com") {
 		return "serviceAccount:" + email
 	}
 	return "user:" + email

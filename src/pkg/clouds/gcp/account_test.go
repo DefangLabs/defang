@@ -79,7 +79,7 @@ func TestGetCurrentAccountPrincipal(t *testing.T) {
 	t.Run("ServiceAccount email in refreshed token", func(t *testing.T) {
 		token := &oauth2.Token{}
 		token = token.WithExtra(map[string]any{
-			"id_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJ1bml0IHRlc3QiLCJpYXQiOm51bGwsImV4cCI6bnVsbCwiYXVkIjoiIiwic3ViIjoiIiwiZW1haWwiOiJ0ZXN0QEBnc2VydmljZWFjY291bnQuY29tIn0.OYcvDGRQgBPpPt7YrO2anQVYAspUsGaQD7iw5kc8uS0",
+			"id_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJ1bml0IHRlc3QiLCJpYXQiOm51bGwsImV4cCI6bnVsbCwiYXVkIjoiIiwic3ViIjoiIiwiZW1haWwiOiIxMjM0NTY3ODkwLWNvbXB1dGVAZGV2ZWxvcGVyLmdzZXJ2aWNlYWNjb3VudC5jb20ifQ.jEjLklHM1qcB9Bo6TXepFy-wVHkEetUWq5DaQmVSsyo",
 		})
 		FindGoogleDefaultCredentials = func(ctx context.Context, scopes ...string) (*google.Credentials, error) {
 			return &google.Credentials{
@@ -92,7 +92,7 @@ func TestGetCurrentAccountPrincipal(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		expected := "serviceAccount:test@@gserviceaccount.com"
+		expected := "serviceAccount:1234567890-compute@developer.gserviceaccount.com"
 		if principal != expected {
 			t.Errorf("expected principal to be %s, got %s", expected, principal)
 		}
