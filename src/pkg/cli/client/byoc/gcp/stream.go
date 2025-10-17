@@ -40,8 +40,8 @@ type ServerStream[T any] struct {
 	cancel   func()
 }
 
-func NewServerStream[T any](ctx context.Context, gcp *gcp.Gcp, parse LogParser[T], filters ...LogFilter[*T]) (*ServerStream[T], error) {
-	tailer, err := gcp.NewTailer(ctx)
+func NewServerStream[T any](ctx context.Context, gcp *gcp.Gcp, parse LogParser[T], projectIds []string, filters ...LogFilter[*T]) (*ServerStream[T], error) {
+	tailer, err := gcp.NewTailer(ctx, projectIds...)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +194,7 @@ func NewLogStream(ctx context.Context, gcpClient *gcp.Gcp, services []string) (*
 			return entry
 		})
 
-	ss, err := NewServerStream(ctx, gcpClient, getLogEntryParser(ctx, gcpClient), restoreServiceName)
+	ss, err := NewServerStream(ctx, gcpClient, getLogEntryParser(ctx, gcpClient), nil, restoreServiceName)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +259,7 @@ func NewSubscribeStream(ctx context.Context, driver *gcp.Gcp, waitForCD bool, et
 		}),
 	)
 
-	ss, err := NewServerStream(ctx, driver, getActivityParser(ctx, driver, waitForCD, etag), filters...)
+	ss, err := NewServerStream(ctx, driver, getActivityParser(ctx, driver, waitForCD, etag), nil, filters...)
 	if err != nil {
 		return nil, err
 	}

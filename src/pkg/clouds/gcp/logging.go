@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 
 	logging "cloud.google.com/go/logging/apiv2"
 	"cloud.google.com/go/logging/apiv2/loggingpb"
@@ -12,7 +13,7 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-func (gcp Gcp) NewTailer(ctx context.Context) (*Tailer, error) {
+func (gcp Gcp) NewTailer(ctx context.Context, projectIds ...string) (*Tailer, error) {
 	client, err := logging.NewClient(ctx)
 	if err != nil {
 		return nil, err
@@ -21,25 +22,33 @@ func (gcp Gcp) NewTailer(ctx context.Context) (*Tailer, error) {
 	if err != nil {
 		return nil, err
 	}
+	projectIds = append([]string{gcp.ProjectId}, projectIds...)
+	slices.Sort(projectIds)
+	projectIds = slices.Compact(projectIds)
+
 	t := &Tailer{
-		projectId: gcp.ProjectId,
-		tleClient: tleClient,
-		client:    client,
+		projectIds: projectIds,
+		tleClient:  tleClient,
+		client:     client,
 	}
 	return t, nil
 }
 
 type Tailer struct {
-	projectId string
-	tleClient loggingpb.LoggingServiceV2_TailLogEntriesClient
-	client    *logging.Client
+	projectIds []string
+	tleClient  loggingpb.LoggingServiceV2_TailLogEntriesClient
+	client     *logging.Client
 
 	cache []*loggingpb.LogEntry
 }
 
 func (t *Tailer) Start(ctx context.Context, query string) error {
+	resourceNames := make([]string, len(t.projectIds))
+	for i, projectId := range t.projectIds {
+		resourceNames[i] = "projects/" + projectId
+	}
 	req := &loggingpb.TailLogEntriesRequest{
-		ResourceNames: []string{"projects/" + t.projectId},
+		ResourceNames: resourceNames,
 		Filter:        query,
 	}
 	if err := t.tleClient.Send(req); err != nil {
