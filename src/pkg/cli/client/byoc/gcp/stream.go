@@ -26,12 +26,13 @@ type LogParser[T any] func(*loggingpb.LogEntry) ([]*T, error)
 type LogFilter[T any] func(entry T) T
 
 type ServerStream[T any] struct {
-	ctx     context.Context
-	gcp     *gcp.Gcp
-	parse   LogParser[T]
-	filters []LogFilter[*T]
-	query   *Query
-	tailer  *gcp.Tailer
+	ctx        context.Context
+	gcp        *gcp.Gcp
+	parse      LogParser[T]
+	filters    []LogFilter[*T]
+	query      *Query
+	tailer     *gcp.Tailer
+	projectIds []string
 
 	lastResp *T
 	lastErr  error
@@ -40,18 +41,19 @@ type ServerStream[T any] struct {
 	cancel   func()
 }
 
-func NewServerStream[T any](ctx context.Context, gcp *gcp.Gcp, parse LogParser[T], filters ...LogFilter[*T]) (*ServerStream[T], error) {
-	tailer, err := gcp.NewTailer(ctx)
+func NewServerStream[T any](ctx context.Context, gcp *gcp.Gcp, parse LogParser[T], projectIds []string, filters ...LogFilter[*T]) (*ServerStream[T], error) {
+	tailer, err := gcp.NewTailer(ctx, projectIds...)
 	if err != nil {
 		return nil, err
 	}
 	streamCtx, cancel := context.WithCancel(ctx)
 	return &ServerStream[T]{
-		ctx:     streamCtx,
-		gcp:     gcp,
-		parse:   parse,
-		filters: filters,
-		tailer:  tailer,
+		ctx:        streamCtx,
+		gcp:        gcp,
+		parse:      parse,
+		filters:    filters,
+		tailer:     tailer,
+		projectIds: projectIds,
 
 		respCh: make(chan *T),
 		errCh:  make(chan error),
@@ -97,7 +99,7 @@ func (s *ServerStream[T]) Start(start time.Time) {
 	go func() {
 		// Only query older logs if start time is more than 10ms ago
 		if !start.IsZero() && start.Unix() > 0 && time.Since(start) > 10*time.Millisecond {
-			lister, err := s.gcp.ListLogEntries(s.ctx, query)
+			lister, err := s.gcp.ListLogEntries(s.ctx, query, s.projectIds...)
 			if err != nil {
 				s.errCh <- err
 				return
@@ -194,7 +196,7 @@ func NewLogStream(ctx context.Context, gcpClient *gcp.Gcp, services []string) (*
 			return entry
 		})
 
-	ss, err := NewServerStream(ctx, gcpClient, getLogEntryParser(ctx, gcpClient), restoreServiceName)
+	ss, err := NewServerStream(ctx, gcpClient, getLogEntryParser(ctx, gcpClient), nil, restoreServiceName)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +261,7 @@ func NewSubscribeStream(ctx context.Context, driver *gcp.Gcp, waitForCD bool, et
 		}),
 	)
 
-	ss, err := NewServerStream(ctx, driver, getActivityParser(ctx, driver, waitForCD, etag), filters...)
+	ss, err := NewServerStream(ctx, driver, getActivityParser(ctx, driver, waitForCD, etag), nil, filters...)
 	if err != nil {
 		return nil, err
 	}
