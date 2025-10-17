@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
@@ -71,7 +72,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			providerID:    client.ProviderAuto,
 			setupMock:     func(m *MockRemoveConfigCLI) {},
 			expectError:   true,
-			expectedError: "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
+			expectedError: common.ErrNoProviderSet.Error(),
 		},
 		{
 			name:          "missing_config_name",

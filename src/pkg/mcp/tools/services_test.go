@@ -7,6 +7,7 @@ import (
 
 	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
@@ -118,7 +119,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			},
 
 			expectedError:       true,
-			errorMessage:        "no provider is configured",
+			errorMessage:        common.ErrNoProviderSet.Error(),
 			expectedGetServices: false,
 		},
 		{

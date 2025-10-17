@@ -14,7 +14,7 @@ import (
 func handleListConfigTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli ListConfigCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
-		return "", fmt.Errorf("No provider configured: %w", err)
+		return "", err
 	}
 
 	term.Debug("Function invoked: cli.Connect")
