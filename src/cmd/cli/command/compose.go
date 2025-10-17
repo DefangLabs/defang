@@ -94,7 +94,8 @@ func makeComposeUpCmd() *cobra.Command {
 				})
 				if !samePlace && len(resp.Deployments) > 0 {
 					if nonInteractive {
-						term.Warnf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", project.Name)
+						term.Errorf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", project.Name)
+						return errors.New("Project is already deployed elsewhere.")
 					} else {
 						help := "Active deployments of this project:"
 						for _, dep := range resp.Deployments {
