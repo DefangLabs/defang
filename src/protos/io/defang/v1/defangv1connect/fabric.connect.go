@@ -53,6 +53,9 @@ const (
 	FabricControllerUpdateProcedure = "/io.defang.v1.FabricController/Update"
 	// FabricControllerDeployProcedure is the fully-qualified name of the FabricController's Deploy RPC.
 	FabricControllerDeployProcedure = "/io.defang.v1.FabricController/Deploy"
+	// FabricControllerGetShardProcedure is the fully-qualified name of the FabricController's GetShard
+	// RPC.
+	FabricControllerGetShardProcedure = "/io.defang.v1.FabricController/GetShard"
 	// FabricControllerGetProcedure is the fully-qualified name of the FabricController's Get RPC.
 	FabricControllerGetProcedure = "/io.defang.v1.FabricController/Get"
 	// FabricControllerDeleteProcedure is the fully-qualified name of the FabricController's Delete RPC.
@@ -168,6 +171,7 @@ type FabricControllerClient interface {
 	// Deprecated: do not use.
 	Update(context.Context, *connect_go.Request[v1.Service]) (*connect_go.Response[v1.ServiceInfo], error)
 	Deploy(context.Context, *connect_go.Request[v1.DeployRequest]) (*connect_go.Response[v1.DeployResponse], error)
+	GetShard(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.GetShardResponse], error)
 	Get(context.Context, *connect_go.Request[v1.GetRequest]) (*connect_go.Response[v1.ServiceInfo], error)
 	// Deprecated: do not use.
 	Delete(context.Context, *connect_go.Request[v1.DeleteRequest]) (*connect_go.Response[v1.DeleteResponse], error)
@@ -260,6 +264,11 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		deploy: connect_go.NewClient[v1.DeployRequest, v1.DeployResponse](
 			httpClient,
 			baseURL+FabricControllerDeployProcedure,
+			opts...,
+		),
+		getShard: connect_go.NewClient[emptypb.Empty, v1.GetShardResponse](
+			httpClient,
+			baseURL+FabricControllerGetShardProcedure,
 			opts...,
 		),
 		get: connect_go.NewClient[v1.GetRequest, v1.ServiceInfo](
@@ -479,6 +488,7 @@ type fabricControllerClient struct {
 	tail                     *connect_go.Client[v1.TailRequest, v1.TailResponse]
 	update                   *connect_go.Client[v1.Service, v1.ServiceInfo]
 	deploy                   *connect_go.Client[v1.DeployRequest, v1.DeployResponse]
+	getShard                 *connect_go.Client[emptypb.Empty, v1.GetShardResponse]
 	get                      *connect_go.Client[v1.GetRequest, v1.ServiceInfo]
 	delete                   *connect_go.Client[v1.DeleteRequest, v1.DeleteResponse]
 	destroy                  *connect_go.Client[v1.DestroyRequest, v1.DestroyResponse]
@@ -552,6 +562,11 @@ func (c *fabricControllerClient) Update(ctx context.Context, req *connect_go.Req
 // Deploy calls io.defang.v1.FabricController.Deploy.
 func (c *fabricControllerClient) Deploy(ctx context.Context, req *connect_go.Request[v1.DeployRequest]) (*connect_go.Response[v1.DeployResponse], error) {
 	return c.deploy.CallUnary(ctx, req)
+}
+
+// GetShard calls io.defang.v1.FabricController.GetShard.
+func (c *fabricControllerClient) GetShard(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.GetShardResponse], error) {
+	return c.getShard.CallUnary(ctx, req)
 }
 
 // Get calls io.defang.v1.FabricController.Get.
@@ -754,6 +769,7 @@ type FabricControllerHandler interface {
 	// Deprecated: do not use.
 	Update(context.Context, *connect_go.Request[v1.Service]) (*connect_go.Response[v1.ServiceInfo], error)
 	Deploy(context.Context, *connect_go.Request[v1.DeployRequest]) (*connect_go.Response[v1.DeployResponse], error)
+	GetShard(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.GetShardResponse], error)
 	Get(context.Context, *connect_go.Request[v1.GetRequest]) (*connect_go.Response[v1.ServiceInfo], error)
 	// Deprecated: do not use.
 	Delete(context.Context, *connect_go.Request[v1.DeleteRequest]) (*connect_go.Response[v1.DeleteResponse], error)
@@ -842,6 +858,11 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerDeployHandler := connect_go.NewUnaryHandler(
 		FabricControllerDeployProcedure,
 		svc.Deploy,
+		opts...,
+	)
+	fabricControllerGetShardHandler := connect_go.NewUnaryHandler(
+		FabricControllerGetShardProcedure,
+		svc.GetShard,
 		opts...,
 	)
 	fabricControllerGetHandler := connect_go.NewUnaryHandler(
@@ -1065,6 +1086,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerUpdateHandler.ServeHTTP(w, r)
 		case FabricControllerDeployProcedure:
 			fabricControllerDeployHandler.ServeHTTP(w, r)
+		case FabricControllerGetShardProcedure:
+			fabricControllerGetShardHandler.ServeHTTP(w, r)
 		case FabricControllerGetProcedure:
 			fabricControllerGetHandler.ServeHTTP(w, r)
 		case FabricControllerDeleteProcedure:
@@ -1172,6 +1195,10 @@ func (UnimplementedFabricControllerHandler) Update(context.Context, *connect_go.
 
 func (UnimplementedFabricControllerHandler) Deploy(context.Context, *connect_go.Request[v1.DeployRequest]) (*connect_go.Response[v1.DeployResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Deploy is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) GetShard(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.GetShardResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetShard is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) Get(context.Context, *connect_go.Request[v1.GetRequest]) (*connect_go.Response[v1.ServiceInfo], error) {
