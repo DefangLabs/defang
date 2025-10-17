@@ -8,57 +8,10 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg/datastructs"
 	"github.com/muesli/termenv"
 	"golang.org/x/term"
 )
-
-// DefaultBufferSize is the default number of recent messages to keep in the circular buffer
-var DefaultBufferSize = 10
-
-type circularBuffer struct {
-	size         int
-	linesWritten int
-	index        int
-	data         []string
-}
-
-func (c *circularBuffer) write(msg string) {
-	c.linesWritten++
-	if len(c.data) < c.size {
-		c.data = append(c.data, msg)
-	} else {
-		c.data[c.index] = msg
-	}
-	c.index = (c.index + 1) % c.size
-}
-
-func (c *circularBuffer) read() []string {
-	if c.linesWritten <= c.size {
-		return slices.Clone(c.data)
-	}
-
-	messages := make([]string, 0, c.size)
-	startIdx := c.index
-
-	// Collect messages in chronological order
-	for i := range c.size {
-		idx := (startIdx + i) % c.size
-		messages = append(messages, c.data[idx])
-	}
-	return messages
-}
-
-func NewCircularBuffer(bufferSize int) circularBuffer {
-	if bufferSize <= 0 {
-		bufferSize = 1 // ensure at least 1 element
-	}
-	return circularBuffer{
-		size:         bufferSize,
-		linesWritten: 0,
-		index:        0,
-		data:         make([]string, 0, bufferSize),
-	}
-}
 
 type Term struct {
 	stdin          FileReader
@@ -70,7 +23,7 @@ type Term struct {
 	hasDarkBg  bool
 
 	warnings []string
-	buffer   circularBuffer
+	buffer   datastructs.CircularBuffer[string]
 }
 
 var DefaultTerm = NewTerm(os.Stdin, os.Stdout, os.Stderr)
@@ -105,7 +58,7 @@ func NewTerm(stdin FileReader, stdout, stderr io.Writer) *Term {
 		stderr: stderr,
 		out:    termenv.NewOutput(stdout),
 		err:    termenv.NewOutput(stderr),
-		buffer: NewCircularBuffer(DefaultBufferSize),
+		buffer: datastructs.NewCircularBuffer[string](datastructs.DefaultBufferSize),
 	}
 	t.hasDarkBg = t.out.HasDarkBackground()
 	if hasTermInEnv() {
@@ -122,7 +75,7 @@ func (t Term) Stdio() (FileReader, termenv.File, io.Writer) {
 
 // GetAllMessages returns all messages currently stored in the buffer in chronological order
 func (t Term) GetAllMessages() []string {
-	return t.buffer.read()
+	return t.buffer.Get()
 }
 
 func (t *Term) ForceColor(color bool) {
@@ -235,7 +188,7 @@ func ensurePrefix(s string, prefix string) string {
 
 func (t *Term) output(c Color, v ...any) (int, error) {
 	msg := fmt.Sprint(v...)
-	t.buffer.write(msg)
+	t.buffer.Add(msg)
 	return output(t.out, c, msg)
 }
 
@@ -244,19 +197,19 @@ func (t *Term) Printc(c Color, v ...any) (int, error) {
 }
 
 func (t *Term) Print(v ...any) (int, error) {
-	t.buffer.write(fmt.Sprint(v...))
+	t.buffer.Add(fmt.Sprint(v...))
 	return fmt.Fprint(t.out, v...)
 }
 
 func (t *Term) Println(v ...any) (int, error) {
 	text := ensureNewline(fmt.Sprintln(v...))
-	t.buffer.write(text)
+	t.buffer.Add(text)
 	return fmt.Fprint(t.out, text)
 }
 
 func (t *Term) Printf(format string, v ...any) (int, error) {
 	text := ensureNewline(fmt.Sprintf(format, v...))
-	t.buffer.write(text)
+	t.buffer.Add(text)
 	return fmt.Fprint(t.out, text)
 }
 
@@ -299,13 +252,13 @@ func (t *Term) Warnf(format string, v ...any) (int, error) {
 
 func (t *Term) Error(v ...any) (int, error) {
 	msg := fmt.Sprintln(v...)
-	t.buffer.write(msg)
+	t.buffer.Add(msg)
 	return output(t.err, ErrorColor, msg)
 }
 
 func (t *Term) Errorf(format string, v ...any) (int, error) {
 	line := ensureNewline(fmt.Sprintf(format, v...))
-	t.buffer.write(line)
+	t.buffer.Add(line)
 	return output(t.err, ErrorColor, line)
 }
 

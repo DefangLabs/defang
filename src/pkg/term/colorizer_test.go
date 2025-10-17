@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/datastructs"
 	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 )
@@ -248,11 +249,11 @@ func TestFlushWarnings(t *testing.T) {
 func TestWriteToBuffer(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
-	originalBufferSize := DefaultBufferSize
+	originalBufferSize := datastructs.DefaultBufferSize
 	t.Cleanup(func() {
-		DefaultBufferSize = originalBufferSize
+		datastructs.DefaultBufferSize = originalBufferSize
 	})
-	DefaultBufferSize = 5
+	datastructs.DefaultBufferSize = 5
 
 	termWriter := NewTerm(os.Stdin, &stdout, &stderr)
 

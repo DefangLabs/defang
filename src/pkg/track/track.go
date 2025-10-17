@@ -12,9 +12,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// maxMessagePerProperty is the maximum number of messages to include in a single tracking property.
-// 3 seems to be a reasonable number to avoid exceeding size limits.
-const maxMessagePerProperty = 3
+const chunkSizeInCharacters = 80 // chars per property in tracking event
 
 var disableAnalytics = pkg.GetenvBool("DEFANG_DISABLE_ANALYTICS")
 
@@ -61,14 +59,22 @@ func FlushAllTracking() {
 	trackWG.Wait()
 }
 
+func ChunkMessages(name string, message []string) []Property {
+	return ChunkMessagesWithSize(name, message, chunkSizeInCharacters)
+}
+
 // function to break a set of messages into smaller chunks for tracking
 // There is a set size limit per property for tracking
-func ChunkMessages(name string, message []string) []Property {
+func ChunkMessagesWithSize(name string, message []string, maxChunkSize int) []Property {
 	var trackMsg []Property
-	for i := 0; i < len(message); i += maxMessagePerProperty {
-		end := min(i+maxMessagePerProperty, len(message))
-		propName := fmt.Sprintf("%s-%d", name, i/maxMessagePerProperty+1)
-		trackMsg = append(trackMsg, P(propName, message[i:end]))
+	// make the message one long string
+	messageStr := strings.Join(message, "\n")
+
+	// split the message into chunks of maxChunkSize
+	for i := 0; i < len(messageStr); i += maxChunkSize {
+		end := min(i+maxChunkSize, len(messageStr))
+		propName := fmt.Sprintf("%s-%d", name, i/maxChunkSize+1)
+		trackMsg = append(trackMsg, P(propName, messageStr[i:end]))
 	}
 	return trackMsg
 }
