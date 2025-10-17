@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-const chunkSizeInCharacters = 80 // chars per property in tracking event
+const chunkSizeInCharacters = 80 // chars per property in tracking event. This is a conservative guess on the max size
 
 var disableAnalytics = pkg.GetenvBool("DEFANG_DISABLE_ANALYTICS")
 
