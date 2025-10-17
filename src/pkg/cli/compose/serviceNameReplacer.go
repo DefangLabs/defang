@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"context"
 	"regexp"
 	"slices"
 	"strings"
@@ -18,7 +19,7 @@ const (
 
 type DNSResolver interface {
 	ServicePrivateDNS(name string) string
-	ServicePublicDNS(name string, projectName string) string
+	ServicePublicDNS(ctx context.Context, name string, projectName string) string
 }
 
 type ServiceNameReplacer struct {
@@ -49,7 +50,7 @@ func NewServiceNameReplacer(dnsResolver DNSResolver, project *composeTypes.Proje
 	}
 }
 
-func (s *ServiceNameReplacer) replaceServiceNameWithDNS(value string) string {
+func (s *ServiceNameReplacer) replaceServiceNameWithDNS(ctx context.Context, value string) string {
 	// First check for private services
 	if s.privateServiceNames != nil {
 		match := s.privateServiceNames.FindStringSubmatchIndex(value)
@@ -67,15 +68,15 @@ func (s *ServiceNameReplacer) replaceServiceNameWithDNS(value string) string {
 		if match != nil {
 			serviceStart := match[2]
 			serviceEnd := match[3]
-			return value[:serviceStart] + s.dnsResolver.ServicePublicDNS(NormalizeServiceName(value[serviceStart:serviceEnd]), s.projectName) + value[serviceEnd:]
+			return value[:serviceStart] + s.dnsResolver.ServicePublicDNS(ctx, NormalizeServiceName(value[serviceStart:serviceEnd]), s.projectName) + value[serviceEnd:]
 		}
 	}
 
 	return value
 }
 
-func (s *ServiceNameReplacer) ReplaceServiceNameWithDNS(serviceName string, key, value string, fixupTarget FixupTarget) string {
-	val := s.replaceServiceNameWithDNS(value)
+func (s *ServiceNameReplacer) ReplaceServiceNameWithDNS(ctx context.Context, serviceName string, key, value string, fixupTarget FixupTarget) string {
+	val := s.replaceServiceNameWithDNS(ctx, value)
 
 	if val != value {
 		term.Debugf("service %q: service name was adjusted: %s %q assigned value %q", serviceName, fixupTarget, key, val)
