@@ -138,7 +138,9 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  rpc Estimate(EstimateRequest) returns (EstimateResponse);
+  rpc Estimate(EstimateRequest) returns (EstimateResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
 
   rpc Preview(PreviewRequest) returns (PreviewResponse);
 
