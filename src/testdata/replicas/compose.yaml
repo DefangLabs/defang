@@ -1,0 +1,17 @@
+services:
+  default:
+    image: nginx:latest
+  replicated:
+    image: nginx:latest
+    deploy:
+      replicas: 3
+  autoscaled:
+    image: nginx:latest
+    x-defang-autoscaling: true
+  deploy:
+    image: nginx:latest
+    deploy:
+      resources:
+        reservations:
+          memory: 256M
+          cpus: "0.25"

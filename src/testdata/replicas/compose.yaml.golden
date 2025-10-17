@@ -1,0 +1,29 @@
+name: replicas
+services:
+  autoscaled:
+    image: nginx:latest
+    networks:
+      default: null
+    x-defang-autoscaling: true
+  default:
+    image: nginx:latest
+    networks:
+      default: null
+  deploy:
+    deploy:
+      resources:
+        reservations:
+          cpus: 0.25
+          memory: "268435456"
+    image: nginx:latest
+    networks:
+      default: null
+  replicated:
+    deploy:
+      replicas: 3
+    image: nginx:latest
+    networks:
+      default: null
+networks:
+  default:
+    name: replicas_default

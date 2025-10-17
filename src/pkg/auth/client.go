@@ -13,7 +13,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
@@ -31,6 +30,15 @@ var (
 	ErrInvalidRefreshToken      = errors.New("invalid refresh token")
 	ErrPollTimeout              = errors.New("polling timed out")
 )
+
+type ErrUnexpectedStatus struct {
+	StatusCode int
+	Status     string
+}
+
+func (e ErrUnexpectedStatus) Error() string {
+	return "unexpected status code: " + e.Status
+}
 
 type AuthorizeOptions struct {
 	pkce     bool
@@ -152,13 +160,12 @@ func NewClient(clientID, issuer string) *client {
 }
 
 func (c client) GetPollRedirectURI() string {
-	return fmt.Sprintf("%s/clients/auth", c.issuer)
+	return c.issuer + "/clients/auth"
 }
 
 func (c client) Poll(ctx context.Context, state string) (string, error) {
 	// Poll the server for the auth result
 	pollUrl := fmt.Sprintf("%s/clients/auth/poll?state=%s", c.issuer, state)
-	term.Debugf("Polling %s for authorization...\n", pollUrl)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", pollUrl, nil)
 	if err != nil {
@@ -167,7 +174,6 @@ func (c client) Poll(ctx context.Context, state string) (string, error) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		term.Debug("poll request failed:", err)
 		return "", fmt.Errorf("poll request failed: %w", err)
 	}
 	defer resp.Body.Close()
@@ -176,8 +182,7 @@ func (c client) Poll(ctx context.Context, state string) (string, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		term.Debug("unexpected status code:", resp.StatusCode)
-		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return "", ErrUnexpectedStatus{StatusCode: resp.StatusCode, Status: resp.Status}
 	}
 
 	// Parse the response body as form-urlencoded
