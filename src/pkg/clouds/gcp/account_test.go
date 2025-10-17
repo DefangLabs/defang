@@ -53,7 +53,7 @@ func TestGetCurrentAccountPrincipal(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		expected := "test@email.com"
+		expected := "user:test@email.com"
 		if principal != expected {
 			t.Errorf("expected principal to be %s, got %s", expected, principal)
 		}

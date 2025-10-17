@@ -54,12 +54,16 @@ func (gcp Gcp) GetCurrentPrincipal(ctx context.Context) (string, error) {
 	// Try to extract email from id_token if present
 	if idToken, ok := token.Extra("id_token").(string); ok && idToken != "" {
 		if email, err := extractEmailFromIDToken(idToken); err == nil && email != "" {
-			return email, nil
+			return "user:" + email, nil
 		}
 	}
 
 	// Last resort: query tokeninfo endpoint
-	return getEmailFromToken(ctx, token.AccessToken)
+	email, err := getEmailFromToken(ctx, token.AccessToken)
+	if err != nil {
+		return "", fmt.Errorf("failed to get email from token: %w", err)
+	}
+	return "user:" + email, nil
 }
 
 func extractEmailFromIDToken(idToken string) (string, error) {
