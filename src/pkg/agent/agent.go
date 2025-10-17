@@ -14,15 +14,19 @@ import (
 	"github.com/openai/openai-go/option"
 )
 
+const DefaultSystemPrompt = "You are a helpful assistant. Your job is to help the user deploy and manage their cloud applications using Defang. Defang is a tool that makes it easy to deploy Docker Compose projects to cloud providers like AWS, GCP, and Digital Ocean."
+
 type Agent struct {
-	ctx   context.Context
-	g     *genkit.Genkit
-	tools []ai.ToolRef
+	ctx    context.Context
+	g      *genkit.Genkit
+	msgs   []*ai.Message
+	prompt string
+	tools  []ai.ToolRef
 }
 
-func New(ctx context.Context, cluster string, authPort int, providerId *client.ProviderID) *Agent {
+func New(ctx context.Context, cluster string, authPort int, providerId *client.ProviderID, prompt string) *Agent {
 	oai := &gateway.OpenAI{
-		APIKey: "FAKE_TOKEN",
+		APIKey: "secret",
 		Opts: []option.RequestOption{
 			option.WithBaseURL("http://localhost:8080/api/v1"),
 		},
@@ -39,9 +43,11 @@ func New(ctx context.Context, cluster string, authPort int, providerId *client.P
 		toolRefs[i] = ai.ToolRef(t)
 	}
 	return &Agent{
-		ctx:   ctx,
-		g:     g,
-		tools: toolRefs,
+		ctx:    ctx,
+		g:      g,
+		msgs:   []*ai.Message{},
+		prompt: prompt,
+		tools:  toolRefs,
 	}
 }
 
@@ -76,46 +82,71 @@ func (a *Agent) Start() error {
 	}
 }
 
-func (a *Agent) handleMessage(msg string) error {
+func (a *Agent) handleToolRequest(req *ai.ToolRequest) (*ai.ToolResponse, error) {
+	tool := genkit.LookupTool(a.g, req.Name)
+	if tool == nil {
+		return nil, fmt.Errorf("tool %q not found", req.Name)
+	}
+
+	output, err := tool.RunRaw(a.ctx, req.Input)
+	if err != nil {
+		return nil, fmt.Errorf("tool %q execution error: %w", tool.Name(), err)
+	}
+
+	return &ai.ToolResponse{
+		Name:   req.Name,
+		Ref:    req.Ref,
+		Output: output,
+	}, nil
+}
+
+func (a *Agent) handleToolCalls(requests []*ai.ToolRequest) ([]*ai.Message, error) {
+	if len(requests) == 0 {
+		return nil, nil
+	}
+
+	var responses []*ai.Message
+	parts := []*ai.Part{}
+	for _, req := range requests {
+		toolResp, err := a.handleToolRequest(req)
+		if err != nil {
+			return nil, fmt.Errorf("tool request error: %w", err)
+		}
+		parts = append(parts, ai.NewToolResponsePart(toolResp))
+	}
+
+	responses = append(responses, ai.NewMessage(ai.RoleTool, nil, parts...))
 	resp, err := genkit.Generate(a.ctx, a.g,
-		ai.WithPrompt(msg),
+		ai.WithMessages(a.msgs...),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("generation error: %w", err)
+	}
+	responses = append(responses, resp.Message)
+	a.msgs = responses
+	return responses, nil
+}
+
+func (a *Agent) handleMessage(msg string) error {
+	a.msgs = append(a.msgs, ai.NewUserMessage(ai.NewTextPart(msg)))
+
+	resp, err := genkit.Generate(a.ctx, a.g,
+		ai.WithPrompt(a.prompt),
 		ai.WithTools(a.tools...),
+		ai.WithMessages(a.msgs...),
 	)
 	if err != nil {
 		return fmt.Errorf("generation error: %w", err)
 	}
 
-	parts := []*ai.Part{}
-	for _, req := range resp.ToolRequests() {
-		tool := genkit.LookupTool(a.g, req.Name)
-		if tool == nil {
-			log.Fatalf("tool %q not found", req.Name)
-		}
-
-		output, err := tool.RunRaw(a.ctx, req.Input)
-		if err != nil {
-			log.Fatalf("tool %q execution failed: %v", tool.Name(), err)
-		}
-
-		parts = append(parts,
-			ai.NewToolResponsePart(&ai.ToolResponse{
-				Name:   req.Name,
-				Ref:    req.Ref,
-				Output: output,
-			}))
+	a.msgs = append(a.msgs, resp.Message)
+	responses, err := a.handleToolCalls(resp.ToolRequests())
+	if err != nil {
+		return fmt.Errorf("tool call handling error: %w", err)
 	}
 
-	if len(parts) > 0 {
-		resp, err = genkit.Generate(a.ctx, a.g,
-			ai.WithMessages(append(resp.History(), ai.NewMessage(ai.RoleTool, nil, parts...))...),
-		)
-		if err != nil {
-			return fmt.Errorf("generation error: %w", err)
-		}
-	}
-
-	for _, msg := range resp.History() {
-		if msg.Role == ai.RoleUser {
+	for _, msg := range responses {
+		if msg.Role == ai.RoleTool {
 			continue
 		}
 		for _, part := range msg.Content {
