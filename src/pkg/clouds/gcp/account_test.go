@@ -20,7 +20,7 @@ func (m *MockTokenSource) Token() (*oauth2.Token, error) {
 }
 
 func TestGetCurrentAccountPrincipal(t *testing.T) {
-	t.Run("Email in credentials", func(t *testing.T) {
+	t.Run("User email in credentials", func(t *testing.T) {
 		FindGoogleDefaultCredentials = func(ctx context.Context, scopes ...string) (*google.Credentials, error) {
 			return &google.Credentials{
 				JSON: []byte(`{"client_email":"test@email.com"}`),
@@ -37,7 +37,24 @@ func TestGetCurrentAccountPrincipal(t *testing.T) {
 		}
 	})
 
-	t.Run("Email in refreshed token", func(t *testing.T) {
+	t.Run("ServiceAccount email in credentials", func(t *testing.T) {
+		FindGoogleDefaultCredentials = func(ctx context.Context, scopes ...string) (*google.Credentials, error) {
+			return &google.Credentials{
+				JSON: []byte(`{"client_email":"test@someproject.iam.gserviceaccount.com"}`),
+			}, nil
+		}
+		var gcp Gcp
+		principal, err := gcp.GetCurrentPrincipal(t.Context())
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		expected := "serviceAccount:test@someproject.iam.gserviceaccount.com"
+		if principal != expected {
+			t.Errorf("expected principal to be %s, got %s", expected, principal)
+		}
+	})
+
+	t.Run("User email in refreshed token", func(t *testing.T) {
 		token := &oauth2.Token{}
 		token = token.WithExtra(map[string]any{
 			"id_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJ1bml0IHRlc3QiLCJpYXQiOm51bGwsImV4cCI6bnVsbCwiYXVkIjoiIiwic3ViIjoiIiwiZW1haWwiOiJ0ZXN0QGVtYWlsLmNvbSJ9.UP2OF86aOg2BkpbFrkKUQ-osrwhTjh9_2JOnUlGMmHM",
@@ -54,6 +71,28 @@ func TestGetCurrentAccountPrincipal(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		expected := "user:test@email.com"
+		if principal != expected {
+			t.Errorf("expected principal to be %s, got %s", expected, principal)
+		}
+	})
+
+	t.Run("ServiceAccount email in refreshed token", func(t *testing.T) {
+		token := &oauth2.Token{}
+		token = token.WithExtra(map[string]any{
+			"id_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJ1bml0IHRlc3QiLCJpYXQiOm51bGwsImV4cCI6bnVsbCwiYXVkIjoiIiwic3ViIjoiIiwiZW1haWwiOiIxMjM0NTY3ODkwLWNvbXB1dGVAZGV2ZWxvcGVyLmdzZXJ2aWNlYWNjb3VudC5jb20ifQ.jEjLklHM1qcB9Bo6TXepFy-wVHkEetUWq5DaQmVSsyo",
+		})
+		FindGoogleDefaultCredentials = func(ctx context.Context, scopes ...string) (*google.Credentials, error) {
+			return &google.Credentials{
+				JSON:        []byte(``),
+				TokenSource: &MockTokenSource{token: token},
+			}, nil
+		}
+		var gcp Gcp
+		principal, err := gcp.GetCurrentPrincipal(t.Context())
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		expected := "serviceAccount:1234567890-compute@developer.gserviceaccount.com"
 		if principal != expected {
 			t.Errorf("expected principal to be %s, got %s", expected, principal)
 		}
