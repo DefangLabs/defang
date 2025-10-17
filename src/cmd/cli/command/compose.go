@@ -104,7 +104,7 @@ func makeComposeUpCmd() *cobra.Command {
 						}
 						var confirm bool
 						if err := survey.AskOne(&survey.Confirm{
-							Message: "This project appears to be already deployed elsewhere. Are you sure you want to continue?",
+							Message: "This project appears to be already deployed elsewhere. Are you sure you want to continue? (Press `?` to see the list of active deployments)",
 							Help:    help,
 							Default: true,
 						}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
