@@ -94,7 +94,8 @@ func makeComposeUpCmd() *cobra.Command {
 				})
 				if !samePlace && len(resp.Deployments) > 0 {
 					if nonInteractive {
-						term.Warnf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", project.Name)
+						term.Errorf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", project.Name)
+						return errors.New("Project is already deployed elsewhere.")
 					} else {
 						help := "Active deployments of this project:"
 						for _, dep := range resp.Deployments {
@@ -104,7 +105,7 @@ func makeComposeUpCmd() *cobra.Command {
 						}
 						var confirm bool
 						if err := survey.AskOne(&survey.Confirm{
-							Message: "This project appears to be already deployed elsewhere. Are you sure you want to continue?",
+							Message: "This project appears to be already deployed elsewhere. Are you sure you want to continue? (Press `?` to see the list of active deployments)",
 							Help:    help,
 							Default: true,
 						}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
