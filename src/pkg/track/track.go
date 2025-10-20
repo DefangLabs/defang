@@ -12,9 +12,10 @@ import (
 	"github.com/spf13/pflag"
 )
 
-const chunkSizeInCharacters = 80 // chars per property in tracking event. This is a conservative guess on the max size
+const maxPropertyCharacterLength = 255 // chars per property in tracking event
 
 var disableAnalytics = pkg.GetenvBool("DEFANG_DISABLE_ANALYTICS")
+var logPropertyNamePrefix = "logs"
 
 type Property = cliClient.Property
 
@@ -46,7 +47,17 @@ func Evt(name string, props ...Property) {
 		term.Debugf("untracked event %q: %v", name, props)
 		return
 	}
-	term.Debugf("tracking event %q: %v", name, props)
+
+	// filter out props with a name prefix of logPropertyNamePrefix, they should already be in the debug output
+	var filteredProps []Property
+	for _, p := range props {
+		if strings.HasPrefix(p.Name, logPropertyNamePrefix) {
+			continue
+		}
+		filteredProps = append(filteredProps, p)
+	}
+
+	term.Debugf("tracking event %q: %v", name, filteredProps)
 	trackWG.Add(1)
 	go func() {
 		defer trackWG.Done()
@@ -59,29 +70,24 @@ func FlushAllTracking() {
 	trackWG.Wait()
 }
 
-func ChunkMessages(name string, message []string) []Property {
-	return ChunkMessagesWithSize(name, message, chunkSizeInCharacters)
-}
-
 // function to break a set of messages into smaller chunks for tracking
 // There is a set size limit per property for tracking
-func ChunkMessagesWithSize(name string, message []string, maxChunkSize int) []Property {
+func MakeEventLogProperties(name string, message []string) []Property {
 	var trackMsg []Property
-	// make the message one long string
-	messageStr := strings.Join(message, "\n")
 
-	// split the message into chunks of maxChunkSize
-	for i := 0; i < len(messageStr); i += maxChunkSize {
-		end := min(i+maxChunkSize, len(messageStr))
-		propName := fmt.Sprintf("%s-%d", name, i/maxChunkSize+1)
-		trackMsg = append(trackMsg, P(propName, messageStr[i:end]))
+	for i, msg := range message {
+		if len(msg) > maxPropertyCharacterLength {
+			msg = msg[:maxPropertyCharacterLength]
+		}
+		propName := fmt.Sprintf("%s-%d", name, i+1)
+		trackMsg = append(trackMsg, P(propName, msg))
 	}
 	return trackMsg
 }
 
 func EvtWithTerm(eventName string, extraProps ...Property) {
 	messages := term.DefaultTerm.GetAllMessages()
-	logProps := ChunkMessages("logs", messages)
+	logProps := MakeEventLogProperties(logPropertyNamePrefix, messages)
 	allProps := append(extraProps, logProps...)
 	Evt(eventName, allProps...)
 }

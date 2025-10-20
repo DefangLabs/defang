@@ -1,6 +1,6 @@
 package datastructs
 
-var DefaultBufferSize = 10
+var DefaultBufferSize = 30
 
 type CircularBuffer[T any] struct {
 	size    int
