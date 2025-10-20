@@ -37,7 +37,7 @@ func (c *CircularBuffer[T]) Get() []T {
 
 func NewCircularBuffer[T any](bufferSize int) CircularBuffer[T] {
 	if bufferSize <= 0 {
-		bufferSize = 1 // ensure at least 1 element
+		panic("failed to created a circular buffer: cannot have zero elements")
 	}
 	return CircularBuffer[T]{
 		size:    bufferSize,
