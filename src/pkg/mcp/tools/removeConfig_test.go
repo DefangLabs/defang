@@ -80,7 +80,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			providerID:    client.ProviderAWS,
 			setupMock:     func(m *MockRemoveConfigCLI) {},
 			expectError:   true,
-			expectedError: "Invalid config `name`: required argument \"name\" not found",
+			expectedError: "missing config `name`: required argument \"name\" not found",
 		},
 		{
 			name:       "connect_error",
@@ -168,9 +168,19 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				},
 			}
 
+			params, err := parseRemoveConfigParams(request)
+			if err != nil {
+				if tt.expectError {
+					assert.EqualError(t, err, tt.expectedError)
+					return
+				} else {
+					assert.NoError(t, err)
+				}
+			}
+
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := handleRemoveConfigTool(t.Context(), loader, request, &tt.providerID, "test-cluster", mockCLI)
+			result, err := handleRemoveConfigTool(t.Context(), loader, params, &tt.providerID, "test-cluster", mockCLI)
 
 			// Verify error expectations
 			if tt.expectError {

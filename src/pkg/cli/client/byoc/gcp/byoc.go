@@ -165,7 +165,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		b.cdServiceAccount = path.Base(cdServiceAccount)
 	}
 	//   3.2 Give CD service account roles needed
-	if err := b.driver.EnsureServiceAccountHasRoles(ctx, b.cdServiceAccount, []string{
+	if err := b.driver.EnsureServiceAccountHasRoles(ctx, "serviceAccount:"+b.cdServiceAccount, []string{
 		"roles/run.admin",                       // For creating and running cloudrun jobs and services (admin needed for `setIamPolicy` permission)
 		"roles/iam.serviceAccountAdmin",         // For creating service accounts
 		"roles/iam.serviceAccountUser",          // For impersonating service accounts
@@ -202,12 +202,12 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 	if err := b.driver.EnsureServiceAccountHasBucketRoles(ctx, b.bucket, b.uploadServiceAccount, []string{"roles/storage.objectUser"}); err != nil {
 		return err
 	}
-	//  4.2 Give current user the token creator role on the upload service account
-	user, err := b.driver.GetCurrentAccountEmail(ctx)
+	//  4.2 Give current principal the token creator role on the upload service account
+	principal, err := b.driver.GetCurrentPrincipal(ctx)
 	if err != nil {
 		return err
 	}
-	if err := b.driver.EnsureUserHasServiceAccountRoles(ctx, user, b.uploadServiceAccount, []string{"roles/iam.serviceAccountTokenCreator"}); err != nil {
+	if err := b.driver.EnsurePrincipalHasServiceAccountRoles(ctx, principal, b.uploadServiceAccount, []string{"roles/iam.serviceAccountTokenCreator"}); err != nil {
 		return err
 	}
 	//  4.3 Wait until we can sign bytes with the upload service account
@@ -216,7 +216,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		if _, err := b.driver.SignBytes(ctx, []byte("testdata"), b.uploadServiceAccount); err != nil {
 			if strings.Contains(err.Error(), "Permission 'iam.serviceAccounts.signBlob' denied on resource") {
 				if time.Since(start) > 5*time.Minute {
-					return errors.New("could not wait for adding serviceAccountTokenCreator role to current user to take effect, please try again later")
+					return errors.New("could not wait for adding serviceAccountTokenCreator role to current principal to take effect, please try again later")
 				}
 				pkg.SleepWithContext(ctx, 30*time.Second)
 				continue
@@ -293,7 +293,7 @@ func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 	}
 
 	// check whether the ADC is logged in by trying to get the current account email
-	email, err := b.driver.GetCurrentAccountEmail(ctx)
+	email, err := b.driver.GetCurrentPrincipal(ctx)
 	if err != nil {
 		// not logged in, get email from gcloud
 		email, gcloudErr := GetUserEmail()

@@ -97,7 +97,7 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 		StackName: uso.StackId,
 	}, stackTimeout)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to update CloudFormation stack: check the CloudFormation console (https://%s.console.aws.amazon.com/cloudformation/home) for the %q stack to learn more: %w", a.AwsEcs.Region, a.stackName, err)
 	}
 	return a.fillWithOutputs(dso)
 }
@@ -128,7 +128,7 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 		StackName: ptr.String(a.stackName),
 	}, stackTimeout)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create CloudFormation stack: check the CloudFormation console (https://%s.console.aws.amazon.com/cloudformation/home) for the %q stack to learn more: %w", a.AwsEcs.Region, a.stackName, err)
 	}
 	return a.fillWithOutputs(dso)
 }

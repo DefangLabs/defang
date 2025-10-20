@@ -107,20 +107,12 @@ func (DefaultToolCLI) NewProvider(ctx context.Context, providerId cliClient.Prov
 	return cli.NewProvider(ctx, providerId, client)
 }
 
-func (DefaultToolCLI) GetRegion(providerId cliClient.ProviderID) string {
-	return cliClient.GetRegion(providerId)
-}
-
 func (DefaultToolCLI) OpenBrowser(url string) error {
 	if OpenBrowserFunc != nil {
 		return OpenBrowserFunc(url)
 	}
 
 	return errors.New("no browser function defined")
-}
-
-func (DefaultToolCLI) SetProviderID(providerId *cliClient.ProviderID, providerString string) error {
-	return providerId.Set(providerString)
 }
 
 // --- Adapter types for tool interfaces ---
@@ -159,9 +151,9 @@ func (a *ListConfigCLIAdapter) ListConfig(ctx context.Context, provider cliClien
 }
 
 // --- LoginCLIInterface ---
-func (LoginCLIAdapter) InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string) error {
+func (LoginCLIAdapter) InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string, mcpClient string) error {
 	// Delegate to login.InteractiveLoginMCP from the login package
-	return login.InteractiveLoginMCP(ctx, client, cluster)
+	return login.InteractiveLoginMCP(ctx, client, cluster, mcpClient)
 }
 
 func (LoginCLIAdapter) GenerateAuthURL(authPort int) string {

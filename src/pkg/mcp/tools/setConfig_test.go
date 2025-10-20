@@ -124,7 +124,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:   map[string]interface{}{"value": testValue},
 			mockCLI:       &MockSetConfigCLI{},
 			expectedError: true,
-			errorMessage:  "Invalid config `name`: required argument \"name\" not found",
+			errorMessage:  "missing 'name' parameter: required argument \"name\" not found",
 		},
 		{
 			name:          "empty config name",
@@ -133,7 +133,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:   map[string]interface{}{"name": "", "value": testValue},
 			mockCLI:       &MockSetConfigCLI{},
 			expectedError: true,
-			errorMessage:  "Invalid config `name`: %!w(<nil>)",
+			errorMessage:  "missing 'name' parameter: %!w(<nil>)",
 		},
 		{
 			name:          "missing config value",
@@ -142,7 +142,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:   map[string]interface{}{"name": testConfigName},
 			mockCLI:       &MockSetConfigCLI{},
 			expectedError: true,
-			errorMessage:  "Invalid config `value`: required argument \"value\" not found",
+			errorMessage:  "missing 'value' parameter: required argument \"value\" not found",
 		},
 		{
 			name:          "empty config value",
@@ -151,7 +151,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:   map[string]interface{}{"name": testConfigName, "value": ""},
 			mockCLI:       &MockSetConfigCLI{},
 			expectedError: true,
-			errorMessage:  "Invalid config `value`: %!w(<nil>)",
+			errorMessage:  "missing 'value' parameter: %!w(<nil>)",
 		},
 
 		// CLI operation error tests
@@ -249,7 +249,16 @@ func TestHandleSetConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			request := createCallToolRequest(tt.requestArgs)
 			loader := &client.MockLoader{}
-			result, err := handleSetConfig(testContext, loader, request, &tt.providerId, tt.cluster, tt.mockCLI)
+			params, err := parseSetConfigParams(request)
+			if err != nil {
+				if tt.expectedError {
+					assert.EqualError(t, err, tt.errorMessage)
+					return
+				} else {
+					assert.NoError(t, err)
+				}
+			}
+			result, err := handleSetConfig(testContext, loader, params, &tt.providerId, tt.cluster, tt.mockCLI)
 
 			if tt.expectedError {
 				assert.Error(t, err)

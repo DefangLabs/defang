@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -27,31 +25,6 @@ import (
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
 )
-
-func createProjectForDebug(loader *compose.Loader) (*compose.Project, error) {
-	projOpts, err := loader.NewProjectOptions()
-	if err != nil {
-		return nil, err
-	}
-
-	// get the project name
-	if projOpts.Name == "" {
-		dir, err := os.Getwd()
-		if err != nil {
-			return nil, err
-		}
-
-		projOpts.Name = filepath.Base(dir)
-	}
-	project := &compose.Project{
-		Name:         projOpts.Name,
-		WorkingDir:   projOpts.WorkingDir,
-		Environment:  projOpts.Environment,
-		ComposeFiles: projOpts.ConfigPaths,
-	}
-
-	return project, nil
-}
 
 func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd := &cobra.Command{
@@ -86,7 +59,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 
 				term.Error("Cannot load project:", loadErr)
-				project, err := createProjectForDebug(loader)
+				project, err := loader.CreateProjectForDebug()
 				if err != nil {
 					return err
 				}
@@ -121,7 +94,8 @@ func makeComposeUpCmd() *cobra.Command {
 				})
 				if !samePlace && len(resp.Deployments) > 0 {
 					if nonInteractive {
-						term.Warnf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", project.Name)
+						term.Errorf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", project.Name)
+						return errors.New("Project is already deployed elsewhere.")
 					} else {
 						help := "Active deployments of this project:"
 						for _, dep := range resp.Deployments {
@@ -131,7 +105,7 @@ func makeComposeUpCmd() *cobra.Command {
 						}
 						var confirm bool
 						if err := survey.AskOne(&survey.Confirm{
-							Message: "This project appears to be already deployed elsewhere. Are you sure you want to continue?",
+							Message: "This project appears to be already deployed elsewhere. Are you sure you want to continue? (Press `?` to see the list of active deployments)",
 							Help:    help,
 							Default: true,
 						}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
@@ -451,7 +425,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}
 
 				term.Error("Cannot load project:", loadErr)
-				project, err := createProjectForDebug(loader)
+				project, err := loader.CreateProjectForDebug()
 				if err != nil {
 					return err
 				}
