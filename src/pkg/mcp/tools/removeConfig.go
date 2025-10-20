@@ -29,7 +29,7 @@ func parseRemoveConfigParams(request mcp.CallToolRequest) (RemoveConfigParams, e
 func handleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader, params RemoveConfigParams, providerId *cliClient.ProviderID, cluster string, cli RemoveConfigCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
-		return "", fmt.Errorf("No provider configured: %w", err)
+		return "", err
 	}
 
 	term.Debug("Function invoked: cli.Connect")

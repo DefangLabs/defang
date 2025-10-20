@@ -16,7 +16,7 @@ import (
 func handleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli DeployCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
-		return "", fmt.Errorf("no provider configured: %w", err)
+		return "", err
 	}
 
 	term.Debug("Function invoked: loader.LoadProject")
