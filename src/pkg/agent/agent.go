@@ -9,6 +9,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/agent/plugins/gateway"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/openai/openai-go/option"
@@ -24,20 +25,22 @@ type Agent struct {
 	tools  []ai.ToolRef
 }
 
-func New(ctx context.Context, cluster string, authPort int, providerId *client.ProviderID, prompt string) *Agent {
+func New(ctx context.Context, addr string, providerId *client.ProviderID, prompt string) *Agent {
+	accessToken := cluster.GetExistingToken(addr)
 	oai := &gateway.OpenAI{
 		APIKey: "secret",
 		Opts: []option.RequestOption{
-			option.WithBaseURL("http://localhost:8080/api/v1"),
+			option.WithAPIKey(accessToken),
+			option.WithBaseURL(fmt.Sprintf("https://%s/api/v1", addr)),
 		},
 	}
 
 	g := genkit.Init(ctx,
-		genkit.WithDefaultModel("gateway/publishers/google/models/gemini-2.5-flash"),
+		genkit.WithDefaultModel("gemini-2.5-flash"),
 		genkit.WithPlugins(oai),
 	)
 
-	tools := CollectTools(cluster, providerId)
+	tools := CollectTools(addr, providerId)
 	toolRefs := make([]ai.ToolRef, len(tools))
 	for i, t := range tools {
 		toolRefs[i] = ai.ToolRef(t)
