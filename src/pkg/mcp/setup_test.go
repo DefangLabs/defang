@@ -146,6 +146,22 @@ func TestGetClientConfigPath(t *testing.T) {
 			expectedPath: filepath.Join(homeDir, ".kiro", "settings", "mcp.json"),
 		},
 
+		// Rovo tests - Darwin
+		{
+			name:         "rovo_darwin",
+			client:       MCPClientRovo,
+			goos:         "darwin",
+			expectedPath: filepath.Join(homeDir, ".rovodev", "mcp.json"),
+		},
+
+		// Rovo tests - Linux
+		{
+			name:         "rovo_linux",
+			client:       MCPClientRovo,
+			goos:         "linux",
+			expectedPath: filepath.Join(homeDir, ".rovodev", "mcp.json"),
+		},
+
 		// Codex tests - default path
 		{
 			name:         "codex_default",

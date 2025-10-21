@@ -36,6 +36,7 @@ const (
 	MCPClientCodex            MCPClient = "codex"
 	MCPClientCursor           MCPClient = "cursor"
 	MCPClientKiro             MCPClient = "kiro"
+	MCPClientRovo             MCPClient = "rovo"
 	MCPClientUnspecified      MCPClient = ""
 	MCPClientVSCode           MCPClient = "vscode"
 	MCPClientVSCodeCodespaces MCPClient = "vscode-codespaces"
@@ -58,6 +59,7 @@ var ValidClients = append(
 		MCPClientCodex,
 		MCPClientCursor,
 		MCPClientKiro,
+		MCPClientRovo,
 		MCPClientWindsurf,
 	},
 	ValidVSCodeClients...,
@@ -127,6 +129,11 @@ var kiroConfig = ClientInfo{
 	useHomeDir: true,
 }
 
+var rovoConfig = ClientInfo{
+	configFile: ".rovodev/mcp.json",
+	useHomeDir: true,
+}
+
 var vscodeConfig = ClientInfo{
 	configFile: "Code/User/mcp.json",
 	useHomeDir: false,
@@ -154,6 +161,7 @@ var clientRegistry = map[MCPClient]ClientInfo{
 	MCPClientCodex:            codexConfig,
 	MCPClientCursor:           cursorConfig,
 	MCPClientKiro:             kiroConfig,
+	MCPClientRovo:             rovoConfig,
 	MCPClientVSCode:           vscodeConfig,
 	MCPClientVSCodeCodespaces: vscodeCodespacesConfig,
 	MCPClientVSCodeInsiders:   vscodeInsidersConfig,
