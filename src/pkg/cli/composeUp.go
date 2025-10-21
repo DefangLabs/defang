@@ -22,8 +22,17 @@ func (e ComposeError) Unwrap() error {
 	return e.error
 }
 
+type ComposeUpParams struct {
+	Project    *compose.Project
+	UploadMode compose.UploadMode
+	Mode       modes.Mode
+}
+
 // ComposeUp validates a compose project and uploads the services using the client
-func ComposeUp(ctx context.Context, project *compose.Project, fabric client.FabricClient, provider client.Provider, upload compose.UploadMode, mode modes.Mode) (*defangv1.DeployResponse, *compose.Project, error) {
+func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.Provider, params ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
+	upload := params.UploadMode
+	project := params.Project
+	mode := params.Mode
 	if dryrun.DoDryRun {
 		upload = compose.UploadModeIgnore
 	}
