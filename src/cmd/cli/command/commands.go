@@ -396,12 +396,12 @@ var RootCmd = &cobra.Command{
 		}
 
 		ctx := cmd.Context()
-		authPort, _ := cmd.Flags().GetInt("auth-server")
 		err := login.InteractiveRequireLoginAndToS(ctx, client, getCluster())
 		if err != nil {
 			return err
 		}
-		return agent.New(ctx, cluster, authPort, &providerID, agent.DefaultSystemPrompt).Start()
+
+		return agent.New(ctx, getCluster(), &providerID, agent.DefaultSystemPrompt).Start()
 	},
 }
 
