@@ -282,7 +282,7 @@ func TestGetClientConfigPath(t *testing.T) {
 }
 
 func TestWriteConfig(t *testing.T) {
-	// This test function will use handleVSCodeConfig and handleStandardConfig to make sure that is not overwritten existing data
+	// This test function will use configureDefangMCPServer to make sure that is not overwritten existing data
 	// and only add or append our defangmcp config, or if there not an existing file; make one and write it.
 	test := []struct {
 		name          string
@@ -724,7 +724,6 @@ func TestWriteConfig(t *testing.T) {
 				_ = os.Remove(tempFilePath)
 			})
 
-			// Get the actual executable path that handleVSCodeConfig and handleStandardConfig will use
 			executablePath, err := os.Executable()
 			if err != nil {
 				t.Fatal(err)
