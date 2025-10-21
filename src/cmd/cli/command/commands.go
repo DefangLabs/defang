@@ -409,7 +409,8 @@ var RootCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return agent.New(ctx, cluster, authPort, &providerID, agent.DefaultSystemPrompt).Start()
+
+		return agent.New(ctx, getCluster(), authPort, &providerID, agent.DefaultSystemPrompt).Start()
 	},
 }
 
