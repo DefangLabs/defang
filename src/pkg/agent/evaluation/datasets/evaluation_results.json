@@ -1,0 +1,116 @@
+{
+  "dataset_id": "defang_scenarios",
+  "total_tests": 10,
+  "passed_tests": 9,
+  "failed_tests": 1,
+  "metrics": {
+    "tool_selection_accuracy": 0.9,
+    "response_quality": 0.85,
+    "error_rate": 0.1,
+    "average_response_time": 150.5
+  },
+  "test_results": [
+    {
+      "input": "Deploy my application",
+      "expected_output": "(?i)(deploy|deployment)",
+      "actual_output": "Simulated response for: Deploy my application",
+      "passed": true,
+      "execution_time_ms": 100,
+      "context": {
+        "scenario": "deploy"
+      }
+    },
+    {
+      "input": "Show me my deployed services",
+      "expected_output": "(?i)(services|list)",
+      "actual_output": "Simulated response for: Show me my deployed services",
+      "passed": true,
+      "execution_time_ms": 120,
+      "context": {
+        "scenario": "services_list"
+      }
+    },
+    {
+      "input": "Set a config variable",
+      "expected_output": "(?i)(config|set|variable)",
+      "actual_output": "Simulated response for: Set a config variable",
+      "passed": false,
+      "error": "Simulated evaluation error",
+      "execution_time_ms": 140,
+      "context": {
+        "scenario": "config_set"
+      }
+    },
+    {
+      "input": "Remove a config variable",
+      "expected_output": "(?i)(config|remove|delete)",
+      "actual_output": "Simulated response for: Remove a config variable",
+      "passed": true,
+      "execution_time_ms": 160,
+      "context": {
+        "scenario": "config_remove"
+      }
+    },
+    {
+      "input": "Show me the logs",
+      "expected_output": "(?i)(logs|log)",
+      "actual_output": "Simulated response for: Show me the logs",
+      "passed": true,
+      "execution_time_ms": 180,
+      "context": {
+        "scenario": "logs"
+      }
+    },
+    {
+      "input": "Estimate deployment costs",
+      "expected_output": "(?i)(estimate|cost)",
+      "actual_output": "Simulated response for: Estimate deployment costs",
+      "passed": true,
+      "execution_time_ms": 200,
+      "context": {
+        "scenario": "estimate"
+      }
+    },
+    {
+      "input": "Destroy my deployment",
+      "expected_output": "(?i)(destroy|delete|remove)",
+      "actual_output": "Simulated response for: Destroy my deployment",
+      "passed": true,
+      "execution_time_ms": 220,
+      "context": {
+        "scenario": "destroy"
+      }
+    },
+    {
+      "input": "Login to Defang",
+      "expected_output": "(?i)(login|authenticate)",
+      "actual_output": "Simulated response for: Login to Defang",
+      "passed": true,
+      "execution_time_ms": 240,
+      "context": {
+        "scenario": "login"
+      }
+    },
+    {
+      "input": "How do I set up AWS provider?",
+      "expected_output": "(?i)(aws|provider|setup)",
+      "actual_output": "Simulated response for: How do I set up AWS provider?",
+      "passed": true,
+      "execution_time_ms": 260,
+      "context": {
+        "scenario": "provider_setup"
+      }
+    },
+    {
+      "input": "What is my current configuration?",
+      "expected_output": "(?i)(list|show|config)",
+      "actual_output": "Simulated response for: What is my current configuration?",
+      "passed": true,
+      "execution_time_ms": 280,
+      "context": {
+        "scenario": "config_list"
+      }
+    }
+  ],
+  "timestamp": "0001-01-01T00:00:00Z"
+}

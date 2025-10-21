@@ -34,6 +34,17 @@
               google-cloud-sdk
               vim
             ];
+
+            shellHook = ''
+              # Install genkit-cli locally in the project if not already present
+              if [ ! -f "node_modules/.bin/genkit" ]; then
+                echo "Installing genkit-cli locally..."
+                npm install genkit-cli
+              fi
+
+              # Add local node_modules/.bin to PATH
+              export PATH="$PWD/node_modules/.bin:$PATH"
+            '';
           };
         packages.defang-cli = pkgs.callPackage ./pkgs/defang/cli.nix { };
         packages.defang-bin = pkgs.callPackage ./pkgs/defang { };
