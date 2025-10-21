@@ -1,0 +1,122 @@
+[
+  {
+    "input": {
+      "message": "Deploy my application to the cloud",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*deploy.*\\]"
+  },
+  {
+    "input": {
+      "message": "Show me all my running services",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*services.*\\]"
+  },
+  {
+    "input": {
+      "message": "I need to see the logs from my application",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*logs.*\\]"
+  },
+  {
+    "input": {
+      "message": "Remove everything I've deployed",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*destroy.*\\]"
+  },
+  {
+    "input": {
+      "message": "How much will it cost to deploy this project?",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*estimate.*\\]"
+  },
+  {
+    "input": {
+      "message": "I want to login to my account",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*login.*\\]"
+  },
+  {
+    "input": {
+      "message": "Set DATABASE_URL environment variable",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*set_config.*\\]"
+  },
+  {
+    "input": {
+      "message": "Remove the API_KEY configuration",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*remove_config.*\\]"
+  },
+  {
+    "input": {
+      "message": "What configuration variables do I have?",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*list_config.*\\]"
+  },
+  {
+    "input": {
+      "message": "Set up AWS as my cloud provider",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*set_aws_provider.*\\]"
+  },
+  {
+    "input": {
+      "message": "Configure Google Cloud Platform",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*set_gcp_provider.*\\]"
+  },
+  {
+    "input": {
+      "message": "Use the playground environment for testing",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*set_playground_provider.*\\]"
+  }
+]

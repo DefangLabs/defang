@@ -145,8 +145,8 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				MockProjectName:  "test-project",
 				GetServicesError: defangcli.ErrNoServices{ProjectName: "test-project"},
 			},
-			expectedError:       true, // Go error is returned
-			errorMessage:        "no services found in project",
+			expectedError:       false, // Go error is returned
+			resultTextContains:  "no services found for the specified project",
 			expectedGetServices: true,
 			expectedProjectName: "test-project",
 		},
@@ -159,8 +159,8 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				MockProjectName:  "test-project",
 				GetServicesError: createConnectError(connect.CodeNotFound, "project test-project is not deployed in Playground"),
 			},
-			expectedError:       true,
-			errorMessage:        "is not deployed in Playground",
+			expectedError:       false,
+			resultTextContains:  "is not deployed in Playground",
 			expectedGetServices: true,
 			expectedProjectName: "test-project",
 		},

@@ -120,3 +120,113 @@ snapshot: ## Used for local testing of goreleaser
 	GORELEASER_ALLOW_DIRTY=true GORELEASER_LOG=debug \
 	goreleaser release --snapshot --clean \
 	--skip=publish,announce,sign,notarize,validate
+
+# Genkit evaluation targets
+EVAL_DIR := pkg/agent/evaluation
+TESTDATA_DIR := $(EVAL_DIR)/datasets
+GENKIT_CMD_DIR := $(EVAL_DIR)/cmd
+
+# Generate dynamic output directory based on branch and commit
+GIT_BRANCH_RAW := $(shell git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | sed 's|origin/||' || git rev-parse --abbrev-ref HEAD)
+GIT_BRANCH := $(shell echo "$(GIT_BRANCH_RAW)" | sed 's/\//-/g')
+GIT_COMMIT := $(shell git rev-parse --short=6 HEAD)
+EVAL_BASE_DIR := $(EVAL_DIR)/testrun-$(GIT_BRANCH)-$(GIT_COMMIT)
+# Generate unique run directory with timestamp
+RUN_TIMESTAMP := $(shell date +%Y%m%d-%H%M%S)
+EVAL_OUTPUT_DIR := $(EVAL_BASE_DIR)/run-$(RUN_TIMESTAMP)
+
+# List of evaluation datasets (excluding evaluation_results.json which is output)
+EVAL_DATASETS := $(filter-out $(TESTDATA_DIR)/evaluation_results.json, $(wildcard $(TESTDATA_DIR)/*.json))
+
+.PHONY: genkit-start
+genkit-start: ## Start the genkit server for evaluations
+	@echo "Starting Genkit server..."
+	cd $(PWD)/$(GENKIT_CMD_DIR) && genkit start -- go run .
+
+.PHONY: genkit-kill
+genkit-kill: ## Kill any running genkit processes
+	@echo "Killing any existing genkit processes..."
+	@pkill -f "genkit start" || true
+	@sleep 2
+
+.PHONY: genkit-restart
+genkit-restart: genkit-kill genkit-start ## Kill existing and start fresh genkit server
+
+.PHONY: genkit-check-server
+genkit-check-server: ## Check if genkit server is running
+	@if ! (curl -s http://localhost:4000 > /dev/null 2>&1 || curl -s http://localhost:4033 > /dev/null 2>&1 || curl -s http://localhost:4034 > /dev/null 2>&1); then \
+		echo "Error: Genkit server is not running."; \
+		echo "Please start the server in another terminal with: make genkit-start"; \
+		echo "Make sure to keep the server running while evaluations are running."; \
+		exit 1; \
+	else \
+		echo "Genkit server detected."; \
+	fi
+
+.PHONY: genkit-eval-all
+genkit-eval-all: genkit-check-server ## Run all genkit evaluations (requires genkit server to be running)
+	@echo "Running all evaluations..."
+	@echo "Output directory: $(EVAL_OUTPUT_DIR)"
+	@mkdir -p $(EVAL_OUTPUT_DIR)
+	@for dataset in $(EVAL_DATASETS); do \
+		echo "Running evaluation: $$dataset"; \
+		cd $(PWD)/$(GENKIT_CMD_DIR) && genkit eval:run ../datasets/$$(basename $$dataset) --output "$(PWD)/$(EVAL_OUTPUT_DIR)/$$(basename $$dataset .json)_results.json" || true; \
+	done
+	@echo "Moving results from .genkit/evals/ to $(EVAL_OUTPUT_DIR)/"
+	@if [ -d "$(PWD)/$(GENKIT_CMD_DIR)/.genkit/evals" ]; then \
+		mv $(PWD)/$(GENKIT_CMD_DIR)/.genkit/evals/*.json $(EVAL_OUTPUT_DIR)/ 2>/dev/null || true; \
+	fi
+	@echo "Generating evaluation summary..."
+	@cd $(PWD)/$(EVAL_DIR)/tools/summarizer && go run . -path ../../testrun-$(GIT_BRANCH)-$(GIT_COMMIT) -output ../../current_state.json
+	@echo "Summary saved to $(EVAL_DIR)/current_state.json"
+
+.PHONY: genkit-summarize
+genkit-summarize: ## Generate summary of current evaluation results
+	@echo "Generating evaluation summary for $(EVAL_BASE_DIR)..."
+	@cd $(PWD)/$(EVAL_DIR)/tools/summarizer && go run . -path ../../testrun-$(GIT_BRANCH)-$(GIT_COMMIT) -output ../../current_state.json
+	@echo "Summary saved to $(EVAL_DIR)/current_state.json"
+
+.PHONY: genkit-list-datasets
+
+
+.PHONY: genkit-list-datasets
+genkit-list-datasets: ## List all available evaluation datasets
+	@echo "Available evaluation datasets:"
+	@for dataset in $(EVAL_DATASETS); do echo "  $$(basename $$dataset)"; done
+
+.PHONY: genkit-clean
+genkit-clean: ## Clean all evaluation results
+	@echo "Cleaning all evaluation results..."
+	rm -rf $(EVAL_DIR)/testrun-*
+
+.PHONY: genkit-clean-current
+genkit-clean-current: ## Clean current branch evaluation results
+	@echo "Cleaning current branch evaluation results: $(EVAL_BASE_DIR)"
+	rm -rf $(EVAL_BASE_DIR)
+
+
+.PHONY: genkit-help
+genkit-help: ## Show genkit evaluation help
+	@echo "Genkit Evaluation Targets:"
+	@echo "  genkit-start          Start the genkit server (run in separate terminal)"
+	@echo "  genkit-kill           Kill any running genkit processes"
+	@echo "  genkit-restart        Kill existing and start fresh genkit server"
+	@echo "  genkit-check-server   Check if genkit server is running"
+	@echo "  genkit-eval-all       Run all evaluations (checks server first)"
+	@echo "  genkit-summarize      Generate summary of current evaluation results"
+	@echo "  genkit-list-datasets  List all available datasets"
+	@echo "  genkit-clean          Clean all evaluation results"
+	@echo "  genkit-clean-current  Clean current branch/commit evaluation results"
+	@echo ""
+	@echo "Directory Structure:"
+	@echo "  Base directory: $(EVAL_BASE_DIR)"
+	@echo "  Current run:    $(EVAL_OUTPUT_DIR)"
+	@echo ""
+	@echo "IMPORTANT: You MUST keep the genkit server running in a separate terminal!"
+	@echo "Each run creates a unique timestamped directory to organize results."
+	@echo ""
+	@echo "Usage Examples:"
+	@echo "  Terminal 1: make genkit-start    (keep running)"
+	@echo "  Terminal 2: make genkit-eval-all"
+	@echo ""
+	@echo "If evals fail, try: make genkit-restart (in Terminal 1)"

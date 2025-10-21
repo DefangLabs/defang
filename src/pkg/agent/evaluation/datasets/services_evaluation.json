@@ -1,0 +1,32 @@
+[
+  {
+    "input": {
+      "message": "Show me my deployed services",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*services.*\\]"
+  },
+  {
+    "input": {
+      "message": "What services are running?",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*services.*\\]"
+  },
+  {
+    "input": {
+      "message": "List all my applications",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*services.*\\]"
+  }
+]

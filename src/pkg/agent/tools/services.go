@@ -50,7 +50,7 @@ func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, pro
 			return fmt.Sprintf("no services found for the specified project %q", projectName), nil
 		}
 		if connect.CodeOf(err) == connect.CodeNotFound && strings.Contains(err.Error(), "is not deployed in Playground") {
-			return fmt.Sprintf("project %s is not deployed in Playground: %w", projectName), nil
+			return fmt.Sprintf("project %s is not deployed in Playground: %s", projectName, err.Error()), nil
 		}
 
 		return "", fmt.Errorf("failed to get services: %w", err)
