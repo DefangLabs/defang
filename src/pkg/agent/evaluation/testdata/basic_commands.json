@@ -1,0 +1,121 @@
+{
+  "id": "defang_basic_commands",
+  "name": "Defang Basic Commands Dataset",
+  "description": "Test dataset for basic Defang agent commands and tool selection",
+  "examples": [
+    {
+      "input": "Deploy my application to the cloud",
+      "reference": "(?i)(deploy|deployment)",
+      "context": {
+        "scenario": "deployment",
+        "expected_tool": "deploy",
+        "category": "basic_operations"
+      }
+    },
+    {
+      "input": "Show me all my running services",
+      "reference": "(?i)(service|list|status)",
+      "context": {
+        "scenario": "services_list",
+        "expected_tool": "services",
+        "category": "basic_operations"
+      }
+    },
+    {
+      "input": "I need to see the logs from my application",
+      "reference": "(?i)(log|logs)",
+      "context": {
+        "scenario": "logs",
+        "expected_tool": "logs",
+        "category": "basic_operations"
+      }
+    },
+    {
+      "input": "Remove everything I've deployed",
+      "reference": "(?i)(destroy|delete|remove)",
+      "context": {
+        "scenario": "destroy",
+        "expected_tool": "destroy",
+        "category": "basic_operations"
+      }
+    },
+    {
+      "input": "How much will it cost to deploy this project?",
+      "reference": "(?i)(estimate|cost|pricing)",
+      "context": {
+        "scenario": "estimate",
+        "expected_tool": "estimate",
+        "category": "basic_operations"
+      }
+    },
+    {
+      "input": "I want to login to my account",
+      "reference": "(?i)(login|authenticate|signin)",
+      "context": {
+        "scenario": "login",
+        "expected_tool": "login",
+        "category": "authentication"
+      }
+    },
+    {
+      "input": "Set DATABASE_URL environment variable",
+      "reference": "(?i)(config|set|variable|environment)",
+      "context": {
+        "scenario": "config_set",
+        "expected_tool": "set_config",
+        "category": "configuration"
+      }
+    },
+    {
+      "input": "Remove the API_KEY configuration",
+      "reference": "(?i)(config|remove|delete|unset)",
+      "context": {
+        "scenario": "config_remove",
+        "expected_tool": "remove_config",
+        "category": "configuration"
+      }
+    },
+    {
+      "input": "What configuration variables do I have?",
+      "reference": "(?i)(config|list|show|configuration)",
+      "context": {
+        "scenario": "config_list",
+        "expected_tool": "list_configs",
+        "category": "configuration"
+      }
+    },
+    {
+      "input": "Set up AWS as my cloud provider",
+      "reference": "(?i)(aws|provider|setup)",
+      "context": {
+        "scenario": "provider_aws",
+        "expected_tool": "set_aws_provider",
+        "category": "provider_setup"
+      }
+    },
+    {
+      "input": "Configure Google Cloud Platform",
+      "reference": "(?i)(gcp|google|cloud|provider)",
+      "context": {
+        "scenario": "provider_gcp",
+        "expected_tool": "set_gcp_provider",
+        "category": "provider_setup"
+      }
+    },
+    {
+      "input": "Use the playground environment for testing",
+      "reference": "(?i)(playground|test|demo)",
+      "context": {
+        "scenario": "provider_playground",
+        "expected_tool": "set_playground_provider",
+        "category": "provider_setup"
+      }
+    }
+  ],
+  "metadata": {
+    "version": "1.0",
+    "created_by": "evaluation_framework",
+    "categories": ["basic_operations", "authentication", "configuration", "provider_setup"],
+    "total_examples": 12
+  }
+}

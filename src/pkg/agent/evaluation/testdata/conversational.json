@@ -1,0 +1,86 @@
+{
+  "id": "defang_conversational",
+  "name": "Defang Conversational Dataset",
+  "description": "Test dataset for natural language understanding and conversational interactions",
+  "examples": [
+    {
+      "input": "Can you help me get my app running in the cloud?",
+      "reference": "(?i)(deploy|deployment|help|assist)",
+      "context": {
+        "scenario": "help_deployment",
+        "expected_behavior": "helpful_deployment_guidance",
+        "category": "conversational"
+      }
+    },
+    {
+      "input": "I'm having trouble with my deployment, what should I do?",
+      "reference": "(?i)(help|troubleshoot|debug|status|logs)",
+      "context": {
+        "scenario": "troubleshooting",
+        "expected_behavior": "suggest_diagnostic_steps",
+        "category": "conversational"
+      }
+    },
+    {
+      "input": "How do I check if my services are healthy?",
+      "reference": "(?i)(service|status|health|check|running)",
+      "context": {
+        "scenario": "health_check",
+        "expected_behavior": "service_status_guidance",
+        "category": "conversational"
+      }
+    },
+    {
+      "input": "What's the difference between AWS and playground deployment?",
+      "reference": "(?i)(aws|playground|provider|difference|compare)",
+      "context": {
+        "scenario": "provider_comparison",
+        "expected_behavior": "explain_providers",
+        "category": "conversational"
+      }
+    },
+    {
+      "input": "I want to clean up all my resources, how do I do that safely?",
+      "reference": "(?i)(clean.*up|destroy|remove|safely|resources)",
+      "context": {
+        "scenario": "safe_cleanup",
+        "expected_behavior": "destruction_guidance",
+        "category": "conversational"
+      }
+    },
+    {
+      "input": "Can you show me what I have deployed currently?",
+      "reference": "(?i)(show|list|current|deployed|services)",
+      "context": {
+        "scenario": "current_status",
+        "expected_behavior": "list_current_deployments",
+        "category": "conversational"
+      }
+    },
+    {
+      "input": "I need to update an environment variable for my app",
+      "reference": "(?i)(update|set|environment|variable|config)",
+      "context": {
+        "scenario": "env_update",
+        "expected_behavior": "config_update_guidance",
+        "category": "conversational"
+      }
+    },
+    {
+      "input": "How much is this costing me right now?",
+      "reference": "(?i)(cost|pricing|billing|estimate|much)",
+      "context": {
+        "scenario": "cost_inquiry",
+        "expected_behavior": "cost_estimation",
+        "category": "conversational"
+      }
+    }
+  ],
+  "metadata": {
+    "version": "1.0",
+    "created_by": "evaluation_framework",
+    "categories": ["conversational"],
+    "total_examples": 8,
+    "purpose": "Test natural language understanding and helpful responses"
+  }
+}

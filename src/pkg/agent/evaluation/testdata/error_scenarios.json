@@ -1,0 +1,59 @@
+{
+  "id": "defang_error_scenarios",
+  "name": "Defang Error Handling Dataset",
+  "description": "Test dataset for error scenarios and edge cases in Defang agent",
+  "examples": [
+    {
+      "input": "Deploy my application but I'm not logged in",
+      "reference": "(?i)(login|authenticate|error|not.*logged)",
+      "context": {
+        "scenario": "deployment_not_logged_in",
+        "expected_behavior": "should_prompt_login",
+        "category": "error_handling"
+      }
+    },
+    {
+      "input": "Show services for a non-existent project",
+      "reference": "(?i)(no.*services|empty|not.*found)",
+      "context": {
+        "scenario": "no_services",
+        "expected_behavior": "graceful_empty_response",
+        "category": "error_handling"
+      }
+    },
+    {
+      "input": "Set an invalid configuration value",
+      "reference": "(?i)(invalid|error|failed|cannot)",
+      "context": {
+        "scenario": "invalid_config",
+        "expected_behavior": "validation_error",
+        "category": "error_handling"
+      }
+    },
+    {
+      "input": "Remove a config that doesn't exist",
+      "reference": "(?i)(not.*found|does.*not.*exist|already.*removed)",
+      "context": {
+        "scenario": "config_not_found",
+        "expected_behavior": "not_found_message",
+        "category": "error_handling"
+      }
+    },
+    {
+      "input": "Deploy without a valid compose file",
+      "reference": "(?i)(compose.*file|docker-compose|not.*found|missing)",
+      "context": {
+        "scenario": "missing_compose",
+        "expected_behavior": "file_not_found_error",
+        "category": "error_handling"
+      }
+    }
+  ],
+  "metadata": {
+    "version": "1.0",
+    "created_by": "evaluation_framework",
+    "categories": ["error_handling"],
+    "total_examples": 5,
+    "purpose": "Test agent's error handling and graceful failure scenarios"
+  }
+}

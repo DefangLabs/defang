@@ -7,17 +7,12 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/agent/plugins/fabric"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/firebase/genkit/go/ai"
-	"github.com/firebase/genkit/go/core/api"
 	"github.com/firebase/genkit/go/genkit"
-	"github.com/firebase/genkit/go/plugins/googlegenai"
-	"github.com/openai/openai-go/option"
 )
 
 const DefaultSystemPrompt = `You are a helpful assistant. Your job is to help
@@ -32,33 +27,18 @@ on a project that is not in the current working directory.
 `
 
 type Agent struct {
-	ctx    context.Context
-	g      *genkit.Genkit
-	msgs   []*ai.Message
-	prompt string
-	tools  []ai.ToolRef
+	ctx            context.Context
+	g              *genkit.Genkit
+	tools          []ai.ToolRef
+	evaluationMode bool
 }
 
-func New(ctx context.Context, addr string, authPort int, providerId *client.ProviderID, prompt string) *Agent {
-	accessToken := cluster.GetExistingToken(addr)
-	provider := "fabric"
-	var providerPlugin api.Plugin
-	providerPlugin = &fabric.OpenAI{
-		APIKey: accessToken,
-		Opts: []option.RequestOption{
-			option.WithBaseURL(fmt.Sprintf("https://%s/api/v1", addr)),
-		},
-	}
-	defaultModel := "google/gemini-2.5-flash"
+func New(ctx context.Context, cluster string, authPort int, providerId *client.ProviderID) *Agent {
+	return NewWithEvaluation(ctx, cluster, authPort, providerId, false)
+}
 
-	if os.Getenv("GOOGLE_API_KEY") != "" {
-		provider = "googleai"
-		providerPlugin = &googlegenai.GoogleAI{}
-		defaultModel = "gemini-2.5-flash"
-	}
-
-	model := pkg.Getenv("DEFANG_MODEL_ID", defaultModel)
-
+func NewWithEvaluation(ctx context.Context, cluster string, authPort int, providerId *client.ProviderID, evaluationMode bool) *Agent {
+	// Initialize Genkit with the Google AI plugin
 	g := genkit.Init(ctx,
 		genkit.WithDefaultModel(fmt.Sprintf("%s/%s", provider, model)),
 		genkit.WithPlugins(providerPlugin),
@@ -70,11 +50,10 @@ func New(ctx context.Context, addr string, authPort int, providerId *client.Prov
 		toolRefs[i] = ai.ToolRef(t)
 	}
 	return &Agent{
-		ctx:    ctx,
-		g:      g,
-		msgs:   []*ai.Message{},
-		prompt: prompt,
-		tools:  toolRefs,
+		ctx:            ctx,
+		g:              g,
+		tools:          toolRefs,
+		evaluationMode: evaluationMode,
 	}
 }
 
@@ -110,40 +89,85 @@ func (a *Agent) Start() error {
 	}
 }
 
-func (a *Agent) handleToolRequest(req *ai.ToolRequest) (*ai.ToolResponse, error) {
-	tool := genkit.LookupTool(a.g, req.Name)
-	if tool == nil {
-		return nil, fmt.Errorf("tool %q not found", req.Name)
-	}
-
-	output, err := tool.RunRaw(a.ctx, req.Input)
+// HandleMessageForEvaluation processes a message and returns the response for evaluation purposes
+func (a *Agent) HandleMessageForEvaluation(msg string) (string, error) {
+	resp, err := genkit.Generate(a.ctx, a.g,
+		ai.WithPrompt(msg),
+		ai.WithTools(a.tools...),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("tool %q execution error: %w", tool.Name(), err)
+		return "", fmt.Errorf("generation error: %w", err)
 	}
 
-	return &ai.ToolResponse{
-		Name:   req.Name,
-		Ref:    req.Ref,
-		Output: output,
-	}, nil
+	parts := []*ai.Part{}
+	for _, req := range resp.ToolRequests() {
+		tool := genkit.LookupTool(a.g, req.Name)
+		if tool == nil {
+			log.Printf("tool %q not found", req.Name)
+			continue
+		}
+
+		output, err := tool.RunRaw(a.ctx, req.Input)
+		if err != nil {
+			log.Printf("tool %q execution failed: %v", tool.Name(), err)
+			// Continue with error response rather than failing completely in evaluation mode
+			if a.evaluationMode {
+				output = fmt.Sprintf("Error executing tool %s: %v", req.Name, err)
+			} else {
+				log.Fatalf("tool %q execution failed: %v", tool.Name(), err)
+			}
+		}
+
+		parts = append(parts,
+			ai.NewToolResponsePart(&ai.ToolResponse{
+				Name:   req.Name,
+				Ref:    req.Ref,
+				Output: output,
+			}))
+	}
+
+	if len(parts) > 0 {
+		resp, err = genkit.Generate(a.ctx, a.g,
+			ai.WithMessages(append(resp.History(), ai.NewMessage(ai.RoleTool, nil, parts...))...),
+		)
+		if err != nil {
+			return "", fmt.Errorf("generation error: %w", err)
+		}
+	}
+
+	// Extract text response from messages
+	var response strings.Builder
+	for _, msg := range resp.History() {
+		if msg.Role == ai.RoleUser {
+			continue
+		}
+		for _, part := range msg.Content {
+			if part.Kind == ai.PartText {
+				response.WriteString(part.Text)
+				response.WriteString("\n")
+			}
+		}
+	}
+
+	return strings.TrimSpace(response.String()), nil
 }
 
-func (a *Agent) handleToolCalls(requests []*ai.ToolRequest) ([]*ai.Message, error) {
-	if len(requests) == 0 {
-		return nil, nil
-	}
+// GetGenkit returns the underlying Genkit instance for evaluation framework integration
+func (a *Agent) GetGenkit() *genkit.Genkit {
+	return a.g
+}
 
-	var responses []*ai.Message
-	parts := []*ai.Part{}
-	for _, req := range requests {
-		toolResp, err := a.handleToolRequest(req)
-		if err != nil {
-			return nil, fmt.Errorf("tool request error: %w", err)
-		}
-		parts = append(parts, ai.NewToolResponsePart(toolResp))
-	}
+// GetTools returns the available tools for evaluation
+func (a *Agent) GetTools() []ai.ToolRef {
+	return a.tools
+}
 
-	responses = append(responses, ai.NewMessage(ai.RoleTool, nil, parts...))
+// IsEvaluationMode returns whether the agent is in evaluation mode
+func (a *Agent) IsEvaluationMode() bool {
+	return a.evaluationMode
+}
+
+func (a *Agent) handleMessage(msg string) error {
 	resp, err := genkit.Generate(a.ctx, a.g,
 		ai.WithMessages(a.msgs...),
 	)
