@@ -94,3 +94,9 @@ type CLIInterface interface {
 	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error)
 	LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error)
 }
+
+type LoginCLIInterface interface {
+	Connecter
+	// Unique methods
+	InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string, mcpClient string) error
+}

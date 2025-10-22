@@ -22,7 +22,7 @@ var multipleComposeFilesOptions = mcp.WithArray("compose_file_paths",
 	mcp.Items(map[string]string{"type": "string"}),
 )
 
-func CollectTools(cluster string, authPort int, providerId *client.ProviderID) []server.ServerTool {
+func CollectTools(cluster string, providerId *client.ProviderID) []server.ServerTool {
 	tools := []server.ServerTool{
 		{
 			Tool: mcp.NewTool("login",
@@ -30,7 +30,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
-				output, err := handleLoginTool(ctx, cluster, authPort, &LoginCLIAdapter{DefaultToolCLI: cli})
+				output, err := handleLoginTool(ctx, cluster, &LoginCLIAdapter{DefaultToolCLI: cli})
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to login", err), err
 				}
