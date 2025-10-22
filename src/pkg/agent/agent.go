@@ -20,7 +20,16 @@ import (
 	"github.com/openai/openai-go/option"
 )
 
-const DefaultSystemPrompt = "You are a helpful assistant. Your job is to help the user deploy and manage their cloud applications using Defang. Defang is a tool that makes it easy to deploy Docker Compose projects to cloud providers like AWS, GCP, and Digital Ocean. Be as succinct, direct, and clear as possible."
+const DefaultSystemPrompt = `You are a helpful assistant. Your job is to help
+the user deploy and manage their cloud applications using Defang. Defang is a
+tool that makes it easy to deploy Docker Compose projects to cloud providers
+like AWS, GCP, and Digital Ocean. Be as succinct, direct, and clear as
+possible.
+Some tools ask for a working_directory. This should usually be set to the
+current working directory (or ".") unless otherwise specified by the user.
+Some tools ask for a project_name. This is optional, but useful when working
+on a project that is not in the current working directory.
+`
 
 type Agent struct {
 	ctx    context.Context
