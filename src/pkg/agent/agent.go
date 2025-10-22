@@ -6,12 +6,16 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 
-	"github.com/DefangLabs/defang/src/pkg/agent/plugins/gateway"
+	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/agent/plugins/fabric"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/firebase/genkit/go/ai"
+	"github.com/firebase/genkit/go/core/api"
 	"github.com/firebase/genkit/go/genkit"
+	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/openai/openai-go/option"
 )
 
@@ -27,17 +31,27 @@ type Agent struct {
 
 func New(ctx context.Context, addr string, providerId *client.ProviderID, prompt string) *Agent {
 	accessToken := cluster.GetExistingToken(addr)
-	oai := &gateway.OpenAI{
-		APIKey: "secret",
+	provider := "fabric"
+	var providerPlugin api.Plugin
+	providerPlugin = &fabric.OpenAI{
+		APIKey: accessToken,
 		Opts: []option.RequestOption{
-			option.WithAPIKey(accessToken),
 			option.WithBaseURL(fmt.Sprintf("https://%s/api/v1", addr)),
 		},
 	}
+	defaultModel := "google/gemini-2.5-flash"
+
+	if os.Getenv("GOOGLE_API_KEY") != "" {
+		provider = "googleai"
+		providerPlugin = &googlegenai.GoogleAI{}
+		defaultModel = "gemini-2.5-flash"
+	}
+
+	model := pkg.Getenv("DEFANG_MODEL_ID", defaultModel)
 
 	g := genkit.Init(ctx,
-		genkit.WithDefaultModel("gemini-2.5-flash"),
-		genkit.WithPlugins(oai),
+		genkit.WithDefaultModel(fmt.Sprintf("%s/%s", provider, model)),
+		genkit.WithPlugins(providerPlugin),
 	)
 
 	tools := CollectTools(addr, providerId)
@@ -133,11 +147,21 @@ func (a *Agent) handleToolCalls(requests []*ai.ToolRequest) ([]*ai.Message, erro
 func (a *Agent) handleMessage(msg string) error {
 	a.msgs = append(a.msgs, ai.NewUserMessage(ai.NewTextPart(msg)))
 
+	modelMessage := ai.NewMessage(ai.RoleModel, nil)
+
 	resp, err := genkit.Generate(a.ctx, a.g,
 		ai.WithPrompt(a.prompt),
 		ai.WithTools(a.tools...),
 		ai.WithMessages(a.msgs...),
+		ai.WithStreaming(func(ctx context.Context, chunk *ai.ModelResponseChunk) error {
+			for _, part := range chunk.Content {
+				fmt.Print(part.Text)
+				modelMessage.Content = append(modelMessage.Content, part)
+			}
+			return nil
+		}),
 	)
+	fmt.Print("\n")
 	if err != nil {
 		return fmt.Errorf("generation error: %w", err)
 	}
