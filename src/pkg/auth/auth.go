@@ -122,7 +122,7 @@ func pollForAuthCode(ctx context.Context, state string) (string, error) {
 		if err != nil {
 			if errors.Is(err, ErrPollTimeout) {
 				term.Debug("poll timed out, retrying...")
-				continue // retry immediately
+				continue // retry
 			}
 			var unexpectedError ErrUnexpectedStatus
 			if errors.As(err, &unexpectedError) && unexpectedError.StatusCode >= 500 {
