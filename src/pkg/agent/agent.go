@@ -19,7 +19,7 @@ import (
 	"github.com/openai/openai-go/option"
 )
 
-const DefaultSystemPrompt = "You are a helpful assistant. Your job is to help the user deploy and manage their cloud applications using Defang. Defang is a tool that makes it easy to deploy Docker Compose projects to cloud providers like AWS, GCP, and Digital Ocean."
+const DefaultSystemPrompt = "You are a helpful assistant. Your job is to help the user deploy and manage their cloud applications using Defang. Defang is a tool that makes it easy to deploy Docker Compose projects to cloud providers like AWS, GCP, and Digital Ocean. Be as succinct, direct, and clear as possible."
 
 type Agent struct {
 	ctx    context.Context
