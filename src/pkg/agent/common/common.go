@@ -31,19 +31,21 @@ func GetStringArg(args map[string]string, key, defaultValue string) string {
 }
 
 type LoaderParams struct {
-	WorkingDirectory string   `json:"working_directory" json_schema:"required"`
-	ProjectName      string   `json:"project_name,omitempty" json_schema:"required"`
+	WorkingDirectory string   `json:"working_directory"`
+	ProjectName      string   `json:"project_name,omitempty"`
 	ComposeFilePaths []string `json:"compose_file_paths,omitempty"`
 }
 
 func ConfigureAgentLoader(params LoaderParams) (*compose.Loader, error) {
 	if params.WorkingDirectory == "" {
-		return nil, errors.New("working directory cannot be empty")
+		params.WorkingDirectory = "."
 	}
 
-	err := os.Chdir(params.WorkingDirectory)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to change working directory: %w", err)
+	if params.WorkingDirectory != "." {
+		err := os.Chdir(params.WorkingDirectory)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to change working directory: %w", err)
+		}
 	}
 
 	projectName := params.ProjectName
