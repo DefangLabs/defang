@@ -74,7 +74,7 @@ func (a *Agent) Start() error {
 	reader := NewInputReader()
 	defer reader.Close()
 
-	term.Println("Welcome to Defang. I can help you deploy your project to the cloud.")
+	term.Println("\nWelcome to Defang. I can help you deploy your project to the cloud.")
 	workdir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("error getting current working directory: %w", err)
@@ -157,6 +157,7 @@ func (a *Agent) handleMessage(msg string) error {
 
 	modelMessage := ai.NewMessage(ai.RoleModel, nil)
 
+	term.Print("* Thinking...\r* ")
 	resp, err := genkit.Generate(a.ctx, a.g,
 		ai.WithPrompt(a.prompt),
 		ai.WithTools(a.tools...),
