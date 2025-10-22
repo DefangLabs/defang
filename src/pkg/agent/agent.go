@@ -12,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/agent/plugins/fabric"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cluster"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/core/api"
 	"github.com/firebase/genkit/go/genkit"
@@ -72,15 +73,21 @@ func (a *Agent) Start() error {
 	reader := NewInputReader()
 	defer reader.Close()
 
-	fmt.Println("Type 'exit' to quit.")
+	term.Println("Welcome to Defang. I can help you deploy your project to the cloud.")
+	workdir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("error getting current working directory: %w", err)
+	}
+	term.Printc(term.DebugColor, fmt.Sprintf("cwd: %s\n", workdir))
+	term.Println("Type '/exit' to quit.")
 
 	for {
-		fmt.Print("> ")
+		term.Print("> ")
 
 		input, err := reader.ReadLine()
 		if err != nil {
 			if errors.Is(err, ErrInterrupted) {
-				fmt.Println("\nReceived termination signal, shutting down...")
+				term.Println("\nReceived termination signal, shutting down...")
 				return nil
 			}
 			if errors.Is(err, io.EOF) {
@@ -89,7 +96,7 @@ func (a *Agent) Start() error {
 			return fmt.Errorf("error reading input: %w", err)
 		}
 
-		if input == "exit" {
+		if input == "/exit" {
 			return nil
 		}
 
@@ -155,13 +162,13 @@ func (a *Agent) handleMessage(msg string) error {
 		ai.WithMessages(a.msgs...),
 		ai.WithStreaming(func(ctx context.Context, chunk *ai.ModelResponseChunk) error {
 			for _, part := range chunk.Content {
-				fmt.Print(part.Text)
+				term.Print(part.Text)
 				modelMessage.Content = append(modelMessage.Content, part)
 			}
 			return nil
 		}),
 	)
-	fmt.Print("\n")
+	term.Print("\n")
 	if err != nil {
 		return fmt.Errorf("generation error: %w", err)
 	}
@@ -178,7 +185,7 @@ func (a *Agent) handleMessage(msg string) error {
 		}
 		for _, part := range msg.Content {
 			if part.Kind == ai.PartText {
-				fmt.Println(part.Text)
+				term.Println(part.Text)
 			}
 		}
 	}
