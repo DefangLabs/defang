@@ -254,7 +254,7 @@ func (g *ModelGenerator) generateStream(ctx context.Context, handleChunk func(co
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request params for debug: %w", err)
 	}
-	_, _ = term.Debugf("Chat.Completions.NewStreaming: %s", string(reqParams))
+	_, _ = term.Debug("Chat.Completions.NewStreaming: %s", string(reqParams))
 	stream := g.client.Chat.Completions.NewStreaming(ctx, *g.request)
 	defer stream.Close()
 
