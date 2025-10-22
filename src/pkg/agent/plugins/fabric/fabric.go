@@ -1,4 +1,4 @@
-package gateway
+package fabric
 
 // Copyright 2025 Google LLC
 //
@@ -18,16 +18,16 @@ import (
 	"context"
 	"os"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/plugins/compat_oai"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/core"
 	"github.com/firebase/genkit/go/core/api"
 	"github.com/firebase/genkit/go/genkit"
-	"github.com/firebase/genkit/go/plugins/compat_oai"
 	openaiGo "github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 )
 
-const provider = "gateway"
+const provider = "fabric"
 
 type TextEmbeddingConfig struct {
 	Dimensions     int                                       `json:"dimensions,omitempty"`
@@ -45,7 +45,7 @@ type EmbedderRef struct {
 
 var (
 	supportedModels = map[string]ai.ModelOptions{
-		"gemini-2.5-flash": {
+		"google/gemini-2.5-flash": {
 			Label:    "Gemini 2.5 Flash",
 			Versions: []string{},
 			Supports: &ai.ModelSupports{
