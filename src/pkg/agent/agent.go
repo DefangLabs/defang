@@ -51,8 +51,7 @@ func New(ctx context.Context, addr string, authPort int, providerId *client.Prov
 	}
 	defaultModel := "google/gemini-2.5-flash"
 
-	googleApiKey := os.Getenv("GOOGLE_API_KEY")
-	if googleApiKey != "" {
+	if os.Getenv("GOOGLE_API_KEY") != "" {
 		provider = "googleai"
 		providerPlugin = &googlegenai.GoogleAI{}
 		defaultModel = "gemini-2.5-flash"
