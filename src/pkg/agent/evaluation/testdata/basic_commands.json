@@ -1,8 +1,4 @@
-{
-  "id": "defang_basic_commands",
-  "name": "Defang Basic Commands Dataset",
-  "description": "Test dataset for basic Defang agent commands and tool selection",
-  "examples": [
+[
     {
       "input": "Deploy my application to the cloud",
       "reference": "(?i)(deploy|deployment)",
@@ -50,7 +46,7 @@
     },
     {
       "input": "I want to login to my account",
-      "reference": "(?i)(login|authenticate|signin)",
+      "reference": "(?i)Please open this URL in your browser: https?://[^\\s]+ to login",
       "context": {
         "scenario": "login",
         "expected_tool": "login",
@@ -111,11 +107,4 @@
         "category": "provider_setup"
       }
     }
-  ],
-  "metadata": {
-    "version": "1.0",
-    "created_by": "evaluation_framework",
-    "categories": ["basic_operations", "authentication", "configuration", "provider_setup"],
-    "total_examples": 12
-  }
-}
+  ]

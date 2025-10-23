@@ -12,19 +12,19 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/firebase/genkit/go/ai"
+	"github.com/firebase/genkit/go/core"
 	"github.com/firebase/genkit/go/genkit"
+	"github.com/firebase/genkit/go/plugins/evaluators"
+	"github.com/firebase/genkit/go/plugins/googlegenai"
 )
 
-const DefaultSystemPrompt = `You are a helpful assistant. Your job is to help
-the user deploy and manage their cloud applications using Defang. Defang is a
-tool that makes it easy to deploy Docker Compose projects to cloud providers
-like AWS, GCP, and Digital Ocean. Be as succinct, direct, and clear as
-possible.
-Some tools ask for a working_directory. This should usually be set to the
-current working directory (or ".") unless otherwise specified by the user.
-Some tools ask for a project_name. This is optional, but useful when working
-on a project that is not in the current working directory.
-`
+type AgentConfig struct {
+	Cluster        string
+	AuthPort       int
+	EvaluationMode bool
+	ProviderId     *client.ProviderID
+	EvalMetrics    []evaluators.MetricConfig
+}
 
 type Agent struct {
 	ctx            context.Context
@@ -34,17 +34,31 @@ type Agent struct {
 }
 
 func New(ctx context.Context, cluster string, authPort int, providerId *client.ProviderID) *Agent {
-	return NewWithEvaluation(ctx, cluster, authPort, providerId, false)
+	agentConfig := AgentConfig{
+		Cluster:        cluster,
+		AuthPort:       authPort,
+		ProviderId:     providerId,
+		EvaluationMode: true,
+		EvalMetrics: []evaluators.MetricConfig{
+			{MetricType: evaluators.EvaluatorRegex},
+			{MetricType: evaluators.EvaluatorDeepEqual},
+		},
+	}
+
+	tools := CollectTools(agentConfig.Cluster, agentConfig.AuthPort, agentConfig.ProviderId)
+	return NewWithEvaluation(ctx, agentConfig, tools)
 }
 
-func NewWithEvaluation(ctx context.Context, cluster string, authPort int, providerId *client.ProviderID, evaluationMode bool) *Agent {
+func NewWithEvaluation(ctx context.Context, config AgentConfig, tools []ai.Tool) *Agent {
 	// Initialize Genkit with the Google AI plugin
 	g := genkit.Init(ctx,
-		genkit.WithDefaultModel(fmt.Sprintf("%s/%s", provider, model)),
-		genkit.WithPlugins(providerPlugin),
+		genkit.WithPlugins(
+			&googlegenai.GoogleAI{},
+			&evaluators.GenkitEval{Metrics: config.EvalMetrics},
+		),
+		genkit.WithDefaultModel("googleai/gemini-2.5-flash"),
 	)
 
-	tools := CollectTools(addr, authPort, providerId)
 	toolRefs := make([]ai.ToolRef, len(tools))
 	for i, t := range tools {
 		toolRefs[i] = ai.ToolRef(t)
@@ -53,8 +67,33 @@ func NewWithEvaluation(ctx context.Context, cluster string, authPort int, provid
 		ctx:            ctx,
 		g:              g,
 		tools:          toolRefs,
-		evaluationMode: evaluationMode,
+		evaluationMode: config.EvaluationMode,
 	}
+}
+
+// setup used for evaluation input structure
+type DefangCLISetup struct {
+	WorkingDirectory *string `json:"working_directory,omitempty"`
+	Provider         *string `json:"provider,omitempty"`
+}
+type DefangCLIInput struct {
+	Message string         `json:"message"`
+	Setup   DefangCLISetup `json:"setup,omitempty"`
+}
+
+// CreateEvaluationFlow creates a Genkit flow for evaluation purposes
+func (a *Agent) CreateEvaluationFlow() *core.Flow[DefangCLIInput, string, struct{}] {
+	return genkit.DefineFlow(a.g, "defang-cli", func(ctx context.Context, input DefangCLIInput) (string, error) {
+		setupString := ""
+		if input.Setup.WorkingDirectory != nil && *input.Setup.WorkingDirectory != "" {
+			setupString += fmt.Sprintf("Make the current directory %s. ", *input.Setup.WorkingDirectory)
+		}
+		if input.Setup.Provider != nil && *input.Setup.Provider != "" {
+			setupString += fmt.Sprintf("Use the %s provider. ", *input.Setup.Provider)
+		}
+
+		return a.HandleMessageForEvaluation(setupString + input.Message)
+	})
 }
 
 func (a *Agent) Start() error {
