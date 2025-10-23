@@ -103,7 +103,7 @@ func (DefaultToolCLI) CreatePlaygroundProvider(client *cliClient.GrpcClient) cli
 	return &cliClient.PlaygroundProvider{FabricClient: client}
 }
 
-func (DefaultToolCLI) NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error) {
+func (DefaultToolCLI) NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) cliClient.Provider {
 	return cli.NewProvider(ctx, providerId, client)
 }
 

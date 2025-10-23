@@ -17,7 +17,7 @@ type Connecter interface {
 }
 
 type ProviderFactory interface {
-	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error)
+	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) cliClient.Provider
 }
 
 type ProjectNameLoader interface {
@@ -83,7 +83,7 @@ type SetConfigCLIInterface interface {
 	Connecter
 	ProjectNameLoader
 	// Unique methods
-	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error)
+	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) cliClient.Provider
 	ConfigSet(ctx context.Context, projectName string, provider cliClient.Provider, name, value string) error
 }
 
@@ -91,6 +91,6 @@ type CLIInterface interface {
 	Connecter
 	// Unique methods
 	GetServices(ctx context.Context, projectName string, provider cliClient.Provider) ([]deployment_info.Service, error)
-	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error)
+	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) cliClient.Provider
 	LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error)
 }

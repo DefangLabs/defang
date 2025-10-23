@@ -123,8 +123,8 @@ func TestCanIUseProvider(t *testing.T) {
 // Helper to temporarily override newProvider in tests
 func withMockedNewProvider(t *testing.T, providerErr error, testFunc func()) {
 	originalNewProvider := newProvider
-	newProvider = func(_ context.Context, _ cliClient.ProviderID, _ cliClient.FabricClient) (cliClient.Provider, error) {
-		return &mockGrpcClientProvider{err: providerErr}, nil
+	newProvider = func(_ context.Context, _ cliClient.ProviderID, _ cliClient.FabricClient) cliClient.Provider {
+		return &mockGrpcClientProvider{err: providerErr}
 	}
 	t.Cleanup(func() { newProvider = originalNewProvider })
 	testFunc()

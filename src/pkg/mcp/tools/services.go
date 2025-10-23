@@ -28,10 +28,7 @@ func handleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, pro
 
 	// Create a Defang client
 	term.Debug("Function invoked: cli.NewProvider")
-	provider, err := cli.NewProvider(ctx, *providerId, client)
-	if err != nil {
-		return "", fmt.Errorf("failed to create provider: %w", err)
-	}
+	provider := cli.NewProvider(ctx, *providerId, client)
 
 	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)

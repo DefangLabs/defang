@@ -16,7 +16,6 @@ import (
 // MockRemoveConfigCLI implements RemoveConfigCLIInterface for testing
 type MockRemoveConfigCLI struct {
 	ConnectError              error
-	NewProviderError          error
 	LoadProjectNameError      error
 	ConfigDeleteError         error
 	ConfigDeleteNotFoundError bool
@@ -32,12 +31,9 @@ func (m *MockRemoveConfigCLI) Connect(ctx context.Context, cluster string) (*cli
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockRemoveConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) (client.Provider, error) {
+func (m *MockRemoveConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) client.Provider {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
-	if m.NewProviderError != nil {
-		return nil, m.NewProviderError
-	}
-	return nil, nil // Mock provider
+	return nil // Mock provider
 }
 
 func (m *MockRemoveConfigCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
@@ -91,16 +87,6 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			},
 			expectError:   true,
 			expectedError: "Could not connect: connection failed",
-		},
-		{
-			name:       "new_provider_error",
-			configName: "DATABASE_URL",
-			providerID: client.ProviderAWS,
-			setupMock: func(m *MockRemoveConfigCLI) {
-				m.NewProviderError = errors.New("provider creation failed")
-			},
-			expectError:   true,
-			expectedError: "Failed to get new provider: provider creation failed",
 		},
 		{
 			name:       "load_project_name_error",

@@ -104,7 +104,7 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantName) *ByocGcp 
 	region := pkg.Getenv("GCP_LOCATION", "us-central1") // Defaults to us-central1 for lower price
 	projectId := getGcpProjectID()
 	b := &ByocGcp{driver: &gcp.Gcp{Region: region, ProjectId: projectId}}
-	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantName, b)
+	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b)
 	return b
 }
 

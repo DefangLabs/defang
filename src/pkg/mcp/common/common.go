@@ -102,12 +102,9 @@ func ProviderNotConfiguredError(providerId client.ProviderID) error {
 }
 
 func checkProviderConfigured(ctx context.Context, client cliClient.FabricClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error) {
-	provider, err := newProvider(ctx, providerId, client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get new provider: %w", err)
-	}
+	provider := newProvider(ctx, providerId, client)
 
-	_, err = provider.AccountInfo(ctx)
+	_, err := provider.AccountInfo(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -15,7 +15,6 @@ import (
 // MockDestroyCLI implements DestroyCLIInterface for testing
 type MockDestroyCLI struct {
 	ConnectError                     error
-	NewProviderError                 error
 	ComposeDownError                 error
 	LoadProjectNameWithFallbackError error
 	CanIUseProviderError             error
@@ -32,9 +31,9 @@ func (m *MockDestroyCLI) Connect(ctx context.Context, cluster string) (*client.G
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockDestroyCLI) NewProvider(ctx context.Context, providerId client.ProviderID, grpcClient client.FabricClient) (client.Provider, error) {
+func (m *MockDestroyCLI) NewProvider(ctx context.Context, providerId client.ProviderID, grpcClient client.FabricClient) client.Provider {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
-	return nil, m.NewProviderError
+	return nil
 }
 
 func (m *MockDestroyCLI) ComposeDown(ctx context.Context, projectName string, grpcClient *client.GrpcClient, provider client.Provider) (string, error) {
@@ -73,14 +72,6 @@ func TestHandleDestroyTool(t *testing.T) {
 				m.ConnectError = errors.New("connection failed")
 			},
 			expectedError: "Could not connect: connection failed",
-		},
-		{
-			name:       "new_provider_error",
-			providerID: client.ProviderAWS,
-			setupMock: func(m *MockDestroyCLI) {
-				m.NewProviderError = errors.New("provider creation failed")
-			},
-			expectedError: "Failed to get new provider: provider creation failed",
 		},
 		{
 			name:       "load_project_name_error",
