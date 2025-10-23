@@ -47,10 +47,10 @@ func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, pro
 	if err != nil {
 		var noServicesErr defangcli.ErrNoServices
 		if errors.As(err, &noServicesErr) {
-			return "", fmt.Errorf("no services found for the specified project %s: %w", projectName, err)
+			return fmt.Sprintf("no services found for the specified project %q", projectName), nil
 		}
 		if connect.CodeOf(err) == connect.CodeNotFound && strings.Contains(err.Error(), "is not deployed in Playground") {
-			return "", fmt.Errorf("project %s is not deployed in Playground: %w", projectName, err)
+			return fmt.Sprintf("project %s is not deployed in Playground: %w", projectName), nil
 		}
 
 		return "", fmt.Errorf("failed to get services: %w", err)
