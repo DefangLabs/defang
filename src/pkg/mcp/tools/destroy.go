@@ -11,6 +11,15 @@ import (
 	"github.com/bufbuild/connect-go"
 )
 
+type DestroyCLIInterface interface {
+	connecter
+	providerFactory
+	projectNameLoader
+	// Unique methods
+	ComposeDown(ctx context.Context, projectName string, client *cliClient.GrpcClient, provider cliClient.Provider) (string, error)
+	CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, provider cliClient.Provider, serviceCount int) error
+}
+
 func handleDestroyTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli DestroyCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {

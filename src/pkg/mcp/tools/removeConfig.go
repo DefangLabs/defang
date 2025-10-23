@@ -25,6 +25,14 @@ func parseRemoveConfigParams(request mcp.CallToolRequest) (RemoveConfigParams, e
 	}, nil
 }
 
+type RemoveConfigCLIInterface interface {
+	connecter
+	providerFactory
+	projectNameLoader
+	// Unique methods
+	ConfigDelete(ctx context.Context, projectName string, provider cliClient.Provider, name string) error
+}
+
 // handleRemoveConfigTool handles the remove config tool logic
 func handleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader, params RemoveConfigParams, providerId *cliClient.ProviderID, cluster string, cli RemoveConfigCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)

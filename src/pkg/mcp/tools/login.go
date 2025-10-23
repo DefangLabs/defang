@@ -11,7 +11,7 @@ import (
 )
 
 type LoginCLIInterface interface {
-	Connecter
+	connecter
 	// Unique methods
 	InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string, mcpClient string) error
 	GenerateAuthURL(authPort int) string
