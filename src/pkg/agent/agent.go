@@ -22,6 +22,7 @@ type AgentConfig struct {
 	Cluster        string
 	AuthPort       int
 	EvaluationMode bool
+	AIModel        string
 	ProviderId     *client.ProviderID
 	EvalMetrics    []evaluators.MetricConfig
 }
@@ -56,7 +57,7 @@ func NewWithEvaluation(ctx context.Context, config AgentConfig, tools []ai.Tool)
 			&googlegenai.GoogleAI{},
 			&evaluators.GenkitEval{Metrics: config.EvalMetrics},
 		),
-		genkit.WithDefaultModel("googleai/gemini-2.5-flash"),
+		genkit.WithDefaultModel(config.AIModel),
 	)
 
 	toolRefs := make([]ai.ToolRef, len(tools))
