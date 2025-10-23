@@ -1,0 +1,32 @@
+[
+  {
+    "input": {
+      "message": "Destroy my deployment",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "(?i)(destroy|delete|remove)"
+  },
+  {
+    "input": {
+      "message": "Take down all my services",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "(?i)(destroy|take down|remove)"
+  },
+  {
+    "input": {
+      "message": "Delete my application from the cloud",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "(?i)(destroy|delete|remove)"
+  }
+]

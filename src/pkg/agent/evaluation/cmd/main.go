@@ -39,121 +39,122 @@ func dummyToolHandler(ctx *ai.ToolContext, name string, args ...any) (string, er
 	return fmt.Sprintf("This is a dummy tool response for %s with args: %v", name, args), nil
 }
 
+// TODO: Should match CollectTools.
 func CollectMockTools(cluster string, authPort int, providerId *client.ProviderID) []ai.Tool {
 	return []ai.Tool{
 		ai.NewTool[agent.LoginParams, string](
-			"login",
-			"Login into Defang",
-			func(ctx *ai.ToolContext, _ agent.LoginParams) (string, error) {
-				return dummyToolHandler(ctx, "login")
+			agent.LoginTool.Name,
+			agent.LoginTool.Description,
+			func(ctx *ai.ToolContext, params agent.LoginParams) (string, error) {
+				return dummyToolHandler(ctx, agent.LoginTool.Name, params)
 			},
 		),
 		ai.NewTool[agent.ServicesParams, string](
-			"services",
-			"List deployed services for the project in the current working directory",
+			agent.ServicesTool.Name,
+			agent.ServicesTool.Description,
 			func(ctx *ai.ToolContext, params agent.ServicesParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
 				var cli tools.CLIInterface = &tools.DefaultToolCLI{}
-				return dummyToolHandler(ctx, "services", loader, providerId, cluster, cli)
+				return dummyToolHandler(ctx, agent.ServicesTool.Name, loader, providerId, cluster, cli)
 			},
 		),
 
-		ai.NewTool("deploy",
-			"Deploy the application defined in the docker-compose files in the current working directory",
+		ai.NewTool(agent.DeployTool.Name,
+			agent.DeployTool.Description,
 			func(ctx *ai.ToolContext, params agent.DeployParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return dummyToolHandler(ctx, "deploy", loader, providerId, cluster, cli)
+				return dummyToolHandler(ctx, agent.DeployTool.Name, loader, providerId, cluster, cli)
 			},
 		),
-		ai.NewTool("destroy",
-			"Destroy the deployed application defined in the docker-compose files in the current working directory",
+		ai.NewTool(agent.DestroyTool.Name,
+			agent.DestroyTool.Description,
 			func(ctx *ai.ToolContext, params tools.DestroyParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return dummyToolHandler(ctx, "destroy", loader, providerId, cluster, cli)
+				return dummyToolHandler(ctx, agent.DestroyTool.Name, loader, providerId, cluster, cli)
 			},
 		),
-		ai.NewTool("logs",
-			"Fetch logs for the deployed application defined in the docker-compose files in the current working directory",
+		ai.NewTool(agent.LogsTool.Name,
+			agent.LogsTool.Description,
 			func(ctx *ai.ToolContext, params tools.LogsParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return dummyToolHandler(ctx, "logs", loader, params, cluster, providerId, cli)
+				return dummyToolHandler(ctx, agent.LogsTool.Name, loader, params, cluster, providerId, cli)
 			},
 		),
-		ai.NewTool("estimate",
-			"Estimate the cost of deployed a Defang project to AWS or GCP",
+		ai.NewTool(agent.EstimateTool.Name,
+			agent.EstimateTool.Description,
 			func(ctx *ai.ToolContext, params tools.EstimateParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return dummyToolHandler(ctx, "estimate", loader, params, cluster, cli)
+				return dummyToolHandler(ctx, agent.EstimateTool.Name, loader, params, cluster, cli)
 			},
 		),
-		ai.NewTool("set_config",
-			"Set a config variable for the defang project",
+		ai.NewTool(agent.SetConfigTool.Name,
+			agent.SetConfigTool.Description,
 			func(ctx *ai.ToolContext, params tools.SetConfigParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return dummyToolHandler(ctx, "set_config", loader, params, providerId, cluster, cli)
+				return dummyToolHandler(ctx, agent.SetConfigTool.Name, loader, params, providerId, cluster, cli)
 			},
 		),
-		ai.NewTool("remove_config",
-			"Remove a config variable from the defang project",
+		ai.NewTool(agent.RemoveConfigTool.Name,
+			agent.RemoveConfigTool.Description,
 			func(ctx *ai.ToolContext, params tools.RemoveConfigParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return dummyToolHandler(ctx, "remove_config", loader, params, providerId, cluster, cli)
+				return dummyToolHandler(ctx, agent.RemoveConfigTool.Name, loader, params, providerId, cluster, cli)
 			},
 		),
-		ai.NewTool("list_configs",
-			"List config variables for the defang project",
+		ai.NewTool(agent.ListConfigsTool.Name,
+			agent.ListConfigsTool.Description,
 			func(ctx *ai.ToolContext, params tools.ListConfigsParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return dummyToolHandler(ctx, "list_configs", loader, providerId, cluster, cli)
+				return dummyToolHandler(ctx, agent.ListConfigsTool.Name, loader, providerId, cluster, cli)
 			},
 		),
-		ai.NewTool("set_aws_provider",
-			"Set the AWS provider for the defang project",
+		ai.NewTool(agent.SetAWSProvider.Name,
+			agent.SetAWSProvider.Description,
 			func(ctx *ai.ToolContext, params tools.SetAWSProviderParams) (string, error) {
-				return dummyToolHandler(ctx, "set_aws_provider", params, providerId, cluster)
+				return dummyToolHandler(ctx, agent.SetAWSProvider.Name, params, providerId, cluster)
 			},
 		),
-		ai.NewTool("set_gcp_provider",
-			"Set the GCP provider for the defang project",
+		ai.NewTool(agent.SetGCPProvider.Name,
+			agent.SetGCPProvider.Description,
 			func(ctx *ai.ToolContext, params tools.SetGCPProviderParams) (string, error) {
-				return dummyToolHandler(ctx, "set_gcp_provider", params, providerId, cluster)
+				return dummyToolHandler(ctx, agent.SetGCPProvider.Name, params, providerId, cluster)
 			},
 		),
-		ai.NewTool("set_playground_provider",
-			"Set the Playground provider for the defang project",
+		ai.NewTool(agent.SetPlaygroundProvider.Name,
+			agent.SetPlaygroundProvider.Description,
 			func(ctx *ai.ToolContext, params tools.SetPlaygroundProviderParams) (string, error) {
-				return dummyToolHandler(ctx, "set_playground_provider", params, providerId, cluster)
+				return dummyToolHandler(ctx, agent.SetPlaygroundProvider.Name, params, providerId, cluster)
 			},
 		),
 	}

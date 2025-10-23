@@ -1,0 +1,42 @@
+[
+  {
+    "input": {
+      "message": "Deploy my application",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "(?i)(deploy|deployment|deployed)"
+  },
+  {
+    "input": {
+      "message": "Start my services in the cloud",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "(?i)(deploy|start|launch)"
+  },
+  {
+    "input": {
+      "message": "I want to deploy to AWS",
+      "setup": {
+        "working_directory": "./",
+        "provider": "aws"
+      }
+    },
+    "reference": "(?i)(deploy|aws)"
+  },
+  {
+    "input": {
+      "message": "Launch my docker-compose application",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "(?i)(deploy|launch|docker)"
+  }
+]

@@ -1,110 +1,122 @@
 [
     {
-      "input": "Deploy my application to the cloud",
-      "reference": "(?i)(deploy|deployment)",
-      "context": {
-        "scenario": "deployment",
-        "expected_tool": "deploy",
-        "category": "basic_operations"
-      }
+      "input": {
+        "message": "Deploy my application to the cloud",
+        "setup": {
+          "working_directory": "./",
+          "provider": "playground"
+        }
+      },
+      "reference": "(?i)(deploy|deployment)"
     },
     {
-      "input": "Show me all my running services",
-      "reference": "(?i)(service|list|status)",
-      "context": {
-        "scenario": "services_list",
-        "expected_tool": "services",
-        "category": "basic_operations"
-      }
+      "input": {
+        "message": "Show me all my running services",
+        "setup": {
+          "working_directory": "./",
+          "provider": "playground"
+        }
+      },
+      "reference": "(?i)(service|list|status)"
     },
     {
-      "input": "I need to see the logs from my application",
-      "reference": "(?i)(log|logs)",
-      "context": {
-        "scenario": "logs",
-        "expected_tool": "logs",
-        "category": "basic_operations"
-      }
+      "input": {
+        "message": "I need to see the logs from my application",
+        "setup": {
+          "working_directory": "./",
+          "provider": "playground"
+        }
+      },
+      "reference": "(?i)(log|logs)"
     },
     {
-      "input": "Remove everything I've deployed",
-      "reference": "(?i)(destroy|delete|remove)",
-      "context": {
-        "scenario": "destroy",
-        "expected_tool": "destroy",
-        "category": "basic_operations"
-      }
+      "input": {
+        "message": "Remove everything I've deployed",
+        "setup": {
+          "working_directory": "./",
+          "provider": "playground"
+        }
+      },
+      "reference": "(?i)(destroy|delete|remove)"
     },
     {
-      "input": "How much will it cost to deploy this project?",
-      "reference": "(?i)(estimate|cost|pricing)",
-      "context": {
-        "scenario": "estimate",
-        "expected_tool": "estimate",
-        "category": "basic_operations"
-      }
+      "input": {
+        "message": "How much will it cost to deploy this project?",
+        "setup": {
+          "working_directory": "./",
+          "provider": "playground"
+        }
+      },
+      "reference": "(?i)(estimate|cost|pricing)"
     },
     {
-      "input": "I want to login to my account",
-      "reference": "(?i)Please open this URL in your browser: https?://[^\\s]+ to login",
-      "context": {
-        "scenario": "login",
-        "expected_tool": "login",
-        "category": "authentication"
-      }
+      "input": {
+        "message": "I want to login to my account",
+        "setup": {
+          "working_directory": "./",
+          "provider": "playground"
+        }
+      },
+      "reference": "(?i)Please open this URL in your browser: https?://[^ ]+ to login"
     },
     {
-      "input": "Set DATABASE_URL environment variable",
-      "reference": "(?i)(config|set|variable|environment)",
-      "context": {
-        "scenario": "config_set",
-        "expected_tool": "set_config",
-        "category": "configuration"
-      }
+      "input": {
+        "message": "Set DATABASE_URL environment variable",
+        "setup": {
+          "working_directory": "./",
+          "provider": "playground"
+        }
+      },
+      "reference": "(?i)(config|set|variable|environment)"
     },
     {
-      "input": "Remove the API_KEY configuration",
-      "reference": "(?i)(config|remove|delete|unset)",
-      "context": {
-        "scenario": "config_remove",
-        "expected_tool": "remove_config",
-        "category": "configuration"
-      }
+      "input": {
+        "message": "Remove the API_KEY configuration",
+        "setup": {
+          "working_directory": "./",
+          "provider": "playground"
+        }
+      },
+      "reference": "(?i)(config|remove|delete|unset)"
     },
     {
-      "input": "What configuration variables do I have?",
-      "reference": "(?i)(config|list|show|configuration)",
-      "context": {
-        "scenario": "config_list",
-        "expected_tool": "list_configs",
-        "category": "configuration"
-      }
+      "input": {
+        "message": "What configuration variables do I have?",
+        "setup": {
+          "working_directory": "./",
+          "provider": "playground"
+        }
+      },
+      "reference": "(?i)(config|list|show|configuration)"
     },
     {
-      "input": "Set up AWS as my cloud provider",
-      "reference": "(?i)(aws|provider|setup)",
-      "context": {
-        "scenario": "provider_aws",
-        "expected_tool": "set_aws_provider",
-        "category": "provider_setup"
-      }
+      "input": {
+        "message": "Set up AWS as my cloud provider",
+        "setup": {
+          "working_directory": "./",
+          "provider": "playground"
+        }
+      },
+      "reference": "(?i)(aws|provider|setup)"
     },
     {
-      "input": "Configure Google Cloud Platform",
-      "reference": "(?i)(gcp|google|cloud|provider)",
-      "context": {
-        "scenario": "provider_gcp",
-        "expected_tool": "set_gcp_provider",
-        "category": "provider_setup"
-      }
+      "input": {
+        "message": "Configure Google Cloud Platform",
+        "setup": {
+          "working_directory": "./",
+          "provider": "playground"
+        }
+      },
+      "reference": "(?i)(gcp|google|cloud|provider)"
     },
     {
-      "input": "Use the playground environment for testing",
-      "reference": "(?i)(playground|test|demo)",
-      "context": {
-        "scenario": "provider_playground",
-        "expected_tool": "set_playground_provider",
-        "category": "provider_setup"
-      }
+      "input": {
+        "message": "Use the playground environment for testing",
+        "setup": {
+          "working_directory": "./",
+          "provider": "playground"
+        }
+      },
+      "reference": "(?i)(playground|test|demo)"
     }
   ]

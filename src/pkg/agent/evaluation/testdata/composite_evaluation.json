@@ -1,0 +1,32 @@
+[
+  {
+    "input": {
+      "message": "Deploy my app and show me the logs",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "(?i)(deploy|logs)"
+  },
+  {
+    "input": {
+      "message": "What's the cost to deploy this to AWS?",
+      "setup": {
+        "working_directory": "./",
+        "provider": "aws"
+      }
+    },
+    "reference": "(?i)(cost|deploy|aws|estimate)"
+  },
+  {
+    "input": {
+      "message": "Set up my environment and deploy",
+      "setup": {
+        "working_directory": "./",
+        "provider": "aws"
+      }
+    },
+    "reference": "(?i)(setup|deploy|environment)"
+  }
+]

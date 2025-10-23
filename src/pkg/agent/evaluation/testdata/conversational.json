@@ -1,86 +1,82 @@
-{
-  "id": "defang_conversational",
-  "name": "Defang Conversational Dataset",
-  "description": "Test dataset for natural language understanding and conversational interactions",
-  "examples": [
-    {
-      "input": "Can you help me get my app running in the cloud?",
-      "reference": "(?i)(deploy|deployment|help|assist)",
-      "context": {
-        "scenario": "help_deployment",
-        "expected_behavior": "helpful_deployment_guidance",
-        "category": "conversational"
+[
+  {
+    "input": {
+      "message": "Can you help me get my app running in the cloud?",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
       }
     },
-    {
-      "input": "I'm having trouble with my deployment, what should I do?",
-      "reference": "(?i)(help|troubleshoot|debug|status|logs)",
-      "context": {
-        "scenario": "troubleshooting",
-        "expected_behavior": "suggest_diagnostic_steps",
-        "category": "conversational"
+    "reference": "(?i)(deploy|deployment|help|assist)"
+  },
+  {
+    "input": {
+      "message": "I'm having trouble with my deployment, what should I do?",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
       }
     },
-    {
-      "input": "How do I check if my services are healthy?",
-      "reference": "(?i)(service|status|health|check|running)",
-      "context": {
-        "scenario": "health_check",
-        "expected_behavior": "service_status_guidance",
-        "category": "conversational"
+    "reference": "(?i)(help|troubleshoot|debug|status|logs)"
+  },
+  {
+    "input": {
+      "message": "How do I check if my services are healthy?",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
       }
     },
-    {
-      "input": "What's the difference between AWS and playground deployment?",
-      "reference": "(?i)(aws|playground|provider|difference|compare)",
-      "context": {
-        "scenario": "provider_comparison",
-        "expected_behavior": "explain_providers",
-        "category": "conversational"
+    "reference": "(?i)(service|status|health|check|running)"
+  },
+  {
+    "input": {
+      "message": "What's the difference between AWS and playground deployment?",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
       }
     },
-    {
-      "input": "I want to clean up all my resources, how do I do that safely?",
-      "reference": "(?i)(clean.*up|destroy|remove|safely|resources)",
-      "context": {
-        "scenario": "safe_cleanup",
-        "expected_behavior": "destruction_guidance",
-        "category": "conversational"
+    "reference": "(?i)(aws|playground|provider|difference|compare)"
+  },
+  {
+    "input": {
+      "message": "I want to clean up all my resources, how do I do that safely?",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
       }
     },
-    {
-      "input": "Can you show me what I have deployed currently?",
-      "reference": "(?i)(show|list|current|deployed|services)",
-      "context": {
-        "scenario": "current_status",
-        "expected_behavior": "list_current_deployments",
-        "category": "conversational"
+    "reference": "(?i)(clean.*up|destroy|remove|safely|resources)"
+  },
+  {
+    "input": {
+      "message": "Can you show me what I have deployed currently?",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
       }
     },
-    {
-      "input": "I need to update an environment variable for my app",
-      "reference": "(?i)(update|set|environment|variable|config)",
-      "context": {
-        "scenario": "env_update",
-        "expected_behavior": "config_update_guidance",
-        "category": "conversational"
+    "reference": "(?i)(show|list|current|deployed|services)"
+  },
+  {
+    "input": {
+      "message": "I need to update an environment variable for my app",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
       }
     },
-    {
-      "input": "How much is this costing me right now?",
-      "reference": "(?i)(cost|pricing|billing|estimate|much)",
-      "context": {
-        "scenario": "cost_inquiry",
-        "expected_behavior": "cost_estimation",
-        "category": "conversational"
+    "reference": "(?i)(update|set|environment|variable|config)"
+  },
+  {
+    "input": {
+      "message": "How much is this costing me right now?",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
       }
-    }
-  ],
-  "metadata": {
-    "version": "1.0",
-    "created_by": "evaluation_framework",
-    "categories": ["conversational"],
-    "total_examples": 8,
-    "purpose": "Test natural language understanding and helpful responses"
+    },
+    "reference": "(?i)(cost|pricing|billing|estimate|much)"
   }
-}
+]

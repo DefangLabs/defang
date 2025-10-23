@@ -1,0 +1,32 @@
+[
+    {
+      "input": {
+        "message": "Set a config variable API_KEY to my-secret",
+        "setup": {
+          "working_directory": "./",
+          "provider": "playground"
+        }
+      },
+      "reference": "(?i)(config|set)"
+    },
+    {
+      "input": {
+        "message": "Remove the DATABASE_URL config",
+        "setup": {
+          "working_directory": "./",
+          "provider": "playground"
+        }
+      },
+      "reference": "(?i)(config|remove|delete)"
+    },
+    {
+      "input": {
+        "message": "Show me all configuration variables",
+        "setup": {
+          "working_directory": "./",
+          "provider": "playground"
+        }
+      },
+      "reference": "(?i)(config|list|show)"
+    }
+  ]

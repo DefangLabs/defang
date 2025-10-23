@@ -75,6 +75,7 @@ func NewWithEvaluation(ctx context.Context, config AgentConfig, tools []ai.Tool)
 type DefangCLISetup struct {
 	WorkingDirectory *string `json:"working_directory,omitempty"`
 	Provider         *string `json:"provider,omitempty"`
+	Region           *string `json:"region,omitempty"`
 }
 type DefangCLIInput struct {
 	Message string         `json:"message"`
@@ -90,6 +91,9 @@ func (a *Agent) CreateEvaluationFlow() *core.Flow[DefangCLIInput, string, struct
 		}
 		if input.Setup.Provider != nil && *input.Setup.Provider != "" {
 			setupString += fmt.Sprintf("Use the %s provider. ", *input.Setup.Provider)
+		}
+		if input.Setup.Region != nil && *input.Setup.Region != "" {
+			setupString += fmt.Sprintf("Set the region to %s. ", *input.Setup.Region)
 		}
 
 		return a.HandleMessageForEvaluation(setupString + input.Message)
