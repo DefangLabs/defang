@@ -83,11 +83,6 @@ func (a *Agent) Start() error {
 	defer reader.Close()
 
 	term.Println("\nWelcome to Defang. I can help you deploy your project to the cloud.")
-	workdir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("error getting current working directory: %w", err)
-	}
-	term.Printc(term.DebugColor, fmt.Sprintf("cwd: %s\n", workdir))
 	term.Println("Type '/exit' to quit.")
 
 	for {
