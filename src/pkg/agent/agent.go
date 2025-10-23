@@ -165,10 +165,15 @@ func (a *Agent) handleMessage(msg string) error {
 	a.msgs = append(a.msgs, ai.NewUserMessage(ai.NewTextPart(msg)))
 
 	modelMessage := ai.NewMessage(ai.RoleModel, nil)
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("error getting current working directory: %w", err)
+	}
+	prompt := fmt.Sprintf("%s\n\nThe current working directory is %q", DefaultSystemPrompt, cwd)
 
 	term.Print("* Thinking...\r* ")
 	resp, err := genkit.Generate(a.ctx, a.g,
-		ai.WithPrompt(a.prompt),
+		ai.WithPrompt(prompt),
 		ai.WithTools(a.tools...),
 		ai.WithMessages(a.msgs...),
 		ai.WithStreaming(func(ctx context.Context, chunk *ai.ModelResponseChunk) error {
