@@ -15,9 +15,9 @@ import (
 
 type LogsParams struct {
 	common.LoaderParams
-	DeploymentID string
-	Since        string
-	Until        string
+	DeploymentID string `json:"deployment_id" jsonschema:"description=Optional: Retrieve logs from a specific deployment."`
+	Since        string `json:"since" jsonschema:"description=Optional: Retrieve logs written after this time. Format as RFC3339 or duration (e.g., '2023-10-01T15:04:05Z' or '1h')."`
+	Until        string `json:"until" jsonschema:"description=Optional: Retrieve logs written before this time. Format as RFC3339 or duration (e.g., '2023-10-01T15:04:05Z' or '1h')."`
 }
 
 func ParseLogsParams(request mcp.CallToolRequest) (LogsParams, error) {
