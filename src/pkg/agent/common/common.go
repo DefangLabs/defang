@@ -29,9 +29,9 @@ func GetStringArg(args map[string]string, key, defaultValue string) string {
 }
 
 type LoaderParams struct {
-	WorkingDirectory string   `json:"working_directory"`
-	ProjectName      string   `json:"project_name,omitempty"`
-	ComposeFilePaths []string `json:"compose_file_paths,omitempty"`
+	WorkingDirectory string   `json:"working_directory" jsonschema:"description=The working directory containing the compose files. Usually the current directory."`
+	ProjectName      string   `json:"project_name,omitempty" jsonschema:"description=Optional: The name of the project. Useful when working with projects that are not in the current directory."`
+	ComposeFilePaths []string `json:"compose_file_paths,omitempty" jsonschema:"description=Optional: Paths to the compose files to use for the project. If not provided, defaults to the compose file in the working directory."`
 }
 
 func ConfigureAgentLoader(params LoaderParams) (*compose.Loader, error) {
