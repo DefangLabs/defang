@@ -8,43 +8,25 @@ import (
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
 type LogsParams struct {
 	DeploymentID string
-	Since        time.Time
-	Until        time.Time
+	Since        string
+	Until        string
 }
 
-func parseLogsParams(request mcp.CallToolRequest) (LogsParams, error) {
+func parseLogsParams(request mcp.CallToolRequest) LogsParams {
 	deploymentId := request.GetString("deployment_id", "")
-	since, err := request.RequireString("since")
-	if err != nil {
-		return LogsParams{}, fmt.Errorf("missing required parameter 'since': %w", err)
-	}
-	until, err := request.RequireString("until")
-	if err != nil {
-		return LogsParams{}, fmt.Errorf("missing required parameter 'until': %w", err)
-	}
-	var sinceTime, untilTime time.Time
-	if since != "" {
-		sinceTime, err = time.Parse(time.RFC3339, since)
-		if err != nil {
-			return LogsParams{}, fmt.Errorf("invalid parameter 'since', must be in RFC3339 format: %w", err)
-		}
-	}
-	if until != "" {
-		untilTime, err = time.Parse(time.RFC3339, until)
-		if err != nil {
-			return LogsParams{}, fmt.Errorf("invalid parameter 'until', must be in RFC3339 format: %w", err)
-		}
-	}
+	since := request.GetString("since", "")
+	until := request.GetString("until", "")
 	return LogsParams{
 		DeploymentID: deploymentId,
-		Since:        sinceTime,
-		Until:        untilTime,
-	}, nil
+		Since:        since,
+		Until:        until,
+	}
 }
 
 func handleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, cluster string, providerId *cliClient.ProviderID, cli CLIInterface) (string, error) {
@@ -70,10 +52,20 @@ func handleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 		return "", fmt.Errorf("provider not configured correctly: %w", err)
 	}
 
+	sinceTime, err := timeutils.ParseTimeOrDuration(params.Since, time.Now())
+	if err != nil {
+		return "", fmt.Errorf("failed to parse 'since' parameter: %w", err)
+	}
+
+	untilTime, err := timeutils.ParseTimeOrDuration(params.Until, time.Now())
+	if err != nil {
+		return "", fmt.Errorf("failed to parse 'until' parameter: %w", err)
+	}
+
 	err = cli.Tail(ctx, provider, project, cliTypes.TailOptions{
 		Deployment: params.DeploymentID,
-		Since:      params.Since,
-		Until:      params.Until,
+		Since:      sinceTime,
+		Until:      untilTime,
 	})
 
 	if err != nil {
