@@ -19,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -520,12 +521,12 @@ func makeComposeLogsCmd() *cobra.Command {
 			}
 
 			now := time.Now()
-			sinceTs, err := cli.ParseTimeOrDuration(since, now)
+			sinceTs, err := timeutils.ParseTimeOrDuration(since, now)
 			if err != nil {
 				return fmt.Errorf("invalid 'since' duration or time: %w", err)
 			}
 			sinceTs = sinceTs.UTC()
-			untilTs, err := cli.ParseTimeOrDuration(until, now)
+			untilTs, err := timeutils.ParseTimeOrDuration(until, now)
 			if err != nil {
 				return fmt.Errorf("invalid 'until' duration or time: %w", err)
 			}
