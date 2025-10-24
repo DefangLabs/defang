@@ -11,15 +11,13 @@ import (
 // QueryAndTailLogGroup queries the log group from the give start time and initiates a Live Tail session.
 // This function also handles the case where the log group does not exist yet.
 // The caller should call `Close()` on the returned EventStream when done.
-func QueryAndTailLogGroup(ctx context.Context, lgi LogGroupInput, start, end time.Time) (LiveTailStream, error) {
+func QueryAndTailLogGroup(ctx context.Context, lgi LogGroupInput, start, end time.Time, doTail bool) (LiveTailStream, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	es := &eventStream{
 		cancel: cancel,
 		ch:     make(chan types.StartLiveTailResponseStream),
 	}
-
-	doTail := end.IsZero()
 
 	var tailStream LiveTailStream
 	if doTail {
