@@ -531,8 +531,7 @@ func setupLogsFlags(cmd *cobra.Command) {
 	cmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
 	cmd.Flags().MarkHidden("etag")
 	cmd.Flags().String("deployment", "", "deployment ID of the service")
-	cmd.Flags().Bool("follow", false, "follow log output") // NOTE: -f is already used by --file
-	cmd.Flags().MarkHidden("follow")                       // TODO: implement this
+	cmd.Flags().Bool("follow", false, "follow log output, --until will be ignored") // NOTE: -f is already used by --file
 	cmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
 	cmd.Flags().String("since", "", "show logs since duration/time")
 	cmd.Flags().String("until", "", "show logs until duration/time")
@@ -551,6 +550,11 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 	var verbose, _ = cmd.Flags().GetBool("verbose")
 	var filter, _ = cmd.Flags().GetString("filter")
 	var until, _ = cmd.Flags().GetString("until")
+	var follow, _ = cmd.Flags().GetBool("follow")
+
+	if follow && until != "" {
+		return errors.New("cannot use --follow and --until together")
+	}
 
 	if etag != "" && deployment == "" {
 		deployment = etag
@@ -610,6 +614,7 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 		Since:      sinceTs,
 		Until:      untilTs,
 		Verbose:    verbose,
+		Follow:     follow,
 	}
 	return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 }
