@@ -1,6 +1,7 @@
 package track
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
@@ -11,7 +12,10 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const maxPropertyCharacterLength = 255 // chars per property in tracking event
+
 var disableAnalytics = pkg.GetenvBool("DEFANG_DISABLE_ANALYTICS")
+var logPropertyNamePrefix = "logs"
 
 type Property = cliClient.Property
 
@@ -43,7 +47,17 @@ func Evt(name string, props ...Property) {
 		term.Debugf("untracked event %q: %v", name, props)
 		return
 	}
-	term.Debugf("tracking event %q: %v", name, props)
+
+	// filter out props with a name prefix of logPropertyNamePrefix, they should already be in the debug output
+	var filteredProps []Property
+	for _, p := range props {
+		if strings.HasPrefix(p.Name, logPropertyNamePrefix) {
+			continue
+		}
+		filteredProps = append(filteredProps, p)
+	}
+
+	term.Debugf("tracking event %q: %v", name, filteredProps)
 	trackWG.Add(1)
 	go func() {
 		defer trackWG.Done()
@@ -54,6 +68,28 @@ func Evt(name string, props ...Property) {
 // FlushAllTracking waits for all tracking goroutines to complete.
 func FlushAllTracking() {
 	trackWG.Wait()
+}
+
+// function to break a set of messages into smaller chunks for tracking
+// There is a set size limit per property for tracking
+func MakeEventLogProperties(name string, message []string) []Property {
+	var trackMsg []Property
+
+	for i, msg := range message {
+		if len(msg) > maxPropertyCharacterLength {
+			msg = msg[:maxPropertyCharacterLength]
+		}
+		propName := fmt.Sprintf("%s-%d", name, i+1)
+		trackMsg = append(trackMsg, P(propName, msg))
+	}
+	return trackMsg
+}
+
+func EvtWithTerm(eventName string, extraProps ...Property) {
+	messages := term.DefaultTerm.GetAllMessages()
+	logProps := MakeEventLogProperties(logPropertyNamePrefix, messages)
+	allProps := append(extraProps, logProps...)
+	Evt(eventName, allProps...)
 }
 
 func isCompletionCommand(cmd *cobra.Command) bool {
@@ -76,10 +112,12 @@ func Cmd(cmd *cobra.Command, verb string, props ...Property) {
 				command = c.Name() + "-" + command
 			}
 		})
+
 		props = append(props,
 			P("CalledAs", calledAs),
 			P("version", cmd.Root().Version),
 		)
+
 		cmd.Flags().Visit(func(f *pflag.Flag) {
 			props = append(props, P(f.Name, f.Value))
 		})
