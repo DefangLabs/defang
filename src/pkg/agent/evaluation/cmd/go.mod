@@ -9,6 +9,7 @@ replace github.com/DefangLabs/defang/src => ../../../../
 require (
 	github.com/DefangLabs/defang/src v0.0.0-00010101000000-000000000000
 	github.com/firebase/genkit/go v1.0.5
+	github.com/stretchr/testify v1.10.0
 )
 
 require (
@@ -66,6 +67,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20250326154945-ae57f3c0d45f // indirect
 	github.com/compose-spec/compose-go/v2 v2.7.2-0.20250715094302-8da9902241f9 // indirect
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/digitalocean/godo v1.131.1 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
@@ -113,6 +115,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/rivo/uniseg v0.4.2 // indirect
 	github.com/ross96D/cancelreader v0.2.6 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1 // indirect
