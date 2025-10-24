@@ -358,8 +358,17 @@ func makeComposeDownCmd() *cobra.Command {
 
 			term.Info("Deleted services, deployment ID", deployment)
 
+			listConfigs, err := provider.ListConfig(cmd.Context(), &defangv1.ListConfigsRequest{Project: projectName})
+			if err == nil {
+				if len(listConfigs.Names) > 0 {
+					term.Warn("Stored project configs are not deleted.")
+				}
+			} else {
+				term.Debugf("ListConfigs failed: %v", err)
+			}
+
 			if detach {
-				printDefangHint("To track the update, do:", "tail --deployment "+deployment)
+				printDefangHint("To track the update, do:", "tail --project-name="+projectName+" --deployment="+deployment)
 				return nil
 			}
 
@@ -378,6 +387,9 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 			term.Info("Done.")
+			if len(listConfigs.Names) > 0 {
+				printDefangHint("To delete stored project configs, run:", "config rm --project-name="+projectName+" "+strings.Join(listConfigs.Names, " "))
+			}
 			return nil
 		},
 	}
