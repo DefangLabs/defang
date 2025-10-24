@@ -7,7 +7,7 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(login|authenticate|error|not.*logged)"
+    "reference": "Tools\\[.*login.*deploy.*\\]|Tools\\[.*deploy.*login.*\\]"
   },
   {
     "input": {
@@ -17,7 +17,7 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(no.*services|empty|not.*found)"
+    "reference": "Tools\\[\\]"
   },
   {
     "input": {
@@ -27,7 +27,7 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(invalid|error|failed|cannot)"
+    "reference": "Tools\\[*.set_config.*\\]"
   },
   {
     "input": {
@@ -37,7 +37,7 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(not.*found|does.*not.*exist|already.*removed)"
+    "reference": "Tools\\[*.remove_config.*\\]"
   },
   {
     "input": {
@@ -47,6 +47,6 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(compose.*file|docker-compose|not.*found|missing)"
+    "reference": "Tools\\[\\]"
   }
 ]

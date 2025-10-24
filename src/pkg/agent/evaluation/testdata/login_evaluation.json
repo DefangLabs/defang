@@ -7,7 +7,7 @@
         "provider": "playground"
       }
     },
-    "reference": "Tools called: \\[.*login.*\\]"
+    "reference": "Tools\\[.*login.*\\]"
   },
   {
     "input": {
@@ -17,7 +17,7 @@
         "provider": "playground"
       }
     },
-    "reference": "Tools called: \\[.*login.*\\]"
+    "reference": "Tools\\[.*login.*\\]"
   },
   {
     "input": {
@@ -27,6 +27,6 @@
         "provider": "playground"
       }
     },
-    "reference": "Tools called: \\[.*login.*\\]"
+    "reference": "Tools\\[.*login.*\\]"
   }
 ]

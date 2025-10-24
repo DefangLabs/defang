@@ -7,7 +7,7 @@
         "provider": "playground"
       }
     },
-    "reference": "Tools called: \\[.*set_config.*\\]"
+    "reference": "Tools\\[.*set_config.*\\]"
   },
   {
     "input": {
@@ -17,7 +17,7 @@
         "provider": "playground"
       }
     },
-    "reference": "Tools called: \\[.*remove_config.*\\]"
+    "reference": "Tools\\[.*remove_config.*\\]"
   },
   {
     "input": {
@@ -27,6 +27,6 @@
         "provider": "playground"
       }
     },
-    "reference": "Tools called: \\[.*list_configs.*\\]"
+    "reference": "Tools\\[.*list_configs.*\\]"
   }
 ]

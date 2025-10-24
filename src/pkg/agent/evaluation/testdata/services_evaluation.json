@@ -7,7 +7,7 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(services|list|deployed)"
+    "reference": "Tools\\[.*services.*\\]"
   },
   {
     "input": {
@@ -17,7 +17,7 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(services|running|status)"
+    "reference": "Tools\\[.*services.*\\]"
   },
   {
     "input": {
@@ -27,6 +27,6 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(services|list|applications)"
+    "reference": "Tools\\[.*services.*\\]"
   }
 ]

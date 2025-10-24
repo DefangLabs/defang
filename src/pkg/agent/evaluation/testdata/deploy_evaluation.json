@@ -7,7 +7,7 @@
         "provider": "playground"
       }
     },
-    "reference": "Tools called: \\[.*deploy.*\\]"
+    "reference": "Tools\\[.*deploy.*\\]"
   },
   {
     "input": {
@@ -17,7 +17,7 @@
         "provider": "playground"
       }
     },
-    "reference": "Tools called: \\[.*deploy.*\\]"
+    "reference": "Tools\\[.*deploy.*\\]"
   },
   {
     "input": {
@@ -27,7 +27,7 @@
         "provider": "aws"
       }
     },
-    "reference": "Tools called: \\[.*deploy.*\\]"
+    "reference": "Tools\\[.*deploy.*\\]"
   },
   {
     "input": {
@@ -37,7 +37,7 @@
         "provider": "gcp"
       }
     },
-    "reference": "Tools called: \\[.*deploy.*\\]"
+    "reference": "Tools\\[.*deploy.*\\]"
   },
   {
     "input": {
@@ -47,6 +47,6 @@
         "provider": "playground"
       }
     },
-    "reference": "Tools called: \\[.*deploy.*\\]"
+    "reference": "Tools\\[.*deploy.*\\]"
   }
 ]

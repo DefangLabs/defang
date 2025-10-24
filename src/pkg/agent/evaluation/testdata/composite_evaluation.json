@@ -17,7 +17,7 @@
         "provider": "aws"
       }
     },
-    "reference": "(?i)(cost|deploy|aws|estimate)"
+    "reference": "(?i)(estimate)"
   },
   {
     "input": {
@@ -27,6 +27,6 @@
         "provider": "aws"
       }
     },
-    "reference": "(?i)(setup|deploy|environment)"
+    "reference": "(?i)(deploy)"
   }
 ]

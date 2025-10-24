@@ -7,7 +7,7 @@
         "provider": "aws"
       }
     },
-    "reference": "(?i)(aws|provider|setup)"
+    "reference": "Tools\\[.*set_aws_provider.*\\]"
   },
   {
     "input": {
@@ -17,7 +17,7 @@
         "provider": "gcp"
       }
     },
-    "reference": "(?i)(gcp|google|cloud|provider)"
+    "reference": "Tools\\[.*set_gcp_provider.*\\]"
   },
   {
     "input": {
@@ -27,6 +27,6 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(playground|test|demo)"
+    "reference": "Tools\\[.*set_playground_provider.*\\]"
   }
 ]

@@ -7,7 +7,7 @@
         "provider": "playground"
       }
     },
-    "reference": "Tools called: \\[.*destroy.*\\]"
+    "reference": "Tools\\[.*destroy.*\\]"
   },
   {
     "input": {
@@ -17,7 +17,7 @@
         "provider": "playground"
       }
     },
-    "reference": "Tools called: \\[.*destroy.*\\]"
+    "reference": "Tools\\[.*destroy.*\\]"
   },
   {
     "input": {
@@ -27,6 +27,6 @@
         "provider": "playground"
       }
     },
-    "reference": "Tools called: \\[.*destroy.*\\]"
+    "reference": "Tools\\[.*destroy.*\\]"
   }
 ]

@@ -7,7 +7,7 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(logs|log entries)"
+    "reference": "Tools\\[.*logs.*\\]"
   },
   {
     "input": {
@@ -17,6 +17,6 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(logs|recent)"
+    "reference": "Tools\\[.*logs.*\\]"
   }
 ]

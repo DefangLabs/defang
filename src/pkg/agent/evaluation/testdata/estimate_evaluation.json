@@ -7,7 +7,7 @@
         "provider": "playground"
       }
     },
-    "reference": "Tools called: \\[.*estimate.*\\]"
+    "reference": "Tools\\[.*estimate.*\\]"
   },
   {
     "input": {
@@ -17,7 +17,7 @@
         "provider": "aws"
       }
     },
-    "reference": "Tools called: \\[.*estimate.*\\]"
+    "reference": "Tools\\[.*estimate.*\\]"
   },
   {
     "input": {
@@ -27,6 +27,6 @@
         "provider": "playground"
       }
     },
-    "reference": "Tools called: \\[.*estimate.*\\]"
+    "reference": "Tools\\[.*estimate.*\\]"
   }
 ]

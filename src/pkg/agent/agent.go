@@ -8,96 +8,74 @@ import (
 	"log"
 	"os"
 
+	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/agent/plugins/fabric"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/firebase/genkit/go/ai"
-	"github.com/firebase/genkit/go/core"
+	"github.com/firebase/genkit/go/core/api"
 	"github.com/firebase/genkit/go/genkit"
-	"github.com/firebase/genkit/go/plugins/evaluators"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
+	"github.com/openai/openai-go/option"
 )
 
-type AgentConfig struct {
-	Cluster        string
-	AuthPort       int
-	EvaluationMode bool
-	AIModel        string
-	ProviderId     *client.ProviderID
-	EvalMetrics    []evaluators.MetricConfig
-}
+const DefaultSystemPrompt = `You are a helpful assistant. Your job is to help
+the user deploy and manage their cloud applications using Defang. Defang is a
+tool that makes it easy to deploy Docker Compose projects to cloud providers
+like AWS, GCP, and Digital Ocean. Be as succinct, direct, and clear as
+possible.
+Some tools ask for a working_directory. This should usually be set to the
+current working directory (or ".") unless otherwise specified by the user.
+Some tools ask for a project_name. This is optional, but useful when working
+on a project that is not in the current working directory.
+`
 
 type Agent struct {
-	ctx            context.Context
-	g              *genkit.Genkit
-	tools          []ai.ToolRef
-	evaluationMode bool
+	ctx    context.Context
+	g      *genkit.Genkit
+	msgs   []*ai.Message
+	prompt string
+	tools  []ai.ToolRef
 }
 
-func New(ctx context.Context, cluster string, authPort int, providerId *client.ProviderID) *Agent {
-	agentConfig := AgentConfig{
-		Cluster:        cluster,
-		AuthPort:       authPort,
-		ProviderId:     providerId,
-		EvaluationMode: true,
-		EvalMetrics: []evaluators.MetricConfig{
-			{MetricType: evaluators.EvaluatorRegex},
-			{MetricType: evaluators.EvaluatorDeepEqual},
+func New(ctx context.Context, addr string, authPort int, providerId *client.ProviderID, prompt string) *Agent {
+	accessToken := cluster.GetExistingToken(addr)
+	provider := "fabric"
+	var providerPlugin api.Plugin
+	providerPlugin = &fabric.OpenAI{
+		APIKey: accessToken,
+		Opts: []option.RequestOption{
+			option.WithBaseURL(fmt.Sprintf("https://%s/api/v1", addr)),
 		},
 	}
+	defaultModel := "google/gemini-2.5-flash"
 
-	tools := CollectTools(agentConfig.Cluster, agentConfig.AuthPort, agentConfig.ProviderId)
-	return NewWithEvaluation(ctx, agentConfig, tools)
-}
+	if os.Getenv("GOOGLE_API_KEY") != "" {
+		provider = "googleai"
+		providerPlugin = &googlegenai.GoogleAI{}
+		defaultModel = "gemini-2.5-flash"
+	}
 
-func NewWithEvaluation(ctx context.Context, config AgentConfig, tools []ai.Tool) *Agent {
-	// Initialize Genkit with the Google AI plugin
+	model := pkg.Getenv("DEFANG_MODEL_ID", defaultModel)
+
 	g := genkit.Init(ctx,
-		genkit.WithPlugins(
-			&googlegenai.GoogleAI{},
-			&evaluators.GenkitEval{Metrics: config.EvalMetrics},
-		),
-		genkit.WithDefaultModel(config.AIModel),
+		genkit.WithDefaultModel(fmt.Sprintf("%s/%s", provider, model)),
+		genkit.WithPlugins(providerPlugin),
 	)
 
+	tools := CollectTools(addr, authPort, providerId)
 	toolRefs := make([]ai.ToolRef, len(tools))
 	for i, t := range tools {
 		toolRefs[i] = ai.ToolRef(t)
 	}
 	return &Agent{
-		ctx:            ctx,
-		g:              g,
-		tools:          toolRefs,
-		evaluationMode: config.EvaluationMode,
+		ctx:    ctx,
+		g:      g,
+		msgs:   []*ai.Message{},
+		prompt: prompt,
+		tools:  toolRefs,
 	}
-}
-
-// setup used for evaluation input structure
-type DefangCLISetup struct {
-	WorkingDirectory *string `json:"working_directory,omitempty"`
-	Provider         *string `json:"provider,omitempty"`
-	Region           *string `json:"region,omitempty"`
-}
-type DefangCLIInput struct {
-	Message string         `json:"message"`
-	Setup   DefangCLISetup `json:"setup,omitempty"`
-}
-
-// CreateEvaluationFlow creates a Genkit flow for evaluation purposes
-func (a *Agent) CreateEvaluationFlow() *core.Flow[DefangCLIInput, string, struct{}] {
-	return genkit.DefineFlow(a.g, "defang-cli", func(ctx context.Context, input DefangCLIInput) (string, error) {
-		setupString := ""
-		if input.Setup.WorkingDirectory != nil && *input.Setup.WorkingDirectory != "" {
-			setupString += fmt.Sprintf("Make the current directory %s. ", *input.Setup.WorkingDirectory)
-		}
-		if input.Setup.Provider != nil && *input.Setup.Provider != "" {
-			setupString += fmt.Sprintf("Use the %s provider. ", *input.Setup.Provider)
-		}
-		if input.Setup.Region != nil && *input.Setup.Region != "" {
-			setupString += fmt.Sprintf("Set the region to %s. ", *input.Setup.Region)
-		}
-
-		return a.HandleMessageForEvaluation(setupString + input.Message)
-	})
 }
 
 func (a *Agent) Start() error {
@@ -132,22 +110,40 @@ func (a *Agent) Start() error {
 	}
 }
 
-// GetGenkit returns the underlying Genkit instance for evaluation framework integration
-func (a *Agent) GetGenkit() *genkit.Genkit {
-	return a.g
+func (a *Agent) handleToolRequest(req *ai.ToolRequest) (*ai.ToolResponse, error) {
+	tool := genkit.LookupTool(a.g, req.Name)
+	if tool == nil {
+		return nil, fmt.Errorf("tool %q not found", req.Name)
+	}
+
+	output, err := tool.RunRaw(a.ctx, req.Input)
+	if err != nil {
+		return nil, fmt.Errorf("tool %q execution error: %w", tool.Name(), err)
+	}
+
+	return &ai.ToolResponse{
+		Name:   req.Name,
+		Ref:    req.Ref,
+		Output: output,
+	}, nil
 }
 
-// GetTools returns the available tools for evaluation
-func (a *Agent) GetTools() []ai.ToolRef {
-	return a.tools
-}
+func (a *Agent) handleToolCalls(requests []*ai.ToolRequest) ([]*ai.Message, error) {
+	if len(requests) == 0 {
+		return nil, nil
+	}
 
-// IsEvaluationMode returns whether the agent is in evaluation mode
-func (a *Agent) IsEvaluationMode() bool {
-	return a.evaluationMode
-}
+	var responses []*ai.Message
+	parts := []*ai.Part{}
+	for _, req := range requests {
+		toolResp, err := a.handleToolRequest(req)
+		if err != nil {
+			return nil, fmt.Errorf("tool request error: %w", err)
+		}
+		parts = append(parts, ai.NewToolResponsePart(toolResp))
+	}
 
-func (a *Agent) handleMessage(msg string) error {
+	responses = append(responses, ai.NewMessage(ai.RoleTool, nil, parts...))
 	resp, err := genkit.Generate(a.ctx, a.g,
 		ai.WithMessages(a.msgs...),
 	)

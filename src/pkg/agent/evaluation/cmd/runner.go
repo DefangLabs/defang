@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg/agent"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/core"
@@ -21,6 +21,17 @@ type FlowConfig struct {
 	AIModel        string
 	ProviderId     *client.ProviderID
 	EvalMetrics    []evaluators.MetricConfig
+}
+
+type FlowSetup struct {
+	WorkingDirectory *string `json:"working_directory,omitempty"`
+	Provider         *string `json:"provider,omitempty"`
+	Region           *string `json:"region,omitempty"`
+}
+
+type FlowInput struct {
+	Message string    `json:"message"`
+	Setup   FlowSetup `json:"setup,omitempty"`
 }
 
 type Runner struct {
@@ -51,25 +62,29 @@ func NewFlowRunner(ctx context.Context, config FlowConfig, tools []ai.Tool) *Run
 }
 
 // CreateEvaluationFlow creates a Genkit flow for evaluation purposes
-func (r *Runner) CreateEvaluationFlow() *core.Flow[agent.DefangCLIInput, string, struct{}] {
-	return genkit.DefineFlow(r.g, "defang-cli", func(ctx context.Context, input agent.DefangCLIInput) (string, error) {
-		setupString := ""
+func (r *Runner) CreateEvaluationFlow() *core.Flow[FlowInput, string, struct{}] {
+	return genkit.DefineFlow(r.g, "defang-cli", func(ctx context.Context, input FlowInput) (string, error) {
+		message := []string{}
 		if input.Setup.WorkingDirectory != nil && *input.Setup.WorkingDirectory != "" {
-			setupString += fmt.Sprintf("Make the current directory %s. ", *input.Setup.WorkingDirectory)
+			message = append(message, fmt.Sprintf("Make the working directory \"%s\"", *input.Setup.WorkingDirectory))
 		}
 		if input.Setup.Provider != nil && *input.Setup.Provider != "" {
-			setupString += fmt.Sprintf("Use the %s provider. ", *input.Setup.Provider)
+			message = append(message, fmt.Sprintf("Set the provider to %s", *input.Setup.Provider))
 		}
 		if input.Setup.Region != nil && *input.Setup.Region != "" {
-			setupString += fmt.Sprintf("Set the region to %s. ", *input.Setup.Region)
+			message = append(message, fmt.Sprintf("Set the region to %s", *input.Setup.Region))
 		}
 
-		return r.HandleMessageForEvaluation(setupString + input.Message)
+		message = append(message, input.Message)
+		messageStr := strings.Join(message, ". ")
+		log.Printf("Flow input: %s", messageStr)
+		return r.HandleMessageForEvaluation(messageStr)
 	})
 }
 
 // HandleMessageForEvaluation processes a message and returns the response for evaluation purposes
 func (r *Runner) HandleMessageForEvaluation(msg string) (string, error) {
+	log.Println("Function invoked: genkit.Generate")
 	resp, err := genkit.Generate(r.ctx, r.g,
 		ai.WithPrompt(msg),
 		ai.WithTools(r.tools...),
@@ -80,6 +95,7 @@ func (r *Runner) HandleMessageForEvaluation(msg string) (string, error) {
 	}
 
 	toolsCalled := []string{}
+	log.Printf("Tools called: %d", len(resp.ToolRequests()))
 	for _, req := range resp.ToolRequests() {
 		toolsCalled = append(toolsCalled, strings.ToLower(req.Name))
 	}
