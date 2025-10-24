@@ -211,7 +211,7 @@ func TestHandleSetConfig(t *testing.T) {
 				NewProviderError: errors.New("No provider configured. Use one of these setup tools:\n* /mcp.defang.AWS_Setup\n* /mcp.defang.GCP_Setup\n* /mcp.defang.Playground_Setup"),
 			},
 			expectedError:         true,
-			errorMessage:          "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
+			errorMessage:          "no provider is configured",
 			expectedConnectCalls:  false, // Early return in providerNotConfiguredError
 			expectedProviderCalls: false, // Early return in providerNotConfiguredError
 		},

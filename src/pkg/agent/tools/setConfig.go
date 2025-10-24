@@ -36,7 +36,7 @@ func ParseSetConfigParams(request mcp.CallToolRequest) (SetConfigParams, error) 
 func HandleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params SetConfigParams, providerId *cliClient.ProviderID, cluster string, cli SetConfigCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
-		return "", fmt.Errorf("No provider configured: %w", err)
+		return "", err
 	}
 
 	term.Debug("Function invoked: cli.Connect")
