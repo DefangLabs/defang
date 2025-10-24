@@ -7,7 +7,7 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(destroy|delete|remove)"
+    "reference": "Tools called: \\[.*destroy.*\\]"
   },
   {
     "input": {
@@ -17,7 +17,7 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(destroy|take down|remove)"
+    "reference": "Tools called: \\[.*destroy.*\\]"
   },
   {
     "input": {
@@ -27,6 +27,6 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(destroy|delete|remove)"
+    "reference": "Tools called: \\[.*destroy.*\\]"
   }
 ]

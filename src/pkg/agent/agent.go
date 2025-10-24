@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -131,69 +130,6 @@ func (a *Agent) Start() error {
 			log.Printf("Error handling message: %v", err)
 		}
 	}
-}
-
-// HandleMessageForEvaluation processes a message and returns the response for evaluation purposes
-func (a *Agent) HandleMessageForEvaluation(msg string) (string, error) {
-	resp, err := genkit.Generate(a.ctx, a.g,
-		ai.WithPrompt(msg),
-		ai.WithTools(a.tools...),
-	)
-	if err != nil {
-		return "", fmt.Errorf("generation error: %w", err)
-	}
-
-	parts := []*ai.Part{}
-	for _, req := range resp.ToolRequests() {
-		tool := genkit.LookupTool(a.g, req.Name)
-		if tool == nil {
-			log.Printf("tool %q not found", req.Name)
-			continue
-		}
-
-		output, err := tool.RunRaw(a.ctx, req.Input)
-		if err != nil {
-			log.Printf("tool %q execution failed: %v", tool.Name(), err)
-			// Continue with error response rather than failing completely in evaluation mode
-			if a.evaluationMode {
-				output = fmt.Sprintf("Error executing tool %s: %v", req.Name, err)
-			} else {
-				log.Fatalf("tool %q execution failed: %v", tool.Name(), err)
-			}
-		}
-
-		parts = append(parts,
-			ai.NewToolResponsePart(&ai.ToolResponse{
-				Name:   req.Name,
-				Ref:    req.Ref,
-				Output: output,
-			}))
-	}
-
-	if len(parts) > 0 {
-		resp, err = genkit.Generate(a.ctx, a.g,
-			ai.WithMessages(append(resp.History(), ai.NewMessage(ai.RoleTool, nil, parts...))...),
-		)
-		if err != nil {
-			return "", fmt.Errorf("generation error: %w", err)
-		}
-	}
-
-	// Extract text response from messages
-	var response strings.Builder
-	for _, msg := range resp.History() {
-		if msg.Role == ai.RoleUser {
-			continue
-		}
-		for _, part := range msg.Content {
-			if part.Kind == ai.PartText {
-				response.WriteString(part.Text)
-				response.WriteString("\n")
-			}
-		}
-	}
-
-	return strings.TrimSpace(response.String()), nil
 }
 
 // GetGenkit returns the underlying Genkit instance for evaluation framework integration

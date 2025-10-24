@@ -7,7 +7,7 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(estimate|cost|price)"
+    "reference": "Tools called: \\[.*estimate.*\\]"
   },
   {
     "input": {
@@ -17,7 +17,7 @@
         "provider": "aws"
       }
     },
-    "reference": "(?i)(estimate|cost|aws)"
+    "reference": "Tools called: \\[.*estimate.*\\]"
   },
   {
     "input": {
@@ -27,6 +27,6 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(estimate|pricing|cost)"
+    "reference": "Tools called: \\[.*estimate.*\\]"
   }
 ]

@@ -7,7 +7,7 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(deploy|deployment|deployed)"
+    "reference": "Tools called: \\[.*deploy.*\\]"
   },
   {
     "input": {
@@ -17,7 +17,7 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(deploy|start|launch)"
+    "reference": "Tools called: \\[.*deploy.*\\]"
   },
   {
     "input": {
@@ -27,7 +27,17 @@
         "provider": "aws"
       }
     },
-    "reference": "(?i)(deploy|aws)"
+    "reference": "Tools called: \\[.*deploy.*\\]"
+  },
+  {
+    "input": {
+      "message": "I want to deploy to GCP",
+      "setup": {
+        "working_directory": "./",
+        "provider": "gcp"
+      }
+    },
+    "reference": "Tools called: \\[.*deploy.*\\]"
   },
   {
     "input": {
@@ -37,6 +47,6 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(deploy|launch|docker)"
+    "reference": "Tools called: \\[.*deploy.*\\]"
   }
 ]

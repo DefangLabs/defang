@@ -7,7 +7,7 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(login|authenticate|signed in)"
+    "reference": "Tools called: \\[.*login.*\\]"
   },
   {
     "input": {
@@ -17,7 +17,7 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(login|authenticate)"
+    "reference": "Tools called: \\[.*login.*\\]"
   },
   {
     "input": {
@@ -27,6 +27,6 @@
         "provider": "playground"
       }
     },
-    "reference": "(?i)(login|sign|authenticate)"
+    "reference": "Tools called: \\[.*login.*\\]"
   }
 ]

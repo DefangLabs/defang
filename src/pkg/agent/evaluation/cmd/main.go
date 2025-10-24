@@ -34,7 +34,7 @@ func main() {
 	ctx := context.Background()
 	provider := client.ProviderAWS
 
-	config := agent.AgentConfig{
+	config := FlowConfig{
 		Cluster:        "cluster",
 		AuthPort:       8080,
 		ProviderId:     &provider,
@@ -46,9 +46,9 @@ func main() {
 		},
 	}
 
-	tools := CollectMockToolsWithConfig(config.Cluster, config.AuthPort, config.ProviderId, evalConfig.Tools)
-	a := agent.NewWithEvaluation(ctx, config, tools)
-	a.CreateEvaluationFlow()
+	tools := MockCollectToolsWithConfig(config.Cluster, config.AuthPort, config.ProviderId, evalConfig.Tools)
+	r := NewFlowRunner(ctx, config, tools)
+	r.CreateEvaluationFlow()
 
 	// keep the main function running fo developer UI testing
 	select {}
@@ -111,12 +111,8 @@ func getToolDescriptions(overrides map[string]ToolOverride) map[string]*agent.To
 	return toolMap
 }
 
-// TODO: Should match CollectTools.
-func CollectMockTools(cluster string, authPort int, providerId *client.ProviderID) []ai.Tool {
-	return CollectMockToolsWithConfig(cluster, authPort, providerId, nil)
-}
-
-func CollectMockToolsWithConfig(cluster string, authPort int, providerId *client.ProviderID, toolOverrides map[string]ToolOverride) []ai.Tool {
+// this function should match CollectTools
+func MockCollectToolsWithConfig(cluster string, authPort int, providerId *client.ProviderID, toolOverrides map[string]ToolOverride) []ai.Tool {
 	// Apply overrides to agent tools if provided
 	toolDefs := getToolDescriptions(toolOverrides)
 

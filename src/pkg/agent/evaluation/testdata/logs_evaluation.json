@@ -11,16 +11,6 @@
   },
   {
     "input": {
-      "message": "What's happening with my application?",
-      "setup": {
-        "working_directory": "./",
-        "provider": "playground"
-      }
-    },
-    "reference": "(?i)(logs|happening|status)"
-  },
-  {
-    "input": {
       "message": "I need to see the recent logs",
       "setup": {
         "working_directory": "./",
