@@ -12,6 +12,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -112,6 +113,23 @@ func FixupConfigError(err error) error {
 		return fmt.Errorf("The operation failed due to missing configs not being set, use the Defang tool called set_config to set the variable: %w", err)
 	}
 	return err
+}
+
+func CanIUseProvider(ctx context.Context, grpcClient client.FabricClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {
+	canUseReq := defangv1.CanIUseRequest{
+		Project:      projectName,
+		Provider:     providerId.Value(),
+		ServiceCount: int32(serviceCount), // #nosec G115 - service count will not overflow int32
+	}
+	term.Debug("Function invoked: client.CanIUse")
+	resp, err := grpcClient.CanIUse(ctx, &canUseReq)
+	if err != nil {
+		return err
+	}
+
+	term.Debug("Function invoked: provider.SetCanIUseConfig")
+	provider.SetCanIUseConfig(resp)
+	return nil
 }
 
 func ProviderNotConfiguredError(providerId client.ProviderID) error {

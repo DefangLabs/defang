@@ -35,7 +35,7 @@ func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, pro
 	term.Debugf("Project name loaded: %s", projectName)
 	if err != nil {
 		if strings.Contains(err.Error(), "no projects found") {
-			return "", fmt.Errorf("no projects found on Playground: %w", err)
+			return "no projects found on Playground", nil
 		}
 		return "", fmt.Errorf("failed to load project name: %w", err)
 	}
@@ -47,7 +47,7 @@ func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, pro
 			return fmt.Sprintf("no services found for the specified project %q", projectName), nil
 		}
 		if connect.CodeOf(err) == connect.CodeNotFound && strings.Contains(err.Error(), "is not deployed in Playground") {
-			return fmt.Sprintf("project %s is not deployed in Playground: %w", projectName), nil
+			return fmt.Sprintf("project %s is not deployed in Playground", projectName), nil
 		}
 
 		return "", fmt.Errorf("failed to get services: %w", err)
