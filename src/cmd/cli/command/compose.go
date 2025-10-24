@@ -26,6 +26,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var logType = logs.LogTypeAll
+
 func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd := &cobra.Command{
 		Use:         "up",
@@ -501,99 +503,115 @@ func makeComposePsCmd() *cobra.Command {
 }
 
 func makeComposeLogsCmd() *cobra.Command {
-	logType := logs.LogTypeAll
 	var logsCmd = &cobra.Command{
 		Use:         "logs [SERVICE...]",
 		Annotations: authNeededAnnotation,
-		Aliases:     []string{"tail"},
 		Short:       "Show logs from one or more services",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			var name, _ = cmd.Flags().GetString("name")
-			var etag, _ = cmd.Flags().GetString("etag")
-			var deployment, _ = cmd.Flags().GetString("deployment")
-			var raw, _ = cmd.Flags().GetBool("raw")
-			var since, _ = cmd.Flags().GetString("since")
-			var utc, _ = cmd.Flags().GetBool("utc")
-			var verbose, _ = cmd.Flags().GetBool("verbose")
-			var filter, _ = cmd.Flags().GetString("filter")
-			var until, _ = cmd.Flags().GetString("until")
-
-			if etag != "" && deployment == "" {
-				deployment = etag
-			}
-
-			if utc {
-				cli.EnableUTCMode()
-			}
-
-			if !cmd.Flags().Changed("verbose") {
-				verbose = true // default verbose for explicit tail command
-			}
-
-			now := time.Now()
-			sinceTs, err := cli.ParseTimeOrDuration(since, now)
-			if err != nil {
-				return fmt.Errorf("invalid 'since' duration or time: %w", err)
-			}
-			sinceTs = sinceTs.UTC()
-			untilTs, err := cli.ParseTimeOrDuration(until, now)
-			if err != nil {
-				return fmt.Errorf("invalid 'until' duration or time: %w", err)
-			}
-			untilTs = untilTs.UTC()
-
-			rangeStr := ""
-			if pkg.IsValidTime(sinceTs) {
-				rangeStr = " since " + sinceTs.Format(time.RFC3339Nano)
-			}
-			if pkg.IsValidTime(untilTs) {
-				rangeStr += " until " + untilTs.Format(time.RFC3339Nano)
-			}
-			term.Infof("Showing logs%s; press Ctrl+C to stop:", rangeStr)
-
-			services := args
-			if len(name) > 0 {
-				services = append(args, strings.Split(name, ",")...) // backwards compat
-			}
-
-			loader := configureLoader(cmd)
-			provider, err := newProviderChecked(cmd.Context(), loader)
-			if err != nil {
-				return err
-			}
-
-			projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
-			if err != nil {
-				return err
-			}
-
-			tailOptions := cli.TailOptions{
-				Deployment: deployment,
-				Filter:     filter,
-				LogType:    logType,
-				Raw:        raw,
-				Services:   services,
-				Since:      sinceTs,
-				Until:      untilTs,
-				Verbose:    verbose,
-			}
-			return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
-		},
+		RunE:        handleLogsCmd,
 	}
-	logsCmd.Flags().StringP("name", "n", "", "name of the service (backwards compat)")
-	logsCmd.Flags().MarkHidden("name")
-	logsCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
-	logsCmd.Flags().MarkHidden("etag")
-	logsCmd.Flags().String("deployment", "", "deployment ID of the service")
-	logsCmd.Flags().Bool("follow", false, "follow log output") // NOTE: -f is already used by --file
-	logsCmd.Flags().MarkHidden("follow")                       // TODO: implement this
-	logsCmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
-	logsCmd.Flags().String("since", "", "show logs since duration/time")
-	logsCmd.Flags().String("until", "", "show logs until duration/time")
-	logsCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
-	logsCmd.Flags().Var(&logType, "type", fmt.Sprintf("show logs of type; one of %v", logs.AllLogTypes))
-	logsCmd.Flags().String("filter", "", "only show logs containing given text; case-insensitive")
+	setupLogsFlags(logsCmd)
 	return logsCmd
+}
+
+func makeComposeTailCmd() *cobra.Command {
+	var tailCmd = &cobra.Command{
+		Use:         "tail [SERVICE...]",
+		Annotations: authNeededAnnotation,
+		Short:       "Show logs from one or more services",
+		RunE:        handleLogsCmd,
+	}
+	setupLogsFlags(tailCmd)
+	tailCmd.Flags().Set("follow", "true")
+	return tailCmd
+}
+
+func setupLogsFlags(cmd *cobra.Command) {
+	cmd.Flags().StringP("name", "n", "", "name of the service (backwards compat)")
+	cmd.Flags().MarkHidden("name")
+	cmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
+	cmd.Flags().MarkHidden("etag")
+	cmd.Flags().String("deployment", "", "deployment ID of the service")
+	cmd.Flags().Bool("follow", false, "follow log output") // NOTE: -f is already used by --file
+	cmd.Flags().MarkHidden("follow")                       // TODO: implement this
+	cmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
+	cmd.Flags().String("since", "", "show logs since duration/time")
+	cmd.Flags().String("until", "", "show logs until duration/time")
+	cmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
+	cmd.Flags().Var(&logType, "type", fmt.Sprintf("show logs of type; one of %v", logs.AllLogTypes))
+	cmd.Flags().String("filter", "", "only show logs containing given text; case-insensitive")
+}
+
+func handleLogsCmd(cmd *cobra.Command, args []string) error {
+	var name, _ = cmd.Flags().GetString("name")
+	var etag, _ = cmd.Flags().GetString("etag")
+	var deployment, _ = cmd.Flags().GetString("deployment")
+	var raw, _ = cmd.Flags().GetBool("raw")
+	var since, _ = cmd.Flags().GetString("since")
+	var utc, _ = cmd.Flags().GetBool("utc")
+	var verbose, _ = cmd.Flags().GetBool("verbose")
+	var filter, _ = cmd.Flags().GetString("filter")
+	var until, _ = cmd.Flags().GetString("until")
+
+	if etag != "" && deployment == "" {
+		deployment = etag
+	}
+
+	if utc {
+		cli.EnableUTCMode()
+	}
+
+	if !cmd.Flags().Changed("verbose") {
+		verbose = true // default verbose for explicit tail command
+	}
+
+	now := time.Now()
+	sinceTs, err := cli.ParseTimeOrDuration(since, now)
+	if err != nil {
+		return fmt.Errorf("invalid 'since' duration or time: %w", err)
+	}
+	sinceTs = sinceTs.UTC()
+	untilTs, err := cli.ParseTimeOrDuration(until, now)
+	if err != nil {
+		return fmt.Errorf("invalid 'until' duration or time: %w", err)
+	}
+	untilTs = untilTs.UTC()
+
+	rangeStr := ""
+	if pkg.IsValidTime(sinceTs) {
+		rangeStr = " since " + sinceTs.Format(time.RFC3339Nano)
+	}
+	if pkg.IsValidTime(untilTs) {
+		rangeStr += " until " + untilTs.Format(time.RFC3339Nano)
+	}
+	term.Infof("Showing logs%s; press Ctrl+C to stop:", rangeStr)
+
+	services := args
+	if len(name) > 0 {
+		services = append(args, strings.Split(name, ",")...) // backwards compat
+	}
+
+	loader := configureLoader(cmd)
+	provider, err := newProviderChecked(cmd.Context(), loader)
+	if err != nil {
+		return err
+	}
+
+	projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+	if err != nil {
+		return err
+	}
+
+	tailOptions := cli.TailOptions{
+		Deployment: deployment,
+		Filter:     filter,
+		LogType:    logType,
+		Raw:        raw,
+		Services:   services,
+		Since:      sinceTs,
+		Until:      untilTs,
+		Verbose:    verbose,
+	}
+	return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 }
 
 func setupComposeCommand() *cobra.Command {
@@ -623,6 +641,7 @@ services:
 	composeCmd.AddCommand(makeComposeDownCmd())
 	composeCmd.AddCommand(makeComposePsCmd())
 	composeCmd.AddCommand(makeComposeLogsCmd())
+	composeCmd.AddCommand(makeComposeTailCmd())
 
 	// deprecated, will be removed in future releases
 	composeCmd.AddCommand(makeComposeStartCmd())
