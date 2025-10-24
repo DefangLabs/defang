@@ -53,6 +53,7 @@ type TailOptions struct {
 	Since              time.Time
 	Until              time.Time
 	Verbose            bool
+	Follow             bool
 }
 
 func (to TailOptions) String() string {
@@ -228,6 +229,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 		Services: options.Services,
 		Since:    sinceTs, // this is also used to continue from the last timestamp
 		Until:    untilTs,
+		Follow:   options.Follow,
 	}
 
 	term.Debug("Tail request:", tailRequest)
