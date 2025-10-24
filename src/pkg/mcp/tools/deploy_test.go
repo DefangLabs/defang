@@ -26,7 +26,6 @@ func (m *MockGrpcClient) Track(event string, props ...interface{}) error {
 // MockDeployCLI implements DeployCLIInterface for testing
 type MockDeployCLI struct {
 	ConnectError                 error
-	NewProviderError             error
 	ComposeUpError               error
 	CheckProviderConfiguredError error
 	LoadProjectError             error
@@ -45,9 +44,9 @@ func (m *MockDeployCLI) Connect(ctx context.Context, cluster string) (*client.Gr
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) (client.Provider, error) {
+func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) client.Provider {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
-	return nil, m.NewProviderError
+	return nil
 }
 
 func (m *MockDeployCLI) ComposeUp(ctx context.Context, project *compose.Project, grpcClient *client.GrpcClient, provider client.Provider, uploadMode compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error) {

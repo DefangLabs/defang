@@ -7,6 +7,7 @@ import (
 
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -45,6 +46,15 @@ func parseLogsParams(request mcp.CallToolRequest) (LogsParams, error) {
 		Since:        sinceTime,
 		Until:        untilTime,
 	}, nil
+}
+
+type LogsCLIInterface interface {
+	connecter
+	providerFactory
+	// Unique methods
+	Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cliTypes.TailOptions) error
+	CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error)
+	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
 }
 
 func handleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, cluster string, providerId *cliClient.ProviderID, cli LogsCLIInterface) (string, error) {

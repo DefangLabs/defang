@@ -68,7 +68,7 @@ func makeComposeUpCmd() *cobra.Command {
 				return cli.InteractiveDebugForClientError(ctx, client, project, loadErr)
 			}
 
-			provider, err := newProvider(ctx, loader)
+			provider, err := newProviderChecked(ctx, loader)
 			if err != nil {
 				return err
 			}
@@ -106,7 +106,7 @@ func makeComposeUpCmd() *cobra.Command {
 						if err := survey.AskOne(&survey.Confirm{
 							Message: "This project appears to be already deployed elsewhere. Are you sure you want to continue?",
 							Help:    help,
-							Default: true,
+							Default: false,
 						}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
 							return err
 						} else if !confirm {
@@ -330,7 +330,7 @@ func makeComposeDownCmd() *cobra.Command {
 			}
 
 			loader := configureLoader(cmd)
-			provider, err := newProvider(cmd.Context(), loader)
+			provider, err := newProviderChecked(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}
@@ -458,7 +458,7 @@ func makeComposePsCmd() *cobra.Command {
 			long, _ := cmd.Flags().GetBool("long")
 
 			loader := configureLoader(cmd)
-			provider, err := newProvider(cmd.Context(), loader)
+			provider, err := newProviderChecked(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}
@@ -545,7 +545,7 @@ func makeComposeLogsCmd() *cobra.Command {
 			}
 
 			loader := configureLoader(cmd)
-			provider, err := newProvider(cmd.Context(), loader)
+			provider, err := newProviderChecked(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}

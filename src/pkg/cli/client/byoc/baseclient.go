@@ -56,7 +56,7 @@ type ByocBaseClient struct {
 	projectBackend ProjectBackend
 }
 
-func NewByocBaseClient(ctx context.Context, tenantName types.TenantName, backend ProjectBackend) *ByocBaseClient {
+func NewByocBaseClient(tenantName types.TenantName, backend ProjectBackend) *ByocBaseClient {
 	b := &ByocBaseClient{
 		TenantName:     string(tenantName),
 		PulumiStack:    "beta", // TODO: make customizable

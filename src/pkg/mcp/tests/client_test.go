@@ -199,14 +199,22 @@ func (m *mockFabricService) Destroy(ctx context.Context, req *connect.Request[de
 // End mockFabricService methods
 
 // Test helpers
-func setupTest(t *testing.T, workingDir string) *client.Client {
+func setupTest(t *testing.T, tmpDir string) *client.Client {
 	t.Helper()
-	ctx := t.Context()
-	if err := SetupTestSuite(ctx, workingDir); err != nil {
+	// Create a minimal mock knowledge_base resource in the test's working directory
+	resourceDir := tmpDir + "/knowledge_base"
+	_ = os.WriteFile(resourceDir+"/README.md", []byte("# Mock Knowledge Base\nThis is a test stub."), 0644)
+	MockFabric = &mockFabricService{
+		configValues: make(map[string]string),
+	}
+	fabricServer := startMockFabricServer(MockFabric)
+	t.Cleanup(fabricServer.Close)
+	mcpClient, err := startInProcessMCPServer(t.Context(), fabricServer)
+	if err != nil {
 		t.Fatalf("failed to start in-process MCP server: %v", err)
 	}
-	t.Cleanup(TeardownTestSuite)
-	return MCPClientInstance.client
+	t.Cleanup(mcpClient.cancel)
+	return mcpClient.client
 }
 
 func assertCalled(t *testing.T, called bool, name string) {
@@ -215,7 +223,7 @@ func assertCalled(t *testing.T, called bool, name string) {
 }
 
 // createTestProjectDir returns a temp directory with a simple compose.yaml and a cleanup function.
-func createTestProjectDir(t *testing.T) (string, func()) {
+func createTestProjectDir(t *testing.T) string {
 	t.Helper()
 	tempDir := t.TempDir()
 	composeContent := `services:
@@ -227,7 +235,7 @@ func createTestProjectDir(t *testing.T) (string, func()) {
 	if err := os.WriteFile(composePath, []byte(composeContent), 0644); err != nil {
 		t.Fatalf("failed to write compose.yaml: %v", err)
 	}
-	return tempDir, func() {}
+	return tempDir
 }
 
 type MCPClient struct {
@@ -236,8 +244,6 @@ type MCPClient struct {
 	serverInfo   *m3mcp.InitializeResult
 	cancel       context.CancelFunc
 }
-
-var MCPClientInstance *MCPClient
 
 // test suite variables
 var (
@@ -310,37 +316,6 @@ func startInProcessMCPServer(ctx context.Context, fabric *httptest.Server) (*MCP
 }
 
 var MockFabric *mockFabricService
-
-func SetupTestSuite(ctx context.Context, workingDir string) error {
-	// Create a minimal mock knowledge_base resource in the test's working directory
-	resourceDir := workingDir + "/knowledge_base"
-	if _, err := os.Stat(resourceDir); os.IsNotExist(err) {
-		err := os.Mkdir(resourceDir, 0755)
-		if err != nil {
-			return fmt.Errorf("failed to create mock knowledge_base resource: %v", err)
-		}
-		_ = os.WriteFile(resourceDir+"/README.md", []byte("# Mock Knowledge Base\nThis is a test stub."), 0644)
-	}
-	MockFabric = &mockFabricService{
-		configValues: make(map[string]string),
-	}
-	var err error
-	var fabricServer = startMockFabricServer(MockFabric)
-	MCPClientInstance, err = startInProcessMCPServer(ctx, fabricServer)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func TeardownTestSuite() {
-	// Clean up the mock knowledge_base resource if it exists
-	os.RemoveAll("knowledge_base")
-	if MCPClientInstance != nil {
-		MCPClientInstance.cancel()
-		MCPClientInstance.fabricServer.Close()
-	}
-}
 
 func TestInProcessMCPServer(t *testing.T) {
 	TestInProcessMCPServer_Setup := func(t *testing.T) {
@@ -568,10 +543,8 @@ func TestInProcessMCPServer(t *testing.T) {
 	}
 
 	// Suite-level setup
-	var cleanup func()
-	projectDir, cleanup = createTestProjectDir(t)
+	projectDir = createTestProjectDir(t)
 	mcpClient = setupTest(t, projectDir)
-	t.Cleanup(cleanup)
 
 	// Test functions
 	tests := []struct {
@@ -596,8 +569,7 @@ func TestInProcessMCPServer(t *testing.T) {
 
 // Test for setAWSBYOCProvider tool
 func TestInProcessMCPServer_SetAWSBYOCProvider(t *testing.T) {
-	var cleanup func()
-	projectDir, cleanup = createTestProjectDir(t)
+	projectDir = createTestProjectDir(t)
 	mcpClient = setupTest(t, projectDir)
 	var origCheck = common.CheckProviderConfigured
 	var origConnect = common.Connect
@@ -606,7 +578,6 @@ func TestInProcessMCPServer_SetAWSBYOCProvider(t *testing.T) {
 		return &cliClient.MockProvider{}, nil
 	}
 	t.Cleanup(func() {
-		cleanup()
 		common.CheckProviderConfigured = origCheck
 		common.Connect = origConnect
 	})
@@ -644,8 +615,7 @@ func TestInProcessMCPServer_SetAWSBYOCProvider(t *testing.T) {
 
 // Test for setGCPBYOCProvider tool
 func TestInProcessMCPServer_SetGCPBYOCProvider(t *testing.T) {
-	var cleanup func()
-	projectDir, cleanup = createTestProjectDir(t)
+	projectDir = createTestProjectDir(t)
 	mcpClient = setupTest(t, projectDir)
 	var origCheck = common.CheckProviderConfigured
 	var origConnect = common.Connect
@@ -654,7 +624,6 @@ func TestInProcessMCPServer_SetGCPBYOCProvider(t *testing.T) {
 		return &cliClient.MockProvider{}, nil
 	}
 	t.Cleanup(func() {
-		cleanup()
 		common.CheckProviderConfigured = origCheck
 		common.Connect = origConnect
 	})

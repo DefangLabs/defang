@@ -32,7 +32,7 @@ func Connect(ctx context.Context, addr string) (*client.GrpcClient, error) {
 	return grpcClient, err
 }
 
-func NewProvider(ctx context.Context, providerID client.ProviderID, fabricClient client.FabricClient) (client.Provider, error) {
+func NewProvider(ctx context.Context, providerID client.ProviderID, fabricClient client.FabricClient) client.Provider {
 	var provider client.Provider
 	term.Debugf("Creating %s provider", providerID)
 	switch providerID {
@@ -45,6 +45,5 @@ func NewProvider(ctx context.Context, providerID client.ProviderID, fabricClient
 	default:
 		provider = &client.PlaygroundProvider{FabricClient: fabricClient}
 	}
-	_, err := provider.AccountInfo(ctx)
-	return provider, err
+	return provider
 }

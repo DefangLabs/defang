@@ -75,7 +75,7 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantName) *ByocDo {
 		client: client,
 		driver: appPlatform.New(doRegion),
 	}
-	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantName, b)
+	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b)
 	return b
 }
 

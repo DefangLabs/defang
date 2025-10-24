@@ -16,7 +16,6 @@ import (
 // MockCLI implements CLIInterface for testing
 type MockCLI struct {
 	ConnectError                     error
-	NewProviderError                 error
 	LoadProjectNameWithFallbackError error
 	MockClient                       *client.GrpcClient
 	MockProvider                     client.Provider
@@ -36,11 +35,8 @@ func (m *MockCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClie
 	return m.MockClient, nil
 }
 
-func (m *MockCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabricClient client.FabricClient) (client.Provider, error) {
-	if m.NewProviderError != nil {
-		return nil, m.NewProviderError
-	}
-	return m.MockProvider, nil
+func (m *MockCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabricClient client.FabricClient) client.Provider {
+	return m.MockProvider
 }
 
 func (m *MockCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
@@ -97,18 +93,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 
 			expectedError:       true,
 			errorMessage:        "connection failed",
-			expectedGetServices: false,
-		},
-		{
-			name:       "provider_creation_error",
-			providerId: client.ProviderDefang,
-			mockCLI: &MockCLI{
-				MockClient:       &client.GrpcClient{},
-				NewProviderError: errors.New("provider creation failed"),
-			},
-
-			expectedError:       true,
-			errorMessage:        "provider creation failed",
 			expectedGetServices: false,
 		},
 		{
