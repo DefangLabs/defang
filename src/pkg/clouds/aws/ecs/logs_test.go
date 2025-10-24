@@ -31,7 +31,7 @@ func TestSplitClusterTask(t *testing.T) {
 }
 
 func TestQueryAndTailLogGroups(t *testing.T) {
-	e, err := QueryAndTailLogGroups(t.Context(), time.Now(), time.Time{})
+	e, err := QueryAndTailLogGroups(t.Context(), time.Now(), time.Time{}, true)
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
