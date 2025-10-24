@@ -170,12 +170,23 @@ genkit-eval-all: genkit-check-server ## Run all genkit evaluations (requires gen
 	@mkdir -p $(EVAL_OUTPUT_DIR)
 	@for dataset in $(EVAL_DATASETS); do \
 		echo "Running evaluation: $$dataset"; \
-		cd $(PWD)/$(GENKIT_CMD_DIR) && genkit eval:run ../datasets/$$(basename $$dataset) --output "../$(EVAL_BASE_DIR)/run-$(RUN_TIMESTAMP)/$$(basename $$dataset .json)_results.json" || true; \
+		cd $(PWD)/$(GENKIT_CMD_DIR) && genkit eval:run ../datasets/$$(basename $$dataset) --output "$(PWD)/$(EVAL_OUTPUT_DIR)/$$(basename $$dataset .json)_results.json" || true; \
 	done
 	@echo "Moving results from .genkit/evals/ to $(EVAL_OUTPUT_DIR)/"
 	@if [ -d "$(PWD)/$(GENKIT_CMD_DIR)/.genkit/evals" ]; then \
 		mv $(PWD)/$(GENKIT_CMD_DIR)/.genkit/evals/*.json $(EVAL_OUTPUT_DIR)/ 2>/dev/null || true; \
 	fi
+	@echo "Generating evaluation summary..."
+	@cd $(PWD)/$(EVAL_DIR)/tools/summarizer && go run . -path ../../testrun-$(GIT_BRANCH)-$(GIT_COMMIT) -output ../../current_state.json
+	@echo "Summary saved to $(EVAL_DIR)/current_state.json"
+
+.PHONY: genkit-summarize
+genkit-summarize: ## Generate summary of current evaluation results
+	@echo "Generating evaluation summary for $(EVAL_BASE_DIR)..."
+	@cd $(PWD)/$(EVAL_DIR)/tools/summarizer && go run . -path ../../testrun-$(GIT_BRANCH)-$(GIT_COMMIT) -output ../../current_state.json
+	@echo "Summary saved to $(EVAL_DIR)/current_state.json"
+
+.PHONY: genkit-list-datasets
 
 
 .PHONY: genkit-list-datasets
@@ -202,6 +213,7 @@ genkit-help: ## Show genkit evaluation help
 	@echo "  genkit-restart        Kill existing and start fresh genkit server"
 	@echo "  genkit-check-server   Check if genkit server is running"
 	@echo "  genkit-eval-all       Run all evaluations (checks server first)"
+	@echo "  genkit-summarize      Generate summary of current evaluation results"
 	@echo "  genkit-list-datasets  List all available datasets"
 	@echo "  genkit-clean          Clean all evaluation results"
 	@echo "  genkit-clean-current  Clean current branch/commit evaluation results"

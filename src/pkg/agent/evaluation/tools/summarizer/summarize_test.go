@@ -7,7 +7,7 @@ import (
 )
 
 func TestLoadResultsSchema(t *testing.T) {
-	evalResults, err := LoadEvaluationResult("../testdata/evaluation_results.json")
+	evalResults, err := LoadEvaluationResult("../../testdata/evaluation_results.json")
 	if err != nil {
 		t.Fatalf("Failed to load evaluation results: %v", err)
 	}
@@ -18,7 +18,7 @@ func TestLoadResultsSchema(t *testing.T) {
 }
 
 func TestResultsScore(t *testing.T) {
-	var testEvaluationSummary TestEvaluationSummary = SummarizeEvaluationResults("../testdata")
+	var testEvaluationSummary TestEvaluationSummary = SummarizeEvaluationResults("../../testdata")
 
 	// these inputs correspond to the testdata/evaluation_results*.json test cases inputs
 	inputs := []string{

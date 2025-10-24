@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -72,6 +73,7 @@ type MetricMetadata struct {
 type EvaluationSummary struct {
 	TotalTests int
 	Passed     int
+	PassRate   string
 }
 
 type TestEvaluationSummary map[string]EvaluationSummary
@@ -127,11 +129,13 @@ func SummarizeEvaluationResults(path string) TestEvaluationSummary {
 				summary[input] = EvaluationSummary{
 					TotalTests: summary[input].TotalTests + 1,
 					Passed:     summary[input].Passed + 1,
+					PassRate:   fmt.Sprintf("%.2f%%", float64(summary[input].Passed+1)/float64(summary[input].TotalTests+1)*100),
 				}
 			} else {
 				summary[input] = EvaluationSummary{
 					TotalTests: summary[input].TotalTests + 1,
 					Passed:     summary[input].Passed,
+					PassRate:   fmt.Sprintf("%.2f%%", float64(summary[input].Passed)/float64(summary[input].TotalTests+1)*100),
 				}
 			}
 		}
