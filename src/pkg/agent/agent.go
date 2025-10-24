@@ -118,6 +118,14 @@ func (a *Agent) handleToolRequest(req *ai.ToolRequest) (*ai.ToolResponse, error)
 
 	output, err := tool.RunRaw(a.ctx, req.Input)
 	if err != nil {
+		var providerErr *common.ProviderNotConfiguredErrorType
+		if errors.As(err, &providerErr) {
+			return &ai.ToolResponse{
+				Name:   req.Name,
+				Ref:    req.Ref,
+				Output: "Please set up a provider using one of the setup tools.",
+			}, nil
+		}
 		return nil, fmt.Errorf("tool %q execution error: %w", tool.Name(), err)
 	}
 
