@@ -617,7 +617,7 @@ func (b *ByocAws) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest)
 	}
 
 	// Gather logs from the CD task, kaniko, ECS events, and all services
-	evtsChan, errsChan := ecs.QueryLogGroups(ctx, start, end, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
+	evtsChan, errsChan := ecs.QueryLogGroups(ctx, start, end, req.LogLimit, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
 	if evtsChan == nil {
 		return <-errsChan
 	}
@@ -701,7 +701,15 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		if req.Until.IsValid() {
 			end = req.Until.AsTime()
 		}
-		tailStream, err = ecs.QueryAndTailLogGroups(ctx, start, end, b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))...)
+		doTail := req.Follow || end.IsZero() || req.Limit == 0
+		tailStream, err = ecs.QueryAndTailLogGroups(
+			ctx,
+			start,
+			end,
+			req.Limit,
+			doTail,
+			b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))...,
+		)
 	}
 
 	if err != nil {
