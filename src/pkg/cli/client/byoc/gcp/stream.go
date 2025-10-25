@@ -91,12 +91,13 @@ func isContextCanceledError(err error) bool {
 	return false
 }
 
-func (s *ServerStream[T]) Start(start time.Time) {
+func (s *ServerStream[T]) Start(start time.Time, follow bool) {
 	query := s.query.GetQuery()
 	term.Debugf("Query and tail logs since %v with query: \n%v", start, query)
+	queryOlderLogs := !start.IsZero() && start.Unix() > 0 && time.Since(start) > 10*time.Millisecond
 	go func() {
 		// Only query older logs if start time is more than 10ms ago
-		if !start.IsZero() && start.Unix() > 0 && time.Since(start) > 10*time.Millisecond {
+		if queryOlderLogs {
 			lister, err := s.gcp.ListLogEntries(s.ctx, query)
 			if err != nil {
 				s.errCh <- err
@@ -122,24 +123,26 @@ func (s *ServerStream[T]) Start(start time.Time) {
 			}
 		}
 
-		// Start tailing logs after all older logs are processed
-		if err := s.tailer.Start(s.ctx, query); err != nil {
-			s.errCh <- err
-			return
-		}
-		for {
-			entry, err := s.tailer.Next(s.ctx)
-			if err != nil {
+		if follow {
+			// Start tailing logs after all older logs are processed
+			if err := s.tailer.Start(s.ctx, query); err != nil {
 				s.errCh <- err
 				return
 			}
-			resps, err := s.parseAndFilter(entry)
-			if err != nil {
-				s.errCh <- err
-				return
-			}
-			for _, resp := range resps {
-				s.respCh <- resp
+			for {
+				entry, err := s.tailer.Next(s.ctx)
+				if err != nil {
+					s.errCh <- err
+					return
+				}
+				resps, err := s.parseAndFilter(entry)
+				if err != nil {
+					s.errCh <- err
+					return
+				}
+				for _, resp := range resps {
+					s.respCh <- resp
+				}
 			}
 		}
 	}()
