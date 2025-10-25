@@ -498,6 +498,9 @@ func makeComposeLogsCmd() *cobra.Command {
 		RunE:        handleLogsCmd,
 	}
 	setupLogsFlags(logsCmd)
+	logsCmd.Flags().String("until", "", "show logs until duration/time")
+	logsCmd.Flags().Int32("limit", 0, "number of log lines to retrieve")                // NOTE: -n is already used by --name
+	logsCmd.Flags().Bool("follow", false, "follow log output, --until will be ignored") // NOTE: -f is already used by --file
 	return logsCmd
 }
 
@@ -518,11 +521,8 @@ func setupLogsFlags(cmd *cobra.Command) {
 	cmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
 	cmd.Flags().MarkHidden("etag")
 	cmd.Flags().String("deployment", "", "deployment ID of the service")
-	cmd.Flags().Int32("limit", 0, "number of log lines to retrieve")                // NOTE: -n is already used by --name
-	cmd.Flags().Bool("follow", false, "follow log output, --until will be ignored") // NOTE: -f is already used by --file
 	cmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
 	cmd.Flags().String("since", "", "show logs since duration/time")
-	cmd.Flags().String("until", "", "show logs until duration/time")
 	cmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	cmd.Flags().Var(&logType, "type", fmt.Sprintf("show logs of type; one of %v", logs.AllLogTypes))
 	cmd.Flags().String("filter", "", "only show logs containing given text; case-insensitive")
