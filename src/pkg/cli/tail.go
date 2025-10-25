@@ -54,6 +54,7 @@ type TailOptions struct {
 	Until              time.Time
 	Verbose            bool
 	Follow             bool
+	Limit              int32
 }
 
 func (to TailOptions) String() string {
@@ -63,6 +64,9 @@ func (to TailOptions) String() string {
 		cmd = "tail" + cmd
 	} else {
 		cmd = "logs" + cmd + " --until=" + to.Until.UTC().Format(time.RFC3339Nano)
+	}
+	if to.Limit > 0 {
+		cmd += fmt.Sprintf(" --limit=%d", to.Limit)
 	}
 	if to.Deployment != "" {
 		cmd += " --deployment=" + to.Deployment
@@ -230,6 +234,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 		Since:    sinceTs, // this is also used to continue from the last timestamp
 		Until:    untilTs,
 		Follow:   options.Follow,
+		Limit:    options.Limit,
 	}
 
 	term.Debug("Tail request:", tailRequest)

@@ -337,6 +337,13 @@ func (q *Query) AddFilter(filter string) {
 	q.baseQuery += fmt.Sprintf(` AND (%q)`, filter)
 }
 
+func (q *Query) AddLimit(limit int32) {
+	if limit == 0 {
+		return
+	}
+	q.baseQuery += fmt.Sprintf(` LIMIT %d`, limit)
+}
+
 func servicesPattern(services []string) string {
 	if len(services) == 0 {
 		return ""

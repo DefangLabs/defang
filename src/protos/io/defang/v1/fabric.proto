@@ -188,6 +188,7 @@ message DebugRequest {
   google.protobuf.Timestamp since = 7;
   google.protobuf.Timestamp until = 8;
   string model_id = 9; // only valid for Pro users
+  int32 log_limit = 10;
 }
 
 message DebugResponse {
@@ -492,6 +493,7 @@ message TailRequest {
   string pattern = 6;
   google.protobuf.Timestamp until = 7;
   bool follow = 8;
+  int32 limit = 9;
 }
 
 message LogEntry {

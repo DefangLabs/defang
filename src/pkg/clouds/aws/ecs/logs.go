@@ -26,7 +26,7 @@ func getLogGroupIdentifier(arnOrId string) string {
 	return strings.TrimSuffix(arnOrId, ":*")
 }
 
-func QueryAndTailLogGroups(ctx context.Context, start, end time.Time, doTail bool, logGroups ...LogGroupInput) (LiveTailStream, error) {
+func QueryAndTailLogGroups(ctx context.Context, start, end time.Time, limit int32, doTail bool, logGroups ...LogGroupInput) (LiveTailStream, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	e := &eventStream{
@@ -39,7 +39,7 @@ func QueryAndTailLogGroups(ctx context.Context, start, end time.Time, doTail boo
 	var err error
 	for _, lgi := range logGroups {
 		var es LiveTailStream
-		es, err = QueryAndTailLogGroup(ctx, lgi, start, end, doTail)
+		es, err = QueryAndTailLogGroup(ctx, lgi, start, end, limit, doTail)
 		if err != nil {
 			break // abort if there is any fatal error
 		}
@@ -104,7 +104,7 @@ func TailLogGroup(ctx context.Context, input LogGroupInput) (LiveTailStream, err
 	return slto.GetStream(), nil
 }
 
-func QueryLogGroups(ctx context.Context, start, end time.Time, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
+func QueryLogGroups(ctx context.Context, start, end time.Time, limit int32, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
 	errsChan := make(chan error)
 
 	// Gather logs from the CD task, kaniko, ECS events, and all services
@@ -114,7 +114,7 @@ func QueryLogGroups(ctx context.Context, start, end time.Time, logGroups ...LogG
 		// Start a go routine for each log group
 		go func(lgi LogGroupInput) {
 			defer close(lgEvtChan)
-			if err := QueryLogGroup(ctx, lgi, start, end, func(logEvents []LogEvent) error {
+			if err := QueryLogGroup(ctx, lgi, start, end, limit, func(logEvents []LogEvent) error {
 				for _, event := range logEvents {
 					lgEvtChan <- event
 				}
@@ -128,22 +128,23 @@ func QueryLogGroups(ctx context.Context, start, end time.Time, logGroups ...LogG
 	return evtsChan, errsChan
 }
 
-func QueryLogGroup(ctx context.Context, input LogGroupInput, start, end time.Time, cb func([]LogEvent) error) error {
+func QueryLogGroup(ctx context.Context, input LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
 	region := region.FromArn(input.LogGroupARN)
 	cw, err := newCloudWatchLogsClient(ctx, region)
 	if err != nil {
 		return err
 	}
-	return filterLogEvents(ctx, cw, input, start, end, cb)
+	return filterLogEvents(ctx, cw, input, start, end, limit, cb)
 }
 
-func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGroupInput, start, end time.Time, cb func([]LogEvent) error) error {
+func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
 	var pattern *string
 	if lgi.LogEventFilterPattern != "" {
 		pattern = &lgi.LogEventFilterPattern
 	}
 	logGroupIdentifier := getLogGroupIdentifier(lgi.LogGroupARN)
 	params := &cloudwatchlogs.FilterLogEventsInput{
+		Limit:              ptr.Int32(limit),
 		StartTime:          ptr.Int64(start.UnixMilli()),
 		EndTime:            ptr.Int64(end.UnixMilli()),
 		LogGroupIdentifier: &logGroupIdentifier,

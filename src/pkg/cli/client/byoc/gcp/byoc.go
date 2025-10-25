@@ -617,6 +617,7 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		logStream.AddSince(startTime)
 		logStream.AddUntil(endTime)
 		logStream.AddFilter(req.Pattern)
+		logStream.AddLimit(req.Limit)
 	}
 	logStream.Start(startTime, req.Follow)
 	return logStream, nil

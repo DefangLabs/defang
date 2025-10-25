@@ -235,6 +235,10 @@ func (s *LogStream) AddFilter(filter string) {
 	s.query.AddFilter(filter)
 }
 
+func (s *LogStream) AddLimit(limit int32) {
+	s.query.AddLimit(limit)
+}
+
 type SubscribeStream struct {
 	*ServerStream[defangv1.SubscribeResponse]
 }

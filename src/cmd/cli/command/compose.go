@@ -518,6 +518,7 @@ func setupLogsFlags(cmd *cobra.Command) {
 	cmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
 	cmd.Flags().MarkHidden("etag")
 	cmd.Flags().String("deployment", "", "deployment ID of the service")
+	cmd.Flags().Int32("limit", 0, "number of log lines to retrieve")                // NOTE: -n is already used by --name
 	cmd.Flags().Bool("follow", false, "follow log output, --until will be ignored") // NOTE: -f is already used by --file
 	cmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
 	cmd.Flags().String("since", "", "show logs since duration/time")
@@ -538,13 +539,10 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 	var filter, _ = cmd.Flags().GetString("filter")
 	var until, _ = cmd.Flags().GetString("until")
 	var follow, _ = cmd.Flags().GetBool("follow")
+	var limit, _ = cmd.Flags().GetInt32("limit")
 
 	if cmd.Name() == "tail" {
 		follow = true
-	}
-
-	if follow {
-		until = ""
 	}
 
 	if etag != "" && deployment == "" {
@@ -606,6 +604,7 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 		Until:      untilTs,
 		Verbose:    verbose,
 		Follow:     follow,
+		Limit:      limit,
 	}
 	return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 }
