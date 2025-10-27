@@ -118,14 +118,14 @@ func PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) {
 	subtotal := (*money.Money)(estimate.Subtotal)
 	tableItems := prepareEstimateLineItemTableItems(estimate.LineItems)
 	term.Println("")
-	switch defangv1.DeploymentMode(mode) {
-	case defangv1.DeploymentMode_DEVELOPMENT, defangv1.DeploymentMode_MODE_UNSPECIFIED:
+	switch mode {
+	case modes.ModeAffordable:
 		term.Println("Estimate for Deployment Mode: AFFORDABLE")
 		term.Println(affordableModeEstimateSummary)
-	case defangv1.DeploymentMode_STAGING:
+	case modes.ModeBalanced:
 		term.Println("Estimate for Deployment Mode: BALANCED")
 		term.Println(balancedModeEstimateSummary)
-	case defangv1.DeploymentMode_PRODUCTION:
+	case modes.ModeHighAvailability:
 		term.Println("Estimate for Deployment Mode: HIGH_AVAILABILITY")
 		term.Println(highAvailabilityModeEstimateSummary)
 	default:
