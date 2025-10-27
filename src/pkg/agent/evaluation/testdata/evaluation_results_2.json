@@ -4,15 +4,6 @@
         "createdAt": "2025-10-24T20:02:47.317Z",
         "metricSummaries": [
             {
-                "evaluator": "/evaluator/genkitEval/deep_equal",
-                "testCaseCount": 5,
-                "errorCount": 3,
-                "scoreUndefinedCount": 5,
-                "statusDistribution": {
-                    "FAIL": 3
-                }
-            },
-            {
                 "evaluator": "/evaluator/genkitEval/regex",
                 "testCaseCount": 5,
                 "errorCount": 4,
@@ -37,12 +28,6 @@
             "traceIds": [],
             "metrics": [
                 {
-                    "evaluator": "/evaluator/genkitEval/deep_equal",
-                    "status": "PASS",
-                    "traceId": "3f16a1cdde60b1230ffe69f8fae0dabc",
-                    "spanId": "5ca080c65fc7c53e"
-                },
-                {
                     "evaluator": "/evaluator/genkitEval/regex",
                     "status": "PASS",
                     "traceId": "fa68250d9cd737072b55265662e38a3a",
@@ -62,13 +47,6 @@
             "reference": "Tools\\[\\]",
             "traceIds": [],
             "metrics": [
-                {
-                    "evaluator": "/evaluator/genkitEval/deep_equal",
-                    "status": "PASS",
-                    "error": "Evaluation of test case 8a0b1f03-0fe9-4802-8819-50d5bec54423 failed: \n output was not provided",
-                    "traceId": "3f16a1cdde60b1230ffe69f8fae0dabc",
-                    "spanId": "3d2d8067def25304"
-                },
                 {
                     "evaluator": "/evaluator/genkitEval/regex",
                     "status": "FAIL",
@@ -91,12 +69,6 @@
             "traceIds": [],
             "metrics": [
                 {
-                    "evaluator": "/evaluator/genkitEval/deep_equal",
-                    "status": "PASS",
-                    "traceId": "3f16a1cdde60b1230ffe69f8fae0dabc",
-                    "spanId": "6e7771df3d1fa5df"
-                },
-                {
                     "evaluator": "/evaluator/genkitEval/regex",
                     "status": "PASS",
                     "traceId": "fa68250d9cd737072b55265662e38a3a",
@@ -116,13 +88,6 @@
             "reference": "Tools\\[*.remove_config.*\\]",
             "traceIds": [],
             "metrics": [
-                {
-                    "evaluator": "/evaluator/genkitEval/deep_equal",
-                    "status": "FAIL",
-                    "error": "Evaluation of test case dbe352b3-56f7-488c-9d34-f727c2fb90f2 failed: \n output was not provided",
-                    "traceId": "3f16a1cdde60b1230ffe69f8fae0dabc",
-                    "spanId": "a86f3b32c9e6756c"
-                },
                 {
                     "evaluator": "/evaluator/genkitEval/regex",
                     "status": "FAIL",
@@ -145,13 +110,6 @@
             "traceIds": [],
             "metrics": [
                 {
-                    "evaluator": "/evaluator/genkitEval/deep_equal",
-                    "status": "FAIL",
-                    "error": "Evaluation of test case 69fc3711-f467-45af-8d74-54506d3b6daa failed: \n output was not provided",
-                    "traceId": "3f16a1cdde60b1230ffe69f8fae0dabc",
-                    "spanId": "b03c7a47a644ccf7"
-                },
-                {
                     "evaluator": "/evaluator/genkitEval/regex",
                     "status": "FAIL",
                     "error": "Evaluation of test case 69fc3711-f467-45af-8d74-54506d3b6daa failed: \n output was not provided",
@@ -162,10 +120,6 @@
         }
     ],
     "metricsMetadata": {
-        "genkitEval/deep_equal": {
-            "displayName": "Deep Equal",
-            "definition": "Tests equality of output against the provided reference"
-        },
         "genkitEval/regex": {
             "displayName": "RegExp",
             "definition": "Tests output against the regexp provided as reference"

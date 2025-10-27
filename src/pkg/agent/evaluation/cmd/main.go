@@ -23,20 +23,22 @@ func main() {
 		EvaluationMode: true,
 		EvalMetrics: []evaluators.MetricConfig{
 			{MetricType: evaluators.EvaluatorRegex},
-			{MetricType: evaluators.EvaluatorDeepEqual},
 		},
 	}
 
 	log.Println("Setting up tools.")
 	tools := agent.CollectTools(config.Cluster, config.AuthPort, config.ProviderId)
-	log.Println("Tools collected:", len(tools))
+	log.Printf("Tools collected: %d tools", len(tools))
+	for i, tool := range tools {
+		log.Printf("Tool %d: %+v", i, tool)
+	}
 
 	log.Println("Initializing runner.")
 	r := NewFlowRunner(ctx, config, tools)
 
 	log.Println("Creating evaluation flow.")
-	r.CreateEvaluationFlow()
+	flow := r.CreateEvaluationFlow()
+	log.Printf("Flow created: %+v", flow)
 
-	// keep the main function running fo developer UI testing
 	select {}
 }

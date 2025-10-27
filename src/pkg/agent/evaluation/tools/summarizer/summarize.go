@@ -11,9 +11,9 @@ import (
 
 // EvaluationResult represents the complete Genkit evaluation result structure
 type EvaluationResult struct {
-	Key             EvaluationKey             `json:"key"`
+	Key             *EvaluationKey            `json:"key,omitempty"`
 	Results         []TestCaseResult          `json:"results"`
-	MetricsMetadata map[string]MetricMetadata `json:"metricsMetadata"`
+	MetricsMetadata map[string]MetricMetadata `json:"metricsMetadata,omitempty"`
 }
 
 // EvaluationKey contains metadata about the evaluation run
@@ -56,12 +56,11 @@ type TestSetup struct {
 
 // Metric represents an evaluation metric result
 type Metric struct {
-	Evaluator string   `json:"evaluator"`
-	Status    string   `json:"status"` // "PASS" or "FAIL"
-	Error     *string  `json:"error,omitempty"`
-	TraceID   string   `json:"traceId"`
-	SpanID    string   `json:"spanId"`
-	Score     *float64 `json:"score,omitempty"`
+	Evaluator string  `json:"evaluator"`
+	Status    string  `json:"status"` // "PASS" or "FAIL"
+	Error     *string `json:"error,omitempty"`
+	TraceID   string  `json:"traceId"`
+	SpanID    string  `json:"spanId"`
 }
 
 // MetricMetadata provides information about an evaluator
@@ -77,12 +76,6 @@ type EvaluationSummary struct {
 }
 
 type TestEvaluationSummary map[string]EvaluationSummary
-
-// Common evaluator types
-const (
-	EvaluatorDeepEqual = "genkitEval/deep_equal"
-	EvaluatorRegex     = "genkitEval/regex"
-)
 
 // Common status values
 const (
@@ -174,8 +167,8 @@ func LoadEvaluationResult(path string) (*EvaluationResult, error) {
 		return nil, err
 	}
 
-	var evalResults EvaluationResult
-	err = json.Unmarshal(data, &evalResults)
+	var evalResults = EvaluationResult{}
+	err = json.Unmarshal(data, &evalResults.Results)
 	if err != nil {
 		return nil, err
 	}

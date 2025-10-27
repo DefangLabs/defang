@@ -84,7 +84,12 @@ func (r *Runner) CreateEvaluationFlow() *core.Flow[FlowInput, string, struct{}] 
 
 // HandleMessageForEvaluation processes a message and returns the response for evaluation purposes
 func (r *Runner) HandleMessageForEvaluation(msg string) (string, error) {
-	log.Println("Function invoked: genkit.Generate")
+	log.Printf("HandleMessageForEvaluation called with: %s", msg)
+
+	allToolsCalled := []string{}
+	maxRounds := 5
+
+	// First generation call
 	resp, err := genkit.Generate(r.ctx, r.g,
 		ai.WithPrompt(msg),
 		ai.WithTools(r.tools...),
@@ -94,11 +99,47 @@ func (r *Runner) HandleMessageForEvaluation(msg string) (string, error) {
 		return "", fmt.Errorf("Generate error: %w", err)
 	}
 
-	toolsCalled := []string{}
-	log.Printf("Tools called: %d", len(resp.ToolRequests()))
-	for _, req := range resp.ToolRequests() {
-		toolsCalled = append(toolsCalled, strings.ToLower(req.Name))
+	log.Printf("Initial response: %d tool requests, text: %q", len(resp.ToolRequests()), resp.Text())
+
+	// Multi-round conversation
+	for round := 2; round <= maxRounds && len(resp.ToolRequests()) > 0; round++ {
+		// Process tool requests and build responses
+		parts := []*ai.Part{}
+		roundTools := []string{}
+
+		for _, req := range resp.ToolRequests() {
+			toolName := strings.ToLower(req.Name)
+			roundTools = append(roundTools, toolName)
+			allToolsCalled = append(allToolsCalled, toolName)
+
+			log.Printf("Tool request: %s", req.Name)
+
+			// Simulate tool response for evaluation
+			toolResp := &ai.ToolResponse{
+				Name:   req.Name,
+				Ref:    req.Ref,
+				Output: fmt.Sprintf("Tool %s executed successfully.", req.Name),
+			}
+			parts = append(parts, ai.NewToolResponsePart(toolResp))
+		}
+
+		log.Printf("Round %d: called tools %v", round-1, roundTools)
+
+		// Continue conversation with tool responses
+		resp, err = genkit.Generate(r.ctx, r.g,
+			ai.WithMessages(append(resp.History(), ai.NewMessage(ai.RoleTool, nil, parts...))...),
+		)
+		if err != nil {
+			log.Printf("Generate error in round %d: %v", round, err)
+			break
+		}
 	}
 
-	return fmt.Sprintf("Tools[%s]", strings.Join(toolsCalled, ", ")), nil
+	if len(allToolsCalled) > 0 {
+		result := fmt.Sprintf("Tools[%s]", strings.Join(allToolsCalled, ", "))
+		log.Printf("Returning tools called: %s", result)
+		return result, nil
+	}
+
+	return "No response generated", nil
 }

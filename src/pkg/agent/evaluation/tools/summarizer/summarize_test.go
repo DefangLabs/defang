@@ -14,7 +14,14 @@ func TestLoadResultsSchema(t *testing.T) {
 
 	// Add assertions to check the contents of evalResults
 	assert.Equal(t, len(evalResults.Results), 5, "Expected 5 evaluation results")
-	assert.Equal(t, len(evalResults.Results[0].Metrics), 2, "First test case should have 2 metrics")
+	assert.Equal(t, len(evalResults.Results[0].Metrics), 1, "First test case should have 1 metrics")
+}
+
+func TestLoadResultsSchemaFail(t *testing.T) {
+	_, err := LoadEvaluationResult("../../testdata/no_file.json")
+	if err == nil {
+		t.Fatalf("Expected error but got none")
+	}
 }
 
 func TestResultsScore(t *testing.T) {
