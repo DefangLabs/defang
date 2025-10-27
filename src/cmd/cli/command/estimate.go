@@ -7,7 +7,6 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
 )
 
@@ -40,20 +39,20 @@ func makeEstimateCmd() *cobra.Command {
 			var previewProvider cliClient.Provider = &cliClient.PlaygroundProvider{FabricClient: client}
 
 			// default to development mode if not specified; TODO: when mode is not specified, show an interactive prompt
-			if mode.Value() == defangv1.DeploymentMode_MODE_UNSPECIFIED {
-				mode = modes.Mode(defangv1.DeploymentMode_DEVELOPMENT)
+			if mode == modes.ModeUnspecified {
+				mode = modes.ModeAffordable
 			}
 			if region == "" {
 				region = cliClient.GetRegion(providerID) // This sets the default region based on the provider
 			}
 
-			estimate, err := cli.RunEstimate(ctx, project, client, previewProvider, providerID, region, mode.Value())
+			estimate, err := cli.RunEstimate(ctx, project, client, previewProvider, providerID, region, mode)
 			if err != nil {
 				return fmt.Errorf("failed to run estimate: %w", err)
 			}
 			term.Debugf("Estimate: %+v", estimate)
 
-			cli.PrintEstimate(mode.Value(), estimate)
+			cli.PrintEstimate(mode, estimate)
 
 			return nil
 		},

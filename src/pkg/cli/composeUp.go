@@ -8,6 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -22,7 +23,7 @@ func (e ComposeError) Unwrap() error {
 }
 
 // ComposeUp validates a compose project and uploads the services using the client
-func ComposeUp(ctx context.Context, project *compose.Project, fabric client.FabricClient, provider client.Provider, upload compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error) {
+func ComposeUp(ctx context.Context, project *compose.Project, fabric client.FabricClient, provider client.Provider, upload compose.UploadMode, mode modes.Mode) (*defangv1.DeployResponse, *compose.Project, error) {
 	if dryrun.DoDryRun {
 		upload = compose.UploadModeIgnore
 	}
@@ -76,7 +77,7 @@ func ComposeUp(ctx context.Context, project *compose.Project, fabric client.Fabr
 	}
 
 	deployRequest := &defangv1.DeployRequest{
-		Mode:           mode,
+		Mode:           defangv1.DeploymentMode(mode),
 		Project:        project.Name,
 		Compose:        bytes,
 		DelegateDomain: delegateDomain.Zone,

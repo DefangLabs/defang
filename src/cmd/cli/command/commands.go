@@ -55,7 +55,7 @@ var (
 	doDebug        = false
 	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
 	hideUpdate     = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
-	mode           = modes.Mode(defangv1.DeploymentMode_MODE_UNSPECIFIED)
+	mode, _        = modes.Parse(os.Getenv("DEFANG_MODE"))
 	modelId        = os.Getenv("DEFANG_MODEL_ID") // for Pro users only
 	nonInteractive = !hasTty
 	org            string

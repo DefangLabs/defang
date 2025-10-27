@@ -9,6 +9,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
 )
@@ -49,7 +50,7 @@ func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.Provi
 	return nil
 }
 
-func (m *MockDeployCLI) ComposeUp(ctx context.Context, project *compose.Project, grpcClient *client.GrpcClient, provider client.Provider, uploadMode compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error) {
+func (m *MockDeployCLI) ComposeUp(ctx context.Context, project *compose.Project, grpcClient *client.GrpcClient, provider client.Provider, uploadMode compose.UploadMode, mode modes.Mode) (*defangv1.DeployResponse, *compose.Project, error) {
 	m.CallLog = append(m.CallLog, "ComposeUp")
 	if m.ComposeUpError != nil {
 		return nil, nil, m.ComposeUpError

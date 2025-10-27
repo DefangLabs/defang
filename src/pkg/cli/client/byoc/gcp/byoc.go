@@ -26,6 +26,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -331,7 +332,7 @@ type cdCommand struct {
 	Project        string
 	Command        []string
 	EnvOverride    map[string]string
-	Mode           defangv1.DeploymentMode
+	Mode           modes.Mode
 	DelegateDomain string
 }
 
@@ -503,7 +504,7 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 	}
 
 	cmd := cdCommand{
-		Mode:           req.Mode,
+		Mode:           modes.Mode(req.Mode),
 		Project:        project.Name,
 		Command:        []string{command, payload},
 		EnvOverride:    map[string]string{"DEFANG_ETAG": etag},

@@ -14,9 +14,9 @@ import (
 )
 
 type EstimateParams struct {
-	DeploymentMode defangv1.DeploymentMode `json:"deployment_mode"`
-	Provider       cliClient.ProviderID    `json:"provider"`
-	Region         string                  `json:"region"`
+	DeploymentMode modes.Mode           `json:"deployment_mode"`
+	Provider       cliClient.ProviderID `json:"provider"`
+	Region         string               `json:"region"`
 }
 
 func parseEstimateParams(request mcp.CallToolRequest, providerId *cliClient.ProviderID) (EstimateParams, error) {
@@ -25,18 +25,8 @@ func parseEstimateParams(request mcp.CallToolRequest, providerId *cliClient.Prov
 		modeString = "AFFORDABLE" // Default to AFFORDABLE if not provided
 	}
 
-	// This logic is replicated from src/cmd/cli/command/mode.go
-	// I couldn't figure out how to import it without circular dependencies
-	modeString = strings.ToUpper(modeString)
-	var mode defangv1.DeploymentMode
-	switch modeString {
-	case "AFFORDABLE":
-		mode = defangv1.DeploymentMode_DEVELOPMENT
-	case "BALANCED":
-		mode = defangv1.DeploymentMode_STAGING
-	case "HIGH_AVAILABILITY":
-		mode = defangv1.DeploymentMode_PRODUCTION
-	default:
+	mode, err := modes.Parse(modeString) // Validate the mode string
+	if err != nil {
 		term.Warnf("Unknown deployment mode provided - %q", modeString)
 		return EstimateParams{}, fmt.Errorf("Unknown deployment mode %q, please use one of %s", modeString, strings.Join(modes.AllDeploymentModes(), ", "))
 	}
@@ -66,10 +56,10 @@ type EstimateCLIInterface interface {
 	connecter
 	// Unique methods
 	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
-	RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error)
-	PrintEstimate(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse)
+	RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error)
+	PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse)
 	CreatePlaygroundProvider(client *cliClient.GrpcClient) cliClient.Provider
-	CaptureTermOutput(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) string
+	CaptureTermOutput(mode modes.Mode, estimate *defangv1.EstimateResponse) string
 }
 
 func handleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, params EstimateParams, cluster string, cli EstimateCLIInterface) (string, error) {

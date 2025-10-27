@@ -11,6 +11,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go/ptr"
@@ -56,9 +57,9 @@ func TestValidationAndConvert(t *testing.T) {
 			logs.WriteString(err.Error() + "\n")
 		}
 
-		mode := defangv1.DeploymentMode_DEVELOPMENT
+		mode := modes.ModeAffordable
 		if strings.Contains(path, "replicas") {
-			mode = defangv1.DeploymentMode_PRODUCTION
+			mode = modes.ModeHighAvailability
 		}
 		if err := ValidateProject(project, mode); err != nil {
 			t.Logf("Project validation failed: %v", err)

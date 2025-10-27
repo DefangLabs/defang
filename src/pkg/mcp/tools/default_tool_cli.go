@@ -13,6 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/pkg/browser"
@@ -35,10 +36,10 @@ func (DefaultToolCLI) ConfigSet(ctx context.Context, projectName string, provide
 	return cli.ConfigSet(ctx, projectName, provider, name, value)
 }
 
-func (DefaultToolCLI) RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
+func (DefaultToolCLI) RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
 	return cli.RunEstimate(ctx, project, client, provider, providerId, region, mode)
 }
-func (DefaultToolCLI) PrintEstimate(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) {
+func (DefaultToolCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) {
 	cli.PrintEstimate(mode, estimate)
 }
 
@@ -51,7 +52,7 @@ func (DefaultToolCLI) Connect(ctx context.Context, cluster string) (*cliClient.G
 	return cli.Connect(ctx, cluster)
 }
 
-func (DefaultToolCLI) ComposeUp(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, uploadMode compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error) {
+func (DefaultToolCLI) ComposeUp(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, uploadMode compose.UploadMode, mode modes.Mode) (*defangv1.DeployResponse, *compose.Project, error) {
 	return cli.ComposeUp(ctx, project, client, provider, uploadMode, mode)
 }
 
@@ -79,7 +80,7 @@ func (DefaultToolCLI) CheckProviderConfigured(ctx context.Context, client *cliCl
 	return common.CheckProviderConfigured(ctx, client, providerId, projectName, serviceCount)
 }
 
-func (DefaultToolCLI) CaptureTermOutput(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) string {
+func (DefaultToolCLI) CaptureTermOutput(mode modes.Mode, estimate *defangv1.EstimateResponse) string {
 	// Use the same logic as DefaultEstimateCLI
 	oldTerm := term.DefaultTerm
 	stdout := new(bytes.Buffer)
