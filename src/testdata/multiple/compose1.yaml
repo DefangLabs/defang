@@ -1,3 +1,5 @@
 services:
   service1:
     image: example
+    environment:
+      - A=${A}

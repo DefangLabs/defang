@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestLoader(t *testing.T) {
@@ -91,4 +93,20 @@ func TestHasSubstitution(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestComposeEnv(t *testing.T) {
+	t.Setenv("COMPOSE_PROJECT_NAME", "env_project_name")
+	t.Setenv("COMPOSE_PATH_SEPARATOR", "|")
+	t.Setenv("COMPOSE_FILE", "../../../testdata/multiple/compose1.yaml|../../../testdata/multiple/compose2.yaml")
+	t.Setenv("COMPOSE_DISABLE_ENV_FILE", "1")
+
+	loader := NewLoader()
+	p, err := loader.LoadProject(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "env_project_name", p.Name)
+	assert.Len(t, p.Services, 2)
+	assert.Equal(t, types.NewMappingWithEquals([]string{"A=${A}"}), p.Services["service1"].Environment)
 }

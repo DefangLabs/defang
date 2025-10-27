@@ -131,7 +131,10 @@ Invoke-Expression -Command (defang completion powershell | Out-String)
 
 The Defang CLI recognizes the following environment variables:
 
-- `COMPOSE_PROJECT_NAME` - The name of the project to use; overrides the name in the `compose.yaml` file
+- `COMPOSE_DISABLE_ENV_FILE` - Whether to disable loading environment variables from a `.env` file in the current directory; defaults to `false`
+- `COMPOSE_FILE` - The Compose file(s) to use; defaults to `compose.yaml`, `compose.yml`, `docker-compose.yaml`, or `docker-compose.yml` in the current directory
+- `COMPOSE_PATH_SEPARATOR` - The path separator to use for `COMPOSE_FILE`; defaults to `:` on Unix/MacOS and `;` on Windows
+- `COMPOSE_PROJECT_NAME` - The name of the project to use; overrides the `name` in the Compose file
 - `DEFANG_ACCESS_TOKEN` - The access token to use for authentication; if not specified, uses token from `defang login`
 - `DEFANG_BUILD_CONTEXT_LIMIT` - The maximum size of the build context when building container images; defaults to `100MiB`
 - `DEFANG_CD_BUCKET` - The S3 bucket to use for the BYOC CD pipeline; defaults to `defang-cd-bucket-…`
