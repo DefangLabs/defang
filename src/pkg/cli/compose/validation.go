@@ -17,7 +17,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
@@ -298,7 +297,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			replicas = *svccfg.Deploy.Replicas
 		}
 	}
-	if mode == modes.Mode(defangv1.DeploymentMode_PRODUCTION) && replicas < 2 && svccfg.Extensions["x-defang-autoscaling"] == nil {
+	if mode == modes.ModeHighAvailability && replicas < 2 && svccfg.Extensions["x-defang-autoscaling"] == nil {
 		term.Warnf("service %q: high-availability mode requires at least 2 replicas or x-defang-autoscaling", svccfg.Name)
 	}
 	if reservations == nil || reservations.MemoryBytes == 0 {

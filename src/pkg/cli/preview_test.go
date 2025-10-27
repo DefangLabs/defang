@@ -11,7 +11,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
@@ -47,7 +46,7 @@ func TestPreviewStops(t *testing.T) {
 				deploymentStatus: tt.err,
 			}
 
-			err := Preview(t.Context(), project, fabric, provider, modes.Mode(defangv1.DeploymentMode_MODE_UNSPECIFIED))
+			err := Preview(t.Context(), project, fabric, provider, modes.ModeUnspecified)
 			if err != nil {
 				if err.Error() != tt.wantError {
 					t.Errorf("got error: %v, want: %v", err, tt.wantError)
@@ -69,7 +68,7 @@ func TestPreviewStops(t *testing.T) {
 
 		provider := &mockDeployProvider{}
 
-		err := Preview(ctx, project, fabric, provider, modes.Mode(defangv1.DeploymentMode_MODE_UNSPECIFIED))
+		err := Preview(ctx, project, fabric, provider, modes.ModeUnspecified)
 		if err != nil {
 			t.Errorf("got error: %v, want nil", err)
 		}

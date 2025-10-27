@@ -450,7 +450,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				return err
 			}
 
-			_, _, err = cli.ComposeUp(ctx, project, client, provider, compose.UploadModeIgnore, modes.Mode(defangv1.DeploymentMode_MODE_UNSPECIFIED))
+			_, _, err = cli.ComposeUp(ctx, project, client, provider, compose.UploadModeIgnore, modes.ModeUnspecified)
 			if !errors.Is(err, dryrun.ErrDryRun) {
 				return err
 			}

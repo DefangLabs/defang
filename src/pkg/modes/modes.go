@@ -2,6 +2,7 @@ package modes
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -10,17 +11,24 @@ import (
 
 type Mode defangv1.DeploymentMode
 
+const (
+	ModeUnspecified      Mode = Mode(defangv1.DeploymentMode_MODE_UNSPECIFIED)
+	ModeAffordable       Mode = Mode(defangv1.DeploymentMode_DEVELOPMENT)
+	ModeBalanced         Mode = Mode(defangv1.DeploymentMode_STAGING)
+	ModeHighAvailability Mode = Mode(defangv1.DeploymentMode_PRODUCTION)
+)
+
 func (b Mode) String() string {
 	if b == 0 {
 		return ""
 	}
 
-	switch defangv1.DeploymentMode(b) {
-	case defangv1.DeploymentMode_DEVELOPMENT:
+	switch b {
+	case ModeAffordable:
 		return "AFFORDABLE"
-	case defangv1.DeploymentMode_STAGING:
+	case ModeBalanced:
 		return "BALANCED"
-	case defangv1.DeploymentMode_PRODUCTION:
+	case ModeHighAvailability:
 		return "HIGH_AVAILABILITY"
 	default:
 		return fmt.Sprintf("UNKNOWN(%d)", b)
@@ -63,19 +71,12 @@ func (b Mode) Value() defangv1.DeploymentMode {
 }
 
 func AllDeploymentModes() []string {
-	enumKeys := make([]int32, 0, len(defangv1.DeploymentMode_name))
-	for k := range defangv1.DeploymentMode_name {
-		enumKeys = append(enumKeys, k)
-	}
-
-	slices.Sort(enumKeys)
 	var modes []string
-	for _, n := range enumKeys {
-		if n == 0 {
+	for _, i := range slices.Sorted(maps.Keys(defangv1.DeploymentMode_name)) {
+		if i == 0 {
 			continue
 		}
-		name := strings.ToUpper(Mode(defangv1.DeploymentMode(n)).String())
-		modes = append(modes, name)
+		modes = append(modes, Mode(i).String())
 	}
 	return modes
 }
