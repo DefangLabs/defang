@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
@@ -15,7 +16,6 @@ import (
 // MockRemoveConfigCLI implements RemoveConfigCLIInterface for testing
 type MockRemoveConfigCLI struct {
 	ConnectError              error
-	NewProviderError          error
 	LoadProjectNameError      error
 	ConfigDeleteError         error
 	ConfigDeleteNotFoundError bool
@@ -31,12 +31,9 @@ func (m *MockRemoveConfigCLI) Connect(ctx context.Context, cluster string) (*cli
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockRemoveConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) (client.Provider, error) {
+func (m *MockRemoveConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) client.Provider {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
-	if m.NewProviderError != nil {
-		return nil, m.NewProviderError
-	}
-	return nil, nil // Mock provider
+	return nil // Mock provider
 }
 
 func (m *MockRemoveConfigCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
@@ -71,7 +68,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			providerID:    client.ProviderAuto,
 			setupMock:     func(m *MockRemoveConfigCLI) {},
 			expectError:   true,
-			expectedError: "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
+			expectedError: common.ErrNoProviderSet.Error(),
 		},
 		{
 			name:          "missing_config_name",
@@ -90,16 +87,6 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			},
 			expectError:   true,
 			expectedError: "Could not connect: connection failed",
-		},
-		{
-			name:       "new_provider_error",
-			configName: "DATABASE_URL",
-			providerID: client.ProviderAWS,
-			setupMock: func(m *MockRemoveConfigCLI) {
-				m.NewProviderError = errors.New("provider creation failed")
-			},
-			expectError:   true,
-			expectedError: "Failed to get new provider: provider creation failed",
 		},
 		{
 			name:       "load_project_name_error",

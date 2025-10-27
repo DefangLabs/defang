@@ -6,8 +6,10 @@ import (
 	"strings"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -48,6 +50,16 @@ func parseEstimateParams(request mcp.CallToolRequest, providerId *cliClient.Prov
 		Provider:       *providerId,
 		Region:         region,
 	}, nil
+}
+
+type EstimateCLIInterface interface {
+	connecter
+	// Unique methods
+	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
+	RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error)
+	PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse)
+	CreatePlaygroundProvider(client *cliClient.GrpcClient) cliClient.Provider
+	CaptureTermOutput(mode modes.Mode, estimate *defangv1.EstimateResponse) string
 }
 
 func handleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, params EstimateParams, cluster string, cli EstimateCLIInterface) (string, error) {

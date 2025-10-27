@@ -454,7 +454,8 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		estimate: connect_go.NewClient[v1.EstimateRequest, v1.EstimateResponse](
 			httpClient,
 			baseURL+FabricControllerEstimateProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
 		),
 		preview: connect_go.NewClient[v1.PreviewRequest, v1.PreviewResponse](
 			httpClient,
@@ -1036,7 +1037,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerEstimateHandler := connect_go.NewUnaryHandler(
 		FabricControllerEstimateProcedure,
 		svc.Estimate,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerPreviewHandler := connect_go.NewUnaryHandler(
 		FabricControllerPreviewProcedure,

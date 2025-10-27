@@ -15,6 +15,14 @@ import (
 
 var FindGoogleDefaultCredentials func(ctx context.Context, scopes ...string) (*google.Credentials, error) = google.FindDefaultCredentials
 
+// TODO: Possibly need to support google groups and domains type of principals
+// Currently we only support:
+// - Google Accounts (user:email)
+// - Service Accounts (serviceAccount:xxx@xxx.gserviceaccount.com)
+// - Principal Sets, i.e. Workload Identity Federation (principalSet:...)
+//
+// Whole list of possible principal types:
+// https://cloud.google.com/iam/docs/principals-overview#principal-types
 func (gcp Gcp) GetCurrentPrincipal(ctx context.Context) (string, error) {
 	creds, err := FindGoogleDefaultCredentials(ctx)
 	if err != nil {
@@ -41,7 +49,7 @@ func (gcp Gcp) GetCurrentPrincipal(ctx context.Context) (string, error) {
 			return "serviceAccount:" + serviceAccount, nil
 		}
 		if key.ClientEmail != "" {
-			return "user:" + key.ClientEmail, nil
+			return getPrincipalFromEmail(key.ClientEmail), nil
 		}
 	}
 
@@ -54,12 +62,16 @@ func (gcp Gcp) GetCurrentPrincipal(ctx context.Context) (string, error) {
 	// Try to extract email from id_token if present
 	if idToken, ok := token.Extra("id_token").(string); ok && idToken != "" {
 		if email, err := extractEmailFromIDToken(idToken); err == nil && email != "" {
-			return email, nil
+			return getPrincipalFromEmail(email), nil
 		}
 	}
 
 	// Last resort: query tokeninfo endpoint
-	return getEmailFromToken(ctx, token.AccessToken)
+	email, err := getEmailFromToken(ctx, token.AccessToken)
+	if err != nil {
+		return "", fmt.Errorf("failed to get email from token: %w", err)
+	}
+	return getPrincipalFromEmail(email), nil
 }
 
 func extractEmailFromIDToken(idToken string) (string, error) {
@@ -83,6 +95,13 @@ func extractEmailFromIDToken(idToken string) (string, error) {
 	}
 
 	return claims.Email, nil
+}
+
+func getPrincipalFromEmail(email string) string {
+	if strings.HasSuffix(email, ".gserviceaccount.com") {
+		return "serviceAccount:" + email
+	}
+	return "user:" + email
 }
 
 func parseServiceAccountFromURL(url string) (string, error) {

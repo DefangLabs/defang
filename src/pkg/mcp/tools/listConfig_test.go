@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
 )
@@ -14,7 +15,6 @@ import (
 // MockListConfigCLI implements ListConfigCLIInterface for testing
 type MockListConfigCLI struct {
 	ConnectError         error
-	NewProviderError     error
 	LoadProjectNameError error
 	ListConfigError      error
 	ConfigResponse       *defangv1.Secrets
@@ -30,12 +30,9 @@ func (m *MockListConfigCLI) Connect(ctx context.Context, cluster string) (*clien
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockListConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) (client.Provider, error) {
+func (m *MockListConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) client.Provider {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
-	if m.NewProviderError != nil {
-		return nil, m.NewProviderError
-	}
-	return nil, nil // Mock provider
+	return nil // Mock provider
 }
 
 func (m *MockListConfigCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
@@ -66,7 +63,7 @@ func TestHandleListConfigTool(t *testing.T) {
 			name:          "provider_auto_not_configured",
 			providerID:    client.ProviderAuto,
 			setupMock:     func(m *MockListConfigCLI) {},
-			expectedError: "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
+			expectedError: common.ErrNoProviderSet.Error(),
 		},
 		{
 			name:       "connect_error",
@@ -75,14 +72,6 @@ func TestHandleListConfigTool(t *testing.T) {
 				m.ConnectError = errors.New("connection failed")
 			},
 			expectedError: "Could not connect: connection failed",
-		},
-		{
-			name:       "new_provider_error",
-			providerID: client.ProviderAWS,
-			setupMock: func(m *MockListConfigCLI) {
-				m.NewProviderError = errors.New("provider creation failed")
-			},
-			expectedError: "Failed to get new provider: provider creation failed",
 		},
 		{
 			name:       "load_project_name_error",

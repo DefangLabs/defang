@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -27,31 +25,6 @@ import (
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
 )
-
-func createProjectForDebug(loader *compose.Loader) (*compose.Project, error) {
-	projOpts, err := loader.NewProjectOptions()
-	if err != nil {
-		return nil, err
-	}
-
-	// get the project name
-	if projOpts.Name == "" {
-		dir, err := os.Getwd()
-		if err != nil {
-			return nil, err
-		}
-
-		projOpts.Name = filepath.Base(dir)
-	}
-	project := &compose.Project{
-		Name:         projOpts.Name,
-		WorkingDir:   projOpts.WorkingDir,
-		Environment:  projOpts.Environment,
-		ComposeFiles: projOpts.ConfigPaths,
-	}
-
-	return project, nil
-}
 
 func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd := &cobra.Command{
@@ -86,7 +59,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 
 				term.Error("Cannot load project:", loadErr)
-				project, err := createProjectForDebug(loader)
+				project, err := loader.CreateProjectForDebug()
 				if err != nil {
 					return err
 				}
@@ -95,7 +68,7 @@ func makeComposeUpCmd() *cobra.Command {
 				return cli.InteractiveDebugForClientError(ctx, client, project, loadErr)
 			}
 
-			provider, err := newProvider(ctx, loader)
+			provider, err := newProviderChecked(ctx, loader)
 			if err != nil {
 				return err
 			}
@@ -133,7 +106,7 @@ func makeComposeUpCmd() *cobra.Command {
 						if err := survey.AskOne(&survey.Confirm{
 							Message: "This project appears to be already deployed elsewhere. Are you sure you want to continue?",
 							Help:    help,
-							Default: true,
+							Default: false,
 						}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
 							return err
 						} else if !confirm {
@@ -357,7 +330,7 @@ func makeComposeDownCmd() *cobra.Command {
 			}
 
 			loader := configureLoader(cmd)
-			provider, err := newProvider(cmd.Context(), loader)
+			provider, err := newProviderChecked(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}
@@ -385,8 +358,17 @@ func makeComposeDownCmd() *cobra.Command {
 
 			term.Info("Deleted services, deployment ID", deployment)
 
+			listConfigs, err := provider.ListConfig(cmd.Context(), &defangv1.ListConfigsRequest{Project: projectName})
+			if err == nil {
+				if len(listConfigs.Names) > 0 {
+					term.Warn("Stored project configs are not deleted.")
+				}
+			} else {
+				term.Debugf("ListConfigs failed: %v", err)
+			}
+
 			if detach {
-				printDefangHint("To track the update, do:", "tail --deployment "+deployment)
+				printDefangHint("To track the update, do:", "tail --project-name="+projectName+" --deployment="+deployment)
 				return nil
 			}
 
@@ -405,6 +387,9 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 			term.Info("Done.")
+			if len(listConfigs.Names) > 0 {
+				printDefangHint("To delete stored project configs, run:", "config rm --project-name="+projectName+" "+strings.Join(listConfigs.Names, " "))
+			}
 			return nil
 		},
 	}
@@ -451,7 +436,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}
 
 				term.Error("Cannot load project:", loadErr)
-				project, err := createProjectForDebug(loader)
+				project, err := loader.CreateProjectForDebug()
 				if err != nil {
 					return err
 				}
@@ -485,7 +470,7 @@ func makeComposePsCmd() *cobra.Command {
 			long, _ := cmd.Flags().GetBool("long")
 
 			loader := configureLoader(cmd)
-			provider, err := newProvider(cmd.Context(), loader)
+			provider, err := newProviderChecked(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}
@@ -572,7 +557,7 @@ func makeComposeLogsCmd() *cobra.Command {
 			}
 
 			loader := configureLoader(cmd)
-			provider, err := newProvider(cmd.Context(), loader)
+			provider, err := newProviderChecked(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}

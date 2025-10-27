@@ -14,10 +14,12 @@ func TestLoadProjectName(t *testing.T) {
 		"tests":          "../../../testdata/testproj/compose.yaml",
 		"fancy-proj_dir": "../../../testdata/Fancy-Proj_Dir/compose.yaml",
 		"altcomp":        "../../../testdata/alttestproj/altcomp.yaml",
+		"interpolate":    "../../../testdata/interpolate/compose.yaml",
 	}
 
 	for expectedName, path := range tests {
 		t.Run("Load project name from compose file or directory:"+expectedName, func(t *testing.T) {
+			t.Setenv("POSTGRES_PASSWORD", "example") // used in interpolate/compose.yaml for warning test
 			loader := NewLoader(WithPath(path))
 			name, err := loader.LoadProjectName(t.Context())
 			if err != nil {
@@ -25,6 +27,9 @@ func TestLoadProjectName(t *testing.T) {
 			}
 			if name != expectedName {
 				t.Errorf("LoadProjectName() failed: expected project name %q, got %q", expectedName, name)
+			}
+			if term.HadWarnings() {
+				t.Errorf("LoadProjectName() failed: unexpected warnings")
 			}
 		})
 	}

@@ -31,11 +31,19 @@ func parseSetConfigParams(request mcp.CallToolRequest) (SetConfigParams, error) 
 	}, nil
 }
 
+type SetConfigCLIInterface interface {
+	connecter
+	projectNameLoader
+	providerFactory
+	// Unique methods
+	ConfigSet(ctx context.Context, projectName string, provider cliClient.Provider, name, value string) error
+}
+
 // handleSetConfig handles the set config MCP tool request
 func handleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params SetConfigParams, providerId *cliClient.ProviderID, cluster string, cli SetConfigCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
-		return "", fmt.Errorf("No provider configured: %w", err)
+		return "", err
 	}
 
 	term.Debug("Function invoked: cli.Connect")
@@ -45,10 +53,7 @@ func handleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params
 	}
 
 	term.Debug("Function invoked: cli.NewProvider")
-	provider, err := cli.NewProvider(ctx, *providerId, client)
-	if err != nil {
-		return "", fmt.Errorf("Failed to get new provider: %w", err)
-	}
+	provider := cli.NewProvider(ctx, *providerId, client)
 
 	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)

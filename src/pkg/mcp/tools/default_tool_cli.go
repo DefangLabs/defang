@@ -56,7 +56,7 @@ func (DefaultToolCLI) ComposeUp(ctx context.Context, project *compose.Project, c
 	return cli.ComposeUp(ctx, project, client, provider, uploadMode, mode)
 }
 
-func (c *DefaultToolCLI) Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cli.TailOptions) error {
+func (DefaultToolCLI) Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cli.TailOptions) error {
 	return cli.Tail(ctx, provider, project.Name, options)
 }
 
@@ -104,7 +104,7 @@ func (DefaultToolCLI) CreatePlaygroundProvider(client *cliClient.GrpcClient) cli
 	return &cliClient.PlaygroundProvider{FabricClient: client}
 }
 
-func (DefaultToolCLI) NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error) {
+func (DefaultToolCLI) NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) cliClient.Provider {
 	return cli.NewProvider(ctx, providerId, client)
 }
 
@@ -118,12 +118,12 @@ func (DefaultToolCLI) OpenBrowser(url string) error {
 
 // --- Adapter types for tool interfaces ---
 // The following adapter types embed DefaultToolCLI to implement specific tool interfaces.
-type DeployCLIAdapter struct{ *DefaultToolCLI }
-type DestroyCLIAdapter struct{ *DefaultToolCLI }
-type SetConfigCLIAdapter struct{ *DefaultToolCLI }
-type RemoveConfigCLIAdapter struct{ *DefaultToolCLI }
-type ListConfigCLIAdapter struct{ *DefaultToolCLI }
-type LoginCLIAdapter struct{ *DefaultToolCLI }
+type DeployCLIAdapter struct{ DefaultToolCLI }
+type DestroyCLIAdapter struct{ DefaultToolCLI }
+type SetConfigCLIAdapter struct{ DefaultToolCLI }
+type RemoveConfigCLIAdapter struct{ DefaultToolCLI }
+type ListConfigCLIAdapter struct{ DefaultToolCLI }
+type LoginCLIAdapter struct{ DefaultToolCLI }
 
 // --- DestroyCLIInterface ---
 func (DestroyCLIAdapter) LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error) {
@@ -152,9 +152,9 @@ func (a *ListConfigCLIAdapter) ListConfig(ctx context.Context, provider cliClien
 }
 
 // --- LoginCLIInterface ---
-func (LoginCLIAdapter) InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string) error {
+func (LoginCLIAdapter) InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string, mcpClient string) error {
 	// Delegate to login.InteractiveLoginMCP from the login package
-	return login.InteractiveLoginMCP(ctx, client, cluster)
+	return login.InteractiveLoginMCP(ctx, client, cluster, mcpClient)
 }
 
 func (LoginCLIAdapter) GenerateAuthURL(authPort int) string {

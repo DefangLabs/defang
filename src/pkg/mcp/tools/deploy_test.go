@@ -8,6 +8,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
@@ -26,7 +27,6 @@ func (m *MockGrpcClient) Track(event string, props ...interface{}) error {
 // MockDeployCLI implements DeployCLIInterface for testing
 type MockDeployCLI struct {
 	ConnectError                 error
-	NewProviderError             error
 	ComposeUpError               error
 	CheckProviderConfiguredError error
 	LoadProjectError             error
@@ -45,9 +45,9 @@ func (m *MockDeployCLI) Connect(ctx context.Context, cluster string) (*client.Gr
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) (client.Provider, error) {
+func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) client.Provider {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
-	return nil, m.NewProviderError
+	return nil
 }
 
 func (m *MockDeployCLI) ComposeUp(ctx context.Context, project *compose.Project, grpcClient *client.GrpcClient, provider client.Provider, uploadMode compose.UploadMode, mode modes.Mode) (*defangv1.DeployResponse, *compose.Project, error) {
@@ -163,7 +163,7 @@ func TestHandleDeployTool(t *testing.T) {
 			name:          "provider_auto_not_configured",
 			providerID:    client.ProviderAuto,
 			setupMock:     func(m *MockDeployCLI) {},
-			expectedError: "no provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
+			expectedError: common.ErrNoProviderSet.Error(),
 		},
 	}
 

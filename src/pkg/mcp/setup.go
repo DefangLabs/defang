@@ -31,32 +31,36 @@ type MCPServerConfig struct {
 type MCPClient string
 
 const (
-	MCPClientUnspecified    MCPClient = ""
-	MCPClientVSCode         MCPClient = "vscode"
-	MCPClientVSCodeInsiders MCPClient = "vscode-insiders"
-	MCPClientClaudeDesktop  MCPClient = "claude-desktop"
-	MCPClientClaudeCode     MCPClient = "claude-code"
-	MCPClientWindsurf       MCPClient = "windsurf"
-	MCPClientCursor         MCPClient = "cursor"
-	MCPClientKiro           MCPClient = "kiro"
-	MCPClientCodex          MCPClient = "codex"
+	MCPClientClaudeCode       MCPClient = "claude-code"
+	MCPClientClaudeDesktop    MCPClient = "claude-desktop"
+	MCPClientCodex            MCPClient = "codex"
+	MCPClientCursor           MCPClient = "cursor"
+	MCPClientKiro             MCPClient = "kiro"
+	MCPClientRovo             MCPClient = "rovo"
+	MCPClientUnspecified      MCPClient = ""
+	MCPClientVSCode           MCPClient = "vscode"
+	MCPClientVSCodeCodespaces MCPClient = "vscode-codespaces"
+	MCPClientVSCodeInsiders   MCPClient = "vscode-insiders"
+	MCPClientWindsurf         MCPClient = "windsurf"
 )
 
 // ValidVSCodeClients is a list of supported VSCode MCP clients with shorthand names
 var ValidVSCodeClients = []MCPClient{
 	MCPClientVSCode,
+	MCPClientVSCodeCodespaces,
 	MCPClientVSCodeInsiders,
 }
 
 // ValidClients is a list of supported MCP clients
 var ValidClients = append(
 	[]MCPClient{
-		MCPClientClaudeDesktop,
 		MCPClientClaudeCode,
-		MCPClientWindsurf,
+		MCPClientClaudeDesktop,
+		MCPClientCodex,
 		MCPClientCursor,
 		MCPClientKiro,
-		MCPClientCodex,
+		MCPClientRovo,
+		MCPClientWindsurf,
 	},
 	ValidVSCodeClients...,
 )
@@ -100,19 +104,9 @@ type ClientInfo struct {
 	useHomeDir bool   // True if config goes directly in home dir, false if in system config dir
 }
 
-var windsurfConfig = ClientInfo{
-	configFile: ".codeium/windsurf/mcp_config.json",
+var claudeCodeConfig = ClientInfo{
+	configFile: ".claude.json",
 	useHomeDir: true,
-}
-
-var vscodeConfig = ClientInfo{
-	configFile: "Code/User/mcp.json",
-	useHomeDir: false,
-}
-
-var codeInsidersConfig = ClientInfo{
-	configFile: "Code - Insiders/User/mcp.json",
-	useHomeDir: false,
 }
 
 var claudeDesktopConfig = ClientInfo{
@@ -120,8 +114,8 @@ var claudeDesktopConfig = ClientInfo{
 	useHomeDir: false,
 }
 
-var claudeCodeConfig = ClientInfo{
-	configFile: ".claude.json",
+var codexConfig = ClientInfo{
+	configFile: ".codex/config.toml",
 	useHomeDir: true,
 }
 
@@ -135,21 +129,43 @@ var kiroConfig = ClientInfo{
 	useHomeDir: true,
 }
 
-var codexConfig = ClientInfo{
-	configFile: ".codex/config.toml",
+var rovoConfig = ClientInfo{
+	configFile: ".rovodev/mcp.json",
+	useHomeDir: true,
+}
+
+var vscodeConfig = ClientInfo{
+	configFile: "Code/User/mcp.json",
+	useHomeDir: false,
+}
+
+var vscodeCodespacesConfig = ClientInfo{
+	configFile: ".vscode-remote/data/User/mcp.json",
+	useHomeDir: true,
+}
+
+var vscodeInsidersConfig = ClientInfo{
+	configFile: "Code - Insiders/User/mcp.json",
+	useHomeDir: false,
+}
+
+var windsurfConfig = ClientInfo{
+	configFile: ".codeium/windsurf/mcp_config.json",
 	useHomeDir: true,
 }
 
 // clientRegistry maps client names to their configuration details
 var clientRegistry = map[MCPClient]ClientInfo{
-	MCPClientWindsurf:       windsurfConfig,
-	MCPClientVSCode:         vscodeConfig,
-	MCPClientVSCodeInsiders: codeInsidersConfig,
-	MCPClientClaudeDesktop:  claudeDesktopConfig,
-	MCPClientClaudeCode:     claudeCodeConfig,
-	MCPClientCursor:         cursorConfig,
-	MCPClientKiro:           kiroConfig,
-	MCPClientCodex:          codexConfig,
+	MCPClientClaudeCode:       claudeCodeConfig,
+	MCPClientClaudeDesktop:    claudeDesktopConfig,
+	MCPClientCodex:            codexConfig,
+	MCPClientCursor:           cursorConfig,
+	MCPClientKiro:             kiroConfig,
+	MCPClientRovo:             rovoConfig,
+	MCPClientVSCode:           vscodeConfig,
+	MCPClientVSCodeCodespaces: vscodeCodespacesConfig,
+	MCPClientVSCodeInsiders:   vscodeInsidersConfig,
+	MCPClientWindsurf:         windsurfConfig,
 }
 
 // getSystemConfigDir returns the system configuration directory for the given OS
@@ -276,7 +292,7 @@ func configureDefangMCPServer(configPath string, client MCPClient) error {
 
 	var key string
 	switch client {
-	case MCPClientVSCode, MCPClientVSCodeInsiders:
+	case MCPClientVSCode, MCPClientVSCodeInsiders, MCPClientVSCodeCodespaces:
 		key = "servers"
 	case MCPClientCodex:
 		// Codex uses TOML format and a different key

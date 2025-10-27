@@ -15,7 +15,9 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
@@ -29,7 +31,7 @@ func (e ErrMissingConfig) Error() string {
 
 var ErrDockerfileNotFound = errors.New("dockerfile not found")
 
-func ValidateProject(project *composeTypes.Project) error {
+func ValidateProject(project *composeTypes.Project, mode modes.Mode) error {
 	if project == nil {
 		return errors.New("no project found")
 	}
@@ -44,14 +46,10 @@ func ValidateProject(project *composeTypes.Project) error {
 
 	var errs []error
 	for _, svccfg := range services {
-		errs = append(errs, validateService(&svccfg, project))
+		errs = append(errs, validateService(&svccfg, project, mode))
 	}
 	for i, svccfg := range services {
 		for j := i + 1; j < len(services); j++ {
-			if svccfg.Name == services[j].Name {
-				errs = append(errs, fmt.Errorf("service %q defined multiple times", svccfg.Name))
-				continue
-			}
 			if gcp.SafeLabelValue(svccfg.Name) == gcp.SafeLabelValue(services[j].Name) { // TODO: Shouldn't be just gcp specific
 				errs = append(errs, fmt.Errorf("the service names %q and %q normalize to the same value, which causes a conflict. Please use distinct names that differ after normalization", svccfg.Name, services[j].Name))
 			}
@@ -60,7 +58,7 @@ func ValidateProject(project *composeTypes.Project) error {
 	return errors.Join(errs...)
 }
 
-func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project) error {
+func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, mode modes.Mode) error {
 	if svccfg.ReadOnly {
 		term.Debugf("service %q: unsupported compose directive: read_only", svccfg.Name)
 	}
@@ -265,6 +263,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			term.Debugf("service %q: unsupported compose directive: healthcheck start_interval", svccfg.Name)
 		}
 	}
+	var replicas int
 	var reservations *composeTypes.Resource
 	if svccfg.Deploy != nil {
 		if svccfg.Deploy.Mode != "" && svccfg.Deploy.Mode != "replicated" {
@@ -295,6 +294,12 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		if len(svccfg.Deploy.Placement.Constraints) != 0 || len(svccfg.Deploy.Placement.Preferences) != 0 || svccfg.Deploy.Placement.MaxReplicas != 0 {
 			term.Debugf("service %q: unsupported compose directive: deploy placement", svccfg.Name)
 		}
+		if svccfg.Deploy.Replicas != nil {
+			replicas = *svccfg.Deploy.Replicas
+		}
+	}
+	if mode == modes.Mode(defangv1.DeploymentMode_PRODUCTION) && replicas < 2 && svccfg.Extensions["x-defang-autoscaling"] == nil {
+		term.Warnf("service %q: high-availability mode requires at least 2 replicas or x-defang-autoscaling", svccfg.Name)
 	}
 	if reservations == nil || reservations.MemoryBytes == 0 {
 		// Don't show this warning for managed pseudo-services like CDN

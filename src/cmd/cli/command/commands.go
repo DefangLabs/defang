@@ -100,7 +100,7 @@ func Execute(ctx context.Context) error {
 
 		if strings.Contains(err.Error(), "maximum number of projects") {
 			projectName := "<name>"
-			provider, err := newProvider(ctx, nil)
+			provider, err := newProviderChecked(ctx, nil)
 			if err != nil {
 				return err
 			}
@@ -298,9 +298,9 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// MCP Command
 	mcpCmd.AddCommand(mcpSetupCmd)
+	mcpServerCmd.Flags().Int("auth-server", 0, "auth server port")
 	mcpCmd.AddCommand(mcpServerCmd)
 	mcpCmd.PersistentFlags().String("client", "", fmt.Sprintf("MCP setup client %v", mcp.ValidClients))
-	mcpServerCmd.Flags().Int("auth-server", 0, "auth server port")
 	RootCmd.AddCommand(mcpCmd)
 
 	// Send Command
@@ -486,7 +486,7 @@ var certGenerateCmd = &cobra.Command{
 			return err
 		}
 
-		provider, err := newProvider(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -646,7 +646,7 @@ var configSetCmd = &cobra.Command{
 
 		// Make sure we have a project to set config for before asking for a value
 		loader := configureLoader(cmd)
-		provider, err := newProvider(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -728,7 +728,7 @@ var configDeleteCmd = &cobra.Command{
 	Short:       "Removes one or more config values",
 	RunE: func(cmd *cobra.Command, names []string) error {
 		loader := configureLoader(cmd)
-		provider, err := newProvider(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -761,7 +761,7 @@ var configListCmd = &cobra.Command{
 	Short:       "List configs",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := newProvider(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -791,7 +791,7 @@ var debugCmd = &cobra.Command{
 		}
 
 		loader := configureLoader(cmd)
-		provider, err := newProvider(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -836,7 +836,7 @@ var deleteCmd = &cobra.Command{
 		var tail, _ = cmd.Flags().GetBool("tail")
 
 		loader := configureLoader(cmd)
-		provider, err := newProvider(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -1143,7 +1143,17 @@ func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 		return nil, err
 	}
 
-	return cli.NewProvider(ctx, providerID, client)
+	provider := cli.NewProvider(ctx, providerID, client)
+	return provider, nil
+}
+
+func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient.Provider, error) {
+	provider, err := newProvider(ctx, loader)
+	if err != nil {
+		return nil, err
+	}
+	_, err = provider.AccountInfo(ctx)
+	return provider, err
 }
 
 func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string, serviceCount int) error {

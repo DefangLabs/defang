@@ -23,6 +23,8 @@ var MCPDevelopmentClient = ""
 
 const PostPrompt = "Please deploy my application with Defang now."
 
+var ErrNoProviderSet = errors.New("No cloud provider is configured. Use `/` to open prompts and use the 3 Defang setup prompts, or use tools: set_aws_provider, set_gcp_provider, or set_playground_provider.")
+
 func GetStringArg(args map[string]string, key, defaultValue string) string {
 	if val, exists := args[key]; exists {
 		return val
@@ -94,18 +96,15 @@ func CanIUseProvider(ctx context.Context, grpcClient client.FabricClient, provid
 
 func ProviderNotConfiguredError(providerId client.ProviderID) error {
 	if providerId == client.ProviderAuto {
-		return errors.New("no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.")
+		return ErrNoProviderSet
 	}
 	return nil
 }
 
 func checkProviderConfigured(ctx context.Context, client cliClient.FabricClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error) {
-	provider, err := newProvider(ctx, providerId, client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get new provider: %w", err)
-	}
+	provider := newProvider(ctx, providerId, client)
 
-	_, err = provider.AccountInfo(ctx)
+	_, err := provider.AccountInfo(ctx)
 	if err != nil {
 		return nil, err
 	}

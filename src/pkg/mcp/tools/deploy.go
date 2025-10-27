@@ -14,10 +14,20 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
+type DeployCLIInterface interface {
+	connecter
+	providerFactory
+	// Unique methods
+	ComposeUp(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, uploadMode compose.UploadMode, mode modes.Mode) (*defangv1.DeployResponse, *compose.Project, error)
+	CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error)
+	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
+	OpenBrowser(url string) error
+}
+
 func handleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli DeployCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
-		return "", fmt.Errorf("no provider configured: %w", err)
+		return "", err
 	}
 
 	term.Debug("Function invoked: loader.LoadProject")

@@ -120,7 +120,7 @@ func newByocProvider(ctx context.Context, tenantName types.TenantName) *ByocAws 
 	b := &ByocAws{
 		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
-	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantName, b)
+	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b)
 
 	return b
 }
