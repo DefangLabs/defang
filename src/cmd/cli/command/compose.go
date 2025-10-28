@@ -552,8 +552,8 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 	var until, _ = cmd.Flags().GetString("until")
 	var follow, _ = cmd.Flags().GetBool("follow")
 
-	if follow {
-		until = ""
+	if follow && until != "" {
+		return errors.New("cannot use --follow and --until together")
 	}
 
 	if etag != "" && deployment == "" {
