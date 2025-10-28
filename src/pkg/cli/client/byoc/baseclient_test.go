@@ -68,7 +68,7 @@ func (m mockGetServiceInfosProvider) GetProjectUpdate(context.Context, string) (
 
 func NewMockGetServiceInfosProvider() *mockGetServiceInfosProvider {
 	p := &mockGetServiceInfosProvider{}
-	p.ByocBaseClient = NewByocBaseClient(context.Background(), "test-tenant", p)
+	p.ByocBaseClient = NewByocBaseClient("test-tenant", p)
 	return p
 }
 

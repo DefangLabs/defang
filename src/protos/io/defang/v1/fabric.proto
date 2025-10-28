@@ -28,6 +28,10 @@ service FabricController {
   rpc Get(GetRequest) returns (ServiceInfo) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // should be GetService
+  rpc GetPlaygroundProjectDomain(google.protobuf.Empty)
+      returns (GetPlaygroundProjectDomainResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  };
   rpc Delete(DeleteRequest) returns (DeleteResponse) {
     option deprecated = true;
   }; // used by pulumi-defang provider; should use Deploy or Destroy
@@ -138,7 +142,9 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  rpc Estimate(EstimateRequest) returns (EstimateResponse);
+  rpc Estimate(EstimateRequest) returns (EstimateResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
 
   rpc Preview(PreviewRequest) returns (PreviewResponse);
 
@@ -404,6 +410,8 @@ message PutConfigRequest {
 message GetConfigsRequest { repeated ConfigKey configs = 1; }
 
 message GetConfigsResponse { repeated Config configs = 1; }
+
+message GetPlaygroundProjectDomainResponse { string domain = 1; }
 
 message DeleteConfigsRequest { repeated ConfigKey configs = 1; }
 

@@ -41,6 +41,8 @@ func PostWithContext(ctx context.Context, url, contentType string, body io.Reade
 	if err != nil {
 		return nil, err
 	}
-	hreq.Header.Set("Content-Type", contentType)
+	if contentType != "" {
+		hreq.Header.Set("Content-Type", contentType)
+	}
 	return DefaultClient.Do(hreq)
 }

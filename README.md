@@ -14,6 +14,10 @@ The Defang Command-Line Interface [(CLI)](https://docs.defang.io/docs/getting-st
 
 ## Defang MCP Server
 
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_defang-0098FF?style=flat&logo=visualstudiocode&logoColor=ffffff)](https://vscode.dev/redirect?url=vscode:mcp/install?%7B%22name%22%3A%22defang%22%2C%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22defang%22%2C%22mcp%22%2C%22serve%22%2C%22--client%22%2C%22vscode%22%5D%7D)
+[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_defang-24bfa5?style=flat&logo=visualstudiocode&logoColor=ffffff)](https://insiders.vscode.dev/redirect?url=vscode-insiders:mcp/install?%7B%22name%22%3A%22defang%22%2C%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22defang%22%2C%22mcp%22%2C%22serve%22%2C%22--client%22%2C%22vscode-insiders%22%5D%7D)
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en-US/install-mcp?name=defang&config=eyJ0eXBlIjoic3RkaW8iLCJjb21tYW5kIjoibnB4IC15IGRlZmFuZyBtY3Agc2VydmUgLS1jbGllbnQgY3Vyc29yIn0%3D)
+
 The Defang Model Context Protocol [(MCP)](https://docs.defang.io/docs/concepts/mcp) Server is tailored for developers who work primarily within integrated development environments (IDEs). It enables seamless cloud deployment from supported editors such as Cursor, Windsurf, VS Code, VS Code Insiders and Claude delivering a fully integrated experience without leaving your development environment.
 
 ## This repo includes:
@@ -127,7 +131,10 @@ Invoke-Expression -Command (defang completion powershell | Out-String)
 
 The Defang CLI recognizes the following environment variables:
 
-- `COMPOSE_PROJECT_NAME` - The name of the project to use; overrides the name in the `compose.yaml` file
+- `COMPOSE_DISABLE_ENV_FILE` - Whether to disable loading environment variables from a `.env` file in the current directory; defaults to `false`
+- `COMPOSE_FILE` - The Compose file(s) to use; defaults to `compose.yaml`, `compose.yml`, `docker-compose.yaml`, or `docker-compose.yml` in the current directory
+- `COMPOSE_PATH_SEPARATOR` - The path separator to use for `COMPOSE_FILE`; defaults to `:` on Unix/MacOS and `;` on Windows
+- `COMPOSE_PROJECT_NAME` - The name of the project to use; overrides the `name` in the Compose file
 - `DEFANG_ACCESS_TOKEN` - The access token to use for authentication; if not specified, uses token from `defang login`
 - `DEFANG_BUILD_CONTEXT_LIMIT` - The maximum size of the build context when building container images; defaults to `100MiB`
 - `DEFANG_CD_BUCKET` - The S3 bucket to use for the BYOC CD pipeline; defaults to `defang-cd-bucket-…`

@@ -8,15 +8,22 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/term"
-
-	"github.com/mark3labs/mcp-go/mcp"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
+type ListConfigCLIInterface interface {
+	connecter
+	providerFactory
+	projectNameLoader
+	// Unique methods
+	ListConfig(ctx context.Context, provider cliClient.Provider, projectName string) (*defangv1.Secrets, error)
+}
+
 // handleListConfigTool handles the list config tool logic
-func handleListConfigTool(ctx context.Context, loader cliClient.ProjectLoader, _ mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli ListConfigCLIInterface) (string, error) {
+func handleListConfigTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli ListConfigCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
-		return "", fmt.Errorf("No provider configured: %w", err)
+		return "", err
 	}
 
 	term.Debug("Function invoked: cli.Connect")
@@ -26,10 +33,7 @@ func handleListConfigTool(ctx context.Context, loader cliClient.ProjectLoader, _
 	}
 
 	term.Debug("Function invoked: cli.NewProvider")
-	provider, err := cli.NewProvider(ctx, *providerId, client)
-	if err != nil {
-		return "", fmt.Errorf("Failed to get new provider: %w", err)
-	}
+	provider := cli.NewProvider(ctx, *providerId, client)
 
 	term.Debug("Function invoked: cliClient.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)

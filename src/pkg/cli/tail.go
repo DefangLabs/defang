@@ -232,6 +232,8 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 		Until:    untilTs,
 	}
 
+	term.Debug("Tail request:", tailRequest)
+
 	serverStream, err := provider.QueryLogs(ctx, tailRequest)
 	if err != nil {
 		return err

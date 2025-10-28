@@ -13,7 +13,6 @@ import (
 // MockSetConfigCLI implements SetConfigCLIInterface for testing
 type MockSetConfigCLI struct {
 	ConnectError          error
-	NewProviderError      error
 	LoadProjectNameError  error
 	ConfigSetError        error
 	ConnectCalled         bool
@@ -41,16 +40,13 @@ func (m *MockSetConfigCLI) Connect(ctx context.Context, cluster string) (*client
 	return m.ReturnedGrpcClient, nil
 }
 
-func (m *MockSetConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabricClient client.FabricClient) (client.Provider, error) {
+func (m *MockSetConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabricClient client.FabricClient) client.Provider {
 	m.NewProviderCalled = true
-	if m.NewProviderError != nil {
-		return nil, m.NewProviderError
-	}
 	if m.ReturnedProvider != nil {
-		return m.ReturnedProvider, nil
+		return m.ReturnedProvider
 	}
 	// Return a simple mock provider to avoid nil pointer issues
-	return &MockProvider{}, nil
+	return &MockProvider{}
 }
 
 // MockProvider implements a minimal subset of client.Provider interface for testing
@@ -123,7 +119,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:   map[string]interface{}{"value": testValue},
 			mockCLI:       &MockSetConfigCLI{},
 			expectedError: true,
-			errorMessage:  "Invalid config `name`: required argument \"name\" not found",
+			errorMessage:  "missing 'name' parameter: required argument \"name\" not found",
 		},
 		{
 			name:          "empty config name",
@@ -132,7 +128,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:   map[string]interface{}{"name": "", "value": testValue},
 			mockCLI:       &MockSetConfigCLI{},
 			expectedError: true,
-			errorMessage:  "Invalid config `name`: %!w(<nil>)",
+			errorMessage:  "missing 'name' parameter: %!w(<nil>)",
 		},
 		{
 			name:          "missing config value",
@@ -141,7 +137,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:   map[string]interface{}{"name": testConfigName},
 			mockCLI:       &MockSetConfigCLI{},
 			expectedError: true,
-			errorMessage:  "Invalid config `value`: required argument \"value\" not found",
+			errorMessage:  "missing 'value' parameter: required argument \"value\" not found",
 		},
 		{
 			name:          "empty config value",
@@ -150,7 +146,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:   map[string]interface{}{"name": testConfigName, "value": ""},
 			mockCLI:       &MockSetConfigCLI{},
 			expectedError: true,
-			errorMessage:  "Invalid config `value`: %!w(<nil>)",
+			errorMessage:  "missing 'value' parameter: %!w(<nil>)",
 		},
 
 		// CLI operation error tests
@@ -163,17 +159,6 @@ func TestHandleSetConfig(t *testing.T) {
 			expectedError:        true,
 			errorMessage:         "Could not connect: connection failed",
 			expectedConnectCalls: true,
-		},
-		{
-			name:                  "provider error",
-			cluster:               testCluster,
-			providerId:            client.ProviderID(""),
-			requestArgs:           map[string]interface{}{"name": testConfigName, "value": testValue},
-			mockCLI:               &MockSetConfigCLI{NewProviderError: errors.New("provider initialization failed")},
-			expectedError:         true,
-			errorMessage:          "Failed to get new provider: provider initialization failed",
-			expectedConnectCalls:  true,
-			expectedProviderCalls: true,
 		},
 		{
 			name:                     "load project name error",
@@ -200,22 +185,6 @@ func TestHandleSetConfig(t *testing.T) {
 			expectedProjectNameCalls: true,
 			expectedConfigSetCalls:   true,
 		},
-
-		// Provider-specific tests
-		{
-			name:        "provider auto not configured",
-			cluster:     testCluster,
-			providerId:  client.ProviderAuto,
-			requestArgs: map[string]interface{}{"name": testConfigName, "value": testValue},
-			mockCLI: &MockSetConfigCLI{
-				NewProviderError: errors.New("No provider configured. Use one of these setup tools:\n* /mcp.defang.AWS_Setup\n* /mcp.defang.GCP_Setup\n* /mcp.defang.Playground_Setup"),
-			},
-			expectedError:         true,
-			errorMessage:          "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
-			expectedConnectCalls:  false, // Early return in providerNotConfiguredError
-			expectedProviderCalls: false, // Early return in providerNotConfiguredError
-		},
-
 		// Success tests
 		{
 			name:                     "successful config set",
@@ -248,7 +217,16 @@ func TestHandleSetConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			request := createCallToolRequest(tt.requestArgs)
 			loader := &client.MockLoader{}
-			result, err := handleSetConfig(testContext, loader, request, &tt.providerId, tt.cluster, tt.mockCLI)
+			params, err := parseSetConfigParams(request)
+			if err != nil {
+				if tt.expectedError {
+					assert.EqualError(t, err, tt.errorMessage)
+					return
+				} else {
+					assert.NoError(t, err)
+				}
+			}
+			result, err := handleSetConfig(testContext, loader, params, &tt.providerId, tt.cluster, tt.mockCLI)
 
 			if tt.expectedError {
 				assert.Error(t, err)

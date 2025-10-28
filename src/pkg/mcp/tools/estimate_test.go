@@ -21,10 +21,8 @@ type MockEstimateCLI struct {
 	ConnectError       error
 	LoadProjectError   error
 	RunEstimateError   error
-	SetProviderIDError error
 	EstimateResponse   *defangv1.EstimateResponse
 	Project            *compose.Project
-	Region             string
 	CapturedOutput     string
 	CallLog            []string
 	ProviderIDAfterSet client.ProviderID // Track the providerID that gets set
@@ -46,7 +44,7 @@ func (m *MockEstimateCLI) LoadProject(ctx context.Context, loader client.Loader)
 	return m.Project, nil
 }
 
-func (m *MockEstimateCLI) RunEstimate(ctx context.Context, project *compose.Project, grpcClient *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
+func (m *MockEstimateCLI) RunEstimate(ctx context.Context, project *compose.Project, grpcClient *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
 	projectName := ""
 	if project != nil {
 		projectName = project.Name
@@ -58,7 +56,7 @@ func (m *MockEstimateCLI) RunEstimate(ctx context.Context, project *compose.Proj
 	return m.EstimateResponse, nil
 }
 
-func (m *MockEstimateCLI) PrintEstimate(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) {
+func (m *MockEstimateCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("PrintEstimate(%s)", mode.String()))
 }
 
@@ -67,36 +65,12 @@ func (m *MockEstimateCLI) ConfigureLoader(request mcp.CallToolRequest) client.Lo
 	return nil
 }
 
-func (m *MockEstimateCLI) GetRegion(providerId client.ProviderID) string {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("GetRegion(%s)", providerId))
-	return m.Region
-}
-
 func (m *MockEstimateCLI) CreatePlaygroundProvider(grpcClient *client.GrpcClient) client.Provider {
 	m.CallLog = append(m.CallLog, "CreatePlaygroundProvider")
 	return nil
 }
 
-func (m *MockEstimateCLI) SetProviderID(providerId *client.ProviderID, providerString string) error {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("SetProviderID(%s)", providerString))
-	if m.SetProviderIDError != nil {
-		return m.SetProviderIDError
-	}
-	// Simulate the actual setting of the provider ID
-	switch providerString {
-	case "":
-		*providerId = m.ProviderIDAfterSet
-	case "AWS", "aws":
-		*providerId = client.ProviderAWS
-	case "GCP", "gcp":
-		*providerId = client.ProviderGCP
-	default:
-		*providerId = client.ProviderAuto
-	}
-	return nil
-}
-
-func (m *MockEstimateCLI) CaptureTermOutput(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) string {
+func (m *MockEstimateCLI) CaptureTermOutput(mode modes.Mode, estimate *defangv1.EstimateResponse) string {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("CaptureTermOutput(%s)", mode.String()))
 	return m.CapturedOutput
 }
@@ -104,20 +78,19 @@ func (m *MockEstimateCLI) CaptureTermOutput(mode defangv1.DeploymentMode, estima
 func TestHandleEstimateTool(t *testing.T) {
 	tests := []struct {
 		name                 string
-		deploymentMode       string
-		provider             string
-		providerID           client.ProviderID
+		arguments            map[string]interface{}
 		setupMock            func(*MockEstimateCLI)
 		expectedTextContains string
 		expectedError        string
 	}{
 		{
-			name:           "unknown_deployment_mode_fails",
-			deploymentMode: "unknown-mode",
-			providerID:     client.ProviderAWS,
+			name: "unknown_deployment_mode_fails",
+			arguments: map[string]interface{}{
+				"deployment_mode": "unknown-mode",
+				"region":          "us-west-2",
+			},
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
-				m.Region = "us-west-2"
 				m.ProviderIDAfterSet = client.ProviderAWS
 				m.EstimateResponse = &defangv1.EstimateResponse{
 					Subtotal: &_type.Money{
@@ -128,19 +101,20 @@ func TestHandleEstimateTool(t *testing.T) {
 				}
 				m.CapturedOutput = "Estimated cost: $15.00/month"
 			},
-			expectedError: "Unknown deployment mode \"UNKNOWN-MODE\", please use one of " + strings.Join(modes.AllDeploymentModes(), ", "),
+			expectedError: "Unknown deployment mode \"unknown-mode\", please use one of " + strings.Join(modes.AllDeploymentModes(), ", "),
 		},
 		{
-			name:       "load_project_error",
-			providerID: client.ProviderAWS,
+			name: "load_project_error",
 			setupMock: func(m *MockEstimateCLI) {
 				m.LoadProjectError = errors.New("failed to parse compose file")
 			},
 			expectedError: "failed to parse compose file: failed to parse compose file: failed to parse compose file",
 		},
 		{
-			name:       "connect_error",
-			providerID: client.ProviderAWS,
+			name: "connect_error",
+			arguments: map[string]interface{}{
+				"provider": "aws",
+			},
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.ConnectError = errors.New("connection failed")
@@ -148,31 +122,35 @@ func TestHandleEstimateTool(t *testing.T) {
 			expectedError: "Could not connect: connection failed",
 		},
 		{
-			name:       "set_provider_id_error",
-			provider:   "invalid-provider",
-			providerID: client.ProviderAWS,
+			name: "set_provider_id_error",
+			arguments: map[string]interface{}{
+				"provider": "invalid-provider",
+			},
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
-				m.SetProviderIDError = errors.New("invalid provider")
 			},
-			expectedError: "Invalid provider specified: invalid provider",
+			expectedError: "Invalid provider specified: provider not one of [auto defang aws digitalocean gcp]",
 		},
 		{
-			name:       "run_estimate_error",
-			providerID: client.ProviderAWS,
+			name: "run_estimate_error",
+			arguments: map[string]interface{}{
+				"provider": "aws",
+				"region":   "us-west-2",
+			},
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
-				m.Region = "us-west-2"
 				m.RunEstimateError = errors.New("estimate failed")
 			},
 			expectedError: "Failed to run estimate: estimate failed",
 		},
 		{
-			name:       "successful_estimate_default_mode",
-			providerID: client.ProviderAWS,
+			name: "successful_estimate_default_mode",
+			arguments: map[string]interface{}{
+				"provider": "aws",
+				"region":   "us-west-2",
+			},
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
-				m.Region = "us-west-2"
 				m.ProviderIDAfterSet = client.ProviderAWS // Set expected provider ID after SetProviderID call
 				m.EstimateResponse = &defangv1.EstimateResponse{
 					Subtotal: &_type.Money{
@@ -186,13 +164,14 @@ func TestHandleEstimateTool(t *testing.T) {
 			expectedTextContains: "Successfully estimated the cost of the project to AWS",
 		},
 		{
-			name:           "successful_estimate_high_availability_mode",
-			deploymentMode: "HIGH_AVAILABILITY",
-			provider:       "GCP",
-			providerID:     client.ProviderGCP,
+			name: "successful_estimate_high_availability_mode",
+			arguments: map[string]interface{}{
+				"deployment_mode": "HIGH_AVAILABILITY",
+				"provider":        "GCP",
+				"region":          "us-central1",
+			},
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
-				m.Region = "us-central1"
 				m.ProviderIDAfterSet = client.ProviderGCP
 				m.EstimateResponse = &defangv1.EstimateResponse{
 					Subtotal: &_type.Money{
@@ -212,29 +191,31 @@ func TestHandleEstimateTool(t *testing.T) {
 			// Create mock and configure it
 			mockCLI := &MockEstimateCLI{
 				CallLog: []string{},
-				Region:  "us-west-2", // Default region
 			}
 			tt.setupMock(mockCLI)
-
-			// Create request
-			args := map[string]interface{}{}
-			if tt.deploymentMode != "" {
-				args["deployment_mode"] = tt.deploymentMode
-			}
-			if tt.provider != "" {
-				args["provider"] = tt.provider
-			}
 
 			request := mcp.CallToolRequest{
 				Params: mcp.CallToolParams{
 					Name:      "estimate",
-					Arguments: args,
+					Arguments: tt.arguments,
 				},
 			}
 
+			providerID := client.ProviderAuto // Default provider ID
+
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := handleEstimateTool(t.Context(), loader, request, &tt.providerID, "test-cluster", mockCLI)
+			params, err := parseEstimateParams(request, &providerID)
+			if err != nil {
+				// If parsing params fails, check if this was the expected error
+				if tt.expectedError != "" {
+					assert.EqualError(t, err, tt.expectedError)
+					return
+				} else {
+					assert.NoError(t, err)
+				}
+			}
+			result, err := handleEstimateTool(t.Context(), loader, params, "test-cluster", mockCLI)
 
 			// Verify error expectations
 			if tt.expectedError != "" {
@@ -252,10 +233,8 @@ func TestHandleEstimateTool(t *testing.T) {
 					"LoadProject",
 					"Connect(test-cluster)",
 					"CreatePlaygroundProvider",
-					"SetProviderID(aws)",
-					"GetRegion(aws)",
-					"RunEstimate(test-project, aws, DEVELOPMENT)",
-					"CaptureTermOutput(DEVELOPMENT)",
+					"RunEstimate(test-project, aws, AFFORDABLE)",
+					"CaptureTermOutput(AFFORDABLE)",
 				}
 				assert.Equal(t, expectedCalls, mockCLI.CallLog)
 			}

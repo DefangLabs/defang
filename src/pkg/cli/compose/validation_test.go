@@ -11,6 +11,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go/ptr"
@@ -35,7 +36,7 @@ func TestValidationAndConvert(t *testing.T) {
 		return configs.Names, nil
 	}
 
-	testRunCompose(t, func(t *testing.T, path string) {
+	testAllComposeFiles(t, func(t *testing.T, path string) {
 		logs := new(bytes.Buffer)
 		term.DefaultTerm = term.NewTerm(os.Stdin, logs, logs)
 
@@ -56,7 +57,11 @@ func TestValidationAndConvert(t *testing.T) {
 			logs.WriteString(err.Error() + "\n")
 		}
 
-		if err := ValidateProject(project); err != nil {
+		mode := modes.ModeAffordable
+		if strings.Contains(path, "replicas") {
+			mode = modes.ModeHighAvailability
+		}
+		if err := ValidateProject(project, mode); err != nil {
 			t.Logf("Project validation failed: %v", err)
 			logs.WriteString(err.Error() + "\n")
 		}

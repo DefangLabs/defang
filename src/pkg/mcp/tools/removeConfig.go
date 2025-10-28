@@ -11,16 +11,33 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-// handleRemoveConfigTool handles the remove config tool logic
-func handleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli RemoveConfigCLIInterface) (string, error) {
-	err := common.ProviderNotConfiguredError(*providerId)
-	if err != nil {
-		return "", fmt.Errorf("No provider configured: %w", err)
-	}
+type RemoveConfigParams struct {
+	Name string
+}
 
+func parseRemoveConfigParams(request mcp.CallToolRequest) (RemoveConfigParams, error) {
 	name, err := request.RequireString("name")
 	if err != nil || name == "" {
-		return "", fmt.Errorf("Invalid config `name`: %w", err)
+		return RemoveConfigParams{}, fmt.Errorf("missing config `name`: %w", err)
+	}
+	return RemoveConfigParams{
+		Name: name,
+	}, nil
+}
+
+type RemoveConfigCLIInterface interface {
+	connecter
+	providerFactory
+	projectNameLoader
+	// Unique methods
+	ConfigDelete(ctx context.Context, projectName string, provider cliClient.Provider, name string) error
+}
+
+// handleRemoveConfigTool handles the remove config tool logic
+func handleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader, params RemoveConfigParams, providerId *cliClient.ProviderID, cluster string, cli RemoveConfigCLIInterface) (string, error) {
+	err := common.ProviderNotConfiguredError(*providerId)
+	if err != nil {
+		return "", err
 	}
 
 	term.Debug("Function invoked: cli.Connect")
@@ -30,10 +47,7 @@ func handleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader,
 	}
 
 	term.Debug("Function invoked: cli.NewProvider")
-	provider, err := cli.NewProvider(ctx, *providerId, client)
-	if err != nil {
-		return "", fmt.Errorf("Failed to get new provider: %w", err)
-	}
+	provider := cli.NewProvider(ctx, *providerId, client)
 
 	term.Debug("Function invoked: cliClient.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
@@ -43,13 +57,13 @@ func handleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader,
 	term.Debug("Project name loaded:", projectName)
 
 	term.Debug("Function invoked: cli.ConfigDelete")
-	if err := cli.ConfigDelete(ctx, projectName, provider, name); err != nil {
+	if err := cli.ConfigDelete(ctx, projectName, provider, params.Name); err != nil {
 		// Show a warning (not an error) if the config was not found
 		if connect.CodeOf(err) == connect.CodeNotFound {
-			return fmt.Sprintf("Config variable %q not found in project %q", name, projectName), nil
+			return fmt.Sprintf("Config variable %q not found in project %q", params.Name, projectName), nil
 		}
-		return "", fmt.Errorf("Failed to remove config variable %q from project %q: %w", name, projectName, err)
+		return "", fmt.Errorf("Failed to remove config variable %q from project %q: %w", params.Name, projectName, err)
 	}
 
-	return fmt.Sprintf("Successfully remove the config variable %q from project %q", name, projectName), nil
+	return fmt.Sprintf("Successfully remove the config variable %q from project %q", params.Name, projectName), nil
 }

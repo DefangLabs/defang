@@ -9,14 +9,25 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
+type DeployCLIInterface interface {
+	connecter
+	providerFactory
+	// Unique methods
+	ComposeUp(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, uploadMode compose.UploadMode, mode modes.Mode) (*defangv1.DeployResponse, *compose.Project, error)
+	CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error)
+	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
+	OpenBrowser(url string) error
+}
+
 func handleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli DeployCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
-		return "", fmt.Errorf("no provider configured: %w", err)
+		return "", err
 	}
 
 	term.Debug("Function invoked: loader.LoadProject")
@@ -45,7 +56,7 @@ func handleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, provi
 
 	term.Debug("Function invoked: cli.ComposeUp")
 	// Use ComposeUp to deploy the services
-	deployResp, project, err := cli.ComposeUp(ctx, project, client, provider, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
+	deployResp, project, err := cli.ComposeUp(ctx, project, client, provider, compose.UploadModeDigest, modes.ModeAffordable)
 	if err != nil {
 		err = fmt.Errorf("failed to compose up services: %w", err)
 

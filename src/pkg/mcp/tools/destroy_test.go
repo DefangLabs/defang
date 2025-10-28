@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
 )
@@ -14,7 +15,6 @@ import (
 // MockDestroyCLI implements DestroyCLIInterface for testing
 type MockDestroyCLI struct {
 	ConnectError                     error
-	NewProviderError                 error
 	ComposeDownError                 error
 	LoadProjectNameWithFallbackError error
 	CanIUseProviderError             error
@@ -31,9 +31,9 @@ func (m *MockDestroyCLI) Connect(ctx context.Context, cluster string) (*client.G
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockDestroyCLI) NewProvider(ctx context.Context, providerId client.ProviderID, grpcClient client.FabricClient) (client.Provider, error) {
+func (m *MockDestroyCLI) NewProvider(ctx context.Context, providerId client.ProviderID, grpcClient client.FabricClient) client.Provider {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
-	return nil, m.NewProviderError
+	return nil
 }
 
 func (m *MockDestroyCLI) ComposeDown(ctx context.Context, projectName string, grpcClient *client.GrpcClient, provider client.Provider) (string, error) {
@@ -72,14 +72,6 @@ func TestHandleDestroyTool(t *testing.T) {
 				m.ConnectError = errors.New("connection failed")
 			},
 			expectedError: "Could not connect: connection failed",
-		},
-		{
-			name:       "new_provider_error",
-			providerID: client.ProviderAWS,
-			setupMock: func(m *MockDestroyCLI) {
-				m.NewProviderError = errors.New("provider creation failed")
-			},
-			expectedError: "Failed to get new provider: provider creation failed",
 		},
 		{
 			name:       "load_project_name_error",
@@ -129,7 +121,7 @@ func TestHandleDestroyTool(t *testing.T) {
 			name:          "provider_auto_not_configured",
 			providerID:    client.ProviderAuto,
 			setupMock:     func(m *MockDestroyCLI) {},
-			expectedError: "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
+			expectedError: common.ErrNoProviderSet.Error(),
 		},
 	}
 

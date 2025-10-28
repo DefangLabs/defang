@@ -36,7 +36,7 @@ var cdDestroyCmd = &cobra.Command{
 	Short:       "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := newProvider(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -62,7 +62,7 @@ var cdDownCmd = &cobra.Command{
 	Short:       "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := newProvider(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -88,7 +88,7 @@ var cdRefreshCmd = &cobra.Command{
 	Short:       "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := newProvider(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -114,7 +114,7 @@ var cdCancelCmd = &cobra.Command{
 	Short:       "Cancel the current CD operation",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := newProvider(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -141,7 +141,7 @@ var cdTearDownCmd = &cobra.Command{
 		force, _ := cmd.Flags().GetBool("force")
 
 		loader := configureLoader(cmd)
-		provider, err := newProvider(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -158,7 +158,7 @@ var cdListCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		remote, _ := cmd.Flags().GetBool("remote")
 
-		provider, err := newProvider(cmd.Context(), nil)
+		provider, err := newProviderChecked(cmd.Context(), nil)
 		if err != nil {
 			return err
 		}
@@ -188,7 +188,7 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		provider, err := newProvider(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -198,6 +198,6 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.Preview(cmd.Context(), project, client, provider, mode.Value())
+		return cli.Preview(cmd.Context(), project, client, provider, mode)
 	},
 }

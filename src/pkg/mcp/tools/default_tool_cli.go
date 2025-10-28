@@ -13,6 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/pkg/browser"
@@ -35,10 +36,10 @@ func (DefaultToolCLI) ConfigSet(ctx context.Context, projectName string, provide
 	return cli.ConfigSet(ctx, projectName, provider, name, value)
 }
 
-func (DefaultToolCLI) RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
+func (DefaultToolCLI) RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
 	return cli.RunEstimate(ctx, project, client, provider, providerId, region, mode)
 }
-func (DefaultToolCLI) PrintEstimate(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) {
+func (DefaultToolCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) {
 	cli.PrintEstimate(mode, estimate)
 }
 
@@ -51,11 +52,11 @@ func (DefaultToolCLI) Connect(ctx context.Context, cluster string) (*cliClient.G
 	return cli.Connect(ctx, cluster)
 }
 
-func (DefaultToolCLI) ComposeUp(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, uploadMode compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error) {
+func (DefaultToolCLI) ComposeUp(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, uploadMode compose.UploadMode, mode modes.Mode) (*defangv1.DeployResponse, *compose.Project, error) {
 	return cli.ComposeUp(ctx, project, client, provider, uploadMode, mode)
 }
 
-func (c *DefaultToolCLI) Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cli.TailOptions) error {
+func (DefaultToolCLI) Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cli.TailOptions) error {
 	return cli.Tail(ctx, provider, project.Name, options)
 }
 
@@ -79,7 +80,7 @@ func (DefaultToolCLI) CheckProviderConfigured(ctx context.Context, client *cliCl
 	return common.CheckProviderConfigured(ctx, client, providerId, projectName, serviceCount)
 }
 
-func (DefaultToolCLI) CaptureTermOutput(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) string {
+func (DefaultToolCLI) CaptureTermOutput(mode modes.Mode, estimate *defangv1.EstimateResponse) string {
 	// Use the same logic as DefaultEstimateCLI
 	oldTerm := term.DefaultTerm
 	stdout := new(bytes.Buffer)
@@ -103,12 +104,8 @@ func (DefaultToolCLI) CreatePlaygroundProvider(client *cliClient.GrpcClient) cli
 	return &cliClient.PlaygroundProvider{FabricClient: client}
 }
 
-func (DefaultToolCLI) NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error) {
+func (DefaultToolCLI) NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) cliClient.Provider {
 	return cli.NewProvider(ctx, providerId, client)
-}
-
-func (DefaultToolCLI) GetRegion(providerId cliClient.ProviderID) string {
-	return cliClient.GetRegion(providerId)
 }
 
 func (DefaultToolCLI) OpenBrowser(url string) error {
@@ -119,18 +116,14 @@ func (DefaultToolCLI) OpenBrowser(url string) error {
 	return errors.New("no browser function defined")
 }
 
-func (DefaultToolCLI) SetProviderID(providerId *cliClient.ProviderID, providerString string) error {
-	return providerId.Set(providerString)
-}
-
 // --- Adapter types for tool interfaces ---
 // The following adapter types embed DefaultToolCLI to implement specific tool interfaces.
-type DeployCLIAdapter struct{ *DefaultToolCLI }
-type DestroyCLIAdapter struct{ *DefaultToolCLI }
-type SetConfigCLIAdapter struct{ *DefaultToolCLI }
-type RemoveConfigCLIAdapter struct{ *DefaultToolCLI }
-type ListConfigCLIAdapter struct{ *DefaultToolCLI }
-type LoginCLIAdapter struct{ *DefaultToolCLI }
+type DeployCLIAdapter struct{ DefaultToolCLI }
+type DestroyCLIAdapter struct{ DefaultToolCLI }
+type SetConfigCLIAdapter struct{ DefaultToolCLI }
+type RemoveConfigCLIAdapter struct{ DefaultToolCLI }
+type ListConfigCLIAdapter struct{ DefaultToolCLI }
+type LoginCLIAdapter struct{ DefaultToolCLI }
 
 // --- DestroyCLIInterface ---
 func (DestroyCLIAdapter) LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error) {
@@ -159,9 +152,9 @@ func (a *ListConfigCLIAdapter) ListConfig(ctx context.Context, provider cliClien
 }
 
 // --- LoginCLIInterface ---
-func (LoginCLIAdapter) InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string) error {
+func (LoginCLIAdapter) InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string, mcpClient string) error {
 	// Delegate to login.InteractiveLoginMCP from the login package
-	return login.InteractiveLoginMCP(ctx, client, cluster)
+	return login.InteractiveLoginMCP(ctx, client, cluster, mcpClient)
 }
 
 func (LoginCLIAdapter) GenerateAuthURL(authPort int) string {
