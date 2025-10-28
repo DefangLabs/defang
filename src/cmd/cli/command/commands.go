@@ -902,8 +902,8 @@ var deploymentsCmd = &cobra.Command{
 }
 
 var deploymentsListCmd = &cobra.Command{
-	Use:         "list",
-	Aliases:     []string{"ls"},
+	Use:         "history",
+	Aliases:     []string{"ls", "list"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "List deployment history for a project",
