@@ -64,6 +64,9 @@ func (to TailOptions) String() string {
 	} else {
 		cmd = "logs" + cmd + " --until=" + to.Until.UTC().Format(time.RFC3339Nano)
 	}
+	if to.Follow {
+		cmd += " --follow"
+	}
 	if to.Deployment != "" {
 		cmd += " --deployment=" + to.Deployment
 	}
