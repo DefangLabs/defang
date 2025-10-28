@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func MockTerm(t *testing.T, stdout *bytes.Buffer, stdin *bytes.Reader) func() {
+func MockTerm(t *testing.T, stdout *bytes.Buffer, stdin *bytes.Reader) {
 	t.Helper()
 	oldTerm := term.DefaultTerm
 	term.DefaultTerm = term.NewTerm(
@@ -19,9 +19,9 @@ func MockTerm(t *testing.T, stdout *bytes.Buffer, stdin *bytes.Reader) func() {
 		&FakeStdout{stdout},
 		new(bytes.Buffer),
 	)
-	return func() {
+	t.Cleanup(func() {
 		term.DefaultTerm = oldTerm
-	}
+	})
 }
 
 func TestStackListCmd(t *testing.T) {
@@ -68,8 +68,7 @@ func TestStackListCmd(t *testing.T) {
 
 			buffer := new(bytes.Buffer)
 			mockStdin := bytes.NewReader([]byte{})
-			cleanup := MockTerm(t, buffer, mockStdin)
-			t.Cleanup(cleanup)
+			MockTerm(t, buffer, mockStdin)
 
 			err := stackListCmd.RunE(stackListCmd, []string{})
 			assert.NoError(t, err)
