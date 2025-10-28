@@ -791,6 +791,11 @@ func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, erro
 	return nil, fmt.Errorf("app not found: %s", appName)
 }
 
+func (b *ByocDo) UpdateShardDomain(ctx context.Context) error {
+	// BYOC providers manage their own domains and don't use shard domains
+	return nil
+}
+
 func (b *ByocDo) ServicePublicDNS(name string, projectName string) string {
 	return dns.SafeLabel(name) + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(b.TenantName) + ".defang.app"
 }

@@ -16,6 +16,7 @@ import (
 type PlaygroundProvider struct {
 	FabricClient
 	RetryDelayer
+	shardDomain string
 }
 
 var _ Provider = (*PlaygroundProvider)(nil)
@@ -25,6 +26,15 @@ func (g *PlaygroundProvider) Deploy(ctx context.Context, req *defangv1.DeployReq
 		return nil, errors.New("DEFANG_PULUMI_DIR is set, but not supported by the Playground provider")
 	}
 	return getMsg(g.GetController().Deploy(ctx, connect.NewRequest(req)))
+}
+
+func (g *PlaygroundProvider) UpdateShardDomain(ctx context.Context) error {
+	resp, err := g.GetPlaygroundProjectDomain(ctx)
+	if err != nil {
+		return err
+	}
+	g.shardDomain = resp.GetDomain()
+	return nil
 }
 
 func (g *PlaygroundProvider) GetDeploymentStatus(ctx context.Context) error {
@@ -106,8 +116,7 @@ func (g PlaygroundProvider) ServicePrivateDNS(name string) string {
 }
 
 func (g PlaygroundProvider) ServicePublicDNS(name string, projectName string) string {
-	// TODO: Move this to fabric since we do not know what shard was assigned, placeholder for now
-	return dns.SafeLabel(string(g.GetTenantName())) + "-" + dns.SafeLabel(name) + "." + "prod1b" + ".defang.dev"
+	return dns.SafeLabel(string(g.GetTenantName())) + "-" + dns.SafeLabel(name) + "." + g.shardDomain
 }
 
 func (g PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, error) {
