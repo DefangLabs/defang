@@ -310,7 +310,12 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 		}
 	}
 
+	return receiveLogs(ctx, provider, projectName, tailRequest, serverStream, options, doSpinner, handler, cancel)
+}
+
+func receiveLogs(ctx context.Context, provider client.Provider, projectName string, tailRequest *defangv1.TailRequest, serverStream client.ServerStream[defangv1.TailResponse], options TailOptions, doSpinner bool, handler LogEntryHandler, cancel context.CancelFunc) error {
 	skipDuplicate := false
+	var err error
 	for {
 		if !serverStream.Receive() {
 			if errors.Is(serverStream.Err(), context.Canceled) || errors.Is(serverStream.Err(), context.DeadlineExceeded) {
