@@ -76,7 +76,8 @@ func List() ([]StackListItem, error) {
 		if strings.HasSuffix(file.Name(), ".defangrc") {
 			content, err := os.ReadFile(file.Name())
 			if err != nil {
-				return nil, err
+				term.Warnf("Skipping unreadable stack file %s: %v\n", file.Name(), err)
+				continue
 			}
 			params, err := Parse(string(content))
 			if err != nil {
