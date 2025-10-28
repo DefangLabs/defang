@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -84,11 +85,8 @@ func TestSetupKnowledgeBase_HTTPError(t *testing.T) {
 	}
 
 	// Verify failing file exists but is empty (we created then errored before write).
-	info, err := os.Stat(filepath.Join(tmp, "knowledge_base.json"))
-	if err != nil {
-		t.Fatalf("expected failing file to exist: %v", err)
-	}
-	if info.Size() != 0 { // io.Copy never executed due to 500 status
-		t.Fatalf("expected failing file to be empty, size=%d", info.Size())
+	_, err := os.Stat(filepath.Join(tmp, "knowledge_base.json"))
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected failing file not to exist: %v", err)
 	}
 }

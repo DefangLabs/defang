@@ -45,13 +45,12 @@ func SetupKnowledgeBase() error {
 
 func downloadKnowledgeBase(filepath string, path string) (err error) {
 	// Create the file
-	out, err := os.Create(filepath)
-	term.Debugf("Creating file: %s", filepath)
+	tmpfile, err := os.CreateTemp("", "defang-kb-*.tmp")
 	if err != nil {
-		term.Error("Failed to create file", "error", err, "filepath", filepath)
+		term.Error("Failed to create temp file", "error", err)
 		return err
 	}
-	defer out.Close()
+	defer os.Remove(tmpfile.Name())
 
 	// Get the data
 	resp, err := http.Get(AskDefangBaseURL + path)
@@ -71,9 +70,17 @@ func downloadKnowledgeBase(filepath string, path string) (err error) {
 
 	// Writer the body to file
 	term.Debugf("Copying Using IO Copy: %s", filepath)
-	_, err = io.Copy(out, resp.Body)
+	_, err = io.Copy(tmpfile, resp.Body)
 	if err != nil {
 		term.Error("Failed to write file", "error", err, "filepath", filepath)
+		return err
+	}
+
+	// move temp file to final location
+	term.Debugf("Moving temp file to final location: %s", filepath)
+	err = os.Rename(tmpfile.Name(), filepath)
+	if err != nil {
+		term.Error("Failed to move temp file", "error", err, "filepath", filepath)
 		return err
 	}
 
