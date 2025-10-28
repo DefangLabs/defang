@@ -46,8 +46,8 @@
   },
   "How do I authenticate with the system?": {
     "TotalTests": 1,
-    "Passed": 0,
-    "PassRate": "0.00%"
+    "Passed": 1,
+    "PassRate": "100.00%"
   },
   "How much will it cost to deploy this project?": {
     "TotalTests": 1,
@@ -61,8 +61,8 @@
   },
   "I need to login to Defang": {
     "TotalTests": 1,
-    "Passed": 0,
-    "PassRate": "0.00%"
+    "Passed": 1,
+    "PassRate": "100.00%"
   },
   "I need to see the logs from my application": {
     "TotalTests": 1,
@@ -91,13 +91,13 @@
   },
   "Launch my docker-compose application": {
     "TotalTests": 1,
-    "Passed": 0,
-    "PassRate": "0.00%"
+    "Passed": 1,
+    "PassRate": "100.00%"
   },
   "List all my applications": {
     "TotalTests": 1,
-    "Passed": 1,
-    "PassRate": "100.00%"
+    "Passed": 0,
+    "PassRate": "0.00%"
   },
   "Remove a config that doesn't exist": {
     "TotalTests": 1,
@@ -106,8 +106,8 @@
   },
   "Remove everything I've deployed": {
     "TotalTests": 1,
-    "Passed": 1,
-    "PassRate": "100.00%"
+    "Passed": 0,
+    "PassRate": "0.00%"
   },
   "Remove the API_KEY configuration": {
     "TotalTests": 1,
@@ -126,8 +126,8 @@
   },
   "Set a config variable API_KEY to my-secret": {
     "TotalTests": 1,
-    "Passed": 0,
-    "PassRate": "0.00%"
+    "Passed": 1,
+    "PassRate": "100.00%"
   },
   "Set an invalid configuration value": {
     "TotalTests": 1,
@@ -146,8 +146,8 @@
   },
   "Set up my environment and deploy": {
     "TotalTests": 1,
-    "Passed": 1,
-    "PassRate": "100.00%"
+    "Passed": 0,
+    "PassRate": "0.00%"
   },
   "Show me all configuration variables": {
     "TotalTests": 1,
@@ -156,18 +156,18 @@
   },
   "Show me all my running services": {
     "TotalTests": 1,
-    "Passed": 0,
-    "PassRate": "0.00%"
+    "Passed": 1,
+    "PassRate": "100.00%"
   },
   "Show me my deployed services": {
     "TotalTests": 1,
-    "Passed": 0,
-    "PassRate": "0.00%"
+    "Passed": 1,
+    "PassRate": "100.00%"
   },
   "Show me the logs": {
     "TotalTests": 1,
-    "Passed": 1,
-    "PassRate": "100.00%"
+    "Passed": 0,
+    "PassRate": "0.00%"
   },
   "Show services for a non-existent project": {
     "TotalTests": 1,
@@ -176,43 +176,43 @@
   },
   "Sign me in please": {
     "TotalTests": 1,
-    "Passed": 0,
-    "PassRate": "0.00%"
+    "Passed": 1,
+    "PassRate": "100.00%"
   },
   "Start my services in the cloud": {
     "TotalTests": 1,
-    "Passed": 0,
-    "PassRate": "0.00%"
+    "Passed": 1,
+    "PassRate": "100.00%"
   },
   "Take down all my services": {
     "TotalTests": 1,
-    "Passed": 0,
-    "PassRate": "0.00%"
+    "Passed": 1,
+    "PassRate": "100.00%"
   },
   "Use the playground environment": {
     "TotalTests": 1,
-    "Passed": 0,
-    "PassRate": "0.00%"
+    "Passed": 1,
+    "PassRate": "100.00%"
   },
   "Use the playground environment for testing": {
     "TotalTests": 1,
-    "Passed": 0,
-    "PassRate": "0.00%"
+    "Passed": 1,
+    "PassRate": "100.00%"
   },
   "What configuration variables do I have?": {
     "TotalTests": 1,
-    "Passed": 1,
-    "PassRate": "100.00%"
-  },
-  "What services are running?": {
-    "TotalTests": 1,
     "Passed": 0,
     "PassRate": "0.00%"
   },
-  "What's the cost to deploy this to AWS?": {
+  "What services are running?": {
     "TotalTests": 1,
     "Passed": 1,
     "PassRate": "100.00%"
+  },
+  "What's the cost to deploy this to AWS?": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
   },
   "What's the pricing for my application?": {
     "TotalTests": 1,

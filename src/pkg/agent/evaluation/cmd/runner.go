@@ -62,8 +62,8 @@ func NewFlowRunner(ctx context.Context, config FlowConfig, tools []ai.Tool) *Run
 }
 
 // CreateEvaluationFlow creates a Genkit flow for evaluation purposes
-func (r *Runner) CreateEvaluationFlow() *core.Flow[FlowInput, string, struct{}] {
-	return genkit.DefineFlow(r.g, "defang-cli", func(ctx context.Context, input FlowInput) (string, error) {
+func (r *Runner) CreateEvaluationFlow() *core.Flow[FlowInput, []string, struct{}] {
+	return genkit.DefineFlow(r.g, "defang-cli", func(ctx context.Context, input FlowInput) ([]string, error) {
 		message := []string{}
 		if input.Setup.WorkingDirectory != nil && *input.Setup.WorkingDirectory != "" {
 			message = append(message, fmt.Sprintf("Make the working directory \"%s\"", *input.Setup.WorkingDirectory))
@@ -78,7 +78,14 @@ func (r *Runner) CreateEvaluationFlow() *core.Flow[FlowInput, string, struct{}] 
 		message = append(message, input.Message)
 		messageStr := strings.Join(message, ". ")
 		log.Printf("Flow input: %s", messageStr)
-		return r.HandleMessageForEvaluation(messageStr)
+
+		result, err := r.HandleMessageForEvaluation(messageStr)
+		if err != nil {
+			return []string{}, err
+		}
+
+		// Return as array with single element to match expected schema
+		return []string{result}, nil
 	})
 }
 
@@ -96,18 +103,28 @@ func (r *Runner) HandleMessageForEvaluation(msg string) (string, error) {
 		ai.WithReturnToolRequests(true),
 	)
 	if err != nil {
-		return "", fmt.Errorf("Generate error: %w", err)
+		log.Printf("Generate error: %v", err)
+		return "Tools[]", fmt.Errorf("Generate error: %w", err)
 	}
 
-	log.Printf("Initial response: %d tool requests, text: %q", len(resp.ToolRequests()), resp.Text())
+	if resp == nil {
+		log.Printf("Warning: received nil response from Generate")
+		return "Tools[]", nil
+	}
+
+	toolRequests := resp.ToolRequests()
+	if toolRequests == nil {
+		toolRequests = []*ai.ToolRequest{}
+	}
+	log.Printf("Initial response: %d tool requests, text: %q", len(toolRequests), resp.Text())
 
 	// Multi-round conversation
-	for round := 2; round <= maxRounds && len(resp.ToolRequests()) > 0; round++ {
+	for round := 2; round <= maxRounds && len(toolRequests) > 0; round++ {
 		// Process tool requests and build responses
 		parts := []*ai.Part{}
 		roundTools := []string{}
 
-		for _, req := range resp.ToolRequests() {
+		for _, req := range toolRequests {
 			toolName := strings.ToLower(req.Name)
 			roundTools = append(roundTools, toolName)
 			allToolsCalled = append(allToolsCalled, toolName)
@@ -126,12 +143,26 @@ func (r *Runner) HandleMessageForEvaluation(msg string) (string, error) {
 		log.Printf("Round %d: called tools %v", round-1, roundTools)
 
 		// Continue conversation with tool responses
+		history := resp.History()
+		if history == nil {
+			history = []*ai.Message{}
+		}
 		resp, err = genkit.Generate(r.ctx, r.g,
-			ai.WithMessages(append(resp.History(), ai.NewMessage(ai.RoleTool, nil, parts...))...),
+			ai.WithMessages(append(history, ai.NewMessage(ai.RoleTool, nil, parts...))...),
 		)
 		if err != nil {
 			log.Printf("Generate error in round %d: %v", round, err)
 			break
+		}
+
+		if resp == nil {
+			log.Printf("Warning: nil response in round %d", round)
+			break
+		}
+
+		toolRequests = resp.ToolRequests()
+		if toolRequests == nil {
+			toolRequests = []*ai.ToolRequest{}
 		}
 	}
 
@@ -141,5 +172,7 @@ func (r *Runner) HandleMessageForEvaluation(msg string) (string, error) {
 		return result, nil
 	}
 
-	return "No response generated", nil
+	// Always return a valid Tools[] format, never empty string
+	log.Printf("No tools called, returning empty Tools[]")
+	return "Tools[]", nil
 }
