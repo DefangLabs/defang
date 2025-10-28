@@ -36,6 +36,6 @@ type CLIInterface interface {
 
 type LoginCLIInterface interface {
 	connecter
-	// Unique methods
+	// Unique method
 	InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string, mcpClient string) error
 }

@@ -299,6 +299,8 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// MCP Command
 	mcpCmd.AddCommand(mcpSetupCmd)
+	// Deprecated: flag --auth-server, we now reach out to the auth server: https://auth.defang.io directly
+	mcpServerCmd.Flags().MarkHidden("auth-server")
 	mcpCmd.AddCommand(mcpServerCmd)
 	mcpCmd.PersistentFlags().String("client", "", fmt.Sprintf("MCP setup client %v", mcp.ValidClients))
 	RootCmd.AddCommand(mcpCmd)
