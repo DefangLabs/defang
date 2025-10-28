@@ -348,47 +348,55 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 			continue
 		}
 
-		for _, e := range msg.Entries {
-			// Replace service progress messages with our own spinner
-			if doSpinner && isProgressDot(e.Message) {
-				continue
-			}
-			ts := e.Timestamp.AsTime()
-			// Skip duplicate logs (e.g. after reconnecting we might get the same log once more)
-			if skipDuplicate && ts.Equal(options.Since) {
-				skipDuplicate = false
-				continue
-			}
-			e.Service = valueOrDefault(e.Service, msg.Service)
-			e.Host = valueOrDefault(e.Host, msg.Host)
-			e.Etag = valueOrDefault(e.Etag, msg.Etag)
-			host := e.Host
-			service := e.Service
-
-			// HACK: skip noisy CI/CD logs (except errors)
-			isInternal := service == "cd" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric" || host == "ecs" || host == "cloudbuild" || host == "pulumi"
-			onlyErrors := !options.Verbose && isInternal
-			if onlyErrors && !e.Stderr {
-				if options.EndEventDetectFunc != nil {
-					if err := options.EndEventDetectFunc(e); err != nil {
-						cancel() // TODO: stuck on defer Close() if we don't do this
-						return err
-					}
-				}
-				continue
-			}
-
-			if ts.After(options.Since) {
-				options.Since = ts
-			}
-			err := handler(e, &options)
-			if err != nil {
-				term.Debug("Ending tail loop", err)
-				cancel() // TODO: stuck on defer Close() if we don't do this
-				return err
-			}
+		err := handleMsgEntries(msg, &options, doSpinner, skipDuplicate, handler)
+		if err != nil {
+			cancel() // TODO: stuck on defer Close() if we don't do this
+			return err
 		}
 	}
+}
+
+func handleMsgEntries(msg *defangv1.TailResponse, options *TailOptions, doSpinner bool, skipDuplicate bool, handler func(*defangv1.LogEntry, *TailOptions) error) error {
+	for _, e := range msg.Entries {
+		// Replace service progress messages with our own spinner
+		if doSpinner && isProgressDot(e.Message) {
+			continue
+		}
+		ts := e.Timestamp.AsTime()
+		// Skip duplicate logs (e.g. after reconnecting we might get the same log once more)
+		if skipDuplicate && ts.Equal(options.Since) {
+			skipDuplicate = false
+			continue
+		}
+		e.Service = valueOrDefault(e.Service, msg.Service)
+		e.Host = valueOrDefault(e.Host, msg.Host)
+		e.Etag = valueOrDefault(e.Etag, msg.Etag)
+		host := e.Host
+		service := e.Service
+
+		// HACK: skip noisy CI/CD logs (except errors)
+		isInternal := service == "cd" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric" || host == "ecs" || host == "cloudbuild" || host == "pulumi"
+		onlyErrors := !options.Verbose && isInternal
+		if onlyErrors && !e.Stderr {
+			if options.EndEventDetectFunc != nil {
+				if err := options.EndEventDetectFunc(e); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+
+		if ts.After(options.Since) {
+			options.Since = ts
+		}
+		err := handler(e, options)
+		if err != nil {
+			term.Debug("Ending tail loop", err)
+			return err
+		}
+	}
+
+	return nil
 }
 
 func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions) error {
