@@ -2,7 +2,6 @@ package stacks
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"regexp"
 	"strings"
@@ -10,6 +9,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/joho/godotenv"
 )
 
 type StackParameters struct {
@@ -27,7 +27,10 @@ func Create(params StackParameters) error {
 		return errors.New("stack name must be alphanumeric")
 	}
 
-	content := Marshal(params)
+	content, err := Marshal(params)
+	if err != nil {
+		return err
+	}
 
 	filename := filename(params.Name)
 	file, err := os.CreateTemp(".", filename+".tmp.")
@@ -100,19 +103,21 @@ func List() ([]StackListItem, error) {
 }
 
 func Parse(content string) (StackParameters, error) {
+	properties, err := godotenv.Parse(strings.NewReader(content))
+	if err != nil {
+		return StackParameters{}, err
+	}
 	var params StackParameters
-	lines := strings.Split(content, "\n")
-	for _, line := range lines {
-		if strings.HasPrefix(line, "DEFANG_PROVIDER=") {
-			providerStr := strings.TrimPrefix(line, "DEFANG_PROVIDER=")
-			params.Provider = cliClient.ProviderID(providerStr)
-		} else if strings.HasPrefix(line, "AWS_REGION=") {
-			params.Region = strings.TrimPrefix(line, "AWS_REGION=")
-		} else if strings.HasPrefix(line, "GCP_REGION=") {
-			params.Region = strings.TrimPrefix(line, "GCP_REGION=")
-		} else if strings.HasPrefix(line, "DEFANG_MODE=") {
-			modeStr := strings.TrimPrefix(line, "DEFANG_MODE=")
-			mode, err := modes.Parse(modeStr)
+	for key, value := range properties {
+		switch key {
+		case "DEFANG_PROVIDER":
+			params.Provider = cliClient.ProviderID(value)
+		case "AWS_REGION":
+			params.Region = value
+		case "GCP_REGION":
+			params.Region = value
+		case "DEFANG_MODE":
+			mode, err := modes.Parse(value)
 			if err != nil {
 				return params, err
 			}
@@ -122,9 +127,9 @@ func Parse(content string) (StackParameters, error) {
 	return params, nil
 }
 
-func Marshal(params StackParameters) string {
-	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("DEFANG_PROVIDER=%s\n", strings.ToLower(params.Provider.String())))
+func Marshal(params StackParameters) (string, error) {
+	var properties map[string]string = make(map[string]string)
+	properties["DEFANG_PROVIDER"] = strings.ToLower(params.Provider.String())
 	if params.Region != "" {
 		var regionVarName string
 		switch params.Provider {
@@ -134,13 +139,13 @@ func Marshal(params StackParameters) string {
 			regionVarName = "GCP_REGION"
 		}
 		if regionVarName != "" {
-			builder.WriteString(fmt.Sprintf("%s=%s\n", regionVarName, strings.ToLower(params.Region)))
+			properties[regionVarName] = strings.ToLower(params.Region)
 		}
 	}
 	if params.Mode != modes.ModeUnspecified {
-		builder.WriteString(fmt.Sprintf("DEFANG_MODE=%s\n", strings.ToLower(params.Mode.String())))
+		properties["DEFANG_MODE"] = strings.ToLower(params.Mode.String())
 	}
-	return builder.String()
+	return godotenv.Marshal(properties)
 }
 
 func Remove(name string) error {

@@ -130,7 +130,7 @@ func TestMarshal(t *testing.T) {
 				Region:   "us-central1",
 				Mode:     modes.ModeBalanced,
 			},
-			expectedContent: "DEFANG_PROVIDER=gcp\nGCP_REGION=us-central1\nDEFANG_MODE=balanced\n",
+			expectedContent: "DEFANG_MODE=\"balanced\"\nDEFANG_PROVIDER=\"gcp\"\nGCP_REGION=\"us-central1\"",
 		},
 		{
 			name: "AWS provider",
@@ -140,7 +140,7 @@ func TestMarshal(t *testing.T) {
 				Region:   "us-east-1",
 				Mode:     modes.ModeAffordable,
 			},
-			expectedContent: "DEFANG_PROVIDER=aws\nAWS_REGION=us-east-1\nDEFANG_MODE=affordable\n",
+			expectedContent: "AWS_REGION=\"us-east-1\"\nDEFANG_MODE=\"affordable\"\nDEFANG_PROVIDER=\"aws\"",
 		},
 		{
 			name: "Unspecified mode",
@@ -150,7 +150,7 @@ func TestMarshal(t *testing.T) {
 				Region:   "us-west-1",
 				Mode:     modes.ModeUnspecified,
 			},
-			expectedContent: "DEFANG_PROVIDER=aws\nAWS_REGION=us-west-1\n",
+			expectedContent: "AWS_REGION=\"us-west-1\"\nDEFANG_PROVIDER=\"aws\"",
 		},
 		{
 			name: "Empty region",
@@ -160,13 +160,14 @@ func TestMarshal(t *testing.T) {
 				Region:   "",
 				Mode:     modes.ModeAffordable,
 			},
-			expectedContent: "DEFANG_PROVIDER=gcp\nDEFANG_MODE=affordable\n",
+			expectedContent: "DEFANG_MODE=\"affordable\"\nDEFANG_PROVIDER=\"gcp\"",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			content := Marshal(tt.params)
+			content, err := Marshal(tt.params)
+			assert.NoError(t, err)
 			if content != tt.expectedContent {
 				t.Errorf("Marshal() = %q, want %q", content, tt.expectedContent)
 			}
