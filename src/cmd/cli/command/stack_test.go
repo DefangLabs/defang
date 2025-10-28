@@ -12,6 +12,7 @@ import (
 )
 
 func MockTerm(t *testing.T, stdout *bytes.Buffer, stdin *bytes.Reader) func() {
+	t.Helper()
 	oldTerm := term.DefaultTerm
 	term.DefaultTerm = term.NewTerm(
 		&FakeStdin{stdin},
