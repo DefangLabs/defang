@@ -54,9 +54,10 @@ func TestCreate(t *testing.T) {
 			if (err != nil) != tt.expectErr {
 				t.Errorf("Create() error = %v, expectErr %v", err, tt.expectErr)
 			}
+
 			// Cleanup created file if no error expected
 			if !tt.expectErr {
-				os.Remove(tt.parameters.Name + ".defangrc")
+				os.Remove(".defangrc." + tt.parameters.Name)
 			}
 		})
 	}
@@ -77,8 +78,8 @@ func TestList(t *testing.T) {
 	t.Run("stacks present", func(t *testing.T) {
 		t.Chdir(t.TempDir())
 		// Create dummy stack files
-		os.Create("stack1.defangrc")
-		os.Create("stack2.defangrc")
+		os.Create(".defangrc.stack1")
+		os.Create(".defangrc.stack2")
 
 		stacks, err := List()
 		if err != nil {
@@ -94,7 +95,7 @@ func TestRemove(t *testing.T) {
 	t.Run("remove existing stack", func(t *testing.T) {
 		t.Chdir(t.TempDir())
 		// Create dummy stack file
-		stackFile := "stack_to_remove.defangrc"
+		stackFile := ".defangrc.stack_to_remove"
 		os.Create(stackFile)
 
 		err := Remove("stack_to_remove")
@@ -111,7 +112,7 @@ func TestRemove(t *testing.T) {
 		err := Remove("non_existing_stack")
 		// expect an error when trying to remove a non-existing stack
 		assert.Error(t, err)
-		assert.ErrorContains(t, err, "remove non_existing_stack.defangrc: no such file or directory")
+		assert.ErrorContains(t, err, "remove .defangrc.non_existing_stack: no such file or directory")
 	})
 }
 

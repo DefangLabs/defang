@@ -28,7 +28,8 @@ func Create(params StackParameters) error {
 	}
 
 	content := Marshal(params)
-	filename := params.Name + ".defangrc"
+
+	filename := filename(params.Name)
 	file, err := os.CreateTemp(".", filename+".tmp.")
 	if err != nil {
 		return err
@@ -73,7 +74,7 @@ func List() ([]StackListItem, error) {
 
 	var stacks []StackListItem
 	for _, file := range files {
-		if strings.HasSuffix(file.Name(), ".defangrc") {
+		if strings.HasPrefix(file.Name(), ".defangrc.") {
 			content, err := os.ReadFile(file.Name())
 			if err != nil {
 				term.Warnf("Skipping unreadable stack file %s: %v\n", file.Name(), err)
@@ -84,7 +85,7 @@ func List() ([]StackListItem, error) {
 				term.Warnf("Skipping invalid stack file %s: %v\n", file.Name(), err)
 				continue
 			}
-			params.Name = strings.TrimSuffix(file.Name(), ".defangrc")
+			params.Name = strings.TrimPrefix(file.Name(), ".defangrc.")
 
 			stacks = append(stacks, StackListItem{
 				Name:     params.Name,
@@ -147,6 +148,9 @@ func Remove(name string) error {
 		return errors.New("stack name cannot be empty")
 	}
 	// delete the stack rc file
-	filename := name + ".defangrc"
-	return os.Remove(filename)
+	return os.Remove(filename(name))
+}
+
+func filename(stackname string) string {
+	return ".defangrc." + stackname
 }

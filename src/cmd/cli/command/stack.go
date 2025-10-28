@@ -129,6 +129,7 @@ func makeStackListCmd() *cobra.Command {
 		Short:   "List existing Defang deployment stacks",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jsonMode, _ := cmd.Flags().GetBool("json")
+
 			stacks, err := stacks.List()
 			if err != nil {
 				return err
