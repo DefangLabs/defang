@@ -298,9 +298,9 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// MCP Command
 	mcpCmd.AddCommand(mcpSetupCmd)
+	mcpServerCmd.Flags().Int("auth-server", 0, "auth server port")
 	mcpCmd.AddCommand(mcpServerCmd)
 	mcpCmd.PersistentFlags().String("client", "", fmt.Sprintf("MCP setup client %v", mcp.ValidClients))
-	mcpServerCmd.Flags().Int("auth-server", 0, "auth server port")
 	RootCmd.AddCommand(mcpCmd)
 
 	// Send Command
@@ -350,20 +350,11 @@ var RootCmd = &cobra.Command{
 		// Use "defer" to track any errors that occur during the command
 		defer func() {
 			var errString = ""
-			logProps := []track.Property{}
 			if err != nil {
-				var errWithLogs cliClient.ErrWithLogCache
-				if errors.As(err, &errWithLogs) {
-					// Add log cache to tracking properties
-					logProps = append(logProps, track.MakeEventLogProperties("log", errWithLogs.Logs)...)
-				}
+				errString = err.Error()
 			}
 
-			props := []track.Property{
-				P("args", args), P("err", errString), P("non-interactive", nonInteractive), P("provider", providerID),
-			}
-			props = append(props, logProps...)
-			track.Cmd(cmd, "Invoked", props...)
+			track.Cmd(cmd, "Invoked", P("args", args), P("err", errString), P("non-interactive", nonInteractive), P("provider", providerID))
 		}()
 
 		// Do this first, since any errors will be printed to the console
