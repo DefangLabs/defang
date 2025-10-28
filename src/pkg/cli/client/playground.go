@@ -28,15 +28,6 @@ func (g *PlaygroundProvider) Deploy(ctx context.Context, req *defangv1.DeployReq
 	return getMsg(g.GetController().Deploy(ctx, connect.NewRequest(req)))
 }
 
-func (g *PlaygroundProvider) UpdateShardDomain(ctx context.Context) error {
-	resp, err := g.GetPlaygroundProjectDomain(ctx)
-	if err != nil {
-		return err
-	}
-	g.shardDomain = resp.GetDomain()
-	return nil
-}
-
 func (g *PlaygroundProvider) GetDeploymentStatus(ctx context.Context) error {
 	return io.EOF // TODO: implement on fabric, for now assume service is deployed
 }
@@ -113,6 +104,15 @@ func (g *PlaygroundProvider) BootstrapList(context.Context) ([]string, error) {
 
 func (g PlaygroundProvider) ServicePrivateDNS(name string) string {
 	return string(g.GetTenantName()) + "-" + name
+}
+
+func (g *PlaygroundProvider) UpdateShardDomain(ctx context.Context) error {
+	resp, err := g.GetPlaygroundProjectDomain(ctx)
+	if err != nil {
+		return err
+	}
+	g.shardDomain = resp.GetDomain()
+	return nil
 }
 
 func (g PlaygroundProvider) ServicePublicDNS(name string, projectName string) string {
