@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -120,12 +122,16 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
 	logrus.SetFormatter(termLogger)
 
+	onlyComposeEnv := slices.DeleteFunc(os.Environ(), func(kv string) bool {
+		return !strings.HasPrefix(kv, "COMPOSE_") // only keep COMPOSE_* variables
+	})
+
 	// Based on how docker compose setup its own project options
 	// https://github.com/docker/compose/blob/1a14fcb1e6645dd92f5a4f2da00071bd59c2e887/cmd/compose/compose.go#L326-L346
 	return cli.NewProjectOptions(l.options.ConfigPaths,
-		cli.WithEnv([]string{"COMPOSE_PROFILES=defang"}),
 		// First apply os.Environment, always win
 		// -- DISABLED FOR DEFANG -- cli.WithOsEnv,
+		cli.WithEnv(onlyComposeEnv),
 		// Load PWD/.env if present and no explicit --env-file has been set
 		cli.WithEnvFiles(), // TODO: Support --env-file to be added as param to this call
 		// read dot env file to populate project environment
@@ -142,7 +148,7 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 		// cli.WithDefaultProfiles(c.Profiles...), TODO: Support --profile to be added as param to this call
 		cli.WithName(l.options.ProjectName),
 		// DEFANG SPECIFIC OPTIONS
-		cli.WithDefaultProfiles("defang"),
+		cli.WithDefaultProfiles("defang"), // FIXME: this overrides any COMPOSE_PROFILES env
 		cli.WithDiscardEnvFile,
 		cli.WithConsistency(false), // TODO: check fails if secrets are used but top-level 'secrets:' is missing
 		cli.WithLoadOptions(func(o *loader.Options) {
