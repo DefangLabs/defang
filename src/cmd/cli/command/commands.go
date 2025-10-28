@@ -352,11 +352,11 @@ var RootCmd = &cobra.Command{
 			var errString = ""
 			logProps := []track.Property{}
 			if err != nil {
-				errString = err.Error()
-
-				// on error, also log the recent terminal messages
-				messages := term.DefaultTerm.GetAllMessages()
-				logProps = append(logProps, track.MakeEventLogProperties("log", messages)...)
+				var errWithLogs cliClient.ErrWithLogCache
+				if errors.As(err, &errWithLogs) {
+					// Add log cache to tracking properties
+					logProps = append(logProps, track.MakeEventLogProperties("log", errWithLogs.Logs)...)
+				}
 			}
 
 			props := []track.Property{

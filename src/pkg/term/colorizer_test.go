@@ -8,9 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/DefangLabs/defang/src/pkg/datastructs"
 	"github.com/muesli/termenv"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestOutput(t *testing.T) {
@@ -220,13 +218,13 @@ func TestFlushWarnings(t *testing.T) {
 	for i, test := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			termWriter := NewTerm(os.Stdin, &stdout, &stderr)
+			term := NewTerm(os.Stdin, &stdout, &stderr)
 
 			for _, warning := range test.warnings {
-				termWriter.Warn(warning)
+				term.Warn(warning)
 			}
 
-			bytesWritten, err := termWriter.FlushWarnings()
+			bytesWritten, err := term.FlushWarnings()
 			if (err != nil) != test.expectErr {
 				t.Errorf("FlushWarnings() error = %v, expectErr %v", err, test.expectErr)
 			}
@@ -239,45 +237,9 @@ func TestFlushWarnings(t *testing.T) {
 				t.Errorf("FlushWarnings() expected %d byteWritten, got %d", bytesInExpected, bytesWritten)
 			}
 
-			if termWriter.getAllWarnings() != nil {
-				t.Errorf("after FlushWarnings() expected no warnings, got %v", termWriter.getAllWarnings())
+			if term.getAllWarnings() != nil {
+				t.Errorf("after FlushWarnings() expected no warnings, got %v", term.getAllWarnings())
 			}
 		})
 	}
-}
-
-func TestWriteToBuffer(t *testing.T) {
-	var stdout, stderr bytes.Buffer
-
-	originalBufferSize := datastructs.DefaultBufferSize
-	t.Cleanup(func() {
-		datastructs.DefaultBufferSize = originalBufferSize
-	})
-	datastructs.DefaultBufferSize = 5
-
-	termWriter := NewTerm(os.Stdin, &stdout, &stderr)
-
-	// no messages initially
-	currentMessages := termWriter.GetAllMessages()
-	assert.Empty(t, currentMessages)
-
-	// add messages, less than buffer capacity
-	termWriter.Info("message 1")
-	termWriter.Info("message 2")
-	termWriter.Info("message 3")
-	termWriter.Info("message 4")
-
-	// sanity check
-	currentMessages = termWriter.GetAllMessages()
-	expectedMessages := []string{" * message 1\n", " * message 2\n", " * message 3\n", " * message 4\n"}
-	assert.Equal(t, expectedMessages, currentMessages)
-
-	// add messages to be over buffer capacity
-	termWriter.Info("message A")
-	termWriter.Info("message B")
-
-	// check only the last number of message are kept
-	currentMessages = termWriter.GetAllMessages()
-	expectedMessages = []string{" * message 2\n", " * message 3\n", " * message 4\n", " * message A\n", " * message B\n"}
-	assert.Equal(t, expectedMessages, currentMessages)
 }

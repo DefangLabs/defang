@@ -17,6 +17,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/datastructs"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
@@ -91,7 +92,7 @@ func makeComposeUpCmd() *cobra.Command {
 					return err
 				}
 
-				track.EvtWithTerm("Debug Prompted", P("loadErr", loadErr))
+				track.Evt("Debug Prompted", P("loadErr", loadErr))
 				return cli.InteractiveDebugForClientError(ctx, client, project, loadErr)
 			}
 
@@ -177,7 +178,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 
-			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, verbose)
+			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, verbose, true)
 			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
 				handleTailAndMonitorErr(ctx, err, client, cli.DebugConfig{
@@ -187,7 +188,11 @@ func makeComposeUpCmd() *cobra.Command {
 					Provider:   provider,
 					Since:      since,
 				})
-				return err
+
+				return cliClient.ErrWithLogCache{
+					Err:  err,
+					Logs: tailOptions.LogCache.Get(),
+				}
 			}
 
 			for _, service := range deploy.Services {
@@ -245,7 +250,7 @@ func handleComposeUpErr(ctx context.Context, err error, project *compose.Project
 	}
 
 	term.Error("Error:", cliClient.PrettyError(err))
-	track.EvtWithTerm("Debug Prompted", P("composeErr", err))
+	track.Evt("Debug Prompted", P("composeErr", err))
 	return cli.InteractiveDebugForClientError(ctx, client, project, err)
 }
 
@@ -260,7 +265,7 @@ func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.G
 		if nonInteractive {
 			printDefangHint("To debug the deployment, do:", debugConfig.String())
 		} else {
-			track.EvtWithTerm("Debug Prompted", P("failedServices", debugConfig.FailedServices),
+			track.Evt("Debug Prompted", P("failedServices", debugConfig.FailedServices),
 				P("etag", debugConfig.Deployment),
 				P("reason", errDeploymentFailed),
 			)
@@ -268,15 +273,15 @@ func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.G
 			// Call the AI debug endpoint using the original command context (not the tail ctx which is canceled)
 			if nil != cli.InteractiveDebugDeployment(ctx, client, debugConfig) {
 				// don't show this defang hint if debugging was successful
-				tailOptions := newTailOptionsForDeploy(debugConfig.Deployment, debugConfig.Since, true)
+				tailOptions := newTailOptionsForDeploy(debugConfig.Deployment, debugConfig.Since, true, true)
 				printDefangHint("To see the logs of the failed service, do:", tailOptions.String())
 			}
 		}
 	}
 }
 
-func newTailOptionsForDeploy(deployment string, since time.Time, verbose bool) cli.TailOptions {
-	return cli.TailOptions{
+func newTailOptionsForDeploy(deployment string, since time.Time, verbose bool, useLogCache bool) cli.TailOptions {
+	tailOpt := cli.TailOptions{
 		Deployment: deployment,
 		LogType:    logs.LogTypeAll,
 		// TODO: Move this to playground provider GetDeploymentStatus
@@ -294,6 +299,12 @@ func newTailOptionsForDeploy(deployment string, since time.Time, verbose bool) c
 		Since:   since,
 		Verbose: verbose,
 	}
+
+	if useLogCache {
+		logCache := datastructs.NewCircularBuffer[string](30)
+		tailOpt.LogCache = &logCache
+	}
+	return tailOpt
 }
 
 func flushWarnings() {
@@ -459,7 +470,7 @@ func makeComposeConfigCmd() *cobra.Command {
 					return err
 				}
 
-				track.EvtWithTerm("Debug Prompted", P("loadErr", loadErr))
+				track.Evt("Debug Prompted", P("loadErr", loadErr))
 				return cli.InteractiveDebugForClientError(ctx, client, project, loadErr)
 			}
 

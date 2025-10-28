@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg/datastructs"
 	"github.com/muesli/termenv"
 	"golang.org/x/term"
 )
@@ -23,7 +22,6 @@ type Term struct {
 	hasDarkBg  bool
 
 	warnings []string
-	buffer   datastructs.CircularBuffer[string]
 }
 
 var DefaultTerm = NewTerm(os.Stdin, os.Stdout, os.Stderr)
@@ -58,7 +56,6 @@ func NewTerm(stdin FileReader, stdout, stderr io.Writer) *Term {
 		stderr: stderr,
 		out:    termenv.NewOutput(stdout),
 		err:    termenv.NewOutput(stderr),
-		buffer: datastructs.NewCircularBuffer[string](datastructs.DefaultBufferSize),
 	}
 	t.hasDarkBg = t.out.HasDarkBackground()
 	if hasTermInEnv() {
@@ -71,11 +68,6 @@ func NewTerm(stdin FileReader, stdout, stderr io.Writer) *Term {
 
 func (t Term) Stdio() (FileReader, termenv.File, io.Writer) {
 	return t.stdin, t.out.TTY(), t.err
-}
-
-// GetAllMessages returns all messages currently stored in the buffer in chronological order
-func (t Term) GetAllMessages() []string {
-	return t.buffer.Get()
 }
 
 func (t *Term) ForceColor(color bool) {
@@ -186,79 +178,62 @@ func ensurePrefix(s string, prefix string) string {
 	return prefix + s
 }
 
-func (t *Term) output(c Color, v ...any) (int, error) {
-	msg := fmt.Sprint(v...)
-	t.buffer.Add(msg)
-	return output(t.out, c, msg)
-}
-
 func (t *Term) Printc(c Color, v ...any) (int, error) {
-	return t.output(c, v...)
+	return output(t.out, c, fmt.Sprint(v...))
 }
 
 func (t *Term) Print(v ...any) (int, error) {
-	t.buffer.Add(fmt.Sprint(v...))
 	return fmt.Fprint(t.out, v...)
 }
 
 func (t *Term) Println(v ...any) (int, error) {
-	text := ensureNewline(fmt.Sprintln(v...))
-	t.buffer.Add(text)
-	return fmt.Fprint(t.out, text)
+	return fmt.Fprint(t.out, ensureNewline(fmt.Sprintln(v...)))
 }
 
 func (t *Term) Printf(format string, v ...any) (int, error) {
-	text := ensureNewline(fmt.Sprintf(format, v...))
-	t.buffer.Add(text)
-	return fmt.Fprint(t.out, text)
+	return fmt.Fprint(t.out, ensureNewline(fmt.Sprintf(format, v...)))
 }
 
 func (t *Term) Debug(v ...any) (int, error) {
 	if !t.debug {
 		return 0, nil
 	}
-	return t.output(DebugColor, ensurePrefix(fmt.Sprintln(v...), " - "))
+	return output(t.out, DebugColor, ensurePrefix(fmt.Sprintln(v...), " - "))
 }
 
 func (t *Term) Debugf(format string, v ...any) (int, error) {
 	if !t.debug {
 		return 0, nil
 	}
-	s := ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " - "))
-	return t.output(DebugColor, s)
+	return output(t.out, DebugColor, ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " - ")))
 }
 
 func (t *Term) Info(v ...any) (int, error) {
-	s := ensurePrefix(fmt.Sprintln(v...), " * ")
-	return t.output(InfoColor, s)
+	return output(t.out, InfoColor, ensurePrefix(fmt.Sprintln(v...), " * "))
 }
 
 func (t *Term) Infof(format string, v ...any) (int, error) {
-	s := ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " * "))
-	return t.output(InfoColor, s)
+	return output(t.out, InfoColor, ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " * ")))
 }
 
 func (t *Term) Warn(v ...any) (int, error) {
 	msg := ensurePrefix(fmt.Sprintln(v...), " ! ")
 	t.warnings = append(t.warnings, msg)
-	return t.output(WarnColor, msg)
+	return output(t.out, WarnColor, msg)
 }
 
 func (t *Term) Warnf(format string, v ...any) (int, error) {
 	msg := ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " ! "))
 	t.warnings = append(t.warnings, msg)
-	return t.output(WarnColor, msg)
+	return output(t.out, WarnColor, msg)
 }
 
 func (t *Term) Error(v ...any) (int, error) {
-	msg := fmt.Sprintln(v...)
-	t.buffer.Add(msg)
-	return output(t.err, ErrorColor, msg)
+	return output(t.err, ErrorColor, fmt.Sprintln(v...))
 }
 
 func (t *Term) Errorf(format string, v ...any) (int, error) {
 	line := ensureNewline(fmt.Sprintf(format, v...))
-	t.buffer.Add(line)
 	return output(t.err, ErrorColor, line)
 }
 

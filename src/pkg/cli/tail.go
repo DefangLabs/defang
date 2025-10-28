@@ -15,6 +15,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/datastructs"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/spinner"
@@ -45,6 +46,7 @@ type TailDetectStopEventFunc func(eventLog *defangv1.LogEntry) error
 
 type TailOptions struct {
 	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe and GetDeploymentStatus instead #851
+	LogCache           *datastructs.CircularBuffer[string]
 	Deployment         types.ETag
 	Filter             string
 	LogType            logs.LogType
@@ -377,6 +379,10 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 }
 
 func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions) error {
+	if options.LogCache != nil {
+		options.LogCache.Add(e.Message)
+	}
+
 	if options.Raw {
 		if e.Stderr {
 			term.Error(e.Message)
