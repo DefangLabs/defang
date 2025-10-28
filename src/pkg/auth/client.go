@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"time"
 
+	defangHttp "github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
@@ -167,16 +168,13 @@ func (c client) Poll(ctx context.Context, state string) (string, error) {
 	// Poll the server for the auth result
 	pollUrl := fmt.Sprintf("%s/clients/auth/poll?state=%s", c.issuer, state)
 
-	req, err := http.NewRequestWithContext(ctx, "POST", pollUrl, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to create poll request: %w", err)
-	}
-
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := defangHttp.PostFormWithContext(ctx, pollUrl, nil)
 	if err != nil {
 		return "", fmt.Errorf("poll request failed: %w", err)
 	}
+
 	defer resp.Body.Close()
+
 	if resp.StatusCode == http.StatusRequestTimeout {
 		return "", ErrPollTimeout
 	}

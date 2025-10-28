@@ -284,7 +284,7 @@ func (cliWithoutBrowser) OpenBrowser(url string) error {
 func startInProcessMCPServer(ctx context.Context, fabric *httptest.Server) (*testClient, error) {
 	providerId := cliClient.ProviderDefang
 	cluster := strings.TrimPrefix(fabric.URL, "http://")
-	srv, err := mcp.NewDefangMCPServer("0.0.1-test", cluster, 0, &providerId, "", cliWithoutBrowser{})
+	srv, err := mcp.NewDefangMCPServer("0.0.1-test", cluster, &providerId, "", cliWithoutBrowser{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MCP server: %v", err)
 	}

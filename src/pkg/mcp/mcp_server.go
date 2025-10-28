@@ -47,13 +47,13 @@ func (t *ToolTracker) TrackTool(name string, handler server.ToolHandlerFunc) ser
 	}
 }
 
-func NewDefangMCPServer(version string, cluster string, authPort int, providerID *cliClient.ProviderID, client MCPClient, cli tools.CLIInterface) (*server.MCPServer, error) {
+func NewDefangMCPServer(version string, cluster string, providerID *cliClient.ProviderID, client MCPClient, cli tools.CLIInterface) (*server.MCPServer, error) {
 	// Setup knowledge base
 	if err := SetupKnowledgeBase(); err != nil {
 		return nil, fmt.Errorf("failed to setup knowledge base: %w", err)
 	}
 
-	defangTools := tools.CollectTools(cluster, authPort, providerID, cli)
+	defangTools := tools.CollectTools(cluster, providerID, cli)
 	s := server.NewMCPServer(
 		"Deploy with Defang",
 		version,

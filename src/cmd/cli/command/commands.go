@@ -299,7 +299,6 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// MCP Command
 	mcpCmd.AddCommand(mcpSetupCmd)
-	mcpServerCmd.Flags().Int("auth-server", 0, "auth server port")
 	mcpCmd.AddCommand(mcpServerCmd)
 	mcpCmd.PersistentFlags().String("client", "", fmt.Sprintf("MCP setup client %v", mcp.ValidClients))
 	RootCmd.AddCommand(mcpCmd)
