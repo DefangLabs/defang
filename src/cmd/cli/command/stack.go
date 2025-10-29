@@ -61,8 +61,8 @@ func makeStackNewCmd() *cobra.Command {
 				provider := ""
 
 				err := survey.AskOne(&survey.Select{
-					Message: "Select cloud provider:",
-					Options: []string{"AWS", "GCP", "Azure"},
+					Message: "Which cloud provider do you want to deploy to?",
+					Options: []string{"AWS", "GCP"},
 					Default: "AWS",
 				}, &provider, survey.WithStdio(term.DefaultTerm.Stdio()))
 				if err != nil {
