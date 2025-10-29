@@ -14,6 +14,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // MockEstimateCLI implements EstimateCLIInterface for testing
@@ -212,7 +213,7 @@ func TestHandleEstimateTool(t *testing.T) {
 					assert.EqualError(t, err, tt.expectedError)
 					return
 				} else {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 				}
 			}
 			result, err := handleEstimateTool(t.Context(), loader, params, "test-cluster", mockCLI)
@@ -221,7 +222,7 @@ func TestHandleEstimateTool(t *testing.T) {
 			if tt.expectedError != "" {
 				assert.EqualError(t, err, tt.expectedError)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				if tt.expectedTextContains != "" && len(result) > 0 {
 					assert.Contains(t, result, tt.expectedTextContains)
 				}

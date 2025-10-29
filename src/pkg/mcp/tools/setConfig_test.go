@@ -8,6 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // MockSetConfigCLI implements SetConfigCLIInterface for testing
@@ -223,7 +224,7 @@ func TestHandleSetConfig(t *testing.T) {
 					assert.EqualError(t, err, tt.errorMessage)
 					return
 				} else {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 				}
 			}
 			result, err := handleSetConfig(testContext, loader, params, &tt.providerId, tt.cluster, tt.mockCLI)
@@ -234,7 +235,7 @@ func TestHandleSetConfig(t *testing.T) {
 					assert.EqualError(t, err, tt.errorMessage)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotEmpty(t, result)
 			}
 

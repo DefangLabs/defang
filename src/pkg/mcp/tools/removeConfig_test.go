@@ -11,6 +11,7 @@ import (
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // MockRemoveConfigCLI implements RemoveConfigCLIInterface for testing
@@ -160,7 +161,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 					assert.EqualError(t, err, tt.expectedError)
 					return
 				} else {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 				}
 			}
 
@@ -175,7 +176,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 					assert.EqualError(t, err, tt.expectedError) // Ensure err is not nil before checking its message
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				if tt.expectedTextContains != "" && len(result) > 0 {
 					assert.Contains(t, result, tt.expectedTextContains)
 				}

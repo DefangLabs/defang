@@ -11,6 +11,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // MockCLI implements CLIInterface for testing
@@ -199,7 +200,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 					assert.Contains(t, err.Error(), tt.errorMessage)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				// Check result text content for non-error results
 				if tt.resultTextContains != "" && len(result) > 0 {
 					assert.Contains(t, result, tt.resultTextContains)
