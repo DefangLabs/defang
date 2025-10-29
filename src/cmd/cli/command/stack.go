@@ -2,6 +2,7 @@ package command
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -58,7 +59,7 @@ func makeStackNewCmd() *cobra.Command {
 			}
 
 			if params.Provider == cliClient.ProviderAuto {
-				provider := ""
+				var provider string
 
 				err := survey.AskOne(&survey.Select{
 					Message: "Which cloud provider do you want to deploy to?",
@@ -67,6 +68,10 @@ func makeStackNewCmd() *cobra.Command {
 				}, &provider, survey.WithStdio(term.DefaultTerm.Stdio()))
 				if err != nil {
 					return err
+				}
+
+				if provider == "" {
+					return errors.New("a cloud provider must be selected")
 				}
 
 				err = providerID.Set(provider)
