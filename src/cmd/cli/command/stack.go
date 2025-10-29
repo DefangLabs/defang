@@ -32,9 +32,10 @@ func makeStackCmd() *cobra.Command {
 
 func makeStackNewCmd() *cobra.Command {
 	var stackNewCmd = &cobra.Command{
-		Use:   "new STACK_NAME",
-		Args:  cobra.ExactArgs(1),
-		Short: "Create a new Defang deployment stack",
+		Use:     "new STACK_NAME",
+		Aliases: []string{"init"},
+		Args:    cobra.ExactArgs(1),
+		Short:   "Create a new Defang deployment stack",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			stackName := args[0]
 			var region, _ = cmd.Flags().GetString("region")
