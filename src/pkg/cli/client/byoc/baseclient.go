@@ -283,6 +283,11 @@ func (b *ByocBaseClient) GetEndpoint(fqn string, projectName, delegateDomain str
 	return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, projectDomain)
 }
 
+func (b *ByocBaseClient) UpdateShardDomain(ctx context.Context) error {
+	// BYOC providers manage their own domains and don't use shard domains
+	return nil
+}
+
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func (b ByocBaseClient) GetPublicFqdn(projectName, delegateDomain, fqn string) string {
 	if projectName == "" {

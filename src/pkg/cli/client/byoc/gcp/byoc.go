@@ -943,11 +943,6 @@ func (b *ByocGcp) StackName(projectName, name string) string {
 	return fmt.Sprintf("%s_%s_%s_%s", byoc.DefangPrefix, projectName, b.PulumiStack, name)
 }
 
-func (b *ByocGcp) UpdateShardDomain(ctx context.Context) error {
-	// BYOC providers manage their own domains and don't use shard domains
-	return nil
-}
-
 func (b *ByocGcp) ServicePublicDNS(name string, projectName string) string {
 	return dns.SafeLabel(name) + "." + b.PulumiStack + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(b.TenantName) + ".defang.app"
 }
