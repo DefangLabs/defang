@@ -298,10 +298,11 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(deploymentsCmd)
 
 	// MCP Command
-	mcpCmd.AddCommand(mcpSetupCmd)
 	mcpServerCmd.Flags().Int("auth-server", 0, "auth server port")
+	mcpServerCmd.Flags().MarkDeprecated("auth-server", "we now reach out to the auth server: https://auth.defang.io directly")
 	mcpCmd.AddCommand(mcpServerCmd)
 	mcpCmd.PersistentFlags().String("client", "", fmt.Sprintf("MCP setup client %v", mcp.ValidClients))
+	mcpCmd.AddCommand(mcpSetupCmd)
 	RootCmd.AddCommand(mcpCmd)
 
 	// Send Command
