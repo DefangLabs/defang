@@ -90,7 +90,7 @@ func makeStackNewCmd() *cobra.Command {
 					defaultRegion = "us-central1"
 				}
 
-				region := ""
+				var region string
 
 				err := survey.AskOne(&survey.Input{
 					Message: fmt.Sprintf("Which %s region do you want to deploy to?", strings.ToUpper(params.Provider.String())),
@@ -104,7 +104,7 @@ func makeStackNewCmd() *cobra.Command {
 			}
 
 			if params.Mode == modes.ModeUnspecified {
-				selectedMode := ""
+				var selectedMode string
 				err := survey.AskOne(&survey.Select{
 					Message: "Which deployment mode do you want to use?",
 					Help:    "Learn about the different deployment modes at https://docs.defang.io/docs/concepts/deployment-modes",
@@ -125,7 +125,7 @@ func makeStackNewCmd() *cobra.Command {
 
 			if stackName == "" {
 				defaultName := fmt.Sprintf("%s-%s", strings.ToLower(params.Provider.String()), params.Region)
-				name := ""
+				var name string
 				err := survey.AskOne(&survey.Input{
 					Message: "What do you want to call this stack?",
 					Default: defaultName,
