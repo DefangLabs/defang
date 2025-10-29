@@ -19,11 +19,13 @@ type StackParameters struct {
 	Mode     modes.Mode
 }
 
+var validStackName = regexp.MustCompile(`^[a-z0-9]+$`)
+
 func Create(params StackParameters) error {
 	if params.Name == "" {
 		return errors.New("stack name cannot be empty")
 	}
-	if !regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString(params.Name) {
+	if !validStackName.MatchString(params.Name) {
 		return errors.New("stack name must be alphanumeric")
 	}
 
