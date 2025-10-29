@@ -33,9 +33,3 @@ type CLIInterface interface {
 	RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error)
 	Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cliTypes.TailOptions) error
 }
-
-type LoginCLIInterface interface {
-	connecter
-	// Unique method
-	InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string, mcpClient string) error
-}
