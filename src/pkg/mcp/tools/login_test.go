@@ -8,6 +8,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // MockLoginCLI implements LoginCLIInterface for testing
@@ -115,7 +116,7 @@ func TestHandleLoginTool(t *testing.T) {
 			if tt.expectedError != "" {
 				assert.EqualError(t, err, tt.expectedError)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				if tt.expectedTextContains != "" && len(result) > 0 {
 					assert.Contains(t, result, tt.expectedTextContains)
 				}

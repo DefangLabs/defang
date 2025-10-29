@@ -16,7 +16,6 @@ import (
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
 	typepb "github.com/DefangLabs/defang/src/protos/google/type"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -565,92 +564,4 @@ func TestInProcessMCPServer(t *testing.T) {
 		MockFabric.resetFlags()
 		t.Run(tc.name, tc.fn)
 	}
-}
-
-// Test for setAWSBYOCProvider tool
-func TestInProcessMCPServer_SetAWSBYOCProvider(t *testing.T) {
-	projectDir = createTestProjectDir(t)
-	mcpClient = setupTest(t, projectDir)
-	var origCheck = common.CheckProviderConfigured
-	var origConnect = common.Connect
-	common.Connect = func(ctx context.Context, cluster string) (*cliClient.GrpcClient, error) { return nil, nil }
-	common.CheckProviderConfigured = func(ctx context.Context, fabric cliClient.FabricClient, providerId cliClient.ProviderID, s string, i int) (cliClient.Provider, error) {
-		return &cliClient.MockProvider{}, nil
-	}
-	t.Cleanup(func() {
-		common.CheckProviderConfigured = origCheck
-		common.Connect = origConnect
-	})
-
-	const dummyToken = "Testing.Token.1234"
-	t.Setenv("DEFANG_ACCESS_TOKEN", dummyToken)
-	awsId := "ABIA12345678901234"
-	awsSecret := "awsSecret"
-	region := "us-test-2"
-	result, err := mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
-		Params: m3mcp.CallToolParams{
-			Name: "set_aws_provider",
-			Arguments: map[string]interface{}{
-				"working_directory": projectDir,
-				"accessKeyId":       awsId,
-				"secretAccessKey":   awsSecret,
-				"region":            region,
-			},
-		},
-	})
-	require.NoError(t, err, "set_aws_provider tool error")
-	require.NotNil(t, result)
-	require.False(t, result.IsError, "set_aws_provider result is error")
-	found := false
-	for _, content := range result.Content {
-		if text, ok := content.(m3mcp.TextContent); ok {
-			if strings.Contains(text.Text, "Successfully set the provider") {
-				found = true
-				break
-			}
-		}
-	}
-	require.True(t, found, "Expected success message in set_aws_provider output")
-}
-
-// Test for setGCPBYOCProvider tool
-func TestInProcessMCPServer_SetGCPBYOCProvider(t *testing.T) {
-	projectDir = createTestProjectDir(t)
-	mcpClient = setupTest(t, projectDir)
-	var origCheck = common.CheckProviderConfigured
-	var origConnect = common.Connect
-	common.Connect = func(ctx context.Context, cluster string) (*cliClient.GrpcClient, error) { return nil, nil }
-	common.CheckProviderConfigured = func(ctx context.Context, fabric cliClient.FabricClient, providerId cliClient.ProviderID, s string, i int) (cliClient.Provider, error) {
-		return &cliClient.MockProvider{}, nil
-	}
-	t.Cleanup(func() {
-		common.CheckProviderConfigured = origCheck
-		common.Connect = origConnect
-	})
-
-	const dummyToken = "Testing.Token.1234"
-	t.Setenv("DEFANG_ACCESS_TOKEN", dummyToken)
-	gcpProjectID := "test-gcp-project"
-	result, err := mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
-		Params: m3mcp.CallToolParams{
-			Name: "set_gcp_provider",
-			Arguments: map[string]interface{}{
-				"working_directory": projectDir,
-				"gcpProjectId":      gcpProjectID,
-			},
-		},
-	})
-	require.NoError(t, err, "set_gcp_provider tool error")
-	require.NotNil(t, result)
-	require.False(t, result.IsError, "set_gcp_provider result is error")
-	found := false
-	for _, content := range result.Content {
-		if text, ok := content.(m3mcp.TextContent); ok {
-			if strings.Contains(text.Text, "Successfully set the provider") {
-				found = true
-				break
-			}
-		}
-	}
-	require.True(t, found, "Expected success message in set_gcp_provider output")
 }

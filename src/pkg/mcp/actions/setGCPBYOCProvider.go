@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 )
@@ -14,7 +15,7 @@ func SetGCPByocProvider(ctx context.Context, providerId *client.ProviderID, clus
 		return err
 	}
 
-	fabric, err := common.Connect(ctx, cluster)
+	fabric, err := cli.Connect(ctx, cluster)
 	if err != nil {
 		return err
 	}
