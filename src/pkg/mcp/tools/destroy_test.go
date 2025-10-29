@@ -10,6 +10,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // MockDestroyCLI implements DestroyCLIInterface for testing
@@ -141,7 +142,7 @@ func TestHandleDestroyTool(t *testing.T) {
 			if tt.expectedError != "" {
 				assert.EqualError(t, err, tt.expectedError)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				if tt.expectedTextContains != "" && len(result) > 0 {
 					assert.Contains(t, result, tt.expectedTextContains)
 				}

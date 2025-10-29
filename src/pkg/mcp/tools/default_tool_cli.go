@@ -147,7 +147,7 @@ func (RemoveConfigCLIAdapter) ConfigDelete(ctx context.Context, projectName stri
 }
 
 // --- ListConfigCLIInterface ---
-func (a *ListConfigCLIAdapter) ListConfig(ctx context.Context, provider cliClient.Provider, projectName string) (*defangv1.Secrets, error) {
+func (a ListConfigCLIAdapter) ListConfig(ctx context.Context, provider cliClient.Provider, projectName string) (*defangv1.Secrets, error) {
 	return a.DefaultToolCLI.ListConfig(ctx, provider, projectName)
 }
 

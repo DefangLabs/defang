@@ -16,14 +16,11 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-var Connect = cli.Connect
-var CheckProviderConfigured = checkProviderConfigured
-var newProvider = cli.NewProvider
-var MCPDevelopmentClient = ""
+var MCPDevelopmentClient = "" // set by NewDefangMCPServer
 
 const PostPrompt = "Please deploy my application with Defang now."
 
-var ErrNoProviderSet = errors.New("No cloud provider is configured. Use `/` to open prompts and use the 3 Defang setup prompts, or use tools: set_aws_provider, set_gcp_provider, or set_playground_provider.")
+var ErrNoProviderSet = errors.New("no cloud provider is configured. Use `/` to open prompts and use the 3 Defang setup prompts, or use tools: set_aws_provider, set_gcp_provider, or set_playground_provider.")
 
 func GetStringArg(args map[string]string, key, defaultValue string) string {
 	if val, exists := args[key]; exists {
@@ -40,7 +37,7 @@ func ConfigureLoader(request mcp.CallToolRequest) (*compose.Loader, error) {
 
 	err = os.Chdir(wd)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to change working directory: %w", err)
+		return nil, fmt.Errorf("failed to change working directory: %w", err)
 	}
 
 	projectName, err := request.RequireString("project_name")
@@ -101,8 +98,8 @@ func ProviderNotConfiguredError(providerId client.ProviderID) error {
 	return nil
 }
 
-func checkProviderConfigured(ctx context.Context, client cliClient.FabricClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error) {
-	provider := newProvider(ctx, providerId, client)
+func CheckProviderConfigured(ctx context.Context, client cliClient.FabricClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error) {
+	provider := cli.NewProvider(ctx, providerId, client)
 
 	_, err := provider.AccountInfo(ctx)
 	if err != nil {
