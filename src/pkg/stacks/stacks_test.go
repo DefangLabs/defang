@@ -130,7 +130,7 @@ func TestMarshal(t *testing.T) {
 				Region:   "us-central1",
 				Mode:     modes.ModeBalanced,
 			},
-			expectedContent: "DEFANG_MODE=\"balanced\"\nDEFANG_PROVIDER=\"gcp\"\nGCP_REGION=\"us-central1\"",
+			expectedContent: "DEFANG_MODE=\"balanced\"\nDEFANG_PROVIDER=\"gcp\"\nGCP_LOCATION=\"us-central1\"",
 		},
 		{
 			name: "AWS provider",
@@ -184,7 +184,7 @@ func TestParse(t *testing.T) {
 		{
 			name: "GCP provider",
 			content: `DEFANG_PROVIDER=gcp
-GCP_REGION=us-central1
+GCP_LOCATION=us-central1
 DEFANG_MODE=balanced
 `,
 			expectedParams: StackParameters{

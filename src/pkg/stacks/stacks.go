@@ -116,7 +116,7 @@ func Parse(content string) (StackParameters, error) {
 			params.Provider = cliClient.ProviderID(value)
 		case "AWS_REGION":
 			params.Region = value
-		case "GCP_REGION":
+		case "GCP_LOCATION":
 			params.Region = value
 		case "DEFANG_MODE":
 			mode, err := modes.Parse(value)
@@ -138,7 +138,7 @@ func Marshal(params StackParameters) (string, error) {
 		case cliClient.ProviderAWS:
 			regionVarName = "AWS_REGION"
 		case cliClient.ProviderGCP:
-			regionVarName = "GCP_REGION"
+			regionVarName = "GCP_LOCATION"
 		}
 		if regionVarName != "" {
 			properties[regionVarName] = strings.ToLower(params.Region)
