@@ -36,10 +36,14 @@ func makeStackNewCmd() *cobra.Command {
 	var stackNewCmd = &cobra.Command{
 		Use:     "new STACK_NAME",
 		Aliases: []string{"init"},
-		Args:    cobra.ExactArgs(1),
+		Args:    cobra.MaximumNArgs(1),
 		Short:   "Create a new Defang deployment stack",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			stackName := args[0]
+			var stackName string
+			if len(args) > 0 {
+				stackName = args[0]
+			}
+
 			var region, _ = cmd.Flags().GetString("region")
 
 			params := stacks.StackParameters{
@@ -111,6 +115,20 @@ func makeStackNewCmd() *cobra.Command {
 					return err
 				}
 				params.Mode = modeParsed
+			}
+
+			if stackName == "" {
+				defaultName := fmt.Sprintf("%s-%s", strings.ToLower(params.Provider.String()), params.Region)
+				name := ""
+				err := survey.AskOne(&survey.Input{
+					Message: "What do you want to call this stack?",
+					Default: defaultName,
+				}, &name, survey.WithStdio(term.DefaultTerm.Stdio()))
+				if err != nil {
+					return err
+				}
+
+				params.Name = name
 			}
 
 			term.Debugf("Creating stack with parameters: %+v\n", params)
