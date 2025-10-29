@@ -26,6 +26,7 @@ func makeStackCmd() *cobra.Command {
 	stackListCmd := makeStackListCmd()
 	stackCmd.AddCommand(stackListCmd)
 	stackRemoveCmd := makeStackRemoveCmd()
+	stackRemoveCmd.Hidden = true
 	stackCmd.AddCommand(stackRemoveCmd)
 	return stackCmd
 }
