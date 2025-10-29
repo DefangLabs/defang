@@ -114,18 +114,14 @@ func AnnotateAwsError(err error) error {
 	return err
 }
 
-type NewByocInterface func(ctx context.Context, tenantName types.TenantName) *ByocAws
-
-func newByocProvider(ctx context.Context, tenantName types.TenantName) *ByocAws {
+func NewByocProvider(ctx context.Context, tenantName types.TenantName, stack string) *ByocAws {
 	b := &ByocAws{
 		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
-	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b)
+	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
 
 	return b
 }
-
-var NewByocProvider NewByocInterface = newByocProvider
 
 func initStsClient(cfg awssdk.Config) {
 	if StsClient == nil {

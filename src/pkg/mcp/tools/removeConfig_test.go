@@ -14,8 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// MockRemoveConfigCLI implements RemoveConfigCLIInterface for testing
+// MockRemoveConfigCLI implements CLIInterface for testing
 type MockRemoveConfigCLI struct {
+	CLIInterface
 	ConnectError              error
 	LoadProjectNameError      error
 	ConfigDeleteError         error
@@ -32,7 +33,7 @@ func (m *MockRemoveConfigCLI) Connect(ctx context.Context, cluster string) (*cli
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockRemoveConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) client.Provider {
+func (m *MockRemoveConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient, stack string) client.Provider {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
 	return nil // Mock provider
 }

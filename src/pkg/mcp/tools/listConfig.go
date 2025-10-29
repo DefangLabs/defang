@@ -8,19 +8,10 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-type ListConfigCLIInterface interface {
-	connecter
-	providerFactory
-	projectNameLoader
-	// Unique methods
-	ListConfig(ctx context.Context, provider cliClient.Provider, projectName string) (*defangv1.Secrets, error)
-}
-
 // handleListConfigTool handles the list config tool logic
-func handleListConfigTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli ListConfigCLIInterface) (string, error) {
+func handleListConfigTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", err
@@ -33,7 +24,7 @@ func handleListConfigTool(ctx context.Context, loader cliClient.ProjectLoader, p
 	}
 
 	term.Debug("Function invoked: cli.NewProvider")
-	provider := cli.NewProvider(ctx, *providerId, client)
+	provider := cli.NewProvider(ctx, *providerId, client, "")
 
 	term.Debug("Function invoked: cliClient.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)

@@ -180,7 +180,7 @@ func makeStackListCmd() *cobra.Command {
 				return err
 			}
 
-			return term.Table(stacks, []string{"Name", "Provider", "Region", "Mode"})
+			return term.Table(stacks, "Name", "Provider", "Region", "Mode")
 		},
 	}
 	stackListCmd.Flags().Bool("json", false, "Output in JSON format")

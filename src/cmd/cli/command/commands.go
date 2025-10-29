@@ -60,6 +60,7 @@ var (
 	nonInteractive = !hasTty
 	org            string
 	providerID     = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", "auto"))
+	stack          = os.Getenv("DEFANG_STACK")
 	verbose        = false
 )
 
@@ -459,14 +460,14 @@ var whoamiCmd = &cobra.Command{
 			_, err = fmt.Println(string(bytes))
 			return err
 		} else {
-			return term.Table([]cli.ShowAccountData{data}, []string{
+			return term.Table([]cli.ShowAccountData{data},
 				"Provider",
 				"AccountID",
 				"Tenant",
 				"TenantID",
 				"SubscriberTier",
 				"Region",
-			})
+			)
 		}
 	},
 }
@@ -1146,7 +1147,7 @@ func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 		return nil, err
 	}
 
-	provider := cli.NewProvider(ctx, providerID, client)
+	provider := cli.NewProvider(ctx, providerID, client, stack)
 	return provider, nil
 }
 

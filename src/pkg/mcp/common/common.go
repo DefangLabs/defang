@@ -98,15 +98,15 @@ func ProviderNotConfiguredError(providerId client.ProviderID) error {
 	return nil
 }
 
-func CheckProviderConfigured(ctx context.Context, client cliClient.FabricClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error) {
-	provider := cli.NewProvider(ctx, providerId, client)
+func CheckProviderConfigured(ctx context.Context, client cliClient.FabricClient, providerId cliClient.ProviderID, projectName, stack string, serviceCount int) (cliClient.Provider, error) {
+	provider := cli.NewProvider(ctx, providerId, client, stack)
 
 	_, err := provider.AccountInfo(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	err = CanIUseProvider(ctx, client, providerId, projectName, provider, serviceCount)
+	err = CanIUseProvider(ctx, client, providerId, projectName, provider, serviceCount) // TODO: append stack?
 	if err != nil {
 		return nil, fmt.Errorf("failed to use provider: %w", err)
 	}

@@ -13,8 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// MockListConfigCLI implements ListConfigCLIInterface for testing
+// MockListConfigCLI implements CLIInterface for testing
 type MockListConfigCLI struct {
+	CLIInterface
 	ConnectError         error
 	LoadProjectNameError error
 	ListConfigError      error
@@ -31,7 +32,7 @@ func (m *MockListConfigCLI) Connect(ctx context.Context, cluster string) (*clien
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockListConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) client.Provider {
+func (m *MockListConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient, stack string) client.Provider {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
 	return nil // Mock provider
 }

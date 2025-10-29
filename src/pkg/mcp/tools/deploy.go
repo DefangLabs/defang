@@ -11,20 +11,9 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-type DeployCLIInterface interface {
-	connecter
-	providerFactory
-	// Unique methods
-	ComposeUp(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, uploadMode compose.UploadMode, mode modes.Mode) (*defangv1.DeployResponse, *compose.Project, error)
-	CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error)
-	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
-	OpenBrowser(url string) error
-}
-
-func handleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli DeployCLIInterface) (string, error) {
+func handleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", err
@@ -46,7 +35,7 @@ func handleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, provi
 
 	term.Debug("Function invoked: cli.NewProvider")
 
-	provider, err := cli.CheckProviderConfigured(ctx, client, *providerId, project.Name, len(project.Services))
+	provider, err := cli.CheckProviderConfigured(ctx, client, *providerId, project.Name, "", len(project.Services))
 	if err != nil {
 		return "", fmt.Errorf("provider not configured correctly: %w", err)
 	}
