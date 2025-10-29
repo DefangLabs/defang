@@ -16,7 +16,7 @@ func TestFixup(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = FixupServices(t.Context(), client.MockProvider{}, proj, UploadModeIgnore)
+		err = FixupServices(t.Context(), &client.MockProvider{}, proj, UploadModeIgnore)
 		if err != nil {
 			t.Fatal(err)
 		}

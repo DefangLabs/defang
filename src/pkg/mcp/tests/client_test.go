@@ -39,11 +39,12 @@ type mockFabricService struct {
 	deployCalled        bool
 	destroyCalled       bool
 
-	canIUseCalled                  bool
-	whoAmICalled                   bool
-	tailCalled                     bool
-	putDeploymentCalled            bool
-	getDelegateSubdomainZoneCalled bool
+	canIUseCalled                    bool
+	whoAmICalled                     bool
+	tailCalled                       bool
+	putDeploymentCalled              bool
+	getDelegateSubdomainZoneCalled   bool
+	getPlaygroundProjectDomainCalled bool
 }
 
 func (m *mockFabricService) resetFlags() {
@@ -60,6 +61,7 @@ func (m *mockFabricService) resetFlags() {
 	m.tailCalled = false
 	m.putDeploymentCalled = false
 	m.getDelegateSubdomainZoneCalled = false
+	m.getPlaygroundProjectDomainCalled = false
 }
 
 func (m *mockFabricService) CanIUse(ctx context.Context, req *connect.Request[defangv1.CanIUseRequest]) (*connect.Response[defangv1.CanIUseResponse], error) {
@@ -193,6 +195,13 @@ func (m *mockFabricService) Destroy(ctx context.Context, req *connect.Request[de
 	m.destroyCalled = true
 	return connect.NewResponse(&defangv1.DestroyResponse{
 		Etag: "mock-destroy-etag",
+	}), nil
+}
+
+func (m *mockFabricService) GetPlaygroundProjectDomain(ctx context.Context, req *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.GetPlaygroundProjectDomainResponse], error) {
+	m.getPlaygroundProjectDomainCalled = true
+	return connect.NewResponse(&defangv1.GetPlaygroundProjectDomainResponse{
+		Domain: "mock-playground.example.com",
 	}), nil
 }
 
