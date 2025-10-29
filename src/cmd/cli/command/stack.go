@@ -3,6 +3,7 @@ package command
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -83,7 +84,7 @@ func makeStackNewCmd() *cobra.Command {
 				region := ""
 
 				err := survey.AskOne(&survey.Input{
-					Message: "Enter cloud region for the stack deployment:",
+					Message: fmt.Sprintf("Which %s region do you want to deploy to?", strings.ToUpper(params.Provider.String())),
 					Default: defaultRegion,
 				}, &region, survey.WithStdio(term.DefaultTerm.Stdio()))
 				if err != nil {
