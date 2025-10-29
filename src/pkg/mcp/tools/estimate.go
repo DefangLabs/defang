@@ -6,10 +6,8 @@ import (
 	"strings"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -28,7 +26,7 @@ func parseEstimateParams(request mcp.CallToolRequest, providerId *cliClient.Prov
 	mode, err := modes.Parse(modeString) // Validate the mode string
 	if err != nil {
 		term.Warnf("Unknown deployment mode provided - %q", modeString)
-		return EstimateParams{}, fmt.Errorf("Unknown deployment mode %q, please use one of %s", modeString, strings.Join(modes.AllDeploymentModes(), ", "))
+		return EstimateParams{}, fmt.Errorf("unknown deployment mode %q, please use one of %s", modeString, strings.Join(modes.AllDeploymentModes(), ", "))
 	}
 
 	providerString, err := request.RequireString("provider")
@@ -37,7 +35,7 @@ func parseEstimateParams(request mcp.CallToolRequest, providerId *cliClient.Prov
 	}
 	err = providerId.Set(providerString)
 	if err != nil {
-		return EstimateParams{}, fmt.Errorf("Invalid provider specified: %w", err)
+		return EstimateParams{}, fmt.Errorf("invalid provider specified: %w", err)
 	}
 
 	var region string
@@ -52,17 +50,7 @@ func parseEstimateParams(request mcp.CallToolRequest, providerId *cliClient.Prov
 	}, nil
 }
 
-type EstimateCLIInterface interface {
-	connecter
-	// Unique methods
-	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
-	RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error)
-	PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse)
-	CreatePlaygroundProvider(client *cliClient.GrpcClient) cliClient.Provider
-	CaptureTermOutput(mode modes.Mode, estimate *defangv1.EstimateResponse) string
-}
-
-func handleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, params EstimateParams, cluster string, cli EstimateCLIInterface) (string, error) {
+func handleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, params EstimateParams, cluster string, cli CLIInterface) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
@@ -73,7 +61,7 @@ func handleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, par
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, cluster)
 	if err != nil {
-		return "", fmt.Errorf("Could not connect: %w", err)
+		return "", fmt.Errorf("could not connect: %w", err)
 	}
 
 	defangProvider := cli.CreatePlaygroundProvider(client)
@@ -82,11 +70,11 @@ func handleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, par
 
 	estimate, err := cli.RunEstimate(ctx, project, client, defangProvider, params.Provider, params.Region, params.DeploymentMode)
 	if err != nil {
-		return "", fmt.Errorf("Failed to run estimate: %w", err)
+		return "", fmt.Errorf("failed to run estimate: %w", err)
 	}
 	term.Debugf("Estimate: %+v", estimate)
 
-	estimateText := cli.CaptureTermOutput(params.DeploymentMode, estimate)
+	estimateText := cli.PrintEstimate(params.DeploymentMode, estimate)
 
 	return "Successfully estimated the cost of the project to " + params.Provider.Name() + ":\n" + estimateText, nil
 }

@@ -128,7 +128,7 @@ func TestDeployValidateGPUResources(t *testing.T) {
 	b := &ByocAws{
 		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
-	b.ByocBaseClient = byoc.NewByocBaseClient("tenant1", b)
+	b.ByocBaseClient = byoc.NewByocBaseClient("tenant1", b, "")
 	b.ByocBaseClient.SetupDone = true
 
 	t.Run("no errors", func(t *testing.T) {

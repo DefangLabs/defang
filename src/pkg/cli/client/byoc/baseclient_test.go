@@ -66,9 +66,9 @@ func (m mockGetServiceInfosProvider) GetProjectUpdate(context.Context, string) (
 	return nil, nil
 }
 
-func NewMockGetServiceInfosProvider() *mockGetServiceInfosProvider {
+func NewMockGetServiceInfosProvider(stack string) *mockGetServiceInfosProvider {
 	p := &mockGetServiceInfosProvider{}
-	p.ByocBaseClient = NewByocBaseClient("test-tenant", p)
+	p.ByocBaseClient = NewByocBaseClient("test-tenant", p, stack)
 	return p
 }
 
@@ -107,7 +107,7 @@ var expectedServiceInfosJson = `[
 ]`
 
 func TestGetServiceInfos(t *testing.T) {
-	testProvider := NewMockGetServiceInfosProvider()
+	testProvider := NewMockGetServiceInfosProvider("")
 
 	serviceInfos, err := testProvider.GetServiceInfos(t.Context(), "test-project", "test-delegate-domain", "test-etag",
 		map[string]composeTypes.ServiceConfig{
@@ -151,7 +151,7 @@ func TestGetServiceInfosWithTestData(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			testProvider := NewMockGetServiceInfosProvider()
+			testProvider := NewMockGetServiceInfosProvider("")
 			serviceInfos, err := testProvider.GetServiceInfos(t.Context(), proj.Name, "test-delegate-domain", "test-etag", proj.Services)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)

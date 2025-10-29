@@ -11,8 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// MockLoginCLI implements LoginCLIInterface for testing
+// MockLoginCLI implements CLIInterface for testing
 type MockLoginCLI struct {
+	CLIInterface
 	ConnectError          error
 	InteractiveLoginError error
 	AuthURL               string

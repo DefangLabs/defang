@@ -114,7 +114,7 @@ Databases will be provisioned using resources optimized for production.
 Services in the "internal" network will be deployed to a private subnet with a
 NAT gateway for outbound internet access.`
 
-func PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) {
+func PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse, term *term.Term) {
 	subtotal := (*money.Money)(estimate.Subtotal)
 	tableItems := prepareEstimateLineItemTableItems(estimate.LineItems)
 	term.Println("")
@@ -132,7 +132,7 @@ func PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) {
 		panic("unexpected mode")
 	}
 
-	term.Table(tableItems, []string{"Cost", "Quantity", "Service", "Description"})
+	term.Table(tableItems, "Cost", "Quantity", "Service", "Description")
 	term.Printf("Estimated Monthly Cost: %s (+ usage)\n", subtotal.String())
 	term.Println("")
 	term.Printf("Estimate does not include taxes or Discount Programs.\n")

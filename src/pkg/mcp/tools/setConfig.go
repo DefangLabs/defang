@@ -31,16 +31,8 @@ func parseSetConfigParams(request mcp.CallToolRequest) (SetConfigParams, error) 
 	}, nil
 }
 
-type SetConfigCLIInterface interface {
-	connecter
-	projectNameLoader
-	providerFactory
-	// Unique methods
-	ConfigSet(ctx context.Context, projectName string, provider cliClient.Provider, name, value string) error
-}
-
 // handleSetConfig handles the set config MCP tool request
-func handleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params SetConfigParams, providerId *cliClient.ProviderID, cluster string, cli SetConfigCLIInterface) (string, error) {
+func handleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params SetConfigParams, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", err
@@ -53,7 +45,7 @@ func handleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params
 	}
 
 	term.Debug("Function invoked: cli.NewProvider")
-	provider := cli.NewProvider(ctx, *providerId, client)
+	provider := cli.NewProvider(ctx, *providerId, client, "")
 
 	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)

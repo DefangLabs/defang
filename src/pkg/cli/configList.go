@@ -31,5 +31,5 @@ func ConfigList(ctx context.Context, projectName string, provider client.Provide
 		configNames[i] = PrintConfig{Name: c}
 	}
 
-	return term.Table(configNames, []string{"Name"})
+	return term.Table(configNames, "Name")
 }

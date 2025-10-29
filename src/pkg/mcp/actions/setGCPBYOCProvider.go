@@ -20,7 +20,7 @@ func SetGCPByocProvider(ctx context.Context, providerId *client.ProviderID, clus
 		return err
 	}
 
-	_, err = common.CheckProviderConfigured(ctx, fabric, client.ProviderGCP, "", 0)
+	_, err = common.CheckProviderConfigured(ctx, fabric, client.ProviderGCP, "", "", 0)
 	if err != nil {
 		return err
 	}

@@ -16,6 +16,7 @@ import (
 
 // MockCLI implements CLIInterface for testing
 type MockCLI struct {
+	CLIInterface
 	ConnectError                     error
 	LoadProjectNameWithFallbackError error
 	MockClient                       *client.GrpcClient
@@ -36,7 +37,7 @@ func (m *MockCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClie
 	return m.MockClient, nil
 }
 
-func (m *MockCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabricClient client.FabricClient) client.Provider {
+func (m *MockCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabricClient client.FabricClient, stack string) client.Provider {
 	return m.MockProvider
 }
 

@@ -56,17 +56,16 @@ type ByocBaseClient struct {
 	projectBackend ProjectBackend
 }
 
-func NewByocBaseClient(tenantName types.TenantName, backend ProjectBackend) *ByocBaseClient {
+func NewByocBaseClient(tenantName types.TenantName, backend ProjectBackend, stack string) *ByocBaseClient {
+	if stack == "" {
+		stack = "beta" // backwards compat
+	}
 	b := &ByocBaseClient{
 		TenantName:     string(tenantName),
-		PulumiStack:    "beta", // TODO: make customizable
+		PulumiStack:    stack,
 		projectBackend: backend,
 	}
 	return b
-}
-
-func MakeEnv(key string, value any) string {
-	return fmt.Sprintf("%s=%q", key, value)
 }
 
 func (b *ByocBaseClient) GetProjectLastCDImage(ctx context.Context, projectName string) (string, error) {

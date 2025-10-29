@@ -13,8 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// MockDestroyCLI implements DestroyCLIInterface for testing
+// MockDestroyCLI implements CLIInterface for testing
 type MockDestroyCLI struct {
+	CLIInterface
 	ConnectError                     error
 	ComposeDownError                 error
 	LoadProjectNameWithFallbackError error
@@ -32,7 +33,7 @@ func (m *MockDestroyCLI) Connect(ctx context.Context, cluster string) (*client.G
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockDestroyCLI) NewProvider(ctx context.Context, providerId client.ProviderID, grpcClient client.FabricClient) client.Provider {
+func (m *MockDestroyCLI) NewProvider(ctx context.Context, providerId client.ProviderID, grpcClient client.FabricClient, stack string) client.Provider {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
 	return nil
 }
@@ -72,7 +73,7 @@ func TestHandleDestroyTool(t *testing.T) {
 			setupMock: func(m *MockDestroyCLI) {
 				m.ConnectError = errors.New("connection failed")
 			},
-			expectedError: "Could not connect: connection failed",
+			expectedError: "could not connect: connection failed",
 		},
 		{
 			name:       "load_project_name_error",
@@ -80,7 +81,7 @@ func TestHandleDestroyTool(t *testing.T) {
 			setupMock: func(m *MockDestroyCLI) {
 				m.LoadProjectNameWithFallbackError = errors.New("failed to load project name")
 			},
-			expectedError: "Failed to load project name: failed to load project name",
+			expectedError: "failed to load project name: failed to load project name",
 		},
 		{
 			name:       "can_i_use_provider_error",
@@ -89,7 +90,7 @@ func TestHandleDestroyTool(t *testing.T) {
 				m.ProjectName = "test-project"
 				m.CanIUseProviderError = errors.New("provider not available")
 			},
-			expectedError: "Failed to use provider: provider not available",
+			expectedError: "failed to use provider: provider not available",
 		},
 		{
 			name:       "compose_down_project_not_found",
@@ -98,7 +99,7 @@ func TestHandleDestroyTool(t *testing.T) {
 				m.ProjectName = "test-project"
 				m.ComposeDownError = connect.NewError(connect.CodeNotFound, errors.New("project not found"))
 			},
-			expectedError: "Project not found, nothing to destroy. Please use a valid project name, compose file path or project directory.",
+			expectedError: "project not found, nothing to destroy. Please use a valid project name, compose file path or project directory",
 		},
 		{
 			name:       "compose_down_generic_error",
@@ -107,7 +108,7 @@ func TestHandleDestroyTool(t *testing.T) {
 				m.ProjectName = "test-project"
 				m.ComposeDownError = errors.New("destroy failed")
 			},
-			expectedError: "Failed to send destroy request: destroy failed",
+			expectedError: "failed to send destroy request: destroy failed",
 		},
 		{
 			name:       "successful_destroy",
