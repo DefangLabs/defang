@@ -318,6 +318,9 @@ func SetupCommands(ctx context.Context, version string) {
 	certCmd.AddCommand(certGenerateCmd)
 	RootCmd.AddCommand(certCmd)
 
+	stackCmd := makeStackCmd()
+	RootCmd.AddCommand(stackCmd)
+
 	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
 		// Add some emphasis to the help command
 		re := regexp.MustCompile(`(?m)^[A-Za-z ]+?:`)

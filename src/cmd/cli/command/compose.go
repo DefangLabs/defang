@@ -598,10 +598,9 @@ func makeComposeLogsCmd() *cobra.Command {
 
 func setupComposeCommand() *cobra.Command {
 	var composeCmd = &cobra.Command{
-		Use:     "compose",
-		Aliases: []string{"stack"},
-		Args:    cobra.NoArgs,
-		Short:   "Work with local Compose files",
+		Use:   "compose",
+		Args:  cobra.NoArgs,
+		Short: "Work with local Compose files",
 		Long: `Define and deploy multi-container applications with Defang. Most compose commands require
 a "compose.yaml" file. The simplest "compose.yaml" file with a single service is:
 
