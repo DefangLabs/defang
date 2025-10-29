@@ -104,7 +104,7 @@ func makeStackNewCmd() *cobra.Command {
 					Message: "Which deployment mode do you want to use?",
 					Help:    "Learn about the different deployment modes at https://docs.defang.io/docs/concepts/deployment-modes",
 					Options: modes.AllDeploymentModes(),
-					Default: modes.ModeAffordable.String(),
+					Default: modes.ModeBalanced.String(),
 				},
 					&selectedMode, survey.WithStdio(term.DefaultTerm.Stdio()))
 				if err != nil {
