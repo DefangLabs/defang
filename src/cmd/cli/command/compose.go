@@ -151,7 +151,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 
-			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, verbose, true)
+			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, verbose)
 			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
 				logs := []string{}
@@ -255,14 +255,14 @@ func handleTailAndMonitorErr(ctx context.Context, err error, logs *[]string, cli
 			// Call the AI debug endpoint using the original command context (not the tail ctx which is canceled)
 			if nil != cli.InteractiveDebugDeployment(ctx, client, debugConfig) {
 				// don't show this defang hint if debugging was successful
-				tailOptions := newTailOptionsForDeploy(debugConfig.Deployment, debugConfig.Since, true, true)
+				tailOptions := newTailOptionsForDeploy(debugConfig.Deployment, debugConfig.Since, true)
 				printDefangHint("To see the logs of the failed service, do:", tailOptions.String())
 			}
 		}
 	}
 }
 
-func newTailOptionsForDeploy(deployment string, since time.Time, verbose bool, useLogCache bool) cli.TailOptions {
+func newTailOptionsForDeploy(deployment string, since time.Time, verbose bool) cli.TailOptions {
 	tailOpt := cli.TailOptions{
 		Deployment: deployment,
 		LogType:    logs.LogTypeAll,
@@ -282,10 +282,8 @@ func newTailOptionsForDeploy(deployment string, since time.Time, verbose bool, u
 		Verbose: verbose,
 	}
 
-	if useLogCache {
-		logCache := datastructs.NewCircularBuffer[string](30)
-		tailOpt.LogCache = &logCache
-	}
+	logCache := datastructs.NewCircularBuffer[string](30)
+	tailOpt.LogCache = &logCache
 	return tailOpt
 }
 
