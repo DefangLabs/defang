@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/circularbuffer"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -17,7 +18,7 @@ import (
 
 const targetServiceState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 
-func TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, tailOptions TailOptions) (ServiceStates, error) {
+func TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, tailOptions TailOptions) (ServiceStates, circularbuffer.BufferInterface[string], error) {
 	if tailOptions.Deployment == "" {
 		panic("tailOptions.Deployment must be a valid deployment ID")
 	}
@@ -66,8 +67,9 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 	}()
 
 	// blocking call to tail
-	var tailErr error
-	if err := Tail(tailCtx, provider, project.Name, tailOptions); err != nil {
+	var err, tailErr error
+	var logCache circularbuffer.BufferInterface[string]
+	if logCache, err = Tail(tailCtx, provider, project.Name, tailOptions); err != nil {
 		term.Debug("Tail stopped with", err, errors.Unwrap(err))
 
 		if connect.CodeOf(err) == connect.CodePermissionDenied {
@@ -98,7 +100,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 		}
 	}
 
-	return serviceStates, errors.Join(cdErr, svcErr, tailErr)
+	return serviceStates, logCache, errors.Join(cdErr, svcErr, tailErr)
 }
 
 func CanMonitorService(service compose.ServiceConfig) bool {

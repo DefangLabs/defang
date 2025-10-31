@@ -150,7 +150,7 @@ func TestTail(t *testing.T) {
 		},
 	}
 
-	err := Tail(t.Context(), p, projectName, TailOptions{Verbose: true}) // Output host
+	_, err := Tail(t.Context(), p, projectName, TailOptions{Verbose: true}) // Output host
 	if err != io.EOF {
 		t.Errorf("Tail() error = %v, want io.EOF", err)
 	}
@@ -249,7 +249,7 @@ func TestUTC(t *testing.T) {
 	localMock = localMock.MockTimestamp(localTime)
 
 	// Start the terminal for local time test
-	err := Tail(t.Context(), localMock, projectName, TailOptions{Verbose: true}) // Output host
+	_, err := Tail(t.Context(), localMock, projectName, TailOptions{Verbose: true}) // Output host
 	if err != nil {
 		t.Errorf("Tail() error = %v, want io.EOF", err)
 	}
@@ -281,7 +281,7 @@ func TestUTC(t *testing.T) {
 	utcMock := &mockTailProvider{}
 	utcMock = utcMock.MockTimestamp(utcTime)
 
-	err = Tail(t.Context(), utcMock, projectName, TailOptions{Verbose: true})
+	_, err = Tail(t.Context(), utcMock, projectName, TailOptions{Verbose: true})
 	if err != nil {
 		t.Errorf("Tail() error = %v, want io.EOF", err)
 	}
@@ -330,7 +330,7 @@ func TestTailError(t *testing.T) {
 			mock := &mockQueryErrorProvider{
 				TailStreamError: tt.err,
 			}
-			err := Tail(t.Context(), mock, "project", tailOptions)
+			_, err := Tail(t.Context(), mock, "project", tailOptions)
 			if err != nil {
 				if err.Error() != tt.wantError {
 					t.Errorf("Tail() error = %q, want: %q", err.Error(), tt.wantError)
@@ -366,7 +366,7 @@ func TestTailContext(t *testing.T) {
 			time.AfterFunc(10*time.Millisecond, func() {
 				mock.tailStream.Send(nil, tt.cause)
 			})
-			err := Tail(ctx, mock, "project", tailOptions)
+			_, err := Tail(ctx, mock, "project", tailOptions)
 			if err.Error() != tt.wantError {
 				t.Errorf("Tail() error = %q, want: %q", err.Error(), tt.wantError)
 			}
