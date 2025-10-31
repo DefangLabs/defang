@@ -321,6 +321,9 @@ func receiveLogs(ctx context.Context, provider client.Provider, projectName stri
 			if errors.Is(serverStream.Err(), context.Canceled) || errors.Is(serverStream.Err(), context.DeadlineExceeded) {
 				return &CancelError{TailOptions: options, error: serverStream.Err(), ProjectName: projectName}
 			}
+			if errors.Is(serverStream.Err(), io.EOF) {
+				return serverStream.Err()
+			}
 
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
 			if isTransientError(serverStream.Err()) {
