@@ -12,7 +12,6 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -74,23 +73,6 @@ func FixupConfigError(err error) error {
 	return err
 }
 
-func CanIUseProvider(ctx context.Context, grpcClient client.FabricClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {
-	canUseReq := defangv1.CanIUseRequest{
-		Project:      projectName,
-		Provider:     providerId.Value(),
-		ServiceCount: int32(serviceCount), // #nosec G115 - service count will not overflow int32
-	}
-	term.Debug("Function invoked: client.CanIUse")
-	resp, err := grpcClient.CanIUse(ctx, &canUseReq)
-	if err != nil {
-		return err
-	}
-
-	term.Debug("Function invoked: provider.SetCanIUseConfig")
-	provider.SetCanIUseConfig(resp)
-	return nil
-}
-
 func ProviderNotConfiguredError(providerId client.ProviderID) error {
 	if providerId == client.ProviderAuto {
 		return ErrNoProviderSet
@@ -101,12 +83,7 @@ func ProviderNotConfiguredError(providerId client.ProviderID) error {
 func CheckProviderConfigured(ctx context.Context, client cliClient.FabricClient, providerId cliClient.ProviderID, projectName, stack string, serviceCount int) (cliClient.Provider, error) {
 	provider := cli.NewProvider(ctx, providerId, client, stack)
 
-	_, err := provider.AccountInfo(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	err = CanIUseProvider(ctx, client, providerId, projectName, provider, serviceCount) // TODO: append stack?
+	err := cliClient.CanIUseProvider(ctx, client, provider, projectName, stack, serviceCount)
 	if err != nil {
 		return nil, fmt.Errorf("failed to use provider: %w", err)
 	}
