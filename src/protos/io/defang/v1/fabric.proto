@@ -501,6 +501,7 @@ message TailRequest {
   string pattern = 6;
   google.protobuf.Timestamp until = 7;
   bool follow = 8;
+  int32 limit = 9;
 }
 
 message LogEntry {
