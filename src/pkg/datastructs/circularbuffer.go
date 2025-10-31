@@ -1,5 +1,11 @@
 package datastructs
 
+// BufferInterface abstracts the buffer operations
+type BufferInterface[T any] interface {
+	Add(item T)
+	Get() []T
+}
+
 type CircularBuffer[T any] struct {
 	size    int
 	entries int

@@ -8,6 +8,7 @@ import (
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/datastructs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -52,7 +53,7 @@ type LogsCLIInterface interface {
 	connecter
 	providerFactory
 	// Unique methods
-	Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cliTypes.TailOptions) error
+	Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cliTypes.TailOptions) (datastructs.BufferInterface[string], error)
 	CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error)
 	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
 }
@@ -80,7 +81,7 @@ func handleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 		return "", fmt.Errorf("provider not configured correctly: %w", err)
 	}
 
-	err = cli.Tail(ctx, provider, project, cliTypes.TailOptions{
+	_, err = cli.Tail(ctx, provider, project, cliTypes.TailOptions{
 		Deployment: params.DeploymentID,
 		Since:      params.Since,
 		Until:      params.Until,

@@ -46,7 +46,6 @@ type TailDetectStopEventFunc func(eventLog *defangv1.LogEntry) error
 
 type TailOptions struct {
 	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe and GetDeploymentStatus instead #851
-	LogCache           *datastructs.CircularBuffer[string]
 	Deployment         types.ETag
 	Filter             string
 	LogType            logs.LogType
@@ -141,7 +140,9 @@ func (cerr CancelError) Unwrap() error {
 	return cerr.error
 }
 
-func Tail(ctx context.Context, provider client.Provider, projectName string, options TailOptions) error {
+func Tail(ctx context.Context, provider client.Provider, projectName string, options TailOptions) (datastructs.BufferInterface[string], error) {
+	logCache := datastructs.NewCircularBuffer[string](30)
+
 	if options.LogType == logs.LogTypeUnspecified {
 		options.LogType = logs.LogTypeAll
 	}
@@ -165,10 +166,10 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 	}
 
 	if dryrun.DoDryRun {
-		return dryrun.ErrDryRun
+		return &logCache, dryrun.ErrDryRun
 	}
 
-	return streamLogs(ctx, provider, projectName, options, logEntryPrintHandler)
+	return &logCache, streamLogs(ctx, provider, projectName, options, logCache, logEntryPrintHandler)
 }
 
 func isTransientError(err error) bool {
@@ -204,7 +205,7 @@ func isTransientError(err error) bool {
 
 type LogEntryHandler func(*defangv1.LogEntry, *TailOptions) error
 
-func streamLogs(ctx context.Context, provider client.Provider, projectName string, options TailOptions, handler LogEntryHandler) error {
+func streamLogs(ctx context.Context, provider client.Provider, projectName string, options TailOptions, logCache datastructs.CircularBuffer[string], handler LogEntryHandler) error {
 	var sinceTs, untilTs *timestamppb.Timestamp
 	if pkg.IsValidTime(options.Since) {
 		sinceTs = timestamppb.New(options.Since)
@@ -354,6 +355,8 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 			host := e.Host
 			service := e.Service
 
+			logCache.Add(e.Message)
+
 			// HACK: skip noisy CI/CD logs (except errors)
 			isInternal := service == "cd" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric" || host == "ecs" || host == "cloudbuild" || host == "pulumi"
 			onlyErrors := !options.Verbose && isInternal
@@ -381,10 +384,6 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 }
 
 func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions) error {
-	if options.LogCache != nil {
-		options.LogCache.Add(e.Message)
-	}
-
 	if options.Raw {
 		if e.Stderr {
 			term.Error(e.Message)

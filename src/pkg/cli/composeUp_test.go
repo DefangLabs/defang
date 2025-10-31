@@ -291,7 +291,7 @@ func TestComposeUpStops(t *testing.T) {
 				timer := time.AfterFunc(time.Second, func() { provider.subscribeStream.Send(tt.svcFailed, tt.subscribeErr) })
 				t.Cleanup(func() { timer.Stop() })
 			}
-			_, err = TailAndMonitor(ctx, project, provider, -1, TailOptions{Deployment: resp.Etag})
+			_, _, err = TailAndMonitor(ctx, project, provider, -1, TailOptions{Deployment: resp.Etag})
 			if err != nil {
 				if err.Error() != tt.wantError {
 					t.Errorf("expected error: %v, got: %v", tt.wantError, err)

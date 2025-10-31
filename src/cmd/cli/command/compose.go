@@ -15,7 +15,6 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/datastructs"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
@@ -152,13 +151,10 @@ func makeComposeUpCmd() *cobra.Command {
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 
 			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, verbose)
-			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
+			serviceStates, logCache, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
-				logs := []string{}
-				if tailOptions.LogCache != nil {
-					logs = tailOptions.LogCache.Get()
-				}
-				handleTailAndMonitorErr(ctx, err, logs, client, cli.DebugConfig{
+				logs := logCache.Get()
+				handleTailAndMonitorErr(ctx, err, &logs, client, cli.DebugConfig{
 					Deployment: deploy.Etag,
 					ModelId:    modelId,
 					Project:    project,
@@ -280,8 +276,6 @@ func newTailOptionsForDeploy(deployment string, since time.Time, verbose bool) c
 		Verbose: verbose,
 	}
 
-	logCache := datastructs.NewCircularBuffer[string](30)
-	tailOpt.LogCache = &logCache
 	return tailOpt
 }
 
@@ -596,7 +590,9 @@ func makeComposeLogsCmd() *cobra.Command {
 				Until:      untilTs,
 				Verbose:    verbose,
 			}
-			return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
+
+			_, err = cli.Tail(cmd.Context(), provider, projectName, tailOptions)
+			return err
 		},
 	}
 	logsCmd.Flags().StringP("name", "n", "", "name of the service (backwards compat)")
