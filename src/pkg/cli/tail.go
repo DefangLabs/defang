@@ -206,6 +206,8 @@ func isTransientError(err error) bool {
 
 type LogEntryHandler func(*defangv1.LogEntry, *TailOptions) error
 
+const DefaultTailLimit = 100
+
 func streamLogs(ctx context.Context, provider client.Provider, projectName string, options TailOptions, handler LogEntryHandler) error {
 	var sinceTs, untilTs *timestamppb.Timestamp
 	if pkg.IsValidTime(options.Since) {
@@ -224,6 +226,11 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 		}
 	}
 
+	limit := int32(0) // 0 means no limit
+	if !options.Follow {
+		limit = DefaultTailLimit
+	}
+
 	tailRequest := &defangv1.TailRequest{
 		Etag:     options.Deployment,
 		LogType:  uint32(options.LogType),
@@ -233,6 +240,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 		Since:    sinceTs, // this is also used to continue from the last timestamp
 		Until:    untilTs,
 		Follow:   options.Follow,
+		Limit:    limit,
 	}
 
 	term.Debug("Tail request:", tailRequest)
