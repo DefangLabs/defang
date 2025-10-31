@@ -162,8 +162,9 @@ func SetupCommands(ctx context.Context, version string) {
 	cobra.EnableTraverseRunHooks = true // we always need to run the RootCmd's pre-run hook
 
 	RootCmd.Version = version
+	RootCmd.PersistentFlags().StringVarP(&stack, "stack", "s", stack, "stack name (for BYOC providers)")
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
-	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", pcluster.DefangFabric, "Defang cluster to connect to")
+	RootCmd.PersistentFlags().StringVar(&cluster, "cluster", pcluster.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
 	RootCmd.PersistentFlags().StringVar(&org, "org", os.Getenv("DEFANG_ORG"), "override GitHub organization name (tenant)")
 	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
@@ -1162,18 +1163,7 @@ func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient
 }
 
 func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string, serviceCount int) error {
-	canUseReq := defangv1.CanIUseRequest{
-		Project:      projectName,
-		Provider:     providerID.Value(),
-		ServiceCount: int32(serviceCount), // #nosec G115 - service count will not overflow int32
-	}
-
-	resp, err := client.CanIUse(ctx, &canUseReq)
-	if err != nil {
-		return err
-	}
-	provider.SetCanIUseConfig(resp)
-	return nil
+	return cliClient.CanIUseProvider(ctx, client, provider, projectName, stack, serviceCount)
 }
 
 func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, error) {

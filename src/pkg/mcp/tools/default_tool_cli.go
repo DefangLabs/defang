@@ -25,7 +25,7 @@ import (
 type DefaultToolCLI struct{}
 
 func (DefaultToolCLI) CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, provider cliClient.Provider, serviceCount int) error {
-	return common.CanIUseProvider(ctx, client, providerId, projectName, provider, serviceCount)
+	return cliClient.CanIUseProvider(ctx, client, provider, projectName, "", serviceCount) // TODO: add stack
 }
 
 func (DefaultToolCLI) ConfigSet(ctx context.Context, projectName string, provider cliClient.Provider, name, value string) error {
