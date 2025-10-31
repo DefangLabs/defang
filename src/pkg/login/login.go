@@ -14,7 +14,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/github"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 )
 
@@ -76,21 +75,22 @@ func interactiveLogin(ctx context.Context, client client.FabricClient, fabric st
 	return nil
 }
 
-func NonInteractiveGitHubLogin(ctx context.Context, client client.FabricClient, fabric string) error {
-	term.Debug("Non-interactive login using GitHub Actions id-token")
-	idToken, err := github.GetIdToken(ctx)
+func NonInteractiveLogin(ctx context.Context, client client.FabricClient, fabric string, token string) error {
+	if token == "" {
+		term.Debug("Non-interactive login using GitHub Actions id-token")
+		var err error
+		token, err = github.GetIdToken(ctx)
+		if err != nil {
+			return fmt.Errorf("non-interactive login failed: %w", err)
+		}
+		term.Debug("Got GitHub Actions id-token")
+	}
+
+	accessToken, err := auth.ExchangeJWTForToken(ctx, token)
 	if err != nil {
 		return fmt.Errorf("non-interactive login failed: %w", err)
 	}
-	term.Debug("Got GitHub Actions id-token")
-	resp, err := client.Token(ctx, &defangv1.TokenRequest{
-		Assertion: idToken,
-		Scope:     []string{"admin", "read", "delete", "tail"},
-	})
-	if err != nil {
-		return err
-	}
-	return cluster.SaveAccessToken(fabric, resp.AccessToken)
+	return cluster.SaveAccessToken(fabric, accessToken)
 }
 
 func InteractiveRequireLoginAndToS(ctx context.Context, fabric *client.GrpcClient, addr string) error {
