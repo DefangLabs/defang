@@ -85,13 +85,6 @@ func MakeEventLogProperties(name string, message []string) []Property {
 	return trackMsg
 }
 
-// func EvtWithTerm(eventName string, extraProps ...Property) {
-// 	messages := term.DefaultTerm.GetAllMessages()
-// 	logProps := MakeEventLogProperties(logPropertyNamePrefix, messages)
-// 	allProps := append(extraProps, logProps...)
-// 	Evt(eventName, allProps...)
-// }
-
 func isCompletionCommand(cmd *cobra.Command) bool {
 	return cmd.Name() == cobra.ShellCompRequestCmd || (cmd.Parent() != nil && cmd.Parent().Name() == "completion")
 }
