@@ -158,7 +158,7 @@ func makeComposeUpCmd() *cobra.Command {
 				if tailOptions.LogCache != nil {
 					logs = tailOptions.LogCache.Get()
 				}
-				handleTailAndMonitorErr(ctx, err, &logs, client, cli.DebugConfig{
+				handleTailAndMonitorErr(ctx, err, logs, client, cli.DebugConfig{
 					Deployment: deploy.Etag,
 					ModelId:    modelId,
 					Project:    project,
@@ -228,7 +228,7 @@ func handleComposeUpErr(ctx context.Context, err error, project *compose.Project
 	return cli.InteractiveDebugForClientError(ctx, client, project, err)
 }
 
-func handleTailAndMonitorErr(ctx context.Context, err error, logs *[]string, client *cliClient.GrpcClient, debugConfig cli.DebugConfig) {
+func handleTailAndMonitorErr(ctx context.Context, err error, logs []string, client *cliClient.GrpcClient, debugConfig cli.DebugConfig) {
 	var errDeploymentFailed cliClient.ErrDeploymentFailed
 	if errors.As(err, &errDeploymentFailed) {
 		// Tail got canceled because of deployment failure: prompt to show the debugger
@@ -240,9 +240,7 @@ func handleTailAndMonitorErr(ctx context.Context, err error, logs *[]string, cli
 			printDefangHint("To debug the deployment, do:", debugConfig.String())
 		} else {
 			props := []track.Property{}
-			if logs != nil {
-				props = track.MakeEventLogProperties("logs", *logs)
-			}
+			props = track.MakeEventLogProperties("logs", logs)
 
 			props = append(props,
 				P("failedServices", debugConfig.FailedServices),
