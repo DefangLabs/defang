@@ -11,9 +11,10 @@ import (
 
 func TestCreate(t *testing.T) {
 	tests := []struct {
-		name       string
-		parameters StackParameters
-		expectErr  bool
+		name             string
+		parameters       StackParameters
+		expectErr        bool
+		expectedFilename string
 	}{
 		{
 			name: "valid parameters",
@@ -23,7 +24,8 @@ func TestCreate(t *testing.T) {
 				Region:   "us-west-2",
 				Mode:     modes.ModeAffordable,
 			},
-			expectErr: false,
+			expectErr:        false,
+			expectedFilename: ".defangrc.teststack",
 		},
 		{
 			name: "missing stack name",
@@ -50,7 +52,7 @@ func TestCreate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			err := Create(tt.parameters)
+			filename, err := Create(tt.parameters)
 			if (err != nil) != tt.expectErr {
 				t.Errorf("Create() error = %v, expectErr %v", err, tt.expectErr)
 			}
@@ -58,6 +60,10 @@ func TestCreate(t *testing.T) {
 			// Cleanup created file if no error expected
 			if !tt.expectErr {
 				os.Remove(".defangrc." + tt.parameters.Name)
+			}
+
+			if filename != tt.expectedFilename {
+				t.Errorf("Create() = %q, want %q", filename, tt.expectedFilename)
 			}
 		})
 	}

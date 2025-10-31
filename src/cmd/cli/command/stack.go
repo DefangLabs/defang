@@ -55,7 +55,8 @@ func makeStackNewCmd() *cobra.Command {
 			}
 
 			if nonInteractive {
-				return stacks.Create(params)
+				_, err := stacks.Create(params)
+				return err
 			}
 
 			if params.Provider == cliClient.ProviderAuto {
@@ -139,7 +140,18 @@ func makeStackNewCmd() *cobra.Command {
 
 			term.Debugf("Creating stack with parameters: %+v\n", params)
 
-			return stacks.Create(params)
+			filename, err := stacks.Create(params)
+			if err != nil {
+				return err
+			}
+
+			term.Infof(
+				"Created new stack configuration file: `%s`. "+
+					"Check this file into version control. "+
+					"You can now deploy this stack using `defang up %s`\n",
+				filename, params.Name,
+			)
+			return nil
 		},
 	}
 	stackNewCmd.Flags().VarP(&mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))

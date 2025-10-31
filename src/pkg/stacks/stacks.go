@@ -21,29 +21,29 @@ type StackParameters struct {
 
 var validStackName = regexp.MustCompile(`^[a-z][-a-z0-9]+$`)
 
-func Create(params StackParameters) error {
+func Create(params StackParameters) (string, error) {
 	if params.Name == "" {
-		return errors.New("stack name cannot be empty")
+		return "", errors.New("stack name cannot be empty")
 	}
 	if !validStackName.MatchString(params.Name) {
-		return errors.New("stack name must start with a letter and contain only lowercase letters, numbers, and hyphens")
+		return "", errors.New("stack name must start with a letter and contain only lowercase letters, numbers, and hyphens")
 	}
 
 	content, err := Marshal(params)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	filename := filename(params.Name)
 	file, err := os.CreateTemp(".", filename+".tmp.")
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer file.Close()
 
 	_, err = file.WriteString(content)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	term.Debugf("Created tmp stack configuration file: %s\n", file.Name())
@@ -51,17 +51,10 @@ func Create(params StackParameters) error {
 	// move to final name
 	err = os.Rename(file.Name(), filename)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	term.Infof(
-		"Created new stack configuration file: `%s`. "+
-			"Check this file into version control. "+
-			"You can now deploy this stack using `defang up %s`\n",
-		filename, params.Name,
-	)
-
-	return nil
+	return filename, nil
 }
 
 type StackListItem struct {
