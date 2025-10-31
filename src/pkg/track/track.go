@@ -15,7 +15,8 @@ import (
 const maxPropertyCharacterLength = 255 // chars per property in tracking event
 
 var disableAnalytics = pkg.GetenvBool("DEFANG_DISABLE_ANALYTICS")
-var logPropertyNamePrefix = "logs"
+
+const logPropertyNamePrefix = "logs"
 
 type Property = cliClient.Property
 
@@ -48,7 +49,7 @@ func Evt(name string, props ...Property) {
 		return
 	}
 
-	// filter out props with a name prefix of logPropertyNamePrefix, they should already be in the debug output
+	// compose logs may be in the tracking, they can be large so filter them out from debug output
 	var filteredProps []Property
 	for _, p := range props {
 		if strings.HasPrefix(p.Name, logPropertyNamePrefix) {

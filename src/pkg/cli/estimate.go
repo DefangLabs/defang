@@ -13,7 +13,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/datastructs"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/money"
@@ -77,8 +76,7 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 		Verbose:    true,
 	}
 
-	logCache := datastructs.NewCircularBuffer[string](30)
-	err = streamLogs(ctx, previewProvider, project.Name, tailOptions, logCache, func(entry *defangv1.LogEntry, options *TailOptions) error {
+	_, err = streamLogs(ctx, previewProvider, project.Name, tailOptions, func(entry *defangv1.LogEntry, options *TailOptions) error {
 		if strings.HasPrefix(entry.Message, "Preview succeeded") {
 			return io.EOF
 		} else if strings.HasPrefix(entry.Message, "Preview failed") {

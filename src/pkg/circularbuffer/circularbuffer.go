@@ -1,4 +1,4 @@
-package datastructs
+package circularbuffer
 
 // BufferInterface abstracts the buffer operations
 type BufferInterface[T any] interface {
@@ -21,7 +21,7 @@ func (c *CircularBuffer[T]) Add(item T) {
 
 func (c *CircularBuffer[T]) Get() []T {
 	maxItems := min(c.entries, c.size)
-	items := make([]T, 0, maxItems)
+	items := make([]T, maxItems)
 	startIdx := c.index
 
 	// the c.index points to the next write position (ie. oldest entry) if the buffer is full,
@@ -34,16 +34,16 @@ func (c *CircularBuffer[T]) Get() []T {
 	// Collect items in chronological order
 	for i := range maxItems {
 		idx := (startIdx + i) % c.size
-		items = append(items, c.data[idx])
+		items[i] = c.data[idx]
 	}
 	return items
 }
 
-func NewCircularBuffer[T any](bufferSize int) CircularBuffer[T] {
+func NewCircularBuffer[T any](bufferSize int) *CircularBuffer[T] {
 	if bufferSize <= 0 {
 		panic("failed to created a circular buffer: cannot have zero elements")
 	}
-	return CircularBuffer[T]{
+	return &CircularBuffer[T]{
 		size:    bufferSize,
 		entries: 0,
 		index:   0,

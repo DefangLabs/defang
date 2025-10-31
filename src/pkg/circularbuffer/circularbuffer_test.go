@@ -1,4 +1,4 @@
-package datastructs
+package circularbuffer
 
 import (
 	"testing"

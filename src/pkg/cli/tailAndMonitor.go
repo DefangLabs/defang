@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/circularbuffer"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/datastructs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
@@ -18,7 +18,7 @@ import (
 
 const targetServiceState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 
-func TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, tailOptions TailOptions) (ServiceStates, datastructs.BufferInterface[string], error) {
+func TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, tailOptions TailOptions) (ServiceStates, circularbuffer.BufferInterface[string], error) {
 	if tailOptions.Deployment == "" {
 		panic("tailOptions.Deployment must be a valid deployment ID")
 	}
@@ -68,7 +68,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 
 	// blocking call to tail
 	var err, tailErr error
-	var logCache datastructs.BufferInterface[string]
+	var logCache circularbuffer.BufferInterface[string]
 	if logCache, err = Tail(tailCtx, provider, project.Name, tailOptions); err != nil {
 		term.Debug("Tail stopped with", err, errors.Unwrap(err))
 

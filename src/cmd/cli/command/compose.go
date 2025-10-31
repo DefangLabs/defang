@@ -154,7 +154,7 @@ func makeComposeUpCmd() *cobra.Command {
 			serviceStates, logCache, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
 				logs := logCache.Get()
-				handleTailAndMonitorErr(ctx, err, &logs, client, cli.DebugConfig{
+				handleTailAndMonitorErr(ctx, err, logs, client, cli.DebugConfig{
 					Deployment: deploy.Etag,
 					ModelId:    modelId,
 					Project:    project,
@@ -235,16 +235,13 @@ func handleTailAndMonitorErr(ctx context.Context, err error, logs []string, clie
 		if nonInteractive {
 			printDefangHint("To debug the deployment, do:", debugConfig.String())
 		} else {
-			props := []track.Property{}
-			props = track.MakeEventLogProperties("logs", logs)
-
+			props := track.MakeEventLogProperties("logs", logs)
 			props = append(props,
 				P("failedServices", debugConfig.FailedServices),
 				P("etag", debugConfig.Deployment),
 				P("reason", errDeploymentFailed),
 			)
-			track.Evt("Debug Prompted", props...,
-			)
+			track.Evt("Debug Prompted", props...)
 
 			// Call the AI debug endpoint using the original command context (not the tail ctx which is canceled)
 			if nil != cli.InteractiveDebugDeployment(ctx, client, debugConfig) {

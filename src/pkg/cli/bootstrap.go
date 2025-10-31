@@ -9,7 +9,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/datastructs"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -51,10 +50,9 @@ func TailAndWaitForCD(ctx context.Context, provider client.Provider, projectName
 		cancelTail(cdErr)
 	}()
 
-	logCache := datastructs.NewCircularBuffer[string](30)
 	// blocking call to tail
 	var tailErr error
-	if err := streamLogs(ctx, provider, projectName, tailOptions, logCache, logEntryPrintHandler); err != nil {
+	if _, err := streamLogs(ctx, provider, projectName, tailOptions, logEntryPrintHandler); err != nil {
 		term.Debug("Tail stopped with", err, errors.Unwrap(err))
 		if !errors.Is(err, context.Canceled) {
 			tailErr = err

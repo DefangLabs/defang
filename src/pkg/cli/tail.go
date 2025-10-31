@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/circularbuffer"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/datastructs"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/spinner"
@@ -140,9 +140,7 @@ func (cerr CancelError) Unwrap() error {
 	return cerr.error
 }
 
-func Tail(ctx context.Context, provider client.Provider, projectName string, options TailOptions) (datastructs.BufferInterface[string], error) {
-	logCache := datastructs.NewCircularBuffer[string](30)
-
+func Tail(ctx context.Context, provider client.Provider, projectName string, options TailOptions) (circularbuffer.BufferInterface[string], error) {
 	if options.LogType == logs.LogTypeUnspecified {
 		options.LogType = logs.LogTypeAll
 	}
@@ -166,10 +164,10 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 	}
 
 	if dryrun.DoDryRun {
-		return &logCache, dryrun.ErrDryRun
+		return nil, dryrun.ErrDryRun
 	}
 
-	return &logCache, streamLogs(ctx, provider, projectName, options, logCache, logEntryPrintHandler)
+	return streamLogs(ctx, provider, projectName, options, logEntryPrintHandler)
 }
 
 func isTransientError(err error) bool {
@@ -205,7 +203,8 @@ func isTransientError(err error) bool {
 
 type LogEntryHandler func(*defangv1.LogEntry, *TailOptions) error
 
-func streamLogs(ctx context.Context, provider client.Provider, projectName string, options TailOptions, logCache datastructs.CircularBuffer[string], handler LogEntryHandler) error {
+func streamLogs(ctx context.Context, provider client.Provider, projectName string, options TailOptions, handler LogEntryHandler) (circularbuffer.BufferInterface[string], error) {
+	logCache := circularbuffer.NewCircularBuffer[string](30)
 	var sinceTs, untilTs *timestamppb.Timestamp
 	if pkg.IsValidTime(options.Since) {
 		sinceTs = timestamppb.New(options.Since)
@@ -237,7 +236,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 
 	serverStream, err := provider.QueryLogs(ctx, tailRequest)
 	if err != nil {
-		return err
+		return logCache, err
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -304,7 +303,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 	for {
 		if !serverStream.Receive() {
 			if errors.Is(serverStream.Err(), context.Canceled) || errors.Is(serverStream.Err(), context.DeadlineExceeded) {
-				return &CancelError{TailOptions: options, error: serverStream.Err(), ProjectName: projectName}
+				return logCache, &CancelError{TailOptions: options, error: serverStream.Err(), ProjectName: projectName}
 			}
 
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
@@ -315,13 +314,13 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 					spaces, _ = term.Warnf("Reconnecting...\r") // overwritten below
 				}
 				if err := provider.DelayBeforeRetry(ctx); err != nil {
-					return err
+					return logCache, err
 				}
 				tailRequest.Since = timestamppb.New(options.Since)
 				serverStream, err = provider.QueryLogs(ctx, tailRequest)
 				if err != nil {
 					term.Debug("Reconnect failed:", err)
-					return err
+					return logCache, err
 				}
 				if !options.Raw {
 					term.Printf("%*s", spaces, "\r") // clear the "reconnecting" message
@@ -330,7 +329,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 				continue
 			}
 
-			return serverStream.Err() // returns nil on EOF
+			return logCache, serverStream.Err() // returns nil on EOF
 		}
 		msg := serverStream.Msg()
 
@@ -364,7 +363,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 				if options.EndEventDetectFunc != nil {
 					if err := options.EndEventDetectFunc(e); err != nil {
 						cancel() // TODO: stuck on defer Close() if we don't do this
-						return err
+						return logCache, err
 					}
 				}
 				continue
@@ -377,7 +376,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 			if err != nil {
 				term.Debug("Ending tail loop", err)
 				cancel() // TODO: stuck on defer Close() if we don't do this
-				return err
+				return logCache, err
 			}
 		}
 	}

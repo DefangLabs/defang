@@ -7,10 +7,10 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/DefangLabs/defang/src/pkg/circularbuffer"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/datastructs"
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
@@ -57,7 +57,7 @@ func (DefaultToolCLI) ComposeUp(ctx context.Context, project *compose.Project, c
 	return cli.ComposeUp(ctx, project, client, provider, uploadMode, mode)
 }
 
-func (DefaultToolCLI) Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cli.TailOptions) (datastructs.BufferInterface[string], error) {
+func (DefaultToolCLI) Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cli.TailOptions) (circularbuffer.BufferInterface[string], error) {
 	return cli.Tail(ctx, provider, project.Name, options)
 }
 
