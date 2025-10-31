@@ -381,13 +381,17 @@ func TestPrintHandler(t *testing.T) {
 		inputfile  string
 		outputfile string
 	}{
+		// {
+		// 	inputfile:  "../../test-datasets/crew_input.jsonl",
+		// 	outputfile: "../../test-datasets/crew_output.txt",
+		// },
+		// {
+		// 	inputfile:  "../../test-datasets/flask_railpack_input.jsonl",
+		// 	outputfile: "../../test-datasets/flask_railpack_output.txt",
+		// },
 		{
-			inputfile:  "../../test-datasets/crew_input.jsonl",
-			outputfile: "../../test-datasets/crew_output.txt",
-		},
-		{
-			inputfile:  "../../test-datasets/flask_railpack_input.jsonl",
-			outputfile: "../../test-datasets/flask_railpack_output.txt",
+			inputfile:  "../../test-datasets/django_input.jsonl",
+			outputfile: "../../test-datasets/django_output.txt",
 		},
 	}
 

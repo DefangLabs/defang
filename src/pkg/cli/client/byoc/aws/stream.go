@@ -13,6 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/utils"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -126,6 +127,8 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) *defangv1.TailRes
 		return nil // TODO: filter these out using the AWS StartLiveTail API
 	}
 
+	utils.AppendJSONObject("logEvents.jsonl", events)
+
 	entries := make([]*defangv1.LogEntry, 0, len(events))
 	for _, event := range events {
 		entry := &defangv1.LogEntry{
@@ -165,6 +168,7 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) *defangv1.TailRes
 			continue
 		}
 
+		utils.AppendJSONObject("logEntries.jsonl", entry)
 		entries = append(entries, entry)
 	}
 	if len(entries) == 0 {
