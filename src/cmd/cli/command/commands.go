@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
-	_ "github.com/DefangLabs/defang/src/cmd/cli/autoload"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -45,24 +44,6 @@ const authNeeded = "auth-needed" // annotation to indicate that a command needs 
 var authNeededAnnotation = map[string]string{authNeeded: ""}
 
 var P = track.P
-
-// GLOBALS
-var (
-	client         *cliClient.GrpcClient
-	cluster        string
-	colorMode      = ColorAuto
-	sourcePlatform = migrate.SourcePlatformUnspecified // default to auto-detecting the source platform
-	doDebug        = false
-	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
-	hideUpdate     = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
-	mode, _        = modes.Parse(os.Getenv("DEFANG_MODE"))
-	modelId        = os.Getenv("DEFANG_MODEL_ID") // for Pro users only
-	nonInteractive = !hasTty
-	org            string
-	providerID     = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", "auto"))
-	stack          = os.Getenv("DEFANG_STACK")
-	verbose        = false
-)
 
 func getCluster() string {
 	if org == "" {
@@ -377,6 +358,9 @@ var RootCmd = &cobra.Command{
 				return err
 			}
 		}
+
+		// Read the global flags again from any .defangrc files in the cwd
+		readGlobals(stack)
 
 		client, err = cli.Connect(ctx, getCluster())
 
