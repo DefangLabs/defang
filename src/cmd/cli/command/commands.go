@@ -545,6 +545,13 @@ var generateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
+		if nonInteractive {
+			if len(args) == 0 {
+				return errors.New("cannot run in non-interactive mode")
+			}
+			return cli.InitFromSamples(ctx, args[0], args)
+		}
+
 		setupClient := setup.SetupClient{
 			Surveyor: surveyor.NewDefaultSurveyor(),
 			Heroku:   migrate.NewHerokuClient(),
@@ -553,7 +560,7 @@ var generateCmd = &cobra.Command{
 			Cluster:  getCluster(),
 		}
 
-		sample := ""
+		var sample string
 		if len(args) > 0 {
 			sample = args[0]
 		}
@@ -573,6 +580,14 @@ var initCmd = &cobra.Command{
 	Short:   "Create a new Defang project from a sample",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
+
+		if nonInteractive {
+			if len(args) == 0 {
+				return errors.New("cannot run in non-interactive mode")
+			}
+			return cli.InitFromSamples(ctx, args[0], args)
+		}
+
 		setupClient := setup.SetupClient{
 			Surveyor: surveyor.NewDefaultSurveyor(),
 			Heroku:   migrate.NewHerokuClient(),
@@ -584,10 +599,6 @@ var initCmd = &cobra.Command{
 		if len(args) > 0 {
 			_, err := setupClient.CloneSample(ctx, args[0])
 			return err
-		}
-
-		if nonInteractive {
-			return errors.New("cannot run in non-interactive mode")
 		}
 
 		result, err := setupClient.Start(ctx)
