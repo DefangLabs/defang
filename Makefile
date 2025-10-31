@@ -7,11 +7,11 @@ install-git-hooks:
 
 .PHONY: pre-commit
 pre-commit:
-	@if git diff --cached --name-only | grep -q '^src/'; then make -C src lint; fi
+	@if git diff --cached --name-only | grep -q '^src/'; then $(MAKE) -C src lint; fi
 
 .PHONY: pre-push
 pre-push: pkgs/npm/README.md src/README.md test-nix
-	@make -C src test
+	@$(MAKE) -C src test
 
 .PHONY: setup
 setup:
@@ -29,4 +29,10 @@ pkgs/npm/README.md src/README.md: README.md
 
 .PHONY: test-nix
 test-nix:
+ifneq (,$(shell which nix))
 	nix run .#defang-cli --extra-experimental-features flakes --extra-experimental-features nix-command
+endif
+
+.PHONY: clean distclean
+clean distclean:
+	$(MAKE) -C src $@
