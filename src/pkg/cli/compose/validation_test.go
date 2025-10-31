@@ -26,7 +26,7 @@ func TestValidationAndConvert(t *testing.T) {
 
 	t.Setenv("NODE_ENV", "if-you-see-this-env-was-used") // for interpolate/compose.yaml; should be ignored
 
-	mockClient := client.MockProvider{}
+	mockClient := &client.MockProvider{}
 	listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
 		configs, err := mockClient.ListConfig(ctx, &defangv1.ListConfigsRequest{})
 		if err != nil {

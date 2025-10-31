@@ -12,18 +12,14 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-var Connect = cli.Connect
-var CheckProviderConfigured = checkProviderConfigured
-var newProvider = cli.NewProvider
-var MCPDevelopmentClient = ""
+var MCPDevelopmentClient = "" // set by NewDefangMCPServer
 
 const PostPrompt = "Please deploy my application with Defang now."
 
-var ErrNoProviderSet = errors.New("No cloud provider is configured. Use `/` to open prompts and use the 3 Defang setup prompts, or use tools: set_aws_provider, set_gcp_provider, or set_playground_provider.")
+var ErrNoProviderSet = errors.New("no cloud provider is configured. Use `/` to open prompts and use the 3 Defang setup prompts, or use tools: set_aws_provider, set_gcp_provider, or set_playground_provider.")
 
 func GetStringArg(args map[string]string, key, defaultValue string) string {
 	if val, exists := args[key]; exists {
@@ -40,7 +36,7 @@ func ConfigureLoader(request mcp.CallToolRequest) (*compose.Loader, error) {
 
 	err = os.Chdir(wd)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to change working directory: %w", err)
+		return nil, fmt.Errorf("failed to change working directory: %w", err)
 	}
 
 	projectName, err := request.RequireString("project_name")
@@ -77,23 +73,6 @@ func FixupConfigError(err error) error {
 	return err
 }
 
-func CanIUseProvider(ctx context.Context, grpcClient client.FabricClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {
-	canUseReq := defangv1.CanIUseRequest{
-		Project:      projectName,
-		Provider:     providerId.Value(),
-		ServiceCount: int32(serviceCount), // #nosec G115 - service count will not overflow int32
-	}
-	term.Debug("Function invoked: client.CanIUse")
-	resp, err := grpcClient.CanIUse(ctx, &canUseReq)
-	if err != nil {
-		return err
-	}
-
-	term.Debug("Function invoked: provider.SetCanIUseConfig")
-	provider.SetCanIUseConfig(resp)
-	return nil
-}
-
 func ProviderNotConfiguredError(providerId client.ProviderID) error {
 	if providerId == client.ProviderAuto {
 		return ErrNoProviderSet
@@ -101,15 +80,10 @@ func ProviderNotConfiguredError(providerId client.ProviderID) error {
 	return nil
 }
 
-func checkProviderConfigured(ctx context.Context, client cliClient.FabricClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error) {
-	provider := newProvider(ctx, providerId, client)
+func CheckProviderConfigured(ctx context.Context, client cliClient.FabricClient, providerId cliClient.ProviderID, projectName, stack string, serviceCount int) (cliClient.Provider, error) {
+	provider := cli.NewProvider(ctx, providerId, client, stack)
 
-	_, err := provider.AccountInfo(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	err = CanIUseProvider(ctx, client, providerId, projectName, provider, serviceCount)
+	err := cliClient.CanIUseProvider(ctx, client, provider, projectName, stack, serviceCount)
 	if err != nil {
 		return nil, fmt.Errorf("failed to use provider: %w", err)
 	}

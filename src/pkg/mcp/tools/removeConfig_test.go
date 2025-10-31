@@ -11,10 +11,12 @@ import (
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// MockRemoveConfigCLI implements RemoveConfigCLIInterface for testing
+// MockRemoveConfigCLI implements CLIInterface for testing
 type MockRemoveConfigCLI struct {
+	CLIInterface
 	ConnectError              error
 	LoadProjectNameError      error
 	ConfigDeleteError         error
@@ -31,7 +33,7 @@ func (m *MockRemoveConfigCLI) Connect(ctx context.Context, cluster string) (*cli
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockRemoveConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) client.Provider {
+func (m *MockRemoveConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient, stack string) client.Provider {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
 	return nil // Mock provider
 }
@@ -160,7 +162,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 					assert.EqualError(t, err, tt.expectedError)
 					return
 				} else {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 				}
 			}
 
@@ -175,7 +177,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 					assert.EqualError(t, err, tt.expectedError) // Ensure err is not nil before checking its message
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				if tt.expectedTextContains != "" && len(result) > 0 {
 					assert.Contains(t, result, tt.expectedTextContains)
 				}

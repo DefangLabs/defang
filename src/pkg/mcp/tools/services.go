@@ -10,20 +10,11 @@ import (
 	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
-	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/bufbuild/connect-go"
 )
 
-type ServicesCLIInterface interface {
-	connecter
-	providerFactory
-	projectNameLoader
-	// Unique methods
-	GetServices(ctx context.Context, projectName string, provider cliClient.Provider) ([]deployment_info.Service, error)
-}
-
-func handleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli ServicesCLIInterface) (string, error) {
+func handleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", err
@@ -37,7 +28,7 @@ func handleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, pro
 
 	// Create a Defang client
 	term.Debug("Function invoked: cli.NewProvider")
-	provider := cli.NewProvider(ctx, *providerId, client)
+	provider := cli.NewProvider(ctx, *providerId, client, "")
 
 	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)

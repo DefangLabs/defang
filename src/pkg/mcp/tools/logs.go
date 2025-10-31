@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg/circularbuffer"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -49,16 +47,7 @@ func parseLogsParams(request mcp.CallToolRequest) (LogsParams, error) {
 	}, nil
 }
 
-type LogsCLIInterface interface {
-	connecter
-	providerFactory
-	// Unique methods
-	Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cliTypes.TailOptions) (circularbuffer.BufferInterface[string], error)
-	CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error)
-	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
-}
-
-func handleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, cluster string, providerId *cliClient.ProviderID, cli LogsCLIInterface) (string, error) {
+func handleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, cluster string, providerId *cliClient.ProviderID, cli CLIInterface) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
@@ -76,7 +65,7 @@ func handleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 
 	term.Debug("Function invoked: cli.NewProvider")
 
-	provider, err := cli.CheckProviderConfigured(ctx, client, *providerId, project.Name, len(project.Services))
+	provider, err := cli.CheckProviderConfigured(ctx, client, *providerId, project.Name, "", len(project.Services))
 	if err != nil {
 		return "", fmt.Errorf("provider not configured correctly: %w", err)
 	}

@@ -73,7 +73,7 @@ func printServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) error 
 		attrs = append(attrs, "DomainName")
 	}
 
-	err := term.Table(serviceTableItems, attrs)
+	err := term.Table(serviceTableItems, attrs...)
 	if err != nil {
 		return err
 	}

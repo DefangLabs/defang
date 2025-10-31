@@ -14,10 +14,12 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// MockEstimateCLI implements EstimateCLIInterface for testing
+// MockEstimateCLI implements CLIInterface for testing
 type MockEstimateCLI struct {
+	CLIInterface
 	ConnectError       error
 	LoadProjectError   error
 	RunEstimateError   error
@@ -56,10 +58,6 @@ func (m *MockEstimateCLI) RunEstimate(ctx context.Context, project *compose.Proj
 	return m.EstimateResponse, nil
 }
 
-func (m *MockEstimateCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("PrintEstimate(%s)", mode.String()))
-}
-
 func (m *MockEstimateCLI) ConfigureLoader(request mcp.CallToolRequest) client.Loader {
 	m.CallLog = append(m.CallLog, "ConfigureLoader")
 	return nil
@@ -70,8 +68,8 @@ func (m *MockEstimateCLI) CreatePlaygroundProvider(grpcClient *client.GrpcClient
 	return nil
 }
 
-func (m *MockEstimateCLI) CaptureTermOutput(mode modes.Mode, estimate *defangv1.EstimateResponse) string {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("CaptureTermOutput(%s)", mode.String()))
+func (m *MockEstimateCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string {
+	m.CallLog = append(m.CallLog, fmt.Sprintf("PrintEstimate(%s)", mode.String()))
 	return m.CapturedOutput
 }
 
@@ -101,7 +99,7 @@ func TestHandleEstimateTool(t *testing.T) {
 				}
 				m.CapturedOutput = "Estimated cost: $15.00/month"
 			},
-			expectedError: "Unknown deployment mode \"unknown-mode\", please use one of " + strings.Join(modes.AllDeploymentModes(), ", "),
+			expectedError: "unknown deployment mode \"unknown-mode\", please use one of " + strings.Join(modes.AllDeploymentModes(), ", "),
 		},
 		{
 			name: "load_project_error",
@@ -119,7 +117,7 @@ func TestHandleEstimateTool(t *testing.T) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.ConnectError = errors.New("connection failed")
 			},
-			expectedError: "Could not connect: connection failed",
+			expectedError: "could not connect: connection failed",
 		},
 		{
 			name: "set_provider_id_error",
@@ -129,7 +127,7 @@ func TestHandleEstimateTool(t *testing.T) {
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
 			},
-			expectedError: "Invalid provider specified: provider not one of [auto defang aws digitalocean gcp]",
+			expectedError: "invalid provider specified: provider not one of [auto defang aws digitalocean gcp]",
 		},
 		{
 			name: "run_estimate_error",
@@ -141,7 +139,7 @@ func TestHandleEstimateTool(t *testing.T) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.RunEstimateError = errors.New("estimate failed")
 			},
-			expectedError: "Failed to run estimate: estimate failed",
+			expectedError: "failed to run estimate: estimate failed",
 		},
 		{
 			name: "successful_estimate_default_mode",
@@ -212,7 +210,7 @@ func TestHandleEstimateTool(t *testing.T) {
 					assert.EqualError(t, err, tt.expectedError)
 					return
 				} else {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 				}
 			}
 			result, err := handleEstimateTool(t.Context(), loader, params, "test-cluster", mockCLI)
@@ -221,7 +219,7 @@ func TestHandleEstimateTool(t *testing.T) {
 			if tt.expectedError != "" {
 				assert.EqualError(t, err, tt.expectedError)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				if tt.expectedTextContains != "" && len(result) > 0 {
 					assert.Contains(t, result, tt.expectedTextContains)
 				}
@@ -234,7 +232,7 @@ func TestHandleEstimateTool(t *testing.T) {
 					"Connect(test-cluster)",
 					"CreatePlaygroundProvider",
 					"RunEstimate(test-project, aws, AFFORDABLE)",
-					"CaptureTermOutput(AFFORDABLE)",
+					"PrintEstimate(AFFORDABLE)",
 				}
 				assert.Equal(t, expectedCalls, mockCLI.CallLog)
 			}

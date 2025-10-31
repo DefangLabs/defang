@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
-	_ "github.com/DefangLabs/defang/src/cmd/cli/autoload"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -45,23 +44,6 @@ const authNeeded = "auth-needed" // annotation to indicate that a command needs 
 var authNeededAnnotation = map[string]string{authNeeded: ""}
 
 var P = track.P
-
-// GLOBALS
-var (
-	client         *cliClient.GrpcClient
-	cluster        string
-	colorMode      = ColorAuto
-	sourcePlatform = migrate.SourcePlatformUnspecified // default to auto-detecting the source platform
-	doDebug        = false
-	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
-	hideUpdate     = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
-	mode, _        = modes.Parse(os.Getenv("DEFANG_MODE"))
-	modelId        = os.Getenv("DEFANG_MODEL_ID") // for Pro users only
-	nonInteractive = !hasTty
-	org            string
-	providerID     = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", "auto"))
-	verbose        = false
-)
 
 func getCluster() string {
 	if org == "" {
@@ -161,8 +143,9 @@ func SetupCommands(ctx context.Context, version string) {
 	cobra.EnableTraverseRunHooks = true // we always need to run the RootCmd's pre-run hook
 
 	RootCmd.Version = version
+	RootCmd.PersistentFlags().StringVarP(&stack, "stack", "s", stack, "stack name (for BYOC providers)")
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
-	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", pcluster.DefangFabric, "Defang cluster to connect to")
+	RootCmd.PersistentFlags().StringVar(&cluster, "cluster", pcluster.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
 	RootCmd.PersistentFlags().StringVar(&org, "org", os.Getenv("DEFANG_ORG"), "override GitHub organization name (tenant)")
 	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
@@ -297,10 +280,11 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(deploymentsCmd)
 
 	// MCP Command
-	mcpCmd.AddCommand(mcpSetupCmd)
 	mcpServerCmd.Flags().Int("auth-server", 0, "auth server port")
+	mcpServerCmd.Flags().MarkDeprecated("auth-server", "we now reach out to the auth server: https://auth.defang.io directly")
 	mcpCmd.AddCommand(mcpServerCmd)
 	mcpCmd.PersistentFlags().String("client", "", fmt.Sprintf("MCP setup client %v", mcp.ValidClients))
+	mcpCmd.AddCommand(mcpSetupCmd)
 	RootCmd.AddCommand(mcpCmd)
 
 	// Send Command
@@ -317,6 +301,9 @@ func SetupCommands(ctx context.Context, version string) {
 	// TODO: Add list, renew etc.
 	certCmd.AddCommand(certGenerateCmd)
 	RootCmd.AddCommand(certCmd)
+
+	stackCmd := makeStackCmd()
+	RootCmd.AddCommand(stackCmd)
 
 	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
 		// Add some emphasis to the help command
@@ -371,6 +358,9 @@ var RootCmd = &cobra.Command{
 				return err
 			}
 		}
+
+		// Read the global flags again from any .defangrc files in the cwd
+		readGlobals(stack)
 
 		client, err = cli.Connect(ctx, getCluster())
 
@@ -456,14 +446,14 @@ var whoamiCmd = &cobra.Command{
 			_, err = fmt.Println(string(bytes))
 			return err
 		} else {
-			return term.Table([]cli.ShowAccountData{data}, []string{
+			return term.Table([]cli.ShowAccountData{data},
 				"Provider",
 				"AccountID",
 				"Tenant",
 				"TenantID",
 				"SubscriberTier",
 				"Region",
-			})
+			)
 		}
 	},
 }
@@ -539,6 +529,13 @@ var generateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
+		if nonInteractive {
+			if len(args) == 0 {
+				return errors.New("cannot run in non-interactive mode")
+			}
+			return cli.InitFromSamples(ctx, args[0], args)
+		}
+
 		setupClient := setup.SetupClient{
 			Surveyor: surveyor.NewDefaultSurveyor(),
 			Heroku:   migrate.NewHerokuClient(),
@@ -547,7 +544,7 @@ var generateCmd = &cobra.Command{
 			Cluster:  getCluster(),
 		}
 
-		sample := ""
+		var sample string
 		if len(args) > 0 {
 			sample = args[0]
 		}
@@ -567,6 +564,14 @@ var initCmd = &cobra.Command{
 	Short:   "Create a new Defang project from a sample",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
+
+		if nonInteractive {
+			if len(args) == 0 {
+				return errors.New("cannot run in non-interactive mode")
+			}
+			return cli.InitFromSamples(ctx, args[0], args)
+		}
+
 		setupClient := setup.SetupClient{
 			Surveyor: surveyor.NewDefaultSurveyor(),
 			Heroku:   migrate.NewHerokuClient(),
@@ -578,10 +583,6 @@ var initCmd = &cobra.Command{
 		if len(args) > 0 {
 			_, err := setupClient.CloneSample(ctx, args[0])
 			return err
-		}
-
-		if nonInteractive {
-			return errors.New("cannot run in non-interactive mode")
 		}
 
 		result, err := setupClient.Start(ctx)
@@ -1143,7 +1144,7 @@ func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 		return nil, err
 	}
 
-	provider := cli.NewProvider(ctx, providerID, client)
+	provider := cli.NewProvider(ctx, providerID, client, stack)
 	return provider, nil
 }
 
@@ -1157,18 +1158,7 @@ func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient
 }
 
 func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string, serviceCount int) error {
-	canUseReq := defangv1.CanIUseRequest{
-		Project:      projectName,
-		Provider:     providerID.Value(),
-		ServiceCount: int32(serviceCount), // #nosec G115 - service count will not overflow int32
-	}
-
-	resp, err := client.CanIUse(ctx, &canUseReq)
-	if err != nil {
-		return err
-	}
-	provider.SetCanIUseConfig(resp)
-	return nil
+	return cliClient.CanIUseProvider(ctx, client, provider, projectName, stack, serviceCount)
 }
 
 func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, error) {

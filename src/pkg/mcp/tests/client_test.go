@@ -10,17 +10,17 @@ import (
 	"time"
 
 	"github.com/bufbuild/connect-go"
-	"github.com/mark3labs/mcp-go/client"
+	m3client "github.com/mark3labs/mcp-go/client"
 	m3mcp "github.com/mark3labs/mcp-go/mcp"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
 	typepb "github.com/DefangLabs/defang/src/protos/google/type"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,11 +39,12 @@ type mockFabricService struct {
 	deployCalled        bool
 	destroyCalled       bool
 
-	canIUseCalled                  bool
-	whoAmICalled                   bool
-	tailCalled                     bool
-	putDeploymentCalled            bool
-	getDelegateSubdomainZoneCalled bool
+	canIUseCalled                    bool
+	whoAmICalled                     bool
+	tailCalled                       bool
+	putDeploymentCalled              bool
+	getDelegateSubdomainZoneCalled   bool
+	getPlaygroundProjectDomainCalled bool
 }
 
 func (m *mockFabricService) resetFlags() {
@@ -60,6 +61,7 @@ func (m *mockFabricService) resetFlags() {
 	m.tailCalled = false
 	m.putDeploymentCalled = false
 	m.getDelegateSubdomainZoneCalled = false
+	m.getPlaygroundProjectDomainCalled = false
 }
 
 func (m *mockFabricService) CanIUse(ctx context.Context, req *connect.Request[defangv1.CanIUseRequest]) (*connect.Response[defangv1.CanIUseResponse], error) {
@@ -196,18 +198,25 @@ func (m *mockFabricService) Destroy(ctx context.Context, req *connect.Request[de
 	}), nil
 }
 
+func (m *mockFabricService) GetPlaygroundProjectDomain(ctx context.Context, req *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.GetPlaygroundProjectDomainResponse], error) {
+	m.getPlaygroundProjectDomainCalled = true
+	return connect.NewResponse(&defangv1.GetPlaygroundProjectDomainResponse{
+		Domain: "mock-playground.example.com",
+	}), nil
+}
+
 // End mockFabricService methods
 
 // Test helpers
-func setupTest(t *testing.T, tmpDir string) *client.Client {
+func setupTest(t *testing.T, tmpDir string) *m3client.Client {
 	t.Helper()
 	// Create a minimal mock knowledge_base resource in the test's working directory
 	resourceDir := tmpDir + "/knowledge_base"
 	_ = os.WriteFile(resourceDir+"/README.md", []byte("# Mock Knowledge Base\nThis is a test stub."), 0644)
-	MockFabric = &mockFabricService{
+	mockFabric = &mockFabricService{
 		configValues: make(map[string]string),
 	}
-	fabricServer := startMockFabricServer(MockFabric)
+	fabricServer := startMockFabricServer(mockFabric)
 	t.Cleanup(fabricServer.Close)
 	mcpClient, err := startInProcessMCPServer(t.Context(), fabricServer)
 	if err != nil {
@@ -238,9 +247,9 @@ func createTestProjectDir(t *testing.T) string {
 	return tempDir
 }
 
-type MCPClient struct {
+type testClient struct {
 	fabricServer *httptest.Server
-	client       *client.Client
+	client       *m3client.Client
 	serverInfo   *m3mcp.InitializeResult
 	cancel       context.CancelFunc
 }
@@ -248,7 +257,7 @@ type MCPClient struct {
 // test suite variables
 var (
 	projectDir string
-	mcpClient  *client.Client
+	mcpClient  *m3client.Client
 )
 
 var expectedToolsList = []string{
@@ -271,16 +280,25 @@ func startMockFabricServer(mockService *mockFabricService) *httptest.Server {
 	return httptest.NewServer(handler)
 }
 
+type cliWithoutBrowser struct {
+	tools.DefaultToolCLI
+}
+
+func (cliWithoutBrowser) OpenBrowser(url string) error {
+	// no-op to avoid opening a browser during tests
+	return nil
+}
+
 // startInProcessMCPServer sets up an in-process MCP server and returns a connected client and a cleanup function.
-func startInProcessMCPServer(ctx context.Context, fabric *httptest.Server) (*MCPClient, error) {
+func startInProcessMCPServer(ctx context.Context, fabric *httptest.Server) (*testClient, error) {
 	providerId := cliClient.ProviderDefang
 	cluster := strings.TrimPrefix(fabric.URL, "http://")
-	srv, err := mcp.NewDefangMCPServer("0.0.1-test", cluster, 0, &providerId, "")
+	srv, err := mcp.NewDefangMCPServer("0.0.1-test", cluster, &providerId, "", cliWithoutBrowser{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MCP server: %v", err)
 	}
 
-	client, err := client.NewInProcessClient(srv)
+	client, err := m3client.NewInProcessClient(srv)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MCP client: %v", err)
 	}
@@ -307,7 +325,7 @@ func startInProcessMCPServer(ctx context.Context, fabric *httptest.Server) (*MCP
 		return nil, fmt.Errorf("failed to initialize MCP client: %v", err)
 	}
 
-	return &MCPClient{
+	return &testClient{
 		client:       client,
 		fabricServer: fabric,
 		serverInfo:   serverInfo,
@@ -315,7 +333,7 @@ func startInProcessMCPServer(ctx context.Context, fabric *httptest.Server) (*MCP
 	}, nil
 }
 
-var MockFabric *mockFabricService
+var mockFabric *mockFabricService
 
 func TestInProcessMCPServer(t *testing.T) {
 	TestInProcessMCPServer_Setup := func(t *testing.T) {
@@ -361,9 +379,9 @@ func TestInProcessMCPServer(t *testing.T) {
 	// 			},
 	// 		},
 	// 	})
-	// 	assertCalled(t, err == nil, "Services tool error")
-	// 	assertCalled(t, !result.IsError, "Services tool IsError")
-	// 	assertCalled(t, MockFabric.getServicesCalled, "services (GetServices)")
+	// 	require.NoError(t, err, "Services tool error")
+	// 	assert.True(t, !result.IsError, "Services tool IsError")
+	// 	assertCalled(t, mockFabric.getServicesCalled, "services (GetServices)")
 	// 	found := false
 	// 	for _, content := range result.Content {
 	// 		if text, ok := content.(m3mcp.TextContent); ok {
@@ -377,7 +395,7 @@ func TestInProcessMCPServer(t *testing.T) {
 	// }
 
 	TestInProcessMCPServer_Estimate := func(t *testing.T) {
-		MockFabric.estimateCalled = false
+		mockFabric.estimateCalled = false
 		start := time.Now()
 		result, err := mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
 			Params: m3mcp.CallToolParams{
@@ -391,10 +409,10 @@ func TestInProcessMCPServer(t *testing.T) {
 		})
 		t.Logf("Estimate tool call took: %v", time.Since(start))
 		t.Logf("Estimate tool error: %v", err)
-		t.Logf("MockFabric.estimateCalled: %v", MockFabric.estimateCalled)
-		assertCalled(t, err == nil, "Estimate tool error")
-		assertCalled(t, !result.IsError, "Estimate tool IsError")
-		assertCalled(t, MockFabric.estimateCalled, "estimate (Estimate)")
+		t.Logf("MockFabric.estimateCalled: %v", mockFabric.estimateCalled)
+		require.NoError(t, err, "Estimate tool error")
+		assert.True(t, !result.IsError, "Estimate tool IsError")
+		assertCalled(t, mockFabric.estimateCalled, "estimate (Estimate)")
 		found := false
 		for _, content := range result.Content {
 			if text, ok := content.(m3mcp.TextContent); ok {
@@ -421,8 +439,8 @@ func TestInProcessMCPServer(t *testing.T) {
 				},
 			},
 		})
-		assertCalled(t, err == nil, "Login tool error")
-		assertCalled(t, !result.IsError, "Login tool IsError")
+		require.NoError(t, err, "Login tool error")
+		assert.True(t, !result.IsError, "Login tool IsError")
 	}
 
 	TestInProcessMCPServer_Config := func(t *testing.T) {
@@ -440,9 +458,9 @@ func TestInProcessMCPServer(t *testing.T) {
 		if err != nil {
 			t.Fatalf("set_config tool failed: %v", err)
 		}
-		assertCalled(t, MockFabric.putSecretCalled, "set_config (PutSecret)")
+		assertCalled(t, mockFabric.putSecretCalled, "set_config (PutSecret)")
 
-		MockFabric.listSecretsCalled = false
+		mockFabric.listSecretsCalled = false
 		result, err := mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
 			Params: m3mcp.CallToolParams{
 				Name: "list_configs",
@@ -454,7 +472,7 @@ func TestInProcessMCPServer(t *testing.T) {
 		if err != nil {
 			t.Fatalf("list_configs tool failed: %v", err)
 		}
-		assertCalled(t, MockFabric.listSecretsCalled, "list_configs (ListSecrets)")
+		assertCalled(t, mockFabric.listSecretsCalled, "list_configs (ListSecrets)")
 		if len(result.Content) == 0 {
 			t.Fatalf("List Configs tool returned empty content")
 		}
@@ -479,7 +497,7 @@ func TestInProcessMCPServer(t *testing.T) {
 		if err != nil {
 			t.Fatalf("remove_config tool failed: %v", err)
 		}
-		assertCalled(t, MockFabric.deleteSecretsCalled, "remove_config (DeleteSecrets)")
+		assertCalled(t, mockFabric.deleteSecretsCalled, "remove_config (DeleteSecrets)")
 
 		result, err = mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
 			Params: m3mcp.CallToolParams{
@@ -492,7 +510,7 @@ func TestInProcessMCPServer(t *testing.T) {
 		if err != nil {
 			t.Fatalf("list_configs tool failed: %v", err)
 		}
-		assertCalled(t, MockFabric.listSecretsCalled, "list_configs (ListSecrets after delete)")
+		assertCalled(t, mockFabric.listSecretsCalled, "list_configs (ListSecrets after delete)")
 		textContent, ok = result.Content[0].(m3mcp.TextContent)
 		if !ok {
 			t.Fatalf("Expected TextContent type in result.Content[0], got %T", result.Content[0])
@@ -504,15 +522,6 @@ func TestInProcessMCPServer(t *testing.T) {
 	}
 
 	TestInProcessMCPServer_DeployAndDestroy := func(t *testing.T) {
-		var origBrowser = tools.OpenBrowserFunc
-		t.Cleanup(func() {
-			tools.OpenBrowserFunc = origBrowser
-		})
-		tools.OpenBrowserFunc = func(url string) error {
-			// no-op to avoid opening a browser during tests
-			return nil
-		}
-
 		const dummyToken = "Testing.Token.1234"
 		t.Setenv("DEFANG_ACCESS_TOKEN", dummyToken)
 
@@ -525,10 +534,10 @@ func TestInProcessMCPServer(t *testing.T) {
 			},
 		})
 		t.Logf("Deploy tool error: %v", err)
-		t.Logf("MockFabric.deployCalled: %v", MockFabric.deployCalled)
-		assertCalled(t, err == nil, "Deploy tool error")
-		assertCalled(t, !result.IsError, "Deploy tool IsError")
-		assertCalled(t, MockFabric.deployCalled, "deploy (Deploy)")
+		t.Logf("MockFabric.deployCalled: %v", mockFabric.deployCalled)
+		require.NoError(t, err, "Deploy tool error")
+		assert.True(t, !result.IsError, "Deploy tool IsError")
+		assertCalled(t, mockFabric.deployCalled, "deploy (Deploy)")
 
 		_, err = mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
 			Params: m3mcp.CallToolParams{
@@ -538,8 +547,8 @@ func TestInProcessMCPServer(t *testing.T) {
 				},
 			},
 		})
-		assertCalled(t, err == nil, "Destroy tool error")
-		assertCalled(t, MockFabric.destroyCalled, "destroy (Destroy)")
+		require.NoError(t, err, "Destroy tool error")
+		assertCalled(t, mockFabric.destroyCalled, "destroy (Destroy)")
 	}
 
 	// Suite-level setup
@@ -562,95 +571,7 @@ func TestInProcessMCPServer(t *testing.T) {
 		// {"TestInProcessMCPServer_Services", TestInProcessMCPServer_Services},
 	}
 	for _, tc := range tests {
-		MockFabric.resetFlags()
+		mockFabric.resetFlags()
 		t.Run(tc.name, tc.fn)
 	}
-}
-
-// Test for setAWSBYOCProvider tool
-func TestInProcessMCPServer_SetAWSBYOCProvider(t *testing.T) {
-	projectDir = createTestProjectDir(t)
-	mcpClient = setupTest(t, projectDir)
-	var origCheck = common.CheckProviderConfigured
-	var origConnect = common.Connect
-	common.Connect = func(ctx context.Context, cluster string) (*cliClient.GrpcClient, error) { return nil, nil }
-	common.CheckProviderConfigured = func(ctx context.Context, fabric cliClient.FabricClient, providerId cliClient.ProviderID, s string, i int) (cliClient.Provider, error) {
-		return &cliClient.MockProvider{}, nil
-	}
-	t.Cleanup(func() {
-		common.CheckProviderConfigured = origCheck
-		common.Connect = origConnect
-	})
-
-	const dummyToken = "Testing.Token.1234"
-	t.Setenv("DEFANG_ACCESS_TOKEN", dummyToken)
-	awsId := "ABIA12345678901234"
-	awsSecret := "awsSecret"
-	region := "us-test-2"
-	result, err := mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
-		Params: m3mcp.CallToolParams{
-			Name: "set_aws_provider",
-			Arguments: map[string]interface{}{
-				"working_directory": projectDir,
-				"accessKeyId":       awsId,
-				"secretAccessKey":   awsSecret,
-				"region":            region,
-			},
-		},
-	})
-	require.NoError(t, err, "set_aws_provider tool error")
-	require.NotNil(t, result)
-	require.False(t, result.IsError, "set_aws_provider result is error")
-	found := false
-	for _, content := range result.Content {
-		if text, ok := content.(m3mcp.TextContent); ok {
-			if strings.Contains(text.Text, "Successfully set the provider") {
-				found = true
-				break
-			}
-		}
-	}
-	require.True(t, found, "Expected success message in set_aws_provider output")
-}
-
-// Test for setGCPBYOCProvider tool
-func TestInProcessMCPServer_SetGCPBYOCProvider(t *testing.T) {
-	projectDir = createTestProjectDir(t)
-	mcpClient = setupTest(t, projectDir)
-	var origCheck = common.CheckProviderConfigured
-	var origConnect = common.Connect
-	common.Connect = func(ctx context.Context, cluster string) (*cliClient.GrpcClient, error) { return nil, nil }
-	common.CheckProviderConfigured = func(ctx context.Context, fabric cliClient.FabricClient, providerId cliClient.ProviderID, s string, i int) (cliClient.Provider, error) {
-		return &cliClient.MockProvider{}, nil
-	}
-	t.Cleanup(func() {
-		common.CheckProviderConfigured = origCheck
-		common.Connect = origConnect
-	})
-
-	const dummyToken = "Testing.Token.1234"
-	t.Setenv("DEFANG_ACCESS_TOKEN", dummyToken)
-	gcpProjectID := "test-gcp-project"
-	result, err := mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
-		Params: m3mcp.CallToolParams{
-			Name: "set_gcp_provider",
-			Arguments: map[string]interface{}{
-				"working_directory": projectDir,
-				"gcpProjectId":      gcpProjectID,
-			},
-		},
-	})
-	require.NoError(t, err, "set_gcp_provider tool error")
-	require.NotNil(t, result)
-	require.False(t, result.IsError, "set_gcp_provider result is error")
-	found := false
-	for _, content := range result.Content {
-		if text, ok := content.(m3mcp.TextContent); ok {
-			if strings.Contains(text.Text, "Successfully set the provider") {
-				found = true
-				break
-			}
-		}
-	}
-	require.True(t, found, "Expected success message in set_gcp_provider output")
 }

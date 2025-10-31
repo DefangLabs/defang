@@ -13,6 +13,7 @@ import (
 func setupGcpByocPrompt(s *server.MCPServer, cluster string, providerId *client.ProviderID) {
 	gcpBYOCPrompt := mcp.NewPrompt("GCP Setup",
 		mcp.WithPromptDescription("Setup for GCP"),
+
 		mcp.WithArgument("GCP_PROJECT_ID",
 			mcp.ArgumentDescription("Your GCP Project ID"),
 			mcp.RequiredArgument(),

@@ -232,6 +232,9 @@ message CanIUseRequest {
   string project = 1;
   Provider provider = 2;
   int32 service_count = 3;
+  string stack = 4;
+  string region = 5;
+  string provider_account_id = 6;
 }
 
 message CanIUseResponse {

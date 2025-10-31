@@ -56,17 +56,16 @@ type ByocBaseClient struct {
 	projectBackend ProjectBackend
 }
 
-func NewByocBaseClient(tenantName types.TenantName, backend ProjectBackend) *ByocBaseClient {
+func NewByocBaseClient(tenantName types.TenantName, backend ProjectBackend, stack string) *ByocBaseClient {
+	if stack == "" {
+		stack = "beta" // backwards compat
+	}
 	b := &ByocBaseClient{
 		TenantName:     string(tenantName),
-		PulumiStack:    "beta", // TODO: make customizable
+		PulumiStack:    stack,
 		projectBackend: backend,
 	}
 	return b
-}
-
-func MakeEnv(key string, value any) string {
-	return fmt.Sprintf("%s=%q", key, value)
 }
 
 func (b *ByocBaseClient) GetProjectLastCDImage(ctx context.Context, projectName string) (string, error) {
@@ -282,6 +281,11 @@ func (b *ByocBaseClient) GetEndpoint(fqn string, projectName, delegateDomain str
 	}
 	safeFqn := dns.SafeLabel(fqn)
 	return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, projectDomain)
+}
+
+func (b *ByocBaseClient) UpdateShardDomain(ctx context.Context) error {
+	// BYOC providers manage their own domains and don't use shard domains
+	return nil
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC

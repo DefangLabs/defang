@@ -11,10 +11,12 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // MockCLI implements CLIInterface for testing
 type MockCLI struct {
+	CLIInterface
 	ConnectError                     error
 	LoadProjectNameWithFallbackError error
 	MockClient                       *client.GrpcClient
@@ -35,7 +37,7 @@ func (m *MockCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClie
 	return m.MockClient, nil
 }
 
-func (m *MockCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabricClient client.FabricClient) client.Provider {
+func (m *MockCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabricClient client.FabricClient, stack string) client.Provider {
 	return m.MockProvider
 }
 
@@ -199,7 +201,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 					assert.Contains(t, err.Error(), tt.errorMessage)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				// Check result text content for non-error results
 				if tt.resultTextContains != "" && len(result) > 0 {
 					assert.Contains(t, result, tt.resultTextContains)

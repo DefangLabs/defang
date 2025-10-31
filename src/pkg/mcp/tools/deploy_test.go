@@ -12,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // MockGrpcClient is a mock that implements the Track method safely
@@ -24,8 +25,9 @@ func (m *MockGrpcClient) Track(event string, props ...interface{}) error {
 	return nil
 }
 
-// MockDeployCLI implements DeployCLIInterface for testing
+// MockDeployCLI implements CLIInterface for testing
 type MockDeployCLI struct {
+	CLIInterface
 	ConnectError                 error
 	ComposeUpError               error
 	CheckProviderConfiguredError error
@@ -45,7 +47,7 @@ func (m *MockDeployCLI) Connect(ctx context.Context, cluster string) (*client.Gr
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) client.Provider {
+func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient, stack string) client.Provider {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
 	return nil
 }
@@ -58,7 +60,7 @@ func (m *MockDeployCLI) ComposeUp(ctx context.Context, project *compose.Project,
 	return m.ComposeUpResponse, m.Project, nil
 }
 
-func (m *MockDeployCLI) CheckProviderConfigured(ctx context.Context, grpcClient *client.GrpcClient, providerId client.ProviderID, projectName string, serviceCount int) (client.Provider, error) {
+func (m *MockDeployCLI) CheckProviderConfigured(ctx context.Context, grpcClient *client.GrpcClient, providerId client.ProviderID, projectName, stack string, serviceCount int) (client.Provider, error) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("CheckProviderConfigured(%s, %s, %d)", providerId, projectName, serviceCount))
 	return nil, m.CheckProviderConfiguredError
 }
@@ -183,7 +185,7 @@ func TestHandleDeployTool(t *testing.T) {
 			if tt.expectedError != "" {
 				assert.EqualError(t, err, tt.expectedError)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				if tt.expectedTextContains != "" && len(result) > 0 {
 					assert.Contains(t, result, tt.expectedTextContains)
 				}

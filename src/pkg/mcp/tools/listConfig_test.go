@@ -10,10 +10,12 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// MockListConfigCLI implements ListConfigCLIInterface for testing
+// MockListConfigCLI implements CLIInterface for testing
 type MockListConfigCLI struct {
+	CLIInterface
 	ConnectError         error
 	LoadProjectNameError error
 	ListConfigError      error
@@ -30,7 +32,7 @@ func (m *MockListConfigCLI) Connect(ctx context.Context, cluster string) (*clien
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockListConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) client.Provider {
+func (m *MockListConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient, stack string) client.Provider {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
 	return nil // Mock provider
 }
@@ -130,7 +132,7 @@ func TestHandleListConfigTool(t *testing.T) {
 			if tt.expectedError != "" {
 				assert.EqualError(t, err, tt.expectedError)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				if tt.expectedTextContains != "" && len(result) > 0 {
 					assert.Contains(t, result, tt.expectedTextContains)
 				}

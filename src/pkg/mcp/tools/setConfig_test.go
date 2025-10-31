@@ -8,10 +8,12 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// MockSetConfigCLI implements SetConfigCLIInterface for testing
+// MockSetConfigCLI implements CLIInterface for testing
 type MockSetConfigCLI struct {
+	CLIInterface
 	ConnectError          error
 	LoadProjectNameError  error
 	ConfigSetError        error
@@ -40,7 +42,7 @@ func (m *MockSetConfigCLI) Connect(ctx context.Context, cluster string) (*client
 	return m.ReturnedGrpcClient, nil
 }
 
-func (m *MockSetConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabricClient client.FabricClient) client.Provider {
+func (m *MockSetConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabricClient client.FabricClient, stack string) client.Provider {
 	m.NewProviderCalled = true
 	if m.ReturnedProvider != nil {
 		return m.ReturnedProvider
@@ -223,7 +225,7 @@ func TestHandleSetConfig(t *testing.T) {
 					assert.EqualError(t, err, tt.errorMessage)
 					return
 				} else {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 				}
 			}
 			result, err := handleSetConfig(testContext, loader, params, &tt.providerId, tt.cluster, tt.mockCLI)
@@ -234,7 +236,7 @@ func TestHandleSetConfig(t *testing.T) {
 					assert.EqualError(t, err, tt.errorMessage)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotEmpty(t, result)
 			}
 

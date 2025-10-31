@@ -55,7 +55,7 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 			b := &ByocAws{
 				driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 			}
-			b.ByocBaseClient = byoc.NewByocBaseClient(tt.TenantName, b)
+			b.ByocBaseClient = byoc.NewByocBaseClient(tt.TenantName, b, "")
 
 			delegateDomain := "example.com"
 			projectLabel := dns.SafeLabel(tt.ProjectName)
