@@ -32,6 +32,21 @@
       "default": null
     }
   },
+  "managed": {
+    "command": null,
+    "entrypoint": null,
+    "image": "redis:latest",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 6379,
+        "protocol": "tcp"
+      }
+    ]
+  },
   "replicated": {
     "command": null,
     "deploy": {

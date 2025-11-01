@@ -297,7 +297,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			replicas = *svccfg.Deploy.Replicas
 		}
 	}
-	if mode == modes.ModeHighAvailability && replicas < 2 && svccfg.Extensions["x-defang-autoscaling"] == nil {
+	if mode == modes.ModeHighAvailability && replicas < 2 && svccfg.Extensions["x-defang-autoscaling"] == nil && IsComputeService(svccfg) {
 		term.Warnf("service %q: high-availability mode requires at least 2 replicas or x-defang-autoscaling", svccfg.Name)
 	}
 	if reservations == nil || reservations.MemoryBytes == 0 {
@@ -504,4 +504,15 @@ func validateManagedStore(managedStore any) (bool, error) {
 	default:
 		return false, errors.New("expected parameters in managed storage definition field")
 	}
+}
+
+func IsComputeService(service *composeTypes.ServiceConfig) bool {
+	if service.Extensions == nil {
+		return true
+	}
+
+	return service.Extensions["x-defang-static-files"] == nil &&
+		service.Extensions["x-defang-redis"] == nil &&
+		service.Extensions["x-defang-mongodb"] == nil &&
+		service.Extensions["x-defang-postgres"] == nil
 }
