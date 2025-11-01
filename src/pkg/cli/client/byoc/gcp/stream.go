@@ -72,6 +72,8 @@ func (s *ServerStream[T]) Receive() bool {
 	case err := <-s.errCh:
 		if context.Cause(s.ctx) == io.EOF {
 			s.lastErr = nil
+		} else if errors.Is(err, io.EOF) {
+			s.lastErr = nil
 		} else if isContextCanceledError(err) {
 			s.lastErr = context.Cause(s.ctx)
 		} else {
