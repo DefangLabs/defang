@@ -144,11 +144,23 @@ func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGrou
 	}
 	logGroupIdentifier := getLogGroupIdentifier(lgi.LogGroupARN)
 	params := &cloudwatchlogs.FilterLogEventsInput{
-		StartTime:          ptr.Int64(start.UnixMilli()),
-		EndTime:            ptr.Int64(end.UnixMilli()),
 		LogGroupIdentifier: &logGroupIdentifier,
 		LogStreamNames:     lgi.LogStreamNames,
 		FilterPattern:      pattern,
+	}
+
+	if !start.IsZero() {
+		params.StartTime = ptr.Int64(start.UnixMilli())
+	}
+	if !end.IsZero() {
+		params.EndTime = ptr.Int64(end.UnixMilli())
+	}
+	if start.IsZero() && end.IsZero() {
+		// If no time range is specified, limit to the last 60 minutes
+		now := time.Now()
+		start = now.Add(-60 * time.Minute)
+		params.StartTime = ptr.Int64(start.UnixMilli())
+		params.EndTime = ptr.Int64(now.UnixMilli())
 	}
 	if lgi.LogStreamNamePrefix != "" {
 		params.LogStreamNamePrefix = &lgi.LogStreamNamePrefix
