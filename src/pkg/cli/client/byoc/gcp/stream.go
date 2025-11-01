@@ -124,7 +124,11 @@ func (s *ServerStream[T]) StartFollow(start time.Time) {
 }
 
 func (s *ServerStream[T]) Start(limit int) {
-	panic("not implemented")
+	query := s.query.GetQuery()
+	term.Debugf("Query logs with query: \n%v", query)
+	go func() {
+		s.queryTail(query, limit)
+	}()
 }
 
 func (s *ServerStream[T]) queryHead(query string) {
@@ -151,6 +155,64 @@ func (s *ServerStream[T]) queryHead(query string) {
 			s.respCh <- resp
 		}
 	}
+}
+
+func (s *ServerStream[T]) queryTail(query string, limit int) {
+	lister, err := s.gcp.ListLogEntries(s.ctx, query, gcp.OrderDescending)
+	if err != nil {
+		s.errCh <- err
+		return
+	}
+	if limit == 0 {
+		for {
+			entry, err := lister.Next()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				s.errCh <- err
+				return
+			}
+			resps, err := s.parseAndFilter(entry)
+			if err != nil {
+				s.errCh <- err
+				return
+			}
+			for _, resp := range resps {
+				s.respCh <- resp
+			}
+		}
+	} else {
+		buffer, err := s.listToBuffer(lister, limit)
+		if err != nil {
+			s.errCh <- err
+		}
+		// iterate over the buffer in reverse order to send the oldest resps first
+		for i := len(buffer) - 1; i >= 0; i-- {
+			s.respCh <- buffer[i]
+		}
+		s.errCh <- io.EOF
+	}
+}
+
+func (s *ServerStream[T]) listToBuffer(lister *gcp.Lister, limit int) ([]*T, error) {
+	received := 0
+	buffer := make([]*T, 0, limit)
+	for range limit {
+		entry, err := lister.Next()
+		if err != nil {
+			return nil, err
+		}
+		resps, err := s.parseAndFilter(entry)
+		if err != nil {
+			return nil, err
+		}
+		for _, resp := range resps {
+			buffer = append(buffer, resp)
+		}
+		received += len(resps)
+	}
+	return buffer, nil
 }
 
 func (s *ServerStream[T]) parseAndFilter(entry *loggingpb.LogEntry) ([]*T, error) {
