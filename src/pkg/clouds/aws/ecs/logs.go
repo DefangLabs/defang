@@ -224,3 +224,24 @@ func GetLogEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {
 		return nil, fmt.Errorf("unexpected event: %T", ev)
 	}
 }
+
+func takeLastN[T any](input chan T, n int) chan T {
+	if n <= 0 {
+		return input
+	}
+	out := make(chan T)
+	go func() {
+		defer close(out)
+		var buffer []T
+		for evt := range input {
+			buffer = append(buffer, evt)
+			if len(buffer) > n {
+				buffer = buffer[1:] // remove oldest
+			}
+		}
+		for _, evt := range buffer {
+			out <- evt
+		}
+	}()
+	return out
+}
