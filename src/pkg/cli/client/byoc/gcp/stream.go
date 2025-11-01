@@ -91,7 +91,7 @@ func isContextCanceledError(err error) bool {
 	return false
 }
 
-func (s *ServerStream[T]) Start(start time.Time) {
+func (s *ServerStream[T]) StartFollow(start time.Time) {
 	query := s.query.GetQuery()
 	term.Debugf("Query and tail logs since %v with query: \n%v", start, query)
 	go func() {
