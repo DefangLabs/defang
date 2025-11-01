@@ -137,23 +137,10 @@ func (s *ServerStream[T]) queryHead(query string) {
 		s.errCh <- err
 		return
 	}
-	for {
-		entry, err := lister.Next()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			s.errCh <- err
-			return
-		}
-		resps, err := s.parseAndFilter(entry)
-		if err != nil {
-			s.errCh <- err
-			return
-		}
-		for _, resp := range resps {
-			s.respCh <- resp
-		}
+	err = s.listToChannel(lister, 0)
+	if err != nil {
+		s.errCh <- err
+		return
 	}
 }
 
@@ -164,23 +151,10 @@ func (s *ServerStream[T]) queryTail(query string, limit int) {
 		return
 	}
 	if limit == 0 {
-		for {
-			entry, err := lister.Next()
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			if err != nil {
-				s.errCh <- err
-				return
-			}
-			resps, err := s.parseAndFilter(entry)
-			if err != nil {
-				s.errCh <- err
-				return
-			}
-			for _, resp := range resps {
-				s.respCh <- resp
-			}
+		err = s.listToChannel(lister, 0)
+		if err != nil {
+			s.errCh <- err
+			return
 		}
 	} else {
 		buffer, err := s.listToBuffer(lister, limit)
@@ -213,6 +187,27 @@ func (s *ServerStream[T]) listToBuffer(lister *gcp.Lister, limit int) ([]*T, err
 		received += len(resps)
 	}
 	return buffer, nil
+}
+
+func (s *ServerStream[T]) listToChannel(lister *gcp.Lister, limit int) error {
+	received := 0
+	for {
+		entry, err := lister.Next()
+		if err != nil {
+			return err
+		}
+		resps, err := s.parseAndFilter(entry)
+		if err != nil {
+			return err
+		}
+		for _, resp := range resps {
+			s.respCh <- resp
+		}
+		received += len(resps)
+		if limit > 0 && received >= limit {
+			return io.EOF
+		}
+	}
 }
 
 func (s *ServerStream[T]) parseAndFilter(entry *loggingpb.LogEntry) ([]*T, error) {
