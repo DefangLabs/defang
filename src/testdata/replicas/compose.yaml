@@ -15,3 +15,6 @@ services:
         reservations:
           memory: 256M
           cpus: "0.25"
+  managed:
+    image: redis:latest
+    x-defang-redis: true

@@ -121,7 +121,7 @@ func makeComposeUpCmd() *cobra.Command {
 			// Show a warning for any (managed) services that we cannot monitor
 			var managedServices []string
 			for _, service := range project.Services {
-				if !cli.CanMonitorService(service) {
+				if !cli.CanMonitorService(&service) {
 					managedServices = append(managedServices, service.Name)
 				}
 			}
