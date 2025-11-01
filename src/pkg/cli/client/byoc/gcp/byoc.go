@@ -558,7 +558,11 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		if req.Since.IsValid() {
 			since = req.Since.AsTime()
 		}
-		subscribeStream.StartFollow(since)
+		if req.Follow {
+			subscribeStream.StartFollow(since)
+		} else {
+			subscribeStream.Start(int(req.Limit))
+		}
 
 		var cancel context.CancelCauseFunc
 		ctx, cancel = context.WithCancelCause(ctx)
@@ -617,7 +621,11 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		logStream.AddUntil(endTime)
 		logStream.AddFilter(req.Pattern)
 	}
-	logStream.StartFollow(startTime)
+	if req.Follow {
+		logStream.StartFollow(startTime)
+	} else {
+		logStream.Start(int(req.Limit))
+	}
 	return logStream, nil
 }
 
