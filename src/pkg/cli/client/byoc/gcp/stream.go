@@ -97,29 +97,7 @@ func (s *ServerStream[T]) StartFollow(start time.Time) {
 	go func() {
 		// Only query older logs if start time is more than 10ms ago
 		if !start.IsZero() && start.Unix() > 0 && time.Since(start) > 10*time.Millisecond {
-			lister, err := s.gcp.ListLogEntries(s.ctx, query, gcp.OrderAscending)
-			if err != nil {
-				s.errCh <- err
-				return
-			}
-			for {
-				entry, err := lister.Next()
-				if errors.Is(err, io.EOF) {
-					break
-				}
-				if err != nil {
-					s.errCh <- err
-					return
-				}
-				resps, err := s.parseAndFilter(entry)
-				if err != nil {
-					s.errCh <- err
-					return
-				}
-				for _, resp := range resps {
-					s.respCh <- resp
-				}
-			}
+			s.queryHead(query)
 		}
 
 		// Start tailing logs after all older logs are processed
@@ -147,6 +125,32 @@ func (s *ServerStream[T]) StartFollow(start time.Time) {
 
 func (s *ServerStream[T]) Start(limit int) {
 	panic("not implemented")
+}
+
+func (s *ServerStream[T]) queryHead(query string) {
+	lister, err := s.gcp.ListLogEntries(s.ctx, query, gcp.OrderAscending)
+	if err != nil {
+		s.errCh <- err
+		return
+	}
+	for {
+		entry, err := lister.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			s.errCh <- err
+			return
+		}
+		resps, err := s.parseAndFilter(entry)
+		if err != nil {
+			s.errCh <- err
+			return
+		}
+		for _, resp := range resps {
+			s.respCh <- resp
+		}
+	}
 }
 
 func (s *ServerStream[T]) parseAndFilter(entry *loggingpb.LogEntry) ([]*T, error) {
