@@ -545,7 +545,7 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 	// TODO: update stack (1st param) to b.PulumiStack
 	subscribeStream.AddJobStatusUpdate("", req.Project, req.Etag, req.Services)
 	subscribeStream.AddServiceStatusUpdate("", req.Project, req.Etag, req.Services)
-	subscribeStream.Start(time.Now())
+	subscribeStream.StartFollow(time.Now())
 	return subscribeStream, nil
 }
 
@@ -560,7 +560,11 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		if req.Since.IsValid() {
 			since = req.Since.AsTime()
 		}
-		subscribeStream.Start(since)
+		if req.Follow {
+			subscribeStream.StartFollow(since)
+		} else {
+			subscribeStream.Start(int(req.Limit))
+		}
 
 		var cancel context.CancelCauseFunc
 		ctx, cancel = context.WithCancelCause(ctx)
@@ -619,7 +623,11 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		logStream.AddUntil(endTime)
 		logStream.AddFilter(req.Pattern)
 	}
-	logStream.Start(startTime)
+	if req.Follow {
+		logStream.StartFollow(startTime)
+	} else {
+		logStream.Start(int(req.Limit))
+	}
 	return logStream, nil
 }
 
@@ -829,7 +837,7 @@ func LogEntriesToString(logEntries []*loggingpb.LogEntry) string {
 func (b *ByocGcp) query(ctx context.Context, query string) ([]*loggingpb.LogEntry, error) {
 	term.Debugf("Querying logs with filter: \n %s", query)
 	var entries []*loggingpb.LogEntry
-	lister, err := b.driver.ListLogEntries(ctx, query)
+	lister, err := b.driver.ListLogEntries(ctx, query, gcp.OrderAscending)
 	if err != nil {
 		return nil, err
 	}

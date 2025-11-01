@@ -79,7 +79,14 @@ type Lister struct {
 	client *logging.Client
 }
 
-func (gcp Gcp) ListLogEntries(ctx context.Context, query string) (*Lister, error) {
+type Order string
+
+const (
+	OrderDescending Order = "desc"
+	OrderAscending  Order = "asc"
+)
+
+func (gcp Gcp) ListLogEntries(ctx context.Context, query string, order Order) (*Lister, error) {
 	client, err := logging.NewClient(ctx)
 	if err != nil {
 		return nil, err
@@ -88,6 +95,7 @@ func (gcp Gcp) ListLogEntries(ctx context.Context, query string) (*Lister, error
 	req := &loggingpb.ListLogEntriesRequest{
 		ResourceNames: []string{"projects/" + gcp.ProjectId},
 		Filter:        query,
+		OrderBy:       fmt.Sprintf("timestamp %s", order),
 	}
 	it := client.ListLogEntries(ctx, req)
 	return &Lister{it: it, client: client}, nil
