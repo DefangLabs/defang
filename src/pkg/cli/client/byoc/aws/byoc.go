@@ -704,14 +704,30 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		if req.Until.IsValid() {
 			end = req.Until.AsTime()
 		}
-		follow := req.Follow || end.IsZero()
-		tailStream, err = ecs.QueryAndTailLogGroups(
-			ctx,
-			start,
-			end,
-			follow,
-			b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))...,
-		)
+		lgis := b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))
+		if req.Follow {
+			tailStream, err = ecs.QueryAndTailLogGroups(
+				ctx,
+				start,
+				end,
+				req.Follow,
+				lgis...,
+			)
+		} else {
+			limit := int(req.Limit)
+			evtsChan, errsChan := ecs.QueryLogGroups(
+				ctx,
+				start,
+				end,
+				limit,
+				lgis...,
+			)
+			if evtsChan == nil {
+				err = <-errsChan
+			} else {
+				tailStream = ecs.NewStaticLogStream(evtsChan, func() {})
+			}
+		}
 	}
 
 	if err != nil {
