@@ -827,7 +827,7 @@ func LogEntriesToString(logEntries []*loggingpb.LogEntry) string {
 func (b *ByocGcp) query(ctx context.Context, query string) ([]*loggingpb.LogEntry, error) {
 	term.Debugf("Querying logs with filter: \n %s", query)
 	var entries []*loggingpb.LogEntry
-	lister, err := b.driver.ListLogEntries(ctx, query)
+	lister, err := b.driver.ListLogEntries(ctx, query, gcp.OrderAscending)
 	if err != nil {
 		return nil, err
 	}
