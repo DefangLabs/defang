@@ -104,9 +104,7 @@ func TailLogGroup(ctx context.Context, input LogGroupInput) (LiveTailStream, err
 	return slto.GetStream(), nil
 }
 
-func QueryLogGroups(ctx context.Context, start, end time.Time, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
-	errsChan := make(chan error)
-
+func QueryLogGroups(ctx context.Context, start, end time.Time, limit int, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
 	// Gather logs from the CD task, kaniko, ECS events, and all services
 	var evtsChan chan LogEvent
 	for _, lgi := range logGroups {
@@ -120,12 +118,16 @@ func QueryLogGroups(ctx context.Context, start, end time.Time, logGroups ...LogG
 				}
 				return nil
 			}); err != nil {
-				errsChan <- err
+				term.Errorf("error querying log group %s: %v", lgi.LogGroupARN, err)
 			}
 		}(lgi)
 		evtsChan = mergeLogEventChan(evtsChan, lgEvtChan) // Merge sort the log events based on timestamp
+		// take the last n events only
+		if limit > 0 {
+			evtsChan = takeLastN(evtsChan, limit)
+		}
 	}
-	return evtsChan, errsChan
+	return evtsChan, nil
 }
 
 func QueryLogGroup(ctx context.Context, input LogGroupInput, start, end time.Time, cb func([]LogEvent) error) error {
