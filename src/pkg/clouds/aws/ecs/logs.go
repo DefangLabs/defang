@@ -10,6 +10,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/smithy-go/ptr"
@@ -24,6 +25,26 @@ import (
 
 func getLogGroupIdentifier(arnOrId string) string {
 	return strings.TrimSuffix(arnOrId, ":*")
+}
+
+func NewStaticLogStream(ch <-chan LogEvent, cancel func()) EventStream[types.StartLiveTailResponseStream] {
+	es := &eventStream{
+		cancel: cancel,
+		ch:     make(chan types.StartLiveTailResponseStream),
+	}
+
+	go func() {
+		defer close(es.ch)
+		for evt := range ch {
+			es.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
+				Value: types.LiveTailSessionUpdate{
+					SessionResults: []types.LiveTailSessionLogEvent{evt},
+				},
+			}
+		}
+	}()
+
+	return es
 }
 
 func QueryAndTailLogGroups(ctx context.Context, start, end time.Time, follow bool, logGroups ...LogGroupInput) (LiveTailStream, error) {
