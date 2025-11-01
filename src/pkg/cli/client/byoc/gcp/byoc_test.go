@@ -25,8 +25,8 @@ func TestSetUpCD(t *testing.T) {
       - "8080:80"
 `))
 	cmd := cdCommand{
-		Project: "testproj",
-		Command: []string{"up", payload},
+		project: "testproj",
+		command: []string{"up", payload},
 	}
 
 	if op, err := b.runCdCommand(ctx, cmd); err != nil {

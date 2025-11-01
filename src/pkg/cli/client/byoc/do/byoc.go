@@ -188,7 +188,13 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 		return nil, err
 	}
 
-	_, err = b.runCdCommand(ctx, project.Name, req.DelegateDomain, cmd, payloadString)
+	cdCmd := cdCommand{
+		command:        []string{cmd, payloadString},
+		delegateDomain: req.DelegateDomain,
+		mode:           req.Mode,
+		project:        project.Name,
+	}
+	_, err = b.runCdCommand(ctx, cdCmd)
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +227,12 @@ func (b *ByocDo) BootstrapCommand(ctx context.Context, req client.BootstrapComma
 		return "", err
 	}
 
-	_, err := b.runCdCommand(ctx, req.Project, "dummy.domain", req.Command)
+	cmd := cdCommand{
+		command:        []string{req.Command},
+		delegateDomain: "dummy.domain",
+		project:        req.Project,
+	}
+	_, err := b.runCdCommand(ctx, cmd)
 	if err != nil {
 		return "", err
 	}
@@ -598,8 +609,16 @@ func (b *ByocDo) PrepareDomainDelegation(ctx context.Context, req client.Prepare
 	return nil, nil // TODO: implement domain delegation for DO
 }
 
-func (b *ByocDo) runCdCommand(ctx context.Context, projectName, delegateDomain string, cmd ...string) (*godo.App, error) { // nolint:unparam
-	env, err := b.environment(projectName, delegateDomain)
+type cdCommand struct {
+	command        []string
+	project        string
+	delegateDomain string
+	mode           defangv1.DeploymentMode
+}
+
+//nolint:unparam
+func (b *ByocDo) runCdCommand(ctx context.Context, cmd cdCommand) (*godo.App, error) {
+	env, err := b.environment(cmd.project, cmd.delegateDomain, cmd.mode)
 	if err != nil {
 		return nil, err
 	}
@@ -609,11 +628,11 @@ func (b *ByocDo) runCdCommand(ctx context.Context, projectName, delegateDomain s
 		for i, v := range env {
 			debugEnv[i] = v.Key + "=" + v.Value
 		}
-		if err := byoc.DebugPulumiNodeJS(ctx, debugEnv, cmd...); err != nil {
+		if err := byoc.DebugPulumiNodeJS(ctx, debugEnv, cmd.command...); err != nil {
 			return nil, err
 		}
 	}
-	app, err := b.driver.Run(ctx, env, b.CDImage, append([]string{"node", "lib/index.js"}, cmd...)...)
+	app, err := b.driver.Run(ctx, env, b.CDImage, append([]string{"node", "lib/index.js"}, cmd.command...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -623,7 +642,7 @@ func (b *ByocDo) runCdCommand(ctx context.Context, projectName, delegateDomain s
 	return app, nil
 }
 
-func (b *ByocDo) environment(projectName, delegateDomain string) ([]*godo.AppVariableDefinition, error) {
+func (b *ByocDo) environment(projectName, delegateDomain string, mode defangv1.DeploymentMode) ([]*godo.AppVariableDefinition, error) {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	defangStateUrl := fmt.Sprintf(`s3://%s?endpoint=%s.digitaloceanspaces.com`, b.driver.BucketName, region)
 	pulumiBackendKey, pulumiBackendValue, err := byoc.GetPulumiBackend(defangStateUrl)
@@ -631,6 +650,10 @@ func (b *ByocDo) environment(projectName, delegateDomain string) ([]*godo.AppVar
 		return nil, err
 	}
 	env := []*godo.AppVariableDefinition{
+		{
+			Key:   "DEFANG_MODE",
+			Value: strings.ToLower(mode.String()),
+		},
 		{
 			Key:   "DEFANG_PREFIX",
 			Value: byoc.DefangPrefix,
@@ -899,14 +922,6 @@ func readHistoricalLogs(ctx context.Context, urls []string) {
 			printlogs(msg)
 		}
 	}
-}
-
-func getServiceEnv(envVars []*godo.AppVariableDefinition) map[string]string { // nolint:unused
-	env := make(map[string]string)
-	for _, envVar := range envVars {
-		env[envVar.Key] = envVar.Value
-	}
-	return env
 }
 
 func printlogs(msg *defangv1.LogEntry) {
