@@ -148,7 +148,7 @@ func makeStackNewCmd() *cobra.Command {
 			term.Infof(
 				"Created new stack configuration file: `%s`. "+
 					"Check this file into version control. "+
-					"You can now deploy this stack using `defang up %s`\n",
+					"You can now deploy this stack using `defang up --stack=%s`\n",
 				filename, params.Name,
 			)
 			return nil
