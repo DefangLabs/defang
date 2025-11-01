@@ -145,6 +145,10 @@ func (s *ServerStream[T]) StartFollow(start time.Time) {
 	}()
 }
 
+func (s *ServerStream[T]) Start(limit int) {
+	panic("not implemented")
+}
+
 func (s *ServerStream[T]) parseAndFilter(entry *loggingpb.LogEntry) ([]*T, error) {
 	resps, err := s.parse(entry)
 	if err != nil {
