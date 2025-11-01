@@ -545,7 +545,7 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 	// TODO: update stack (1st param) to b.PulumiStack
 	subscribeStream.AddJobStatusUpdate("", req.Project, req.Etag, req.Services)
 	subscribeStream.AddServiceStatusUpdate("", req.Project, req.Etag, req.Services)
-	subscribeStream.Start(time.Now())
+	subscribeStream.StartFollow(time.Now())
 	return subscribeStream, nil
 }
 
@@ -560,7 +560,7 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		if req.Since.IsValid() {
 			since = req.Since.AsTime()
 		}
-		subscribeStream.Start(since)
+		subscribeStream.StartFollow(since)
 
 		var cancel context.CancelCauseFunc
 		ctx, cancel = context.WithCancelCause(ctx)
@@ -619,7 +619,7 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		logStream.AddUntil(endTime)
 		logStream.AddFilter(req.Pattern)
 	}
-	logStream.Start(startTime)
+	logStream.StartFollow(startTime)
 	return logStream, nil
 }
 
