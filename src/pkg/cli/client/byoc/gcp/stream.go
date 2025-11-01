@@ -97,7 +97,7 @@ func (s *ServerStream[T]) Start(start time.Time) {
 	go func() {
 		// Only query older logs if start time is more than 10ms ago
 		if !start.IsZero() && start.Unix() > 0 && time.Since(start) > 10*time.Millisecond {
-			lister, err := s.gcp.ListLogEntries(s.ctx, query)
+			lister, err := s.gcp.ListLogEntries(s.ctx, query, gcp.OrderAscending)
 			if err != nil {
 				s.errCh <- err
 				return
