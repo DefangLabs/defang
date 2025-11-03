@@ -47,7 +47,7 @@ func NewStaticLogStream(ch <-chan LogEvent, cancel func()) EventStream[types.Sta
 	return es
 }
 
-func QueryAndTailLogGroups(ctx context.Context, start, end time.Time, follow bool, logGroups ...LogGroupInput) (LiveTailStream, error) {
+func QueryAndTailLogGroups(ctx context.Context, start, end time.Time, logGroups ...LogGroupInput) (LiveTailStream, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	e := &eventStream{
@@ -60,7 +60,7 @@ func QueryAndTailLogGroups(ctx context.Context, start, end time.Time, follow boo
 	var err error
 	for _, lgi := range logGroups {
 		var es LiveTailStream
-		es, err = QueryAndTailLogGroup(ctx, lgi, start, end, follow)
+		es, err = QueryAndTailLogGroup(ctx, lgi, start, end)
 		if err != nil {
 			break // abort if there is any fatal error
 		}
