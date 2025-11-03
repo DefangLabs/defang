@@ -391,6 +391,11 @@ func TestPrintHandler(t *testing.T) {
 		},
 	}
 
+	loc, err := time.LoadLocation("America/Vancouver")
+	if err != nil {
+		t.Fatalf("Failed to load location: %v", err)
+	}
+	time.Local = loc
 	for _, tc := range testdata {
 		logEntries := jsonFileToLogEntry(t, tc.inputfile)
 
