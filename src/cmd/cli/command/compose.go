@@ -501,7 +501,7 @@ func makeComposePsCmd() *cobra.Command {
 }
 
 func makeComposeLogsCmd() *cobra.Command {
-	logType := logs.LogTypeRun
+	logType := logs.LogTypeAll
 	var logsCmd = &cobra.Command{
 		Use:         "logs [SERVICE...]",
 		Annotations: authNeededAnnotation,
