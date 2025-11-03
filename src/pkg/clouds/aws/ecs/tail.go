@@ -58,6 +58,9 @@ func (a *AwsEcs) GetTaskArn(taskID string) (TaskArn, error) {
 }
 
 func (a *AwsEcs) QueryTaskID(ctx context.Context, taskID string, start, end time.Time, limit int) (EventStream[types.StartLiveTailResponseStream], error) {
+	if taskID == "" {
+		return nil, errors.New("taskID is empty")
+	}
 	ctx, cancel := context.WithCancel(ctx)
 	es := &eventStream{
 		cancel: cancel,
