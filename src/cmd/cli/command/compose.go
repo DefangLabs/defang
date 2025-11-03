@@ -534,7 +534,7 @@ func setupLogsFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("follow", false, "follow log output; incompatible with --until") // NOTE: -f is already used by --file
 	cmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
 	cmd.Flags().String("since", "", "show logs since duration/time")
-	cmd.Flags().String("until", "", "show logs until duration/time")
+	cmd.Flags().String("until", "", "show logs until duration/time; incompatible with --follow")
 	cmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	cmd.Flags().Var(&logType, "type", fmt.Sprintf("show logs of type; one of %v", logs.AllLogTypes))
 	cmd.Flags().String("filter", "", "only show logs containing given text; case-insensitive")
