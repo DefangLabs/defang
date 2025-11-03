@@ -354,12 +354,10 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 				options.Since = ts
 			}
 
-			if options.Verbose || e.Stderr { // if we are in verbose mode or see an error
-				err := handler(e, &options, term.DefaultTerm)
-				if err != nil {
-					term.Debug("Ending tail loop", err)
-					return err
-				}
+			err := handler(e, &options, term.DefaultTerm)
+			if err != nil {
+				term.Debug("Ending tail loop", err)
+				return err
 			}
 
 			// Detect end logging event
