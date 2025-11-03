@@ -531,7 +531,7 @@ func setupLogsFlags(cmd *cobra.Command) {
 	cmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
 	cmd.Flags().MarkHidden("etag")
 	cmd.Flags().String("deployment", "", "deployment ID of the service")
-	cmd.Flags().Bool("follow", false, "follow log output, --until will be ignored") // NOTE: -f is already used by --file
+	cmd.Flags().Bool("follow", false, "follow log output; incompatible with --until") // NOTE: -f is already used by --file
 	cmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
 	cmd.Flags().String("since", "", "show logs since duration/time")
 	cmd.Flags().String("until", "", "show logs until duration/time")
