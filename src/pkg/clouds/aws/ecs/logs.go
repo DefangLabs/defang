@@ -10,7 +10,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/smithy-go/ptr"
@@ -128,6 +127,7 @@ func TailLogGroup(ctx context.Context, input LogGroupInput) (LiveTailStream, err
 func QueryLogGroups(ctx context.Context, start, end time.Time, limit int, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
 	// Gather logs from the CD task, kaniko, ECS events, and all services
 	var evtsChan chan LogEvent
+	var errChan chan error
 	for _, lgi := range logGroups {
 		lgEvtChan := make(chan LogEvent)
 		// Start a go routine for each log group
@@ -139,7 +139,7 @@ func QueryLogGroups(ctx context.Context, start, end time.Time, limit int, logGro
 				}
 				return nil
 			}); err != nil {
-				term.Errorf("error querying log group %s: %v", lgi.LogGroupARN, err)
+				errChan <- fmt.Errorf("error querying log group %q: %w", lgi.LogGroupARN, err)
 			}
 		}(lgi)
 		evtsChan = mergeLogEventChan(evtsChan, lgEvtChan) // Merge sort the log events based on timestamp
@@ -148,7 +148,7 @@ func QueryLogGroups(ctx context.Context, start, end time.Time, limit int, logGro
 			evtsChan = takeLastN(evtsChan, limit)
 		}
 	}
-	return evtsChan, nil
+	return evtsChan, errChan
 }
 
 func QueryLogGroup(ctx context.Context, input LogGroupInput, start, end time.Time, cb func([]LogEvent) error) error {
