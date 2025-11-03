@@ -25,30 +25,31 @@ var (
 	org            string
 	providerID     = cliClient.ProviderAuto
 	sourcePlatform = migrate.SourcePlatformUnspecified // default to auto-detecting the source platform
-	stack          string
+	stack          = os.Getenv("DEFANG_STACK")
 	verbose        = false
 )
 
-func readGlobals(stackFile string) {
-	if stackFile != "" {
-		rcfile := ".defangrc." + stackFile
+func readGlobals(stackName string) {
+	if stackName != "" {
+		rcfile := ".defangrc." + stackName
 		if err := godotenv.Load(rcfile); err != nil {
 			term.Debugf("could not load %s: %v", rcfile, err)
 		} else {
 			term.Debugf("loaded globals from %s", rcfile)
 		}
 	}
-	if err := godotenv.Load(".defangrc"); err != nil {
-		term.Debugf("could not load %s: %v", ".defangrc", err)
+	const rcfile = ".defangrc"
+	if err := godotenv.Load(rcfile); err != nil {
+		term.Debugf("could not load %s: %v", rcfile, err)
 	} else {
-		term.Debugf("loaded globals from %s", ".defangrc")
+		term.Debugf("loaded globals from %s", rcfile)
 	}
 
-	stack = os.Getenv("DEFANG_STACK")
+	stack = pkg.Getenv("DEFANG_STACK", stack)
 	hasTty = term.IsTerminal() && !pkg.GetenvBool("CI")
 	hideUpdate = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
-	mode, _ = modes.Parse(os.Getenv("DEFANG_MODE"))
-	modelId = os.Getenv("DEFANG_MODEL_ID") // for Pro users only
+	mode, _ = modes.Parse(pkg.Getenv("DEFANG_MODE", string(mode)))
+	modelId = pkg.Getenv("DEFANG_MODEL_ID", modelId) // for Pro users only
 	nonInteractive = !hasTty
-	providerID = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", "auto"))
+	providerID = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", string(providerID)))
 }
