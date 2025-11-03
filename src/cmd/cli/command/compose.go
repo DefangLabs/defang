@@ -646,7 +646,9 @@ services:
 	composeCmd.AddCommand(makeComposeDownCmd())
 	composeCmd.AddCommand(makeComposePsCmd())
 	composeCmd.AddCommand(makeLogsCmd())
-	composeCmd.AddCommand(makeTailCmd())
+	composeTailCmd := makeTailCmd()
+	composeTailCmd.Hidden = true
+	composeCmd.AddCommand(composeTailCmd)
 
 	// deprecated, will be removed in future releases
 	composeCmd.AddCommand(makeComposeStartCmd())
