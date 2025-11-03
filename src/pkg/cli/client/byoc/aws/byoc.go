@@ -710,7 +710,6 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 				ctx,
 				start,
 				end,
-				req.Follow,
 				lgis...,
 			)
 		} else {
