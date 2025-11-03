@@ -200,7 +200,7 @@ func isTransientError(err error) bool {
 	return false
 }
 
-type LogEntryHandler func(*defangv1.LogEntry, *TailOptions, *term.Term) error
+type LogEntryHandler func(*defangv1.LogEntry, *TailOptions) error
 
 func streamLogs(ctx context.Context, provider client.Provider, projectName string, options TailOptions, handler LogEntryHandler) error {
 	var sinceTs, untilTs *timestamppb.Timestamp
@@ -349,37 +349,36 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 			e.Service = valueOrDefault(e.Service, msg.Service)
 			e.Host = valueOrDefault(e.Host, msg.Host)
 			e.Etag = valueOrDefault(e.Etag, msg.Etag)
+			host := e.Host
+			service := e.Service
+
+			// HACK: skip noisy CI/CD logs (except errors)
+			isInternal := service == "cd" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric" || host == "ecs" || host == "cloudbuild" || host == "pulumi"
+			onlyErrors := !options.Verbose && isInternal
+			if onlyErrors && !e.Stderr {
+				if options.EndEventDetectFunc != nil {
+					if err := options.EndEventDetectFunc(e); err != nil {
+						cancel() // TODO: stuck on defer Close() if we don't do this
+						return err
+					}
+				}
+				continue
+			}
 
 			if ts.After(options.Since) {
 				options.Since = ts
 			}
-
-			err := handler(e, &options, term.DefaultTerm)
+			err := handler(e, &options)
 			if err != nil {
 				term.Debug("Ending tail loop", err)
+				cancel() // TODO: stuck on defer Close() if we don't do this
 				return err
-			}
-
-			// Detect end logging event
-			if options.EndEventDetectFunc != nil {
-				if err := options.EndEventDetectFunc(e); err != nil {
-					return err
-				}
 			}
 		}
 	}
 }
 
-func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions, t *term.Term) error {
-	// HACK: skip noisy CI/CD logs (except errors)
-	var internalServices = []string{"cd", "kaniko", "fabric", "ecs", "codebuild", "cloudbuild", "pulumi"}
-	var internalHosts = []string{"kaniko", "fabric", "ecs", "codebuild", "cloudbuild", "pulumi"}
-	isInternal := slices.Contains(internalServices, e.Service) || slices.Contains(internalHosts, e.Host)
-	onlyErrors := !options.Verbose && isInternal
-	if onlyErrors && !e.Stderr {
-		return nil
-	}
-
+func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions) error {
 	if options.Raw {
 		if e.Stderr {
 			term.Error(e.Message)
@@ -389,24 +388,18 @@ func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions, t *term.Te
 		return nil
 	}
 
-	printLogEntry(e, options, t)
-	return nil
-}
-
-func printLogEntry(e *defangv1.LogEntry, options *TailOptions, t *term.Term) {
 	ts := e.Timestamp.AsTime()
 	tsString := ts.Local().Format(RFC3339Milli)
 	tsColor := termenv.ANSIBrightBlack
-	if t.HasDarkBackground() {
+	if term.HasDarkBackground() {
 		tsColor = termenv.ANSIWhite
 	}
 	if e.Stderr {
 		tsColor = termenv.ANSIBrightRed
 	}
-
 	var prefixLen int
 	trimmed := strings.TrimRight(e.Message, "\t\r\n ")
-	buf := term.NewMessageBuilder(t.StdoutCanColor())
+	buf := term.NewMessageBuilder(term.StdoutCanColor())
 	for i, line := range strings.Split(trimmed, "\n") {
 		if i == 0 {
 			prefixLen, _ = buf.Printc(tsColor, tsString, " ")
@@ -425,7 +418,7 @@ func printLogEntry(e *defangv1.LogEntry, options *TailOptions, t *term.Term) {
 		} else {
 			buf.WriteString(strings.Repeat(" ", prefixLen))
 		}
-		if t.StdoutCanColor() {
+		if term.StdoutCanColor() {
 			if !strings.Contains(line, "\033[") {
 				line = colorKeyRegex.ReplaceAllString(line, replaceString) // add some color
 			}
@@ -435,8 +428,15 @@ func printLogEntry(e *defangv1.LogEntry, options *TailOptions, t *term.Term) {
 		buf.WriteString(line)
 		buf.WriteRune('\n')
 	}
+	term.Print(buf.String())
 
-	t.Print(buf.String())
+	// Detect end logging event
+	if options.EndEventDetectFunc != nil {
+		if err := options.EndEventDetectFunc(e); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func valueOrDefault(value, def string) string {

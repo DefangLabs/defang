@@ -111,7 +111,6 @@ func (s *ServerStream[T]) Start(start time.Time) {
 					s.errCh <- err
 					return
 				}
-
 				resps, err := s.parseAndFilter(entry)
 				if err != nil {
 					s.errCh <- err
@@ -304,9 +303,8 @@ func getLogEntryParser(ctx context.Context, gcpClient *gcp.Gcp) func(entry *logg
 		} else if entry.GetJsonPayload() != nil && entry.GetJsonPayload().GetFields()["cos.googleapis.com/stream"] != nil {
 			stderr = entry.GetJsonPayload().GetFields()["cos.googleapis.com/stream"].GetStringValue() == "stderr"
 		}
-		if strings.Contains(strings.ToLower(msg), "error:") {
-			stderr = true
-		}
+
+		// fmt.Printf("ENTRY: %+v\n", entry)
 
 		var serviceName, etag, host string
 		serviceName = entry.Labels["defang-service"]
