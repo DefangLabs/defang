@@ -1,0 +1,714 @@
+{"message":" ** Update started for stack beta","timestamp":{"seconds":1762154064,"nanos":677000000},"stderr":true,"service":"cd","host":"pulumi"}
+{"message":"Downloading payload from S3...","timestamp":{"seconds":1762154064,"nanos":678000000},"service":"cd","host":"pulumi"}
+{"message":"Initializing stack...","timestamp":{"seconds":1762154064,"nanos":810000000},"service":"cd","host":"pulumi"}
+{"message":"Running update...","timestamp":{"seconds":1762154066,"nanos":240000000},"service":"cd","host":"pulumi"}
+{"message":"\u001b[38;5;13m\u001b[1mUpdating (beta):\u001b[0m","timestamp":{"seconds":1762154066,"nanos":727000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m pulumi:pulumi:Stack flask-railpack-2-beta \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154066,"nanos":824000000},"service":"cd","host":"pulumi"}
+{"message":" ** Building image for \"flask\"...","timestamp":{"seconds":1762154067,"nanos":824000000},"stderr":true,"service":"cd","host":"pulumi"}
+{"message":" ** Updating service \"flask\"","timestamp":{"seconds":1762154067,"nanos":842000000},"stderr":true,"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m pulumi:pulumi:Stack flask-railpack-2-beta \u001b[1m\u001b[38;5;2mcreating (1s)\u001b[0m \u001b[0mNo pull-through cache or mirror found: pulling gcr.io/kaniko-project/executor:v1.23.2 may incur bandwidth costs.\u001b[0m","timestamp":{"seconds":1762154068,"nanos":320000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m pulumi:pulumi:Stack flask-railpack-2-beta \u001b[1m\u001b[38;5;2mcreating (1s)\u001b[0m \u001b[0mProject: flask-railpack-2, Org: nullfunc, Domain: flask-railpack-2.nullfunc.defang.app, Version: 0.6.0-1110-g7b7daedd\u001b[0m","timestamp":{"seconds":1762154068,"nanos":331000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m pulumi:pulumi:Stack flask-railpack-2-beta \u001b[1m\u001b[38;5;2mcreating (1s)\u001b[0m \u001b[0mUsing context: s3://defang-cd-bucket-ren6kjmnovwj/uploads/sha256-Vr1P_Q0ydyxfRZWyz8CzsBn73Q1fGvQ4H_7VvMRVz7w_.zip\u001b[0m","timestamp":{"seconds":1762154068,"nanos":371000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m defang-mvp:shared/ecs:Defang defang \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154069,"nanos":534000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:cloudwatch:LogGroup ecs \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154070,"nanos":8000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:s3:Bucket alb-logs \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154070,"nanos":11000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ecr:PullThroughCacheRule ecr-public \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154070,"nanos":12000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:cloudwatch:LogGroup logs \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154070,"nanos":12000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:iam:Policy AllowRoute53Sidecar \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154070,"nanos":13000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:VpcDhcpOptions dhcp-options \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154070,"nanos":15000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:route53:Zone flask-railpack-2.nullfunc.defang.app \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154070,"nanos":15000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:cloudwatch:LogGroup ecs \u001b[38;5;2mcreated (0.20s)\u001b[0m ","timestamp":{"seconds":1762154070,"nanos":206000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:cloudwatch:LogGroup logs \u001b[38;5;2mcreated (0.51s)\u001b[0m ","timestamp":{"seconds":1762154070,"nanos":519000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ecr:PullThroughCacheRule ecr-public \u001b[38;5;2mcreated (0.53s)\u001b[0m ","timestamp":{"seconds":1762154070,"nanos":538000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:VpcDhcpOptions dhcp-options \u001b[38;5;2mcreated (0.88s)\u001b[0m ","timestamp":{"seconds":1762154070,"nanos":898000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:iam:Policy AllowRoute53Sidecar \u001b[38;5;2mcreated (1s)\u001b[0m ","timestamp":{"seconds":1762154071,"nanos":88000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:iam:Role code-build-role \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154071,"nanos":601000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:iam:Role ecs-task-execution-role \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154071,"nanos":602000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:acm:Certificate *.flask-railpack-2.nullfunc.defang.app \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154071,"nanos":604000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:iam:Role ecs-agent-profile \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154071,"nanos":606000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ecs:Cluster cluster \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154071,"nanos":606000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:iam:Role flask \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154071,"nanos":608000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:s3:Bucket alb-logs \u001b[38;5;2mcreated (1s)\u001b[0m ","timestamp":{"seconds":1762154071,"nanos":831000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:iam:Role code-build-role \u001b[38;5;2mcreated (0.64s)\u001b[0m ","timestamp":{"seconds":1762154072,"nanos":245000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:cloudwatch:LogResourcePolicy flask-railpack-2-ecs-log-policy \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154072,"nanos":514000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:iam:Role ecs-task-execution-role \u001b[38;5;2mcreated (0.92s)\u001b[0m ","timestamp":{"seconds":1762154072,"nanos":524000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m awsx:ec2:Vpc shared-vpc \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154072,"nanos":614000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:iam:Role ecs-agent-profile \u001b[38;5;2mcreated (1s)\u001b[0m ","timestamp":{"seconds":1762154072,"nanos":679000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:cloudwatch:LogResourcePolicy flask-railpack-2-ecs-log-policy \u001b[38;5;2mcreated (0.26s)\u001b[0m ","timestamp":{"seconds":1762154072,"nanos":778000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:iam:Role flask \u001b[38;5;2mcreated (1s)\u001b[0m ","timestamp":{"seconds":1762154072,"nanos":796000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m awsx:ecr:Repository flask-railpack-2/kaniko-build \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154072,"nanos":880000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m awsx:ecr:Repository flask-railpack-2/kaniko-build/cache \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154073,"nanos":154000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:s3:BucketPolicy alb-logs-policy \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154073,"nanos":285000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:s3:BucketPublicAccessBlock alb-logs-block \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154073,"nanos":421000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:iam:RolePolicy ecs-task-execution-role-AllowGetSecrets \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154073,"nanos":709000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:s3:BucketPublicAccessBlock alb-logs-block \u001b[38;5;2mcreated (0.84s)\u001b[0m ","timestamp":{"seconds":1762154074,"nanos":259000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:iam:RolePolicy ecs-task-execution-role-AllowECRPassThrough \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154074,"nanos":261000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:s3:BucketPolicy alb-logs-policy \u001b[38;5;2mcreated (1s)\u001b[0m ","timestamp":{"seconds":1762154074,"nanos":289000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:iam:InstanceProfile ecs-agent-profile \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154074,"nanos":621000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:iam:RolePolicy ecs-task-execution-role-AllowGetSecrets \u001b[38;5;2mcreated (0.99s)\u001b[0m ","timestamp":{"seconds":1762154074,"nanos":696000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:iam:RolePolicy ecs-task-execution-role-AllowECRPassThrough \u001b[38;5;2mcreated (0.88s)\u001b[0m ","timestamp":{"seconds":1762154075,"nanos":140000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:Vpc shared-vpc \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154075,"nanos":216000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ecr:Repository flask-railpack-2/kaniko-build \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154075,"nanos":219000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ecr:Repository flask-railpack-2/kaniko-build/cache \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154075,"nanos":358000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:iam:RolePoliciesExclusive ecs-task-execution-role \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154075,"nanos":497000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:iam:InstanceProfile ecs-agent-profile \u001b[38;5;2mcreated (1s)\u001b[0m ","timestamp":{"seconds":1762154075,"nanos":654000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ecr:Repository flask-railpack-2/kaniko-build \u001b[38;5;2mcreated (0.67s)\u001b[0m ","timestamp":{"seconds":1762154075,"nanos":890000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ecr:Repository flask-railpack-2/kaniko-build/cache \u001b[38;5;2mcreated (0.66s)\u001b[0m ","timestamp":{"seconds":1762154076,"nanos":15000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:iam:RolePoliciesExclusive ecs-task-execution-role \u001b[38;5;2mcreated (0.60s)\u001b[0m ","timestamp":{"seconds":1762154076,"nanos":94000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ecr:LifecyclePolicy flask-railpack-2/kaniko-build \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154076,"nanos":356000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ecr:LifecyclePolicy flask-railpack-2/kaniko-build/cache \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154076,"nanos":527000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ecr:LifecyclePolicy flask-railpack-2/kaniko-build \u001b[38;5;2mcreated (0.57s)\u001b[0m ","timestamp":{"seconds":1762154076,"nanos":922000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ecr:LifecyclePolicy flask-railpack-2/kaniko-build/cache \u001b[38;5;2mcreated (0.58s)\u001b[0m ","timestamp":{"seconds":1762154077,"nanos":105000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:acm:Certificate *.flask-railpack-2.nullfunc.defang.app \u001b[38;5;2mcreated (8s)\u001b[0m ","timestamp":{"seconds":1762154079,"nanos":747000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ecs:Cluster cluster \u001b[38;5;2mcreated (10s)\u001b[0m ","timestamp":{"seconds":1762154082,"nanos":570000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ecs:ClusterCapacityProviders cluster-capacity-providers \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154082,"nanos":702000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:cloudwatch:EventRule flask-railpack-2-ecs-lifecycle-rule \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154082,"nanos":702000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:cloudwatch:EventRule flask-railpack-2-ecs-lifecycle-rule \u001b[38;5;2mcreated (0.39s)\u001b[0m ","timestamp":{"seconds":1762154083,"nanos":89000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:cloudwatch:EventTarget flask-railpack-2-ecs-event-cw-target \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154083,"nanos":209000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:cloudwatch:EventTarget flask-railpack-2-ecs-event-cw-target \u001b[38;5;2mcreated (0.18s)\u001b[0m ","timestamp":{"seconds":1762154083,"nanos":389000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:Vpc shared-vpc \u001b[38;5;2mcreated (11s)\u001b[0m ","timestamp":{"seconds":1762154086,"nanos":758000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:Subnet shared-vpc-private-3 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154086,"nanos":904000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:Subnet shared-vpc-public-1 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154086,"nanos":904000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:Subnet shared-vpc-private-1 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154086,"nanos":906000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:InternetGateway shared-vpc \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154086,"nanos":907000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:VpcEndpoint com.amazonaws.us-west-2.s3 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154086,"nanos":908000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:Subnet shared-vpc-public-3 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154086,"nanos":910000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:Subnet shared-vpc-private-3 \u001b[38;5;2mcreated (0.53s)\u001b[0m ","timestamp":{"seconds":1762154087,"nanos":435000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:Subnet shared-vpc-private-1 \u001b[38;5;2mcreated (0.90s)\u001b[0m ","timestamp":{"seconds":1762154087,"nanos":805000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:InternetGateway shared-vpc \u001b[38;5;2mcreated (0.90s)\u001b[0m ","timestamp":{"seconds":1762154087,"nanos":807000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:Subnet shared-vpc-public-2 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154087,"nanos":947000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:Subnet shared-vpc-private-2 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154088,"nanos":108000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTable shared-vpc-private-3 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154088,"nanos":220000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:Subnet shared-vpc-private-2 \u001b[38;5;2mcreated (0.92s)\u001b[0m ","timestamp":{"seconds":1762154089,"nanos":32000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTable shared-vpc-private-3 \u001b[38;5;2mcreated (0.94s)\u001b[0m ","timestamp":{"seconds":1762154089,"nanos":163000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTable shared-vpc-private-1 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154089,"nanos":241000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTable shared-vpc-private-2 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154089,"nanos":370000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTable shared-vpc-private-1 \u001b[38;5;2mcreated (0.81s)\u001b[0m ","timestamp":{"seconds":1762154090,"nanos":52000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTable shared-vpc-private-2 \u001b[38;5;2mcreated (0.73s)\u001b[0m ","timestamp":{"seconds":1762154090,"nanos":102000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTableAssociation shared-vpc-private-3 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154090,"nanos":290000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTableAssociation shared-vpc-private-1 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154090,"nanos":517000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTableAssociation shared-vpc-private-3 \u001b[38;5;2mcreated (0.69s)\u001b[0m ","timestamp":{"seconds":1762154090,"nanos":984000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTableAssociation shared-vpc-private-1 \u001b[38;5;2mcreated (0.65s)\u001b[0m ","timestamp":{"seconds":1762154091,"nanos":170000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTableAssociation shared-vpc-private-2 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154091,"nanos":178000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTableAssociation shared-vpc-private-2 \u001b[38;5;2mcreated (0.68s)\u001b[0m ","timestamp":{"seconds":1762154091,"nanos":859000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ecs:ClusterCapacityProviders cluster-capacity-providers \u001b[38;5;2mcreated (10s)\u001b[0m ","timestamp":{"seconds":1762154093,"nanos":11000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m defang-mvp:shared/ecs:Kaniko kaniko \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154093,"nanos":231000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:VpcEndpoint com.amazonaws.us-west-2.s3 \u001b[38;5;2mcreated (6s)\u001b[0m ","timestamp":{"seconds":1762154093,"nanos":395000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:cloudwatch:LogGroup builds \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154093,"nanos":901000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:iam:Role kaniko-task-role \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154093,"nanos":901000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:cloudwatch:LogGroup builds \u001b[38;5;2mcreated (0.29s)\u001b[0m ","timestamp":{"seconds":1762154094,"nanos":191000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:codebuild:Project flask-image \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154094,"nanos":768000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:iam:RolePolicy code-build-role-codebuildPolicy \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154094,"nanos":769000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:iam:Role kaniko-task-role \u001b[38;5;2mcreated (1s)\u001b[0m ","timestamp":{"seconds":1762154095,"nanos":177000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:codebuild:Project flask-image \u001b[38;5;2mcreated (0.52s)\u001b[0m ","timestamp":{"seconds":1762154095,"nanos":285000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:iam:RolePolicy kaniko-task-role-AllowCloudWatchLogs \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154095,"nanos":430000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:iam:RolePolicy code-build-role-codebuildPolicy \u001b[38;5;2mcreated (0.69s)\u001b[0m ","timestamp":{"seconds":1762154095,"nanos":461000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:iam:RolePolicy kaniko-task-role-AllowCloudWatchLogs \u001b[38;5;2mcreated (0.69s)\u001b[0m ","timestamp":{"seconds":1762154096,"nanos":123000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:iam:RolePoliciesExclusive code-build-role \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154096,"nanos":760000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m pulumi-nodejs:dynamic:Resource flask-image \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154096,"nanos":845000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:iam:RolePoliciesExclusive kaniko-task-role \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154096,"nanos":850000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:iam:RolePoliciesExclusive code-build-role \u001b[38;5;2mcreated (0.30s)\u001b[0m ","timestamp":{"seconds":1762154097,"nanos":57000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:iam:RolePoliciesExclusive kaniko-task-role \u001b[38;5;2mcreated (0.66s)\u001b[0m ","timestamp":{"seconds":1762154097,"nanos":505000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ecs:TaskDefinition kanikoTaskDefAmd64 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154097,"nanos":767000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ecs:TaskDefinition kanikoTaskDefArm64 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154097,"nanos":767000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ecs:TaskDefinition kanikoTaskDefAmd64 \u001b[38;5;2mcreated (0.29s)\u001b[0m ","timestamp":{"seconds":1762154098,"nanos":58000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:Subnet shared-vpc-public-1 \u001b[38;5;2mcreated (11s)\u001b[0m ","timestamp":{"seconds":1762154098,"nanos":86000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ecs:TaskDefinition kanikoTaskDefArm64 \u001b[38;5;2mcreated (0.46s)\u001b[0m ","timestamp":{"seconds":1762154098,"nanos":231000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m pulumi:pulumi:Stack flask-railpack-2-beta \u001b[1m\u001b[38;5;2mcreating (31s)\u001b[0m \u001b[0mwarning: [runtime] CodeBuild build failed for project flask-image-df4eac2: {\"state\":\"FAILURE\",\"reason\":\"Service role arn:aws:iam::532501343364:role/Defang-flask-railpack-2-beta-code-build-roleus-west-2 does not allow AWS CodeBuild to create Amazon CloudWatch Logs log streams for build arn:aws:codebuild:us-west-2:532501343364:build/flask-image-df4eac2:8d3ace30-ba32-4246-95c7-b7a7ac06312a. Error message: User: arn:aws:sts::532501343364:assumed-role/Defang-flask-railpack-2-beta-code-build-roleus-west-2/AWSCodeBuild-8d3ace30-ba32-4246-95c7-b7a7ac06312a is not authorized to perform: logs:CreateLogStream on resource: arn:aws:logs:us-west-2:532501343364:log-group:/Defang/flask-railpack-2/beta/builds:log-stream:flask-image/flask_9cn7t35vg8ju/8d3ace30-ba32-4246-95c7-b7a7ac06312a because no identity-based policy allows the logs:CreateLogStream action\",\"observedResponses\":{\"\\\"Service role arn:aws:iam::532501343364:role/Defang-flask-railpack-2-beta-code-build-roleus-west-2 does not allow AWS CodeBuild to create Amazon CloudWatch Logs log streams for build arn:aws:codebuild:us-west-2:532501343364:build/flask-image-df4eac2:8d3ace30-ba32-4246-95c7-b7a7ac06312a. Error message: User: arn:aws:sts::532501343364:assumed-role/Defang-flask-railpack-2-beta-code-build-roleus-west-2/AWSCodeBuild-8d3ace30-ba32-4246-95c7-b7a7ac06312a is not authorized to perform: logs:CreateLogStream on resource: arn:aws:logs:us-west-2:532501343364:log-group:/Defang/flask-railpack-2/beta/builds:log-stream:flask-image/flask_9cn7t35vg8ju/8d3ace30-ba32-4246-95c7-b7a7ac06312a because no identity-based policy allows the logs:CreateLogStream action\\\"\":1}} (retrying after 5s)","timestamp":{"seconds":1762154098,"nanos":398000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTable shared-vpc-public-1 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154098,"nanos":443000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:Subnet shared-vpc-public-3 \u001b[38;5;2mcreated (11s)\u001b[0m ","timestamp":{"seconds":1762154098,"nanos":598000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTable shared-vpc-public-3 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154099,"nanos":46000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:Subnet shared-vpc-public-2 \u001b[38;5;2mcreated (11s)\u001b[0m ","timestamp":{"seconds":1762154099,"nanos":137000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTable shared-vpc-public-1 \u001b[38;5;2mcreated (0.82s)\u001b[0m ","timestamp":{"seconds":1762154099,"nanos":266000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTable shared-vpc-public-2 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154099,"nanos":521000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTableAssociation shared-vpc-public-1 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154099,"nanos":687000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:Route shared-vpc-public-1 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154099,"nanos":690000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTable shared-vpc-public-3 \u001b[38;5;2mcreated (0.66s)\u001b[0m ","timestamp":{"seconds":1762154099,"nanos":708000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTableAssociation shared-vpc-public-1 \u001b[38;5;2mcreated (0.59s)\u001b[0m ","timestamp":{"seconds":1762154100,"nanos":278000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTable shared-vpc-public-2 \u001b[38;5;2mcreated (0.81s)\u001b[0m ","timestamp":{"seconds":1762154100,"nanos":328000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTableAssociation shared-vpc-public-3 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154100,"nanos":443000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:Route shared-vpc-public-3 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154100,"nanos":444000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:Route shared-vpc-public-1 \u001b[38;5;2mcreated (1s)\u001b[0m ","timestamp":{"seconds":1762154100,"nanos":785000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTableAssociation shared-vpc-public-2 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154100,"nanos":851000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:Route shared-vpc-public-2 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154100,"nanos":854000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTableAssociation shared-vpc-public-3 \u001b[38;5;2mcreated (0.91s)\u001b[0m ","timestamp":{"seconds":1762154101,"nanos":352000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:Route shared-vpc-public-3 \u001b[38;5;2mcreated (1s)\u001b[0m ","timestamp":{"seconds":1762154101,"nanos":765000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:RouteTableAssociation shared-vpc-public-2 \u001b[38;5;2mcreated (1s)\u001b[0m ","timestamp":{"seconds":1762154102,"nanos":76000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:Route shared-vpc-public-2 \u001b[38;5;2mcreated (1s)\u001b[0m ","timestamp":{"seconds":1762154102,"nanos":490000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:VpcDhcpOptionsAssociation dhcp-options-association \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154102,"nanos":936000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:SecurityGroup bootstrap \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154102,"nanos":936000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:route53:Zone flask-railpack-2.internal \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154102,"nanos":936000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:SecurityGroup sg443 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154102,"nanos":936000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:VpcDhcpOptionsAssociation dhcp-options-association \u001b[38;5;2mcreated (0.43s)\u001b[0m ","timestamp":{"seconds":1762154103,"nanos":319000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:SecurityGroup bootstrap \u001b[38;5;2mcreated (1s)\u001b[0m ","timestamp":{"seconds":1762154104,"nanos":629000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:SecurityGroup sg443 \u001b[38;5;2mcreated (2s)\u001b[0m ","timestamp":{"seconds":1762154105,"nanos":355000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:lb:LoadBalancer alb \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154105,"nanos":617000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:route53:Zone flask-railpack-2.nullfunc.defang.app \u001b[38;5;2mcreated (37s)\u001b[0m ","timestamp":{"seconds":1762154107,"nanos":473000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:route53:Record flask-railpack-2.nullfunc.defang.app_SOA \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154107,"nanos":731000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:route53:Record _cf4cbb066822f88945f519d97d26c9fc.flask-railpack-2.nullfunc.defang.app_CNAME \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154107,"nanos":732000000},"service":"cd","host":"pulumi"}
+{"message":"[Container] 2025/11/03 07:15:20.692589 Running on CodeBuild On-demand\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:20.692603 Waiting for agent ping\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:21.897051 Waiting for DOWNLOAD_SOURCE\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.066582 Phase is DOWNLOAD_SOURCE\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.068430 CODEBUILD_SRC_DIR=/codebuild/output/src2466658155/src\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.068828 YAML location is /codebuild/readonly/buildspec.yml\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.070384 Setting HTTP client timeout to higher timeout for S3 source\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.070465 Processing environment variables\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.151677 Moving to directory /codebuild/output/src2466658155/src\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.151698 Cache is not defined in the buildspec\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.185469 Skip cache due to: no paths specified to be cached\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.185659 Registering with agent\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.215112 Phases found in YAML: 2\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.215127  PRE_BUILD: 4 commands\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.215131  BUILD: 3 commands\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.215333 Phase complete: DOWNLOAD_SOURCE State: SUCCEEDED\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.215353 Phase context status code:  Message: \n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.322319 Entering phase INSTALL\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.360418 Phase complete: INSTALL State: SUCCEEDED\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.360431 Phase context status code:  Message: \n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.396020 Entering phase PRE_BUILD\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.431484 Running command nohup /usr/bin/dockerd --host=unix:///var/run/docker.sock --host=tcp://127.0.0.1:2375 --storage-driver=overlay2 \u0026\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:22.437121 Running command timeout 15 sh -c \"until docker info; do echo .; sleep 1; done\"\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:22.460797492Z\" level=info msg=\"Starting up\"\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:22.461238017Z\" level=warning msg=\"Binding to IP address without --tlsverify is insecure and gives root access on this machine to everyone who has access to your network.\" host=\"tcp://127.0.0.1:2375\"\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:22.461254492Z\" level=warning msg=\"Binding to an IP address, even on localhost, can also give access to scripts run in a browser. Be safe out there!\" host=\"tcp://127.0.0.1:2375\"\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:22.461264524Z\" level=warning msg=\"[DEPRECATION NOTICE] In future versions this will be a hard failure preventing the daemon from starting! Learn more at: https://docs.docker.com/go/api-security/\" host=\"tcp://127.0.0.1:2375\"\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"Client: Docker Engine - Community\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":" Version:    28.4.0\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":" Context:    default\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":" Debug Mode: false\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":" Plugins:\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"  buildx: Docker Buildx (Docker Inc.)\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"    Version:  v0.27.0\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"    Path:     /usr/libexec/docker/cli-plugins/docker-buildx\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"  compose: Docker Compose (Docker Inc.)\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"    Version:  v2.39.2\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"    Path:     /usr/libexec/docker/cli-plugins/docker-compose\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"Server:\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":".\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.461658765Z\" level=info msg=\"containerd not running, starting managed containerd\"\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.462304212Z\" level=info msg=\"started new containerd process\" address=/var/run/docker/containerd/containerd.sock module=libcontainerd pid=142\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.478384397Z\" level=info msg=\"starting containerd\" revision=05044ec0a9a75232cad458027ca83437aae3f4da version=1.7.27\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.500706052Z\" level=info msg=\"loading plugin \\\"io.containerd.snapshotter.v1.aufs\\\"...\" type=io.containerd.snapshotter.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.500865130Z\" level=info msg=\"skip loading plugin \\\"io.containerd.snapshotter.v1.aufs\\\"...\" error=\"aufs is not supported (modprobe aufs failed: exec: \\\"modprobe\\\": executable file not found in $PATH \\\"\\\"): skip plugin\" type=io.containerd.snapshotter.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.500887084Z\" level=info msg=\"loading plugin \\\"io.containerd.event.v1.exchange\\\"...\" type=io.containerd.event.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.500898828Z\" level=info msg=\"loading plugin \\\"io.containerd.internal.v1.opt\\\"...\" type=io.containerd.internal.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.501014779Z\" level=info msg=\"loading plugin \\\"io.containerd.warning.v1.deprecations\\\"...\" type=io.containerd.warning.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.501026075Z\" level=info msg=\"loading plugin \\\"io.containerd.snapshotter.v1.blockfile\\\"...\" type=io.containerd.snapshotter.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.501058728Z\" level=info msg=\"skip loading plugin \\\"io.containerd.snapshotter.v1.blockfile\\\"...\" error=\"no scratch file generator: skip plugin\" type=io.containerd.snapshotter.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.501067649Z\" level=info msg=\"loading plugin \\\"io.containerd.snapshotter.v1.btrfs\\\"...\" type=io.containerd.snapshotter.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.501208177Z\" level=info msg=\"skip loading plugin \\\"io.containerd.snapshotter.v1.btrfs\\\"...\" error=\"path /var/lib/docker/containerd/daemon/io.containerd.snapshotter.v1.btrfs (xfs) must be a btrfs filesystem to be used with the btrfs snapshotter: skip plugin\" type=io.containerd.snapshotter.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.501217618Z\" level=info msg=\"loading plugin \\\"io.containerd.snapshotter.v1.devmapper\\\"...\" type=io.containerd.snapshotter.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.501226365Z\" level=info msg=\"skip loading plugin \\\"io.containerd.snapshotter.v1.devmapper\\\"...\" error=\"devmapper not configured: skip plugin\" type=io.containerd.snapshotter.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.501233481Z\" level=info msg=\"loading plugin \\\"io.containerd.snapshotter.v1.native\\\"...\" type=io.containerd.snapshotter.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.501267440Z\" level=info msg=\"loading plugin \\\"io.containerd.snapshotter.v1.overlayfs\\\"...\" type=io.containerd.snapshotter.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.501384866Z\" level=info msg=\"loading plugin \\\"io.containerd.snapshotter.v1.zfs\\\"...\" type=io.containerd.snapshotter.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.501493609Z\" level=info msg=\"skip loading plugin \\\"io.containerd.snapshotter.v1.zfs\\\"...\" error=\"path /var/lib/docker/containerd/daemon/io.containerd.snapshotter.v1.zfs must be a zfs filesystem to be used with the zfs snapshotter: skip plugin\" type=io.containerd.snapshotter.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.501507000Z\" level=info msg=\"loading plugin \\\"io.containerd.content.v1.content\\\"...\" type=io.containerd.content.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.501526355Z\" level=info msg=\"loading plugin \\\"io.containerd.metadata.v1.bolt\\\"...\" type=io.containerd.metadata.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.501561665Z\" level=info msg=\"metadata content store policy set\" policy=shared\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.507726517Z\" level=info msg=\"loading plugin \\\"io.containerd.gc.v1.scheduler\\\"...\" type=io.containerd.gc.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.507777040Z\" level=info msg=\"loading plugin \\\"io.containerd.differ.v1.walking\\\"...\" type=io.containerd.differ.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.507796366Z\" level=info msg=\"loading plugin \\\"io.containerd.lease.v1.manager\\\"...\" type=io.containerd.lease.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.507815070Z\" level=info msg=\"loading plugin \\\"io.containerd.streaming.v1.manager\\\"...\" type=io.containerd.streaming.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.507830606Z\" level=info msg=\"loading plugin \\\"io.containerd.runtime.v1.linux\\\"...\" type=io.containerd.runtime.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.507917773Z\" level=info msg=\"loading plugin \\\"io.containerd.monitor.v1.cgroups\\\"...\" type=io.containerd.monitor.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508215374Z\" level=info msg=\"loading plugin \\\"io.containerd.runtime.v2.task\\\"...\" type=io.containerd.runtime.v2\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508310864Z\" level=info msg=\"loading plugin \\\"io.containerd.runtime.v2.shim\\\"...\" type=io.containerd.runtime.v2\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508324298Z\" level=info msg=\"loading plugin \\\"io.containerd.sandbox.store.v1.local\\\"...\" type=io.containerd.sandbox.store.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508337350Z\" level=info msg=\"loading plugin \\\"io.containerd.sandbox.controller.v1.local\\\"...\" type=io.containerd.sandbox.controller.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508349238Z\" level=info msg=\"loading plugin \\\"io.containerd.service.v1.containers-service\\\"...\" type=io.containerd.service.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508359755Z\" level=info msg=\"loading plugin \\\"io.containerd.service.v1.content-service\\\"...\" type=io.containerd.service.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508373505Z\" level=info msg=\"loading plugin \\\"io.containerd.service.v1.diff-service\\\"...\" type=io.containerd.service.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508384910Z\" level=info msg=\"loading plugin \\\"io.containerd.service.v1.images-service\\\"...\" type=io.containerd.service.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508397611Z\" level=info msg=\"loading plugin \\\"io.containerd.service.v1.introspection-service\\\"...\" type=io.containerd.service.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508408506Z\" level=info msg=\"loading plugin \\\"io.containerd.service.v1.namespaces-service\\\"...\" type=io.containerd.service.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508418867Z\" level=info msg=\"loading plugin \\\"io.containerd.service.v1.snapshots-service\\\"...\" type=io.containerd.service.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508427249Z\" level=info msg=\"loading plugin \\\"io.containerd.service.v1.tasks-service\\\"...\" type=io.containerd.service.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508443336Z\" level=info msg=\"loading plugin \\\"io.containerd.grpc.v1.containers\\\"...\" type=io.containerd.grpc.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508453780Z\" level=info msg=\"loading plugin \\\"io.containerd.grpc.v1.content\\\"...\" type=io.containerd.grpc.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508464563Z\" level=info msg=\"loading plugin \\\"io.containerd.grpc.v1.diff\\\"...\" type=io.containerd.grpc.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508475495Z\" level=info msg=\"loading plugin \\\"io.containerd.grpc.v1.events\\\"...\" type=io.containerd.grpc.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508489259Z\" level=info msg=\"loading plugin \\\"io.containerd.grpc.v1.images\\\"...\" type=io.containerd.grpc.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508503103Z\" level=info msg=\"loading plugin \\\"io.containerd.grpc.v1.introspection\\\"...\" type=io.containerd.grpc.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508515269Z\" level=info msg=\"loading plugin \\\"io.containerd.grpc.v1.leases\\\"...\" type=io.containerd.grpc.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508528318Z\" level=info msg=\"loading plugin \\\"io.containerd.grpc.v1.namespaces\\\"...\" type=io.containerd.grpc.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508544446Z\" level=info msg=\"loading plugin \\\"io.containerd.grpc.v1.sandbox-controllers\\\"...\" type=io.containerd.grpc.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508558025Z\" level=info msg=\"loading plugin \\\"io.containerd.grpc.v1.sandboxes\\\"...\" type=io.containerd.grpc.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508567822Z\" level=info msg=\"loading plugin \\\"io.containerd.grpc.v1.snapshots\\\"...\" type=io.containerd.grpc.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508576673Z\" level=info msg=\"loading plugin \\\"io.containerd.grpc.v1.streaming\\\"...\" type=io.containerd.grpc.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508586708Z\" level=info msg=\"loading plugin \\\"io.containerd.grpc.v1.tasks\\\"...\" type=io.containerd.grpc.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508598024Z\" level=info msg=\"loading plugin \\\"io.containerd.transfer.v1.local\\\"...\" type=io.containerd.transfer.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508618663Z\" level=info msg=\"loading plugin \\\"io.containerd.grpc.v1.transfer\\\"...\" type=io.containerd.grpc.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508635247Z\" level=info msg=\"loading plugin \\\"io.containerd.grpc.v1.version\\\"...\" type=io.containerd.grpc.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508644105Z\" level=info msg=\"loading plugin \\\"io.containerd.internal.v1.restart\\\"...\" type=io.containerd.internal.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508688164Z\" level=info msg=\"loading plugin \\\"io.containerd.tracing.processor.v1.otlp\\\"...\" type=io.containerd.tracing.processor.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508707438Z\" level=info msg=\"skip loading plugin \\\"io.containerd.tracing.processor.v1.otlp\\\"...\" error=\"skip plugin: tracing endpoint not configured\" type=io.containerd.tracing.processor.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508716069Z\" level=info msg=\"loading plugin \\\"io.containerd.internal.v1.tracing\\\"...\" type=io.containerd.internal.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508726897Z\" level=info msg=\"skip loading plugin \\\"io.containerd.internal.v1.tracing\\\"...\" error=\"skip plugin: tracing endpoint not configured\" type=io.containerd.internal.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508734565Z\" level=info msg=\"loading plugin \\\"io.containerd.grpc.v1.healthcheck\\\"...\" type=io.containerd.grpc.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508748275Z\" level=info msg=\"loading plugin \\\"io.containerd.nri.v1.nri\\\"...\" type=io.containerd.nri.v1\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508756675Z\" level=info msg=\"NRI interface is disabled by configuration.\"\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508912770Z\" level=info msg=serving... address=/var/run/docker/containerd/containerd-debug.sock\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.508972954Z\" level=info msg=serving... address=/var/run/docker/containerd/containerd.sock.ttrpc\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.509020867Z\" level=info msg=serving... address=/var/run/docker/containerd/containerd.sock\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.509036332Z\" level=info msg=\"containerd successfully booted in 0.031179s\"\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.514776914Z\" level=info msg=\"OTEL tracing is not configured, using no-op tracer provider\"\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.514864820Z\" level=info msg=\"CDI directory does not exist, skipping: failed to monitor for changes: no such file or directory\" dir=/etc/cdi\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.514875540Z\" level=info msg=\"CDI directory does not exist, skipping: failed to monitor for changes: no such file or directory\" dir=/var/run/cdi\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.522286913Z\" level=info msg=\"Creating a containerd client\" address=/var/run/docker/containerd/containerd.sock timeout=1m0s\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.533042772Z\" level=info msg=\"[graphdriver] trying configured driver: overlay2\"\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:23.708441442Z\" level=info msg=\"Loading containers: start.\"\n","timestamp":{"seconds":1762154126,"nanos":138000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:26.470429674Z\" level=info msg=\"Loading containers: done.\"\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:26.496890172Z\" level=warning msg=\"[DEPRECATION NOTICE]: API is accessible on http://127.0.0.1:2375 without encryption.\\n         Access to the remote API is equivalent to root access on the host. Refer\\n         to the 'Docker daemon attack surface' section in the documentation for\\n         more information: https://docs.docker.com/go/attack-surface/\\nIn future versions this will be a hard failure preventing the daemon from starting! Learn more at: https://docs.docker.com/go/api-security/\"\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:26.496929979Z\" level=info msg=\"Docker daemon\" commit=249d679 containerd-snapshotter=false storage-driver=overlay2 version=28.4.0\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:26.496973928Z\" level=info msg=\"Initializing buildkit\"\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:26.521436534Z\" level=info msg=\"Completed buildkit initialization\"\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:26.525232803Z\" level=info msg=\"Daemon has completed initialization\"\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:26.525287469Z\" level=info msg=\"API listen on /var/run/docker.sock\"\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:26.525306102Z\" level=info msg=\"API listen on 127.0.0.1:2375\"\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"Client: Docker Engine - Community\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Version:    28.4.0\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Context:    default\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Debug Mode: false\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Plugins:\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  buildx: Docker Buildx (Docker Inc.)\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"    Version:  v0.27.0\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"    Path:     /usr/libexec/docker/cli-plugins/docker-buildx\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  compose: Docker Compose (Docker Inc.)\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"    Version:  v2.39.2\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"    Path:     /usr/libexec/docker/cli-plugins/docker-compose\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"Server:\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Containers: 0\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  Running: 0\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  Paused: 0\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  Stopped: 0\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Images: 0\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Server Version: 28.4.0\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Storage Driver: overlay2\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  Backing Filesystem: xfs\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  Supports d_type: true\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  Using metacopy: false\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  Native Overlay Diff: true\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  userxattr: false\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Logging Driver: json-file\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Cgroup Driver: cgroupfs\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Cgroup Version: 1\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Plugins:\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  Volume: local\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  Network: bridge host ipvlan macvlan null overlay\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  Log: awslogs fluentd gcplogs gelf journald json-file local splunk syslog\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" CDI spec directories:\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  /etc/cdi\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  /var/run/cdi\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Swarm: inactive\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Runtimes: io.containerd.runc.v2 runc\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Default Runtime: runc\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Init Binary: docker-init\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" containerd version: 05044ec0a9a75232cad458027ca83437aae3f4da\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" runc version: v1.2.5-0-g59923ef\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" init version: de40ad0\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Security Options:\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  seccomp\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"   Profile: builtin\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Kernel Version: 4.14.355-280.684.amzn2.x86_64\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Operating System: Ubuntu 22.04.5 LTS (containerized)\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" OSType: linux\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Architecture: x86_64\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" CPUs: 8\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Total Memory: 15.2GiB\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Name: 54e0d5167cbe\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" ID: cd9a03e2-3e5a-4b7c-9945-98aed5a110f5\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Docker Root Dir: /var/lib/docker\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Debug Mode: false\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Experimental: false\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Insecure Registries:\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  ::1/128\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  127.0.0.0/8\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":" Live Restore Enabled: false\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"[DEPRECATION NOTICE]: API is accessible on http://127.0.0.1:2375 without encryption.\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"         Access to the remote API is equivalent to root access on the host. Refer\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"         to the 'Docker daemon attack surface' section in the documentation for\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"         more information: https://docs.docker.com/go/attack-surface/\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"In future versions this will be a hard failure preventing the daemon from starting! Learn more at: https://docs.docker.com/go/api-security/\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:26.537665 Running command echo \"Docker daemon is up!\"\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"Docker daemon is up!\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:26.543157 Running command railpack prepare ${CODEBUILD_SRC_DIR} --plan-out ./railpack-plan.json --info-out ./railpack-info.json\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"                  \n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"╭────────────────╮\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"│ Railpack 0.7.0 │\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"╰────────────────╯\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  ↳ Detected Python\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  ↳ Using pip\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"            \n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  Packages  \n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  ──────────\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  python  │  3.13.9  │  railpack default (3.13)\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"            \n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  Steps     \n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  ──────────\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  ▸ install\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"    $ python -m venv /app/.venv\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"    $ pip install -r requirements.txt\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"            \n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  Deploy    \n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"  ──────────\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"    $ python app.py\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:28.186511 Phase complete: PRE_BUILD State: SUCCEEDED\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:28.186529 Phase context status code:  Message: \n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:28.219922 Entering phase BUILD\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:28.220756 Running command echo Building the Docker image...\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"Building the Docker image...\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:28.226454 Running command docker buildx create --use --driver=docker-container --platform linux/amd64\n","timestamp":{"seconds":1762154128,"nanos":211000000},"service":"cd","host":"codebuild"}
+{"message":"interesting_dirac\n","timestamp":{"seconds":1762154130,"nanos":249000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154130,"nanos":249000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:15:28.285992 Running command docker buildx build -t 532501343364.dkr.ecr.us-west-2.amazonaws.com/flask-railpack-2/kaniko-build:flask-image-ef5dc382-x86_64 -f ./railpack-plan.json --push --platform linux/amd64 --build-arg \"BUILDKIT_SYNTAX\"  ${CODEBUILD_SRC_DIR}\n","timestamp":{"seconds":1762154130,"nanos":249000000},"service":"cd","host":"codebuild"}
+{"message":"#0 building with \"interesting_dirac\" instance using docker-container driver\n","timestamp":{"seconds":1762154130,"nanos":249000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154130,"nanos":249000000},"service":"cd","host":"codebuild"}
+{"message":"#1 [internal] booting buildkit\n","timestamp":{"seconds":1762154130,"nanos":249000000},"service":"cd","host":"codebuild"}
+{"message":"#1 pulling image moby/buildkit:buildx-stable-1\n","timestamp":{"seconds":1762154130,"nanos":249000000},"service":"cd","host":"codebuild"}
+{"message":"#1 pulling image moby/buildkit:buildx-stable-1 3.1s done\n","timestamp":{"seconds":1762154132,"nanos":263000000},"service":"cd","host":"codebuild"}
+{"message":"#1 creating container buildx_buildkit_interesting_dirac0\n","timestamp":{"seconds":1762154132,"nanos":263000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:15:31.969286152Z\" level=error msg=\"Handler for POST /v1.51/containers/6d41de822dce907ebcd18a95bc30366dd703162c821ccbad912cfa075d49893a/start returned error: could not select device driver \\\"\\\" with capabilities: [[gpu]]\" spanID=b0008267f9ad66e5 traceID=5dc79b9ad977ab8dfb47a19e2a3b9495\n","timestamp":{"seconds":1762154132,"nanos":263000000},"service":"cd","host":"codebuild"}
+{"message":"#1 creating container buildx_buildkit_interesting_dirac0 1.0s done\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"#1 DONE 4.1s\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"#2 [internal] load build definition from railpack-plan.json\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"#2 transferring dockerfile: 3.03kB done\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"#2 DONE 0.0s\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"#3 resolve image config for docker-image://ghcr.io/railwayapp/railpack-frontend:latest\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"#3 DONE 1.1s\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"#4 docker-image://ghcr.io/railwayapp/railpack-frontend:latest@sha256:665bb7b85bacf894d9e05cf350c35fd6b1b766e8faa3a7a235b549c6a21e0586\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"#4 resolve ghcr.io/railwayapp/railpack-frontend:latest@sha256:665bb7b85bacf894d9e05cf350c35fd6b1b766e8faa3a7a235b549c6a21e0586 0.0s done\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"#4 sha256:fef430add54fdf5fc0b3b36788b90993edda413165c632e9e3499efb1fc0a3b5 0B / 7.80MB 0.2s\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"#4 sha256:fef430add54fdf5fc0b3b36788b90993edda413165c632e9e3499efb1fc0a3b5 3.15MB / 7.80MB 0.3s\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"#4 sha256:2d35ebdb57d9971fea0cac1582aa78935adf8058b2cc32db163c98822e5dfa1b 3.80MB / 3.80MB 0.2s done\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"#4 extracting sha256:2d35ebdb57d9971fea0cac1582aa78935adf8058b2cc32db163c98822e5dfa1b\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"#4 sha256:fef430add54fdf5fc0b3b36788b90993edda413165c632e9e3499efb1fc0a3b5 7.80MB / 7.80MB 0.4s done\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"#4 extracting sha256:2d35ebdb57d9971fea0cac1582aa78935adf8058b2cc32db163c98822e5dfa1b 0.1s done\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"#4 extracting sha256:fef430add54fdf5fc0b3b36788b90993edda413165c632e9e3499efb1fc0a3b5 0.1s done\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"#4 DONE 0.5s\n","timestamp":{"seconds":1762154134,"nanos":279000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#5 load build definition from railpack-plan.json\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#5 transferring dockerfile: 3.03kB done\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#5 DONE 0.0s\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#6 loading .\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#6 DONE 0.0s\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 docker-image://ghcr.io/railwayapp/railpack-builder:latest\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 resolve ghcr.io/railwayapp/railpack-builder:latest\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 resolve ghcr.io/railwayapp/railpack-builder:latest 0.7s done\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 DONE 0.7s\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#8 docker-image://ghcr.io/railwayapp/railpack-runtime:latest\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#8 resolve ghcr.io/railwayapp/railpack-runtime:latest\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#8 resolve ghcr.io/railwayapp/railpack-runtime:latest 0.7s done\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#8 DONE 0.8s\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#6 loading .\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#6 transferring context: 5.69kB done\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#6 DONE 0.1s\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 docker-image://ghcr.io/railwayapp/railpack-builder:latest\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 32B / 32B 0.1s done\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:4c6d6396838b0bab96e1d48a7003807271da9c7535806ba7f3e942ea64ebfc41 119B / 119B 0.1s done\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:ca6ef7bca8ed2706fbc275417397f4b002343f301f926491a31606b6ecc96480 0B / 10.02MB 0.2s\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:59ec0b6dd4e2e8d50eb376a027f451987a1a77cbff84baba2fe959f1ef0cf132 0B / 224.47MB 0.2s\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:255774e0027b72d2327719e78dbad5ad8c9cf446d055e45be7fc149418470bae 0B / 64.40MB 0.2s\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:ca6ef7bca8ed2706fbc275417397f4b002343f301f926491a31606b6ecc96480 10.02MB / 10.02MB 0.4s done\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:7cd785773db44407e20a679ce5439222e505475eed5b99f1910eb2cda51729ab 0B / 48.47MB 0.2s\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:59ec0b6dd4e2e8d50eb376a027f451987a1a77cbff84baba2fe959f1ef0cf132 17.83MB / 224.47MB 0.5s\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:255774e0027b72d2327719e78dbad5ad8c9cf446d055e45be7fc149418470bae 10.49MB / 64.40MB 0.3s\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:7cd785773db44407e20a679ce5439222e505475eed5b99f1910eb2cda51729ab 3.15MB / 48.47MB 0.3s\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:091eb8249475f42de217265c501e0186f0a3ea7490ef7f51458c30db91fb3cac 0B / 24.01MB 0.2s\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:255774e0027b72d2327719e78dbad5ad8c9cf446d055e45be7fc149418470bae 20.97MB / 64.40MB 0.5s\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:091eb8249475f42de217265c501e0186f0a3ea7490ef7f51458c30db91fb3cac 5.24MB / 24.01MB 0.3s\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:255774e0027b72d2327719e78dbad5ad8c9cf446d055e45be7fc149418470bae 30.41MB / 64.40MB 0.6s\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:7cd785773db44407e20a679ce5439222e505475eed5b99f1910eb2cda51729ab 8.39MB / 48.47MB 0.6s\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:091eb8249475f42de217265c501e0186f0a3ea7490ef7f51458c30db91fb3cac 14.68MB / 24.01MB 0.5s\n","timestamp":{"seconds":1762154136,"nanos":301000000},"service":"cd","host":"codebuild"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:route53:Record flask-railpack-2.nullfunc.defang.app_SOA \u001b[38;5;2mcreated (26s)\u001b[0m ","timestamp":{"seconds":1762154133,"nanos":920000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:route53:Record _cf4cbb066822f88945f519d97d26c9fc.flask-railpack-2.nullfunc.defang.app_CNAME \u001b[38;5;2mcreated (26s)\u001b[0m ","timestamp":{"seconds":1762154134,"nanos":123000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:acm:CertificateValidation *.flask-railpack-2.nullfunc.defang.appValidation \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154134,"nanos":331000000},"service":"cd","host":"pulumi"}
+{"message":"#7 sha256:59ec0b6dd4e2e8d50eb376a027f451987a1a77cbff84baba2fe959f1ef0cf132 30.41MB / 224.47MB 0.9s\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:255774e0027b72d2327719e78dbad5ad8c9cf446d055e45be7fc149418470bae 40.89MB / 64.40MB 0.8s\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:7cd785773db44407e20a679ce5439222e505475eed5b99f1910eb2cda51729ab 18.87MB / 48.47MB 0.8s\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:091eb8249475f42de217265c501e0186f0a3ea7490ef7f51458c30db91fb3cac 24.01MB / 24.01MB 0.6s\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:255774e0027b72d2327719e78dbad5ad8c9cf446d055e45be7fc149418470bae 61.87MB / 64.40MB 1.1s\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:7cd785773db44407e20a679ce5439222e505475eed5b99f1910eb2cda51729ab 27.26MB / 48.47MB 0.9s\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:091eb8249475f42de217265c501e0186f0a3ea7490ef7f51458c30db91fb3cac 24.01MB / 24.01MB 0.6s done\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:59ec0b6dd4e2e8d50eb376a027f451987a1a77cbff84baba2fe959f1ef0cf132 50.33MB / 224.47MB 1.2s\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:255774e0027b72d2327719e78dbad5ad8c9cf446d055e45be7fc149418470bae 64.40MB / 64.40MB 1.1s done\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:7cd785773db44407e20a679ce5439222e505475eed5b99f1910eb2cda51729ab 46.14MB / 48.47MB 1.2s\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:59ec0b6dd4e2e8d50eb376a027f451987a1a77cbff84baba2fe959f1ef0cf132 70.25MB / 224.47MB 1.5s\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:7cd785773db44407e20a679ce5439222e505475eed5b99f1910eb2cda51729ab 48.47MB / 48.47MB 1.3s done\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 extracting sha256:7cd785773db44407e20a679ce5439222e505475eed5b99f1910eb2cda51729ab\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:59ec0b6dd4e2e8d50eb376a027f451987a1a77cbff84baba2fe959f1ef0cf132 90.18MB / 224.47MB 1.8s\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:59ec0b6dd4e2e8d50eb376a027f451987a1a77cbff84baba2fe959f1ef0cf132 111.15MB / 224.47MB 2.1s\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:59ec0b6dd4e2e8d50eb376a027f451987a1a77cbff84baba2fe959f1ef0cf132 131.07MB / 224.47MB 2.4s\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 extracting sha256:7cd785773db44407e20a679ce5439222e505475eed5b99f1910eb2cda51729ab 1.0s done\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 extracting sha256:091eb8249475f42de217265c501e0186f0a3ea7490ef7f51458c30db91fb3cac\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:59ec0b6dd4e2e8d50eb376a027f451987a1a77cbff84baba2fe959f1ef0cf132 150.99MB / 224.47MB 2.7s\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 extracting sha256:091eb8249475f42de217265c501e0186f0a3ea7490ef7f51458c30db91fb3cac 0.4s done\n","timestamp":{"seconds":1762154138,"nanos":318000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:59ec0b6dd4e2e8d50eb376a027f451987a1a77cbff84baba2fe959f1ef0cf132 170.92MB / 224.47MB 3.0s\n","timestamp":{"seconds":1762154140,"nanos":333000000},"service":"cd","host":"codebuild"}
+{"message":"#7 extracting sha256:255774e0027b72d2327719e78dbad5ad8c9cf446d055e45be7fc149418470bae\n","timestamp":{"seconds":1762154140,"nanos":333000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:59ec0b6dd4e2e8d50eb376a027f451987a1a77cbff84baba2fe959f1ef0cf132 190.84MB / 224.47MB 3.3s\n","timestamp":{"seconds":1762154140,"nanos":333000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:59ec0b6dd4e2e8d50eb376a027f451987a1a77cbff84baba2fe959f1ef0cf132 211.81MB / 224.47MB 3.6s\n","timestamp":{"seconds":1762154140,"nanos":333000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:59ec0b6dd4e2e8d50eb376a027f451987a1a77cbff84baba2fe959f1ef0cf132 224.47MB / 224.47MB 3.9s\n","timestamp":{"seconds":1762154140,"nanos":333000000},"service":"cd","host":"codebuild"}
+{"message":"#7 sha256:59ec0b6dd4e2e8d50eb376a027f451987a1a77cbff84baba2fe959f1ef0cf132 224.47MB / 224.47MB 4.0s done\n","timestamp":{"seconds":1762154140,"nanos":333000000},"service":"cd","host":"codebuild"}
+{"message":"#7 extracting sha256:255774e0027b72d2327719e78dbad5ad8c9cf446d055e45be7fc149418470bae 1.4s done\n","timestamp":{"seconds":1762154140,"nanos":333000000},"service":"cd","host":"codebuild"}
+{"message":"#7 DONE 5.1s\n","timestamp":{"seconds":1762154140,"nanos":333000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154140,"nanos":333000000},"service":"cd","host":"codebuild"}
+{"message":"#7 docker-image://ghcr.io/railwayapp/railpack-builder:latest\n","timestamp":{"seconds":1762154140,"nanos":333000000},"service":"cd","host":"codebuild"}
+{"message":"#7 extracting sha256:59ec0b6dd4e2e8d50eb376a027f451987a1a77cbff84baba2fe959f1ef0cf132\n","timestamp":{"seconds":1762154140,"nanos":333000000},"service":"cd","host":"codebuild"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:acm:CertificateValidation *.flask-railpack-2.nullfunc.defang.appValidation \u001b[38;5;2mcreated (23s)\u001b[0m ","timestamp":{"seconds":1762154158,"nanos":48000000},"service":"cd","host":"pulumi"}
+{"message":"#7 extracting sha256:59ec0b6dd4e2e8d50eb376a027f451987a1a77cbff84baba2fe959f1ef0cf132 4.1s done\n","timestamp":{"seconds":1762154144,"nanos":350000000},"service":"cd","host":"codebuild"}
+{"message":"#7 DONE 9.2s\n","timestamp":{"seconds":1762154144,"nanos":350000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154144,"nanos":350000000},"service":"cd","host":"codebuild"}
+{"message":"#7 docker-image://ghcr.io/railwayapp/railpack-builder:latest\n","timestamp":{"seconds":1762154144,"nanos":350000000},"service":"cd","host":"codebuild"}
+{"message":"#7 extracting sha256:ca6ef7bca8ed2706fbc275417397f4b002343f301f926491a31606b6ecc96480 0.1s done\n","timestamp":{"seconds":1762154144,"nanos":350000000},"service":"cd","host":"codebuild"}
+{"message":"#7 DONE 9.4s\n","timestamp":{"seconds":1762154144,"nanos":350000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154144,"nanos":350000000},"service":"cd","host":"codebuild"}
+{"message":"#7 docker-image://ghcr.io/railwayapp/railpack-builder:latest\n","timestamp":{"seconds":1762154144,"nanos":350000000},"service":"cd","host":"codebuild"}
+{"message":"#7 extracting sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 0.0s done\n","timestamp":{"seconds":1762154144,"nanos":350000000},"service":"cd","host":"codebuild"}
+{"message":"#7 extracting sha256:4c6d6396838b0bab96e1d48a7003807271da9c7535806ba7f3e942ea64ebfc41 0.0s done\n","timestamp":{"seconds":1762154144,"nanos":350000000},"service":"cd","host":"codebuild"}
+{"message":"#7 DONE 9.4s\n","timestamp":{"seconds":1762154144,"nanos":350000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154144,"nanos":350000000},"service":"cd","host":"codebuild"}
+{"message":"#9 mkdir /etc/mise\n","timestamp":{"seconds":1762154144,"nanos":350000000},"service":"cd","host":"codebuild"}
+{"message":"#9 DONE 3.1s\n","timestamp":{"seconds":1762154148,"nanos":364000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154148,"nanos":364000000},"service":"cd","host":"codebuild"}
+{"message":"#10 create mise config\n","timestamp":{"seconds":1762154148,"nanos":364000000},"service":"cd","host":"codebuild"}
+{"message":"#10 DONE 0.1s\n","timestamp":{"seconds":1762154148,"nanos":364000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154148,"nanos":364000000},"service":"cd","host":"codebuild"}
+{"message":"#11 install mise packages: python\n","timestamp":{"seconds":1762154148,"nanos":364000000},"service":"cd","host":"codebuild"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m pulumi:pulumi:Stack flask-railpack-2-beta \u001b[1m\u001b[38;5;2mcreating (100s)\u001b[0m \u001b[0minfo: [runtime] Searching build logs for image digest in /Defang/flask-railpack-2/beta/builds/flask-image/flask_9cn7t35vg8ju/23532ec2-ea70-40f6-8345-0b23cad00455 using pattern: %pushing manifest for 532501343364\\.dkr\\.ecr\\.us-west-2\\.amazonaws\\.com/flask-railpack-2/kaniko-build:flask-image-ef5dc382-x86_64@sha256:[a-f0-9]{64} [0-9.]*s done%","timestamp":{"seconds":1762154167,"nanos":354000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m pulumi-nodejs:dynamic:Resource flask-image \u001b[38;5;2mcreated (70s)\u001b[0m ","timestamp":{"seconds":1762154167,"nanos":485000000},"service":"cd","host":"pulumi"}
+{"message":" ** Build succeeded for \"flask\"","timestamp":{"seconds":1762154167,"nanos":787000000},"stderr":true,"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m pulumi-nodejs:dynamic:Resource flask-image \u001b[38;5;2mcreated (70s)\u001b[0m \u001b[0mStarted CodeBuild build for project flask-image-df4eac2\u001b[0m","timestamp":{"seconds":1762154167,"nanos":789000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m pulumi-nodejs:dynamic:Resource flask-image \u001b[38;5;2mcreated (70s)\u001b[0m \u001b[0mBuilt image 532501343364.dkr.ecr.us-west-2.amazonaws.com/flask-railpack-2/kaniko-build:flask-image-ef5dc382-x86_64@sha256:c4d6323d8e02c97d70af3ab87e342fcb7863503639baf4743164ac6ebfeb3b50 with build ID flask-image-df4eac2:23532ec2-ea70-40f6-8345-0b23cad00455 using CodeBuild project flask-image-df4eac2\u001b[0m","timestamp":{"seconds":1762154167,"nanos":844000000},"service":"cd","host":"pulumi"}
+{"message":"#11 1.302 mise python@3.13.9   install\n","timestamp":{"seconds":1762154150,"nanos":380000000},"service":"cd","host":"codebuild"}
+{"message":"#11 1.389 mise python@3.13.9   download cpython-3.13.9+20251031-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz\n","timestamp":{"seconds":1762154150,"nanos":380000000},"service":"cd","host":"codebuild"}
+{"message":"#11 1.867 mise python@3.13.9   extract cpython-3.13.9+20251031-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz\n","timestamp":{"seconds":1762154150,"nanos":380000000},"service":"cd","host":"codebuild"}
+{"message":"#11 2.495 mise python@3.13.9   python --version\n","timestamp":{"seconds":1762154150,"nanos":380000000},"service":"cd","host":"codebuild"}
+{"message":"#11 2.497 mise python@3.13.9   Python 3.13.9\n","timestamp":{"seconds":1762154150,"nanos":380000000},"service":"cd","host":"codebuild"}
+{"message":"#11 2.503 mise python@3.13.9 ✓ installed\n","timestamp":{"seconds":1762154150,"nanos":380000000},"service":"cd","host":"codebuild"}
+{"message":"#11 DONE 2.8s\n","timestamp":{"seconds":1762154150,"nanos":380000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154150,"nanos":380000000},"service":"cd","host":"codebuild"}
+{"message":"#12 python -m venv /app/.venv\n","timestamp":{"seconds":1762154150,"nanos":380000000},"service":"cd","host":"codebuild"}
+{"message":"#12 ...\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"#13 copy /mise/shims\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"#13 DONE 0.0s\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"#14 copy /mise/installs\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"#14 DONE 0.5s\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"#12 python -m venv /app/.venv\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"#12 ...\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"#15 copy /usr/local/bin/mise\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"#15 DONE 0.1s\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"#16 copy /etc/mise/config.toml\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"#16 DONE 0.1s\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"#17 copy /root/.local/state/mise\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"#17 DONE 0.1s\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"#12 python -m venv /app/.venv\n","timestamp":{"seconds":1762154152,"nanos":395000000},"service":"cd","host":"codebuild"}
+{"message":"#12 DONE 3.2s\n","timestamp":{"seconds":1762154154,"nanos":410000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154154,"nanos":410000000},"service":"cd","host":"codebuild"}
+{"message":"#18 copy requirements.txt\n","timestamp":{"seconds":1762154154,"nanos":410000000},"service":"cd","host":"codebuild"}
+{"message":"#18 DONE 0.1s\n","timestamp":{"seconds":1762154154,"nanos":410000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154154,"nanos":410000000},"service":"cd","host":"codebuild"}
+{"message":"#19 pip install -r requirements.txt\n","timestamp":{"seconds":1762154154,"nanos":410000000},"service":"cd","host":"codebuild"}
+{"message":"#19 0.856 Collecting Flask==2.2.5 (from -r requirements.txt (line 1))\n","timestamp":{"seconds":1762154154,"nanos":410000000},"service":"cd","host":"codebuild"}
+{"message":"#19 0.881   Downloading Flask-2.2.5-py3-none-any.whl.metadata (3.9 kB)\n","timestamp":{"seconds":1762154154,"nanos":410000000},"service":"cd","host":"codebuild"}
+{"message":"#19 0.915 Collecting Werkzeug==2.2.2 (from -r requirements.txt (line 2))\n","timestamp":{"seconds":1762154154,"nanos":410000000},"service":"cd","host":"codebuild"}
+{"message":"#19 0.923   Downloading Werkzeug-2.2.2-py3-none-any.whl.metadata (4.4 kB)\n","timestamp":{"seconds":1762154154,"nanos":410000000},"service":"cd","host":"codebuild"}
+{"message":"#19 0.981 Collecting MarkupSafe==2.1.1 (from -r requirements.txt (line 3))\n","timestamp":{"seconds":1762154154,"nanos":410000000},"service":"cd","host":"codebuild"}
+{"message":"#19 0.990   Downloading MarkupSafe-2.1.1.tar.gz (18 kB)\n","timestamp":{"seconds":1762154154,"nanos":410000000},"service":"cd","host":"codebuild"}
+{"message":"#19 1.006   Installing build dependencies: started\n","timestamp":{"seconds":1762154154,"nanos":410000000},"service":"cd","host":"codebuild"}
+{"message":"#19 2.078   Installing build dependencies: finished with status 'done'\n","timestamp":{"seconds":1762154156,"nanos":427000000},"service":"cd","host":"codebuild"}
+{"message":"#19 2.080   Getting requirements to build wheel: started\n","timestamp":{"seconds":1762154156,"nanos":427000000},"service":"cd","host":"codebuild"}
+{"message":"#19 2.721   Getting requirements to build wheel: finished with status 'done'\n","timestamp":{"seconds":1762154156,"nanos":427000000},"service":"cd","host":"codebuild"}
+{"message":"#19 2.723   Preparing metadata (pyproject.toml): started\n","timestamp":{"seconds":1762154156,"nanos":427000000},"service":"cd","host":"codebuild"}
+{"message":"#19 3.391   Preparing metadata (pyproject.toml): finished with status 'done'\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 3.417 Collecting Jinja2\u003e=3.0 (from Flask==2.2.5-\u003e-r requirements.txt (line 1))\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 3.425   Downloading jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 3.447 Collecting itsdangerous\u003e=2.0 (from Flask==2.2.5-\u003e-r requirements.txt (line 1))\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 3.455   Downloading itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 3.481 Collecting click\u003e=8.0 (from Flask==2.2.5-\u003e-r requirements.txt (line 1))\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 3.493   Downloading click-8.3.0-py3-none-any.whl.metadata (2.6 kB)\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 3.511 Downloading Flask-2.2.5-py3-none-any.whl (101 kB)\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 3.533 Downloading Werkzeug-2.2.2-py3-none-any.whl (232 kB)\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 3.554 Downloading click-8.3.0-py3-none-any.whl (107 kB)\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 3.568 Downloading itsdangerous-2.2.0-py3-none-any.whl (16 kB)\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 3.581 Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 3.596 Building wheels for collected packages: MarkupSafe\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 3.596   Building wheel for MarkupSafe (pyproject.toml): started\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 4.519   Building wheel for MarkupSafe (pyproject.toml): finished with status 'done'\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 4.520   Created wheel for MarkupSafe: filename=markupsafe-2.1.1-cp313-cp313-linux_x86_64.whl size=27649 sha256=80bc8326e5b357806d43b94eda431c181f1e0916d10f72ead9dfa26fb0c83188\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 4.520   Stored in directory: /opt/pip-cache/wheels/59/85/28/24c5338b231eb0e9378f1817c5ee6750e4e8a4c20b27121476\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 4.522 Successfully built MarkupSafe\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 4.530 Installing collected packages: MarkupSafe, itsdangerous, click, Werkzeug, Jinja2, Flask\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 4.881 \n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 4.883 Successfully installed Flask-2.2.5 Jinja2-3.1.6 MarkupSafe-2.1.1 Werkzeug-2.2.2 click-8.3.0 itsdangerous-2.2.0\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"#19 DONE 5.1s\n","timestamp":{"seconds":1762154158,"nanos":443000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154160,"nanos":467000000},"service":"cd","host":"codebuild"}
+{"message":"#20 copy / /app\n","timestamp":{"seconds":1762154160,"nanos":467000000},"service":"cd","host":"codebuild"}
+{"message":"#20 DONE 0.1s\n","timestamp":{"seconds":1762154160,"nanos":467000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154160,"nanos":467000000},"service":"cd","host":"codebuild"}
+{"message":"#21 copy /app/.venv\n","timestamp":{"seconds":1762154160,"nanos":467000000},"service":"cd","host":"codebuild"}
+{"message":"#21 ...\n","timestamp":{"seconds":1762154160,"nanos":467000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154160,"nanos":467000000},"service":"cd","host":"codebuild"}
+{"message":"#22 copy /app\n","timestamp":{"seconds":1762154160,"nanos":467000000},"service":"cd","host":"codebuild"}
+{"message":"#22 DONE 0.1s\n","timestamp":{"seconds":1762154160,"nanos":467000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154160,"nanos":467000000},"service":"cd","host":"codebuild"}
+{"message":"#21 copy /app/.venv\n","timestamp":{"seconds":1762154160,"nanos":467000000},"service":"cd","host":"codebuild"}
+{"message":"#21 DONE 0.1s\n","timestamp":{"seconds":1762154160,"nanos":467000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154160,"nanos":467000000},"service":"cd","host":"codebuild"}
+{"message":"#23 [railpack] merge ghcr.io/railwayapp/railpack-runtime:latest, $packages:mise, $build, $build\n","timestamp":{"seconds":1762154160,"nanos":467000000},"service":"cd","host":"codebuild"}
+{"message":"#23 DONE 0.0s\n","timestamp":{"seconds":1762154160,"nanos":467000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154160,"nanos":467000000},"service":"cd","host":"codebuild"}
+{"message":"#24 exporting to image\n","timestamp":{"seconds":1762154160,"nanos":467000000},"service":"cd","host":"codebuild"}
+{"message":"#24 exporting layers\n","timestamp":{"seconds":1762154160,"nanos":467000000},"service":"cd","host":"codebuild"}
+{"message":"#24 exporting layers 3.9s done\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"#24 exporting manifest sha256:5bb702cfea3c2bc14cf46b504486eccd599ad0086fc4a826ce1a8a57c22eebdc done\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"#24 exporting config sha256:55209b1b4fc1f3e1f11ab6963d496e7bfc057df6aabb2d4091761c903fd1202e done\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"#24 exporting attestation manifest sha256:9aa1ee741fa158516f4f43f8153c9f842ef619f10b8c5aa1035a1bd1befd404f 0.0s done\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"#24 exporting manifest list sha256:c4d6323d8e02c97d70af3ab87e342fcb7863503639baf4743164ac6ebfeb3b50 0.0s done\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"#24 pushing layers\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"#24 ...\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"#25 [auth] sharing credentials for 532501343364.dkr.ecr.us-west-2.amazonaws.com\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"#25 DONE 0.0s\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"#24 exporting to image\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"#24 ...\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"#8 docker-image://ghcr.io/railwayapp/railpack-runtime:latest\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"#8 sha256:6e909acdb790c5a1989d9cfc795fda5a246ad6664bb27b5c688e2b734b2c5fad 0B / 28.20MB 0.2s\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"#8 sha256:9710fe284c4c9a2ff5f3c644177eb4d39a8f2c4d09f19fcf8512a3de408be239 0B / 3.55MB 0.2s\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"#8 sha256:6e909acdb790c5a1989d9cfc795fda5a246ad6664bb27b5c688e2b734b2c5fad 17.83MB / 28.20MB 0.5s\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"#8 sha256:9710fe284c4c9a2ff5f3c644177eb4d39a8f2c4d09f19fcf8512a3de408be239 3.55MB / 3.55MB 0.2s done\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"#8 sha256:6e909acdb790c5a1989d9cfc795fda5a246ad6664bb27b5c688e2b734b2c5fad 28.20MB / 28.20MB 0.6s\n","timestamp":{"seconds":1762154164,"nanos":487000000},"service":"cd","host":"codebuild"}
+{"message":"#8 sha256:6e909acdb790c5a1989d9cfc795fda5a246ad6664bb27b5c688e2b734b2c5fad 28.20MB / 28.20MB 0.6s done\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"#8 DONE 1.4s\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"#24 exporting to image\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"#24 pushing layers 2.3s done\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"#24 pushing manifest for 532501343364.dkr.ecr.us-west-2.amazonaws.com/flask-railpack-2/kaniko-build:flask-image-ef5dc382-x86_64@sha256:c4d6323d8e02c97d70af3ab87e342fcb7863503639baf4743164ac6ebfeb3b50\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"#24 pushing manifest for 532501343364.dkr.ecr.us-west-2.amazonaws.com/flask-railpack-2/kaniko-build:flask-image-ef5dc382-x86_64@sha256:c4d6323d8e02c97d70af3ab87e342fcb7863503639baf4743164ac6ebfeb3b50 0.6s done\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"#24 DONE 6.9s\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"time=\"2025-11-03T07:16:05.919990897Z\" level=error msg=\"Error running exec ad75549305b5b447939ce1d8c8a45c83b49f52976709bfed4c621e5fa81233f9 in container: exec attach failed: error attaching stdout stream: write unix /var/run/docker.sock-\u003e@: write: broken pipe\"\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:16:05.923156 Phase complete: BUILD State: SUCCEEDED\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:16:05.923171 Phase context status code:  Message: \n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:16:05.959058 Entering phase POST_BUILD\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:16:05.961593 Phase complete: POST_BUILD State: SUCCEEDED\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:16:05.961609 Phase context status code:  Message: \n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:16:06.002551 Set report auto-discover timeout to 5 seconds\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:16:06.002597 Expanding base directory path:  .\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:16:06.003900 Assembling file list\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:16:06.003913 Expanding .\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:16:06.005233 Expanding file paths for base directory .\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:16:06.005242 Assembling file list\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:16:06.005245 Expanding **/*\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:16:06.006631 No matching auto-discover report paths found\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:16:06.006647 Report auto-discover file discovery took 0.004096 seconds\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:16:06.006660 Phase complete: UPLOAD_ARTIFACTS State: SUCCEEDED\n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":"[Container] 2025/11/03 07:16:06.006668 Phase context status code:  Message: \n","timestamp":{"seconds":1762154166,"nanos":170000000},"service":"cd","host":"codebuild"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:route53:Zone flask-railpack-2.internal \u001b[38;5;2mcreated (93s)\u001b[0m ","timestamp":{"seconds":1762154196,"nanos":350000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:route53:Record flask-railpack-2.internal_SOA \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154196,"nanos":802000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:route53:Record flask-railpack-2.internal_SOA \u001b[38;5;2mcreated (19s)\u001b[0m ","timestamp":{"seconds":1762154215,"nanos":981000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:lb:LoadBalancer alb \u001b[38;5;2mcreated (171s)\u001b[0m ","timestamp":{"seconds":1762154277,"nanos":109000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:route53:Record flask-railpack-2.nullfunc.defang.app_A \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154277,"nanos":348000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:lb:Listener alb-http \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154277,"nanos":354000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:lb:Listener alb-https \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154277,"nanos":354000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:route53:Record *.flask-railpack-2.nullfunc.defang.app_A \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154277,"nanos":358000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:lb:TargetGroup flask-5000 \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154277,"nanos":443000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:lb:Listener alb-http \u001b[38;5;2mcreated (0.67s)\u001b[0m ","timestamp":{"seconds":1762154278,"nanos":19000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:lb:Listener alb-https \u001b[38;5;2mcreated (1s)\u001b[0m ","timestamp":{"seconds":1762154278,"nanos":409000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:lb:TargetGroup flask-5000 \u001b[38;5;2mcreated (1s)\u001b[0m ","timestamp":{"seconds":1762154278,"nanos":838000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:lb:ListenerRule flask-5000-rule \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154279,"nanos":49000000},"service":"cd","host":"pulumi"}
+{"message":"SERVICE_DEPLOYMENT_IN_PROGRESS","timestamp":{"seconds":1762154282},"service":"flask","host":"ecs"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:lb:ListenerRule flask-5000-rule \u001b[38;5;2mcreated (0.35s)\u001b[0m ","timestamp":{"seconds":1762154279,"nanos":395000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ecs:TaskDefinition flask-railpack-2_flask-taskdef \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154279,"nanos":595000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ec2:SecurityGroup flask-railpack-2_flask-sg \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154279,"nanos":597000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ecs:TaskDefinition flask-railpack-2_flask-taskdef \u001b[38;5;2mcreated (0.33s)\u001b[0m ","timestamp":{"seconds":1762154279,"nanos":923000000},"service":"cd","host":"pulumi"}
+{"message":" ** Updated service \"flask\" to revision 2","timestamp":{"seconds":1762154280,"nanos":286000000},"stderr":true,"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ec2:SecurityGroup flask-railpack-2_flask-sg \u001b[38;5;2mcreated (2s)\u001b[0m ","timestamp":{"seconds":1762154281,"nanos":648000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:ecs:Service flask-railpack-2_flask \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154281,"nanos":878000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:ecs:Service flask-railpack-2_flask \u001b[38;5;2mcreated (1s)\u001b[0m ","timestamp":{"seconds":1762154283,"nanos":2000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[1m\u001b[38;5;2m+ \u001b[0m aws:s3:BucketObject state \u001b[1m\u001b[38;5;2mcreating (0s)\u001b[0m ","timestamp":{"seconds":1762154283,"nanos":192000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:s3:BucketObject state \u001b[38;5;2mcreated (0.35s)\u001b[0m ","timestamp":{"seconds":1762154283,"nanos":534000000},"service":"cd","host":"pulumi"}
+{"message":"CAPACITY_PROVIDER_STEADY_STATE","timestamp":{"seconds":1762154288},"service":"flask","host":"ecs"}
+{"message":"TASK_PROVISIONING : 0c07376b89e94f1fb13100f2fda76bd4","timestamp":{"seconds":1762154298},"service":"flask","etag":"9cn7t35vg8ju","host":"ecs"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:route53:Record *.flask-railpack-2.nullfunc.defang.app_A \u001b[38;5;2mcreated (27s)\u001b[0m ","timestamp":{"seconds":1762154305,"nanos":136000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m aws:route53:Record flask-railpack-2.nullfunc.defang.app_A \u001b[38;5;2mcreated (29s)\u001b[0m ","timestamp":{"seconds":1762154306,"nanos":905000000},"service":"cd","host":"pulumi"}
+{"message":" \u001b[38;5;2m+ \u001b[0m pulumi:pulumi:Stack flask-railpack-2-beta \u001b[38;5;2mcreated (240s)\u001b[0m 5 \u001b[38;5;5mmessages\u001b[0m","timestamp":{"seconds":1762154307,"nanos":316000000},"service":"cd","host":"pulumi"}
+{"message":"\u001b[38;5;13m\u001b[1mDiagnostics:\u001b[0m","timestamp":{"seconds":1762154307,"nanos":316000000},"service":"cd","host":"pulumi"}
+{"message":"  \u001b[38;5;12mpulumi-nodejs:dynamic:Resource (flask-image):\u001b[0m","timestamp":{"seconds":1762154307,"nanos":316000000},"service":"cd","host":"pulumi"}
+{"message":"    \u001b[0mStarted CodeBuild build for project flask-image-df4eac2\u001b[0m","timestamp":{"seconds":1762154307,"nanos":316000000},"service":"cd","host":"pulumi"}
+{"message":"    \u001b[0mBuilt image 532501343364.dkr.ecr.us-west-2.amazonaws.com/flask-railpack-2/kaniko-build:flask-image-ef5dc382-x86_64@sha256:c4d6323d8e02c97d70af3ab87e342fcb7863503639baf4743164ac6ebfeb3b50 with build ID flask-image-df4eac2:23532ec2-ea70-40f6-8345-0b23cad00455 using CodeBuild project flask-image-df4eac2\u001b[0m","timestamp":{"seconds":1762154307,"nanos":316000000},"service":"cd","host":"pulumi"}
+{"message":"  \u001b[38;5;12mpulumi:pulumi:Stack (flask-railpack-2-beta):\u001b[0m","timestamp":{"seconds":1762154307,"nanos":316000000},"service":"cd","host":"pulumi"}
+{"message":"    \u001b[0mNo pull-through cache or mirror found: pulling gcr.io/kaniko-project/executor:v1.23.2 may incur bandwidth costs.\u001b[0m","timestamp":{"seconds":1762154307,"nanos":316000000},"service":"cd","host":"pulumi"}
+{"message":"    \u001b[0mProject: flask-railpack-2, Org: nullfunc, Domain: flask-railpack-2.nullfunc.defang.app, Version: 0.6.0-1110-g7b7daedd\u001b[0m","timestamp":{"seconds":1762154307,"nanos":316000000},"service":"cd","host":"pulumi"}
+{"message":"    \u001b[0mUsing context: s3://defang-cd-bucket-ren6kjmnovwj/uploads/sha256-Vr1P_Q0ydyxfRZWyz8CzsBn73Q1fGvQ4H_7VvMRVz7w_.zip\u001b[0m","timestamp":{"seconds":1762154307,"nanos":316000000},"service":"cd","host":"pulumi"}
+{"message":"    \u001b[0mwarning: [runtime] CodeBuild build failed for project flask-image-df4eac2: {\"state\":\"FAILURE\",\"reason\":\"Service role arn:aws:iam::532501343364:role/Defang-flask-railpack-2-beta-code-build-roleus-west-2 does not allow AWS CodeBuild to create Amazon CloudWatch Logs log streams for build arn:aws:codebuild:us-west-2:532501343364:build/flask-image-df4eac2:8d3ace30-ba32-4246-95c7-b7a7ac06312a. Error message: User: arn:aws:sts::532501343364:assumed-role/Defang-flask-railpack-2-beta-code-build-roleus-west-2/AWSCodeBuild-8d3ace30-ba32-4246-95c7-b7a7ac06312a is not authorized to perform: logs:CreateLogStream on resource: arn:aws:logs:us-west-2:532501343364:log-group:/Defang/flask-railpack-2/beta/builds:log-stream:flask-image/flask_9cn7t35vg8ju/8d3ace30-ba32-4246-95c7-b7a7ac06312a because no identity-based policy allows the logs:CreateLogStream action\",\"observedResponses\":{\"\\\"Service role arn:aws:iam::532501343364:role/Defang-flask-railpack-2-beta-code-build-roleus-west-2 does not allow AWS CodeBuild to create Amazon CloudWatch Logs log streams for build arn:aws:codebuild:us-west-2:532501343364:build/flask-image-df4eac2:8d3ace30-ba32-4246-95c7-b7a7ac06312a. Error message: User: arn:aws:sts::532501343364:assumed-role/Defang-flask-railpack-2-beta-code-build-roleus-west-2/AWSCodeBuild-8d3ace30-ba32-4246-95c7-b7a7ac06312a is not authorized to perform: logs:CreateLogStream on resource: arn:aws:logs:us-west-2:532501343364:log-group:/Defang/flask-railpack-2/beta/builds:log-stream:flask-image/flask_9cn7t35vg8ju/8d3ace30-ba32-4246-95c7-b7a7ac06312a because no identity-based policy allows the logs:CreateLogStream action\\\"\":1}} (retrying after 5s)","timestamp":{"seconds":1762154307,"nanos":316000000},"service":"cd","host":"pulumi"}
+{"message":"    \u001b[0minfo: [runtime] Searching build logs for image digest in /Defang/flask-railpack-2/beta/builds/flask-image/flask_9cn7t35vg8ju/23532ec2-ea70-40f6-8345-0b23cad00455 using pattern: %pushing manifest for 532501343364\\.dkr\\.ecr\\.us-west-2\\.amazonaws\\.com/flask-railpack-2/kaniko-build:flask-image-ef5dc382-x86_64@sha256:[a-f0-9]{64} [0-9.]*s done%","timestamp":{"seconds":1762154307,"nanos":316000000},"service":"cd","host":"pulumi"}
+{"message":"\u001b[38;5;13m\u001b[1mOutputs:\u001b[0m","timestamp":{"seconds":1762154307,"nanos":319000000},"service":"cd","host":"pulumi"}
+{"message":"\u001b[38;5;2m    albArn            : \u001b[0m\u001b[38;5;2m\"arn:aws:elasticloadbalancing:us-west-2:532501343364:loadbalancer/app/defang-flask-railpack-2-beta-alb/6819d820ef501048\"\u001b[0m\u001b[38;5;2m","timestamp":{"seconds":1762154307,"nanos":320000000},"service":"cd","host":"pulumi"}
+{"message":"\u001b[0m\u001b[38;5;2m    fqdn              : \u001b[0m\u001b[38;5;2m\"flask-railpack-2.nullfunc.defang.app\"\u001b[0m\u001b[38;5;2m","timestamp":{"seconds":1762154307,"nanos":320000000},"service":"cd","host":"pulumi"}
+{"message":"\u001b[0m\u001b[38;5;2m    kanikoLogGroupArn : \u001b[0m\u001b[38;5;2m\"arn:aws:logs:us-west-2:532501343364:log-group:/Defang/flask-railpack-2/beta/builds\"\u001b[0m\u001b[38;5;2m","timestamp":{"seconds":1762154307,"nanos":320000000},"service":"cd","host":"pulumi"}
+{"message":"\u001b[0m\u001b[38;5;2m    privateLbCIDRs    : \u001b[0m\u001b[38;5;2m[","timestamp":{"seconds":1762154307,"nanos":320000000},"service":"cd","host":"pulumi"}
+{"message":"\u001b[0m\u001b[38;5;2m        [0]: \u001b[0m\u001b[38;5;2m\"10.0.32.0/20\"\u001b[0m\u001b[38;5;2m","timestamp":{"seconds":1762154307,"nanos":320000000},"service":"cd","host":"pulumi"}
+{"message":"\u001b[0m\u001b[38;5;2m        [1]: \u001b[0m\u001b[38;5;2m\"10.0.160.0/20\"\u001b[0m\u001b[38;5;2m","timestamp":{"seconds":1762154307,"nanos":320000000},"service":"cd","host":"pulumi"}
+{"message":"\u001b[0m\u001b[38;5;2m        [2]: \u001b[0m\u001b[38;5;2m\"10.0.96.0/20\"\u001b[0m\u001b[38;5;2m","timestamp":{"seconds":1762154307,"nanos":320000000},"service":"cd","host":"pulumi"}
+{"message":"\u001b[0m\u001b[38;5;2m    ]\u001b[0m\u001b[38;5;2m","timestamp":{"seconds":1762154307,"nanos":320000000},"service":"cd","host":"pulumi"}
+{"message":"\u001b[0m\u001b[38;5;2m    serviceLogGroupArn: \u001b[0m\u001b[38;5;2m\"arn:aws:logs:us-west-2:532501343364:log-group:/Defang/flask-railpack-2/beta/logs\"\u001b[0m\u001b[38;5;2m","timestamp":{"seconds":1762154307,"nanos":320000000},"service":"cd","host":"pulumi"}
+{"message":"\u001b[0m\u001b[38;5;2m    state             : \u001b[0m\u001b[38;5;2m\"projects/flask-railpack-2/beta/project.pb\"\u001b[0m\u001b[38;5;2m","timestamp":{"seconds":1762154307,"nanos":320000000},"service":"cd","host":"pulumi"}
+{"message":"\u001b[0m\u001b[38;5;2m    vpcId             : \u001b[0m\u001b[38;5;2m\"vpc-0beb5b22625f775fb\"\u001b[0m\u001b[38;5;2m","timestamp":{"seconds":1762154307,"nanos":320000000},"service":"cd","host":"pulumi"}
+{"message":"\u001b[38;5;13m\u001b[1mResources:\u001b[0m","timestamp":{"seconds":1762154307,"nanos":320000000},"service":"cd","host":"pulumi"}
+{"message":"    \u001b[38;5;2m+ 86 created\u001b[0m","timestamp":{"seconds":1762154307,"nanos":320000000},"service":"cd","host":"pulumi"}
+{"message":"\u001b[38;5;13m\u001b[1mDuration:\u001b[0m 4m1s","timestamp":{"seconds":1762154307,"nanos":320000000},"service":"cd","host":"pulumi"}
+{"message":" ** Update succeeded in 241.0s; provisioning...","timestamp":{"seconds":1762154309,"nanos":176000000},"stderr":true,"service":"cd","host":"pulumi"}
+{"message":"TASK_PENDING : 0c07376b89e94f1fb13100f2fda76bd4","timestamp":{"seconds":1762154309},"service":"flask","etag":"9cn7t35vg8ju","host":"ecs"}
+{"message":"TASK_ACTIVATING : 0c07376b89e94f1fb13100f2fda76bd4","timestamp":{"seconds":1762154317},"service":"flask","etag":"9cn7t35vg8ju","host":"ecs"}
+{"message":" * Serving Flask app 'app'","timestamp":{"seconds":1762154318,"nanos":886000000},"service":"flask","etag":"9cn7t35vg8ju","host":"0c07376b89e94f1fb13100f2fda76bd4"}
+{"message":" * Debug mode: on","timestamp":{"seconds":1762154318,"nanos":886000000},"service":"flask","etag":"9cn7t35vg8ju","host":"0c07376b89e94f1fb13100f2fda76bd4"}
+{"message":"\u001b[31m\u001b[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.\u001b[0m","timestamp":{"seconds":1762154318,"nanos":904000000},"service":"flask","etag":"9cn7t35vg8ju","host":"0c07376b89e94f1fb13100f2fda76bd4"}
+{"message":" * Running on all addresses (0.0.0.0)","timestamp":{"seconds":1762154318,"nanos":904000000},"service":"flask","etag":"9cn7t35vg8ju","host":"0c07376b89e94f1fb13100f2fda76bd4"}
+{"message":" * Running on http://127.0.0.1:5000","timestamp":{"seconds":1762154318,"nanos":904000000},"service":"flask","etag":"9cn7t35vg8ju","host":"0c07376b89e94f1fb13100f2fda76bd4"}
+{"message":" * Running on http://10.0.109.18:5000","timestamp":{"seconds":1762154318,"nanos":904000000},"service":"flask","etag":"9cn7t35vg8ju","host":"0c07376b89e94f1fb13100f2fda76bd4"}
+{"message":"\u001b[33mPress CTRL+C to quit\u001b[0m","timestamp":{"seconds":1762154318,"nanos":904000000},"service":"flask","etag":"9cn7t35vg8ju","host":"0c07376b89e94f1fb13100f2fda76bd4"}
+{"message":" * Restarting with stat","timestamp":{"seconds":1762154318,"nanos":920000000},"service":"flask","etag":"9cn7t35vg8ju","host":"0c07376b89e94f1fb13100f2fda76bd4"}
+{"message":" * Debugger is active!","timestamp":{"seconds":1762154319,"nanos":515000000},"service":"flask","etag":"9cn7t35vg8ju","host":"0c07376b89e94f1fb13100f2fda76bd4"}
+{"message":" * Debugger PIN: 133-869-310","timestamp":{"seconds":1762154319,"nanos":531000000},"service":"flask","etag":"9cn7t35vg8ju","host":"0c07376b89e94f1fb13100f2fda76bd4"}
+{"message":"127.0.0.1 - - [03/Nov/2025 07:18:43] \"GET / HTTP/1.1\" 200 -","timestamp":{"seconds":1762154323,"nanos":965000000},"service":"flask","etag":"9cn7t35vg8ju","host":"0c07376b89e94f1fb13100f2fda76bd4"}
+{"message":"127.0.0.1 - - [03/Nov/2025 07:18:48] \"GET / HTTP/1.1\" 200 -","timestamp":{"seconds":1762154328,"nanos":914000000},"service":"flask","etag":"9cn7t35vg8ju","host":"0c07376b89e94f1fb13100f2fda76bd4"}
+{"message":"10.0.43.146 - - [03/Nov/2025 07:18:49] \"GET / HTTP/1.1\" 200 -","timestamp":{"seconds":1762154329,"nanos":64000000},"service":"flask","etag":"9cn7t35vg8ju","host":"0c07376b89e94f1fb13100f2fda76bd4"}
+{"message":"TASK_RUNNING : 0c07376b89e94f1fb13100f2fda76bd4","timestamp":{"seconds":1762154333},"service":"flask","etag":"9cn7t35vg8ju","host":"ecs"}
+{"message":"127.0.0.1 - - [03/Nov/2025 07:18:53] \"GET / HTTP/1.1\" 200 -","timestamp":{"seconds":1762154333,"nanos":918000000},"service":"flask","etag":"9cn7t35vg8ju","host":"0c07376b89e94f1fb13100f2fda76bd4"}
+{"message":"10.0.43.146 - - [03/Nov/2025 07:18:54] \"GET / HTTP/1.1\" 200 -","timestamp":{"seconds":1762154334,"nanos":59000000},"service":"flask","etag":"9cn7t35vg8ju","host":"0c07376b89e94f1fb13100f2fda76bd4"}
+{"message":"127.0.0.1 - - [03/Nov/2025 07:18:58] \"GET / HTTP/1.1\" 200 -","timestamp":{"seconds":1762154338,"nanos":915000000},"service":"flask","etag":"9cn7t35vg8ju","host":"0c07376b89e94f1fb13100f2fda76bd4"}
+{"message":"10.0.43.146 - - [03/Nov/2025 07:18:59] \"GET / HTTP/1.1\" 200 -","timestamp":{"seconds":1762154339,"nanos":65000000},"service":"flask","etag":"9cn7t35vg8ju","host":"0c07376b89e94f1fb13100f2fda76bd4"}
+{"message":"127.0.0.1 - - [03/Nov/2025 07:19:03] \"GET / HTTP/1.1\" 200 -","timestamp":{"seconds":1762154343,"nanos":919000000},"service":"flask","etag":"9cn7t35vg8ju","host":"0c07376b89e94f1fb13100f2fda76bd4"}
+{"message":"10.0.43.146 - - [03/Nov/2025 07:19:04] \"GET / HTTP/1.1\" 200 -","timestamp":{"seconds":1762154344,"nanos":71000000},"service":"flask","etag":"9cn7t35vg8ju","host":"0c07376b89e94f1fb13100f2fda76bd4"}
+{"message":"SERVICE_DEPLOYMENT_COMPLETED","timestamp":{"seconds":1762154348},"service":"flask","etag":"9cn7t35vg8ju","host":"ecs"}
+{"message":"SERVICE_STEADY_STATE","timestamp":{"seconds":1762154348},"service":"flask","host":"ecs"}
+{"message":"CAPACITY_PROVIDER_STEADY_STATE","timestamp":{"seconds":1762154348},"service":"flask","host":"ecs"}
