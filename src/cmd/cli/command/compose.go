@@ -502,7 +502,7 @@ func makeComposePsCmd() *cobra.Command {
 	return getServicesCmd
 }
 
-func makeComposeLogsCmd() *cobra.Command {
+func makeLogsCmd() *cobra.Command {
 	var logsCmd = &cobra.Command{
 		Use:         "logs [SERVICE...]",
 		Annotations: authNeededAnnotation,
@@ -513,7 +513,7 @@ func makeComposeLogsCmd() *cobra.Command {
 	return logsCmd
 }
 
-func makeComposeTailCmd() *cobra.Command {
+func makeTailCmd() *cobra.Command {
 	var tailCmd = &cobra.Command{
 		Use:         "tail [SERVICE...]",
 		Annotations: authNeededAnnotation,
@@ -645,8 +645,8 @@ services:
 	composeCmd.AddCommand(makeComposeConfigCmd())
 	composeCmd.AddCommand(makeComposeDownCmd())
 	composeCmd.AddCommand(makeComposePsCmd())
-	composeCmd.AddCommand(makeComposeLogsCmd())
-	composeCmd.AddCommand(makeComposeTailCmd())
+	composeCmd.AddCommand(makeLogsCmd())
+	composeCmd.AddCommand(makeTailCmd())
 
 	// deprecated, will be removed in future releases
 	composeCmd.AddCommand(makeComposeStartCmd())
