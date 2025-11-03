@@ -126,7 +126,7 @@ pull:
 
 .PHONY: version
 version:
-	git tag $$(
+	git tag $$( \
 	  git tag -l 'v*' --sort=-v:refname | \
 	  head -n1 | \
 	  awk -F. '{$$NF = $$NF + 1;} 1' OFS=. \
