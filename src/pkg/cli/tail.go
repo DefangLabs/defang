@@ -374,8 +374,8 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 
 func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions, t *term.Term) error {
 	// HACK: skip noisy CI/CD logs (except errors)
-	var internalServices = []string{"cd", "kaniko", "fabric", "ecs", "cloudbuild", "pulumi"}
-	var internalHosts = []string{"kaniko", "fabric", "ecs", "cloudbuild", "pulumi"}
+	var internalServices = []string{"cd", "kaniko", "fabric", "ecs", "codebuild", "cloudbuild", "pulumi"}
+	var internalHosts = []string{"kaniko", "fabric", "ecs", "codebuild", "cloudbuild", "pulumi"}
 	isInternal := slices.Contains(internalServices, e.Service) || slices.Contains(internalHosts, e.Host)
 	onlyErrors := !options.Verbose && isInternal
 	if onlyErrors && !e.Stderr {

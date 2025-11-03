@@ -381,17 +381,13 @@ func TestPrintHandler(t *testing.T) {
 		inputfile  string
 		outputfile string
 	}{
-		// {
-		// 	inputfile:  "../../test-datasets/crew_input.jsonl",
-		// 	outputfile: "../../test-datasets/crew_output.txt",
-		// },
-		// {
-		// 	inputfile:  "../../test-datasets/flask_railpack_input.jsonl",
-		// 	outputfile: "../../test-datasets/flask_railpack_output.txt",
-		// },
 		{
-			inputfile:  "../../test-datasets/django_input.jsonl",
-			outputfile: "../../test-datasets/django_output.txt",
+			inputfile:  "../../test-datasets/crew_input.jsonl",
+			outputfile: "../../test-datasets/crew_output.data",
+		},
+		{
+			inputfile:  "../../test-datasets/flask_railpack_input.jsonl",
+			outputfile: "../../test-datasets/flask_railpack_output.data",
 		},
 	}
 
@@ -438,6 +434,10 @@ func TestPrintHandler(t *testing.T) {
 			actualLineClean = strings.ReplaceAll(actualLineClean, "\t", "    ")
 			expectedLineClean = strings.ReplaceAll(expectedLineClean, "\t", "    ")
 
+			// Normalize \
+			// actualLineClean = strings.ReplaceAll(actualLineClean, "\", "    ")
+			expectedLineClean = strings.ReplaceAll(expectedLineClean, "\\\"", "\"")
+			expectedLineClean = strings.ReplaceAll(expectedLineClean, "\t", "    ")
 			if actualLineClean != expectedLineClean {
 				t.Errorf("File %s Line %d mismatch:\nActual:   %q\nExpected: %q", tc.outputfile, i, actualLineClean, expectedLineClean)
 			}
