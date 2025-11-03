@@ -263,11 +263,11 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(debugCmd)
 
 	// Tail Command
-	tailCmd := makeComposeTailCmd()
+	tailCmd := makeTailCmd()
 	RootCmd.AddCommand(tailCmd)
 
 	// Logs Command
-	logsCmd := makeComposeLogsCmd()
+	logsCmd := makeLogsCmd()
 	RootCmd.AddCommand(logsCmd)
 
 	// Delete Command
