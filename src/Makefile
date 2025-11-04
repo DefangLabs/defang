@@ -160,8 +160,8 @@ minor-release: pull test no-diff increment-minor-version
 major-release: pull test no-diff increment-major-version
 	git push --follow-tags --tags
 
-.PHONY: release-help
-release-help:
+.PHONY: release
+release:
 	@echo "To create a release, use one of the following targets:"
 	@echo "  make patch-release   # Create a patch release (increments patch version)"
 	@echo "  make minor-release   # Create a minor release (increments minor version)"
