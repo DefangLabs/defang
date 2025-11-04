@@ -1,0 +1,22 @@
+[
+  {
+    "input": {
+      "message": "Show me the logs",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*logs.*\\]"
+  },
+  {
+    "input": {
+      "message": "I need to see the recent logs",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*logs.*\\]"
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "input": {
+      "message": "I need to login to Defang",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*login.*\\]"
+  },
+  {
+    "input": {
+      "message": "How do I authenticate with the system?",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*login.*\\]"
+  },
+  {
+    "input": {
+      "message": "Sign me in please",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*login.*\\]"
+  }
+]
