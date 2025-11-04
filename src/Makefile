@@ -124,17 +124,48 @@ no-diff:
 pull:
 	git pull
 
-.PHONY: version
-version:
+.PHONY: increment-patch-version
+increment-patch-version:
 	git tag $$( \
 	  git tag -l 'v*' --sort=-v:refname | \
 	  head -n1 | \
 	  awk -F. '{$$NF = $$NF + 1;} 1' OFS=. \
 	)
 
-.PHONY: release
-release: pull test no-diff version
+.PHONY: increment-minor-version
+increment-minor-version:
+	@git tag $$( \
+		git tag -l 'v*' --sort=-v:refname | \
+		head -n1 | \
+		awk -F. '{$$(NF-1) = $$((NF-1)) + 1; $$NF = 0;} 1' OFS=. \
+	)
+
+.PHONY: increment-major-version
+increment-major-version:
+	@git tag $$( \
+		git tag -l 'v*' --sort=-v:refname | \
+		head -n1 | \
+		awk -F. '{maj=substr($$1,2)+1; printf "v%d.0.0\n", maj}' \
+	)
+
+.PHONY: patch-release
+patch-release: pull test no-diff increment-patch-version
 	git push --follow-tags --tags
+
+.PHONY: minor-release
+minor-release: pull test no-diff increment-minor-version
+	git push --follow-tags --tags
+
+.PHONY: major-release
+major-release: pull test no-diff increment-major-version
+	git push --follow-tags --tags
+
+.PHONY: release
+release:
+	@echo "To create a release, use one of the following targets:"
+	@echo "  make patch-release   # Create a patch release (increments patch version)"
+	@echo "  make minor-release   # Create a minor release (increments minor version)"
+	@echo "  make major-release   # Create a major release (increments major version)"
 
 .PHONY: lint
 lint: $(GOLANGCI-LINT)
