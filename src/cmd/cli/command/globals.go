@@ -29,7 +29,25 @@ var (
 	verbose        = false
 )
 
-func readGlobals(stackName string) {
+// readGlobals loads configuration from .defangrc files and returns updated values.
+// It takes current values as input and returns potentially updated values from the rc files.
+func readGlobals(stackName string, currentStack string, currentHasTty bool, currentHideUpdate bool, currentMode modes.Mode, currentModelId string, currentProviderID cliClient.ProviderID) (
+	stack string,
+	hasTty bool,
+	hideUpdate bool,
+	mode modes.Mode,
+	modelId string,
+	nonInteractive bool,
+	providerID cliClient.ProviderID,
+) {
+	// Initialize with current values
+	stack = currentStack
+	hasTty = currentHasTty
+	hideUpdate = currentHideUpdate
+	mode = currentMode
+	modelId = currentModelId
+	providerID = currentProviderID
+
 	if stackName != "" {
 		rcfile := ".defangrc." + stackName
 		if err := godotenv.Load(rcfile); err != nil {
@@ -52,4 +70,6 @@ func readGlobals(stackName string) {
 	modelId = pkg.Getenv("DEFANG_MODEL_ID", modelId) // for Pro users only
 	nonInteractive = !hasTty
 	providerID = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", string(providerID)))
+
+	return stack, hasTty, hideUpdate, mode, modelId, nonInteractive, providerID
 }

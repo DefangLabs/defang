@@ -3,6 +3,9 @@ package command
 import (
 	"os"
 	"testing"
+
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 )
 
 func Test_readGlobals(t *testing.T) {
@@ -10,7 +13,7 @@ func Test_readGlobals(t *testing.T) {
 
 	t.Run("OS env beats any .defangrc file", func(t *testing.T) {
 		t.Setenv("VALUE", "from OS env")
-		readGlobals("test")
+		readGlobals("test", "", false, false, modes.ModeUnspecified, "", cliClient.ProviderAuto)
 		if v := os.Getenv("VALUE"); v != "from OS env" {
 			t.Errorf("expected VALUE to be 'from OS env', got '%s'", v)
 		}
@@ -18,7 +21,7 @@ func Test_readGlobals(t *testing.T) {
 	})
 
 	t.Run(".defangrc.test beats .defangrc", func(t *testing.T) {
-		readGlobals("test")
+		readGlobals("test", "", false, false, modes.ModeUnspecified, "", cliClient.ProviderAuto)
 		if v := os.Getenv("VALUE"); v != "from .defangrc.test" {
 			t.Errorf("expected VALUE to be 'from .defangrc.test', got '%s'", v)
 		}
@@ -26,7 +29,7 @@ func Test_readGlobals(t *testing.T) {
 	})
 
 	t.Run(".defangrc used if no stack", func(t *testing.T) {
-		readGlobals("non-existent-stack")
+		readGlobals("non-existent-stack", "", false, false, modes.ModeUnspecified, "", cliClient.ProviderAuto)
 		if v := os.Getenv("VALUE"); v != "from .defangrc" {
 			t.Errorf("expected VALUE to be 'from .defangrc', got '%s'", v)
 		}
