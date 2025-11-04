@@ -8,5 +8,6 @@ node_modules/
 
 .bin/
 
+.genkit/
 *.log
 *.txt
