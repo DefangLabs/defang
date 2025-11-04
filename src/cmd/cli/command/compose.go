@@ -34,6 +34,16 @@ func makeComposeUpCmd() *cobra.Command {
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and deploy a new project or update an existing project",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			localClient := getClient(ctx)
+			localProviderID := getProviderID(ctx)
+			localStack := getStack(ctx)
+			localMode := getMode(ctx)
+			localModelId := getModelId(ctx)
+			localVerbose := getVerbose(ctx)
+			localHasTty := getHasTty(ctx)
+			localNonInteractive := getNonInteractive(ctx)
+
 			var force, _ = cmd.Flags().GetBool("force")
 			var detach, _ = cmd.Flags().GetBool("detach")
 			var utc, _ = cmd.Flags().GetBool("utc")
@@ -49,12 +59,11 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			since := time.Now()
-			loader := configureLoader(cmd)
+			loader := configureLoader(cmd, localNonInteractive)
 
-			ctx := cmd.Context()
 			project, loadErr := loader.LoadProject(ctx)
 			if loadErr != nil {
-				if nonInteractive {
+				if localNonInteractive {
 					return loadErr
 				}
 
@@ -65,22 +74,22 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				return cli.InteractiveDebugForClientError(ctx, client, project, loadErr)
+				return cli.InteractiveDebugForClientError(ctx, localClient, project, loadErr)
 			}
 
-			provider, err := newProviderChecked(ctx, loader)
+			provider, err := newProviderChecked(ctx, loader, localClient, localProviderID, localStack, localNonInteractive)
 			if err != nil {
 				return err
 			}
 
 			// Check if the user has permission to use the provider
-			err = canIUseProvider(ctx, provider, project.Name, len(project.Services))
+			err = canIUseProvider(ctx, localClient, provider, project.Name, localStack, len(project.Services))
 			if err != nil {
 				return err
 			}
 
 			// Check if the project is already deployed and warn the user if they're deploying it elsewhere
-			if resp, err := client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
+			if resp, err := localClient.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
 				Project: project.Name,
 				Type:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
 			}); err != nil {
@@ -90,10 +99,10 @@ func makeComposeUpCmd() *cobra.Command {
 			} else {
 				samePlace := slices.ContainsFunc(resp.Deployments, func(dep *defangv1.Deployment) bool {
 					// Old deployments may not have a region or account ID, so we check for empty values too
-					return dep.Provider == providerID.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
+					return dep.Provider == localProviderID.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
 				})
 				if !samePlace && len(resp.Deployments) > 0 {
-					if nonInteractive {
+					if localNonInteractive {
 						term.Warnf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", project.Name)
 					} else {
 						help := "Active deployments of this project:"
@@ -127,9 +136,9 @@ func makeComposeUpCmd() *cobra.Command {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
 			}
 
-			deploy, project, err := cli.ComposeUp(ctx, project, client, provider, upload, mode)
+			deploy, project, err := cli.ComposeUp(ctx, project, localClient, provider, upload, localMode)
 			if err != nil {
-				return handleComposeUpErr(ctx, err, project, provider)
+				return handleComposeUpErr(ctx, err, localClient, localNonInteractive, project, provider)
 			}
 
 			if len(deploy.Services) == 0 {
@@ -150,12 +159,12 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 
-			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, verbose)
+			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, localVerbose)
 			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
-				handleTailAndMonitorErr(ctx, err, client, cli.DebugConfig{
+				handleTailAndMonitorErr(ctx, err, localClient, localNonInteractive, cli.DebugConfig{
 					Deployment: deploy.Etag,
-					ModelId:    modelId,
+					ModelId:    localModelId,
 					Project:    project,
 					Provider:   provider,
 					Since:      since,
@@ -174,7 +183,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			term.Info("Done.")
-			flushWarnings()
+			flushWarnings(localHasTty)
 			return nil
 		},
 	}
@@ -192,7 +201,7 @@ func makeComposeUpCmd() *cobra.Command {
 	return composeUpCmd
 }
 
-func handleComposeUpErr(ctx context.Context, err error, project *compose.Project, provider cliClient.Provider) error {
+func handleComposeUpErr(ctx context.Context, err error, client *cliClient.GrpcClient, nonInteractive bool, project *compose.Project, provider cliClient.Provider) error {
 	if errors.Is(err, types.ErrComposeFileNotFound) {
 		// TODO: generate a compose file based on the current project
 		printDefangHint("To start a new project, do:", "new")
@@ -222,7 +231,7 @@ func handleComposeUpErr(ctx context.Context, err error, project *compose.Project
 	return cli.InteractiveDebugForClientError(ctx, client, project, err)
 }
 
-func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.GrpcClient, debugConfig cli.DebugConfig) {
+func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.GrpcClient, nonInteractive bool, debugConfig cli.DebugConfig) {
 	var errDeploymentFailed cliClient.ErrDeploymentFailed
 	if errors.As(err, &errDeploymentFailed) {
 		// Tail got canceled because of deployment failure: prompt to show the debugger
@@ -266,7 +275,7 @@ func newTailOptionsForDeploy(deployment string, since time.Time, verbose bool) c
 	}
 }
 
-func flushWarnings() {
+func flushWarnings(hasTty bool) {
 	if hasTty && term.HadWarnings() {
 		fmt.Println("\n\u26A0\uFE0F Some warnings were seen during this command:")
 		term.FlushWarnings()
@@ -322,6 +331,13 @@ func makeComposeDownCmd() *cobra.Command {
 		Annotations: authNeededAnnotation,
 		Short:       "Reads a Compose file and deprovisions its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			localClient := getClient(ctx)
+			localProviderID := getProviderID(ctx)
+			localStack := getStack(ctx)
+			localVerbose := getVerbose(ctx)
+			localNonInteractive := getNonInteractive(ctx)
+
 			var detach, _ = cmd.Flags().GetBool("detach")
 			var utc, _ = cmd.Flags().GetBool("utc")
 
@@ -329,8 +345,8 @@ func makeComposeDownCmd() *cobra.Command {
 				cli.EnableUTCMode()
 			}
 
-			loader := configureLoader(cmd)
-			provider, err := newProviderChecked(cmd.Context(), loader)
+			loader := configureLoader(cmd, localNonInteractive)
+			provider, err := newProviderChecked(cmd.Context(), loader, localClient, localProviderID, localStack, localNonInteractive)
 			if err != nil {
 				return err
 			}
@@ -340,13 +356,13 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 
-			err = canIUseProvider(cmd.Context(), provider, projectName, 0)
+			err = canIUseProvider(cmd.Context(), localClient, provider, projectName, localStack, 0)
 			if err != nil {
 				return err
 			}
 
 			since := time.Now()
-			deployment, err := cli.ComposeDown(cmd.Context(), projectName, client, provider, args...)
+			deployment, err := cli.ComposeDown(cmd.Context(), projectName, localClient, provider, args...)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
@@ -372,7 +388,7 @@ func makeComposeDownCmd() *cobra.Command {
 				return nil
 			}
 
-			tailOptions := newTailOptionsForDown(deployment, since)
+			tailOptions := newTailOptionsForDown(deployment, since, localVerbose)
 			tailCtx := cmd.Context() // FIXME: stop Tail when the deployment task is done
 			err = cli.TailAndWaitForCD(tailCtx, provider, projectName, tailOptions)
 			if err != nil && !errors.Is(err, io.EOF) {
@@ -400,7 +416,7 @@ func makeComposeDownCmd() *cobra.Command {
 	return composeDownCmd
 }
 
-func newTailOptionsForDown(deployment string, since time.Time) cli.TailOptions {
+func newTailOptionsForDown(deployment string, since time.Time, verbose bool) cli.TailOptions {
 	return cli.TailOptions{
 		Deployment: deployment,
 		Since:      since,
@@ -426,12 +442,17 @@ func makeComposeConfigCmd() *cobra.Command {
 		Args:  cobra.NoArgs, // TODO: takes optional list of service names
 		Short: "Reads a Compose file and shows the generated config",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			loader := configureLoader(cmd)
-
 			ctx := cmd.Context()
+			localClient := getClient(ctx)
+			localProviderID := getProviderID(ctx)
+			localStack := getStack(ctx)
+			localNonInteractive := getNonInteractive(ctx)
+
+			loader := configureLoader(cmd, localNonInteractive)
+
 			project, loadErr := loader.LoadProject(ctx)
 			if loadErr != nil {
-				if nonInteractive {
+				if localNonInteractive {
 					return loadErr
 				}
 
@@ -442,10 +463,10 @@ func makeComposeConfigCmd() *cobra.Command {
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				return cli.InteractiveDebugForClientError(ctx, client, project, loadErr)
+				return cli.InteractiveDebugForClientError(ctx, localClient, project, loadErr)
 			}
 
-			provider, err := newProvider(ctx, loader)
+			provider, err := newProvider(ctx, loader, localClient, localProviderID, localStack, localNonInteractive)
 			if err != nil {
 				return err
 			}
@@ -467,10 +488,16 @@ func makeComposePsCmd() *cobra.Command {
 		Aliases:     []string{"getServices", "services"},
 		Short:       "Get list of services in the project",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			localClient := getClient(ctx)
+			localProviderID := getProviderID(ctx)
+			localStack := getStack(ctx)
+			localNonInteractive := getNonInteractive(ctx)
+
 			long, _ := cmd.Flags().GetBool("long")
 
-			loader := configureLoader(cmd)
-			provider, err := newProviderChecked(cmd.Context(), loader)
+			loader := configureLoader(cmd, localNonInteractive)
+			provider, err := newProviderChecked(cmd.Context(), loader, localClient, localProviderID, localStack, localNonInteractive)
 			if err != nil {
 				return err
 			}
@@ -508,13 +535,19 @@ func makeComposeLogsCmd() *cobra.Command {
 		Aliases:     []string{"tail"},
 		Short:       "Show logs from one or more services",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			localClient := getClient(ctx)
+			localProviderID := getProviderID(ctx)
+			localStack := getStack(ctx)
+			localNonInteractive := getNonInteractive(ctx)
+
 			var name, _ = cmd.Flags().GetString("name")
 			var etag, _ = cmd.Flags().GetString("etag")
 			var deployment, _ = cmd.Flags().GetString("deployment")
 			var raw, _ = cmd.Flags().GetBool("raw")
 			var since, _ = cmd.Flags().GetString("since")
 			var utc, _ = cmd.Flags().GetBool("utc")
-			var verbose, _ = cmd.Flags().GetBool("verbose")
+			localVerboseFlag, _ := cmd.Flags().GetBool("verbose")
 			var filter, _ = cmd.Flags().GetString("filter")
 			var until, _ = cmd.Flags().GetString("until")
 
@@ -526,8 +559,8 @@ func makeComposeLogsCmd() *cobra.Command {
 				cli.EnableUTCMode()
 			}
 
-			if !cmd.Flags().Changed("verbose") {
-				verbose = true // default verbose for explicit tail command
+			if !cmd.Flags().Changed("verbose") && !cmd.Flags().Changed("v") {
+				localVerboseFlag = true // default verbose for explicit tail command
 			}
 
 			now := time.Now()
@@ -556,8 +589,8 @@ func makeComposeLogsCmd() *cobra.Command {
 				services = append(args, strings.Split(name, ",")...) // backwards compat
 			}
 
-			loader := configureLoader(cmd)
-			provider, err := newProviderChecked(cmd.Context(), loader)
+			loader := configureLoader(cmd, localNonInteractive)
+			provider, err := newProviderChecked(cmd.Context(), loader, localClient, localProviderID, localStack, localNonInteractive)
 			if err != nil {
 				return err
 			}
@@ -575,7 +608,7 @@ func makeComposeLogsCmd() *cobra.Command {
 				Services:   services,
 				Since:      sinceTs,
 				Until:      untilTs,
-				Verbose:    verbose,
+				Verbose:    localVerboseFlag,
 			}
 			return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 		},
