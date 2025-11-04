@@ -77,7 +77,7 @@ func ComposeUp(ctx context.Context, project *compose.Project, fabric client.Fabr
 	}
 
 	deployRequest := &defangv1.DeployRequest{
-		Mode:           defangv1.DeploymentMode(mode),
+		Mode:           mode.Value(),
 		Project:        project.Name,
 		Compose:        bytes,
 		DelegateDomain: delegateDomain.Zone,
