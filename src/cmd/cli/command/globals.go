@@ -48,8 +48,8 @@ func readGlobals(stackName string) {
 	stack = pkg.Getenv("DEFANG_STACK", stack)
 	hasTty = term.IsTerminal() && !pkg.GetenvBool("CI")
 	hideUpdate = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
-	mode, _ = modes.Parse(pkg.Getenv("DEFANG_MODE", string(mode)))
+	mode, _ = modes.Parse(pkg.Getenv("DEFANG_MODE", mode.String()))
 	modelId = pkg.Getenv("DEFANG_MODEL_ID", modelId) // for Pro users only
 	nonInteractive = !hasTty
-	providerID = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", string(providerID)))
+	providerID = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", providerID.String()))
 }
