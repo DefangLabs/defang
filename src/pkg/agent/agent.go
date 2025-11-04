@@ -132,8 +132,7 @@ func (a *Agent) handleToolRequest(req *ai.ToolRequest) (*ai.ToolResponse, error)
 
 	output, err := tool.RunRaw(a.ctx, req.Input)
 	if err != nil {
-		var providerErr *common.ProviderNotConfiguredErrorType
-		if errors.As(err, &providerErr) {
+		if errors.Is(err, common.ErrNoProviderSet) {
 			return &ai.ToolResponse{
 				Name:   req.Name,
 				Ref:    req.Ref,
