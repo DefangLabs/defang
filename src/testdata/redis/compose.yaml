@@ -33,3 +33,7 @@ services:
     image: redis
     x-defang-redis:
     command: ["--port", "6380"]
+
+  valkey-service:
+    image: valkey/valkey:latest
+    x-defang-redis: true
