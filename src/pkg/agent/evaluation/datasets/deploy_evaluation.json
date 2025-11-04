@@ -1,0 +1,52 @@
+[
+  {
+    "input": {
+      "message": "Deploy my application",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*deploy.*\\]"
+  },
+  {
+    "input": {
+      "message": "Start my services in the cloud",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*deploy.*\\]"
+  },
+  {
+    "input": {
+      "message": "I want to deploy to AWS",
+      "setup": {
+        "working_directory": "./",
+        "provider": "aws"
+      }
+    },
+    "reference": "Tools\\[.*deploy.*\\]"
+  },
+  {
+    "input": {
+      "message": "I want to deploy to GCP",
+      "setup": {
+        "working_directory": "./",
+        "provider": "gcp"
+      }
+    },
+    "reference": "Tools\\[.*deploy.*\\]"
+  },
+  {
+    "input": {
+      "message": "Launch my docker-compose application",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*deploy.*\\]"
+  }
+]
