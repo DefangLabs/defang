@@ -53,6 +53,7 @@ type TailOptions struct {
 	Since              time.Time
 	Until              time.Time
 	Verbose            bool
+	Follow             bool
 }
 
 func (to TailOptions) String() string {
@@ -62,6 +63,9 @@ func (to TailOptions) String() string {
 		cmd = "tail" + cmd
 	} else {
 		cmd = "logs" + cmd + " --until=" + to.Until.UTC().Format(time.RFC3339Nano)
+	}
+	if to.Follow {
+		cmd += " --follow"
 	}
 	if to.Deployment != "" {
 		cmd += " --deployment=" + to.Deployment
@@ -202,6 +206,8 @@ func isTransientError(err error) bool {
 
 type LogEntryHandler func(*defangv1.LogEntry, *TailOptions, *term.Term) error
 
+const DefaultTailLimit = 100
+
 func streamLogs(ctx context.Context, provider client.Provider, projectName string, options TailOptions, handler LogEntryHandler) error {
 	var sinceTs, untilTs *timestamppb.Timestamp
 	if pkg.IsValidTime(options.Since) {
@@ -220,6 +226,11 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 		}
 	}
 
+	limit := int32(0) // 0 means no limit
+	if !options.Follow {
+		limit = DefaultTailLimit
+	}
+
 	tailRequest := &defangv1.TailRequest{
 		Etag:     options.Deployment,
 		LogType:  uint32(options.LogType),
@@ -228,6 +239,8 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 		Services: options.Services,
 		Since:    sinceTs, // this is also used to continue from the last timestamp
 		Until:    untilTs,
+		Follow:   options.Follow,
+		Limit:    limit,
 	}
 
 	term.Debug("Tail request:", tailRequest)
@@ -297,11 +310,19 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 		}
 	}
 
+	return receiveLogs(ctx, provider, projectName, tailRequest, serverStream, options, doSpinner, handler)
+}
+
+func receiveLogs(ctx context.Context, provider client.Provider, projectName string, tailRequest *defangv1.TailRequest, serverStream client.ServerStream[defangv1.TailResponse], options TailOptions, doSpinner bool, handler LogEntryHandler) error {
 	skipDuplicate := false
+	var err error
 	for {
 		if !serverStream.Receive() {
 			if errors.Is(serverStream.Err(), context.Canceled) || errors.Is(serverStream.Err(), context.DeadlineExceeded) {
 				return &CancelError{TailOptions: options, error: serverStream.Err(), ProjectName: projectName}
+			}
+			if errors.Is(serverStream.Err(), io.EOF) {
+				return serverStream.Err()
 			}
 
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
@@ -335,39 +356,46 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 			continue
 		}
 
-		for _, e := range msg.Entries {
-			// Replace service progress messages with our own spinner
-			if doSpinner && isProgressDot(e.Message) {
-				continue
-			}
-			ts := e.Timestamp.AsTime()
-			// Skip duplicate logs (e.g. after reconnecting we might get the same log once more)
-			if skipDuplicate && ts.Equal(options.Since) {
-				skipDuplicate = false
-				continue
-			}
-			e.Service = valueOrDefault(e.Service, msg.Service)
-			e.Host = valueOrDefault(e.Host, msg.Host)
-			e.Etag = valueOrDefault(e.Etag, msg.Etag)
+		if err = handleLogEntryMsgs(msg, doSpinner, skipDuplicate, options, handler); err != nil {
+			return err
+		}
+	}
+}
 
-			if ts.After(options.Since) {
-				options.Since = ts
-			}
+func handleLogEntryMsgs(msg *defangv1.TailResponse, doSpinner bool, skipDuplicate bool, options TailOptions, handler LogEntryHandler) error {
+	for _, e := range msg.Entries {
+		// Replace service progress messages with our own spinner
+		if doSpinner && isProgressDot(e.Message) {
+			continue
+		}
+		ts := e.Timestamp.AsTime()
+		// Skip duplicate logs (e.g. after reconnecting we might get the same log once more)
+		if skipDuplicate && ts.Equal(options.Since) {
+			skipDuplicate = false
+			continue
+		}
+		e.Service = valueOrDefault(e.Service, msg.Service)
+		e.Host = valueOrDefault(e.Host, msg.Host)
+		e.Etag = valueOrDefault(e.Etag, msg.Etag)
 
-			err := handler(e, &options, term.DefaultTerm)
-			if err != nil {
-				term.Debug("Ending tail loop", err)
+		if ts.After(options.Since) {
+			options.Since = ts
+		}
+
+		err := handler(e, &options, term.DefaultTerm)
+		if err != nil {
+			term.Debug("Ending tail loop", err)
+			return err
+		}
+
+		// Detect end logging event
+		if options.EndEventDetectFunc != nil {
+			if err := options.EndEventDetectFunc(e); err != nil {
 				return err
-			}
-
-			// Detect end logging event
-			if options.EndEventDetectFunc != nil {
-				if err := options.EndEventDetectFunc(e); err != nil {
-					return err
-				}
 			}
 		}
 	}
+	return nil
 }
 
 func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions, t *term.Term) error {

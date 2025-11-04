@@ -263,10 +263,12 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(debugCmd)
 
 	// Tail Command
-	tailCmd := makeComposeLogsCmd()
-	tailCmd.Use = "tail [SERVICE...]"
-	tailCmd.Aliases = []string{"logs"}
+	tailCmd := makeTailCmd()
 	RootCmd.AddCommand(tailCmd)
+
+	// Logs Command
+	logsCmd := makeLogsCmd()
+	RootCmd.AddCommand(logsCmd)
 
 	// Delete Command
 	deleteCmd.Flags().BoolP("name", "n", false, "name of the service(s) (backwards compat)")
