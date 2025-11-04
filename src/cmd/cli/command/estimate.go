@@ -18,16 +18,21 @@ func makeEstimateCmd() *cobra.Command {
 		Short:       "Estimate the cost of deploying the current project",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
+			localClient := getClient(ctx)
+			localProviderID := getProviderID(ctx)
+			localMode := getMode(ctx)
+			localNonInteractive := getNonInteractive(ctx)
+
 			region, _ := cmd.Flags().GetString("region")
 
-			loader := configureLoader(cmd)
+			loader := configureLoader(cmd, localNonInteractive)
 			project, err := loader.LoadProject(ctx)
 			if err != nil {
 				return err
 			}
 
-			if providerID == cliClient.ProviderAuto {
-				_, err = interactiveSelectProvider([]cliClient.ProviderID{
+			if localProviderID == cliClient.ProviderAuto {
+				localProviderID, _, err = interactiveSelectProvider([]cliClient.ProviderID{
 					cliClient.ProviderAWS,
 					cliClient.ProviderGCP,
 				})
@@ -36,23 +41,23 @@ func makeEstimateCmd() *cobra.Command {
 				}
 			}
 
-			var previewProvider cliClient.Provider = &cliClient.PlaygroundProvider{FabricClient: client}
+			var previewProvider cliClient.Provider = &cliClient.PlaygroundProvider{FabricClient: localClient}
 
 			// default to development mode if not specified; TODO: when mode is not specified, show an interactive prompt
-			if mode == modes.ModeUnspecified {
-				mode = modes.ModeAffordable
+			if localMode == modes.ModeUnspecified {
+				localMode = modes.ModeAffordable
 			}
 			if region == "" {
-				region = cliClient.GetRegion(providerID) // This sets the default region based on the provider
+				region = cliClient.GetRegion(localProviderID) // This sets the default region based on the provider
 			}
 
-			estimate, err := cli.RunEstimate(ctx, project, client, previewProvider, providerID, region, mode)
+			estimate, err := cli.RunEstimate(ctx, project, localClient, previewProvider, localProviderID, region, localMode)
 			if err != nil {
 				return fmt.Errorf("failed to run estimate: %w", err)
 			}
 			term.Debugf("Estimate: %+v", estimate)
 
-			cli.PrintEstimate(mode, estimate, term.DefaultTerm)
+			cli.PrintEstimate(localMode, estimate, term.DefaultTerm)
 
 			return nil
 		},
