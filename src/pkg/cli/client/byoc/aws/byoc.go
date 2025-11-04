@@ -612,7 +612,7 @@ func (b *ByocAws) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest)
 	}
 
 	// Gather logs from the CD task, kaniko, ECS events, and all services
-	evtsChan, errsChan := ecs.QueryLogGroups(ctx, start, end, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
+	evtsChan, errsChan := ecs.QueryLogGroups(ctx, start, end, 0, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
 	if evtsChan == nil {
 		return <-errsChan
 	}
@@ -679,10 +679,18 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	var tailStream ecs.LiveTailStream
 
 	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is a task ID
-		tailStream, err = b.driver.TailTaskID(ctx, etag)
-		if err == nil {
-			b.cdTaskArn, err = b.driver.GetTaskArn(etag)
-			etag = "" // no need to filter by etag
+		if req.Follow {
+			tailStream, err = b.driver.TailTaskID(ctx, etag)
+			if err == nil {
+				b.cdTaskArn, err = b.driver.GetTaskArn(etag)
+				etag = "" // no need to filter by etag
+			}
+		} else {
+			tailStream, err = b.driver.QueryTaskID(ctx, etag, time.Time{}, time.Now(), int(req.Limit))
+			if err == nil {
+				b.cdTaskArn, err = b.driver.GetTaskArn(etag)
+				etag = "" // no need to filter by etag
+			}
 		}
 	} else {
 		var service string
@@ -696,7 +704,29 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		if req.Until.IsValid() {
 			end = req.Until.AsTime()
 		}
-		tailStream, err = ecs.QueryAndTailLogGroups(ctx, start, end, b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))...)
+		lgis := b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))
+		if req.Follow {
+			tailStream, err = ecs.QueryAndTailLogGroups(
+				ctx,
+				start,
+				end,
+				lgis...,
+			)
+		} else {
+			limit := int(req.Limit)
+			evtsChan, errsChan := ecs.QueryLogGroups(
+				ctx,
+				start,
+				end,
+				limit,
+				lgis...,
+			)
+			if evtsChan == nil {
+				err = <-errsChan
+			} else {
+				tailStream = ecs.NewStaticLogStream(evtsChan, func() {})
+			}
+		}
 	}
 
 	if err != nil {

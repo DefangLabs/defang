@@ -26,6 +26,26 @@ func getLogGroupIdentifier(arnOrId string) string {
 	return strings.TrimSuffix(arnOrId, ":*")
 }
 
+func NewStaticLogStream(ch <-chan LogEvent, cancel func()) EventStream[types.StartLiveTailResponseStream] {
+	es := &eventStream{
+		cancel: cancel,
+		ch:     make(chan types.StartLiveTailResponseStream),
+	}
+
+	go func() {
+		defer close(es.ch)
+		for evt := range ch {
+			es.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
+				Value: types.LiveTailSessionUpdate{
+					SessionResults: []types.LiveTailSessionLogEvent{evt},
+				},
+			}
+		}
+	}()
+
+	return es
+}
+
 func QueryAndTailLogGroups(ctx context.Context, start, end time.Time, logGroups ...LogGroupInput) (LiveTailStream, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -104,11 +124,10 @@ func TailLogGroup(ctx context.Context, input LogGroupInput) (LiveTailStream, err
 	return slto.GetStream(), nil
 }
 
-func QueryLogGroups(ctx context.Context, start, end time.Time, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
-	errsChan := make(chan error)
-
+func QueryLogGroups(ctx context.Context, start, end time.Time, limit int, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
 	// Gather logs from the CD task, kaniko, ECS events, and all services
 	var evtsChan chan LogEvent
+	var errChan chan error
 	for _, lgi := range logGroups {
 		lgEvtChan := make(chan LogEvent)
 		// Start a go routine for each log group
@@ -120,12 +139,16 @@ func QueryLogGroups(ctx context.Context, start, end time.Time, logGroups ...LogG
 				}
 				return nil
 			}); err != nil {
-				errsChan <- err
+				errChan <- fmt.Errorf("error querying log group %q: %w", lgi.LogGroupARN, err)
 			}
 		}(lgi)
 		evtsChan = mergeLogEventChan(evtsChan, lgEvtChan) // Merge sort the log events based on timestamp
+		// take the last n events only
+		if limit > 0 {
+			evtsChan = takeLastN(evtsChan, limit)
+		}
 	}
-	return evtsChan, errsChan
+	return evtsChan, errChan
 }
 
 func QueryLogGroup(ctx context.Context, input LogGroupInput, start, end time.Time, cb func([]LogEvent) error) error {
@@ -144,11 +167,23 @@ func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGrou
 	}
 	logGroupIdentifier := getLogGroupIdentifier(lgi.LogGroupARN)
 	params := &cloudwatchlogs.FilterLogEventsInput{
-		StartTime:          ptr.Int64(start.UnixMilli()),
-		EndTime:            ptr.Int64(end.UnixMilli()),
 		LogGroupIdentifier: &logGroupIdentifier,
 		LogStreamNames:     lgi.LogStreamNames,
 		FilterPattern:      pattern,
+	}
+
+	if !start.IsZero() {
+		params.StartTime = ptr.Int64(start.UnixMilli())
+	}
+	if !end.IsZero() {
+		params.EndTime = ptr.Int64(end.UnixMilli())
+	}
+	if start.IsZero() && end.IsZero() {
+		// If no time range is specified, limit to the last 60 minutes
+		now := time.Now()
+		start = now.Add(-60 * time.Minute)
+		params.StartTime = ptr.Int64(start.UnixMilli())
+		params.EndTime = ptr.Int64(now.UnixMilli())
 	}
 	if lgi.LogStreamNamePrefix != "" {
 		params.LogStreamNamePrefix = &lgi.LogStreamNamePrefix
@@ -211,4 +246,25 @@ func GetLogEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {
 	default:
 		return nil, fmt.Errorf("unexpected event: %T", ev)
 	}
+}
+
+func takeLastN[T any](input chan T, n int) chan T {
+	if n <= 0 {
+		return input
+	}
+	out := make(chan T)
+	go func() {
+		defer close(out)
+		var buffer []T
+		for evt := range input {
+			buffer = append(buffer, evt)
+			if len(buffer) > n {
+				buffer = buffer[1:] // remove oldest
+			}
+		}
+		for _, evt := range buffer {
+			out <- evt
+		}
+	}()
+	return out
 }
