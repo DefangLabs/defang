@@ -40,6 +40,11 @@ func makeStackNewCmd() *cobra.Command {
 		Args:    cobra.MaximumNArgs(1),
 		Short:   "Create a new Defang deployment stack",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			localProviderID := getProviderID(ctx)
+			localMode := getMode(ctx)
+			localNonInteractive := getNonInteractive(ctx)
+
 			var stackName string
 			if len(args) > 0 {
 				stackName = args[0]
@@ -49,12 +54,12 @@ func makeStackNewCmd() *cobra.Command {
 
 			params := stacks.StackParameters{
 				Name:     stackName,
-				Provider: providerID, // default provider
+				Provider: localProviderID, // default provider
 				Region:   region,
-				Mode:     mode,
+				Mode:     localMode,
 			}
 
-			if nonInteractive {
+			if localNonInteractive {
 				_, err := stacks.Create(params)
 				return err
 			}
@@ -75,16 +80,16 @@ func makeStackNewCmd() *cobra.Command {
 					return errors.New("a cloud provider must be selected")
 				}
 
-				err = providerID.Set(provider)
+				err = localProviderID.Set(provider)
 				if err != nil {
 					return err
 				}
-				params.Provider = providerID
+				params.Provider = localProviderID
 			}
 
 			if params.Region == "" {
 				defaultRegion := ""
-				switch providerID {
+				switch localProviderID {
 				case cliClient.ProviderAWS:
 					defaultRegion = "us-west-2"
 				case cliClient.ProviderGCP:

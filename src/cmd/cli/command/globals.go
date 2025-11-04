@@ -18,7 +18,6 @@ var (
 	colorMode      = ColorAuto
 	doDebug        = false
 	hasTty         = term.IsTerminal()
-	hideUpdate     = false
 	mode           = modes.ModeUnspecified
 	modelId        string
 	nonInteractive = !hasTty
@@ -31,7 +30,7 @@ var (
 
 // readGlobals loads configuration from .defangrc files and returns updated values.
 // It takes current values as input and returns potentially updated values from the rc files.
-func readGlobals(stackName string, currentStack string, currentHasTty bool, currentHideUpdate bool, currentMode modes.Mode, currentModelId string, currentProviderID cliClient.ProviderID) (
+func readGlobals(stackName string, currentStack string, currentMode modes.Mode, currentModelId string, currentProviderID cliClient.ProviderID) (
 	stack string,
 	hasTty bool,
 	hideUpdate bool,
@@ -42,8 +41,6 @@ func readGlobals(stackName string, currentStack string, currentHasTty bool, curr
 ) {
 	// Initialize with current values
 	stack = currentStack
-	hasTty = currentHasTty
-	hideUpdate = currentHideUpdate
 	mode = currentMode
 	modelId = currentModelId
 	providerID = currentProviderID

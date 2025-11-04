@@ -119,6 +119,16 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 			nonInteractive = true
 			t.Cleanup(func() { nonInteractive = ni })
 
+			// Set up context with required values
+			ctx := stackCreateCmd.Context()
+			if ctx == nil {
+				ctx = t.Context()
+			}
+			ctx = withProviderID(ctx, cliClient.ProviderAWS)
+			ctx = withMode(ctx, modes.ModeAffordable)
+			ctx = withNonInteractive(ctx, true)
+			stackCreateCmd.SetContext(ctx)
+
 			err := stackCreateCmd.RunE(stackCreateCmd, args)
 			if (err != nil) != tt.expectErr {
 				t.Errorf("RunE() error = %v, expectErr %v", err, tt.expectErr)
