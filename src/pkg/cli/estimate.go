@@ -58,7 +58,7 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 
 	resp, err := client.Preview(ctx, &defangv1.PreviewRequest{
 		Provider:    estimateProviderID.Value(),
-		Mode:        defangv1.DeploymentMode(mode),
+		Mode:        mode.Value(),
 		Region:      region,
 		Compose:     composeData,
 		ProjectName: project.Name,
