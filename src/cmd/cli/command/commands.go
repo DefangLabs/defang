@@ -694,8 +694,7 @@ var configSetCmd = &cobra.Command{
 		} else {
 			// Handle single config with special modes (backward compatibility)
 			if len(args) == 1 && !strings.Contains(args[0], "=") {
-				parts := strings.SplitN(args[0], "=", 2)
-				name := parts[0]
+				name := args[0]
 
 				if !pkg.IsValidSecretName(name) {
 					return fmt.Errorf("invalid config name: %q", name)
