@@ -58,7 +58,9 @@ func NewModelGenerator(client *openai.Client, modelName string) *ModelGenerator 
 		client:    client,
 		modelName: modelName,
 		request: &openai.ChatCompletionNewParams{
-			Model: (modelName),
+			Model:               modelName,
+			MaxCompletionTokens: param.NewOpt[int64](256),
+			Temperature:         param.NewOpt[float64](0.5),
 		},
 	}
 }
