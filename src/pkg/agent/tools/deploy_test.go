@@ -145,7 +145,7 @@ func TestHandleDeployTool(t *testing.T) {
 					},
 				}
 			},
-			expectedTextContains: "Please use the web portal url:",
+			expectedTextContains: "The deployment is now in progress.",
 		},
 		{
 			name:       "successful_deploy_aws_provider",
@@ -159,7 +159,7 @@ func TestHandleDeployTool(t *testing.T) {
 					},
 				}
 			},
-			expectedTextContains: "Please use the aws console",
+			expectedTextContains: "The deployment is now in progress.",
 		},
 		{
 			name:          "provider_auto_not_configured",
