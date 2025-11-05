@@ -51,7 +51,7 @@ func QueryAndTailLogGroup(ctx context.Context, lgi LogGroupInput, start, end tim
 				end = time.Now()
 			}
 			// Query the logs between the start time and now; TODO: could use a single CloudWatch client for all queries in same region
-			if err := QueryLogGroup(ctx, lgi, start, end, func(events []LogEvent) error {
+			if err := QueryLogGroup(ctx, lgi, start, end, 0, func(events []LogEvent) error {
 				es.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
 					Value: types.LiveTailSessionUpdate{SessionResults: events},
 				}

@@ -686,7 +686,7 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 				etag = "" // no need to filter by etag
 			}
 		} else {
-			tailStream, err = b.driver.QueryTaskID(ctx, etag, time.Time{}, time.Now(), int(req.Limit))
+			tailStream, err = b.driver.QueryTaskID(ctx, etag, time.Time{}, time.Now(), req.Limit)
 			if err == nil {
 				b.cdTaskArn, err = b.driver.GetTaskArn(etag)
 				etag = "" // no need to filter by etag
@@ -713,12 +713,11 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 				lgis...,
 			)
 		} else {
-			limit := int(req.Limit)
 			evtsChan, errsChan := ecs.QueryLogGroups(
 				ctx,
 				start,
 				end,
-				limit,
+				req.Limit,
 				lgis...,
 			)
 			if evtsChan == nil {

@@ -561,7 +561,7 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		if req.Follow {
 			subscribeStream.StartFollow(since)
 		} else {
-			subscribeStream.Start(int(req.Limit))
+			subscribeStream.Start(req.Limit)
 		}
 
 		var cancel context.CancelCauseFunc
@@ -624,7 +624,7 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	if req.Follow {
 		logStream.StartFollow(startTime)
 	} else {
-		logStream.Start(int(req.Limit))
+		logStream.Start(req.Limit)
 	}
 	return logStream, nil
 }

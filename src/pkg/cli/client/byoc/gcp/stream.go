@@ -125,7 +125,7 @@ func (s *ServerStream[T]) StartFollow(start time.Time) {
 	}()
 }
 
-func (s *ServerStream[T]) Start(limit int) {
+func (s *ServerStream[T]) Start(limit int32) {
 	query := s.query.GetQuery()
 	term.Debugf("Query logs with query: \n%v", query)
 	go func() {
@@ -146,7 +146,7 @@ func (s *ServerStream[T]) queryHead(query string) {
 	}
 }
 
-func (s *ServerStream[T]) queryTail(query string, limit int) {
+func (s *ServerStream[T]) queryTail(query string, limit int32) {
 	lister, err := s.gcp.ListLogEntries(s.ctx, query, gcp.OrderDescending)
 	if err != nil {
 		s.errCh <- err
@@ -171,7 +171,7 @@ func (s *ServerStream[T]) queryTail(query string, limit int) {
 	}
 }
 
-func (s *ServerStream[T]) listToBuffer(lister *gcp.Lister, limit int) ([]*T, error) {
+func (s *ServerStream[T]) listToBuffer(lister *gcp.Lister, limit int32) ([]*T, error) {
 	received := 0
 	buffer := make([]*T, 0, limit)
 	for range limit {
@@ -191,7 +191,7 @@ func (s *ServerStream[T]) listToBuffer(lister *gcp.Lister, limit int) ([]*T, err
 	return buffer, nil
 }
 
-func (s *ServerStream[T]) listToChannel(lister *gcp.Lister, limit int) error {
+func (s *ServerStream[T]) listToChannel(lister *gcp.Lister, limit int32) error {
 	received := 0
 	for {
 		entry, err := lister.Next()
@@ -206,7 +206,7 @@ func (s *ServerStream[T]) listToChannel(lister *gcp.Lister, limit int) error {
 			s.respCh <- resp
 		}
 		received += len(resps)
-		if limit > 0 && received >= limit {
+		if limit > 0 && received >= int(limit) {
 			return io.EOF
 		}
 	}

@@ -124,8 +124,7 @@ func TailLogGroup(ctx context.Context, input LogGroupInput) (LiveTailStream, err
 	return slto.GetStream(), nil
 }
 
-func QueryLogGroups(ctx context.Context, start, end time.Time, limit int, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
-	// Gather logs from the CD task, kaniko, ECS events, and all services
+func QueryLogGroups(ctx context.Context, start, end time.Time, limit int32, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
 	var evtsChan chan LogEvent
 	var errChan chan error
 	for _, lgi := range logGroups {
@@ -133,7 +132,7 @@ func QueryLogGroups(ctx context.Context, start, end time.Time, limit int, logGro
 		// Start a go routine for each log group
 		go func(lgi LogGroupInput) {
 			defer close(lgEvtChan)
-			if err := QueryLogGroup(ctx, lgi, start, end, func(logEvents []LogEvent) error {
+			if err := QueryLogGroup(ctx, lgi, start, end, limit, func(logEvents []LogEvent) error {
 				for _, event := range logEvents {
 					lgEvtChan <- event
 				}
@@ -145,22 +144,22 @@ func QueryLogGroups(ctx context.Context, start, end time.Time, limit int, logGro
 		evtsChan = mergeLogEventChan(evtsChan, lgEvtChan) // Merge sort the log events based on timestamp
 		// take the last n events only
 		if limit > 0 {
-			evtsChan = takeLastN(evtsChan, limit)
+			evtsChan = takeLastN(evtsChan, int(limit))
 		}
 	}
 	return evtsChan, errChan
 }
 
-func QueryLogGroup(ctx context.Context, input LogGroupInput, start, end time.Time, cb func([]LogEvent) error) error {
+func QueryLogGroup(ctx context.Context, input LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
 	region := region.FromArn(input.LogGroupARN)
 	cw, err := newCloudWatchLogsClient(ctx, region)
 	if err != nil {
 		return err
 	}
-	return filterLogEvents(ctx, cw, input, start, end, cb)
+	return filterLogEvents(ctx, cw, input, start, end, limit, cb)
 }
 
-func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGroupInput, start, end time.Time, cb func([]LogEvent) error) error {
+func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
 	var pattern *string
 	if lgi.LogEventFilterPattern != "" {
 		pattern = &lgi.LogEventFilterPattern
@@ -189,6 +188,11 @@ func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGrou
 		params.LogStreamNamePrefix = &lgi.LogStreamNamePrefix
 	}
 	for {
+		if limit > 0 {
+			// Specifying the limit parameter only guarantees that a single page doesn't return more log events than the
+			// specified limit, but it might return fewer events than the limit. This is the expected API behavior.
+			params.Limit = ptr.Int32(limit)
+		}
 		fleo, err := cw.FilterLogEvents(ctx, params)
 		if err != nil {
 			return err
@@ -209,6 +213,10 @@ func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGrou
 		if fleo.NextToken == nil {
 			return nil
 		}
+		if limit > 0 && len(events) >= int(limit) {
+			return nil
+		}
+		limit -= int32(len(events)) // #nosec G115 - always safe because len(events) <= limit
 		params.NextToken = fleo.NextToken
 	}
 }

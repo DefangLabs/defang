@@ -57,7 +57,7 @@ func (a *AwsEcs) GetTaskArn(taskID string) (TaskArn, error) {
 	return &taskArn, nil
 }
 
-func (a *AwsEcs) QueryTaskID(ctx context.Context, taskID string, start, end time.Time, limit int) (EventStream[types.StartLiveTailResponseStream], error) {
+func (a *AwsEcs) QueryTaskID(ctx context.Context, taskID string, start, end time.Time, limit int32) (EventStream[types.StartLiveTailResponseStream], error) {
 	if taskID == "" {
 		return nil, errors.New("taskID is empty")
 	}
@@ -68,17 +68,14 @@ func (a *AwsEcs) QueryTaskID(ctx context.Context, taskID string, start, end time
 	}
 
 	lgi := LogGroupInput{LogGroupARN: a.LogGroupARN, LogStreamNames: []string{GetCDLogStreamForTaskID(taskID)}}
-	if err := QueryLogGroup(ctx, lgi, start, end, func(events []LogEvent) error {
+	// Note: this function only returns once the query is complete, so returning an event stream is somewhat misleading
+	if err := QueryLogGroup(ctx, lgi, start, end, limit, func(events []LogEvent) error {
 		es.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
 			Value: types.LiveTailSessionUpdate{SessionResults: events},
 		}
 		return nil
 	}); err != nil {
 		es.err = err
-	}
-
-	if limit > 0 {
-		es.ch = takeLastN(es.ch, limit)
 	}
 
 	return es, nil
