@@ -3,6 +3,7 @@ package aws
 import (
 	"encoding/json"
 	"io"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -16,6 +17,8 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+var codeBuildPrefixRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+-image/`)
 
 // byocServerStream is a wrapper around awsecs.EventStream that implements connect-like ServerStream
 type byocServerStream struct {
@@ -76,9 +79,11 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) *defangv1.TailRes
 		// We could loop around the select, but returning an empty response updates the spinner.
 		return nil
 	}
+
 	var response defangv1.TailResponse
 	parseFirelensRecords := false
 	parseECSEventRecords := false
+	parseCodeBuildRecords := false
 	// Get the Etag/Host/Service from the first entry (should be the same for all events in this batch)
 	first := events[0]
 	switch {
@@ -90,8 +95,13 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) *defangv1.TailRes
 		// LogStreams: "crun/main/0f2a8ccde0374239bdd04f5e07d8c523"
 		response.Host = "pulumi"
 		response.Service = "cd"
+	case strings.HasSuffix(*first.LogGroupIdentifier, "/builds") && codeBuildPrefixRegex.MatchString(*first.LogStreamName):
+		response.Host = "codebuild"
+		response.Service = "cd"
+		parseCodeBuildRecords = true
 	case strings.HasSuffix(*first.LogGroupIdentifier, "/builds") && strings.Contains(*first.LogStreamName, "-firelens-"):
 		// These events are from the Firelens sidecar "<service>/<kaniko>-firelens-<taskID>"; try to parse the JSON
+		// or ""
 		// LogStreams: "app-image/kaniko-firelens-babe6cdb246b4c10b5b7093bb294e6c7"
 		var record logs.FirelensMessage
 		if err := json.Unmarshal([]byte(*first.Message), &record); err == nil {
@@ -155,7 +165,11 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) *defangv1.TailRes
 				entry.Host = evt.Host()
 				entry.Message = evt.Status()
 			}
-		} else if response.Service == "cd" && strings.HasPrefix(entry.Message, logs.ErrorPrefix) {
+		} else if parseCodeBuildRecords {
+			entry.Service = "cd"
+			entry.Etag = response.Etag
+			entry.Host = response.Host
+		} else if (response.Service == "cd") && (strings.HasPrefix(entry.Message, logs.ErrorPrefix) || strings.Contains(strings.ToLower(entry.Message), "error:")) {
 			entry.Stderr = true
 		}
 		if entry.Etag != "" && bs.etag != "" && entry.Etag != bs.etag {
@@ -164,6 +178,7 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) *defangv1.TailRes
 		if entry.Service != "" && len(bs.services) > 0 && !slices.Contains(bs.services, entry.Service) {
 			continue
 		}
+
 		entries = append(entries, entry)
 	}
 	if len(entries) == 0 {

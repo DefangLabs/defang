@@ -370,8 +370,9 @@ func getLogEntryParser(ctx context.Context, gcpClient *gcp.Gcp) func(entry *logg
 		} else if entry.GetJsonPayload() != nil && entry.GetJsonPayload().GetFields()["cos.googleapis.com/stream"] != nil {
 			stderr = entry.GetJsonPayload().GetFields()["cos.googleapis.com/stream"].GetStringValue() == "stderr"
 		}
-
-		// fmt.Printf("ENTRY: %+v\n", entry)
+		if strings.Contains(strings.ToLower(msg), "error:") {
+			stderr = true
+		}
 
 		var serviceName, etag, host string
 		serviceName = entry.Labels["defang-service"]
