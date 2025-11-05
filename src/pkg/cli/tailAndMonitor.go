@@ -11,11 +11,44 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 )
 
 const targetServiceState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
+
+type ServiceMonitor struct {
+	ctx           context.Context
+	cancel        context.CancelCauseFunc
+	wg            *sync.WaitGroup
+	serviceStates *ServiceStates
+	err           error
+}
+
+func NewServiceMonitor(ctx context.Context, provider client.Provider, project *compose.Project, deploymentID types.ETag) *ServiceMonitor {
+	svcStatusCtx, cancel := context.WithCancelCause(ctx)
+	_, computeServices := splitManagedAndUnmanagedServices(project.Services)
+	m := &ServiceMonitor{
+		ctx:    svcStatusCtx,
+		cancel: cancel,
+		wg:     &sync.WaitGroup{},
+	}
+
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		// block on waiting for services to reach target state
+		serviceStates, svcErr := WaitServiceState(svcStatusCtx, provider, targetServiceState, project.Name, deploymentID, computeServices)
+		m.serviceStates = &serviceStates
+		m.err = svcErr
+	}()
+	return m
+}
+
+func (m *ServiceMonitor) Cancel() {
+	m.wg.Done()
+}
 
 func TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, tailOptions TailOptions) (ServiceStates, error) {
 	tailOptions.Follow = true
@@ -31,22 +64,10 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 	tailCtx, cancelTail := context.WithCancelCause(context.Background())
 	defer cancelTail(nil) // to cancel tail and clean-up context
 
-	svcStatusCtx, cancelSvcStatus := context.WithCancelCause(ctx)
-	defer cancelSvcStatus(nil) // to cancel WaitServiceState and clean-up context
-
-	_, computeServices := splitManagedAndUnmanagedServices(project.Services)
-
-	var serviceStates ServiceStates
-	var cdErr, svcErr error
-
-	wg := &sync.WaitGroup{}
-	wg.Add(2)
-
-	go func() {
-		defer wg.Done()
-		// block on waiting for services to reach target state
-		serviceStates, svcErr = WaitServiceState(svcStatusCtx, provider, targetServiceState, project.Name, tailOptions.Deployment, computeServices)
-	}()
+	monitor := NewServiceMonitor(ctx, provider, project, tailOptions.Deployment)
+	var cdErr error
+	wg := monitor.wg
+	wg.Add(1)
 
 	go func() {
 		defer wg.Done()
@@ -54,7 +75,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 		if err := WaitForCdTaskExit(ctx, provider); err != nil {
 			cdErr = err
 			// When CD fails, stop WaitServiceState
-			cancelSvcStatus(cdErr)
+			monitor.cancel(cdErr)
 		}
 	}()
 
@@ -99,7 +120,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 		}
 	}
 
-	return serviceStates, errors.Join(cdErr, svcErr, tailErr)
+	return *monitor.serviceStates, errors.Join(cdErr, monitor.err, tailErr)
 }
 
 func CanMonitorService(service compose.ServiceConfig) bool {
