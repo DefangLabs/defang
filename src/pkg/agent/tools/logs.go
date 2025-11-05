@@ -84,5 +84,5 @@ func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 		return "", fmt.Errorf("failed to fetch logs: %w", err)
 	}
 
-	return "EOF", nil
+	return "", nil
 }
