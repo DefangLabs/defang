@@ -700,9 +700,7 @@ var configSetCmd = &cobra.Command{
 				return errors.New("failed to set any config values")
 			}
 
-			if successCount > 1 {
-				term.Infof("Successfully set %d config value(s)", successCount)
-			}
+			term.Infof("Successfully set %d config value(s)", successCount)
 
 			printDefangHint("To update the deployed values, do:", "compose up")
 			return nil
