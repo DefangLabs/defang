@@ -85,7 +85,7 @@ func UpdateServiceStates(ctx context.Context, serviceInfos []*defangv1.ServiceIn
 				wg.Add(1)
 				go func(serviceInfo *defangv1.ServiceInfo) {
 					defer wg.Done()
-					url := "https://" + endpoint + "/" // TODO: use serviceInfo.Healthcheck
+					url := "https://" + endpoint + serviceInfo.HealthcheckPath
 					// Use the regular net/http package to make the request without retries
 					req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 					if err != nil {
