@@ -103,7 +103,7 @@ func UpdateServiceStates(ctx context.Context, serviceInfos []*defangv1.ServiceIn
 						serviceInfo.State = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 						term.Debugf("[%s] ✔ healthy", serviceInfo.Service.Name)
 					} else {
-						term.Debugf("[%s] ✘ unhealthy (status %d)", serviceInfo.Service.Name, resp.StatusCode)
+						term.Debugf("[%s] ✘ unhealthy (%s)", serviceInfo.Service.Name, resp.Status)
 					}
 				}(serviceInfo)
 			}
