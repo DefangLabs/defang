@@ -8,7 +8,7 @@ import (
 	"text/tabwriter"
 )
 
-func Table(slice any, attributes ...string) error {
+func Table(slice any, attributes []string) error {
 	return DefaultTerm.Table(slice, attributes...)
 }
 

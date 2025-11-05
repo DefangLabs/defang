@@ -8,13 +8,12 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-// MockSetConfigCLI implements CLIInterface for testing
+// MockSetConfigCLI implements SetConfigCLIInterface for testing
 type MockSetConfigCLI struct {
-	CLIInterface
 	ConnectError          error
+	NewProviderError      error
 	LoadProjectNameError  error
 	ConfigSetError        error
 	ConnectCalled         bool
@@ -42,13 +41,16 @@ func (m *MockSetConfigCLI) Connect(ctx context.Context, cluster string) (*client
 	return m.ReturnedGrpcClient, nil
 }
 
-func (m *MockSetConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabricClient client.FabricClient, stack string) client.Provider {
+func (m *MockSetConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabricClient client.FabricClient) (client.Provider, error) {
 	m.NewProviderCalled = true
+	if m.NewProviderError != nil {
+		return nil, m.NewProviderError
+	}
 	if m.ReturnedProvider != nil {
-		return m.ReturnedProvider
+		return m.ReturnedProvider, nil
 	}
 	// Return a simple mock provider to avoid nil pointer issues
-	return &MockProvider{}
+	return &MockProvider{}, nil
 }
 
 // MockProvider implements a minimal subset of client.Provider interface for testing
@@ -163,6 +165,17 @@ func TestHandleSetConfig(t *testing.T) {
 			expectedConnectCalls: true,
 		},
 		{
+			name:                  "provider error",
+			cluster:               testCluster,
+			providerId:            client.ProviderID(""),
+			requestArgs:           map[string]interface{}{"name": testConfigName, "value": testValue},
+			mockCLI:               &MockSetConfigCLI{NewProviderError: errors.New("provider initialization failed")},
+			expectedError:         true,
+			errorMessage:          "Failed to get new provider: provider initialization failed",
+			expectedConnectCalls:  true,
+			expectedProviderCalls: true,
+		},
+		{
 			name:                     "load project name error",
 			cluster:                  testCluster,
 			providerId:               client.ProviderID(""),
@@ -187,6 +200,22 @@ func TestHandleSetConfig(t *testing.T) {
 			expectedProjectNameCalls: true,
 			expectedConfigSetCalls:   true,
 		},
+
+		// Provider-specific tests
+		{
+			name:        "provider auto not configured",
+			cluster:     testCluster,
+			providerId:  client.ProviderAuto,
+			requestArgs: map[string]interface{}{"name": testConfigName, "value": testValue},
+			mockCLI: &MockSetConfigCLI{
+				NewProviderError: errors.New("No provider configured. Use one of these setup tools:\n* /mcp.defang.AWS_Setup\n* /mcp.defang.GCP_Setup\n* /mcp.defang.Playground_Setup"),
+			},
+			expectedError:         true,
+			errorMessage:          "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
+			expectedConnectCalls:  false, // Early return in providerNotConfiguredError
+			expectedProviderCalls: false, // Early return in providerNotConfiguredError
+		},
+
 		// Success tests
 		{
 			name:                     "successful config set",
@@ -225,7 +254,7 @@ func TestHandleSetConfig(t *testing.T) {
 					assert.EqualError(t, err, tt.errorMessage)
 					return
 				} else {
-					require.NoError(t, err)
+					assert.NoError(t, err)
 				}
 			}
 			result, err := HandleSetConfig(testContext, loader, params, &tt.providerId, tt.cluster, tt.mockCLI)
@@ -236,7 +265,7 @@ func TestHandleSetConfig(t *testing.T) {
 					assert.EqualError(t, err, tt.errorMessage)
 				}
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				assert.NotEmpty(t, result)
 			}
 

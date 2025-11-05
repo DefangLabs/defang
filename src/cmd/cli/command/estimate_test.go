@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
-	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	_type "github.com/DefangLabs/defang/src/protos/google/type"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -124,7 +123,7 @@ func TestPrintEstimate(t *testing.T) {
 	}
 
 	stdout, _ := term.SetupTestTerm(t)
-	cli.PrintEstimate(modes.ModeAffordable, estimate, term.DefaultTerm)
+	cli.PrintEstimate(defangv1.DeploymentMode_DEVELOPMENT, estimate)
 
 	expectedOutput := `
 Estimate for Deployment Mode: AFFORDABLE

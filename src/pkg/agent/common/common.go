@@ -16,11 +16,12 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-var MCPDevelopmentClient = "" // set by NewDefangMCPServer
+var Connect = cli.Connect
+var CheckProviderConfigured = checkProviderConfigured
+var newProvider = cli.NewProvider
+var MCPDevelopmentClient = ""
 
 const PostPrompt = "Please deploy my application with Defang now."
-
-var ErrNoProviderSet = errors.New("no cloud provider is configured. Use `/` to open prompts and use the 3 Defang setup prompts, or use tools: set_aws_provider, set_gcp_provider, or set_playground_provider.")
 
 func GetStringArg(args map[string]string, key, defaultValue string) string {
 	if val, exists := args[key]; exists {
@@ -78,7 +79,7 @@ func ConfigureLoader(request mcp.CallToolRequest) (*compose.Loader, error) {
 
 	err = os.Chdir(wd)
 	if err != nil {
-		return nil, fmt.Errorf("failed to change working directory: %w", err)
+		return nil, fmt.Errorf("Failed to change working directory: %w", err)
 	}
 
 	projectName, err := request.RequireString("project_name")
@@ -134,15 +135,23 @@ func CanIUseProvider(ctx context.Context, grpcClient client.FabricClient, provid
 
 func ProviderNotConfiguredError(providerId client.ProviderID) error {
 	if providerId == client.ProviderAuto {
-		return ErrNoProviderSet
+		return errors.New("no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.")
 	}
 	return nil
 }
 
-func CheckProviderConfigured(ctx context.Context, client cliClient.FabricClient, providerId cliClient.ProviderID, projectName, stack string, serviceCount int) (cliClient.Provider, error) {
-	provider := cli.NewProvider(ctx, providerId, client, stack)
+func checkProviderConfigured(ctx context.Context, client cliClient.FabricClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error) {
+	provider, err := newProvider(ctx, providerId, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get new provider: %w", err)
+	}
 
-	err := cliClient.CanIUseProvider(ctx, client, provider, projectName, stack, serviceCount)
+	_, err = provider.AccountInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	err = CanIUseProvider(ctx, client, providerId, projectName, provider, serviceCount)
 	if err != nil {
 		return nil, fmt.Errorf("failed to use provider: %w", err)
 	}

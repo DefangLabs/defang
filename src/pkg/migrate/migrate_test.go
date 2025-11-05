@@ -12,7 +12,6 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 // MockSurveyor implements the Surveyor interface for testing
@@ -358,7 +357,7 @@ func TestInteractiveSetup(t *testing.T) {
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}
 
 			// Verify mock expectations
@@ -377,7 +376,7 @@ func TestInteractiveSetup(t *testing.T) {
 				// Verify the data payload contains expected Heroku application info
 				var appInfo HerokuApplicationInfo
 				err := json.Unmarshal(req.Data, &appInfo)
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				assert.Equal(t, tt.herokuDynos, appInfo.Dynos)
 				assert.Equal(t, tt.herokuAddons, appInfo.Addons)
 				assert.Equal(t, tt.herokuConfigVars, appInfo.ConfigVars)
@@ -481,7 +480,7 @@ services:
 			if tt.expectingError {
 				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				assert.Equal(t, tt.expected, result)
 			}
 		})
@@ -550,7 +549,7 @@ func TestExtractFirstCodeBlock(t *testing.T) {
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}
 			assert.Equal(t, tt.expected, result)
 		})

@@ -8,28 +8,89 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
-	"github.com/DefangLabs/defang/src/pkg/modes"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-type CLIInterface interface {
-	CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, provider cliClient.Provider, serviceCount int) error
-	CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName, stack string, serviceCount int) (cliClient.Provider, error)
-	ComposeDown(ctx context.Context, projectName string, client *cliClient.GrpcClient, provider cliClient.Provider) (string, error)
-	ComposeUp(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, uploadMode compose.UploadMode, mode modes.Mode) (*defangv1.DeployResponse, *compose.Project, error)
-	ConfigDelete(ctx context.Context, projectName string, provider cliClient.Provider, name string) error
-	ConfigSet(ctx context.Context, projectName string, provider cliClient.Provider, name, value string) error
+// --- Common method sets ---
+type Connecter interface {
 	Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error)
-	CreatePlaygroundProvider(client *cliClient.GrpcClient) cliClient.Provider
-	GenerateAuthURL(authPort int) string
-	GetServices(ctx context.Context, projectName string, provider cliClient.Provider) ([]deployment_info.Service, error)
-	InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string, mcpClient string) error
-	ListConfig(ctx context.Context, provider cliClient.Provider, projectName string) (*defangv1.Secrets, error)
-	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
+}
+
+type ProviderFactory interface {
+	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error)
+}
+
+type ProjectNameLoader interface {
 	LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error)
-	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient, stack string) cliClient.Provider
+}
+
+// --- Tool interfaces composed from common sets ---
+type DeployCLIInterface interface {
+	Connecter
+	ProviderFactory
+	// Unique methods
+	ComposeUp(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, uploadMode compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error)
+	CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error)
+	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
 	OpenBrowser(url string) error
-	PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string
-	RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error)
+}
+
+type LogsCLIInterface interface {
+	Connecter
+	ProviderFactory
+	// Unique methods
 	Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cliTypes.TailOptions) error
+	CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error)
+	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
+}
+
+type DestroyCLIInterface interface {
+	Connecter
+	ProviderFactory
+	ProjectNameLoader
+	// Unique methods
+	ComposeDown(ctx context.Context, projectName string, client *cliClient.GrpcClient, provider cliClient.Provider) (string, error)
+	CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, provider cliClient.Provider, serviceCount int) error
+}
+
+type EstimateCLIInterface interface {
+	Connecter
+	// Unique methods
+	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
+	RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error)
+	PrintEstimate(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse)
+	CreatePlaygroundProvider(client *cliClient.GrpcClient) cliClient.Provider
+	CaptureTermOutput(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) string
+}
+
+type ListConfigCLIInterface interface {
+	Connecter
+	ProviderFactory
+	ProjectNameLoader
+	// Unique methods
+	ListConfig(ctx context.Context, provider cliClient.Provider, projectName string) (*defangv1.Secrets, error)
+}
+
+type RemoveConfigCLIInterface interface {
+	Connecter
+	ProviderFactory
+	ProjectNameLoader
+	// Unique methods
+	ConfigDelete(ctx context.Context, projectName string, provider cliClient.Provider, name string) error
+}
+
+type SetConfigCLIInterface interface {
+	Connecter
+	ProjectNameLoader
+	// Unique methods
+	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error)
+	ConfigSet(ctx context.Context, projectName string, provider cliClient.Provider, name, value string) error
+}
+
+type CLIInterface interface {
+	Connecter
+	// Unique methods
+	GetServices(ctx context.Context, projectName string, provider cliClient.Provider) ([]deployment_info.Service, error)
+	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error)
+	LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error)
 }

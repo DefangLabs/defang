@@ -1,0 +1,52 @@
+[
+  {
+    "input": {
+      "message": "Deploy my application but I'm not logged in",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*login.*deploy.*\\]|Tools\\[.*deploy.*login.*\\]"
+  },
+  {
+    "input": {
+      "message": "Show services for a non-existent project",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[\\]"
+  },
+  {
+    "input": {
+      "message": "Set an invalid configuration value",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[*.set_config.*\\]"
+  },
+  {
+    "input": {
+      "message": "Remove a config that doesn't exist",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[*.remove_config.*\\]"
+  },
+  {
+    "input": {
+      "message": "Deploy without a valid compose file",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[\\]"
+  }
+]

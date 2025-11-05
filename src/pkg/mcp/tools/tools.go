@@ -67,7 +67,7 @@ func translateGenKitToolsToMCP(genkitTools []ai.Tool) []server.ServerTool {
 	return translatedTools
 }
 
-func CollectTools(cluster string, providerId *client.ProviderID) []server.ServerTool {
-	genkitTools := agent.CollectTools(cluster, providerId)
+func CollectTools(cluster string, authPort int, providerId *client.ProviderID) []server.ServerTool {
+	genkitTools := agent.CollectTools(cluster, authPort, providerId)
 	return translateGenKitToolsToMCP(genkitTools)
 }

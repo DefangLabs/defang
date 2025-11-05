@@ -31,36 +31,34 @@ type MCPServerConfig struct {
 type MCPClient string
 
 const (
-	MCPClientClaudeCode       MCPClient = "claude-code"
+	MCPClientUnspecified      MCPClient = ""
+	MCPClientVSCodeCodespaces MCPClient = "vscode-codespaces"
+	MCPClientVSCode           MCPClient = "vscode"
+	MCPClientVSCodeInsiders   MCPClient = "vscode-insiders"
 	MCPClientClaudeDesktop    MCPClient = "claude-desktop"
-	MCPClientCodex            MCPClient = "codex"
+	MCPClientClaudeCode       MCPClient = "claude-code"
+	MCPClientWindsurf         MCPClient = "windsurf"
 	MCPClientCursor           MCPClient = "cursor"
 	MCPClientKiro             MCPClient = "kiro"
-	MCPClientRovo             MCPClient = "rovo"
-	MCPClientUnspecified      MCPClient = ""
-	MCPClientVSCode           MCPClient = "vscode"
-	MCPClientVSCodeCodespaces MCPClient = "vscode-codespaces"
-	MCPClientVSCodeInsiders   MCPClient = "vscode-insiders"
-	MCPClientWindsurf         MCPClient = "windsurf"
+	MCPClientCodex            MCPClient = "codex"
 )
 
 // ValidVSCodeClients is a list of supported VSCode MCP clients with shorthand names
 var ValidVSCodeClients = []MCPClient{
 	MCPClientVSCode,
-	MCPClientVSCodeCodespaces,
 	MCPClientVSCodeInsiders,
+	MCPClientVSCodeCodespaces,
 }
 
 // ValidClients is a list of supported MCP clients
 var ValidClients = append(
 	[]MCPClient{
-		MCPClientClaudeCode,
 		MCPClientClaudeDesktop,
-		MCPClientCodex,
+		MCPClientClaudeCode,
+		MCPClientWindsurf,
 		MCPClientCursor,
 		MCPClientKiro,
-		MCPClientRovo,
-		MCPClientWindsurf,
+		MCPClientCodex,
 	},
 	ValidVSCodeClients...,
 )
@@ -104,9 +102,24 @@ type ClientInfo struct {
 	useHomeDir bool   // True if config goes directly in home dir, false if in system config dir
 }
 
-var claudeCodeConfig = ClientInfo{
-	configFile: ".claude.json",
+var windsurfConfig = ClientInfo{
+	configFile: ".codeium/windsurf/mcp_config.json",
 	useHomeDir: true,
+}
+
+var vscodeCodespacesConfig = ClientInfo{
+	configFile: ".vscode-remote/data/User/mcp.json",
+	useHomeDir: true,
+}
+
+var vscodeConfig = ClientInfo{
+	configFile: "Code/User/mcp.json",
+	useHomeDir: false,
+}
+
+var codeInsidersConfig = ClientInfo{
+	configFile: "Code - Insiders/User/mcp.json",
+	useHomeDir: false,
 }
 
 var claudeDesktopConfig = ClientInfo{
@@ -114,8 +127,8 @@ var claudeDesktopConfig = ClientInfo{
 	useHomeDir: false,
 }
 
-var codexConfig = ClientInfo{
-	configFile: ".codex/config.toml",
+var claudeCodeConfig = ClientInfo{
+	configFile: ".claude.json",
 	useHomeDir: true,
 }
 
@@ -129,43 +142,22 @@ var kiroConfig = ClientInfo{
 	useHomeDir: true,
 }
 
-var rovoConfig = ClientInfo{
-	configFile: ".rovodev/mcp.json",
-	useHomeDir: true,
-}
-
-var vscodeConfig = ClientInfo{
-	configFile: "Code/User/mcp.json",
-	useHomeDir: false,
-}
-
-var vscodeCodespacesConfig = ClientInfo{
-	configFile: ".vscode-remote/data/User/mcp.json",
-	useHomeDir: true,
-}
-
-var vscodeInsidersConfig = ClientInfo{
-	configFile: "Code - Insiders/User/mcp.json",
-	useHomeDir: false,
-}
-
-var windsurfConfig = ClientInfo{
-	configFile: ".codeium/windsurf/mcp_config.json",
+var codexConfig = ClientInfo{
+	configFile: ".codex/config.toml",
 	useHomeDir: true,
 }
 
 // clientRegistry maps client names to their configuration details
 var clientRegistry = map[MCPClient]ClientInfo{
-	MCPClientClaudeCode:       claudeCodeConfig,
+	MCPClientWindsurf:         windsurfConfig,
+	MCPClientVSCodeCodespaces: vscodeCodespacesConfig,
+	MCPClientVSCode:           vscodeConfig,
+	MCPClientVSCodeInsiders:   codeInsidersConfig,
 	MCPClientClaudeDesktop:    claudeDesktopConfig,
-	MCPClientCodex:            codexConfig,
+	MCPClientClaudeCode:       claudeCodeConfig,
 	MCPClientCursor:           cursorConfig,
 	MCPClientKiro:             kiroConfig,
-	MCPClientRovo:             rovoConfig,
-	MCPClientVSCode:           vscodeConfig,
-	MCPClientVSCodeCodespaces: vscodeCodespacesConfig,
-	MCPClientVSCodeInsiders:   vscodeInsidersConfig,
-	MCPClientWindsurf:         windsurfConfig,
+	MCPClientCodex:            codexConfig,
 }
 
 // getSystemConfigDir returns the system configuration directory for the given OS

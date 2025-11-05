@@ -47,6 +47,23 @@ var authNeededAnnotation = map[string]string{authNeeded: ""}
 
 var P = track.P
 
+// GLOBALS
+var (
+	client         *cliClient.GrpcClient
+	cluster        string
+	colorMode      = ColorAuto
+	sourcePlatform = migrate.SourcePlatformUnspecified // default to auto-detecting the source platform
+	doDebug        = false
+	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
+	hideUpdate     = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
+	mode           = modes.Mode(defangv1.DeploymentMode_MODE_UNSPECIFIED)
+	modelId        = os.Getenv("DEFANG_MODEL_ID") // for Pro users only
+	nonInteractive = !hasTty
+	org            string
+	providerID     = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", "auto"))
+	verbose        = false
+)
+
 func getCluster() string {
 	if org == "" {
 		return cluster
@@ -84,7 +101,7 @@ func Execute(ctx context.Context) error {
 
 		if strings.Contains(err.Error(), "maximum number of projects") {
 			projectName := "<name>"
-			provider, err := newProviderChecked(ctx, nil)
+			provider, err := newProvider(ctx, nil)
 			if err != nil {
 				return err
 			}
@@ -145,9 +162,8 @@ func SetupCommands(ctx context.Context, version string) {
 	cobra.EnableTraverseRunHooks = true // we always need to run the RootCmd's pre-run hook
 
 	RootCmd.Version = version
-	RootCmd.PersistentFlags().StringVarP(&stack, "stack", "s", stack, "stack name (for BYOC providers)")
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
-	RootCmd.PersistentFlags().StringVar(&cluster, "cluster", pcluster.DefangFabric, "Defang cluster to connect to")
+	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", pcluster.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
 	RootCmd.PersistentFlags().StringVar(&org, "org", os.Getenv("DEFANG_ORG"), "override GitHub organization name (tenant)")
 	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
@@ -265,12 +281,10 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(debugCmd)
 
 	// Tail Command
-	tailCmd := makeTailCmd()
+	tailCmd := makeComposeLogsCmd()
+	tailCmd.Use = "tail [SERVICE...]"
+	tailCmd.Aliases = []string{"logs"}
 	RootCmd.AddCommand(tailCmd)
-
-	// Logs Command
-	logsCmd := makeLogsCmd()
-	RootCmd.AddCommand(logsCmd)
 
 	// Delete Command
 	deleteCmd.Flags().BoolP("name", "n", false, "name of the service(s) (backwards compat)")
@@ -284,11 +298,10 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(deploymentsCmd)
 
 	// MCP Command
+	mcpCmd.AddCommand(mcpSetupCmd)
 	mcpServerCmd.Flags().Int("auth-server", 0, "auth server port")
-	mcpServerCmd.Flags().MarkDeprecated("auth-server", "we now reach out to the auth server: https://auth.defang.io directly")
 	mcpCmd.AddCommand(mcpServerCmd)
 	mcpCmd.PersistentFlags().String("client", "", fmt.Sprintf("MCP setup client %v", mcp.ValidClients))
-	mcpCmd.AddCommand(mcpSetupCmd)
 	RootCmd.AddCommand(mcpCmd)
 
 	// Send Command
@@ -305,9 +318,6 @@ func SetupCommands(ctx context.Context, version string) {
 	// TODO: Add list, renew etc.
 	certCmd.AddCommand(certGenerateCmd)
 	RootCmd.AddCommand(certCmd)
-
-	stackCmd := makeStackCmd()
-	RootCmd.AddCommand(stackCmd)
 
 	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
 		// Add some emphasis to the help command
@@ -363,9 +373,6 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		// Read the global flags again from any .defangrc files in the cwd
-		readGlobals(stack)
-
 		client, err = cli.Connect(ctx, getCluster())
 
 		if v, err := client.GetVersions(ctx); err == nil {
@@ -397,12 +404,13 @@ var RootCmd = &cobra.Command{
 		}
 
 		ctx := cmd.Context()
+		authPort, _ := cmd.Flags().GetInt("auth-server")
 		err := login.InteractiveRequireLoginAndToS(ctx, client, getCluster())
 		if err != nil {
 			return err
 		}
 
-		return agent.New(ctx, getCluster(), &providerID, agent.DefaultSystemPrompt).Start()
+		return agent.New(ctx, getCluster(), authPort, &providerID, agent.DefaultSystemPrompt).Start()
 	},
 }
 
@@ -464,14 +472,14 @@ var whoamiCmd = &cobra.Command{
 			_, err = fmt.Println(string(bytes))
 			return err
 		} else {
-			return term.Table([]cli.ShowAccountData{data},
+			return term.Table([]cli.ShowAccountData{data}, []string{
 				"Provider",
 				"AccountID",
 				"Tenant",
 				"TenantID",
 				"SubscriberTier",
 				"Region",
-			)
+			})
 		}
 	},
 }
@@ -494,7 +502,7 @@ var certGenerateCmd = &cobra.Command{
 			return err
 		}
 
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -547,13 +555,6 @@ var generateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		if nonInteractive {
-			if len(args) == 0 {
-				return errors.New("cannot run in non-interactive mode")
-			}
-			return cli.InitFromSamples(ctx, args[0], args)
-		}
-
 		setupClient := setup.SetupClient{
 			Surveyor: surveyor.NewDefaultSurveyor(),
 			Heroku:   migrate.NewHerokuClient(),
@@ -562,7 +563,7 @@ var generateCmd = &cobra.Command{
 			Cluster:  getCluster(),
 		}
 
-		var sample string
+		sample := ""
 		if len(args) > 0 {
 			sample = args[0]
 		}
@@ -582,14 +583,6 @@ var initCmd = &cobra.Command{
 	Short:   "Create a new Defang project from a sample",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-
-		if nonInteractive {
-			if len(args) == 0 {
-				return errors.New("cannot run in non-interactive mode")
-			}
-			return cli.InitFromSamples(ctx, args[0], args)
-		}
-
 		setupClient := setup.SetupClient{
 			Surveyor: surveyor.NewDefaultSurveyor(),
 			Heroku:   migrate.NewHerokuClient(),
@@ -601,6 +594,10 @@ var initCmd = &cobra.Command{
 		if len(args) > 0 {
 			_, err := setupClient.CloneSample(ctx, args[0])
 			return err
+		}
+
+		if nonInteractive {
+			return errors.New("cannot run in non-interactive mode")
 		}
 
 		result, err := setupClient.Start(ctx)
@@ -665,7 +662,7 @@ var configSetCmd = &cobra.Command{
 
 		// Make sure we have a project to set config for before asking for a value
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -747,7 +744,7 @@ var configDeleteCmd = &cobra.Command{
 	Short:       "Removes one or more config values",
 	RunE: func(cmd *cobra.Command, names []string) error {
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -780,7 +777,7 @@ var configListCmd = &cobra.Command{
 	Short:       "List configs",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -810,7 +807,7 @@ var debugCmd = &cobra.Command{
 		}
 
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -855,7 +852,7 @@ var deleteCmd = &cobra.Command{
 		var tail, _ = cmd.Flags().GetBool("tail")
 
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -921,8 +918,8 @@ var deploymentsCmd = &cobra.Command{
 }
 
 var deploymentsListCmd = &cobra.Command{
-	Use:         "history",
-	Aliases:     []string{"ls", "list"},
+	Use:         "list",
+	Aliases:     []string{"ls"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "List deployment history for a project",
@@ -1162,21 +1159,22 @@ func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 		return nil, err
 	}
 
-	provider := cli.NewProvider(ctx, providerID, client, stack)
-	return provider, nil
-}
-
-func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient.Provider, error) {
-	provider, err := newProvider(ctx, loader)
-	if err != nil {
-		return nil, err
-	}
-	_, err = provider.AccountInfo(ctx)
-	return provider, err
+	return cli.NewProvider(ctx, providerID, client)
 }
 
 func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string, serviceCount int) error {
-	return cliClient.CanIUseProvider(ctx, client, provider, projectName, stack, serviceCount)
+	canUseReq := defangv1.CanIUseRequest{
+		Project:      projectName,
+		Provider:     providerID.Value(),
+		ServiceCount: int32(serviceCount), // #nosec G115 - service count will not overflow int32
+	}
+
+	resp, err := client.CanIUse(ctx, &canUseReq)
+	if err != nil {
+		return err
+	}
+	provider.SetCanIUseConfig(resp)
+	return nil
 }
 
 func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, error) {

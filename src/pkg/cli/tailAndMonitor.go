@@ -18,7 +18,6 @@ import (
 const targetServiceState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 
 func TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, tailOptions TailOptions) (ServiceStates, error) {
-	tailOptions.Follow = true
 	if tailOptions.Deployment == "" {
 		panic("tailOptions.Deployment must be a valid deployment ID")
 	}

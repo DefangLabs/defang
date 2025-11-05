@@ -71,7 +71,7 @@ Dockerfile
 defang
 defang.exe
 # Ignore our project-level state
-.defang*`
+.defang`
 )
 
 type ArchiveType struct {

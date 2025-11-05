@@ -1,12 +1,10 @@
 package compose
 
 import (
-	"context"
 	"regexp"
 	"slices"
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
@@ -18,17 +16,19 @@ const (
 	EnvironmentVars FixupTarget = "environment variable"
 )
 
+type DNSResolver interface {
+	ServicePrivateDNS(name string) string
+	ServicePublicDNS(name string, projectName string) string
+}
+
 type ServiceNameReplacer struct {
-	dnsResolver         client.DNSResolver
+	dnsResolver         DNSResolver
 	projectName         string
 	privateServiceNames *regexp.Regexp
 	publicServiceNames  *regexp.Regexp
 }
 
-func NewServiceNameReplacer(ctx context.Context, dnsResolver client.DNSResolver, project *composeTypes.Project) (ServiceNameReplacer, error) {
-	if err := dnsResolver.UpdateShardDomain(ctx); err != nil {
-		return ServiceNameReplacer{}, err
-	}
+func NewServiceNameReplacer(dnsResolver DNSResolver, project *composeTypes.Project) ServiceNameReplacer {
 	// Create a regexp to detect private service names in environment variable and build arg values
 	var privateServiceNames []string // services with private "host" ports
 	var publicServiceNames []string  // services with "ingress" ports
@@ -46,7 +46,7 @@ func NewServiceNameReplacer(ctx context.Context, dnsResolver client.DNSResolver,
 		projectName:         project.Name,
 		privateServiceNames: makeServiceNameRegex(privateServiceNames),
 		publicServiceNames:  makeServiceNameRegex(publicServiceNames),
-	}, nil
+	}
 }
 
 func (s *ServiceNameReplacer) replaceServiceNameWithDNS(value string) string {

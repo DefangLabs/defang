@@ -8,12 +8,10 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-// MockLoginCLI implements CLIInterface for testing
+// MockLoginCLI implements LoginCLIInterface for testing
 type MockLoginCLI struct {
-	CLIInterface
 	ConnectError          error
 	InteractiveLoginError error
 	AuthURL               string
@@ -60,6 +58,15 @@ func TestHandleLoginTool(t *testing.T) {
 			expectedTextContains: "Successfully logged in to Defang",
 		},
 		{
+			name:     "connect_error_with_auth_port",
+			cluster:  "test-cluster",
+			authPort: 3000,
+			setupMock: func(m *MockLoginCLI) {
+				m.ConnectError = errors.New("connection failed - not authenticated")
+			},
+			expectedTextContains: "Please open this URL in your browser: http://127.0.0.1:3000 to login",
+		},
+		{
 			name:     "connect_error_interactive_login_success",
 			cluster:  "test-cluster",
 			authPort: 0,
@@ -80,6 +87,16 @@ func TestHandleLoginTool(t *testing.T) {
 			expectedError: "login failed",
 		},
 		{
+			name:     "custom_auth_url",
+			cluster:  "production-cluster",
+			authPort: 8080,
+			setupMock: func(m *MockLoginCLI) {
+				m.ConnectError = errors.New("connection failed - not authenticated")
+				m.AuthURL = "https://custom-auth.example.com/login"
+			},
+			expectedTextContains: "https://custom-auth.example.com/login",
+		},
+		{
 			// Note: Removed cluster-specific duplicate scenarios (playground/aws) to keep suite concise
 		},
 	}
@@ -94,11 +111,11 @@ func TestHandleLoginTool(t *testing.T) {
 
 			// Call the function
 			var err error
-			result, err := HandleLoginTool(context.Background(), tt.cluster, mockCLI)
+			result, err := HandleLoginTool(context.Background(), tt.cluster, tt.authPort, mockCLI)
 			if tt.expectedError != "" {
 				assert.EqualError(t, err, tt.expectedError)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				if tt.expectedTextContains != "" && len(result) > 0 {
 					assert.Contains(t, result, tt.expectedTextContains)
 				}
@@ -108,6 +125,14 @@ func TestHandleLoginTool(t *testing.T) {
 			if tt.name == "successful_login_already_connected" {
 				expectedCalls := []string{
 					"Connect(test-cluster)",
+				}
+				assert.Equal(t, expectedCalls, mockCLI.CallLog)
+			}
+
+			if tt.name == "connect_error_with_auth_port" {
+				expectedCalls := []string{
+					"Connect(test-cluster)",
+					"GenerateAuthURL(3000)",
 				}
 				assert.Equal(t, expectedCalls, mockCLI.CallLog)
 			}

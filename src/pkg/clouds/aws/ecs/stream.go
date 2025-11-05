@@ -19,32 +19,38 @@ func QueryAndTailLogGroup(ctx context.Context, lgi LogGroupInput, start, end tim
 		ch:     make(chan types.StartLiveTailResponseStream),
 	}
 
+	doTail := end.IsZero()
+
 	var tailStream LiveTailStream
-	// First call TailLogGroup once to check if the log group exists or we have another error
-	var err error
-	tailStream, err = TailLogGroup(ctx, lgi)
-	if err != nil {
-		var resourceNotFound *types.ResourceNotFoundException
-		if !errors.As(err, &resourceNotFound) {
-			return nil, err
+	if doTail {
+		// First call TailLogGroup once to check if the log group exists or we have another error
+		var err error
+		tailStream, err = TailLogGroup(ctx, lgi)
+		if err != nil {
+			var resourceNotFound *types.ResourceNotFoundException
+			if !errors.As(err, &resourceNotFound) {
+				return nil, err
+			}
+			// Doesn't exist yet, continue to poll for it
 		}
-		// Doesn't exist yet, continue to poll for it
 	}
 
 	// Start goroutine to wait for the log group to be created and then tail it
 	go func() {
 		defer close(es.ch)
 
-		// If the log group does not exist yet, poll until it does
-		if tailStream == nil {
-			var err error
-			tailStream, err = pollTailLogGroup(ctx, lgi)
-			if err != nil {
-				es.err = err
-				return
+		if doTail {
+			// If the log group does not exist yet, poll until it does
+			if tailStream == nil {
+				var err error
+				tailStream, err = pollTailLogGroup(ctx, lgi)
+				if err != nil {
+					es.err = err
+					return
+				}
 			}
+			defer tailStream.Close()
 		}
-		defer tailStream.Close()
 
 		if !start.IsZero() {
 			if end.IsZero() {
@@ -62,8 +68,10 @@ func QueryAndTailLogGroup(ctx context.Context, lgi LogGroupInput, start, end tim
 			}
 		}
 
-		// Pipe the events from the tail stream to the internal channel
-		es.err = es.pipeEvents(ctx, tailStream)
+		if doTail {
+			// Pipe the events from the tail stream to the internal channel
+			es.err = es.pipeEvents(ctx, tailStream)
+		}
 	}()
 
 	return es, nil

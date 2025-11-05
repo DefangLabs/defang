@@ -75,10 +75,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 		project.Services[svccfg.Name] = *svccfg
 	}
 
-	svcNameReplacer, err := NewServiceNameReplacer(ctx, provider, project)
-	if err != nil {
-		return err
-	}
+	svcNameReplacer := NewServiceNameReplacer(provider, project)
 
 	for _, svccfg := range project.Services {
 		// Upload the build context, if any; TODO: parallelize

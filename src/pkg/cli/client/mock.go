@@ -30,10 +30,6 @@ func (m MockProvider) ServicePublicDNS(service string, projectName string) strin
 	return dns.SafeLabel(service) + "." + dns.SafeLabel(projectName) + ".tenant2.defang.app"
 }
 
-func (m MockProvider) UpdateShardDomain(ctx context.Context) error {
-	return nil
-}
-
 // MockServerStream mocks a ServerStream.
 type MockServerStream[Msg any] struct {
 	index int

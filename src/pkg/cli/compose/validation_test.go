@@ -11,7 +11,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go/ptr"
@@ -26,7 +25,7 @@ func TestValidationAndConvert(t *testing.T) {
 
 	t.Setenv("NODE_ENV", "if-you-see-this-env-was-used") // for interpolate/compose.yaml; should be ignored
 
-	mockClient := &client.MockProvider{}
+	mockClient := client.MockProvider{}
 	listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
 		configs, err := mockClient.ListConfig(ctx, &defangv1.ListConfigsRequest{})
 		if err != nil {
@@ -57,9 +56,9 @@ func TestValidationAndConvert(t *testing.T) {
 			logs.WriteString(err.Error() + "\n")
 		}
 
-		mode := modes.ModeAffordable
+		mode := defangv1.DeploymentMode_DEVELOPMENT
 		if strings.Contains(path, "replicas") {
-			mode = modes.ModeHighAvailability
+			mode = defangv1.DeploymentMode_PRODUCTION
 		}
 		if err := ValidateProject(project, mode); err != nil {
 			t.Logf("Project validation failed: %v", err)

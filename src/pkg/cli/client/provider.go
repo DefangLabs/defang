@@ -10,12 +10,6 @@ import (
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
-type DNSResolver interface {
-	ServicePrivateDNS(name string) string
-	ServicePublicDNS(name string, projectName string) string
-	UpdateShardDomain(ctx context.Context) error
-}
-
 type BootstrapCommandRequest struct {
 	Command string
 	Project string
@@ -40,7 +34,6 @@ type ServerStream[Res any] interface {
 }
 
 type Provider interface {
-	DNSResolver
 	AccountInfo(context.Context) (*AccountInfo, error)
 	BootstrapCommand(context.Context, BootstrapCommandRequest) (types.ETag, error)
 	BootstrapList(context.Context) ([]string, error)
@@ -61,6 +54,8 @@ type Provider interface {
 	QueryForDebug(context.Context, *defangv1.DebugRequest) error
 	QueryLogs(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	RemoteProjectName(context.Context) (string, error)
+	ServicePrivateDNS(string) string
+	ServicePublicDNS(string, string) string
 	SetCanIUseConfig(*defangv1.CanIUseResponse)
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)
 	TearDown(context.Context) error

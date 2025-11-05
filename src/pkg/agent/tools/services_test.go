@@ -5,19 +5,17 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // MockCLI implements CLIInterface for testing
 type MockCLI struct {
-	CLIInterface
 	ConnectError                     error
+	NewProviderError                 error
 	LoadProjectNameWithFallbackError error
 	MockClient                       *client.GrpcClient
 	MockProvider                     client.Provider
@@ -37,8 +35,11 @@ func (m *MockCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClie
 	return m.MockClient, nil
 }
 
-func (m *MockCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabricClient client.FabricClient, stack string) client.Provider {
-	return m.MockProvider
+func (m *MockCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabricClient client.FabricClient) (client.Provider, error) {
+	if m.NewProviderError != nil {
+		return nil, m.NewProviderError
+	}
+	return m.MockProvider, nil
 }
 
 func (m *MockCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
@@ -98,6 +99,18 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			expectedGetServices: false,
 		},
 		{
+			name:       "provider_creation_error",
+			providerId: client.ProviderDefang,
+			mockCLI: &MockCLI{
+				MockClient:       &client.GrpcClient{},
+				NewProviderError: errors.New("provider creation failed"),
+			},
+
+			expectedError:       true,
+			errorMessage:        "provider creation failed",
+			expectedGetServices: false,
+		},
+		{
 			name:       "auto_provider_not_configured",
 			providerId: client.ProviderAuto,
 			mockCLI: &MockCLI{
@@ -105,7 +118,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			},
 
 			expectedError:       true,
-			errorMessage:        common.ErrNoProviderSet.Error(),
+			errorMessage:        "no provider is configured",
 			expectedGetServices: false,
 		},
 		{
@@ -132,6 +145,8 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				MockProjectName:  "test-project",
 				GetServicesError: defangcli.ErrNoServices{ProjectName: "test-project"},
 			},
+			expectedError:       false, // Go error is returned
+			resultTextContains:  "no services found for the specified project",
 			expectedGetServices: true,
 			expectedProjectName: "test-project",
 		},
@@ -144,6 +159,8 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				MockProjectName:  "test-project",
 				GetServicesError: createConnectError(connect.CodeNotFound, "project test-project is not deployed in Playground"),
 			},
+			expectedError:       false,
+			resultTextContains:  "is not deployed in Playground",
 			expectedGetServices: true,
 			expectedProjectName: "test-project",
 		},
@@ -197,7 +214,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 					assert.Contains(t, err.Error(), tt.errorMessage)
 				}
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				// Check result text content for non-error results
 				if tt.resultTextContains != "" && len(result) > 0 {
 					assert.Contains(t, result, tt.resultTextContains)

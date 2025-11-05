@@ -12,7 +12,7 @@ import (
 )
 
 func TestDeploy(t *testing.T) {
-	b := NewByocProvider(ctx, "ten ant", "") // no domain
+	b := NewByocProvider(ctx, "ten ant") // no domain
 
 	t.Run("multiple ingress without domain", func(t *testing.T) {
 		t.Skip("skipping test: delegation enabled")
@@ -38,7 +38,7 @@ func TestDeploy(t *testing.T) {
 }
 
 func TestTail(t *testing.T) {
-	b := NewByocProvider(ctx, "TestTail", "")
+	b := NewByocProvider(ctx, "TestTail")
 
 	ss, err := b.QueryLogs(context.Background(), &defangv1.TailRequest{Project: "byoc_integration_test"})
 	if err != nil {
@@ -64,7 +64,7 @@ func TestTail(t *testing.T) {
 }
 
 func TestGetServices(t *testing.T) {
-	b := NewByocProvider(ctx, "TestGetServices", "")
+	b := NewByocProvider(ctx, "TestGetServices")
 
 	services, err := b.GetServices(context.Background(), &defangv1.GetServicesRequest{Project: "byoc_integration_test"})
 	if err != nil {
@@ -83,7 +83,7 @@ func TestGetServices(t *testing.T) {
 func TestPutSecret(t *testing.T) {
 	const secretName = "hello"
 
-	b := NewByocProvider(ctx, "TestPutSecret", "")
+	b := NewByocProvider(ctx, "TestPutSecret")
 
 	t.Run("delete non-existent", func(t *testing.T) {
 		err := b.DeleteConfig(context.Background(), &defangv1.Secrets{Project: "byoc_integration_test", Names: []string{secretName}})
@@ -134,7 +134,7 @@ func TestPutSecret(t *testing.T) {
 }
 
 func TestListSecrets(t *testing.T) {
-	b := NewByocProvider(ctx, "TestListSecrets", "")
+	b := NewByocProvider(ctx, "TestListSecrets")
 
 	t.Run("list", func(t *testing.T) {
 		secrets, err := b.ListConfig(context.Background(), &defangv1.ListConfigsRequest{Project: "byoc_integration_test2"}) // ensure we don't accidentally see the secrets from the other test

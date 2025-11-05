@@ -40,7 +40,6 @@ func BootstrapCommand(ctx context.Context, projectName string, verbose bool, pro
 }
 
 func TailAndWaitForCD(ctx context.Context, provider client.Provider, projectName string, tailOptions TailOptions) error {
-	tailOptions.Follow = true
 	ctx, cancelTail := context.WithCancelCause(ctx)
 	defer cancelTail(nil) // to cancel tail and clean-up context
 

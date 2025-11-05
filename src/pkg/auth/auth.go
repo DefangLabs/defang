@@ -4,16 +4,65 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html/template"
+	"log/slog"
+	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/pkg/browser"
 )
 
 var openAuthClient = NewClient("defang-cli", pkg.Getenv("DEFANG_ISSUER", "https://auth.defang.io"))
+
+// TODO: Remove
+const (
+	authTemplateString = `<!DOCTYPE html>
+<html>
+	<head>
+		<title>Defang | Authentication Status</title>
+		<style>
+			body {
+				font-family: 'Exo', sans-serif;
+				background: linear-gradient(to right, #1e3c72, #2a5298);
+				color: white;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				height: 100vh;
+				margin: 0;
+			}
+			.container {
+				text-align: center;
+			}
+			.status-message {
+				font-size: 2em;
+				margin-bottom: 1em;
+			}
+			.close-link {
+				font-size: 1em;
+				cursor: pointer;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<h1>Welcome to Defang</h1>
+			<p class="status-message">{{.StatusMessage}}</p>
+			<p class="close-link" onclick="window.close()">You can close this window.</p>
+		</div>
+	</body>
+</html>`
+)
+
+var (
+	authTemplate = template.Must(template.New("auth").Parse(authTemplateString))
+)
 
 type ErrNoBrowser struct {
 	Err error
@@ -36,6 +85,66 @@ const (
 	CliFlow LoginFlow = false
 	McpFlow LoginFlow = true
 )
+
+// TODO: Remove
+// ServeAuthCodeFlowServer serves the auth code flow server and will save the auth token to the file when it has been received.
+// The server will run on the port that is specified by authPort. The server will continue to run indefinitely.
+// TODO: make the server stop once we have the code
+func ServeAuthCodeFlowServer(ctx context.Context, authPort int, tenant types.TenantName, saveToken func(string)) error {
+	redirectUri := "http://127.0.0.1:" + strconv.Itoa(authPort) + "/auth"
+
+	// Get the authorization URL before setting up the handler
+	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, WithPkce())
+	if err != nil {
+		return err
+	}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			slog.Info("redirecting to " + ar.url.String())
+			http.Redirect(w, r, ar.url.String(), http.StatusFound)
+			return
+		}
+		if r.URL.Path != "/auth" {
+			http.NotFound(w, r)
+			return
+		}
+		var msg string
+		query := r.URL.Query()
+		switch {
+		case query.Get("error") != "":
+			msg = "Authentication failed: " + query.Get("error_description")
+			slog.Error("authentication failed", "error", query.Get("error_description"))
+		case query.Get("state") != ar.state:
+			msg = "Authentication error: state mismatch"
+			slog.Error("authentication error: state mismatch", "state", query.Get("state"), "expected", ar.state)
+		default:
+			msg = "Authentication successful"
+			token, err := ExchangeCodeForToken(ctx, AuthCodeFlow{code: query.Get("code"), redirectUri: redirectUri, verifier: ar.verifier})
+			if err != nil {
+				slog.Error("failed to exchange code for token", "error", err)
+				msg = "Authentication failed: " + err.Error()
+			}
+			saveToken(token)
+		}
+		authTemplate.Execute(w, struct{ StatusMessage string }{msg})
+	})
+
+	// set the port and the handler to the server
+	server := &http.Server{
+		Addr:              "0.0.0.0:" + strconv.Itoa(authPort),
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	// Start the server
+	err = server.ListenAndServe()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
 
 func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(string), mcpClient string) (AuthCodeFlow, error) {
 	ctx, cancel := context.WithCancel(ctx)
@@ -122,11 +231,13 @@ func pollForAuthCode(ctx context.Context, state string) (string, error) {
 		if err != nil {
 			if errors.Is(err, ErrPollTimeout) {
 				term.Debug("poll timed out, retrying...")
-				continue // retry
+				continue // retry immediately
 			}
 			var unexpectedError ErrUnexpectedStatus
 			if errors.As(err, &unexpectedError) && unexpectedError.StatusCode >= 500 {
-				term.Debugf("received server error: %s, retrying...", unexpectedError.Status)
+				term.Debug("received server error, retrying...")
+				// TODO: replace with Hashicorp HTTP client from our own http package and remove all the old Docker Auth code; https://github.com/DefangLabs/defang/pull/1536/files#r2436696774
+				pkg.SleepWithContext(ctx, time.Second)
 				continue // retry
 			}
 			return "", err

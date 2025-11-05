@@ -64,7 +64,7 @@ func DeploymentsList(ctx context.Context, listType defangv1.DeploymentType, proj
 		return sortKeys[i] < sortKeys[j]
 	})
 
-	return term.Table(deployments, "ProjectName", "Provider", "AccountId", "Region", "Deployment", "DeployedAt")
+	return term.Table(deployments, []string{"ProjectName", "Provider", "AccountId", "Region", "Deployment", "DeployedAt"})
 }
 
 func getProvider(provider defangv1.Provider, providerString string) string {

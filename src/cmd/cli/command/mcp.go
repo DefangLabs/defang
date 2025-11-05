@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	agentTools "github.com/DefangLabs/defang/src/pkg/agent/tools"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/server"
@@ -28,6 +28,7 @@ var mcpServerCmd = &cobra.Command{
 	Short:   "Start defang MCP server",
 	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		authPort, _ := cmd.Flags().GetInt("auth-server")
 		ideClient, _ := cmd.Flags().GetString("client")
 
 		mcpClient, err := mcp.ParseMCPClient(ideClient)
@@ -50,9 +51,21 @@ var mcpServerCmd = &cobra.Command{
 
 		// Create a new MCP server
 		term.Debug("Creating MCP server")
-		s, err := mcp.NewDefangMCPServer(RootCmd.Version, cluster, &providerID, mcpClient, agentTools.DefaultToolCLI{})
+		s, err := mcp.NewDefangMCPServer(RootCmd.Version, cluster, authPort, &providerID, mcpClient)
 		if err != nil {
 			return fmt.Errorf("failed to create MCP server: %w", err)
+		}
+
+		// Start auth server for docker login flow
+		if authPort != 0 {
+			term.Debug("Starting Auth Server for MCP-in-Docker login flow")
+			term.Debug("Function invoked: cli.InteractiveLoginInsideDocker")
+
+			go func() {
+				if err := login.InteractiveLoginInsideDocker(cmd.Context(), cluster, authPort); err != nil {
+					term.Error("Failed to start auth server", "error", err)
+				}
+			}()
 		}
 
 		// Start the server

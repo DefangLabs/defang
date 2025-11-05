@@ -16,7 +16,6 @@ import (
 type PlaygroundProvider struct {
 	FabricClient
 	RetryDelayer
-	shardDomain string
 }
 
 var _ Provider = (*PlaygroundProvider)(nil)
@@ -106,17 +105,9 @@ func (g PlaygroundProvider) ServicePrivateDNS(name string) string {
 	return string(g.GetTenantName()) + "-" + name
 }
 
-func (g *PlaygroundProvider) UpdateShardDomain(ctx context.Context) error {
-	resp, err := g.GetPlaygroundProjectDomain(ctx)
-	if err != nil {
-		return err
-	}
-	g.shardDomain = resp.GetDomain()
-	return nil
-}
-
 func (g PlaygroundProvider) ServicePublicDNS(name string, projectName string) string {
-	return dns.SafeLabel(string(g.GetTenantName())) + "-" + dns.SafeLabel(name) + "." + g.shardDomain
+	// TODO: Move this to fabric since we do not know what shard was assigned, placeholder for now
+	return dns.SafeLabel(string(g.GetTenantName())) + "-" + dns.SafeLabel(name) + "." + "prod1b" + ".defang.dev"
 }
 
 func (g PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, error) {

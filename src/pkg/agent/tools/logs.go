@@ -15,9 +15,9 @@ import (
 
 type LogsParams struct {
 	common.LoaderParams
-	DeploymentID string `json:"deployment_id,omitempty" jsonschema:"description=Optional: Retrieve logs from a specific deployment."`
-	Since        string `json:"since,omitempty" jsonschema:"description=Optional: Retrieve logs written after this time. Format as RFC3339 or duration (e.g., '2023-10-01T15:04:05Z' or '1h')."`
-	Until        string `json:"until,omitempty" jsonschema:"description=Optional: Retrieve logs written before this time. Format as RFC3339 or duration (e.g., '2023-10-01T15:04:05Z' or '1h')."`
+	DeploymentID string `json:"deployment_id" jsonschema:"description=Optional: Retrieve logs from a specific deployment."`
+	Since        string `json:"since" jsonschema:"description=Optional: Retrieve logs written after this time. Format as RFC3339 or duration (e.g., '2023-10-01T15:04:05Z' or '1h')."`
+	Until        string `json:"until" jsonschema:"description=Optional: Retrieve logs written before this time. Format as RFC3339 or duration (e.g., '2023-10-01T15:04:05Z' or '1h')."`
 }
 
 func ParseLogsParams(request mcp.CallToolRequest) (LogsParams, error) {
@@ -31,7 +31,7 @@ func ParseLogsParams(request mcp.CallToolRequest) (LogsParams, error) {
 	}, nil
 }
 
-func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, cluster string, providerId *cliClient.ProviderID, cli CLIInterface) (string, error) {
+func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, cluster string, providerId *cliClient.ProviderID, cli LogsCLIInterface) (string, error) {
 	var sinceTime, untilTime time.Time
 	var err error
 	now := time.Now()
@@ -65,7 +65,7 @@ func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 
 	term.Debug("Function invoked: cli.NewProvider")
 
-	provider, err := cli.CheckProviderConfigured(ctx, client, *providerId, project.Name, "", len(project.Services))
+	provider, err := cli.CheckProviderConfigured(ctx, client, *providerId, project.Name, len(project.Services))
 	if err != nil {
 		return "", fmt.Errorf("provider not configured correctly: %w", err)
 	}

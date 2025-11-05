@@ -8,7 +8,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
-	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -25,11 +24,11 @@ func (e ComposeError) Unwrap() error {
 type ComposeUpParams struct {
 	Project    *compose.Project
 	UploadMode compose.UploadMode
-	Mode       modes.Mode
+	Mode       defangv1.DeploymentMode
 }
 
 // ComposeUp validates a compose project and uploads the services using the client
-func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.Provider, params ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
+func ComposeUp(ctx context.Context, fabric client.FabricClient, p client.Provider, params ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	upload := params.UploadMode
 	project := params.Project
 	mode := params.Mode
@@ -41,7 +40,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 	// FIXME: should not need to validate configs if we are doing preview, but preview will fail on missing configs.
 	if upload != compose.UploadModeIgnore {
 		listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
-			configs, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
+			configs, err := p.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
 			if err != nil {
 				return nil, err
 			}
@@ -61,7 +60,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 	// Do not modify the original project, because the caller needs it for debugging.
 	fixedProject := project.WithoutUnnecessaryResources()
 
-	if err := compose.FixupServices(ctx, provider, fixedProject, upload); err != nil {
+	if err := compose.FixupServices(ctx, p, fixedProject, upload); err != nil {
 		return nil, project, err
 	}
 
@@ -86,13 +85,13 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 	}
 
 	deployRequest := &defangv1.DeployRequest{
-		Mode:           mode.Value(),
+		Mode:           mode,
 		Project:        project.Name,
 		Compose:        bytes,
 		DelegateDomain: delegateDomain.Zone,
 	}
 
-	delegation, err := provider.PrepareDomainDelegation(ctx, client.PrepareDomainDelegationRequest{
+	delegation, err := p.PrepareDomainDelegation(ctx, client.PrepareDomainDelegationRequest{
 		DelegateDomain: delegateDomain.Zone,
 		Preview:        upload == compose.UploadModePreview || upload == compose.UploadModeEstimate,
 		Project:        project.Name,
@@ -103,7 +102,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		deployRequest.DelegationSetId = delegation.DelegationSetId
 	}
 
-	accountInfo, err := provider.AccountInfo(ctx)
+	accountInfo, err := p.AccountInfo(ctx)
 	if err != nil {
 		return nil, project, err
 	}
@@ -111,7 +110,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 	var action defangv1.DeploymentAction
 	var resp *defangv1.DeployResponse
 	if upload == compose.UploadModePreview || upload == compose.UploadModeEstimate {
-		resp, err = provider.Preview(ctx, deployRequest)
+		resp, err = p.Preview(ctx, deployRequest)
 		if err != nil {
 			return nil, project, err
 		}
@@ -125,7 +124,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 			}
 		}
 
-		resp, err = provider.Deploy(ctx, deployRequest)
+		resp, err = p.Deploy(ctx, deployRequest)
 		if err != nil {
 			return nil, project, err
 		}

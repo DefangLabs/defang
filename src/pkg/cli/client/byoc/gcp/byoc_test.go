@@ -8,7 +8,7 @@ import (
 func TestSetUpCD(t *testing.T) {
 	t.Skip("skipping test")
 	ctx := t.Context()
-	b := NewByocProvider(ctx, "testTenantID", "")
+	b := NewByocProvider(ctx, "testTenantID")
 	account, err := b.AccountInfo(ctx)
 	if err != nil {
 		t.Errorf("AccountInfo() error = %v, want nil", err)
@@ -25,8 +25,8 @@ func TestSetUpCD(t *testing.T) {
       - "8080:80"
 `))
 	cmd := cdCommand{
-		project: "testproj",
-		command: []string{"up", payload},
+		Project: "testproj",
+		Command: []string{"up", payload},
 	}
 
 	if op, err := b.runCdCommand(ctx, cmd); err != nil {

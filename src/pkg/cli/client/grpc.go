@@ -112,10 +112,6 @@ func (g GrpcClient) GetDelegateSubdomainZone(ctx context.Context, req *defangv1.
 	return getMsg(g.client.GetDelegateSubdomainZone(ctx, connect.NewRequest(req)))
 }
 
-func (g GrpcClient) GetPlaygroundProjectDomain(ctx context.Context) (*defangv1.GetPlaygroundProjectDomainResponse, error) {
-	return getMsg(g.client.GetPlaygroundProjectDomain(ctx, &connect.Request[emptypb.Empty]{}))
-}
-
 func (g GrpcClient) AgreeToS(ctx context.Context) error {
 	_, err := g.client.SignEULA(ctx, &connect.Request[emptypb.Empty]{})
 	return err

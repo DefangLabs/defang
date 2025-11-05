@@ -6,10 +6,10 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/logs"
-	"github.com/DefangLabs/defang/src/pkg/modes"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func Preview(ctx context.Context, project *compose.Project, fabric cliClient.FabricClient, provider cliClient.Provider, mode modes.Mode) error {
+func Preview(ctx context.Context, project *compose.Project, fabric cliClient.FabricClient, provider cliClient.Provider, mode defangv1.DeploymentMode) error {
 	resp, project, err := ComposeUp(ctx, fabric, provider, ComposeUpParams{
 		Project:    project,
 		UploadMode: compose.UploadModePreview,

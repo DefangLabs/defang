@@ -1,16 +1,14 @@
 package compose
 
 import (
-	"context"
 	"testing"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 type serviceNameReplacerMockProvider struct {
-	client.DNSResolver
+	DNSResolver
 }
 
 func (m serviceNameReplacerMockProvider) ServicePrivateDNS(name string) string {
@@ -21,12 +19,7 @@ func (m serviceNameReplacerMockProvider) ServicePublicDNS(name string, projectNa
 	return dns.SafeLabel(name) + "." + dns.SafeLabel(projectName) + ".tenant2.defang.app"
 }
 
-func (m serviceNameReplacerMockProvider) UpdateShardDomain(ctx context.Context) error {
-	// Mock fabric call for GetPlaygroundProjectDomain
-	return nil
-}
-
-func setup() (ServiceNameReplacer, error) {
+func setup() ServiceNameReplacer {
 	services := composeTypes.Services{}
 	services["host-serviceA"] = composeTypes.ServiceConfig{
 		Name: "host-serviceA",
@@ -61,12 +54,7 @@ func setup() (ServiceNameReplacer, error) {
 		Services: services,
 	}
 
-	svcNameReplacer, err := NewServiceNameReplacer(context.Background(), serviceNameReplacerMockProvider{}, project)
-	if err != nil {
-		return ServiceNameReplacer{}, err
-	}
-
-	return svcNameReplacer, nil
+	return NewServiceNameReplacer(serviceNameReplacerMockProvider{}, project)
 }
 
 func TestServiceNameReplacer(t *testing.T) {
@@ -103,10 +91,7 @@ func TestServiceNameReplacer(t *testing.T) {
 	}
 
 	// Create a service name replacer
-	replacer, err := setup()
-	if err != nil {
-		t.Error(err)
-	}
+	replacer := setup()
 
 	for _, tc := range testCases {
 		got := replacer.ReplaceServiceNameWithDNS(tc.service, tc.key, tc.value, tc.fixUpTarget)
@@ -117,10 +102,7 @@ func TestServiceNameReplacer(t *testing.T) {
 }
 
 func TestServiceNameReplacerHasService(t *testing.T) {
-	replacer, err := setup()
-	if err != nil {
-		t.Error(err)
-	}
+	replacer := setup()
 
 	if !replacer.HasServiceName("host-serviceA") {
 		t.Error("Expected to have host-serviceA")

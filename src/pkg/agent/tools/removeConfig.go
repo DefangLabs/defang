@@ -27,10 +27,10 @@ func ParseRemoveConfigParams(request mcp.CallToolRequest) (RemoveConfigParams, e
 }
 
 // HandleRemoveConfigTool handles the remove config tool logic
-func HandleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader, params RemoveConfigParams, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (string, error) {
+func HandleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader, params RemoveConfigParams, providerId *cliClient.ProviderID, cluster string, cli RemoveConfigCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("No provider configured: %w", err)
 	}
 
 	term.Debug("Function invoked: cli.Connect")
@@ -40,7 +40,10 @@ func HandleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader,
 	}
 
 	term.Debug("Function invoked: cli.NewProvider")
-	provider := cli.NewProvider(ctx, *providerId, client, "")
+	provider, err := cli.NewProvider(ctx, *providerId, client)
+	if err != nil {
+		return "", fmt.Errorf("Failed to get new provider: %w", err)
+	}
 
 	term.Debug("Function invoked: cliClient.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)

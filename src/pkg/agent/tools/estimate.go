@@ -23,14 +23,13 @@ func ParseEstimateParams(request mcp.CallToolRequest, providerId *cliClient.Prov
 	if err != nil {
 		mode = "AFFORDABLE" // Default to affordable if not provided
 	}
-
 	providerString, err := request.RequireString("provider")
 	if err != nil {
 		providerString = "auto" // Default to auto if not provided
 	}
 	err = providerId.Set(providerString)
 	if err != nil {
-		return EstimateParams{}, fmt.Errorf("invalid provider specified: %w", err)
+		return EstimateParams{}, fmt.Errorf("Invalid provider specified: %w", err)
 	}
 
 	var region string
@@ -45,7 +44,7 @@ func ParseEstimateParams(request mcp.CallToolRequest, providerId *cliClient.Prov
 	}, nil
 }
 
-func HandleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, params EstimateParams, cluster string, cli CLIInterface) (string, error) {
+func HandleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, params EstimateParams, cluster string, cli EstimateCLIInterface) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
@@ -56,7 +55,7 @@ func HandleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, par
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, cluster)
 	if err != nil {
-		return "", fmt.Errorf("could not connect: %w", err)
+		return "", fmt.Errorf("Could not connect: %w", err)
 	}
 
 	defangProvider := cli.CreatePlaygroundProvider(client)
@@ -69,13 +68,13 @@ func HandleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, par
 		return "", err
 	}
 
-	estimate, err := cli.RunEstimate(ctx, project, client, defangProvider, params.Provider, params.Region, deploymentMode)
+	estimate, err := cli.RunEstimate(ctx, project, client, defangProvider, params.Provider, params.Region, deploymentMode.Value())
 	if err != nil {
-		return "", fmt.Errorf("failed to run estimate: %w", err)
+		return "", fmt.Errorf("Failed to run estimate: %w", err)
 	}
 	term.Debugf("Estimate: %+v", estimate)
 
-	estimateText := cli.PrintEstimate(deploymentMode, estimate)
+	estimateText := cli.CaptureTermOutput(deploymentMode.Value(), estimate)
 
 	return "Successfully estimated the cost of the project to " + params.Provider.Name() + ":\n" + estimateText, nil
 }

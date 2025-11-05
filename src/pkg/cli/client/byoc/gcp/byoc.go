@@ -100,11 +100,11 @@ type ByocGcp struct {
 	cdEtag      string
 }
 
-func NewByocProvider(ctx context.Context, tenantName types.TenantName, stack string) *ByocGcp {
+func NewByocProvider(ctx context.Context, tenantName types.TenantName) *ByocGcp {
 	region := pkg.Getenv("GCP_LOCATION", "us-central1") // Defaults to us-central1 for lower price
 	projectId := getGcpProjectID()
 	b := &ByocGcp{driver: &gcp.Gcp{Region: region, ProjectId: projectId}}
-	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
+	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantName, b)
 	return b
 }
 
@@ -317,8 +317,8 @@ func (b *ByocGcp) BootstrapCommand(ctx context.Context, req client.BootstrapComm
 		return "", err
 	}
 	cmd := cdCommand{
-		project: req.Project,
-		command: []string{req.Command},
+		Project: req.Project,
+		Command: []string{req.Command},
 	}
 	cdTaskId, err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
 	if err != nil {
@@ -328,11 +328,11 @@ func (b *ByocGcp) BootstrapCommand(ctx context.Context, req client.BootstrapComm
 }
 
 type cdCommand struct {
-	command        []string
-	delegateDomain string
-	envOverride    map[string]string
-	mode           defangv1.DeploymentMode
-	project        string
+	Project        string
+	Command        []string
+	EnvOverride    map[string]string
+	Mode           defangv1.DeploymentMode
+	DelegateDomain string
 }
 
 func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, error) {
@@ -344,12 +344,12 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 	env := map[string]string{
 		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_JSON":              os.Getenv("DEFANG_JSON"),
-		"DEFANG_MODE":              strings.ToLower(cmd.mode.String()),
+		"DEFANG_MODE":              strings.ToLower(cmd.Mode.String()),
 		"DEFANG_ORG":               "defang",
 		"DEFANG_PREFIX":            byoc.DefangPrefix,
 		"DEFANG_STATE_URL":         defangStateUrl,
 		"GCP_PROJECT":              b.driver.ProjectId,
-		"PROJECT":                  cmd.project,
+		"PROJECT":                  cmd.Project,
 		pulumiBackendKey:           pulumiBackendValue,          // TODO: make secret
 		"PULUMI_CONFIG_PASSPHRASE": byoc.PulumiConfigPassphrase, // TODO: make secret
 		"PULUMI_COPILOT":           "false",
@@ -362,13 +362,13 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		env["NO_COLOR"] = "1"
 	}
 
-	if cmd.delegateDomain != "" {
-		env["DOMAIN"] = b.GetProjectDomain(cmd.project, cmd.delegateDomain)
+	if cmd.DelegateDomain != "" {
+		env["DOMAIN"] = b.GetProjectDomain(cmd.Project, cmd.DelegateDomain)
 	} else {
 		env["DOMAIN"] = "dummy.domain"
 	}
 
-	for k, v := range cmd.envOverride {
+	for k, v := range cmd.EnvOverride {
 		env[k] = v
 	}
 
@@ -380,12 +380,12 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		for k, v := range env {
 			debugEnv = append(debugEnv, k+"="+v)
 		}
-		if err := byoc.DebugPulumiGolang(ctx, debugEnv, cmd.command...); err != nil {
+		if err := byoc.DebugPulumiGolang(ctx, debugEnv, cmd.Command...); err != nil {
 			return "", err
 		}
 	}
 
-	execution, err := b.driver.Run(ctx, gcp.JobNameCD, env, cmd.command...)
+	execution, err := b.driver.Run(ctx, gcp.JobNameCD, env, cmd.Command...)
 	if err != nil {
 		return "", err
 	}
@@ -502,14 +502,15 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 		payload = strings.Replace(payload, "https://storage.googleapis.com/", "gs://", 1)
 	}
 
-	cdCmd := cdCommand{
-		command:        []string{command, payload},
-		delegateDomain: req.DelegateDomain,
-		envOverride:    map[string]string{"DEFANG_ETAG": etag},
-		mode:           req.Mode,
-		project:        project.Name,
+	cmd := cdCommand{
+		Mode:           req.Mode,
+		Project:        project.Name,
+		Command:        []string{command, payload},
+		EnvOverride:    map[string]string{"DEFANG_ETAG": etag},
+		DelegateDomain: req.DelegateDomain,
 	}
-	execution, err := b.runCdCommand(ctx, cdCmd)
+
+	execution, err := b.runCdCommand(ctx, cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -543,7 +544,7 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 	// TODO: update stack (1st param) to b.PulumiStack
 	subscribeStream.AddJobStatusUpdate("", req.Project, req.Etag, req.Services)
 	subscribeStream.AddServiceStatusUpdate("", req.Project, req.Etag, req.Services)
-	subscribeStream.StartFollow(time.Now())
+	subscribeStream.Start(time.Now())
 	return subscribeStream, nil
 }
 
@@ -558,11 +559,7 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		if req.Since.IsValid() {
 			since = req.Since.AsTime()
 		}
-		if req.Follow {
-			subscribeStream.StartFollow(since)
-		} else {
-			subscribeStream.Start(int(req.Limit))
-		}
+		subscribeStream.Start(since)
 
 		var cancel context.CancelCauseFunc
 		ctx, cancel = context.WithCancelCause(ctx)
@@ -621,11 +618,7 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		logStream.AddUntil(endTime)
 		logStream.AddFilter(req.Pattern)
 	}
-	if req.Follow {
-		logStream.StartFollow(startTime)
-	} else {
-		logStream.Start(int(req.Limit))
-	}
+	logStream.Start(startTime)
 	return logStream, nil
 }
 
@@ -835,7 +828,7 @@ func LogEntriesToString(logEntries []*loggingpb.LogEntry) string {
 func (b *ByocGcp) query(ctx context.Context, query string) ([]*loggingpb.LogEntry, error) {
 	term.Debugf("Querying logs with filter: \n %s", query)
 	var entries []*loggingpb.LogEntry
-	lister, err := b.driver.ListLogEntries(ctx, query, gcp.OrderAscending)
+	lister, err := b.driver.ListLogEntries(ctx, query)
 	if err != nil {
 		return nil, err
 	}

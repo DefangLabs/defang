@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetExistingToken(t *testing.T) {
@@ -25,7 +25,7 @@ func TestGetExistingToken(t *testing.T) {
 		expectedToken := "file-token"
 		tokenFile := GetTokenFile(fabric)
 		err := os.WriteFile(tokenFile, []byte(expectedToken), 0600)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 
 		t.Cleanup(func() {
 			os.Remove(tokenFile)
