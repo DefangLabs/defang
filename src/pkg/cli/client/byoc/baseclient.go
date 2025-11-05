@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -210,12 +212,14 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 	}
 
 	pkg.Ensure(projectName != "", "ProjectName not set")
+	healthCheckPath := GetHealthCheckPath(service)
 	si := &defangv1.ServiceInfo{
-		AllowScaling: b.AllowScaling,
-		Domainname:   service.DomainName,
-		Etag:         pkg.RandomID(), // TODO: could be hash for dedup/idempotency
-		Project:      projectName,    // was: tenant
-		Service:      &defangv1.Service{Name: service.Name},
+		AllowScaling:    b.AllowScaling,
+		Domainname:      service.DomainName,
+		Etag:            pkg.RandomID(), // TODO: could be hash for dedup/idempotency
+		Project:         projectName,    // was: tenant
+		Service:         &defangv1.Service{Name: service.Name},
+		HealthcheckPath: healthCheckPath,
 	}
 
 	hasHost := false
@@ -301,4 +305,49 @@ func (b ByocBaseClient) GetPublicFqdn(projectName, delegateDomain, fqn string) s
 func (b ByocBaseClient) GetPrivateFqdn(projectName string, fqn string) string {
 	safeFqn := dns.SafeLabel(fqn)
 	return fmt.Sprintf("%s.%s", safeFqn, GetPrivateDomain(projectName)) // TODO: consider merging this with ServicePrivateDNS
+}
+
+var urlPattern = regexp.MustCompile(`(https?://[^\s]+)`)
+
+// use a regular expression to exract a url from the string
+// if no url is found, return an empty string
+func matchUrl(str string) string {
+	matches := urlPattern.FindStringSubmatch(str)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+	return ""
+}
+
+func GetHealthCheckURL(healthcheck *composeTypes.HealthCheckConfig) string {
+	if healthcheck == nil {
+		return ""
+	}
+	if healthcheck.Test == nil {
+		return ""
+	}
+	if len(healthcheck.Test) == 1 {
+		return matchUrl(healthcheck.Test[0])
+	}
+	if len(healthcheck.Test) > 1 {
+		for _, part := range healthcheck.Test {
+			if url := matchUrl(part); url != "" {
+				return url
+			}
+		}
+	}
+	return ""
+}
+
+func GetHealthCheckPath(service composeTypes.ServiceConfig) string {
+	urlStr := GetHealthCheckURL(service.HealthCheck)
+	if urlStr == "" {
+		return "/"
+	}
+	parsedUrl, err := url.Parse(urlStr)
+	if err != nil {
+		term.Warnf("Unable to parse healthcheck for %q, defaulting to \"/\"", service.Name)
+		return "/"
+	}
+	return parsedUrl.Path
 }
