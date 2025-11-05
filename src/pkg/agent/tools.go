@@ -71,7 +71,7 @@ func CollectTools(cluster string, providerId *client.ProviderID) []ai.Tool {
 			},
 		),
 		ai.NewTool("deploy",
-			"Deploy the application defined in the docker-compose files in the current working directory",
+			"Initiate deployment of the application defined in the docker-compose files in the current working directory",
 			func(ctx *ai.ToolContext, params DeployParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
