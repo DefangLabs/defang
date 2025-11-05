@@ -74,6 +74,8 @@ func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 		Deployment: params.DeploymentID,
 		Since:      sinceTime,
 		Until:      untilTime,
+		Limit:      100,
+		Raw:        true,
 	})
 
 	if err != nil {
