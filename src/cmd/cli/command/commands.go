@@ -37,6 +37,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 )
 
@@ -226,6 +227,7 @@ func SetupCommands(ctx context.Context, version string) {
 	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
 	configSetCmd.Flags().BoolP("env", "e", false, "set the config from an environment variable")
 	configSetCmd.Flags().Bool("random", false, "set a secure randomly generated value for config")
+	configSetCmd.Flags().String("from-env", "", "load config values from an .env file")
 	_ = configSetCmd.Flags().MarkHidden("name")
 
 	configCmd.AddCommand(configSetCmd)
@@ -638,14 +640,16 @@ var configCmd = &cobra.Command{
 }
 
 var configSetCmd = &cobra.Command{
-	Use:         "create CONFIG [file|-]", // like Docker
+	Use:         "create CONFIG... [file|-]", // like Docker
 	Annotations: authNeededAnnotation,
-	Args:        cobra.RangeArgs(1, 2),
+	Args:        cobra.MinimumNArgs(1),
 	Aliases:     []string{"set", "add", "put"},
-	Short:       "Adds or updates a sensitive config value",
+	Short:       "Adds or updates sensitive config value(s)",
+	Long:        "Adds or updates one or more sensitive config values. Supports multiple KEY=VALUE pairs or loading from .env file.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fromEnv, _ := cmd.Flags().GetBool("env")
 		random, _ := cmd.Flags().GetBool("random")
+		fromEnvFile, _ := cmd.Flags().GetString("from-env")
 
 		// Make sure we have a project to set config for before asking for a value
 		loader := configureLoader(cmd)
@@ -659,64 +663,139 @@ var configSetCmd = &cobra.Command{
 			return err
 		}
 
-		parts := strings.SplitN(args[0], "=", 2)
-		name := parts[0]
+		// Collect all key-value pairs to set
+		configsToSet := make(map[string]string)
 
-		if !pkg.IsValidSecretName(name) {
-			return fmt.Errorf("invalid config name: %q", name)
-		}
-
-		var value string
-		if fromEnv {
-			if len(args) == 2 || len(parts) == 2 {
-				return errors.New("cannot specify config value or input file when using --env")
+		// Handle --from-env flag
+		if fromEnvFile != "" {
+			if fromEnv || random {
+				return errors.New("cannot use --from-env with --env or --random")
 			}
-			var ok bool
-			value, ok = os.LookupEnv(name)
-			if !ok {
-				return fmt.Errorf("environment variable %q not found", name)
-			}
-		} else if len(parts) == 2 {
-			// Handle name=value; can't also specify a file in this case
-			if len(args) == 2 {
-				return errors.New("cannot specify both config value and input file")
-			}
-			value = parts[1]
-		} else if nonInteractive || len(args) == 2 {
-			// Read the value from a file or stdin
-			var err error
-			var bytes []byte
-			if len(args) == 2 && args[1] != "-" {
-				bytes, err = os.ReadFile(args[1])
-			} else {
-				bytes, err = io.ReadAll(os.Stdin)
-			}
-			if err != nil && err != io.EOF {
-				return fmt.Errorf("failed reading the config value: %w", err)
-			}
-			// Trim the newline at the end because single line values are common
-			value = strings.TrimSuffix(string(bytes), "\n")
-		} else if random {
-			// Generate a random value for the config
-			value = CreateRandomConfigValue()
-			term.Info("Generated random value: " + value)
-		} else {
-			// Prompt for sensitive value
-			var sensitivePrompt = &survey.Password{
-				Message: fmt.Sprintf("Enter value for %q:", name),
-				Help:    "The value will be stored securely and cannot be retrieved later.",
+			if len(args) > 0 {
+				return errors.New("cannot specify CONFIG arguments with --from-env")
 			}
 
-			err := survey.AskOne(sensitivePrompt, &value, survey.WithStdio(term.DefaultTerm.Stdio()))
+			envMap, err := godotenv.Read(fromEnvFile)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to read env file %q: %w", fromEnvFile, err)
+			}
+
+			for name, value := range envMap {
+				if !pkg.IsValidSecretName(name) {
+					term.Warnf("Skipping invalid config name: %q", name)
+					continue
+				}
+				configsToSet[name] = value
+			}
+
+			if len(configsToSet) == 0 {
+				return errors.New("no valid config found in env file")
+			}
+		} else {
+			// Handle single config with special modes (backward compatibility)
+			if len(args) == 1 && !strings.Contains(args[0], "=") {
+				parts := strings.SplitN(args[0], "=", 2)
+				name := parts[0]
+
+				if !pkg.IsValidSecretName(name) {
+					return fmt.Errorf("invalid config name: %q", name)
+				}
+
+				var value string
+				if fromEnv {
+					var ok bool
+					value, ok = os.LookupEnv(name)
+					if !ok {
+						return fmt.Errorf("environment variable %q not found", name)
+					}
+				} else if random {
+					// Generate a random value for the config
+					value = CreateRandomConfigValue()
+					term.Info("Generated random value: " + value)
+				} else if nonInteractive {
+					// Read the value from stdin in non-interactive mode
+					bytes, err := io.ReadAll(os.Stdin)
+					if err != nil && err != io.EOF {
+						return fmt.Errorf("failed reading the config value: %w", err)
+					}
+					value = strings.TrimSuffix(string(bytes), "\n")
+				} else {
+					// Prompt for sensitive value
+					var sensitivePrompt = &survey.Password{
+						Message: fmt.Sprintf("Enter value for %q:", name),
+						Help:    "The value will be stored securely and cannot be retrieved later.",
+					}
+
+					err := survey.AskOne(sensitivePrompt, &value, survey.WithStdio(term.DefaultTerm.Stdio()))
+					if err != nil {
+						return err
+					}
+				}
+				configsToSet[name] = value
+			} else if len(args) == 2 && !strings.Contains(args[0], "=") {
+				// Handle legacy: CONFIG file|- format
+				if fromEnv || random {
+					return errors.New("cannot use file input with --env or --random")
+				}
+
+				name := args[0]
+				if !pkg.IsValidSecretName(name) {
+					return fmt.Errorf("invalid config name: %q", name)
+				}
+
+				var bytes []byte
+				if args[1] != "-" {
+					bytes, err = os.ReadFile(args[1])
+				} else {
+					bytes, err = io.ReadAll(os.Stdin)
+				}
+				if err != nil && err != io.EOF {
+					return fmt.Errorf("failed reading the config value: %w", err)
+				}
+				value := strings.TrimSuffix(string(bytes), "\n")
+				configsToSet[name] = value
+			} else {
+				// Handle multiple KEY=VALUE arguments
+				if fromEnv || random {
+					return errors.New("cannot use KEY=VALUE format with --env or --random")
+				}
+
+				for _, arg := range args {
+					parts := strings.SplitN(arg, "=", 2)
+					if len(parts) != 2 {
+						return fmt.Errorf("invalid config format: %q (expected KEY=VALUE)", arg)
+					}
+
+					name := parts[0]
+					value := parts[1]
+
+					if !pkg.IsValidSecretName(name) {
+						return fmt.Errorf("invalid config name: %q", name)
+					}
+
+					configsToSet[name] = value
+				}
 			}
 		}
 
-		if err := cli.ConfigSet(cmd.Context(), projectName, provider, name, value); err != nil {
-			return err
+		// Set all configs
+		successCount := 0
+		for name, value := range configsToSet {
+			if err := cli.ConfigSet(cmd.Context(), projectName, provider, name, value); err != nil {
+				term.Warnf("Failed to set %q: %v", name, err)
+			} else {
+				term.Info("Updated value for", name)
+				successCount++
+			}
 		}
-		term.Info("Updated value for", name)
+
+		if successCount == 0 {
+			return errors.New("failed to set any config values")
+		}
+
+		if successCount > 1 {
+			term.Infof("Successfully set %d config value(s)", successCount)
+		}
 
 		printDefangHint("To update the deployed values, do:", "compose up")
 		return nil
