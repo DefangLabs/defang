@@ -767,19 +767,16 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid config name; must be alphanumeric or _, cannot start with a number: %q", req.Name))
 	}
 	secretId := b.StackName(req.Project, req.Name)
-
-	// TODO: only one of sensistive/insensitive should exist
-	if req.GetType() != defangv1.ConfigType_CONFIGTYPE_INSENSITIVE {
-		secretId = secretId + "/insensitive"
-	}
 	term.Debugf("Creating secret %q", secretId)
 
-	if _, err := b.driver.CreateSecret(ctx, secretId); err != nil {
+	var encrypted bool = req.Type != defangv1.ConfigType_CONFIGTYPE_INSENSITIVE
+
+	if _, err := b.driver.CreateSecret(ctx, encrypted, secretId); err != nil {
 		if stat, ok := status.FromError(err); ok && stat.Code() == codes.PermissionDenied {
 			if err := b.driver.EnsureAPIsEnabled(ctx, "secretmanager.googleapis.com"); err != nil {
 				return annotateGcpError(err)
 			}
-			_, err = b.driver.CreateSecret(ctx, secretId)
+			_, err = b.driver.CreateSecret(ctx, encrypted, secretId)
 		}
 		if err != nil {
 			if stat, ok := status.FromError(err); ok && stat.Code() == codes.AlreadyExists {

@@ -646,7 +646,7 @@ var configCmd = &cobra.Command{
 var configGetCmd = &cobra.Command{
 	Use:         "get CONFIG", // like Docker
 	Annotations: authNeededAnnotation,
-	Args:        cobra.ExactArgs(1),
+	Args:        cobra.ArbitraryArgs,
 	Aliases:     []string{"show"},
 	Short:       "Gets an insensitive config value",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -663,26 +663,26 @@ var configGetCmd = &cobra.Command{
 			return err
 		}
 
-		if len(args) != 1 {
-			return errors.New("please specify exactly one config name to get")
+		for _, name := range args {
+			if !pkg.IsValidSecretName(name) {
+				return fmt.Errorf("invalid config name: %q", name)
+			}
 		}
 
-		name := args[0]
-		if !pkg.IsValidSecretName(name) {
-			return fmt.Errorf("invalid config name: %q", name)
-		}
-
-		resp, err := cli.ConfigGet(cmd.Context(), projectName, name, provider)
+		resp, err := cli.ConfigGet(cmd.Context(), projectName, args, provider)
 		if err != nil {
 			return err
 		}
 
-		if resp == nil || len(resp.Configs) == 0 {
-			println("Config", name, "not found")
-			return nil
+		for _, config := range resp.Configs {
+			if config.Type != defangv1.ConfigType_CONFIGTYPE_INSENSITIVE {
+				config.Value = "<sensitive value hidden>"
+			}
+
+			config.Name = config.Name[strings.LastIndex(config.Name, "/")+1:]
 		}
 
-		term.Printf("Config %q: %q\n", name, resp.Configs[0].Value)
+		term.Table(resp.Configs, "Name", "Value")
 		return nil
 	},
 }
@@ -802,15 +802,24 @@ var configSetCmd = &cobra.Command{
 			value = CreateRandomConfigValue()
 			term.Info("Generated random value: " + value)
 		} else {
-			// Prompt for sensitive value
-			var sensitivePrompt = &survey.Password{
-				Message: fmt.Sprintf("Enter value for %q:", name),
-				Help:    "The value will be stored securely and cannot be retrieved later.",
-			}
-
-			err := survey.AskOne(sensitivePrompt, &value, survey.WithStdio(term.DefaultTerm.Stdio()))
-			if err != nil {
-				return err
+			if insensitive {
+				var sensitivePrompt = &survey.Input{
+					Message: fmt.Sprintf("Enter value for %q:", name),
+					Help:    "The value will be stored securely.",
+				}
+				err := survey.AskOne(sensitivePrompt, &value, survey.WithStdio(term.DefaultTerm.Stdio()))
+				if err != nil {
+					return err
+				}
+			} else {
+				insensitivePrompt := &survey.Password{
+					Message: fmt.Sprintf("Enter value for %q:", name),
+					Help:    "The value will be stored securely and cannot be retrieved later.",
+				}
+				err := survey.AskOne(insensitivePrompt, &value, survey.WithStdio(term.DefaultTerm.Stdio()))
+				if err != nil {
+					return err
+				}
 			}
 		}
 
