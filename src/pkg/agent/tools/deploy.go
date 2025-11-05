@@ -45,7 +45,7 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, provi
 
 	term.Debug("Function invoked: cli.ComposeUp")
 	// Use ComposeUp to deploy the services
-	deployResp, project, err := cli.ComposeUp(ctx, project, client, provider, compose.UploadModeDigest, modes.ModeAffordable)
+	deployResp, _, err := cli.ComposeUp(ctx, project, client, provider, compose.UploadModeDigest, modes.ModeAffordable)
 	if err != nil {
 		err = fmt.Errorf("failed to compose up services: %w", err)
 
