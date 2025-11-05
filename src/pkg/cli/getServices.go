@@ -39,6 +39,10 @@ func GetServices(ctx context.Context, projectName string, provider client.Provid
 		return ErrNoServices{ProjectName: projectName}
 	}
 
+	return PrintServiceInfos(servicesResponse, long)
+}
+
+func PrintServiceInfos(servicesResponse *defangv1.GetServicesResponse, long bool) error {
 	if long {
 		// Truncate nanoseconds from timestamps for readability.
 		services := make([]*defangv1.ServiceInfo, 0, len(servicesResponse.Services))
@@ -52,14 +56,13 @@ func GetServices(ctx context.Context, projectName string, provider client.Provid
 		return PrintObject("", servicesResponse)
 	}
 
-	printServices := make([]printService, numServices)
+	printServices := make([]printService, len(servicesResponse.Services))
 	for i, si := range servicesResponse.Services {
 		printServices[i] = printService{
 			Service:     si.Service.Name,
 			Deployment:  si.Etag,
 			ServiceInfo: si,
 		}
-		servicesResponse.Services[i] = nil
 	}
 
 	return term.Table(printServices, "Service", "Deployment", "PublicFqdn", "PrivateFqdn", "Status")
