@@ -40,7 +40,7 @@ func (mockGetServicesHandler) GetServices(ctx context.Context, req *connect.Requ
 				Service: &defangv1.Service{
 					Name: "foo",
 				},
-				Endpoints:   []string{},
+				Endpoints:   []string{"test-foo--3000.prod1.defang.dev"},
 				Project:     "test",
 				Etag:        "a1b2c3",
 				Status:      "UNKNOWN",
@@ -85,8 +85,8 @@ func TestGetServices(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetServices() error = %v", err)
 		}
-		expectedOutput := "\x1b[1m\nSERVICE  DEPLOYMENT  PUBLICFQDN                 PRIVATEFQDN  STATUS\x1b[0m" + `
-foo      a1b2c3      test-foo.prod1.defang.dev               UNKNOWN
+		expectedOutput := "\x1b[1m\nSERVICE  DEPLOYMENT  STATE          FQDN                       STATUS\x1b[0m" + `
+foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  404 Not Found
 `
 
 		receivedLines := strings.Split(stdout.String(), "\n")
@@ -123,6 +123,8 @@ foo      a1b2c3      test-foo.prod1.defang.dev               UNKNOWN
 			"project: test\n" +
 			"services:\n" +
 			"    - createdAt: \"2021-09-01T12:34:56Z\"\n" +
+			"      endpoints:\n" +
+			"        - test-foo--3000.prod1.defang.dev\n" +
 			"      etag: a1b2c3\n" +
 			"      project: test\n" +
 			"      publicFqdn: test-foo.prod1.defang.dev\n" +
