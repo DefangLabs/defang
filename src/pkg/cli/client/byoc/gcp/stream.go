@@ -139,7 +139,7 @@ func (s *ServerStream[T]) queryHead(query string) {
 		s.errCh <- err
 		return
 	}
-	err = s.listToChannel(lister, 0)
+	err = s.listToChannel(lister)
 	if err != nil {
 		s.errCh <- err
 		return
@@ -153,7 +153,7 @@ func (s *ServerStream[T]) queryTail(query string, limit int32) {
 		return
 	}
 	if limit == 0 {
-		err = s.listToChannel(lister, 0)
+		err = s.listToChannel(lister)
 		if err != nil {
 			s.errCh <- err
 			return
@@ -183,18 +183,18 @@ func (s *ServerStream[T]) listToBuffer(lister *gcp.Lister, limit int32) ([]*T, e
 		if err != nil {
 			return nil, err
 		}
-		for _, resp := range resps {
-			buffer = append(buffer, resp)
-		}
+		buffer = append(buffer, resps...)
 		received += len(resps)
 	}
 	return buffer, nil
 }
 
-func (s *ServerStream[T]) listToChannel(lister *gcp.Lister, limit int32) error {
-	received := 0
+func (s *ServerStream[T]) listToChannel(lister *gcp.Lister) error {
 	for {
 		entry, err := lister.Next()
+		if errors.Is(err, io.EOF) {
+			return nil // query is done; proceed with tail
+		}
 		if err != nil {
 			return err
 		}
@@ -204,10 +204,6 @@ func (s *ServerStream[T]) listToChannel(lister *gcp.Lister, limit int32) error {
 		}
 		for _, resp := range resps {
 			s.respCh <- resp
-		}
-		received += len(resps)
-		if limit > 0 && received >= int(limit) {
-			return io.EOF
 		}
 	}
 }
