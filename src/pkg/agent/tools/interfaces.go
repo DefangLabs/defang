@@ -3,6 +3,7 @@ package tools
 
 import (
 	"context"
+	"time"
 
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -32,4 +33,5 @@ type CLIInterface interface {
 	PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string
 	RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error)
 	Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cliTypes.TailOptions) error
+	TailAndMonitor(ctx context.Context, project *compose.Project, provider cliClient.Provider, waitTimeout time.Duration, tailOptions cliTypes.TailOptions) (cliTypes.ServiceStates, error)
 }

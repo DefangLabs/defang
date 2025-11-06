@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -34,6 +35,10 @@ func (DefaultToolCLI) ConfigSet(ctx context.Context, projectName string, provide
 
 func (DefaultToolCLI) RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
 	return cli.RunEstimate(ctx, project, client, provider, providerId, region, mode)
+}
+
+func (DefaultToolCLI) TailAndMonitor(ctx context.Context, project *compose.Project, provider cliClient.Provider, waitTimeout time.Duration, tailOptions cli.TailOptions) (cli.ServiceStates, error) {
+	return cli.TailAndMonitor(ctx, project, provider, waitTimeout, tailOptions)
 }
 
 func (DefaultToolCLI) ListConfig(ctx context.Context, provider cliClient.Provider, projectName string) (*defangv1.Secrets, error) {

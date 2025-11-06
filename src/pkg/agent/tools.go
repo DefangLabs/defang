@@ -1,15 +1,12 @@
 package agent
 
 import (
-	"bytes"
 	"context"
-	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/agent/tools"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/firebase/genkit/go/ai"
 )
 
@@ -23,26 +20,6 @@ type ServicesParams struct {
 }
 type DeployParams struct {
 	common.LoaderParams
-}
-
-// create a new Term that captures output to a buffer while also printing it to stdout
-func captureTerm(f func() (string, error)) (string, error) {
-	// replace the default term with a new term that writes to a buffer
-	originalTerm := term.DefaultTerm
-	outStream := bytes.NewBuffer(nil)
-	errStream := bytes.NewBuffer(nil)
-	newTerm := term.NewTerm(
-		os.Stdin,
-		outStream,
-		errStream,
-	)
-	term.DefaultTerm = newTerm
-	defer func() {
-		term.DefaultTerm = originalTerm
-	}()
-	result, err := f()
-	output := outStream.String() + errStream.String()
-	return output + result, err
 }
 
 func CollectTools(cluster string, providerId *client.ProviderID) []ai.Tool {
@@ -65,7 +42,7 @@ func CollectTools(cluster string, providerId *client.ProviderID) []ai.Tool {
 					return "Failed to configure loader", err
 				}
 				var cli tools.CLIInterface = &tools.DefaultToolCLI{}
-				return captureTerm(func() (string, error) {
+				return tools.CaptureTerm(func() (string, error) {
 					return tools.HandleServicesTool(ctx.Context, loader, providerId, cluster, cli)
 				})
 			},
@@ -78,9 +55,8 @@ func CollectTools(cluster string, providerId *client.ProviderID) []ai.Tool {
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return captureTerm(func() (string, error) {
-					return tools.HandleDeployTool(ctx.Context, loader, providerId, cluster, cli)
-				})
+				// DO NOT wrap this in CaptureStdout, we have special handling for term output in deploy
+				return tools.HandleDeployTool(ctx.Context, loader, providerId, cluster, cli)
 			},
 		),
 		ai.NewTool("destroy",
@@ -91,7 +67,7 @@ func CollectTools(cluster string, providerId *client.ProviderID) []ai.Tool {
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return captureTerm(func() (string, error) {
+				return tools.CaptureTerm(func() (string, error) {
 					return tools.HandleDestroyTool(ctx.Context, loader, providerId, cluster, cli)
 				})
 			},
@@ -104,7 +80,7 @@ func CollectTools(cluster string, providerId *client.ProviderID) []ai.Tool {
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return captureTerm(func() (string, error) {
+				return tools.CaptureTerm(func() (string, error) {
 					return tools.HandleLogsTool(ctx.Context, loader, params, cluster, providerId, cli)
 				})
 			},
@@ -117,7 +93,7 @@ func CollectTools(cluster string, providerId *client.ProviderID) []ai.Tool {
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return captureTerm(func() (string, error) {
+				return tools.CaptureTerm(func() (string, error) {
 					return tools.HandleEstimateTool(ctx.Context, loader, params, cluster, cli)
 				})
 			},
@@ -130,7 +106,7 @@ func CollectTools(cluster string, providerId *client.ProviderID) []ai.Tool {
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return captureTerm(func() (string, error) {
+				return tools.CaptureTerm(func() (string, error) {
 					return tools.HandleSetConfig(ctx.Context, loader, params, providerId, cluster, cli)
 				})
 			},
@@ -143,7 +119,7 @@ func CollectTools(cluster string, providerId *client.ProviderID) []ai.Tool {
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return captureTerm(func() (string, error) {
+				return tools.CaptureTerm(func() (string, error) {
 					return tools.HandleRemoveConfigTool(ctx.Context, loader, params, providerId, cluster, cli)
 				})
 			},
@@ -156,7 +132,7 @@ func CollectTools(cluster string, providerId *client.ProviderID) []ai.Tool {
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return captureTerm(func() (string, error) {
+				return tools.CaptureTerm(func() (string, error) {
 					return tools.HandleListConfigTool(ctx.Context, loader, providerId, cluster, cli)
 				})
 			},

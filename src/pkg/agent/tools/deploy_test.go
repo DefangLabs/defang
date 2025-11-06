@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
+	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/modes"
@@ -33,6 +35,7 @@ type MockDeployCLI struct {
 	CheckProviderConfiguredError error
 	LoadProjectError             error
 	OpenBrowserError             error
+	TailAndMonitorError          error
 	ComposeUpResponse            *defangv1.DeployResponse
 	Project                      *compose.Project
 	CallLog                      []string
@@ -76,6 +79,14 @@ func (m *MockDeployCLI) LoadProject(ctx context.Context, loader client.Loader) (
 func (m *MockDeployCLI) OpenBrowser(url string) error {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("OpenBrowser(%s)", url))
 	return m.OpenBrowserError
+}
+
+func (m *MockDeployCLI) TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, tailOptions cliTypes.TailOptions) (cliTypes.ServiceStates, error) {
+	m.CallLog = append(m.CallLog, "TailAndMonitor")
+	if m.TailAndMonitorError != nil {
+		return nil, m.TailAndMonitorError
+	}
+	return nil, nil
 }
 
 func TestHandleDeployTool(t *testing.T) {
