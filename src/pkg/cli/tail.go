@@ -310,16 +310,16 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 		}
 	}
 
-	return receiveLogs(ctx, provider, projectName, tailRequest, serverStream, options, doSpinner, handler)
+	return receiveLogs(ctx, provider, projectName, tailRequest, serverStream, &options, doSpinner, handler)
 }
 
-func receiveLogs(ctx context.Context, provider client.Provider, projectName string, tailRequest *defangv1.TailRequest, serverStream client.ServerStream[defangv1.TailResponse], options TailOptions, doSpinner bool, handler LogEntryHandler) error {
+func receiveLogs(ctx context.Context, provider client.Provider, projectName string, tailRequest *defangv1.TailRequest, serverStream client.ServerStream[defangv1.TailResponse], options *TailOptions, doSpinner bool, handler LogEntryHandler) error {
 	skipDuplicate := false
 	var err error
 	for {
 		if !serverStream.Receive() {
 			if errors.Is(serverStream.Err(), context.Canceled) || errors.Is(serverStream.Err(), context.DeadlineExceeded) {
-				return &CancelError{TailOptions: options, error: serverStream.Err(), ProjectName: projectName}
+				return &CancelError{TailOptions: *options, error: serverStream.Err(), ProjectName: projectName}
 			}
 			if errors.Is(serverStream.Err(), io.EOF) {
 				return serverStream.Err()
@@ -362,7 +362,7 @@ func receiveLogs(ctx context.Context, provider client.Provider, projectName stri
 	}
 }
 
-func handleLogEntryMsgs(msg *defangv1.TailResponse, doSpinner bool, skipDuplicate bool, options TailOptions, handler LogEntryHandler) error {
+func handleLogEntryMsgs(msg *defangv1.TailResponse, doSpinner bool, skipDuplicate bool, options *TailOptions, handler LogEntryHandler) error {
 	for _, e := range msg.Entries {
 		// Replace service progress messages with our own spinner
 		if doSpinner && isProgressDot(e.Message) {
@@ -382,7 +382,7 @@ func handleLogEntryMsgs(msg *defangv1.TailResponse, doSpinner bool, skipDuplicat
 			options.Since = ts
 		}
 
-		err := handler(e, &options, term.DefaultTerm)
+		err := handler(e, options, term.DefaultTerm)
 		if err != nil {
 			term.Debug("Ending tail loop", err)
 			return err
