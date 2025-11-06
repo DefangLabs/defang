@@ -658,6 +658,11 @@ var configGetCmd = &cobra.Command{
 			return err
 		}
 
+		_, isPlayground := provider.(*cliClient.PlaygroundProvider)
+		if isPlayground {
+			return errors.New("insensitive configs are not supported in playground")
+		}
+
 		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 		if err != nil {
 			return err
@@ -682,7 +687,11 @@ var configGetCmd = &cobra.Command{
 			config.Name = config.Name[strings.LastIndex(config.Name, "/")+1:]
 		}
 
-		term.Table(resp.Configs, "Name", "Value")
+		if len(resp.Configs) == 0 {
+			term.Info("No configs found")
+		} else {
+			term.Table(resp.Configs, "Name", "Value")
+		}
 		return nil
 	},
 }
@@ -704,6 +713,11 @@ var configSetCmd = &cobra.Command{
 		provider, err := newProviderChecked(cmd.Context(), loader)
 		if err != nil {
 			return err
+		}
+
+		_, isPlayground := provider.(*cliClient.PlaygroundProvider)
+		if insensitive && isPlayground {
+			return errors.New("insensitive configs are not supported in playground")
 		}
 
 		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)

@@ -376,13 +376,18 @@ func (b *ByocDo) GetConfigs(ctx context.Context, config *defangv1.GetConfigsRequ
 		for _, env := range app.Spec.Envs {
 			if env.Key == config.Name {
 				switch env.Type {
-				case godo.AppVariableType_General:
+				case godo.AppVariableType_Secret:
 					resp.Configs = append(resp.Configs, &defangv1.Config{
 						Name:  env.Key,
 						Value: env.Value,
+						Type:  defangv1.ConfigType_CONFIGTYPE_SENSITIVE,
 					})
-				case godo.AppVariableType_Secret:
-					return nil, fmt.Errorf("failed to get secret %q", env.Key)
+				default:
+					resp.Configs = append(resp.Configs, &defangv1.Config{
+						Name:  env.Key,
+						Value: env.Value,
+						Type:  defangv1.ConfigType_CONFIGTYPE_INSENSITIVE,
+					})
 				}
 			}
 		}
