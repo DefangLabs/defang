@@ -3,6 +3,9 @@ package cli
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -33,12 +36,17 @@ func GetServices(ctx context.Context, projectName string, provider client.Provid
 		return err
 	}
 
-	numServices := len(servicesResponse.Services)
-
-	if numServices == 0 {
+	if len(servicesResponse.Services) == 0 {
 		return ErrNoServices{ProjectName: projectName}
 	}
 
+	term.Info("Checking service health...")
+	UpdateServiceStates(ctx, servicesResponse.Services)
+
+	return PrintServiceInfos(servicesResponse, long)
+}
+
+func PrintServiceInfos(servicesResponse *defangv1.GetServicesResponse, long bool) error {
 	if long {
 		// Truncate nanoseconds from timestamps for readability.
 		services := make([]*defangv1.ServiceInfo, 0, len(servicesResponse.Services))
@@ -52,7 +60,7 @@ func GetServices(ctx context.Context, projectName string, provider client.Provid
 		return PrintObject("", servicesResponse)
 	}
 
-	printServices := make([]printService, numServices)
+	printServices := make([]printService, len(servicesResponse.Services))
 	for i, si := range servicesResponse.Services {
 		printServices[i] = printService{
 			Service:     si.Service.Name,
@@ -62,5 +70,44 @@ func GetServices(ctx context.Context, projectName string, provider client.Provid
 		servicesResponse.Services[i] = nil
 	}
 
-	return term.Table(printServices, "Service", "Deployment", "PublicFqdn", "PrivateFqdn", "Status")
+	return term.Table(printServices, "Service", "Deployment", "PublicFqdn", "PrivateFqdn", "State")
+}
+
+func UpdateServiceStates(ctx context.Context, serviceInfos []*defangv1.ServiceInfo) {
+	// Create a context with a timeout for HTTP requests
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	var wg sync.WaitGroup
+
+	for _, serviceInfo := range serviceInfos {
+		for _, endpoint := range serviceInfo.Endpoints {
+			if !strings.Contains(endpoint, ":") {
+				wg.Add(1)
+				go func(serviceInfo *defangv1.ServiceInfo) {
+					defer wg.Done()
+					url := "https://" + endpoint + serviceInfo.HealthcheckPath
+					// Use the regular net/http package to make the request without retries
+					req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+					if err != nil {
+						term.Errorf("Failed to create healthcheck request for %q at %s: %s", serviceInfo.Service.Name, url, err.Error())
+						return
+					}
+					term.Debugf("[%s] checking health at %s", serviceInfo.Service.Name, url)
+					resp, err := http.DefaultClient.Do(req)
+					if err != nil {
+						term.Errorf("Healthcheck failed for %q at %s: %s", serviceInfo.Service.Name, url, err.Error())
+						return
+					}
+					defer resp.Body.Close()
+					if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+						serviceInfo.State = defangv1.ServiceState_DEPLOYMENT_COMPLETED
+						term.Debugf("[%s] ✔ healthy", serviceInfo.Service.Name)
+					} else {
+						term.Debugf("[%s] ✘ unhealthy (%s)", serviceInfo.Service.Name, resp.Status)
+					}
+				}(serviceInfo)
+			}
+		}
+	}
+	wg.Wait()
 }

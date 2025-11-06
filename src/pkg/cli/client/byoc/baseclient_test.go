@@ -82,7 +82,8 @@ var expectedServiceInfosJson = `[
     "etag": "test-etag",
     "status": "UPDATE_QUEUED",
     "zone_id": "test-zone-id",
-    "state": 7
+    "state": 7,
+    "healthcheck_path": "/"
   },
   {
     "service": {
@@ -92,7 +93,8 @@ var expectedServiceInfosJson = `[
     "etag": "test-etag",
     "status": "UPDATE_QUEUED",
     "zone_id": "test-zone-id",
-    "state": 7
+    "state": 7,
+    "healthcheck_path": "/"
   },
   {
     "service": {
@@ -102,7 +104,8 @@ var expectedServiceInfosJson = `[
     "etag": "test-etag",
     "status": "UPDATE_QUEUED",
     "zone_id": "test-zone-id",
-    "state": 7
+    "state": 7,
+    "healthcheck_path": "/"
   }
 ]`
 
