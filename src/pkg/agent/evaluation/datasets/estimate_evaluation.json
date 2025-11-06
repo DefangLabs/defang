@@ -1,0 +1,32 @@
+[
+  {
+    "input": {
+      "message": "Estimate the cost of my deployment",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*estimate.*\\]"
+  },
+  {
+    "input": {
+      "message": "How much will this cost on AWS?",
+      "setup": {
+        "working_directory": "./",
+        "provider": "aws"
+      }
+    },
+    "reference": "Tools\\[.*estimate.*\\]"
+  },
+  {
+    "input": {
+      "message": "What's the pricing for my application?",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*estimate.*\\]"
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "input": {
+      "message": "Set up AWS as my provider",
+      "setup": {
+        "working_directory": "./",
+        "provider": "aws"
+      }
+    },
+    "reference": "Tools\\[.*set_aws_provider.*\\]"
+  },
+  {
+    "input": {
+      "message": "Configure Google Cloud Platform",
+      "setup": {
+        "working_directory": "./",
+        "provider": "gcp"
+      }
+    },
+    "reference": "Tools\\[.*set_gcp_provider.*\\]"
+  },
+  {
+    "input": {
+      "message": "Use the playground environment",
+      "setup": {
+        "working_directory": "./",
+        "provider": "playground"
+      }
+    },
+    "reference": "Tools\\[.*set_playground_provider.*\\]"
+  }
+]

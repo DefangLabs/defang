@@ -1,0 +1,222 @@
+{
+  "Configure Google Cloud Platform": {
+    "TotalTests": 2,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "Delete my application from the cloud": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "Deploy my app and show me the logs": {
+    "TotalTests": 1,
+    "Passed": 1,
+    "PassRate": "100.00%"
+  },
+  "Deploy my application": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "Deploy my application but I'm not logged in": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "Deploy my application to the cloud": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "Deploy without a valid compose file": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "Destroy my deployment": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "Estimate the cost of my deployment": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "How do I authenticate with the system?": {
+    "TotalTests": 1,
+    "Passed": 1,
+    "PassRate": "100.00%"
+  },
+  "How much will it cost to deploy this project?": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "How much will this cost on AWS?": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "I need to login to Defang": {
+    "TotalTests": 1,
+    "Passed": 1,
+    "PassRate": "100.00%"
+  },
+  "I need to see the logs from my application": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "I need to see the recent logs": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "I want to deploy to AWS": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "I want to deploy to GCP": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "I want to login to my account": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "Launch my docker-compose application": {
+    "TotalTests": 1,
+    "Passed": 1,
+    "PassRate": "100.00%"
+  },
+  "List all my applications": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "Remove a config that doesn't exist": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "Remove everything I've deployed": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "Remove the API_KEY configuration": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "Remove the DATABASE_URL config": {
+    "TotalTests": 1,
+    "Passed": 1,
+    "PassRate": "100.00%"
+  },
+  "Set DATABASE_URL environment variable": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "Set a config variable API_KEY to my-secret": {
+    "TotalTests": 1,
+    "Passed": 1,
+    "PassRate": "100.00%"
+  },
+  "Set an invalid configuration value": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "Set up AWS as my cloud provider": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "Set up AWS as my provider": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "Set up my environment and deploy": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "Show me all configuration variables": {
+    "TotalTests": 1,
+    "Passed": 1,
+    "PassRate": "100.00%"
+  },
+  "Show me all my running services": {
+    "TotalTests": 1,
+    "Passed": 1,
+    "PassRate": "100.00%"
+  },
+  "Show me my deployed services": {
+    "TotalTests": 1,
+    "Passed": 1,
+    "PassRate": "100.00%"
+  },
+  "Show me the logs": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "Show services for a non-existent project": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "Sign me in please": {
+    "TotalTests": 1,
+    "Passed": 1,
+    "PassRate": "100.00%"
+  },
+  "Start my services in the cloud": {
+    "TotalTests": 1,
+    "Passed": 1,
+    "PassRate": "100.00%"
+  },
+  "Take down all my services": {
+    "TotalTests": 1,
+    "Passed": 1,
+    "PassRate": "100.00%"
+  },
+  "Use the playground environment": {
+    "TotalTests": 1,
+    "Passed": 1,
+    "PassRate": "100.00%"
+  },
+  "Use the playground environment for testing": {
+    "TotalTests": 1,
+    "Passed": 1,
+    "PassRate": "100.00%"
+  },
+  "What configuration variables do I have?": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "What services are running?": {
+    "TotalTests": 1,
+    "Passed": 1,
+    "PassRate": "100.00%"
+  },
+  "What's the cost to deploy this to AWS?": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  },
+  "What's the pricing for my application?": {
+    "TotalTests": 1,
+    "Passed": 0,
+    "PassRate": "0.00%"
+  }
+}
