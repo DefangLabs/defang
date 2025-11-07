@@ -544,10 +544,15 @@ func (b *ByocAws) getSecretID(projectName, name string) string {
 func (b *ByocAws) GetConfigs(ctx context.Context, secret *defangv1.GetConfigsRequest) (*defangv1.GetConfigsResponse, error) {
 	resp := &defangv1.GetConfigsResponse{}
 
-	// gather unique project names from the requested configs
+	// gather unique project names to config name
 	projects := make(map[string]struct{})
+	projectConfigs := make(map[string]struct{})
+
 	for _, config := range secret.Configs {
-		projects[config.Project] = struct{}{}
+		if _, found := projects[config.Project]; !found {
+			projects[config.Project] = struct{}{}
+		}
+		projectConfigs[b.getSecretID(config.Project, config.Name)] = struct{}{}
 	}
 
 	for project := range projects {
@@ -556,16 +561,18 @@ func (b *ByocAws) GetConfigs(ctx context.Context, secret *defangv1.GetConfigsReq
 		params, _ := b.driver.GetSecret(ctx, fqn)
 
 		for _, param := range params {
-			configType := defangv1.ConfigType_CONFIGTYPE_SENSITIVE
-			if param.Type == ssmTypes.ParameterTypeString {
-				configType = defangv1.ConfigType_CONFIGTYPE_INSENSITIVE
+			if _, found := projectConfigs[*param.Name]; found {
+				configType := defangv1.ConfigType_CONFIGTYPE_SENSITIVE
+				if param.Type == ssmTypes.ParameterTypeString {
+					configType = defangv1.ConfigType_CONFIGTYPE_INSENSITIVE
+				}
+				resp.Configs = append(resp.Configs, &defangv1.Config{
+					Project: project,
+					Name:    *param.Name,
+					Value:   *param.Value,
+					Type:    configType,
+				})
 			}
-			resp.Configs = append(resp.Configs, &defangv1.Config{
-				Project: project,
-				Name:    *param.Name,
-				Value:   *param.Value,
-				Type:    configType,
-			})
 		}
 	}
 	return resp, nil
