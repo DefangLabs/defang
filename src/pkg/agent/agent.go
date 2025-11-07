@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"regexp"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
@@ -32,6 +33,8 @@ current working directory (or ".") unless otherwise specified by the user.
 Some tools ask for a project_name. This is optional, but useful when working
 on a project that is not in the current working directory.
 `
+
+var whitespacePattern = regexp.MustCompile(`^\s*$`)
 
 type Agent struct {
 	ctx    context.Context
@@ -111,6 +114,11 @@ func (a *Agent) Start() error {
 
 		if input == "/exit" {
 			return nil
+		}
+
+		// if input is empty or all whitespace, continue
+		if whitespacePattern.MatchString(input) {
+			continue
 		}
 
 		if err := a.handleMessage(input); err != nil {
