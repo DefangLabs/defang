@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"regexp"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/agent/plugins/fabric"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cluster"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/core/api"
 	"github.com/firebase/genkit/go/genkit"
@@ -37,11 +35,12 @@ on a project that is not in the current working directory.
 var whitespacePattern = regexp.MustCompile(`^\s*$`)
 
 type Agent struct {
-	ctx    context.Context
-	g      *genkit.Genkit
-	msgs   []*ai.Message
-	prompt string
-	tools  []ai.ToolRef
+	ctx       context.Context
+	g         *genkit.Genkit
+	msgs      []*ai.Message
+	prompt    string
+	tools     []ai.ToolRef
+	outStream io.Writer
 }
 
 func New(ctx context.Context, addr string, providerId *client.ProviderID, prompt string) *Agent {
@@ -82,28 +81,37 @@ func New(ctx context.Context, addr string, providerId *client.ProviderID, prompt
 	}
 
 	return &Agent{
-		ctx:    ctx,
-		g:      g,
-		msgs:   []*ai.Message{},
-		prompt: prompt,
-		tools:  toolRefs,
+		ctx:       ctx,
+		g:         g,
+		msgs:      []*ai.Message{},
+		prompt:    prompt,
+		tools:     toolRefs,
+		outStream: os.Stdout,
 	}
+}
+
+func (a *Agent) Printf(format string, args ...interface{}) {
+	fmt.Fprintf(a.outStream, format, args...)
+}
+
+func (a *Agent) Println(args ...interface{}) {
+	fmt.Fprintln(a.outStream, args...)
 }
 
 func (a *Agent) Start() error {
 	reader := NewInputReader()
 	defer reader.Close()
 
-	term.Println("\nWelcome to Defang. I can help you deploy your project to the cloud.")
-	term.Println("Type '/exit' to quit.")
+	a.Printf("\nWelcome to Defang. I can help you deploy your project to the cloud.\n")
+	a.Printf("Type '/exit' to quit.\n")
 
 	for {
-		term.Print("> ")
+		a.Printf("> ")
 
 		input, err := reader.ReadLine()
 		if err != nil {
 			if errors.Is(err, ErrInterrupted) {
-				term.Println("\nReceived termination signal, shutting down...")
+				a.Printf("\nReceived termination signal, shutting down...\n")
 				return nil
 			}
 			if errors.Is(err, io.EOF) {
@@ -122,7 +130,7 @@ func (a *Agent) Start() error {
 		}
 
 		if err := a.handleMessage(input); err != nil {
-			log.Printf("Error handling message: %v", err)
+			a.Printf("Error handling message: %v", err)
 		}
 	}
 }
@@ -132,7 +140,7 @@ func (a *Agent) handleToolRequest(req *ai.ToolRequest) (*ai.ToolResponse, error)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling tool request input: %w", err)
 	}
-	term.Printf("* %s(%s)\n", req.Name, inputs)
+	a.Printf("* %s(%s)\n", req.Name, inputs)
 	tool := genkit.LookupTool(a.g, req.Name)
 	if tool == nil {
 		return nil, fmt.Errorf("tool %q not found", req.Name)
@@ -168,7 +176,7 @@ func (a *Agent) handleToolCalls(requests []*ai.ToolRequest) ([]*ai.Message, erro
 		if err != nil {
 			return nil, fmt.Errorf("tool request error: %w", err)
 		}
-		_, _ = term.Printf("  > %s\n", toolResp.Output)
+		a.Printf("  > %s\n", toolResp.Output)
 		parts = append(parts, ai.NewToolResponsePart(toolResp))
 	}
 
@@ -182,7 +190,7 @@ func (a *Agent) handleToolCalls(requests []*ai.ToolRequest) ([]*ai.Message, erro
 	if err != nil {
 		return nil, fmt.Errorf("generation error: %w", err)
 	}
-	term.Println("")
+	a.Println("")
 	responses = append(responses, resp.Message)
 	a.msgs = responses
 	return responses, nil
@@ -190,7 +198,7 @@ func (a *Agent) handleToolCalls(requests []*ai.ToolRequest) ([]*ai.Message, erro
 
 func (a *Agent) streamingCallback(ctx context.Context, chunk *ai.ModelResponseChunk) error {
 	for _, part := range chunk.Content {
-		term.Print(part.Text)
+		a.Printf("%s", part.Text)
 	}
 	return nil
 }
@@ -204,7 +212,7 @@ func (a *Agent) handleMessage(msg string) error {
 	}
 	prompt := fmt.Sprintf("%s\n\nThe current working directory is %q", DefaultSystemPrompt, cwd)
 
-	term.Print("* Thinking...\r* ")
+	a.Printf("* Thinking...\r* ")
 
 	resp, err := genkit.Generate(a.ctx, a.g,
 		ai.WithPrompt(prompt),
@@ -213,16 +221,16 @@ func (a *Agent) handleMessage(msg string) error {
 		ai.WithReturnToolRequests(true),
 		ai.WithStreaming(a.streamingCallback),
 	)
-	term.Print("\n")
+	a.Println("")
 	if err != nil {
 		return fmt.Errorf("generation error: %w", err)
 	}
 
 	a.msgs = append(a.msgs, resp.Message)
 	for _, part := range resp.Message.Content {
-		term.Print(part.Text)
+		a.Printf("%s", part.Text)
 	}
-	term.Println("")
+	a.Println("")
 
 	if len(resp.ToolRequests()) > 0 {
 		_, err := a.handleToolCalls(resp.ToolRequests())
