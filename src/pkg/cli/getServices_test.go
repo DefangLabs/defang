@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -72,9 +71,8 @@ func TestGetServices(t *testing.T) {
 
 	t.Run("no services", func(t *testing.T) {
 		err := GetServices(ctx, "empty", &provider, false)
-		var expectedError ErrNoServices
-		if !errors.As(err, &expectedError) {
-			t.Fatalf("expected GetServices() error to be of type ErrNoServices, got: %v", err)
+		if err != nil {
+			t.Fatalf("expected GetServices() to return no error, got: %v", err)
 		}
 	})
 
@@ -85,8 +83,8 @@ func TestGetServices(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetServices() error = %v", err)
 		}
-		expectedOutput := "\x1b[1m\nSERVICE  DEPLOYMENT  PUBLICFQDN                 PRIVATEFQDN  STATUS\x1b[0m" + `
-foo      a1b2c3      test-foo.prod1.defang.dev               UNKNOWN
+		expectedOutput := "\x1b[95m * Checking service health...\n\x1b[0m\x1b[1m\nSERVICE  DEPLOYMENT  PUBLICFQDN                 PRIVATEFQDN  STATE\x1b[0m" + `
+foo      a1b2c3      test-foo.prod1.defang.dev               NOT_SPECIFIED
 `
 
 		receivedLines := strings.Split(stdout.String(), "\n")
@@ -106,9 +104,8 @@ foo      a1b2c3      test-foo.prod1.defang.dev               UNKNOWN
 
 	t.Run("no services long", func(t *testing.T) {
 		err := GetServices(ctx, "empty", &provider, false)
-		var expectedError ErrNoServices
-		if !errors.As(err, &expectedError) {
-			t.Fatalf("expected GetServices() error to be of type ErrNoServices, got: %v", err)
+		if err != nil {
+			t.Fatalf("expected GetServices() to return no error, got: %v", err)
 		}
 	})
 
@@ -119,7 +116,7 @@ foo      a1b2c3      test-foo.prod1.defang.dev               UNKNOWN
 		if err != nil {
 			t.Fatalf("GetServices() error = %v", err)
 		}
-		expectedOutput := "expiresAt: \"2021-09-02T12:34:56Z\"\n" +
+		expectedOutput := "\x1b[95m * Checking service health...\n\x1b[0mexpiresAt: \"2021-09-02T12:34:56Z\"\n" +
 			"project: test\n" +
 			"services:\n" +
 			"    - createdAt: \"2021-09-01T12:34:56Z\"\n" +
