@@ -6,11 +6,11 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/login"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"

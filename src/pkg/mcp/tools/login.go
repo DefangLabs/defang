@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/auth"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 

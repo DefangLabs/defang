@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/mcp"
 )

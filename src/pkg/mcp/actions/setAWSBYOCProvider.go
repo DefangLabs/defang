@@ -5,9 +5,9 @@ import (
 	"errors"
 	"os"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 )
 
 func SetAWSByocProvider(ctx context.Context, providerId *client.ProviderID, cluster string, accessKeyId string, secretKey string, region string) error {
