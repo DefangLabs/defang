@@ -50,7 +50,6 @@ type Provider interface {
 	DeleteConfig(context.Context, *defangv1.Secrets) error
 	Deploy(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
 	Destroy(context.Context, *defangv1.DestroyRequest) (types.ETag, error)
-	GetConfigs(context.Context, *defangv1.GetConfigsRequest) (*defangv1.GetConfigsResponse, error)
 	GetDeploymentStatus(context.Context) error // nil means deployment is pending/running; io.EOF means deployment is done
 	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 	GetService(context.Context, *defangv1.GetRequest) (*defangv1.ServiceInfo, error)

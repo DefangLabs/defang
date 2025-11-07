@@ -24,7 +24,6 @@ type MockSetConfigCLI struct {
 	ReturnedGrpcClient    *client.GrpcClient
 	ReturnedProvider      client.Provider
 	ReturnedProjectName   string
-	ConfigSetIsSecret     bool
 	ConfigSetProjectName  string
 	ConfigSetProvider     client.Provider
 	ConfigSetName         string
@@ -73,9 +72,8 @@ func (m *MockSetConfigCLI) LoadProjectNameWithFallback(ctx context.Context, load
 	return "mock-project", nil
 }
 
-func (m *MockSetConfigCLI) ConfigSet(ctx context.Context, isSecret bool, projectName string, provider client.Provider, name, value string) error {
+func (m *MockSetConfigCLI) ConfigSet(ctx context.Context, projectName string, provider client.Provider, name, value string) error {
 	m.ConfigSetCalled = true
-	m.ConfigSetIsSecret = isSecret
 	m.ConfigSetProjectName = projectName
 	m.ConfigSetProvider = provider
 	m.ConfigSetName = name
