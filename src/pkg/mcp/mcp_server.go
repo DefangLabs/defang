@@ -55,32 +55,13 @@ func NewDefangMCPServer(version string, cluster string, providerID *cliClient.Pr
 	}
 
 	defangTools := tools.CollectTools(cluster, providerID)
-	var s *server.MCPServer
-	s = server.NewMCPServer(
+	s := server.NewMCPServer(
 		"Deploy with Defang",
 		version,
 		server.WithResourceCapabilities(true, true),
 		server.WithPromptCapabilities(true),
 		server.WithToolCapabilities(true),
 		server.WithInstructions(prepareInstructions(defangTools)),
-		server.WithHooks(&server.Hooks{
-			OnAfterInitialize: []server.OnAfterInitializeFunc{
-				func(ctx context.Context, id any, message *mcp.InitializeRequest, result *mcp.InitializeResult) {
-					term.Info("MCP Session initialized for client: " + string(client))
-					if s != nil {
-						term.Info("Sending MCP server notification to client")
-						params := map[string]any{
-							"level": "info",
-							"data":  "Processing started",
-						}
-						err := s.SendNotificationToClient(ctx, "notifications/message", params)
-						if err != nil {
-							term.Warnf("Failed to send MCP server ready notification to client: %v", err)
-						}
-					}
-				},
-			},
-		}),
 	)
 
 	resources.SetupResources(s)
