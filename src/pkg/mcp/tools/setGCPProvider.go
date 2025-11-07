@@ -9,8 +9,8 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-// handleSetGCPProvider handles the set GCP provider MCP tool request
-func handleSetGCPProvider(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string) (string, error) {
+// HandleSetGCPProvider handles the set GCP provider MCP tool request
+func HandleSetGCPProvider(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string) (string, error) {
 	gcpProjectID, err := request.RequireString("gcpProjectId")
 	if err != nil {
 		return "", fmt.Errorf("Invalid GCP project ID: %w", err)
