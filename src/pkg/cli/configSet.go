@@ -9,7 +9,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func ConfigSet(ctx context.Context, insensitive bool, projectName string, provider client.Provider, name string, value string) error {
+func ConfigSet(ctx context.Context, isSecret bool, projectName string, provider client.Provider, name string, value string) error {
 	term.Debugf("Setting config %q in project %q", name, projectName)
 
 	if dryrun.DoDryRun {
@@ -17,7 +17,7 @@ func ConfigSet(ctx context.Context, insensitive bool, projectName string, provid
 	}
 
 	req := defangv1.PutConfigRequest{Project: projectName, Name: name, Value: value}
-	if insensitive {
+	if !isSecret {
 		req.Type = defangv1.ConfigType_CONFIGTYPE_INSENSITIVE
 	}
 

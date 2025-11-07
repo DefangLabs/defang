@@ -227,7 +227,7 @@ func SetupCommands(ctx context.Context, version string) {
 	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
 	configSetCmd.Flags().BoolP("env", "e", false, "set the config from an environment variable")
 	configSetCmd.Flags().Bool("random", false, "set a secure randomly generated value for config")
-	configSetCmd.Flags().Bool("insensitive", false, "set an insensitive config")
+	configSetCmd.Flags().Bool("secret", true, "set a secret config")
 	configSetCmd.Flags().String("env-file", "", "load config values from an .env file")
 	_ = configSetCmd.Flags().MarkHidden("name")
 
@@ -648,7 +648,7 @@ var configGetCmd = &cobra.Command{
 	Annotations: authNeededAnnotation,
 	Args:        cobra.ArbitraryArgs,
 	Aliases:     []string{"show"},
-	Short:       "Gets an insensitive config value",
+	Short:       "Show config value",
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		// Make sure we have a project to set config for before asking for a value
@@ -660,7 +660,7 @@ var configGetCmd = &cobra.Command{
 
 		_, isPlayground := provider.(*cliClient.PlaygroundProvider)
 		if isPlayground {
-			return errors.New("insensitive configs are not supported in playground")
+			return errors.New("non-secret configs are not supported in playground")
 		}
 
 		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
@@ -681,7 +681,7 @@ var configGetCmd = &cobra.Command{
 
 		for _, config := range resp.Configs {
 			if config.Type != defangv1.ConfigType_CONFIGTYPE_INSENSITIVE {
-				config.Value = "<sensitive value hidden>"
+				config.Value = "<value hidden>"
 			}
 
 			config.Name = config.Name[strings.LastIndex(config.Name, "/")+1:]
@@ -701,11 +701,11 @@ var configSetCmd = &cobra.Command{
 	Annotations: authNeededAnnotation,
 	Args:        cobra.RangeArgs(0, 2), // Allow 0 args when using --env-file
 	Aliases:     []string{"set", "add", "put"},
-	Short:       "Adds or updates a sensitive config value",
+	Short:       "Adds or updates a config value",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fromEnv, _ := cmd.Flags().GetBool("env")
 		random, _ := cmd.Flags().GetBool("random")
-		insensitive, _ := cmd.Flags().GetBool("insensitive")
+		isSecret, _ := cmd.Flags().GetBool("secret") // intentional typo for backwards compat
 		envFile, _ := cmd.Flags().GetString("env-file")
 
 		// Make sure we have a project to set config for before asking for a value
@@ -716,8 +716,8 @@ var configSetCmd = &cobra.Command{
 		}
 
 		_, isPlayground := provider.(*cliClient.PlaygroundProvider)
-		if insensitive && isPlayground {
-			return errors.New("insensitive configs are not supported in playground")
+		if !isSecret && isPlayground {
+			return errors.New("non-secret configs are not supported in playground")
 		}
 
 		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
@@ -751,7 +751,7 @@ var configSetCmd = &cobra.Command{
 					continue
 				}
 
-				if err := cli.ConfigSet(cmd.Context(), insensitive, projectName, provider, name, value); err != nil {
+				if err := cli.ConfigSet(cmd.Context(), isSecret, projectName, provider, name, value); err != nil {
 					term.Warnf("Failed to set %q: %v", name, err)
 				} else {
 					term.Info("Updated value for", name)
@@ -816,28 +816,28 @@ var configSetCmd = &cobra.Command{
 			value = CreateRandomConfigValue()
 			term.Info("Generated random value: " + value)
 		} else {
-			if insensitive {
-				var sensitivePrompt = &survey.Input{
+			if isSecret {
+				secretPrompt := &survey.Password{
 					Message: fmt.Sprintf("Enter value for %q:", name),
-					Help:    "The value will be stored securely.",
+					Help:    "The value will be stored securely and cannot be retrieved later.",
 				}
-				err := survey.AskOne(sensitivePrompt, &value, survey.WithStdio(term.DefaultTerm.Stdio()))
+				err := survey.AskOne(secretPrompt, &value, survey.WithStdio(term.DefaultTerm.Stdio()))
 				if err != nil {
 					return err
 				}
 			} else {
-				insensitivePrompt := &survey.Password{
+				var nonSecretPrompt = &survey.Input{
 					Message: fmt.Sprintf("Enter value for %q:", name),
-					Help:    "The value will be stored securely and cannot be retrieved later.",
+					Help:    "The value will be stored securely.",
 				}
-				err := survey.AskOne(insensitivePrompt, &value, survey.WithStdio(term.DefaultTerm.Stdio()))
+				err := survey.AskOne(nonSecretPrompt, &value, survey.WithStdio(term.DefaultTerm.Stdio()))
 				if err != nil {
 					return err
 				}
 			}
 		}
 
-		if err := cli.ConfigSet(cmd.Context(), insensitive, projectName, provider, name, value); err != nil {
+		if err := cli.ConfigSet(cmd.Context(), isSecret, projectName, provider, name, value); err != nil {
 			return err
 		}
 		term.Info("Updated value for", name)

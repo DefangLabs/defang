@@ -24,7 +24,7 @@ func TestConfigSet(t *testing.T) {
 	t.Run("expect error on DryRun", func(t *testing.T) {
 		dryrun.DoDryRun = true
 		t.Cleanup(func() { dryrun.DoDryRun = false })
-		err := ConfigSet(ctx, false, "test", provider, "test_name", "test_value")
+		err := ConfigSet(ctx, true, "test", provider, "test_name", "test_value")
 		if err != dryrun.ErrDryRun {
 			t.Fatalf("Expected dryrun.ErrDryRun, got %v", err)
 		}

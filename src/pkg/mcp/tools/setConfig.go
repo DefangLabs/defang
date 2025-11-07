@@ -12,13 +12,13 @@ import (
 )
 
 type SetConfigParams struct {
-	Insensitive bool
-	Name        string
-	Value       string
+	Secret bool
+	Name   string
+	Value  string
 }
 
 func parseSetConfigParams(request mcp.CallToolRequest) (SetConfigParams, error) {
-	insensitive := request.GetBool("insensitive", false)
+	secret := request.GetBool("secret", true)
 
 	name, err := request.RequireString("name")
 	if err != nil || name == "" {
@@ -29,9 +29,9 @@ func parseSetConfigParams(request mcp.CallToolRequest) (SetConfigParams, error) 
 		return SetConfigParams{}, fmt.Errorf("missing 'value' parameter: %w", err)
 	}
 	return SetConfigParams{
-		Insensitive: insensitive,
-		Name:        name,
-		Value:       value,
+		Secret: secret,
+		Name:   name,
+		Value:  value,
 	}, nil
 }
 
@@ -63,7 +63,7 @@ func handleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params
 	}
 
 	term.Debug("Function invoked: cli.ConfigSet")
-	if err := cli.ConfigSet(ctx, params.Insensitive, projectName, provider, params.Name, params.Value); err != nil {
+	if err := cli.ConfigSet(ctx, params.Secret, projectName, provider, params.Name, params.Value); err != nil {
 		return "", fmt.Errorf("Failed to set config: %w", err)
 	}
 
