@@ -700,50 +700,14 @@ func (b *ByocGcp) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 	}
 }
 
-func (b *ByocGcp) GetConfigs(ctx context.Context, req *defangv1.GetConfigsRequest) (*defangv1.GetConfigsResponse, error) {
-	resp := &defangv1.GetConfigsResponse{}
-	for _, config := range req.Configs {
-		secretId := b.StackName(config.Project, config.Name)
-
-		term.Debugf("Getting config %q", secretId)
-		secretValue, visible, err := b.driver.GetSecretVersion(ctx, secretId)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get config %q: %w", secretId, err)
-		}
-
-		configType := defangv1.ConfigType_CONFIGTYPE_SENSITIVE
-		if visible {
-			configType = defangv1.ConfigType_CONFIGTYPE_INSENSITIVE
-		}
-		resp.Configs = append(resp.Configs, &defangv1.Config{
-			Name:  config.Name,
-			Value: secretValue,
-			Type:  configType,
-		})
-	}
-	return resp, nil
-}
-
 func (b *ByocGcp) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
 	for _, name := range req.Names {
 		secretId := b.StackName(req.Project, name)
 		term.Debugf("Deleting secret %q", secretId)
-
-		var notFoundCount = 0
-		for _, sid := range []string{secretId} {
-			if err := b.driver.DeleteSecret(ctx, sid); err != nil {
-				if status.Code(err) == codes.NotFound {
-					notFoundCount++
-					if notFoundCount != 2 {
-						continue
-					}
-				}
-
-				return fmt.Errorf("failed to delete secret %q: %w", name, err)
-			}
+		if err := b.driver.DeleteSecret(ctx, secretId); err != nil {
+			return fmt.Errorf("failed to delete secret %q: %w", secretId, err)
 		}
 	}
-
 	return nil
 }
 
@@ -773,14 +737,12 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 	secretId := b.StackName(req.Project, req.Name)
 	term.Debugf("Creating secret %q", secretId)
 
-	var visible bool = req.Type != defangv1.ConfigType_CONFIGTYPE_INSENSITIVE
-
-	if _, err := b.driver.CreateSecret(ctx, visible, secretId); err != nil {
+	if _, err := b.driver.CreateSecret(ctx, secretId); err != nil {
 		if stat, ok := status.FromError(err); ok && stat.Code() == codes.PermissionDenied {
 			if err := b.driver.EnsureAPIsEnabled(ctx, "secretmanager.googleapis.com"); err != nil {
 				return annotateGcpError(err)
 			}
-			_, err = b.driver.CreateSecret(ctx, visible, secretId)
+			_, err = b.driver.CreateSecret(ctx, secretId)
 		}
 		if err != nil {
 			if stat, ok := status.FromError(err); ok && stat.Code() == codes.AlreadyExists {

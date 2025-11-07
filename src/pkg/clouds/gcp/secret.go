@@ -10,32 +10,13 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-// SecretVisibility represents the visibility level of a secret
-type SecretVisibility string
-
-const (
-	// SecretVisibilityPrivate indicates the secret is private and protected
-	SecretVisibilityPrivate SecretVisibility = "private"
-	// SecretVisibilityUnprotected indicates the secret is unprotected and can be accessed
-	SecretVisibilityUnprotected SecretVisibility = "unprotected"
-)
-
-// String returns the string representation of the SecretVisibility
-func (sv SecretVisibility) String() string {
-	return string(sv)
-}
-
-func (gcp Gcp) CreateSecret(ctx context.Context, visible bool, secretID string) (string, error) {
+func (gcp Gcp) CreateSecret(ctx context.Context, secretID string) (string, error) {
 	client, err := secretmanager.NewClient(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to create secretmanager client: %w", err)
 	}
 	defer client.Close()
 
-	visibility := SecretVisibilityPrivate
-	if !visible {
-		visibility = SecretVisibilityUnprotected
-	}
 	req := &secretmanagerpb.CreateSecretRequest{
 		Parent:   "projects/" + gcp.ProjectId,
 		SecretId: secretID,
@@ -44,9 +25,6 @@ func (gcp Gcp) CreateSecret(ctx context.Context, visible bool, secretID string) 
 				Replication: &secretmanagerpb.Replication_Automatic_{
 					Automatic: &secretmanagerpb.Replication_Automatic{},
 				},
-			},
-			Labels: map[string]string{
-				"visibility": visibility.String(),
 			},
 		},
 	}
@@ -77,35 +55,6 @@ func (gcp Gcp) AddSecretVersion(ctx context.Context, secretName string, payload 
 		return "", err
 	}
 	return resp.Name, nil
-}
-
-func (gcp Gcp) GetSecretVersion(ctx context.Context, secretName string) (string, bool, error) {
-	client, err := secretmanager.NewClient(ctx)
-	if err != nil {
-		return "", false, fmt.Errorf("failed to create secretmanager client: %w", err)
-	}
-	defer client.Close()
-
-	// Get the secret metadata to check the label
-	secretReq := &secretmanagerpb.GetSecretRequest{
-		Name: fmt.Sprintf("projects/%v/secrets/%v", gcp.ProjectId, secretName),
-	}
-	secret, err := client.GetSecret(ctx, secretReq)
-	if err != nil {
-		return "", false, fmt.Errorf("failed to get secret metadata: %w", err)
-	}
-
-	visible := secret.Labels["visibility"] == SecretVisibilityUnprotected.String()
-
-	// Get the secret value
-	req := &secretmanagerpb.AccessSecretVersionRequest{
-		Name: fmt.Sprintf("projects/%v/secrets/%v/versions/latest", gcp.ProjectId, secretName),
-	}
-	resp, err := client.AccessSecretVersion(ctx, req)
-	if err != nil {
-		return "", false, err
-	}
-	return string(resp.Payload.Data), visible, nil
 }
 
 // CleanupOldVersions keeps only the two most recent enabled versions of a secret.

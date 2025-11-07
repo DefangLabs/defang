@@ -105,7 +105,7 @@ func (l *Local) GetInfo(ctx context.Context, taskID PID) (*types.TaskInfo, error
 	return nil, client.ErrNotImplemented("not implemented for local driver")
 }
 
-func (l *Local) PutSecret(ctx context.Context, encrypt bool, name, value string) error {
+func (l *Local) PutSecret(ctx context.Context, name, value string) error {
 	return client.ErrNotImplemented("not implemented for local driver")
 }
 
