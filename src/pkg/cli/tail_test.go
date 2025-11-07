@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -372,4 +374,130 @@ func TestTailContext(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPrintHandler(t *testing.T) {
+	var testdata = []struct {
+		inputfile  string
+		outputfile string
+	}{
+		{
+			inputfile:  "../../test-datasets/crew_input.jsonl",
+			outputfile: "../../test-datasets/crew_output.data",
+		},
+		{
+			inputfile:  "../../test-datasets/flask_railpack_input.jsonl",
+			outputfile: "../../test-datasets/flask_railpack_output.data",
+		},
+	}
+
+	loc, err := time.LoadLocation("America/Vancouver")
+	if err != nil {
+		t.Fatalf("Failed to load location: %v", err)
+	}
+	time.Local = loc
+	for _, tc := range testdata {
+		logEntries := jsonFileToLogEntry(t, tc.inputfile)
+
+		// Create buffers to capture output and set up terminal
+		var stdout, stderr bytes.Buffer
+		mockTerm := term.NewTerm(os.Stdin, &stdout, &stderr)
+
+		for _, entry := range logEntries {
+			logEntryPrintHandler(entry, &TailOptions{
+				Deployment: entry.Etag,
+				Services:   []string{},
+				Verbose:    false,
+			}, mockTerm)
+		}
+
+		// Convert output to string array
+		outputLines := strings.Split(strings.TrimSuffix(stdout.String(), "\n"), "\n")
+
+		// Read expected output from file as plain text
+		expectedLines := fileToStringArray(t, tc.outputfile)
+
+		// Compare line by line
+		t.Logf("Got %d output lines, expected %d lines for %s", len(outputLines), len(expectedLines), tc.outputfile)
+
+		maxLines := max(len(outputLines), len(expectedLines))
+		for i := range maxLines {
+			var actualLine, expectedLine string
+
+			if i < len(outputLines) {
+				actualLine = strings.TrimSpace(outputLines[i])
+			}
+			if i < len(expectedLines) {
+				expectedLine = strings.TrimSpace(expectedLines[i])
+			}
+
+			// Strip ANSI codes from actual output
+			actualLineClean := term.StripAnsi(actualLine)
+			expectedLineClean := term.StripAnsi(expectedLine)
+
+			// Normalize whitespace: convert tabs to spaces for consistent comparison
+			actualLineClean = strings.ReplaceAll(actualLineClean, "\t", "    ")
+			expectedLineClean = strings.ReplaceAll(expectedLineClean, "\t", "    ")
+
+			// Normalize \
+			// actualLineClean = strings.ReplaceAll(actualLineClean, "\", "    ")
+			expectedLineClean = strings.ReplaceAll(expectedLineClean, "\\\"", "\"")
+			expectedLineClean = strings.ReplaceAll(expectedLineClean, "\t", "    ")
+			if actualLineClean != expectedLineClean {
+				t.Errorf("File %s Line %d mismatch:\nActual:   %q\nExpected: %q", tc.outputfile, i, actualLineClean, expectedLineClean)
+			}
+		}
+	}
+}
+
+func fileToStringArray(t *testing.T, fileName string) []string {
+	expectedFile, err := os.Open(fileName)
+	if err != nil {
+		t.Fatalf("Failed to open expected output file: %v", err)
+	}
+	defer expectedFile.Close()
+
+	var expectedLines []string
+	scanner := bufio.NewScanner(expectedFile)
+	for scanner.Scan() {
+		expectedLines = append(expectedLines, scanner.Text())
+	}
+	return expectedLines
+}
+
+func jsonFileToLogEntry(t *testing.T, fileName string) []*defangv1.LogEntry {
+	file, err := os.Open(fileName)
+	if err != nil {
+		t.Fatalf("Failed to open test data file: %v", err)
+	}
+	defer file.Close()
+
+	var logEntries []*defangv1.LogEntry
+	scanner := bufio.NewScanner(file)
+	lineNum := 0
+
+	// Read each line and unmarshal it
+	for scanner.Scan() {
+		lineNum++
+		line := scanner.Text()
+
+		// Skip empty lines
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		var logEntry defangv1.LogEntry
+		if err := json.Unmarshal([]byte(line), &logEntry); err != nil {
+			t.Fatalf("Failed to unmarshal line %d: %v\nLine content: %s", lineNum, err, line)
+		}
+
+		logEntries = append(logEntries, &logEntry)
+	}
+
+	if err := scanner.Err(); err != nil {
+		t.Fatalf("Error while reading file: %v", err)
+	}
+
+	t.Logf("Successfully loaded %d log entries from %s", len(logEntries), fileName)
+	return logEntries
 }

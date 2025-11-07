@@ -58,7 +58,7 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 
 	resp, err := client.Preview(ctx, &defangv1.PreviewRequest{
 		Provider:    estimateProviderID.Value(),
-		Mode:        defangv1.DeploymentMode(mode),
+		Mode:        mode.Value(),
 		Region:      region,
 		Compose:     composeData,
 		ProjectName: project.Name,
@@ -76,13 +76,13 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 		Verbose:    true,
 	}
 
-	_, err = streamLogs(ctx, previewProvider, project.Name, tailOptions, func(entry *defangv1.LogEntry, options *TailOptions) error {
+	_, err = streamLogs(ctx, previewProvider, project.Name, tailOptions, func(entry *defangv1.LogEntry, options *TailOptions, t *term.Term) error {
 		if strings.HasPrefix(entry.Message, "Preview succeeded") {
 			return io.EOF
 		} else if strings.HasPrefix(entry.Message, "Preview failed") {
 			return errors.New(entry.Message)
 		}
-		term.Debug(entry.Message)
+		t.Debug(entry.Message)
 		pulumiPreviewLogLines = append(pulumiPreviewLogLines, entry.Message)
 		return nil
 	})

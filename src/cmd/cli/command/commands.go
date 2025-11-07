@@ -37,6 +37,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 )
 
@@ -226,6 +227,7 @@ func SetupCommands(ctx context.Context, version string) {
 	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
 	configSetCmd.Flags().BoolP("env", "e", false, "set the config from an environment variable")
 	configSetCmd.Flags().Bool("random", false, "set a secure randomly generated value for config")
+	configSetCmd.Flags().String("env-file", "", "load config values from an .env file")
 	_ = configSetCmd.Flags().MarkHidden("name")
 
 	configCmd.AddCommand(configSetCmd)
@@ -263,10 +265,12 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(debugCmd)
 
 	// Tail Command
-	tailCmd := makeComposeLogsCmd()
-	tailCmd.Use = "tail [SERVICE...]"
-	tailCmd.Aliases = []string{"logs"}
+	tailCmd := makeTailCmd()
 	RootCmd.AddCommand(tailCmd)
+
+	// Logs Command
+	logsCmd := makeLogsCmd()
+	RootCmd.AddCommand(logsCmd)
 
 	// Delete Command
 	deleteCmd.Flags().BoolP("name", "n", false, "name of the service(s) (backwards compat)")
@@ -638,12 +642,13 @@ var configCmd = &cobra.Command{
 var configSetCmd = &cobra.Command{
 	Use:         "create CONFIG [file|-]", // like Docker
 	Annotations: authNeededAnnotation,
-	Args:        cobra.RangeArgs(1, 2),
+	Args:        cobra.RangeArgs(0, 2), // Allow 0 args when using --env-file
 	Aliases:     []string{"set", "add", "put"},
 	Short:       "Adds or updates a sensitive config value",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fromEnv, _ := cmd.Flags().GetBool("env")
 		random, _ := cmd.Flags().GetBool("random")
+		envFile, _ := cmd.Flags().GetString("env-file")
 
 		// Make sure we have a project to set config for before asking for a value
 		loader := configureLoader(cmd)
@@ -655,6 +660,55 @@ var configSetCmd = &cobra.Command{
 		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 		if err != nil {
 			return err
+		}
+
+		// Handle --env-file flag
+		if envFile != "" {
+			if fromEnv || random {
+				return errors.New("cannot use --env-file with --env or --random")
+			}
+			if len(args) > 0 {
+				return errors.New("cannot specify CONFIG arguments with --env-file")
+			}
+
+			envMap, err := godotenv.Read(envFile)
+			if err != nil {
+				return fmt.Errorf("failed to read env file %q: %w", envFile, err)
+			}
+
+			if len(envMap) == 0 {
+				return errors.New("no config found in env file")
+			}
+
+			// Set each config from the env file
+			successCount := 0
+			for name, value := range envMap {
+				if !pkg.IsValidSecretName(name) {
+					term.Warnf("Skipping invalid config name: %q", name)
+					continue
+				}
+
+				if err := cli.ConfigSet(cmd.Context(), projectName, provider, name, value); err != nil {
+					term.Warnf("Failed to set %q: %v", name, err)
+				} else {
+					term.Info("Updated value for", name)
+					successCount++
+				}
+			}
+
+			if successCount == 0 {
+				return errors.New("failed to set any config values")
+			}
+
+			term.Infof("Successfully set %d config value(s)", successCount)
+
+			printDefangHint("To update the deployed values, do:", "compose up")
+			return nil
+		}
+
+		// Original single config logic
+		if len(args) == 0 {
+			return errors.New("CONFIG argument is required when not using --env-file")
 		}
 
 		parts := strings.SplitN(args[0], "=", 2)

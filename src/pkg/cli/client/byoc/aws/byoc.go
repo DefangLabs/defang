@@ -24,7 +24,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
-	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -257,14 +256,14 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		payloadString = http.RemoveQueryParam(payloadUrl)
 	}
 
-	cdCommand := cdCmd{
-		mode:            modes.Mode(req.Mode),
-		project:         project.Name,
+	cdCmd := cdCommand{
+		command:         []string{cmd, payloadString},
 		delegateDomain:  req.DelegateDomain,
 		delegationSetId: req.DelegationSetId,
-		cmd:             []string{cmd, payloadString},
+		mode:            req.Mode,
+		project:         project.Name,
 	}
-	cdTaskArn, err := b.runCdCommand(ctx, cdCommand)
+	cdTaskArn, err := b.runCdCommand(ctx, cdCmd)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
@@ -403,15 +402,15 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 	return env, nil
 }
 
-type cdCmd struct {
-	mode            modes.Mode
-	project         string
+type cdCommand struct {
+	command         []string
 	delegateDomain  string
 	delegationSetId string
-	cmd             []string
+	mode            defangv1.DeploymentMode
+	project         string
 }
 
-func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCmd) (ecs.TaskArn, error) {
+func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn, error) {
 	// Setup the deployment environment
 	env, err := b.environment(cmd.project)
 	if err != nil {
@@ -436,11 +435,11 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCmd) (ecs.TaskArn, err
 		for k, v := range env {
 			debugEnv = append(debugEnv, k+"="+v)
 		}
-		if err := byoc.DebugPulumiNodeJS(ctx, debugEnv, cmd.cmd...); err != nil {
+		if err := byoc.DebugPulumiNodeJS(ctx, debugEnv, cmd.command...); err != nil {
 			return nil, err
 		}
 	}
-	return b.driver.Run(ctx, env, cmd.cmd...)
+	return b.driver.Run(ctx, env, cmd.command...)
 }
 
 func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
@@ -451,11 +450,10 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 		return nil, err
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
-	cmd := cdCmd{
-		mode:           modes.ModeUnspecified,
+	cmd := cdCommand{
 		project:        req.Project,
 		delegateDomain: req.DelegateDomain,
-		cmd:            []string{"up", ""}, // 2nd empty string is a empty payload
+		command:        []string{"up", ""}, // 2nd empty string is a empty payload
 	}
 	cdTaskArn, err := b.runCdCommand(ctx, cmd)
 	if err != nil {
@@ -614,7 +612,7 @@ func (b *ByocAws) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest)
 	}
 
 	// Gather logs from the CD task, kaniko, ECS events, and all services
-	evtsChan, errsChan := ecs.QueryLogGroups(ctx, start, end, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
+	evtsChan, errsChan := ecs.QueryLogGroups(ctx, start, end, 0, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
 	if evtsChan == nil {
 		return <-errsChan
 	}
@@ -681,10 +679,18 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	var tailStream ecs.LiveTailStream
 
 	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is a task ID
-		tailStream, err = b.driver.TailTaskID(ctx, etag)
-		if err == nil {
-			b.cdTaskArn, err = b.driver.GetTaskArn(etag)
-			etag = "" // no need to filter by etag
+		if req.Follow {
+			tailStream, err = b.driver.TailTaskID(ctx, etag)
+			if err == nil {
+				b.cdTaskArn, err = b.driver.GetTaskArn(etag)
+				etag = "" // no need to filter by etag
+			}
+		} else {
+			tailStream, err = b.driver.QueryTaskID(ctx, etag, time.Time{}, time.Now(), req.Limit)
+			if err == nil {
+				b.cdTaskArn, err = b.driver.GetTaskArn(etag)
+				etag = "" // no need to filter by etag
+			}
 		}
 	} else {
 		var service string
@@ -698,7 +704,28 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		if req.Until.IsValid() {
 			end = req.Until.AsTime()
 		}
-		tailStream, err = ecs.QueryAndTailLogGroups(ctx, start, end, b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))...)
+		lgis := b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))
+		if req.Follow {
+			tailStream, err = ecs.QueryAndTailLogGroups(
+				ctx,
+				start,
+				end,
+				lgis...,
+			)
+		} else {
+			evtsChan, errsChan := ecs.QueryLogGroups(
+				ctx,
+				start,
+				end,
+				req.Limit,
+				lgis...,
+			)
+			if evtsChan == nil {
+				err = <-errsChan
+			} else {
+				tailStream = ecs.NewStaticLogStream(evtsChan, func() {})
+			}
+		}
 	}
 
 	if err != nil {
@@ -777,10 +804,9 @@ func (b *ByocAws) BootstrapCommand(ctx context.Context, req client.BootstrapComm
 	if err := b.setUpCD(ctx); err != nil {
 		return "", err
 	}
-	cmd := cdCmd{
-		mode:    modes.ModeUnspecified,
+	cmd := cdCommand{
 		project: req.Project,
-		cmd:     []string{req.Command},
+		command: []string{req.Command},
 	}
 	cdTaskArn, err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
 	if err != nil {

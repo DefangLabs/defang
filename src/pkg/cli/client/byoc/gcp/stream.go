@@ -72,6 +72,8 @@ func (s *ServerStream[T]) Receive() bool {
 	case err := <-s.errCh:
 		if context.Cause(s.ctx) == io.EOF {
 			s.lastErr = nil
+		} else if errors.Is(err, io.EOF) {
+			s.lastErr = nil
 		} else if isContextCanceledError(err) {
 			s.lastErr = context.Cause(s.ctx)
 		} else {
@@ -91,35 +93,13 @@ func isContextCanceledError(err error) bool {
 	return false
 }
 
-func (s *ServerStream[T]) Start(start time.Time) {
+func (s *ServerStream[T]) StartFollow(start time.Time) {
 	query := s.query.GetQuery()
 	term.Debugf("Query and tail logs since %v with query: \n%v", start, query)
 	go func() {
 		// Only query older logs if start time is more than 10ms ago
 		if !start.IsZero() && start.Unix() > 0 && time.Since(start) > 10*time.Millisecond {
-			lister, err := s.gcp.ListLogEntries(s.ctx, query)
-			if err != nil {
-				s.errCh <- err
-				return
-			}
-			for {
-				entry, err := lister.Next()
-				if errors.Is(err, io.EOF) {
-					break
-				}
-				if err != nil {
-					s.errCh <- err
-					return
-				}
-				resps, err := s.parseAndFilter(entry)
-				if err != nil {
-					s.errCh <- err
-					return
-				}
-				for _, resp := range resps {
-					s.respCh <- resp
-				}
-			}
+			s.queryHead(query)
 		}
 
 		// Start tailing logs after all older logs are processed
@@ -143,6 +123,89 @@ func (s *ServerStream[T]) Start(start time.Time) {
 			}
 		}
 	}()
+}
+
+func (s *ServerStream[T]) Start(limit int32) {
+	query := s.query.GetQuery()
+	term.Debugf("Query logs with query: \n%v", query)
+	go func() {
+		s.queryTail(query, limit)
+	}()
+}
+
+func (s *ServerStream[T]) queryHead(query string) {
+	lister, err := s.gcp.ListLogEntries(s.ctx, query, gcp.OrderAscending)
+	if err != nil {
+		s.errCh <- err
+		return
+	}
+	err = s.listToChannel(lister)
+	if err != nil {
+		s.errCh <- err
+		return
+	}
+}
+
+func (s *ServerStream[T]) queryTail(query string, limit int32) {
+	lister, err := s.gcp.ListLogEntries(s.ctx, query, gcp.OrderDescending)
+	if err != nil {
+		s.errCh <- err
+		return
+	}
+	if limit == 0 {
+		err = s.listToChannel(lister)
+		if err != nil {
+			s.errCh <- err
+			return
+		}
+	} else {
+		buffer, err := s.listToBuffer(lister, limit)
+		if err != nil {
+			s.errCh <- err
+		}
+		// iterate over the buffer in reverse order to send the oldest resps first
+		for i := len(buffer) - 1; i >= 0; i-- {
+			s.respCh <- buffer[i]
+		}
+		s.errCh <- io.EOF
+	}
+}
+
+func (s *ServerStream[T]) listToBuffer(lister *gcp.Lister, limit int32) ([]*T, error) {
+	received := 0
+	buffer := make([]*T, 0, limit)
+	for range limit {
+		entry, err := lister.Next()
+		if err != nil {
+			return nil, err
+		}
+		resps, err := s.parseAndFilter(entry)
+		if err != nil {
+			return nil, err
+		}
+		buffer = append(buffer, resps...)
+		received += len(resps)
+	}
+	return buffer, nil
+}
+
+func (s *ServerStream[T]) listToChannel(lister *gcp.Lister) error {
+	for {
+		entry, err := lister.Next()
+		if errors.Is(err, io.EOF) {
+			return nil // query is done; proceed with tail
+		}
+		if err != nil {
+			return err
+		}
+		resps, err := s.parseAndFilter(entry)
+		if err != nil {
+			return err
+		}
+		for _, resp := range resps {
+			s.respCh <- resp
+		}
+	}
 }
 
 func (s *ServerStream[T]) parseAndFilter(entry *loggingpb.LogEntry) ([]*T, error) {
@@ -303,8 +366,9 @@ func getLogEntryParser(ctx context.Context, gcpClient *gcp.Gcp) func(entry *logg
 		} else if entry.GetJsonPayload() != nil && entry.GetJsonPayload().GetFields()["cos.googleapis.com/stream"] != nil {
 			stderr = entry.GetJsonPayload().GetFields()["cos.googleapis.com/stream"].GetStringValue() == "stderr"
 		}
-
-		// fmt.Printf("ENTRY: %+v\n", entry)
+		if strings.Contains(strings.ToLower(msg), "error:") {
+			stderr = true
+		}
 
 		var serviceName, etag, host string
 		serviceName = entry.Labels["defang-service"]

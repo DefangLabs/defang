@@ -26,6 +26,26 @@ func getLogGroupIdentifier(arnOrId string) string {
 	return strings.TrimSuffix(arnOrId, ":*")
 }
 
+func NewStaticLogStream(ch <-chan LogEvent, cancel func()) EventStream[types.StartLiveTailResponseStream] {
+	es := &eventStream{
+		cancel: cancel,
+		ch:     make(chan types.StartLiveTailResponseStream),
+	}
+
+	go func() {
+		defer close(es.ch)
+		for evt := range ch {
+			es.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
+				Value: types.LiveTailSessionUpdate{
+					SessionResults: []types.LiveTailSessionLogEvent{evt},
+				},
+			}
+		}
+	}()
+
+	return es
+}
+
 func QueryAndTailLogGroups(ctx context.Context, start, end time.Time, logGroups ...LogGroupInput) (LiveTailStream, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -104,56 +124,75 @@ func TailLogGroup(ctx context.Context, input LogGroupInput) (LiveTailStream, err
 	return slto.GetStream(), nil
 }
 
-func QueryLogGroups(ctx context.Context, start, end time.Time, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
-	errsChan := make(chan error)
-
-	// Gather logs from the CD task, kaniko, ECS events, and all services
+func QueryLogGroups(ctx context.Context, start, end time.Time, limit int32, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
 	var evtsChan chan LogEvent
+	var errChan chan error
 	for _, lgi := range logGroups {
 		lgEvtChan := make(chan LogEvent)
 		// Start a go routine for each log group
 		go func(lgi LogGroupInput) {
 			defer close(lgEvtChan)
-			if err := QueryLogGroup(ctx, lgi, start, end, func(logEvents []LogEvent) error {
+			if err := QueryLogGroup(ctx, lgi, start, end, limit, func(logEvents []LogEvent) error {
 				for _, event := range logEvents {
 					lgEvtChan <- event
 				}
 				return nil
 			}); err != nil {
-				errsChan <- err
+				errChan <- fmt.Errorf("error querying log group %q: %w", lgi.LogGroupARN, err)
 			}
 		}(lgi)
 		evtsChan = mergeLogEventChan(evtsChan, lgEvtChan) // Merge sort the log events based on timestamp
+		// take the last n events only
+		if limit > 0 {
+			evtsChan = takeLastN(evtsChan, int(limit))
+		}
 	}
-	return evtsChan, errsChan
+	return evtsChan, errChan
 }
 
-func QueryLogGroup(ctx context.Context, input LogGroupInput, start, end time.Time, cb func([]LogEvent) error) error {
+func QueryLogGroup(ctx context.Context, input LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
 	region := region.FromArn(input.LogGroupARN)
 	cw, err := newCloudWatchLogsClient(ctx, region)
 	if err != nil {
 		return err
 	}
-	return filterLogEvents(ctx, cw, input, start, end, cb)
+	return filterLogEvents(ctx, cw, input, start, end, limit, cb)
 }
 
-func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGroupInput, start, end time.Time, cb func([]LogEvent) error) error {
+func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
 	var pattern *string
 	if lgi.LogEventFilterPattern != "" {
 		pattern = &lgi.LogEventFilterPattern
 	}
 	logGroupIdentifier := getLogGroupIdentifier(lgi.LogGroupARN)
 	params := &cloudwatchlogs.FilterLogEventsInput{
-		StartTime:          ptr.Int64(start.UnixMilli()),
-		EndTime:            ptr.Int64(end.UnixMilli()),
 		LogGroupIdentifier: &logGroupIdentifier,
 		LogStreamNames:     lgi.LogStreamNames,
 		FilterPattern:      pattern,
+	}
+
+	if !start.IsZero() {
+		params.StartTime = ptr.Int64(start.UnixMilli())
+	}
+	if !end.IsZero() {
+		params.EndTime = ptr.Int64(end.UnixMilli())
+	}
+	if start.IsZero() && end.IsZero() {
+		// If no time range is specified, limit to the last 60 minutes
+		now := time.Now()
+		start = now.Add(-60 * time.Minute)
+		params.StartTime = ptr.Int64(start.UnixMilli())
+		params.EndTime = ptr.Int64(now.UnixMilli())
 	}
 	if lgi.LogStreamNamePrefix != "" {
 		params.LogStreamNamePrefix = &lgi.LogStreamNamePrefix
 	}
 	for {
+		if limit > 0 {
+			// Specifying the limit parameter only guarantees that a single page doesn't return more log events than the
+			// specified limit, but it might return fewer events than the limit. This is the expected API behavior.
+			params.Limit = ptr.Int32(limit)
+		}
 		fleo, err := cw.FilterLogEvents(ctx, params)
 		if err != nil {
 			return err
@@ -174,6 +213,10 @@ func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGrou
 		if fleo.NextToken == nil {
 			return nil
 		}
+		if limit > 0 && len(events) >= int(limit) {
+			return nil
+		}
+		limit -= int32(len(events)) // #nosec G115 - always safe because len(events) <= limit
 		params.NextToken = fleo.NextToken
 	}
 }
@@ -211,4 +254,25 @@ func GetLogEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {
 	default:
 		return nil, fmt.Errorf("unexpected event: %T", ev)
 	}
+}
+
+func takeLastN[T any](input chan T, n int) chan T {
+	if n <= 0 {
+		return input
+	}
+	out := make(chan T)
+	go func() {
+		defer close(out)
+		var buffer []T
+		for evt := range input {
+			buffer = append(buffer, evt)
+			if len(buffer) > n {
+				buffer = buffer[1:] // remove oldest
+			}
+		}
+		for _, evt := range buffer {
+			out <- evt
+		}
+	}()
+	return out
 }

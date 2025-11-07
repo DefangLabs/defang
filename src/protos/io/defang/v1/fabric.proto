@@ -341,6 +341,7 @@ message ServiceInfo {
   string lb_dns_name = 17; // fully qualified domain name for the load-balancer
   bool allow_scaling = 18; // true if service is allowed to autoscale
   ResourceType type = 21;
+  string healthcheck_path = 22;
 }
 
 enum ResourceType {
@@ -355,6 +356,7 @@ enum ResourceType {
   RESOURCE_TYPE_AWS_ECS_EC2_SERVICE = 202;
   RESOURCE_TYPE_AWS_RDS_POSTGRES = 210;
   RESOURCE_TYPE_AWS_ELASTICACHE_REDIS = 220;
+  RESOURCE_TYPE_AWS_ELASTICACHE_VALKEY = 221;
   RESOURCE_TYPE_AWS_DOCUMENTDB = 230;
   RESOURCE_TYPE_AWS_CLOUDFRONT_S3 = 240;
   RESOURCE_TYPE_AWS_BEDROCK = 250;
@@ -500,6 +502,8 @@ message TailRequest {
   uint32 log_type = 5; // bitfield
   string pattern = 6;
   google.protobuf.Timestamp until = 7;
+  bool follow = 8;
+  int32 limit = 9;
 }
 
 message LogEntry {

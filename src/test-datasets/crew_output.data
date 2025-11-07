@@ -1,0 +1,15 @@
+2025-10-29T17:19:33.630-07:00 cd  ** Update started for stack beta
+2025-10-29T17:19:47.596-07:00 cd  ** Updating service "redis"
+2025-10-29T17:19:47.601-07:00 cd  ** Updating service "llm"
+2025-10-29T17:19:47.909-07:00 cd  ** Updating service "postgres"
+2025-10-29T17:19:48.033-07:00 cd  ** Updating service "embedding"
+2025-10-29T17:19:48.221-07:00 cd  ** Building image for "worker"...
+2025-10-29T17:19:48.742-07:00 cd  ** Building image for "app"...
+2025-10-29T17:20:21.994-07:00 cd  +  gcp:compute:Subnetwork defang-crew-django-redis-postgres-beta-shared-subnet creating (11s) error:   sdk-v2/provider2.go:572: sdk.helper_schema: Error waiting to create Subnetwork: Error waiting for Creating Subnetwork: Invalid IPCidrRange: 10.0.0.0/16 conflicts with existing subnetwork 'crew-django-redis-postgres-shared-subnet-965d916' in region 'us-central1'.
+2025-10-29T17:20:21.994-07:00 cd  +  gcp:compute:Subnetwork defang-crew-django-redis-postgres-beta-shared-subnet creating (11s) error: 1 error occurred:
+2025-10-29T17:20:21.994-07:00 cd  +  gcp:compute:Subnetwork defang-crew-django-redis-postgres-beta-shared-subnet **creating failed** error: 1 error occurred:
+2025-10-29T17:20:41.546-07:00 cd Failed to update stack: failed to run update: exit status 255
+2025-10-29T17:20:40.555-07:00 cd     error:   sdk-v2/provider2.go:572: sdk.helper_schema: Error waiting to create Subnetwork: Error waiting for Creating Subnetwork: Invalid IPCidrRange: 10.0.0.0/16 conflicts with existing subnetwork 'crew-django-redis-postgres-shared-subnet-965d916' in region 'us-central1'.
+2025-10-29T17:20:40.535-07:00 cd     pulumi:pulumi:Stack crew-django-redis-postgres-beta running error: update failed
+2025-10-29T17:20:40.555-07:00 cd     error: update failed
+2025-10-29T17:20:40.555-07:00 cd     error: 1 error occurred:

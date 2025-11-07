@@ -210,12 +210,14 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 	}
 
 	pkg.Ensure(projectName != "", "ProjectName not set")
+	healthCheckPath, _ := compose.GetHealthCheckPathAndPort(service.HealthCheck)
 	si := &defangv1.ServiceInfo{
-		AllowScaling: b.AllowScaling,
-		Domainname:   service.DomainName,
-		Etag:         pkg.RandomID(), // TODO: could be hash for dedup/idempotency
-		Project:      projectName,    // was: tenant
-		Service:      &defangv1.Service{Name: service.Name},
+		AllowScaling:    b.AllowScaling,
+		Domainname:      service.DomainName,
+		Etag:            pkg.RandomID(), // TODO: could be hash for dedup/idempotency
+		Project:         projectName,    // was: tenant
+		Service:         &defangv1.Service{Name: service.Name},
+		HealthcheckPath: healthCheckPath,
 	}
 
 	hasHost := false
