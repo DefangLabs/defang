@@ -75,13 +75,6 @@ func HandleDeployTool(
 			return "", errors.New("no services deployed")
 		}
 
-		return "Deployment started", nil
-	})
-	if err != nil {
-		return "", err
-	}
-
-	go func() {
 		monitorOutput, err := CaptureTerm(func() (string, error) {
 			_, err := cli.TailAndMonitor(ctx, project, *provider, 0, cliTypes.TailOptions{
 				Follow:     true,
@@ -98,8 +91,12 @@ func HandleDeployTool(
 		}
 
 		term.Debugf("Deployment output:\n%s", monitorOutput)
-		term.Println("Deployment completed.")
-	}()
+		return "Deployment completed", nil
+	})
+
+	if err != nil {
+		return deployOutput, err
+	}
 
 	// Success case
 	urls := strings.Builder{}
