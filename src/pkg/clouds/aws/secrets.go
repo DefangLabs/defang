@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -88,6 +89,26 @@ func (a *Aws) IsValidSecret(ctx context.Context, name string) (bool, error) {
 		return false, err
 	}
 	return len(res.Parameters) == 1, nil
+}
+
+func (a *Aws) GetSecret(ctx context.Context, name string) (string, error) {
+	cfg, err := a.LoadConfig(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	svc := newFromConfig(cfg)
+	out, err := svc.GetParametersByPath(ctx, &ssm.GetParametersByPathInput{
+		Path: &name,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	if len(out.Parameters) == 0 {
+		return "", &types.ParameterNotFound{Message: ptr.String(fmt.Sprintf("parameter %q not found", name))}
+	}
+	return *out.Parameters[0].Value, nil
 }
 
 func (a *Aws) PutSecret(ctx context.Context, name, value string) error {

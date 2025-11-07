@@ -33,6 +33,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	ssmTypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/ptr"
@@ -536,22 +537,39 @@ func (b *ByocAws) GetServices(ctx context.Context, req *defangv1.GetServicesRequ
 	return &listServiceResp, nil
 }
 
-func (b *ByocAws) getSecretID(projectName, name string) string {
+func (b *ByocAws) getSecretID(configType defangv1.ConfigType, projectName, name string) string {
+	if configType == defangv1.ConfigType_CONFIGTYPE_INSENSITIVE {
+		return fmt.Sprintf("%s/%s", b.StackDir(projectName, name), "insensitive") // same as defang_service.ts
+	}
 	return b.StackDir(projectName, name) // same as defang_service.ts
+}
+
+func (b *ByocAws) GetConfigs(ctx context.Context, secret *defangv1.GetConfigsRequest) (*defangv1.GetConfigsResponse, error) {
+	resp := &defangv1.GetConfigsResponse{}
+	for _, config := range secret.Configs {
+		fqn := b.getSecretID(defangv1.ConfigType_CONFIGTYPE_INSENSITIVE, config.Project, config.Name)
+		term.Debugf("Getting parameter %q", fqn)
+		value, _ := b.driver.GetSecret(ctx, fqn)
+		resp.Configs = append(resp.Configs, &defangv1.Config{
+			Name:  config.Name,
+			Value: value,
+		})
+	}
+	return resp, nil
 }
 
 func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.PutConfigRequest) error {
 	if !pkg.IsValidSecretName(secret.Name) {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid config name; must be alphanumeric or _, cannot start with a number: %q", secret.Name))
 	}
-	fqn := b.getSecretID(secret.Project, secret.Name)
+	fqn := b.getSecretID(secret.Type, secret.Project, secret.Name)
 	term.Debugf("Putting parameter %q", fqn)
 	err := b.driver.PutSecret(ctx, fqn, secret.Value)
 	return AnnotateAwsError(err)
 }
 
 func (b *ByocAws) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
-	prefix := b.getSecretID(req.Project, "")
+	prefix := b.getSecretID(defangv1.ConfigType_CONFIGTYPE_UNSPECIFIED, req.Project, "")
 	term.Debugf("Listing parameters with prefix %q", prefix)
 	awsSecrets, err := b.driver.ListSecretsByPrefix(ctx, prefix)
 	if err != nil {
@@ -825,12 +843,18 @@ func (b *ByocAws) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (st
 
 func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
 	ids := make([]string, len(secrets.Names))
-	for i, name := range secrets.Names {
-		ids[i] = b.getSecretID(secrets.Project, name)
-	}
-	term.Debug("Deleting parameters", ids)
-	if err := b.driver.DeleteSecrets(ctx, ids...); err != nil {
-		return AnnotateAwsError(err)
+	configTypes := []defangv1.ConfigType{defangv1.ConfigType_CONFIGTYPE_SENSITIVE, defangv1.ConfigType_CONFIGTYPE_INSENSITIVE}
+	for _, configType := range configTypes {
+		for i, name := range secrets.Names {
+			ids[i] = b.getSecretID(configType, secrets.Project, name)
+		}
+		term.Debug("Deleting parameters", ids)
+		if err := b.driver.DeleteSecrets(ctx, ids...); err != nil {
+			var paramNotFoundErr *ssmTypes.ParameterNotFound
+			if !errors.As(err, &paramNotFoundErr) {
+				return AnnotateAwsError(err)
+			}
+		}
 	}
 	return nil
 }

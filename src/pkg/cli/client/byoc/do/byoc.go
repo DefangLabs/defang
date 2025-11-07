@@ -365,6 +365,32 @@ func (b *ByocDo) ListConfig(ctx context.Context, req *defangv1.ListConfigsReques
 	return secrets, nil
 }
 
+func (b *ByocDo) GetConfigs(ctx context.Context, config *defangv1.GetConfigsRequest) (*defangv1.GetConfigsResponse, error) {
+	resp := &defangv1.GetConfigsResponse{}
+	for _, config := range config.Configs {
+		app, err := b.getAppByName(ctx, config.Project)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, env := range app.Spec.Envs {
+			if env.Key == config.Name {
+				switch env.Type {
+				case godo.AppVariableType_General:
+					resp.Configs = append(resp.Configs, &defangv1.Config{
+						Name:  env.Key,
+						Value: env.Value,
+					})
+				case godo.AppVariableType_Secret:
+					return nil, fmt.Errorf("failed to get secret %q", env.Key)
+				}
+			}
+		}
+	}
+
+	return resp, nil
+}
+
 func (b *ByocDo) PutConfig(ctx context.Context, config *defangv1.PutConfigRequest) error {
 	// redeploy app with updated config in pulumi "regular deployment"
 	app, err := b.getAppByName(ctx, config.Project)
@@ -372,10 +398,15 @@ func (b *ByocDo) PutConfig(ctx context.Context, config *defangv1.PutConfigReques
 		return err
 	}
 
+	configType := godo.AppVariableType_Secret
+	if config.GetType() == defangv1.ConfigType_CONFIGTYPE_INSENSITIVE {
+		configType = godo.AppVariableType_General
+	}
+
 	newSecret := &godo.AppVariableDefinition{
 		Key:   config.Name,
 		Value: config.Value,
-		Type:  godo.AppVariableType_Secret,
+		Type:  configType,
 	}
 
 	app.Spec.Envs = append(app.Spec.Envs, newSecret)

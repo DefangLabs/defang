@@ -57,6 +57,24 @@ func (gcp Gcp) AddSecretVersion(ctx context.Context, secretName string, payload 
 	return resp.Name, nil
 }
 
+func (gcp Gcp) GetSecretVersion(ctx context.Context, secretName string) (string, error) {
+	client, err := secretmanager.NewClient(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to create secretmanager client: %w", err)
+	}
+	defer client.Close()
+
+	req := &secretmanagerpb.AccessSecretVersionRequest{
+		Name: fmt.Sprintf("projects/%v/secrets/%v/versions/latest", gcp.ProjectId, secretName),
+	}
+
+	resp, err := client.AccessSecretVersion(ctx, req)
+	if err != nil {
+		return "", err
+	}
+	return resp.Name, nil
+}
+
 // CleanupOldVersions keeps only the two most recent enabled versions of a secret.
 func (gcp Gcp) CleanupOldVersionsExcept(ctx context.Context, secretName string, keep int) error {
 	client, err := secretmanager.NewClient(ctx)

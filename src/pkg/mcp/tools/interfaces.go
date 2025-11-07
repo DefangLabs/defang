@@ -18,7 +18,7 @@ type CLIInterface interface {
 	ComposeDown(ctx context.Context, projectName string, client *cliClient.GrpcClient, provider cliClient.Provider) (string, error)
 	ComposeUp(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, uploadMode compose.UploadMode, mode modes.Mode) (*defangv1.DeployResponse, *compose.Project, error)
 	ConfigDelete(ctx context.Context, projectName string, provider cliClient.Provider, name string) error
-	ConfigSet(ctx context.Context, projectName string, provider cliClient.Provider, name, value string) error
+	ConfigSet(ctx context.Context, insensitive bool, projectName string, provider cliClient.Provider, name, value string) error
 	Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error)
 	CreatePlaygroundProvider(client *cliClient.GrpcClient) cliClient.Provider
 	GenerateAuthURL(authPort int) string

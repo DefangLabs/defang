@@ -227,10 +227,14 @@ func SetupCommands(ctx context.Context, version string) {
 	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
 	configSetCmd.Flags().BoolP("env", "e", false, "set the config from an environment variable")
 	configSetCmd.Flags().Bool("random", false, "set a secure randomly generated value for config")
+	configSetCmd.Flags().Bool("insensitive", false, "set an insensitive config")
 	configSetCmd.Flags().String("env-file", "", "load config values from an .env file")
 	_ = configSetCmd.Flags().MarkHidden("name")
 
 	configCmd.AddCommand(configSetCmd)
+
+	configGetCmd.Flags().BoolP("name", "n", false, "name of the config")
+	configCmd.AddCommand(configGetCmd)
 
 	configDeleteCmd.Flags().BoolP("name", "n", false, "name of the config(s) (backwards compat)")
 	_ = configDeleteCmd.Flags().MarkHidden("name")
@@ -639,6 +643,50 @@ var configCmd = &cobra.Command{
 	Short:   "Add, update, or delete service config",
 }
 
+var configGetCmd = &cobra.Command{
+	Use:         "get CONFIG", // like Docker
+	Annotations: authNeededAnnotation,
+	Args:        cobra.ExactArgs(1),
+	Aliases:     []string{"show"},
+	Short:       "Gets an insensitive config value",
+	RunE: func(cmd *cobra.Command, args []string) error {
+
+		// Make sure we have a project to set config for before asking for a value
+		loader := configureLoader(cmd)
+		provider, err := newProviderChecked(cmd.Context(), loader)
+		if err != nil {
+			return err
+		}
+
+		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		if err != nil {
+			return err
+		}
+
+		if len(args) != 1 {
+			return errors.New("please specify exactly one config name to get")
+		}
+
+		name := args[0]
+		if !pkg.IsValidSecretName(name) {
+			return fmt.Errorf("invalid config name: %q", name)
+		}
+
+		resp, err := cli.ConfigGet(cmd.Context(), projectName, name, provider)
+		if err != nil {
+			return err
+		}
+
+		if resp == nil || len(resp.Configs) == 0 {
+			println("Config", name, "not found")
+			return nil
+		}
+
+		term.Printf("Config %q: %q\n", name, resp.Configs[0].Value)
+		return nil
+	},
+}
+
 var configSetCmd = &cobra.Command{
 	Use:         "create CONFIG [file|-]", // like Docker
 	Annotations: authNeededAnnotation,
@@ -648,6 +696,7 @@ var configSetCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fromEnv, _ := cmd.Flags().GetBool("env")
 		random, _ := cmd.Flags().GetBool("random")
+		insensitive, _ := cmd.Flags().GetBool("insensitive")
 		envFile, _ := cmd.Flags().GetString("env-file")
 
 		// Make sure we have a project to set config for before asking for a value
@@ -688,7 +737,7 @@ var configSetCmd = &cobra.Command{
 					continue
 				}
 
-				if err := cli.ConfigSet(cmd.Context(), projectName, provider, name, value); err != nil {
+				if err := cli.ConfigSet(cmd.Context(), insensitive, projectName, provider, name, value); err != nil {
 					term.Warnf("Failed to set %q: %v", name, err)
 				} else {
 					term.Info("Updated value for", name)
@@ -765,7 +814,7 @@ var configSetCmd = &cobra.Command{
 			}
 		}
 
-		if err := cli.ConfigSet(cmd.Context(), projectName, provider, name, value); err != nil {
+		if err := cli.ConfigSet(cmd.Context(), insensitive, projectName, provider, name, value); err != nil {
 			return err
 		}
 		term.Info("Updated value for", name)

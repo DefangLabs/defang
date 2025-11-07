@@ -28,8 +28,8 @@ func (DefaultToolCLI) CanIUseProvider(ctx context.Context, client *cliClient.Grp
 	return cliClient.CanIUseProvider(ctx, client, provider, projectName, "", serviceCount) // TODO: add stack
 }
 
-func (DefaultToolCLI) ConfigSet(ctx context.Context, projectName string, provider cliClient.Provider, name, value string) error {
-	return cli.ConfigSet(ctx, projectName, provider, name, value)
+func (DefaultToolCLI) ConfigSet(ctx context.Context, insensitive bool, projectName string, provider cliClient.Provider, name, value string) error {
+	return cli.ConfigSet(ctx, insensitive, projectName, provider, name, value)
 }
 
 func (DefaultToolCLI) RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
