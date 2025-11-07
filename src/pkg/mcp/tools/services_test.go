@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
