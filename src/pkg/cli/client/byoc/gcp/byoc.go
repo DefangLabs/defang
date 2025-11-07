@@ -705,10 +705,10 @@ func (b *ByocGcp) GetConfigs(ctx context.Context, req *defangv1.GetConfigsReques
 	for _, config := range req.Configs {
 		secretId := b.StackName(config.Project, config.Name)
 
-		term.Debugf("Getting secret %q", secretId)
+		term.Debugf("Getting config %q", secretId)
 		secretValue, visible, err := b.driver.GetSecretVersion(ctx, secretId)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get secret %q: %w", secretId, err)
+			return nil, fmt.Errorf("failed to get config %q: %w", secretId, err)
 		}
 
 		configType := defangv1.ConfigType_CONFIGTYPE_SENSITIVE

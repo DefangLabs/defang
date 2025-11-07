@@ -95,7 +95,7 @@ func (gcp Gcp) GetSecretVersion(ctx context.Context, secretName string) (string,
 		return "", false, fmt.Errorf("failed to get secret metadata: %w", err)
 	}
 
-	visibility := secret.Labels["visibility"] == SecretVisibilityUnprotected.String()
+	visible := secret.Labels["visibility"] == SecretVisibilityUnprotected.String()
 
 	// Get the secret value
 	req := &secretmanagerpb.AccessSecretVersionRequest{
@@ -105,7 +105,7 @@ func (gcp Gcp) GetSecretVersion(ctx context.Context, secretName string) (string,
 	if err != nil {
 		return "", false, err
 	}
-	return string(resp.Payload.Data), visibility, nil
+	return string(resp.Payload.Data), visible, nil
 }
 
 // CleanupOldVersions keeps only the two most recent enabled versions of a secret.
