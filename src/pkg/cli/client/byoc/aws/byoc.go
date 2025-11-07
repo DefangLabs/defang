@@ -545,6 +545,39 @@ func (b *ByocAws) GetConfigs(ctx context.Context, secret *defangv1.GetConfigsReq
 	resp := &defangv1.GetConfigsResponse{}
 
 	// gather unique project names to config name
+	projects, projectConfigs := getUniqueProjectConfigs(secret, b)
+
+	for project := range projects {
+		fqn := b.getSecretID(project, "")
+		term.Debugf("Getting parameter %q", fqn)
+		params, _ := b.driver.GetSecret(ctx, fqn)
+
+		ssmParamToGetConfigResponse(params, projectConfigs, resp, project)
+	}
+	return resp, nil
+}
+
+func ssmParamToGetConfigResponse(ssmParameters []ssmTypes.Parameter, projectConfigs map[string]struct{}, resp *defangv1.GetConfigsResponse, project string) {
+	for _, param := range ssmParameters {
+		if param.Name == nil || param.Value == nil {
+			continue
+		}
+		if _, found := projectConfigs[*param.Name]; found {
+			configType := defangv1.ConfigType_CONFIGTYPE_SENSITIVE
+			if param.Type == ssmTypes.ParameterTypeString {
+				configType = defangv1.ConfigType_CONFIGTYPE_INSENSITIVE
+			}
+			resp.Configs = append(resp.Configs, &defangv1.Config{
+				Project: project,
+				Name:    *param.Name,
+				Value:   *param.Value,
+				Type:    configType,
+			})
+		}
+	}
+}
+
+func getUniqueProjectConfigs(secret *defangv1.GetConfigsRequest, b *ByocAws) (map[string]struct{}, map[string]struct{}) {
 	projects := make(map[string]struct{})
 	projectConfigs := make(map[string]struct{})
 
@@ -554,28 +587,7 @@ func (b *ByocAws) GetConfigs(ctx context.Context, secret *defangv1.GetConfigsReq
 		}
 		projectConfigs[b.getSecretID(config.Project, config.Name)] = struct{}{}
 	}
-
-	for project := range projects {
-		fqn := b.getSecretID(project, "")
-		term.Debugf("Getting parameter %q", fqn)
-		params, _ := b.driver.GetSecret(ctx, fqn)
-
-		for _, param := range params {
-			if _, found := projectConfigs[*param.Name]; found {
-				configType := defangv1.ConfigType_CONFIGTYPE_SENSITIVE
-				if param.Type == ssmTypes.ParameterTypeString {
-					configType = defangv1.ConfigType_CONFIGTYPE_INSENSITIVE
-				}
-				resp.Configs = append(resp.Configs, &defangv1.Config{
-					Project: project,
-					Name:    *param.Name,
-					Value:   *param.Value,
-					Type:    configType,
-				})
-			}
-		}
-	}
-	return resp, nil
+	return projects, projectConfigs
 }
 
 func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.PutConfigRequest) error {
