@@ -137,7 +137,7 @@ func TestHandleDestroyTool(t *testing.T) {
 
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := handleDestroyTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI)
+			result, err := HandleDestroyTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI)
 
 			// Verify error expectations
 			if tt.expectedError != "" {
