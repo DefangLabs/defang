@@ -69,10 +69,10 @@ func (r *Runner) CreateEvaluationFlow() *core.Flow[FlowInput, []string, struct{}
 			message = append(message, fmt.Sprintf("Make the working directory \"%s\"", *input.Setup.WorkingDirectory))
 		}
 		if input.Setup.Provider != nil && *input.Setup.Provider != "" {
-			message = append(message, fmt.Sprintf("Set the provider to %s", *input.Setup.Provider))
+			message = append(message, "Set the provider to "+*input.Setup.Provider)
 		}
 		if input.Setup.Region != nil && *input.Setup.Region != "" {
-			message = append(message, fmt.Sprintf("Set the region to %s", *input.Setup.Region))
+			message = append(message, "Set the region to "+*input.Setup.Region)
 		}
 
 		message = append(message, input.Message)
@@ -147,8 +147,10 @@ func (r *Runner) HandleMessageForEvaluation(msg string) (string, error) {
 		if history == nil {
 			history = []*ai.Message{}
 		}
+
+		metadata := map[string]any{}
 		resp, err = genkit.Generate(r.ctx, r.g,
-			ai.WithMessages(append(history, ai.NewMessage(ai.RoleTool, nil, parts...))...),
+			ai.WithMessages(append(history, ai.NewMessage(ai.RoleTool, metadata, parts...))...),
 		)
 		if err != nil {
 			log.Printf("Generate error in round %d: %v", round, err)

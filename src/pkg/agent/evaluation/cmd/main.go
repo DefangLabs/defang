@@ -27,7 +27,7 @@ func main() {
 	}
 
 	log.Println("Setting up tools.")
-	tools := agent.CollectTools(config.Cluster, config.AuthPort, config.ProviderId)
+	tools := agent.CollectTools(config.Cluster, config.ProviderId)
 	log.Printf("Tools collected: %d tools", len(tools))
 	for i, tool := range tools {
 		log.Printf("Tool %d: %+v", i, tool)
