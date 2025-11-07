@@ -33,6 +33,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	ssmTypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/ptr"
@@ -540,13 +541,67 @@ func (b *ByocAws) getSecretID(projectName, name string) string {
 	return b.StackDir(projectName, name) // same as defang_service.ts
 }
 
+func (b *ByocAws) GetConfigs(ctx context.Context, secret *defangv1.GetConfigsRequest) (*defangv1.GetConfigsResponse, error) {
+	resp := &defangv1.GetConfigsResponse{}
+
+	// gather unique project names to config name
+	projects, projectConfigs := getUniqueProjectConfigs(secret, b)
+
+	for project := range projects {
+		fqn := b.getSecretID(project, "")
+		term.Debugf("Getting parameter %q", fqn)
+		params, _ := b.driver.GetSecret(ctx, fqn)
+
+		ssmParamToGetConfigResponse(params, projectConfigs, resp, project)
+	}
+	return resp, nil
+}
+
+func ssmParamToGetConfigResponse(ssmParameters []ssmTypes.Parameter, projectConfigs map[string]struct{}, resp *defangv1.GetConfigsResponse, project string) {
+	for _, param := range ssmParameters {
+		if param.Name == nil || param.Value == nil {
+			continue
+		}
+		if _, found := projectConfigs[*param.Name]; found {
+			configType := defangv1.ConfigType_CONFIGTYPE_SENSITIVE
+			if param.Type == ssmTypes.ParameterTypeString {
+				configType = defangv1.ConfigType_CONFIGTYPE_INSENSITIVE
+			}
+			resp.Configs = append(resp.Configs, &defangv1.Config{
+				Project: project,
+				Name:    *param.Name,
+				Value:   *param.Value,
+				Type:    configType,
+			})
+		}
+	}
+}
+
+func getUniqueProjectConfigs(secret *defangv1.GetConfigsRequest, b *ByocAws) (map[string]struct{}, map[string]struct{}) {
+	projects := make(map[string]struct{})
+	projectConfigs := make(map[string]struct{})
+
+	for _, config := range secret.Configs {
+		if _, found := projects[config.Project]; !found {
+			projects[config.Project] = struct{}{}
+		}
+		projectConfigs[b.getSecretID(config.Project, config.Name)] = struct{}{}
+	}
+	return projects, projectConfigs
+}
+
 func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.PutConfigRequest) error {
 	if !pkg.IsValidSecretName(secret.Name) {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid config name; must be alphanumeric or _, cannot start with a number: %q", secret.Name))
 	}
 	fqn := b.getSecretID(secret.Project, secret.Name)
 	term.Debugf("Putting parameter %q", fqn)
-	err := b.driver.PutSecret(ctx, fqn, secret.Value)
+
+	encrypt := true
+	if secret.Type == defangv1.ConfigType_CONFIGTYPE_INSENSITIVE {
+		encrypt = false
+	}
+	err := b.driver.PutSecret(ctx, encrypt, fqn, secret.Value)
 	return AnnotateAwsError(err)
 }
 
@@ -830,7 +885,10 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	}
 	term.Debug("Deleting parameters", ids)
 	if err := b.driver.DeleteSecrets(ctx, ids...); err != nil {
-		return AnnotateAwsError(err)
+		var paramNotFoundErr *ssmTypes.ParameterNotFound
+		if !errors.As(err, &paramNotFoundErr) {
+			return AnnotateAwsError(err)
+		}
 	}
 	return nil
 }

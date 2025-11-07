@@ -48,7 +48,7 @@ type Driver interface {
 	Stop(ctx context.Context, taskID TaskID) error
 	// Exec(ctx context.Context, taskID TaskID, args ...string) error
 	GetInfo(ctx context.Context, taskID TaskID) (*TaskInfo, error)
-	PutSecret(ctx context.Context, name, value string) error
+	PutSecret(ctx context.Context, encrypt bool, name, value string) error
 	// DeleteSecrets(ctx context.Context, names ...string) error
 	ListSecrets(ctx context.Context) ([]string, error) // no values
 	CreateUploadURL(ctx context.Context, name string) (string, error)
