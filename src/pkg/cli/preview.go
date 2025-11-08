@@ -10,7 +10,11 @@ import (
 )
 
 func Preview(ctx context.Context, project *compose.Project, fabric cliClient.FabricClient, provider cliClient.Provider, mode modes.Mode) error {
-	resp, project, err := ComposeUp(ctx, project, fabric, provider, compose.UploadModePreview, mode)
+	resp, project, err := ComposeUp(ctx, fabric, provider, ComposeUpParams{
+		Mode:       mode,
+		Project:    project,
+		UploadMode: compose.UploadModePreview,
+	})
 	if err != nil {
 		return err
 	}

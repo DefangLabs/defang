@@ -99,7 +99,11 @@ func TestComposeUp(t *testing.T) {
 
 	mc := client.MockFabricClient{DelegateDomain: "example.com"}
 	mp := &mockDeployProvider{MockProvider: client.MockProvider{UploadUrl: server.URL + "/"}}
-	d, project, err := ComposeUp(t.Context(), proj, mc, mp, compose.UploadModeDigest, modes.ModeAffordable)
+	d, project, err := ComposeUp(t.Context(), mc, mp, ComposeUpParams{
+		Mode:       modes.ModeAffordable,
+		Project:    proj,
+		UploadMode: compose.UploadModeDigest,
+	})
 	if err != nil {
 		t.Fatalf("ComposeUp() failed: %v", err)
 	}
@@ -283,7 +287,11 @@ func TestComposeUpStops(t *testing.T) {
 				deploymentStatus: tt.cdStatus,
 			}
 
-			resp, project, err := ComposeUp(ctx, project, fabric, provider, compose.UploadModeDigest, modes.ModeUnspecified)
+			resp, project, err := ComposeUp(ctx, fabric, provider, ComposeUpParams{
+				Mode:       modes.ModeUnspecified,
+				Project:    project,
+				UploadMode: compose.UploadModeDigest,
+			})
 			if err != nil {
 				t.Fatalf("ComposeUp() failed: %v", err)
 			}
