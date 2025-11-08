@@ -21,10 +21,12 @@ var statefulImages = []string{
 	"postgres",
 	"rabbitmq",
 	"redis",
+	"redis-stack",
 	"rethinkdb",
 	"scylla",
 	"timescaledb",
 	"valkey",
+	"valkey-bundle",
 	"vault",
 	"zookeeper",
 }
