@@ -12,6 +12,7 @@ import (
 )
 
 type RemoveConfigParams struct {
+	common.LoaderParams
 	Name string
 }
 
