@@ -5,9 +5,10 @@ import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	"github.com/DefangLabs/defang/src/pkg/agent/tools"
+	agentTools "github.com/DefangLabs/defang/src/pkg/agent/tools"
 	"github.com/DefangLabs/defang/src/pkg/mcp/prompts"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
+	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -47,13 +48,13 @@ func (t *ToolTracker) TrackTool(name string, handler server.ToolHandlerFunc) ser
 	}
 }
 
-func NewDefangMCPServer(version string, cluster string, providerID *cliClient.ProviderID, client MCPClient, cli tools.CLIInterface) (*server.MCPServer, error) {
+func NewDefangMCPServer(version string, cluster string, providerID *cliClient.ProviderID, client MCPClient, cli agentTools.CLIInterface) (*server.MCPServer, error) {
 	// Setup knowledge base
 	if err := SetupKnowledgeBase(); err != nil {
 		return nil, fmt.Errorf("failed to setup knowledge base: %w", err)
 	}
 
-	defangTools := tools.CollectTools(cluster, providerID, cli)
+	defangTools := tools.CollectTools(cluster, providerID)
 	s := server.NewMCPServer(
 		"Deploy with Defang",
 		version,
