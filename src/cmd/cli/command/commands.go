@@ -15,6 +15,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/agent"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
@@ -391,6 +392,19 @@ var RootCmd = &cobra.Command{
 		}
 
 		return err
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if nonInteractive {
+			return nil
+		}
+
+		ctx := cmd.Context()
+		err := login.InteractiveRequireLoginAndToS(ctx, client, getCluster())
+		if err != nil {
+			return err
+		}
+
+		return agent.New(ctx, getCluster(), &providerID, agent.DefaultSystemPrompt).Start()
 	},
 }
 
