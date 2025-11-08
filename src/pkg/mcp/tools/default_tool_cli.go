@@ -45,8 +45,8 @@ func (DefaultToolCLI) Connect(ctx context.Context, cluster string) (*cliClient.G
 	return cli.Connect(ctx, cluster)
 }
 
-func (DefaultToolCLI) ComposeUp(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, uploadMode compose.UploadMode, mode modes.Mode) (*defangv1.DeployResponse, *compose.Project, error) {
-	return cli.ComposeUp(ctx, project, client, provider, uploadMode, mode)
+func (DefaultToolCLI) ComposeUp(ctx context.Context, client *cliClient.GrpcClient, provider cliClient.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
+	return cli.ComposeUp(ctx, client, provider, params)
 }
 
 func (DefaultToolCLI) Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cli.TailOptions) error {

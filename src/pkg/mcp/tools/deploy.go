@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
+	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
@@ -45,7 +46,11 @@ func handleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, provi
 
 	term.Debug("Function invoked: cli.ComposeUp")
 	// Use ComposeUp to deploy the services
-	deployResp, project, err := cli.ComposeUp(ctx, project, client, provider, compose.UploadModeDigest, modes.ModeAffordable)
+	deployResp, project, err := cli.ComposeUp(ctx, client, provider, cliTypes.ComposeUpParams{
+		Project:    project,
+		UploadMode: compose.UploadModeDigest,
+		Mode:       modes.ModeAffordable,
+	})
 	if err != nil {
 		err = fmt.Errorf("failed to compose up services: %w", err)
 
