@@ -54,6 +54,7 @@ type TailOptions struct {
 	Until              time.Time
 	Verbose            bool
 	Follow             bool
+	Limit              int
 }
 
 func (to TailOptions) String() string {
