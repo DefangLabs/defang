@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"regexp"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/agent/plugins/fabric"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cluster"
@@ -37,6 +39,7 @@ type Agent struct {
 	g         *genkit.Genkit
 	msgs      []*ai.Message
 	prompt    string
+	tools     []ai.ToolRef
 	outStream io.Writer
 }
 
@@ -65,11 +68,24 @@ func New(ctx context.Context, addr string, providerId *client.ProviderID, prompt
 		genkit.WithPlugins(providerPlugin),
 	)
 
+	tools := CollectTools(addr, providerId)
+	toolRefs := make([]ai.ToolRef, len(tools))
+	for i, t := range tools {
+		toolRef := ai.ToolRef(t)
+		toolRefs[i] = toolRef
+		action, ok := toolRef.(ai.Tool)
+		if !ok {
+			panic("toolRef is not an ai.Tool")
+		}
+		genkit.RegisterAction(g, action)
+	}
+
 	return &Agent{
 		ctx:       ctx,
 		g:         g,
 		msgs:      []*ai.Message{},
 		prompt:    prompt,
+		tools:     toolRefs,
 		outStream: os.Stdout,
 	}
 }
@@ -119,6 +135,67 @@ func (a *Agent) Start() error {
 	}
 }
 
+func (a *Agent) handleToolRequest(req *ai.ToolRequest) (*ai.ToolResponse, error) {
+	inputs, err := json.Marshal(req.Input)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling tool request input: %w", err)
+	}
+	a.Printf("* %s(%s)\n", req.Name, inputs)
+	tool := genkit.LookupTool(a.g, req.Name)
+	if tool == nil {
+		return nil, fmt.Errorf("tool %q not found", req.Name)
+	}
+
+	output, err := tool.RunRaw(a.ctx, req.Input)
+	if err != nil {
+		if errors.Is(err, common.ErrNoProviderSet) {
+			return &ai.ToolResponse{
+				Name:   req.Name,
+				Ref:    req.Ref,
+				Output: "Please set up a provider using one of the setup tools.",
+			}, nil
+		}
+		return nil, fmt.Errorf("tool %q execution error: %w", tool.Name(), err)
+	}
+
+	return &ai.ToolResponse{
+		Name:   req.Name,
+		Ref:    req.Ref,
+		Output: output,
+	}, nil
+}
+
+func (a *Agent) handleToolCalls(requests []*ai.ToolRequest) ([]*ai.Message, error) {
+	if len(requests) == 0 {
+		return nil, nil
+	}
+
+	parts := []*ai.Part{}
+	for _, req := range requests {
+		toolResp, err := a.handleToolRequest(req)
+		if err != nil {
+			return nil, fmt.Errorf("tool request error: %w", err)
+		}
+		a.Printf("  > %s\n", toolResp.Output)
+		parts = append(parts, ai.NewToolResponsePart(toolResp))
+	}
+
+	responses := []*ai.Message{ai.NewMessage(ai.RoleTool, nil, parts...)}
+	a.msgs = append(a.msgs, responses...)
+	resp, err := genkit.Generate(a.ctx, a.g,
+		ai.WithTools(a.tools...),
+		ai.WithMessages(a.msgs...),
+		ai.WithStreaming(a.streamingCallback),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("generation error: %w", err)
+	}
+	a.Println("")
+	responses = append(responses, resp.Message)
+	a.msgs = responses
+	return responses, nil
+}
+
 func (a *Agent) streamingCallback(ctx context.Context, chunk *ai.ModelResponseChunk) error {
 	for _, part := range chunk.Content {
 		a.Printf("%s", part.Text)
@@ -139,7 +216,9 @@ func (a *Agent) handleMessage(msg string) error {
 
 	resp, err := genkit.Generate(a.ctx, a.g,
 		ai.WithPrompt(prompt),
+		ai.WithTools(a.tools...),
 		ai.WithMessages(a.msgs...),
+		ai.WithReturnToolRequests(true),
 		ai.WithStreaming(a.streamingCallback),
 	)
 	a.Println("")
@@ -152,6 +231,13 @@ func (a *Agent) handleMessage(msg string) error {
 		a.Printf("%s", part.Text)
 	}
 	a.Println("")
+
+	if len(resp.ToolRequests()) > 0 {
+		_, err := a.handleToolCalls(resp.ToolRequests())
+		if err != nil {
+			return fmt.Errorf("tool call handling error: %w", err)
+		}
+	}
 
 	return nil
 }
