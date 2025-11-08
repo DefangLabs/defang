@@ -505,3 +505,14 @@ func validateManagedStore(managedStore any) (bool, error) {
 		return false, errors.New("expected parameters in managed storage definition field")
 	}
 }
+
+func IsComputeService(service *composeTypes.ServiceConfig) bool {
+	if service.Extensions == nil {
+		return true
+	}
+
+	return service.Extensions["x-defang-static-files"] == nil &&
+		service.Extensions["x-defang-redis"] == nil &&
+		service.Extensions["x-defang-mongodb"] == nil &&
+		service.Extensions["x-defang-postgres"] == nil
+}

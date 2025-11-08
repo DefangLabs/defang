@@ -18,6 +18,11 @@ services:
     image: nginx:latest
     networks:
       default: null
+  managed:
+    image: redis:latest
+    networks:
+      default: null
+    x-defang-redis: true
   replicated:
     deploy:
       replicas: 3
