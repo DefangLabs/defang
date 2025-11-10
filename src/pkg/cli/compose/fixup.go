@@ -457,7 +457,8 @@ func IsPostgresRepo(repo string) bool {
 }
 
 func IsRedisRepo(repo string) bool {
-	return strings.HasSuffix(repo, "redis") || strings.HasSuffix(repo, "valkey")
+	return strings.HasSuffix(repo, "redis") || strings.HasSuffix(repo, "redis-stack") ||
+		strings.HasSuffix(repo, "valkey") || strings.HasSuffix(repo, "valkey-bundle")
 }
 
 func IsMongoRepo(repo string) bool {
