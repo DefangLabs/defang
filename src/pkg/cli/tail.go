@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/circularbuffer"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -143,7 +144,7 @@ func (cerr CancelError) Unwrap() error {
 	return cerr.error
 }
 
-func Tail(ctx context.Context, provider client.Provider, projectName string, options TailOptions) error {
+func Tail(ctx context.Context, provider client.Provider, projectName string, options TailOptions) (circularbuffer.BufferInterface[string], error) {
 	if options.LogType == logs.LogTypeUnspecified {
 		options.LogType = logs.LogTypeAll
 	}
@@ -167,7 +168,7 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 	}
 
 	if dryrun.DoDryRun {
-		return dryrun.ErrDryRun
+		return nil, dryrun.ErrDryRun
 	}
 
 	return streamLogs(ctx, provider, projectName, options, logEntryPrintHandler)
@@ -208,7 +209,7 @@ type LogEntryHandler func(*defangv1.LogEntry, *TailOptions, *term.Term) error
 
 const DefaultTailLimit = 100
 
-func streamLogs(ctx context.Context, provider client.Provider, projectName string, options TailOptions, handler LogEntryHandler) error {
+func streamLogs(ctx context.Context, provider client.Provider, projectName string, options TailOptions, handler LogEntryHandler) (circularbuffer.BufferInterface[string], error) {
 	var sinceTs, untilTs *timestamppb.Timestamp
 	if pkg.IsValidTime(options.Since) {
 		sinceTs = timestamppb.New(options.Since)
@@ -247,7 +248,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 
 	serverStream, err := provider.QueryLogs(ctx, tailRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -313,16 +314,17 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 	return receiveLogs(ctx, provider, projectName, tailRequest, serverStream, &options, doSpinner, handler)
 }
 
-func receiveLogs(ctx context.Context, provider client.Provider, projectName string, tailRequest *defangv1.TailRequest, serverStream client.ServerStream[defangv1.TailResponse], options *TailOptions, doSpinner bool, handler LogEntryHandler) error {
+func receiveLogs(ctx context.Context, provider client.Provider, projectName string, tailRequest *defangv1.TailRequest, serverStream client.ServerStream[defangv1.TailResponse], options *TailOptions, doSpinner bool, handler LogEntryHandler) (circularbuffer.BufferInterface[string], error) {
+	logCache := circularbuffer.NewCircularBuffer[string](30)
 	skipDuplicate := false
 	var err error
 	for {
 		if !serverStream.Receive() {
 			if errors.Is(serverStream.Err(), context.Canceled) || errors.Is(serverStream.Err(), context.DeadlineExceeded) {
-				return &CancelError{TailOptions: *options, error: serverStream.Err(), ProjectName: projectName}
+				return logCache, &CancelError{TailOptions: *options, error: serverStream.Err(), ProjectName: projectName}
 			}
 			if errors.Is(serverStream.Err(), io.EOF) {
-				return serverStream.Err()
+				return nil, serverStream.Err()
 			}
 
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
@@ -333,13 +335,13 @@ func receiveLogs(ctx context.Context, provider client.Provider, projectName stri
 					spaces, _ = term.Warnf("Reconnecting...\r") // overwritten below
 				}
 				if err := provider.DelayBeforeRetry(ctx); err != nil {
-					return err
+					return logCache, err
 				}
 				tailRequest.Since = timestamppb.New(options.Since)
 				serverStream, err = provider.QueryLogs(ctx, tailRequest)
 				if err != nil {
 					term.Debug("Reconnect failed:", err)
-					return err
+					return logCache, err
 				}
 				if !options.Raw {
 					term.Printf("%*s", spaces, "\r") // clear the "reconnecting" message
@@ -348,7 +350,7 @@ func receiveLogs(ctx context.Context, provider client.Provider, projectName stri
 				continue
 			}
 
-			return serverStream.Err() // returns nil on EOF
+			return logCache, serverStream.Err() // returns nil on EOF
 		}
 		msg := serverStream.Msg()
 
@@ -356,13 +358,13 @@ func receiveLogs(ctx context.Context, provider client.Provider, projectName stri
 			continue
 		}
 
-		if err = handleLogEntryMsgs(msg, doSpinner, skipDuplicate, options, handler); err != nil {
-			return err
+		if err = handleLogEntryMsgs(msg, logCache, doSpinner, skipDuplicate, options, handler); err != nil {
+			return nil, err
 		}
 	}
 }
 
-func handleLogEntryMsgs(msg *defangv1.TailResponse, doSpinner bool, skipDuplicate bool, options *TailOptions, handler LogEntryHandler) error {
+func handleLogEntryMsgs(msg *defangv1.TailResponse, logCache circularbuffer.BufferInterface[string], doSpinner bool, skipDuplicate bool, options *TailOptions, handler LogEntryHandler) error {
 	for _, e := range msg.Entries {
 		// Replace service progress messages with our own spinner
 		if doSpinner && isProgressDot(e.Message) {
@@ -381,6 +383,8 @@ func handleLogEntryMsgs(msg *defangv1.TailResponse, doSpinner bool, skipDuplicat
 		if ts.After(options.Since) {
 			options.Since = ts
 		}
+
+		logCache.Add(e.Message)
 
 		err := handler(e, options, term.DefaultTerm)
 		if err != nil {

@@ -153,15 +153,17 @@ func makeComposeUpCmd() *cobra.Command {
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 
 			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, verbose)
-			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
+			serviceStates, logCache, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
-				handleTailAndMonitorErr(ctx, err, client, cli.DebugConfig{
+				logs := logCache.Get()
+				handleTailAndMonitorErr(ctx, err, logs, client, cli.DebugConfig{
 					Deployment: deploy.Etag,
 					ModelId:    modelId,
 					Project:    project,
 					Provider:   provider,
 					Since:      since,
 				})
+
 				return err
 			}
 
@@ -224,7 +226,7 @@ func handleComposeUpErr(ctx context.Context, err error, project *compose.Project
 	return cli.InteractiveDebugForClientError(ctx, client, project, err)
 }
 
-func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.GrpcClient, debugConfig cli.DebugConfig) {
+func handleTailAndMonitorErr(ctx context.Context, err error, logs []string, client *cliClient.GrpcClient, debugConfig cli.DebugConfig) {
 	var errDeploymentFailed cliClient.ErrDeploymentFailed
 	if errors.As(err, &errDeploymentFailed) {
 		// Tail got canceled because of deployment failure: prompt to show the debugger
@@ -235,7 +237,13 @@ func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.G
 		if nonInteractive {
 			printDefangHint("To debug the deployment, do:", debugConfig.String())
 		} else {
-			track.Evt("Debug Prompted", P("failedServices", debugConfig.FailedServices), P("etag", debugConfig.Deployment), P("reason", errDeploymentFailed))
+			props := track.MakeEventLogProperties("logs", logs)
+			props = append(props,
+				P("failedServices", debugConfig.FailedServices),
+				P("etag", debugConfig.Deployment),
+				P("reason", errDeploymentFailed),
+			)
+			track.Evt("Debug Prompted", props...)
 
 			// Call the AI debug endpoint using the original command context (not the tail ctx which is canceled)
 			if nil != cli.InteractiveDebugDeployment(ctx, client, debugConfig) {
@@ -248,7 +256,7 @@ func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.G
 }
 
 func newTailOptionsForDeploy(deployment string, since time.Time, verbose bool) cli.TailOptions {
-	return cli.TailOptions{
+	tailOpt := cli.TailOptions{
 		Deployment: deployment,
 		LogType:    logs.LogTypeAll,
 		// TODO: Move this to playground provider GetDeploymentStatus
@@ -266,6 +274,8 @@ func newTailOptionsForDeploy(deployment string, since time.Time, verbose bool) c
 		Since:   since,
 		Verbose: verbose,
 	}
+
+	return tailOpt
 }
 
 func flushWarnings() {
@@ -616,7 +626,9 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 		Verbose:    verbose,
 		Follow:     follow,
 	}
-	return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
+
+	_, err = cli.Tail(cmd.Context(), provider, projectName, tailOptions)
+	return err
 }
 
 func setupComposeCommand() *cobra.Command {
