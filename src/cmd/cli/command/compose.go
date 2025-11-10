@@ -510,6 +510,7 @@ func makeLogsCmd() *cobra.Command {
 		RunE:        handleLogsCmd,
 	}
 	setupLogsFlags(logsCmd)
+	logsCmd.Flags().Int32("limit", 100, "maximum number of log lines to show")
 	return logsCmd
 }
 
@@ -551,6 +552,7 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 	var filter, _ = cmd.Flags().GetString("filter")
 	var until, _ = cmd.Flags().GetString("until")
 	var follow, _ = cmd.Flags().GetBool("follow")
+	var limit, _ = cmd.Flags().GetInt32("limit")
 
 	if follow && until != "" {
 		return errors.New("cannot use --follow and --until together")
@@ -615,6 +617,7 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 		Until:      untilTs,
 		Verbose:    verbose,
 		Follow:     follow,
+		Limit:      limit,
 	}
 	return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 }

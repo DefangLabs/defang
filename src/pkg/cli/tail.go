@@ -44,16 +44,17 @@ var (
 type TailDetectStopEventFunc func(eventLog *defangv1.LogEntry) error
 
 type TailOptions struct {
-	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe and GetDeploymentStatus instead #851
 	Deployment         types.ETag
+	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe and GetDeploymentStatus instead #851
 	Filter             string
+	Follow             bool
+	Limit              int32
 	LogType            logs.LogType
 	Raw                bool
 	Services           []string
 	Since              time.Time
 	Until              time.Time
 	Verbose            bool
-	Follow             bool
 }
 
 func (to TailOptions) String() string {
@@ -206,8 +207,6 @@ func isTransientError(err error) bool {
 
 type LogEntryHandler func(*defangv1.LogEntry, *TailOptions, *term.Term) error
 
-const DefaultTailLimit = 100
-
 func streamLogs(ctx context.Context, provider client.Provider, projectName string, options TailOptions, handler LogEntryHandler) error {
 	var sinceTs, untilTs *timestamppb.Timestamp
 	if pkg.IsValidTime(options.Since) {
@@ -226,11 +225,6 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 		}
 	}
 
-	limit := int32(0) // 0 means no limit
-	if !options.Follow {
-		limit = DefaultTailLimit
-	}
-
 	tailRequest := &defangv1.TailRequest{
 		Etag:     options.Deployment,
 		LogType:  uint32(options.LogType),
@@ -240,7 +234,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 		Since:    sinceTs, // this is also used to continue from the last timestamp
 		Until:    untilTs,
 		Follow:   options.Follow,
-		Limit:    limit,
+		Limit:    options.Limit,
 	}
 
 	term.Debug("Tail request:", tailRequest)
