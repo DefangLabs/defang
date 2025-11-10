@@ -78,7 +78,7 @@ func (to TailOptions) String() string {
 	if !to.Verbose {
 		cmd += " --verbose=0"
 	}
-	if to.LogType != logs.LogTypeUnspecified {
+	if to.LogType != logs.LogTypeUnspecified && to.LogType != logs.LogTypeAll {
 		cmd += " --type=" + to.LogType.String()
 	}
 	if to.Filter != "" {
