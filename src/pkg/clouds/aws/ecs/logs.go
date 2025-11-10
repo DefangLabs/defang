@@ -132,7 +132,15 @@ func QueryLogGroups(ctx context.Context, start, end time.Time, limit int32, logG
 		// Start a go routine for each log group
 		go func(lgi LogGroupInput) {
 			defer close(lgEvtChan)
-			if err := QueryLogGroup(ctx, lgi, start, end, limit, func(logEvents []LogEvent) error {
+			// CloudWatch only supports querying a LogGroup from a timestamp in
+			// ascending order. After we query each LogGroup, we merge the results
+			// and take the last N events. Because we can't tell in advance which
+			// LogGroup will have the most recent events, we have to query all
+			// log groups without limit, and then apply the limit after merging.
+			// TODO: optimize this by simulating a descending query by doing
+			// multiple queries with time windows, starting from the end time
+			// and moving backwards until we have enough events.
+			if err := QueryLogGroup(ctx, lgi, start, end, 0, func(logEvents []LogEvent) error {
 				for _, event := range logEvents {
 					lgEvtChan <- event
 				}
