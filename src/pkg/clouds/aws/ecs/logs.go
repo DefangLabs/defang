@@ -126,7 +126,7 @@ func TailLogGroup(ctx context.Context, input LogGroupInput) (LiveTailStream, err
 
 func QueryLogGroups(ctx context.Context, start, end time.Time, limit int32, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
 	var evtsChan chan LogEvent
-	var errChan chan error
+	errChan := make(chan error, len(logGroups))
 	for _, lgi := range logGroups {
 		lgEvtChan := make(chan LogEvent)
 		// Start a go routine for each log group
