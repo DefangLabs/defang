@@ -58,12 +58,12 @@ type TailOptions struct {
 }
 
 func (to TailOptions) String() string {
-	cmd := " --since=" + to.Since.UTC().Format(time.RFC3339Nano)
-	if to.Until.IsZero() {
-		// No --until implies --follow
-		cmd = "tail" + cmd
-	} else {
-		cmd = "logs" + cmd + " --until=" + to.Until.UTC().Format(time.RFC3339Nano)
+	cmd := ""
+	if !to.Since.IsZero() {
+		cmd += " --since=" + to.Since.UTC().Format(time.RFC3339Nano)
+	}
+	if !to.Until.IsZero() {
+		cmd += " --until=" + to.Until.UTC().Format(time.RFC3339Nano)
 	}
 	if to.Follow {
 		cmd += " --follow"
@@ -133,7 +133,7 @@ type CancelError struct {
 }
 
 func (cerr CancelError) Error() string {
-	cmd := cerr.String()
+	cmd := "logs" + cerr.String()
 	if cerr.ProjectName != "" {
 		cmd += " --project-name=" + cerr.ProjectName
 	}

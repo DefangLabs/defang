@@ -310,7 +310,7 @@ func (m mockQueryErrorProvider) QueryLogs(ctx context.Context, req *defangv1.Tai
 }
 
 func TestTailError(t *testing.T) {
-	const cancelError = "tail --since=2024-01-02T03:04:05Z --verbose=0 --project-name=project"
+	const cancelError = "logs --since=2024-01-02T03:04:05Z --verbose=0 --project-name=project"
 	tailOptions := TailOptions{
 		Since: time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC),
 	}
@@ -345,7 +345,7 @@ func TestTailError(t *testing.T) {
 }
 
 func TestTailContext(t *testing.T) {
-	const cancelError = "tail --since=2024-01-02T03:04:05Z --verbose=0 --project-name=project"
+	const cancelError = "logs --since=2024-01-02T03:04:05Z --verbose=0 --project-name=project"
 	tailOptions := TailOptions{
 		Since: time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC),
 	}
