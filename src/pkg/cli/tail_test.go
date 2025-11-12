@@ -104,6 +104,20 @@ func (m *mockTailProvider) GetProjectUpdate(ctx context.Context, projectName str
 	return nil, nil
 }
 
+// mockTimestampProvider is a specialized provider for timestamp tests that returns a valid project
+type mockTimestampProvider struct {
+	*mockTailProvider
+}
+
+func (m *mockTimestampProvider) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
+	// Return a valid project update to avoid warning messages in timestamp tests
+	return &defangv1.ProjectUpdate{
+		Services: []*defangv1.ServiceInfo{
+			{Service: &defangv1.Service{Name: "test-service"}},
+		},
+	}, nil
+}
+
 type mockTailStream = client.MockServerStream[defangv1.TailResponse]
 
 func (m *mockTailProvider) MockTimestamp(timestamp time.Time) *mockTailProvider {
@@ -253,8 +267,8 @@ func TestUTC(t *testing.T) {
 
 	// Create mock data for tail with local time
 	const projectName = "project"
-	localMock := &mockTailProvider{}
-	localMock = localMock.MockTimestamp(localTime)
+	localMock := &mockTimestampProvider{&mockTailProvider{}}
+	localMock.mockTailProvider = localMock.mockTailProvider.MockTimestamp(localTime)
 
 	// Start the terminal for local time test
 	err := Tail(t.Context(), localMock, projectName, TailOptions{Verbose: true}) // Output host
@@ -286,8 +300,8 @@ func TestUTC(t *testing.T) {
 	t.Cleanup(cleanup2)
 
 	// Create new mock data for tail with UTC time
-	utcMock := &mockTailProvider{}
-	utcMock = utcMock.MockTimestamp(utcTime)
+	utcMock := &mockTimestampProvider{&mockTailProvider{}}
+	utcMock.mockTailProvider = utcMock.mockTailProvider.MockTimestamp(utcTime)
 
 	err = Tail(t.Context(), utcMock, projectName, TailOptions{Verbose: true})
 	if err != nil {
