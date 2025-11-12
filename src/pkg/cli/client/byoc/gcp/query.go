@@ -42,7 +42,7 @@ func (q *Query) GetQuery() string {
 	return buf.String()
 }
 
-func NewLogQuery(projectId string) *Query {
+func NewLogQuery(projectId gcp.ProjectId) *Query {
 	return NewQuery(fmt.Sprintf(`(
 logName=~"logs/run.googleapis.com%%2F(stdout|stderr)$" OR
 logName="projects/%[1]s/logs/cloudbuild" OR
