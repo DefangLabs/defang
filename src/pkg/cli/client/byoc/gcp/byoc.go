@@ -188,7 +188,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		return err
 	}
 	//   3.2 Give CD role access to CD bucket
-	if err := b.driver.EnsureServiceAccountHasBucketRoles(ctx, b.bucket, b.cdServiceAccount, []string{"roles/storage.admin"}); err != nil {
+	if err := b.driver.EnsurePrincipalHasBucketRoles(ctx, b.bucket, "serviceAccount:"+b.cdServiceAccount, []string{"roles/storage.admin"}); err != nil {
 		return err
 	}
 
@@ -199,7 +199,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		b.uploadServiceAccount = path.Base(uploadServiceAccount)
 	}
 	//  4.1 Give upload service account access to cd bucket
-	if err := b.driver.EnsureServiceAccountHasBucketRoles(ctx, b.bucket, b.uploadServiceAccount, []string{"roles/storage.objectUser"}); err != nil {
+	if err := b.driver.EnsurePrincipalHasBucketRoles(ctx, b.bucket, "serviceAccount:"+b.uploadServiceAccount, []string{"roles/storage.objectUser"}); err != nil {
 		return err
 	}
 	//  4.2 Give current principal the token creator role on the upload service account
@@ -926,6 +926,15 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 	}
 	if bucketName == "" {
 		return nil, errors.New("no defang cd bucket found")
+	}
+
+	principal, err := b.driver.GetCurrentPrincipal(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get GCP current principal: %w", err)
+	}
+
+	if err := b.driver.EnsurePrincipalHasBucketRoles(ctx, bucketName, principal, []string{"roles/storage.objectViewer"}); err != nil {
+		return nil, fmt.Errorf("failed to give current principal %q access to cd bucket: %w", principal, err)
 	}
 
 	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/byoc/aws/index.ts#L89

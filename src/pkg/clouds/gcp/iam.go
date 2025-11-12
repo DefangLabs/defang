@@ -160,7 +160,7 @@ func (gcp Gcp) EnsureServiceAccountHasRoles(ctx context.Context, serviceAccount 
 	return ensureAccountHasRolesWithResource(ctx, client, projectResource, serviceAccount, roles)
 }
 
-func (gcp Gcp) EnsureServiceAccountHasBucketRoles(ctx context.Context, bucketName, serviceAccount string, roles []string) error {
+func (gcp Gcp) EnsurePrincipalHasBucketRoles(ctx context.Context, bucketName, principal string, roles []string) error {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create storage client: %w", err)
@@ -169,7 +169,6 @@ func (gcp Gcp) EnsureServiceAccountHasBucketRoles(ctx context.Context, bucketNam
 
 	// Get the bucket's IAM policy
 	bucket := client.Bucket(bucketName)
-	serviceAccountMember := "serviceAccount:" + serviceAccount
 	policy, err := bucket.IAM().Policy(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get IAM policy for bucket %s: %w", bucketName, err)
@@ -179,18 +178,18 @@ func (gcp Gcp) EnsureServiceAccountHasBucketRoles(ctx context.Context, bucketNam
 	for _, roleStr := range roles {
 		role := iam.RoleName(roleStr)
 		members := policy.Members(role)
-		if !slices.Contains(members, serviceAccountMember) {
-			policy.Add(serviceAccountMember, role)
+		if !slices.Contains(members, principal) {
+			policy.Add(principal, role)
 			needUpdate = true
 		}
 	}
 
 	if !needUpdate {
-		term.Debugf("Service account %s already has roles %v on bucket %s", serviceAccount, roles, bucketName)
+		term.Debugf("Principal %s already has roles %v on bucket %s", principal, roles, bucketName)
 		return nil
 	}
 
-	term.Infof("Updating IAM policy for service account %s on bucket %s", serviceAccount, bucketName)
+	term.Infof("Updating IAM policy for principal %s on bucket %s", principal, bucketName)
 	for i := range 3 { // Service account might not be visible for a few seconds after creation for policy attachment
 		if err := bucket.IAM().SetPolicy(ctx, policy); err != nil {
 			if i < 2 {
@@ -207,13 +206,13 @@ func (gcp Gcp) EnsureServiceAccountHasBucketRoles(ctx context.Context, bucketNam
 	for start := time.Now(); time.Since(start) < 5*time.Minute; {
 		vp, err := bucket.IAM().Policy(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to verify IAM policy for service account %s on bucket %s: %w", serviceAccount, bucketName, err)
+			return fmt.Errorf("failed to verify IAM policy for principal %s on bucket %s: %w", principal, bucketName, err)
 		}
 
 		for _, roleStr := range roles {
 			role := iam.RoleName(roleStr)
 			members := vp.Members(role)
-			if !slices.Contains(members, serviceAccountMember) {
+			if !slices.Contains(members, principal) {
 				pkg.SleepWithContext(ctx, 3*time.Second)
 				continue
 			}
