@@ -107,7 +107,7 @@ func (s *ServerStream[T]) StartFollow(start time.Time) {
 	go func() {
 		// Only query older logs if start time is more than 10ms ago
 		if !start.IsZero() && start.Unix() > 0 && time.Since(start) > 10*time.Millisecond {
-			s.queryHead(query)
+			s.queryHead(query, 0)
 		}
 
 		// Start tailing logs after all older logs are processed
@@ -133,7 +133,15 @@ func (s *ServerStream[T]) StartFollow(start time.Time) {
 	}()
 }
 
-func (s *ServerStream[T]) Start(limit int32) {
+func (s *ServerStream[T]) StartHead(limit int32) {
+	query := s.query.GetQuery()
+	term.Debugf("Query logs with query: \n%v", query)
+	go func() {
+		s.queryHead(query, limit)
+	}()
+}
+
+func (s *ServerStream[T]) StartTail(limit int32) {
 	query := s.query.GetQuery()
 	term.Debugf("Query logs with query: \n%v", query)
 	go func() {
@@ -141,15 +149,27 @@ func (s *ServerStream[T]) Start(limit int32) {
 	}()
 }
 
-func (s *ServerStream[T]) queryHead(query string) {
+func (s *ServerStream[T]) queryHead(query string, limit int32) {
 	lister, err := s.gcpLogsClient.ListLogEntries(s.ctx, query, gcp.OrderAscending)
 	if err != nil {
 		s.errCh <- err
 		return
 	}
-	err = s.listToChannel(lister)
-	if err != nil && !errors.Is(err, io.EOF) { // Ignore EOF for listing older logs, to proceed to tailing
-		s.errCh <- err
+	if limit == 0 {
+		err = s.listToChannel(lister)
+		if err != nil && !errors.Is(err, io.EOF) { // Ignore EOF for listing older logs, to proceed to tailing
+			s.errCh <- err
+			return
+		}
+	} else {
+		buffer, err := s.listToBuffer(lister, limit)
+		if err != nil {
+			s.errCh <- err
+		}
+		for i := range buffer {
+			s.respCh <- buffer[i]
+		}
+		s.errCh <- io.EOF
 	}
 }
 
