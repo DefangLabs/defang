@@ -99,6 +99,11 @@ func (m *mockTailProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequ
 	return ss, nil
 }
 
+func (m *mockTailProvider) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
+	// Mock implementation that returns nil to indicate no project update available
+	return nil, nil
+}
+
 type mockTailStream = client.MockServerStream[defangv1.TailResponse]
 
 func (m *mockTailProvider) MockTimestamp(timestamp time.Time) *mockTailProvider {
@@ -158,6 +163,7 @@ func TestTail(t *testing.T) {
 	}
 
 	expectedLogs := []string{
+		"! Project \"project1\" not found or has no deployments. Logs may be empty or from failed deployments.\n",
 		"SOMEETAG service1 SOMEHOST e1msg1\n",
 		"SOMEOTHERETAG service1 SOMEHOST e1msg2\n",
 		"SOMEOTHERETAG2 service1 SOMEOTHERHOST e1msg3\n",
@@ -307,6 +313,11 @@ type mockQueryErrorProvider struct {
 
 func (m mockQueryErrorProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	return &mockTailStream{Error: m.TailStreamError}, nil
+}
+
+func (m mockQueryErrorProvider) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
+	// Mock implementation that returns nil to indicate no project update available
+	return nil, nil
 }
 
 func TestTailError(t *testing.T) {

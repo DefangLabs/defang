@@ -239,6 +239,17 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 
 	term.Debug("Tail request:", tailRequest)
 
+	// Validate that the project exists before querying logs (for all providers)
+	// This is a best-effort validation that provides a helpful warning to users
+	if projectName != "" {
+		projectUpdate, err := provider.GetProjectUpdate(ctx, projectName)
+		if err != nil {
+			term.Warnf("Failed to check project: %v", err)
+		} else if projectUpdate == nil {
+			term.Warnf("Project %q not found or has no deployments. Logs may be empty or from failed deployments.", projectName)
+		}
+	}
+
 	serverStream, err := provider.QueryLogs(ctx, tailRequest)
 	if err != nil {
 		return err
