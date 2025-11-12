@@ -173,6 +173,14 @@ func TestTail(t *testing.T) {
 
 	got := strings.SplitAfter(stdout.String(), "\n")
 
+	// expect the first line to be a message about fetching older logs
+	if !strings.Contains(got[0], "To view older logs, run: `defang logs --until=") {
+		t.Errorf("Expected first line to contain 'To view older logs, run: `defang logs --until=', got %q", got[0])
+	}
+
+	// Remove the first line which is a hint
+	got = got[1:]
+
 	if len(got) != len(expectedLogs) {
 		t.Log(got)
 		t.Fatalf("Expecting %v lines of log, but got %v", len(expectedLogs), len(got))
@@ -256,7 +264,9 @@ func TestUTC(t *testing.T) {
 		t.Errorf("Tail() error = %v, want io.EOF", err)
 	}
 
-	localTimeparse := strings.TrimSpace(term.StripAnsi(stdout.String()))
+	output := stdout.String()
+	lines := strings.Split(output, "\n")
+	localTimeparse := strings.TrimSpace(term.StripAnsi(lines[1])) // skip first line which is a hint
 	convertedLocalTime, err := time.Parse(format, localTimeparse)
 	if err != nil {
 		t.Error("Error parsing time:", err)
@@ -288,8 +298,10 @@ func TestUTC(t *testing.T) {
 		t.Errorf("Tail() error = %v, want io.EOF", err)
 	}
 
+	output2 := stdout2.String()
+	lines2 := strings.Split(output2, "\n")
 	// Parse the time from the terminal for UTC time
-	utcTimeParse := strings.TrimSpace(term.StripAnsi(stdout2.String()))
+	utcTimeParse := strings.TrimSpace(term.StripAnsi(lines2[1])) // skip first line which is a hint
 	convertedUTCTime, err := time.Parse(format, utcTimeParse)
 	if err != nil {
 		t.Error("Error parsing time:", err)
@@ -310,7 +322,7 @@ func (m mockQueryErrorProvider) QueryLogs(ctx context.Context, req *defangv1.Tai
 }
 
 func TestTailError(t *testing.T) {
-	const cancelError = "tail --since=2024-01-02T03:04:05Z --verbose=0 --type=ALL --project-name=project"
+	const cancelError = "logs --since=2024-01-02T03:04:05Z --verbose=0 --project-name=project"
 	tailOptions := TailOptions{
 		Since: time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC),
 	}
@@ -345,7 +357,7 @@ func TestTailError(t *testing.T) {
 }
 
 func TestTailContext(t *testing.T) {
-	const cancelError = "tail --since=2024-01-02T03:04:05Z --verbose=0 --type=ALL --project-name=project"
+	const cancelError = "logs --since=2024-01-02T03:04:05Z --verbose=0 --project-name=project"
 	tailOptions := TailOptions{
 		Since: time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC),
 	}

@@ -58,12 +58,12 @@ type TailOptions struct {
 }
 
 func (to TailOptions) String() string {
-	cmd := " --since=" + to.Since.UTC().Format(time.RFC3339Nano)
-	if to.Until.IsZero() {
-		// No --until implies --follow
-		cmd = "tail" + cmd
-	} else {
-		cmd = "logs" + cmd + " --until=" + to.Until.UTC().Format(time.RFC3339Nano)
+	cmd := ""
+	if !to.Since.IsZero() {
+		cmd += " --since=" + to.Since.UTC().Format(time.RFC3339Nano)
+	}
+	if !to.Until.IsZero() {
+		cmd += " --until=" + to.Until.UTC().Format(time.RFC3339Nano)
 	}
 	if to.Follow {
 		cmd += " --follow"
@@ -78,7 +78,7 @@ func (to TailOptions) String() string {
 	if !to.Verbose {
 		cmd += " --verbose=0"
 	}
-	if to.LogType != logs.LogTypeUnspecified {
+	if to.LogType != logs.LogTypeUnspecified && to.LogType != logs.LogTypeAll {
 		cmd += " --type=" + to.LogType.String()
 	}
 	if to.Filter != "" {
@@ -133,7 +133,7 @@ type CancelError struct {
 }
 
 func (cerr CancelError) Error() string {
-	cmd := cerr.String()
+	cmd := "logs" + cerr.String()
 	if cerr.ProjectName != "" {
 		cmd += " --project-name=" + cerr.ProjectName
 	}
@@ -307,7 +307,45 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 	return receiveLogs(ctx, provider, projectName, tailRequest, serverStream, &options, doSpinner, handler)
 }
 
+func makeHeadBookendOptions(options *TailOptions, firstLogTime time.Time) *TailOptions {
+	newOptions := *options
+	if !firstLogTime.IsZero() {
+		newOptions.Until = firstLogTime
+	} else {
+		newOptions.Until = newOptions.Since
+	}
+	newOptions.Since = time.Time{}
+	return &newOptions
+}
+
+func printHeadBookend(options *TailOptions, firstLogTime time.Time) {
+	newOptions := makeHeadBookendOptions(options, firstLogTime)
+	if !newOptions.Until.IsZero() {
+		term.Info("To view older logs, run: `defang logs" + newOptions.String() + "`")
+	}
+}
+
+func makeTailBookendOptions(options *TailOptions, lastLogTime time.Time) *TailOptions {
+	newOptions := *options
+	if !lastLogTime.IsZero() {
+		newOptions.Since = lastLogTime
+	} else {
+		newOptions.Since = newOptions.Until
+	}
+	newOptions.Until = time.Time{}
+	return &newOptions
+}
+
+func printTailBookend(options *TailOptions, lastLogTime time.Time) {
+	newOptions := makeTailBookendOptions(options, lastLogTime)
+	if !newOptions.Since.IsZero() {
+		term.Info("To view more recent logs, run: `defang logs" + newOptions.String() + "`")
+	}
+}
+
 func receiveLogs(ctx context.Context, provider client.Provider, projectName string, tailRequest *defangv1.TailRequest, serverStream client.ServerStream[defangv1.TailResponse], options *TailOptions, doSpinner bool, handler LogEntryHandler) error {
+	headBookendPrinted := false
+	lastLogTime := time.Time{}
 	skipDuplicate := false
 	var err error
 	for {
@@ -342,12 +380,25 @@ func receiveLogs(ctx context.Context, provider client.Provider, projectName stri
 				continue
 			}
 
-			return serverStream.Err() // returns nil on EOF
+			if serverStream.Err() == nil { // returns nil on EOF
+				printTailBookend(options, lastLogTime)
+				return nil
+			}
+			return serverStream.Err()
 		}
 		msg := serverStream.Msg()
 
 		if msg == nil {
 			continue
+		}
+
+		if !headBookendPrinted && len(msg.Entries) > 0 {
+			printHeadBookend(options, msg.Entries[0].Timestamp.AsTime())
+			headBookendPrinted = true
+		}
+
+		if len(msg.Entries) > 0 {
+			lastLogTime = msg.Entries[len(msg.Entries)-1].Timestamp.AsTime()
 		}
 
 		if err = handleLogEntryMsgs(msg, doSpinner, skipDuplicate, options, handler); err != nil {
