@@ -548,6 +548,17 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 }
 
 func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+	// Validate that the project exists before querying logs
+	if req.Project != "" {
+		projectUpdate, err := b.GetProjectUpdate(ctx, req.Project)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check project: %w", err)
+		}
+		if projectUpdate == nil {
+			return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("project %q not found or has no deployments", req.Project))
+		}
+	}
+
 	if b.cdExecution != "" && req.Etag == b.cdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
 		subscribeStream, err := NewSubscribeStream(ctx, b.driver, true, req.Etag, req.Services)
 		if err != nil {
