@@ -152,7 +152,11 @@ func QueryLogGroups(ctx context.Context, start, end time.Time, limit int32, logG
 		evtsChan = mergeLogEventChan(evtsChan, lgEvtChan) // Merge sort the log events based on timestamp
 		// take the last n events only
 		if limit > 0 {
-			evtsChan = takeLastN(evtsChan, int(limit))
+			if start.IsZero() {
+				evtsChan = takeLastN(evtsChan, int(limit))
+			} else {
+				evtsChan = takeFirstN(evtsChan, int(limit))
+			}
 		}
 	}
 	return evtsChan, errChan
@@ -280,6 +284,25 @@ func takeLastN[T any](input chan T, n int) chan T {
 		}
 		for _, evt := range buffer {
 			out <- evt
+		}
+	}()
+	return out
+}
+
+func takeFirstN[T any](input chan T, n int) chan T {
+	if n <= 0 {
+		return input
+	}
+	out := make(chan T)
+	go func() {
+		defer close(out)
+		count := 0
+		for evt := range input {
+			if count >= n {
+				break
+			}
+			out <- evt
+			count++
 		}
 	}()
 	return out
