@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/smithy-go/ptr"
@@ -46,7 +45,12 @@ func NewStaticLogStream(ch <-chan LogEvent, cancel func()) EventStream[types.Sta
 	return es
 }
 
-func QueryAndTailLogGroups(ctx context.Context, start, end time.Time, logGroups ...LogGroupInput) (LiveTailStream, error) {
+type FiltererTailer interface {
+	LogFilterer
+	LogTailer
+}
+
+func QueryAndTailLogGroups(ctx context.Context, cw FiltererTailer, start, end time.Time, logGroups ...LogGroupInput) (LiveTailStream, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	e := &eventStream{
@@ -59,7 +63,7 @@ func QueryAndTailLogGroups(ctx context.Context, start, end time.Time, logGroups 
 	var err error
 	for _, lgi := range logGroups {
 		var es LiveTailStream
-		es, err = QueryAndTailLogGroup(ctx, lgi, start, end)
+		es, err = QueryAndTailLogGroup(ctx, cw, lgi, start, end)
 		if err != nil {
 			break // abort if there is any fatal error
 		}
@@ -93,7 +97,11 @@ type LogGroupInput struct {
 	LogEventFilterPattern string
 }
 
-func TailLogGroup(ctx context.Context, input LogGroupInput) (LiveTailStream, error) {
+type LogTailer interface {
+	StartLiveTail(ctx context.Context, params *cloudwatchlogs.StartLiveTailInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.StartLiveTailOutput, error)
+}
+
+func TailLogGroup(ctx context.Context, cw LogTailer, input LogGroupInput) (LiveTailStream, error) {
 	var pattern *string
 	if input.LogEventFilterPattern != "" {
 		pattern = &input.LogEventFilterPattern
@@ -110,12 +118,6 @@ func TailLogGroup(ctx context.Context, input LogGroupInput) (LiveTailStream, err
 		LogEventFilterPattern: pattern,
 	}
 
-	region := region.FromArn(slti.LogGroupIdentifiers[0]) // must have at least one log group
-	cw, err := newCloudWatchLogsClient(ctx, region)       // assume all log groups are in the same region
-	if err != nil {
-		return nil, err
-	}
-
 	slto, err := cw.StartLiveTail(ctx, slti)
 	if err != nil {
 		return nil, err
@@ -124,7 +126,11 @@ func TailLogGroup(ctx context.Context, input LogGroupInput) (LiveTailStream, err
 	return slto.GetStream(), nil
 }
 
-func QueryLogGroups(ctx context.Context, start, end time.Time, limit int32, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
+type LogFilterer interface {
+	FilterLogEvents(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error)
+}
+
+func QueryLogGroups(ctx context.Context, cw LogFilterer, start, end time.Time, limit int32, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
 	var evtsChan chan LogEvent
 	errChan := make(chan error, len(logGroups))
 	for _, lgi := range logGroups {
@@ -140,7 +146,7 @@ func QueryLogGroups(ctx context.Context, start, end time.Time, limit int32, logG
 			// TODO: optimize this by simulating a descending query by doing
 			// multiple queries with time windows, starting from the end time
 			// and moving backwards until we have enough events.
-			if err := QueryLogGroup(ctx, lgi, start, end, 0, func(logEvents []LogEvent) error {
+			if err := QueryLogGroup(ctx, cw, lgi, start, end, 0, func(logEvents []LogEvent) error {
 				for _, event := range logEvents {
 					lgEvtChan <- event
 				}
@@ -162,16 +168,11 @@ func QueryLogGroups(ctx context.Context, start, end time.Time, limit int32, logG
 	return evtsChan, errChan
 }
 
-func QueryLogGroup(ctx context.Context, input LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
-	region := region.FromArn(input.LogGroupARN)
-	cw, err := newCloudWatchLogsClient(ctx, region)
-	if err != nil {
-		return err
-	}
+func QueryLogGroup(ctx context.Context, cw LogFilterer, input LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
 	return filterLogEvents(ctx, cw, input, start, end, limit, cb)
 }
 
-func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
+func filterLogEvents(ctx context.Context, cw LogFilterer, lgi LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
 	var pattern *string
 	if lgi.LogEventFilterPattern != "" {
 		pattern = &lgi.LogEventFilterPattern
@@ -233,7 +234,7 @@ func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGrou
 	}
 }
 
-func newCloudWatchLogsClient(ctx context.Context, region aws.Region) (*cloudwatchlogs.Client, error) {
+func NewCloudWatchLogsClient(ctx context.Context, region aws.Region) (*cloudwatchlogs.Client, error) {
 	cfg, err := aws.LoadDefaultConfig(ctx, region)
 	if err != nil {
 		return nil, err
