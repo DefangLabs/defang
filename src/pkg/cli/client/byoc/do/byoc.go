@@ -142,7 +142,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 		return nil, err
 	}
 
-	if err := b.setUp(ctx); err != nil {
+	if err := b.SetUpCD(ctx); err != nil {
 		return nil, err
 	}
 
@@ -223,7 +223,7 @@ func (b *ByocDo) GetDeploymentStatus(ctx context.Context) error {
 }
 
 func (b *ByocDo) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (string, error) {
-	if err := b.setUp(ctx); err != nil {
+	if err := b.SetUpCD(ctx); err != nil {
 		return "", err
 	}
 
@@ -257,7 +257,7 @@ func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
 }
 
 func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	if err := b.setUp(ctx); err != nil {
+	if err := b.SetUpCD(ctx); err != nil {
 		return nil, err
 	}
 
@@ -465,7 +465,7 @@ func (b *ByocDo) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (clie
 	}
 }
 
-func (b *ByocDo) TearDown(ctx context.Context) error {
+func (b *ByocDo) TearDownCD(ctx context.Context) error {
 	app, err := b.getAppByName(ctx, appPlatform.CdName)
 	if err != nil {
 		return err
@@ -760,7 +760,7 @@ func (b *ByocDo) environment(projectName, delegateDomain string, mode defangv1.D
 	return env, nil
 }
 
-func (b *ByocDo) setUp(ctx context.Context) error {
+func (b *ByocDo) SetUpCD(ctx context.Context) error {
 	if b.SetupDone {
 		return nil
 	}

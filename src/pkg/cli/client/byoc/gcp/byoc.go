@@ -116,7 +116,7 @@ func getGcpProjectID() string {
 	return projectId
 }
 
-func (b *ByocGcp) setUpCD(ctx context.Context) error {
+func (b *ByocGcp) SetUpCD(ctx context.Context) error {
 	if b.setupDone {
 		return nil
 	}
@@ -313,7 +313,7 @@ func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 }
 
 func (b *ByocGcp) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (types.ETag, error) {
-	if err := b.setUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx); err != nil {
 		return "", err
 	}
 	cmd := cdCommand{
@@ -395,7 +395,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 }
 
 func (b *ByocGcp) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	if err := b.setUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx); err != nil {
 		return nil, err
 	}
 
@@ -460,7 +460,7 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 
 	// FIXME: Get cd image tag for the project
 
-	if err := b.setUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx); err != nil {
 		return nil, err
 	}
 
@@ -872,7 +872,7 @@ func (b *ByocGcp) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 	return nil, client.ErrNotImplemented("GCP Delete")
 }
 
-func (b *ByocGcp) TearDown(ctx context.Context) error {
+func (b *ByocGcp) TearDownCD(ctx context.Context) error {
 	// FIXME: implement
 	return client.ErrNotImplemented("GCP TearDown")
 }
