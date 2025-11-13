@@ -4,11 +4,15 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
+	"github.com/DefangLabs/defang/src/pkg/modes"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -59,6 +63,71 @@ func (m *MockCLI) GetServices(ctx context.Context, projectName string, provider 
 		return nil, m.GetServicesError
 	}
 	return m.MockServices, nil
+}
+
+// Add other required CLIInterface methods as no-op implementations
+func (m *MockCLI) CanIUseProvider(ctx context.Context, client *client.GrpcClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {
+	return nil
+}
+
+func (m *MockCLI) CheckProviderConfigured(ctx context.Context, client *client.GrpcClient, providerId client.ProviderID, projectName, stack string, serviceCount int) (client.Provider, error) {
+	return m.MockProvider, nil
+}
+
+func (m *MockCLI) ComposeDown(ctx context.Context, projectName string, client *client.GrpcClient, provider client.Provider) (string, error) {
+	return "", nil
+}
+
+func (m *MockCLI) ComposeUp(ctx context.Context, client *client.GrpcClient, provider client.Provider, params defangcli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
+	return nil, nil, nil
+}
+
+func (m *MockCLI) ConfigDelete(ctx context.Context, projectName string, provider client.Provider, name string) error {
+	return nil
+}
+
+func (m *MockCLI) ConfigSet(ctx context.Context, projectName string, provider client.Provider, name, value string) error {
+	return nil
+}
+
+func (m *MockCLI) CreatePlaygroundProvider(client *client.GrpcClient) client.Provider {
+	return m.MockProvider
+}
+
+func (m *MockCLI) GenerateAuthURL(authPort int) string {
+	return ""
+}
+
+func (m *MockCLI) InteractiveLoginMCP(ctx context.Context, client *client.GrpcClient, cluster string, mcpClient string) error {
+	return nil
+}
+
+func (m *MockCLI) ListConfig(ctx context.Context, provider client.Provider, projectName string) (*defangv1.Secrets, error) {
+	return nil, nil
+}
+
+func (m *MockCLI) LoadProject(ctx context.Context, loader client.Loader) (*compose.Project, error) {
+	return nil, nil
+}
+
+func (m *MockCLI) OpenBrowser(url string) error {
+	return nil
+}
+
+func (m *MockCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string {
+	return ""
+}
+
+func (m *MockCLI) RunEstimate(ctx context.Context, project *compose.Project, client *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
+	return nil, nil
+}
+
+func (m *MockCLI) Tail(ctx context.Context, provider client.Provider, project *compose.Project, options defangcli.TailOptions) error {
+	return nil
+}
+
+func (m *MockCLI) TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, options defangcli.TailOptions) (defangcli.ServiceStates, error) {
+	return nil, nil
 }
 
 // createConnectError creates a connect error with the specified code and message
@@ -132,8 +201,8 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				MockProjectName:  "test-project",
 				GetServicesError: defangcli.ErrNoServices{ProjectName: "test-project"},
 			},
-			expectedError:       true, // Go error is returned
-			errorMessage:        "no services found in project",
+			expectedError:       false, // Returns successful result with message
+			resultTextContains:  "no services found for the specified project",
 			expectedGetServices: true,
 			expectedProjectName: "test-project",
 		},
@@ -146,8 +215,8 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				MockProjectName:  "test-project",
 				GetServicesError: createConnectError(connect.CodeNotFound, "project test-project is not deployed in Playground"),
 			},
-			expectedError:       true,
-			errorMessage:        "is not deployed in Playground",
+			expectedError:       false, // Returns successful result with message
+			resultTextContains:  "is not deployed in Playground",
 			expectedGetServices: true,
 			expectedProjectName: "test-project",
 		},
