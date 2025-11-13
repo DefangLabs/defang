@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
+	"github.com/DefangLabs/defang/src/pkg/agent/tools"
 	"github.com/DefangLabs/defang/src/pkg/mcp/prompts"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
-	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/mark3labs/mcp-go/mcp"

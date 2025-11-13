@@ -32,6 +32,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/setup"
 	"github.com/DefangLabs/defang/src/pkg/surveyor"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -858,11 +859,11 @@ var debugCmd = &cobra.Command{
 		}
 
 		now := time.Now()
-		sinceTs, err := cli.ParseTimeOrDuration(since, now)
+		sinceTs, err := timeutils.ParseTimeOrDuration(since, now)
 		if err != nil {
 			return fmt.Errorf("invalid 'since' time: %w", err)
 		}
-		untilTs, err := cli.ParseTimeOrDuration(until, now)
+		untilTs, err := timeutils.ParseTimeOrDuration(until, now)
 		if err != nil {
 			return fmt.Errorf("invalid 'until' time: %w", err)
 		}

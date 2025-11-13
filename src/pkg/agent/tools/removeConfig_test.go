@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
@@ -156,7 +156,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				},
 			}
 
-			params, err := parseRemoveConfigParams(request)
+			params, err := ParseRemoveConfigParams(request)
 			if err != nil {
 				if tt.expectError {
 					assert.EqualError(t, err, tt.expectedError)
@@ -168,7 +168,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := handleRemoveConfigTool(t.Context(), loader, params, &tt.providerID, "test-cluster", mockCLI)
+			result, err := HandleRemoveConfigTool(t.Context(), loader, params, &tt.providerID, "test-cluster", mockCLI)
 
 			// Verify error expectations
 			if tt.expectError {

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -15,7 +15,7 @@ type RemoveConfigParams struct {
 	Name string
 }
 
-func parseRemoveConfigParams(request mcp.CallToolRequest) (RemoveConfigParams, error) {
+func ParseRemoveConfigParams(request mcp.CallToolRequest) (RemoveConfigParams, error) {
 	name, err := request.RequireString("name")
 	if err != nil || name == "" {
 		return RemoveConfigParams{}, fmt.Errorf("missing config `name`: %w", err)
@@ -25,8 +25,8 @@ func parseRemoveConfigParams(request mcp.CallToolRequest) (RemoveConfigParams, e
 	}, nil
 }
 
-// handleRemoveConfigTool handles the remove config tool logic
-func handleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader, params RemoveConfigParams, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (string, error) {
+// HandleRemoveConfigTool handles the remove config tool logic
+func HandleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader, params RemoveConfigParams, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", err

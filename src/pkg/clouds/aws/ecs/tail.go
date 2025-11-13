@@ -15,9 +15,13 @@ import (
 const AwsLogsStreamPrefix = CrunProjectName
 
 func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
+	cw, err := NewCloudWatchLogsClient(ctx, a.Region)
+	if err != nil {
+		return err
+	}
 	taskId := GetTaskID(taskArn)
 	a.Region = region.FromArn(*taskArn)
-	es, err := a.TailTaskID(ctx, taskId)
+	es, err := a.TailTaskID(ctx, cw, taskId)
 	if err != nil {
 		return err
 	}
@@ -57,7 +61,7 @@ func (a *AwsEcs) GetTaskArn(taskID string) (TaskArn, error) {
 	return &taskArn, nil
 }
 
-func (a *AwsEcs) QueryTaskID(ctx context.Context, taskID string, start, end time.Time, limit int32) (EventStream[types.StartLiveTailResponseStream], error) {
+func (a *AwsEcs) QueryTaskID(ctx context.Context, cw LogFilterer, taskID string, start, end time.Time, limit int32) (EventStream[types.StartLiveTailResponseStream], error) {
 	if taskID == "" {
 		return nil, errors.New("taskID is empty")
 	}
@@ -69,7 +73,7 @@ func (a *AwsEcs) QueryTaskID(ctx context.Context, taskID string, start, end time
 
 	lgi := LogGroupInput{LogGroupARN: a.LogGroupARN, LogStreamNames: []string{GetCDLogStreamForTaskID(taskID)}}
 	// Note: this function only returns once the query is complete, so returning an event stream is somewhat misleading
-	if err := QueryLogGroup(ctx, lgi, start, end, limit, func(events []LogEvent) error {
+	if err := QueryLogGroup(ctx, cw, lgi, start, end, limit, func(events []LogEvent) error {
 		es.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
 			Value: types.LiveTailSessionUpdate{SessionResults: events},
 		}
@@ -81,13 +85,13 @@ func (a *AwsEcs) QueryTaskID(ctx context.Context, taskID string, start, end time
 	return es, nil
 }
 
-func (a *AwsEcs) TailTaskID(ctx context.Context, taskID string) (LiveTailStream, error) {
+func (a *AwsEcs) TailTaskID(ctx context.Context, cw LogTailer, taskID string) (LiveTailStream, error) {
 	if taskID == "" {
 		return nil, errors.New("taskID is empty")
 	}
 	lgi := LogGroupInput{LogGroupARN: a.LogGroupARN, LogStreamNames: []string{GetCDLogStreamForTaskID(taskID)}}
 	for {
-		stream, err := TailLogGroup(ctx, lgi)
+		stream, err := TailLogGroup(ctx, cw, lgi)
 		if err != nil {
 			var resourceNotFound *types.ResourceNotFoundException
 			if !errors.As(err, &resourceNotFound) {

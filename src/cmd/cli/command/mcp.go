@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/tools"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
-	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"

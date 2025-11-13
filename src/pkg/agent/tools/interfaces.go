@@ -4,6 +4,7 @@ package tools
 import (
 	"context"
 
+	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
@@ -16,7 +17,7 @@ type CLIInterface interface {
 	CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, provider cliClient.Provider, serviceCount int) error
 	CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName, stack string, serviceCount int) (cliClient.Provider, error)
 	ComposeDown(ctx context.Context, projectName string, client *cliClient.GrpcClient, provider cliClient.Provider) (string, error)
-	ComposeUp(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, uploadMode compose.UploadMode, mode modes.Mode) (*defangv1.DeployResponse, *compose.Project, error)
+	ComposeUp(ctx context.Context, client *cliClient.GrpcClient, provider cliClient.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error)
 	ConfigDelete(ctx context.Context, projectName string, provider cliClient.Provider, name string) error
 	ConfigSet(ctx context.Context, projectName string, provider cliClient.Provider, name, value string) error
 	Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error)

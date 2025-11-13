@@ -1,0 +1,13 @@
+(
+logName=~"logs/run.googleapis.com%2F(stdout|stderr)$" OR
+logName="projects/test-project/logs/cloudbuild" OR
+logName="projects/test-project/logs/cos_containers" OR
+logName="projects/test-project/logs/docker-logs"
+) AND (timestamp >= "2024-01-01T00:00:00Z") AND (
+(
+  resource.type = "cloud_run_job"
+) OR (
+  resource.type="build"
+  labels.build_tags =~ "__[a-zA-Z0-9-]{1,63}_"
+)
+)

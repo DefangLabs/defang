@@ -19,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -129,7 +130,11 @@ func makeComposeUpCmd() *cobra.Command {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
 			}
 
-			deploy, project, err := cli.ComposeUp(ctx, project, client, provider, upload, mode)
+			deploy, project, err := cli.ComposeUp(ctx, client, provider, cli.ComposeUpParams{
+				Project:    project,
+				UploadMode: upload,
+				Mode:       mode,
+			})
 			if err != nil {
 				return handleComposeUpErr(ctx, err, project, provider)
 			}
@@ -241,7 +246,7 @@ func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.G
 			if nil != cli.InteractiveDebugDeployment(ctx, client, debugConfig) {
 				// don't show this defang hint if debugging was successful
 				tailOptions := newTailOptionsForDeploy(debugConfig.Deployment, debugConfig.Since, true)
-				printDefangHint("To see the logs of the failed service, run: defang logs", tailOptions.String())
+				printDefangHint("To see the logs of the failed service, run:", "logs "+tailOptions.String())
 			}
 		}
 	}
@@ -452,7 +457,11 @@ func makeComposeConfigCmd() *cobra.Command {
 				return err
 			}
 
-			_, _, err = cli.ComposeUp(ctx, project, client, provider, compose.UploadModeIgnore, modes.ModeUnspecified)
+			_, _, err = cli.ComposeUp(ctx, client, provider, cli.ComposeUpParams{
+				Project:    project,
+				UploadMode: compose.UploadModeIgnore,
+				Mode:       modes.ModeUnspecified,
+			})
 			if !errors.Is(err, dryrun.ErrDryRun) {
 				return err
 			}
@@ -571,12 +580,12 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	now := time.Now()
-	sinceTs, err := cli.ParseTimeOrDuration(since, now)
+	sinceTs, err := timeutils.ParseTimeOrDuration(since, now)
 	if err != nil {
 		return fmt.Errorf("invalid 'since' duration or time: %w", err)
 	}
 	sinceTs = sinceTs.UTC()
-	untilTs, err := cli.ParseTimeOrDuration(until, now)
+	untilTs, err := timeutils.ParseTimeOrDuration(until, now)
 	if err != nil {
 		return fmt.Errorf("invalid 'until' duration or time: %w", err)
 	}

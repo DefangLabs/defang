@@ -320,11 +320,11 @@ func (b *ByocGcp) BootstrapCommand(ctx context.Context, req client.BootstrapComm
 		project: req.Project,
 		command: []string{req.Command},
 	}
-	cdTaskId, err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
+	cdExecutionId, err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
 	if err != nil {
 		return "", err
 	}
-	return cdTaskId, nil
+	return cdExecutionId, nil
 }
 
 type cdCommand struct {
@@ -548,44 +548,20 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 }
 
 func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	if b.cdExecution != "" && req.Etag == b.cdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
-		subscribeStream, err := NewSubscribeStream(ctx, b.driver, true, req.Etag, req.Services)
+	// BootstrapCommand returns the job execution ID as the eTag, which subsequently passed in as eTag in TailRequest,
+	// in those cases, we need a way to detect when the CD task has finished running and stop tailing thg logs by cancelling the logging context.
+	if b.cdExecution != "" && req.Etag == b.cdExecution {
+		var err error
+		ctx, err = b.getCDExecutionContext(ctx, b.driver, req)
 		if err != nil {
 			return nil, err
 		}
-		subscribeStream.AddJobExecutionUpdate(path.Base(b.cdExecution))
-		var since time.Time
-		if req.Since.IsValid() {
-			since = req.Since.AsTime()
-		}
-		if req.Follow {
-			subscribeStream.StartFollow(since)
-		} else {
-			subscribeStream.Start(req.Limit)
-		}
-
-		var cancel context.CancelCauseFunc
-		ctx, cancel = context.WithCancelCause(ctx)
-		go func() {
-			defer subscribeStream.Close()
-			for subscribeStream.Receive() {
-				msg := subscribeStream.Msg()
-				if msg.State == defangv1.ServiceState_BUILD_FAILED || msg.State == defangv1.ServiceState_DEPLOYMENT_FAILED {
-					pkg.SleepWithContext(ctx, 3*time.Second) // Make sure the logs are flushed, gcp logs has a longer delay, thus 3s
-					cancel(fmt.Errorf("CD job failed %s", msg.Status))
-					return
-				}
-				if msg.State == defangv1.ServiceState_DEPLOYMENT_COMPLETED {
-					pkg.SleepWithContext(ctx, 3*time.Second) // Make sure the logs are flushed, gcp logs has a longer delay, thus 3s
-					cancel(io.EOF)
-					return
-				}
-			}
-			cancel(subscribeStream.Err())
-		}()
 	}
+	return b.getLogStream(ctx, b.driver, req)
+}
 
-	logStream, err := NewLogStream(ctx, b.driver, req.Services)
+func (b *ByocGcp) getLogStream(ctx context.Context, gcpLogsClient GcpLogsClient, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+	logStream, err := NewLogStream(ctx, gcpLogsClient, req.Services)
 	if err != nil {
 		return nil, err
 	}
@@ -598,35 +574,76 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	if req.Until.IsValid() {
 		endTime = req.Until.AsTime()
 	}
-	if req.Since.IsValid() || req.Etag != "" {
+	etag := req.Etag
+	if etag == b.cdExecution { // Do not pass the cd execution name as etag
+		etag = ""
+	}
+	if logs.LogType(req.LogType).Has(logs.LogTypeBuild) {
 		execName := path.Base(b.cdExecution)
 		if execName == "." {
 			execName = ""
 		}
-		etag := req.Etag
-		if etag == b.cdExecution { // Do not pass the cd execution name as etag
-			etag = ""
-		}
-		if logs.LogType(req.LogType).Has(logs.LogTypeBuild) {
-			logStream.AddJobExecutionLog(execName) // CD log when there is an execution name
-			// TODO: update stack (1st param) to b.PulumiStack
-			logStream.AddJobLog("", req.Project, etag, req.Services)        // Kaniko or CD logs when there is no execution name
-			logStream.AddCloudBuildLog("", req.Project, etag, req.Services) // CloudBuild logs
-		}
-		if logs.LogType(req.LogType).Has(logs.LogTypeRun) {
-			// TODO: update stack (1st param) to b.PulumiStack
-			logStream.AddServiceLog("", req.Project, etag, req.Services) // Service logs
-		}
-		logStream.AddSince(startTime)
-		logStream.AddUntil(endTime)
-		logStream.AddFilter(req.Pattern)
+		logStream.AddJobExecutionLog(execName) // CD log when there is an execution name
+		// TODO: update stack (1st param) to b.PulumiStack
+		logStream.AddJobLog("", req.Project, etag, req.Services)        // Kaniko or CD logs when there is no execution name
+		logStream.AddCloudBuildLog("", req.Project, etag, req.Services) // CloudBuild logs
 	}
+	if logs.LogType(req.LogType).Has(logs.LogTypeRun) {
+		// TODO: update stack (1st param) to b.PulumiStack
+		logStream.AddServiceLog("", req.Project, etag, req.Services) // Service logs
+	}
+	logStream.AddSince(startTime)
+	logStream.AddUntil(endTime)
+	logStream.AddFilter(req.Pattern)
 	if req.Follow {
 		logStream.StartFollow(startTime)
+	} else if req.Since.IsValid() {
+		logStream.StartHead(req.Limit)
 	} else {
-		logStream.Start(req.Limit)
+		logStream.StartTail(req.Limit)
 	}
 	return logStream, nil
+}
+
+func (b *ByocGcp) getCDExecutionContext(ctx context.Context, gcpLogsClient GcpLogsClient, req *defangv1.TailRequest) (context.Context, error) {
+	subscribeStream, err := NewSubscribeStream(ctx, gcpLogsClient, true, req.Etag, req.Services)
+	if err != nil {
+		return nil, err
+	}
+	subscribeStream.AddJobExecutionUpdate(path.Base(b.cdExecution))
+	var since time.Time
+	if req.Since.IsValid() {
+		since = req.Since.AsTime()
+	}
+	if req.Follow {
+		subscribeStream.StartFollow(since)
+	} else if req.Since.IsValid() {
+		subscribeStream.StartHead(req.Limit)
+	} else {
+		subscribeStream.StartTail(req.Limit)
+	}
+
+	var cancel context.CancelCauseFunc
+	ctx, cancel = context.WithCancelCause(ctx)
+	// Note: No defer cancel as cancel will always be called in the goroutine below
+	go func() {
+		defer subscribeStream.Close()
+		for subscribeStream.Receive() {
+			msg := subscribeStream.Msg()
+			if msg.State == defangv1.ServiceState_BUILD_FAILED || msg.State == defangv1.ServiceState_DEPLOYMENT_FAILED {
+				pkg.SleepWithContext(ctx, 3*time.Second) // Make sure the logs are flushed, gcp logs has a longer delay, thus 3s
+				cancel(fmt.Errorf("CD job failed %s", msg.Status))
+				return
+			}
+			if msg.State == defangv1.ServiceState_DEPLOYMENT_COMPLETED {
+				pkg.SleepWithContext(ctx, 3*time.Second) // Make sure the logs are flushed, gcp logs has a longer delay, thus 3s
+				cancel(io.EOF)
+				return
+			}
+		}
+		cancel(subscribeStream.Err())
+	}()
+	return ctx, nil
 }
 
 func (b *ByocGcp) GetService(ctx context.Context, req *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
@@ -770,7 +787,7 @@ func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
 	if req.Until.IsValid() {
 		until = req.Until.AsTime()
 	}
-	query := NewLogQuery(b.driver.ProjectId)
+	query := NewLogQuery(b.driver.GetProjectID())
 	if b.cdExecution != "" {
 		query.AddJobExecutionQuery(path.Base(b.cdExecution))
 	}

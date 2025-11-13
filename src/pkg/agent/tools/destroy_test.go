@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -137,7 +137,7 @@ func TestHandleDestroyTool(t *testing.T) {
 
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := handleDestroyTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI)
+			result, err := HandleDestroyTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI)
 
 			// Verify error expectations
 			if tt.expectedError != "" {
