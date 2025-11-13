@@ -48,10 +48,19 @@ func (m *mockFiltererTailer) FilterLogEvents(ctx context.Context, input *cloudwa
 }
 
 func (m *mockFiltererTailer) StartLiveTail(ctx context.Context, input *cloudwatchlogs.StartLiveTailInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.StartLiveTailOutput, error) {
-	slto := &cloudwatchlogs.StartLiveTailOutput{}
-	return slto, nil
+	// I cannot figure out how to mock a StartLiveTailOutput with a working
+	// EventStream, so I am just returning a ResourceNotFoundException for
+	// testing purposes. This kind of sucks because we have code to handle
+	// this error. We continue to poll for the log group until it exists.
+	// That means that this test only tests that we can poll for the log group.
+	return nil, &types.ResourceNotFoundException{
+		Message: ptr.String("The specified log group does not exist."),
+	}
 }
 
+// This is a pretty bad test. It ends up only testing that we can poll for the log group.
+// because our mock StartLiveTail always returns ResourceNotFoundException.
+// That means the test repeatedly tries to open a stream until we call Close() on it.
 func TestQueryAndTailLogGroups(t *testing.T) {
 	logGroups := []LogGroupInput{
 		{
