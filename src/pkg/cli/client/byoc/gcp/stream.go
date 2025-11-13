@@ -25,13 +25,21 @@ import (
 type LogParser[T any] func(*loggingpb.LogEntry) ([]*T, error)
 type LogFilter[T any] func(entry T) T
 
+type GcpLogsClient interface {
+	ListLogEntries(ctx context.Context, query string, order gcp.Order) (gcp.Lister, error)
+	NewTailer(ctx context.Context) (gcp.Tailer, error)
+	GetExecutionEnv(ctx context.Context, executionName string) (map[string]string, error)
+	GetProjectID() gcp.ProjectId
+	GetBuildInfo(ctx context.Context, buildId string) (*gcp.BuildTag, error)
+}
+
 type ServerStream[T any] struct {
-	ctx     context.Context
-	gcp     *gcp.Gcp
-	parse   LogParser[T]
-	filters []LogFilter[*T]
-	query   *Query
-	tailer  *gcp.Tailer
+	ctx           context.Context
+	gcpLogsClient GcpLogsClient
+	parse         LogParser[T]
+	filters       []LogFilter[*T]
+	query         *Query
+	tailer        gcp.Tailer
 
 	lastResp *T
 	lastErr  error
@@ -40,18 +48,18 @@ type ServerStream[T any] struct {
 	cancel   func()
 }
 
-func NewServerStream[T any](ctx context.Context, gcp *gcp.Gcp, parse LogParser[T], filters ...LogFilter[*T]) (*ServerStream[T], error) {
-	tailer, err := gcp.NewTailer(ctx)
+func NewServerStream[T any](ctx context.Context, gcpLogsClient GcpLogsClient, parse LogParser[T], filters ...LogFilter[*T]) (*ServerStream[T], error) {
+	tailer, err := gcpLogsClient.NewTailer(ctx)
 	if err != nil {
 		return nil, err
 	}
 	streamCtx, cancel := context.WithCancel(ctx)
 	return &ServerStream[T]{
-		ctx:     streamCtx,
-		gcp:     gcp,
-		parse:   parse,
-		filters: filters,
-		tailer:  tailer,
+		ctx:           streamCtx,
+		gcpLogsClient: gcpLogsClient,
+		parse:         parse,
+		filters:       filters,
+		tailer:        tailer,
 
 		respCh: make(chan *T),
 		errCh:  make(chan error),
@@ -134,20 +142,19 @@ func (s *ServerStream[T]) Start(limit int32) {
 }
 
 func (s *ServerStream[T]) queryHead(query string) {
-	lister, err := s.gcp.ListLogEntries(s.ctx, query, gcp.OrderAscending)
+	lister, err := s.gcpLogsClient.ListLogEntries(s.ctx, query, gcp.OrderAscending)
 	if err != nil {
 		s.errCh <- err
 		return
 	}
 	err = s.listToChannel(lister)
-	if err != nil {
+	if err != nil && !errors.Is(err, io.EOF) { // Ignore EOF for listing older logs, to proceed to tailing
 		s.errCh <- err
-		return
 	}
 }
 
 func (s *ServerStream[T]) queryTail(query string, limit int32) {
-	lister, err := s.gcp.ListLogEntries(s.ctx, query, gcp.OrderDescending)
+	lister, err := s.gcpLogsClient.ListLogEntries(s.ctx, query, gcp.OrderDescending)
 	if err != nil {
 		s.errCh <- err
 		return
@@ -171,7 +178,7 @@ func (s *ServerStream[T]) queryTail(query string, limit int32) {
 	}
 }
 
-func (s *ServerStream[T]) listToBuffer(lister *gcp.Lister, limit int32) ([]*T, error) {
+func (s *ServerStream[T]) listToBuffer(lister gcp.Lister, limit int32) ([]*T, error) {
 	received := 0
 	buffer := make([]*T, 0, limit)
 	for range limit {
@@ -189,12 +196,9 @@ func (s *ServerStream[T]) listToBuffer(lister *gcp.Lister, limit int32) ([]*T, e
 	return buffer, nil
 }
 
-func (s *ServerStream[T]) listToChannel(lister *gcp.Lister) error {
+func (s *ServerStream[T]) listToChannel(lister gcp.Lister) error {
 	for {
 		entry, err := lister.Next()
-		if errors.Is(err, io.EOF) {
-			return nil // query is done; proceed with tail
-		}
 		if err != nil {
 			return err
 		}
@@ -249,7 +253,7 @@ type LogStream struct {
 	*ServerStream[defangv1.TailResponse]
 }
 
-func NewLogStream(ctx context.Context, gcpClient *gcp.Gcp, services []string) (*LogStream, error) {
+func NewLogStream(ctx context.Context, gcpLogsClient GcpLogsClient, services []string) (*LogStream, error) {
 	restoreServiceName := getServiceNameRestorer(services, gcp.SafeLabelValue,
 		func(entry *defangv1.TailResponse) string { return entry.Service },
 		func(entry *defangv1.TailResponse, name string) *defangv1.TailResponse {
@@ -257,12 +261,12 @@ func NewLogStream(ctx context.Context, gcpClient *gcp.Gcp, services []string) (*
 			return entry
 		})
 
-	ss, err := NewServerStream(ctx, gcpClient, getLogEntryParser(ctx, gcpClient), restoreServiceName)
+	ss, err := NewServerStream(ctx, gcpLogsClient, getLogEntryParser(ctx, gcpLogsClient), restoreServiceName)
 	if err != nil {
 		return nil, err
 	}
 
-	ss.query = NewLogQuery(gcpClient.ProjectId)
+	ss.query = NewLogQuery(gcpLogsClient.GetProjectID())
 	return &LogStream{ServerStream: ss}, nil
 }
 
@@ -313,7 +317,7 @@ func getServiceNameRestorer[T any](services []string, encode func(string) string
 	}
 }
 
-func NewSubscribeStream(ctx context.Context, driver *gcp.Gcp, waitForCD bool, etag string, services []string, filters ...LogFilter[*defangv1.SubscribeResponse]) (*SubscribeStream, error) {
+func NewSubscribeStream(ctx context.Context, driver GcpLogsClient, waitForCD bool, etag string, services []string, filters ...LogFilter[*defangv1.SubscribeResponse]) (*SubscribeStream, error) {
 	filters = append(filters, getServiceNameRestorer(services, gcp.SafeLabelValue,
 		func(entry *defangv1.SubscribeResponse) string { return entry.Name },
 		func(entry *defangv1.SubscribeResponse, name string) *defangv1.SubscribeResponse {
@@ -349,7 +353,7 @@ func (s *SubscribeStream) AddServiceStatusUpdate(stack, project, etag string, se
 
 var cdExecutionNamePattern = regexp.MustCompile(`^defang-cd-[a-z0-9]{5}$`)
 
-func getLogEntryParser(ctx context.Context, gcpClient *gcp.Gcp) func(entry *loggingpb.LogEntry) ([]*defangv1.TailResponse, error) {
+func getLogEntryParser(ctx context.Context, gcpClient GcpLogsClient) func(entry *loggingpb.LogEntry) ([]*defangv1.TailResponse, error) {
 	envCache := make(map[string]map[string]string)
 	return func(entry *loggingpb.LogEntry) ([]*defangv1.TailResponse, error) {
 		if entry == nil {
@@ -445,7 +449,7 @@ func getLogEntryParser(ctx context.Context, gcpClient *gcp.Gcp) func(entry *logg
 
 const defangCD = "#defang-cd" // Special service name for CD, # is used to avoid conflict with service names
 
-func getActivityParser(ctx context.Context, gcp *gcp.Gcp, waitForCD bool, etag string) func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeResponse, error) {
+func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitForCD bool, etag string) func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeResponse, error) {
 	cdSuccess := false
 	readyServices := make(map[string]string)
 
@@ -635,7 +639,7 @@ func getActivityParser(ctx context.Context, gcp *gcp.Gcp, waitForCD bool, etag s
 			if buildId == "" {
 				return nil, nil // Ignore activities without build id
 			}
-			bt, err := gcp.GetBuildInfo(ctx, buildId) // TODO: Cache the build IDs?
+			bt, err := gcpLogsClient.GetBuildInfo(ctx, buildId) // TODO: Cache the build IDs?
 			if err != nil {
 				term.Warnf("failed to get build tag for build %v: %v", buildId, err)
 				return nil, nil
