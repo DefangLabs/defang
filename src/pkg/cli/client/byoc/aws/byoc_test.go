@@ -19,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	ssmTypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
@@ -171,5 +172,138 @@ func TestSubscribe(t *testing.T) {
 
 			wg.Wait()
 		})
+	}
+}
+func TestGetUniqueProjectConfigs(t *testing.T) {
+	b := &ByocAws{
+		ByocBaseClient: &byoc.ByocBaseClient{
+			PulumiStack: "test-stack",
+		},
+	}
+
+	req := &defangv1.GetConfigsRequest{
+		Configs: []*defangv1.ConfigKey{
+			{Project: "proj1", Name: "cfg1"},
+			{Project: "proj1", Name: "cfg2"},
+			{Project: "proj2", Name: "cfg1"},
+			{Project: "proj2", Name: "cfg3"},
+			{Project: "proj1", Name: "cfg1"}, // duplicate
+		},
+	}
+
+	projects, projectConfigs := getUniqueProjectConfigs(req, b)
+
+	// Check projects
+	expectedProjects := map[string]struct{}{
+		"proj1": {},
+		"proj2": {},
+	}
+	if len(projects) != len(expectedProjects) {
+		t.Errorf("expected %d projects, got %d", len(expectedProjects), len(projects))
+	}
+	for k := range expectedProjects {
+		if _, ok := projects[k]; !ok {
+			t.Errorf("expected project %q in result", k)
+		}
+	}
+
+	// Check projectConfigs
+	expectedConfigs := map[string]struct{}{
+		"/Defang/proj1/test-stack/cfg1": {},
+		"/Defang/proj1/test-stack/cfg2": {},
+		"/Defang/proj2/test-stack/cfg1": {},
+		"/Defang/proj2/test-stack/cfg3": {},
+	}
+	if len(projectConfigs) != len(expectedConfigs) {
+		t.Errorf("expected %d projectConfigs, got %d", len(expectedConfigs), len(projectConfigs))
+	}
+	for k := range expectedConfigs {
+		if _, ok := projectConfigs[k]; !ok {
+			t.Errorf("expected config %q in result", k)
+		}
+	}
+}
+
+func TestSsmParamToGetConfigResponse(t *testing.T) {
+	project := "proj1"
+	resp := &defangv1.GetConfigsResponse{}
+
+	paramName1 := "/Defang/proj1/test-stack/cfg1"
+	paramValue1 := "secret1"
+	paramName2 := "/Defang/proj1/test-stack/cfg2"
+	paramValue2 := "notsecret"
+	paramName3 := "/Defang/proj1/test-stack/other"
+	paramValue3 := "shouldskip"
+
+	// configs
+	ssmParameters := []ssmTypes.Parameter{
+		{
+			// sensitive parameter
+			Name:  &paramName1,
+			Value: &paramValue1,
+			Type:  ssmTypes.ParameterTypeSecureString,
+		},
+		{
+			// insensitive parameter
+			Name:  &paramName2,
+			Value: &paramValue2,
+			Type:  ssmTypes.ParameterTypeString,
+		},
+		{
+			// wll be skipped since Name is nil
+			Name:  nil,
+			Value: &paramValue3,
+			Type:  ssmTypes.ParameterTypeString,
+		},
+		{
+			// will be skipped since Value is nil
+			Name:  &paramName3,
+			Value: nil,
+			Type:  ssmTypes.ParameterTypeString,
+		},
+	}
+
+	projectConfigs := map[string]struct{}{
+		paramName1: {},
+		paramName2: {},
+	}
+
+	ssmParamToGetConfigResponse(ssmParameters, projectConfigs, resp, project)
+
+	if len(resp.Configs) != 2 {
+		t.Fatalf("expected 2 configs, got %d", len(resp.Configs))
+	}
+
+	expected := []*defangv1.Config{
+		{
+			Project: project,
+			Name:    paramName1,
+			Value:   paramValue1,
+			Type:    defangv1.ConfigType_CONFIGTYPE_SENSITIVE,
+		},
+		{
+			Project: project,
+			Name:    paramName2,
+			Value:   paramValue2,
+			Type:    defangv1.ConfigType_CONFIGTYPE_INSENSITIVE,
+		},
+	}
+
+	for i, expectedConfig := range expected {
+		actualConfig := resp.Configs[i]
+
+		// compare all fields
+		if actualConfig.Project != expectedConfig.Project {
+			t.Errorf("config[%d] project: got %q, want %q", i, actualConfig.Project, expectedConfig.Project)
+		}
+		if actualConfig.Name != expectedConfig.Name {
+			t.Errorf("config[%d] name: got %q, want %q", i, actualConfig.Name, expectedConfig.Name)
+		}
+		if actualConfig.Value != expectedConfig.Value {
+			t.Errorf("config[%d] value: got %q, want %q", i, actualConfig.Value, expectedConfig.Value)
+		}
+		if actualConfig.Type != expectedConfig.Type {
+			t.Errorf("config[%d] type: got %v, want %v", i, actualConfig.Type, expectedConfig.Type)
+		}
 	}
 }

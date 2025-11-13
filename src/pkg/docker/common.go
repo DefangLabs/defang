@@ -31,7 +31,7 @@ func New() *Docker {
 
 var _ types.Driver = (*Docker)(nil)
 
-func (Docker) PutSecret(ctx context.Context, name, value string) error {
+func (Docker) PutSecret(ctx context.Context, encrypt bool, name, value string) error {
 	return errors.New("docker does not support secrets")
 }
 

@@ -391,6 +391,7 @@ message SecretValue {
 enum ConfigType {
   CONFIGTYPE_UNSPECIFIED = 0;
   CONFIGTYPE_SENSITIVE = 1;
+  CONFIGTYPE_INSENSITIVE = 2;
 }
 
 message Config {

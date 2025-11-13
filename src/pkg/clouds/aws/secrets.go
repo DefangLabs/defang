@@ -90,7 +90,37 @@ func (a *Aws) IsValidSecret(ctx context.Context, name string) (bool, error) {
 	return len(res.Parameters) == 1, nil
 }
 
-func (a *Aws) PutSecret(ctx context.Context, name, value string) error {
+func (a *Aws) GetSecret(ctx context.Context, rootPath string) ([]types.Parameter, error) {
+	result := []types.Parameter{}
+	cfg, err := a.LoadConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	svc := newFromConfig(cfg)
+	var nextToken *string
+	for {
+		out, err := svc.GetParametersByPath(ctx, &ssm.GetParametersByPathInput{
+			Path:           &rootPath,
+			WithDecryption: ptr.Bool(false),
+			Recursive:      ptr.Bool(true),
+			NextToken:      nextToken,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, out.Parameters...)
+
+		if nextToken = out.NextToken; nextToken == nil {
+			break
+		}
+	}
+
+	return result, nil
+}
+
+func (a *Aws) PutSecret(ctx context.Context, encrypt bool, name, value string) error {
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return err
@@ -101,10 +131,15 @@ func (a *Aws) PutSecret(ctx context.Context, name, value string) error {
 
 	svc := newFromConfig(cfg)
 
+	paramType := types.ParameterTypeString
+	if encrypt {
+		paramType = types.ParameterTypeSecureString
+	}
+
 	// Call ssm:PutParameter
 	_, err = svc.PutParameter(ctx, &ssm.PutParameterInput{
 		Overwrite: ptr.Bool(true),
-		Type:      types.ParameterTypeSecureString,
+		Type:      paramType,
 		Name:      secretId,
 		Value:     secretString,
 		// SecretString: secretString,

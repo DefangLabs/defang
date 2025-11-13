@@ -41,6 +41,10 @@ func (g *PlaygroundProvider) Estimate(ctx context.Context, req *defangv1.Estimat
 	return getMsg(g.GetController().Estimate(ctx, connect.NewRequest(req)))
 }
 
+func (g *PlaygroundProvider) GetConfigs(ctx context.Context, req *defangv1.GetConfigsRequest) (*defangv1.GetConfigsResponse, error) {
+	return nil, errors.New("GetConfigs is not yet implemented for the Playground provider")
+}
+
 func (g *PlaygroundProvider) GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error) {
 	return nil, errors.New("the project update command is not valid for the Defang playground; did you forget --provider?")
 }
