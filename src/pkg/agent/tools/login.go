@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/auth"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-// handleLoginTool handles the login tool logic
-func handleLoginTool(ctx context.Context, cluster string, cli CLIInterface) (string, error) {
+// HandleLoginTool handles the login tool logic
+func HandleLoginTool(ctx context.Context, cluster string, cli CLIInterface) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, cluster)
 	if err != nil {

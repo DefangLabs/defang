@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
@@ -192,7 +192,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			loader := &client.MockLoader{}
-			result, err := handleServicesTool(ctx, loader, &tt.providerId, testCluster, tt.mockCLI)
+			result, err := HandleServicesTool(ctx, loader, &tt.providerId, testCluster, tt.mockCLI)
 
 			// Check Go error expectation
 			if tt.expectedError {

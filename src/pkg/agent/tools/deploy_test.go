@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
+	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/mcp/common"
-	"github.com/DefangLabs/defang/src/pkg/modes"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -52,7 +52,7 @@ func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.Provi
 	return nil
 }
 
-func (m *MockDeployCLI) ComposeUp(ctx context.Context, project *compose.Project, grpcClient *client.GrpcClient, provider client.Provider, uploadMode compose.UploadMode, mode modes.Mode) (*defangv1.DeployResponse, *compose.Project, error) {
+func (m *MockDeployCLI) ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	m.CallLog = append(m.CallLog, "ComposeUp")
 	if m.ComposeUpError != nil {
 		return nil, nil, m.ComposeUpError
@@ -179,7 +179,7 @@ func TestHandleDeployTool(t *testing.T) {
 
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := handleDeployTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI)
+			result, err := HandleDeployTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI)
 
 			// Verify error expectations
 			if tt.expectedError != "" {
