@@ -299,11 +299,11 @@ func takeFirstN[T any](input chan T, n int) chan T {
 		defer close(out)
 		count := 0
 		for evt := range input {
+			out <- evt
+			count++
 			if count >= n {
 				break
 			}
-			out <- evt
-			count++
 		}
 	}()
 	return out
