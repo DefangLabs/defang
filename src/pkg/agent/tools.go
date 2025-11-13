@@ -55,8 +55,9 @@ func CollectTools(cluster string, providerId *client.ProviderID) []ai.Tool {
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				// DO NOT wrap this in CaptureStdout, we have special handling for term output in deploy
-				return tools.HandleDeployTool(ctx.Context, loader, providerId, cluster, cli)
+				return tools.CaptureTerm(func() (string, error) {
+					return tools.HandleDeployTool(ctx.Context, loader, providerId, cluster, cli)
+				})
 			},
 		),
 		ai.NewTool("destroy",
