@@ -241,7 +241,7 @@ func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.G
 			if nil != cli.InteractiveDebugDeployment(ctx, client, debugConfig) {
 				// don't show this defang hint if debugging was successful
 				tailOptions := newTailOptionsForDeploy(debugConfig.Deployment, debugConfig.Since, true)
-				printDefangHint("To see the logs of the failed service, run: defang logs", tailOptions.String())
+				printDefangHint("To see the logs of the failed service, run:", "logs "+tailOptions.String())
 			}
 		}
 	}

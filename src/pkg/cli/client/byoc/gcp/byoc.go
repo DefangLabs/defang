@@ -597,8 +597,10 @@ func (b *ByocGcp) getLogStream(ctx context.Context, gcpLogsClient GcpLogsClient,
 	logStream.AddFilter(req.Pattern)
 	if req.Follow {
 		logStream.StartFollow(startTime)
+	} else if req.Since.IsValid() {
+		logStream.StartHead(req.Limit)
 	} else {
-		logStream.Start(req.Limit)
+		logStream.StartTail(req.Limit)
 	}
 	return logStream, nil
 }
@@ -615,8 +617,10 @@ func (b *ByocGcp) getCDExecutionContext(ctx context.Context, gcpLogsClient GcpLo
 	}
 	if req.Follow {
 		subscribeStream.StartFollow(since)
+	} else if req.Since.IsValid() {
+		subscribeStream.StartHead(req.Limit)
 	} else {
-		subscribeStream.Start(req.Limit)
+		subscribeStream.StartTail(req.Limit)
 	}
 
 	var cancel context.CancelCauseFunc

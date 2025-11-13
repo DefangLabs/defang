@@ -1,9 +1,14 @@
 package gcp
 
 import (
+	"strconv"
 	"testing"
 
+	"cloud.google.com/go/logging/apiv2/loggingpb"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type HasName struct {
@@ -47,4 +52,109 @@ func TestServiceNameRestorer(t *testing.T) {
 			}
 		})
 	}
+}
+func makeMockLogEntries(n int) []loggingpb.LogEntry {
+	logEntries := make([]loggingpb.LogEntry, n)
+	for i := range logEntries {
+		logEntries[i] = loggingpb.LogEntry{
+			Payload: &loggingpb.LogEntry_TextPayload{
+				TextPayload: "Log entry number " + strconv.Itoa(i),
+			},
+			Timestamp: timestamppb.Now(),
+		}
+	}
+	return logEntries
+}
+
+func TestStartHead(t *testing.T) {
+	ctx := t.Context()
+	projectId := gcp.ProjectId("test-project-12345")
+	services := []string{}
+	restoreServiceName := getServiceNameRestorer(services, gcp.SafeLabelValue,
+		func(entry *defangv1.TailResponse) string { return entry.Service },
+		func(entry *defangv1.TailResponse, name string) *defangv1.TailResponse {
+			entry.Service = name
+			return entry
+		})
+
+	limit := 2
+	logEntries := makeMockLogEntries(limit + 1)
+
+	mockGcpLogsClient := &MockGcpLogsClient{
+		lister: &MockGcpLoggingLister{
+			logEntries: logEntries,
+		},
+		tailer: &MockGcpLoggingTailer{},
+	}
+
+	stream, err := NewServerStream(
+		ctx,
+		mockGcpLogsClient,
+		getLogEntryParser(ctx, mockGcpLogsClient),
+		restoreServiceName,
+	)
+	assert.NoError(t, err)
+	stream.query = NewLogQuery(projectId)
+	stream.StartHead(int32(limit))
+	collectedMessages := []string{}
+	for {
+		if !stream.Receive() {
+			assert.NoError(t, stream.Err())
+			break
+		}
+		response := stream.Msg()
+		collectedMessages = append(collectedMessages, response.Entries[0].Message)
+	}
+	assert.Equal(t, 2, len(collectedMessages))
+	assert.Equal(t, "Log entry number 0", collectedMessages[0])
+	assert.Equal(t, "Log entry number 1", collectedMessages[1])
+}
+
+func TestStartTail(t *testing.T) {
+	ctx := t.Context()
+	projectId := gcp.ProjectId("test-project-12345")
+	services := []string{}
+	restoreServiceName := getServiceNameRestorer(services, gcp.SafeLabelValue,
+		func(entry *defangv1.TailResponse) string { return entry.Service },
+		func(entry *defangv1.TailResponse, name string) *defangv1.TailResponse {
+			entry.Service = name
+			return entry
+		})
+
+	limit := 2
+	logEntries := makeMockLogEntries(limit + 1)
+
+	// reverse the list of log entries to simulate querying logs in descending order
+	for i, j := 0, len(logEntries)-1; i < j; i, j = i+1, j-1 {
+		logEntries[i], logEntries[j] = logEntries[j], logEntries[i]
+	}
+
+	mockGcpLogsClient := &MockGcpLogsClient{
+		lister: &MockGcpLoggingLister{
+			logEntries: logEntries,
+		},
+		tailer: &MockGcpLoggingTailer{},
+	}
+
+	stream, err := NewServerStream(
+		ctx,
+		mockGcpLogsClient,
+		getLogEntryParser(ctx, mockGcpLogsClient),
+		restoreServiceName,
+	)
+	assert.NoError(t, err)
+	stream.query = NewLogQuery(projectId)
+	stream.StartTail(int32(limit))
+	collectedMessages := []string{}
+	for {
+		if !stream.Receive() {
+			assert.NoError(t, stream.Err())
+			break
+		}
+		response := stream.Msg()
+		collectedMessages = append(collectedMessages, response.Entries[0].Message)
+	}
+	assert.Equal(t, 2, len(collectedMessages))
+	assert.Equal(t, "Log entry number 1", collectedMessages[0])
+	assert.Equal(t, "Log entry number 2", collectedMessages[1])
 }

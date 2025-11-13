@@ -611,8 +611,13 @@ func (b *ByocAws) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest)
 		return AnnotateAwsError(err)
 	}
 
+	cw, err := ecs.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region
+	if err != nil {
+		return err
+	}
+
 	// Gather logs from the CD task, kaniko, ECS events, and all services
-	evtsChan, errsChan := ecs.QueryLogGroups(ctx, start, end, 0, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
+	evtsChan, errsChan := ecs.QueryLogGroups(ctx, cw, start, end, 0, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
 	if evtsChan == nil {
 		return <-errsChan
 	}
@@ -666,6 +671,12 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		return nil, AnnotateAwsError(err)
 	}
 
+	var err error
+	cw, err := ecs.NewCloudWatchLogsClient(ctx, b.driver.Region)
+	if err != nil {
+		return nil, err
+	}
+
 	etag := req.Etag
 	// if etag == "" && req.Service == "cd" {
 	// 	etag = awsecs.GetTaskID(b.cdTaskArn); TODO: find the last CD task
@@ -675,21 +686,25 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	//  * Etag, no service: 	tail all tasks/services with that Etag
 	//  * No Etag, service:		tail all tasks/services with that service name
 	//  * Etag, service:		tail that task/service
-	var err error
 	var tailStream ecs.LiveTailStream
-
 	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is a task ID
 		if req.Follow {
-			tailStream, err = b.driver.TailTaskID(ctx, etag)
+			tailStream, err = b.driver.TailTaskID(ctx, cw, etag)
 			if err == nil {
 				b.cdTaskArn, err = b.driver.GetTaskArn(etag)
 				etag = "" // no need to filter by etag
+				if err != nil {
+					return nil, AnnotateAwsError(err)
+				}
 			}
 		} else {
-			tailStream, err = b.driver.QueryTaskID(ctx, etag, time.Time{}, time.Now(), req.Limit)
+			tailStream, err = b.driver.QueryTaskID(ctx, cw, etag, time.Time{}, time.Now(), req.Limit)
 			if err == nil {
 				b.cdTaskArn, err = b.driver.GetTaskArn(etag)
 				etag = "" // no need to filter by etag
+				if err != nil {
+					return nil, AnnotateAwsError(err)
+				}
 			}
 		}
 	} else {
@@ -704,17 +719,26 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		if req.Until.IsValid() {
 			end = req.Until.AsTime()
 		}
+		cw, err := ecs.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region
+		if err != nil {
+			return nil, err
+		}
 		lgis := b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))
 		if req.Follow {
 			tailStream, err = ecs.QueryAndTailLogGroups(
 				ctx,
+				cw,
 				start,
 				end,
 				lgis...,
 			)
+			if err != nil {
+				return nil, AnnotateAwsError(err)
+			}
 		} else {
 			evtsChan, errsChan := ecs.QueryLogGroups(
 				ctx,
+				cw,
 				start,
 				end,
 				req.Limit,
@@ -722,14 +746,13 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 			)
 			if evtsChan == nil {
 				err = <-errsChan
+				if err != nil {
+					return nil, AnnotateAwsError(err)
+				}
 			} else {
 				tailStream = ecs.NewStaticLogStream(evtsChan, func() {})
 			}
 		}
-	}
-
-	if err != nil {
-		return nil, AnnotateAwsError(err)
 	}
 
 	return newByocServerStream(tailStream, etag, req.GetServices(), b), nil
