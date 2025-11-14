@@ -22,7 +22,7 @@ type DeployParams struct {
 	common.LoaderParams
 }
 
-func CollectTools(cluster string, providerId *client.ProviderID) []ai.Tool {
+func CollectDefangTools(cluster string, providerId *client.ProviderID) []ai.Tool {
 	// loginHandler := MakeLoginToolHandler(cluster, authPort, &LoginCLIAdapter{DefaultToolCLI: &DefaultToolCLI{}})
 
 	return []ai.Tool{
