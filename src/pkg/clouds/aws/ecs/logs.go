@@ -133,11 +133,14 @@ type LogFilterer interface {
 func QueryLogGroups(ctx context.Context, cw LogFilterer, start, end time.Time, limit int32, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
 	var evtsChan chan LogEvent
 	errChan := make(chan error, len(logGroups))
+	var wg sync.WaitGroup
 	for _, lgi := range logGroups {
+		wg.Add(1)
 		lgEvtChan := make(chan LogEvent)
 		// Start a go routine for each log group
 		go func(lgi LogGroupInput) {
 			defer close(lgEvtChan)
+			defer wg.Done()
 			// CloudWatch only supports querying a LogGroup from a timestamp in
 			// ascending order. After we query each LogGroup, we merge the results
 			// and take the last N events. Because we can't tell in advance which
@@ -146,12 +149,13 @@ func QueryLogGroups(ctx context.Context, cw LogFilterer, start, end time.Time, l
 			// TODO: optimize this by simulating a descending query by doing
 			// multiple queries with time windows, starting from the end time
 			// and moving backwards until we have enough events.
-			if err := QueryLogGroup(ctx, cw, lgi, start, end, 0, func(logEvents []LogEvent) error {
+			err := QueryLogGroup(ctx, cw, lgi, start, end, 0, func(logEvents []LogEvent) error {
 				for _, event := range logEvents {
 					lgEvtChan <- event
 				}
 				return nil
-			}); err != nil {
+			})
+			if err != nil {
 				errChan <- fmt.Errorf("error querying log group %q: %w", lgi.LogGroupARN, err)
 			}
 		}(lgi)
@@ -165,6 +169,10 @@ func QueryLogGroups(ctx context.Context, cw LogFilterer, start, end time.Time, l
 			}
 		}
 	}
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
 	return evtsChan, errChan
 }
 
