@@ -27,6 +27,8 @@ fi
 # check if DEFANG_INSTALL_VERSION is set and set the release path accordingly
 if [[ -z "$DEFANG_INSTALL_VERSION" ]]; then
     RELEASE_PATH="latest"
+elif [[ "$DEFANG_INSTALL_VERSION" == "nightly" ]]; then
+    RELEASE_PATH="tags/nightly"
 else
     RELEASE_PATH="tags/v${DEFANG_INSTALL_VERSION#v}"
 fi
@@ -70,9 +72,9 @@ DOWNLOAD_URL=""
 
 # Based on the OS, filter the download URL
 if [ "$OS" = "Darwin" ]; then
-    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o "https://github.com/DefangLabs/defang/releases/download/v[0-9.]*/defang_[0-9.]*_macOS.zip" | head -n 1)
+    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o "https://github.com/DefangLabs/defang/releases/download/.*/defang_.*_macOS.zip" | head -n 1)
 elif [ "$OS" = "Linux" ]; then
-    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o "https://github.com/DefangLabs/defang/releases/download/v[0-9.]*/defang_[0-9.]*_linux_${ARCH_SUFFIX}.tar.gz" | head -n 1)
+    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o "https://github.com/DefangLabs/defang/releases/download/.*/defang_.*_linux_${ARCH_SUFFIX}.tar.gz" | head -n 1)
 fi
 
 # Abort if the download URL is not found
