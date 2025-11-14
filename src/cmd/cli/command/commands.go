@@ -23,6 +23,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	pcluster "github.com/DefangLabs/defang/src/pkg/cluster"
+	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -882,7 +883,7 @@ var debugCmd = &cobra.Command{
 			return fmt.Errorf("invalid 'until' time: %w", err)
 		}
 
-		debugConfig := cli.DebugConfig{
+		debugConfig := debug.DebugConfig{
 			Deployment:     deployment,
 			FailedServices: args,
 			ModelId:        modelId,
@@ -891,7 +892,7 @@ var debugCmd = &cobra.Command{
 			Since:          sinceTs.UTC(),
 			Until:          untilTs.UTC(),
 		}
-		return cli.DebugDeployment(cmd.Context(), client, debugConfig)
+		return debug.DebugDeployment(cmd.Context(), client, debugConfig)
 	},
 }
 
