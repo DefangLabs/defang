@@ -180,6 +180,7 @@ func SetupCommands(ctx context.Context, version string) {
 	cdCmd.AddCommand(cdCancelCmd)
 	cdPreviewCmd.Flags().VarP(&mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	cdCmd.AddCommand(cdPreviewCmd)
+	cdCmd.AddCommand(cdInstallCmd)
 
 	// Eula command
 	tosCmd.Flags().Bool("agree-tos", false, "agree to the Defang terms of service")

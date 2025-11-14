@@ -10,7 +10,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-func TearDown(ctx context.Context, provider client.Provider, force bool) error {
+func TearDownCD(ctx context.Context, provider client.Provider, force bool) error {
 	if dryrun.DoDryRun {
 		return errors.New("dry run")
 	}
@@ -22,5 +22,5 @@ func TearDown(ctx context.Context, provider client.Provider, force bool) error {
 		}
 	}
 	term.Warn(`Deleting the CD cluster; this does not delete the services!`)
-	return provider.TearDown(ctx)
+	return provider.TearDownCD(ctx)
 }

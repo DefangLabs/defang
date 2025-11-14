@@ -146,7 +146,7 @@ var cdTearDownCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.TearDown(cmd.Context(), provider, force)
+		return cli.TearDownCD(cmd.Context(), provider, force)
 	},
 }
 
@@ -199,5 +199,27 @@ var cdPreviewCmd = &cobra.Command{
 		}
 
 		return cli.Preview(cmd.Context(), project, client, provider, mode)
+	},
+}
+
+var cdInstallCmd = &cobra.Command{
+	Use:         "install",
+	Aliases:     []string{"setup"},
+	Args:        cobra.NoArgs,
+	Annotations: authNeededAnnotation,
+	Short:       "Install the CD resources into the cluster",
+	Hidden:      true, // users shouldn't have to run this manually, because it's done on deploy
+	RunE: func(cmd *cobra.Command, args []string) error {
+		loader := configureLoader(cmd)
+		provider, err := newProviderChecked(cmd.Context(), loader)
+		if err != nil {
+			return err
+		}
+
+		if err := canIUseProvider(cmd.Context(), provider, "", 0); err != nil {
+			return err
+		}
+
+		return cli.InstallCD(cmd.Context(), provider)
 	},
 }

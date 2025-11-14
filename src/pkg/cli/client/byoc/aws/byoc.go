@@ -51,7 +51,7 @@ var StsClient StsProviderAPI
 type ByocAws struct {
 	*byoc.ByocBaseClient
 
-	driver *cfn.AwsEcs // TODO: ecs is stateful, contains the output of the cd cfn stack after setUpCD
+	driver *cfn.AwsEcs // TODO: ecs is stateful, contains the output of the cd cfn stack after SetUpCD
 
 	ecsEventHandlers []ECSEventHandler
 	handlersLock     sync.RWMutex
@@ -128,7 +128,7 @@ func initStsClient(cfg awssdk.Config) {
 	}
 }
 
-func (b *ByocAws) setUpCD(ctx context.Context) error {
+func (b *ByocAws) SetUpCD(ctx context.Context) error {
 	if b.SetupDone {
 		return nil
 	}
@@ -208,7 +208,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		return nil, err
 	}
 
-	if err := b.setUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx); err != nil {
 		return nil, err
 	}
 
@@ -446,7 +446,7 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 	if len(req.Names) > 0 {
 		return nil, client.ErrNotImplemented("per-service deletion is not supported for BYOC")
 	}
-	if err := b.setUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx); err != nil {
 		return nil, err
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
@@ -565,7 +565,7 @@ func (b *ByocAws) ListConfig(ctx context.Context, req *defangv1.ListConfigsReque
 }
 
 func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	if err := b.setUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx); err != nil {
 		return nil, err
 	}
 
@@ -619,7 +619,7 @@ func (b *ByocAws) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest)
 	// Gather logs from the CD task, kaniko, ECS events, and all services
 	evtsChan, errsChan := ecs.QueryLogGroups(ctx, cw, start, end, 0, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
 	if evtsChan == nil {
-		return <-errsChan
+		return <-errsChan // TODO: there could be multiple errors
 	}
 
 	const maxQuerySizePerLogGroup = 128 * 1024 // 128KB per LogGroup (to stay well below the 1MB gRPC payload limit)
@@ -745,11 +745,12 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 				lgis...,
 			)
 			if evtsChan == nil {
-				err = <-errsChan
+				err = <-errsChan // TODO: there could be multiple errors
 				if err != nil {
 					return nil, AnnotateAwsError(err)
 				}
 			} else {
+				// TODO: any errors from errsChan should be reported
 				tailStream = ecs.NewStaticLogStream(evtsChan, func() {})
 			}
 		}
@@ -819,12 +820,12 @@ func (b *ByocAws) UpdateServiceInfo(ctx context.Context, si *defangv1.ServiceInf
 	return nil
 }
 
-func (b *ByocAws) TearDown(ctx context.Context) error {
+func (b *ByocAws) TearDownCD(ctx context.Context) error {
 	return b.driver.TearDown(ctx)
 }
 
 func (b *ByocAws) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (string, error) {
-	if err := b.setUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx); err != nil {
 		return "", err
 	}
 	cmd := cdCommand{

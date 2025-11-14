@@ -24,8 +24,8 @@ func TestSetUpCD(t *testing.T) {
 		t.Errorf("AccountInfo() error = %v, want nil", err)
 	}
 	t.Logf("account: %+v", account)
-	if err := b.setUpCD(ctx); err != nil {
-		t.Errorf("setUpCD() error = %v, want nil", err)
+	if err := b.SetUpCD(ctx); err != nil {
+		t.Errorf("SetUpCD() error = %v, want nil", err)
 	}
 
 	payload := base64.StdEncoding.EncodeToString([]byte(`services:

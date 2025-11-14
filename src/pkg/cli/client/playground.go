@@ -94,8 +94,12 @@ func (g *PlaygroundProvider) Destroy(ctx context.Context, req *defangv1.DestroyR
 	return resp.Etag, nil
 }
 
-func (g *PlaygroundProvider) TearDown(ctx context.Context) error {
+func (g *PlaygroundProvider) TearDownCD(ctx context.Context) error {
 	return errors.New("the teardown command is not valid for the Defang playground; did you forget --provider?")
+}
+
+func (g *PlaygroundProvider) SetUpCD(ctx context.Context) error {
+	return errors.New("this command is not valid for the Defang playground; did you forget --provider?")
 }
 
 func (g *PlaygroundProvider) BootstrapList(context.Context) ([]string, error) {
