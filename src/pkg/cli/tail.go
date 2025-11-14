@@ -55,6 +55,7 @@ type TailOptions struct {
 	Since              time.Time
 	Until              time.Time
 	Verbose            bool
+	PrintBookends      bool
 }
 
 func (to TailOptions) String() string {
@@ -142,6 +143,7 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 		return dryrun.ErrDryRun
 	}
 
+	options.PrintBookends = true
 	return streamLogs(ctx, provider, projectName, options, logEntryPrintHandler)
 }
 
@@ -352,7 +354,9 @@ func receiveLogs(ctx context.Context, provider client.Provider, projectName stri
 			}
 
 			if serverStream.Err() == nil { // returns nil on EOF
-				printTailBookend(options, lastLogTime)
+				if options.PrintBookends {
+					printTailBookend(options, lastLogTime)
+				}
 				return nil
 			}
 			return serverStream.Err()
@@ -363,7 +367,7 @@ func receiveLogs(ctx context.Context, provider client.Provider, projectName stri
 			continue
 		}
 
-		if !headBookendPrinted && len(msg.Entries) > 0 {
+		if options.PrintBookends && !headBookendPrinted && len(msg.Entries) > 0 {
 			printHeadBookend(options, msg.Entries[0].Timestamp.AsTime())
 			headBookendPrinted = true
 		}
