@@ -15,6 +15,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
@@ -68,7 +69,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				return cli.InteractiveDebugForClientError(ctx, client, project, loadErr)
+				return debug.InteractiveDebugForClientError(ctx, client, project, loadErr)
 			}
 
 			provider, err := newProviderChecked(ctx, loader)
@@ -160,7 +161,7 @@ func makeComposeUpCmd() *cobra.Command {
 			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, verbose)
 			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
-				handleTailAndMonitorErr(ctx, err, client, cli.DebugConfig{
+				handleTailAndMonitorErr(ctx, err, client, debug.DebugConfig{
 					Deployment: deploy.Etag,
 					ModelId:    modelId,
 					Project:    project,
@@ -226,10 +227,10 @@ func handleComposeUpErr(ctx context.Context, err error, project *compose.Project
 
 	term.Error("Error:", cliClient.PrettyError(err))
 	track.Evt("Debug Prompted", P("composeErr", err))
-	return cli.InteractiveDebugForClientError(ctx, client, project, err)
+	return debug.InteractiveDebugForClientError(ctx, client, project, err)
 }
 
-func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.GrpcClient, debugConfig cli.DebugConfig) {
+func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.GrpcClient, debugConfig debug.DebugConfig) {
 	var errDeploymentFailed cliClient.ErrDeploymentFailed
 	if errors.As(err, &errDeploymentFailed) {
 		// Tail got canceled because of deployment failure: prompt to show the debugger
@@ -243,7 +244,7 @@ func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.G
 			track.Evt("Debug Prompted", P("failedServices", debugConfig.FailedServices), P("etag", debugConfig.Deployment), P("reason", errDeploymentFailed))
 
 			// Call the AI debug endpoint using the original command context (not the tail ctx which is canceled)
-			if nil != cli.InteractiveDebugDeployment(ctx, client, debugConfig) {
+			if nil != debug.InteractiveDebugDeployment(ctx, client, debugConfig) {
 				// don't show this defang hint if debugging was successful
 				tailOptions := newTailOptionsForDeploy(debugConfig.Deployment, debugConfig.Since, true)
 				printDefangHint("To see the logs of the failed service, run:", "logs "+tailOptions.String())
@@ -449,7 +450,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				return cli.InteractiveDebugForClientError(ctx, client, project, loadErr)
+				return debug.InteractiveDebugForClientError(ctx, client, project, loadErr)
 			}
 
 			provider, err := newProvider(ctx, loader)

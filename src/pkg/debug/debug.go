@@ -1,4 +1,4 @@
-package cli
+package debug
 
 import (
 	"context"
@@ -20,6 +20,8 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+var P = track.P
 
 // Arbitrary limit on the maximum number of files to process to avoid walking the entire drive and we have limited
 // context window for the LLM also.
