@@ -15,6 +15,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/agent"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
@@ -22,6 +23,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	pcluster "github.com/DefangLabs/defang/src/pkg/cluster"
+	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -391,6 +393,19 @@ var RootCmd = &cobra.Command{
 		}
 
 		return err
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if nonInteractive {
+			return nil
+		}
+
+		ctx := cmd.Context()
+		err := login.InteractiveRequireLoginAndToS(ctx, client, getCluster())
+		if err != nil {
+			return err
+		}
+		prompt := "Welcome to Defang. I can help you deploy your project to the cloud"
+		return agent.New(ctx, getCluster(), &providerID, agent.DefaultSystemPrompt).StartWithUserPrompt(prompt)
 	},
 }
 
@@ -868,7 +883,7 @@ var debugCmd = &cobra.Command{
 			return fmt.Errorf("invalid 'until' time: %w", err)
 		}
 
-		debugConfig := cli.DebugConfig{
+		debugConfig := debug.DebugConfig{
 			Deployment:     deployment,
 			FailedServices: args,
 			ModelId:        modelId,
@@ -877,7 +892,7 @@ var debugCmd = &cobra.Command{
 			Since:          sinceTs.UTC(),
 			Until:          untilTs.UTC(),
 		}
-		return cli.DebugDeployment(cmd.Context(), client, debugConfig)
+		return debug.DebugDeployment(cmd.Context(), client, debugConfig)
 	},
 }
 

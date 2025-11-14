@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -78,6 +79,11 @@ func (m *MockDeployCLI) OpenBrowser(url string) error {
 	return m.OpenBrowserError
 }
 
+func (m *MockDeployCLI) TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, options cli.TailOptions) (cli.ServiceStates, error) {
+	m.CallLog = append(m.CallLog, "TailAndMonitor")
+	return nil, nil
+}
+
 func TestHandleDeployTool(t *testing.T) {
 	tests := []struct {
 		name                 string
@@ -145,7 +151,7 @@ func TestHandleDeployTool(t *testing.T) {
 					},
 				}
 			},
-			expectedTextContains: "Please use the web portal url:",
+			expectedTextContains: "Deployment completed successfully",
 		},
 		{
 			name:       "successful_deploy_aws_provider",
@@ -159,7 +165,7 @@ func TestHandleDeployTool(t *testing.T) {
 					},
 				}
 			},
-			expectedTextContains: "Please use the aws console",
+			expectedTextContains: "Deployment completed successfully",
 		},
 		{
 			name:          "provider_auto_not_configured",
@@ -198,7 +204,7 @@ func TestHandleDeployTool(t *testing.T) {
 					"Connect(test-cluster)",
 					"CheckProviderConfigured(defang, test-project, 0)",
 					"ComposeUp",
-					// Note: OpenBrowser is called in a goroutine, so it may not be tracked in time
+					"TailAndMonitor",
 				}
 				assert.Equal(t, expectedCalls, mockCLI.CallLog)
 			}
