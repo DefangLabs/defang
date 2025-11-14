@@ -21,6 +21,6 @@ func TearDownCD(ctx context.Context, provider client.Provider, force bool) error
 			return errors.New("there are still deployed services; use --force to tear down anyway")
 		}
 	}
-	term.Warn(`Deleting the CD cluster; this does not delete the services!`)
+	term.Warn("Deleting the CD cluster; this does not delete services or configs!")
 	return provider.TearDownCD(ctx)
 }

@@ -173,6 +173,14 @@ func (b *ByocAws) SetUpCD(ctx context.Context) error {
 		return AnnotateAwsError(err)
 	}
 
+	// Delete default SecurityGroup rules to comply with stricter AWS account security policies
+	if sgId := b.driver.DefaultSecurityGroupID; sgId != "" {
+		term.Debugf("Cleaning up default Security Group rules (%s)", sgId)
+		if err := b.driver.RevokeDefaultSecurityGroupRules(ctx, sgId); err != nil {
+			term.Warnf("Could not clean up default Security Group rules: %v", err)
+		}
+	}
+
 	b.SetupDone = true
 	return nil
 }

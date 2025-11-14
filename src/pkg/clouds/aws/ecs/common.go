@@ -18,14 +18,15 @@ type TaskArn = types.TaskID
 
 type AwsEcs struct {
 	aws.Aws
-	BucketName      string
-	ClusterName     string
-	LogGroupARN     string
-	SecurityGroupID string
-	Spot            bool
-	SubNetID        string
-	TaskDefARN      string
-	VpcID           string
+	BucketName             string
+	ClusterName            string
+	DefaultSecurityGroupID string
+	LogGroupARN            string
+	SecurityGroupID        string
+	Spot                   bool
+	SubNetID               string
+	TaskDefARN             string
+	VpcID                  string
 }
 
 func PlatformToArchOS(platform string) (string, string) {

@@ -10,7 +10,6 @@ import (
 
 	common "github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn/outputs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
@@ -68,7 +67,7 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 	// Check the template version first, to avoid updating to an outdated template; TODO: can we use StackPolicy/Conditions instead?
 	if dso, err := cfn.DescribeStacks(ctx, &cloudformation.DescribeStacksInput{StackName: &a.stackName}); err == nil && len(dso.Stacks) == 1 {
 		for _, output := range dso.Stacks[0].Outputs {
-			if *output.OutputKey == outputs.TemplateVersion {
+			if *output.OutputKey == OutputsTemplateVersion {
 				deployedRev, _ := strconv.Atoi(*output.OutputValue)
 				if deployedRev > TemplateRevision {
 					return fmt.Errorf("CloudFormation stack %s is newer than the current template: update the CLI", a.stackName)
@@ -181,20 +180,22 @@ func (a *AwsEcs) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) error
 	}
 	for _, output := range dso.Stacks[0].Outputs {
 		switch *output.OutputKey {
-		case outputs.SubnetID:
+		case OutputsSubnetID:
 			// Only set the SubNetID if it's not already set; this allows the user to override the subnet
 			if a.SubNetID == "" {
 				a.SubNetID = *output.OutputValue
 			}
-		case outputs.TaskDefArn:
+		case OutputsDefaultSecurityGroupID:
+			a.DefaultSecurityGroupID = *output.OutputValue
+		case OutputsTaskDefArn:
 			a.TaskDefARN = *output.OutputValue
-		case outputs.ClusterName:
+		case OutputsClusterName:
 			a.ClusterName = *output.OutputValue
-		case outputs.LogGroupARN:
+		case OutputsLogGroupARN:
 			a.LogGroupARN = *output.OutputValue
-		case outputs.SecurityGroupID:
+		case OutputsSecurityGroupID:
 			a.SecurityGroupID = *output.OutputValue
-		case outputs.BucketName:
+		case OutputsBucketName:
 			a.BucketName = *output.OutputValue
 		}
 	}
