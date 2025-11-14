@@ -404,8 +404,8 @@ var RootCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-
-		return agent.New(ctx, getCluster(), &providerID, agent.DefaultSystemPrompt).Start()
+		prompt := "Welcome to Defang. I can help you deploy your project to the cloud"
+		return agent.New(ctx, getCluster(), &providerID, agent.DefaultSystemPrompt).StartWithUserPrompt(prompt)
 	},
 }
 

@@ -98,12 +98,25 @@ func (a *Agent) Println(args ...interface{}) {
 	fmt.Fprintln(a.outStream, args...)
 }
 
-func (a *Agent) Start() error {
+func (a *Agent) StartWithUserPrompt(userPrompt string) error {
+	a.Printf("\n%s\n", userPrompt)
+	a.Printf("Type '/exit' to quit.\n")
+	return a.startSession()
+}
+
+func (a *Agent) StartWithMessage(msg string) error {
+	a.Printf("Type '/exit' to quit.\n")
+
+	if err := a.handleMessage(msg); err != nil {
+		return fmt.Errorf("error handling initial message: %w", err)
+	}
+
+	return a.startSession()
+}
+
+func (a *Agent) startSession() error {
 	reader := NewInputReader()
 	defer reader.Close()
-
-	a.Printf("\nWelcome to Defang. I can help you deploy your project to the cloud.\n")
-	a.Printf("Type '/exit' to quit.\n")
 
 	for {
 		a.Printf("> ")
@@ -227,10 +240,6 @@ func (a *Agent) handleMessage(msg string) error {
 	}
 
 	a.msgs = append(a.msgs, resp.Message)
-	for _, part := range resp.Message.Content {
-		a.Printf("%s", part.Text)
-	}
-	a.Println("")
 
 	if len(resp.ToolRequests()) > 0 {
 		_, err := a.handleToolCalls(resp.ToolRequests())
