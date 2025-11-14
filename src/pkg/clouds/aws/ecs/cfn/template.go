@@ -11,7 +11,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	awsecs "github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn/outputs"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/awslabs/goformation/v7/cloudformation"
@@ -430,15 +429,19 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 		// Family:                  cloudformation.SubPtr("${AWS::StackName}-TaskDefinition"), // optional, but needed to avoid TaskDef replacement
 	}
 
-	var vpcId *string
-	if overrides.VpcID == "" && createVpcResources {
+	vpcId := overrides.VpcID
+	if vpcId == "" {
+		if !createVpcResources {
+			panic("using the default VPC: not implemented")
+		}
+
 		// 8a. a VPC
 		const _vpc = "VPC"
 		template.Resources[_vpc] = &ec2.VPC{
 			Tags:      append([]tags.Tag{{Key: "Name", Value: prefix + "vpc"}}, defaultTags...),
 			CidrBlock: ptr.String("10.0.0.0/16"),
 		}
-		vpcId = cloudformation.RefPtr(_vpc)
+		vpcId = cloudformation.Ref(_vpc)
 		// 8b. an internet gateway; FIXME: make internet access optional
 		const _internetGateway = "InternetGateway"
 		template.Resources[_internetGateway] = &ec2.InternetGateway{
@@ -447,14 +450,14 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 		// 8c. an internet gateway attachment for the VPC
 		const _internetGatewayAttachment = "InternetGatewayAttachment"
 		template.Resources[_internetGatewayAttachment] = &ec2.VPCGatewayAttachment{
-			VpcId:             cloudformation.Ref(_vpc),
+			VpcId:             vpcId,
 			InternetGatewayId: cloudformation.RefPtr(_internetGateway),
 		}
 		// 8d. a route table
 		const _routeTable = "RouteTable"
 		template.Resources[_routeTable] = &ec2.RouteTable{
 			Tags:  append([]tags.Tag{{Key: "Name", Value: prefix + "routetable"}}, defaultTags...),
-			VpcId: cloudformation.Ref(_vpc),
+			VpcId: vpcId,
 		}
 		// 8e. a route for the route table and internet gateway
 		const _route = "Route"
@@ -469,7 +472,7 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 			Tags: append([]tags.Tag{{Key: "Name", Value: prefix + "subnet"}}, defaultTags...),
 			// AvailabilityZone:; TODO: parse region suffix
 			CidrBlock:           ptr.String("10.0.0.0/20"),
-			VpcId:               cloudformation.Ref(_vpc),
+			VpcId:               vpcId,
 			MapPublicIpOnLaunch: ptr.Bool(true),
 		}
 		// 8g. a subnet / route table association
@@ -482,34 +485,27 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 		const _s3GatewayEndpoint = "S3GatewayEndpoint"
 		template.Resources[_s3GatewayEndpoint] = &ec2.VPCEndpoint{
 			VpcEndpointType: ptr.String("Gateway"),
-			VpcId:           cloudformation.Ref(_vpc),
+			VpcId:           vpcId,
 			ServiceName:     cloudformation.Sub("com.amazonaws.${AWS::Region}.s3"),
 		}
 
-		template.Outputs[outputs.SubnetID] = cloudformation.Output{
+		const _defaultSecurityGroup = "DefaultSecurityGroup"
+		template.Outputs[OutputsDefaultSecurityGroupID] = cloudformation.Output{
+			Description: ptr.String("ID of the security group"),
+			Value:       cloudformation.GetAtt(_vpc, _defaultSecurityGroup),
+		}
+		template.Outputs[OutputsSubnetID] = cloudformation.Output{
 			Value:       cloudformation.Ref(_subnet),
 			Description: ptr.String("ID of the subnet"),
 		}
-	}
-
-	if overrides.VpcID != "" {
-		vpcId = ptr.String(overrides.VpcID)
 	}
 
 	const _securityGroup = "SecurityGroup"
 	template.Resources[_securityGroup] = &ec2.SecurityGroup{
 		Tags:             defaultTags, // Name tag is ignored
 		GroupDescription: "Security group for the ECS task that allows all outbound and inbound traffic",
-		VpcId:            vpcId,
-		SecurityGroupIngress: []ec2.SecurityGroup_Ingress{
-			{
-				IpProtocol: "tcp",
-				FromPort:   ptr.Int(1),
-				ToPort:     ptr.Int(65535),
-				CidrIp:     ptr.String("0.0.0.0/0"), // from anywhere; FIXME: make optional and/or restrict to "my ip"
-			},
-		},
-		// SecurityGroupEgress: []ec2.SecurityGroup_Egress{; FIXME: add ability to restrict outbound traffic
+		VpcId:            &vpcId,
+		// SecurityGroupEgress: []ec2.SecurityGroup_Egress{; use default egress; FIXME: add ability to restrict outbound traffic
 		// 	{
 		// 		IpProtocol: "tcp",
 		// 		FromPort:   ptr.Int(1),
@@ -519,28 +515,28 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 		// },
 	}
 
-	// Declare stack outputs
-	template.Outputs[outputs.TaskDefArn] = cloudformation.Output{
+	// Declare the remaining stack outputs
+	template.Outputs[OutputsTaskDefArn] = cloudformation.Output{
 		Description: ptr.String("ARN of the ECS task definition"),
 		Value:       cloudformation.Ref(_taskDefinition),
 	}
-	template.Outputs[outputs.ClusterName] = cloudformation.Output{
+	template.Outputs[OutputsClusterName] = cloudformation.Output{
 		Description: ptr.String("Name of the ECS cluster"),
 		Value:       cloudformation.Ref(_cluster),
 	}
-	template.Outputs[outputs.LogGroupARN] = cloudformation.Output{
+	template.Outputs[OutputsLogGroupARN] = cloudformation.Output{
 		Description: ptr.String("ARN of the CloudWatch log group"),
 		Value:       cloudformation.GetAtt(_logGroup, "Arn"),
 	}
-	template.Outputs[outputs.SecurityGroupID] = cloudformation.Output{
+	template.Outputs[OutputsSecurityGroupID] = cloudformation.Output{
 		Description: ptr.String("ID of the security group"),
 		Value:       cloudformation.Ref(_securityGroup),
 	}
-	template.Outputs[outputs.BucketName] = cloudformation.Output{
+	template.Outputs[OutputsBucketName] = cloudformation.Output{
 		Description: ptr.String("Name of the S3 bucket"),
 		Value:       cloudformation.Ref(_bucket),
 	}
-	template.Outputs[outputs.TemplateVersion] = cloudformation.Output{
+	template.Outputs[OutputsTemplateVersion] = cloudformation.Output{
 		Description: ptr.String("Version of this CloudFormation template"),
 		Value:       cloudformation.Int(TemplateRevision),
 	}

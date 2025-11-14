@@ -13,6 +13,6 @@ func InstallCD(ctx context.Context, provider client.Provider) error {
 	if dryrun.DoDryRun {
 		return errors.New("dry run")
 	}
-	term.Warn(`Installing the CD resources into the cluster`)
+	term.Info("Installing the CD resources into the cluster")
 	return provider.SetUpCD(ctx)
 }
