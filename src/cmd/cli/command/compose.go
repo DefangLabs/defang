@@ -69,7 +69,11 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				return debug.InteractiveDebugForClientError(ctx, client, project, loadErr)
+				return debug.InteractiveDebugForClientError(ctx, client, debug.DebugConfig{
+					Project:    project,
+					Addr:       getCluster(),
+					ProviderID: &providerID,
+				}, loadErr)
 			}
 
 			provider, err := newProviderChecked(ctx, loader)
@@ -167,6 +171,8 @@ func makeComposeUpCmd() *cobra.Command {
 					Project:    project,
 					Provider:   provider,
 					Since:      since,
+					Addr:       getCluster(),
+					ProviderID: &providerID,
 				})
 				return err
 			}
@@ -227,7 +233,11 @@ func handleComposeUpErr(ctx context.Context, err error, project *compose.Project
 
 	term.Error("Error:", cliClient.PrettyError(err))
 	track.Evt("Debug Prompted", P("composeErr", err))
-	return debug.InteractiveDebugForClientError(ctx, client, project, err)
+	return debug.InteractiveDebugForClientError(ctx, client, debug.DebugConfig{
+		Project:    project,
+		Addr:       getCluster(),
+		ProviderID: &providerID,
+	}, err)
 }
 
 func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.GrpcClient, debugConfig debug.DebugConfig) {
@@ -450,7 +460,11 @@ func makeComposeConfigCmd() *cobra.Command {
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				return debug.InteractiveDebugForClientError(ctx, client, project, loadErr)
+				return debug.InteractiveDebugForClientError(ctx, client, debug.DebugConfig{
+					Project:    project,
+					Addr:       getCluster(),
+					ProviderID: &providerID,
+				}, loadErr)
 			}
 
 			provider, err := newProvider(ctx, loader)

@@ -11,6 +11,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/agent"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
@@ -20,6 +21,8 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+var UseDefangAgent = os.Getenv("DEFANG_DEBUG_AGENT") == "1"
 
 var P = track.P
 
@@ -33,6 +36,8 @@ var (
 )
 
 type DebugConfig struct {
+	ProviderID     *client.ProviderID
+	Addr           string
 	Deployment     types.ETag
 	FailedServices []string
 	ModelId        string
@@ -73,8 +78,8 @@ func InteractiveDebugDeployment(ctx context.Context, client client.FabricClient,
 	return interactiveDebug(ctx, client, debugConfig, nil)
 }
 
-func InteractiveDebugForClientError(ctx context.Context, client client.FabricClient, project *compose.Project, clientErr error) error {
-	return interactiveDebug(ctx, client, DebugConfig{Project: project}, clientErr)
+func InteractiveDebugForClientError(ctx context.Context, client client.FabricClient, debugConfig DebugConfig, clientErr error) error {
+	return interactiveDebug(ctx, client, debugConfig, clientErr)
 }
 
 func interactiveDebug(ctx context.Context, client client.FabricClient, debugConfig DebugConfig, clientErr error) error {
@@ -93,7 +98,7 @@ func interactiveDebug(ctx context.Context, client client.FabricClient, debugConf
 	track.Evt("Debug Prompt Accepted", P("etag", debugConfig.Deployment), P("loadErr", clientErr))
 
 	if clientErr != nil {
-		if err := debugComposeFileLoadError(ctx, client, debugConfig.Project, clientErr); err != nil {
+		if err := debugComposeFileLoadError(ctx, client, debugConfig, clientErr); err != nil {
 			term.Warnf("Failed to debug compose file load: %v", err)
 			return err
 		}
@@ -127,6 +132,16 @@ func DebugDeployment(ctx context.Context, client client.FabricClient, debugConfi
 		return dryrun.ErrDryRun
 	}
 
+	if UseDefangAgent {
+		term.Debug("Using Defang Agent for debugging")
+		prompt := fmt.Sprintf(
+			"An error occurred while deploying this project to %s with Defang. "+
+				"Help troubleshoot and recommend a solution. Look at the logs to understand what happened.",
+			debugConfig.ProviderID.Name(),
+		)
+		return agent.New(ctx, debugConfig.Addr, debugConfig.ProviderID, prompt).Start()
+	}
+
 	var sinceTs, untilTs *timestamppb.Timestamp
 	if pkg.IsValidTime(debugConfig.Since) {
 		sinceTs = timestamppb.New(debugConfig.Since)
@@ -158,13 +173,19 @@ func DebugDeployment(ctx context.Context, client client.FabricClient, debugConfi
 	return nil
 }
 
-func debugComposeFileLoadError(ctx context.Context, client client.FabricClient, project *compose.Project, loadErr error) error {
+func debugComposeFileLoadError(ctx context.Context, client client.FabricClient, debugConfig DebugConfig, loadErr error) error {
 	term.Debugf("Invoking AI debugger for load error: %v", loadErr)
 
+	project := debugConfig.Project
 	files := findMatchingProjectFiles(project, nil)
 
 	if dryrun.DoDryRun {
 		return dryrun.ErrDryRun
+	}
+
+	if UseDefangAgent {
+		prompt := "The following error occurred while loading the compose file. Help troubleshoot and recommend a solution." + loadErr.Error()
+		return agent.New(ctx, debugConfig.Addr, debugConfig.ProviderID, prompt).Start()
 	}
 
 	req := defangv1.DebugRequest{
