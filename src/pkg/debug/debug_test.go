@@ -96,7 +96,7 @@ func TestDebugProject(t *testing.T) {
 	fabricClient := MockDebugFabricClient{}
 
 	t.Run("with load error", func(t *testing.T) {
-		if err := debugComposeFileLoadError(t.Context(), fabricClient, project, loadErr); err != nil {
+		if err := debugComposeFileLoadError(t.Context(), fabricClient, DebugConfig{Project: project}, loadErr); err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
 	})
