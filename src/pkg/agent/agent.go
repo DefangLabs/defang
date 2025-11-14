@@ -68,7 +68,7 @@ func New(ctx context.Context, addr string, providerId *client.ProviderID, prompt
 		genkit.WithPlugins(providerPlugin),
 	)
 
-	tools := CollectTools(addr, providerId)
+	tools := CollectDefangTools(addr, providerId)
 	toolRefs := make([]ai.ToolRef, len(tools))
 	for i, t := range tools {
 		toolRef := ai.ToolRef(t)
