@@ -95,7 +95,7 @@ func (gcp Gcp) EnsureServiceAccountExists(ctx context.Context, serviceAccountId,
 	defer client.Close()
 
 	// Check if the service account already exists, if so, update it if necessary
-	serviceAccountEmail := fmt.Sprintf("%s@%s.iam.gserviceaccount.com", serviceAccountId, gcp.ProjectId)
+	serviceAccountEmail := gcp.GetServiceAccountEmail(serviceAccountId)
 	serviceAccountPath := fmt.Sprintf("projects/%s/serviceAccounts/%s", gcp.ProjectId, serviceAccountEmail)
 	account, err := client.GetServiceAccount(ctx, &iamadmpb.GetServiceAccountRequest{Name: serviceAccountPath})
 	if err == nil {
@@ -149,7 +149,7 @@ func (gcp Gcp) EnsureServiceAccountExists(ctx context.Context, serviceAccountId,
 	return "", fmt.Errorf("failed to check service account existence: %w", err)
 }
 
-func (gcp Gcp) EnsureServiceAccountHasRoles(ctx context.Context, serviceAccount string, roles []string) error {
+func (gcp Gcp) EnsurePrincipalHasRoles(ctx context.Context, serviceAccount string, roles []string) error {
 	client, err := resourcemanager.NewProjectsClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create resource manager client: %w", err)
@@ -157,10 +157,10 @@ func (gcp Gcp) EnsureServiceAccountHasRoles(ctx context.Context, serviceAccount 
 	defer client.Close()
 
 	projectResource := "projects/" + gcp.ProjectId
-	return ensureAccountHasRolesWithResource(ctx, client, projectResource, serviceAccount, roles)
+	return ensurePrincipalHasRolesWithResource(ctx, client, projectResource, serviceAccount, roles)
 }
 
-func (gcp Gcp) EnsureServiceAccountHasBucketRoles(ctx context.Context, bucketName, serviceAccount string, roles []string) error {
+func (gcp Gcp) EnsurePrincipalHasBucketRoles(ctx context.Context, bucketName, principal string, roles []string) error {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create storage client: %w", err)
@@ -169,7 +169,6 @@ func (gcp Gcp) EnsureServiceAccountHasBucketRoles(ctx context.Context, bucketNam
 
 	// Get the bucket's IAM policy
 	bucket := client.Bucket(bucketName)
-	serviceAccountMember := "serviceAccount:" + serviceAccount
 	policy, err := bucket.IAM().Policy(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get IAM policy for bucket %s: %w", bucketName, err)
@@ -179,18 +178,18 @@ func (gcp Gcp) EnsureServiceAccountHasBucketRoles(ctx context.Context, bucketNam
 	for _, roleStr := range roles {
 		role := iam.RoleName(roleStr)
 		members := policy.Members(role)
-		if !slices.Contains(members, serviceAccountMember) {
-			policy.Add(serviceAccountMember, role)
+		if !slices.Contains(members, principal) {
+			policy.Add(principal, role)
 			needUpdate = true
 		}
 	}
 
 	if !needUpdate {
-		term.Debugf("Service account %s already has roles %v on bucket %s", serviceAccount, roles, bucketName)
+		term.Debugf("Principal %s already has roles %v on bucket %s", principal, roles, bucketName)
 		return nil
 	}
 
-	term.Infof("Updating IAM policy for service account %s on bucket %s", serviceAccount, bucketName)
+	term.Infof("Updating IAM policy for principal %s on bucket %s", principal, bucketName)
 	for i := range 3 { // Service account might not be visible for a few seconds after creation for policy attachment
 		if err := bucket.IAM().SetPolicy(ctx, policy); err != nil {
 			if i < 2 {
@@ -207,13 +206,13 @@ func (gcp Gcp) EnsureServiceAccountHasBucketRoles(ctx context.Context, bucketNam
 	for start := time.Now(); time.Since(start) < 5*time.Minute; {
 		vp, err := bucket.IAM().Policy(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to verify IAM policy for service account %s on bucket %s: %w", serviceAccount, bucketName, err)
+			return fmt.Errorf("failed to verify IAM policy for principal %s on bucket %s: %w", principal, bucketName, err)
 		}
 
 		for _, roleStr := range roles {
 			role := iam.RoleName(roleStr)
 			members := vp.Members(role)
-			if !slices.Contains(members, serviceAccountMember) {
+			if !slices.Contains(members, principal) {
 				pkg.SleepWithContext(ctx, 3*time.Second)
 				continue
 			}
@@ -230,7 +229,7 @@ func (gcp Gcp) EnsureServiceAccountHasArtifactRegistryRoles(ctx context.Context,
 	}
 	defer client.Close()
 
-	return ensureAccountHasRolesWithResource(ctx, client, repo, serviceAccount, roles)
+	return ensurePrincipalHasRolesWithResource(ctx, client, repo, serviceAccount, roles)
 }
 
 // TODO: Investigate if this can be merged with EnsureServiceAccountHasRoles
@@ -293,7 +292,7 @@ type resourceWithIAMPolicyClient interface {
 	SetIamPolicy(context.Context, *iampb.SetIamPolicyRequest, ...gax.CallOption) (*iampb.Policy, error)
 }
 
-func ensureAccountHasRolesWithResource(ctx context.Context, client resourceWithIAMPolicyClient, resource, principal string, roles []string) error {
+func ensurePrincipalHasRolesWithResource(ctx context.Context, client resourceWithIAMPolicyClient, resource, principal string, roles []string) error {
 	policy, err := client.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{Resource: resource})
 	if err != nil {
 		return fmt.Errorf("failed to get IAM policy for resource %s: %w", resource, err)
@@ -350,4 +349,8 @@ func ensureAccountHasRolesWithResource(ctx context.Context, client resourceWithI
 		return nil
 	}
 	return fmt.Errorf("timed out waiting for IAM policy update on resource %s", resource)
+}
+
+func (gcp Gcp) GetServiceAccountEmail(name string) string {
+	return fmt.Sprintf("%s@%s.iam.gserviceaccount.com", name, gcp.ProjectId)
 }
