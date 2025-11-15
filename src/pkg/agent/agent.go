@@ -68,18 +68,6 @@ func New(ctx context.Context, addr string, providerId *client.ProviderID, prompt
 		genkit.WithPlugins(providerPlugin),
 	)
 
-	tools := CollectDefangTools(addr, providerId)
-	toolRefs := make([]ai.ToolRef, len(tools))
-	for i, t := range tools {
-		toolRef := ai.ToolRef(t)
-		toolRefs[i] = toolRef
-		action, ok := toolRef.(ai.Tool)
-		if !ok {
-			panic("toolRef is not an ai.Tool")
-		}
-		genkit.RegisterAction(g, action)
-	}
-
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("error getting current working directory: %w", err)
@@ -93,7 +81,18 @@ func New(ctx context.Context, addr string, providerId *client.ProviderID, prompt
 		outStream: os.Stdout,
 	}
 
+	defangTools := CollectDefangTools(addr, providerId)
+	fsTools := CollectFsTools()
+	a.RegisterTools(defangTools...)
+	a.RegisterTools(fsTools...)
 	return a, nil
+}
+
+func (a *Agent) RegisterTools(tools ...ai.Tool) {
+	for _, t := range tools {
+		genkit.RegisterAction(a.g, t)
+		a.tools = append(a.tools, ai.ToolRef(t))
+	}
 }
 
 func (a *Agent) Printf(format string, args ...interface{}) {
