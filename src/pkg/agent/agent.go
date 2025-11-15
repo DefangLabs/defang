@@ -56,6 +56,7 @@ var whitespacePattern = regexp.MustCompile(`^\s*$`)
 type Agent struct {
 	ctx       context.Context
 	g         *genkit.Genkit
+	maxTurns  int
 	msgs      []*ai.Message
 	prompt    string
 	tools     []ai.ToolRef
@@ -95,6 +96,7 @@ func New(ctx context.Context, addr string, providerId *client.ProviderID, prompt
 	a := &Agent{
 		ctx:       ctx,
 		g:         g,
+		maxTurns:  3,
 		msgs:      []*ai.Message{},
 		prompt:    fmt.Sprintf("%s\n\nThe current working directory is %q", prompt, cwd),
 		outStream: os.Stdout,
@@ -131,7 +133,7 @@ func (a *Agent) StartWithUserPrompt(userPrompt string) error {
 func (a *Agent) StartWithMessage(msg string) error {
 	a.Printf("Type '/exit' to quit.\n")
 
-	if err := a.handleMessage(msg); err != nil {
+	if err := a.handleUserMessage(msg); err != nil {
 		return fmt.Errorf("error handling initial message: %w", err)
 	}
 
@@ -166,7 +168,7 @@ func (a *Agent) startSession() error {
 			continue
 		}
 
-		if err := a.handleMessage(input); err != nil {
+		if err := a.handleUserMessage(input); err != nil {
 			a.Printf("Error handling message: %v", err)
 		}
 	}
@@ -219,17 +221,10 @@ func (a *Agent) handleToolCalls(requests []*ai.ToolRequest) ([]*ai.Message, erro
 
 	responses := []*ai.Message{ai.NewMessage(ai.RoleTool, nil, parts...)}
 	a.msgs = append(a.msgs, responses...)
-	resp, err := genkit.Generate(a.ctx, a.g,
-		ai.WithTools(a.tools...),
-		ai.WithMessages(a.msgs...),
-		ai.WithStreaming(a.streamingCallback),
-	)
+	_, err := a.generate()
 	if err != nil {
 		return nil, fmt.Errorf("generation error: %w", err)
 	}
-	a.Println("")
-	responses = append(responses, resp.Message)
-	a.msgs = responses
 	return responses, nil
 }
 
@@ -240,11 +235,35 @@ func (a *Agent) streamingCallback(ctx context.Context, chunk *ai.ModelResponseCh
 	return nil
 }
 
-func (a *Agent) handleMessage(msg string) error {
+func (a *Agent) handleUserMessage(msg string) error {
 	a.msgs = append(a.msgs, ai.NewUserMessage(ai.NewTextPart(msg)))
 
+	return a.generateLoop()
+}
+
+func (a *Agent) generateLoop() error {
 	a.Printf("* Thinking...\r* ")
 
+	for range a.maxTurns {
+		resp, err := a.generate()
+		if err != nil {
+			continue
+		}
+		toolRequests := resp.ToolRequests()
+		if len(toolRequests) > 0 {
+			_, err := a.handleToolCalls(toolRequests)
+			if err != nil {
+				a.Printf("%v", err)
+				a.msgs = append(a.msgs, ai.NewMessage(ai.RoleTool, nil, ai.NewTextPart(err.Error())))
+				continue
+			}
+		}
+	}
+
+	return nil
+}
+
+func (a *Agent) generate() (*ai.ModelResponse, error) {
 	resp, err := genkit.Generate(a.ctx, a.g,
 		ai.WithPrompt(a.prompt),
 		ai.WithTools(a.tools...),
@@ -254,17 +273,9 @@ func (a *Agent) handleMessage(msg string) error {
 	)
 	a.Println("")
 	if err != nil {
-		return fmt.Errorf("generation error: %w", err)
+		return nil, err
 	}
 
 	a.msgs = append(a.msgs, resp.Message)
-
-	if len(resp.ToolRequests()) > 0 {
-		_, err := a.handleToolCalls(resp.ToolRequests())
-		if err != nil {
-			return fmt.Errorf("tool call handling error: %w", err)
-		}
-	}
-
-	return nil
+	return resp, nil
 }
