@@ -192,7 +192,7 @@ func (a *Agent) handleToolRequest(req *ai.ToolRequest) (*ai.ToolResponse, error)
 				Output: "Please set up a provider using one of the setup tools.",
 			}, nil
 		}
-		return nil, fmt.Errorf("tool %q execution error: %w", tool.Name(), err)
+		return nil, err
 	}
 
 	return &ai.ToolResponse{
@@ -211,7 +211,7 @@ func (a *Agent) handleToolCalls(requests []*ai.ToolRequest) ([]*ai.Message, erro
 	for _, req := range requests {
 		toolResp, err := a.handleToolRequest(req)
 		if err != nil {
-			return nil, fmt.Errorf("tool request error: %w", err)
+			return nil, err
 		}
 		a.Printf("  > %s\n", toolResp.Output)
 		parts = append(parts, ai.NewToolResponsePart(toolResp))
