@@ -84,6 +84,15 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 		return err
 	}
 
+	// First, check if there are any domain names in the compose file at all
+	hasDomains := false
+	for _, service := range project.Services {
+		if service.DomainName != "" {
+			hasDomains = true
+			break
+		}
+	}
+
 	cnt := 0
 	for _, serviceInfo := range services.Services {
 		if service, ok := project.Services[serviceInfo.Service.Name]; ok && service.DomainName != "" && serviceInfo.ZoneId == "" {
@@ -99,7 +108,8 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 			}
 		}
 	}
-	if cnt == 0 {
+	// Only show the "no domainname found" message if there truly are no domains in the compose file
+	if cnt == 0 && !hasDomains {
 		term.Infof("No `domainname` found in compose file; no HTTPS cert generation needed")
 	}
 
