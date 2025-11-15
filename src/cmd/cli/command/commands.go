@@ -144,8 +144,10 @@ func Execute(ctx context.Context) error {
 func SetupCommands(ctx context.Context, version string) {
 	cobra.EnableTraverseRunHooks = true // we always need to run the RootCmd's pre-run hook
 
+	var stack string
+
 	RootCmd.Version = version
-	RootCmd.PersistentFlags().StringVarP(&stack, "stack", "s", stack, "stack name (for BYOC providers)")
+	RootCmd.PersistentFlags().StringVarP(&stack, "stack", "s", os.Getenv("DEFANG_STACK"), "stack name (for BYOC providers)")
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().StringVar(&cluster, "cluster", pcluster.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
@@ -333,6 +335,9 @@ var RootCmd = &cobra.Command{
 	Short:         "Defang CLI is used to take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
 		ctx := cmd.Context()
+		config.loadEnv()
+		config.loadFlags(cmd.Flags())
+
 		term.SetDebug(doDebug)
 
 		// Don't track/connect the completion commands
@@ -365,8 +370,10 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
+		stack, _ := cmd.Flags().GetString("stack")
+
 		// Read the global flags again from any .defangrc files in the cwd
-		readGlobals(stack)
+		config.loadRC(stack, cmd.Flags())
 
 		client, err = cli.Connect(ctx, getCluster())
 
@@ -1200,7 +1207,7 @@ func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 		return nil, err
 	}
 
-	provider := cli.NewProvider(ctx, providerID, client, stack)
+	provider := cli.NewProvider(ctx, providerID, client, config.Stack)
 	return provider, nil
 }
 
@@ -1214,7 +1221,7 @@ func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient
 }
 
 func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string, serviceCount int) error {
-	return cliClient.CanIUseProvider(ctx, client, provider, projectName, stack, serviceCount)
+	return cliClient.CanIUseProvider(ctx, client, provider, projectName, config.Stack, serviceCount)
 }
 
 func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, error) {
