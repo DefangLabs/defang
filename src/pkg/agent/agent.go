@@ -43,7 +43,7 @@ type Agent struct {
 	outStream io.Writer
 }
 
-func New(ctx context.Context, addr string, providerId *client.ProviderID, prompt string) *Agent {
+func New(ctx context.Context, addr string, providerId *client.ProviderID, prompt string) (*Agent, error) {
 	accessToken := cluster.GetExistingToken(addr)
 	provider := "fabric"
 	var providerPlugin api.Plugin
@@ -80,14 +80,20 @@ func New(ctx context.Context, addr string, providerId *client.ProviderID, prompt
 		genkit.RegisterAction(g, action)
 	}
 
-	return &Agent{
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("error getting current working directory: %w", err)
+	}
+
+	a := &Agent{
 		ctx:       ctx,
 		g:         g,
 		msgs:      []*ai.Message{},
-		prompt:    prompt,
-		tools:     toolRefs,
+		prompt:    fmt.Sprintf("%s\n\nThe current working directory is %q", prompt, cwd),
 		outStream: os.Stdout,
 	}
+
+	return a, nil
 }
 
 func (a *Agent) Printf(format string, args ...interface{}) {

@@ -139,7 +139,11 @@ func DebugDeployment(ctx context.Context, client client.FabricClient, debugConfi
 				"Help troubleshoot and recommend a solution. Look at the logs to understand what happened.",
 			debugConfig.ProviderID.Name(),
 		)
-		return agent.New(ctx, debugConfig.Addr, debugConfig.ProviderID, agent.DefaultSystemPrompt).StartWithUserPrompt(prompt)
+		ag, err := agent.New(ctx, debugConfig.Addr, debugConfig.ProviderID, agent.DefaultSystemPrompt)
+		if err != nil {
+			return err
+		}
+		return ag.StartWithUserPrompt(prompt)
 	}
 
 	var sinceTs, untilTs *timestamppb.Timestamp
@@ -185,7 +189,11 @@ func debugComposeFileLoadError(ctx context.Context, client client.FabricClient, 
 
 	if UseDefangAgent {
 		prompt := "The following error occurred while loading the compose file. Help troubleshoot and recommend a solution." + loadErr.Error()
-		return agent.New(ctx, debugConfig.Addr, debugConfig.ProviderID, agent.DefaultSystemPrompt).StartWithMessage(prompt)
+		ag, err := agent.New(ctx, debugConfig.Addr, debugConfig.ProviderID, agent.DefaultSystemPrompt)
+		if err != nil {
+			return err
+		}
+		return ag.StartWithMessage(prompt)
 	}
 
 	req := defangv1.DebugRequest{
