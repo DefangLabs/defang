@@ -175,11 +175,6 @@ func (a *Agent) startSession() error {
 }
 
 func (a *Agent) handleToolRequest(req *ai.ToolRequest) (*ai.ToolResponse, error) {
-	inputs, err := json.Marshal(req.Input)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling tool request input: %w", err)
-	}
-	a.Printf("* %s(%s)\n", req.Name, inputs)
 	tool := genkit.LookupTool(a.g, req.Name)
 	if tool == nil {
 		return nil, fmt.Errorf("tool %q not found", req.Name)
@@ -229,9 +224,9 @@ func (a *Agent) handleToolCalls(requests []*ai.ToolRequest) ([]*ai.Message, erro
 }
 
 func (a *Agent) streamingCallback(ctx context.Context, chunk *ai.ModelResponseChunk) error {
-	for _, part := range chunk.Content {
-		a.Printf("%s", part.Text)
-	}
+	// for _, part := range chunk.Content {
+	// 	a.Printf("%s", part.Text)
+	// }
 	return nil
 }
 
@@ -242,7 +237,7 @@ func (a *Agent) handleUserMessage(msg string) error {
 }
 
 func (a *Agent) generateLoop() error {
-	a.Printf("* Thinking...\r* ")
+	a.Printf("* Thinking...\r")
 
 	for range a.maxTurns {
 		resp, err := a.generate()
@@ -271,10 +266,26 @@ func (a *Agent) generate() (*ai.ModelResponse, error) {
 		ai.WithReturnToolRequests(true),
 		ai.WithStreaming(a.streamingCallback),
 	)
-	a.Println("")
 	if err != nil {
 		return nil, err
 	}
+	for _, part := range resp.Message.Content {
+		if part.Kind == ai.PartText {
+			a.Printf("%s", part.Text)
+		}
+		if part.Kind == ai.PartToolRequest {
+			req := part.ToolRequest
+			inputs, err := json.Marshal(req.Input)
+			if err != nil {
+				return nil, fmt.Errorf("error marshaling tool request input: %w", err)
+			}
+			a.Printf("* %s(%s)\n", req.Name, inputs)
+		}
+		if part.Kind == ai.PartReasoning {
+			a.Printf("_%s_\n", part.Text)
+		}
+	}
+	a.Println("")
 
 	a.msgs = append(a.msgs, resp.Message)
 	return resp, nil
