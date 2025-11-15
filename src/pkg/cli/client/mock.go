@@ -34,6 +34,12 @@ func (m MockProvider) UpdateShardDomain(ctx context.Context) error {
 	return nil
 }
 
+func (m MockProvider) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
+	// Mock implementation that returns nil to indicate no project update available
+	// This prevents test failures while maintaining expected behavior
+	return nil, nil
+}
+
 // MockServerStream mocks a ServerStream.
 type MockServerStream[Msg any] struct {
 	index int
