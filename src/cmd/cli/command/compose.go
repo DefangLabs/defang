@@ -157,7 +157,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 
-			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, verbose)
+			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, config.Verbose)
 			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
 				handleTailAndMonitorErr(ctx, err, client, cli.DebugConfig{
@@ -422,7 +422,7 @@ func newTailOptionsForDown(deployment string, since time.Time) cli.TailOptions {
 			}
 			return nil // keep tailing logs
 		},
-		Verbose: verbose,
+		Verbose: config.Verbose,
 		LogType: logs.LogTypeAll,
 	}
 }

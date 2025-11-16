@@ -144,17 +144,15 @@ func Execute(ctx context.Context) error {
 func SetupCommands(ctx context.Context, version string) {
 	cobra.EnableTraverseRunHooks = true // we always need to run the RootCmd's pre-run hook
 
-	var stack string
-
 	RootCmd.Version = version
-	RootCmd.PersistentFlags().StringVarP(&stack, "stack", "s", os.Getenv("DEFANG_STACK"), "stack name (for BYOC providers)")
+	RootCmd.PersistentFlags().StringVarP(&config.Stack, "stack", "s", os.Getenv("DEFANG_STACK"), "stack name (for BYOC providers)")
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().StringVar(&cluster, "cluster", pcluster.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
 	RootCmd.PersistentFlags().StringVar(&org, "org", os.Getenv("DEFANG_ORG"), "override GitHub organization name (tenant)")
 	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
-	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
+	RootCmd.PersistentFlags().BoolVarP(&config.Verbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
 	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", pkg.GetenvBool("DEFANG_DEBUG"), "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&dryrun.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
 	RootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "disable interactive prompts / no TTY")
@@ -939,7 +937,7 @@ var deleteCmd = &cobra.Command{
 			Deployment: deployment,
 			LogType:    logs.LogTypeAll,
 			Since:      since,
-			Verbose:    verbose,
+			Verbose:    config.Verbose,
 		}
 		tailCtx := cmd.Context() // FIXME: stop Tail when the deployment is done
 		return cli.TailAndWaitForCD(tailCtx, provider, projectName, tailOptions)

@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"os"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -26,22 +27,25 @@ var (
 	providerID     = cliClient.ProviderAuto
 	sourcePlatform = migrate.SourcePlatformUnspecified // default to auto-detecting the source platform
 	// stack          = os.Getenv("DEFANG_STACK")
-	verbose = false
+	// verbose = false
 
 	config GlobalConfig
 )
 
 type GlobalConfig struct {
-	Stack string
+	Stack   string
+	Verbose bool
 }
 
 func (r *GlobalConfig) loadEnv() {
 	// TODO: init each property from the environment or defaults
 	r.Stack = os.Getenv("DEFANG_STACK")
+	r.Verbose = os.Getenv("DEFANG_VERBOSE") == "true"
 }
 
 func (r *GlobalConfig) loadFlags(flags *pflag.FlagSet) {
 	flags.Set("stack", r.Stack)
+	flags.Set("verbose", fmt.Sprintf("%v", r.Verbose))
 }
 
 func (r *GlobalConfig) loadRC(stackName string, flags *pflag.FlagSet) {
