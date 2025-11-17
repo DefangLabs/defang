@@ -50,7 +50,7 @@ func TestGetCloudStorageClientWithServiceAccount(t *testing.T) {
 		return nil, nil
 	}
 
-	if client, err := getCloudStorageClientWithServiceAccount(context.Background(), "fake-service-account"); err != nil {
+	if client, err := getCloudStorageClientWithServiceAccount(t.Context(), "fake-service-account"); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else if client != mockClient {
 		t.Errorf("expected client to be %v but got %v", mockClient, client)
