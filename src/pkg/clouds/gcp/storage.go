@@ -23,6 +23,8 @@ var newStorageClient = func(ctx context.Context, opts ...option.ClientOption) (S
 	return storage.NewClient(ctx, opts...)
 }
 
+var impersonateCredentialsTokenSource = impersonate.CredentialsTokenSource
+
 type StorageClient interface {
 	Bucket(name string) *storage.BucketHandle
 	Buckets(ctx context.Context, projectID string) *storage.BucketIterator
@@ -213,7 +215,7 @@ func iterateBucketObjects(ctx context.Context, bucketName, prefix string, client
 }
 
 func getCloudStorageClientWithServiceAccount(ctx context.Context, serviceAccount string) (StorageClient, error) {
-	ts, err := impersonate.CredentialsTokenSource(ctx, impersonate.CredentialsConfig{
+	ts, err := impersonateCredentialsTokenSource(ctx, impersonate.CredentialsConfig{
 		TargetPrincipal: serviceAccount,
 		Scopes:          []string{"https://www.googleapis.com/auth/cloud-platform"},
 	})

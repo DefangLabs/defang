@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"cloud.google.com/go/storage"
+	"golang.org/x/oauth2"
+	"google.golang.org/api/impersonate"
 	"google.golang.org/api/option"
 )
 
@@ -22,9 +24,11 @@ func (m *MockStorageClient) Close() error {
 }
 
 func TestGetCloudStorageClientWithServiceAccount(t *testing.T) {
-	original := newStorageClient
+	originalNewClient := newStorageClient
+	originalImpersonate := impersonateCredentialsTokenSource
 	t.Cleanup(func() {
-		newStorageClient = original
+		newStorageClient = originalNewClient
+		impersonateCredentialsTokenSource = originalImpersonate
 	})
 	mockClient := &MockStorageClient{}
 	newStorageClient = func(ctx context.Context, opts ...option.ClientOption) (StorageClient, error) {
@@ -37,6 +41,13 @@ func TestGetCloudStorageClientWithServiceAccount(t *testing.T) {
 			t.Errorf("expected option to be of type option.WithTokenSource but got %T", opts[0])
 		}
 		return mockClient, nil
+	}
+	impersonateCredentialsTokenSource = func(ctx context.Context, ts impersonate.CredentialsConfig, opts ...option.ClientOption) (oauth2.TokenSource, error) {
+		expectedServiceAccount := "fake-service-account"
+		if ts.TargetPrincipal != expectedServiceAccount {
+			t.Errorf("expected TargetPrincipal to be %s but got %s", expectedServiceAccount, ts.TargetPrincipal)
+		}
+		return nil, nil
 	}
 
 	if client, err := getCloudStorageClientWithServiceAccount(context.Background(), "fake-service-account"); err != nil {
