@@ -271,8 +271,13 @@ func (b *ByocGcp) BootstrapList(ctx context.Context) ([]string, error) {
 	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
 
 	var stacks []string
+	uploadSA := b.driver.GetServiceAccountEmail(DefangUploadServiceAccountName)
+	term.Debug("Getting services from pulumi stacks bucket:", bucketName, prefix, uploadSA)
+	objLoader := func(ctx context.Context, bucket, object string) ([]byte, error) {
+		return b.driver.GetBucketObjectWithServiceAccount(ctx, bucket, object, uploadSA)
+	}
 	err = b.driver.IterateBucketObjects(ctx, bucketName, prefix, func(obj *storage.ObjectAttrs) error {
-		stack, err := byoc.ParsePulumiStackObject(ctx, gcpObj{obj}, bucketName, prefix, b.driver.GetBucketObject)
+		stack, err := byoc.ParsePulumiStackObject(ctx, gcpObj{obj}, bucketName, prefix, objLoader)
 		if err != nil {
 			return err
 		}
