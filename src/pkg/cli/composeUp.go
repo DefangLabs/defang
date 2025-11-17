@@ -63,6 +63,14 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 	// Do not modify the original project, because the caller needs it for debugging.
 	fixedProject := project.WithoutUnnecessaryResources()
 
+	// Validate Dockerfiles before processing the build contexts
+	// Only validate when actually deploying (not for dry-run/ignore mode)
+	if upload != compose.UploadModeIgnore && upload != compose.UploadModeEstimate {
+		if err := compose.ValidateServiceDockerfiles(project); err != nil {
+			return nil, project, &ComposeError{err}
+		}
+	}
+
 	if err := compose.FixupServices(ctx, provider, fixedProject, upload); err != nil {
 		return nil, project, err
 	}
