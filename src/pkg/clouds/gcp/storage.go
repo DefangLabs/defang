@@ -19,6 +19,16 @@ import (
 	"google.golang.org/api/option"
 )
 
+var newStorageClient = func(ctx context.Context, opts ...option.ClientOption) (StorageClient, error) {
+	return storage.NewClient(ctx, opts...)
+}
+
+type StorageClient interface {
+	Bucket(name string) *storage.BucketHandle
+	Buckets(ctx context.Context, projectID string) *storage.BucketIterator
+	Close() error
+}
+
 func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string) (string, error) {
 	existing, err := gcp.GetBucketWithPrefix(ctx, prefix)
 	if err != nil {
@@ -29,9 +39,9 @@ func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string) (string, e
 		return existing, nil
 	}
 
-	client, err := storage.NewClient(ctx)
+	client, err := newStorageClient(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to create storeage client: %w", err)
+		return "", fmt.Errorf("failed to create storage client: %w", err)
 	}
 	defer client.Close()
 
@@ -54,7 +64,7 @@ func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string) (string, e
 }
 
 func (gcp Gcp) GetBucketWithPrefix(ctx context.Context, prefix string) (string, error) {
-	client, err := storage.NewClient(ctx)
+	client, err := newStorageClient(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get stoage bucket with prefix %q: %w", prefix, err)
 	}
@@ -76,7 +86,7 @@ func (gcp Gcp) GetBucketWithPrefix(ctx context.Context, prefix string) (string, 
 }
 
 func (gcp Gcp) CreateUploadURL(ctx context.Context, bucketName, objectName, serviceAccount string) (string, error) {
-	client, err := storage.NewClient(ctx)
+	client, err := newStorageClient(ctx)
 	if err != nil {
 		return "", fmt.Errorf("unable to create upload URL, failed to create storage client: %w", err)
 	}
@@ -135,7 +145,7 @@ func (gcp Gcp) SignBytes(ctx context.Context, b []byte, name string) ([]byte, er
 }
 
 func (gcp Gcp) GetBucketObject(ctx context.Context, bucketName, objectName string) ([]byte, error) {
-	client, err := storage.NewClient(ctx)
+	client, err := newStorageClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get bucket object, failed to create storage client: %w", err)
 	}
@@ -144,22 +154,15 @@ func (gcp Gcp) GetBucketObject(ctx context.Context, bucketName, objectName strin
 }
 
 func (gcp Gcp) GetBucketObjectWithServiceAccount(ctx context.Context, bucketName, objectName, serviceAccount string) ([]byte, error) {
-	ts, err := impersonate.CredentialsTokenSource(ctx, impersonate.CredentialsConfig{
-		TargetPrincipal: serviceAccount,
-		Scopes:          []string{"https://www.googleapis.com/auth/cloud-platform"},
-	})
+	client, err := getCloudStorageClientWithServiceAccount(ctx, serviceAccount)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get bucket object, failed to create impersonated token source for service account %v: %w", serviceAccount, err)
-	}
-	client, err := storage.NewClient(ctx, option.WithTokenSource(ts))
-	if err != nil {
-		return nil, fmt.Errorf("unable to get bucket object, failed to create storage client: %w", err)
+		return nil, err
 	}
 	defer client.Close()
 	return gcp.getBucketObject(ctx, bucketName, objectName, client)
 }
 
-func (gcp Gcp) getBucketObject(ctx context.Context, bucketName, objectName string, client *storage.Client) ([]byte, error) {
+func (gcp Gcp) getBucketObject(ctx context.Context, bucketName, objectName string, client StorageClient) ([]byte, error) {
 	bucket := client.Bucket(bucketName)
 	r, err := bucket.Object(objectName).NewReader(ctx)
 	if err != nil {
@@ -171,12 +174,26 @@ func (gcp Gcp) getBucketObject(ctx context.Context, bucketName, objectName strin
 }
 
 func (gcp Gcp) IterateBucketObjects(ctx context.Context, bucketName, prefix string, f func(*storage.ObjectAttrs) error) error {
-	client, err := storage.NewClient(ctx)
+	client, err := newStorageClient(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to iterate on bucket object, failed to create storage client: %w", err)
 	}
 	defer client.Close()
 
+	return iterateBucketObjects(ctx, bucketName, prefix, client, f)
+}
+
+func (gcp Gcp) IterateBucketObjectsWithServiceAccount(ctx context.Context, bucketName, prefix, serviceAccount string, f func(*storage.ObjectAttrs) error) error {
+	client, err := getCloudStorageClientWithServiceAccount(ctx, serviceAccount)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	return iterateBucketObjects(ctx, bucketName, prefix, client, f)
+}
+
+func iterateBucketObjects(ctx context.Context, bucketName, prefix string, client StorageClient, f func(*storage.ObjectAttrs) error) error {
 	bucket := client.Bucket(bucketName)
 	it := bucket.Objects(ctx, &storage.Query{Prefix: prefix})
 	for {
@@ -193,4 +210,19 @@ func (gcp Gcp) IterateBucketObjects(ctx context.Context, bucketName, prefix stri
 		}
 	}
 	return nil
+}
+
+func getCloudStorageClientWithServiceAccount(ctx context.Context, serviceAccount string) (StorageClient, error) {
+	ts, err := impersonate.CredentialsTokenSource(ctx, impersonate.CredentialsConfig{
+		TargetPrincipal: serviceAccount,
+		Scopes:          []string{"https://www.googleapis.com/auth/cloud-platform"},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to create impersonated token source for service account %v: %w", serviceAccount, err)
+	}
+	client, err := newStorageClient(ctx, option.WithTokenSource(ts))
+	if err != nil {
+		return nil, fmt.Errorf("unable to create storage client: %w", err)
+	}
+	return client, nil
 }
