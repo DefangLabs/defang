@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
 
 	pkgtypes "github.com/DefangLabs/defang/src/pkg/types"
 )
@@ -16,7 +16,7 @@ func (d *Docker) SetUp(ctx context.Context, containers []pkgtypes.Container) err
 		return errors.New("only one container is supported with docker driver")
 	}
 	task := containers[0]
-	rc, err := d.ImagePull(ctx, task.Image, types.ImagePullOptions{Platform: task.Platform})
+	rc, err := d.ImagePull(ctx, task.Image, image.PullOptions{Platform: task.Platform})
 	if err != nil {
 		return err
 	}
