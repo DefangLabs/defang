@@ -152,8 +152,8 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().StringVar(&org, "org", os.Getenv("DEFANG_ORG"), "override GitHub organization name (tenant)")
 	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
-	RootCmd.PersistentFlags().BoolVarP(&config.Verbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
-	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", pkg.GetenvBool("DEFANG_DEBUG"), "debug logging for troubleshooting the CLI")
+	RootCmd.PersistentFlags().BoolP("verbose", "v", false, "verbose logging") // backwards compat: only used by tail
+	RootCmd.PersistentFlags().Bool("debug", false, "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&dryrun.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
 	RootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "disable interactive prompts / no TTY")
 	RootCmd.PersistentFlags().StringP("project-name", "p", "", "project name")
@@ -336,7 +336,7 @@ var RootCmd = &cobra.Command{
 		config.loadEnv()
 		config.loadFlags(cmd.Flags())
 
-		term.SetDebug(doDebug)
+		term.SetDebug(config.Debug)
 
 		// Don't track/connect the completion commands
 		if IsCompletionCommand(cmd) {

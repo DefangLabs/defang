@@ -17,7 +17,6 @@ var (
 	client     *cliClient.GrpcClient
 	cluster    string
 	colorMode  = ColorAuto
-	doDebug    = false
 	hasTty     = term.IsTerminal()
 	hideUpdate = false
 	// mode           = modes.ModeUnspecified
@@ -35,6 +34,7 @@ var (
 type GlobalConfig struct {
 	Stack   string
 	Verbose bool
+	Debug   bool
 	Mode    modes.Mode
 }
 
@@ -46,8 +46,14 @@ func (r *GlobalConfig) loadEnv() {
 	if envVerbose := os.Getenv("DEFANG_VERBOSE"); envVerbose != "" {
 		r.Verbose = envVerbose == "true"
 	}
+	if envDebug := os.Getenv("DEFANG_DEBUG"); envDebug != "" {
+		r.Debug = envDebug == "true"
+	}
 	if envMode := os.Getenv("DEFANG_MODE"); envMode != "" {
-		r.Mode, _ = modes.Parse(envMode)
+		// Only apply environment mode if the mode is still unspecified (no flag was set)
+		if r.Mode == modes.ModeUnspecified {
+			r.Mode, _ = modes.Parse(envMode)
+		}
 	}
 }
 
@@ -55,14 +61,30 @@ func (r *GlobalConfig) loadFlags(flags *pflag.FlagSet) {
 	if flags == nil {
 		return
 	}
-	// Only set flags if they haven't been explicitly changed by the user
-	if !flags.Changed("stack") {
+	// If flag was changed by user, update config from flag value (flag takes priority)
+	// If flag was not changed by user, set flag from config value (env/RC file values)
+
+	if flags.Changed("stack") {
+		r.Stack = flags.Lookup("stack").Value.String()
+	} else {
 		flags.Set("stack", r.Stack)
 	}
-	if !flags.Changed("verbose") {
+
+	if flags.Changed("verbose") {
+		r.Verbose = flags.Lookup("verbose").Value.String() == "true"
+	} else {
 		flags.Set("verbose", fmt.Sprintf("%v", r.Verbose))
 	}
-	if !flags.Changed("mode") {
+
+	if flags.Changed("debug") {
+		r.Debug = flags.Lookup("debug").Value.String() == "true"
+	} else {
+		flags.Set("debug", fmt.Sprintf("%v", r.Debug))
+	}
+
+	if flags.Changed("mode") {
+		r.Mode, _ = modes.Parse(flags.Lookup("mode").Value.String())
+	} else {
 		flags.Set("mode", r.Mode.String())
 	}
 }

@@ -65,6 +65,7 @@ func Test_prorityLoading(t *testing.T) {
 					entries: map[string]string{
 						"DEFANG_MODE":    "AFFORDABLE",
 						"DEFANG_VERBOSE": "false",
+						"DEFANG_DEBUG":   "true",
 						"DEFANG_STACK":   "from-rc",
 					},
 				},
@@ -72,16 +73,19 @@ func Test_prorityLoading(t *testing.T) {
 			envVars: map[string]string{
 				"DEFANG_MODE":    "BALANCED",
 				"DEFANG_VERBOSE": "true",
+				"DEFANG_DEBUG":   "false",
 				"DEFANG_STACK":   "from-env",
 			},
 			flags: map[string]string{
 				"mode":    "HIGH_AVAILABILITY",
 				"verbose": "false",
+				"debug":   "true",
 				"stack":   "from-flags",
 			},
 			expected: GlobalConfig{
 				Mode:    modes.ModeHighAvailability,
 				Verbose: false,
+				Debug:   true,
 				Stack:   "from-flags",
 			},
 		},
@@ -93,6 +97,7 @@ func Test_prorityLoading(t *testing.T) {
 					entries: map[string]string{
 						"DEFANG_MODE":    "AFFORDABLE",
 						"DEFANG_VERBOSE": "false",
+						"DEFANG_DEBUG":   "true",
 						"DEFANG_STACK":   "from-rc",
 					},
 				},
@@ -100,11 +105,13 @@ func Test_prorityLoading(t *testing.T) {
 			envVars: map[string]string{
 				"DEFANG_MODE":    "BALANCED",
 				"DEFANG_VERBOSE": "true",
+				"DEFANG_DEBUG":   "false",
 				"DEFANG_STACK":   "from-env",
 			},
 			expected: GlobalConfig{
 				Mode:    modes.ModeBalanced,
 				Verbose: true,
+				Debug:   false,
 				Stack:   "from-env",
 			},
 		},
@@ -116,6 +123,7 @@ func Test_prorityLoading(t *testing.T) {
 					entries: map[string]string{
 						"DEFANG_MODE":    "AFFORDABLE",
 						"DEFANG_VERBOSE": "true",
+						"DEFANG_DEBUG":   "false",
 						"DEFANG_STACK":   "from-rc",
 					},
 				},
@@ -123,6 +131,7 @@ func Test_prorityLoading(t *testing.T) {
 			expected: GlobalConfig{
 				Mode:    modes.ModeAffordable, // RC file values
 				Verbose: true,
+				Debug:   false,
 				Stack:   "from-rc",
 			},
 		},
@@ -161,6 +170,7 @@ func Test_prorityLoading(t *testing.T) {
 			flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
 			flags.String("mode", "", "deployment mode")
 			flags.Bool("verbose", false, "verbose output")
+			flags.Bool("debug", false, "debug output")
 			flags.String("stack", "", "stack name")
 
 			// Set flags if provided
@@ -189,6 +199,9 @@ func Test_prorityLoading(t *testing.T) {
 			if flagVerbose := flags.Lookup("verbose"); flagVerbose != nil && flagVerbose.Changed {
 				config.Verbose = flagVerbose.Value.String() == "true"
 			}
+			if flagDebug := flags.Lookup("debug"); flagDebug != nil && flagDebug.Changed {
+				config.Debug = flagDebug.Value.String() == "true"
+			}
 			if flagStack := flags.Lookup("stack"); flagStack != nil && flagStack.Changed {
 				config.Stack = flagStack.Value.String()
 			}
@@ -199,6 +212,9 @@ func Test_prorityLoading(t *testing.T) {
 			}
 			if config.Verbose != tt.expected.Verbose {
 				t.Errorf("expected Verbose to be %v, got %v", tt.expected.Verbose, config.Verbose)
+			}
+			if config.Debug != tt.expected.Debug {
+				t.Errorf("expected Debug to be %v, got %v", tt.expected.Debug, config.Debug)
 			}
 			if config.Stack != tt.expected.Stack {
 				t.Errorf("expected Stack to be '%s', got '%s'", tt.expected.Stack, config.Stack)
