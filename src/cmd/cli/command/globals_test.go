@@ -74,6 +74,8 @@ func Test_prorityLoading(t *testing.T) {
 						"DEFANG_ORG":             "from-rc-org",
 						"DEFANG_SOURCE_PLATFORM": "heroku",
 						"DEFANG_COLOR":           "never",
+						"DEFANG_TTY":             "true",
+						"DEFANG_NON_INTERACTIVE": "false",
 					},
 				},
 			},
@@ -89,15 +91,16 @@ func Test_prorityLoading(t *testing.T) {
 				"DEFANG_COLOR":           "auto",
 			},
 			flags: map[string]string{
-				"mode":     "HIGH_AVAILABILITY",
-				"verbose":  "false",
-				"debug":    "true",
-				"stack":    "from-flags",
-				"cluster":  "from-flags-cluster",
-				"provider": "aws",
-				"org":      "from-flags-org",
-				"from":     "heroku",
-				"color":    "always",
+				"mode":            "HIGH_AVAILABILITY",
+				"verbose":         "false",
+				"debug":           "true",
+				"stack":           "from-flags",
+				"cluster":         "from-flags-cluster",
+				"provider":        "aws",
+				"org":             "from-flags-org",
+				"from":            "heroku",
+				"color":           "always",
+				"non-interactive": "false",
 			},
 			expected: GlobalConfig{
 				Mode:           modes.ModeHighAvailability,
@@ -109,6 +112,8 @@ func Test_prorityLoading(t *testing.T) {
 				Org:            "from-flags-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAlways,
+				HasTty:         false, // from env override
+				NonInteractive: false, // from flags override
 			},
 		},
 		{
@@ -126,6 +131,8 @@ func Test_prorityLoading(t *testing.T) {
 						"DEFANG_ORG":             "from-rc-org",
 						"DEFANG_SOURCE_PLATFORM": "heroku",
 						"DEFANG_COLOR":           "never",
+						"DEFANG_TTY":             "false",
+						"DEFANG_NON_INTERACTIVE": "true",
 					},
 				},
 			},
@@ -139,6 +146,8 @@ func Test_prorityLoading(t *testing.T) {
 				"DEFANG_ORG":             "from-env-org",
 				"DEFANG_SOURCE_PLATFORM": "heroku",
 				"DEFANG_COLOR":           "auto",
+				"DEFANG_TTY":             "true",
+				"DEFANG_NON_INTERACTIVE": "false",
 			},
 			expected: GlobalConfig{
 				Mode:           modes.ModeBalanced,
@@ -150,6 +159,8 @@ func Test_prorityLoading(t *testing.T) {
 				Org:            "from-env-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAuto,
+				HasTty:         true,  // from env
+				NonInteractive: false, // from env
 			},
 		},
 		{
@@ -167,6 +178,8 @@ func Test_prorityLoading(t *testing.T) {
 						"DEFANG_ORG":             "from-rc-org",
 						"DEFANG_SOURCE_PLATFORM": "heroku",
 						"DEFANG_COLOR":           "always",
+						"DEFANG_TTY":             "false",
+						"DEFANG_NON_INTERACTIVE": "true",
 					},
 				},
 			},
@@ -180,6 +193,8 @@ func Test_prorityLoading(t *testing.T) {
 				Org:            "from-rc-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAlways,
+				HasTty:         false, // from rc
+				NonInteractive: true,  // from rc
 			},
 		},
 	}
@@ -224,6 +239,7 @@ func Test_prorityLoading(t *testing.T) {
 			flags.String("org", "", "organization name")
 			flags.String("from", "", "source platform")
 			flags.String("color", "", "color mode")
+			flags.String("non-interactive", "false", "non-interactive mode")
 
 			// Set flags if provided
 			for flagName, flagValue := range tt.flags {
@@ -272,6 +288,9 @@ func Test_prorityLoading(t *testing.T) {
 			if flagColor := flags.Lookup("color"); flagColor != nil && flagColor.Changed {
 				config.ColorMode.Set(flagColor.Value.String())
 			}
+			if flagNonInteractive := flags.Lookup("non-interactive"); flagNonInteractive != nil && flagNonInteractive.Changed {
+				config.NonInteractive = flagNonInteractive.Value.String() == "true"
+			}
 
 			// Verify the final configuration matches expectations
 			if config.Mode.String() != tt.expected.Mode.String() {
@@ -300,6 +319,12 @@ func Test_prorityLoading(t *testing.T) {
 			}
 			if config.ColorMode != tt.expected.ColorMode {
 				t.Errorf("expected ColorMode to be '%s', got '%s'", tt.expected.ColorMode, config.ColorMode)
+			}
+			if config.HasTty != tt.expected.HasTty {
+				t.Errorf("expected HasTty to be %v, got %v", tt.expected.HasTty, config.HasTty)
+			}
+			if config.NonInteractive != tt.expected.NonInteractive {
+				t.Errorf("expected NonInteractive to be %v, got %v", tt.expected.NonInteractive, config.NonInteractive)
 			}
 		})
 	}

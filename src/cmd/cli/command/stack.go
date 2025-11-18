@@ -54,7 +54,7 @@ func makeStackNewCmd() *cobra.Command {
 				Mode:     config.Mode,
 			}
 
-			if nonInteractive {
+			if config.NonInteractive {
 				_, err := stacks.Create(params)
 				return err
 			}

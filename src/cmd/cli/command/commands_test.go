@@ -283,12 +283,12 @@ func TestGetProvider(t *testing.T) {
 
 		mockCtrl.savedProvider = map[string]defangv1.Provider{"empty": defangv1.Provider_AWS}
 
-		ni := nonInteractive
+		ni := config.NonInteractive
 		sts := aws.StsClient
 		aws.StsClient = &mockStsProviderAPI{}
-		nonInteractive = false
+		config.NonInteractive = false
 		t.Cleanup(func() {
-			nonInteractive = ni
+			config.NonInteractive = ni
 			aws.StsClient = sts
 			mockCtrl.savedProvider = nil
 		})
@@ -309,10 +309,10 @@ func TestGetProvider(t *testing.T) {
 		mockCtrl.savedProvider = map[string]defangv1.Provider{"someotherproj": defangv1.Provider_AWS}
 		RootCmd = FakeRootWithProviderParam("")
 
-		ni := nonInteractive
+		ni := config.NonInteractive
 		sts := aws.StsClient
 		aws.StsClient = &mockStsProviderAPI{}
-		nonInteractive = false
+		config.NonInteractive = false
 		oldTerm := term.DefaultTerm
 		term.DefaultTerm = term.NewTerm(
 			&FakeStdin{bytes.NewReader([]byte("aws\n"))},
@@ -320,7 +320,7 @@ func TestGetProvider(t *testing.T) {
 			new(bytes.Buffer),
 		)
 		t.Cleanup(func() {
-			nonInteractive = ni
+			config.NonInteractive = ni
 			aws.StsClient = sts
 			mockCtrl.savedProvider = nil
 			term.DefaultTerm = oldTerm
@@ -350,10 +350,10 @@ func TestGetProvider(t *testing.T) {
 		mockCtrl.savedProvider = map[string]defangv1.Provider{"someotherproj": defangv1.Provider_AWS}
 		RootCmd = FakeRootWithProviderParam("")
 
-		ni := nonInteractive
+		ni := config.NonInteractive
 		sts := aws.StsClient
 		aws.StsClient = &mockStsProviderAPI{}
-		nonInteractive = false
+		config.NonInteractive = false
 		oldTerm := term.DefaultTerm
 		term.DefaultTerm = term.NewTerm(
 			&FakeStdin{bytes.NewReader([]byte("\n"))}, // Use default option, which should be DO from env var
@@ -361,7 +361,7 @@ func TestGetProvider(t *testing.T) {
 			new(bytes.Buffer),
 		)
 		t.Cleanup(func() {
-			nonInteractive = ni
+			config.NonInteractive = ni
 			aws.StsClient = sts
 			mockCtrl.savedProvider = nil
 			term.DefaultTerm = oldTerm
@@ -383,10 +383,10 @@ func TestGetProvider(t *testing.T) {
 		mockCtrl.savedProvider = map[string]defangv1.Provider{"empty": defangv1.Provider_AWS}
 		RootCmd = FakeRootWithProviderParam("auto")
 
-		ni := nonInteractive
+		ni := config.NonInteractive
 		sts := aws.StsClient
 		aws.StsClient = &mockStsProviderAPI{}
-		nonInteractive = false
+		config.NonInteractive = false
 		oldTerm := term.DefaultTerm
 		term.DefaultTerm = term.NewTerm(
 			&FakeStdin{bytes.NewReader([]byte("gcp\n"))},
@@ -394,7 +394,7 @@ func TestGetProvider(t *testing.T) {
 			new(bytes.Buffer),
 		)
 		t.Cleanup(func() {
-			nonInteractive = ni
+			config.NonInteractive = ni
 			aws.StsClient = sts
 			mockCtrl.savedProvider = nil
 			term.DefaultTerm = oldTerm
@@ -414,10 +414,10 @@ func TestGetProvider(t *testing.T) {
 		os.Unsetenv("DEFANG_PROVIDER")
 		mockCtrl.savedProvider = map[string]defangv1.Provider{"empty": defangv1.Provider_AWS}
 		RootCmd = FakeRootWithProviderParam("digitalocean")
-		ni := nonInteractive
-		nonInteractive = false
+		ni := config.NonInteractive
+		config.NonInteractive = false
 		t.Cleanup(func() {
-			nonInteractive = ni
+			config.NonInteractive = ni
 			mockCtrl.savedProvider = nil
 		})
 

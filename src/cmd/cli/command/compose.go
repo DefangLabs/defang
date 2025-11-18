@@ -57,7 +57,7 @@ func makeComposeUpCmd() *cobra.Command {
 			ctx := cmd.Context()
 			project, loadErr := loader.LoadProject(ctx)
 			if loadErr != nil {
-				if nonInteractive {
+				if config.NonInteractive {
 					return loadErr
 				}
 
@@ -96,7 +96,7 @@ func makeComposeUpCmd() *cobra.Command {
 					return dep.Provider == config.ProviderID.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
 				})
 				if !samePlace && len(resp.Deployments) > 0 {
-					if nonInteractive {
+					if config.NonInteractive {
 						term.Warnf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", project.Name)
 					} else {
 						help := "Active deployments of this project:"
@@ -205,7 +205,7 @@ func handleComposeUpErr(ctx context.Context, err error, project *compose.Project
 		printDefangHint("To start a new project, do:", "new")
 	}
 
-	if nonInteractive || errors.Is(err, byoc.ErrLocalPulumiStopped) {
+	if config.NonInteractive || errors.Is(err, byoc.ErrLocalPulumiStopped) {
 		return err
 	}
 
@@ -237,7 +237,7 @@ func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.G
 		if errDeploymentFailed.Service != "" {
 			debugConfig.FailedServices = []string{errDeploymentFailed.Service}
 		}
-		if nonInteractive {
+		if config.NonInteractive {
 			printDefangHint("To debug the deployment, do:", debugConfig.String())
 		} else {
 			track.Evt("Debug Prompted", P("failedServices", debugConfig.FailedServices), P("etag", debugConfig.Deployment), P("reason", errDeploymentFailed))
@@ -274,7 +274,7 @@ func newTailOptionsForDeploy(deployment string, since time.Time, verbose bool) c
 }
 
 func flushWarnings() {
-	if hasTty && term.HadWarnings() {
+	if config.HasTty && term.HadWarnings() {
 		fmt.Println("\n\u26A0\uFE0F Some warnings were seen during this command:")
 		term.FlushWarnings()
 	}
@@ -438,7 +438,7 @@ func makeComposeConfigCmd() *cobra.Command {
 			ctx := cmd.Context()
 			project, loadErr := loader.LoadProject(ctx)
 			if loadErr != nil {
-				if nonInteractive {
+				if config.NonInteractive {
 					return loadErr
 				}
 

@@ -18,7 +18,7 @@ var mcpCmd = &cobra.Command{
 	Short: "Manage MCP Server for defang",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		//set global nonInteractive to false
-		nonInteractive = false
+		config.NonInteractive = false
 	},
 }
 

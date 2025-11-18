@@ -124,11 +124,11 @@ func Execute(ctx context.Context) error {
 		return ExitCode(code)
 	}
 
-	if hasTty && term.HadWarnings() {
+	if config.HasTty && term.HadWarnings() {
 		fmt.Println("For help with warnings, check our FAQ at https://s.defang.io/warnings")
 	}
 
-	if hasTty && !hideUpdate && pkg.RandomIndex(10) == 0 {
+	if config.HasTty && !hideUpdate && pkg.RandomIndex(10) == 0 {
 		if latest, err := GetLatestVersion(ctx); err == nil && isNewer(GetCurrentVersion(), latest) {
 			term.Debug("Latest Version:", latest, "Current Version:", GetCurrentVersion())
 			fmt.Println("A newer version of the CLI is available at https://github.com/DefangLabs/defang/releases/latest")
@@ -155,7 +155,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().BoolP("verbose", "v", false, "verbose logging") // backwards compat: only used by tail
 	RootCmd.PersistentFlags().Bool("debug", false, "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&dryrun.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
-	RootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "disable interactive prompts / no TTY")
+	RootCmd.PersistentFlags().String("non-interactive", "false", "disable interactive prompts / no TTY")
 	RootCmd.PersistentFlags().StringP("project-name", "p", "", "project name")
 	RootCmd.PersistentFlags().StringP("cwd", "C", "", "change directory before running the command")
 	_ = RootCmd.MarkPersistentFlagDirname("cwd")
@@ -350,7 +350,7 @@ var RootCmd = &cobra.Command{
 				errString = err.Error()
 			}
 
-			track.Cmd(cmd, "Invoked", P("args", args), P("err", errString), P("non-interactive", nonInteractive), P("provider", config.ProviderID))
+			track.Cmd(cmd, "Invoked", P("args", args), P("err", errString), P("non-interactive", config.NonInteractive), P("provider", config.ProviderID))
 		}()
 
 		// Do this first, since any errors will be printed to the console
@@ -380,7 +380,7 @@ var RootCmd = &cobra.Command{
 		if v, err := client.GetVersions(ctx); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
 			term.Debug("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
-			if hasTty && isNewer(version, v.CliMin) && !isUpgradeCommand(cmd) {
+			if config.HasTty && isNewer(version, v.CliMin) && !isUpgradeCommand(cmd) {
 				term.Warn("Your CLI version is outdated. Please upgrade to the latest version by running:\n\n  defang upgrade\n")
 				hideUpdate = true // hide the upgrade hint at the end
 			}
@@ -391,7 +391,7 @@ var RootCmd = &cobra.Command{
 			return nil
 		}
 
-		if nonInteractive {
+		if config.NonInteractive {
 			err = client.CheckLoginAndToS(ctx)
 		} else {
 			err = login.InteractiveRequireLoginAndToS(ctx, client, getCluster())
@@ -408,7 +408,7 @@ var loginCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		trainingOptOut, _ := cmd.Flags().GetBool("training-opt-out")
 
-		if nonInteractive {
+		if config.NonInteractive {
 			if err := login.NonInteractiveGitHubLogin(cmd.Context(), client, getCluster()); err != nil {
 				return err
 			}
@@ -438,7 +438,7 @@ var whoamiCmd = &cobra.Command{
 	Short: "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		nonInteractive = true // don't show provider prompt
+		config.NonInteractive = true // don't show provider prompt
 		provider, err := newProvider(cmd.Context(), loader)
 		if err != nil {
 			term.Debug("unable to get provider:", err)
@@ -542,7 +542,7 @@ var generateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		if nonInteractive {
+		if config.NonInteractive {
 			if len(args) == 0 {
 				return errors.New("cannot run in non-interactive mode")
 			}
@@ -578,7 +578,7 @@ var initCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		if nonInteractive {
+		if config.NonInteractive {
 			if len(args) == 0 {
 				return errors.New("cannot run in non-interactive mode")
 			}
@@ -743,7 +743,7 @@ var configSetCmd = &cobra.Command{
 				return errors.New("cannot specify both config value and input file")
 			}
 			value = parts[1]
-		} else if nonInteractive || len(args) == 2 {
+		} else if config.NonInteractive || len(args) == 2 {
 			// Read the value from a file or stdin
 			var err error
 			var bytes []byte
@@ -1051,7 +1051,7 @@ var tosCmd = &cobra.Command{
 			return login.NonInteractiveAgreeToS(cmd.Context(), client)
 		}
 
-		if nonInteractive {
+		if config.NonInteractive {
 			printDefangHint("To agree to the terms of service, do:", cmd.CalledAs()+" --agree-tos")
 			return nil
 		}
@@ -1101,7 +1101,7 @@ func configureLoader(cmd *cobra.Command) *compose.Loader {
 }
 
 func doubleCheckProjectName(projectName string) {
-	if nonInteractive {
+	if config.NonInteractive {
 		return
 	}
 	var confirm bool
@@ -1163,7 +1163,7 @@ func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 
 	switch config.ProviderID {
 	case cliClient.ProviderAuto:
-		if nonInteractive {
+		if config.NonInteractive {
 			// Defaults to defang provider in non-interactive mode
 			if awsInEnv() {
 				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")

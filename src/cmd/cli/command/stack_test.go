@@ -115,9 +115,9 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 			stackCreateCmd.Flags().Set("region", tt.parameters.Region)
 
 			// Mock non-interactive mode
-			ni := nonInteractive
-			nonInteractive = true
-			t.Cleanup(func() { nonInteractive = ni })
+			ni := config.NonInteractive
+			config.NonInteractive = true
+			t.Cleanup(func() { config.NonInteractive = ni })
 
 			err := stackCreateCmd.RunE(stackCreateCmd, args)
 			if (err != nil) != tt.expectErr {

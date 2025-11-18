@@ -18,11 +18,11 @@ var (
 	// cluster    string
 	// colorMode = ColorAuto
 	// doDebug    = false
-	hasTty     = term.IsTerminal()
+	// hasTty     = term.IsTerminal()
 	hideUpdate = false
 	// mode           = modes.ModeUnspecified
-	modelId        string
-	nonInteractive = !hasTty
+	modelId string
+	// nonInteractive = !hasTty
 	// org            string
 	// providerID     = cliClient.ProviderAuto
 	// sourcePlatform = migrate.SourcePlatformUnspecified // default to auto-detecting the source platform
@@ -42,6 +42,8 @@ type GlobalConfig struct {
 	Org            string
 	SourcePlatform migrate.SourcePlatform
 	ColorMode      ColorMode
+	HasTty         bool
+	NonInteractive bool
 }
 
 func (r *GlobalConfig) loadEnv() {
@@ -80,6 +82,18 @@ func (r *GlobalConfig) loadEnv() {
 	// Initialize color mode from environment variable or leave empty for default
 	if envColorMode := os.Getenv("DEFANG_COLOR"); envColorMode != "" {
 		r.ColorMode.Set(envColorMode)
+	}
+	// Initialize HasTty from environment or use terminal detection
+	if envTty := os.Getenv("DEFANG_TTY"); envTty != "" {
+		r.HasTty = envTty == "true"
+	} else {
+		r.HasTty = term.IsTerminal()
+	}
+	// Initialize NonInteractive from environment or derive from HasTty
+	if envNonInteractive := os.Getenv("DEFANG_NON_INTERACTIVE"); envNonInteractive != "" {
+		r.NonInteractive = envNonInteractive == "true"
+	} else {
+		r.NonInteractive = !r.HasTty
 	}
 }
 
@@ -162,6 +176,21 @@ func (r *GlobalConfig) loadFlags(flags *pflag.FlagSet) {
 			r.ColorMode = ColorAuto
 		}
 		flags.Set("color", r.ColorMode.String())
+	}
+
+	// HasTty doesn't have a flag, so just ensure it's initialized
+	if !r.HasTty {
+		r.HasTty = term.IsTerminal()
+	}
+
+	if flags.Changed("non-interactive") {
+		r.NonInteractive = flags.Lookup("non-interactive").Value.String() == "true"
+	} else {
+		// If not explicitly set, ensure it reflects HasTty state
+		if !r.NonInteractive && !r.HasTty {
+			r.NonInteractive = true
+		}
+		flags.Set("non-interactive", fmt.Sprintf("%v", r.NonInteractive))
 	}
 }
 

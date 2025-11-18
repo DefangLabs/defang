@@ -42,7 +42,7 @@ func prettyExecutable(def string) string {
 }
 
 func printDefangHint(hint string, cmds ...string) {
-	if pkg.GetenvBool("DEFANG_HIDE_HINTS") || !hasTty {
+	if pkg.GetenvBool("DEFANG_HIDE_HINTS") || !config.HasTty {
 		return
 	}
 
