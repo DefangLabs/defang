@@ -333,10 +333,10 @@ var RootCmd = &cobra.Command{
 	Short:         "Defang CLI is used to take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
 		ctx := cmd.Context()
-		config.loadEnv()
-		config.loadFlags(cmd.Flags())
+		// config.loadEnv()
+		// config.loadFlags(cmd.Flags())
 
-		term.SetDebug(config.Debug)
+		// term.SetDebug(config.Debug)
 
 		// Don't track/connect the completion commands
 		if IsCompletionCommand(cmd) {
@@ -372,6 +372,8 @@ var RootCmd = &cobra.Command{
 
 		// Read the global flags again from any .defangrc files in the cwd
 		config.loadRC(stack, cmd.Flags())
+
+		term.SetDebug(config.Debug)
 
 		client, err = cli.Connect(ctx, getCluster())
 

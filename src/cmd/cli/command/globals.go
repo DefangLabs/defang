@@ -107,18 +107,30 @@ func (r *GlobalConfig) loadFlags(flags *pflag.FlagSet) {
 	if flags.Changed("cluster") {
 		r.Cluster = flags.Lookup("cluster").Value.String()
 	} else {
+		// If config has no value, use flag's default value
+		if r.Cluster == "" {
+			r.Cluster = flags.Lookup("cluster").DefValue
+		}
 		flags.Set("cluster", r.Cluster)
 	}
 
 	if flags.Changed("provider") {
 		r.ProviderID.Set(flags.Lookup("provider").Value.String())
 	} else {
+		// If config has no value, use flag's default value
+		if r.ProviderID.String() == "" {
+			r.ProviderID.Set(flags.Lookup("provider").DefValue)
+		}
 		flags.Set("provider", r.ProviderID.String())
 	}
 
 	if flags.Changed("org") {
 		r.Org = flags.Lookup("org").Value.String()
 	} else {
+		// If config has no value, use flag's default value
+		if r.Org == "" {
+			r.Org = flags.Lookup("org").DefValue
+		}
 		flags.Set("org", r.Org)
 	}
 }
@@ -141,6 +153,7 @@ func (r *GlobalConfig) loadRC(stackName string, flags *pflag.FlagSet) {
 
 	r.loadEnv()
 	r.loadFlags(flags)
+	term.Debug("loadRC finished: config.Cluster =", r.Cluster)
 }
 
 // func readGlobals(stackName string) GlobalConfig {
