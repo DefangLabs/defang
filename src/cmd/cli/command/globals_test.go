@@ -73,6 +73,7 @@ func Test_prorityLoading(t *testing.T) {
 						"DEFANG_PROVIDER":        "defang",
 						"DEFANG_ORG":             "from-rc-org",
 						"DEFANG_SOURCE_PLATFORM": "heroku",
+						"DEFANG_COLOR":           "never",
 					},
 				},
 			},
@@ -85,6 +86,7 @@ func Test_prorityLoading(t *testing.T) {
 				"DEFANG_PROVIDER":        "gcp",
 				"DEFANG_ORG":             "from-env-org",
 				"DEFANG_SOURCE_PLATFORM": "heroku",
+				"DEFANG_COLOR":           "auto",
 			},
 			flags: map[string]string{
 				"mode":     "HIGH_AVAILABILITY",
@@ -95,6 +97,7 @@ func Test_prorityLoading(t *testing.T) {
 				"provider": "aws",
 				"org":      "from-flags-org",
 				"from":     "heroku",
+				"color":    "always",
 			},
 			expected: GlobalConfig{
 				Mode:           modes.ModeHighAvailability,
@@ -105,6 +108,7 @@ func Test_prorityLoading(t *testing.T) {
 				ProviderID:     cliClient.ProviderAWS,
 				Org:            "from-flags-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
+				ColorMode:      ColorAlways,
 			},
 		},
 		{
@@ -121,6 +125,7 @@ func Test_prorityLoading(t *testing.T) {
 						"DEFANG_PROVIDER":        "defang",
 						"DEFANG_ORG":             "from-rc-org",
 						"DEFANG_SOURCE_PLATFORM": "heroku",
+						"DEFANG_COLOR":           "never",
 					},
 				},
 			},
@@ -133,6 +138,7 @@ func Test_prorityLoading(t *testing.T) {
 				"DEFANG_PROVIDER":        "gcp",
 				"DEFANG_ORG":             "from-env-org",
 				"DEFANG_SOURCE_PLATFORM": "heroku",
+				"DEFANG_COLOR":           "auto",
 			},
 			expected: GlobalConfig{
 				Mode:           modes.ModeBalanced,
@@ -143,6 +149,7 @@ func Test_prorityLoading(t *testing.T) {
 				ProviderID:     cliClient.ProviderGCP,
 				Org:            "from-env-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
+				ColorMode:      ColorAuto,
 			},
 		},
 		{
@@ -159,6 +166,7 @@ func Test_prorityLoading(t *testing.T) {
 						"DEFANG_PROVIDER":        "defang",
 						"DEFANG_ORG":             "from-rc-org",
 						"DEFANG_SOURCE_PLATFORM": "heroku",
+						"DEFANG_COLOR":           "always",
 					},
 				},
 			},
@@ -171,6 +179,7 @@ func Test_prorityLoading(t *testing.T) {
 				ProviderID:     cliClient.ProviderDefang,
 				Org:            "from-rc-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
+				ColorMode:      ColorAlways,
 			},
 		},
 	}
@@ -214,6 +223,7 @@ func Test_prorityLoading(t *testing.T) {
 			flags.String("provider", "", "provider name")
 			flags.String("org", "", "organization name")
 			flags.String("from", "", "source platform")
+			flags.String("color", "", "color mode")
 
 			// Set flags if provided
 			for flagName, flagValue := range tt.flags {
@@ -259,6 +269,9 @@ func Test_prorityLoading(t *testing.T) {
 			if flagFrom := flags.Lookup("from"); flagFrom != nil && flagFrom.Changed {
 				config.SourcePlatform.Set(flagFrom.Value.String())
 			}
+			if flagColor := flags.Lookup("color"); flagColor != nil && flagColor.Changed {
+				config.ColorMode.Set(flagColor.Value.String())
+			}
 
 			// Verify the final configuration matches expectations
 			if config.Mode.String() != tt.expected.Mode.String() {
@@ -284,6 +297,9 @@ func Test_prorityLoading(t *testing.T) {
 			}
 			if config.SourcePlatform != tt.expected.SourcePlatform {
 				t.Errorf("expected SourcePlatform to be '%s', got '%s'", tt.expected.SourcePlatform, config.SourcePlatform)
+			}
+			if config.ColorMode != tt.expected.ColorMode {
+				t.Errorf("expected ColorMode to be '%s', got '%s'", tt.expected.ColorMode, config.ColorMode)
 			}
 		})
 	}

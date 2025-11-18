@@ -16,7 +16,7 @@ import (
 var (
 	client *cliClient.GrpcClient
 	// cluster    string
-	colorMode = ColorAuto
+	// colorMode = ColorAuto
 	// doDebug    = false
 	hasTty     = term.IsTerminal()
 	hideUpdate = false
@@ -41,6 +41,7 @@ type GlobalConfig struct {
 	ProviderID     cliClient.ProviderID
 	Org            string
 	SourcePlatform migrate.SourcePlatform
+	ColorMode      ColorMode
 }
 
 func (r *GlobalConfig) loadEnv() {
@@ -75,6 +76,10 @@ func (r *GlobalConfig) loadEnv() {
 	// Initialize source platform from environment variable or leave empty for default
 	if envSourcePlatform := os.Getenv("DEFANG_SOURCE_PLATFORM"); envSourcePlatform != "" {
 		r.SourcePlatform.Set(envSourcePlatform)
+	}
+	// Initialize color mode from environment variable or leave empty for default
+	if envColorMode := os.Getenv("DEFANG_COLOR"); envColorMode != "" {
+		r.ColorMode.Set(envColorMode)
 	}
 }
 
@@ -147,6 +152,16 @@ func (r *GlobalConfig) loadFlags(flags *pflag.FlagSet) {
 			r.SourcePlatform = migrate.SourcePlatformUnspecified
 		}
 		// Note: 'from' flag is only on initCmd, not global, so we don't set it here
+	}
+
+	if flags.Changed("color") {
+		r.ColorMode.Set(flags.Lookup("color").Value.String())
+	} else {
+		// If config has no value, use default (auto)
+		if r.ColorMode.String() == "" {
+			r.ColorMode = ColorAuto
+		}
+		flags.Set("color", r.ColorMode.String())
 	}
 }
 

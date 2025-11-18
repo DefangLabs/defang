@@ -146,7 +146,7 @@ func SetupCommands(ctx context.Context, version string) {
 
 	RootCmd.Version = version
 	RootCmd.PersistentFlags().StringVarP(&config.Stack, "stack", "s", os.Getenv("DEFANG_STACK"), "stack name (for BYOC providers)")
-	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
+	RootCmd.PersistentFlags().String("color", ColorAuto.String(), fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().String("cluster", pcluster.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
 	RootCmd.PersistentFlags().String("org", os.Getenv("DEFANG_ORG"), "override GitHub organization name (tenant)")
@@ -354,7 +354,7 @@ var RootCmd = &cobra.Command{
 		}()
 
 		// Do this first, since any errors will be printed to the console
-		switch colorMode {
+		switch config.ColorMode {
 		case ColorNever:
 			term.ForceColor(false)
 		case ColorAlways:
