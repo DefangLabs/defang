@@ -133,7 +133,7 @@ func makeComposeUpCmd() *cobra.Command {
 			deploy, project, err := cli.ComposeUp(ctx, client, provider, cli.ComposeUpParams{
 				Project:    project,
 				UploadMode: upload,
-				Mode:       mode,
+				Mode:       config.Mode,
 			})
 			if err != nil {
 				return handleComposeUpErr(ctx, err, project, provider)
@@ -190,7 +190,7 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // obsolete, but keep for backwards compatibility
 	_ = composeUpCmd.Flags().MarkHidden("tail")
-	composeUpCmd.Flags().VarP(&mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
+	composeUpCmd.Flags().VarP(&config.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	composeUpCmd.Flags().Bool("build", true, "build the image before starting the service") // docker-compose compatibility
 	_ = composeUpCmd.Flags().MarkHidden("build")
 	composeUpCmd.Flags().Bool("wait", true, "wait for services to be running|healthy") // docker-compose compatibility

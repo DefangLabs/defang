@@ -14,13 +14,13 @@ import (
 
 // GLOBALS
 var (
-	client         *cliClient.GrpcClient
-	cluster        string
-	colorMode      = ColorAuto
-	doDebug        = false
-	hasTty         = term.IsTerminal()
-	hideUpdate     = false
-	mode           = modes.ModeUnspecified
+	client     *cliClient.GrpcClient
+	cluster    string
+	colorMode  = ColorAuto
+	doDebug    = false
+	hasTty     = term.IsTerminal()
+	hideUpdate = false
+	// mode           = modes.ModeUnspecified
 	modelId        string
 	nonInteractive = !hasTty
 	org            string
@@ -35,17 +35,36 @@ var (
 type GlobalConfig struct {
 	Stack   string
 	Verbose bool
+	Mode    modes.Mode
 }
 
 func (r *GlobalConfig) loadEnv() {
 	// TODO: init each property from the environment or defaults
-	r.Stack = os.Getenv("DEFANG_STACK")
-	r.Verbose = os.Getenv("DEFANG_VERBOSE") == "true"
+	if envStack := os.Getenv("DEFANG_STACK"); envStack != "" {
+		r.Stack = envStack
+	}
+	if envVerbose := os.Getenv("DEFANG_VERBOSE"); envVerbose != "" {
+		r.Verbose = envVerbose == "true"
+	}
+	if envMode := os.Getenv("DEFANG_MODE"); envMode != "" {
+		r.Mode, _ = modes.Parse(envMode)
+	}
 }
 
 func (r *GlobalConfig) loadFlags(flags *pflag.FlagSet) {
-	flags.Set("stack", r.Stack)
-	flags.Set("verbose", fmt.Sprintf("%v", r.Verbose))
+	if flags == nil {
+		return
+	}
+	// Only set flags if they haven't been explicitly changed by the user
+	if !flags.Changed("stack") {
+		flags.Set("stack", r.Stack)
+	}
+	if !flags.Changed("verbose") {
+		flags.Set("verbose", fmt.Sprintf("%v", r.Verbose))
+	}
+	if !flags.Changed("mode") {
+		flags.Set("mode", r.Mode.String())
+	}
 }
 
 func (r *GlobalConfig) loadRC(stackName string, flags *pflag.FlagSet) {
