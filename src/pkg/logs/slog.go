@@ -8,7 +8,9 @@ import (
 )
 
 type termHandler struct {
-	t *term.Term
+	t           *term.Term
+	preformatted string // Pre-formatted attributes with their group prefixes
+	groups      []string
 }
 
 func newTermHandler(t *term.Term) *termHandler {
@@ -20,19 +22,27 @@ func NewTermLogger(t *term.Term) *slog.Logger {
 }
 
 func (h *termHandler) Handle(ctx context.Context, r slog.Record) error {
-	// Format attrs if any
-	var attrs string
-	if r.NumAttrs() > 0 {
-		r.Attrs(func(a slog.Attr) bool {
-			if attrs == "" {
-				attrs = " {"
-			} else {
-				attrs += ", "
-			}
-			attrs += a.String()
-			return true
-		})
-		attrs += "}"
+	// Start with pre-formatted attributes
+	attrs := h.preformatted
+	
+	// Add attrs from the record (with current group prefix if any)
+	r.Attrs(func(a slog.Attr) bool {
+		if attrs != "" {
+			attrs += ", "
+		}
+		
+		// Add group prefix if any
+		prefix := ""
+		for _, g := range h.groups {
+			prefix += g + "."
+		}
+		
+		attrs += prefix + a.String()
+		return true
+	})
+	
+	if attrs != "" {
+		attrs = " {" + attrs + "}"
 	}
 
 	msg := r.Message + attrs
@@ -64,11 +74,41 @@ func (h *termHandler) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (h *termHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	// Since we format attributes in Handle(), we can just return self
-	return h
+	// Format new attributes with current group prefix
+	newPreformatted := h.preformatted
+	
+	prefix := ""
+	for _, g := range h.groups {
+		prefix += g + "."
+	}
+	
+	for _, a := range attrs {
+		if newPreformatted != "" {
+			newPreformatted += ", "
+		}
+		newPreformatted += prefix + a.String()
+	}
+	
+	return &termHandler{
+		t:           h.t,
+		preformatted: newPreformatted,
+		groups:      h.groups,
+	}
 }
 
 func (h *termHandler) WithGroup(name string) slog.Handler {
-	// Groups are not supported in this implementation
-	return h
+	if name == "" {
+		return h
+	}
+	
+	// Create a new handler with the group added
+	newGroups := make([]string, len(h.groups)+1)
+	copy(newGroups, h.groups)
+	newGroups[len(h.groups)] = name
+	
+	return &termHandler{
+		t:           h.t,
+		preformatted: h.preformatted,
+		groups:      newGroups,
+	}
 }
