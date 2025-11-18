@@ -74,8 +74,9 @@ func Test_prorityLoading(t *testing.T) {
 						"DEFANG_ORG":             "from-rc-org",
 						"DEFANG_SOURCE_PLATFORM": "heroku",
 						"DEFANG_COLOR":           "never",
-						"DEFANG_TTY":             "true",
-						"DEFANG_NON_INTERACTIVE": "false",
+						"DEFANG_TTY":             "false",
+						"DEFANG_NON_INTERACTIVE": "true",
+						"DEFANG_HIDE_UPDATE":     "true",
 					},
 				},
 			},
@@ -89,6 +90,7 @@ func Test_prorityLoading(t *testing.T) {
 				"DEFANG_ORG":             "from-env-org",
 				"DEFANG_SOURCE_PLATFORM": "heroku",
 				"DEFANG_COLOR":           "auto",
+				"DEFANG_HIDE_UPDATE":     "false",
 			},
 			flags: map[string]string{
 				"mode":            "HIGH_AVAILABILITY",
@@ -114,6 +116,7 @@ func Test_prorityLoading(t *testing.T) {
 				ColorMode:      ColorAlways,
 				HasTty:         false, // from env override
 				NonInteractive: false, // from flags override
+				HideUpdate:     false, // from env override (env false beats rc true)
 			},
 		},
 		{
@@ -148,6 +151,7 @@ func Test_prorityLoading(t *testing.T) {
 				"DEFANG_COLOR":           "auto",
 				"DEFANG_TTY":             "true",
 				"DEFANG_NON_INTERACTIVE": "false",
+				"DEFANG_HIDE_UPDATE":     "false",
 			},
 			expected: GlobalConfig{
 				Mode:           modes.ModeBalanced,
@@ -161,6 +165,7 @@ func Test_prorityLoading(t *testing.T) {
 				ColorMode:      ColorAuto,
 				HasTty:         true,  // from env
 				NonInteractive: false, // from env
+				HideUpdate:     false, // from env (env overrides rc)
 			},
 		},
 		{
@@ -180,6 +185,7 @@ func Test_prorityLoading(t *testing.T) {
 						"DEFANG_COLOR":           "always",
 						"DEFANG_TTY":             "false",
 						"DEFANG_NON_INTERACTIVE": "true",
+						"DEFANG_HIDE_UPDATE":     "true",
 					},
 				},
 			},
@@ -195,6 +201,7 @@ func Test_prorityLoading(t *testing.T) {
 				ColorMode:      ColorAlways,
 				HasTty:         false, // from rc
 				NonInteractive: true,  // from rc
+				HideUpdate:     true,  // from rc
 			},
 		},
 	}
@@ -325,6 +332,9 @@ func Test_prorityLoading(t *testing.T) {
 			}
 			if config.NonInteractive != tt.expected.NonInteractive {
 				t.Errorf("expected NonInteractive to be %v, got %v", tt.expected.NonInteractive, config.NonInteractive)
+			}
+			if config.HideUpdate != tt.expected.HideUpdate {
+				t.Errorf("expected HideUpdate to be %v, got %v", tt.expected.HideUpdate, config.HideUpdate)
 			}
 		})
 	}

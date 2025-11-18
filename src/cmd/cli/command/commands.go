@@ -128,7 +128,7 @@ func Execute(ctx context.Context) error {
 		fmt.Println("For help with warnings, check our FAQ at https://s.defang.io/warnings")
 	}
 
-	if config.HasTty && !hideUpdate && pkg.RandomIndex(10) == 0 {
+	if config.HasTty && !config.HideUpdate && pkg.RandomIndex(10) == 0 {
 		if latest, err := GetLatestVersion(ctx); err == nil && isNewer(GetCurrentVersion(), latest) {
 			term.Debug("Latest Version:", latest, "Current Version:", GetCurrentVersion())
 			fmt.Println("A newer version of the CLI is available at https://github.com/DefangLabs/defang/releases/latest")
@@ -382,7 +382,7 @@ var RootCmd = &cobra.Command{
 			term.Debug("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
 			if config.HasTty && isNewer(version, v.CliMin) && !isUpgradeCommand(cmd) {
 				term.Warn("Your CLI version is outdated. Please upgrade to the latest version by running:\n\n  defang upgrade\n")
-				hideUpdate = true // hide the upgrade hint at the end
+				config.HideUpdate = true // hide the upgrade hint at the end
 			}
 		}
 
@@ -1066,7 +1066,7 @@ var upgradeCmd = &cobra.Command{
 	Aliases: []string{"update"},
 	Short:   "Upgrade the Defang CLI to the latest version",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		hideUpdate = true
+		config.HideUpdate = true
 		return cli.Upgrade(cmd.Context())
 	},
 }

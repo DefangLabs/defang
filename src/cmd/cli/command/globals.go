@@ -19,7 +19,7 @@ var (
 	// colorMode = ColorAuto
 	// doDebug    = false
 	// hasTty     = term.IsTerminal()
-	hideUpdate = false
+	// hideUpdate = false
 	// mode           = modes.ModeUnspecified
 	modelId string
 	// nonInteractive = !hasTty
@@ -44,6 +44,7 @@ type GlobalConfig struct {
 	ColorMode      ColorMode
 	HasTty         bool
 	NonInteractive bool
+	HideUpdate     bool
 }
 
 func (r *GlobalConfig) loadEnv() {
@@ -94,6 +95,10 @@ func (r *GlobalConfig) loadEnv() {
 		r.NonInteractive = envNonInteractive == "true"
 	} else {
 		r.NonInteractive = !r.HasTty
+	}
+	// Initialize HideUpdate from environment variable
+	if envHideUpdate := os.Getenv("DEFANG_HIDE_UPDATE"); envHideUpdate != "" {
+		r.HideUpdate = envHideUpdate == "true"
 	}
 }
 
@@ -219,7 +224,7 @@ func (r *GlobalConfig) loadRC(stackName string, flags *pflag.FlagSet) {
 
 // 	stack := pkg.Getenv("DEFANG_STACK", stackName)
 // 	hasTty = term.IsTerminal() && !pkg.GetenvBool("CI")
-// 	hideUpdate = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
+// 	config.HideUpdate = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
 // 	mode, _ = modes.Parse(pkg.Getenv("DEFANG_MODE", mode.String()))
 // 	modelId = pkg.Getenv("DEFANG_MODEL_ID", modelId) // for Pro users only
 // 	nonInteractive = !hasTty
