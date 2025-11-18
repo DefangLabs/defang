@@ -23,7 +23,7 @@ var (
 	// mode           = modes.ModeUnspecified
 	modelId        string
 	nonInteractive = !hasTty
-	org            string
+	// org            string
 	// providerID     = cliClient.ProviderAuto
 	sourcePlatform = migrate.SourcePlatformUnspecified // default to auto-detecting the source platform
 	// stack          = os.Getenv("DEFANG_STACK")
@@ -39,6 +39,7 @@ type GlobalConfig struct {
 	Mode       modes.Mode
 	Cluster    string
 	ProviderID cliClient.ProviderID
+	Org        string
 }
 
 func (r *GlobalConfig) loadEnv() {
@@ -65,6 +66,10 @@ func (r *GlobalConfig) loadEnv() {
 	// Initialize provider from environment variable (DEFANG_PROVIDER) or leave empty for flag default
 	if envProvider := os.Getenv("DEFANG_PROVIDER"); envProvider != "" {
 		r.ProviderID.Set(envProvider) // Use Set method since ProviderID has validation
+	}
+	// Initialize org from environment variable (DEFANG_ORG) or leave empty for flag default
+	if envOrg := os.Getenv("DEFANG_ORG"); envOrg != "" {
+		r.Org = envOrg
 	}
 }
 
@@ -109,6 +114,12 @@ func (r *GlobalConfig) loadFlags(flags *pflag.FlagSet) {
 		r.ProviderID.Set(flags.Lookup("provider").Value.String())
 	} else {
 		flags.Set("provider", r.ProviderID.String())
+	}
+
+	if flags.Changed("org") {
+		r.Org = flags.Lookup("org").Value.String()
+	} else {
+		flags.Set("org", r.Org)
 	}
 }
 

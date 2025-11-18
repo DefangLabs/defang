@@ -48,10 +48,10 @@ var authNeededAnnotation = map[string]string{authNeeded: ""}
 var P = track.P
 
 func getCluster() string {
-	if org == "" {
+	if config.Org == "" {
 		return config.Cluster
 	}
-	return org + "@" + config.Cluster
+	return config.Org + "@" + config.Cluster
 }
 
 func Execute(ctx context.Context) error {
@@ -149,7 +149,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().String("cluster", pcluster.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
-	RootCmd.PersistentFlags().StringVar(&org, "org", os.Getenv("DEFANG_ORG"), "override GitHub organization name (tenant)")
+	RootCmd.PersistentFlags().String("org", os.Getenv("DEFANG_ORG"), "override GitHub organization name (tenant)")
 	RootCmd.PersistentFlags().StringP("provider", "P", cliClient.ProviderAuto.String(), fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
 	RootCmd.PersistentFlags().BoolP("verbose", "v", false, "verbose logging") // backwards compat: only used by tail
@@ -1014,7 +1014,7 @@ var tokenCmd = &cobra.Command{
 		var expires, _ = cmd.Flags().GetDuration("expires")
 
 		// TODO: should default to use the current tenant, not the default tenant
-		return cli.Token(cmd.Context(), client, types.TenantName(org), expires, scope.Scope(s))
+		return cli.Token(cmd.Context(), client, types.TenantName(config.Org), expires, scope.Scope(s))
 	},
 }
 

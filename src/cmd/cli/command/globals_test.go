@@ -70,6 +70,7 @@ func Test_prorityLoading(t *testing.T) {
 						"DEFANG_STACK":    "from-rc",
 						"DEFANG_FABRIC":   "from-rc-cluster",
 						"DEFANG_PROVIDER": "defang",
+						"DEFANG_ORG":      "from-rc-org",
 					},
 				},
 			},
@@ -80,6 +81,7 @@ func Test_prorityLoading(t *testing.T) {
 				"DEFANG_STACK":    "from-env",
 				"DEFANG_FABRIC":   "from-env-cluster",
 				"DEFANG_PROVIDER": "gcp",
+				"DEFANG_ORG":      "from-env-org",
 			},
 			flags: map[string]string{
 				"mode":     "HIGH_AVAILABILITY",
@@ -88,6 +90,7 @@ func Test_prorityLoading(t *testing.T) {
 				"stack":    "from-flags",
 				"cluster":  "from-flags-cluster",
 				"provider": "aws",
+				"org":      "from-flags-org",
 			},
 			expected: GlobalConfig{
 				Mode:       modes.ModeHighAvailability,
@@ -96,6 +99,7 @@ func Test_prorityLoading(t *testing.T) {
 				Stack:      "from-flags",
 				Cluster:    "from-flags-cluster",
 				ProviderID: cliClient.ProviderAWS,
+				Org:        "from-flags-org",
 			},
 		},
 		{
@@ -110,6 +114,7 @@ func Test_prorityLoading(t *testing.T) {
 						"DEFANG_STACK":    "from-rc",
 						"DEFANG_FABRIC":   "from-rc-cluster",
 						"DEFANG_PROVIDER": "defang",
+						"DEFANG_ORG":      "from-rc-org",
 					},
 				},
 			},
@@ -120,6 +125,7 @@ func Test_prorityLoading(t *testing.T) {
 				"DEFANG_STACK":    "from-env",
 				"DEFANG_FABRIC":   "from-env-cluster",
 				"DEFANG_PROVIDER": "gcp",
+				"DEFANG_ORG":      "from-env-org",
 			},
 			expected: GlobalConfig{
 				Mode:       modes.ModeBalanced,
@@ -128,6 +134,7 @@ func Test_prorityLoading(t *testing.T) {
 				Stack:      "from-env",
 				Cluster:    "from-env-cluster",
 				ProviderID: cliClient.ProviderGCP,
+				Org:        "from-env-org",
 			},
 		},
 		{
@@ -142,6 +149,7 @@ func Test_prorityLoading(t *testing.T) {
 						"DEFANG_STACK":    "from-rc",
 						"DEFANG_FABRIC":   "from-rc-cluster",
 						"DEFANG_PROVIDER": "defang",
+						"DEFANG_ORG":      "from-rc-org",
 					},
 				},
 			},
@@ -152,6 +160,7 @@ func Test_prorityLoading(t *testing.T) {
 				Stack:      "from-rc",
 				Cluster:    "from-rc-cluster",
 				ProviderID: cliClient.ProviderDefang,
+				Org:        "from-rc-org",
 			},
 		},
 	}
@@ -193,6 +202,7 @@ func Test_prorityLoading(t *testing.T) {
 			flags.String("stack", "", "stack name")
 			flags.String("cluster", "", "cluster name")
 			flags.String("provider", "", "provider name")
+			flags.String("org", "", "organization name")
 
 			// Set flags if provided
 			for flagName, flagValue := range tt.flags {
@@ -232,6 +242,9 @@ func Test_prorityLoading(t *testing.T) {
 			if flagProvider := flags.Lookup("provider"); flagProvider != nil && flagProvider.Changed {
 				config.ProviderID.Set(flagProvider.Value.String())
 			}
+			if flagOrg := flags.Lookup("org"); flagOrg != nil && flagOrg.Changed {
+				config.Org = flagOrg.Value.String()
+			}
 
 			// Verify the final configuration matches expectations
 			if config.Mode.String() != tt.expected.Mode.String() {
@@ -251,6 +264,9 @@ func Test_prorityLoading(t *testing.T) {
 			}
 			if config.ProviderID != tt.expected.ProviderID {
 				t.Errorf("expected ProviderID to be '%s', got '%s'", tt.expected.ProviderID, config.ProviderID)
+			}
+			if config.Org != tt.expected.Org {
+				t.Errorf("expected Org to be '%s', got '%s'", tt.expected.Org, config.Org)
 			}
 		})
 	}
