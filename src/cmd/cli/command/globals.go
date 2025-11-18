@@ -14,9 +14,10 @@ import (
 
 // GLOBALS
 var (
-	client     *cliClient.GrpcClient
-	cluster    string
-	colorMode  = ColorAuto
+	client *cliClient.GrpcClient
+	// cluster    string
+	colorMode = ColorAuto
+	// doDebug    = false
 	hasTty     = term.IsTerminal()
 	hideUpdate = false
 	// mode           = modes.ModeUnspecified
@@ -36,6 +37,7 @@ type GlobalConfig struct {
 	Verbose bool
 	Debug   bool
 	Mode    modes.Mode
+	Cluster string
 }
 
 func (r *GlobalConfig) loadEnv() {
@@ -54,6 +56,10 @@ func (r *GlobalConfig) loadEnv() {
 		if r.Mode == modes.ModeUnspecified {
 			r.Mode, _ = modes.Parse(envMode)
 		}
+	}
+	// Initialize cluster from environment variable (DEFANG_FABRIC) or leave empty for flag default
+	if envCluster := os.Getenv("DEFANG_FABRIC"); envCluster != "" {
+		r.Cluster = envCluster
 	}
 }
 
@@ -86,6 +92,12 @@ func (r *GlobalConfig) loadFlags(flags *pflag.FlagSet) {
 		r.Mode, _ = modes.Parse(flags.Lookup("mode").Value.String())
 	} else {
 		flags.Set("mode", r.Mode.String())
+	}
+
+	if flags.Changed("cluster") {
+		r.Cluster = flags.Lookup("cluster").Value.String()
+	} else {
+		flags.Set("cluster", r.Cluster)
 	}
 }
 

@@ -22,7 +22,7 @@ func TestPrintPlaygroundPortalServiceURLs(t *testing.T) {
 	term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
 
 	providerID = cliClient.ProviderDefang
-	cluster = pcluster.DefaultCluster
+	config.Cluster = pcluster.DefaultCluster
 	printPlaygroundPortalServiceURLs([]*defangv1.ServiceInfo{
 		{
 			Service: &defangv1.Service{Name: "service1"},

@@ -15,7 +15,7 @@ const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
 
 func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
 	// We can only show services deployed to the prod1 defang SaaS environment.
-	if providerID == cliClient.ProviderDefang && cluster == pcluster.DefaultCluster {
+	if providerID == cliClient.ProviderDefang && config.Cluster == pcluster.DefaultCluster {
 		term.Info("Monitor your services' status in the defang portal")
 		for _, serviceInfo := range serviceInfos {
 			term.Println("   -", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)

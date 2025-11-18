@@ -49,9 +49,9 @@ var P = track.P
 
 func getCluster() string {
 	if org == "" {
-		return cluster
+		return config.Cluster
 	}
-	return org + "@" + cluster
+	return org + "@" + config.Cluster
 }
 
 func Execute(ctx context.Context) error {
@@ -147,7 +147,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.Version = version
 	RootCmd.PersistentFlags().StringVarP(&config.Stack, "stack", "s", os.Getenv("DEFANG_STACK"), "stack name (for BYOC providers)")
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
-	RootCmd.PersistentFlags().StringVar(&cluster, "cluster", pcluster.DefangFabric, "Defang cluster to connect to")
+	RootCmd.PersistentFlags().String("cluster", pcluster.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
 	RootCmd.PersistentFlags().StringVar(&org, "org", os.Getenv("DEFANG_ORG"), "override GitHub organization name (tenant)")
 	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
@@ -163,7 +163,7 @@ func SetupCommands(ctx context.Context, version string) {
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
 	// Create a temporary gRPC client for tracking events before login
-	cli.Connect(ctx, cluster)
+	cli.Connect(ctx, getCluster())
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)

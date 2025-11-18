@@ -67,6 +67,7 @@ func Test_prorityLoading(t *testing.T) {
 						"DEFANG_VERBOSE": "false",
 						"DEFANG_DEBUG":   "true",
 						"DEFANG_STACK":   "from-rc",
+						"DEFANG_FABRIC":  "from-rc-cluster",
 					},
 				},
 			},
@@ -75,18 +76,21 @@ func Test_prorityLoading(t *testing.T) {
 				"DEFANG_VERBOSE": "true",
 				"DEFANG_DEBUG":   "false",
 				"DEFANG_STACK":   "from-env",
+				"DEFANG_FABRIC":  "from-env-cluster",
 			},
 			flags: map[string]string{
 				"mode":    "HIGH_AVAILABILITY",
 				"verbose": "false",
 				"debug":   "true",
 				"stack":   "from-flags",
+				"cluster": "from-flags-cluster",
 			},
 			expected: GlobalConfig{
 				Mode:    modes.ModeHighAvailability,
 				Verbose: false,
 				Debug:   true,
 				Stack:   "from-flags",
+				Cluster: "from-flags-cluster",
 			},
 		},
 		{
@@ -99,6 +103,7 @@ func Test_prorityLoading(t *testing.T) {
 						"DEFANG_VERBOSE": "false",
 						"DEFANG_DEBUG":   "true",
 						"DEFANG_STACK":   "from-rc",
+						"DEFANG_FABRIC":  "from-rc-cluster",
 					},
 				},
 			},
@@ -107,12 +112,14 @@ func Test_prorityLoading(t *testing.T) {
 				"DEFANG_VERBOSE": "true",
 				"DEFANG_DEBUG":   "false",
 				"DEFANG_STACK":   "from-env",
+				"DEFANG_FABRIC":  "from-env-cluster",
 			},
 			expected: GlobalConfig{
 				Mode:    modes.ModeBalanced,
 				Verbose: true,
 				Debug:   false,
 				Stack:   "from-env",
+				Cluster: "from-env-cluster",
 			},
 		},
 		{
@@ -125,6 +132,7 @@ func Test_prorityLoading(t *testing.T) {
 						"DEFANG_VERBOSE": "true",
 						"DEFANG_DEBUG":   "false",
 						"DEFANG_STACK":   "from-rc",
+						"DEFANG_FABRIC":  "from-rc-cluster",
 					},
 				},
 			},
@@ -133,6 +141,7 @@ func Test_prorityLoading(t *testing.T) {
 				Verbose: true,
 				Debug:   false,
 				Stack:   "from-rc",
+				Cluster: "from-rc-cluster",
 			},
 		},
 	}
@@ -172,6 +181,7 @@ func Test_prorityLoading(t *testing.T) {
 			flags.Bool("verbose", false, "verbose output")
 			flags.Bool("debug", false, "debug output")
 			flags.String("stack", "", "stack name")
+			flags.String("cluster", "", "cluster name")
 
 			// Set flags if provided
 			for flagName, flagValue := range tt.flags {
@@ -205,6 +215,9 @@ func Test_prorityLoading(t *testing.T) {
 			if flagStack := flags.Lookup("stack"); flagStack != nil && flagStack.Changed {
 				config.Stack = flagStack.Value.String()
 			}
+			if flagCluster := flags.Lookup("cluster"); flagCluster != nil && flagCluster.Changed {
+				config.Cluster = flagCluster.Value.String()
+			}
 
 			// Verify the final configuration matches expectations
 			if config.Mode.String() != tt.expected.Mode.String() {
@@ -218,6 +231,9 @@ func Test_prorityLoading(t *testing.T) {
 			}
 			if config.Stack != tt.expected.Stack {
 				t.Errorf("expected Stack to be '%s', got '%s'", tt.expected.Stack, config.Stack)
+			}
+			if config.Cluster != tt.expected.Cluster {
+				t.Errorf("expected Cluster to be '%s', got '%s'", tt.expected.Cluster, config.Cluster)
 			}
 		})
 	}
