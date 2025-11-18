@@ -26,7 +26,7 @@ func makeEstimateCmd() *cobra.Command {
 				return err
 			}
 
-			if providerID == cliClient.ProviderAuto {
+			if config.ProviderID == cliClient.ProviderAuto {
 				_, err = interactiveSelectProvider([]cliClient.ProviderID{
 					cliClient.ProviderAWS,
 					cliClient.ProviderGCP,
@@ -43,10 +43,10 @@ func makeEstimateCmd() *cobra.Command {
 				config.Mode = modes.ModeAffordable
 			}
 			if region == "" {
-				region = cliClient.GetRegion(providerID) // This sets the default region based on the provider
+				region = cliClient.GetRegion(config.ProviderID) // This sets the default region based on the provider
 			}
 
-			estimate, err := cli.RunEstimate(ctx, project, client, previewProvider, providerID, region, config.Mode)
+			estimate, err := cli.RunEstimate(ctx, project, client, previewProvider, config.ProviderID, region, config.Mode)
 			if err != nil {
 				return fmt.Errorf("failed to run estimate: %w", err)
 			}

@@ -49,7 +49,7 @@ func makeStackNewCmd() *cobra.Command {
 
 			params := stacks.StackParameters{
 				Name:     stackName,
-				Provider: providerID, // default provider
+				Provider: config.ProviderID, // default provider
 				Region:   region,
 				Mode:     config.Mode,
 			}
@@ -75,16 +75,16 @@ func makeStackNewCmd() *cobra.Command {
 					return errors.New("a cloud provider must be selected")
 				}
 
-				err = providerID.Set(provider)
+				err = config.ProviderID.Set(provider)
 				if err != nil {
 					return err
 				}
-				params.Provider = providerID
+				params.Provider = config.ProviderID
 			}
 
 			if params.Region == "" {
 				defaultRegion := ""
-				switch providerID {
+				switch config.ProviderID {
 				case cliClient.ProviderAWS:
 					defaultRegion = "us-west-2"
 				case cliClient.ProviderGCP:

@@ -150,7 +150,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().String("cluster", pcluster.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
 	RootCmd.PersistentFlags().StringVar(&org, "org", os.Getenv("DEFANG_ORG"), "override GitHub organization name (tenant)")
-	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
+	RootCmd.PersistentFlags().StringP("provider", "P", cliClient.ProviderAuto.String(), fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
 	RootCmd.PersistentFlags().BoolP("verbose", "v", false, "verbose logging") // backwards compat: only used by tail
 	RootCmd.PersistentFlags().Bool("debug", false, "debug logging for troubleshooting the CLI")
@@ -350,7 +350,7 @@ var RootCmd = &cobra.Command{
 				errString = err.Error()
 			}
 
-			track.Cmd(cmd, "Invoked", P("args", args), P("err", errString), P("non-interactive", nonInteractive), P("provider", providerID))
+			track.Cmd(cmd, "Invoked", P("args", args), P("err", errString), P("non-interactive", nonInteractive), P("provider", config.ProviderID))
 		}()
 
 		// Do this first, since any errors will be printed to the console
@@ -1153,13 +1153,13 @@ func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 		whence = "command line flag"
 	} else if val, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
 		// Sanitize the provider value from the environment variable
-		if err := providerID.Set(val); err != nil {
+		if err := config.ProviderID.Set(val); err != nil {
 			return fmt.Errorf("invalid provider '%v' in environment variable DEFANG_PROVIDER, supported providers are: %v", val, cliClient.AllProviders())
 		}
 		whence = "environment variable"
 	}
 
-	switch providerID {
+	switch config.ProviderID {
 	case cliClient.ProviderAuto:
 		if nonInteractive {
 			// Defaults to defang provider in non-interactive mode
@@ -1172,7 +1172,7 @@ func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 			if gcpInEnv() {
 				term.Warn("Using Defang playground, but GCP_PROJECT_ID/CLOUDSDK_CORE_PROJECT environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
 			}
-			providerID = cliClient.ProviderDefang
+			config.ProviderID = cliClient.ProviderDefang
 		} else {
 			var err error
 			if whence, err = determineProviderID(ctx, loader); err != nil {
@@ -1196,7 +1196,7 @@ func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
 	}
 
-	term.Infof("Using %s provider from %s%s", providerID.Name(), whence, extraMsg)
+	term.Infof("Using %s provider from %s%s", config.ProviderID.Name(), whence, extraMsg)
 	return nil
 }
 
@@ -1205,7 +1205,7 @@ func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 		return nil, err
 	}
 
-	provider := cli.NewProvider(ctx, providerID, client, config.Stack)
+	provider := cli.NewProvider(ctx, config.ProviderID, client, config.Stack)
 	return provider, nil
 }
 
@@ -1236,7 +1236,7 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 			if err != nil {
 				term.Debugf("Unable to get selected provider: %v", err)
 			} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
-				providerID.SetValue(resp.Provider)
+				config.ProviderID.SetValue(resp.Provider)
 				return "stored preference", nil
 			}
 		}
@@ -1246,10 +1246,10 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 
 	// Save the selected provider to the fabric
 	if projectName != "" {
-		if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projectName, Provider: providerID.Value()}); err != nil {
+		if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projectName, Provider: config.ProviderID.Value()}); err != nil {
 			term.Debugf("Unable to save selected provider to defang server: %v", err)
 		} else {
-			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, projectName)
+			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", config.ProviderID, projectName)
 		}
 	}
 
@@ -1287,7 +1287,7 @@ func interactiveSelectProvider(providers []cliClient.ProviderID) (string, error)
 		return "", fmt.Errorf("failed to select provider: %w", err)
 	}
 	track.Evt("ProviderSelected", P("provider", optionValue))
-	if err := providerID.Set(optionValue); err != nil {
+	if err := config.ProviderID.Set(optionValue); err != nil {
 		panic(err)
 	}
 

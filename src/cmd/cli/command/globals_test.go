@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/spf13/pflag"
 )
@@ -63,34 +64,38 @@ func Test_prorityLoading(t *testing.T) {
 				{
 					stackname: "test",
 					entries: map[string]string{
-						"DEFANG_MODE":    "AFFORDABLE",
-						"DEFANG_VERBOSE": "false",
-						"DEFANG_DEBUG":   "true",
-						"DEFANG_STACK":   "from-rc",
-						"DEFANG_FABRIC":  "from-rc-cluster",
+						"DEFANG_MODE":     "AFFORDABLE",
+						"DEFANG_VERBOSE":  "false",
+						"DEFANG_DEBUG":    "true",
+						"DEFANG_STACK":    "from-rc",
+						"DEFANG_FABRIC":   "from-rc-cluster",
+						"DEFANG_PROVIDER": "defang",
 					},
 				},
 			},
 			envVars: map[string]string{
-				"DEFANG_MODE":    "BALANCED",
-				"DEFANG_VERBOSE": "true",
-				"DEFANG_DEBUG":   "false",
-				"DEFANG_STACK":   "from-env",
-				"DEFANG_FABRIC":  "from-env-cluster",
+				"DEFANG_MODE":     "BALANCED",
+				"DEFANG_VERBOSE":  "true",
+				"DEFANG_DEBUG":    "false",
+				"DEFANG_STACK":    "from-env",
+				"DEFANG_FABRIC":   "from-env-cluster",
+				"DEFANG_PROVIDER": "gcp",
 			},
 			flags: map[string]string{
-				"mode":    "HIGH_AVAILABILITY",
-				"verbose": "false",
-				"debug":   "true",
-				"stack":   "from-flags",
-				"cluster": "from-flags-cluster",
+				"mode":     "HIGH_AVAILABILITY",
+				"verbose":  "false",
+				"debug":    "true",
+				"stack":    "from-flags",
+				"cluster":  "from-flags-cluster",
+				"provider": "aws",
 			},
 			expected: GlobalConfig{
-				Mode:    modes.ModeHighAvailability,
-				Verbose: false,
-				Debug:   true,
-				Stack:   "from-flags",
-				Cluster: "from-flags-cluster",
+				Mode:       modes.ModeHighAvailability,
+				Verbose:    false,
+				Debug:      true,
+				Stack:      "from-flags",
+				Cluster:    "from-flags-cluster",
+				ProviderID: cliClient.ProviderAWS,
 			},
 		},
 		{
@@ -99,27 +104,30 @@ func Test_prorityLoading(t *testing.T) {
 				{
 					stackname: "test",
 					entries: map[string]string{
-						"DEFANG_MODE":    "AFFORDABLE",
-						"DEFANG_VERBOSE": "false",
-						"DEFANG_DEBUG":   "true",
-						"DEFANG_STACK":   "from-rc",
-						"DEFANG_FABRIC":  "from-rc-cluster",
+						"DEFANG_MODE":     "AFFORDABLE",
+						"DEFANG_VERBOSE":  "false",
+						"DEFANG_DEBUG":    "true",
+						"DEFANG_STACK":    "from-rc",
+						"DEFANG_FABRIC":   "from-rc-cluster",
+						"DEFANG_PROVIDER": "defang",
 					},
 				},
 			},
 			envVars: map[string]string{
-				"DEFANG_MODE":    "BALANCED",
-				"DEFANG_VERBOSE": "true",
-				"DEFANG_DEBUG":   "false",
-				"DEFANG_STACK":   "from-env",
-				"DEFANG_FABRIC":  "from-env-cluster",
+				"DEFANG_MODE":     "BALANCED",
+				"DEFANG_VERBOSE":  "true",
+				"DEFANG_DEBUG":    "false",
+				"DEFANG_STACK":    "from-env",
+				"DEFANG_FABRIC":   "from-env-cluster",
+				"DEFANG_PROVIDER": "gcp",
 			},
 			expected: GlobalConfig{
-				Mode:    modes.ModeBalanced,
-				Verbose: true,
-				Debug:   false,
-				Stack:   "from-env",
-				Cluster: "from-env-cluster",
+				Mode:       modes.ModeBalanced,
+				Verbose:    true,
+				Debug:      false,
+				Stack:      "from-env",
+				Cluster:    "from-env-cluster",
+				ProviderID: cliClient.ProviderGCP,
 			},
 		},
 		{
@@ -128,20 +136,22 @@ func Test_prorityLoading(t *testing.T) {
 				{
 					stackname: "test",
 					entries: map[string]string{
-						"DEFANG_MODE":    "AFFORDABLE",
-						"DEFANG_VERBOSE": "true",
-						"DEFANG_DEBUG":   "false",
-						"DEFANG_STACK":   "from-rc",
-						"DEFANG_FABRIC":  "from-rc-cluster",
+						"DEFANG_MODE":     "AFFORDABLE",
+						"DEFANG_VERBOSE":  "true",
+						"DEFANG_DEBUG":    "false",
+						"DEFANG_STACK":    "from-rc",
+						"DEFANG_FABRIC":   "from-rc-cluster",
+						"DEFANG_PROVIDER": "defang",
 					},
 				},
 			},
 			expected: GlobalConfig{
-				Mode:    modes.ModeAffordable, // RC file values
-				Verbose: true,
-				Debug:   false,
-				Stack:   "from-rc",
-				Cluster: "from-rc-cluster",
+				Mode:       modes.ModeAffordable, // RC file values
+				Verbose:    true,
+				Debug:      false,
+				Stack:      "from-rc",
+				Cluster:    "from-rc-cluster",
+				ProviderID: cliClient.ProviderDefang,
 			},
 		},
 	}
@@ -182,6 +192,7 @@ func Test_prorityLoading(t *testing.T) {
 			flags.Bool("debug", false, "debug output")
 			flags.String("stack", "", "stack name")
 			flags.String("cluster", "", "cluster name")
+			flags.String("provider", "", "provider name")
 
 			// Set flags if provided
 			for flagName, flagValue := range tt.flags {
@@ -218,6 +229,9 @@ func Test_prorityLoading(t *testing.T) {
 			if flagCluster := flags.Lookup("cluster"); flagCluster != nil && flagCluster.Changed {
 				config.Cluster = flagCluster.Value.String()
 			}
+			if flagProvider := flags.Lookup("provider"); flagProvider != nil && flagProvider.Changed {
+				config.ProviderID.Set(flagProvider.Value.String())
+			}
 
 			// Verify the final configuration matches expectations
 			if config.Mode.String() != tt.expected.Mode.String() {
@@ -234,6 +248,9 @@ func Test_prorityLoading(t *testing.T) {
 			}
 			if config.Cluster != tt.expected.Cluster {
 				t.Errorf("expected Cluster to be '%s', got '%s'", tt.expected.Cluster, config.Cluster)
+			}
+			if config.ProviderID != tt.expected.ProviderID {
+				t.Errorf("expected ProviderID to be '%s', got '%s'", tt.expected.ProviderID, config.ProviderID)
 			}
 		})
 	}

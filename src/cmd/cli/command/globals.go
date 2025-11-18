@@ -24,7 +24,7 @@ var (
 	modelId        string
 	nonInteractive = !hasTty
 	org            string
-	providerID     = cliClient.ProviderAuto
+	// providerID     = cliClient.ProviderAuto
 	sourcePlatform = migrate.SourcePlatformUnspecified // default to auto-detecting the source platform
 	// stack          = os.Getenv("DEFANG_STACK")
 	// verbose = false
@@ -33,11 +33,12 @@ var (
 )
 
 type GlobalConfig struct {
-	Stack   string
-	Verbose bool
-	Debug   bool
-	Mode    modes.Mode
-	Cluster string
+	Stack      string
+	Verbose    bool
+	Debug      bool
+	Mode       modes.Mode
+	Cluster    string
+	ProviderID cliClient.ProviderID
 }
 
 func (r *GlobalConfig) loadEnv() {
@@ -60,6 +61,10 @@ func (r *GlobalConfig) loadEnv() {
 	// Initialize cluster from environment variable (DEFANG_FABRIC) or leave empty for flag default
 	if envCluster := os.Getenv("DEFANG_FABRIC"); envCluster != "" {
 		r.Cluster = envCluster
+	}
+	// Initialize provider from environment variable (DEFANG_PROVIDER) or leave empty for flag default
+	if envProvider := os.Getenv("DEFANG_PROVIDER"); envProvider != "" {
+		r.ProviderID.Set(envProvider) // Use Set method since ProviderID has validation
 	}
 }
 
@@ -98,6 +103,12 @@ func (r *GlobalConfig) loadFlags(flags *pflag.FlagSet) {
 		r.Cluster = flags.Lookup("cluster").Value.String()
 	} else {
 		flags.Set("cluster", r.Cluster)
+	}
+
+	if flags.Changed("provider") {
+		r.ProviderID.Set(flags.Lookup("provider").Value.String())
+	} else {
+		flags.Set("provider", r.ProviderID.String())
 	}
 }
 
