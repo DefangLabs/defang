@@ -1,11 +1,12 @@
 #######################################################################################
 #                                                                                     #
-# This script installs the latest release of defang from GitHub. It is designed       #
+# This script installs the latest release of Defang from GitHub. It is designed       #
 # to be run like this:                                                                #
 #                                                                                     #
 # eval "$(curl -fsSL s.defang.io/install)"                                            #
 #                                                                                     #
-# This allows us to do some interactive stuff where we can prompt the user for input. #
+# This allows us to do some interactive stuff where we can prompt the user for input  #
+# and have the user run the defang executable from the updated PATH environment var.  #
 #                                                                                     #
 #######################################################################################
 
