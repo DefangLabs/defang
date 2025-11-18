@@ -25,7 +25,7 @@ var (
 	nonInteractive = !hasTty
 	// org            string
 	// providerID     = cliClient.ProviderAuto
-	sourcePlatform = migrate.SourcePlatformUnspecified // default to auto-detecting the source platform
+	// sourcePlatform = migrate.SourcePlatformUnspecified // default to auto-detecting the source platform
 	// stack          = os.Getenv("DEFANG_STACK")
 	// verbose = false
 
@@ -33,13 +33,14 @@ var (
 )
 
 type GlobalConfig struct {
-	Stack      string
-	Verbose    bool
-	Debug      bool
-	Mode       modes.Mode
-	Cluster    string
-	ProviderID cliClient.ProviderID
-	Org        string
+	Stack          string
+	Verbose        bool
+	Debug          bool
+	Mode           modes.Mode
+	Cluster        string
+	ProviderID     cliClient.ProviderID
+	Org            string
+	SourcePlatform migrate.SourcePlatform
 }
 
 func (r *GlobalConfig) loadEnv() {
@@ -70,6 +71,10 @@ func (r *GlobalConfig) loadEnv() {
 	// Initialize org from environment variable (DEFANG_ORG) or leave empty for flag default
 	if envOrg := os.Getenv("DEFANG_ORG"); envOrg != "" {
 		r.Org = envOrg
+	}
+	// Initialize source platform from environment variable or leave empty for default
+	if envSourcePlatform := os.Getenv("DEFANG_SOURCE_PLATFORM"); envSourcePlatform != "" {
+		r.SourcePlatform.Set(envSourcePlatform)
 	}
 }
 
@@ -132,6 +137,16 @@ func (r *GlobalConfig) loadFlags(flags *pflag.FlagSet) {
 			r.Org = flags.Lookup("org").DefValue
 		}
 		flags.Set("org", r.Org)
+	}
+
+	if flags.Changed("from") {
+		r.SourcePlatform.Set(flags.Lookup("from").Value.String())
+	} else {
+		// If config has no value, use default (unspecified)
+		if r.SourcePlatform.String() == "" {
+			r.SourcePlatform = migrate.SourcePlatformUnspecified
+		}
+		// Note: 'from' flag is only on initCmd, not global, so we don't set it here
 	}
 }
 

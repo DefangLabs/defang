@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/migrate"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/spf13/pflag"
 )
@@ -64,24 +65,26 @@ func Test_prorityLoading(t *testing.T) {
 				{
 					stackname: "test",
 					entries: map[string]string{
-						"DEFANG_MODE":     "AFFORDABLE",
-						"DEFANG_VERBOSE":  "false",
-						"DEFANG_DEBUG":    "true",
-						"DEFANG_STACK":    "from-rc",
-						"DEFANG_FABRIC":   "from-rc-cluster",
-						"DEFANG_PROVIDER": "defang",
-						"DEFANG_ORG":      "from-rc-org",
+						"DEFANG_MODE":            "AFFORDABLE",
+						"DEFANG_VERBOSE":         "false",
+						"DEFANG_DEBUG":           "true",
+						"DEFANG_STACK":           "from-rc",
+						"DEFANG_FABRIC":          "from-rc-cluster",
+						"DEFANG_PROVIDER":        "defang",
+						"DEFANG_ORG":             "from-rc-org",
+						"DEFANG_SOURCE_PLATFORM": "heroku",
 					},
 				},
 			},
 			envVars: map[string]string{
-				"DEFANG_MODE":     "BALANCED",
-				"DEFANG_VERBOSE":  "true",
-				"DEFANG_DEBUG":    "false",
-				"DEFANG_STACK":    "from-env",
-				"DEFANG_FABRIC":   "from-env-cluster",
-				"DEFANG_PROVIDER": "gcp",
-				"DEFANG_ORG":      "from-env-org",
+				"DEFANG_MODE":            "BALANCED",
+				"DEFANG_VERBOSE":         "true",
+				"DEFANG_DEBUG":           "false",
+				"DEFANG_STACK":           "from-env",
+				"DEFANG_FABRIC":          "from-env-cluster",
+				"DEFANG_PROVIDER":        "gcp",
+				"DEFANG_ORG":             "from-env-org",
+				"DEFANG_SOURCE_PLATFORM": "heroku",
 			},
 			flags: map[string]string{
 				"mode":     "HIGH_AVAILABILITY",
@@ -91,15 +94,17 @@ func Test_prorityLoading(t *testing.T) {
 				"cluster":  "from-flags-cluster",
 				"provider": "aws",
 				"org":      "from-flags-org",
+				"from":     "heroku",
 			},
 			expected: GlobalConfig{
-				Mode:       modes.ModeHighAvailability,
-				Verbose:    false,
-				Debug:      true,
-				Stack:      "from-flags",
-				Cluster:    "from-flags-cluster",
-				ProviderID: cliClient.ProviderAWS,
-				Org:        "from-flags-org",
+				Mode:           modes.ModeHighAvailability,
+				Verbose:        false,
+				Debug:          true,
+				Stack:          "from-flags",
+				Cluster:        "from-flags-cluster",
+				ProviderID:     cliClient.ProviderAWS,
+				Org:            "from-flags-org",
+				SourcePlatform: migrate.SourcePlatformHeroku,
 			},
 		},
 		{
@@ -108,33 +113,36 @@ func Test_prorityLoading(t *testing.T) {
 				{
 					stackname: "test",
 					entries: map[string]string{
-						"DEFANG_MODE":     "AFFORDABLE",
-						"DEFANG_VERBOSE":  "false",
-						"DEFANG_DEBUG":    "true",
-						"DEFANG_STACK":    "from-rc",
-						"DEFANG_FABRIC":   "from-rc-cluster",
-						"DEFANG_PROVIDER": "defang",
-						"DEFANG_ORG":      "from-rc-org",
+						"DEFANG_MODE":            "AFFORDABLE",
+						"DEFANG_VERBOSE":         "false",
+						"DEFANG_DEBUG":           "true",
+						"DEFANG_STACK":           "from-rc",
+						"DEFANG_FABRIC":          "from-rc-cluster",
+						"DEFANG_PROVIDER":        "defang",
+						"DEFANG_ORG":             "from-rc-org",
+						"DEFANG_SOURCE_PLATFORM": "heroku",
 					},
 				},
 			},
 			envVars: map[string]string{
-				"DEFANG_MODE":     "BALANCED",
-				"DEFANG_VERBOSE":  "true",
-				"DEFANG_DEBUG":    "false",
-				"DEFANG_STACK":    "from-env",
-				"DEFANG_FABRIC":   "from-env-cluster",
-				"DEFANG_PROVIDER": "gcp",
-				"DEFANG_ORG":      "from-env-org",
+				"DEFANG_MODE":            "BALANCED",
+				"DEFANG_VERBOSE":         "true",
+				"DEFANG_DEBUG":           "false",
+				"DEFANG_STACK":           "from-env",
+				"DEFANG_FABRIC":          "from-env-cluster",
+				"DEFANG_PROVIDER":        "gcp",
+				"DEFANG_ORG":             "from-env-org",
+				"DEFANG_SOURCE_PLATFORM": "heroku",
 			},
 			expected: GlobalConfig{
-				Mode:       modes.ModeBalanced,
-				Verbose:    true,
-				Debug:      false,
-				Stack:      "from-env",
-				Cluster:    "from-env-cluster",
-				ProviderID: cliClient.ProviderGCP,
-				Org:        "from-env-org",
+				Mode:           modes.ModeBalanced,
+				Verbose:        true,
+				Debug:          false,
+				Stack:          "from-env",
+				Cluster:        "from-env-cluster",
+				ProviderID:     cliClient.ProviderGCP,
+				Org:            "from-env-org",
+				SourcePlatform: migrate.SourcePlatformHeroku,
 			},
 		},
 		{
@@ -143,24 +151,26 @@ func Test_prorityLoading(t *testing.T) {
 				{
 					stackname: "test",
 					entries: map[string]string{
-						"DEFANG_MODE":     "AFFORDABLE",
-						"DEFANG_VERBOSE":  "true",
-						"DEFANG_DEBUG":    "false",
-						"DEFANG_STACK":    "from-rc",
-						"DEFANG_FABRIC":   "from-rc-cluster",
-						"DEFANG_PROVIDER": "defang",
-						"DEFANG_ORG":      "from-rc-org",
+						"DEFANG_MODE":            "AFFORDABLE",
+						"DEFANG_VERBOSE":         "true",
+						"DEFANG_DEBUG":           "false",
+						"DEFANG_STACK":           "from-rc",
+						"DEFANG_FABRIC":          "from-rc-cluster",
+						"DEFANG_PROVIDER":        "defang",
+						"DEFANG_ORG":             "from-rc-org",
+						"DEFANG_SOURCE_PLATFORM": "heroku",
 					},
 				},
 			},
 			expected: GlobalConfig{
-				Mode:       modes.ModeAffordable, // RC file values
-				Verbose:    true,
-				Debug:      false,
-				Stack:      "from-rc",
-				Cluster:    "from-rc-cluster",
-				ProviderID: cliClient.ProviderDefang,
-				Org:        "from-rc-org",
+				Mode:           modes.ModeAffordable, // RC file values
+				Verbose:        true,
+				Debug:          false,
+				Stack:          "from-rc",
+				Cluster:        "from-rc-cluster",
+				ProviderID:     cliClient.ProviderDefang,
+				Org:            "from-rc-org",
+				SourcePlatform: migrate.SourcePlatformHeroku,
 			},
 		},
 	}
@@ -203,6 +213,7 @@ func Test_prorityLoading(t *testing.T) {
 			flags.String("cluster", "", "cluster name")
 			flags.String("provider", "", "provider name")
 			flags.String("org", "", "organization name")
+			flags.String("from", "", "source platform")
 
 			// Set flags if provided
 			for flagName, flagValue := range tt.flags {
@@ -245,6 +256,9 @@ func Test_prorityLoading(t *testing.T) {
 			if flagOrg := flags.Lookup("org"); flagOrg != nil && flagOrg.Changed {
 				config.Org = flagOrg.Value.String()
 			}
+			if flagFrom := flags.Lookup("from"); flagFrom != nil && flagFrom.Changed {
+				config.SourcePlatform.Set(flagFrom.Value.String())
+			}
 
 			// Verify the final configuration matches expectations
 			if config.Mode.String() != tt.expected.Mode.String() {
@@ -267,6 +281,9 @@ func Test_prorityLoading(t *testing.T) {
 			}
 			if config.Org != tt.expected.Org {
 				t.Errorf("expected Org to be '%s', got '%s'", tt.expected.Org, config.Org)
+			}
+			if config.SourcePlatform != tt.expected.SourcePlatform {
+				t.Errorf("expected SourcePlatform to be '%s', got '%s'", tt.expected.SourcePlatform, config.SourcePlatform)
 			}
 		})
 	}

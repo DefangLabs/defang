@@ -211,7 +211,7 @@ func SetupCommands(ctx context.Context, version string) {
 	generateCmd.Flags().StringVar(&modelId, "model", modelId, "LLM model to use for generating the code (Pro users only)")
 	RootCmd.AddCommand(generateCmd)
 	// new command
-	initCmd.PersistentFlags().Var(&sourcePlatform, "from", fmt.Sprintf(`the platform from which to migrate the project; one of %v`, migrate.AllSourcePlatforms))
+	initCmd.PersistentFlags().Var(&config.SourcePlatform, "from", fmt.Sprintf(`the platform from which to migrate the project; one of %v`, migrate.AllSourcePlatforms))
 	RootCmd.AddCommand(initCmd)
 
 	// Get Services Command
