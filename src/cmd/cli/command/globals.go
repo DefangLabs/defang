@@ -69,12 +69,10 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) {
 
 	if !flags.Changed("mode") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_MODE"); ok {
-			mode, err := modes.Parse(fromEnv)
+			err := r.Mode.Set(fromEnv)
 			if err != nil {
 				term.Debugf("invalid DEFANG_MODE value: %v", err)
-				term.Debugf("using deafult mode from flag: %s", r.Mode.String())
 			}
-			r.Mode = mode
 		}
 	}
 
@@ -128,7 +126,7 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) {
 		}
 	}
 
-	// Not a flag but check environment variable for TTY setting
+	// Not flags but check these environment variables
 	if fromEnv, ok := os.LookupEnv("DEFANG_TTY"); ok {
 		r.HasTty, _ = strconv.ParseBool(fromEnv)
 	}
