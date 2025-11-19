@@ -55,6 +55,9 @@ const TemplateRevision = 2 // bump this when the template changes!
 // - EnablePullThroughCache: "true"/"false" - Whether to enable ECR pull-through cache
 // - DockerHubUsername: Username for Docker Hub authentication (optional)
 // - DockerHubAccessToken: Access token for Docker Hub authentication (optional)
+// - OidcProviderIssuer: OIDC provider trusted issuer (optional)
+// - OidcProviderSubjects: Comma-delimited list of OIDC provider trusted subject patterns (optional)
+// - OidcProviderThumbprints: Comma-delimited list of OIDC provider thumbprints (optional)
 func createTemplate(stack string, containers []types.Container) (*cloudformation.Template, error) {
 	prefix := stack + "-"
 
@@ -76,7 +79,7 @@ func createTemplate(stack string, containers []types.Container) (*cloudformation
 		Description:   ptr.String("Whether to use FARGATE_SPOT capacity provider"),
 	}
 	template.Parameters[ParamsExistingVpcId] = cloudformation.Parameter{
-		Type:        "String",
+		Type:        "String", // TODO: use "AWS::EC2::VPC::Id" but seems it cannot be optional
 		Default:     ptr.String(""),
 		Description: ptr.String("ID of existing VPC to use (leave empty to create new VPC)"),
 	}
@@ -104,6 +107,21 @@ func createTemplate(stack string, containers []types.Container) (*cloudformation
 		Description: ptr.String("Docker Hub access token for private registry access (optional)"),
 		NoEcho:      ptr.Bool(true),
 	}
+	template.Parameters[ParamsOidcProviderIssuer] = cloudformation.Parameter{
+		Type:        "String",
+		Default:     ptr.String(""),
+		Description: ptr.String("OIDC provider trusted issuer (optional)"),
+	}
+	template.Parameters[ParamsOidcProviderSubjects] = cloudformation.Parameter{
+		Type:        "CommaDelimitedList",
+		Default:     ptr.String(""),
+		Description: ptr.String("OIDC provider trusted subject patterns (optional)"),
+	}
+	template.Parameters[ParamsOidcProviderThumbprints] = cloudformation.Parameter{
+		Type:        "CommaDelimitedList",
+		Default:     ptr.String(""),
+		Description: ptr.String("OIDC provider thumbprints (optional)"),
+	}
 
 	// Conditions
 	const _condUseSpot = "UseSpot"
@@ -119,6 +137,12 @@ func createTemplate(stack string, containers []types.Container) (*cloudformation
 		cloudformation.Equals(cloudformation.Ref(ParamsEnablePullThroughCache), "true"),
 		cloudformation.Not([]string{cloudformation.Equals(cloudformation.Ref(ParamsDockerHubUsername), "")}),
 		cloudformation.Not([]string{cloudformation.Equals(cloudformation.Ref(ParamsDockerHubAccessToken), "")}),
+	})
+	const _condOidcProvider = "OidcProvider"
+	template.Conditions[_condOidcProvider] = cloudformation.And([]string{
+		cloudformation.Not([]string{cloudformation.Equals(cloudformation.Ref(ParamsOidcProviderIssuer), "")}),
+		cloudformation.Not([]string{cloudformation.Equals(cloudformation.Join("", cloudformation.Ref(ParamsOidcProviderSubjects)), "")}),
+		cloudformation.Not([]string{cloudformation.Equals(cloudformation.Join("", cloudformation.Ref(ParamsOidcProviderThumbprints)), "")}),
 	})
 
 	// 1. bucket (for deployment state)
@@ -229,7 +253,7 @@ func createTemplate(stack string, containers []types.Container) (*cloudformation
 	execPolicies := []iam.Role_Policy{
 		{
 			// From https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache.html#pull-through-cache-iam
-			PolicyName: "AllowECRPassThrough",
+			PolicyName: "AllowECRPassThrough", // misnomer
 			PolicyDocument: map[string]any{
 				"Version": "2012-10-17",
 				"Statement": []any{
@@ -542,12 +566,13 @@ func createTemplate(stack string, containers []types.Container) (*cloudformation
 		Description: ptr.String("ID of the subnet"),
 	}
 
+	// Don't use the default security group, because its rules might have been removed or modified
 	const _securityGroup = "SecurityGroup"
 	template.Resources[_securityGroup] = &ec2.SecurityGroup{
 		Tags:             defaultTags, // Name tag is ignored
-		GroupDescription: "Security group for the ECS task that allows all outbound and inbound traffic",
+		GroupDescription: "Security group for the ECS task that allows all outbound traffic",
 		VpcId:            ptr.String(vpcId),
-		// SecurityGroupEgress: []ec2.SecurityGroup_Egress{; use default egress; FIXME: add ability to restrict outbound traffic
+		// SecurityGroupEgress: []ec2.SecurityGroup_Egress{; use default egress; TODO: add ability to restrict outbound traffic
 		// 	{
 		// 		IpProtocol: "tcp",
 		// 		FromPort:   ptr.Int(1),
@@ -556,6 +581,54 @@ func createTemplate(stack string, containers []types.Container) (*cloudformation
 		// 	},
 		// },
 	}
+
+	// 9a. IAM OIDC provider
+	// FIXME: You cannot register the same provider multiple times in a single AWS account. If you try to submit a URL that has already been used for an OpenID Connect provider in the AWS account, you will get an error.
+	const _oidcProvider = "OIDCProvider"
+	const oidcProviderAud = "sts.amazonaws.com"
+	template.Resources[_oidcProvider] = &iam.OIDCProvider{
+		AWSCloudFormationCondition: _condOidcProvider,
+		ClientIdList:               []string{oidcProviderAud},
+		ThumbprintList:             []string{cloudformation.Ref(ParamsOidcProviderThumbprints)},
+		Url:                        cloudformation.SubPtr(`https://${` + ParamsOidcProviderIssuer + `}`),
+	}
+
+	// 9b. CI role
+	const _CIRole = "CIRole"
+	template.Resources[_CIRole] = &iam.Role{
+		AWSCloudFormationCondition: _condOidcProvider,
+		Tags:                       defaultTags,
+		AssumeRolePolicyDocument: map[string]any{
+			"Version": "2012-10-17",
+			"Statement": []map[string]any{
+				{
+					"Effect": "Allow",
+					"Principal": map[string]any{
+						"Federated": cloudformation.Ref(_oidcProvider),
+					},
+					"Action": []string{
+						"sts:AssumeRoleWithWebIdentity",
+					},
+					"Condition": map[string]any{
+						"StringLike": map[string]any{
+							cloudformation.Sub(`${` + ParamsOidcProviderIssuer + `}:sub`): cloudformation.Ref(ParamsOidcProviderSubjects),
+						},
+						"StringEquals": map[string]any{
+							cloudformation.Sub(`${` + ParamsOidcProviderIssuer + `}:aud`): oidcProviderAud,
+						},
+					},
+				},
+			},
+		},
+		ManagedPolicyArns: []string{
+			"arn:aws:iam::aws:policy/AdministratorAccess",
+		},
+	}
+
+	// template.Outputs[OutputsCIRoleARN] = cloudformation.Output{
+	// 	Description: ptr.String("ARN of the CI role"),
+	// 	Value:       cloudformation.Ref(_CIRole),
+	// }
 
 	// Declare the remaining stack outputs
 	template.Outputs[OutputsTaskDefArn] = cloudformation.Output{

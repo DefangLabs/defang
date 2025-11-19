@@ -152,4 +152,5 @@ func (g *PlaygroundProvider) QueryForDebug(ctx context.Context, req *defangv1.De
 func (g *PlaygroundProvider) PrepareDomainDelegation(ctx context.Context, req PrepareDomainDelegationRequest) (*PrepareDomainDelegationResponse, error) {
 	return nil, nil // Playground does not support delegate domains
 }
+
 func (g *PlaygroundProvider) SetCanIUseConfig(*defangv1.CanIUseResponse) {}

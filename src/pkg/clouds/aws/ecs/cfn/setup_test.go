@@ -18,14 +18,13 @@ func TestCloudFormation(t *testing.T) {
 		t.Skip("skipping slow integration test")
 	}
 
-	retainBucket = false // delete bucket after test
-
 	user := pkg.GetCurrentUser() // avoid conflict with other users in the same account
 	aws := New("crun-test-"+user, region.Region("us-west-2"))
 	if aws == nil {
 		t.Fatal("aws is nil")
 	}
 	aws.RetainBucket = false // delete bucket after test
+	aws.Spot = true
 
 	ctx := context.Background()
 

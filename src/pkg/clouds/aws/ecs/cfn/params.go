@@ -1,10 +1,13 @@
 package cfn
 
 const (
-	ParamsUseSpotInstances       = "UseSpotInstances"
-	ParamsExistingVpcId          = "ExistingVpcId"
-	ParamsRetainBucket           = "RetainBucket"
-	ParamsEnablePullThroughCache = "EnablePullThroughCache"
-	ParamsDockerHubUsername      = "DockerHubUsername"
-	ParamsDockerHubAccessToken   = "DockerHubAccessToken"
+	ParamsDockerHubAccessToken    = "DockerHubAccessToken"
+	ParamsDockerHubUsername       = "DockerHubUsername"
+	ParamsEnablePullThroughCache  = "EnablePullThroughCache"
+	ParamsExistingVpcId           = "ExistingVpcId"
+	ParamsOidcProviderIssuer      = "OidcProviderIssuer"
+	ParamsOidcProviderSubjects    = "OidcProviderSubjects"
+	ParamsOidcProviderThumbprints = "OidcProviderThumbprints"
+	ParamsRetainBucket            = "RetainBucket"
+	ParamsUseSpotInstances        = "UseSpotInstances"
 )
