@@ -244,7 +244,7 @@ func TestGetProvider(t *testing.T) {
 		canIUseResponse: defangv1.CanIUseResponse{},
 	}
 	mockClient.SetClient(mockCtrl)
-	client = &mockClient
+	config.Client = &mockClient
 	loader := cliClient.MockLoader{Project: compose.Project{Name: "empty"}}
 	oldRootCmd := RootCmd
 	t.Cleanup(func() {

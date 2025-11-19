@@ -68,7 +68,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				return cli.InteractiveDebugForClientError(ctx, client, project, loadErr)
+				return cli.InteractiveDebugForClientError(ctx, config.Client, project, loadErr)
 			}
 
 			provider, err := newProviderChecked(ctx, loader)
@@ -83,7 +83,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			// Check if the project is already deployed and warn the user if they're deploying it elsewhere
-			if resp, err := client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
+			if resp, err := config.Client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
 				Project: project.Name,
 				Type:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
 			}); err != nil {
@@ -130,7 +130,7 @@ func makeComposeUpCmd() *cobra.Command {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
 			}
 
-			deploy, project, err := cli.ComposeUp(ctx, client, provider, cli.ComposeUpParams{
+			deploy, project, err := cli.ComposeUp(ctx, config.Client, provider, cli.ComposeUpParams{
 				Project:    project,
 				UploadMode: upload,
 				Mode:       config.Mode,
@@ -160,7 +160,7 @@ func makeComposeUpCmd() *cobra.Command {
 			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, config.Verbose)
 			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
-				handleTailAndMonitorErr(ctx, err, client, cli.DebugConfig{
+				handleTailAndMonitorErr(ctx, err, config.Client, cli.DebugConfig{
 					Deployment: deploy.Etag,
 					ModelId:    modelId,
 					Project:    project,
@@ -226,7 +226,7 @@ func handleComposeUpErr(ctx context.Context, err error, project *compose.Project
 
 	term.Error("Error:", cliClient.PrettyError(err))
 	track.Evt("Debug Prompted", P("composeErr", err))
-	return cli.InteractiveDebugForClientError(ctx, client, project, err)
+	return cli.InteractiveDebugForClientError(ctx, config.Client, project, err)
 }
 
 func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.GrpcClient, debugConfig cli.DebugConfig) {
@@ -353,7 +353,7 @@ func makeComposeDownCmd() *cobra.Command {
 			}
 
 			since := time.Now()
-			deployment, err := cli.ComposeDown(cmd.Context(), projectName, client, provider, args...)
+			deployment, err := cli.ComposeDown(cmd.Context(), projectName, config.Client, provider, args...)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
@@ -449,7 +449,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				return cli.InteractiveDebugForClientError(ctx, client, project, loadErr)
+				return cli.InteractiveDebugForClientError(ctx, config.Client, project, loadErr)
 			}
 
 			provider, err := newProvider(ctx, loader)
@@ -457,7 +457,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				return err
 			}
 
-			_, _, err = cli.ComposeUp(ctx, client, provider, cli.ComposeUpParams{
+			_, _, err = cli.ComposeUp(ctx, config.Client, provider, cli.ComposeUpParams{
 				Project:    project,
 				UploadMode: compose.UploadModeIgnore,
 				Mode:       modes.ModeUnspecified,

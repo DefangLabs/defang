@@ -36,7 +36,7 @@ func makeEstimateCmd() *cobra.Command {
 				}
 			}
 
-			var previewProvider cliClient.Provider = &cliClient.PlaygroundProvider{FabricClient: client}
+			var previewProvider cliClient.Provider = &cliClient.PlaygroundProvider{FabricClient: config.Client}
 
 			// default to development mode if not specified; TODO: when mode is not specified, show an interactive prompt
 			if config.Mode == modes.ModeUnspecified {
@@ -46,7 +46,7 @@ func makeEstimateCmd() *cobra.Command {
 				region = cliClient.GetRegion(config.ProviderID) // This sets the default region based on the provider
 			}
 
-			estimate, err := cli.RunEstimate(ctx, project, client, previewProvider, config.ProviderID, region, config.Mode)
+			estimate, err := cli.RunEstimate(ctx, project, config.Client, previewProvider, config.ProviderID, region, config.Mode)
 			if err != nil {
 				return fmt.Errorf("failed to run estimate: %w", err)
 			}
