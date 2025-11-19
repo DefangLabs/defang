@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -13,11 +14,12 @@ import (
 func Test_readGlobals(t *testing.T) {
 	t.Chdir("testdata")
 
-	config = GlobalConfig{} // reset globals
+	var testConfig GlobalConfig
+	testConfig = GlobalConfig{} // reset globals
 
 	t.Run("OS env beats any .defangrc file", func(t *testing.T) {
 		t.Setenv("VALUE", "from OS env")
-		config.loadRC("test", nil)
+		testConfig.loadRC("test", nil)
 		if v := os.Getenv("VALUE"); v != "from OS env" {
 			t.Errorf("expected VALUE to be 'from OS env', got '%s'", v)
 		}
@@ -25,7 +27,7 @@ func Test_readGlobals(t *testing.T) {
 	})
 
 	t.Run(".defangrc.test beats .defangrc", func(t *testing.T) {
-		config.loadRC("test", nil)
+		testConfig.loadRC("test", nil)
 		if v := os.Getenv("VALUE"); v != "from .defangrc.test" {
 			t.Errorf("expected VALUE to be 'from .defangrc.test', got '%s'", v)
 		}
@@ -33,7 +35,7 @@ func Test_readGlobals(t *testing.T) {
 	})
 
 	t.Run(".defangrc used if no stack", func(t *testing.T) {
-		config.loadRC("non-existent-stack", nil)
+		testConfig.loadRC("non-existent-stack", nil)
 		if v := os.Getenv("VALUE"); v != "from .defangrc" {
 			t.Errorf("expected VALUE to be 'from .defangrc', got '%s'", v)
 		}
@@ -42,10 +44,27 @@ func Test_readGlobals(t *testing.T) {
 }
 
 func Test_priorityLoading(t *testing.T) {
-	// This is more of an integration test to ensure the loading order is correct
+	// This test to ensure the loading order is correct
 	// when loading from env, rc files, and flags.
 	// The precedence should be: flags > env vars > .defangrc files
-	t.Chdir("testdata")
+
+	// make a default config for for comparison and copying
+	newDefaultConfig := func() GlobalConfig {
+		return GlobalConfig{
+			ColorMode:      ColorAuto,
+			Debug:          false,
+			HasTty:         true, // set to true just for test instead of term.IsTerminal() for consistency
+			HideUpdate:     false,
+			Mode:           modes.ModeUnspecified,
+			NonInteractive: false, // set to false just for test instead of !term.IsTerminal() for consistency
+			ProviderID:     cliClient.ProviderAuto,
+			SourcePlatform: migrate.SourcePlatformUnspecified,
+			Verbose:        false,
+			Stack:          "",
+			Cluster:        getCluster(),
+			Org:            "",
+		}
+	}
 
 	type stack struct {
 		stackname string
@@ -170,7 +189,7 @@ func Test_priorityLoading(t *testing.T) {
 			},
 		},
 		{
-			name: "RC files used when no env vars or flags",
+			name: "RC file used when no env vars or flags",
 			rcStacks: []stack{
 				{
 					stackname: "test",
@@ -205,27 +224,39 @@ func Test_priorityLoading(t *testing.T) {
 				HideUpdate:     true,  // from rc
 			},
 		},
+		{
+			name:     "no rc file, no env vars and no flags results in defaults",
+			expected: newDefaultConfig(), // should match the initialized defaults above
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Reset config for each test with proper defaults
-			config = GlobalConfig{
-				ColorMode:      ColorAuto,
-				Debug:          false,
-				HasTty:         true, // Set to true for test consistency
-				HideUpdate:     false,
-				Mode:           modes.ModeUnspecified,
-				NonInteractive: false,
-				ProviderID:     cliClient.ProviderAuto,
-				SourcePlatform: migrate.SourcePlatformUnspecified,
-				Verbose:        false,
-			}
+			testConfig := newDefaultConfig()
 
-			// Create RC files
+			// simulate SetupCommands()
+			flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
+			flags.StringVarP(&testConfig.Stack, "stack", "s", testConfig.Stack, "stack name (for BYOC providers)")
+			flags.Var(&testConfig.ColorMode, "color", "colorize output")
+			flags.StringVar(&testConfig.Cluster, "cluster", testConfig.Cluster, "Defang cluster to connect to")
+			flags.StringVar(&testConfig.Org, "org", testConfig.Org, "override GitHub organization name (tenant)")
+			flags.VarP(&testConfig.ProviderID, "provider", "P", "bring-your-own-cloud provider")
+			flags.BoolVarP(&testConfig.Verbose, "verbose", "v", testConfig.Verbose, "verbose logging")
+			flags.BoolVar(&testConfig.Debug, "debug", testConfig.Debug, "debug logging for troubleshooting the CLI")
+			flags.BoolVar(&testConfig.NonInteractive, "non-interactive", testConfig.NonInteractive, "disable interactive prompts / no TTY")
+			flags.Var(&testConfig.SourcePlatform, "from", "the platform from which to migrate the project")
+			flags.VarP(&testConfig.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
+
+			tempDir := t.TempDir()
+			originalDir, _ := os.Getwd()
+			os.Chdir(tempDir)
+
+			filenames := []string{".defangrc"}
+			rcEnvs := []string{}
+			// Create RC files in the temporary directory
 			for _, rcStack := range tt.rcStacks {
 				filename := ".defangrc." + rcStack.stackname
-				defer os.Remove(filename) // Clean up
+				filenames = append(filenames, filename)
 
 				f, err := os.Create(filename)
 				if err != nil {
@@ -237,117 +268,97 @@ func Test_priorityLoading(t *testing.T) {
 					if _, err := f.WriteString(key + "=" + value + "\n"); err != nil {
 						t.Fatalf("failed to write to file %s: %v", filename, err)
 					}
+					rcEnvs = append(rcEnvs, key)
 				}
 				f.Close()
 			}
 
 			// Set environment variables (these override RC file values)
 			for key, value := range tt.envVars {
-				t.Setenv(key, value)
+				os.Setenv(key, value)
+				defer os.Unsetenv(key)
 			}
 
-			// Create flag set to simulate command line flags
-			flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
-			flags.String("mode", "", "deployment mode")
-			flags.Bool("verbose", false, "verbose output")
-			flags.Bool("debug", false, "debug output")
-			flags.String("stack", "", "stack name")
-			flags.String("cluster", "", "cluster name")
-			flags.String("provider", "", "provider name")
-			flags.String("org", "", "organization name")
-			flags.String("from", "", "source platform")
-			flags.String("color", "", "color mode")
-			flags.String("non-interactive", "false", "non-interactive mode")
-
-			// Set flags if provided
+			// Set flags based on user input (these override env and RC file values)
 			for flagName, flagValue := range tt.flags {
 				if err := flags.Set(flagName, flagValue); err != nil {
 					t.Fatalf("failed to set flag %s=%s: %v", flagName, flagValue, err)
 				}
 			}
 
-			// Load configuration in the correct order
 			stackName := ""
 			if len(tt.rcStacks) > 0 {
 				stackName = tt.rcStacks[0].stackname
-			}
-			if flagStack := flags.Lookup("stack"); flagStack != nil && flagStack.Changed {
-				stackName = flagStack.Value.String()
+				flagStack := flags.Lookup("stack")
+				if flagStack != nil && flagStack.Changed {
+					stackName = flagStack.Value.String()
+				}
 			}
 
 			// This simulates the actual loading sequence
-			config.loadRC(stackName, flags)
-
-			// The syncFlagsWithEnv method inside loadRC should handle environment variables
-			// For flags that were explicitly changed, we need to apply them after loadRC
-			if flagMode := flags.Lookup("mode"); flagMode != nil && flagMode.Changed {
-				config.Mode, _ = modes.Parse(flagMode.Value.String())
-			}
-			if flagVerbose := flags.Lookup("verbose"); flagVerbose != nil && flagVerbose.Changed {
-				config.Verbose = flagVerbose.Value.String() == "true"
-			}
-			if flagDebug := flags.Lookup("debug"); flagDebug != nil && flagDebug.Changed {
-				config.Debug = flagDebug.Value.String() == "true"
-			}
-			if flagStack := flags.Lookup("stack"); flagStack != nil && flagStack.Changed {
-				config.Stack = flagStack.Value.String()
-			}
-			if flagCluster := flags.Lookup("cluster"); flagCluster != nil && flagCluster.Changed {
-				config.Cluster = flagCluster.Value.String()
-			}
-			if flagProvider := flags.Lookup("provider"); flagProvider != nil && flagProvider.Changed {
-				config.ProviderID.Set(flagProvider.Value.String())
-			}
-			if flagOrg := flags.Lookup("org"); flagOrg != nil && flagOrg.Changed {
-				config.Org = flagOrg.Value.String()
-			}
-			if flagFrom := flags.Lookup("from"); flagFrom != nil && flagFrom.Changed {
-				config.SourcePlatform.Set(flagFrom.Value.String())
-			}
-			if flagColor := flags.Lookup("color"); flagColor != nil && flagColor.Changed {
-				config.ColorMode.Set(flagColor.Value.String())
-			}
-			if flagNonInteractive := flags.Lookup("non-interactive"); flagNonInteractive != nil && flagNonInteractive.Changed {
-				config.NonInteractive = flagNonInteractive.Value.String() == "true"
-			}
+			testConfig.loadRC(stackName, flags)
 
 			// Verify the final configuration matches expectations
-			if config.Mode.String() != tt.expected.Mode.String() {
-				t.Errorf("expected Mode to be '%s', got '%s'", tt.expected.Mode.String(), config.Mode.String())
+			if testConfig.Mode.String() != tt.expected.Mode.String() {
+				t.Errorf("expected Mode to be '%s', got '%s'", tt.expected.Mode.String(), testConfig.Mode.String())
 			}
-			if config.Verbose != tt.expected.Verbose {
-				t.Errorf("expected Verbose to be %v, got %v", tt.expected.Verbose, config.Verbose)
+			if testConfig.Verbose != tt.expected.Verbose {
+				t.Errorf("expected Verbose to be %v, got %v", tt.expected.Verbose, testConfig.Verbose)
 			}
-			if config.Debug != tt.expected.Debug {
-				t.Errorf("expected Debug to be %v, got %v", tt.expected.Debug, config.Debug)
+			if testConfig.Debug != tt.expected.Debug {
+				t.Errorf("expected Debug to be %v, got %v", tt.expected.Debug, testConfig.Debug)
 			}
-			if config.Stack != tt.expected.Stack {
-				t.Errorf("expected Stack to be '%s', got '%s'", tt.expected.Stack, config.Stack)
+			if testConfig.Stack != tt.expected.Stack {
+				t.Errorf("expected Stack to be '%s', got '%s'", tt.expected.Stack, testConfig.Stack)
 			}
-			if config.Cluster != tt.expected.Cluster {
-				t.Errorf("expected Cluster to be '%s', got '%s'", tt.expected.Cluster, config.Cluster)
+			if testConfig.Cluster != tt.expected.Cluster {
+				t.Errorf("expected Cluster to be '%s', got '%s'", tt.expected.Cluster, testConfig.Cluster)
 			}
-			if config.ProviderID != tt.expected.ProviderID {
-				t.Errorf("expected ProviderID to be '%s', got '%s'", tt.expected.ProviderID, config.ProviderID)
+			if testConfig.ProviderID != tt.expected.ProviderID {
+				t.Errorf("expected ProviderID to be '%s', got '%s'", tt.expected.ProviderID, testConfig.ProviderID)
 			}
-			if config.Org != tt.expected.Org {
-				t.Errorf("expected Org to be '%s', got '%s'", tt.expected.Org, config.Org)
+			if testConfig.Org != tt.expected.Org {
+				t.Errorf("expected Org to be '%s', got '%s'", tt.expected.Org, testConfig.Org)
 			}
-			if config.SourcePlatform != tt.expected.SourcePlatform {
-				t.Errorf("expected SourcePlatform to be '%s', got '%s'", tt.expected.SourcePlatform, config.SourcePlatform)
+			if testConfig.SourcePlatform != tt.expected.SourcePlatform {
+				t.Errorf("expected SourcePlatform to be '%s', got '%s'", tt.expected.SourcePlatform, testConfig.SourcePlatform)
 			}
-			if config.ColorMode != tt.expected.ColorMode {
-				t.Errorf("expected ColorMode to be '%s', got '%s'", tt.expected.ColorMode, config.ColorMode)
+			if testConfig.ColorMode != tt.expected.ColorMode {
+				t.Errorf("expected ColorMode to be '%s', got '%s'", tt.expected.ColorMode, testConfig.ColorMode)
 			}
-			if config.HasTty != tt.expected.HasTty {
-				t.Errorf("expected HasTty to be %v, got %v", tt.expected.HasTty, config.HasTty)
+			if testConfig.HasTty != tt.expected.HasTty {
+				t.Errorf("expected HasTty to be %v, got %v", tt.expected.HasTty, testConfig.HasTty)
 			}
-			if config.NonInteractive != tt.expected.NonInteractive {
-				t.Errorf("expected NonInteractive to be %v, got %v", tt.expected.NonInteractive, config.NonInteractive)
+			if testConfig.NonInteractive != tt.expected.NonInteractive {
+				t.Errorf("expected NonInteractive to be %v, got %v", tt.expected.NonInteractive, testConfig.NonInteractive)
 			}
-			if config.HideUpdate != tt.expected.HideUpdate {
-				t.Errorf("expected HideUpdate to be %v, got %v", tt.expected.HideUpdate, config.HideUpdate)
+			if testConfig.HideUpdate != tt.expected.HideUpdate {
+				t.Errorf("expected HideUpdate to be %v, got %v", tt.expected.HideUpdate, testConfig.HideUpdate)
 			}
+
+			// cleanup to ensure complete test isolation
+			t.Cleanup(func() {
+				// Unset all environment variables
+				for key, _ := range tt.envVars {
+					os.Unsetenv(key)
+				}
+
+				// Unset all RC env vars
+				for _, rcEnv := range rcEnvs {
+					os.Unsetenv(rcEnv)
+				}
+
+				// Remove temp directory and all its contents
+				os.RemoveAll(tempDir)
+
+				// Remove any .defangrc* files that might have been created
+				for _, rcFile := range filenames {
+					os.Remove(rcFile)
+				}
+
+				// Restore original directory after test
+				os.Chdir(originalDir)
+			})
 		})
 	}
 }

@@ -20,8 +20,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	pcluster "github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	pcluster "github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -337,10 +337,7 @@ var RootCmd = &cobra.Command{
 	Short:         "Defang CLI is used to take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
 		ctx := cmd.Context()
-		// config.loadEnv()
-		// config.loadFlags(cmd.Flags())
-
-		// term.SetDebug(config.Debug)
+		term.SetDebug(config.Debug)
 
 		// Don't track/connect the completion commands
 		if IsCompletionCommand(cmd) {
@@ -376,8 +373,6 @@ var RootCmd = &cobra.Command{
 
 		// Read the global flags again from any .defangrc files in the cwd
 		config.loadRC(stack, cmd.Flags())
-
-		term.SetDebug(config.Debug)
 
 		config.Client, err = cli.Connect(ctx, getCluster())
 

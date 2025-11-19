@@ -12,23 +12,6 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// // GLOBALS
-// var (
-// // cluster    string
-// // colorMode = ColorAuto
-// // doDebug    = false
-// // hasTty     = term.IsTerminal()
-// // hideUpdate = false
-// // mode           = modes.ModeUnspecified
-// // modelId string // only for debug/generate; Pro users
-// // nonInteractive = !hasTty
-// // org            string
-// // providerID     = cliClient.ProviderAuto
-// // sourcePlatform = migrate.SourcePlatformUnspecified // default to auto-detecting the source platform
-// // stack          = os.Getenv("DEFANG_STACK")
-// // verbose = false
-// )
-
 var config GlobalConfig = GlobalConfig{
 	ColorMode:      ColorAuto,
 	Debug:          false,
