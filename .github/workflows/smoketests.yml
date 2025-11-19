@@ -1,0 +1,29 @@
+name: Smoke Tests
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  trigger-smoketests:
+    name: Trigger CLI Smoke Tests
+    runs-on: ubuntu-latest
+    concurrency:
+      group: smoketests-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Trigger smoke tests in DefangLabs/defang-mvp
+        run: |
+          curl -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.DEFANG_MVP_ACTIONS_DISPATCH_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            https://api.github.com/repos/DefangLabs/defang-mvp/actions/workflows/cli-smoketests.yml/dispatches \
+            -d '{
+              "ref": "main",
+              "inputs": {
+                "sample-name": "html-css-js"
+              }
+            }'
