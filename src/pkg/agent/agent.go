@@ -203,18 +203,26 @@ func (a *Agent) handleToolRequest(req *ai.ToolRequest) (*ai.ToolResponse, error)
 	}, nil
 }
 
-func (a *Agent) handleToolCalls(requests []*ai.ToolRequest) (*ai.Message, error) {
+func (a *Agent) handleToolCalls(requests []*ai.ToolRequest) *ai.Message {
 	parts := []*ai.Part{}
 	for _, req := range requests {
+		var part *ai.Part
 		toolResp, err := a.handleToolRequest(req)
 		if err != nil {
-			return nil, err
+			a.Printf("! %v", err)
+			part = ai.NewToolResponsePart(&ai.ToolResponse{
+				Name:   req.Name,
+				Ref:    req.Ref,
+				Output: err.Error(),
+			})
+		} else {
+			a.Println("~ ", toolResp.Output)
+			part = ai.NewToolResponsePart(toolResp)
 		}
-		a.Println("~ ", toolResp.Output)
-		parts = append(parts, ai.NewToolResponsePart(toolResp))
+		parts = append(parts, part)
 	}
 
-	return ai.NewMessage(ai.RoleTool, nil, parts...), nil
+	return ai.NewMessage(ai.RoleTool, nil, parts...)
 }
 
 func (a *Agent) streamingCallback(ctx context.Context, chunk *ai.ModelResponseChunk) error {
@@ -251,12 +259,7 @@ func (a *Agent) generateLoop() error {
 			return nil
 		}
 
-		toolResp, err := a.handleToolCalls(toolRequests)
-		if err != nil {
-			a.Printf("! %v", err)
-			a.msgs = append(a.msgs, ai.NewMessage(ai.RoleTool, nil, ai.NewTextPart(err.Error())))
-			continue
-		}
+		toolResp := a.handleToolCalls(toolRequests)
 		a.msgs = append(a.msgs, toolResp)
 	}
 
