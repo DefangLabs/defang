@@ -252,7 +252,7 @@ func TestGetProvider(t *testing.T) {
 	})
 	FakeRootWithProviderParam := func(provider string) *cobra.Command {
 		cmd := &cobra.Command{}
-		cmd.PersistentFlags().StringP("provider", "P", cliClient.ProviderAuto.String(), "fake provider flag")
+		cmd.PersistentFlags().VarP(&config.ProviderID, "provider", "P", "fake provider flag")
 		if provider != "" {
 			cmd.ParseFlags([]string{"--provider", provider})
 		}

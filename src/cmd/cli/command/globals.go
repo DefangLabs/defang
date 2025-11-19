@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -14,6 +15,7 @@ import (
 
 var config GlobalConfig = GlobalConfig{
 	ColorMode:      ColorAuto,
+	Cluster:        cluster.DefangFabric,
 	Debug:          false,
 	HasTty:         term.IsTerminal(),
 	HideUpdate:     false,
@@ -22,7 +24,6 @@ var config GlobalConfig = GlobalConfig{
 	ProviderID:     cliClient.ProviderAuto,
 	SourcePlatform: migrate.SourcePlatformUnspecified, // default to auto-detecting the source platform
 	Verbose:        false,
-	Stack:          os.Getenv("DEFANG_STACK"),
 }
 
 type GlobalConfig struct {
@@ -43,9 +44,6 @@ type GlobalConfig struct {
 }
 
 func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) {
-	if flags == nil {
-		return
-	}
 	// If flag was changed by user, update config from flag value (flag takes priority)
 	// If flag was not changed by user, set flag from config value (env/RC file values)
 

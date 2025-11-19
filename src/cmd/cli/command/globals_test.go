@@ -3,6 +3,7 @@ package command
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -16,10 +17,12 @@ func Test_readGlobals(t *testing.T) {
 
 	var testConfig GlobalConfig
 	testConfig = GlobalConfig{} // reset globals
+	flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	flags.StringVarP(&testConfig.Stack, "stack", "s", testConfig.Stack, "stack name (for BYOC providers)")
 
 	t.Run("OS env beats any .defangrc file", func(t *testing.T) {
 		t.Setenv("VALUE", "from OS env")
-		testConfig.loadRC("test", nil)
+		testConfig.loadRC("test", flags)
 		if v := os.Getenv("VALUE"); v != "from OS env" {
 			t.Errorf("expected VALUE to be 'from OS env', got '%s'", v)
 		}
@@ -27,7 +30,7 @@ func Test_readGlobals(t *testing.T) {
 	})
 
 	t.Run(".defangrc.test beats .defangrc", func(t *testing.T) {
-		testConfig.loadRC("test", nil)
+		testConfig.loadRC("test", flags)
 		if v := os.Getenv("VALUE"); v != "from .defangrc.test" {
 			t.Errorf("expected VALUE to be 'from .defangrc.test', got '%s'", v)
 		}
@@ -35,7 +38,7 @@ func Test_readGlobals(t *testing.T) {
 	})
 
 	t.Run(".defangrc used if no stack", func(t *testing.T) {
-		testConfig.loadRC("non-existent-stack", nil)
+		testConfig.loadRC("non-existent-stack", flags)
 		if v := os.Getenv("VALUE"); v != "from .defangrc" {
 			t.Errorf("expected VALUE to be 'from .defangrc', got '%s'", v)
 		}
@@ -49,21 +52,19 @@ func Test_priorityLoading(t *testing.T) {
 	// The precedence should be: flags > env vars > .defangrc files
 
 	// make a default config for for comparison and copying
-	newDefaultConfig := func() GlobalConfig {
-		return GlobalConfig{
-			ColorMode:      ColorAuto,
-			Debug:          false,
-			HasTty:         true, // set to true just for test instead of term.IsTerminal() for consistency
-			HideUpdate:     false,
-			Mode:           modes.ModeUnspecified,
-			NonInteractive: false, // set to false just for test instead of !term.IsTerminal() for consistency
-			ProviderID:     cliClient.ProviderAuto,
-			SourcePlatform: migrate.SourcePlatformUnspecified,
-			Verbose:        false,
-			Stack:          "",
-			Cluster:        getCluster(),
-			Org:            "",
-		}
+	defaultConfig := GlobalConfig{
+		ColorMode:      ColorAuto,
+		Debug:          false,
+		HasTty:         true, // set to true just for test instead of term.IsTerminal() for consistency
+		HideUpdate:     false,
+		Mode:           modes.ModeUnspecified,
+		NonInteractive: false, // set to false just for test instead of !term.IsTerminal() for consistency
+		ProviderID:     cliClient.ProviderAuto,
+		SourcePlatform: migrate.SourcePlatformUnspecified,
+		Verbose:        false,
+		Stack:          "",
+		Cluster:        "",
+		Org:            "",
 	}
 
 	type stack struct {
@@ -72,31 +73,31 @@ func Test_priorityLoading(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		rcStacks []stack
-		envVars  map[string]string
-		flags    map[string]string
-		expected GlobalConfig
+		name         string
+		rcStack      stack
+		createRCFile bool
+		envVars      map[string]string
+		flags        map[string]string
+		expected     GlobalConfig
 	}{
 		{
-			name: "Flags override env and rc files",
-			rcStacks: []stack{
-				{
-					stackname: "test",
-					entries: map[string]string{
-						"DEFANG_MODE":            "AFFORDABLE",
-						"DEFANG_VERBOSE":         "false",
-						"DEFANG_DEBUG":           "true",
-						"DEFANG_STACK":           "from-rc",
-						"DEFANG_FABRIC":          "from-rc-cluster",
-						"DEFANG_PROVIDER":        "defang",
-						"DEFANG_ORG":             "from-rc-org",
-						"DEFANG_SOURCE_PLATFORM": "heroku",
-						"DEFANG_COLOR":           "never",
-						"DEFANG_TTY":             "false",
-						"DEFANG_NON_INTERACTIVE": "true",
-						"DEFANG_HIDE_UPDATE":     "true",
-					},
+			name:         "Flags override env and rc file",
+			createRCFile: true,
+			rcStack: stack{
+				stackname: "test",
+				entries: map[string]string{
+					"DEFANG_MODE":            "AFFORDABLE",
+					"DEFANG_VERBOSE":         "false",
+					"DEFANG_DEBUG":           "true",
+					"DEFANG_STACK":           "from-rc",
+					"DEFANG_FABRIC":          "from-rc-cluster",
+					"DEFANG_PROVIDER":        "defang",
+					"DEFANG_ORG":             "from-rc-org",
+					"DEFANG_SOURCE_PLATFORM": "heroku",
+					"DEFANG_COLOR":           "never",
+					"DEFANG_TTY":             "false",
+					"DEFANG_NON_INTERACTIVE": "true",
+					"DEFANG_HIDE_UPDATE":     "true",
 				},
 			},
 			envVars: map[string]string{
@@ -140,23 +141,22 @@ func Test_priorityLoading(t *testing.T) {
 			},
 		},
 		{
-			name: "Env overrides rc files when no flags set",
-			rcStacks: []stack{
-				{
-					stackname: "test",
-					entries: map[string]string{
-						"DEFANG_MODE":            "AFFORDABLE",
-						"DEFANG_VERBOSE":         "false",
-						"DEFANG_DEBUG":           "true",
-						"DEFANG_STACK":           "from-rc",
-						"DEFANG_FABRIC":          "from-rc-cluster",
-						"DEFANG_PROVIDER":        "defang",
-						"DEFANG_ORG":             "from-rc-org",
-						"DEFANG_SOURCE_PLATFORM": "heroku",
-						"DEFANG_COLOR":           "never",
-						"DEFANG_TTY":             "false",
-						"DEFANG_NON_INTERACTIVE": "true",
-					},
+			name:         "Env overrides rc files when no flags set",
+			createRCFile: true,
+			rcStack: stack{
+				stackname: "test",
+				entries: map[string]string{
+					"DEFANG_MODE":            "AFFORDABLE",
+					"DEFANG_VERBOSE":         "false",
+					"DEFANG_DEBUG":           "true",
+					"DEFANG_STACK":           "from-rc",
+					"DEFANG_FABRIC":          "from-rc-cluster",
+					"DEFANG_PROVIDER":        "defang",
+					"DEFANG_ORG":             "from-rc-org",
+					"DEFANG_SOURCE_PLATFORM": "heroku",
+					"DEFANG_COLOR":           "never",
+					"DEFANG_TTY":             "false",
+					"DEFANG_NON_INTERACTIVE": "true",
 				},
 			},
 			envVars: map[string]string{
@@ -189,24 +189,23 @@ func Test_priorityLoading(t *testing.T) {
 			},
 		},
 		{
-			name: "RC file used when no env vars or flags",
-			rcStacks: []stack{
-				{
-					stackname: "test",
-					entries: map[string]string{
-						"DEFANG_MODE":            "AFFORDABLE",
-						"DEFANG_VERBOSE":         "true",
-						"DEFANG_DEBUG":           "false",
-						"DEFANG_STACK":           "from-rc",
-						"DEFANG_FABRIC":          "from-rc-cluster",
-						"DEFANG_PROVIDER":        "defang",
-						"DEFANG_ORG":             "from-rc-org",
-						"DEFANG_SOURCE_PLATFORM": "heroku",
-						"DEFANG_COLOR":           "always",
-						"DEFANG_TTY":             "false",
-						"DEFANG_NON_INTERACTIVE": "true",
-						"DEFANG_HIDE_UPDATE":     "true",
-					},
+			name:         "RC file used when no env vars or flags",
+			createRCFile: true,
+			rcStack: stack{
+				stackname: "test",
+				entries: map[string]string{
+					"DEFANG_MODE":            "AFFORDABLE",
+					"DEFANG_VERBOSE":         "true",
+					"DEFANG_DEBUG":           "false",
+					"DEFANG_STACK":           "from-rc",
+					"DEFANG_FABRIC":          "from-rc-cluster",
+					"DEFANG_PROVIDER":        "defang",
+					"DEFANG_ORG":             "from-rc-org",
+					"DEFANG_SOURCE_PLATFORM": "heroku",
+					"DEFANG_COLOR":           "always",
+					"DEFANG_TTY":             "false",
+					"DEFANG_NON_INTERACTIVE": "true",
+					"DEFANG_HIDE_UPDATE":     "true",
 				},
 			},
 			expected: GlobalConfig{
@@ -225,14 +224,50 @@ func Test_priorityLoading(t *testing.T) {
 			},
 		},
 		{
-			name:     "no rc file, no env vars and no flags results in defaults",
-			expected: newDefaultConfig(), // should match the initialized defaults above
+			name:         "RC with default defangrc name, when no env vars or flags",
+			createRCFile: true,
+			rcStack: stack{
+				stackname: "",
+				entries: map[string]string{
+					"DEFANG_MODE":            "AFFORDABLE",
+					"DEFANG_VERBOSE":         "true",
+					"DEFANG_DEBUG":           "false",
+					"DEFANG_STACK":           "from-rc",
+					"DEFANG_FABRIC":          "from-rc-cluster",
+					"DEFANG_PROVIDER":        "defang",
+					"DEFANG_ORG":             "from-rc-org",
+					"DEFANG_SOURCE_PLATFORM": "heroku",
+					"DEFANG_COLOR":           "always",
+					"DEFANG_TTY":             "false",
+					"DEFANG_NON_INTERACTIVE": "true",
+					"DEFANG_HIDE_UPDATE":     "true",
+				},
+			},
+			expected: GlobalConfig{
+				Mode:           modes.ModeAffordable, // RC file values
+				Verbose:        true,
+				Debug:          false,
+				Stack:          "from-rc",
+				Cluster:        "from-rc-cluster",
+				ProviderID:     cliClient.ProviderDefang,
+				Org:            "from-rc-org",
+				SourcePlatform: migrate.SourcePlatformHeroku,
+				ColorMode:      ColorAlways,
+				HasTty:         false, // from rc
+				NonInteractive: true,  // from rc
+				HideUpdate:     true,  // from rc
+			},
+		},
+		{
+			name:         "no rc file, no env vars and no flags",
+			createRCFile: false,
+			expected:     defaultConfig, // should match the initialized defaults above
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testConfig := newDefaultConfig()
+			testConfig := defaultConfig
 
 			// simulate SetupCommands()
 			flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
@@ -247,38 +282,6 @@ func Test_priorityLoading(t *testing.T) {
 			flags.Var(&testConfig.SourcePlatform, "from", "the platform from which to migrate the project")
 			flags.VarP(&testConfig.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 
-			tempDir := t.TempDir()
-			originalDir, _ := os.Getwd()
-			os.Chdir(tempDir)
-
-			filenames := []string{".defangrc"}
-			rcEnvs := []string{}
-			// Create RC files in the temporary directory
-			for _, rcStack := range tt.rcStacks {
-				filename := ".defangrc." + rcStack.stackname
-				filenames = append(filenames, filename)
-
-				f, err := os.Create(filename)
-				if err != nil {
-					t.Fatalf("failed to create file %s: %v", filename, err)
-				}
-
-				// Write as environment file format (KEY=VALUE)
-				for key, value := range rcStack.entries {
-					if _, err := f.WriteString(key + "=" + value + "\n"); err != nil {
-						t.Fatalf("failed to write to file %s: %v", filename, err)
-					}
-					rcEnvs = append(rcEnvs, key)
-				}
-				f.Close()
-			}
-
-			// Set environment variables (these override RC file values)
-			for key, value := range tt.envVars {
-				os.Setenv(key, value)
-				defer os.Unsetenv(key)
-			}
-
 			// Set flags based on user input (these override env and RC file values)
 			for flagName, flagValue := range tt.flags {
 				if err := flags.Set(flagName, flagValue); err != nil {
@@ -286,19 +289,44 @@ func Test_priorityLoading(t *testing.T) {
 				}
 			}
 
-			stackName := ""
-			if len(tt.rcStacks) > 0 {
-				stackName = tt.rcStacks[0].stackname
-				flagStack := flags.Lookup("stack")
-				if flagStack != nil && flagStack.Changed {
-					stackName = flagStack.Value.String()
-				}
+			// Set environment variables (these override RC file values)
+			for key, value := range tt.envVars {
+				t.Setenv(key, value)
 			}
 
-			// This simulates the actual loading sequence
-			testConfig.loadRC(stackName, flags)
+			// Make rc files in a temporary directory
+			tempDir := t.TempDir()
+			t.Chdir(tempDir)
 
-			// Verify the final configuration matches expectations
+			var rcEnvs []string
+			// Create RC files in the temporary directory
+			if tt.createRCFile {
+				var path string
+				if tt.rcStack.stackname != "" {
+					path = filepath.Join(tempDir, ".defangrc."+tt.rcStack.stackname)
+				} else {
+					path = filepath.Join(tempDir, ".defangrc")
+				}
+
+				f, err := os.Create(path)
+				if err != nil {
+					t.Fatalf("failed to create file %s: %v", path, err)
+				}
+
+				// Write as environment file format
+				for key, value := range tt.rcStack.entries {
+					if _, err := f.WriteString(key + "=" + value + "\n"); err != nil {
+						t.Fatalf("failed to write to file %s: %v", path, err)
+					}
+					rcEnvs = append(rcEnvs, key)
+				}
+				f.Close()
+			}
+
+			// simulates the actual loading sequence
+			testConfig.loadRC(tt.rcStack.stackname, flags)
+
+			// verify the final configuration matches expectations
 			if testConfig.Mode.String() != tt.expected.Mode.String() {
 				t.Errorf("expected Mode to be '%s', got '%s'", tt.expected.Mode.String(), testConfig.Mode.String())
 			}
@@ -336,28 +364,14 @@ func Test_priorityLoading(t *testing.T) {
 				t.Errorf("expected HideUpdate to be %v, got %v", tt.expected.HideUpdate, testConfig.HideUpdate)
 			}
 
-			// cleanup to ensure complete test isolation
 			t.Cleanup(func() {
-				// Unset all environment variables
-				for key, _ := range tt.envVars {
-					os.Unsetenv(key)
-				}
+				// Unseting env vars set for this test is hanndled by t.Setenv automatically
+				// t.tempDir() will clean up created files
 
-				// Unset all RC env vars
+				// Unset all RC env vars created by loadRC since it uses os.Setenv
 				for _, rcEnv := range rcEnvs {
 					os.Unsetenv(rcEnv)
 				}
-
-				// Remove temp directory and all its contents
-				os.RemoveAll(tempDir)
-
-				// Remove any .defangrc* files that might have been created
-				for _, rcFile := range filenames {
-					os.Remove(rcFile)
-				}
-
-				// Restore original directory after test
-				os.Chdir(originalDir)
 			})
 		})
 	}

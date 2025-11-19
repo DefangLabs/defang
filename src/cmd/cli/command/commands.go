@@ -21,7 +21,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
-	pcluster "github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -48,14 +47,10 @@ var authNeededAnnotation = map[string]string{authNeeded: ""}
 var P = track.P
 
 func getCluster() string {
-	cluster := config.Cluster
-	if cluster == "" {
-		cluster = pcluster.DefaultCluster
-	}
 	if config.Org == "" {
-		return cluster
+		return config.Cluster
 	}
-	return config.Org + "@" + cluster
+	return config.Org + "@" + config.Cluster
 }
 
 func Execute(ctx context.Context) error {
@@ -153,7 +148,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().Var(&config.ColorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().StringVar(&config.Cluster, "cluster", config.Cluster, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
-	RootCmd.PersistentFlags().String("org", os.Getenv("DEFANG_ORG"), "override GitHub organization name (tenant)")
+	RootCmd.PersistentFlags().StringVar(&config.Org, "org", config.Org, "override GitHub organization name (tenant)")
 	RootCmd.PersistentFlags().VarP(&config.ProviderID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
 	RootCmd.PersistentFlags().BoolVarP(&config.Verbose, "verbose", "v", config.Verbose, "verbose logging") // backwards compat: only used by tail
