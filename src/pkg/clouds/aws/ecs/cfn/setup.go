@@ -18,7 +18,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 )
 
-type AwsEcsCfn struct {
+type AwsEcsCfnCfn struct {
 	ecs.AwsEcs
 	stackName string
 }
@@ -130,7 +130,7 @@ func (a *AwsEcsCfn) createStackAndWait(ctx context.Context, templateBody string)
 	return a.fillWithOutputs(dso)
 }
 
-func (a *AwsEcsCfn) SetUp(ctx context.Context, containers []types.Container) error {
+func (a *AwsEcsCfnCfn) SetUp(ctx context.Context, containers []types.Container) error {
 	tmpl, err := createTemplate(a.stackName, containers, TemplateOverrides{VpcID: a.VpcID, Spot: a.Spot})
 	if err != nil {
 		return fmt.Errorf("failed to create CloudFormation template: %w", err)
