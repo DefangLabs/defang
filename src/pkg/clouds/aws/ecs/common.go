@@ -22,6 +22,7 @@ type AwsEcs struct {
 	ClusterName            string
 	DefaultSecurityGroupID string
 	LogGroupARN            string
+	RetainBucket           bool
 	SecurityGroupID        string
 	Spot                   bool
 	SubNetID               string

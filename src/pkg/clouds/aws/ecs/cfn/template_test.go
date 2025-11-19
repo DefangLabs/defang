@@ -1,6 +1,12 @@
 package cfn
 
-import "testing"
+import (
+	"os"
+	"testing"
+
+	"github.com/DefangLabs/defang/src/pkg/types"
+	"github.com/stretchr/testify/assert"
+)
 
 func TestGetCacheRepoPrefix(t *testing.T) {
 	// Test cases
@@ -34,4 +40,30 @@ func TestGetCacheRepoPrefix(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCreateTemplate(t *testing.T) {
+	template, err := createTemplate("test", []types.Container{
+		{Image: "alpine:latest"},
+		{Image: "docker.io/library/alpine:latest"},
+		{Image: "public.ecr.aws/docker/library/alpine:latest"},
+	})
+	if err != nil {
+		t.Fatalf("Error creating template: %v", err)
+	}
+	actual, err := template.YAML()
+	if err != nil {
+		t.Fatalf("Error generating template YAML: %v", err)
+	}
+	const golden = "testdata/golden.yaml"
+	expected, err := os.ReadFile(golden)
+	if err != nil {
+		if os.IsNotExist(err) {
+			os.WriteFile(golden, actual, 0644)
+			t.Fatalf("Golden file created: %s", golden)
+		} else {
+			t.Fatalf("Error reading golden file: %v", err)
+		}
+	}
+	assert.Equal(t, string(expected), string(actual))
 }

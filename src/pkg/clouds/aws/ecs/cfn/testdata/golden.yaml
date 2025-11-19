@@ -1,0 +1,406 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Conditions:
+    CreateVpcResources:
+        Fn::Equals:
+            - Ref: ExistingVpcId
+            - ""
+    EnableDockerPullThroughCache:
+        Fn::And:
+            - Fn::Equals:
+                - Ref: EnablePullThroughCache
+                - "true"
+            - Fn::Not:
+                - Fn::Equals:
+                    - Ref: DockerHubUsername
+                    - ""
+            - Fn::Not:
+                - Fn::Equals:
+                    - Ref: DockerHubAccessToken
+                    - ""
+    EnablePullThroughCache:
+        Fn::Equals:
+            - Ref: EnablePullThroughCache
+            - "true"
+    RetainS3Bucket:
+        Fn::Equals:
+            - Ref: RetainBucket
+            - "true"
+    UseSpot:
+        Fn::Equals:
+            - Ref: UseSpotInstances
+            - "true"
+Description: 'Defang AWS CloudFormation template for an ECS task. Don''t delete: use the CLI instead.'
+Outputs:
+    bucketName:
+        Description: Name of the S3 bucket
+        Value:
+            Ref: Bucket
+    clusterName:
+        Description: Name of the ECS cluster
+        Value:
+            Ref: Cluster
+    defaultSecurityGroupId:
+        Condition: CreateVpcResources
+        Description: ID of the default security group
+        Value:
+            Fn::GetAtt:
+                - VPC
+                - DefaultSecurityGroup
+    logGroupArn:
+        Description: ARN of the CloudWatch log group
+        Value:
+            Fn::GetAtt:
+                - LogGroup
+                - Arn
+    securityGroupId:
+        Description: ID of the security group
+        Value:
+            Ref: SecurityGroup
+    subnetId:
+        Condition: CreateVpcResources
+        Description: ID of the subnet
+        Value:
+            Ref: Subnet
+    taskDefArn:
+        Description: ARN of the ECS task definition
+        Value:
+            Ref: TaskDefinition
+    templateVersion:
+        Description: Version of this CloudFormation template
+        Value: 2
+Parameters:
+    DockerHubAccessToken:
+        Default: ""
+        Description: Docker Hub access token for private registry access (optional)
+        NoEcho: true
+        Type: String
+    DockerHubUsername:
+        Default: ""
+        Description: Docker Hub username for private registry access (optional)
+        NoEcho: true
+        Type: String
+    EnablePullThroughCache:
+        AllowedValues:
+            - "true"
+            - "false"
+        Default: "true"
+        Description: Whether to enable ECR pull-through cache
+        Type: String
+    ExistingVpcId:
+        Default: ""
+        Description: ID of existing VPC to use (leave empty to create new VPC)
+        Type: String
+    RetainBucket:
+        AllowedValues:
+            - "true"
+            - "false"
+        Default: "true"
+        Description: Whether to retain the S3 bucket on stack deletion
+        Type: String
+    UseSpotInstances:
+        AllowedValues:
+            - "true"
+            - "false"
+        Default: "false"
+        Description: Whether to use FARGATE_SPOT capacity provider
+        Type: String
+Resources:
+    Bucket:
+        DeletionPolicy:
+            Fn::If:
+                - RetainS3Bucket
+                - RetainExceptOnCreate
+                - Delete
+        Properties:
+            Tags:
+                - Key: CreatedBy
+                  Value: crun
+            VersioningConfiguration:
+                Status: Enabled
+        Type: AWS::S3::Bucket
+    CapacityProvider:
+        Properties:
+            CapacityProviders:
+                - Fn::If:
+                    - UseSpot
+                    - FARGATE_SPOT
+                    - FARGATE
+            Cluster:
+                Ref: Cluster
+            DefaultCapacityProviderStrategy:
+                - CapacityProvider:
+                    Fn::If:
+                        - UseSpot
+                        - FARGATE_SPOT
+                        - FARGATE
+                  Weight: 1
+        Type: AWS::ECS::ClusterCapacityProviderAssociations
+    Cluster:
+        Properties:
+            Tags:
+                - Key: CreatedBy
+                  Value: crun
+        Type: AWS::ECS::Cluster
+    ExecutionRole:
+        Properties:
+            AssumeRolePolicyDocument:
+                Statement:
+                    - Action:
+                        - sts:AssumeRole
+                      Effect: Allow
+                      Principal:
+                        Service:
+                            - ecs-tasks.amazonaws.com
+                Version: "2012-10-17"
+            ManagedPolicyArns:
+                - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+            Policies:
+                - PolicyDocument:
+                    Statement:
+                        - Action:
+                            - ecr:CreatePullThroughCacheRule
+                            - ecr:BatchImportUpstreamImage
+                            - ecr:CreateRepository
+                          Effect: Allow
+                          Resource: '*'
+                        - Fn::If:
+                            - EnableDockerPullThroughCache
+                            - Action:
+                                - secretsmanager:GetSecretValue
+                                - ssm:GetParameters
+                              Effect: Allow
+                              Resource:
+                                Ref: PrivateRepoSecret
+                            - Ref: AWS::NoValue
+                    Version: "2012-10-17"
+                  PolicyName: AllowECRPassThrough
+            Tags:
+                - Key: CreatedBy
+                  Value: crun
+        Type: AWS::IAM::Role
+    InternetGateway:
+        Condition: CreateVpcResources
+        Properties:
+            Tags:
+                - Key: Name
+                  Value: test-igw
+                - Key: CreatedBy
+                  Value: crun
+        Type: AWS::EC2::InternetGateway
+    InternetGatewayAttachment:
+        Condition: CreateVpcResources
+        Properties:
+            InternetGatewayId:
+                Ref: InternetGateway
+            VpcId:
+                Ref: VPC
+        Type: AWS::EC2::VPCGatewayAttachment
+    LogGroup:
+        DependsOn:
+            - Cluster
+        Properties:
+            RetentionInDays: 1
+            Tags:
+                - Key: CreatedBy
+                  Value: crun
+        Type: AWS::Logs::LogGroup
+    PrivateRepoSecret:
+        Condition: EnableDockerPullThroughCache
+        Properties:
+            Description: Docker Hub credentials for the ECR pull-through cache rule
+            Name: ecr-pullthroughcache/test-docker-public
+            SecretString:
+                Fn::Sub: '{"username":"${DockerHubUsername}","accessToken":"${DockerHubAccessToken}"}'
+            Tags:
+                - Key: CreatedBy
+                  Value: crun
+        Type: AWS::SecretsManager::Secret
+    PullThroughCache:
+        Condition: EnablePullThroughCache
+        Properties:
+            EcrRepositoryPrefix: test-ecr-public
+            UpstreamRegistryUrl: public.ecr.aws
+        Type: AWS::ECR::PullThroughCacheRule
+    PullThroughCacheDocker:
+        Condition: EnableDockerPullThroughCache
+        Properties:
+            CredentialArn:
+                Ref: PrivateRepoSecret
+            EcrRepositoryPrefix: test-docker-public
+            UpstreamRegistryUrl: registry-1.docker.io
+        Type: AWS::ECR::PullThroughCacheRule
+    Route:
+        Condition: CreateVpcResources
+        Properties:
+            DestinationCidrBlock: 0.0.0.0/0
+            GatewayId:
+                Ref: InternetGateway
+            RouteTableId:
+                Ref: RouteTable
+        Type: AWS::EC2::Route
+    RouteTable:
+        Condition: CreateVpcResources
+        Properties:
+            Tags:
+                - Key: Name
+                  Value: test-routetable
+                - Key: CreatedBy
+                  Value: crun
+            VpcId:
+                Ref: VPC
+        Type: AWS::EC2::RouteTable
+    S3GatewayEndpoint:
+        Condition: CreateVpcResources
+        Properties:
+            ServiceName:
+                Fn::Sub: com.amazonaws.${AWS::Region}.s3
+            VpcEndpointType: Gateway
+            VpcId:
+                Ref: VPC
+        Type: AWS::EC2::VPCEndpoint
+    SecurityGroup:
+        Properties:
+            GroupDescription: Security group for the ECS task that allows all outbound and inbound traffic
+            Tags:
+                - Key: CreatedBy
+                  Value: crun
+            VpcId:
+                Fn::If:
+                    - CreateVpcResources
+                    - Ref: VPC
+                    - Ref: ExistingVpcId
+        Type: AWS::EC2::SecurityGroup
+    Subnet:
+        Condition: CreateVpcResources
+        Properties:
+            CidrBlock: 10.0.0.0/20
+            MapPublicIpOnLaunch: true
+            Tags:
+                - Key: Name
+                  Value: test-subnet
+                - Key: CreatedBy
+                  Value: crun
+            VpcId:
+                Ref: VPC
+        Type: AWS::EC2::Subnet
+    SubnetRouteTableAssociation:
+        Condition: CreateVpcResources
+        Properties:
+            RouteTableId:
+                Ref: RouteTable
+            SubnetId:
+                Ref: Subnet
+        Type: AWS::EC2::SubnetRouteTableAssociation
+    TaskDefinition:
+        Properties:
+            ContainerDefinitions:
+                - Image: alpine:latest
+                  LogConfiguration:
+                    LogDriver: awslogs
+                    Options:
+                        awslogs-group:
+                            Ref: LogGroup
+                        awslogs-region:
+                            Ref: AWS::Region
+                        awslogs-stream-prefix: crun
+                  Name: main
+                  StopTimeout: 120
+                - Image:
+                    Fn::If:
+                        - EnableDockerPullThroughCache
+                        - Fn::Sub: ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/test-docker-public/library/alpine:latest
+                        - docker.io/library/alpine:latest
+                  LogConfiguration:
+                    LogDriver: awslogs
+                    Options:
+                        awslogs-group:
+                            Ref: LogGroup
+                        awslogs-region:
+                            Ref: AWS::Region
+                        awslogs-stream-prefix: crun
+                  Name: main
+                  StopTimeout: 120
+                - Image:
+                    Fn::If:
+                        - EnablePullThroughCache
+                        - Fn::Sub: ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/test-ecr-public/docker/library/alpine:latest
+                        - public.ecr.aws/docker/library/alpine:latest
+                  LogConfiguration:
+                    LogDriver: awslogs
+                    Options:
+                        awslogs-group:
+                            Ref: LogGroup
+                        awslogs-region:
+                            Ref: AWS::Region
+                        awslogs-stream-prefix: crun
+                  Name: main
+                  StopTimeout: 120
+            Cpu: "256"
+            ExecutionRoleArn:
+                Ref: ExecutionRole
+            Memory: "512"
+            NetworkMode: awsvpc
+            RequiresCompatibilities:
+                - FARGATE
+            RuntimePlatform: {}
+            Tags:
+                - Key: CreatedBy
+                  Value: crun
+            TaskRoleArn:
+                Ref: TaskRole
+        Type: AWS::ECS::TaskDefinition
+    TaskRole:
+        Properties:
+            AssumeRolePolicyDocument:
+                Statement:
+                    - Action:
+                        - sts:AssumeRole
+                      Effect: Allow
+                      Principal:
+                        Service:
+                            - ecs-tasks.amazonaws.com
+                Version: "2012-10-17"
+            ManagedPolicyArns:
+                - arn:aws:iam::aws:policy/AdministratorAccess
+            Policies:
+                - PolicyDocument:
+                    Statement:
+                        - Action:
+                            - ssmmessages:CreateDataChannel
+                            - ssmmessages:OpenDataChannel
+                            - ssmmessages:OpenControlChannel
+                            - ssmmessages:CreateControlChannel
+                          Effect: Allow
+                          Resource: '*'
+                    Version: "2012-10-17"
+                  PolicyName: AllowExecuteCommand
+                - PolicyDocument:
+                    Statement:
+                        - Action:
+                            - iam:PassRole
+                          Effect: Allow
+                          Resource: '*'
+                    Version: "2012-10-17"
+                  PolicyName: AllowPassRole
+                - PolicyDocument:
+                    Statement:
+                        - Action:
+                            - sts:AssumeRole
+                          Effect: Allow
+                          Resource: '*'
+                    Version: "2012-10-17"
+                  PolicyName: AllowAssumeRole
+            Tags:
+                - Key: CreatedBy
+                  Value: crun
+        Type: AWS::IAM::Role
+    VPC:
+        Condition: CreateVpcResources
+        Properties:
+            CidrBlock: 10.0.0.0/16
+            Tags:
+                - Key: Name
+                  Value: test-vpc
+                - Key: CreatedBy
+                  Value: crun
+        Type: AWS::EC2::VPC

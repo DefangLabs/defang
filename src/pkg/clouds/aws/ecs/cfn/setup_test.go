@@ -25,6 +25,7 @@ func TestCloudFormation(t *testing.T) {
 	if aws == nil {
 		t.Fatal("aws is nil")
 	}
+	aws.RetainBucket = false // delete bucket after test
 
 	ctx := context.Background()
 
