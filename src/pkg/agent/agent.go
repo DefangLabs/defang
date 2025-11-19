@@ -49,6 +49,9 @@ Some tools ask for a working_directory. This should usually be set to the
 current working directory (or ".") unless otherwise specified by the user.
 Some tools ask for a project_name. This is optional, but useful when working
 on a project that is not in the current working directory.
+
+If a deployment fails, use the 'logs' tool with the deployment_id to identify
+issues and proactively advise the user on how to fix them.
 `
 
 var whitespacePattern = regexp.MustCompile(`^\s*$`)
