@@ -70,7 +70,7 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, provi
 		Raw:        true,
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to tail deployment logs: %w", err)
+		return "", err
 	}
 
 	return "Deployment completed successfully", nil
