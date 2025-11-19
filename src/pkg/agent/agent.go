@@ -202,33 +202,28 @@ func (a *Agent) handleToolRequest(req *ai.ToolRequest) (*ai.ToolResponse, error)
 	}, nil
 }
 
-func (a *Agent) handleToolCalls(requests []*ai.ToolRequest) ([]*ai.Message, error) {
-	if len(requests) == 0 {
-		return nil, nil
-	}
-
+func (a *Agent) handleToolCalls(requests []*ai.ToolRequest) (*ai.Message, error) {
 	parts := []*ai.Part{}
 	for _, req := range requests {
 		toolResp, err := a.handleToolRequest(req)
 		if err != nil {
 			return nil, err
 		}
-		a.Printf("%s\n", toolResp.Output)
+		a.Println("~ ", toolResp.Output)
 		parts = append(parts, ai.NewToolResponsePart(toolResp))
 	}
 
-	responses := []*ai.Message{ai.NewMessage(ai.RoleTool, nil, parts...)}
-	a.msgs = append(a.msgs, responses...)
-	_, err := a.generate()
-	if err != nil {
-		return nil, fmt.Errorf("generation error: %w", err)
-	}
-	return responses, nil
+	return ai.NewMessage(ai.RoleTool, nil, parts...), nil
 }
 
 func (a *Agent) streamingCallback(ctx context.Context, chunk *ai.ModelResponseChunk) error {
 	for _, part := range chunk.Content {
-		a.Printf("%s", part.Text)
+		if part.Kind == ai.PartText {
+			a.Printf("%s", part.Text)
+		}
+		if part.Kind == ai.PartReasoning {
+			a.Printf("_%s_", part.Text)
+		}
 	}
 	return nil
 }
@@ -247,15 +242,20 @@ func (a *Agent) generateLoop() error {
 		if err != nil {
 			continue
 		}
+
+		a.msgs = append(a.msgs, resp.Message)
 		toolRequests := resp.ToolRequests()
-		if len(toolRequests) > 0 {
-			_, err := a.handleToolCalls(toolRequests)
-			if err != nil {
-				a.Printf("%v", err)
-				a.msgs = append(a.msgs, ai.NewMessage(ai.RoleTool, nil, ai.NewTextPart(err.Error())))
-				continue
-			}
+		if len(toolRequests) == 0 {
+			return nil
 		}
+
+		toolResp, err := a.handleToolCalls(toolRequests)
+		if err != nil {
+			a.Printf("! %v", err)
+			a.msgs = append(a.msgs, ai.NewMessage(ai.RoleTool, nil, ai.NewTextPart(err.Error())))
+			continue
+		}
+		a.msgs = append(a.msgs, toolResp)
 	}
 
 	return nil
@@ -274,23 +274,16 @@ func (a *Agent) generate() (*ai.ModelResponse, error) {
 	}
 	// a.Println("")
 	for _, part := range resp.Message.Content {
-		// if part.Kind == ai.PartText {
-		// 	a.Printf("%s", part.Text)
-		// }
 		if part.Kind == ai.PartToolRequest {
 			req := part.ToolRequest
 			inputs, err := json.Marshal(req.Input)
 			if err != nil {
-				return nil, fmt.Errorf("error marshaling tool request input: %w", err)
+				a.Printf("! error marshaling tool request input: %v\n", err)
+			} else {
+				a.Printf("* %s(%s)\n", req.Name, inputs)
 			}
-			a.Printf("* %s(%s)\n", req.Name, inputs)
-		}
-		if part.Kind == ai.PartReasoning {
-			a.Printf("_%s_\n", part.Text)
 		}
 	}
-	a.Println("")
 
-	a.msgs = append(a.msgs, resp.Message)
 	return resp, nil
 }
