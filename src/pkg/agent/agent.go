@@ -271,7 +271,7 @@ func (e *EmptyResponseError) Error() string {
 
 func (a *Agent) generate() (*ai.ModelResponse, error) {
 	resp, err := genkit.Generate(a.ctx, a.g,
-		ai.WithPrompt(a.prompt),
+		ai.WithSystem(a.prompt),
 		ai.WithTools(a.tools...),
 		ai.WithMessages(a.msgs...),
 		ai.WithReturnToolRequests(true),
