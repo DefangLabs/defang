@@ -14,8 +14,22 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/google/uuid"
 
+	"google.golang.org/api/impersonate"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 )
+
+var newStorageClient = func(ctx context.Context, opts ...option.ClientOption) (StorageClient, error) {
+	return storage.NewClient(ctx, opts...)
+}
+
+var impersonateCredentialsTokenSource = impersonate.CredentialsTokenSource
+
+type StorageClient interface {
+	Bucket(name string) *storage.BucketHandle
+	Buckets(ctx context.Context, projectID string) *storage.BucketIterator
+	Close() error
+}
 
 func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string) (string, error) {
 	existing, err := gcp.GetBucketWithPrefix(ctx, prefix)
@@ -27,9 +41,9 @@ func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string) (string, e
 		return existing, nil
 	}
 
-	client, err := storage.NewClient(ctx)
+	client, err := newStorageClient(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to create storeage client: %w", err)
+		return "", fmt.Errorf("failed to create storage client: %w", err)
 	}
 	defer client.Close()
 
@@ -40,6 +54,10 @@ func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string) (string, e
 	if err := bucket.Create(ctx, gcp.ProjectId, &storage.BucketAttrs{
 		Location:     gcp.Region,
 		StorageClass: "STANDARD", // No minimum storage duration
+		// Uniform bucket-level access must be enabled to grant Workload Identity Federation entities access to Cloud Storage resources.
+		// We need Workload Identity Federation for githbub actions to be able access the build bucket
+		// https://docs.cloud.google.com/storage/docs/uniform-bucket-level-access#should-you-use
+		UniformBucketLevelAccess: storage.UniformBucketLevelAccess{Enabled: true},
 	}); err != nil {
 		return "", fmt.Errorf("failed to create bucket %q: %w", newBucketName, err)
 	}
@@ -48,32 +66,29 @@ func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string) (string, e
 }
 
 func (gcp Gcp) GetBucketWithPrefix(ctx context.Context, prefix string) (string, error) {
-	client, err := storage.NewClient(ctx)
+	client, err := newStorageClient(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get stoage bucket with prefix %q: %w", prefix, err)
 	}
 	defer client.Close()
 
-	// List all buckets in the specified project
+	// List all buckets matching the prefix in the specified project
 	it := client.Buckets(ctx, gcp.ProjectId)
 	it.Prefix = prefix
-	for {
-		attrs, err := it.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return "", fmt.Errorf("bucket iterator error: %w", err)
-		}
 
-		return attrs.Name, nil
+	// Return the first matching bucket
+	attrs, err := it.Next()
+	if err == iterator.Done {
+		return "", nil
 	}
-
-	return "", nil
+	if err != nil {
+		return "", fmt.Errorf("bucket iterator error: %w", err)
+	}
+	return attrs.Name, nil
 }
 
 func (gcp Gcp) CreateUploadURL(ctx context.Context, bucketName, objectName, serviceAccount string) (string, error) {
-	client, err := storage.NewClient(ctx)
+	client, err := newStorageClient(ctx)
 	if err != nil {
 		return "", fmt.Errorf("unable to create upload URL, failed to create storage client: %w", err)
 	}
@@ -132,12 +147,24 @@ func (gcp Gcp) SignBytes(ctx context.Context, b []byte, name string) ([]byte, er
 }
 
 func (gcp Gcp) GetBucketObject(ctx context.Context, bucketName, objectName string) ([]byte, error) {
-	client, err := storage.NewClient(ctx)
+	client, err := newStorageClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get bucket object, failed to create storage client: %w", err)
 	}
 	defer client.Close()
+	return gcp.getBucketObject(ctx, bucketName, objectName, client)
+}
 
+func (gcp Gcp) GetBucketObjectWithServiceAccount(ctx context.Context, bucketName, objectName, serviceAccount string) ([]byte, error) {
+	client, err := getCloudStorageClientWithServiceAccount(ctx, serviceAccount)
+	if err != nil {
+		return nil, err
+	}
+	defer client.Close()
+	return gcp.getBucketObject(ctx, bucketName, objectName, client)
+}
+
+func (gcp Gcp) getBucketObject(ctx context.Context, bucketName, objectName string, client StorageClient) ([]byte, error) {
 	bucket := client.Bucket(bucketName)
 	r, err := bucket.Object(objectName).NewReader(ctx)
 	if err != nil {
@@ -149,12 +176,26 @@ func (gcp Gcp) GetBucketObject(ctx context.Context, bucketName, objectName strin
 }
 
 func (gcp Gcp) IterateBucketObjects(ctx context.Context, bucketName, prefix string, f func(*storage.ObjectAttrs) error) error {
-	client, err := storage.NewClient(ctx)
+	client, err := newStorageClient(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to iterate on bucket object, failed to create storage client: %w", err)
 	}
 	defer client.Close()
 
+	return iterateBucketObjects(ctx, bucketName, prefix, client, f)
+}
+
+func (gcp Gcp) IterateBucketObjectsWithServiceAccount(ctx context.Context, bucketName, prefix, serviceAccount string, f func(*storage.ObjectAttrs) error) error {
+	client, err := getCloudStorageClientWithServiceAccount(ctx, serviceAccount)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	return iterateBucketObjects(ctx, bucketName, prefix, client, f)
+}
+
+func iterateBucketObjects(ctx context.Context, bucketName, prefix string, client StorageClient, f func(*storage.ObjectAttrs) error) error {
 	bucket := client.Bucket(bucketName)
 	it := bucket.Objects(ctx, &storage.Query{Prefix: prefix})
 	for {
@@ -171,4 +212,19 @@ func (gcp Gcp) IterateBucketObjects(ctx context.Context, bucketName, prefix stri
 		}
 	}
 	return nil
+}
+
+func getCloudStorageClientWithServiceAccount(ctx context.Context, serviceAccount string) (StorageClient, error) {
+	ts, err := impersonateCredentialsTokenSource(ctx, impersonate.CredentialsConfig{
+		TargetPrincipal: serviceAccount,
+		Scopes:          []string{"https://www.googleapis.com/auth/cloud-platform"},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to create impersonated token source for service account %v: %w", serviceAccount, err)
+	}
+	client, err := newStorageClient(ctx, option.WithTokenSource(ts))
+	if err != nil {
+		return nil, fmt.Errorf("unable to create storage client: %w", err)
+	}
+	return client, nil
 }

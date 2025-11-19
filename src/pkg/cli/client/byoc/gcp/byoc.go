@@ -41,8 +41,9 @@ import (
 var _ client.Provider = (*ByocGcp)(nil)
 
 const (
-	DefangCDProjectName = "defang-cd"
-	UploadPrefix        = "uploads/"
+	DefangCDProjectName            = "defang-cd"
+	DefangUploadServiceAccountName = "defang-upload"
+	UploadPrefix                   = "uploads/"
 )
 
 var (
@@ -165,7 +166,7 @@ func (b *ByocGcp) SetUpCD(ctx context.Context) error {
 		b.cdServiceAccount = path.Base(cdServiceAccount)
 	}
 	//   3.2 Give CD service account roles needed
-	if err := b.driver.EnsureServiceAccountHasRoles(ctx, "serviceAccount:"+b.cdServiceAccount, []string{
+	if err := b.driver.EnsurePrincipalHasRoles(ctx, "serviceAccount:"+b.cdServiceAccount, []string{
 		"roles/run.admin",                       // For creating and running cloudrun jobs and services (admin needed for `setIamPolicy` permission)
 		"roles/iam.serviceAccountAdmin",         // For creating service accounts
 		"roles/iam.serviceAccountUser",          // For impersonating service accounts
@@ -188,18 +189,18 @@ func (b *ByocGcp) SetUpCD(ctx context.Context) error {
 		return err
 	}
 	//   3.2 Give CD role access to CD bucket
-	if err := b.driver.EnsureServiceAccountHasBucketRoles(ctx, b.bucket, b.cdServiceAccount, []string{"roles/storage.admin"}); err != nil {
+	if err := b.driver.EnsurePrincipalHasBucketRoles(ctx, b.bucket, "serviceAccount:"+b.cdServiceAccount, []string{"roles/storage.admin"}); err != nil {
 		return err
 	}
 
 	// 4 Setup service account for upload and give ability to create signed URLs using it to current user
-	if uploadServiceAccount, err := b.driver.EnsureServiceAccountExists(ctx, "defang-upload", "defang upload", "Service account for defang cli to generate pre-signed URL to upload artifacts"); err != nil {
+	if uploadServiceAccount, err := b.driver.EnsureServiceAccountExists(ctx, DefangUploadServiceAccountName, "defang upload", "Service account for defang cli to generate pre-signed URL to upload artifacts"); err != nil {
 		return err
 	} else {
 		b.uploadServiceAccount = path.Base(uploadServiceAccount)
 	}
 	//  4.1 Give upload service account access to cd bucket
-	if err := b.driver.EnsureServiceAccountHasBucketRoles(ctx, b.bucket, b.uploadServiceAccount, []string{"roles/storage.objectUser"}); err != nil {
+	if err := b.driver.EnsurePrincipalHasBucketRoles(ctx, b.bucket, "serviceAccount:"+b.uploadServiceAccount, []string{"roles/storage.objectUser"}); err != nil {
 		return err
 	}
 	//  4.2 Give current principal the token creator role on the upload service account
@@ -270,8 +271,13 @@ func (b *ByocGcp) BootstrapList(ctx context.Context) ([]string, error) {
 	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
 
 	var stacks []string
+	uploadSA := b.driver.GetServiceAccountEmail(DefangUploadServiceAccountName)
+	term.Debug("Getting services from pulumi stacks bucket:", bucketName, prefix, uploadSA)
+	objLoader := func(ctx context.Context, bucket, object string) ([]byte, error) {
+		return b.driver.GetBucketObjectWithServiceAccount(ctx, bucket, object, uploadSA)
+	}
 	err = b.driver.IterateBucketObjects(ctx, bucketName, prefix, func(obj *storage.ObjectAttrs) error {
-		stack, err := byoc.ParsePulumiStackObject(ctx, gcpObj{obj}, bucketName, prefix, b.driver.GetBucketObject)
+		stack, err := byoc.ParsePulumiStackObject(ctx, gcpObj{obj}, bucketName, prefix, objLoader)
 		if err != nil {
 			return err
 		}
@@ -947,10 +953,13 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 
 	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/byoc/aws/index.ts#L89
 	path := fmt.Sprintf("projects/%s/%s/project.pb", projectName, b.PulumiStack)
-	term.Debug("Getting services from bucket:", bucketName, path)
-	pbBytes, err := b.driver.GetBucketObject(ctx, bucketName, path)
+
+	// Current user might not have object viewer access to the bucket, use the upload service account to get the object
+	uploadSA := b.driver.GetServiceAccountEmail(DefangUploadServiceAccountName)
+	term.Debug("Getting services from bucket:", bucketName, path, uploadSA)
+	pbBytes, err := b.driver.GetBucketObjectWithServiceAccount(ctx, bucketName, path, uploadSA)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get project bucket object, try bootstrap the project with a deployment: %w", err)
 	}
 
 	projUpdate := defangv1.ProjectUpdate{}
