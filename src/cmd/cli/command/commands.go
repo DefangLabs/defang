@@ -207,7 +207,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(logoutCmd)
 
 	// Generate Command
-	generateCmd.Flags().StringVar(&modelId, "model", modelId, "LLM model to use for generating the code (Pro users only)")
+	generateCmd.Flags().StringVar(&config.ModelID, "model", config.ModelID, "LLM model to use for generating the code (Pro users only)")
 	RootCmd.AddCommand(generateCmd)
 	// new command
 	initCmd.PersistentFlags().Var(&config.SourcePlatform, "from", fmt.Sprintf(`the platform from which to migrate the project; one of %v`, migrate.AllSourcePlatforms))
@@ -262,7 +262,7 @@ func SetupCommands(ctx context.Context, version string) {
 	debugCmd.Flags().String("deployment", "", "deployment ID of the service")
 	debugCmd.Flags().String("since", "", "start time for logs (RFC3339 format)")
 	debugCmd.Flags().String("until", "", "end time for logs (RFC3339 format)")
-	debugCmd.Flags().StringVar(&modelId, "model", modelId, "LLM model to use for debugging (Pro users only)")
+	debugCmd.Flags().StringVar(&config.ModelID, "model", config.ModelID, "LLM model to use for debugging (Pro users only)")
 	RootCmd.AddCommand(debugCmd)
 
 	// Tail Command
@@ -551,7 +551,7 @@ var generateCmd = &cobra.Command{
 		setupClient := setup.SetupClient{
 			Surveyor: surveyor.NewDefaultSurveyor(),
 			Heroku:   migrate.NewHerokuClient(),
-			ModelID:  modelId,
+			ModelID:  config.ModelID,
 			Fabric:   config.Client,
 			Cluster:  getCluster(),
 		}
@@ -587,7 +587,7 @@ var initCmd = &cobra.Command{
 		setupClient := setup.SetupClient{
 			Surveyor: surveyor.NewDefaultSurveyor(),
 			Heroku:   migrate.NewHerokuClient(),
-			ModelID:  modelId,
+			ModelID:  config.ModelID,
 			Fabric:   config.Client,
 			Cluster:  getCluster(),
 		}
@@ -877,7 +877,7 @@ var debugCmd = &cobra.Command{
 		debugConfig := cli.DebugConfig{
 			Deployment:     deployment,
 			FailedServices: args,
-			ModelId:        modelId,
+			ModelId:        config.ModelID,
 			Project:        project,
 			Provider:       provider,
 			Since:          sinceTs.UTC(),

@@ -12,22 +12,22 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// GLOBALS
-var (
-	// cluster    string
-	// colorMode = ColorAuto
-	// doDebug    = false
-	// hasTty     = term.IsTerminal()
-	// hideUpdate = false
-	// mode           = modes.ModeUnspecified
-	modelId string // only for debug/generate; Pro users
-	// nonInteractive = !hasTty
-	// org            string
-	// providerID     = cliClient.ProviderAuto
-	// sourcePlatform = migrate.SourcePlatformUnspecified // default to auto-detecting the source platform
-	// stack          = os.Getenv("DEFANG_STACK")
-	// verbose = false
-)
+// // GLOBALS
+// var (
+// // cluster    string
+// // colorMode = ColorAuto
+// // doDebug    = false
+// // hasTty     = term.IsTerminal()
+// // hideUpdate = false
+// // mode           = modes.ModeUnspecified
+// // modelId string // only for debug/generate; Pro users
+// // nonInteractive = !hasTty
+// // org            string
+// // providerID     = cliClient.ProviderAuto
+// // sourcePlatform = migrate.SourcePlatformUnspecified // default to auto-detecting the source platform
+// // stack          = os.Getenv("DEFANG_STACK")
+// // verbose = false
+// )
 
 var config GlobalConfig = GlobalConfig{
 	ColorMode:      ColorAuto,
@@ -49,6 +49,7 @@ type GlobalConfig struct {
 	HasTty         bool
 	HideUpdate     bool
 	Mode           modes.Mode
+	ModelID        string // only for debug/generate; Pro users
 	NonInteractive bool
 	Org            string
 	ProviderID     cliClient.ProviderID
@@ -56,72 +57,6 @@ type GlobalConfig struct {
 	Stack          string
 	Verbose        bool
 }
-
-// func (r *GlobalConfig) loadEnv() {
-// 	// TODO: init each property from the environment or defaults
-// 	if envStack := os.Getenv("DEFANG_STACK"); envStack != "" {
-// 		r.Stack = envStack
-// 	}
-// 	// if envVerbose := os.Getenv("DEFANG_VERBOSE"); envVerbose != "" {
-// 	// 	r.Verbose = envVerbose == "true"
-// 	// }
-// 	// if envDebug := os.Getenv("DEFANG_DEBUG"); envDebug != "" {
-// 	// 	r.Debug = envDebug == "true"
-// 	// }
-// 	// if envMode := os.Getenv("DEFANG_MODE"); envMode != "" {
-// 	// 	// Only apply environment mode if the mode is still unspecified (no flag was set)
-// 	// 	if r.Mode == modes.ModeUnspecified {
-// 	// 		r.Mode, _ = modes.Parse(envMode)
-// 	// 	}
-// 	// }
-// 	// Initialize cluster from environment variable (DEFANG_FABRIC) or leave empty for flag default
-// 	// if envCluster := os.Getenv("DEFANG_FABRIC"); envCluster != "" {
-// 	// 	r.Cluster = envCluster
-// 	// }
-// 	// Initialize provider from environment variable (DEFANG_PROVIDER) or leave empty for flag default
-// 	// if envProvider := os.Getenv("DEFANG_PROVIDER"); envProvider != "" {
-// 	// 	r.ProviderID.Set(envProvider) // Use Set method since ProviderID has validation
-// 	// }
-// 	// // Initialize org from environment variable (DEFANG_ORG) or leave empty for flag default
-// 	// if envOrg := os.Getenv("DEFANG_ORG"); envOrg != "" {
-// 	// 	r.Org = envOrg
-// 	// }
-// 	// Initialize source platform from environment variable or leave empty for default
-// 	// if envSourcePlatform := os.Getenv("DEFANG_SOURCE_PLATFORM"); envSourcePlatform != "" {
-// 	// 	r.SourcePlatform.Set(envSourcePlatform)
-// 	// }
-// 	// // Initialize color mode from environment variable or leave empty for default
-// 	// if envColorMode := os.Getenv("DEFANG_COLOR"); envColorMode != "" {
-// 	// 	r.ColorMode.Set(envColorMode)
-// 	// }
-// 	// Initialize HasTty from environment or use terminal detection
-// 	// if envTty := os.Getenv("DEFANG_TTY"); envTty != "" {
-// 	// 	r.HasTty = envTty == "true"
-// 	// } else {
-// 	// 	r.HasTty = term.IsTerminal()
-// 	// }
-// 	// Initialize NonInteractive from environment or derive from HasTty
-// 	// if envNonInteractive := os.Getenv("DEFANG_NON_INTERACTIVE"); envNonInteractive != "" {
-// 	// 	r.NonInteractive = envNonInteractive == "true"
-// 	// } else {
-// 	// 	r.NonInteractive = !r.HasTty
-// 	// }
-
-// 	// if flags.Changed("non-interactive") {
-// 	// 	r.NonInteractive = flags.Lookup("non-interactive").Value.String() == "true"
-// 	// } else {
-// 	// 	// If not explicitly set, ensure it reflects HasTty state
-// 	// 	if !r.NonInteractive && !r.HasTty {
-// 	// 		r.NonInteractive = true
-// 	// 	}
-// 	// 	flags.Set("non-interactive", fmt.Sprintf("%v", r.NonInteractive))
-// 	// }
-
-// 	// Initialize HideUpdate from environment variable
-// 	// if envHideUpdate := os.Getenv("DEFANG_HIDE_UPDATE"); envHideUpdate != "" {
-// 	// 	r.HideUpdate = envHideUpdate == "true"
-// 	// }
-// }
 
 func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) {
 	if flags == nil {
