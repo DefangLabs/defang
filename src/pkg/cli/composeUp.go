@@ -39,6 +39,14 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 		upload = compose.UploadModeIgnore
 	}
 
+	// Validate Dockerfiles before processing the build contexts
+	// Only validate when actually deploying (not for dry-run/ignore mode)
+	if upload != compose.UploadModeIgnore && upload != compose.UploadModeEstimate {
+		if err := compose.ValidateServiceDockerfiles(project); err != nil {
+			return nil, project, &ComposeError{err}
+		}
+	}
+
 	// Validate the project configuration against the provider's configuration, but only if we are going to deploy.
 	// FIXME: should not need to validate configs if we are doing preview, but preview will fail on missing configs.
 	if upload != compose.UploadModeIgnore {
@@ -62,15 +70,6 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 	// Create a new project with only the necessary resources.
 	// Do not modify the original project, because the caller needs it for debugging.
 	fixedProject := project.WithoutUnnecessaryResources()
-
-	// Validate Dockerfiles before processing the build contexts
-	// Only validate when actually deploying (not for dry-run/ignore mode)
-	if upload != compose.UploadModeIgnore && upload != compose.UploadModeEstimate {
-		if err := compose.ValidateServiceDockerfiles(project); err != nil {
-			return nil, project, &ComposeError{err}
-		}
-	}
-
 	if err := compose.FixupServices(ctx, provider, fixedProject, upload); err != nil {
 		return nil, project, err
 	}
