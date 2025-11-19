@@ -62,6 +62,8 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, provi
 		return "", errors.New("no services deployed")
 	}
 
+	term.Println("Starting deployment_id:", deployResp.Etag)
+
 	_, err = cli.TailAndMonitor(ctx, project, provider, 0, cliTypes.TailOptions{
 		Follow:     true,
 		Deployment: deployResp.Etag,
