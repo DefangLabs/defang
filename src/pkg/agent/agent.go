@@ -14,6 +14,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/agent/plugins/fabric"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cluster"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/core/api"
 	"github.com/firebase/genkit/go/genkit"
@@ -240,6 +241,7 @@ func (a *Agent) generateLoop() error {
 	for range a.maxTurns {
 		resp, err := a.generate()
 		if err != nil {
+			term.Debugf("error: %v", err)
 			continue
 		}
 
