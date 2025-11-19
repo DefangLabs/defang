@@ -22,10 +22,10 @@ type DockerfileValidationError struct {
 
 func (e *DockerfileValidationError) Error() string {
 	if e.Line > 0 {
-		return fmt.Sprintf("service %q: Dockerfile validation error in %q at line %d: %s",
+		return fmt.Sprintf("service %q: %q at line %d:\n\t%s",
 			e.ServiceName, e.DockerfilePath, e.Line, e.Message)
 	}
-	return fmt.Sprintf("service %q: Dockerfile validation error in %q: %s",
+	return fmt.Sprintf("service %q: %q:\n\t%s",
 		e.ServiceName, e.DockerfilePath, e.Message)
 }
 
@@ -106,7 +106,7 @@ func ValidateDockerfile(dockerfilePath string, serviceName string) error {
 					ServiceName:    serviceName,
 					DockerfilePath: dockerfilePath,
 					Line:           child.StartLine,
-					Message:        fmt.Sprintf("%s instruction must come after FROM (except ARG)", instruction),
+					Message:        instruction + " instruction must come after FROM (except ARG)",
 				}
 			}
 			break

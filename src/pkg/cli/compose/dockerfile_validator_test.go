@@ -75,8 +75,8 @@ FROM alpine`,
 		},
 		{
 			name: "Valid Dockerfile with trailing whitespace",
-			dockerfile: `FROM alpine:latest  
-RUN echo "hello"  
+			dockerfile: `FROM alpine:latest
+RUN echo "hello"
 CMD ["echo", "world"]  `,
 			expectError: false,
 		},
@@ -281,7 +281,8 @@ func TestDockerfileValidationError(t *testing.T) {
 				DockerfilePath: "/path/to/Dockerfile",
 				Message:        "missing FROM instruction",
 			},
-			expected: `service "web": Dockerfile validation error in "/path/to/Dockerfile": missing FROM instruction`,
+			expected: `service "web": "/path/to/Dockerfile":
+	missing FROM instruction`,
 		},
 		{
 			name: "Error with line number",
@@ -291,7 +292,8 @@ func TestDockerfileValidationError(t *testing.T) {
 				Line:           5,
 				Message:        "invalid syntax",
 			},
-			expected: `service "api": Dockerfile validation error in "/path/to/Dockerfile" at line 5: invalid syntax`,
+			expected: `service "api": "/path/to/Dockerfile" at line 5:
+	invalid syntax`,
 		},
 	}
 
