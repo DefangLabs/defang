@@ -263,6 +263,12 @@ func (a *Agent) generateLoop() error {
 	return nil
 }
 
+type EmptyResponseError struct{}
+
+func (e *EmptyResponseError) Error() string {
+	return "empty response from model"
+}
+
 func (a *Agent) generate() (*ai.ModelResponse, error) {
 	resp, err := genkit.Generate(a.ctx, a.g,
 		ai.WithPrompt(a.prompt),
@@ -274,7 +280,10 @@ func (a *Agent) generate() (*ai.ModelResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	// a.Println("")
+	if len(resp.Message.Content) == 0 {
+		return nil, &EmptyResponseError{}
+	}
+	a.Println("")
 	for _, part := range resp.Message.Content {
 		if part.Kind == ai.PartToolRequest {
 			req := part.ToolRequest
