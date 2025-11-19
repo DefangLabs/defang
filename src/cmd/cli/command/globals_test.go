@@ -189,7 +189,7 @@ func Test_priorityLoading(t *testing.T) {
 			},
 		},
 		{
-			name:         "RC file used when no env vars or flags",
+			name:         "RC file used when no env vars or flags set",
 			createRCFile: true,
 			rcStack: stack{
 				stackname: "test",
@@ -224,7 +224,15 @@ func Test_priorityLoading(t *testing.T) {
 			},
 		},
 		{
-			name:         "RC with default defangrc name, when no env vars or flags",
+			name:         "RC file with no values used when no env vars or flags set",
+			createRCFile: true,
+			rcStack: stack{
+				stackname: "test",
+			},
+			expected: defaultConfig,
+		},
+		{
+			name:         "default defangrc name, when no env vars or flags",
 			createRCFile: true,
 			rcStack: stack{
 				stackname: "",
@@ -257,6 +265,14 @@ func Test_priorityLoading(t *testing.T) {
 				NonInteractive: true,  // from rc
 				HideUpdate:     true,  // from rc
 			},
+		},
+		{
+			name:         "default defangrc name and no values, when no env vars or flags",
+			createRCFile: true,
+			rcStack: stack{
+				stackname: "",
+			},
+			expected: defaultConfig,
 		},
 		{
 			name:         "no rc file, no env vars and no flags",
@@ -296,7 +312,6 @@ func Test_priorityLoading(t *testing.T) {
 
 			// Make rc files in a temporary directory
 			tempDir := t.TempDir()
-			t.Chdir(tempDir)
 
 			var rcEnvs []string
 			// Create RC files in the temporary directory
@@ -323,6 +338,7 @@ func Test_priorityLoading(t *testing.T) {
 				f.Close()
 			}
 
+			t.Chdir(tempDir)
 			// simulates the actual loading sequence
 			testConfig.loadRC(tt.rcStack.stackname, flags)
 
