@@ -39,6 +39,7 @@ var config GlobalConfig = GlobalConfig{
 	ProviderID:     cliClient.ProviderAuto,
 	SourcePlatform: migrate.SourcePlatformUnspecified, // default to auto-detecting the source platform
 	Verbose:        false,
+	Stack:          os.Getenv("DEFANG_STACK"),
 }
 
 type GlobalConfig struct {
@@ -65,10 +66,10 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) {
 	// If flag was changed by user, update config from flag value (flag takes priority)
 	// If flag was not changed by user, set flag from config value (env/RC file values)
 
-	if flags.Changed("stack") {
-		r.Stack = flags.Lookup("stack").Value.String()
-	} else {
-		flags.Set("stack", r.Stack)
+	if !flags.Changed("stack") {
+		if fromEnv, ok := os.LookupEnv("DEFANG_STACK"); ok {
+			r.Stack = fromEnv
+		}
 	}
 
 	if !flags.Changed("verbose") {
@@ -83,7 +84,7 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) {
 		}
 	}
 
-	if flags.Changed("mode") {
+	if !flags.Changed("mode") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_MODE"); ok {
 			mode, err := modes.Parse(fromEnv)
 			if err != nil {

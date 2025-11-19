@@ -41,7 +41,7 @@ func Test_readGlobals(t *testing.T) {
 	})
 }
 
-func Test_prorityLoading(t *testing.T) {
+func Test_priorityLoading(t *testing.T) {
 	// This is more of an integration test to ensure the loading order is correct
 	// when loading from env, rc files, and flags.
 	// The precedence should be: flags > env vars > .defangrc files
@@ -90,6 +90,7 @@ func Test_prorityLoading(t *testing.T) {
 				"DEFANG_ORG":             "from-env-org",
 				"DEFANG_SOURCE_PLATFORM": "heroku",
 				"DEFANG_COLOR":           "auto",
+				"DEFANG_TTY":             "false",
 				"DEFANG_HIDE_UPDATE":     "false",
 			},
 			flags: map[string]string{
@@ -208,8 +209,18 @@ func Test_prorityLoading(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Reset config for each test
-			config = GlobalConfig{}
+			// Reset config for each test with proper defaults
+			config = GlobalConfig{
+				ColorMode:      ColorAuto,
+				Debug:          false,
+				HasTty:         true, // Set to true for test consistency
+				HideUpdate:     false,
+				Mode:           modes.ModeUnspecified,
+				NonInteractive: false,
+				ProviderID:     cliClient.ProviderAuto,
+				SourcePlatform: migrate.SourcePlatformUnspecified,
+				Verbose:        false,
+			}
 
 			// Create RC files
 			for _, rcStack := range tt.rcStacks {
@@ -230,7 +241,7 @@ func Test_prorityLoading(t *testing.T) {
 				f.Close()
 			}
 
-			// Set environment variables
+			// Set environment variables (these override RC file values)
 			for key, value := range tt.envVars {
 				t.Setenv(key, value)
 			}
@@ -267,7 +278,8 @@ func Test_prorityLoading(t *testing.T) {
 			// This simulates the actual loading sequence
 			config.loadRC(stackName, flags)
 
-			// Apply flags to config (simulate what happens in the actual CLI)
+			// The syncFlagsWithEnv method inside loadRC should handle environment variables
+			// For flags that were explicitly changed, we need to apply them after loadRC
 			if flagMode := flags.Lookup("mode"); flagMode != nil && flagMode.Changed {
 				config.Mode, _ = modes.Parse(flagMode.Value.String())
 			}

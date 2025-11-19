@@ -144,7 +144,7 @@ func SetupCommands(ctx context.Context, version string) {
 	cobra.EnableTraverseRunHooks = true // we always need to run the RootCmd's pre-run hook
 
 	RootCmd.Version = version
-	RootCmd.PersistentFlags().StringVarP(&config.Stack, "stack", "s", os.Getenv("DEFANG_STACK"), "stack name (for BYOC providers)")
+	RootCmd.PersistentFlags().StringVarP(&config.Stack, "stack", "s", config.Stack, "stack name (for BYOC providers)")
 	RootCmd.PersistentFlags().Var(&config.ColorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().StringVar(&config.Cluster, "cluster", config.Cluster, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
