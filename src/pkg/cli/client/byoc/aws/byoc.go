@@ -51,7 +51,7 @@ var StsClient StsProviderAPI
 type ByocAws struct {
 	*byoc.ByocBaseClient
 
-	driver *cfn.AwsEcs // TODO: ecs is stateful, contains the output of the cd cfn stack after SetUpCD
+	driver *cfn.AwsEcsCfn // TODO: ecs is stateful, contains the output of the cd cfn stack after SetUpCD
 
 	ecsEventHandlers []ECSEventHandler
 	handlersLock     sync.RWMutex
