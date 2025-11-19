@@ -20,6 +20,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	pcluster "github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/login"
@@ -47,10 +48,14 @@ var authNeededAnnotation = map[string]string{authNeeded: ""}
 var P = track.P
 
 func getCluster() string {
-	if config.Org == "" {
-		return config.Cluster
+	cluster := config.Cluster
+	if cluster == "" {
+		cluster = pcluster.DefaultCluster
 	}
-	return config.Org + "@" + config.Cluster
+	if config.Org == "" {
+		return cluster
+	}
+	return config.Org + "@" + cluster
 }
 
 func Execute(ctx context.Context) error {
