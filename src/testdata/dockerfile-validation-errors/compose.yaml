@@ -1,0 +1,8 @@
+services:
+  invalid-dockerfile:
+    build:
+      context: .
+      dockerfile: Dockerfile.invalid
+    ports:
+      - target: 8080
+        mode: ingress

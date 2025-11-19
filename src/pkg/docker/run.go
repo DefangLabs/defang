@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -25,7 +24,7 @@ func (d Docker) Run(ctx context.Context, env map[string]string, cmd ...string) (
 		return nil, err
 	}
 
-	return &resp.ID, d.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{})
+	return &resp.ID, d.ContainerStart(ctx, resp.ID, container.StartOptions{})
 }
 
 func mapToSlice(m map[string]string) []string {
