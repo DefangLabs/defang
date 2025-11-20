@@ -409,7 +409,7 @@ var RootCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return ag.StartWithUserPrompt(prompt)
+		return ag.StartWithUserPrompt(ctx, prompt)
 	},
 }
 

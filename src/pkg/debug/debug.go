@@ -134,16 +134,28 @@ func DebugDeployment(ctx context.Context, client client.FabricClient, debugConfi
 
 	if UseDefangAgent {
 		term.Debug("Using Defang Agent for debugging")
+		yaml, err := debugConfig.Project.MarshalYAML()
+		if err != nil {
+			term.Println("Failed to marshal compose project to YAML for debug:", err)
+		}
 		prompt := fmt.Sprintf(
 			"An error occurred while deploying this project to %s with Defang. "+
-				"Help troubleshoot and recommend a solution. Look at the logs to understand what happened.",
+				"Help troubleshoot and recommend a solution. Look at the logs to understand what happened."+
+				"The deployment ID is %q. The deployment started at %s and finished at %s. The failed services are %v."+
+				"The compose files are at %s. The compose file is as follows:\n\n%s",
 			debugConfig.ProviderID.Name(),
+			debugConfig.Deployment,
+			debugConfig.Since.String(),
+			debugConfig.Until.String(),
+			debugConfig.FailedServices,
+			debugConfig.Project.ComposeFiles,
+			yaml,
 		)
 		ag, err := agent.New(ctx, debugConfig.Addr, debugConfig.ProviderID, agent.DefaultSystemPrompt)
 		if err != nil {
 			return err
 		}
-		return ag.StartWithUserPrompt(prompt)
+		return ag.StartWithMessage(ctx, prompt)
 	}
 
 	var sinceTs, untilTs *timestamppb.Timestamp
@@ -193,7 +205,7 @@ func debugComposeFileLoadError(ctx context.Context, client client.FabricClient, 
 		if err != nil {
 			return err
 		}
-		return ag.StartWithMessage(prompt)
+		return ag.StartWithMessage(ctx, prompt)
 	}
 
 	req := defangv1.DebugRequest{
