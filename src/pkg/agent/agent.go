@@ -108,34 +108,34 @@ func New(ctx context.Context, addr string, providerId *client.ProviderID, prompt
 
 	defangTools := CollectDefangTools(addr, providerId)
 	fsTools := CollectFsTools()
-	a.RegisterTools(defangTools...)
-	a.RegisterTools(fsTools...)
+	a.registerTools(defangTools...)
+	a.registerTools(fsTools...)
 	return a, nil
 }
 
-func (a *Agent) RegisterTools(tools ...ai.Tool) {
+func (a *Agent) registerTools(tools ...ai.Tool) {
 	for _, t := range tools {
 		genkit.RegisterAction(a.g, t)
 		a.tools = append(a.tools, ai.ToolRef(t))
 	}
 }
 
-func (a *Agent) Printf(format string, args ...interface{}) {
+func (a *Agent) printf(format string, args ...interface{}) {
 	fmt.Fprintf(a.outStream, format, args...)
 }
 
-func (a *Agent) Println(args ...interface{}) {
+func (a *Agent) println(args ...interface{}) {
 	fmt.Fprintln(a.outStream, args...)
 }
 
 func (a *Agent) StartWithUserPrompt(userPrompt string) error {
-	a.Printf("\n%s\n", userPrompt)
-	a.Printf("Type '/exit' to quit.\n")
+	a.printf("\n%s\n", userPrompt)
+	a.printf("Type '/exit' to quit.\n")
 	return a.startSession()
 }
 
 func (a *Agent) StartWithMessage(msg string) error {
-	a.Printf("Type '/exit' to quit.\n")
+	a.printf("Type '/exit' to quit.\n")
 
 	if err := a.handleUserMessage(msg); err != nil {
 		return fmt.Errorf("error handling initial message: %w", err)
@@ -149,12 +149,12 @@ func (a *Agent) startSession() error {
 	defer reader.Close()
 
 	for {
-		a.Printf("> ")
+		a.printf("> ")
 
 		input, err := reader.ReadLine()
 		if err != nil {
 			if errors.Is(err, ErrInterrupted) {
-				a.Printf("\nReceived termination signal, shutting down...\n")
+				a.printf("\nReceived termination signal, shutting down...\n")
 				return nil
 			}
 			if errors.Is(err, io.EOF) {
@@ -173,7 +173,7 @@ func (a *Agent) startSession() error {
 		}
 
 		if err := a.handleUserMessage(input); err != nil {
-			a.Printf("Error handling message: %v", err)
+			a.printf("Error handling message: %v", err)
 		}
 	}
 }
@@ -209,14 +209,14 @@ func (a *Agent) handleToolCalls(requests []*ai.ToolRequest) *ai.Message {
 		var part *ai.Part
 		toolResp, err := a.handleToolRequest(req)
 		if err != nil {
-			a.Printf("! %v", err)
+			a.printf("! %v", err)
 			part = ai.NewToolResponsePart(&ai.ToolResponse{
 				Name:   req.Name,
 				Ref:    req.Ref,
 				Output: err.Error(),
 			})
 		} else {
-			a.Println("~ ", toolResp.Output)
+			a.println("~ ", toolResp.Output)
 			part = ai.NewToolResponsePart(toolResp)
 		}
 		parts = append(parts, part)
@@ -228,10 +228,10 @@ func (a *Agent) handleToolCalls(requests []*ai.ToolRequest) *ai.Message {
 func (a *Agent) streamingCallback(ctx context.Context, chunk *ai.ModelResponseChunk) error {
 	for _, part := range chunk.Content {
 		if part.Kind == ai.PartText {
-			a.Printf("%s", part.Text)
+			a.printf("%s", part.Text)
 		}
 		if part.Kind == ai.PartReasoning {
-			a.Printf("_%s_", part.Text)
+			a.printf("_%s_", part.Text)
 		}
 	}
 	return nil
@@ -244,7 +244,7 @@ func (a *Agent) handleUserMessage(msg string) error {
 }
 
 func (a *Agent) generateLoop() error {
-	a.Println("* Thinking...")
+	a.println("* Thinking...")
 
 	prevTurnToolRequestsJSON := make(map[string]bool)
 
@@ -303,15 +303,15 @@ func (a *Agent) generate() (*ai.ModelResponse, error) {
 	if len(resp.Message.Content) == 0 {
 		return nil, &EmptyResponseError{}
 	}
-	a.Println("")
+	a.println("")
 	for _, part := range resp.Message.Content {
 		if part.Kind == ai.PartToolRequest {
 			req := part.ToolRequest
 			inputs, err := json.Marshal(req.Input)
 			if err != nil {
-				a.Printf("! error marshaling tool request input: %v\n", err)
+				a.printf("! error marshaling tool request input: %v\n", err)
 			} else {
-				a.Printf("* %s(%s)\n", req.Name, inputs)
+				a.printf("* %s(%s)\n", req.Name, inputs)
 			}
 		}
 	}
