@@ -246,6 +246,8 @@ func (a *Agent) handleUserMessage(msg string) error {
 func (a *Agent) generateLoop() error {
 	a.Println("* Thinking...")
 
+	prevTurnToolRequestsJSON := make(map[string]bool)
+
 	for range a.maxTurns {
 		resp, err := a.generate()
 		if err != nil {
@@ -258,6 +260,21 @@ func (a *Agent) generateLoop() error {
 		if len(toolRequests) == 0 {
 			return nil
 		}
+
+		newToolsRequestsJSON := make(map[string]bool)
+		for _, req := range toolRequests {
+			inputs, err := json.Marshal(req.Input)
+			if err != nil {
+				return fmt.Errorf("error marshaling tool request input: %w", err)
+			}
+			currJSON := fmt.Sprintf("%s:%s", req.Name, inputs)
+			newToolsRequestsJSON[currJSON] = true
+			if prevTurnToolRequestsJSON[currJSON] {
+				return fmt.Errorf("tool request %q with inputs %s repeated from previous turn, aborting to prevent infinite loop", req.Name, inputs)
+			}
+		}
+
+		prevTurnToolRequestsJSON = newToolsRequestsJSON
 
 		toolResp := a.handleToolCalls(toolRequests)
 		a.msgs = append(a.msgs, toolResp)
