@@ -159,7 +159,7 @@ func (a *Agent) startSession(ctx context.Context) error {
 		}
 
 		if err := a.handleUserMessage(ctx, input); err != nil {
-			a.printer.Printf("Error handling message: %v", err)
+			a.printer.Println("Error handling message: %v", err)
 		}
 	}
 }

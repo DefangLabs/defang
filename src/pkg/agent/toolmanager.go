@@ -104,7 +104,7 @@ func (t *ToolManager) handleToolRequest(ctx context.Context, req *ai.ToolRequest
 	}, nil
 }
 
-func (t *ToolManager) equalPrevious(toolRequests []*ai.ToolRequest) error {
+func (t *ToolManager) EqualPrevious(toolRequests []*ai.ToolRequest) error {
 	newToolsRequestsJSON := make(map[string]bool)
 	for _, req := range toolRequests {
 		inputs, err := json.Marshal(req.Input)
