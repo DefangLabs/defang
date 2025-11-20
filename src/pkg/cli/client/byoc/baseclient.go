@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -25,7 +26,7 @@ func (mp ErrMultipleProjects) Error() string {
 }
 
 type ProjectBackend interface {
-	BootstrapList(context.Context) ([]string, error)
+	BootstrapList(context.Context, bool) (iter.Seq[string], error)
 	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 }
 
@@ -99,12 +100,14 @@ func (b *ByocBaseClient) ServicePrivateDNS(name string) string {
 
 func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) {
 	// Get the list of projects from remote
-	projectNames, err := b.projectBackend.BootstrapList(ctx)
+	stacks, err := b.projectBackend.BootstrapList(ctx, false)
 	if err != nil {
 		return "", fmt.Errorf("no cloud projects found: %w", err)
 	}
-	for i, name := range projectNames {
-		projectNames[i] = strings.Split(name, "/")[0] // Remove the stack name
+	var projectNames []string
+	for name := range stacks {
+		projectName := strings.Split(name, "/")[0] // Remove the stack name
+		projectNames = append(projectNames, projectName)
 	}
 
 	if len(projectNames) == 0 {

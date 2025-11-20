@@ -49,3 +49,39 @@ func FromArn(arn string) Region {
 	}
 	return Region(parts[3])
 }
+
+func AllRegions() []Region {
+	return []Region{
+		AFSouth1,
+		APEast1,
+		APNortheast1,
+		APNortheast2,
+		APNortheast3,
+		APSouth1,
+		APSouth2,
+		APSoutheast1,
+		APSoutheast2,
+		APSoutheast3,
+		APSoutheast4,
+		CACentral,
+		CNNorth1,
+		CNNorthwest1,
+		EUCentral1,
+		EUCentral2,
+		EUNorth1,
+		EUSouth1,
+		EUSouth2,
+		EUWest1,
+		EUWest2,
+		EUWest3,
+		MECentral1,
+		MESouth1,
+		SAEast1,
+		USGovEast1,
+		USGovWest1,
+		USEast1,
+		USEast2,
+		USWest1,
+		USWest2,
+	}
+}

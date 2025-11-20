@@ -23,8 +23,6 @@ type AwsEcsCfn struct {
 	stackName string
 }
 
-// var _ types.Driver = (*AwsEcs)(nil)
-
 const stackTimeout = time.Minute * 3
 
 func OptionVPCAndSubnetID(ctx context.Context, vpcID, subnetID string) func(types.Driver) error {
