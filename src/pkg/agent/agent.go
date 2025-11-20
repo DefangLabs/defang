@@ -166,7 +166,7 @@ func (a *Agent) startSession(ctx context.Context) error {
 
 func (a *Agent) handleUserMessage(ctx context.Context, msg string) error {
 	a.msgs = append(a.msgs, ai.NewUserMessage(ai.NewTextPart(msg)))
-	responseMessages, err := a.generator.GenerateLoop(ctx, a.system, a.msgs, 3)
+	responseMessages, err := a.generator.GenerateLoop(ctx, a.system, a.msgs, 8)
 	if err != nil {
 		return err
 	}
