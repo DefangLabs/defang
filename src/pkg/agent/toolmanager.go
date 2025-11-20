@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 )
@@ -104,20 +105,20 @@ func (t *ToolManager) handleToolRequest(ctx context.Context, req *ai.ToolRequest
 	}, nil
 }
 
-func (t *ToolManager) EqualPrevious(toolRequests []*ai.ToolRequest) error {
+func (t *ToolManager) EqualPrevious(toolRequests []*ai.ToolRequest) bool {
 	newToolsRequestsJSON := make(map[string]bool)
 	for _, req := range toolRequests {
 		inputs, err := json.Marshal(req.Input)
 		if err != nil {
-			return fmt.Errorf("error marshaling tool request input: %w", err)
+			term.Debugf("error marshaling tool request input: %v", err)
 		}
 		currJSON := fmt.Sprintf("%s:%s", req.Name, inputs)
 		newToolsRequestsJSON[currJSON] = true
 		if t.prevTurnToolRequestsJSON[currJSON] {
-			return fmt.Errorf("tool request %q with inputs %s repeated from previous turn, aborting to prevent infinite loop", req.Name, inputs)
+			return true
 		}
 	}
 
 	t.prevTurnToolRequestsJSON = newToolsRequestsJSON
-	return nil
+	return false
 }

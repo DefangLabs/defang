@@ -67,7 +67,7 @@ func TestToolManager_InfiniteLoopDetection_TableDriven(t *testing.T) {
 	tests := []struct {
 		name           string
 		toolRequests   [][]*ai.ToolRequest
-		expectedErrors []bool
+		expectedResult []bool
 	}{
 		{
 			name: "repeated request triggers error",
@@ -85,7 +85,7 @@ func TestToolManager_InfiniteLoopDetection_TableDriven(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []bool{false, true},
+			expectedResult: []bool{false, true},
 		},
 		{
 			name: "different inputs do not trigger error",
@@ -103,7 +103,7 @@ func TestToolManager_InfiniteLoopDetection_TableDriven(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []bool{false, false},
+			expectedResult: []bool{false, false},
 		},
 		{
 			name: "different tools do not trigger error",
@@ -121,7 +121,7 @@ func TestToolManager_InfiniteLoopDetection_TableDriven(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []bool{false, false},
+			expectedResult: []bool{false, false},
 		},
 	}
 
@@ -131,12 +131,8 @@ func TestToolManager_InfiniteLoopDetection_TableDriven(t *testing.T) {
 				prevTurnToolRequestsJSON: make(map[string]bool),
 			}
 			for i, reqs := range tt.toolRequests {
-				err := toolManager.EqualPrevious(reqs)
-				if tt.expectedErrors[i] {
-					assert.Error(t, err)
-				} else {
-					assert.NoError(t, err)
-				}
+				result := toolManager.EqualPrevious(reqs)
+				assert.Equal(t, tt.expectedResult[i], result)
 			}
 		})
 	}

@@ -69,7 +69,7 @@ func (g *Generator) GenerateLoop(ctx context.Context, prompt string, messages []
 			return responseMessages, nil
 		}
 
-		if err := g.toolManager.EqualPrevious(toolRequests); err != nil {
+		if g.toolManager.EqualPrevious(toolRequests) {
 			return nil, err
 		}
 
