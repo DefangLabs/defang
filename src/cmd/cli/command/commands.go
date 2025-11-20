@@ -364,10 +364,11 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		stack, _ := cmd.Flags().GetString("stack")
-
 		// Read the global flags again from any .defangrc files in the cwd
-		config.loadRC(stack, cmd.Flags())
+		err = config.loadRC(config.getStack(cmd.Flags()), cmd.Flags())
+		if err != nil {
+			return err
+		}
 
 		config.Client, err = cli.Connect(ctx, getCluster())
 

@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 
@@ -43,25 +44,59 @@ type GlobalConfig struct {
 	Verbose        bool
 }
 
-func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) {
-	// If flag was changed by user, update config from flag value (flag takes priority)
-	// If flag was not changed by user, set flag from config value (env/RC file values)
-
+func (r *GlobalConfig) getStack(flags *pflag.FlagSet) string {
 	if !flags.Changed("stack") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_STACK"); ok {
 			r.Stack = fromEnv
 		}
 	}
 
+	return r.Stack
+}
+
+func (r *GlobalConfig) syncNonFlagEnvVars() error {
+	var err error
+
+	// Not flags but check these environment variables
+	if fromEnv, ok := os.LookupEnv("DEFANG_TTY"); ok {
+		r.HasTty, err = strconv.ParseBool(fromEnv)
+		if err != nil {
+			return err
+		}
+	}
+
+	if fromEnv, ok := os.LookupEnv("DEFANG_HIDE_UPDATE"); ok {
+		r.HideUpdate, err = strconv.ParseBool(fromEnv)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
+	// If flag was changed by user, update config from flag value (flag takes priority)
+	// If flag was not changed by user, set flag from config value (env/RC file values)
+	var err error
+
+	r.Stack = r.getStack(flags)
+
 	if !flags.Changed("verbose") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_VERBOSE"); ok {
-			r.Verbose, _ = strconv.ParseBool(fromEnv)
+			r.Verbose, err = strconv.ParseBool(fromEnv)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	if !flags.Changed("debug") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_DEBUG"); ok {
-			r.Debug, _ = strconv.ParseBool(fromEnv)
+			r.Debug, err = strconv.ParseBool(fromEnv)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -82,11 +117,9 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) {
 
 	if !flags.Changed("provider") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
-			err := r.ProviderID.Set(fromEnv)
+			err = r.ProviderID.Set(fromEnv)
 			if err != nil {
-				term.Debugf("invalid DEFANG_PROVIDER value: %v", err)
-				term.Debugf("resetting ProviderID to Auto")
-				r.ProviderID = cliClient.ProviderAuto
+				return err
 			}
 		}
 	}
@@ -99,42 +132,37 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) {
 
 	if !flags.Changed("from") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_SOURCE_PLATFORM"); ok {
-			err := r.SourcePlatform.Set(fromEnv)
+			err = r.SourcePlatform.Set(fromEnv)
 			if err != nil {
-				term.Debugf("invalid DEFANG_SOURCE_PLATFORM value: %v", err)
-
-				term.Debugf("resetting SourcePlatform to Unspecified")
-				r.SourcePlatform = migrate.SourcePlatformUnspecified
+				return err
 			}
 		}
 	}
 
 	if !flags.Changed("color") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_COLOR"); ok {
-			err := r.ColorMode.Set(fromEnv)
+			err = r.ColorMode.Set(fromEnv)
 			if err != nil {
-				term.Debugf("invalid DEFANG_COLOR value: %v", err)
+				return err
 			}
 		}
 	}
 
 	if !flags.Changed("non-interactive") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_NON_INTERACTIVE"); ok {
-			r.NonInteractive, _ = strconv.ParseBool(fromEnv)
+			r.NonInteractive, err = strconv.ParseBool(fromEnv)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
-	// Not flags but check these environment variables
-	if fromEnv, ok := os.LookupEnv("DEFANG_TTY"); ok {
-		r.HasTty, _ = strconv.ParseBool(fromEnv)
-	}
-
-	if fromEnv, ok := os.LookupEnv("DEFANG_HIDE_UPDATE"); ok {
-		r.HideUpdate, _ = strconv.ParseBool(fromEnv)
-	}
+	return r.syncNonFlagEnvVars()
 }
 
-func (r *GlobalConfig) loadRC(stackName string, flags *pflag.FlagSet) {
+func (r *GlobalConfig) loadRC(stackName string, flags *pflag.FlagSet) error {
+	// TODO: talk about if we give a non-existent stack name, do we error out or fall back slightly to .defangrc only
+	// if we do error out the the test behavior of Test_readGlobals needs to be adjusted
 	if stackName != "" {
 		rcfile := ".defangrc." + stackName
 		if err := godotenv.Load(rcfile); err != nil {
@@ -150,5 +178,10 @@ func (r *GlobalConfig) loadRC(stackName string, flags *pflag.FlagSet) {
 		term.Debugf("loaded globals from %s", rcfile)
 	}
 
-	r.syncFlagsWithEnv(flags)
+	err := r.syncFlagsWithEnv(flags)
+	if err != nil {
+		return fmt.Errorf("error syncing flags with env: %v", err)
+	}
+
+	return nil
 }

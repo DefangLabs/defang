@@ -22,7 +22,7 @@ func Test_readGlobals(t *testing.T) {
 
 	t.Run("OS env beats any .defangrc file", func(t *testing.T) {
 		t.Setenv("VALUE", "from OS env")
-		testConfig.loadRC("test", flags)
+		testConfig.loadRC("test;", flags)
 		if v := os.Getenv("VALUE"); v != "from OS env" {
 			t.Errorf("expected VALUE to be 'from OS env', got '%s'", v)
 		}
