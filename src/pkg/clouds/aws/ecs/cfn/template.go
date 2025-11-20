@@ -183,7 +183,7 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 			// TODO: support pull through cache for other registries
 			// TODO: support private repos (with or without pull-through cache)
 		}
-		if strings.TrimSpace(image) == "" {
+		if image == "" {
 			return nil, fmt.Errorf("container %v is using invalid image: %q", task.Name, task.Image)
 		}
 		images = append(images, image)
