@@ -62,7 +62,14 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 	if a.SecurityGroupID != "" {
 		securityGroups = []string{a.SecurityGroupID}
 	}
+	capacityProvider := "FARGATE"
+	if a.Spot {
+		capacityProvider = "FARGATE_SPOT"
+	}
 	rti := ecs.RunTaskInput{
+		CapacityProviderStrategy: []types.CapacityProviderStrategyItem{
+			{CapacityProvider: ptr.String(capacityProvider), Weight: 1},
+		},
 		Count:          ptr.Int32(taskCount),
 		LaunchType:     types.LaunchTypeFargate,
 		TaskDefinition: ptr.String(a.TaskDefARN),

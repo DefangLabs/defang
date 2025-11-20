@@ -9,5 +9,4 @@ const (
 	ParamsOidcProviderSubjects    = "OidcProviderSubjects"
 	ParamsOidcProviderThumbprints = "OidcProviderThumbprints"
 	ParamsRetainBucket            = "RetainBucket"
-	ParamsUseSpotInstances        = "UseSpotInstances"
 )

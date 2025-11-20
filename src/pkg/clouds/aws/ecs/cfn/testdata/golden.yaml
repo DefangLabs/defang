@@ -21,13 +21,27 @@ Conditions:
         Fn::Equals:
             - Ref: EnablePullThroughCache
             - "true"
+    OidcProvider:
+        Fn::And:
+            - Fn::Not:
+                - Fn::Equals:
+                    - Ref: OidcProviderIssuer
+                    - ""
+            - Fn::Not:
+                - Fn::Equals:
+                    - Fn::Join:
+                        - ""
+                        - Ref: OidcProviderSubjects
+                    - ""
+            - Fn::Not:
+                - Fn::Equals:
+                    - Fn::Join:
+                        - ""
+                        - Ref: OidcProviderThumbprints
+                    - ""
     RetainS3Bucket:
         Fn::Equals:
             - Ref: RetainBucket
-            - "true"
-    UseSpot:
-        Fn::Equals:
-            - Ref: UseSpotInstances
             - "true"
 Description: 'Defang AWS CloudFormation template for an ECS task. Don''t delete: use the CLI instead.'
 Outputs:
@@ -90,19 +104,24 @@ Parameters:
         Default: ""
         Description: ID of existing VPC to use (leave empty to create new VPC)
         Type: String
+    OidcProviderIssuer:
+        Default: ""
+        Description: OIDC provider trusted issuer (optional)
+        Type: String
+    OidcProviderSubjects:
+        Default: ""
+        Description: OIDC provider trusted subject patterns (optional)
+        Type: CommaDelimitedList
+    OidcProviderThumbprints:
+        Default: ""
+        Description: OIDC provider thumbprints (optional)
+        Type: CommaDelimitedList
     RetainBucket:
         AllowedValues:
             - "true"
             - "false"
         Default: "true"
         Description: Whether to retain the S3 bucket on stack deletion
-        Type: String
-    UseSpotInstances:
-        AllowedValues:
-            - "true"
-            - "false"
-        Default: "false"
-        Description: Whether to use FARGATE_SPOT capacity provider
         Type: String
 Resources:
     Bucket:
@@ -118,21 +137,39 @@ Resources:
             VersioningConfiguration:
                 Status: Enabled
         Type: AWS::S3::Bucket
+    CIRole:
+        Condition: OidcProvider
+        Properties:
+            AssumeRolePolicyDocument:
+                Statement:
+                    - Action:
+                        - sts:AssumeRoleWithWebIdentity
+                      Condition:
+                        StringEquals:
+                            eyAiRm46OlN1YiIgOiAiJHtPaWRjUHJvdmlkZXJJc3N1ZXJ9OmF1ZCIgfQ==: sts.amazonaws.com
+                        StringLike:
+                            eyAiRm46OlN1YiIgOiAiJHtPaWRjUHJvdmlkZXJJc3N1ZXJ9OnN1YiIgfQ==:
+                                Ref: OidcProviderSubjects
+                      Effect: Allow
+                      Principal:
+                        Federated:
+                            Ref: OIDCProvider
+                Version: "2012-10-17"
+            ManagedPolicyArns:
+                - arn:aws:iam::aws:policy/AdministratorAccess
+            Tags:
+                - Key: CreatedBy
+                  Value: crun
+        Type: AWS::IAM::Role
     CapacityProvider:
         Properties:
             CapacityProviders:
-                - Fn::If:
-                    - UseSpot
-                    - FARGATE_SPOT
-                    - FARGATE
+                - FARGATE
+                - FARGATE_SPOT
             Cluster:
                 Ref: Cluster
             DefaultCapacityProviderStrategy:
-                - CapacityProvider:
-                    Fn::If:
-                        - UseSpot
-                        - FARGATE_SPOT
-                        - FARGATE
+                - CapacityProvider: FARGATE
                   Weight: 1
         Type: AWS::ECS::ClusterCapacityProviderAssociations
     Cluster:
@@ -204,6 +241,16 @@ Resources:
                 - Key: CreatedBy
                   Value: crun
         Type: AWS::Logs::LogGroup
+    OIDCProvider:
+        Condition: OidcProvider
+        Properties:
+            ClientIdList:
+                - sts.amazonaws.com
+            ThumbprintList:
+                - Ref: OidcProviderThumbprints
+            Url:
+                Fn::Sub: https://${OidcProviderIssuer}
+        Type: AWS::IAM::OIDCProvider
     PrivateRepoSecret:
         Condition: EnableDockerPullThroughCache
         Properties:
@@ -260,7 +307,7 @@ Resources:
         Type: AWS::EC2::VPCEndpoint
     SecurityGroup:
         Properties:
-            GroupDescription: Security group for the ECS task that allows all outbound and inbound traffic
+            GroupDescription: Security group for the ECS task that allows all outbound traffic
             Tags:
                 - Key: CreatedBy
                   Value: crun

@@ -18,6 +18,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	byocAws "github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
@@ -140,6 +141,17 @@ func Execute(ctx context.Context) error {
 	return nil
 }
 
+var cloudformationCmd = &cobra.Command{
+	Use:    "cloudformation",
+	Short:  "CloudFormation template related commands",
+	Hidden: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		template, err := byocAws.PrintCloudFormationTemplate()
+		term.Println(string(template))
+		return err
+	},
+}
+
 /*
 SetupCommands initializes and configures the entire Defang CLI command structure.
 It registers all global flags that bind to GlobalConfig, sets up all subcommands with their
@@ -227,8 +239,10 @@ func SetupCommands(ctx context.Context, version string) {
 	lsCommand.Aliases = []string{"getServices", "ps", "ls", "list"}
 	RootCmd.AddCommand(lsCommand)
 
-	// Get Status Command
-	RootCmd.AddCommand(getVersionCmd)
+	// Version Command
+	RootCmd.AddCommand(versionCmd)
+
+	RootCmd.AddCommand(cloudformationCmd)
 
 	// Config Command (was: secrets)
 	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
@@ -627,7 +641,7 @@ func collectUnsetEnvVars(project *composeTypes.Project) []string {
 	return nil
 }
 
-var getVersionCmd = &cobra.Command{
+var versionCmd = &cobra.Command{
 	Use:     "version",
 	Args:    cobra.NoArgs,
 	Aliases: []string{"ver", "stat", "status"}, // for backwards compatibility

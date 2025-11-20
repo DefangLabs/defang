@@ -43,7 +43,7 @@ func TestGetCacheRepoPrefix(t *testing.T) {
 }
 
 func TestCreateTemplate(t *testing.T) {
-	template, err := createTemplate("test", []types.Container{
+	template, err := CreateTemplate("test", []types.Container{
 		{Image: "alpine:latest"},
 		{Image: "docker.io/library/alpine:latest"},
 		{Image: "public.ecr.aws/docker/library/alpine:latest"},

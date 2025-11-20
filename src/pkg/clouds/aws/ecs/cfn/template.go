@@ -49,7 +49,6 @@ const TemplateRevision = 2 // bump this when the template changes!
 // by providing different parameter values during stack creation/update.
 //
 // Parameters supported:
-// - UseSpotInstances: "true"/"false" - Whether to use FARGATE_SPOT capacity provider
 // - ExistingVpcId: VPC ID string or empty to create new VPC
 // - RetainBucket: "true"/"false" - Whether to retain S3 bucket on stack deletion
 // - EnablePullThroughCache: "true"/"false" - Whether to enable ECR pull-through cache
@@ -58,7 +57,7 @@ const TemplateRevision = 2 // bump this when the template changes!
 // - OidcProviderIssuer: OIDC provider trusted issuer (optional)
 // - OidcProviderSubjects: Comma-delimited list of OIDC provider trusted subject patterns (optional)
 // - OidcProviderThumbprints: Comma-delimited list of OIDC provider thumbprints (optional)
-func createTemplate(stack string, containers []types.Container) (*cloudformation.Template, error) {
+func CreateTemplate(stack string, containers []types.Container) (*cloudformation.Template, error) {
 	prefix := stack + "-"
 
 	defaultTags := []tags.Tag{
@@ -72,12 +71,6 @@ func createTemplate(stack string, containers []types.Container) (*cloudformation
 	template.Description = "Defang AWS CloudFormation template for an ECS task. Don't delete: use the CLI instead."
 
 	// Parameters
-	template.Parameters[ParamsUseSpotInstances] = cloudformation.Parameter{
-		Type:          "String",
-		Default:       ptr.String("false"),
-		AllowedValues: []any{"true", "false"},
-		Description:   ptr.String("Whether to use FARGATE_SPOT capacity provider"),
-	}
 	template.Parameters[ParamsExistingVpcId] = cloudformation.Parameter{
 		Type:        "String", // TODO: use "AWS::EC2::VPC::Id" but seems it cannot be optional
 		Default:     ptr.String(""),
@@ -124,8 +117,6 @@ func createTemplate(stack string, containers []types.Container) (*cloudformation
 	}
 
 	// Conditions
-	const _condUseSpot = "UseSpot"
-	template.Conditions[_condUseSpot] = cloudformation.Equals(cloudformation.Ref(ParamsUseSpotInstances), "true")
 	const _condCreateVpcResources = "CreateVpcResources"
 	template.Conditions[_condCreateVpcResources] = cloudformation.Equals(cloudformation.Ref(ParamsExistingVpcId), "")
 	const _condRetainS3Bucket = "RetainS3Bucket"
@@ -155,6 +146,19 @@ func createTemplate(stack string, containers []types.Container) (*cloudformation
 			Status: "Enabled",
 		},
 	}
+	// 1b. TODO: add lifecycle policy to the bucket to delete old versions
+	// const _bucketLifecyclePolicy = "BucketLifecyclePolicy"
+	// template.Resources[_bucketLifecyclePolicy] = &s3.Bucket_LifecycleConfiguration{
+	// 	Rules: []s3.Bucket_LifecycleConfiguration_Rule{
+	// 		{
+	// 			Id:     ptr.String("DeleteOldVersions"),
+	// 			Status: "Enabled",
+	// 			NoncurrentVersionExpiration: &s3.Bucket_LifecycleConfiguration_Rule_NoncurrentVersionExpiration{
+	// 				NoncurrentDays: ptr.Int(30),
+	// 			},
+	// 		},
+	// 	},
+	// }
 
 	// 2. ECS cluster
 	const _cluster = "Cluster"
@@ -166,13 +170,11 @@ func createTemplate(stack string, containers []types.Container) (*cloudformation
 	// 3. ECS capacity provider
 	const _capacityProvider = "CapacityProvider"
 	template.Resources[_capacityProvider] = &ecs.ClusterCapacityProviderAssociations{
-		Cluster: cloudformation.Ref(_cluster),
-		CapacityProviders: []string{
-			cloudformation.If(_condUseSpot, "FARGATE_SPOT", "FARGATE"),
-		},
+		Cluster:           cloudformation.Ref(_cluster),
+		CapacityProviders: []string{"FARGATE", "FARGATE_SPOT"},
 		DefaultCapacityProviderStrategy: []ecs.ClusterCapacityProviderAssociations_CapacityProviderStrategy{
 			{
-				CapacityProvider: cloudformation.If(_condUseSpot, "FARGATE_SPOT", "FARGATE"),
+				CapacityProvider: "FARGATE", // task may override to FARGATE_SPOT
 				Weight:           ptr.Int(1),
 			},
 		},

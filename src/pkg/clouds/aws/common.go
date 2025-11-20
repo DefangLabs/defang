@@ -27,7 +27,7 @@ func (a *Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
 		return cfg, err
 	}
 	if cfg.Region == "" {
-		return cfg, errors.New("missing AWS region: set AWS_REGION or edit your AWS profile")
+		return cfg, errors.New("missing AWS region: set AWS_REGION or edit your AWS profile at ~/.aws/config")
 	}
 	a.Region = Region(cfg.Region)
 	return cfg, err

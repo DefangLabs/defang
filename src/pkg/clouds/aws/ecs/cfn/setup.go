@@ -137,17 +137,13 @@ func (a *AwsEcsCfn) createStackAndWait(ctx context.Context, templateBody string,
 }
 
 func (a *AwsEcsCfn) SetUp(ctx context.Context, containers []types.Container) error {
-	template, err := createTemplate(a.stackName, containers)
+	template, err := CreateTemplate(a.stackName, containers)
 	if err != nil {
 		return fmt.Errorf("failed to create CloudFormation template: %w", err)
 	}
 
 	// Set parameter values based on current configuration
 	parameters := []cfnTypes.Parameter{
-		{
-			ParameterKey:   ptr.String(ParamsUseSpotInstances),
-			ParameterValue: ptr.String(strconv.FormatBool(a.Spot)),
-		},
 		{
 			ParameterKey:   ptr.String(ParamsExistingVpcId),
 			ParameterValue: ptr.String(a.VpcID),
