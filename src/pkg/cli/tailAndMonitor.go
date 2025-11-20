@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -100,7 +99,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 		}
 	}
 
-	return serviceStates, fmt.Errorf("deployment_id %q: %w", tailOptions.Deployment, errors.Join(cdErr, svcErr, tailErr))
+	return serviceStates, errors.Join(cdErr, svcErr, tailErr)
 }
 
 func CanMonitorService(service *compose.ServiceConfig) bool {
