@@ -9,15 +9,33 @@ import (
 )
 
 func CaptureTerm(f func() (string, error)) (string, error) {
+	return captureTerm(false, f)
+}
+
+func TeeTerm(f func() (string, error)) (string, error) {
+	return captureTerm(true, f)
+}
+
+func captureTerm(tee bool, f func() (string, error)) (string, error) {
 	// replace the default term with a new term that writes to a buffer
 	originalTerm := term.DefaultTerm
 	outBuffer := bytes.NewBuffer(nil)
 	errBuffer := bytes.NewBuffer(nil)
+	var outWriter io.Writer
+	var errWriter io.Writer
+	if tee {
+		outWriter = io.MultiWriter(outBuffer, os.Stdout)
+		errWriter = io.MultiWriter(errBuffer, os.Stderr)
+		// Replace newTerm creation below to use outWriter and errWriter
+	} else {
+		outWriter = outBuffer
+		errWriter = errBuffer
+	}
 	newTerm := term.NewTerm(
 		os.Stdin,
 		// whenever something is written to outBuffer or errBuffer, also write it to the original term's outStream
-		io.MultiWriter(outBuffer, os.Stdout),
-		io.MultiWriter(errBuffer, os.Stderr),
+		outWriter,
+		errWriter,
 	)
 	term.DefaultTerm = newTerm
 	defer func() {

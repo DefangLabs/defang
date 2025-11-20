@@ -55,7 +55,7 @@ func CollectDefangTools(cluster string, providerId *client.ProviderID) []ai.Tool
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return tools.CaptureTerm(func() (string, error) {
+				return tools.TeeTerm(func() (string, error) {
 					return tools.HandleDeployTool(ctx.Context, loader, providerId, cluster, cli)
 				})
 			},
