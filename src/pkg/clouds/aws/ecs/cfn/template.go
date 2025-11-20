@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"math"
 	"os"
 	"strconv"
@@ -57,7 +58,7 @@ type TemplateOverrides struct {
 
 const TemplateRevision = 1 // bump this when the template changes!
 
-func createTemplate(stack string, containers []types.Container, overrides TemplateOverrides) *cloudformation.Template {
+func createTemplate(stack string, containers []types.Container, overrides TemplateOverrides) (*cloudformation.Template, error) {
 	prefix := stack + "-"
 
 	defaultTags := []tags.Tag{
@@ -180,6 +181,9 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 		} else {
 			// TODO: support pull through cache for other registries
 			// TODO: support private repos (with or without pull-through cache)
+		}
+		if image == "" {
+			return nil, fmt.Errorf("container %v is using invalid image: %q", task.Name, task.Image)
 		}
 		images = append(images, image)
 	}
@@ -541,5 +545,5 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 		Value:       cloudformation.Int(TemplateRevision),
 	}
 
-	return template
+	return template, nil
 }
