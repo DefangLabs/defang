@@ -3,11 +3,4 @@ logName=~"logs/run.googleapis.com%2F(stdout|stderr)$" OR
 logName="projects/test-project/logs/cloudbuild" OR
 logName="projects/test-project/logs/cos_containers" OR
 logName="projects/test-project/logs/docker-logs"
-) AND (
-(
-  resource.type = "cloud_run_job"
-) OR (
-  resource.type="build"
-  labels.build_tags =~ "__[a-zA-Z0-9-]{1,63}_"
-)
 )

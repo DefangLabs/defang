@@ -572,13 +572,11 @@ func (b *ByocGcp) getLogStream(ctx context.Context, gcpLogsClient GcpLogsClient,
 		return nil, err
 	}
 
-	startTime := time.Now()
 	if req.Since.IsValid() {
-		startTime = req.Since.AsTime()
+		logStream.AddSince(req.Since.AsTime())
 	}
-	var endTime time.Time
 	if req.Until.IsValid() {
-		endTime = req.Until.AsTime()
+		logStream.AddUntil(req.Until.AsTime())
 	}
 	etag := req.Etag
 	if etag == b.cdExecution { // Do not pass the cd execution name as etag
@@ -598,11 +596,9 @@ func (b *ByocGcp) getLogStream(ctx context.Context, gcpLogsClient GcpLogsClient,
 		// TODO: update stack (1st param) to b.PulumiStack
 		logStream.AddServiceLog("", req.Project, etag, req.Services) // Service logs
 	}
-	logStream.AddSince(startTime)
-	logStream.AddUntil(endTime)
 	logStream.AddFilter(req.Pattern)
 	if req.Follow {
-		logStream.StartFollow(startTime)
+		logStream.StartFollow(req.Since.AsTime())
 	} else if req.Since.IsValid() {
 		logStream.StartHead(req.Limit)
 	} else {

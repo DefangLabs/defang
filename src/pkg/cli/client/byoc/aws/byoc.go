@@ -695,6 +695,13 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	//  * No Etag, service:		tail all tasks/services with that service name
 	//  * Etag, service:		tail that task/service
 	var tailStream ecs.LiveTailStream
+	var start, end time.Time
+	if req.Since.IsValid() {
+		start = req.Since.AsTime()
+	}
+	if req.Until.IsValid() {
+		end = req.Until.AsTime()
+	}
 	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is a task ID
 		if req.Follow {
 			tailStream, err = b.driver.TailTaskID(ctx, cw, etag)
@@ -706,7 +713,7 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 				}
 			}
 		} else {
-			tailStream, err = b.driver.QueryTaskID(ctx, cw, etag, time.Time{}, time.Now(), req.Limit)
+			tailStream, err = b.driver.QueryTaskID(ctx, cw, etag, start, end, req.Limit)
 			if err == nil {
 				b.cdTaskArn, err = b.driver.GetTaskArn(etag)
 				etag = "" // no need to filter by etag
@@ -719,13 +726,6 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		var service string
 		if len(req.Services) == 1 {
 			service = req.Services[0]
-		}
-		var start, end time.Time
-		if req.Since.IsValid() {
-			start = req.Since.AsTime()
-		}
-		if req.Until.IsValid() {
-			end = req.Until.AsTime()
 		}
 		cw, err := ecs.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region
 		if err != nil {
