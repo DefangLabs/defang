@@ -20,22 +20,3 @@ const (
 	SYD1 Region = "syd1"
 	TOR1 Region = "tor1"
 )
-
-func AllRegions() []Region {
-	return []Region{
-		AMS2,
-		AMS3,
-		BLR1,
-		FRA1,
-		LON1,
-		NYC1,
-		NYC2,
-		NYC3,
-		SFO1,
-		SFO2,
-		SFO3,
-		SGP1,
-		SYD1,
-		TOR1,
-	}
-}

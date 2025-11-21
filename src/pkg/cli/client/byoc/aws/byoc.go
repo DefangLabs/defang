@@ -22,7 +22,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -870,9 +869,7 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 
 func (b *ByocAws) BootstrapList(ctx context.Context, allRegions bool) (iter.Seq[string], error) {
 	if allRegions {
-		allRegions := region.AllRegions()
-		slices.Reverse(allRegions) // us-* first
-		return listPulumiStacksInRegionsParallel(ctx, allRegions), nil
+		return listPulumiStacksInRegionsParallel(ctx)
 	} else {
 		bucketName := b.bucketName()
 		if bucketName == "" {
@@ -881,7 +878,6 @@ func (b *ByocAws) BootstrapList(ctx context.Context, allRegions bool) (iter.Seq[
 			}
 			bucketName = b.bucketName()
 		}
-
 		return listPulumiStacksInBucket(ctx, b.driver.Region, bucketName)
 	}
 }
