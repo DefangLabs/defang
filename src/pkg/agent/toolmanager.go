@@ -59,6 +59,14 @@ func (t *ToolManager) RegisterTools(tools ...ai.Tool) {
 }
 
 func (t *ToolManager) HandleToolCalls(ctx context.Context, requests []*ai.ToolRequest) *ai.Message {
+	if t.EqualPrevious(requests) {
+		return ai.NewMessage(ai.RoleTool, nil, ai.NewToolResponsePart(&ai.ToolResponse{
+			Name:   "error",
+			Ref:    "error",
+			Output: "The same tool request was made in the previous turn. To prevent infinite loops, no action was taken.",
+		}))
+	}
+
 	parts := []*ai.Part{}
 	for _, req := range requests {
 		var part *ai.Part

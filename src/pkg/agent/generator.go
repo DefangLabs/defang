@@ -69,10 +69,6 @@ func (g *Generator) GenerateLoop(ctx context.Context, prompt string, messages []
 			return responseMessages, nil
 		}
 
-		if g.toolManager.EqualPrevious(toolRequests) {
-			return nil, err
-		}
-
 		toolResp := g.toolManager.HandleToolCalls(ctx, toolRequests)
 		responseMessages = append(responseMessages, toolResp)
 	}
