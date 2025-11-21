@@ -1,7 +1,6 @@
 package command
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 
@@ -14,7 +13,8 @@ import (
 	"github.com/spf13/pflag"
 )
 
-var config GlobalConfig = GlobalConfig{
+var global GlobalConfig = GlobalConfig{
+	// set default values
 	ColorMode:      ColorAuto,
 	Cluster:        cluster.DefangFabric,
 	Debug:          false,
@@ -28,6 +28,11 @@ var config GlobalConfig = GlobalConfig{
 }
 
 type GlobalConfig struct {
+	/*
+		GlobalConfig holds the global configuration options for the CLI.
+		These options can be set via command-line flags, environment variables,
+		or (.defangrc) configuration files.
+	*/
 	Client         *cliClient.GrpcClient
 	Cluster        string
 	ColorMode      ColorMode
@@ -45,6 +50,8 @@ type GlobalConfig struct {
 }
 
 func (r *GlobalConfig) getStack(flags *pflag.FlagSet) string {
+	// If flag was changed by user, use that value, else check env var
+	// This is used to determine which RC file to load at startup
 	if !flags.Changed("stack") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_STACK"); ok {
 			r.Stack = fromEnv
@@ -55,6 +62,7 @@ func (r *GlobalConfig) getStack(flags *pflag.FlagSet) string {
 }
 
 func (r *GlobalConfig) syncNonFlagEnvVars() error {
+	// Not flags but check these environment variables for values set by user
 	var err error
 
 	// Not flags but check these environment variables
@@ -160,9 +168,7 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 	return r.syncNonFlagEnvVars()
 }
 
-func (r *GlobalConfig) loadRC(stackName string, flags *pflag.FlagSet) error {
-	// TODO: talk about if we give a non-existent stack name, do we error out or fall back slightly to .defangrc only
-	// if we do error out the the test behavior of Test_readGlobals needs to be adjusted
+func (r *GlobalConfig) loadRC(stackName string) {
 	if stackName != "" {
 		rcfile := ".defangrc." + stackName
 		if err := godotenv.Load(rcfile); err != nil {
@@ -178,10 +184,4 @@ func (r *GlobalConfig) loadRC(stackName string, flags *pflag.FlagSet) error {
 		term.Debugf("loaded globals from %s", rcfile)
 	}
 
-	err := r.syncFlagsWithEnv(flags)
-	if err != nil {
-		return fmt.Errorf("error syncing flags with env: %v", err)
-	}
-
-	return nil
 }

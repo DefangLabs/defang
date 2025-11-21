@@ -24,7 +24,7 @@ var cdCmd = &cobra.Command{
 
 		if json {
 			os.Setenv("DEFANG_JSON", "1")
-			config.Verbose = true
+			global.Verbose = true
 		}
 	},
 }
@@ -51,7 +51,7 @@ var cdDestroyCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.BootstrapCommand(cmd.Context(), projectName, config.Verbose, provider, "destroy")
+		return cli.BootstrapCommand(cmd.Context(), projectName, global.Verbose, provider, "destroy")
 	},
 }
 
@@ -77,7 +77,7 @@ var cdDownCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.BootstrapCommand(cmd.Context(), projectName, config.Verbose, provider, "down")
+		return cli.BootstrapCommand(cmd.Context(), projectName, global.Verbose, provider, "down")
 	},
 }
 
@@ -103,7 +103,7 @@ var cdRefreshCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.BootstrapCommand(cmd.Context(), projectName, config.Verbose, provider, "refresh")
+		return cli.BootstrapCommand(cmd.Context(), projectName, global.Verbose, provider, "refresh")
 	},
 }
 
@@ -129,7 +129,7 @@ var cdCancelCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.BootstrapCommand(cmd.Context(), projectName, config.Verbose, provider, "cancel")
+		return cli.BootstrapCommand(cmd.Context(), projectName, global.Verbose, provider, "cancel")
 	},
 }
 
@@ -170,7 +170,7 @@ var cdListCmd = &cobra.Command{
 			}
 
 			// FIXME: this needs auth because it spawns the CD task
-			return cli.BootstrapCommand(cmd.Context(), "", config.Verbose, provider, "list")
+			return cli.BootstrapCommand(cmd.Context(), "", global.Verbose, provider, "list")
 		}
 		return cli.BootstrapLocalList(cmd.Context(), provider)
 	},
@@ -198,7 +198,7 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.Preview(cmd.Context(), project, config.Client, provider, config.Mode)
+		return cli.Preview(cmd.Context(), project, global.Client, provider, global.Mode)
 	},
 }
 

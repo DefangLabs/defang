@@ -16,13 +16,11 @@ func Test_readGlobals(t *testing.T) {
 	t.Chdir("testdata")
 
 	var testConfig GlobalConfig
-	testConfig = GlobalConfig{} // reset globals
-	flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	flags.StringVarP(&testConfig.Stack, "stack", "s", testConfig.Stack, "stack name (for BYOC providers)")
+	testConfig = GlobalConfig{}
 
 	t.Run("OS env beats any .defangrc file", func(t *testing.T) {
 		t.Setenv("VALUE", "from OS env")
-		testConfig.loadRC("test", flags)
+		testConfig.loadRC("test")
 		if v := os.Getenv("VALUE"); v != "from OS env" {
 			t.Errorf("expected VALUE to be 'from OS env', got '%s'", v)
 		}
@@ -30,7 +28,7 @@ func Test_readGlobals(t *testing.T) {
 	})
 
 	t.Run(".defangrc.test beats .defangrc", func(t *testing.T) {
-		testConfig.loadRC("test", flags)
+		testConfig.loadRC("test")
 		if v := os.Getenv("VALUE"); v != "from .defangrc.test" {
 			t.Errorf("expected VALUE to be 'from .defangrc.test', got '%s'", v)
 		}
@@ -38,7 +36,7 @@ func Test_readGlobals(t *testing.T) {
 	})
 
 	t.Run(".defangrc used if no stack", func(t *testing.T) {
-		testConfig.loadRC("non-existent-stack", flags)
+		testConfig.loadRC("non-existent-stack")
 		if v := os.Getenv("VALUE"); v != "from .defangrc" {
 			t.Errorf("expected VALUE to be 'from .defangrc', got '%s'", v)
 		}
@@ -46,9 +44,9 @@ func Test_readGlobals(t *testing.T) {
 	})
 }
 
-func Test_priorityLoading(t *testing.T) {
-	// This test to ensure the loading order is correct
-	// when loading from env, rc files, and flags.
+func Test_configurationPrecedence(t *testing.T) {
+	// Test various combinations of flags, environment variables, and .defangrc files
+	// no matter the order they are applied, or combination, the final configuration should be correct.
 	// The precedence should be: flags > env vars > .defangrc files
 
 	// make a default config for for comparison and copying
@@ -339,8 +337,10 @@ func Test_priorityLoading(t *testing.T) {
 			}
 
 			t.Chdir(tempDir)
+
 			// simulates the actual loading sequence
-			testConfig.loadRC(tt.rcStack.stackname, flags)
+			testConfig.loadRC(tt.rcStack.stackname)
+			testConfig.syncFlagsWithEnv(flags)
 
 			// verify the final configuration matches expectations
 			if testConfig.Mode.String() != tt.expected.Mode.String() {
