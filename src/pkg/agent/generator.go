@@ -54,6 +54,12 @@ func (g *Generator) streamingCallback(_ context.Context, chunk *ai.ModelResponse
 	return nil
 }
 
+type maxTurnsReachedError struct{}
+
+func (e *maxTurnsReachedError) Error() string {
+	return "maximum number of turns reached"
+}
+
 func (g *Generator) HandleMessage(ctx context.Context, prompt string, maxTurns int, message *ai.Message) error {
 	if message != nil {
 		g.messages = append(g.messages, message)
@@ -76,7 +82,7 @@ func (g *Generator) HandleMessage(ctx context.Context, prompt string, maxTurns i
 		g.messages = append(g.messages, toolResp)
 	}
 
-	return nil
+	return &maxTurnsReachedError{}
 }
 
 func (g *Generator) generate(ctx context.Context, prompt string, messages []*ai.Message) (*ai.ModelResponse, error) {

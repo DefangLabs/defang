@@ -27,7 +27,6 @@ func (m *mockGenkitGenerator) Generate(ctx context.Context, prompt string, tools
 }
 
 func TestHandleMessage(t *testing.T) {
-	// get the current working directory
 	prompt := "Test prompt"
 	cwd, err := os.Getwd()
 	assert.NoError(t, err)
@@ -36,10 +35,11 @@ func TestHandleMessage(t *testing.T) {
 		maxTurns                 int
 		generatorResponses       []*ai.ModelResponse
 		expectedResponseMessages []*ai.Message
+		expectedError            error
 	}{
 		{
 			name:     "GenerateLoop no tool calls",
-			maxTurns: 1,
+			maxTurns: 2,
 			generatorResponses: []*ai.ModelResponse{
 				{
 					Message: ai.NewModelTextMessage("Response 1"),
@@ -52,7 +52,7 @@ func TestHandleMessage(t *testing.T) {
 		},
 		{
 			name:     "GenerateLoop with tool calls",
-			maxTurns: 1,
+			maxTurns: 2,
 			generatorResponses: []*ai.ModelResponse{
 				{
 					Message: ai.NewModelMessage(
@@ -60,6 +60,56 @@ func TestHandleMessage(t *testing.T) {
 							Name: "read_file",
 							Input: map[string]any{
 								"path": "value1",
+							},
+						}),
+					),
+				},
+				{
+					Message: ai.NewModelTextMessage("All done"),
+				},
+			},
+			expectedResponseMessages: []*ai.Message{
+				ai.NewUserTextMessage("User message"),
+				ai.NewModelMessage(
+					ai.NewToolRequestPart(&ai.ToolRequest{
+						Name: "read_file",
+						Input: map[string]any{
+							"path": "value1",
+						},
+					}),
+				),
+				ai.NewMessage(ai.RoleTool, nil,
+					ai.NewToolResponsePart(&ai.ToolResponse{
+						Name:   "read_file",
+						Ref:    "",
+						Output: "error calling tool read_file: open " + cwd + "/value1: no such file or directory",
+					}),
+				),
+				ai.NewModelMessage(
+					ai.NewTextPart("All done"),
+				),
+			},
+		},
+		{
+			name:     "GenerateLoop with tool calls in both responses",
+			maxTurns: 2,
+			generatorResponses: []*ai.ModelResponse{
+				{
+					Message: ai.NewModelMessage(
+						ai.NewToolRequestPart(&ai.ToolRequest{
+							Name: "read_file",
+							Input: map[string]any{
+								"path": "value1",
+							},
+						}),
+					),
+				},
+				{
+					Message: ai.NewModelMessage(
+						ai.NewToolRequestPart(&ai.ToolRequest{
+							Name: "read_file",
+							Input: map[string]any{
+								"path": "value2",
 							},
 						}),
 					),
@@ -82,7 +132,23 @@ func TestHandleMessage(t *testing.T) {
 						Output: "error calling tool read_file: open " + cwd + "/value1: no such file or directory",
 					}),
 				),
+				ai.NewModelMessage(
+					ai.NewToolRequestPart(&ai.ToolRequest{
+						Name: "read_file",
+						Input: map[string]any{
+							"path": "value2",
+						},
+					}),
+				),
+				ai.NewMessage(ai.RoleTool, nil,
+					ai.NewToolResponsePart(&ai.ToolResponse{
+						Name:   "read_file",
+						Ref:    "",
+						Output: "error calling tool read_file: open " + cwd + "/value2: no such file or directory",
+					}),
+				),
 			},
+			expectedError: &maxTurnsReachedError{},
 		},
 	}
 
@@ -107,7 +173,11 @@ func TestHandleMessage(t *testing.T) {
 
 			message := ai.NewUserTextMessage("User message")
 			err := generator.HandleMessage(ctx, prompt, tt.maxTurns, message)
-			assert.NoError(t, err, "GenerateLoop should not return an error")
+			if tt.expectedError != nil {
+				assert.ErrorIs(t, err, tt.expectedError, "GenerateLoop should return the expected error")
+			} else {
+				assert.NoError(t, err, "GenerateLoop should not return an error")
+			}
 			for i, resp := range generator.messages {
 				expectedContent := tt.expectedResponseMessages[i].Content[0]
 				actualContent := resp.Content[0]

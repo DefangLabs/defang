@@ -8,10 +8,12 @@ import (
 	"os"
 	"regexp"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/agent/plugins/fabric"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cluster"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/core/api"
 	"github.com/firebase/genkit/go/genkit"
@@ -184,12 +186,29 @@ func (a *Agent) startSession(ctx context.Context) error {
 }
 
 func (a *Agent) handleUserMessage(ctx context.Context, msg string) error {
-	err := a.generator.HandleMessage(ctx, a.system, 8, ai.NewUserMessage(ai.NewTextPart(msg)))
-	if err != nil {
-		return err
-	}
+	maxTurns := 8
+	for {
+		err := a.generator.HandleMessage(ctx, a.system, maxTurns, ai.NewUserMessage(ai.NewTextPart(msg)))
+		if err == nil {
+			return nil
+		}
+		if _, ok := err.(*maxTurnsReachedError); !ok {
+			return err
+		}
 
-	return nil
+		var continueSession bool
+		err = survey.AskOne(&survey.Confirm{
+			Message: "Defang is still working on this, would you like to continue?",
+			Default: true,
+		}, &continueSession, survey.WithStdio(term.DefaultTerm.Stdio()))
+		if err != nil {
+			return fmt.Errorf("error prompting to continue session: %w", err)
+		}
+		if continueSession {
+			continue
+		}
+		return nil
+	}
 }
 
 func prepareSystemPrompt(prompt string) (string, error) {
