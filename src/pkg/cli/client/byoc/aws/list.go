@@ -5,26 +5,16 @@ import (
 	"fmt"
 	"io"
 	"iter"
-	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
-
-func listPulumiStacksInRegion(ctx context.Context, region aws.Region) (iter.Seq[string], error) {
-	// Determine the bucket name from the CloudFormation stack outputs (if any); this is slow!
-	driver := cfn.New(byoc.CdTaskPrefix, region)
-	if err := driver.FillOutputs(ctx); err != nil {
-		return nil, err
-	}
-	return listPulumiStacksInBucket(ctx, region, driver.BucketName)
-}
 
 func listPulumiStacksInBucket(ctx context.Context, region aws.Region, bucketName string) (iter.Seq[string], error) {
 	cfg, err := aws.LoadDefaultConfig(ctx, region)
@@ -91,61 +81,78 @@ func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string)
 	}, nil
 }
 
-func listStacksInRegionWorker(ctx context.Context, jobsCh <-chan region.Region, stackCh chan<- string) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case region, ok := <-jobsCh:
-			if !ok {
-				return // no more jobs
-			}
-			stacks, err := listPulumiStacksInRegion(ctx, region)
-			if err != nil {
-				term.Debugf("Skipping region %s: %v", region, err)
-				continue
-			}
-			for stack := range stacks {
-				select {
-				case <-ctx.Done():
-					return
-				case stackCh <- fmt.Sprintf("%s [%s]", stack, region):
-				}
-			}
-		}
+func listPulumiStacksInRegionsParallel(ctx context.Context) (iter.Seq[string], error) {
+	// Use a single S3 query to list all buckets with the defang-cd- prefix
+	// This is faster than calling CloudFormation DescribeStacks in each region
+	// Note: S3 ListBuckets is a global operation, so we use empty region
+	cfg, err := aws.LoadDefaultConfig(ctx, "")
+	if err != nil {
+		return nil, AnnotateAwsError(err)
 	}
-}
 
-func listPulumiStacksInRegionsParallel(ctx context.Context, regions []region.Region) iter.Seq[string] {
-	jobsCh := make(chan region.Region, len(regions))
-	stackCh := make(chan string)
+	s3client := s3.NewFromConfig(cfg)
+	listBucketsOutput, err := s3client.ListBuckets(ctx, &s3.ListBucketsInput{})
+	if err != nil {
+		return nil, AnnotateAwsError(err)
+	}
 
 	return func(yield func(string) bool) {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
+		stackCh := make(chan string)
 
-		// Start N workers
+		// Filter buckets by prefix and get their locations
 		var wg sync.WaitGroup
-		for range runtime.NumCPU() {
+		for _, bucket := range listBucketsOutput.Buckets {
+			if bucket.Name == nil {
+				continue
+			}
+			// Filter by prefix: defang-cd-
+			if !strings.HasPrefix(*bucket.Name, byoc.CdTaskPrefix+"-") {
+				continue
+			}
+
+			// Get bucket location
+			locationOutput, err := s3client.GetBucketLocation(ctx, &s3.GetBucketLocationInput{
+				Bucket: bucket.Name,
+			})
+			if err != nil {
+				term.Debugf("Skipping bucket %s: failed to get location: %v", *bucket.Name, AnnotateAwsError(err))
+				continue
+			}
+
+			// GetBucketLocation returns empty string for us-east-1 buckets
+			bucketRegion := aws.Region(locationOutput.LocationConstraint)
+			if bucketRegion == "" {
+				bucketRegion = region.USEast1
+			}
+
 			wg.Add(1)
-			go func() {
+			go func(region aws.Region) {
 				defer wg.Done()
-				listStacksInRegionWorker(ctx, jobsCh, stackCh)
-			}()
+				stacks, err := listPulumiStacksInBucket(ctx, region, *bucket.Name)
+				if err != nil {
+					return
+				}
+				for stack := range stacks {
+					select {
+					case <-ctx.Done():
+						return
+					case stackCh <- fmt.Sprintf("%s [%s]", stack, region):
+					}
+				}
+			}(bucketRegion)
 		}
-		// Feed the jobs
-		for _, region := range regions {
-			jobsCh <- region // non-blocking because of buffered channel
-		}
-		close(jobsCh)
+
 		go func() {
 			wg.Wait()
-			close(stackCh) // stops the consumer for loop
+			close(stackCh) // Close channel when all goroutines are done, which stops the iteration below
 		}()
+
 		for stack := range stackCh {
 			if !yield(stack) {
 				break
 			}
 		}
-	}
+	}, nil
 }
