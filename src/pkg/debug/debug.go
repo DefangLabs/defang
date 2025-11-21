@@ -141,13 +141,20 @@ func DebugDeployment(ctx context.Context, client client.FabricClient, debugConfi
 		prompt := fmt.Sprintf(
 			"An error occurred while deploying this project to %s with Defang. "+
 				"Help troubleshoot and recommend a solution. Look at the logs to understand what happened."+
-				"The deployment ID is %q. The deployment started at %s and finished at %s. The failed services are %v."+
-				"The compose files are at %s. The compose file is as follows:\n\n%s",
-			debugConfig.ProviderID.Name(),
-			debugConfig.Deployment,
-			debugConfig.Since.String(),
-			debugConfig.Until.String(),
-			debugConfig.FailedServices,
+				"The deployment ID is %q.", debugConfig.ProviderID.Name(), debugConfig.Deployment)
+
+		if len(debugConfig.FailedServices) > 0 {
+			prompt += fmt.Sprintf(" The services that failed to deploy are: %v.", debugConfig.FailedServices)
+		}
+		if pkg.IsValidTime(debugConfig.Since) {
+			prompt += fmt.Sprintf(" The deployment started at %s.", debugConfig.Since.String())
+		}
+		if pkg.IsValidTime(debugConfig.Until) {
+			prompt += fmt.Sprintf(" The deployment finished at %s.", debugConfig.Until.String())
+		}
+
+		prompt += fmt.Sprintf(
+			"The compose files are at %s. The compose file is as follows:\n\n%s",
 			debugConfig.Project.ComposeFiles,
 			yaml,
 		)

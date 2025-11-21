@@ -171,6 +171,7 @@ func makeComposeUpCmd() *cobra.Command {
 					Project:    project,
 					Provider:   provider,
 					Since:      since,
+					Until:      time.Now(),
 					Addr:       getCluster(),
 					ProviderID: &providerID,
 				})
