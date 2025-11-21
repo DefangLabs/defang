@@ -98,6 +98,8 @@ var global GlobalConfig = GlobalConfig{
 getStackName determines the stack name to use
 The returned stack name is used to determine which stack-specific RC file
 (.defangrc.<stackName>) should be loaded during configuration initialization.
+If no stack name is provided it will return the default value from the GlobalConfig struct,
+which will result in loading only the general .defangrc file.
 */
 func (r *GlobalConfig) getStackName(flags *pflag.FlagSet) string {
 	if !flags.Changed("stack") {
