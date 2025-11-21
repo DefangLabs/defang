@@ -896,7 +896,7 @@ var debugCmd = &cobra.Command{
 			Since:          sinceTs.UTC(),
 			Until:          untilTs.UTC(),
 		}
-		return debug.DebugDeployment(cmd.Context(), client, debugConfig)
+		return debug.DebugDeployment(cmd.Context(), getCluster(), debugConfig)
 	},
 }
 
