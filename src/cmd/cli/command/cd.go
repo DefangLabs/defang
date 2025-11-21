@@ -25,7 +25,7 @@ var cdCmd = &cobra.Command{
 
 		if json {
 			os.Setenv("DEFANG_JSON", "1")
-			verbose = true
+			global.Verbose = true
 		}
 	},
 }
@@ -52,7 +52,7 @@ func bootstrapCommand(cmd *cobra.Command, args []string, command string) error {
 		if err != nil {
 			return err
 		}
-		errs = append(errs, cli.BootstrapCommand(ctx, projectName, verbose, provider, command))
+		errs = append(errs, cli.BootstrapCommand(ctx, projectName, global.Verbose, provider, command))
 	}
 	return errors.Join(errs...)
 }
@@ -135,7 +135,7 @@ var cdListCmd = &cobra.Command{
 			}
 
 			// FIXME: this needs auth because it spawns the CD task
-			return cli.BootstrapCommand(cmd.Context(), "", verbose, provider, "list")
+			return cli.BootstrapCommand(cmd.Context(), "", global.Verbose, provider, "list")
 		}
 		return cli.BootstrapLocalList(cmd.Context(), provider, all)
 	},
@@ -163,7 +163,7 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.Preview(cmd.Context(), project, client, provider, mode)
+		return cli.Preview(cmd.Context(), project, global.Client, provider, global.Mode)
 	},
 }
 

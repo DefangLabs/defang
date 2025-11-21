@@ -49,12 +49,12 @@ func makeStackNewCmd() *cobra.Command {
 
 			params := stacks.StackParameters{
 				Name:     stackName,
-				Provider: providerID, // default provider
+				Provider: global.ProviderID, // default provider
 				Region:   region,
-				Mode:     mode,
+				Mode:     global.Mode,
 			}
 
-			if nonInteractive {
+			if global.NonInteractive {
 				_, err := stacks.Create(params)
 				return err
 			}
@@ -75,16 +75,16 @@ func makeStackNewCmd() *cobra.Command {
 					return errors.New("a cloud provider must be selected")
 				}
 
-				err = providerID.Set(provider)
+				err = global.ProviderID.Set(provider)
 				if err != nil {
 					return err
 				}
-				params.Provider = providerID
+				params.Provider = global.ProviderID
 			}
 
 			if params.Region == "" {
 				defaultRegion := ""
-				switch providerID {
+				switch global.ProviderID {
 				case cliClient.ProviderAWS:
 					defaultRegion = "us-west-2"
 				case cliClient.ProviderGCP:
@@ -154,7 +154,7 @@ func makeStackNewCmd() *cobra.Command {
 			return nil
 		},
 	}
-	stackNewCmd.Flags().VarP(&mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
+	stackNewCmd.Flags().VarP(&global.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	stackNewCmd.Flags().StringP("region", "r", "", "Cloud region for the stack deployment")
 
 	return stackNewCmd

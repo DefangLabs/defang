@@ -18,7 +18,7 @@ var mcpCmd = &cobra.Command{
 	Short: "Manage MCP Server for defang",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		//set global nonInteractive to false
-		nonInteractive = false
+		global.NonInteractive = false
 	},
 }
 
@@ -46,11 +46,9 @@ var mcpServerCmd = &cobra.Command{
 			term.SetDebug(true)
 		}
 
-		cluster := getCluster()
-
 		// Create a new MCP server
 		term.Debug("Creating MCP server")
-		s, err := mcp.NewDefangMCPServer(RootCmd.Version, cluster, &providerID, mcpClient, tools.DefaultToolCLI{})
+		s, err := mcp.NewDefangMCPServer(RootCmd.Version, getCluster(), &global.ProviderID, mcpClient, tools.DefaultToolCLI{})
 		if err != nil {
 			return fmt.Errorf("failed to create MCP server: %w", err)
 		}
