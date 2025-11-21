@@ -11,7 +11,9 @@ import (
 	"github.com/aws/smithy-go/ptr"
 )
 
-type mockS3Client struct{}
+type mockS3Client struct {
+	S3Client
+}
 
 func (mockS3Client) GetObject(context.Context, *s3.GetObjectInput, ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
 	return &s3.GetObjectOutput{
@@ -42,7 +44,7 @@ func (mockS3Client) ListObjectsV2(context.Context, *s3.ListObjectsV2Input, ...fu
 				Size: ptr.Int64(2000),
 			},
 			{
-				Key:  ptr.String(".pulumi/stacks/project2/stack4.bak"),
+				Key:  ptr.String(".pulumi/stacks/project2/stack4.bak"), // wrong extension, should be skipped
 				Size: ptr.Int64(2000),
 			},
 		},

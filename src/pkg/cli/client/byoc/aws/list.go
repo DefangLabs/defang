@@ -16,13 +16,21 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-func listPulumiStacksInBucket(ctx context.Context, region aws.Region, bucketName string) (iter.Seq[string], error) {
+func newS3Client(ctx context.Context, region aws.Region) (*s3.Client, error) {
 	cfg, err := aws.LoadDefaultConfig(ctx, region)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
 
 	s3client := s3.NewFromConfig(cfg)
+	return s3client, nil
+}
+
+func listPulumiStacksInBucket(ctx context.Context, region aws.Region, bucketName string) (iter.Seq[string], error) {
+	s3client, err := newS3Client(ctx, region)
+	if err != nil {
+		return nil, err
+	}
 	return ListPulumiStacks(ctx, s3client, bucketName)
 }
 
@@ -37,7 +45,9 @@ func (a s3Obj) Size() int64 {
 }
 
 type S3Client interface {
+	GetBucketLocation(ctx context.Context, params *s3.GetBucketLocationInput, optFns ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error)
 	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
+	ListBuckets(ctx context.Context, params *s3.ListBucketsInput, optFns ...func(*s3.Options)) (*s3.ListBucketsOutput, error)
 	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
 }
 
@@ -81,16 +91,9 @@ func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string)
 	}, nil
 }
 
-func listPulumiStacksInRegionsParallel(ctx context.Context) (iter.Seq[string], error) {
+func listPulumiStacksAllRegions(ctx context.Context, s3client S3Client) (iter.Seq[string], error) {
 	// Use a single S3 query to list all buckets with the defang-cd- prefix
 	// This is faster than calling CloudFormation DescribeStacks in each region
-	// Note: S3 ListBuckets is a global operation, so we use empty region
-	cfg, err := aws.LoadDefaultConfig(ctx, "")
-	if err != nil {
-		return nil, AnnotateAwsError(err)
-	}
-
-	s3client := s3.NewFromConfig(cfg)
 	listBucketsOutput, err := s3client.ListBuckets(ctx, &s3.ListBucketsInput{})
 	if err != nil {
 		return nil, AnnotateAwsError(err)

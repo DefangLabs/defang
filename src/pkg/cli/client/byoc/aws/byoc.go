@@ -869,7 +869,11 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 
 func (b *ByocAws) BootstrapList(ctx context.Context, allRegions bool) (iter.Seq[string], error) {
 	if allRegions {
-		return listPulumiStacksInRegionsParallel(ctx)
+		s3Client, err := newS3Client(ctx, b.driver.Region)
+		if err != nil {
+			return nil, AnnotateAwsError(err)
+		}
+		return listPulumiStacksAllRegions(ctx, s3Client)
 	} else {
 		bucketName := b.bucketName()
 		if bucketName == "" {
