@@ -26,8 +26,9 @@ func (m *mockGenkitGenerator) Generate(ctx context.Context, prompt string, tools
 	return nil, m.err
 }
 
-func TestGenerateLoop(t *testing.T) {
+func TestHandleMessage(t *testing.T) {
 	// get the current working directory
+	prompt := "Test prompt"
 	cwd, err := os.Getwd()
 	assert.NoError(t, err)
 	tests := []struct {
@@ -45,6 +46,7 @@ func TestGenerateLoop(t *testing.T) {
 				},
 			},
 			expectedResponseMessages: []*ai.Message{
+				ai.NewUserTextMessage("User message"),
 				ai.NewModelTextMessage("Response 1"),
 			},
 		},
@@ -64,6 +66,7 @@ func TestGenerateLoop(t *testing.T) {
 				},
 			},
 			expectedResponseMessages: []*ai.Message{
+				ai.NewUserTextMessage("User message"),
 				ai.NewModelMessage(
 					ai.NewToolRequestPart(&ai.ToolRequest{
 						Name: "read_file",
@@ -88,10 +91,6 @@ func TestGenerateLoop(t *testing.T) {
 			// Here you would set up the necessary context, prompt, and messages
 			// For demonstration purposes, we'll use placeholders
 			ctx := t.Context()
-			prompt := "Test prompt"
-			messages := []*ai.Message{
-				ai.NewUserTextMessage("User message"),
-			}
 			printer := &mockPrinter{}
 
 			gk := genkit.Init(ctx)
@@ -106,9 +105,10 @@ func TestGenerateLoop(t *testing.T) {
 				toolManager: toolManager,
 			}
 
-			responseMessages, err := generator.GenerateLoop(ctx, prompt, messages, tt.maxTurns)
+			message := ai.NewUserTextMessage("User message")
+			err := generator.HandleMessage(ctx, prompt, tt.maxTurns, message)
 			assert.NoError(t, err, "GenerateLoop should not return an error")
-			for i, resp := range responseMessages {
+			for i, resp := range generator.messages {
 				expectedContent := tt.expectedResponseMessages[i].Content[0]
 				actualContent := resp.Content[0]
 				assert.Equal(t, expectedContent.Kind, actualContent.Kind, "Response message part kind should match")

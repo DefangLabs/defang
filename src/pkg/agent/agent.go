@@ -79,7 +79,6 @@ type Agent struct {
 	generator *Generator
 	printer   Printer
 	system    string
-	msgs      []*ai.Message
 }
 
 func New(ctx context.Context, addr string, providerId *client.ProviderID, system string) (*Agent, error) {
@@ -129,7 +128,6 @@ func New(ctx context.Context, addr string, providerId *client.ProviderID, system
 		printer:   printer,
 		generator: generator,
 		system:    preparedSystemPrompt,
-		msgs:      make([]*ai.Message, 0),
 	}
 
 	return a, nil
@@ -186,13 +184,11 @@ func (a *Agent) startSession(ctx context.Context) error {
 }
 
 func (a *Agent) handleUserMessage(ctx context.Context, msg string) error {
-	a.msgs = append(a.msgs, ai.NewUserMessage(ai.NewTextPart(msg)))
-	responseMessages, err := a.generator.GenerateLoop(ctx, a.system, a.msgs, 8)
+	err := a.generator.HandleMessage(ctx, a.system, 8, ai.NewUserMessage(ai.NewTextPart(msg)))
 	if err != nil {
 		return err
 	}
 
-	a.msgs = append(a.msgs, responseMessages...)
 	return nil
 }
 

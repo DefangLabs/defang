@@ -28,6 +28,7 @@ func (g *genkitGenerator) Generate(ctx context.Context, prompt string, tools []a
 }
 
 type Generator struct {
+	messages        []*ai.Message
 	genkitGenerator GenkitGenerator
 	printer         Printer
 	toolManager     *ToolManager
@@ -53,27 +54,29 @@ func (g *Generator) streamingCallback(_ context.Context, chunk *ai.ModelResponse
 	return nil
 }
 
-func (g *Generator) GenerateLoop(ctx context.Context, prompt string, messages []*ai.Message, maxTurns int) ([]*ai.Message, error) {
-	responseMessages := make([]*ai.Message, 0)
+func (g *Generator) HandleMessage(ctx context.Context, prompt string, maxTurns int, message *ai.Message) error {
+	if message != nil {
+		g.messages = append(g.messages, message)
+	}
 	for range maxTurns {
-		resp, err := g.generate(ctx, prompt, messages)
+		resp, err := g.generate(ctx, prompt, g.messages)
 		if err != nil {
 			term.Debugf("error: %v", err)
 			continue
 		}
 
-		responseMessages = append(responseMessages, resp.Message)
+		g.messages = append(g.messages, resp.Message)
 
 		toolRequests := resp.ToolRequests()
 		if len(toolRequests) == 0 {
-			return responseMessages, nil
+			return nil
 		}
 
 		toolResp := g.toolManager.HandleToolCalls(ctx, toolRequests)
-		responseMessages = append(responseMessages, toolResp)
+		g.messages = append(g.messages, toolResp)
 	}
 
-	return responseMessages, nil
+	return nil
 }
 
 func (g *Generator) generate(ctx context.Context, prompt string, messages []*ai.Message) (*ai.ModelResponse, error) {
