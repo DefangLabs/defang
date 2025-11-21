@@ -140,6 +140,11 @@ func Execute(ctx context.Context) error {
 	return nil
 }
 
+/*
+SetupCommands initializes and configures the entire Defang CLI command structure.
+It registers all global flags that bind to GlobalConfig, sets up all subcommands with their
+specific flags, and establishes the command hierarchy.
+*/
 func SetupCommands(ctx context.Context, version string) {
 	cobra.EnableTraverseRunHooks = true // we always need to run the RootCmd's pre-run hook
 
@@ -366,8 +371,8 @@ var RootCmd = &cobra.Command{
 		}
 
 		// Read the global flags again from any .defangrc files in the cwd
-		global.loadRC(global.getStack(cmd.Flags()))
-		global.syncFlagsWithEnv(cmd.Flags())
+		global.loadRC(global.getStackName(cmd.Flags()))
+		err = global.syncFlagsWithEnv(cmd.Flags())
 		if err != nil {
 			return err
 		}

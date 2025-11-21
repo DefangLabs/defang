@@ -13,26 +13,52 @@ import (
 	"github.com/spf13/pflag"
 )
 
-var global GlobalConfig = GlobalConfig{
-	// set default values
-	ColorMode:      ColorAuto,
-	Cluster:        cluster.DefangFabric,
-	Debug:          false,
-	HasTty:         term.IsTerminal(),
-	HideUpdate:     false,
-	Mode:           modes.ModeUnspecified,
-	NonInteractive: !term.IsTerminal(),
-	ProviderID:     cliClient.ProviderAuto,
-	SourcePlatform: migrate.SourcePlatformUnspecified, // default to auto-detecting the source platform
-	Verbose:        false,
-}
+/*
+GlobalConfig holds the global configuration options for the Defang CLI.
+These options can be configured through multiple sources with the following priority order:
+1. Command-line flags (highest priority)
+2. Environment variables (DEFANG_* prefix)
+3. Configuration files (.defangrc, .defangrc.<stack>) (lowest priority)
 
+Configuration Flow:
+- Default values are set when initializing the global variable
+- RC files are loaded to set environment variables (loadRC)
+- Environment variables and RC file values are synced to struct fields (syncFlagsWithEnv)
+- Command-line flags take precedence over all other sources
+
+Adding New Configuration Options:
+To add a new configuration option, you must update these components:
+
+1. Add the field to this GlobalConfig struct with appropriate type and Go documentation
+
+2. Set a default value in the global variable initialization (top of this file)
+
+3. Register the command-line flag in SetupCommands() function (commands.go):
+  - For boolean flags: use BoolVar() or BoolVarP()
+  - For string flags: use StringVar() or StringVarP()
+  - For custom types: use Var() or VarP() (type must implement pflag.Value interface)
+  - Example: RootCmd.PersistentFlags().BoolVar(&global.NewFlag, "new-flag", global.NewFlag, "description")
+
+4. Add environment variable synchronization in syncFlagsWithEnv() method:
+  - Check if flag was changed by user with flags.Changed("flag-name")
+  - If not changed, read from environment variable DEFANG_FLAG_NAME
+  - Handle type conversion (strconv.ParseBool for bool, direct assignment for string, etc.)
+  - Example pattern:
+    if !flags.Changed("new-flag") {
+    if fromEnv, ok := os.LookupEnv("DEFANG_NEW_FLAG"); ok {
+    global.NewFlag, err = strconv.ParseBool(fromEnv) // for bool
+    if err != nil {
+    return err
+    }
+    }
+    }
+
+5. For non-flag environment variables (like HasTty, HideUpdate), add handling in syncNonFlagEnvVars()
+
+Note: Ensure the flag name, environment variable name, and struct field name are consistent
+and follow the established naming conventions.
+*/
 type GlobalConfig struct {
-	/*
-		GlobalConfig holds the global configuration options for the CLI.
-		These options can be set via command-line flags, environment variables,
-		or (.defangrc) configuration files.
-	*/
 	Client         *cliClient.GrpcClient
 	Cluster        string
 	ColorMode      ColorMode
@@ -49,9 +75,31 @@ type GlobalConfig struct {
 	Verbose        bool
 }
 
-func (r *GlobalConfig) getStack(flags *pflag.FlagSet) string {
-	// If flag was changed by user, use that value, else check env var
-	// This is used to determine which RC file to load at startup
+/*
+global is the singleton instance of GlobalConfig that holds all CLI configuration.
+This instance is initialized with default values and is modified throughout
+the application lifecycle as configuration sources are processed (RC files, environment
+variables, and command-line flags).
+*/
+var global GlobalConfig = GlobalConfig{
+	ColorMode:      ColorAuto,
+	Cluster:        cluster.DefangFabric,
+	Debug:          false,
+	HasTty:         term.IsTerminal(),
+	HideUpdate:     false,
+	Mode:           modes.ModeUnspecified,
+	NonInteractive: !term.IsTerminal(),
+	ProviderID:     cliClient.ProviderAuto,
+	SourcePlatform: migrate.SourcePlatformUnspecified, // default to auto-detecting the source platform
+	Verbose:        false,
+}
+
+/*
+getStackName determines the stack name to use
+The returned stack name is used to determine which stack-specific RC file
+(.defangrc.<stackName>) should be loaded during configuration initialization.
+*/
+func (r *GlobalConfig) getStackName(flags *pflag.FlagSet) string {
 	if !flags.Changed("stack") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_STACK"); ok {
 			r.Stack = fromEnv
@@ -61,11 +109,15 @@ func (r *GlobalConfig) getStack(flags *pflag.FlagSet) string {
 	return r.Stack
 }
 
+/*
+syncNonFlagEnvVars handles environment variables that are not associated with command-line flags.
+This ensures that these settings can still be configured via environment variables even though
+they don't have corresponding CLI flags (e.g., HasTty, HideUpdate).
+*/
 func (r *GlobalConfig) syncNonFlagEnvVars() error {
-	// Not flags but check these environment variables for values set by user
 	var err error
 
-	// Not flags but check these environment variables
+	// Check these environment variables that don't have corresponding command-line flags
 	if fromEnv, ok := os.LookupEnv("DEFANG_TTY"); ok {
 		r.HasTty, err = strconv.ParseBool(fromEnv)
 		if err != nil {
@@ -83,12 +135,23 @@ func (r *GlobalConfig) syncNonFlagEnvVars() error {
 	return nil
 }
 
+/*
+syncFlagsWithEnv synchronizes configuration values from environment variables into the GlobalConfig struct.
+This function implements the priority system where command-line flags take precedence over environment variables.
+
+Logic for each configuration option:
+- If the flag was explicitly set by the user (flags.Changed), use the flag value (already set by cobra)
+- If the flag was NOT set by the user, check for the corresponding DEFANG_* environment variable
+- If the environment variable exists, parse it and update the struct field
+- Environment variables can come from the shell environment or RC files loaded by loadRC()
+
+This ensures the priority order: command-line flags > environment variables > RC file values > defaults
+*/
 func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
-	// If flag was changed by user, update config from flag value (flag takes priority)
-	// If flag was not changed by user, set flag from config value (env/RC file values)
 	var err error
 
-	r.Stack = r.getStack(flags)
+	// called once once more in case stack name was changed by an RC file
+	r.Stack = r.getStackName(flags)
 
 	if !flags.Changed("verbose") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_VERBOSE"); ok {
@@ -168,6 +231,17 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 	return r.syncNonFlagEnvVars()
 }
 
+/*
+loadRC loads configuration values from .defangrc files into environment variables.
+
+Loading order:
+1. If stackName is provided, loads .defangrc.<stackName> first
+2. Then loads the general .defangrc file
+
+Important: RC files have the lowest priority in the configuration hierarchy.
+They will NOT override environment variables that are already set, since
+godotenv.Load respects existing environment variables.
+*/
 func (r *GlobalConfig) loadRC(stackName string) {
 	if stackName != "" {
 		rcfile := ".defangrc." + stackName
