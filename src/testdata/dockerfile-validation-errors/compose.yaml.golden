@@ -1,0 +1,15 @@
+name: dockerfile-validation-errors
+services:
+  invalid-dockerfile:
+    build:
+      context: .
+      dockerfile: Dockerfile.invalid
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8080
+        protocol: tcp
+networks:
+  default:
+    name: dockerfile-validation-errors_default

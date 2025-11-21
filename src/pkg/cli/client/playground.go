@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"iter"
 	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/dns"
@@ -102,7 +103,7 @@ func (g *PlaygroundProvider) SetUpCD(ctx context.Context) error {
 	return errors.New("this command is not valid for the Defang playground; did you forget --provider?")
 }
 
-func (g *PlaygroundProvider) BootstrapList(context.Context) ([]string, error) {
+func (g *PlaygroundProvider) BootstrapList(context.Context, bool) (iter.Seq[string], error) {
 	return nil, errors.New("this command is not valid for the Defang playground; did you forget --provider?")
 }
 

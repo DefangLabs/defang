@@ -1,0 +1,2 @@
+RUN echo "This will fail"
+CMD ["echo", "Missing FROM"]

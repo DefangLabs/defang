@@ -28,6 +28,8 @@ type ServiceConfig = composeTypes.ServiceConfig
 
 type Services = composeTypes.Services
 
+type BuildConfig = composeTypes.BuildConfig
+
 type LoaderOptions struct {
 	ConfigPaths []string
 	ProjectName string

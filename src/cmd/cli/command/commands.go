@@ -174,6 +174,7 @@ func SetupCommands(ctx context.Context, version string) {
 	cdCmd.AddCommand(cdRefreshCmd)
 	cdTearDownCmd.Flags().Bool("force", false, "force the teardown of the CD stack")
 	cdCmd.AddCommand(cdTearDownCmd)
+	cdListCmd.Flags().BoolP("all", "a", false, "list projects and stacks in all regions")
 	cdListCmd.Flags().Bool("remote", false, "invoke the command on the remote cluster")
 	cdCmd.AddCommand(cdListCmd)
 	cdCmd.AddCommand(cdCancelCmd)

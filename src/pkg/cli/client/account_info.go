@@ -10,5 +10,9 @@ type AccountInfo struct {
 }
 
 func (a AccountInfo) String() string {
-	return fmt.Sprintf("%s account %q in region %q", a.Provider.Name(), a.AccountID, a.Region)
+	str := fmt.Sprintf("%s account %q", a.Provider.Name(), a.AccountID)
+	if a.Region != "" {
+		str += " in region %s" + a.Region
+	}
+	return str
 }
