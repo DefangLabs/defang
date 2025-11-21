@@ -126,6 +126,7 @@ func listPulumiStacksInRegionsParallel(ctx context.Context, regions []region.Reg
 	return func(yield func(string) bool) {
 		// Use a single S3 query to list all buckets with the defang-cd- prefix
 		// This is faster than calling CloudFormation DescribeStacks in each region
+		// Note: S3 ListBuckets is a global operation, so we use empty region
 		cfg, err := aws.LoadDefaultConfig(ctx, "")
 		if err != nil {
 			term.Debugf("Failed to load AWS config: %v", AnnotateAwsError(err))
@@ -159,10 +160,10 @@ func listPulumiStacksInRegionsParallel(ctx context.Context, regions []region.Reg
 				continue
 			}
 
-			// GetBucketLocation returns empty string for us-east-1
+			// GetBucketLocation returns empty string for us-east-1 buckets
 			bucketRegion := string(locationOutput.LocationConstraint)
 			if bucketRegion == "" {
-				bucketRegion = "us-east-1"
+				bucketRegion = string(region.USEast1)
 			}
 
 			buckets = append(buckets, bucketInfo{
