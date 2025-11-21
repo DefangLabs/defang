@@ -6,6 +6,7 @@ import (
 	"io"
 	"iter"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
@@ -91,25 +92,30 @@ func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string)
 	}, nil
 }
 
-func listStacksInRegionWorker(ctx context.Context, jobsCh <-chan region.Region, stackCh chan<- string) {
+type bucketInfo struct {
+	name   string
+	region aws.Region
+}
+
+func listStacksInBucketWorker(ctx context.Context, jobsCh <-chan bucketInfo, stackCh chan<- string) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case region, ok := <-jobsCh:
+		case bucket, ok := <-jobsCh:
 			if !ok {
 				return // no more jobs
 			}
-			stacks, err := listPulumiStacksInRegion(ctx, region)
+			stacks, err := listPulumiStacksInBucket(ctx, bucket.region, bucket.name)
 			if err != nil {
-				term.Debugf("Skipping region %s: %v", region, err)
+				term.Debugf("Skipping bucket %s: %v", bucket.name, err)
 				continue
 			}
 			for stack := range stacks {
 				select {
 				case <-ctx.Done():
 					return
-				case stackCh <- fmt.Sprintf("%s [%s]", stack, region):
+				case stackCh <- fmt.Sprintf("%s [%s]", stack, bucket.region):
 				}
 			}
 		}
@@ -117,12 +123,64 @@ func listStacksInRegionWorker(ctx context.Context, jobsCh <-chan region.Region, 
 }
 
 func listPulumiStacksInRegionsParallel(ctx context.Context, regions []region.Region) iter.Seq[string] {
-	jobsCh := make(chan region.Region, len(regions))
-	stackCh := make(chan string)
-
 	return func(yield func(string) bool) {
+		// Use a single S3 query to list all buckets with the defang-cd- prefix
+		// This is faster than calling CloudFormation DescribeStacks in each region
+		cfg, err := aws.LoadDefaultConfig(ctx, "")
+		if err != nil {
+			term.Debugf("Failed to load AWS config: %v", AnnotateAwsError(err))
+			return
+		}
+
+		s3client := s3.NewFromConfig(cfg)
+		listBucketsOutput, err := s3client.ListBuckets(ctx, &s3.ListBucketsInput{})
+		if err != nil {
+			term.Debugf("Failed to list S3 buckets: %v", AnnotateAwsError(err))
+			return
+		}
+
+		// Filter buckets by prefix and get their locations
+		var buckets []bucketInfo
+		for _, bucket := range listBucketsOutput.Buckets {
+			if bucket.Name == nil {
+				continue
+			}
+			// Filter by prefix: defang-cd-
+			if !strings.HasPrefix(*bucket.Name, byoc.CdTaskPrefix+"-") {
+				continue
+			}
+
+			// Get bucket location
+			locationOutput, err := s3client.GetBucketLocation(ctx, &s3.GetBucketLocationInput{
+				Bucket: bucket.Name,
+			})
+			if err != nil {
+				term.Debugf("Skipping bucket %s: failed to get location: %v", *bucket.Name, AnnotateAwsError(err))
+				continue
+			}
+
+			// GetBucketLocation returns empty string for us-east-1
+			bucketRegion := string(locationOutput.LocationConstraint)
+			if bucketRegion == "" {
+				bucketRegion = "us-east-1"
+			}
+
+			buckets = append(buckets, bucketInfo{
+				name:   *bucket.Name,
+				region: aws.Region(bucketRegion),
+			})
+		}
+
+		if len(buckets) == 0 {
+			return
+		}
+
+		// Process buckets in parallel
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
+
+		jobsCh := make(chan bucketInfo, len(buckets))
+		stackCh := make(chan string)
 
 		// Start N workers
 		var wg sync.WaitGroup
@@ -130,18 +188,21 @@ func listPulumiStacksInRegionsParallel(ctx context.Context, regions []region.Reg
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				listStacksInRegionWorker(ctx, jobsCh, stackCh)
+				listStacksInBucketWorker(ctx, jobsCh, stackCh)
 			}()
 		}
+
 		// Feed the jobs
-		for _, region := range regions {
-			jobsCh <- region // non-blocking because of buffered channel
+		for _, bucket := range buckets {
+			jobsCh <- bucket // non-blocking because of buffered channel
 		}
 		close(jobsCh)
+
 		go func() {
 			wg.Wait()
 			close(stackCh) // stops the consumer for loop
 		}()
+
 		for stack := range stackCh {
 			if !yield(stack) {
 				break
