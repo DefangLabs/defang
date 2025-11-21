@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"iter"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -43,7 +44,7 @@ type Provider interface {
 	DNSResolver
 	AccountInfo(context.Context) (*AccountInfo, error)
 	BootstrapCommand(context.Context, BootstrapCommandRequest) (types.ETag, error)
-	BootstrapList(context.Context) ([]string, error)
+	BootstrapList(context.Context, bool) (iter.Seq[string], error)
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
 	DelayBeforeRetry(context.Context) error
 	Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error)

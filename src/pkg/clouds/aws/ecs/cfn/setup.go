@@ -18,29 +18,27 @@ import (
 	"github.com/aws/smithy-go/ptr"
 )
 
-type AwsEcs struct {
+type AwsEcsCfn struct {
 	ecs.AwsEcs
 	stackName string
 }
-
-// var _ types.Driver = (*AwsEcs)(nil)
 
 const stackTimeout = time.Minute * 3
 
 func OptionVPCAndSubnetID(ctx context.Context, vpcID, subnetID string) func(types.Driver) error {
 	return func(d types.Driver) error {
-		if ecs, ok := d.(*AwsEcs); ok {
+		if ecs, ok := d.(*AwsEcsCfn); ok {
 			return ecs.PopulateVPCandSubnetID(ctx, vpcID, subnetID)
 		}
 		return errors.New("only AwsEcs driver supports VPC ID and Subnet ID option")
 	}
 }
 
-func New(stack string, region region.Region) *AwsEcs {
+func New(stack string, region region.Region) *AwsEcsCfn {
 	if stack == "" {
 		panic("stack must be set")
 	}
-	return &AwsEcs{
+	return &AwsEcsCfn{
 		stackName: stack,
 		AwsEcs: ecs.AwsEcs{
 			Aws:  common.Aws{Region: region},
@@ -49,7 +47,7 @@ func New(stack string, region region.Region) *AwsEcs {
 	}
 }
 
-func (a *AwsEcs) newClient(ctx context.Context) (*cloudformation.Client, error) {
+func (a *AwsEcsCfn) newClient(ctx context.Context) (*cloudformation.Client, error) {
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return nil, err
@@ -58,7 +56,7 @@ func (a *AwsEcs) newClient(ctx context.Context) (*cloudformation.Client, error) 
 	return cloudformation.NewFromConfig(cfg), nil
 }
 
-func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) error {
+func (a *AwsEcsCfn) updateStackAndWait(ctx context.Context, templateBody string) error {
 	cfn, err := a.newClient(ctx)
 	if err != nil {
 		return err
@@ -101,7 +99,7 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 	return a.fillWithOutputs(dso)
 }
 
-func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) error {
+func (a *AwsEcsCfn) createStackAndWait(ctx context.Context, templateBody string) error {
 	cfn, err := a.newClient(ctx)
 	if err != nil {
 		return err
@@ -132,7 +130,7 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 	return a.fillWithOutputs(dso)
 }
 
-func (a *AwsEcs) SetUp(ctx context.Context, containers []types.Container) error {
+func (a *AwsEcsCfn) SetUp(ctx context.Context, containers []types.Container) error {
 	tmpl, err := createTemplate(a.stackName, containers, TemplateOverrides{VpcID: a.VpcID, Spot: a.Spot})
 	if err != nil {
 		return fmt.Errorf("failed to create CloudFormation template: %w", err)
@@ -157,7 +155,7 @@ func (a *AwsEcs) SetUp(ctx context.Context, containers []types.Container) error 
 
 type ErrStackNotFoundException = cfnTypes.StackNotFoundException
 
-func (a *AwsEcs) FillOutputs(ctx context.Context) error {
+func (a *AwsEcsCfn) FillOutputs(ctx context.Context) error {
 	cfn, err := a.newClient(ctx)
 	if err != nil {
 		return err
@@ -179,7 +177,7 @@ func (a *AwsEcs) FillOutputs(ctx context.Context) error {
 	return a.fillWithOutputs(dso)
 }
 
-func (a *AwsEcs) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) error {
+func (a *AwsEcsCfn) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) error {
 	if len(dso.Stacks) != 1 {
 		return fmt.Errorf("expected 1 CloudFormation stack, got %d", len(dso.Stacks))
 	}
@@ -208,7 +206,7 @@ func (a *AwsEcs) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) error
 	return nil
 }
 
-func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) (ecs.TaskArn, error) {
+func (a *AwsEcsCfn) Run(ctx context.Context, env map[string]string, cmd ...string) (ecs.TaskArn, error) {
 	if err := a.FillOutputs(ctx); err != nil {
 		return nil, err
 	}
@@ -216,28 +214,28 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 	return a.AwsEcs.Run(ctx, env, cmd...)
 }
 
-func (a *AwsEcs) Tail(ctx context.Context, taskArn ecs.TaskArn) error {
+func (a *AwsEcsCfn) Tail(ctx context.Context, taskArn ecs.TaskArn) error {
 	if err := a.FillOutputs(ctx); err != nil {
 		return err
 	}
 	return a.AwsEcs.Tail(ctx, taskArn)
 }
 
-func (a *AwsEcs) Stop(ctx context.Context, taskArn ecs.TaskArn) error {
+func (a *AwsEcsCfn) Stop(ctx context.Context, taskArn ecs.TaskArn) error {
 	if err := a.FillOutputs(ctx); err != nil {
 		return err
 	}
 	return a.AwsEcs.Stop(ctx, taskArn)
 }
 
-func (a *AwsEcs) GetInfo(ctx context.Context, taskArn ecs.TaskArn) (*types.TaskInfo, error) {
+func (a *AwsEcsCfn) GetInfo(ctx context.Context, taskArn ecs.TaskArn) (*types.TaskInfo, error) {
 	if err := a.FillOutputs(ctx); err != nil {
 		return nil, err
 	}
 	return a.AwsEcs.Info(ctx, taskArn)
 }
 
-func (a *AwsEcs) TearDown(ctx context.Context) error {
+func (a *AwsEcsCfn) TearDown(ctx context.Context) error {
 	cfn, err := a.newClient(ctx)
 	if err != nil {
 		return err

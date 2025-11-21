@@ -16,11 +16,16 @@ type Obj interface {
 
 func ParsePulumiStackObject(ctx context.Context, obj Obj, bucket, prefix string, objLoader func(ctx context.Context, bucket, object string) ([]byte, error)) (string, error) {
 	// The JSON file for an empty stack is ~600 bytes; we add a margin of 100 bytes to account for the length of the stack/project names
-	if !strings.HasSuffix(obj.Name(), ".json") || obj.Size() < 700 {
+	stack, isJson := strings.CutSuffix(obj.Name(), ".json")
+	if !isJson || obj.Size() < 700 {
 		return "", nil
 	}
-	// Cut off the prefix and the .json suffix
-	stack := (obj.Name())[len(prefix) : len(obj.Name())-5]
+	// Cut off the prefix
+	stack, ok := strings.CutPrefix(stack, prefix)
+	if !ok {
+		return "", fmt.Errorf("expected object key %q to start with prefix %q", obj.Name(), prefix)
+	}
+
 	// Check the contents of the JSON file, because the size is not a reliable indicator of a valid stack
 	data, err := objLoader(ctx, bucket, obj.Name())
 	if err != nil {
