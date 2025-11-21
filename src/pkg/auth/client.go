@@ -28,6 +28,7 @@ const (
 var (
 	ErrInvalidAccessToken       = errors.New("invalid access token")
 	ErrInvalidAuthorizationCode = errors.New("invalid authorization code")
+	ErrInvalidJWT               = errors.New("invalid JWT")
 	ErrInvalidRefreshToken      = errors.New("invalid refresh token")
 	ErrPollTimeout              = errors.New("polling timed out")
 )
@@ -137,6 +138,10 @@ type Client interface {
 	 * Exchange the code for access and refresh tokens.
 	 */
 	Exchange(code string, redirectURI string, verifier string) (*ExchangeSuccess, error)
+	/**
+	 * Exchange jwt for access and refresh tokens.
+	 */
+	ExchangeJWT(jwt string) (*ExchangeSuccess, error)
 	/**
 	 * Refreshes the tokens if they have expired. This is used in an SPA app to maintain the
 	 * session, without logging the user out.
@@ -266,6 +271,20 @@ func (c client) callToken(body url.Values) (*Tokens, error) {
 }
 
 /**
+ * Helper function to exchange tokens with common error handling.
+ */
+func (c client) exchangeForTokens(body url.Values) (*ExchangeSuccess, error) {
+	tokens, err := c.callToken(body)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ExchangeSuccess{
+		Tokens: *tokens,
+	}, nil
+}
+
+/**
  * Exchange the code for access and refresh tokens.
  */
 func (c client) Exchange(code string, redirectURI string, verifier string) (*ExchangeSuccess, error) {
@@ -276,18 +295,40 @@ func (c client) Exchange(code string, redirectURI string, verifier string) (*Exc
 		"grant_type":    {"authorization_code"},
 		"redirect_uri":  {redirectURI},
 	}
-	tokens, err := c.callToken(body)
+
+	result, err := c.exchangeForTokens(body)
 	if err != nil {
 		var oauthError *OAuthError
 		if errors.As(err, &oauthError) {
 			return nil, fmt.Errorf("%w: %w", ErrInvalidAuthorizationCode, err)
 		}
+
 		return nil, fmt.Errorf("token exchange failed: %w", err)
 	}
 
-	return &ExchangeSuccess{
-		Tokens: *tokens,
-	}, nil
+	return result, nil
+}
+
+/**
+ * Exchange the JWT for access and refresh tokens.
+ */
+func (c client) ExchangeJWT(jwt string) (*ExchangeSuccess, error) {
+	body := url.Values{
+		"grant_type": {"urn:ietf:params:oauth:grant-type:jwt-bearer"},
+		"assertion":  {jwt},
+	}
+	result, err := c.exchangeForTokens(body)
+
+	if err != nil {
+		var oauthError *OAuthError
+		if errors.As(err, &oauthError) {
+			return nil, fmt.Errorf("%w: %w", ErrInvalidJWT, err)
+		}
+
+		return nil, fmt.Errorf("token exchange failed: %w", err)
+	}
+
+	return result, nil
 }
 
 /**
