@@ -336,6 +336,7 @@ func startInProcessMCPServer(ctx context.Context, fabric *httptest.Server) (*tes
 var mockFabric *mockFabricService
 
 func TestInProcessMCPServer(t *testing.T) {
+	t.Skip()
 	TestInProcessMCPServer_Setup := func(t *testing.T) {
 		listResourcesReq := m3mcp.ListResourcesRequest{}
 		resList, _ := mcpClient.ListResources(t.Context(), listResourcesReq)

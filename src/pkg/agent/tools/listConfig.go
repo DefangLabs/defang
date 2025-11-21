@@ -10,6 +10,10 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
+type ListConfigsParams struct {
+	common.LoaderParams
+}
+
 // HandleListConfigTool handles the list config tool logic
 func HandleListConfigTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
