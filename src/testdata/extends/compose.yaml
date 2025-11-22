@@ -1,0 +1,40 @@
+services:
+  array-set:
+    extends:
+      file: ./compose.base.yaml
+      service: array-env
+    environment:
+      - WITH_VALUE=bar
+      - EMPTY_VALUE=bar
+      - NO_VALUE=bar
+      - NEW_VALUE=bar
+
+  map-set:
+    extends:
+      file: ./compose.base.yaml
+      service: map-env
+    environment:
+      WITH_VALUE: bar
+      EMPTY_VALUE: bar
+      NO_VALUE: bar
+      NEW_VALUE: bar
+
+  array-unset:
+    extends:
+      file: ./compose.base.yaml
+      service: array-env
+    environment:
+      - WITH_VALUE
+      - EMPTY_VALUE
+      - NO_VALUE
+      - NEW_VALUE
+
+  map-unset:
+    extends:
+      file: ./compose.base.yaml
+      service: map-env
+    environment:
+      WITH_VALUE:
+      EMPTY_VALUE:
+      NO_VALUE:
+      NEW_VALUE:

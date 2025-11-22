@@ -65,7 +65,7 @@ func Test_configurationPrecedence(t *testing.T) {
 	// no matter the order they are applied, or combination, the final configuration should be correct.
 	// The precedence should be: flags > env vars > .defangrc files
 
-	// make a default config for for comparison and copying
+	// make a default config for comparison and copying
 	defaultConfig := GlobalConfig{
 		ColorMode:      ColorAuto,
 		Debug:          false,
