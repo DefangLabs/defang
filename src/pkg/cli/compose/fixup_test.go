@@ -2,17 +2,23 @@ package compose
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFixup(t *testing.T) {
-	testAllComposeFiles(t, func(t *testing.T, path string) {
+	testAllComposeFiles(t, func(t *testing.T, name string, path string) {
 		loader := NewLoader(WithPath(path))
 		proj, err := loader.LoadProject(t.Context())
+		if strings.HasPrefix(name, "invalid-") {
+			assert.Error(t, err, "Expected error for invalid compose file: %s", path)
+			return
+		}
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -74,7 +74,7 @@ func CollectDefangTools(cluster string, providerId *client.ProviderID) []ai.Tool
 			},
 		),
 		ai.NewTool("logs",
-			"Fetch logs for the deployed application defined in the docker-compose files in the current working directory",
+			"Fetch logs for the application in pages of up to 100 lines. You can use the 'since' and 'until' parameters to page through logs by time.",
 			func(ctx *ai.ToolContext, params tools.LogsParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {

@@ -857,6 +857,7 @@ var debugCmd = &cobra.Command{
 	Hidden:      true,
 	Short:       "Debug a build, deployment, or service failure",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
 		etag, _ := cmd.Flags().GetString("etag")
 		deployment, _ := cmd.Flags().GetString("deployment")
 		since, _ := cmd.Flags().GetString("since")
@@ -867,12 +868,17 @@ var debugCmd = &cobra.Command{
 		}
 
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		_, err := newProviderChecked(ctx, loader)
 		if err != nil {
 			return err
 		}
 
-		project, err := loader.LoadProject(cmd.Context())
+		project, err := loader.LoadProject(ctx)
+		if err != nil {
+			return err
+		}
+
+		debugger, err := debug.NewDebugger(ctx, getCluster(), &providerID)
 		if err != nil {
 			return err
 		}
@@ -890,13 +896,12 @@ var debugCmd = &cobra.Command{
 		debugConfig := debug.DebugConfig{
 			Deployment:     deployment,
 			FailedServices: args,
-			ModelId:        modelId,
 			Project:        project,
-			Provider:       provider,
+			ProviderID:     &providerID,
 			Since:          sinceTs.UTC(),
 			Until:          untilTs.UTC(),
 		}
-		return debug.DebugDeployment(cmd.Context(), getCluster(), debugConfig)
+		return debugger.DebugDeployment(ctx, debugConfig)
 	},
 }
 

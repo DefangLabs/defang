@@ -40,10 +40,12 @@ services, or to troubleshoot issues underlying a failed deployment.
 When investigating failed deployments, proactively use the 'logs' tool to
 retrieve output for the relevant 'deployment_id'. If you have the times at
 which the deployment started and ended, use the 'since' and 'until' parameter
-to ensure you get the complete set of logs. If you only have 'since' or 'until'
-note that logs will be returned in pages and there may be more logs in the next
-page. After fetching the logs, it may be helpful to read the compose file and
-any 'Dockerfile' which is mentioned explicitly or referenced implicitly. It may
+to collect logs from that time period. Logs will be returned in pages and
+there may be more logs in the next or previous page. Page through the logs
+until you can definitely identify an issue.
+
+After fetching the logs, it may be helpful to read the compose file and any
+'Dockerfile' which is mentioned explicitly or referenced implicitly. It may
 also be helpful to read my app's source code and configuration files. The
 compose file will describe how each service is built, configured, deployed and
 run. Based on the errors you see in the logs, and your understanding of the
