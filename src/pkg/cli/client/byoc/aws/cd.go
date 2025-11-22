@@ -45,7 +45,8 @@ func makeContainers(pulumiVersion, cdImage string) []types.Container {
 }
 
 func PrintCloudFormationTemplate() ([]byte, error) {
-	containers := makeContainers("latest", "defanglabs/defang-cd:latest")
+	// TODO: grab pulumi version and cd image from Fabric CanIUse API
+	containers := makeContainers("latest", "public.ecr.aws/defang-io/cd:latest")
 	template, err := cfn.CreateTemplate("test-stack", containers)
 	if err != nil {
 		return nil, err

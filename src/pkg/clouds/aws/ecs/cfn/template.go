@@ -71,6 +71,7 @@ func CreateTemplate(stack string, containers []types.Container) (*cloudformation
 	template.Description = "Defang AWS CloudFormation template for an ECS task. Don't delete: use the CLI instead."
 
 	// Parameters
+	// TODO: add an option to use the default VPC
 	template.Parameters[ParamsExistingVpcId] = cloudformation.Parameter{
 		Type:        "String", // TODO: use "AWS::EC2::VPC::Id" but seems it cannot be optional
 		Default:     ptr.String(""),
@@ -92,7 +93,7 @@ func CreateTemplate(stack string, containers []types.Container) (*cloudformation
 		Type:        "String",
 		Default:     ptr.String(""),
 		Description: ptr.String("Docker Hub username for private registry access (optional)"),
-		NoEcho:      ptr.Bool(true),
+		// NoEcho:      ptr.Bool(true), allow seeing username in AWS Console
 	}
 	template.Parameters[ParamsDockerHubAccessToken] = cloudformation.Parameter{
 		Type:        "String",
@@ -115,6 +116,11 @@ func CreateTemplate(stack string, containers []types.Container) (*cloudformation
 		Default:     ptr.String(""),
 		Description: ptr.String("OIDC provider thumbprints (optional)"),
 	}
+	template.Parameters[ParamsCIRoleName] = cloudformation.Parameter{
+		Type:        "String",
+		Default:     ptr.String(""),
+		Description: ptr.String("Name of the CI role (optional)"),
+	}
 
 	// Conditions
 	const _condCreateVpcResources = "CreateVpcResources"
@@ -135,6 +141,8 @@ func CreateTemplate(stack string, containers []types.Container) (*cloudformation
 		cloudformation.Not([]string{cloudformation.Equals(cloudformation.Join("", cloudformation.Ref(ParamsOidcProviderSubjects)), "")}),
 		cloudformation.Not([]string{cloudformation.Equals(cloudformation.Join("", cloudformation.Ref(ParamsOidcProviderThumbprints)), "")}),
 	})
+	const _condOverrideCIRoleName = "OverrideCIRoleName"
+	template.Conditions[_condOverrideCIRoleName] = cloudformation.Not([]string{cloudformation.Equals(cloudformation.Ref(ParamsCIRoleName), "")})
 
 	// 1. bucket (for deployment state)
 	const _bucket = "Bucket"
@@ -588,10 +596,11 @@ func CreateTemplate(stack string, containers []types.Container) (*cloudformation
 	// FIXME: You cannot register the same provider multiple times in a single AWS account. If you try to submit a URL that has already been used for an OpenID Connect provider in the AWS account, you will get an error.
 	const _oidcProvider = "OIDCProvider"
 	const oidcProviderAud = "sts.amazonaws.com"
-	template.Resources[_oidcProvider] = &iam.OIDCProvider{
+	template.Resources[_oidcProvider] = &OIDCProvider{
 		AWSCloudFormationCondition: _condOidcProvider,
+		Tags:                       defaultTags,
 		ClientIdList:               []string{oidcProviderAud},
-		ThumbprintList:             []string{cloudformation.Ref(ParamsOidcProviderThumbprints)},
+		ThumbprintList:             cloudformation.Ref(ParamsOidcProviderThumbprints),
 		Url:                        cloudformation.SubPtr(`https://${` + ParamsOidcProviderIssuer + `}`),
 	}
 
@@ -599,29 +608,32 @@ func CreateTemplate(stack string, containers []types.Container) (*cloudformation
 	const _CIRole = "CIRole"
 	template.Resources[_CIRole] = &iam.Role{
 		AWSCloudFormationCondition: _condOidcProvider,
-		Tags:                       defaultTags,
-		AssumeRolePolicyDocument: map[string]any{
-			"Version": "2012-10-17",
-			"Statement": []map[string]any{
-				{
-					"Effect": "Allow",
-					"Principal": map[string]any{
-						"Federated": cloudformation.Ref(_oidcProvider),
-					},
-					"Action": []string{
-						"sts:AssumeRoleWithWebIdentity",
-					},
-					"Condition": map[string]any{
-						"StringLike": map[string]any{
-							cloudformation.Sub(`${` + ParamsOidcProviderIssuer + `}:sub`): cloudformation.Ref(ParamsOidcProviderSubjects),
-						},
-						"StringEquals": map[string]any{
-							cloudformation.Sub(`${` + ParamsOidcProviderIssuer + `}:aud`): oidcProviderAud,
-						},
-					},
-				},
-			},
-		},
+		RoleName: cloudformation.IfPtr(_condOverrideCIRoleName,
+			cloudformation.Ref(ParamsCIRoleName),
+			cloudformation.Ref("AWS::NoValue"),
+		),
+		Tags: defaultTags,
+		AssumeRolePolicyDocument: cloudformation.SubVars(`{
+    "Version": "2012-10-17",
+    "Statement": [{
+        "Effect": "Allow",
+        "Principal": {
+            "Federated": "${Provider}"
+        },
+        "Action": "sts:AssumeRoleWithWebIdentity",
+        "Condition": {
+            "StringEquals": {
+                "${`+ParamsOidcProviderIssuer+`}:aud": "`+oidcProviderAud+`"
+            },
+            "StringLike": {
+                "${`+ParamsOidcProviderIssuer+`}:sub": [ "${Subjects}" ]
+            }
+        }
+    }]
+}`, map[string]any{
+			"Provider": cloudformation.Ref(_oidcProvider),
+			"Subjects": cloudformation.Join(`","`, cloudformation.Ref(ParamsOidcProviderSubjects)),
+		}),
 		ManagedPolicyArns: []string{
 			"arn:aws:iam::aws:policy/AdministratorAccess",
 		},

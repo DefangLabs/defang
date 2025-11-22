@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
@@ -31,13 +30,14 @@ func CanIUseProvider(ctx context.Context, client FabricClient, provider Provider
 	// Allow local override of the CD image and Pulumi version
 	resp.CdImage = pkg.Getenv("DEFANG_CD_IMAGE", resp.CdImage)
 	resp.PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", resp.PulumiVersion)
-	if resp.CdImage == "previous" {
-		if projUpdate, err := provider.GetProjectUpdate(ctx, projectName); err != nil {
-			term.Debugf("unable to get project update for project %s: %v", projectName, err)
-		} else if projUpdate != nil {
-			resp.CdImage = projUpdate.CdVersion
-		}
-	}
+	// FIXME: use previous CD image for refresh/down/destroy/cancel commands
+	// if resp.CdImage == "previous" {
+	// 	if projUpdate, err := provider.GetProjectUpdate(ctx, projectName); err != nil {
+	// 		term.Debugf("unable to get project update for project %s: %v", projectName, err)
+	// 	} else if projUpdate != nil {
+	// 		resp.CdImage = projUpdate.CdVersion
+	// 	}
+	// }
 	provider.SetCanIUseConfig(resp)
 	return nil
 }

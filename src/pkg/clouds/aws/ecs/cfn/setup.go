@@ -68,6 +68,19 @@ func (a *AwsEcsCfn) updateStackAndWait(ctx context.Context, templateBody string,
 	// Check the template version first, to avoid updating to an outdated template; TODO: can we use StackPolicy/Conditions instead?
 	// TODO: should check all regions
 	if dso, err := cfn.DescribeStacks(ctx, &cloudformation.DescribeStacksInput{StackName: &a.stackName}); err == nil && len(dso.Stacks) == 1 {
+		// Set "Use previous value" for parameters not in the new parameters list
+		newParams := map[string]struct{}{}
+		for _, newParam := range parameters {
+			newParams[*newParam.ParameterKey] = struct{}{}
+		}
+		for _, param := range dso.Stacks[0].Parameters {
+			if _, ok := newParams[*param.ParameterKey]; !ok {
+				parameters = append(parameters, cfnTypes.Parameter{
+					ParameterKey:     param.ParameterKey,
+					UsePreviousValue: ptr.Bool(true),
+				})
+			}
+		}
 		for _, output := range dso.Stacks[0].Outputs {
 			if *output.OutputKey == OutputsTemplateVersion {
 				deployedRev, _ := strconv.Atoi(*output.OutputValue)
@@ -142,8 +155,21 @@ func (a *AwsEcsCfn) SetUp(ctx context.Context, containers []types.Container) err
 		return fmt.Errorf("failed to create CloudFormation template: %w", err)
 	}
 
+	templateBody, err := template.YAML()
+	if err != nil {
+		return err
+	}
+
+	return a.upsertStackAndWait(ctx, templateBody)
+}
+
+func (a *AwsEcsCfn) upsertStackAndWait(ctx context.Context, templateBody []byte) error {
 	// Set parameter values based on current configuration
 	parameters := []cfnTypes.Parameter{
+		// {
+		// 	ParameterKey:   ptr.String(ParamsCIRoleName),
+		// 	ParameterValue: ptr.String("defang-cd-CDIRole-us-west-2"),
+		// },
 		{
 			ParameterKey:   ptr.String(ParamsExistingVpcId),
 			ParameterValue: ptr.String(a.VpcID),
@@ -172,11 +198,6 @@ func (a *AwsEcsCfn) SetUp(ctx context.Context, containers []types.Container) err
 		})
 	}
 	// TODO: support DOCKER_AUTH_CONFIG
-
-	templateBody, err := template.YAML()
-	if err != nil {
-		return fmt.Errorf("failed to marshal CloudFormation template as YAML: %w", err)
-	}
 
 	// Upsert with parameters
 	if err := a.updateStackAndWait(ctx, string(templateBody), parameters); err != nil {

@@ -30,7 +30,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.44.7
 	github.com/aws/aws-sdk-go-v2/service/sts v1.26.7
 	github.com/aws/smithy-go v1.22.1
-	github.com/awslabs/goformation/v7 v7.13.1
+	github.com/awslabs/goformation/v7 v7.14.9
 	github.com/bufbuild/connect-go v1.10.0
 	github.com/compose-spec/compose-go/v2 v2.7.2-0.20250715094302-8da9902241f9
 	github.com/digitalocean/godo v1.131.1

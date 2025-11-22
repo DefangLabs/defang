@@ -1,6 +1,7 @@
 package cfn
 
 const (
+	ParamsCIRoleName              = "CIRoleName"
 	ParamsDockerHubAccessToken    = "DockerHubAccessToken"
 	ParamsDockerHubUsername       = "DockerHubUsername"
 	ParamsEnablePullThroughCache  = "EnablePullThroughCache"
