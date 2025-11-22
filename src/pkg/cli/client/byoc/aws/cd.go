@@ -3,7 +3,6 @@ package aws
 import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/aws/smithy-go/ptr"
 )
@@ -42,14 +41,4 @@ func makeContainers(pulumiVersion, cdImage string) []types.Container {
 			},
 		},
 	}
-}
-
-func PrintCloudFormationTemplate() ([]byte, error) {
-	// TODO: grab pulumi version and cd image from Fabric CanIUse API
-	containers := makeContainers("latest", "public.ecr.aws/defang-io/cd:latest")
-	template, err := cfn.CreateTemplate("test-stack", containers)
-	if err != nil {
-		return nil, err
-	}
-	return template.YAML()
 }

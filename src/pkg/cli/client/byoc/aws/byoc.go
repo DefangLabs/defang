@@ -131,6 +131,15 @@ func (b *ByocAws) makeContainers() []types.Container {
 	return makeContainers(b.PulumiVersion, b.CDImage)
 }
 
+func (b *ByocAws) PrintCloudFormationTemplate() ([]byte, error) {
+	containers := b.makeContainers()
+	template, err := cfn.CreateTemplate(byoc.CdTaskPrefix, containers)
+	if err != nil {
+		return nil, err
+	}
+	return template.YAML()
+}
+
 func (b *ByocAws) SetUpCD(ctx context.Context) error {
 	if b.SetupDone {
 		return nil

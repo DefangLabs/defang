@@ -6,7 +6,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	byocAws "github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/cobra"
 )
@@ -192,12 +192,19 @@ var cdInstallCmd = &cobra.Command{
 }
 
 var cdCloudformationCmd = &cobra.Command{
-	Use:    "cloudformation",
-	Short:  "CloudFormation template related commands",
-	Args:   cobra.NoArgs,
-	Hidden: true,
+	Use:         "cloudformation",
+	Short:       "CloudFormation template related commands",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Hidden:      true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		template, err := byocAws.PrintCloudFormationTemplate()
+		provider := aws.NewByocProvider(cmd.Context(), global.Client.GetTenantName(), global.Stack)
+
+		if err := canIUseProvider(cmd.Context(), provider, "", 0); err != nil {
+			return err
+		}
+
+		template, err := provider.PrintCloudFormationTemplate()
 		term.Println(string(template))
 		return err
 	},
