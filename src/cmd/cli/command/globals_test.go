@@ -20,7 +20,10 @@ func Test_readGlobals(t *testing.T) {
 
 	t.Run("OS env beats any .defangrc file", func(t *testing.T) {
 		t.Setenv("VALUE", "from OS env")
-		testConfig.loadRC("test")
+		err := testConfig.loadRC("test")
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
 		if v := os.Getenv("VALUE"); v != "from OS env" {
 			t.Errorf("expected VALUE to be 'from OS env', got '%s'", v)
 		}
@@ -28,7 +31,10 @@ func Test_readGlobals(t *testing.T) {
 	})
 
 	t.Run(".defangrc.test beats .defangrc", func(t *testing.T) {
-		testConfig.loadRC("test")
+		err := testConfig.loadRC("test")
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
 		if v := os.Getenv("VALUE"); v != "from .defangrc.test" {
 			t.Errorf("expected VALUE to be 'from .defangrc.test', got '%s'", v)
 		}
@@ -36,11 +42,21 @@ func Test_readGlobals(t *testing.T) {
 	})
 
 	t.Run(".defangrc used if no stack", func(t *testing.T) {
-		testConfig.loadRC("non-existent-stack")
+		err := testConfig.loadRC("")
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
 		if v := os.Getenv("VALUE"); v != "from .defangrc" {
 			t.Errorf("expected VALUE to be 'from .defangrc', got '%s'", v)
 		}
 		os.Unsetenv("VALUE")
+	})
+
+	t.Run("incorrect stackname used if no stack", func(t *testing.T) {
+		err := testConfig.loadRC("non-existent-stack")
+		if err == nil {
+			t.Fatalf("this test should fail for non-existent stack: %v", err)
+		}
 	})
 }
 
@@ -339,8 +355,15 @@ func Test_configurationPrecedence(t *testing.T) {
 			t.Chdir(tempDir)
 
 			// simulates the actual loading sequence
-			testConfig.loadRC(tt.rcStack.stackname)
-			testConfig.syncFlagsWithEnv(flags)
+			err := testConfig.loadRC(tt.rcStack.stackname)
+			if err != nil {
+				t.Fatalf("failed to load RC file: %v", err)
+			}
+
+			err = testConfig.syncFlagsWithEnv(flags)
+			if err != nil {
+				t.Fatalf("failed to sync flags with env vars: %v", err)
+			}
 
 			// verify the final configuration matches expectations
 			if testConfig.Mode.String() != tt.expected.Mode.String() {
