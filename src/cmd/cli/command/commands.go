@@ -371,7 +371,11 @@ var RootCmd = &cobra.Command{
 		}
 
 		// Read the global flags again from any .defangrc files in the cwd
-		global.loadRC(global.getStackName(cmd.Flags()))
+		err = global.loadRC(global.getStackName(cmd.Flags()))
+		if err != nil {
+			return err
+		}
+
 		err = global.syncFlagsWithEnv(cmd.Flags())
 		if err != nil {
 			return err
