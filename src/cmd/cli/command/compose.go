@@ -275,7 +275,7 @@ func newTailOptionsForDeploy(deployment string, since time.Time, verbose bool) c
 
 func flushWarnings() {
 	if global.HasTty && term.HadWarnings() {
-		fmt.Println("\n\u26A0\uFE0F Some warnings were seen during this command:")
+		term.Println("\n\u26A0\uFE0F Some warnings were seen during this command:")
 		term.FlushWarnings()
 	}
 }

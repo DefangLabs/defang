@@ -257,7 +257,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 						case 3: // Ctrl-C
 							cancel() // cancel the tail context
 						case 10, 13: // Enter or Return
-							fmt.Println(" ") // empty line, but overwrite the spinner
+							term.Println(" ") // empty line, but overwrite the spinner
 						case 'v', 'V':
 							verbose := !options.Verbose
 							options.Verbose = verbose

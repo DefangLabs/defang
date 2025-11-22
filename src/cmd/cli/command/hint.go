@@ -1,12 +1,12 @@
 package command
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 func prettyExecutable(def string) string {
@@ -48,7 +48,7 @@ func printDefangHint(hint string, cmds ...string) {
 
 	executable := prettyExecutable("defang")
 
-	fmt.Printf("\n%s\n\n", hint)
+	term.Printf("\n%s\n\n", hint)
 	if providerFlag := RootCmd.Flag("provider"); providerFlag.Changed {
 		executable += " --provider=" + providerFlag.Value.String()
 	}
@@ -59,9 +59,9 @@ func printDefangHint(hint string, cmds ...string) {
 		executable += " --org=" + orgFlag.Value.String()
 	}
 	for _, arg := range cmds {
-		fmt.Printf("  %s %s\n\n", executable, arg)
+		term.Printf("  %s %s\n\n", executable, arg)
 	}
 	if pkg.RandomIndex(10) == 0 {
-		fmt.Println("To silence these hints, do: export DEFANG_HIDE_HINTS=1")
+		term.Println("To silence these hints, do: export DEFANG_HIDE_HINTS=1")
 	}
 }

@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -84,7 +83,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 	}
 
 	if upload == compose.UploadModeIgnore {
-		fmt.Println(string(bytes))
+		term.Println(string(bytes))
 		return nil, project, dryrun.ErrDryRun
 	}
 
@@ -160,7 +159,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 	}
 
 	if term.DoDebug() {
-		fmt.Println("Project:", project.Name)
+		term.Println("Project:", project.Name)
 		for _, serviceInfo := range resp.Services {
 			PrintObject(serviceInfo.Service.Name, serviceInfo)
 		}

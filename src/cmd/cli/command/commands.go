@@ -117,22 +117,22 @@ func Execute(ctx context.Context) error {
 		}
 
 		if credError := new(gcp.CredentialsError); errors.As(err, &credError) {
-			fmt.Print("\nPlease log in by running: \n\n\t gcloud auth application-default login\n\n")
+			term.Print("\nPlease log in by running: \n\n\t gcloud auth application-default login\n\n")
 		}
 
 		return ExitCode(code)
 	}
 
 	if global.HasTty && term.HadWarnings() {
-		fmt.Println("For help with warnings, check our FAQ at https://s.defang.io/warnings")
+		term.Println("For help with warnings, check our FAQ at https://s.defang.io/warnings")
 	}
 
 	if global.HasTty && !global.HideUpdate && pkg.RandomIndex(10) == 0 {
 		if latest, err := GetLatestVersion(ctx); err == nil && isNewer(GetCurrentVersion(), latest) {
 			term.Debug("Latest Version:", latest, "Current Version:", GetCurrentVersion())
-			fmt.Println("A newer version of the CLI is available at https://github.com/DefangLabs/defang/releases/latest")
+			term.Println("A newer version of the CLI is available at https://github.com/DefangLabs/defang/releases/latest")
 			if pkg.RandomIndex(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
-				fmt.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
+				term.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
 			}
 		}
 	}
@@ -462,7 +462,7 @@ var whoamiCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			_, err = fmt.Println(string(bytes))
+			_, err = term.Println(string(bytes))
 			return err
 		} else {
 			return term.Table([]cli.ShowAccountData{data},
@@ -634,15 +634,15 @@ var getVersionCmd = &cobra.Command{
 	Short:   "Get version information for the CLI and Fabric service",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		term.Printc(term.BrightCyan, "Defang CLI:    ")
-		fmt.Println(GetCurrentVersion())
+		term.Println(GetCurrentVersion())
 
 		term.Printc(term.BrightCyan, "Latest CLI:    ")
 		ver, err := GetLatestVersion(cmd.Context())
-		fmt.Println(ver)
+		term.Println(ver)
 
 		term.Printc(term.BrightCyan, "Defang Fabric: ")
 		ver, err2 := cli.GetVersion(cmd.Context(), global.Client)
-		fmt.Println(ver)
+		term.Println(ver)
 		return errors.Join(err, err2)
 	},
 }

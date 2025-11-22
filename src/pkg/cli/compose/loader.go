@@ -112,7 +112,7 @@ func (l *Loader) loadProject(ctx context.Context, suppressWarn bool) (*Project, 
 
 	if term.DoDebug() {
 		b, _ := yaml.Marshal(project)
-		fmt.Println(string(b))
+		term.Println(string(b))
 	}
 
 	l.cached = project

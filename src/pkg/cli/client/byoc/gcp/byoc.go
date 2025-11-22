@@ -404,7 +404,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		return "", err
 	}
 	b.cdExecution = execution
-	// fmt.Printf("CD Execution: %s\n", execution)
+	// term.Printf("CD Execution: %s\n", execution)
 	return execution, nil
 }
 

@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -84,7 +83,7 @@ func BootstrapLocalList(ctx context.Context, provider client.Provider, allRegion
 		if !allRegions {
 			stack, _ = SplitProjectStack(stack)
 		}
-		fmt.Println(" -", stack) // TODO: json output mode
+		term.Println(" -", stack) // TODO: json output mode
 	}
 	if count == 0 {
 		accountInfo, err := provider.AccountInfo(ctx)
@@ -94,7 +93,7 @@ func BootstrapLocalList(ctx context.Context, provider client.Provider, allRegion
 		if allRegions {
 			accountInfo.Region = ""
 		}
-		fmt.Printf("No projects found in %v\n", accountInfo)
+		term.Printf("No projects found in %v\n", accountInfo)
 	}
 	return nil
 }
