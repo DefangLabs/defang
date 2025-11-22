@@ -160,7 +160,7 @@ This ensures the priority order: command-line flags > environment variables > RC
 func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 	var err error
 
-	// called once once more in case stack name was changed by an RC file
+	// called once more in case stack name was changed by an RC file
 	r.Stack = r.getStackName(flags)
 
 	if !flags.Changed("verbose") {
