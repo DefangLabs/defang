@@ -47,6 +47,21 @@ func TestCreate(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		{
+			name: "single letter ok",
+			parameters: StackParameters{
+				Name: "a",
+			},
+			expectErr:        false,
+			expectedFilename: ".defangrc.a",
+		},
+		{
+			name: "hyphen not ok",
+			parameters: StackParameters{
+				Name: "invalid-name",
+			},
+			expectErr: true,
+		},
 	}
 
 	for _, tt := range tests {

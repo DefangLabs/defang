@@ -19,14 +19,14 @@ type StackParameters struct {
 	Mode     modes.Mode
 }
 
-var validStackName = regexp.MustCompile(`^[a-z][-a-z0-9]+$`)
+var validStackName = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
 
 func Create(params StackParameters) (string, error) {
 	if params.Name == "" {
 		return "", errors.New("stack name cannot be empty")
 	}
 	if !validStackName.MatchString(params.Name) {
-		return "", errors.New("stack name must start with a letter and contain only lowercase letters, numbers, and hyphens")
+		return "", errors.New("stack name must start with a letter and contain only lowercase letters and numbers")
 	}
 
 	content, err := Marshal(params)
