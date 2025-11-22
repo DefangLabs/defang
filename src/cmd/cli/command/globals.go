@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 
@@ -253,20 +254,24 @@ They will NOT override environment variables that are already set, since
 godotenv.Load respects existing environment variables. Stack-specific RC files
 are considered required when specified, while the general RC file is optional.
 */
-func (r *GlobalConfig) loadRC(stackName string) {
+func (r *GlobalConfig) loadRC(stackName string) error {
 	if stackName != "" {
+		// If a stack name is provided, load the stack-specific RC file but return error if it fails or does not exist
 		rcfile := ".defangrc." + stackName
 		if err := godotenv.Load(rcfile); err != nil {
-			term.Debugf("could not load %s: %v", rcfile, err)
+			return fmt.Errorf("could not load %s: %v", rcfile, err)
 		} else {
 			term.Debugf("loaded globals from %s", rcfile)
 		}
 	}
+	// If no stack name is provided, trying load the general .defangrc file
+	// An error here is non-fatal since the file is optional
 	const rcfile = ".defangrc"
 	if err := godotenv.Load(rcfile); err != nil {
-		term.Debugf("could not load %s: %v", rcfile, err)
+		term.Debugf("could not load %s, continuing without .defangrc file: %v", rcfile, err)
 	} else {
 		term.Debugf("loaded globals from %s", rcfile)
 	}
 
+	return nil
 }
