@@ -1,0 +1,30 @@
+name: Test cloud Auth
+
+on:
+  push:
+    branches:
+      - lio/cloudformation-template
+
+jobs:
+  test-auth:
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: src/go.mod
+          cache-dependency-path: src/go.sum
+
+      - name: Test AWS login
+        run: go run ./cmd/cli whoami -Paws --debug
+        working-directory: src
+
+      - name: Test GCP login
+        run: go run ./cmd/cli whoami -Pgcp --debug
+        working-directory: src
