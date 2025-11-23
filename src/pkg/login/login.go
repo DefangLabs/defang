@@ -97,13 +97,12 @@ func NonInteractiveGitHubLogin(ctx context.Context, client client.FabricClient, 
 		if file := os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE"); file == "" {
 			// AWS_ROLE_ARN is set, but AWS_WEB_IDENTITY_TOKEN_FILE is empty: write the token to a file
 			jwtPath := cluster.GetTokenFile(fabric) + ".jwt"
+			term.Debugf("writing web identity token to %s for role %s", jwtPath, roleArn)
 			if err := os.WriteFile(jwtPath, []byte(idToken), 0600); err != nil {
-				term.Debug("unable to write web identity token file:", err)
-			} else {
-				term.Debug("wrote web identity token file to", jwtPath)
-				os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath) // only for this invocation
-				os.Setenv("AWS_ROLE_SESSION_NAME", "testyml")     // only for this invocation
+				return err
 			}
+			os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath) // only for this invocation
+			os.Setenv("AWS_ROLE_SESSION_NAME", "testyml")     // only for this invocation
 		}
 	}
 
