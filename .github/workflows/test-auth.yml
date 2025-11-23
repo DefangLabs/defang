@@ -29,7 +29,7 @@ jobs:
         run: go run ./cmd/cli whoami -Paws --debug
         working-directory: src
         env:
-          DEFANG_AWS_ROLEARN: arn:aws:iam::532501343364:role/crun-test-llunesu-CIRole-Lot7V1mEw4Dq
+          AWS_ROLE_ARN: arn:aws:iam::532501343364:role/crun-test-llunesu-CIRole-Lot7V1mEw4Dq
 
       - name: Test GCP whoami
         run: go run ./cmd/cli whoami -Pgcp --debug
