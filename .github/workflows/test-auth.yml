@@ -12,8 +12,9 @@ jobs:
       id-token: write
     runs-on: ubuntu-latest
     env:
-      GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/902234435689/locations/global/workloadIdentityPools/github/providers/defang-github-provider"
+      AWS_DEFAULT_REGION: us-west-2
       AWS_ROLE_ARN: arn:aws:iam::532501343364:role/crun-test-llunesu-CIRole-Lot7V1mEw4Dq
+      GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/902234435689/locations/global/workloadIdentityPools/github/providers/defang-github-provider"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6

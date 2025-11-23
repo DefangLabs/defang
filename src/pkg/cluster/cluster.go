@@ -50,10 +50,11 @@ func GetExistingToken(fabric string) string {
 		accessToken = string(all)
 
 		jwtPath := tokenFile + ".jwt"
-		if file := os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE"); file == "" {
-			os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath)
+		if _, err := os.Stat(jwtPath); err == nil {
+			if file := os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE"); file == "" {
+				os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath)
+			}
 		}
-
 	} else {
 		term.Debug("Using access token from env DEFANG_ACCESS_TOKEN")
 	}
