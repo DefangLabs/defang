@@ -28,7 +28,11 @@ jobs:
       - name: Test AWS whoami
         run: go run ./cmd/cli whoami -Paws --debug
         working-directory: src
+        env:
+          DEFANG_AWS_ROLEARN: arn:aws:iam::532501343364:role/crun-test-llunesu-CIRole-Lot7V1mEw4Dq
 
       - name: Test GCP whoami
         run: go run ./cmd/cli whoami -Pgcp --debug
         working-directory: src
+        env:
+          DEFANG_GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/902234435689/locations/global/workloadIdentityPools/github/providers/defang-github-provider"

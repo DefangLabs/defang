@@ -86,6 +86,7 @@ Install the Defang CLI from one of the following sources:
   ```
   docker run -it defangio/defang-cli help
   ```
+
 - Using [NPX](https://docs.npmjs.com/cli/v9/commands/npx):
 
   ```
@@ -141,6 +142,7 @@ The Defang CLI recognizes the following environment variables:
 - `COMPOSE_PATH_SEPARATOR` - The path separator to use for `COMPOSE_FILE`; defaults to `:` on Unix/MacOS and `;` on Windows
 - `COMPOSE_PROJECT_NAME` - The name of the project to use; overrides the `name` in the Compose file
 - `DEFANG_ACCESS_TOKEN` - The access token to use for authentication; if not specified, uses token from `defang login`
+- `DEFANG_AWS_ROLEARN` - The AWS IAM Role ARN to assume for AWS BYOC deployments
 - `DEFANG_BUILD_CONTEXT_LIMIT` - The maximum size of the build context when building container images; defaults to `100MiB`
 - `DEFANG_CD_BUCKET` - The S3 bucket to use for the BYOC CD pipeline; defaults to `defang-cd-bucket-…`
 - `DEFANG_CD_IMAGE` - The image to use for the Continuous Deployment (CD) pipeline; defaults to `public.ecr.aws/defang-io/cd:public-beta`
@@ -148,6 +150,7 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_DISABLE_ANALYTICS` - If set to `true`, disables sending analytics to Defang; defaults to `false`
 - `DEFANG_EDITOR` - The editor to launch after new project generation; defaults to `code` (VS Code)
 - `DEFANG_FABRIC` - The address of the Defang Fabric to use; defaults to `fabric-prod1.defang.dev`
+- `DEFANG_GCP_WORKLOAD_IDENTITY_PROVIDER` - The GCP Workload Identity Provider to use for GCP BYOC deployments
 - `DEFANG_JSON` - If set to `true`, outputs JSON instead of human-readable output; defaults to `false`
 - `DEFANG_HIDE_HINTS` - If set to `true`, hides hints in the CLI output; defaults to `false`
 - `DEFANG_HIDE_UPDATE` - If set to `true`, hides the update notification; defaults to `false`
