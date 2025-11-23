@@ -11,6 +11,9 @@ jobs:
       contents: read
       id-token: write
     runs-on: ubuntu-latest
+    env:
+      GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/902234435689/locations/global/workloadIdentityPools/github/providers/defang-github-provider"
+      AWS_ROLE_ARN: arn:aws:iam::532501343364:role/crun-test-llunesu-CIRole-Lot7V1mEw4Dq
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -24,9 +27,6 @@ jobs:
       - name: Test login
         run: go run ./cmd/cli login --debug
         working-directory: src
-        env:
-          GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/902234435689/locations/global/workloadIdentityPools/github/providers/defang-github-provider"
-          AWS_ROLE_ARN: arn:aws:iam::532501343364:role/crun-test-llunesu-CIRole-Lot7V1mEw4Dq
 
       - name: Test AWS whoami
         run: go run ./cmd/cli whoami -Paws --debug

@@ -103,6 +103,8 @@ func NonInteractiveGitHubLogin(ctx context.Context, client client.FabricClient, 
 			}
 			os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath) // only for this invocation
 			os.Setenv("AWS_ROLE_SESSION_NAME", "testyml")     // only for this invocation
+		} else {
+			term.Debug("AWS_WEB_IDENTITY_TOKEN_FILE is already set; not writing token to a new file")
 		}
 	}
 
