@@ -21,10 +21,14 @@ jobs:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
 
-      - name: Test AWS login
+      - name: Test login
+        run: go run ./cmd/cli login --debug
+        working-directory: src
+
+      - name: Test AWS whoami
         run: go run ./cmd/cli whoami -Paws --debug
         working-directory: src
 
-      - name: Test GCP login
+      - name: Test GCP whoami
         run: go run ./cmd/cli whoami -Pgcp --debug
         working-directory: src
