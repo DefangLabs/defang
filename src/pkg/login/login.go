@@ -91,24 +91,23 @@ func NonInteractiveGitHubLogin(ctx context.Context, client client.FabricClient, 
 		return err
 	}
 
+	err = cluster.SaveAccessToken(fabric, resp.AccessToken) // creates the state folder too
+
 	if roleArn := os.Getenv("AWS_ROLE_ARN"); roleArn != "" {
 		if file := os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE"); file == "" {
-			f, err := os.CreateTemp("", "id_token")
-			if err != nil {
-				term.Debug("unable to create web identity token file:", err)
+			// AWS_ROLE_ARN is set, but AWS_WEB_IDENTITY_TOKEN_FILE is empty: write the token to a file
+			jwtPath := cluster.GetTokenFile(fabric) + ".jwt"
+			if err := os.WriteFile(jwtPath, []byte(idToken), 0600); err != nil {
+				term.Debug("unable to write web identity token file:", err)
 			} else {
-				if err := os.WriteFile(f.Name(), []byte(idToken), 0600); err != nil {
-					term.Debug("unable to write web identity token file:", err)
-				} else {
-					term.Debug("wrote web identity token file to", f.Name())
-					os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", f.Name())
-					os.Setenv("AWS_ROLE_SESSION_NAME", "testyml")
-				}
+				term.Debug("wrote web identity token file to", jwtPath)
+				os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath) // only for this invocation
+				os.Setenv("AWS_ROLE_SESSION_NAME", "testyml")     // only for this invocation
 			}
 		}
 	}
 
-	return cluster.SaveAccessToken(fabric, resp.AccessToken)
+	return err
 }
 
 func InteractiveRequireLoginAndToS(ctx context.Context, fabric *client.GrpcClient, addr string) error {
