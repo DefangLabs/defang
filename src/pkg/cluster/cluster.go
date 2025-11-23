@@ -52,7 +52,9 @@ func GetExistingToken(fabric string) string {
 		jwtPath := tokenFile + ".jwt"
 		if _, err := os.Stat(jwtPath); err == nil {
 			if file := os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE"); file == "" {
-				os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath)
+				term.Debugf("setting AWS_WEB_IDENTITY_TOKEN_FILE to %s", jwtPath)
+				os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath) // only for this invocation
+				os.Setenv("AWS_ROLE_SESSION_NAME", "defang-cli")  // only for this invocation
 			}
 		}
 	} else {
