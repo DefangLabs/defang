@@ -1,4 +1,26 @@
 {
+  "array-override": {
+    "command": null,
+    "entrypoint": null,
+    "environment": {
+      "EMPTY_VALUE": "bar",
+      "NEW_VALUE": "bar",
+      "NO_VALUE": "bar",
+      "WITH_VALUE": "bar"
+    },
+    "image": "bogus",
+    "networks": {
+      "default": null
+    }
+  },
+  "array-reset": {
+    "command": null,
+    "entrypoint": null,
+    "image": "bogus",
+    "networks": {
+      "default": null
+    }
+  },
   "array-set": {
     "command": null,
     "entrypoint": null,
@@ -23,6 +45,31 @@
       "NEW_VALUE": null,
       "NO_VALUE": null,
       "WITH_VALUE": null
+    },
+    "image": "bogus",
+    "networks": {
+      "default": null
+    }
+  },
+  "map-override": {
+    "command": null,
+    "entrypoint": null,
+    "environment": {
+      "EMPTY_VALUE": "bar",
+      "NEW_VALUE": "bar",
+      "NO_VALUE": "bar",
+      "WITH_VALUE": "bar"
+    },
+    "image": "bogus",
+    "networks": {
+      "default": null
+    }
+  },
+  "map-reset": {
+    "command": null,
+    "entrypoint": null,
+    "environment": {
+      "BASE_ONLY": "foo"
     },
     "image": "bogus",
     "networks": {

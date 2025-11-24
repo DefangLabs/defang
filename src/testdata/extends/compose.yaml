@@ -38,3 +38,39 @@ services:
       EMPTY_VALUE:
       NO_VALUE:
       NEW_VALUE:
+
+  array-reset:
+    extends:
+      file: ./compose.base.yaml
+      service: array-env
+    environment: !reset []
+
+  map-reset:
+    extends:
+      file: ./compose.base.yaml
+      service: map-env
+    environment:
+      WITH_VALUE: !reset
+      EMPTY_VALUE: !reset
+      NO_VALUE: !reset
+      NEW_VALUE: !reset
+
+  array-override:
+    extends:
+      file: ./compose.base.yaml
+      service: array-env
+    environment: !override
+      - WITH_VALUE=bar
+      - EMPTY_VALUE=bar
+      - NO_VALUE=bar
+      - NEW_VALUE=bar
+
+  map-override:
+    extends:
+      file: ./compose.base.yaml
+      service: map-env
+    environment: !override
+      WITH_VALUE: bar
+      EMPTY_VALUE: bar
+      NO_VALUE: bar
+      NEW_VALUE: bar
