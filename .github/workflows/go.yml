@@ -73,7 +73,7 @@ jobs:
         if: steps.nix-test.outcome == 'failure'
         run: |
           # Extract the correct hash from the error output
-          NEW_HASH=$(grep -oP '(?<=got:\s+)sha256-[A-Za-z0-9+/=]+' /tmp/nix-test-output.log | head -1)
+          NEW_HASH=$(grep 'got:' /tmp/nix-test-output.log | grep -oP 'sha256-[A-Za-z0-9+/=]+' | head -1)
           
           if [ -n "$NEW_HASH" ]; then
             echo "Found new hash: $NEW_HASH"
