@@ -74,32 +74,32 @@ jobs:
         run: |
           # Extract the correct hash from the error output
           NEW_HASH=$(grep 'got:' /tmp/nix-test-output.log | grep -oP 'sha256-[A-Za-z0-9+/]+=*' | head -1)
-          
+
           if [ -n "$NEW_HASH" ]; then
             # Validate hash format (should be sha256- followed by 44 base64 characters)
             if ! echo "$NEW_HASH" | grep -qE '^sha256-[A-Za-z0-9+/]{43}=$'; then
               echo "❌ Extracted hash has invalid format: $NEW_HASH"
               exit 1
             fi
-            
+
             echo "Found new hash: $NEW_HASH"
-            
+
             # Update the vendorHash in cli.nix
             OLD_HASH=$(grep -oP 'vendorHash = "\Ksha256-[A-Za-z0-9+/]+=*' pkgs/defang/cli.nix)
             echo "Old hash: $OLD_HASH"
-            
+
             # Use @ as delimiter since it won't appear in base64 hashes
             sed -i "s@vendorHash = \"$OLD_HASH\"@vendorHash = \"$NEW_HASH\"@" pkgs/defang/cli.nix
-            
+
             # Configure git
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            
+
             # Commit and push the change
             git add pkgs/defang/cli.nix
             git commit -m "Update Nix vendorHash to $NEW_HASH"
             git push
-            
+
             echo "✅ Updated vendorHash and committed the change"
           else
             echo "❌ Could not extract hash from error output"
