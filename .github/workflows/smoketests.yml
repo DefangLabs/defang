@@ -5,6 +5,8 @@ on:
     branches:
       - main
 
+permissions: {}
+
 jobs:
   trigger-smoketests:
     name: Trigger CLI Smoke Tests
