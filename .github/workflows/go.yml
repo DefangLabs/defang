@@ -397,7 +397,6 @@ jobs:
     runs-on: ubuntu-latest
     if: failure() && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     needs: [go-release, post-release, nix-shell-test, push-docker]
-    environment: release
     steps:
       - name: Slack Notification
         uses: rtCamp/action-slack-notify@v2
