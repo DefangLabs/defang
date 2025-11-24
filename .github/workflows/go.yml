@@ -51,6 +51,8 @@ jobs:
   nix-shell-test:
     runs-on: ubuntu-latest
     needs: go-test
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -60,9 +62,47 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
 
       - name: Check nix-shell default.nix
+        id: nix-test
+        continue-on-error: true
         run: |
           set -o pipefail
-          make test-nix 2>&1 | sed -u 's|\s\+got:|::error file=pkgs/defang/cli.nix,line=9::Replace the vendorHash in cli.nix with the correct value:|'
+          make test-nix 2>&1 | tee /tmp/nix-test-output.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Update vendorHash if needed
+        if: steps.nix-test.outcome == 'failure'
+        run: |
+          # Extract the correct hash from the error output
+          NEW_HASH=$(grep -oP '(?<=got:\s+)sha256-[A-Za-z0-9+/=]+' /tmp/nix-test-output.log | head -1)
+          
+          if [ -n "$NEW_HASH" ]; then
+            echo "Found new hash: $NEW_HASH"
+            
+            # Update the vendorHash in cli.nix
+            OLD_HASH=$(grep -oP 'vendorHash = "\Ksha256-[^"]+' pkgs/defang/cli.nix)
+            echo "Old hash: $OLD_HASH"
+            
+            sed -i "s|vendorHash = \"$OLD_HASH\"|vendorHash = \"$NEW_HASH\"|" pkgs/defang/cli.nix
+            
+            # Configure git
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            
+            # Commit and push the change
+            git add pkgs/defang/cli.nix
+            git commit -m "Update Nix vendorHash to $NEW_HASH"
+            git push
+            
+            echo "✅ Updated vendorHash and committed the change"
+          else
+            echo "❌ Could not extract hash from error output"
+            cat /tmp/nix-test-output.log
+            exit 1
+          fi
+
+      - name: Verify nix-shell after update
+        if: steps.nix-test.outcome == 'failure'
+        run: make test-nix
 
   # go-byoc-test:
   #   runs-on: ubuntu-latest
