@@ -5,7 +5,8 @@ on:
     branches:
       - main
 
-permissions: {}
+permissions:
+  id-token: write
 
 jobs:
   trigger-smoketests:
