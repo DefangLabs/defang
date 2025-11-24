@@ -1,0 +1,73 @@
+name: extends
+services:
+  array-override:
+    environment:
+      EMPTY_VALUE: bar
+      NEW_VALUE: bar
+      NO_VALUE: bar
+      WITH_VALUE: bar
+    image: bogus
+    networks:
+      default: null
+  array-reset:
+    image: bogus
+    networks:
+      default: null
+  array-set:
+    environment:
+      BASE_ONLY: foo
+      EMPTY_VALUE: bar
+      NEW_VALUE: bar
+      NO_VALUE: bar
+      WITH_VALUE: bar
+    image: bogus
+    networks:
+      default: null
+  array-unset:
+    environment:
+      BASE_ONLY: foo
+      EMPTY_VALUE: null
+      NEW_VALUE: null
+      NO_VALUE: null
+      WITH_VALUE: null
+    image: bogus
+    networks:
+      default: null
+  map-override:
+    environment:
+      EMPTY_VALUE: bar
+      NEW_VALUE: bar
+      NO_VALUE: bar
+      WITH_VALUE: bar
+    image: bogus
+    networks:
+      default: null
+  map-reset:
+    environment:
+      BASE_ONLY: foo
+    image: bogus
+    networks:
+      default: null
+  map-set:
+    environment:
+      BASE_ONLY: foo
+      EMPTY_VALUE: bar
+      NEW_VALUE: bar
+      NO_VALUE: bar
+      WITH_VALUE: bar
+    image: bogus
+    networks:
+      default: null
+  map-unset:
+    environment:
+      BASE_ONLY: foo
+      EMPTY_VALUE: null
+      NEW_VALUE: null
+      NO_VALUE: null
+      WITH_VALUE: null
+    image: bogus
+    networks:
+      default: null
+networks:
+  default:
+    name: extends_default
