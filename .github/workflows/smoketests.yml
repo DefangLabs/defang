@@ -27,6 +27,6 @@ jobs:
               workflow_id: 'cli-smoketests.yml',
               ref: 'main',
               inputs: {
-                'sample-name': 'html-css-js-sample'
+                'sample-name': 'html-css-js'
               }
             });
