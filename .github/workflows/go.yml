@@ -348,7 +348,6 @@ jobs:
       - name: Trigger CLI Autodoc
         uses: peter-evans/repository-dispatch@v3
         with:
-          # TODO: can we use GITHUB_TOKEN here instead?
           token: ${{ secrets.DOCS_ACTION_TRIGGER_TOKEN }}
           repository: DefangLabs/defang-docs
           event-type: cli-autodoc
