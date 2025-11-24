@@ -20,7 +20,6 @@ jobs:
       - name: Trigger Workflow
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.DEFANG_MVP_ACTIONS_DISPATCH_TOKEN }}
           script: |
             await github.rest.actions.createWorkflowDispatch({
               owner: 'DefangLabs',
