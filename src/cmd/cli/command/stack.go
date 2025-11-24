@@ -118,8 +118,7 @@ func makeStackNewCmd() *cobra.Command {
 			}
 
 			if stackName == "" {
-				compressedRegion := strings.ReplaceAll(params.Region, "-", "")
-				defaultName := strings.ToLower(params.Provider.String() + compressedRegion)
+				defaultName := stacks.MakeDefaultName(params.Provider, params.Region)
 				var name string
 				err := survey.AskOne(&survey.Input{
 					Message: "What do you want to call this stack?",

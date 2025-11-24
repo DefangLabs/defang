@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/joho/godotenv"
@@ -14,12 +14,17 @@ import (
 
 type StackParameters struct {
 	Name     string
-	Provider cliClient.ProviderID
+	Provider client.ProviderID
 	Region   string
 	Mode     modes.Mode
 }
 
 var validStackName = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
+
+func MakeDefaultName(providerId client.ProviderID, region string) string {
+	compressedRegion := strings.ReplaceAll(region, "-", "")
+	return strings.ToLower(providerId.String() + compressedRegion)
+}
 
 func Create(params StackParameters) (string, error) {
 	if params.Name == "" {
@@ -106,7 +111,7 @@ func Parse(content string) (StackParameters, error) {
 	for key, value := range properties {
 		switch key {
 		case "DEFANG_PROVIDER":
-			params.Provider = cliClient.ProviderID(value)
+			params.Provider = client.ProviderID(value)
 		case "AWS_REGION":
 			params.Region = value
 		case "GCP_LOCATION":
@@ -128,9 +133,9 @@ func Marshal(params StackParameters) (string, error) {
 	if params.Region != "" {
 		var regionVarName string
 		switch params.Provider {
-		case cliClient.ProviderAWS:
+		case client.ProviderAWS:
 			regionVarName = "AWS_REGION"
-		case cliClient.ProviderGCP:
+		case client.ProviderGCP:
 			regionVarName = "GCP_LOCATION"
 		}
 		if regionVarName != "" {

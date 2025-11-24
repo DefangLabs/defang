@@ -9,6 +9,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestMakeDefaultName(t *testing.T) {
+	tests := []struct {
+		provider cliClient.ProviderID
+		region   string
+		expected string
+	}{
+		{cliClient.ProviderAWS, "us-west-2", "awsuswest2"},
+		{cliClient.ProviderGCP, "us-central1", "gcpuscentral1"},
+		{cliClient.ProviderDO, "NYC3", "digitaloceannyc3"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.provider.String()+"_"+tt.region, func(t *testing.T) {
+			result := MakeDefaultName(tt.provider, tt.region)
+			if result != tt.expected {
+				t.Errorf("MakeDefaultName() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestCreate(t *testing.T) {
 	tests := []struct {
 		name             string
