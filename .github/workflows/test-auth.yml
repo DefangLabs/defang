@@ -29,6 +29,12 @@ jobs:
         run: go run ./cmd/cli login --debug
         working-directory: src
 
+      - name: Save defang state as assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: defang-state-assets
+          path: ~/.local/state/defang
+
       - name: Test AWS whoami
         run: go run ./cmd/cli whoami -Paws --debug
         working-directory: src
