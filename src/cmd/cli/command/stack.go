@@ -19,9 +19,6 @@ func makeStackCmd() *cobra.Command {
 		Use:   "stack",
 		Args:  cobra.NoArgs,
 		Short: "Manage Defang deployment stacks",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return nil
-		},
 	}
 	stackNewCmd := makeStackNewCmd()
 	stackCmd.AddCommand(stackNewCmd)
@@ -36,7 +33,7 @@ func makeStackCmd() *cobra.Command {
 func makeStackNewCmd() *cobra.Command {
 	var stackNewCmd = &cobra.Command{
 		Use:     "new STACK_NAME",
-		Aliases: []string{"init"},
+		Aliases: []string{"init", "create"},
 		Args:    cobra.MaximumNArgs(1),
 		Short:   "Create a new Defang deployment stack",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -60,12 +57,14 @@ func makeStackNewCmd() *cobra.Command {
 			}
 
 			if params.Provider == cliClient.ProviderAuto {
+				var options []string
+				for _, p := range cliClient.AllProviders() {
+					options = append(options, p.Name())
+				}
 				var provider string
-
 				err := survey.AskOne(&survey.Select{
 					Message: "Which cloud provider do you want to deploy to?",
-					Options: []string{"AWS", "GCP"},
-					Default: "AWS",
+					Options: options,
 				}, &provider, survey.WithStdio(term.DefaultTerm.Stdio()))
 				if err != nil {
 					return err
@@ -82,14 +81,8 @@ func makeStackNewCmd() *cobra.Command {
 				params.Provider = global.ProviderID
 			}
 
-			if params.Region == "" {
-				defaultRegion := ""
-				switch global.ProviderID {
-				case cliClient.ProviderAWS:
-					defaultRegion = "us-west-2"
-				case cliClient.ProviderGCP:
-					defaultRegion = "us-central1"
-				}
+			if params.Region == "" && params.Provider != cliClient.ProviderDefang {
+				defaultRegion := cliClient.GetRegion(params.Provider)
 
 				var region string
 
@@ -110,7 +103,7 @@ func makeStackNewCmd() *cobra.Command {
 					Message: "Which deployment mode do you want to use?",
 					Help:    "Learn about the different deployment modes at https://docs.defang.io/docs/concepts/deployment-modes",
 					Options: modes.AllDeploymentModes(),
-					Default: modes.ModeBalanced.String(),
+					Default: modes.ModeAffordable.String(),
 				},
 					&selectedMode, survey.WithStdio(term.DefaultTerm.Stdio()))
 				if err != nil {
@@ -125,7 +118,7 @@ func makeStackNewCmd() *cobra.Command {
 			}
 
 			if stackName == "" {
-				defaultName := fmt.Sprintf("%s-%s", strings.ToLower(params.Provider.String()), params.Region)
+				defaultName := stacks.MakeDefaultName(params.Provider, params.Region)
 				var name string
 				err := survey.AskOne(&survey.Input{
 					Message: "What do you want to call this stack?",
