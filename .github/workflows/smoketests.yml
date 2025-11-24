@@ -14,16 +14,17 @@ jobs:
       cancel-in-progress: true
 
     steps:
-      - name: Trigger smoke tests in DefangLabs/defang-mvp
-        run: |
-          curl -X POST \
-            -H "Accept: application/vnd.github.v3+json" \
-            -H "Authorization: token ${{ secrets.DEFANG_MVP_ACTIONS_DISPATCH_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            https://api.github.com/repos/DefangLabs/defang-mvp/actions/workflows/cli-smoketests.yml/dispatches \
-            -d '{
-              "ref": "main",
-              "inputs": {
-                "sample-name": "html-css-js"
+      - name: Trigger Workflow
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.DEFANG_MVP_ACTIONS_DISPATCH_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: 'DefangLabs',
+              repo: 'defang-mvp',
+              workflow_id: 'cli-smoketests.yml',
+              ref: 'main',
+              inputs: {
+                'sample-name': 'html-css-js-sample'
               }
-            }'
+            });
