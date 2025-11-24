@@ -58,6 +58,8 @@ const TemplateRevision = 2 // bump this when the template changes!
 // - OidcProviderSubjects: Comma-delimited list of OIDC provider trusted subject patterns (optional)
 // - OidcProviderThumbprints: Comma-delimited list of OIDC provider thumbprints (optional)
 func CreateTemplate(stack string, containers []types.Container) (*cloudformation.Template, error) {
+	const oidcProviderDefaultAud = "sts.amazonaws.com"
+
 	prefix := stack + "-"
 
 	defaultTags := []tags.Tag{
@@ -120,6 +122,11 @@ func CreateTemplate(stack string, containers []types.Container) (*cloudformation
 		Type:        "String",
 		Default:     ptr.String(""),
 		Description: ptr.String("Name of the CI role (optional)"),
+	}
+	template.Parameters[ParamsOidcProviderAudiences] = cloudformation.Parameter{
+		Type:        "CommaDelimitedList",
+		Default:     ptr.String(oidcProviderDefaultAud),
+		Description: ptr.String("OIDC provider trusted audience (optional)"),
 	}
 
 	// Conditions
@@ -595,11 +602,10 @@ func CreateTemplate(stack string, containers []types.Container) (*cloudformation
 	// 9a. IAM OIDC provider
 	// FIXME: You cannot register the same provider multiple times in a single AWS account. If you try to submit a URL that has already been used for an OpenID Connect provider in the AWS account, you will get an error.
 	const _oidcProvider = "OIDCProvider"
-	const oidcProviderAud = "sts.amazonaws.com"
 	template.Resources[_oidcProvider] = &OIDCProvider{
 		AWSCloudFormationCondition: _condOidcProvider,
 		Tags:                       defaultTags,
-		ClientIdList:               []string{oidcProviderAud},
+		ClientIdList:               cloudformation.Ref(ParamsOidcProviderAudiences),
 		ThumbprintList:             cloudformation.Ref(ParamsOidcProviderThumbprints),
 		Url:                        cloudformation.SubPtr(`https://${` + ParamsOidcProviderIssuer + `}`),
 	}
@@ -623,7 +629,7 @@ func CreateTemplate(stack string, containers []types.Container) (*cloudformation
         "Action": "sts:AssumeRoleWithWebIdentity",
         "Condition": {
             "StringEquals": {
-                "${`+ParamsOidcProviderIssuer+`}:aud": "`+oidcProviderAud+`"
+                "${`+ParamsOidcProviderIssuer+`}:aud": [ "${Audiences}" ]
             },
             "StringLike": {
                 "${`+ParamsOidcProviderIssuer+`}:sub": [ "${Subjects}" ]
@@ -631,8 +637,9 @@ func CreateTemplate(stack string, containers []types.Container) (*cloudformation
         }
     }]
 }`, map[string]any{
-			"Provider": cloudformation.Ref(_oidcProvider),
-			"Subjects": cloudformation.Join(`","`, cloudformation.Ref(ParamsOidcProviderSubjects)),
+			"Audiences": cloudformation.Join(`","`, cloudformation.Ref(ParamsOidcProviderAudiences)),
+			"Provider":  cloudformation.Ref(_oidcProvider),
+			"Subjects":  cloudformation.Join(`","`, cloudformation.Ref(ParamsOidcProviderSubjects)),
 		}),
 		ManagedPolicyArns: []string{
 			"arn:aws:iam::aws:policy/AdministratorAccess",

@@ -8,7 +8,7 @@ import (
 	"github.com/awslabs/goformation/v7/cloudformation/tags"
 )
 
-// Forked from goformation to fix ThumbprintList type/marshalling bug
+// Forked from goformation to fix ClientIdList and ThumbprintList type/marshalling bug
 
 // OIDCProvider AWS CloudFormation Resource (AWS::IAM::OIDCProvider)
 // See: http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-oidcprovider.html
@@ -17,7 +17,7 @@ type OIDCProvider struct {
 	// ClientIdList AWS CloudFormation Property
 	// Required: false
 	// See: http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-oidcprovider.html#cfn-iam-oidcprovider-clientidlist
-	ClientIdList []string `json:"ClientIdList,omitempty"`
+	ClientIdList interface{} `json:"ClientIdList,omitempty"`
 
 	// Tags AWS CloudFormation Property
 	// Required: false

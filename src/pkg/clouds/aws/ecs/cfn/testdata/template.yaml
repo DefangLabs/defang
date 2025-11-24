@@ -112,6 +112,10 @@ Parameters:
     Default: ""
     Description: ID of existing VPC to use (leave empty to create new VPC)
     Type: String
+  OidcProviderAudiences:
+    Default: sts.amazonaws.com
+    Description: OIDC provider trusted audience (optional)
+    Type: CommaDelimitedList
   OidcProviderIssuer:
     Default: ""
     Description: OIDC provider trusted issuer (optional)
@@ -161,7 +165,7 @@ Resources:
                     "Action": "sts:AssumeRoleWithWebIdentity",
                     "Condition": {
                         "StringEquals": {
-                            "${OidcProviderIssuer}:aud": "sts.amazonaws.com"
+                            "${OidcProviderIssuer}:aud": [ "${Audiences}" ]
                         },
                         "StringLike": {
                             "${OidcProviderIssuer}:sub": [ "${Subjects}" ]
@@ -169,7 +173,11 @@ Resources:
                     }
                 }]
             }
-          - Provider:
+          - Audiences:
+              Fn::Join:
+                - '","'
+                - Ref: OidcProviderAudiences
+            Provider:
               Ref: OIDCProvider
             Subjects:
               Fn::Join:
@@ -270,7 +278,7 @@ Resources:
     Condition: OidcProvider
     Properties:
       ClientIdList:
-        - sts.amazonaws.com
+        Ref: OidcProviderAudiences
       Tags:
         - Key: CreatedBy
           Value: crun

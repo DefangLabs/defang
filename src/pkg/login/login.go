@@ -78,7 +78,7 @@ func interactiveLogin(ctx context.Context, client client.FabricClient, fabric st
 
 func NonInteractiveGitHubLogin(ctx context.Context, client client.FabricClient, fabric string) error {
 	term.Debug("Non-interactive login using GitHub Actions id-token")
-	idToken, err := github.GetIdToken(ctx)
+	idToken, err := github.GetIdToken(ctx, "") // default audience (ie. https://github.com/ORG)
 	if err != nil {
 		return fmt.Errorf("non-interactive login failed: %w", err)
 	}
@@ -94,17 +94,19 @@ func NonInteractiveGitHubLogin(ctx context.Context, client client.FabricClient, 
 	err = cluster.SaveAccessToken(fabric, resp.AccessToken) // creates the state folder too
 
 	if roleArn := os.Getenv("AWS_ROLE_ARN"); roleArn != "" {
-		if file := os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE"); file == "" {
-			// AWS_ROLE_ARN is set, but AWS_WEB_IDENTITY_TOKEN_FILE is empty: write the token to a file
-			jwtPath := cluster.GetTokenFile(fabric) + ".jwt"
+		// If AWS_ROLE_ARN is set, we're doing "Assume Role with Web Identity"
+		if os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") == "" {
+			// AWS_ROLE_ARN is set, but AWS_WEB_IDENTITY_TOKEN_FILE is empty: write the token to a new file
+			jwtPath, _ := cluster.GetWebIdentityTokenFile(fabric)
 			term.Debugf("writing web identity token to %s for role %s", jwtPath, roleArn)
 			if err := os.WriteFile(jwtPath, []byte(idToken), 0600); err != nil {
-				return err
+				return fmt.Errorf("failed to save web identity token: %w", err)
 			}
-			os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath) // only for this invocation
-			os.Setenv("AWS_ROLE_SESSION_NAME", "testyml")     // only for this invocation
+			// Set AWS env vars for this CLI invocation
+			os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath)
+			os.Setenv("AWS_ROLE_SESSION_NAME", "testyml") // TODO: from WhoAmI
 		} else {
-			term.Debugf("AWS_WEB_IDENTITY_TOKEN_FILE is already set to %q; not writing token to a new file", file)
+			term.Debugf("AWS_WEB_IDENTITY_TOKEN_FILE is already set; not writing token to a new file")
 		}
 	}
 
