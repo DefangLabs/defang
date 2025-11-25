@@ -69,29 +69,15 @@ func NewByocBaseClient(tenantName types.TenantName, backend ProjectBackend, stac
 	return b
 }
 
-func (b *ByocBaseClient) GetProjectLastCDImage(ctx context.Context, projectName string) (string, error) {
-	projUpdate, err := b.projectBackend.GetProjectUpdate(ctx, projectName)
-	if err != nil {
-		return "", err
-	}
-
-	if projUpdate == nil {
-		return "", nil
-	}
-
-	return projUpdate.CdVersion, nil
-}
-
 func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
 	return nil, client.ErrNotImplemented("AI debugging is not yet supported for BYOC")
 }
 
 func (b *ByocBaseClient) SetCanIUseConfig(quotas *defangv1.CanIUseResponse) {
-	// Allow local override of the CD image
-	b.CDImage = pkg.Getenv("DEFANG_CD_IMAGE", quotas.CdImage)
-	b.AllowScaling = quotas.AllowScaling
-	b.AllowGPU = quotas.Gpu
-	b.PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", quotas.PulumiVersion)
+	b.CanIUseConfig.AllowGPU = quotas.Gpu
+	b.CanIUseConfig.AllowScaling = quotas.AllowScaling
+	b.CanIUseConfig.CDImage = quotas.CdImage
+	b.CanIUseConfig.PulumiVersion = quotas.PulumiVersion
 }
 
 func (b *ByocBaseClient) ServicePrivateDNS(name string) string {

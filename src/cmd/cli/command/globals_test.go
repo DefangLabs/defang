@@ -359,6 +359,16 @@ func Test_configurationPrecedence(t *testing.T) {
 				f.Close()
 			}
 
+			t.Cleanup(func() {
+				// Unseting env vars set for this test is handled by t.Setenv automatically
+				// t.tempDir() will clean up created files
+
+				// Unset all RC env vars created by loadRC since it uses os.Setenv
+				for _, rcEnv := range rcEnvs {
+					os.Unsetenv(rcEnv)
+				}
+			})
+
 			t.Chdir(tempDir)
 
 			// simulates the actual loading sequence
@@ -409,16 +419,6 @@ func Test_configurationPrecedence(t *testing.T) {
 			if testConfig.HideUpdate != tt.expected.HideUpdate {
 				t.Errorf("expected HideUpdate to be %v, got %v", tt.expected.HideUpdate, testConfig.HideUpdate)
 			}
-
-			t.Cleanup(func() {
-				// Unseting env vars set for this test is hanndled by t.Setenv automatically
-				// t.tempDir() will clean up created files
-
-				// Unset all RC env vars created by loadRC since it uses os.Setenv
-				for _, rcEnv := range rcEnvs {
-					os.Unsetenv(rcEnv)
-				}
-			})
 		})
 	}
 }

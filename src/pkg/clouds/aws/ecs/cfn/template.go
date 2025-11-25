@@ -3,16 +3,14 @@ package cfn
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
-	"os"
 	"strconv"
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	awsecs "github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
-	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/awslabs/goformation/v7/cloudformation"
 	"github.com/awslabs/goformation/v7/cloudformation/ec2"
@@ -27,18 +25,10 @@ import (
 )
 
 const (
-	createVpcResources   = true // TODO: make this configurable, add an option to use the default VPC
-	maxCachePrefixLength = 20   // prefix must be 2-20 characters long; should be 30 https://github.com/hashicorp/terraform-provider-aws/pull/34716
+	maxCachePrefixLength = 20 // prefix must be 2-20 characters long; should be 30 https://github.com/hashicorp/terraform-provider-aws/pull/34716
 
 	CreatedByTagKey   = "CreatedBy"
 	CreatedByTagValue = awsecs.CrunProjectName
-)
-
-var (
-	dockerHubUsername    = os.Getenv("DOCKERHUB_USERNAME") // TODO: support DOCKER_AUTH_CONFIG
-	dockerHubAccessToken = os.Getenv("DOCKERHUB_ACCESS_TOKEN")
-	noCache              = pkg.GetenvBool("DEFANG_NO_CACHE") // set to 1/true to disable pull-through cache
-	retainBucket         = true                              // set to false in unit tests
 )
 
 func getCacheRepoPrefix(prefix, suffix string) string {
@@ -51,14 +41,25 @@ func getCacheRepoPrefix(prefix, suffix string) string {
 	return repo
 }
 
-type TemplateOverrides struct {
-	Spot  bool
-	VpcID string
-}
+const TemplateRevision = 2 // bump this when the template changes!
 
-const TemplateRevision = 1 // bump this when the template changes!
+// CreateStaticTemplate creates a parameterized CloudFormation template that can be statically served
+// All conditional logic is moved to CloudFormation parameters and conditions.
+// This allows the template to be generated once and reused across different deployments
+// by providing different parameter values during stack creation/update.
+//
+// Parameters supported:
+// - ExistingVpcId: VPC ID string or empty to create new VPC
+// - RetainBucket: "true"/"false" - Whether to retain S3 bucket on stack deletion
+// - EnablePullThroughCache: "true"/"false" - Whether to enable ECR pull-through cache
+// - DockerHubUsername: Username for Docker Hub authentication (optional)
+// - DockerHubAccessToken: Access token for Docker Hub authentication (optional)
+// - OidcProviderIssuer: OIDC provider trusted issuer (optional)
+// - OidcProviderSubjects: Comma-delimited list of OIDC provider trusted subject patterns (optional)
+// - OidcProviderThumbprints: Comma-delimited list of OIDC provider thumbprints (optional)
+func CreateTemplate(stack string, containers []clouds.Container) (*cloudformation.Template, error) {
+	const oidcProviderDefaultAud = "sts.amazonaws.com"
 
-func createTemplate(stack string, containers []types.Container, overrides TemplateOverrides) (*cloudformation.Template, error) {
 	prefix := stack + "-"
 
 	defaultTags := []tags.Tag{
@@ -71,20 +72,108 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 	template := cloudformation.NewTemplate()
 	template.Description = "Defang AWS CloudFormation template for an ECS task. Don't delete: use the CLI instead."
 
+	// Parameters
+	// TODO: add an option to use the default VPC
+	template.Parameters[ParamsExistingVpcId] = cloudformation.Parameter{
+		Type:        "String", // TODO: use "AWS::EC2::VPC::Id" but seems it cannot be optional
+		Default:     ptr.String(""),
+		Description: ptr.String("ID of existing VPC to use (leave empty to create new VPC)"),
+	}
+	template.Parameters[ParamsRetainBucket] = cloudformation.Parameter{
+		Type:          "String",
+		Default:       ptr.String("true"),
+		AllowedValues: []any{"true", "false"},
+		Description:   ptr.String("Whether to retain the S3 bucket on stack deletion"),
+	}
+	template.Parameters[ParamsEnablePullThroughCache] = cloudformation.Parameter{
+		Type:          "String",
+		Default:       ptr.String("true"),
+		AllowedValues: []any{"true", "false"},
+		Description:   ptr.String("Whether to enable ECR pull-through cache"),
+	}
+	template.Parameters[ParamsDockerHubUsername] = cloudformation.Parameter{
+		Type:        "String",
+		Default:     ptr.String(""),
+		Description: ptr.String("Docker Hub username for private registry access (optional)"),
+		// NoEcho:      ptr.Bool(true), allow seeing username in AWS Console
+	}
+	template.Parameters[ParamsDockerHubAccessToken] = cloudformation.Parameter{
+		Type:        "String",
+		Default:     ptr.String(""),
+		Description: ptr.String("Docker Hub access token for private registry access (optional)"),
+		NoEcho:      ptr.Bool(true),
+	}
+	template.Parameters[ParamsOidcProviderIssuer] = cloudformation.Parameter{
+		Type:        "String",
+		Default:     ptr.String(""),
+		Description: ptr.String("OIDC provider trusted issuer (optional)"),
+	}
+	template.Parameters[ParamsOidcProviderSubjects] = cloudformation.Parameter{
+		Type:        "CommaDelimitedList",
+		Default:     ptr.String(""),
+		Description: ptr.String("OIDC provider trusted subject patterns (optional)"),
+	}
+	template.Parameters[ParamsOidcProviderThumbprints] = cloudformation.Parameter{
+		Type:        "CommaDelimitedList",
+		Default:     ptr.String(""),
+		Description: ptr.String("OIDC provider thumbprints (optional)"),
+	}
+	template.Parameters[ParamsCIRoleName] = cloudformation.Parameter{
+		Type:        "String",
+		Default:     ptr.String(""),
+		Description: ptr.String("Name of the CI role (optional)"),
+	}
+	template.Parameters[ParamsOidcProviderAudiences] = cloudformation.Parameter{
+		Type:        "CommaDelimitedList",
+		Default:     ptr.String(oidcProviderDefaultAud),
+		Description: ptr.String("OIDC provider trusted audience (optional)"),
+	}
+
+	// Conditions
+	const _condCreateVpcResources = "CreateVpcResources"
+	template.Conditions[_condCreateVpcResources] = cloudformation.Equals(cloudformation.Ref(ParamsExistingVpcId), "")
+	const _condRetainS3Bucket = "RetainS3Bucket"
+	template.Conditions[_condRetainS3Bucket] = cloudformation.Equals(cloudformation.Ref(ParamsRetainBucket), "true")
+	const _condEnablePullThroughCache = "EnablePullThroughCache"
+	template.Conditions[_condEnablePullThroughCache] = cloudformation.Equals(cloudformation.Ref(ParamsEnablePullThroughCache), "true")
+	const _condEnableDockerPullThroughCache = "EnableDockerPullThroughCache"
+	template.Conditions[_condEnableDockerPullThroughCache] = cloudformation.And([]string{
+		cloudformation.Equals(cloudformation.Ref(ParamsEnablePullThroughCache), "true"),
+		cloudformation.Not([]string{cloudformation.Equals(cloudformation.Ref(ParamsDockerHubUsername), "")}),
+		cloudformation.Not([]string{cloudformation.Equals(cloudformation.Ref(ParamsDockerHubAccessToken), "")}),
+	})
+	const _condOidcProvider = "OidcProvider"
+	template.Conditions[_condOidcProvider] = cloudformation.And([]string{
+		cloudformation.Not([]string{cloudformation.Equals(cloudformation.Ref(ParamsOidcProviderIssuer), "")}),
+		cloudformation.Not([]string{cloudformation.Equals(cloudformation.Join("", cloudformation.Ref(ParamsOidcProviderSubjects)), "")}),
+		cloudformation.Not([]string{cloudformation.Equals(cloudformation.Join("", cloudformation.Ref(ParamsOidcProviderThumbprints)), "")}),
+	})
+	const _condOverrideCIRoleName = "OverrideCIRoleName"
+	template.Conditions[_condOverrideCIRoleName] = cloudformation.Not([]string{cloudformation.Equals(cloudformation.Ref(ParamsCIRoleName), "")})
+
 	// 1. bucket (for deployment state)
 	const _bucket = "Bucket"
-	var bucketDeletionPolicy policies.DeletionPolicy
-	if retainBucket {
-		bucketDeletionPolicy = "RetainExceptOnCreate"
-	}
 	template.Resources[_bucket] = &s3.Bucket{
 		Tags: defaultTags,
 		// BucketName: ptr.String(PREFIX + "bucket" + SUFFIX), // optional; TODO: might want to fix this name to allow Pulumi destroy after stack deletion
-		AWSCloudFormationDeletionPolicy: bucketDeletionPolicy,
+		AWSCloudFormationDeletionPolicy: policies.DeletionPolicy(cloudformation.If(_condRetainS3Bucket, "RetainExceptOnCreate", "Delete")),
 		VersioningConfiguration: &s3.Bucket_VersioningConfiguration{
 			Status: "Enabled",
 		},
 	}
+	// 1b. TODO: add lifecycle policy to the bucket to delete old versions
+	// const _bucketLifecyclePolicy = "BucketLifecyclePolicy"
+	// template.Resources[_bucketLifecyclePolicy] = &s3.Bucket_LifecycleConfiguration{
+	// 	Rules: []s3.Bucket_LifecycleConfiguration_Rule{
+	// 		{
+	// 			Id:     ptr.String("DeleteOldVersions"),
+	// 			Status: "Enabled",
+	// 			NoncurrentVersionExpiration: &s3.Bucket_LifecycleConfiguration_Rule_NoncurrentVersionExpiration{
+	// 				NoncurrentDays: ptr.Int(30),
+	// 			},
+	// 		},
+	// 	},
+	// }
 
 	// 2. ECS cluster
 	const _cluster = "Cluster"
@@ -94,19 +183,13 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 	}
 
 	// 3. ECS capacity provider
-	capacityProvider := "FARGATE"
-	if overrides.Spot {
-		capacityProvider = "FARGATE_SPOT"
-	}
 	const _capacityProvider = "CapacityProvider"
 	template.Resources[_capacityProvider] = &ecs.ClusterCapacityProviderAssociations{
-		Cluster: cloudformation.Ref(_cluster),
-		CapacityProviders: []string{
-			capacityProvider,
-		},
+		Cluster:           cloudformation.Ref(_cluster),
+		CapacityProviders: []string{"FARGATE", "FARGATE_SPOT"},
 		DefaultCapacityProviderStrategy: []ecs.ClusterCapacityProviderAssociations_CapacityProviderStrategy{
 			{
-				CapacityProvider: capacityProvider,
+				CapacityProvider: "FARGATE", // task may override to FARGATE_SPOT
 				Weight:           ptr.Int(1),
 			},
 		},
@@ -124,68 +207,45 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 		},
 	}
 
-	// #nosec G101 - not a secret
-	const _privateRepoSecret = "PrivateRepoSecret"
 	// 5. ECR pull-through cache rules
 	// TODO: Creating pull through cache rules isn't supported in the following Regions:
 	// * China (Beijing) (cn-north-1)
 	// * China (Ningxia) (cn-northwest-1)
 	// * AWS GovCloud (US-East) (us-gov-east-1)
 	// * AWS GovCloud (US-West) (us-gov-west-1)
-	images := make([]string, 0, len(containers))
-	for _, task := range containers {
-		image := task.Image
-		if noCache {
-			// no pull-through cache
-		} else if repo, ok := strings.CutPrefix(image, awsecs.EcrPublicRegistry); ok {
-			const _pullThroughCache = "PullThroughCache"
-			ecrPublicPrefix := getCacheRepoPrefix(prefix, "ecr-public")
 
-			// 5. The pull-through cache rule
-			template.Resources[_pullThroughCache] = &ecr.PullThroughCacheRule{
-				EcrRepositoryPrefix: ptr.String(ecrPublicPrefix),
-				UpstreamRegistryUrl: ptr.String(awsecs.EcrPublicRegistry),
-			}
+	// Create pull-through cache resources conditionally
+	ecrPublicPrefix := getCacheRepoPrefix(prefix, "ecr-public")
+	dockerPublicPrefix := getCacheRepoPrefix(prefix, "docker-public")
 
-			image = cloudformation.Sub("${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/" + ecrPublicPrefix + repo)
-		} else if repo, ok := strings.CutPrefix(image, awsecs.DockerRegistry); ok && dockerHubUsername != "" && dockerHubAccessToken != "" {
-			const _pullThroughCache = "PullThroughCacheDocker"
-			dockerPublicPrefix := getCacheRepoPrefix(prefix, "docker-public")
+	// 5a. ECR Public pull-through cache
+	const _pullThroughCache = "PullThroughCache"
+	template.Resources[_pullThroughCache] = &ecr.PullThroughCacheRule{
+		AWSCloudFormationCondition: _condEnablePullThroughCache,
+		EcrRepositoryPrefix:        ptr.String(ecrPublicPrefix),
+		UpstreamRegistryUrl:        ptr.String(awsecs.EcrPublicRegistry),
+	}
 
-			// 5a. When creating the Secrets Manager secret that contains the upstream registry credentials, the secret name must use the `ecr-pullthroughcache/` prefix.
-			// This is the struct AWS wants, see https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache-creating-secret.html
-			bytes, err := json.Marshal(struct {
-				Username    string `json:"username"`
-				AccessToken string `json:"accessToken"`
-			}{dockerHubUsername, dockerHubAccessToken})
-			if err != nil {
-				panic(err) // there's no reason this should ever fail
-			}
+	// 5b. Docker Hub credentials secret - needs proper JSON format
+	// When creating the Secrets Manager secret that contains the upstream registry credentials, the secret name must use the `ecr-pullthroughcache/` prefix.
+	// This is the struct AWS wants, see https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache-creating-secret.html
+	// #nosec G101 - not a secret
+	const _privateRepoSecret = "PrivateRepoSecret"
+	template.Resources[_privateRepoSecret] = &secretsmanager.Secret{
+		AWSCloudFormationCondition: _condEnableDockerPullThroughCache,
+		Tags:                       defaultTags,
+		Description:                ptr.String("Docker Hub credentials for the ECR pull-through cache rule"),
+		Name:                       ptr.String("ecr-pullthroughcache/" + dockerPublicPrefix),
+		SecretString:               ptr.String(cloudformation.Sub(`{"username":"${` + ParamsDockerHubUsername + `}","accessToken":"${` + ParamsDockerHubAccessToken + `}"}`)),
+	}
 
-			// This is $0.40 per secret per month, so make it opt-in (only done when DOCKERHUB_* env vars are set)
-			template.Resources[_privateRepoSecret] = &secretsmanager.Secret{
-				Tags:         defaultTags,
-				Description:  ptr.String("Docker Hub credentials for the ECR pull-through cache rule"),
-				Name:         ptr.String("ecr-pullthroughcache/" + dockerPublicPrefix),
-				SecretString: ptr.String(string(bytes)),
-			}
-
-			// 5b. The pull-through cache rule
-			template.Resources[_pullThroughCache] = &ecr.PullThroughCacheRule{
-				EcrRepositoryPrefix: ptr.String(dockerPublicPrefix),
-				UpstreamRegistryUrl: ptr.String("registry-1.docker.io"),
-				CredentialArn:       cloudformation.RefPtr(_privateRepoSecret),
-			}
-
-			image = cloudformation.Sub("${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/" + dockerPublicPrefix + repo)
-		} else {
-			// TODO: support pull through cache for other registries
-			// TODO: support private repos (with or without pull-through cache)
-		}
-		if image == "" {
-			return nil, fmt.Errorf("container %v is using invalid image: %q", task.Name, task.Image)
-		}
-		images = append(images, image)
+	// 5c. Docker Hub pull-through cache
+	const _pullThroughCacheDocker = "PullThroughCacheDocker"
+	template.Resources[_pullThroughCacheDocker] = &ecr.PullThroughCacheRule{
+		AWSCloudFormationCondition: _condEnableDockerPullThroughCache,
+		EcrRepositoryPrefix:        ptr.String(dockerPublicPrefix),
+		UpstreamRegistryUrl:        ptr.String("registry-1.docker.io"),
+		CredentialArn:              cloudformation.RefPtr(_privateRepoSecret),
 	}
 
 	// 6. IAM roles for ECS task
@@ -207,43 +267,39 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 	}
 
 	// 6a. IAM exec role for task
-	execPolicies := []iam.Role_Policy{{
-		// From https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache.html#pull-through-cache-iam
-		PolicyName: "AllowECRPassThrough",
-		PolicyDocument: map[string]any{
-			"Version": "2012-10-17",
-			"Statement": []map[string]any{
-				{
-					"Effect": "Allow",
-					"Action": []string{
-						"ecr:CreatePullThroughCacheRule",
-						"ecr:BatchImportUpstreamImage", // should be registry permission instead
-						"ecr:CreateRepository",         // can be registry permission instead
+	execPolicies := []iam.Role_Policy{
+		{
+			// From https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache.html#pull-through-cache-iam
+			PolicyName: "AllowECRPassThrough", // misnomer
+			PolicyDocument: map[string]any{
+				"Version": "2012-10-17",
+				"Statement": []any{
+					map[string]any{
+						"Effect": "Allow",
+						"Action": []string{
+							"ecr:CreatePullThroughCacheRule",
+							"ecr:BatchImportUpstreamImage", // should be registry permission instead
+							"ecr:CreateRepository",         // can be registry permission instead
+						},
+						"Resource": "*", // FIXME: restrict cloudformation.Sub("arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/${PullThroughCache}:*"),
 					},
-					"Resource": "*", // FIXME: restrict cloudformation.Sub("arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/${PullThroughCache}:*"),
+					cloudformation.If(_condEnableDockerPullThroughCache,
+						map[string]any{
+							"Effect": "Allow",
+							"Action": []string{
+								"secretsmanager:GetSecretValue",
+								"ssm:GetParameters",
+								// "kms:Decrypt", Required only if your key uses a custom KMS key and not the default key
+							},
+							"Resource": cloudformation.Ref(_privateRepoSecret),
+						},
+						cloudformation.Ref("AWS::NoValue"),
+					),
 				},
 			},
 		},
-	}}
-	if _, ok := template.Resources[_privateRepoSecret]; ok {
-		execPolicies = append(execPolicies, iam.Role_Policy{
-			PolicyName: "AllowGetRepoSecret",
-			PolicyDocument: map[string]any{
-				"Version": "2012-10-17",
-				"Statement": []map[string]any{
-					{
-						"Effect": "Allow",
-						"Action": []string{
-							"secretsmanager:GetSecretValue",
-							"ssm:GetParameters",
-							// "kms:Decrypt", Required only if your key uses a custom KMS key and not the default key
-						},
-						"Resource": cloudformation.Ref(_privateRepoSecret),
-					},
-				},
-			},
-		})
 	}
+
 	const _executionRole = "ExecutionRole"
 	template.Resources[_executionRole] = &iam.Role{
 		Tags: defaultTags,
@@ -320,13 +376,13 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 	// 7. ECS task definition
 	var totalCpu, totalMiB float64
 	var platform string
-	for _, task := range containers {
-		totalCpu += float64(task.Cpus)
-		totalMiB += math.Max(float64(task.Memory)/1024/1024, 6) // 6MiB min for the container
+	for _, container := range containers {
+		totalCpu += float64(container.Cpus)
+		totalMiB += math.Max(float64(container.Memory)/1024/1024, 6) // 6MiB min for the container
 		if platform == "" {
-			platform = task.Platform
-		} else if platform != task.Platform {
-			panic("all containers must have the same platform")
+			platform = container.Platform
+		} else if platform != container.Platform {
+			return nil, errors.New("all containers must have the same platform")
 		}
 	}
 	mCpu, mib := awsecs.FixupFargateConfig(totalCpu, totalMiB)
@@ -341,7 +397,7 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 
 	var volumes []ecs.TaskDefinition_Volume
 	var containerDefinitions []ecs.TaskDefinition_ContainerDefinition
-	for i, container := range containers {
+	for _, container := range containers {
 		for _, v := range container.Volumes {
 			volumes = append(volumes, ecs.TaskDefinition_Volume{
 				Name: ptr.String(v.Source),
@@ -389,9 +445,28 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 			}
 		}
 
+		image := container.Image
+		if repo, ok := strings.CutPrefix(image, awsecs.EcrPublicRegistry); ok {
+			image = cloudformation.If(_condEnablePullThroughCache,
+				cloudformation.Sub("${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/"+ecrPublicPrefix+repo),
+				container.Image,
+			)
+		} else if repo, ok := strings.CutPrefix(image, awsecs.DockerRegistry); ok {
+			image = cloudformation.If(_condEnableDockerPullThroughCache,
+				cloudformation.Sub("${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/"+dockerPublicPrefix+repo),
+				container.Image,
+			)
+		} else {
+			// TODO: support pull through cache for other registries
+			// TODO: support private repos (with or without pull-through cache)
+		}
+		if image == "" {
+			return nil, fmt.Errorf("container %v is using invalid image: %q", container.Name, image)
+		}
+
 		def := ecs.TaskDefinition_ContainerDefinition{
 			Name:        name,
-			Image:       images[i],
+			Image:       image,
 			StopTimeout: ptr.Int(120), // TODO: make this configurable
 			Essential:   container.Essential,
 			Cpu:         cpuShares,
@@ -433,83 +508,88 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 		// Family:                  cloudformation.SubPtr("${AWS::StackName}-TaskDefinition"), // optional, but needed to avoid TaskDef replacement
 	}
 
-	vpcId := overrides.VpcID
-	if vpcId == "" {
-		if !createVpcResources {
-			panic("using the default VPC: not implemented")
-		}
-
-		// 8a. a VPC
-		const _vpc = "VPC"
-		template.Resources[_vpc] = &ec2.VPC{
-			Tags:      append([]tags.Tag{{Key: "Name", Value: prefix + "vpc"}}, defaultTags...),
-			CidrBlock: ptr.String("10.0.0.0/16"),
-		}
-		vpcId = cloudformation.Ref(_vpc)
-		// 8b. an internet gateway; FIXME: make internet access optional
-		const _internetGateway = "InternetGateway"
-		template.Resources[_internetGateway] = &ec2.InternetGateway{
-			Tags: append([]tags.Tag{{Key: "Name", Value: prefix + "igw"}}, defaultTags...),
-		}
-		// 8c. an internet gateway attachment for the VPC
-		const _internetGatewayAttachment = "InternetGatewayAttachment"
-		template.Resources[_internetGatewayAttachment] = &ec2.VPCGatewayAttachment{
-			VpcId:             vpcId,
-			InternetGatewayId: cloudformation.RefPtr(_internetGateway),
-		}
-		// 8d. a route table
-		const _routeTable = "RouteTable"
-		template.Resources[_routeTable] = &ec2.RouteTable{
-			Tags:  append([]tags.Tag{{Key: "Name", Value: prefix + "routetable"}}, defaultTags...),
-			VpcId: vpcId,
-		}
-		// 8e. a route for the route table and internet gateway
-		const _route = "Route"
-		template.Resources[_route] = &ec2.Route{
-			RouteTableId:         cloudformation.Ref(_routeTable),
-			DestinationCidrBlock: ptr.String("0.0.0.0/0"),
-			GatewayId:            cloudformation.RefPtr(_internetGateway),
-		}
-		// 8f. a public subnet
-		const _subnet = "Subnet"
-		template.Resources[_subnet] = &ec2.Subnet{
-			Tags: append([]tags.Tag{{Key: "Name", Value: prefix + "subnet"}}, defaultTags...),
-			// AvailabilityZone:; TODO: parse region suffix
-			CidrBlock:           ptr.String("10.0.0.0/20"),
-			VpcId:               vpcId,
-			MapPublicIpOnLaunch: ptr.Bool(true),
-		}
-		// 8g. a subnet / route table association
-		const _subnetRouteTableAssociation = "SubnetRouteTableAssociation"
-		template.Resources[_subnetRouteTableAssociation] = &ec2.SubnetRouteTableAssociation{
-			SubnetId:     cloudformation.Ref(_subnet),
-			RouteTableId: cloudformation.Ref(_routeTable),
-		}
-		// 8h. S3 gateway endpoint (to avoid S3 bandwidth charges)
-		const _s3GatewayEndpoint = "S3GatewayEndpoint"
-		template.Resources[_s3GatewayEndpoint] = &ec2.VPCEndpoint{
-			VpcEndpointType: ptr.String("Gateway"),
-			VpcId:           vpcId,
-			ServiceName:     cloudformation.Sub("com.amazonaws.${AWS::Region}.s3"),
-		}
-
-		const _defaultSecurityGroup = "DefaultSecurityGroup"
-		template.Outputs[OutputsDefaultSecurityGroupID] = cloudformation.Output{
-			Description: ptr.String("ID of the security group"),
-			Value:       cloudformation.GetAtt(_vpc, _defaultSecurityGroup),
-		}
-		template.Outputs[OutputsSubnetID] = cloudformation.Output{
-			Value:       cloudformation.Ref(_subnet),
-			Description: ptr.String("ID of the subnet"),
-		}
+	// VPC resources - create conditionally
+	const _vpc = "VPC"
+	template.Resources[_vpc] = &ec2.VPC{
+		AWSCloudFormationCondition: _condCreateVpcResources,
+		Tags:                       append([]tags.Tag{{Key: "Name", Value: prefix + "vpc"}}, defaultTags...),
+		CidrBlock:                  ptr.String("10.0.0.0/16"),
 	}
 
+	vpcId := cloudformation.If(_condCreateVpcResources, cloudformation.Ref(_vpc), cloudformation.Ref(ParamsExistingVpcId))
+	// 8b. an internet gateway; TODO: make internet access optional
+	const _internetGateway = "InternetGateway"
+	template.Resources[_internetGateway] = &ec2.InternetGateway{
+		AWSCloudFormationCondition: _condCreateVpcResources,
+		Tags:                       append([]tags.Tag{{Key: "Name", Value: prefix + "igw"}}, defaultTags...),
+	}
+	// 8c. an internet gateway attachment for the VPC
+	const _internetGatewayAttachment = "InternetGatewayAttachment"
+	template.Resources[_internetGatewayAttachment] = &ec2.VPCGatewayAttachment{
+		AWSCloudFormationCondition: _condCreateVpcResources,
+		VpcId:                      cloudformation.Ref(_vpc),
+		InternetGatewayId:          cloudformation.RefPtr(_internetGateway),
+	}
+	// 8d. a route table
+	const _routeTable = "RouteTable"
+	template.Resources[_routeTable] = &ec2.RouteTable{
+		AWSCloudFormationCondition: _condCreateVpcResources,
+		Tags:                       append([]tags.Tag{{Key: "Name", Value: prefix + "routetable"}}, defaultTags...),
+		VpcId:                      cloudformation.Ref(_vpc),
+	}
+	// 8e. a route for the route table and internet gateway
+	const _route = "Route"
+	template.Resources[_route] = &ec2.Route{
+		AWSCloudFormationCondition: _condCreateVpcResources,
+		RouteTableId:               cloudformation.Ref(_routeTable),
+		DestinationCidrBlock:       ptr.String("0.0.0.0/0"),
+		GatewayId:                  cloudformation.RefPtr(_internetGateway),
+	}
+	// 8f. a public subnet
+	const _subnet = "Subnet"
+	template.Resources[_subnet] = &ec2.Subnet{
+		AWSCloudFormationCondition: _condCreateVpcResources,
+		Tags:                       append([]tags.Tag{{Key: "Name", Value: prefix + "subnet"}}, defaultTags...),
+		// AvailabilityZone:; TODO: parse region suffix
+		CidrBlock:           ptr.String("10.0.0.0/20"),
+		VpcId:               cloudformation.Ref(_vpc),
+		MapPublicIpOnLaunch: ptr.Bool(true),
+	}
+	// 8g. a subnet / route table association
+	const _subnetRouteTableAssociation = "SubnetRouteTableAssociation"
+	template.Resources[_subnetRouteTableAssociation] = &ec2.SubnetRouteTableAssociation{
+		AWSCloudFormationCondition: _condCreateVpcResources,
+		SubnetId:                   cloudformation.Ref(_subnet),
+		RouteTableId:               cloudformation.Ref(_routeTable),
+	}
+	// 8h. S3 gateway endpoint (to avoid S3 bandwidth charges)
+	const _s3GatewayEndpoint = "S3GatewayEndpoint"
+	template.Resources[_s3GatewayEndpoint] = &ec2.VPCEndpoint{
+		AWSCloudFormationCondition: _condCreateVpcResources,
+		VpcEndpointType:            ptr.String("Gateway"),
+		VpcId:                      cloudformation.Ref(_vpc),
+		ServiceName:                cloudformation.Sub("com.amazonaws.${AWS::Region}.s3"),
+	}
+
+	const _defaultSecurityGroup = "DefaultSecurityGroup"
+	template.Outputs[OutputsDefaultSecurityGroupID] = cloudformation.Output{
+		Condition:   ptr.String(_condCreateVpcResources),
+		Description: ptr.String("ID of the default security group"),
+		Value:       cloudformation.GetAtt(_vpc, _defaultSecurityGroup),
+	}
+	template.Outputs[OutputsSubnetID] = cloudformation.Output{
+		Condition:   ptr.String(_condCreateVpcResources),
+		Value:       cloudformation.Ref(_subnet),
+		Description: ptr.String("ID of the subnet"),
+	}
+
+	// Don't use the default security group, because its rules might have been removed or modified
 	const _securityGroup = "SecurityGroup"
 	template.Resources[_securityGroup] = &ec2.SecurityGroup{
 		Tags:             defaultTags, // Name tag is ignored
-		GroupDescription: "Security group for the ECS task that allows all outbound and inbound traffic",
-		VpcId:            &vpcId,
-		// SecurityGroupEgress: []ec2.SecurityGroup_Egress{; use default egress; FIXME: add ability to restrict outbound traffic
+		GroupDescription: "Security group for the ECS task that allows all outbound traffic",
+		VpcId:            ptr.String(vpcId),
+		// SecurityGroupEgress: []ec2.SecurityGroup_Egress{; use default egress; TODO: add ability to restrict outbound traffic
 		// 	{
 		// 		IpProtocol: "tcp",
 		// 		FromPort:   ptr.Int(1),
@@ -518,6 +598,58 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 		// 	},
 		// },
 	}
+
+	// 9a. IAM OIDC provider
+	// FIXME: You cannot register the same provider multiple times in a single AWS account. If you try to submit a URL that has already been used for an OpenID Connect provider in the AWS account, you will get an error.
+	const _oidcProvider = "OIDCProvider"
+	template.Resources[_oidcProvider] = &OIDCProvider{
+		AWSCloudFormationCondition: _condOidcProvider,
+		Tags:                       defaultTags,
+		ClientIdList:               cloudformation.Ref(ParamsOidcProviderAudiences),
+		ThumbprintList:             cloudformation.Ref(ParamsOidcProviderThumbprints),
+		Url:                        cloudformation.SubPtr(`https://${` + ParamsOidcProviderIssuer + `}`),
+	}
+
+	// 9b. CI role
+	const _CIRole = "CIRole"
+	template.Resources[_CIRole] = &iam.Role{
+		AWSCloudFormationCondition: _condOidcProvider,
+		RoleName: cloudformation.IfPtr(_condOverrideCIRoleName,
+			cloudformation.Ref(ParamsCIRoleName),
+			cloudformation.Ref("AWS::NoValue"),
+		),
+		Tags: defaultTags,
+		AssumeRolePolicyDocument: cloudformation.SubVars(`{
+    "Version": "2012-10-17",
+    "Statement": [{
+        "Effect": "Allow",
+        "Principal": {
+            "Federated": "${Provider}"
+        },
+        "Action": "sts:AssumeRoleWithWebIdentity",
+        "Condition": {
+            "StringEquals": {
+                "${`+ParamsOidcProviderIssuer+`}:aud": [ "${Audiences}" ]
+            },
+            "StringLike": {
+                "${`+ParamsOidcProviderIssuer+`}:sub": [ "${Subjects}" ]
+            }
+        }
+    }]
+}`, map[string]any{
+			"Audiences": cloudformation.Join(`","`, cloudformation.Ref(ParamsOidcProviderAudiences)),
+			"Provider":  cloudformation.Ref(_oidcProvider),
+			"Subjects":  cloudformation.Join(`","`, cloudformation.Ref(ParamsOidcProviderSubjects)),
+		}),
+		ManagedPolicyArns: []string{
+			"arn:aws:iam::aws:policy/AdministratorAccess",
+		},
+	}
+
+	// template.Outputs[OutputsCIRoleARN] = cloudformation.Output{
+	// 	Description: ptr.String("ARN of the CI role"),
+	// 	Value:       cloudformation.Ref(_CIRole),
+	// }
 
 	// Declare the remaining stack outputs
 	template.Outputs[OutputsTaskDefArn] = cloudformation.Output{

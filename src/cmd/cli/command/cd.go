@@ -6,6 +6,8 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/cobra"
 )
 
@@ -186,5 +188,26 @@ var cdInstallCmd = &cobra.Command{
 		}
 
 		return cli.InstallCD(cmd.Context(), provider)
+	},
+}
+
+var cdCloudformationCmd = &cobra.Command{
+	Use:         "cloudformation",
+	Short:       "CloudFormation template related commands",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Hidden:      true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		provider := aws.NewByocProvider(cmd.Context(), global.Client.GetTenantName(), global.Stack)
+
+		if err := canIUseProvider(cmd.Context(), provider, "", 0); err != nil {
+			return err
+		}
+
+		template, err := provider.PrintCloudFormationTemplate()
+		if err == nil {
+			_, err = term.Print(string(template))
+		}
+		return err
 	},
 }
