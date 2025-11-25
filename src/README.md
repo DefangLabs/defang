@@ -34,7 +34,6 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_DISABLE_ANALYTICS` - If set to `true`, disables sending analytics to Defang; defaults to `false`
 - `DEFANG_EDITOR` - The editor to launch after new project generation; defaults to `code` (VS Code)
 - `DEFANG_FABRIC` - The address of the Defang Fabric to use; defaults to `fabric-prod1.defang.dev`
-- `DEFANG_GCP_WORKLOAD_IDENTITY_PROVIDER` - The GCP Workload Identity Provider to use for GCP BYOC deployments
 - `DEFANG_JSON` - If set to `true`, outputs JSON instead of human-readable output; defaults to `false`
 - `DEFANG_HIDE_HINTS` - If set to `true`, hides hints in the CLI output; defaults to `false`
 - `DEFANG_HIDE_UPDATE` - If set to `true`, hides the update notification; defaults to `false`
