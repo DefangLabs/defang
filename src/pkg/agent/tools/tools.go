@@ -21,7 +21,7 @@ type DeployParams struct {
 	common.LoaderParams
 }
 
-func CollectDefangTools(cluster string, providerId *client.ProviderID) []ai.Tool {
+func CollectDefangTools(cluster string, ec ElicitationsController, providerId *client.ProviderID) []ai.Tool {
 	// loginHandler := MakeLoginToolHandler(cluster, authPort, &LoginCLIAdapter{DefaultToolCLI: &DefaultToolCLI{}})
 
 	return []ai.Tool{
@@ -52,7 +52,7 @@ func CollectDefangTools(cluster string, providerId *client.ProviderID) []ai.Tool
 					return "Failed to configure loader", err
 				}
 				cli := &DefaultToolCLI{}
-				return HandleDeployTool(ctx.Context, loader, providerId, cluster, cli)
+				return HandleDeployTool(ctx.Context, loader, providerId, cluster, cli, ec)
 			},
 		),
 		ai.NewTool("destroy",
@@ -121,23 +121,23 @@ func CollectDefangTools(cluster string, providerId *client.ProviderID) []ai.Tool
 				return HandleListConfigTool(ctx.Context, loader, providerId, cluster, cli)
 			},
 		),
-		ai.NewTool("set_aws_provider",
-			"Set the AWS provider for the defang project",
-			func(ctx *ai.ToolContext, params SetAWSProviderParams) (string, error) {
-				return HandleSetAWSProvider(ctx.Context, params, providerId, cluster)
-			},
-		),
-		ai.NewTool("set_gcp_provider",
-			"Set the GCP provider for the defang project",
-			func(ctx *ai.ToolContext, params SetGCPProviderParams) (string, error) {
-				return HandleSetGCPProvider(ctx.Context, params, providerId, cluster)
-			},
-		),
-		ai.NewTool("set_playground_provider",
-			"Set the Playground provider for the defang project",
-			func(ctx *ai.ToolContext, params SetPlaygroundProviderParams) (string, error) {
-				return HandleSetPlaygroundProvider(providerId)
-			},
-		),
+		// ai.NewTool("set_aws_provider",
+		// 	"Set the AWS provider for the defang project",
+		// 	func(ctx *ai.ToolContext, params SetAWSProviderParams) (string, error) {
+		// 		return HandleSetAWSProvider(ctx.Context, params, providerId, cluster)
+		// 	},
+		// ),
+		// ai.NewTool("set_gcp_provider",
+		// 	"Set the GCP provider for the defang project",
+		// 	func(ctx *ai.ToolContext, params SetGCPProviderParams) (string, error) {
+		// 		return HandleSetGCPProvider(ctx.Context, params, providerId, cluster)
+		// 	},
+		// ),
+		// ai.NewTool("set_playground_provider",
+		// 	"Set the Playground provider for the defang project",
+		// 	func(ctx *ai.ToolContext, params SetPlaygroundProviderParams) (string, error) {
+		// 		return HandleSetPlaygroundProvider(providerId)
+		// 	},
+		// ),
 	}
 }

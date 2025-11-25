@@ -154,3 +154,14 @@ func Remove(name string) error {
 func filename(stackname string) string {
 	return ".defangrc." + stackname
 }
+
+func DefaultRegion(provider cliClient.ProviderID) string {
+	switch provider {
+	case cliClient.ProviderAWS:
+		return "us-west-2"
+	case cliClient.ProviderGCP:
+		return "us-central1"
+	default:
+		return ""
+	}
+}

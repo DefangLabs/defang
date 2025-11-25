@@ -114,7 +114,8 @@ func New(ctx context.Context, addr string, providerId *client.ProviderID, system
 
 	printer := printer{outStream: os.Stdout}
 	toolManager := NewToolManager(gk, printer)
-	defangTools := tools.CollectDefangTools(addr, providerId)
+	ec := tools.NewCLIAgentElicitationsController(os.Stdin, os.Stdout, os.Stderr)
+	defangTools := tools.CollectDefangTools(addr, ec, providerId)
 	toolManager.RegisterTools(defangTools...)
 	fsTools := CollectFsTools()
 	toolManager.RegisterTools(fsTools...)

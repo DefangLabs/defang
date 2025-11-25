@@ -84,6 +84,12 @@ func (m *MockDeployCLI) TailAndMonitor(ctx context.Context, project *compose.Pro
 	return nil, nil
 }
 
+type mockElicitationsController struct{}
+
+func (m *mockElicitationsController) Request(ctx context.Context, req ElicitationRequest) (ElicitationResponse, error) {
+	return ElicitationResponse{}, nil
+}
+
 func TestHandleDeployTool(t *testing.T) {
 	tests := []struct {
 		name                 string
@@ -185,7 +191,8 @@ func TestHandleDeployTool(t *testing.T) {
 
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := HandleDeployTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI)
+			ec := &mockElicitationsController{}
+			result, err := HandleDeployTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI, ec)
 
 			// Verify error expectations
 			if tt.expectedError != "" {

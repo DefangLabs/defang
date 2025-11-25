@@ -83,13 +83,7 @@ func makeStackNewCmd() *cobra.Command {
 			}
 
 			if params.Region == "" {
-				defaultRegion := ""
-				switch providerID {
-				case cliClient.ProviderAWS:
-					defaultRegion = "us-west-2"
-				case cliClient.ProviderGCP:
-					defaultRegion = "us-central1"
-				}
+				defaultRegion := stacks.DefaultRegion(providerID)
 
 				var region string
 

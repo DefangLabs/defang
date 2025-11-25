@@ -10,6 +10,17 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+type mcpElicitationsController struct{}
+
+func (c *mcpElicitationsController) Request(ctx context.Context, req agentTools.ElicitationRequest) (agentTools.ElicitationResponse, error) {
+	// Implementation for MCP elicitations can be added here
+	return agentTools.ElicitationResponse{}, nil
+}
+
+func NewMCPElicitationsController() *mcpElicitationsController {
+	return &mcpElicitationsController{}
+}
+
 func translateSchema(schema map[string]any) mcp.ToolInputSchema {
 	if schema == nil {
 		return mcp.ToolInputSchema{
@@ -68,6 +79,7 @@ func translateGenKitToolsToMCP(genkitTools []ai.Tool) []server.ServerTool {
 }
 
 func CollectTools(cluster string, providerId *client.ProviderID) []server.ServerTool {
-	genkitTools := agentTools.CollectDefangTools(cluster, providerId)
+	ec := NewMCPElicitationsController()
+	genkitTools := agentTools.CollectDefangTools(cluster, ec, providerId)
 	return translateGenKitToolsToMCP(genkitTools)
 }
