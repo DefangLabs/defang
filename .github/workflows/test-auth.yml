@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AWS_DEFAULT_REGION: us-west-2
-      AWS_ROLE_ARN: arn:aws:iam::532501343364:role/crun-test-llunesu-CIRole-Lot7V1mEw4Dq
+      AWS_ROLE_ARN: arn:aws:iam::532501343364:role/defang-cd-CIRole-jbKgzP2HmAoR
       GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/902234435689/locations/global/workloadIdentityPools/github/providers/defang-github-provider"
     steps:
       - name: Checkout repository
