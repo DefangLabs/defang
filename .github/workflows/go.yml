@@ -97,26 +97,31 @@ jobs:
             # Use @ as delimiter since it won't appear in base64 hashes
             sed -i "s@vendorHash = \"$OLD_HASH\"@vendorHash = \"$NEW_HASH\"@" pkgs/defang/cli.nix
 
-            # Configure git
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
+            # Verify the fix works before committing
+            echo "Verifying the updated hash..."
+            if make test-nix; then
+              echo "✅ Verification successful"
 
-            # Commit and push the change
-            git add pkgs/defang/cli.nix
-            git commit -m "Update Nix vendorHash to $NEW_HASH"
-            git push
+              # Configure git
+              git config user.name "github-actions[bot]"
+              git config user.email "github-actions[bot]@users.noreply.github.com"
 
-            echo "✅ Updated vendorHash and committed the change"
+              # Commit and push the change
+              git add pkgs/defang/cli.nix
+              git commit -m "Update Nix vendorHash to $NEW_HASH"
+              git push
+
+              echo "✅ Updated vendorHash and committed the change"
+            else
+              echo "❌ Verification failed after updating hash"
+              exit 1
+            fi
           else
             echo "❌ Could not extract hash from error output"
             echo "Last 20 lines of output:"
             tail -20 /tmp/nix-test-output.log
             exit 1
           fi
-
-      - name: Verify nix-shell after update
-        if: steps.nix-test.outcome == 'failure'
-        run: make test-nix
 
   # go-byoc-test:
   #   runs-on: ubuntu-latest
