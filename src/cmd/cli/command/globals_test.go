@@ -17,9 +17,9 @@ func Test_readGlobals(t *testing.T) {
 
 	testConfig := GlobalConfig{}
 
-	t.Run("OS env beats any .defangrc file", func(t *testing.T) {
+	t.Run("OS env beats any .defang file", func(t *testing.T) {
 		t.Setenv("VALUE", "from OS env")
-		err := testConfig.loadRC("test")
+		err := testConfig.loadDotDefang("test")
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -29,30 +29,30 @@ func Test_readGlobals(t *testing.T) {
 		os.Unsetenv("VALUE")
 	})
 
-	t.Run(".defangrc.test beats .defangrc", func(t *testing.T) {
-		err := testConfig.loadRC("test")
+	t.Run(".defang.test beats .defang", func(t *testing.T) {
+		err := testConfig.loadDotDefang("test")
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		if v := os.Getenv("VALUE"); v != "from .defangrc.test" {
-			t.Errorf("expected VALUE to be 'from .defangrc.test', got '%s'", v)
+		if v := os.Getenv("VALUE"); v != "from .defang.test" {
+			t.Errorf("expected VALUE to be 'from .defang.test', got '%s'", v)
 		}
 		os.Unsetenv("VALUE")
 	})
 
-	t.Run(".defangrc used if no stack", func(t *testing.T) {
-		err := testConfig.loadRC("")
+	t.Run(".defang used if no stack", func(t *testing.T) {
+		err := testConfig.loadDotDefang("")
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		if v := os.Getenv("VALUE"); v != "from .defangrc" {
-			t.Errorf("expected VALUE to be 'from .defangrc', got '%s'", v)
+		if v := os.Getenv("VALUE"); v != "from .defang" {
+			t.Errorf("expected VALUE to be 'from .defang', got '%s'", v)
 		}
 		os.Unsetenv("VALUE")
 	})
 
 	t.Run("incorrect stackname used if no stack", func(t *testing.T) {
-		err := testConfig.loadRC("non-existent-stack")
+		err := testConfig.loadDotDefang("non-existent-stack")
 		if err == nil {
 			t.Fatalf("this test should fail for non-existent stack: %v", err)
 		}
@@ -60,9 +60,9 @@ func Test_readGlobals(t *testing.T) {
 }
 
 func Test_configurationPrecedence(t *testing.T) {
-	// Test various combinations of flags, environment variables, and .defangrc files
+	// Test various combinations of flags, environment variables, and .defang files
 	// no matter the order they are applied, or combination, the final configuration should be correct.
-	// The precedence should be: flags > env vars > .defangrc files
+	// The precedence should be: flags > env vars > .defang files
 
 	// make a default config for comparison and copying
 	defaultConfig := GlobalConfig{
@@ -245,7 +245,7 @@ func Test_configurationPrecedence(t *testing.T) {
 			expected: defaultConfig,
 		},
 		{
-			name:         "default defangrc name, when no env vars or flags",
+			name:         "default .defang name, when no env vars or flags",
 			createRCFile: true,
 			rcStack: stack{
 				stackname: "",
@@ -280,7 +280,7 @@ func Test_configurationPrecedence(t *testing.T) {
 			},
 		},
 		{
-			name:         "default defangrc name and no values, when no env vars or flags",
+			name:         "default .defang name and no values, when no env vars or flags",
 			createRCFile: true,
 			rcStack: stack{
 				stackname: "",
@@ -339,9 +339,9 @@ func Test_configurationPrecedence(t *testing.T) {
 			if tt.createRCFile {
 				var path string
 				if tt.rcStack.stackname != "" {
-					path = filepath.Join(tempDir, ".defangrc."+tt.rcStack.stackname)
+					path = filepath.Join(tempDir, ".defang."+tt.rcStack.stackname)
 				} else {
-					path = filepath.Join(tempDir, ".defangrc")
+					path = filepath.Join(tempDir, ".defang")
 				}
 
 				f, err := os.Create(path)
@@ -363,7 +363,7 @@ func Test_configurationPrecedence(t *testing.T) {
 				// Unseting env vars set for this test is handled by t.Setenv automatically
 				// t.tempDir() will clean up created files
 
-				// Unset all RC env vars created by loadRC since it uses os.Setenv
+				// Unset all RC env vars created by loadDotDefang since it uses os.Setenv
 				for _, rcEnv := range rcEnvs {
 					os.Unsetenv(rcEnv)
 				}
@@ -372,7 +372,7 @@ func Test_configurationPrecedence(t *testing.T) {
 			t.Chdir(tempDir)
 
 			// simulates the actual loading sequence
-			err := testConfig.loadRC(tt.rcStack.stackname)
+			err := testConfig.loadDotDefang(tt.rcStack.stackname)
 			if err != nil {
 				t.Fatalf("failed to load RC file: %v", err)
 			}

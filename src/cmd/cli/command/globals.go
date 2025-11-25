@@ -20,12 +20,12 @@ These options can be configured through multiple sources with the following prio
 
  1. Command-line flags (highest priority)
  2. Environment variables (DEFANG_* prefix)
- 3. Configuration files (.defangrc, .defangrc.<stack>) (lowest priority)
+ 3. Configuration files (.defang, .defang.<stack>) (lowest priority)
 
 Configuration Flow:
 
   - Default values are set when initializing the global variable
-  - RC files are loaded to set environment variables (loadRC)
+  - RC files are loaded to set environment variables (loadDotDefang)
   - Environment variables and RC file values are synced to struct fields (syncFlagsWithEnv)
   - Command-line flags take precedence over all other sources
 
@@ -104,9 +104,9 @@ var global GlobalConfig = GlobalConfig{
 /*
 getStackName determines the stack name to use
 The returned stack name is used to determine which stack-specific RC file
-(.defangrc.<stackName>) should be loaded during configuration initialization.
+(.defang.<stackName>) should be loaded during configuration initialization.
 If no stack name is provided it will return the default value from the GlobalConfig struct,
-which will result in loading only the general .defangrc file.
+which will result in loading only the general .defang file.
 */
 func (r *GlobalConfig) getStackName(flags *pflag.FlagSet) string {
 	if !flags.Changed("stack") {
@@ -153,7 +153,7 @@ Logic for each configuration option:
   - If the flag was explicitly set by the user (flags.Changed), use the flag value (already set by cobra)
   - If the flag was NOT set by the user, check for the corresponding DEFANG_* environment variable
   - If the environment variable exists, parse it and update the struct field
-  - Environment variables can come from the shell environment or RC files loaded by loadRC()
+  - Environment variables can come from the shell environment or RC files loaded by loadDotDefang()
 
 This ensures the priority order: command-line flags > environment variables > RC file values > defaults
 */
@@ -240,31 +240,31 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 }
 
 /*
-loadRC loads configuration values from .defangrc files into environment variables.
+loadDotDefang loads configuration values from .defang files into environment variables.
 
 Loading order:
 
- 1. If stackName is provided, loads .defangrc.<stackName> first (required - returns error if missing/invalid)
- 2. Then loads the general .defangrc file (optional - missing file is not an error)
+ 1. If stackName is provided, loads .defang.<stackName> first (required - returns error if missing/invalid)
+ 2. Then loads the general .defang file (optional - missing file is not an error)
 
 Important: RC files have the lowest priority in the configuration hierarchy.
 They will NOT override environment variables that are already set, since
 godotenv.Load respects existing environment variables. Stack-specific RC files
 are considered required when specified, while the general RC file is optional.
 */
-func (r *GlobalConfig) loadRC(stackName string) error {
+func (r *GlobalConfig) loadDotDefang(stackName string) error {
 	if stackName != "" {
 		// If a stack name is provided, load the stack-specific RC file but return error if it fails or does not exist
-		rcfile := ".defangrc." + stackName
+		rcfile := ".defang." + stackName
 		if err := godotenv.Load(rcfile); err != nil {
 			return fmt.Errorf("could not load %s: %v", rcfile, err)
 		} else {
 			term.Debugf("loaded globals from %s", rcfile)
 		}
 	}
-	// If no stack name is provided, trying load the general .defangrc file
+	// If no stack name is provided, trying load the general .defang file
 	// An error here is non-fatal since the file is optional
-	const rcfile = ".defangrc"
+	const rcfile = ".defang"
 	if err := godotenv.Load(rcfile); err != nil {
 		term.Debugf("could not load %s, continuing without applying a rc file: %v", rcfile, err)
 	} else {
