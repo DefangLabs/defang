@@ -43,7 +43,7 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/hexops/gotextdiff v1.0.3
 	github.com/joho/godotenv v1.5.1
-	github.com/mark3labs/mcp-go v0.38.0
+	github.com/mark3labs/mcp-go v0.40.0
 	github.com/miekg/dns v1.1.59
 	github.com/moby/buildkit v0.17.3
 	github.com/moby/patternmatcher v0.6.0
