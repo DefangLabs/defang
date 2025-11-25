@@ -2,6 +2,8 @@ package debug
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -130,7 +132,7 @@ func TestDebugComposeLoadError(t *testing.T) {
 			debugConfig: DebugConfig{
 				Deployment: "load-error-deployment",
 			},
-			expectedPrompt: "The following error occurred while loading the compose file. Help troubleshoot and recommend a solution.validating /Users/jordan/wk/defang/src/testdata/invalid-no-services/compose.yaml:  additional properties 'foo' not allowed",
+			expectedPrompt: "The following error occurred while loading the compose file. Help troubleshoot and recommend a solution.validating %s/compose.yaml:  additional properties 'foo' not allowed",
 			permission:     true,
 		},
 	}
@@ -147,11 +149,17 @@ func TestDebugComposeLoadError(t *testing.T) {
 			mockAgent.ExpectedCalls = nil
 			mockAgent.Calls = nil
 
-			if tt.permission {
-				mockAgent.On("StartWithMessage", ctx, tt.expectedPrompt).Return(nil)
+			t.Chdir("../../testdata/invalid-no-services")
+
+			// Build expected prompt with current working directory
+			var expectedPrompt string
+			if tt.permission && tt.expectedPrompt != "" {
+				cwd, err := os.Getwd()
+				assert.NoError(t, err, "Getwd should not return an error")
+				expectedPrompt = fmt.Sprintf(tt.expectedPrompt, cwd)
+				mockAgent.On("StartWithMessage", ctx, expectedPrompt).Return(nil)
 			}
 
-			t.Chdir("../../testdata/invalid-no-services")
 			loader := compose.NewLoader()
 
 			_, loadErr := loader.LoadProject(ctx)
@@ -167,7 +175,7 @@ func TestDebugComposeLoadError(t *testing.T) {
 			}
 
 			if tt.permission {
-				mockAgent.AssertCalled(t, "StartWithMessage", ctx, tt.expectedPrompt)
+				mockAgent.AssertCalled(t, "StartWithMessage", ctx, expectedPrompt)
 			} else {
 				mockAgent.AssertNotCalled(t, "StartWithMessage", mock.Anything, mock.Anything)
 			}
