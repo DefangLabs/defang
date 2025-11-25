@@ -185,12 +185,12 @@ func TestCommandGates(t *testing.T) {
 			err := testCommand(tt.command, server.URL)
 
 			if tt.expectCanIUseCalled != mockService.canIUseIsCalled {
-				t.Fatalf("unexpected canIUse: expected usage: %t", tt.expectCanIUseCalled)
+				t.Errorf("unexpected canIUse: expected usage: %t", tt.expectCanIUseCalled)
 			}
 
 			if err != nil {
 				if tt.expectCanIUseCalled && err.Error() != "resource_exhausted: no access to use aws provider" {
-					t.Fatalf("expected \"no access error\" - got: %v", err.Error())
+					t.Errorf("expected \"no access\" error - got: %v", err.Error())
 				}
 			}
 		})
