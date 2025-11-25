@@ -71,7 +71,7 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 			{CapacityProvider: ptr.String(capacityProvider), Weight: 1},
 		},
 		Count: ptr.Int32(taskCount),
-		// LaunchType:     types.LaunchTypeFargate,
+		// LaunchType:     types.LaunchTypeFargate, mutually exclusive with CapacityProviderStrategy
 		TaskDefinition: ptr.String(a.TaskDefARN),
 		PropagateTags:  types.PropagateTagsTaskDefinition,
 		Cluster:        ptr.String(a.ClusterName),
