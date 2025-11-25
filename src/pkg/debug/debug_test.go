@@ -69,12 +69,12 @@ func TestDebugDeployment(t *testing.T) {
 			debugConfig: DebugConfig{
 				Deployment:     "test-deployment",
 				ProviderID:     &providerID,
-				Since:          time.Date(2025, 1, 2, 3, 4, 5, 0, time.Local),
-				Until:          time.Date(2025, 1, 2, 4, 5, 6, 0, time.Local),
+				Since:          time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC),
+				Until:          time.Date(2025, 1, 2, 4, 5, 6, 0, time.UTC),
 				FailedServices: []string{"backend"},
 				Project:        &project,
 			},
-			expectedPrompt: "An error occurred while deploying this project to AWS with Defang. Help troubleshoot and recommend a solution. Look at the logs to understand what happened.The deployment ID is \"test-deployment\". The services that failed to deploy are: [backend]. The deployment started at 2025-01-02 03:04:05 -0800 PST. The deployment finished at 2025-01-02 04:05:06 -0800 PST.The compose files are at []. The compose file is as follows:\n\nservices: {}\n",
+			expectedPrompt: "An error occurred while deploying this project to AWS with Defang. Help troubleshoot and recommend a solution. Look at the logs to understand what happened.The deployment ID is \"test-deployment\". The services that failed to deploy are: [backend]. The deployment started at 2025-01-02 03:04:05 +0000 UTC. The deployment finished at 2025-01-02 04:05:06 +0000 UTC.The compose files are at []. The compose file is as follows:\n\nservices: {}\n",
 			permission:     true,
 		},
 	}
