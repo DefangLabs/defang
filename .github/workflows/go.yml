@@ -320,6 +320,7 @@ jobs:
 
   push-docker:
     runs-on: ubuntu-latest
+    environment: release
     needs:
       - go-release
     steps:
