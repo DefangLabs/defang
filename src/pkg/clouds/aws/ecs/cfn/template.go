@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	awsecs "github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
-	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/awslabs/goformation/v7/cloudformation"
 	"github.com/awslabs/goformation/v7/cloudformation/ec2"
@@ -57,7 +57,7 @@ const TemplateRevision = 2 // bump this when the template changes!
 // - OidcProviderIssuer: OIDC provider trusted issuer (optional)
 // - OidcProviderSubjects: Comma-delimited list of OIDC provider trusted subject patterns (optional)
 // - OidcProviderThumbprints: Comma-delimited list of OIDC provider thumbprints (optional)
-func CreateTemplate(stack string, containers []types.Container) (*cloudformation.Template, error) {
+func CreateTemplate(stack string, containers []clouds.Container) (*cloudformation.Template, error) {
 	const oidcProviderDefaultAud = "sts.amazonaws.com"
 
 	prefix := stack + "-"

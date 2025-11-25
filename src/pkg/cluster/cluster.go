@@ -68,7 +68,7 @@ func GetExistingToken(fabric string) string {
 
 func GetWebIdentityTokenFile(fabric string) (string, error) {
 	jwtPath := GetTokenFile(fabric) + ".jwt"
-	_, err := os.Stat(client.StateDir)
+	_, err := os.Stat(jwtPath)
 	return jwtPath, err
 }
 

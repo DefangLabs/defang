@@ -19,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
@@ -127,7 +128,7 @@ func initStsClient(cfg awssdk.Config) {
 	}
 }
 
-func (b *ByocAws) makeContainers() []types.Container {
+func (b *ByocAws) makeContainers() []clouds.Container {
 	return makeContainers(b.PulumiVersion, b.CDImage)
 }
 

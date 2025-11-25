@@ -2,14 +2,14 @@ package aws
 
 import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
-	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/aws/smithy-go/ptr"
 )
 
-func makeContainers(pulumiVersion, cdImage string) []types.Container {
+func makeContainers(pulumiVersion, cdImage string) []clouds.Container {
 	cdSidecarName := byoc.CdTaskPrefix
-	return []types.Container{
+	return []clouds.Container{
 		{
 			Image:     "public.ecr.aws/pulumi/pulumi-nodejs:" + pulumiVersion,
 			Name:      ecs.CdContainerName,
@@ -20,14 +20,14 @@ func makeContainers(pulumiVersion, cdImage string) []types.Container {
 				cdSidecarName,
 			},
 			WorkDir:    "/app",
-			DependsOn:  map[string]types.ContainerCondition{cdSidecarName: "START"},
+			DependsOn:  map[string]clouds.ContainerCondition{cdSidecarName: "START"},
 			EntryPoint: []string{"node", "lib/index.js"},
 		},
 		{
 			Image:     cdImage,
 			Name:      cdSidecarName,
 			Essential: ptr.Bool(false),
-			Volumes: []types.TaskVolume{
+			Volumes: []clouds.TaskVolume{
 				{
 					Source:   "pulumi-plugins",
 					Target:   "/root/.pulumi/plugins",

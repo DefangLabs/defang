@@ -22,6 +22,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/dns"
@@ -233,7 +234,7 @@ func (b *ByocGcp) SetUpCD(ctx context.Context) error {
 	term.Debugf("Using CD image: %q", b.CDImage)
 
 	serviceAccount := path.Base(b.cdServiceAccount)
-	if err := b.driver.SetupJob(ctx, "defang-cd", serviceAccount, []types.Container{
+	if err := b.driver.SetupJob(ctx, "defang-cd", serviceAccount, []clouds.Container{
 		{
 			Image:     b.CDImage,
 			Name:      ecs.CdContainerName,

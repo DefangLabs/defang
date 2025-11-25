@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/DefangLabs/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
@@ -45,7 +45,7 @@ func TestGetCacheRepoPrefix(t *testing.T) {
 
 func createTestTemplate(t *testing.T) []byte {
 	t.Helper()
-	template, err := CreateTemplate("test", []types.Container{
+	template, err := CreateTemplate("test", []clouds.Container{
 		{
 			Image: "alpine:latest",
 		},

@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	common "github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	awsecs "github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
-	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfnTypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/smithy-go"
@@ -27,8 +27,8 @@ type AwsEcsCfn struct {
 
 const stackTimeout = time.Minute * 3
 
-func OptionVPCAndSubnetID(ctx context.Context, vpcID, subnetID string) func(types.Driver) error {
-	return func(d types.Driver) error {
+func OptionVPCAndSubnetID(ctx context.Context, vpcID, subnetID string) func(clouds.Driver) error {
+	return func(d clouds.Driver) error {
 		if ecs, ok := d.(*AwsEcsCfn); ok {
 			return ecs.PopulateVPCandSubnetID(ctx, vpcID, subnetID)
 		}
@@ -149,7 +149,7 @@ func (a *AwsEcsCfn) createStackAndWait(ctx context.Context, templateBody string,
 	return a.fillWithOutputs(dso)
 }
 
-func (a *AwsEcsCfn) SetUp(ctx context.Context, containers []types.Container) error {
+func (a *AwsEcsCfn) SetUp(ctx context.Context, containers []clouds.Container) error {
 	template, err := CreateTemplate(a.stackName, containers)
 	if err != nil {
 		return fmt.Errorf("failed to create CloudFormation template: %w", err)
@@ -286,7 +286,7 @@ func (a *AwsEcsCfn) Stop(ctx context.Context, taskArn awsecs.TaskArn) error {
 	return a.AwsEcs.Stop(ctx, taskArn)
 }
 
-func (a *AwsEcsCfn) GetInfo(ctx context.Context, taskArn awsecs.TaskArn) (*types.TaskInfo, error) {
+func (a *AwsEcsCfn) GetInfo(ctx context.Context, taskArn awsecs.TaskArn) (*clouds.TaskInfo, error) {
 	if err := a.FillOutputs(ctx); err != nil {
 		return nil, err
 	}

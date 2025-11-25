@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
-	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 func TestCloudFormation(t *testing.T) {
@@ -43,7 +43,7 @@ func TestCloudFormation(t *testing.T) {
 		}
 	})
 
-	var taskid types.TaskID
+	var taskid clouds.TaskID
 	t.Run("Run", func(t *testing.T) {
 		var err error
 		taskid, err = aws.Run(ctx, nil, "echo", "hello")
