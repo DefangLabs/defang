@@ -205,7 +205,9 @@ var cdCloudformationCmd = &cobra.Command{
 		}
 
 		template, err := provider.PrintCloudFormationTemplate()
-		term.Println(string(template))
+		if err == nil {
+			_, err = term.Print(string(template))
+		}
 		return err
 	},
 }
