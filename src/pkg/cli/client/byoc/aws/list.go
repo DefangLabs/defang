@@ -26,7 +26,7 @@ func newS3Client(ctx context.Context, region aws.Region) (*s3.Client, error) {
 	return s3client, nil
 }
 
-func listPulumiStacksInBucket(ctx context.Context, region aws.Region, bucketName string) (iter.Seq[string], error) {
+func listPulumiStacksInBucket(ctx context.Context, region aws.Region, bucketName string) (iter.Seq2[string, *byoc.PulumiState], error) {
 	s3client, err := newS3Client(ctx, region)
 	if err != nil {
 		return nil, err
@@ -51,7 +51,7 @@ type S3Client interface {
 	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
 }
 
-func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string) (iter.Seq[string], error) {
+func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string) (iter.Seq2[string, *byoc.PulumiState], error) {
 	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
 
 	term.Debug("Listing stacks in bucket:", bucketName)
@@ -62,12 +62,12 @@ func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
-	return func(yield func(string) bool) {
+	return func(yield func(string, *byoc.PulumiState) bool) {
 		for _, obj := range out.Contents {
 			if obj.Key == nil || obj.Size == nil {
 				continue
 			}
-			stack, err := byoc.ParsePulumiStackObject(ctx, s3Obj{obj}, bucketName, prefix, func(ctx context.Context, bucket, path string) ([]byte, error) {
+			stack, state, err := byoc.ParsePulumiStackObject(ctx, s3Obj{obj}, bucketName, prefix, func(ctx context.Context, bucket, path string) ([]byte, error) {
 				getObjectOutput, err := s3client.GetObject(ctx, &s3.GetObjectInput{
 					Bucket: &bucket,
 					Key:    &path,
@@ -82,7 +82,7 @@ func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string)
 				continue
 			}
 			if stack != "" {
-				if !yield(stack) {
+				if !yield(stack, state) {
 					break
 				}
 			}
@@ -91,7 +91,7 @@ func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string)
 	}, nil
 }
 
-func listPulumiStacksAllRegions(ctx context.Context, s3client S3Client) (iter.Seq[string], error) {
+func listPulumiStacksAllRegions(ctx context.Context, s3client S3Client) (iter.Seq2[string, *byoc.PulumiState], error) {
 	// Use a single S3 query to list all buckets with the defang-cd- prefix
 	// This is faster than calling CloudFormation DescribeStacks in each region
 	listBucketsOutput, err := s3client.ListBuckets(ctx, &s3.ListBucketsInput{})
@@ -99,10 +99,14 @@ func listPulumiStacksAllRegions(ctx context.Context, s3client S3Client) (iter.Se
 		return nil, AnnotateAwsError(err)
 	}
 
-	return func(yield func(string) bool) {
+	return func(yield func(string, *byoc.PulumiState) bool) {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		stackCh := make(chan string)
+		type stackAndState struct {
+			stack string
+			state *byoc.PulumiState
+		}
+		stackCh := make(chan stackAndState)
 
 		// Filter buckets by prefix and get their locations
 		var wg sync.WaitGroup
@@ -137,11 +141,11 @@ func listPulumiStacksAllRegions(ctx context.Context, s3client S3Client) (iter.Se
 				if err != nil {
 					return
 				}
-				for stack := range stacks {
+				for stack, state := range stacks {
 					select {
 					case <-ctx.Done():
 						return
-					case stackCh <- fmt.Sprintf("%s [%s]", stack, region):
+					case stackCh <- stackAndState{stack: fmt.Sprintf("%s [%s]", stack, region), state: state}:
 					}
 				}
 			}(bucketRegion)
@@ -152,8 +156,8 @@ func listPulumiStacksAllRegions(ctx context.Context, s3client S3Client) (iter.Se
 			close(stackCh) // Close channel when all goroutines are done, which stops the iteration below
 		}()
 
-		for stack := range stackCh {
-			if !yield(stack) {
+		for stackAndState := range stackCh {
+			if !yield(stackAndState.stack, stackAndState.state) {
 				break
 			}
 		}

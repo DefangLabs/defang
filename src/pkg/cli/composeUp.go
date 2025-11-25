@@ -69,6 +69,10 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 	// Create a new project with only the necessary resources.
 	// Do not modify the original project, because the caller needs it for debugging.
 	fixedProject := project.WithoutUnnecessaryResources()
+
+	// Find all the base images in the Dockerfiles
+
+	// Fixup services is where the build contexts are uploaded and rewritten.
 	if err := compose.FixupServices(ctx, provider, fixedProject, upload); err != nil {
 		return nil, project, err
 	}

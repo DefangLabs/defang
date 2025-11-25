@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -23,6 +24,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/dns"
+	"github.com/DefangLabs/defang/src/pkg/dockerhub"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -58,6 +60,8 @@ type ByocAws struct {
 	cdEtag           types.ETag
 	cdStart          time.Time
 	cdTaskArn        ecs.TaskArn
+
+	needDockerHubCreds bool
 }
 
 var _ client.Provider = (*ByocAws)(nil)
@@ -271,6 +275,20 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		mode:            req.Mode,
 		project:         project.Name,
 	}
+
+	if b.needDockerHubCreds {
+		term.Debugf("Docker Hub credentials are needed for image pulls")
+		dockerHubCreds, err := b.getDockerHubCredentials(ctx, project.Name)
+		if err != nil {
+			term.Debugf("Could not retrieve Docker Hub credentials: %v", err)
+			term.Warnf("Please set the DOCKERHUB_USERNAME and DOCKERHUB_PASSWORD environment variables, or run docker login so Defang can generate a Personal Access Token for pulling images. Without credentials, image pulls may fail.")
+		} else {
+			term.Debugf("Using Docker Hub credentials: %+v", dockerHubCreds)
+			cdCmd.dockerHubUsername = dockerHubCreds.Username
+			cdCmd.dockerHubAccessToken = dockerHubCreds.AccessToken
+		}
+	}
+
 	cdTaskArn, err := b.runCdCommand(ctx, cdCmd)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
@@ -289,6 +307,106 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		Services: serviceInfos, // TODO: Should we use the retrieved services instead?
 		Etag:     etag,
 	}, nil
+}
+
+func (b *ByocAws) FixupServices(ctx context.Context, project *composeTypes.Project) error {
+	images, err := compose.FindAllBaseImages(project)
+	if err != nil {
+		return err
+	}
+
+	for _, image := range images {
+		if !dockerhub.IsDockerHubImage(image) {
+			continue
+		}
+		parsed, err := dockerhub.ParseImage(image)
+		if err != nil {
+			return err
+		}
+		ecrRepo := "docker/" + parsed.Repo
+		tag := parsed.Tag
+		if tag == "" {
+			tag = parsed.Digest
+		}
+
+		found, err := b.driver.CheckImageExistOnPublicECR(ctx, ecrRepo, tag)
+		if err != nil {
+			return err
+		}
+		if !found {
+			b.needDockerHubCreds = true
+		}
+	}
+	return nil
+}
+
+type RepoAuth struct {
+	Username    string `json:"username"`
+	AccessToken string `json:"accessToken"`
+}
+
+func (b *ByocAws) getDockerHubCredentials(ctx context.Context, projectName string) (*RepoAuth, error) {
+	// Take credentials from environment variables if set
+	user, pass := os.Getenv("DOCKERHUB_USERNAME"), os.Getenv("DOCKERHUB_PASSWORD")
+	if user != "" && pass != "" {
+		return &RepoAuth{Username: user, AccessToken: pass}, nil
+	}
+
+	// Try to retrieve existing Docker Hub credentials from secrets manager based on the stack state file
+	if creds, err := b.getExistingDockerHubCredentials(ctx, projectName); err == nil {
+		term.Debugf("Could not get existing Docker Hub credentials: %v", err)
+	} else {
+		return creds, nil
+	}
+
+	// Create new Docker Hub credentials
+	user, pass, err := dockerhub.GenerateNewPAT(ctx, "Defang CLI generated Token for project "+projectName)
+	if err != nil {
+		return nil, err
+	}
+	return &RepoAuth{Username: user, AccessToken: pass}, nil
+}
+
+func (b *ByocAws) getExistingDockerHubCredentials(ctx context.Context, projectName string) (*RepoAuth, error) {
+	stackAndStates, err := b.bootstrapList(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	var found *byoc.PulumiState
+	for stack, state := range stackAndStates {
+		parts := strings.SplitN(stack, "/", 2)
+		if parts[0] == projectName {
+			found = state
+			break
+		}
+	}
+	if found == nil {
+		return nil, fmt.Errorf("could not find stack for project %q", projectName)
+	}
+
+	for _, res := range found.Checkpoint.Latest.Resources {
+		if strings.HasSuffix(res.Urn, "::aws:ecr/pullThroughCacheRule:PullThroughCacheRule::docker-hub") {
+			credArn, ok := res.Inputs["credentialArn"]
+			if !ok {
+				return nil, errors.New("could not find credentialArn in ECR pull through cache resource")
+			}
+			credArnStr, ok := credArn.(string)
+			if !ok {
+				return nil, errors.New("credentialArn is not a string")
+			}
+
+			credsJson, err := b.driver.GetValueFromSecretManager(ctx, credArnStr)
+			if err != nil {
+				return nil, err
+			}
+			var creds RepoAuth
+			if err := json.Unmarshal([]byte(credsJson), &creds); err != nil {
+				return nil, err
+			}
+			return &creds, nil
+		}
+	}
+	return nil, errors.New("could not find existing Docker Hub credentials in project stack")
 }
 
 func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string, error) {
@@ -416,6 +534,9 @@ type cdCommand struct {
 	delegationSetId string
 	mode            defangv1.DeploymentMode
 	project         string
+
+	dockerHubUsername    string
+	dockerHubAccessToken string
 }
 
 func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn, error) {
@@ -433,6 +554,10 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn,
 		env["DOMAIN"] = "dummy.domain"
 	}
 	env["DEFANG_MODE"] = strings.ToLower(cmd.mode.String())
+	if cmd.dockerHubUsername != "" && cmd.dockerHubAccessToken != "" {
+		env["DOCKERHUB_USERNAME"] = cmd.dockerHubUsername
+		env["DOCKERHUB_ACCESS_TOKEN"] = cmd.dockerHubAccessToken
+	}
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging
@@ -868,6 +993,20 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 }
 
 func (b *ByocAws) BootstrapList(ctx context.Context, allRegions bool) (iter.Seq[string], error) {
+	stackAndStates, err := b.bootstrapList(ctx, allRegions)
+	if err != nil {
+		return nil, err
+	}
+	return func(yield func(string) bool) {
+		for stack := range stackAndStates {
+			if !yield(stack) {
+				break
+			}
+		}
+	}, nil
+}
+
+func (b *ByocAws) bootstrapList(ctx context.Context, allRegions bool) (iter.Seq2[string, *byoc.PulumiState], error) {
 	if allRegions {
 		s3Client, err := newS3Client(ctx, b.driver.Region)
 		if err != nil {

@@ -18,7 +18,17 @@ import (
 
 const RAILPACK = "*Railpack"
 
+type ServiceFixupper interface {
+	FixupServices(ctx context.Context, project *composeTypes.Project) error
+}
+
 func FixupServices(ctx context.Context, provider client.Provider, project *composeTypes.Project, upload UploadMode) error {
+	if fixupper, ok := provider.(ServiceFixupper); ok {
+		if err := fixupper.FixupServices(ctx, project); err != nil {
+			return err
+		}
+	}
+
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
 	config, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
 	if err != nil {

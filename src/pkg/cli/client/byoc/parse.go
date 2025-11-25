@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
@@ -14,39 +15,55 @@ type Obj interface {
 	Size() int64
 }
 
-func ParsePulumiStackObject(ctx context.Context, obj Obj, bucket, prefix string, objLoader func(ctx context.Context, bucket, object string) ([]byte, error)) (string, error) {
+type PulumiResource struct {
+	Urn                  string              `json:"urn"`
+	Custom               bool                `json:"custom"`
+	Type                 string              `json:"type"`
+	Id                   string              `json:"id,omitempty"`
+	Inputs               map[string]any      `json:"inputs,omitempty"`
+	Outputs              map[string]any      `json:"outputs,omitempty"`
+	Parent               string              `json:"parent,omitempty"`
+	Dependencies         []string            `json:"dependencies,omitempty"`
+	Provider             string              `json:"provider,omitempty"`
+	PropertyDependencies map[string][]string `json:"propertyDependencies,omitempty"`
+	Created              *time.Time          `json:"created,omitempty"`
+	Modified             *time.Time          `json:"modified,omitempty"`
+}
+
+type PulumiState struct {
+	Version    int `json:"version"`
+	Checkpoint struct {
+		// Stack  string `json:"stack"` TODO: could use this instead of deriving the stack name from the key
+		Latest struct {
+			Resources         []PulumiResource `json:"resources,omitempty"`
+			PendingOperations []struct {
+				Resource PulumiResource `json:"resource"`
+				Type     string         `json:"type"`
+			} `json:"pending_operations,omitempty"`
+		}
+	}
+}
+
+func ParsePulumiStackObject(ctx context.Context, obj Obj, bucket, prefix string, objLoader func(ctx context.Context, bucket, object string) ([]byte, error)) (string, *PulumiState, error) {
 	// The JSON file for an empty stack is ~600 bytes; we add a margin of 100 bytes to account for the length of the stack/project names
 	stack, isJson := strings.CutSuffix(obj.Name(), ".json")
 	if !isJson || obj.Size() < 700 {
-		return "", nil
+		return "", nil, nil
 	}
 	// Cut off the prefix
 	stack, ok := strings.CutPrefix(stack, prefix)
 	if !ok {
-		return "", fmt.Errorf("expected object key %q to start with prefix %q", obj.Name(), prefix)
+		return "", nil, fmt.Errorf("expected object key %q to start with prefix %q", obj.Name(), prefix)
 	}
 
 	// Check the contents of the JSON file, because the size is not a reliable indicator of a valid stack
 	data, err := objLoader(ctx, bucket, obj.Name())
 	if err != nil {
-		return "", fmt.Errorf("failed to get Pulumi state object %q: %w", obj.Name(), err)
+		return "", nil, fmt.Errorf("failed to get Pulumi state object %q: %w", obj.Name(), err)
 	}
-	var state struct {
-		Version    int `json:"version"`
-		Checkpoint struct {
-			// Stack  string `json:"stack"` TODO: could use this instead of deriving the stack name from the key
-			Latest struct {
-				Resources         []struct{} `json:"resources,omitempty"`
-				PendingOperations []struct {
-					Resource struct {
-						Urn string `json:"urn"`
-					}
-				} `json:"pending_operations,omitempty"`
-			}
-		}
-	}
+	var state PulumiState
 	if err := json.Unmarshal(data, &state); err != nil {
-		return "", fmt.Errorf("failed to decode Pulumi state %q: %w", obj.Name(), err)
+		return "", nil, fmt.Errorf("failed to decode Pulumi state %q: %w", obj.Name(), err)
 	} else if state.Version != 3 {
 		term.Debug("Skipping Pulumi state with version", state.Version)
 	} else if len(state.Checkpoint.Latest.PendingOperations) > 0 {
@@ -55,8 +72,8 @@ func ParsePulumiStackObject(ctx context.Context, obj Obj, bucket, prefix string,
 			stack += fmt.Sprintf(" (pending %q)", parts[3])
 		}
 	} else if len(state.Checkpoint.Latest.Resources) == 0 {
-		return "", nil // skip: no resources and no pending operations
+		return "", nil, nil // skip: no resources and no pending operations
 	}
 
-	return stack, nil
+	return stack, &state, nil
 }

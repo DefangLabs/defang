@@ -7,6 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 )
@@ -149,4 +153,48 @@ func TestListSecrets(t *testing.T) {
 			t.Fatalf("expected empty list, got %v", secrets.Names)
 		}
 	})
+}
+
+func TestFixupServices(t *testing.T) {
+	tests := []struct {
+		name    string
+		project string
+		want    bool
+	}{
+		{
+			name:    "no docker hub images",
+			project: "debugproj",
+			want:    false,
+		},
+		{
+			name:    "docker hub image in compose file",
+			project: "testproj",
+			want:    true,
+		},
+		{
+			name:    "docker hub image in docker file",
+			project: "bun",
+			want:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		b := &ByocAws{
+			driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
+		}
+		t.Run(tt.name, func(t *testing.T) {
+			loader := compose.NewLoader(compose.WithPath("../../../../../testdata/" + tt.project + "/compose.yaml"))
+			proj, err := loader.LoadProject(t.Context())
+			if err != nil {
+				t.Fatalf("LoadProject() failed: %v", err)
+			}
+			err = b.FixupServices(t.Context(), proj)
+			if err != nil {
+				t.Errorf("FixupServices() error: %v", err)
+			}
+			if b.needDockerHubCreds != tt.want {
+				t.Errorf("FixupServices() needDockerHubCreds = %v, want %v", b.needDockerHubCreds, tt.want)
+			}
+		})
+	}
 }
