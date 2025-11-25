@@ -77,7 +77,7 @@ func List() ([]StackListItem, error) {
 
 	var stacks []StackListItem
 	for _, file := range files {
-		if strings.HasPrefix(file.Name(), ".defangrc.") {
+		if strings.HasPrefix(file.Name(), ".defang.") {
 			content, err := os.ReadFile(file.Name())
 			if err != nil {
 				term.Warnf("Skipping unreadable stack file %s: %v\n", file.Name(), err)
@@ -88,7 +88,7 @@ func List() ([]StackListItem, error) {
 				term.Warnf("Skipping invalid stack file %s: %v\n", file.Name(), err)
 				continue
 			}
-			params.Name = strings.TrimPrefix(file.Name(), ".defangrc.")
+			params.Name = strings.TrimPrefix(file.Name(), ".defang.")
 
 			stacks = append(stacks, StackListItem{
 				Name:     params.Name,
@@ -157,5 +157,5 @@ func Remove(name string) error {
 }
 
 func filename(stackname string) string {
-	return ".defangrc." + stackname
+	return ".defang." + stackname
 }
