@@ -42,9 +42,7 @@ func CollectDefangTools(cluster string, providerId *client.ProviderID) []ai.Tool
 					return "Failed to configure loader", err
 				}
 				var cli tools.CLIInterface = &tools.DefaultToolCLI{}
-				return tools.CaptureTerm(func() (string, error) {
-					return tools.HandleServicesTool(ctx.Context, loader, providerId, cluster, cli)
-				})
+				return tools.HandleServicesTool(ctx.Context, loader, providerId, cluster, cli)
 			},
 		),
 		ai.NewTool("deploy",
@@ -55,9 +53,7 @@ func CollectDefangTools(cluster string, providerId *client.ProviderID) []ai.Tool
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return tools.TeeTerm(func() (string, error) {
-					return tools.HandleDeployTool(ctx.Context, loader, providerId, cluster, cli)
-				})
+				return tools.HandleDeployTool(ctx.Context, loader, providerId, cluster, cli)
 			},
 		),
 		ai.NewTool("destroy",
@@ -68,9 +64,7 @@ func CollectDefangTools(cluster string, providerId *client.ProviderID) []ai.Tool
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return tools.CaptureTerm(func() (string, error) {
-					return tools.HandleDestroyTool(ctx.Context, loader, providerId, cluster, cli)
-				})
+				return tools.HandleDestroyTool(ctx.Context, loader, providerId, cluster, cli)
 			},
 		),
 		ai.NewTool("logs",
@@ -81,9 +75,7 @@ func CollectDefangTools(cluster string, providerId *client.ProviderID) []ai.Tool
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return tools.CaptureTerm(func() (string, error) {
-					return tools.HandleLogsTool(ctx.Context, loader, params, cluster, providerId, cli)
-				})
+				return tools.HandleLogsTool(ctx.Context, loader, params, cluster, providerId, cli)
 			},
 		),
 		ai.NewTool("estimate",
@@ -94,9 +86,7 @@ func CollectDefangTools(cluster string, providerId *client.ProviderID) []ai.Tool
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return tools.CaptureTerm(func() (string, error) {
-					return tools.HandleEstimateTool(ctx.Context, loader, params, cluster, cli)
-				})
+				return tools.HandleEstimateTool(ctx.Context, loader, params, cluster, cli)
 			},
 		),
 		ai.NewTool("set_config",
@@ -107,9 +97,7 @@ func CollectDefangTools(cluster string, providerId *client.ProviderID) []ai.Tool
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return tools.CaptureTerm(func() (string, error) {
-					return tools.HandleSetConfig(ctx.Context, loader, params, providerId, cluster, cli)
-				})
+				return tools.HandleSetConfig(ctx.Context, loader, params, providerId, cluster, cli)
 			},
 		),
 		ai.NewTool("remove_config",
@@ -120,9 +108,7 @@ func CollectDefangTools(cluster string, providerId *client.ProviderID) []ai.Tool
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return tools.CaptureTerm(func() (string, error) {
-					return tools.HandleRemoveConfigTool(ctx.Context, loader, params, providerId, cluster, cli)
-				})
+				return tools.HandleRemoveConfigTool(ctx.Context, loader, params, providerId, cluster, cli)
 			},
 		),
 		ai.NewTool("list_configs",
@@ -133,9 +119,7 @@ func CollectDefangTools(cluster string, providerId *client.ProviderID) []ai.Tool
 					return "Failed to configure loader", err
 				}
 				cli := &tools.DefaultToolCLI{}
-				return tools.CaptureTerm(func() (string, error) {
-					return tools.HandleListConfigTool(ctx.Context, loader, providerId, cluster, cli)
-				})
+				return tools.HandleListConfigTool(ctx.Context, loader, providerId, cluster, cli)
 			},
 		),
 		ai.NewTool("set_aws_provider",

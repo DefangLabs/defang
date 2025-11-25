@@ -2,21 +2,22 @@ package tools
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-func CaptureTerm(f func() (string, error)) (string, error) {
+func CaptureTerm(f func() (any, error)) (string, error) {
 	return captureTerm(false, f)
 }
 
-func TeeTerm(f func() (string, error)) (string, error) {
+func TeeTerm(f func() (any, error)) (string, error) {
 	return captureTerm(true, f)
 }
 
-func captureTerm(tee bool, f func() (string, error)) (string, error) {
+func captureTerm(tee bool, f func() (any, error)) (string, error) {
 	// replace the default term with a new term that writes to a buffer
 	originalTerm := term.DefaultTerm
 	outBuffer := bytes.NewBuffer(nil)
@@ -43,5 +44,5 @@ func captureTerm(tee bool, f func() (string, error)) (string, error) {
 	}()
 	result, err := f()
 	output := outBuffer.String() + errBuffer.String()
-	return output + result, err
+	return output + fmt.Sprint(result), err
 }

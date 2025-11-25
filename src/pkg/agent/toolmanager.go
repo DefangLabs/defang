@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
+	"github.com/DefangLabs/defang/src/pkg/agent/tools"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
@@ -94,7 +95,9 @@ func (t *ToolManager) handleToolRequest(ctx context.Context, req *ai.ToolRequest
 		return nil, fmt.Errorf("tool %q not found", req.Name)
 	}
 
-	output, err := tool.RunRaw(ctx, req.Input)
+	output, err := tools.TeeTerm(func() (any, error) {
+		return tool.RunRaw(ctx, req.Input)
+	})
 	if err != nil {
 		if errors.Is(err, common.ErrNoProviderSet) {
 			return &ai.ToolResponse{
