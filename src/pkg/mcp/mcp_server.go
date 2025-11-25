@@ -18,13 +18,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 )
 
-func prepareInstructions(defangTools []server.ServerTool) string {
-	instructions := "Defang provides tools for deploying web applications to cloud providers (AWS, GCP, Digital Ocean) using a compose.yaml file."
-	for _, tool := range defangTools {
-		instructions += "\n\n" + tool.Tool.Name + " - " + tool.Tool.Description
-	}
-	return instructions
-}
+var SystemInstructions = "Defang provides tools for deploying web applications to cloud providers (AWS, GCP, Digital Ocean) using a compose.yaml file."
 
 type ToolTracker struct {
 	providerId *cliClient.ProviderID
@@ -54,16 +48,17 @@ func NewDefangMCPServer(version string, cluster string, providerID *cliClient.Pr
 		return nil, fmt.Errorf("failed to setup knowledge base: %w", err)
 	}
 
-	defangTools := tools.CollectTools(cluster, providerID)
 	s := server.NewMCPServer(
 		"Deploy with Defang",
 		version,
 		server.WithResourceCapabilities(true, true),
 		server.WithPromptCapabilities(true),
 		server.WithToolCapabilities(true),
-		server.WithInstructions(prepareInstructions(defangTools)),
+		server.WithInstructions(SystemInstructions),
+		server.WithElicitation(),
 	)
 
+	defangTools := tools.CollectTools(s, cluster, providerID)
 	resources.SetupResources(s)
 	prompts.SetupPrompts(s, cluster, providerID)
 

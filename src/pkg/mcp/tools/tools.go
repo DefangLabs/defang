@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"errors"
 
 	agentTools "github.com/DefangLabs/defang/src/pkg/agent/tools"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -10,15 +11,37 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-type mcpElicitationsController struct{}
-
-func (c *mcpElicitationsController) Request(ctx context.Context, req agentTools.ElicitationRequest) (agentTools.ElicitationResponse, error) {
-	// Implementation for MCP elicitations can be added here
-	return agentTools.ElicitationResponse{}, nil
+type mcpElicitationsController struct {
+	server *server.MCPServer
 }
 
-func NewMCPElicitationsController() *mcpElicitationsController {
-	return &mcpElicitationsController{}
+func NewMCPElicitationsController(server *server.MCPServer) *mcpElicitationsController {
+	return &mcpElicitationsController{
+		server: server,
+	}
+}
+
+func (c *mcpElicitationsController) Request(ctx context.Context, req agentTools.ElicitationRequest) (agentTools.ElicitationResponse, error) {
+	result, err := c.server.RequestElicitation(ctx, mcp.ElicitationRequest{
+		Params: mcp.ElicitationParams{
+			Message:         req.Message,
+			RequestedSchema: req.Schema,
+		},
+	})
+	if err != nil {
+		return agentTools.ElicitationResponse{}, err
+	}
+
+	// cast result.Content to map[string]string
+	contentMap, ok := result.Content.(map[string]string)
+	if !ok {
+		return agentTools.ElicitationResponse{}, errors.New("invalid elicitation response content")
+	}
+
+	return agentTools.ElicitationResponse{
+		Action:  string(result.Action),
+		Content: contentMap,
+	}, nil
 }
 
 func translateSchema(schema map[string]any) mcp.ToolInputSchema {
@@ -78,8 +101,8 @@ func translateGenKitToolsToMCP(genkitTools []ai.Tool) []server.ServerTool {
 	return translatedTools
 }
 
-func CollectTools(cluster string, providerId *client.ProviderID) []server.ServerTool {
-	ec := NewMCPElicitationsController()
+func CollectTools(server *server.MCPServer, cluster string, providerId *client.ProviderID) []server.ServerTool {
+	ec := NewMCPElicitationsController(server)
 	genkitTools := agentTools.CollectDefangTools(cluster, ec, providerId)
 	return translateGenKitToolsToMCP(genkitTools)
 }
