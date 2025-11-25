@@ -396,7 +396,7 @@ var RootCmd = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if nonInteractive {
-			return nil
+			return cmd.Help()
 		}
 
 		ctx := cmd.Context()
