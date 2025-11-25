@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func TestIsKanikoError(t *testing.T) {
+func TestIsLogrusError(t *testing.T) {
 	tests := []struct {
 		name string
 		msg  string
@@ -42,18 +42,17 @@ func TestIsKanikoError(t *testing.T) {
 
 func TestTermLogFormatter(t *testing.T) {
 	logrusDefaultOut := logrus.StandardLogger().Out
-	defaultTerm := term.DefaultTerm
-
+	logrusDefaultFormatter := logrus.StandardLogger().Formatter
 	t.Cleanup(func() {
 		logrus.SetOutput(logrusDefaultOut)
-		term.DefaultTerm = defaultTerm
+		logrus.SetFormatter(logrusDefaultFormatter)
 	})
 
 	var out, termout, termerr bytes.Buffer
-	term.DefaultTerm = term.NewTerm(os.Stdin, &termout, &termerr)
-	f := TermLogFormatter{Term: term.DefaultTerm}
-	logrus.SetOutput(&out)
+	testTerm := term.NewTerm(os.Stdin, &termout, &termerr)
+	f := TermLogFormatter{Term: testTerm, Prefix: "xxx:"}
 	logrus.SetFormatter(f)
+	logrus.SetOutput(&out)
 
 	logrus.Debug("debug message") // Should be hidden
 	logrus.WithFields(
@@ -72,31 +71,29 @@ func TestTermLogFormatter(t *testing.T) {
 	if len(lines) != 2 {
 		t.Errorf("Unexpected term stdout output, number of lines don't match, want 2 has %v", len(lines))
 	}
-	if !isLogLine(lines[0], " * test message", "key=value", "key2=2", "key3=true", "key4={1 2}") {
+	if !isLogLine(lines[0], " * xxx:test message", "key=value", "key2=2", "key3=true", "key4={1 2}") {
 		t.Errorf("log line with fields does not match, got %q", lines[0])
 	}
-	if !isLogLine(lines[1], " ! warning message") {
+	if !isLogLine(lines[1], " ! xxx:warning message") {
 		t.Errorf("warning line does not match, got %q", lines[1])
 	}
 
-	if !isLogLine(termerr.String(), "error message", "errkey=errvalue", "errcode=100") {
+	if !isLogLine(termerr.String(), "xxx:error message", "errkey=errvalue", "errcode=100") {
 		t.Errorf("error line does not match, got %q", termerr.String())
 	}
 }
 
 func TestDiscardFormatter(t *testing.T) {
 	logrusDefaultOut := logrus.StandardLogger().Out
-	defaultTerm := term.DefaultTerm
-
+	logrusDefaultFormatter := logrus.StandardLogger().Formatter
 	t.Cleanup(func() {
 		logrus.SetOutput(logrusDefaultOut)
-		term.DefaultTerm = defaultTerm
+		logrus.SetFormatter(logrusDefaultFormatter)
 	})
 
 	var out, termout, termerr bytes.Buffer
 	logrus.SetOutput(&out)
 	logrus.SetFormatter(DiscardFormatter{})
-	term.DefaultTerm = term.NewTerm(os.Stdin, &termout, &termerr)
 
 	logrus.Debug("debug message")
 	logrus.Info("info message")
@@ -118,7 +115,7 @@ func TestDiscardFormatter(t *testing.T) {
 
 func isLogLine(line, msg string, fields ...string) bool {
 	if !strings.Contains(line, msg) {
-		fmt.Println("Messing message: ", line, msg)
+		fmt.Println("Missing message: ", line, msg)
 		return false
 	}
 	for _, field := range fields {

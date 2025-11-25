@@ -186,6 +186,7 @@ func SetupCommands(ctx context.Context, version string) {
 	cdPreviewCmd.Flags().VarP(&global.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	cdCmd.AddCommand(cdPreviewCmd)
 	cdCmd.AddCommand(cdInstallCmd)
+	cdCmd.AddCommand(cdCloudformationCmd)
 
 	// Eula command
 	tosCmd.Flags().Bool("agree-tos", false, "agree to the Defang terms of service")
@@ -227,8 +228,8 @@ func SetupCommands(ctx context.Context, version string) {
 	lsCommand.Aliases = []string{"getServices", "ps", "ls", "list"}
 	RootCmd.AddCommand(lsCommand)
 
-	// Get Status Command
-	RootCmd.AddCommand(getVersionCmd)
+	// Version Command
+	RootCmd.AddCommand(versionCmd)
 
 	// Config Command (was: secrets)
 	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
@@ -627,7 +628,7 @@ func collectUnsetEnvVars(project *composeTypes.Project) []string {
 	return nil
 }
 
-var getVersionCmd = &cobra.Command{
+var versionCmd = &cobra.Command{
 	Use:     "version",
 	Args:    cobra.NoArgs,
 	Aliases: []string{"ver", "stat", "status"}, // for backwards compatibility

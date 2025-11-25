@@ -14,9 +14,7 @@ import (
 	"time"
 
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/hexops/gotextdiff"
-	"github.com/hexops/gotextdiff/myers"
-	"github.com/hexops/gotextdiff/span"
+	"github.com/pmezard/go-difflib/difflib"
 )
 
 var (
@@ -171,8 +169,17 @@ func Diff(actualRaw, goldenRaw string) error {
 		return nil
 	}
 
-	edits := myers.ComputeEdits(span.URIFromPath("expected"), goldenRaw, actualRaw)
-	diff := fmt.Sprint(gotextdiff.ToUnified("expected", "actual", goldenRaw, edits))
+	// Show the diff (but only the lines that differ to avoid overwhelming output)
+	diff, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
+		A:        difflib.SplitLines(goldenRaw),
+		B:        difflib.SplitLines(actualRaw),
+		FromFile: "Expected",
+		FromDate: "",
+		ToFile:   "Actual",
+		ToDate:   "",
+		Context:  1,
+	})
+
 	return fmt.Errorf("mismatch:\n%s", diff)
 }
 

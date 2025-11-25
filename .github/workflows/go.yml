@@ -6,6 +6,12 @@ on:
       - "v*" # push events to tagged commits
     branches:
       - "**"
+    paths:
+      - ".github/workflows/go.yml"
+      - "Makefile"
+      - "pkgs/**"
+      - "src/**"
+
 permissions:
   contents: read
   id-token: write # for GitHub id-token auth
@@ -368,6 +374,7 @@ jobs:
 
   push-docker:
     runs-on: ubuntu-latest
+    environment: release
     needs:
       - go-release
     steps:

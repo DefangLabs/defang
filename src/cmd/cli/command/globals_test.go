@@ -15,8 +15,7 @@ import (
 func Test_readGlobals(t *testing.T) {
 	t.Chdir("testdata")
 
-	var testConfig GlobalConfig
-	testConfig = GlobalConfig{}
+	testConfig := GlobalConfig{}
 
 	t.Run("OS env beats any .defangrc file", func(t *testing.T) {
 		t.Setenv("VALUE", "from OS env")
@@ -293,6 +292,14 @@ func Test_configurationPrecedence(t *testing.T) {
 			createRCFile: false,
 			expected:     defaultConfig, // should match the initialized defaults above
 		},
+		{
+			name:         "ignore empty debug bool",
+			createRCFile: false,
+			envVars: map[string]string{
+				"DEFANG_DEBUG": "",
+			},
+			expected: defaultConfig, // should ignore invalid and keep default false
+		},
 	}
 
 	for _, tt := range tests {
@@ -352,6 +359,16 @@ func Test_configurationPrecedence(t *testing.T) {
 				f.Close()
 			}
 
+			t.Cleanup(func() {
+				// Unseting env vars set for this test is handled by t.Setenv automatically
+				// t.tempDir() will clean up created files
+
+				// Unset all RC env vars created by loadRC since it uses os.Setenv
+				for _, rcEnv := range rcEnvs {
+					os.Unsetenv(rcEnv)
+				}
+			})
+
 			t.Chdir(tempDir)
 
 			// simulates the actual loading sequence
@@ -402,16 +419,6 @@ func Test_configurationPrecedence(t *testing.T) {
 			if testConfig.HideUpdate != tt.expected.HideUpdate {
 				t.Errorf("expected HideUpdate to be %v, got %v", tt.expected.HideUpdate, testConfig.HideUpdate)
 			}
-
-			t.Cleanup(func() {
-				// Unseting env vars set for this test is hanndled by t.Setenv automatically
-				// t.tempDir() will clean up created files
-
-				// Unset all RC env vars created by loadRC since it uses os.Setenv
-				for _, rcEnv := range rcEnvs {
-					os.Unsetenv(rcEnv)
-				}
-			})
 		})
 	}
 }

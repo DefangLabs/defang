@@ -174,10 +174,8 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 
 	if !flags.Changed("debug") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_DEBUG"); ok {
-			r.Debug, err = strconv.ParseBool(fromEnv)
-			if err != nil {
-				return err
-			}
+			// Ignore error: our action sets this to empty value; default to false if parsing fails
+			r.Debug, _ = strconv.ParseBool(fromEnv)
 		}
 	}
 

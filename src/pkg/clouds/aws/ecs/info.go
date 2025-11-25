@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 
-	"github.com/DefangLabs/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/smithy-go/ptr"
 )
 
-func (a AwsEcs) Info(ctx context.Context, id TaskArn) (*types.TaskInfo, error) {
+func (a AwsEcs) Info(ctx context.Context, id TaskArn) (*clouds.TaskInfo, error) {
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func (a AwsEcs) Info(ctx context.Context, id TaskArn) (*types.TaskInfo, error) {
 			return nil, nil
 		}
 		// TODO: add mapped ports / endpoints
-		return &types.TaskInfo{IP: ip}, nil
+		return &clouds.TaskInfo{IP: ip}, nil
 	}
 	return nil, nil // no public IP?
 }
