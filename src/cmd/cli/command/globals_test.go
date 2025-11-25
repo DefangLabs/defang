@@ -15,8 +15,7 @@ import (
 func Test_readGlobals(t *testing.T) {
 	t.Chdir("testdata")
 
-	var testConfig GlobalConfig
-	testConfig = GlobalConfig{}
+	testConfig := GlobalConfig{}
 
 	t.Run("OS env beats any .defangrc file", func(t *testing.T) {
 		t.Setenv("VALUE", "from OS env")
@@ -292,6 +291,14 @@ func Test_configurationPrecedence(t *testing.T) {
 			name:         "no rc file, no env vars and no flags",
 			createRCFile: false,
 			expected:     defaultConfig, // should match the initialized defaults above
+		},
+		{
+			name:         "ignore empty debug bool",
+			createRCFile: false,
+			envVars: map[string]string{
+				"DEFANG_DEBUG": "",
+			},
+			expected: defaultConfig, // should ignore invalid and keep default false
 		},
 	}
 
