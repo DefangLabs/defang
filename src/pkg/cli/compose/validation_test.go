@@ -32,7 +32,6 @@ func TestValidationAndConvert(t *testing.T) {
 		if err != nil {
 			return nil, err
 		}
-
 		return configs.Names, nil
 	}
 
@@ -49,12 +48,12 @@ func TestValidationAndConvert(t *testing.T) {
 
 		if err := FixupServices(t.Context(), mockClient, project, UploadModeIgnore); err != nil {
 			t.Logf("Service conversion failed: %v", err)
-			logs.WriteString(err.Error() + "\n")
+			logs.WriteString("Error: " + err.Error() + "\n") // no coverage!
 		}
 
 		if err := ValidateProjectConfig(t.Context(), project, listConfigNamesFunc); err != nil {
 			t.Logf("Project config validation failed: %v", err)
-			logs.WriteString(err.Error() + "\n")
+			logs.WriteString("Error: " + err.Error() + "\n")
 		}
 
 		mode := modes.ModeAffordable
@@ -63,7 +62,7 @@ func TestValidationAndConvert(t *testing.T) {
 		}
 		if err := ValidateProject(project, mode); err != nil {
 			t.Logf("Project validation failed: %v", err)
-			logs.WriteString(err.Error() + "\n")
+			logs.WriteString("Error: " + err.Error() + "\n") // no coverage!
 		}
 
 		// The order of the services is not guaranteed, so we sort the logs before comparing

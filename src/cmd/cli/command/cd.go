@@ -1,10 +1,13 @@
 package command
 
 import (
+	"errors"
 	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/cobra"
 )
 
@@ -24,112 +27,71 @@ var cdCmd = &cobra.Command{
 
 		if json {
 			os.Setenv("DEFANG_JSON", "1")
-			verbose = true
+			global.Verbose = true
 		}
 	},
 }
 
+func bootstrapCommand(cmd *cobra.Command, args []string, command string) error {
+	ctx := cmd.Context()
+	loader := configureLoader(cmd)
+	provider, err := newProviderChecked(ctx, loader)
+	if err != nil {
+		return err
+	}
+
+	if len(args) == 0 {
+		projectName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
+		if err != nil {
+			return err
+		}
+		args = []string{projectName}
+	}
+
+	var errs []error
+	for _, projectName := range args {
+		err := canIUseProvider(ctx, provider, projectName, 0)
+		if err != nil {
+			return err
+		}
+		errs = append(errs, cli.BootstrapCommand(ctx, projectName, global.Verbose, provider, command))
+	}
+	return errors.Join(errs...)
+}
+
 var cdDestroyCmd = &cobra.Command{
-	Use:         "destroy",
+	Use:         "destroy [PROJECT...]",
 	Annotations: authNeededAnnotation, // need subscription
-	Args:        cobra.NoArgs,         // TODO: set MaximumNArgs(1),
 	Short:       "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
-		if err != nil {
-			return err
-		}
-
-		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
-		if err != nil {
-			return err
-		}
-
-		err = canIUseProvider(cmd.Context(), provider, projectName, 0)
-		if err != nil {
-			return err
-		}
-
-		return cli.BootstrapCommand(cmd.Context(), projectName, verbose, provider, "destroy")
+		return bootstrapCommand(cmd, args, "destroy")
 	},
 }
 
 var cdDownCmd = &cobra.Command{
-	Use:         "down",
+	Use:         "down [PROJECT...]",
 	Annotations: authNeededAnnotation, // need subscription
-	Args:        cobra.NoArgs,         // TODO: set MaximumNArgs(1),
 	Short:       "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
-		if err != nil {
-			return err
-		}
-
-		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
-		if err != nil {
-			return err
-		}
-
-		err = canIUseProvider(cmd.Context(), provider, projectName, 0)
-		if err != nil {
-			return err
-		}
-
-		return cli.BootstrapCommand(cmd.Context(), projectName, verbose, provider, "down")
+		return bootstrapCommand(cmd, args, "down")
 	},
 }
 
 var cdRefreshCmd = &cobra.Command{
-	Use:         "refresh",
+	Use:         "refresh [PROJECT...]",
 	Annotations: authNeededAnnotation, // need subscription
-	Args:        cobra.NoArgs,         // TODO: set MaximumNArgs(1),
 	Short:       "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
-		if err != nil {
-			return err
-		}
-
-		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
-		if err != nil {
-			return err
-		}
-
-		err = canIUseProvider(cmd.Context(), provider, projectName, 0)
-		if err != nil {
-			return err
-		}
-
-		return cli.BootstrapCommand(cmd.Context(), projectName, verbose, provider, "refresh")
+		return bootstrapCommand(cmd, args, "refresh")
 	},
 }
 
 var cdCancelCmd = &cobra.Command{
-	Use:         "cancel",
+	Use:         "cancel [PROJECT...]",
 	Annotations: authNeededAnnotation, // need subscription
-	Args:        cobra.NoArgs,         // TODO: set MaximumNArgs(1),
 	Short:       "Cancel the current CD operation",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
-		if err != nil {
-			return err
-		}
-
-		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
-		if err != nil {
-			return err
-		}
-
-		err = canIUseProvider(cmd.Context(), provider, projectName, 0)
-		if err != nil {
-			return err
-		}
-
-		return cli.BootstrapCommand(cmd.Context(), projectName, verbose, provider, "cancel")
+		return bootstrapCommand(cmd, args, "cancel")
 	},
 }
 
@@ -157,6 +119,7 @@ var cdListCmd = &cobra.Command{
 	Short:   "List all the projects and stacks in the CD cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		remote, _ := cmd.Flags().GetBool("remote")
+		all, _ := cmd.Flags().GetBool("all")
 
 		provider, err := newProviderChecked(cmd.Context(), nil)
 		if err != nil {
@@ -164,15 +127,19 @@ var cdListCmd = &cobra.Command{
 		}
 
 		if remote {
+			if all {
+				return errors.New("--all cannot be used with --remote")
+			}
+
 			err = canIUseProvider(cmd.Context(), provider, "", 0)
 			if err != nil {
 				return err
 			}
 
 			// FIXME: this needs auth because it spawns the CD task
-			return cli.BootstrapCommand(cmd.Context(), "", verbose, provider, "list")
+			return cli.BootstrapCommand(cmd.Context(), "", global.Verbose, provider, "list")
 		}
-		return cli.BootstrapLocalList(cmd.Context(), provider)
+		return cli.BootstrapLocalList(cmd.Context(), provider, all)
 	},
 }
 
@@ -198,7 +165,7 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.Preview(cmd.Context(), project, client, provider, mode)
+		return cli.Preview(cmd.Context(), project, global.Client, provider, global.Mode)
 	},
 }
 
@@ -221,5 +188,26 @@ var cdInstallCmd = &cobra.Command{
 		}
 
 		return cli.InstallCD(cmd.Context(), provider)
+	},
+}
+
+var cdCloudformationCmd = &cobra.Command{
+	Use:         "cloudformation",
+	Short:       "CloudFormation template related commands",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Hidden:      true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		provider := aws.NewByocProvider(cmd.Context(), global.Client.GetTenantName(), global.Stack)
+
+		if err := canIUseProvider(cmd.Context(), provider, "", 0); err != nil {
+			return err
+		}
+
+		template, err := provider.PrintCloudFormationTemplate()
+		if err == nil {
+			_, err = term.Print(string(template))
+		}
+		return err
 	},
 }

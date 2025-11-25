@@ -1,0 +1,15 @@
+services:
+  array-env:
+    image: bogus
+    environment:
+      - WITH_VALUE=foo
+      - EMPTY_VALUE=
+      - NO_VALUE
+      - BASE_ONLY=foo
+  map-env:
+    image: bogus
+    environment:
+      WITH_VALUE: foo
+      EMPTY_VALUE: ""
+      NO_VALUE:
+      BASE_ONLY: foo

@@ -13,10 +13,10 @@ import (
 	"syscall"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 )
 
-type PID = types.TaskID
+type PID = clouds.TaskID
 
 type Local struct {
 	entrypoint []string
@@ -26,13 +26,13 @@ type Local struct {
 	workDir    string
 }
 
-var _ types.Driver = (*Local)(nil)
+var _ clouds.Driver = (*Local)(nil)
 
 func New() *Local {
 	return &Local{}
 }
 
-func (l *Local) SetUp(ctx context.Context, containers []types.Container) error {
+func (l *Local) SetUp(ctx context.Context, containers []clouds.Container) error {
 	if len(containers) != 1 {
 		return errors.New("expected exactly one container")
 	}
@@ -101,7 +101,7 @@ func (l *Local) Stop(ctx context.Context, taskID PID) error {
 	return syscall.Kill(-pid, syscall.SIGTERM) // negative pid kills the process group
 }
 
-func (l *Local) GetInfo(ctx context.Context, taskID PID) (*types.TaskInfo, error) {
+func (l *Local) GetInfo(ctx context.Context, taskID PID) (*clouds.TaskInfo, error) {
 	return nil, client.ErrNotImplemented("not implemented for local driver")
 }
 

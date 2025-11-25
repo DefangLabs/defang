@@ -1,0 +1,32 @@
+name: Smoke Tests
+
+on:
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+jobs:
+  trigger-smoketests:
+    name: Trigger CLI Smoke Tests
+    runs-on: ubuntu-latest
+    concurrency:
+      group: smoketests-${{ github.ref }}
+      cancel-in-progress: false
+    environment: smoketest
+    steps:
+      - name: Trigger Workflow
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.DEFANG_MVP_ACTIONS_DISPATCH_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: 'DefangLabs',
+              repo: 'defang-mvp',
+              workflow_id: 'cli-smoketests.yml',
+              ref: 'main',
+              inputs: {
+                'sample-name': 'html-css-js'
+              }
+            });

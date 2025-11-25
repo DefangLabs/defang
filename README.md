@@ -86,6 +86,7 @@ Install the Defang CLI from one of the following sources:
   ```
   docker run -it defangio/defang-cli help
   ```
+
 - Using [NPX](https://docs.npmjs.com/cli/v9/commands/npx):
 
   ```

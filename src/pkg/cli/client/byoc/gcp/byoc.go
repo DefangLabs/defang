@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"os"
 	"path"
 	"strings"
@@ -21,6 +22,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/dns"
@@ -232,7 +234,7 @@ func (b *ByocGcp) SetUpCD(ctx context.Context) error {
 	term.Debugf("Using CD image: %q", b.CDImage)
 
 	serviceAccount := path.Base(b.cdServiceAccount)
-	if err := b.driver.SetupJob(ctx, "defang-cd", serviceAccount, []types.Container{
+	if err := b.driver.SetupJob(ctx, "defang-cd", serviceAccount, []clouds.Container{
 		{
 			Image:     b.CDImage,
 			Name:      ecs.CdContainerName,
@@ -259,7 +261,7 @@ func (o gcpObj) Size() int64 {
 	return o.obj.Size
 }
 
-func (b *ByocGcp) BootstrapList(ctx context.Context) ([]string, error) {
+func (b *ByocGcp) BootstrapList(ctx context.Context, _allRegions bool) (iter.Seq[string], error) {
 	bucketName, err := b.driver.GetBucketWithPrefix(ctx, "defang-cd")
 	if err != nil {
 		return nil, annotateGcpError(err)
@@ -270,26 +272,33 @@ func (b *ByocGcp) BootstrapList(ctx context.Context) ([]string, error) {
 
 	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
 
-	var stacks []string
 	uploadSA := b.driver.GetServiceAccountEmail(DefangUploadServiceAccountName)
 	term.Debug("Getting services from pulumi stacks bucket:", bucketName, prefix, uploadSA)
 	objLoader := func(ctx context.Context, bucket, object string) ([]byte, error) {
 		return b.driver.GetBucketObjectWithServiceAccount(ctx, bucket, object, uploadSA)
 	}
-	err = b.driver.IterateBucketObjects(ctx, bucketName, prefix, func(obj *storage.ObjectAttrs) error {
-		stack, err := byoc.ParsePulumiStackObject(ctx, gcpObj{obj}, bucketName, prefix, objLoader)
-		if err != nil {
-			return err
-		}
-		if stack != "" {
-			stacks = append(stacks, stack)
-		}
-		return nil
-	})
+	seq, err := b.driver.IterateBucketObjects(ctx, bucketName, prefix)
 	if err != nil {
 		return nil, annotateGcpError(err)
 	}
-	return stacks, nil
+	return func(yield func(string) bool) {
+		for obj, err := range seq {
+			if err != nil {
+				term.Debugf("Error listing object in bucket %s: %v", bucketName, annotateGcpError(err))
+				continue
+			}
+			stack, err := byoc.ParsePulumiStackObject(ctx, gcpObj{obj}, bucketName, prefix, objLoader)
+			if err != nil {
+				term.Debugf("Skipping %q in bucket %s: %v", obj.Name, bucketName, annotateGcpError(err))
+				continue
+			}
+			if stack != "" {
+				if !yield(stack) {
+					break
+				}
+			}
+		}
+	}, nil
 }
 
 func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
@@ -396,7 +405,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		return "", err
 	}
 	b.cdExecution = execution
-	// fmt.Printf("CD Execution: %s\n", execution)
+	// term.Printf("CD Execution: %s\n", execution)
 	return execution, nil
 }
 
@@ -572,13 +581,11 @@ func (b *ByocGcp) getLogStream(ctx context.Context, gcpLogsClient GcpLogsClient,
 		return nil, err
 	}
 
-	startTime := time.Now()
 	if req.Since.IsValid() {
-		startTime = req.Since.AsTime()
+		logStream.AddSince(req.Since.AsTime())
 	}
-	var endTime time.Time
 	if req.Until.IsValid() {
-		endTime = req.Until.AsTime()
+		logStream.AddUntil(req.Until.AsTime())
 	}
 	etag := req.Etag
 	if etag == b.cdExecution { // Do not pass the cd execution name as etag
@@ -598,11 +605,9 @@ func (b *ByocGcp) getLogStream(ctx context.Context, gcpLogsClient GcpLogsClient,
 		// TODO: update stack (1st param) to b.PulumiStack
 		logStream.AddServiceLog("", req.Project, etag, req.Services) // Service logs
 	}
-	logStream.AddSince(startTime)
-	logStream.AddUntil(endTime)
 	logStream.AddFilter(req.Pattern)
 	if req.Follow {
-		logStream.StartFollow(startTime)
+		logStream.StartFollow(req.Since.AsTime())
 	} else if req.Since.IsValid() {
 		logStream.StartHead(req.Limit)
 	} else {

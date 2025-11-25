@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -18,7 +18,7 @@ func TestRun(t *testing.T) {
 
 	d := New()
 
-	err := d.SetUp(context.Background(), []types.Container{{Image: "alpine:latest", Platform: d.platform}})
+	err := d.SetUp(context.Background(), []clouds.Container{{Image: "alpine:latest", Platform: d.platform}})
 	if err != nil {
 		t.Fatal(err)
 	}

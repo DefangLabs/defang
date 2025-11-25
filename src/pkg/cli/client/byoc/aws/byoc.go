@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"os"
 	"slices"
 	"strconv"
@@ -18,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
@@ -32,10 +34,8 @@ import (
 	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/proto"
@@ -51,7 +51,7 @@ var StsClient StsProviderAPI
 type ByocAws struct {
 	*byoc.ByocBaseClient
 
-	driver *cfn.AwsEcs // TODO: ecs is stateful, contains the output of the cd cfn stack after SetUpCD
+	driver *cfn.AwsEcsCfn // TODO: ecs is stateful, contains the output of the cd cfn stack after SetUpCD
 
 	ecsEventHandlers []ECSEventHandler
 	handlersLock     sync.RWMutex
@@ -128,6 +128,19 @@ func initStsClient(cfg awssdk.Config) {
 	}
 }
 
+func (b *ByocAws) makeContainers() []clouds.Container {
+	return makeContainers(b.PulumiVersion, b.CDImage)
+}
+
+func (b *ByocAws) PrintCloudFormationTemplate() ([]byte, error) {
+	containers := b.makeContainers()
+	template, err := cfn.CreateTemplate(byoc.CdTaskPrefix, containers)
+	if err != nil {
+		return nil, err
+	}
+	return template.YAML()
+}
+
 func (b *ByocAws) SetUpCD(ctx context.Context) error {
 	if b.SetupDone {
 		return nil
@@ -135,41 +148,7 @@ func (b *ByocAws) SetUpCD(ctx context.Context) error {
 
 	term.Debugf("Using CD image: %q", b.CDImage)
 
-	cdTaskName := byoc.CdTaskPrefix
-	containers := []types.Container{
-		{
-			// FIXME: get the Pulumi image or version from Fabric: https://github.com/DefangLabs/defang/issues/1027
-			Image:     "public.ecr.aws/pulumi/pulumi-nodejs:" + b.PulumiVersion,
-			Name:      ecs.CdContainerName,
-			Cpus:      2.0,
-			Memory:    2048_000_000, // 2G
-			Essential: ptr.Bool(true),
-			VolumesFrom: []string{
-				cdTaskName,
-			},
-			WorkDir:    "/app",
-			DependsOn:  map[string]types.ContainerCondition{cdTaskName: "START"},
-			EntryPoint: []string{"node", "lib/index.js"},
-		},
-		{
-			Image:     b.CDImage,
-			Name:      cdTaskName,
-			Essential: ptr.Bool(false),
-			Volumes: []types.TaskVolume{
-				{
-					Source:   "pulumi-plugins",
-					Target:   "/root/.pulumi/plugins",
-					ReadOnly: true,
-				},
-				{
-					Source:   "cd",
-					Target:   "/app",
-					ReadOnly: true,
-				},
-			},
-		},
-	}
-	if err := b.driver.SetUp(ctx, containers); err != nil {
+	if err := b.driver.SetUp(ctx, b.makeContainers()); err != nil {
 		return AnnotateAwsError(err)
 	}
 
@@ -695,6 +674,13 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	//  * No Etag, service:		tail all tasks/services with that service name
 	//  * Etag, service:		tail that task/service
 	var tailStream ecs.LiveTailStream
+	var start, end time.Time
+	if req.Since.IsValid() {
+		start = req.Since.AsTime()
+	}
+	if req.Until.IsValid() {
+		end = req.Until.AsTime()
+	}
 	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is a task ID
 		if req.Follow {
 			tailStream, err = b.driver.TailTaskID(ctx, cw, etag)
@@ -706,7 +692,7 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 				}
 			}
 		} else {
-			tailStream, err = b.driver.QueryTaskID(ctx, cw, etag, time.Time{}, time.Now(), req.Limit)
+			tailStream, err = b.driver.QueryTaskID(ctx, cw, etag, start, end, req.Limit)
 			if err == nil {
 				b.cdTaskArn, err = b.driver.GetTaskArn(etag)
 				etag = "" // no need to filter by etag
@@ -719,13 +705,6 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		var service string
 		if len(req.Services) == 1 {
 			service = req.Services[0]
-		}
-		var start, end time.Time
-		if req.Since.IsValid() {
-			start = req.Since.AsTime()
-		}
-		if req.Until.IsValid() {
-			end = req.Until.AsTime()
 		}
 		cw, err := ecs.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region
 		if err != nil {
@@ -867,69 +846,23 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	return nil
 }
 
-type s3Obj struct{ obj s3types.Object }
-
-func (a s3Obj) Name() string {
-	return *a.obj.Key
-}
-
-func (a s3Obj) Size() int64 {
-	return *a.obj.Size
-}
-
-func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
-	bucketName := b.bucketName()
-	if bucketName == "" {
-		if err := b.driver.FillOutputs(ctx); err != nil {
+func (b *ByocAws) BootstrapList(ctx context.Context, allRegions bool) (iter.Seq[string], error) {
+	if allRegions {
+		s3Client, err := newS3Client(ctx, b.driver.Region)
+		if err != nil {
 			return nil, AnnotateAwsError(err)
 		}
-		bucketName = b.bucketName()
-	}
-
-	cfg, err := b.driver.LoadConfig(ctx)
-	if err != nil {
-		return nil, AnnotateAwsError(err)
-	}
-
-	s3client := s3.NewFromConfig(cfg)
-	return ListPulumiStacks(ctx, s3client, bucketName)
-}
-
-func ListPulumiStacks(ctx context.Context, s3client *s3.Client, bucketName string) ([]string, error) {
-	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
-
-	term.Debug("Listing stacks in bucket:", bucketName)
-	out, err := s3client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
-		Bucket: &bucketName,
-		Prefix: &prefix,
-	})
-	if err != nil {
-		return nil, AnnotateAwsError(err)
-	}
-	var stacks []string
-	for _, obj := range out.Contents {
-		if obj.Key == nil || obj.Size == nil {
-			continue
-		}
-		stack, err := byoc.ParsePulumiStackObject(ctx, s3Obj{obj}, bucketName, prefix, func(ctx context.Context, bucket, path string) ([]byte, error) {
-			getObjectOutput, err := s3client.GetObject(ctx, &s3.GetObjectInput{
-				Bucket: &bucket,
-				Key:    &path,
-			})
-			if err != nil {
-				return nil, err
+		return listPulumiStacksAllRegions(ctx, s3Client)
+	} else {
+		bucketName := b.bucketName()
+		if bucketName == "" {
+			if err := b.driver.FillOutputs(ctx); err != nil {
+				return nil, AnnotateAwsError(err)
 			}
-			return io.ReadAll(getObjectOutput.Body)
-		})
-		if err != nil {
-			return nil, err
+			bucketName = b.bucketName()
 		}
-		if stack != "" {
-			stacks = append(stacks, stack)
-		}
-		// TODO: check for lock files
+		return listPulumiStacksInBucket(ctx, b.driver.Region, bucketName)
 	}
-	return stacks, nil
 }
 
 type ECSEventHandler interface {

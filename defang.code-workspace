@@ -1,19 +1,27 @@
 {
-	"folders": [
-		{
-			"path": "."
-		},
-		{
-			"path": "src"
-		}
-	],
-	"settings": {
-		"go.testEnvVars": {
-			"AWS_PROFILE": "defang-sandbox"
-		},
-		"go.buildTags": "integration",
-		"go.testFlags": ["-short"],
-		"go.testTimeout": "300s",
-		"makefile.configureOnOpen": false
-	}
+  "folders": [
+    {
+      "path": "."
+    },
+    {
+      "path": "src"
+    }
+  ],
+  "settings": {
+    "yaml.customTags": [
+      "!reset mapping",
+      "!reset sequence",
+      "!reset scalar",
+      "!reset null",
+      "!override mapping",
+      "!override sequence"
+    ],
+    "go.testEnvVars": {
+      "AWS_PROFILE": "defang-sandbox"
+    },
+    "go.buildTags": "integration",
+    "go.testFlags": ["-short"],
+    "go.testTimeout": "300s",
+    "makefile.configureOnOpen": false
+  }
 }

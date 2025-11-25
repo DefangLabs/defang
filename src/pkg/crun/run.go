@@ -1,4 +1,4 @@
-package cmd
+package crun
 
 import (
 	"context"
@@ -8,8 +8,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
-	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 type RunContainerArgs struct {
@@ -52,7 +52,7 @@ func Run(ctx context.Context, args RunContainerArgs) error {
 		return err
 	}
 
-	containers := []types.Container{
+	containers := []clouds.Container{
 		{
 			Image:    args.Image,
 			Memory:   args.Memory,

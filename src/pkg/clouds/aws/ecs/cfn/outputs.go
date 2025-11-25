@@ -2,6 +2,7 @@ package cfn
 
 const (
 	OutputsBucketName             = "bucketName"
+	OutputsCIRoleARN              = "ciRoleArn"
 	OutputsClusterName            = "clusterName"
 	OutputsDefaultSecurityGroupID = "defaultSecurityGroupId"
 	OutputsLogGroupARN            = "logGroupArn"

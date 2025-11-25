@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"net/url"
 	"os"
 	"regexp"
@@ -242,7 +243,7 @@ func (b *ByocDo) BootstrapCommand(ctx context.Context, req client.BootstrapComma
 	return etag, nil
 }
 
-func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
+func (b *ByocDo) BootstrapList(ctx context.Context, _allRegions bool) (iter.Seq[string], error) {
 	s3client, err := b.driver.CreateS3Client()
 	if err != nil {
 		return nil, err

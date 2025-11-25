@@ -5,8 +5,6 @@ import (
 	"net/http"
 )
 
-type Header = http.Header
-
 func GetWithContext(ctx context.Context, url string) (*http.Response, error) {
 	hreq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

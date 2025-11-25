@@ -167,40 +167,50 @@ func TestGetLogStream(t *testing.T) {
 		cdExecution string
 	}{
 		// TODO: use golang 1.25 synctest to avoid needing a fixed Since in every test case
+		{name: "no_args", req: &defangv1.TailRequest{}},
 		{name: "since", req: &defangv1.TailRequest{Since: timestamppb.New(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))}},
 		{name: "since_and_until", req: &defangv1.TailRequest{
 			Since: timestamppb.New(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
 			Until: timestamppb.New(time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)),
 		}},
 		{name: "with_pattern", req: &defangv1.TailRequest{
-			Since:   timestamppb.New(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
 			Pattern: "error",
 		}},
-		{name: "with_project", req: &defangv1.TailRequest{
+		{name: "with_pattern_since_and_until", req: &defangv1.TailRequest{
+			Pattern: "error",
 			Since:   timestamppb.New(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
+			Until:   timestamppb.New(time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)),
+		}},
+		{name: "with_project", req: &defangv1.TailRequest{
 			Project: "test-project",
 			LogType: uint32(logs.LogTypeAll),
 		}},
-		{name: "with_logtype_build", req: &defangv1.TailRequest{
+		{name: "with_project_since_and_until", req: &defangv1.TailRequest{
+			Project: "test-project",
 			Since:   timestamppb.New(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
+			Until:   timestamppb.New(time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)),
+			LogType: uint32(logs.LogTypeAll),
+		}},
+		{name: "with_logtype_build", req: &defangv1.TailRequest{
 			LogType: uint32(logs.LogTypeBuild),
 		}},
 		{name: "with_logtype_run", req: &defangv1.TailRequest{
-			Since:   timestamppb.New(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
 			LogType: uint32(logs.LogTypeRun),
 		}},
 		{name: "with_logtype_all", req: &defangv1.TailRequest{
-			Since:   timestamppb.New(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
 			Pattern: "error",
 			LogType: uint32(logs.LogTypeAll),
 		}},
 		{name: "with_cd_exec", req: &defangv1.TailRequest{
-			Since:   timestamppb.New(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
 			LogType: uint32(logs.LogTypeAll),
 		},
 			cdExecution: "test-execution-id",
 		},
 		{name: "with_etag", req: &defangv1.TailRequest{
+			LogType: uint32(logs.LogTypeAll),
+			Etag:    "test-etag",
+		}},
+		{name: "with_etag_and_since", req: &defangv1.TailRequest{
 			Since:   timestamppb.New(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
 			LogType: uint32(logs.LogTypeAll),
 			Etag:    "test-etag",
@@ -209,6 +219,16 @@ func TestGetLogStream(t *testing.T) {
 			Since:   timestamppb.New(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
 			LogType: uint32(logs.LogTypeAll),
 			Etag:    "test-execution-id",
+		},
+			cdExecution: "test-execution-id",
+		},
+		{name: "with_everything", req: &defangv1.TailRequest{
+			Project: "test-project",
+			Pattern: "error",
+			Since:   timestamppb.New(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
+			Until:   timestamppb.New(time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)),
+			LogType: uint32(logs.LogTypeAll),
+			Etag:    "test-etag",
 		},
 			cdExecution: "test-execution-id",
 		},

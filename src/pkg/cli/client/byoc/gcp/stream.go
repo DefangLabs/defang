@@ -204,6 +204,9 @@ func (s *ServerStream[T]) listToBuffer(lister gcp.Lister, limit int32) ([]*T, er
 	for range limit {
 		entry, err := lister.Next()
 		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return buffer, nil
+			}
 			return nil, err
 		}
 		resps, err := s.parseAndFilter(entry)

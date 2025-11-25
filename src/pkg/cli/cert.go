@@ -254,7 +254,7 @@ func waitForCNAME(ctx context.Context, domain string, targets []string, client c
 		return nil
 	}
 	term.Infof("Configure a CNAME or ALIAS record for the domain name: %v", domain)
-	fmt.Printf("  %v  -> %v\n", domain, strings.Join(targets, " or "))
+	term.Printf("  %v  -> %v\n", domain, strings.Join(targets, " or "))
 	term.Infof("Awaiting DNS record setup and propagation... This may take a while.")
 
 	for {

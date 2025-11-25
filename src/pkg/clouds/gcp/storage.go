@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"iter"
 	"strings"
 	"time"
 
@@ -175,43 +176,57 @@ func (gcp Gcp) getBucketObject(ctx context.Context, bucketName, objectName strin
 	return io.ReadAll(r)
 }
 
-func (gcp Gcp) IterateBucketObjects(ctx context.Context, bucketName, prefix string, f func(*storage.ObjectAttrs) error) error {
+func (gcp Gcp) IterateBucketObjects(ctx context.Context, bucketName, prefix string) (iter.Seq2[*storage.ObjectAttrs, error], error) {
 	client, err := newStorageClient(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to iterate on bucket object, failed to create storage client: %w", err)
+		return nil, fmt.Errorf("unable to iterate on bucket object, failed to create storage client: %w", err)
 	}
-	defer client.Close()
 
-	return iterateBucketObjects(ctx, bucketName, prefix, client, f)
+	return func(yield func(*storage.ObjectAttrs, error) bool) {
+		defer client.Close()
+
+		for oa, err := range iterateBucketObjects(ctx, bucketName, prefix, client) {
+			if !yield(oa, err) {
+				break
+			}
+		}
+	}, nil
 }
 
-func (gcp Gcp) IterateBucketObjectsWithServiceAccount(ctx context.Context, bucketName, prefix, serviceAccount string, f func(*storage.ObjectAttrs) error) error {
+func (gcp Gcp) IterateBucketObjectsWithServiceAccount(ctx context.Context, bucketName, prefix, serviceAccount string) (iter.Seq2[*storage.ObjectAttrs, error], error) {
 	client, err := getCloudStorageClientWithServiceAccount(ctx, serviceAccount)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer client.Close()
+	return func(yield func(*storage.ObjectAttrs, error) bool) {
+		defer client.Close()
 
-	return iterateBucketObjects(ctx, bucketName, prefix, client, f)
+		for oa, err := range iterateBucketObjects(ctx, bucketName, prefix, client) {
+			if !yield(oa, err) {
+				break
+			}
+		}
+	}, nil
 }
 
-func iterateBucketObjects(ctx context.Context, bucketName, prefix string, client StorageClient, f func(*storage.ObjectAttrs) error) error {
+func iterateBucketObjects(ctx context.Context, bucketName, prefix string, client StorageClient) iter.Seq2[*storage.ObjectAttrs, error] {
 	bucket := client.Bucket(bucketName)
 	it := bucket.Objects(ctx, &storage.Query{Prefix: prefix})
-	for {
-		attrs, err := it.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("failed to iterate on bucket object %q: %w", bucketName, err)
-		}
+	return func(yield func(*storage.ObjectAttrs, error) bool) {
+		for {
+			attrs, err := it.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				err = fmt.Errorf("failed to iterate on bucket object %q: %w", bucketName, err)
+			}
 
-		if err := f(attrs); err != nil {
-			return err
+			if !yield(attrs, err) {
+				break
+			}
 		}
 	}
-	return nil
 }
 
 func getCloudStorageClientWithServiceAccount(ctx context.Context, serviceAccount string) (StorageClient, error) {

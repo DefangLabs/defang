@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/DefangLabs/defang/src/pkg/cmd"
+	"github.com/DefangLabs/defang/src/pkg/crun"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/pflag"
 )
@@ -61,7 +61,7 @@ func main() {
 		pflag.Parse()
 	}
 
-	region := cmd.Region(*region)
+	region := crun.Region(*region)
 	ctx := context.Background()
 
 	requireTaskID := func() string {
@@ -85,19 +85,19 @@ func main() {
 		envMap := make(map[string]string)
 		// Apply env vars from files first, so they can be overridden by the command line
 		for _, envFile := range *envFiles {
-			if _, err := cmd.ParseEnvFile(envFile, envMap); err != nil {
+			if _, err := crun.ParseEnvFile(envFile, envMap); err != nil {
 				term.Fatal(err)
 			}
 		}
 		// Apply env vars from the command line last, so they take precedence
 		for _, env := range *envs {
-			if key, value := cmd.ParseEnvLine(env); key != "" {
+			if key, value := crun.ParseEnvLine(env); key != "" {
 				envMap[key] = value
 			}
 		}
 
-		memory := cmd.ParseMemory(*memory)
-		err = cmd.Run(ctx, cmd.RunContainerArgs{
+		memory := crun.ParseMemory(*memory)
+		err = crun.Run(ctx, crun.RunContainerArgs{
 			Region:   region,
 			Image:    runFlags.Arg(0),
 			Memory:   memory,
@@ -109,18 +109,18 @@ func main() {
 		})
 	case "stop", "s":
 		taskID := requireTaskID()
-		err = cmd.Stop(ctx, region, &taskID)
+		err = crun.Stop(ctx, region, &taskID)
 	case "logs", "tail", "l":
 		taskID := requireTaskID()
-		err = cmd.Logs(ctx, region, &taskID)
+		err = crun.Logs(ctx, region, &taskID)
 	case "destroy", "teardown", "d":
 		if pflag.NArg() != 1 {
 			term.Fatal("destroy does not take any arguments")
 		}
-		err = cmd.Destroy(ctx, region)
+		err = crun.Destroy(ctx, region)
 	case "info", "i":
 		taskID := requireTaskID()
-		err = cmd.PrintInfo(ctx, region, &taskID)
+		err = crun.PrintInfo(ctx, region, &taskID)
 	}
 
 	if err != nil {

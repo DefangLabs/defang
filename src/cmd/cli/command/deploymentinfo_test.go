@@ -21,8 +21,8 @@ func TestPrintPlaygroundPortalServiceURLs(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
 
-	providerID = cliClient.ProviderDefang
-	cluster = pcluster.DefaultCluster
+	global.ProviderID = cliClient.ProviderDefang
+	global.Cluster = pcluster.DefaultCluster
 	printPlaygroundPortalServiceURLs([]*defangv1.ServiceInfo{
 		{
 			Service: &defangv1.Service{Name: "service1"},

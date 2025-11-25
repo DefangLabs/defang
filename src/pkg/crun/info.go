@@ -1,13 +1,13 @@
-package cmd
+package crun
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/DefangLabs/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 )
 
-func PrintInfo(ctx context.Context, region Region, id types.TaskID) error {
+func PrintInfo(ctx context.Context, region Region, id clouds.TaskID) error {
 	driver, err := createDriver(region)
 	if err != nil {
 		return err

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -25,7 +26,7 @@ func (mp ErrMultipleProjects) Error() string {
 }
 
 type ProjectBackend interface {
-	BootstrapList(context.Context) ([]string, error)
+	BootstrapList(context.Context, bool) (iter.Seq[string], error)
 	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 }
 
@@ -68,29 +69,15 @@ func NewByocBaseClient(tenantName types.TenantName, backend ProjectBackend, stac
 	return b
 }
 
-func (b *ByocBaseClient) GetProjectLastCDImage(ctx context.Context, projectName string) (string, error) {
-	projUpdate, err := b.projectBackend.GetProjectUpdate(ctx, projectName)
-	if err != nil {
-		return "", err
-	}
-
-	if projUpdate == nil {
-		return "", nil
-	}
-
-	return projUpdate.CdVersion, nil
-}
-
 func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
 	return nil, client.ErrNotImplemented("AI debugging is not yet supported for BYOC")
 }
 
 func (b *ByocBaseClient) SetCanIUseConfig(quotas *defangv1.CanIUseResponse) {
-	// Allow local override of the CD image
-	b.CDImage = pkg.Getenv("DEFANG_CD_IMAGE", quotas.CdImage)
-	b.AllowScaling = quotas.AllowScaling
-	b.AllowGPU = quotas.Gpu
-	b.PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", quotas.PulumiVersion)
+	b.CanIUseConfig.AllowGPU = quotas.Gpu
+	b.CanIUseConfig.AllowScaling = quotas.AllowScaling
+	b.CanIUseConfig.CDImage = quotas.CdImage
+	b.CanIUseConfig.PulumiVersion = quotas.PulumiVersion
 }
 
 func (b *ByocBaseClient) ServicePrivateDNS(name string) string {
@@ -99,12 +86,14 @@ func (b *ByocBaseClient) ServicePrivateDNS(name string) string {
 
 func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) {
 	// Get the list of projects from remote
-	projectNames, err := b.projectBackend.BootstrapList(ctx)
+	stacks, err := b.projectBackend.BootstrapList(ctx, false)
 	if err != nil {
 		return "", fmt.Errorf("no cloud projects found: %w", err)
 	}
-	for i, name := range projectNames {
-		projectNames[i] = strings.Split(name, "/")[0] // Remove the stack name
+	var projectNames []string
+	for name := range stacks {
+		projectName := strings.Split(name, "/")[0] // Remove the stack name
+		projectNames = append(projectNames, projectName)
 	}
 
 	if len(projectNames) == 0 {

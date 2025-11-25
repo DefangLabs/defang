@@ -68,9 +68,8 @@ func (p ProviderID) Value() defangv1.Provider {
 }
 
 func (p *ProviderID) Set(str string) error {
-	str = strings.ToLower(str)
 	for _, provider := range allProviders {
-		if provider.String() == str {
+		if strings.EqualFold(str, provider.String()) || strings.EqualFold(str, provider.Name()) {
 			*p = provider
 			return nil
 		}
