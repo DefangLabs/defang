@@ -1,10 +1,9 @@
-package agent
+package tools
 
 import (
 	"context"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	"github.com/DefangLabs/defang/src/pkg/agent/tools"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/firebase/genkit/go/ai"
@@ -30,7 +29,7 @@ func CollectDefangTools(cluster string, providerId *client.ProviderID) []ai.Tool
 			"login",
 			"Login into Defang",
 			func(ctx *ai.ToolContext, _ LoginParams) (string, error) {
-				return tools.HandleLoginTool(ctx.Context, cluster, &tools.DefaultToolCLI{})
+				return HandleLoginTool(ctx.Context, cluster, &DefaultToolCLI{})
 			},
 		),
 		ai.NewTool[ServicesParams, string](
@@ -41,8 +40,8 @@ func CollectDefangTools(cluster string, providerId *client.ProviderID) []ai.Tool
 				if err != nil {
 					return "Failed to configure loader", err
 				}
-				var cli tools.CLIInterface = &tools.DefaultToolCLI{}
-				return tools.HandleServicesTool(ctx.Context, loader, providerId, cluster, cli)
+				var cli CLIInterface = &DefaultToolCLI{}
+				return HandleServicesTool(ctx.Context, loader, providerId, cluster, cli)
 			},
 		),
 		ai.NewTool("deploy",
@@ -52,92 +51,92 @@ func CollectDefangTools(cluster string, providerId *client.ProviderID) []ai.Tool
 				if err != nil {
 					return "Failed to configure loader", err
 				}
-				cli := &tools.DefaultToolCLI{}
-				return tools.HandleDeployTool(ctx.Context, loader, providerId, cluster, cli)
+				cli := &DefaultToolCLI{}
+				return HandleDeployTool(ctx.Context, loader, providerId, cluster, cli)
 			},
 		),
 		ai.NewTool("destroy",
 			"Destroy the deployed application defined in the docker-compose files in the current working directory",
-			func(ctx *ai.ToolContext, params tools.DestroyParams) (string, error) {
+			func(ctx *ai.ToolContext, params DestroyParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
-				cli := &tools.DefaultToolCLI{}
-				return tools.HandleDestroyTool(ctx.Context, loader, providerId, cluster, cli)
+				cli := &DefaultToolCLI{}
+				return HandleDestroyTool(ctx.Context, loader, providerId, cluster, cli)
 			},
 		),
 		ai.NewTool("logs",
 			"Fetch logs for the application in pages of up to 100 lines. You can use the 'since' and 'until' parameters to page through logs by time.",
-			func(ctx *ai.ToolContext, params tools.LogsParams) (string, error) {
+			func(ctx *ai.ToolContext, params LogsParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
-				cli := &tools.DefaultToolCLI{}
-				return tools.HandleLogsTool(ctx.Context, loader, params, cluster, providerId, cli)
+				cli := &DefaultToolCLI{}
+				return HandleLogsTool(ctx.Context, loader, params, cluster, providerId, cli)
 			},
 		),
 		ai.NewTool("estimate",
 			"Estimate the cost of deployed a Defang project to AWS or GCP",
-			func(ctx *ai.ToolContext, params tools.EstimateParams) (string, error) {
+			func(ctx *ai.ToolContext, params EstimateParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
-				cli := &tools.DefaultToolCLI{}
-				return tools.HandleEstimateTool(ctx.Context, loader, params, cluster, cli)
+				cli := &DefaultToolCLI{}
+				return HandleEstimateTool(ctx.Context, loader, params, cluster, cli)
 			},
 		),
 		ai.NewTool("set_config",
 			"Set a config variable for the defang project",
-			func(ctx *ai.ToolContext, params tools.SetConfigParams) (string, error) {
+			func(ctx *ai.ToolContext, params SetConfigParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
-				cli := &tools.DefaultToolCLI{}
-				return tools.HandleSetConfig(ctx.Context, loader, params, providerId, cluster, cli)
+				cli := &DefaultToolCLI{}
+				return HandleSetConfig(ctx.Context, loader, params, providerId, cluster, cli)
 			},
 		),
 		ai.NewTool("remove_config",
 			"Remove a config variable from the defang project",
-			func(ctx *ai.ToolContext, params tools.RemoveConfigParams) (string, error) {
+			func(ctx *ai.ToolContext, params RemoveConfigParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
-				cli := &tools.DefaultToolCLI{}
-				return tools.HandleRemoveConfigTool(ctx.Context, loader, params, providerId, cluster, cli)
+				cli := &DefaultToolCLI{}
+				return HandleRemoveConfigTool(ctx.Context, loader, params, providerId, cluster, cli)
 			},
 		),
 		ai.NewTool("list_configs",
 			"List config variables for the defang project",
-			func(ctx *ai.ToolContext, params tools.ListConfigsParams) (string, error) {
+			func(ctx *ai.ToolContext, params ListConfigsParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
-				cli := &tools.DefaultToolCLI{}
-				return tools.HandleListConfigTool(ctx.Context, loader, providerId, cluster, cli)
+				cli := &DefaultToolCLI{}
+				return HandleListConfigTool(ctx.Context, loader, providerId, cluster, cli)
 			},
 		),
 		ai.NewTool("set_aws_provider",
 			"Set the AWS provider for the defang project",
-			func(ctx *ai.ToolContext, params tools.SetAWSProviderParams) (string, error) {
-				return tools.HandleSetAWSProvider(ctx.Context, params, providerId, cluster)
+			func(ctx *ai.ToolContext, params SetAWSProviderParams) (string, error) {
+				return HandleSetAWSProvider(ctx.Context, params, providerId, cluster)
 			},
 		),
 		ai.NewTool("set_gcp_provider",
 			"Set the GCP provider for the defang project",
-			func(ctx *ai.ToolContext, params tools.SetGCPProviderParams) (string, error) {
-				return tools.HandleSetGCPProvider(ctx.Context, params, providerId, cluster)
+			func(ctx *ai.ToolContext, params SetGCPProviderParams) (string, error) {
+				return HandleSetGCPProvider(ctx.Context, params, providerId, cluster)
 			},
 		),
 		ai.NewTool("set_playground_provider",
 			"Set the Playground provider for the defang project",
-			func(ctx *ai.ToolContext, params tools.SetPlaygroundProviderParams) (string, error) {
-				return tools.HandleSetPlaygroundProvider(providerId)
+			func(ctx *ai.ToolContext, params SetPlaygroundProviderParams) (string, error) {
+				return HandleSetPlaygroundProvider(providerId)
 			},
 		),
 	}

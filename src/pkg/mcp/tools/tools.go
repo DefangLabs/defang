@@ -3,7 +3,7 @@ package tools
 import (
 	"context"
 
-	"github.com/DefangLabs/defang/src/pkg/agent"
+	agentTools "github.com/DefangLabs/defang/src/pkg/agent/tools"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -68,6 +68,6 @@ func translateGenKitToolsToMCP(genkitTools []ai.Tool) []server.ServerTool {
 }
 
 func CollectTools(cluster string, providerId *client.ProviderID) []server.ServerTool {
-	genkitTools := agent.CollectDefangTools(cluster, providerId)
+	genkitTools := agentTools.CollectDefangTools(cluster, providerId)
 	return translateGenKitToolsToMCP(genkitTools)
 }

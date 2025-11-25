@@ -12,6 +12,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/agent/plugins/fabric"
+	"github.com/DefangLabs/defang/src/pkg/agent/tools"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -113,7 +114,7 @@ func New(ctx context.Context, addr string, providerId *client.ProviderID, system
 
 	printer := printer{outStream: os.Stdout}
 	toolManager := NewToolManager(gk, printer)
-	defangTools := CollectDefangTools(addr, providerId)
+	defangTools := tools.CollectDefangTools(addr, providerId)
 	toolManager.RegisterTools(defangTools...)
 	fsTools := CollectFsTools()
 	toolManager.RegisterTools(fsTools...)
