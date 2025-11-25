@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
@@ -218,5 +219,11 @@ func prepareSystemPrompt(prompt string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error getting current working directory: %w", err)
 	}
-	return fmt.Sprintf("%s\n\nThe current working directory is %q", prompt, cwd), nil
+	currentDate := time.Now().Format("2006-01-02T15:04:05 -0800 PST")
+	return fmt.Sprintf(
+		"%s\n\nThe current working directory is %q\nThe current date is %s",
+		prompt,
+		cwd,
+		currentDate,
+	), nil
 }
