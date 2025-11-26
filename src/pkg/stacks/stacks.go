@@ -3,6 +3,7 @@ package stacks
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -39,8 +40,13 @@ func Create(params StackParameters) (string, error) {
 		return "", err
 	}
 
+	// Ensure .defang directory exists
+	if err := os.MkdirAll(".defang", 0755); err != nil {
+		return "", err
+	}
+
 	filename := filename(params.Name)
-	file, err := os.CreateTemp(".", filename+".tmp.")
+	file, err := os.CreateTemp(".defang", filepath.Base(filename)+".tmp.")
 	if err != nil {
 		return "", err
 	}
@@ -70,33 +76,41 @@ type StackListItem struct {
 }
 
 func List() ([]StackListItem, error) {
-	files, err := os.ReadDir(".")
+	// Check if .defang directory exists
+	if _, err := os.Stat(".defang"); os.IsNotExist(err) {
+		return []StackListItem{}, nil
+	}
+
+	files, err := os.ReadDir(".defang")
 	if err != nil {
 		return nil, err
 	}
 
 	var stacks []StackListItem
 	for _, file := range files {
-		if strings.HasPrefix(file.Name(), ".defang.") {
-			content, err := os.ReadFile(file.Name())
-			if err != nil {
-				term.Warnf("Skipping unreadable stack file %s: %v\n", file.Name(), err)
-				continue
-			}
-			params, err := Parse(string(content))
-			if err != nil {
-				term.Warnf("Skipping invalid stack file %s: %v\n", file.Name(), err)
-				continue
-			}
-			params.Name = strings.TrimPrefix(file.Name(), ".defang.")
-
-			stacks = append(stacks, StackListItem{
-				Name:     params.Name,
-				Provider: params.Provider.String(),
-				Region:   params.Region,
-				Mode:     params.Mode.String(),
-			})
+		if file.IsDir() || strings.HasPrefix(file.Name(), ".") {
+			continue
 		}
+		
+		filename := filepath.Join(".defang", file.Name())
+		content, err := os.ReadFile(filename)
+		if err != nil {
+			term.Warnf("Skipping unreadable stack file %s: %v\n", filename, err)
+			continue
+		}
+		params, err := Parse(string(content))
+		if err != nil {
+			term.Warnf("Skipping invalid stack file %s: %v\n", filename, err)
+			continue
+		}
+		params.Name = file.Name()
+
+		stacks = append(stacks, StackListItem{
+			Name:     params.Name,
+			Provider: params.Provider.String(),
+			Region:   params.Region,
+			Mode:     params.Mode.String(),
+		})
 	}
 
 	return stacks, nil
@@ -157,5 +171,5 @@ func Remove(name string) error {
 }
 
 func filename(stackname string) string {
-	return ".defang." + stackname
+	return filepath.Join(".defang", stackname)
 }

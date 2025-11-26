@@ -3,6 +3,7 @@ package command
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -20,7 +21,7 @@ These options can be configured through multiple sources with the following prio
 
  1. Command-line flags (highest priority)
  2. Environment variables (DEFANG_* prefix)
- 3. Configuration files (.defang, .defang.<stack>) (lowest priority)
+ 3. Configuration files (.defang/<stack>, .defang/.defang) (lowest priority)
 
 Configuration Flow:
 
@@ -104,9 +105,9 @@ var global GlobalConfig = GlobalConfig{
 /*
 getStackName determines the stack name to use
 The returned stack name is used to determine which stack-specific RC file
-(.defang.<stackName>) should be loaded during configuration initialization.
+(.defang/<stackName>) should be loaded during configuration initialization.
 If no stack name is provided it will return the default value from the GlobalConfig struct,
-which will result in loading only the general .defang file.
+which will result in loading only the general .defang/.defang file.
 */
 func (r *GlobalConfig) getStackName(flags *pflag.FlagSet) string {
 	if !flags.Changed("stack") {
@@ -244,8 +245,8 @@ loadDotDefang loads configuration values from .defang files into environment var
 
 Loading order:
 
- 1. If stackName is provided, loads .defang.<stackName> first (required - returns error if missing/invalid)
- 2. Then loads the general .defang file (optional - missing file is not an error)
+ 1. If stackName is provided, loads .defang/<stackName> first (required - returns error if missing/invalid)
+ 2. Then loads the general .defang/.defang file (optional - missing file is not an error)
 
 Important: RC files have the lowest priority in the configuration hierarchy.
 They will NOT override environment variables that are already set, since
@@ -255,16 +256,16 @@ are considered required when specified, while the general RC file is optional.
 func (r *GlobalConfig) loadDotDefang(stackName string) error {
 	if stackName != "" {
 		// If a stack name is provided, load the stack-specific RC file but return error if it fails or does not exist
-		rcfile := ".defang." + stackName
+		rcfile := filepath.Join(".defang", stackName)
 		if err := godotenv.Load(rcfile); err != nil {
 			return fmt.Errorf("could not load %s: %v", rcfile, err)
 		} else {
 			term.Debugf("loaded globals from %s", rcfile)
 		}
 	}
-	// If no stack name is provided, trying load the general .defang file
+	// If no stack name is provided, trying load the general .defang/.defang file
 	// An error here is non-fatal since the file is optional
-	const rcfile = ".defang"
+	rcfile := filepath.Join(".defang", ".defang")
 	if err := godotenv.Load(rcfile); err != nil {
 		term.Debugf("could not load %s, continuing without applying a rc file: %v", rcfile, err)
 	} else {

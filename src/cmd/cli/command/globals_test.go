@@ -29,7 +29,7 @@ func Test_readGlobals(t *testing.T) {
 		os.Unsetenv("VALUE")
 	})
 
-	t.Run(".defang.test beats .defang", func(t *testing.T) {
+	t.Run(".defang/test beats .defang/.defang", func(t *testing.T) {
 		err := testConfig.loadDotDefang("test")
 		if err != nil {
 			t.Fatalf("%v", err)
@@ -40,7 +40,7 @@ func Test_readGlobals(t *testing.T) {
 		os.Unsetenv("VALUE")
 	})
 
-	t.Run(".defang used if no stack", func(t *testing.T) {
+	t.Run(".defang/.defang used if no stack", func(t *testing.T) {
 		err := testConfig.loadDotDefang("")
 		if err != nil {
 			t.Fatalf("%v", err)
@@ -338,10 +338,12 @@ func Test_configurationPrecedence(t *testing.T) {
 			// Create RC files in the temporary directory
 			if tt.createRCFile {
 				var path string
+				defangDir := filepath.Join(tempDir, ".defang")
+				os.MkdirAll(defangDir, 0755)
 				if tt.rcStack.stackname != "" {
-					path = filepath.Join(tempDir, ".defang."+tt.rcStack.stackname)
+					path = filepath.Join(defangDir, tt.rcStack.stackname)
 				} else {
-					path = filepath.Join(tempDir, ".defang")
+					path = filepath.Join(defangDir, ".defang")
 				}
 
 				f, err := os.Create(path)
