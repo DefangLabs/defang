@@ -34,8 +34,8 @@ func Test_readGlobals(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		if v := os.Getenv("VALUE"); v != "from .defang.test" {
-			t.Errorf("expected VALUE to be 'from .defang.test', got '%s'", v)
+		if v := os.Getenv("VALUE"); v != "from .defang/test" {
+			t.Errorf("expected VALUE to be 'from .defang/test', got '%s'", v)
 		}
 		os.Unsetenv("VALUE")
 	})
@@ -45,8 +45,8 @@ func Test_readGlobals(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		if v := os.Getenv("VALUE"); v != "from .defang" {
-			t.Errorf("expected VALUE to be 'from .defang', got '%s'", v)
+		if v := os.Getenv("VALUE"); v != "from .defang/.defang" {
+			t.Errorf("expected VALUE to be 'from .defang/.defang', got '%s'", v)
 		}
 		os.Unsetenv("VALUE")
 	})
