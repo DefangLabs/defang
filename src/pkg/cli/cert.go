@@ -108,9 +108,13 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 			}
 		}
 	}
-	// Only show the "no domainname found" message if there truly are no domains in the compose file
-	if cnt == 0 && !hasDomains {
-		term.Infof("No `domainname` found in compose file; no HTTPS cert generation needed")
+	// Handle different scenarios based on domain presence and cert processing
+	if cnt == 0 {
+		if !hasDomains {
+			term.Infof("No `domainname` found in compose file; no HTTPS cert generation needed")
+		} else {
+			term.Infof("Deployment may not be finished yet; please wait and try again")
+		}
 	}
 
 	return nil
