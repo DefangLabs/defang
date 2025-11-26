@@ -336,7 +336,7 @@ func Test_configurationPrecedence(t *testing.T) {
 			tempDir := t.TempDir()
 
 			var rcEnvs []string
-			// Create ENV files in the temporary directory
+			// Create env files in the temporary directory
 			if tt.createRCFile {
 				path := filepath.Join(tempDir, ".defang")
 				if tt.rcStack.stackname != "" {
@@ -363,7 +363,7 @@ func Test_configurationPrecedence(t *testing.T) {
 				// Unseting env vars set for this test is handled by t.Setenv automatically
 				// t.tempDir() will clean up created files
 
-				// Unset all ENV env vars created by loadDotDefang since it uses os.Setenv
+				// Unset all env vars created by loadDotDefang since it uses os.Setenv
 				for _, rcEnv := range rcEnvs {
 					os.Unsetenv(rcEnv)
 				}
