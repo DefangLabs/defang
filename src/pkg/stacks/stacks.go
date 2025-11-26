@@ -3,6 +3,7 @@ package stacks
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -20,6 +21,8 @@ type StackParameters struct {
 }
 
 var validStackName = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
+
+const dotDefang = ".defang"
 
 func MakeDefaultName(providerId client.ProviderID, region string) string {
 	compressedRegion := strings.ReplaceAll(region, "-", "")
@@ -39,8 +42,11 @@ func Create(params StackParameters) (string, error) {
 		return "", err
 	}
 
+	if err := os.Mkdir(dotDefang, 0700); err != nil && !errors.Is(err, os.ErrExist) {
+		return "", err
+	}
 	filename := filename(params.Name)
-	file, err := os.CreateTemp(".", filename+".tmp.")
+	file, err := os.CreateTemp(dotDefang, params.Name+".tmp.")
 	if err != nil {
 		return "", err
 	}
@@ -70,33 +76,35 @@ type StackListItem struct {
 }
 
 func List() ([]StackListItem, error) {
-	files, err := os.ReadDir(".")
+	files, err := os.ReadDir(dotDefang)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
 	var stacks []StackListItem
 	for _, file := range files {
-		if strings.HasPrefix(file.Name(), ".defang.") {
-			content, err := os.ReadFile(file.Name())
-			if err != nil {
-				term.Warnf("Skipping unreadable stack file %s: %v\n", file.Name(), err)
-				continue
-			}
-			params, err := Parse(string(content))
-			if err != nil {
-				term.Warnf("Skipping invalid stack file %s: %v\n", file.Name(), err)
-				continue
-			}
-			params.Name = strings.TrimPrefix(file.Name(), ".defang.")
-
-			stacks = append(stacks, StackListItem{
-				Name:     params.Name,
-				Provider: params.Provider.String(),
-				Region:   params.Region,
-				Mode:     params.Mode.String(),
-			})
+		filename := filepath.Join(dotDefang, file.Name())
+		content, err := os.ReadFile(filename)
+		if err != nil {
+			term.Warnf("Skipping unreadable stack file %s: %v\n", filename, err)
+			continue
 		}
+		params, err := Parse(string(content))
+		if err != nil {
+			term.Warnf("Skipping invalid stack file %s: %v\n", filename, err)
+			continue
+		}
+		params.Name = file.Name()
+
+		stacks = append(stacks, StackListItem{
+			Name:     params.Name,
+			Provider: params.Provider.String(),
+			Region:   params.Region,
+			Mode:     params.Mode.String(),
+		})
 	}
 
 	return stacks, nil
@@ -111,7 +119,9 @@ func Parse(content string) (StackParameters, error) {
 	for key, value := range properties {
 		switch key {
 		case "DEFANG_PROVIDER":
-			params.Provider = client.ProviderID(value)
+			if err := params.Provider.Set(value); err != nil {
+				return params, err
+			}
 		case "AWS_REGION":
 			params.Region = value
 		case "GCP_LOCATION":
@@ -152,10 +162,10 @@ func Remove(name string) error {
 	if name == "" {
 		return errors.New("stack name cannot be empty")
 	}
-	// delete the stack rc file
+	// delete the stack file
 	return os.Remove(filename(name))
 }
 
 func filename(stackname string) string {
-	return ".defang." + stackname
+	return filepath.Join(dotDefang, stackname)
 }
