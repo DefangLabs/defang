@@ -90,7 +90,7 @@ func TestComposeUp(t *testing.T) {
 	gotContext := atomic.Bool{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPut {
-			t.Errorf("ComposeStart() failed: expected PUT request, got %s", r.Method)
+			t.Errorf("ComposeStart() failed: expected PUT request, got: %s", r.Method)
 		}
 		gotContext.Store(true)
 		w.WriteHeader(http.StatusOK) // return 200 OK same as S3

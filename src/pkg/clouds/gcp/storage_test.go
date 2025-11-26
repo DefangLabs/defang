@@ -45,7 +45,7 @@ func TestGetCloudStorageClientWithServiceAccount(t *testing.T) {
 	impersonateCredentialsTokenSource = func(ctx context.Context, ts impersonate.CredentialsConfig, opts ...option.ClientOption) (oauth2.TokenSource, error) {
 		expectedServiceAccount := "fake-service-account"
 		if ts.TargetPrincipal != expectedServiceAccount {
-			t.Errorf("expected TargetPrincipal to be %s but got %s", expectedServiceAccount, ts.TargetPrincipal)
+			t.Errorf("expected TargetPrincipal to be %s but got: %s", expectedServiceAccount, ts.TargetPrincipal)
 		}
 		return nil, nil
 	}

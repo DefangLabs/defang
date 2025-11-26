@@ -28,7 +28,7 @@ func TestAuthorize(t *testing.T) {
 	challenge := generateChallenge(result.verifier, S256Method)
 	expected := issuer + "/authorize?client_id=defang-cli&code_challenge=" + challenge + "&code_challenge_method=S256&redirect_uri=http%3A%2F%2Flocalhost%3A1234%2F&response_type=code&state=" + result.state
 	if result.url.String() != expected {
-		t.Fatalf("Expected URL %s, got %s", expected, result.url.String())
+		t.Fatalf("Expected URL %s, got: %s", expected, result.url.String())
 	}
 }
 
@@ -143,7 +143,7 @@ func TestRefresh(t *testing.T) {
 		switch r.URL.Path {
 		case "/token":
 			if r.Method != http.MethodPost {
-				t.Errorf("Expected POST method, got %s", r.Method)
+				t.Errorf("Expected POST method, got: %s", r.Method)
 			}
 			if expected, got := "refresh_token", r.PostFormValue("grant_type"); expected != got {
 				t.Errorf("Expected grant_type %s, got: %s", expected, got)

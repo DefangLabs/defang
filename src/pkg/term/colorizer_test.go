@@ -181,7 +181,7 @@ func TestWarn(t *testing.T) {
 			}
 			for j, expected := range test.expected {
 				if uniqueWarnings[j] != expected {
-					t.Errorf("Expected %s unique warnings, got %s", expected, uniqueWarnings[j])
+					t.Errorf("Expected %s unique warnings, got: %s", expected, uniqueWarnings[j])
 				}
 			}
 		})

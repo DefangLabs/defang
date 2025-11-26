@@ -41,7 +41,7 @@ func TestDetectConfig(t *testing.T) {
 			// check for the output values
 			for i, d := range ds {
 				if d != tt.expectedOutput[i] {
-					t.Errorf("Expected detector type %s, but got %s", tt.expectedOutput[i], d)
+					t.Errorf("Expected detector type %s, but got: %s", tt.expectedOutput[i], d)
 				}
 			}
 		})

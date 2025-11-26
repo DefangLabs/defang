@@ -160,7 +160,7 @@ func TestMakeServiceNameRegex(t *testing.T) {
 	}
 	for _, tt := range tdt {
 		if got := s.replaceServiceNameWithDNS(tt.value); got != tt.expected {
-			t.Errorf("makeServiceNameRegex(%q) expected %s, got %s", tt.value, tt.expected, got)
+			t.Errorf("makeServiceNameRegex(%q) expected %s, got: %s", tt.value, tt.expected, got)
 		}
 	}
 }

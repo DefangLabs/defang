@@ -335,7 +335,7 @@ func (b *ByocAws) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 	return &client.AccountInfo{
 		Region:    cfg.Region,
 		AccountID: *identity.Account,
-		Details:   *identity.UserId,
+		Details:   *identity.Arn, // contains the user role
 		Provider:  client.ProviderAWS,
 	}, nil
 }
