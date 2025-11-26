@@ -102,6 +102,11 @@ func Load(name string) (*StackListItem, error) {
 		return nil, errors.New("stack name cannot be empty")
 	}
 
+	err := godotenv.Load(filename(name))
+	if err != nil {
+		return nil, err
+	}
+
 	content, err := os.ReadFile(filename(name))
 	if err != nil {
 		return nil, err

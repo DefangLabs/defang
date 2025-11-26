@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
@@ -19,29 +20,78 @@ import (
 
 var stack *stacks.StackListItem
 
-func createNewStack(ctx context.Context, ec ElicitationsController) (*stacks.StackListItem, error) {
+func ElicitString(ctx context.Context, ec ElicitationsController, message, field string) (string, error) {
+	return elicitString(ctx, ec, message, field, "")
+}
+
+func ElicitStringWithDefault(ctx context.Context, ec ElicitationsController, message, field, defaultValue string) (string, error) {
+	return elicitString(ctx, ec, message, field, defaultValue)
+}
+
+func elicitString(ctx context.Context, ec ElicitationsController, message, field, defaultValue string) (string, error) {
 	response, err := ec.Request(ctx, ElicitationRequest{
-		Message: "Where do you want to deploy?",
+		Message: message,
 		Schema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"provider": map[string]any{
+				field: map[string]any{
 					"type":        "string",
-					"description": "Cloud Provider",
-					"enum":        []string{"aws", "gcp", "digitalocean"},
+					"description": field,
+					"default":     defaultValue,
 				},
 			},
-			"required": []string{"provider"},
+			"required": []string{field},
 		},
 	})
-
 	if err != nil {
-		return nil, fmt.Errorf("failed to elicit provider choice: %w", err)
+		return "", fmt.Errorf("failed to elicit %s: %w", field, err)
 	}
 
-	providerName, ok := response.Content["provider"].(string)
+	value, ok := response.Content[field].(string)
 	if !ok {
-		return nil, errors.New("invalid provider selection")
+		return "", fmt.Errorf("invalid %s value", field)
+	}
+
+	return value, nil
+}
+
+func ElicitEnum(ctx context.Context, ec ElicitationsController, message, field string, options []string) (string, error) {
+	response, err := ec.Request(ctx, ElicitationRequest{
+		Message: message,
+		Schema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				field: map[string]any{
+					"type":        "string",
+					"description": field,
+					"enum":        options,
+				},
+			},
+			"required": []string{field},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to elicit %s: %w", field, err)
+	}
+
+	value, ok := response.Content[field].(string)
+	if !ok {
+		return "", fmt.Errorf("invalid %s value", field)
+	}
+
+	return value, nil
+}
+
+func createNewStack(ctx context.Context, ec ElicitationsController) (*stacks.StackListItem, error) {
+	providerName, err := ElicitEnum(
+		ctx,
+		ec,
+		"Where do you want to deploy?",
+		"provider",
+		[]string{"aws", "gcp", "digitalocean"},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to elicit provider choice: %w", err)
 	}
 
 	var providerID cliClient.ProviderID
@@ -50,32 +100,16 @@ func createNewStack(ctx context.Context, ec ElicitationsController) (*stacks.Sta
 		return nil, err
 	}
 	defaultRegion := stacks.DefaultRegion(providerID)
-
-	// create new stack
-	response, err = ec.Request(ctx, ElicitationRequest{
-		Message: "Which region do you want to deploy to?",
-		Schema: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"region": map[string]any{
-					"type":        "string",
-					"description": "Cloud region",
-					"default":     defaultRegion,
-				},
-			},
-			"required": []string{"provider"},
-		},
-	})
+	region, err := ElicitStringWithDefault(ctx, ec, "Which region do you want to deploy to?", "region", defaultRegion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to elicit region choice: %w", err)
 	}
 
-	region, ok := response.Content["region"].(string)
-	if !ok {
-		return nil, errors.New("invalid region selection")
+	defaultName := fmt.Sprintf("%s-%s", strings.ToLower(providerID.String()), region)
+	name, err := ElicitStringWithDefault(ctx, ec, "Enter a name for your stack:", "stack_name", defaultName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to elicit stack name: %w", err)
 	}
-	// TODO: ask for this
-	name := fmt.Sprintf("%s-%s", strings.ToLower(providerID.String()), region)
 	params := stacks.StackParameters{
 		Provider: providerID,
 		Region:   region,
@@ -109,29 +143,11 @@ func selectStack(ctx context.Context, ec ElicitationsController) (string, error)
 	}
 	stackNames = append(stackNames, CreateNewStack)
 
-	// Prompt user to select or create stack
-	response, err := ec.Request(ctx, ElicitationRequest{
-		Message: "Select a stack",
-		Schema: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"stack": map[string]any{
-					"type":        "string",
-					"description": "Which stack to use",
-					"enum":        stackNames,
-				},
-			},
-			"required": []string{"stack"},
-		},
-	})
+	selectedStackName, err := ElicitEnum(ctx, ec, "Select a stack", "stack", stackNames)
 	if err != nil {
 		return "", fmt.Errorf("failed to elicit stack choice: %w", err)
 	}
 
-	selectedStackName, ok := response.Content["stack"].(string)
-	if !ok {
-		return "", errors.New("invalid stack selection")
-	}
 	return selectedStackName, nil
 }
 
@@ -152,6 +168,102 @@ func setupStack(ctx context.Context, ec ElicitationsController) (*stacks.StackLi
 	}
 
 	return stacks.Load(selectedStackName)
+}
+
+func SetupAWSAuthentication(ctx context.Context, ec ElicitationsController) error {
+	strategy, err := ElicitEnum(ctx, ec, "How do you authenticate to AWS?", "strategy", []string{"access_key", "profile"})
+	if err != nil {
+		return fmt.Errorf("failed to elicit AWS Access Key ID: %w", err)
+	}
+	if strategy == "profile" {
+		if os.Getenv("AWS_PROFILE") == "" {
+			profile, err := ElicitString(ctx, ec, "Enter your AWS Profile Name:", "profile_name")
+			if err != nil {
+				return fmt.Errorf("failed to elicit AWS Profile Name: %w", err)
+			}
+			if err := os.Setenv("AWS_PROFILE", profile); err != nil {
+				return fmt.Errorf("failed to set AWS_PROFILE environment variable: %w", err)
+			}
+		}
+	} else {
+		if os.Getenv("AWS_ACCESS_KEY_ID") == "" {
+			accessKeyID, err := ElicitString(ctx, ec, "Enter your AWS Access Key ID:", "access_key_id")
+			if err != nil {
+				return fmt.Errorf("failed to elicit AWS Access Key ID: %w", err)
+			}
+			if err := os.Setenv("AWS_ACCESS_KEY_ID", accessKeyID); err != nil {
+				return fmt.Errorf("failed to set AWS_ACCESS_KEY_ID environment variable: %w", err)
+			}
+		}
+		if os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
+			accessKeySecret, err := ElicitString(ctx, ec, "Enter your AWS Secret Access Key:", "access_key_secret")
+			if err != nil {
+				return fmt.Errorf("failed to elicit AWS Secret Access Key: %w", err)
+			}
+			if err := os.Setenv("AWS_SECRET_ACCESS_KEY", accessKeySecret); err != nil {
+				return fmt.Errorf("failed to set AWS_SECRET_ACCESS_KEY environment variable: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+func SetupGCPAuthentication(ctx context.Context, ec ElicitationsController) error {
+	if os.Getenv("GCP_PROJECT_ID") == "" {
+		gcpProjectID, err := ElicitString(ctx, ec, "Enter your GCP Project ID:", "gcp_project_id")
+		if err != nil {
+			return fmt.Errorf("failed to elicit GCP Project ID: %w", err)
+		}
+		if err := os.Setenv("GCP_PROJECT_ID", gcpProjectID); err != nil {
+			return fmt.Errorf("failed to set GCP_PROJECT_ID environment variable: %w", err)
+		}
+	}
+	return nil
+}
+
+func SetupDOAuthentication(ctx context.Context, ec ElicitationsController) error {
+	if os.Getenv("DIGITALOCEAN_TOKEN") == "" {
+		pat, err := ElicitString(ctx, ec, "Enter your DigitalOcean Personal Access Token:", "personal_access_token")
+		if err != nil {
+			return fmt.Errorf("failed to elicit DigitalOcean Personal Access Token: %w", err)
+		}
+		if err := os.Setenv("DIGITALOCEAN_TOKEN", pat); err != nil {
+			return fmt.Errorf("failed to set DIGITALOCEAN_TOKEN environment variable: %w", err)
+		}
+	}
+
+	if os.Getenv("SPACES_ACCESS_KEY_ID") == "" {
+		spaces_access_key, err := ElicitString(ctx, ec, "Enter your DigitalOcean Spaces Access Key:", "spaces_access_key")
+		if err != nil {
+			return fmt.Errorf("failed to elicit DigitalOcean Spaces Access Key: %w", err)
+		}
+		if err := os.Setenv("SPACES_ACCESS_KEY_ID", spaces_access_key); err != nil {
+			return fmt.Errorf("failed to set SPACES_ACCESS_KEY_ID environment variable: %w", err)
+		}
+	}
+
+	if os.Getenv("SPACES_SECRET_ACCESS_KEY") == "" {
+		spaces_secret_key, err := ElicitString(ctx, ec, "Enter your DigitalOcean Spaces Secret Access Key:", "spaces_secret_access_key")
+		if err != nil {
+			return fmt.Errorf("failed to elicit DigitalOcean Spaces Secret Key: %w", err)
+		}
+		if err := os.Setenv("SPACES_SECRET_ACCESS_KEY", spaces_secret_key); err != nil {
+			return fmt.Errorf("failed to set SPACES_SECRET_ACCESS_KEY environment variable: %w", err)
+		}
+	}
+	return nil
+}
+
+func setupProviderAuthentication(ctx context.Context, ec ElicitationsController, providerId cliClient.ProviderID) error {
+	switch providerId {
+	case cliClient.ProviderAWS:
+		return SetupAWSAuthentication(ctx, ec)
+	case cliClient.ProviderGCP:
+		return SetupGCPAuthentication(ctx, ec)
+	case cliClient.ProviderDO:
+		return SetupDOAuthentication(ctx, ec)
+	}
+	return nil
 }
 
 func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli CLIInterface, ec ElicitationsController) (string, error) {
@@ -175,6 +287,11 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, provi
 
 	providerId.Set(stack.Provider)
 
+	err = setupProviderAuthentication(ctx, ec, *providerId)
+	if err != nil {
+		return "", fmt.Errorf("failed to setup provider authentication: %w", err)
+	}
+
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
@@ -183,7 +300,7 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, provi
 		return "", fmt.Errorf("local deployment failed: %v. Please provide a valid compose file path.", err)
 	}
 
-	provider, err := cli.CheckProviderConfigured(ctx, client, *providerId, project.Name, "", len(project.Services))
+	provider, err := cli.CheckProviderConfigured(ctx, client, *providerId, project.Name, stack.Name, len(project.Services))
 	if err != nil {
 		return "", fmt.Errorf("provider not configured correctly: %w", err)
 	}
