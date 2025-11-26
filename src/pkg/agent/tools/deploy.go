@@ -164,7 +164,11 @@ func setupStack(ctx context.Context, ec ElicitationsController) (*stacks.StackLi
 	}
 
 	if selectedStackName == CreateNewStack {
-		return createNewStack(ctx, ec)
+		newStack, err := createNewStack(ctx, ec)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new stack: %w", err)
+		}
+		selectedStackName = newStack.Name
 	}
 
 	return stacks.Load(selectedStackName)
