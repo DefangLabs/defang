@@ -88,7 +88,7 @@ func createNewStack(ctx context.Context, ec ElicitationsController) (*stacks.Sta
 		ec,
 		"Where do you want to deploy?",
 		"provider",
-		[]string{"aws", "gcp", "digitalocean"},
+		[]string{"aws", "gcp", "digitalocean", "playground"},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to elicit provider choice: %w", err)
