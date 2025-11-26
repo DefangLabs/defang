@@ -261,6 +261,9 @@ func (a *AwsEcsCfn) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) er
 		}
 	}
 
+	if a.AccountID == "" && a.LogGroupARN != "" {
+		a.AccountID = common.GetAccountID(a.LogGroupARN)
+	}
 	return nil
 }
 

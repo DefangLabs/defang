@@ -57,18 +57,13 @@ func (a *AwsEcs) GetVpcID() string {
 	return a.VpcID
 }
 
-func (a *AwsEcs) getAccountID() string {
-	// TaskDefARN was set by a call to FillOutputs
-	return aws.GetAccountID(a.TaskDefARN)
-}
-
 func (a *AwsEcs) MakeARN(service, resource string) string {
 	return strings.Join([]string{
 		"arn",
 		"aws",
 		service,
 		string(a.Region),
-		a.getAccountID(),
+		a.AccountID,
 		resource,
 	}, ":")
 }

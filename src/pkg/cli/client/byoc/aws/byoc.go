@@ -335,7 +335,7 @@ func (b *ByocAws) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 	return &client.AccountInfo{
 		Region:    cfg.Region,
 		AccountID: *identity.Account,
-		Details:   *identity.Arn,
+		Details:   *identity.UserId,
 		Provider:  client.ProviderAWS,
 	}, nil
 }
@@ -369,7 +369,7 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_JSON":                os.Getenv("DEFANG_JSON"),
 		"DEFANG_ORG":                 b.TenantName,
-		"DEFANG_PREFIX":              byoc.DefangPrefix,
+		"DEFANG_PREFIX":              b.Prefix,
 		"DEFANG_STATE_URL":           defangStateUrl,
 		"NODE_NO_WARNINGS":           "1",
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
@@ -592,7 +592,7 @@ func (b *ByocAws) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest)
 		end = req.Until.AsTime()
 	}
 
-	// get stack information (for log group ARN)
+	// get stack information (for CD log group ARN)
 	err := b.driver.FillOutputs(ctx)
 	if err != nil {
 		return AnnotateAwsError(err)
@@ -603,7 +603,7 @@ func (b *ByocAws) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest)
 		return err
 	}
 
-	// Gather logs from the CD task, kaniko, ECS events, and all services
+	// Gather logs from the CD task, builds, ECS events, and all services
 	evtsChan, errsChan := ecs.QueryLogGroups(ctx, cw, start, end, 0, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
 	if evtsChan == nil {
 		return <-errsChan // TODO: there could be multiple errors
@@ -655,7 +655,7 @@ loop:
 func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	// FillOutputs is needed to get the CD task ARN or the LogGroup ARNs
 	if err := b.driver.FillOutputs(ctx); err != nil {
-		return nil, AnnotateAwsError(err)
+		term.Debugf("Failed to retrieve stack outputs: %v", err)
 	}
 
 	var err error
@@ -759,18 +759,22 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 	}
 
 	var groups []ecs.LogGroupInput
-	// Tail CD and kaniko
+	// Tail CD and builds
 	if logType.Has(logs.LogTypeBuild) {
-		cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern} // TODO: filter by etag
-		// If we know the CD task ARN, only tail the logstream for that CD task
-		if b.cdTaskArn != nil && b.cdEtag == etag {
-			cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.cdTaskArn))}
+		if b.driver.LogGroupARN == "" {
+			term.Debug("CD stack LogGroupARN is not set; skipping CD logs")
+		} else {
+			cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern} // TODO: filter by etag
+			// If we know the CD task ARN, only tail the logstream for that CD task
+			if b.cdTaskArn != nil && b.cdEtag == etag {
+				cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.cdTaskArn))}
+			}
+			groups = append(groups, cdTail)
+			term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames, filter)
 		}
-		groups = append(groups, cdTail)
-		term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames, filter)
-		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "builds")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service
-		term.Debug("Query kaniko logs", kanikoTail.LogGroupARN, filter)
-		groups = append(groups, kanikoTail)
+		buildsTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "builds")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service
+		term.Debug("Query builds logs", buildsTail.LogGroupARN, filter)
+		groups = append(groups, buildsTail)
 		ecsTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "ecs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
 		term.Debug("Query ecs events logs", ecsTail.LogGroupARN, filter)
 		groups = append(groups, ecsTail)

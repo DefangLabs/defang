@@ -18,10 +18,9 @@ const (
 )
 
 var (
-	DefangPrefix           = pkg.Getenv("DEFANG_PREFIX", "Defang") // prefix for all resources created by Defang
-	DefangPulumiBackend    = os.Getenv("DEFANG_PULUMI_BACKEND")
+	DefangPulumiBackend    = os.Getenv("DEFANG_PULUMI_BACKEND") // FIXME: allow override in .defang file
 	ErrLocalPulumiStopped  = errors.New("local pulumi command succeeded; stopping")
-	PulumiConfigPassphrase = pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf")
+	PulumiConfigPassphrase = pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf") // FIXME: allow override in .defang file
 )
 
 func getPulumiAccessToken() (string, error) {
