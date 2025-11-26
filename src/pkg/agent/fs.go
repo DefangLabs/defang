@@ -2,8 +2,10 @@ package agent
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/firebase/genkit/go/ai"
 )
@@ -21,17 +23,32 @@ type ListFilesParams struct {
 	Path string `json:"path"`
 }
 
+func isSafePath(path string) bool {
+	cleaned := filepath.Clean(path)
+
+	// Reject absolute paths
+	if filepath.IsAbs(cleaned) {
+		return false
+	}
+
+	// Reject paths that traverse outside the current directory
+	if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return false
+	}
+
+	return true
+}
+
 func CollectFsTools() []ai.Tool {
 	return []ai.Tool{
 		ai.NewTool[ReadFileParams, string](
 			"read_file",
 			"Read the contents of a file from the local filesystem",
 			func(ctx *ai.ToolContext, params ReadFileParams) (string, error) {
-				absPath, err := filepath.Abs(params.Path)
-				if err != nil {
-					return "", err
+				if !isSafePath(params.Path) {
+					return "", errors.New("Accessing files outside the current working directory is not permitted")
 				}
-				bytes, err := os.ReadFile(absPath)
+				bytes, err := os.ReadFile(params.Path)
 				if err != nil {
 					return "", err
 				}
@@ -42,6 +59,9 @@ func CollectFsTools() []ai.Tool {
 			"find_files",
 			"Find files in a directory on the local filesystem matching a given pattern",
 			func(ctx *ai.ToolContext, params FindFilesParams) (string, error) {
+				if !isSafePath(params.Path) {
+					return "", errors.New("Accessing files outside the current working directory is not permitted")
+				}
 				var matches []string
 				err := filepath.Walk(params.Path, func(path string, info os.FileInfo, err error) error {
 					if err != nil {
@@ -70,6 +90,9 @@ func CollectFsTools() []ai.Tool {
 			"list_files",
 			"List files in a directory on the local filesystem",
 			func(ctx *ai.ToolContext, params ListFilesParams) (string, error) {
+				if !isSafePath(params.Path) {
+					return "", errors.New("Accessing files outside the current working directory is not permitted")
+				}
 				entries, err := os.ReadDir(params.Path)
 				if err != nil {
 					return "", err
