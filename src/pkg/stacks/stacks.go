@@ -91,7 +91,7 @@ func List() ([]StackListItem, error) {
 		if file.IsDir() || strings.HasPrefix(file.Name(), ".") {
 			continue
 		}
-		
+
 		filename := filepath.Join(".defang", file.Name())
 		content, err := os.ReadFile(filename)
 		if err != nil {
