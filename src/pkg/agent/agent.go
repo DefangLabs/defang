@@ -223,7 +223,7 @@ func prepareSystemPrompt(prompt string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error getting current working directory: %w", err)
 	}
-	currentDate := time.Now().Format("2006-01-02T15:04:05 -0800 PST")
+	currentDate := time.Now().Format(time.RFC3339)
 	return fmt.Sprintf(
 		"%s\n\nThe current working directory is %q\nThe current date is %s",
 		prompt,
