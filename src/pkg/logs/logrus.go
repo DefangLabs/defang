@@ -11,7 +11,8 @@ import (
 
 func IsLogrusError(message string) bool {
 	// Logrus's TextFormatter prefixes messages with the uppercase log level, optionally truncated and/or in color
-	switch message[:pkg.Min(len(message), 4)] {
+	prefixLen := pkg.Min(len(message), 4)
+	switch message[:prefixLen] {
 	case "ERRO", "FATA", "PANI", "\x1b[31": // red
 		return true // always show
 	case "WARN", "\x1b[33": // yellow
@@ -26,14 +27,19 @@ func IsLogrusError(message string) bool {
 }
 
 type TermLogFormatter struct {
-	Term *term.Term
+	Prefix string
+	Term   *term.Term
 }
 
 func (f TermLogFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	var buf strings.Builder
+	buf.WriteString(f.Prefix)
 	buf.WriteString(entry.Message)
 	for k, v := range entry.Data {
-		fmt.Fprintf(&buf, " %s=%v", k, v)
+		buf.WriteByte(' ')
+		buf.WriteString(k)
+		buf.WriteByte('=')
+		buf.WriteString(fmt.Sprint(v)) // consider quoting if needed
 	}
 
 	switch entry.Level {
@@ -54,6 +60,6 @@ func (f TermLogFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 
 type DiscardFormatter struct{}
 
-func (f DiscardFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+func (DiscardFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	return nil, nil
 }

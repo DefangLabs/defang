@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/joho/godotenv"
@@ -14,19 +14,24 @@ import (
 
 type StackParameters struct {
 	Name     string
-	Provider cliClient.ProviderID
+	Provider client.ProviderID
 	Region   string
 	Mode     modes.Mode
 }
 
-var validStackName = regexp.MustCompile(`^[a-z][-a-z0-9]+$`)
+var validStackName = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
+
+func MakeDefaultName(providerId client.ProviderID, region string) string {
+	compressedRegion := strings.ReplaceAll(region, "-", "")
+	return strings.ToLower(providerId.String() + compressedRegion)
+}
 
 func Create(params StackParameters) (string, error) {
 	if params.Name == "" {
 		return "", errors.New("stack name cannot be empty")
 	}
 	if !validStackName.MatchString(params.Name) {
-		return "", errors.New("stack name must start with a letter and contain only lowercase letters, numbers, and hyphens")
+		return "", errors.New("stack name must start with a letter and contain only lowercase letters and numbers")
 	}
 
 	content, err := Marshal(params)
@@ -72,7 +77,7 @@ func List() ([]StackListItem, error) {
 
 	var stacks []StackListItem
 	for _, file := range files {
-		if strings.HasPrefix(file.Name(), ".defangrc.") {
+		if strings.HasPrefix(file.Name(), ".defang.") {
 			content, err := os.ReadFile(file.Name())
 			if err != nil {
 				term.Warnf("Skipping unreadable stack file %s: %v\n", file.Name(), err)
@@ -83,7 +88,7 @@ func List() ([]StackListItem, error) {
 				term.Warnf("Skipping invalid stack file %s: %v\n", file.Name(), err)
 				continue
 			}
-			params.Name = strings.TrimPrefix(file.Name(), ".defangrc.")
+			params.Name = strings.TrimPrefix(file.Name(), ".defang.")
 
 			stacks = append(stacks, StackListItem{
 				Name:     params.Name,
@@ -106,7 +111,7 @@ func Parse(content string) (StackParameters, error) {
 	for key, value := range properties {
 		switch key {
 		case "DEFANG_PROVIDER":
-			params.Provider = cliClient.ProviderID(value)
+			params.Provider = client.ProviderID(value)
 		case "AWS_REGION":
 			params.Region = value
 		case "GCP_LOCATION":
@@ -128,9 +133,9 @@ func Marshal(params StackParameters) (string, error) {
 	if params.Region != "" {
 		var regionVarName string
 		switch params.Provider {
-		case cliClient.ProviderAWS:
+		case client.ProviderAWS:
 			regionVarName = "AWS_REGION"
-		case cliClient.ProviderGCP:
+		case client.ProviderGCP:
 			regionVarName = "GCP_LOCATION"
 		}
 		if regionVarName != "" {
@@ -152,5 +157,5 @@ func Remove(name string) error {
 }
 
 func filename(stackname string) string {
-	return ".defangrc." + stackname
+	return ".defang." + stackname
 }

@@ -6,12 +6,11 @@ import (
 	"io"
 	"os"
 
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/docker/docker/api/types/image"
-
-	pkgtypes "github.com/DefangLabs/defang/src/pkg/types"
 )
 
-func (d *Docker) SetUp(ctx context.Context, containers []pkgtypes.Container) error {
+func (d *Docker) SetUp(ctx context.Context, containers []clouds.Container) error {
 	if len(containers) != 1 {
 		return errors.New("only one container is supported with docker driver")
 	}

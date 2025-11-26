@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 )
 
 func TestLocal(t *testing.T) {
@@ -16,7 +16,7 @@ func TestLocal(t *testing.T) {
 	ctx := t.Context()
 
 	t.Run("SetUp", func(t *testing.T) {
-		if err := l.SetUp(ctx, []types.Container{{EntryPoint: []string{"/bin/sh"}}}); err != nil {
+		if err := l.SetUp(ctx, []clouds.Container{{EntryPoint: []string{"/bin/sh"}}}); err != nil {
 			t.Fatal(err)
 		}
 	})

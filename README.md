@@ -86,6 +86,7 @@ Install the Defang CLI from one of the following sources:
   ```
   docker run -it defangio/defang-cli help
   ```
+
 - Using [NPX](https://docs.npmjs.com/cli/v9/commands/npx):
 
   ```
@@ -166,7 +167,7 @@ The Defang CLI recognizes the following environment variables:
 - `TZ` - The timezone to use for log timestamps: an IANA TZ name like `UTC` or `Europe/Amsterdam`; defaults to `Local`
 - `XDG_STATE_HOME` - The directory to use for storing state; defaults to `~/.local/state`
 
-Environment variables will be loaded from a `.defangrc` file in the current directory, if it exists. This file follows
+Environment variables will be loaded from a `.defang` file in the current directory, if it exists. This file follows
 the same format as a `.env` file: `KEY=VALUE` pairs on each line, lines starting with `#` are treated as comments and ignored.
 
 ## Development

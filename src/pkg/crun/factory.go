@@ -1,19 +1,19 @@
-package cmd
+package crun
 
 import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
-	"github.com/DefangLabs/defang/src/pkg/docker"
-	"github.com/DefangLabs/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/crun/docker"
 )
 
-type DriverOption func(types.Driver) error
+type DriverOption func(clouds.Driver) error
 
-func createDriver(reg Region, opts ...DriverOption) (types.Driver, error) {
-	var driver types.Driver
+func createDriver(reg Region, opts ...DriverOption) (clouds.Driver, error) {
+	var driver clouds.Driver
 	switch reg {
 	case "docker", "local", "":
 		driver = docker.New()
@@ -65,7 +65,7 @@ func createDriver(reg Region, opts ...DriverOption) (types.Driver, error) {
 
 func stackName(stack string) string {
 	if stack == "" {
-		return types.ProjectName
+		return clouds.ProjectName
 	}
-	return types.ProjectName + "-" + stack
+	return clouds.ProjectName + "-" + stack
 }

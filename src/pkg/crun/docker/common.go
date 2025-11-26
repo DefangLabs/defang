@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 
-	"github.com/DefangLabs/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/docker/docker/client"
 )
 
-type ContainerID = types.TaskID
+type ContainerID = clouds.TaskID
 
 type Docker struct {
 	*client.Client
@@ -29,7 +29,7 @@ func New() *Docker {
 	}
 }
 
-var _ types.Driver = (*Docker)(nil)
+var _ clouds.Driver = (*Docker)(nil)
 
 func (Docker) PutSecret(ctx context.Context, name, value string) error {
 	return errors.New("docker does not support secrets")

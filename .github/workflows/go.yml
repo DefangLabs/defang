@@ -6,6 +6,12 @@ on:
       - "v*" # push events to tagged commits
     branches:
       - "**"
+    paths:
+      - ".github/workflows/go.yml"
+      - "Makefile"
+      - "pkgs/**"
+      - "src/**"
+
 permissions:
   contents: read
   id-token: write # for GitHub id-token auth
@@ -320,6 +326,7 @@ jobs:
 
   push-docker:
     runs-on: ubuntu-latest
+    environment: release
     needs:
       - go-release
     steps:
@@ -343,6 +350,7 @@ jobs:
   post-release:
     runs-on: ubuntu-latest
     needs: go-release
+    environment: release
     steps:
       - name: Trigger CLI Autodoc
         uses: peter-evans/repository-dispatch@v3

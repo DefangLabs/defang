@@ -9,6 +9,30 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestMakeDefaultName(t *testing.T) {
+	tests := []struct {
+		provider cliClient.ProviderID
+		region   string
+		expected string
+	}{
+		{cliClient.ProviderAWS, "us-west-2", "awsuswest2"},
+		{cliClient.ProviderGCP, "us-central1", "gcpuscentral1"},
+		{cliClient.ProviderDO, "NYC3", "digitaloceannyc3"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.provider.String()+"_"+tt.region, func(t *testing.T) {
+			result := MakeDefaultName(tt.provider, tt.region)
+			if result != tt.expected {
+				t.Errorf("MakeDefaultName() = %q, want %q", result, tt.expected)
+			}
+			if !validStackName.MatchString(result) {
+				t.Errorf("MakeDefaultName() produced invalid stack name: %q", result)
+			}
+		})
+	}
+}
+
 func TestCreate(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -25,7 +49,7 @@ func TestCreate(t *testing.T) {
 				Mode:     modes.ModeAffordable,
 			},
 			expectErr:        false,
-			expectedFilename: ".defangrc.teststack",
+			expectedFilename: ".defang.teststack",
 		},
 		{
 			name: "missing stack name",
@@ -47,6 +71,21 @@ func TestCreate(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		{
+			name: "single letter ok",
+			parameters: StackParameters{
+				Name: "a",
+			},
+			expectErr:        false,
+			expectedFilename: ".defang.a",
+		},
+		{
+			name: "hyphen not ok",
+			parameters: StackParameters{
+				Name: "invalid-name",
+			},
+			expectErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -59,7 +98,7 @@ func TestCreate(t *testing.T) {
 
 			// Cleanup created file if no error expected
 			if !tt.expectErr {
-				os.Remove(".defangrc." + tt.parameters.Name)
+				os.Remove(".defang." + tt.parameters.Name)
 			}
 
 			if filename != tt.expectedFilename {
@@ -84,8 +123,8 @@ func TestList(t *testing.T) {
 	t.Run("stacks present", func(t *testing.T) {
 		t.Chdir(t.TempDir())
 		// Create dummy stack files
-		os.Create(".defangrc.stack1")
-		os.Create(".defangrc.stack2")
+		os.Create(".defang.stack1")
+		os.Create(".defang.stack2")
 
 		stacks, err := List()
 		if err != nil {
@@ -101,7 +140,7 @@ func TestRemove(t *testing.T) {
 	t.Run("remove existing stack", func(t *testing.T) {
 		t.Chdir(t.TempDir())
 		// Create dummy stack file
-		stackFile := ".defangrc.stack_to_remove"
+		stackFile := ".defang.stack_to_remove"
 		os.Create(stackFile)
 
 		err := Remove("stack_to_remove")
@@ -118,7 +157,7 @@ func TestRemove(t *testing.T) {
 		err := Remove("non_existing_stack")
 		// expect an error when trying to remove a non-existing stack
 		assert.Error(t, err)
-		assert.ErrorContains(t, err, "remove .defangrc.non_existing_stack: no such file or directory")
+		assert.ErrorContains(t, err, "remove .defang.non_existing_stack: no such file or directory")
 	})
 }
 

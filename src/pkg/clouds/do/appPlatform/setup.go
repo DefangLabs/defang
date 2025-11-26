@@ -304,9 +304,9 @@ func (d DoApp) CreateS3Client() (*s3.Client, error) {
 	return s3Client, nil
 }
 
-// var _ types.Driver = (*DoAppPlatform)(nil)
+// var _ clouds.Driver = (*DoAppPlatform)(nil)
 
-// func (DoApp) GetInfo(context.Context, types.TaskID) (*types.TaskInfo, error) {
+// func (DoApp) GetInfo(context.Context, clouds.TaskID) (*clouds.TaskInfo, error) {
 // 	panic("implement me")
 // }
 
