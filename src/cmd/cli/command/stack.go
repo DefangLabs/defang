@@ -83,7 +83,7 @@ func makeStackNewCmd() *cobra.Command {
 			}
 
 			if params.Region == "" {
-				defaultRegion := stacks.DefaultRegion(providerID)
+				defaultRegion := cliClient.GetRegion(providerID)
 
 				var region string
 

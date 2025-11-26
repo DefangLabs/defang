@@ -99,8 +99,7 @@ func createNewStack(ctx context.Context, ec ElicitationsController) (*stacks.Sta
 	if err != nil {
 		return nil, err
 	}
-	// TODO: use cliClient.GetRegion(providerID)
-	defaultRegion := stacks.DefaultRegion(providerID)
+	defaultRegion := cliClient.GetRegion(providerID)
 	region, err := ElicitStringWithDefault(ctx, ec, "Which region do you want to deploy to?", "region", defaultRegion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to elicit region choice: %w", err)
