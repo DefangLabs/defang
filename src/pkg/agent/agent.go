@@ -23,6 +23,7 @@ import (
 	"github.com/openai/openai-go/option"
 )
 
+// TODO: consider hiding this behind the fabric chat completions endpoint
 const DefaultSystemPrompt = `You are an interactive CLI tool called Defang.
 Your purpose is to assist me with deploying, managing, and troubleshooting
 issues with my cloud application. Use the instructions below and the tools
@@ -87,10 +88,11 @@ type Agent struct {
 	system    string
 }
 
-func New(ctx context.Context, addr string, providerId *client.ProviderID, system string) (*Agent, error) {
-	accessToken := cluster.GetExistingToken(addr)
+func New(ctx context.Context, clusterAddr string, providerId *client.ProviderID, system string) (*Agent, error) {
+	accessToken := cluster.GetExistingToken(clusterAddr)
 	provider := "fabric"
 	var providerPlugin api.Plugin
+	_, addr := cluster.SplitTenantHost(clusterAddr)
 	providerPlugin = &fabric.OpenAI{
 		APIKey: accessToken,
 		Opts: []option.RequestOption{
@@ -115,7 +117,7 @@ func New(ctx context.Context, addr string, providerId *client.ProviderID, system
 	printer := printer{outStream: os.Stdout}
 	toolManager := NewToolManager(gk, printer)
 	ec := tools.NewCLIAgentElicitationsController(os.Stdin, os.Stdout, os.Stderr)
-	defangTools := tools.CollectDefangTools(addr, ec, providerId)
+	defangTools := tools.CollectDefangTools(clusterAddr, ec, providerId)
 	toolManager.RegisterTools(defangTools...)
 	fsTools := CollectFsTools()
 	toolManager.RegisterTools(fsTools...)
