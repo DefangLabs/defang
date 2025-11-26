@@ -97,6 +97,30 @@ func List() ([]StackListItem, error) {
 	return stacks, nil
 }
 
+func Load(name string) (*StackListItem, error) {
+	if name == "" {
+		return nil, errors.New("stack name cannot be empty")
+	}
+
+	content, err := os.ReadFile(filename(name))
+	if err != nil {
+		return nil, err
+	}
+
+	params, err := Parse(string(content))
+	if err != nil {
+		return nil, err
+	}
+	params.Name = name
+
+	return &StackListItem{
+		Name:     params.Name,
+		Provider: params.Provider.String(),
+		Region:   params.Region,
+		Mode:     params.Mode.String(),
+	}, nil
+}
+
 func Parse(content string) (StackParameters, error) {
 	properties, err := godotenv.Parse(strings.NewReader(content))
 	if err != nil {

@@ -25,13 +25,13 @@ func CollectDefangTools(cluster string, ec ElicitationsController, providerId *c
 	// loginHandler := MakeLoginToolHandler(cluster, authPort, &LoginCLIAdapter{DefaultToolCLI: &DefaultToolCLI{}})
 
 	return []ai.Tool{
-		ai.NewTool[LoginParams, string](
-			"login",
-			"Login into Defang",
-			func(ctx *ai.ToolContext, _ LoginParams) (string, error) {
-				return HandleLoginTool(ctx.Context, cluster, &DefaultToolCLI{})
-			},
-		),
+		// ai.NewTool[LoginParams, string](
+		// 	"login",
+		// 	"Login into Defang",
+		// 	func(ctx *ai.ToolContext, _ LoginParams) (string, error) {
+		// 		return HandleLoginTool(ctx.Context, cluster, &DefaultToolCLI{})
+		// 	},
+		// ),
 		ai.NewTool[ServicesParams, string](
 			"services",
 			"List deployed services for the project in the current working directory",

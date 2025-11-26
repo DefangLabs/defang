@@ -2,7 +2,7 @@ package tools
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	agentTools "github.com/DefangLabs/defang/src/pkg/agent/tools"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -33,9 +33,9 @@ func (c *mcpElicitationsController) Request(ctx context.Context, req agentTools.
 	}
 
 	// cast result.Content to map[string]string
-	contentMap, ok := result.Content.(map[string]string)
+	contentMap, ok := result.Content.(map[string]any)
 	if !ok {
-		return agentTools.ElicitationResponse{}, errors.New("invalid elicitation response content")
+		return agentTools.ElicitationResponse{}, fmt.Errorf("invalid eliciation response content type, got %T", result.Content)
 	}
 
 	return agentTools.ElicitationResponse{

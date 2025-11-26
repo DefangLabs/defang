@@ -21,7 +21,7 @@ type ElicitationRequest struct {
 
 type ElicitationResponse struct {
 	Action  string
-	Content map[string]string
+	Content map[string]any
 }
 
 type cliAgentElicitationsController struct {
@@ -105,7 +105,7 @@ func (c *cliAgentElicitationsController) Request(_ context.Context, req Elicitat
 		}, err
 	}
 
-	content := make(map[string]string, 0)
+	content := make(map[string]any, 0)
 	for k, v := range response {
 		answer, ok := v.(survey.OptionAnswer)
 		if ok {

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
+	"github.com/DefangLabs/defang/src/pkg/auth"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
@@ -16,9 +17,9 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-var stack *string
+var stack *stacks.StackListItem
 
-func createNewStack(ctx context.Context, ec ElicitationsController) (*string, error) {
+func createNewStack(ctx context.Context, ec ElicitationsController) (*stacks.StackListItem, error) {
 	response, err := ec.Request(ctx, ElicitationRequest{
 		Message: "Where do you want to deploy?",
 		Schema: map[string]any{
@@ -38,7 +39,7 @@ func createNewStack(ctx context.Context, ec ElicitationsController) (*string, er
 		return nil, fmt.Errorf("failed to elicit provider choice: %w", err)
 	}
 
-	providerName, ok := response.Content["provider"]
+	providerName, ok := response.Content["provider"].(string)
 	if !ok {
 		return nil, errors.New("invalid provider selection")
 	}
@@ -69,7 +70,7 @@ func createNewStack(ctx context.Context, ec ElicitationsController) (*string, er
 		return nil, fmt.Errorf("failed to elicit region choice: %w", err)
 	}
 
-	region, ok := response.Content["region"]
+	region, ok := response.Content["region"].(string)
 	if !ok {
 		return nil, errors.New("invalid region selection")
 	}
@@ -85,24 +86,28 @@ func createNewStack(ctx context.Context, ec ElicitationsController) (*string, er
 		return nil, fmt.Errorf("failed to create stack: %w", err)
 	}
 
-	return &name, nil
+	return &stacks.StackListItem{
+		Name:     name,
+		Provider: providerID.Name(),
+		Region:   region,
+	}, nil
 }
 
-func selectStack(ctx context.Context, ec ElicitationsController) (*string, error) {
+func selectStack(ctx context.Context, ec ElicitationsController) (string, error) {
 	stackList, err := stacks.List()
 	if err != nil {
-		return nil, fmt.Errorf("failed to list stacks: %w", err)
+		return "", fmt.Errorf("failed to list stacks: %w", err)
 	}
 
 	if len(stackList) == 0 {
-		return createNewStack(ctx, ec)
+		return CreateNewStack, nil
 	}
 
 	stackNames := make([]string, 0, len(stackList)+1)
 	for _, s := range stackList {
 		stackNames = append(stackNames, s.Name)
 	}
-	stackNames = append(stackNames, "Create new stack")
+	stackNames = append(stackNames, CreateNewStack)
 
 	// Prompt user to select or create stack
 	response, err := ec.Request(ctx, ElicitationRequest{
@@ -120,37 +125,55 @@ func selectStack(ctx context.Context, ec ElicitationsController) (*string, error
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to elicit stack choice: %w", err)
+		return "", fmt.Errorf("failed to elicit stack choice: %w", err)
 	}
 
-	selectedStack, ok := response.Content["stack"]
+	selectedStackName, ok := response.Content["stack"].(string)
 	if !ok {
-		return nil, errors.New("invalid stack selection")
+		return "", errors.New("invalid stack selection")
 	}
-	return &selectedStack, nil
+	return selectedStackName, nil
 }
 
-func setupStack(ctx context.Context, ec ElicitationsController) (*string, error) {
+const CreateNewStack = "Create new stack"
+
+func setupStack(ctx context.Context, ec ElicitationsController) (*stacks.StackListItem, error) {
 	if stack != nil {
 		return stack, nil
 	}
 
-	selectedStack, err := selectStack(ctx, ec)
+	selectedStackName, err := selectStack(ctx, ec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select stack: %w", err)
 	}
-	if *selectedStack != "Create new stack" {
-		return selectedStack, nil
+
+	if selectedStackName == CreateNewStack {
+		return createNewStack(ctx, ec)
 	}
 
-	return createNewStack(ctx, ec)
+	return stacks.Load(selectedStackName)
 }
 
 func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli CLIInterface, ec ElicitationsController) (string, error) {
-	_, err := setupStack(ctx, ec)
+	client, err := cli.Connect(ctx, cluster)
+	if err != nil {
+		term.Debug("Function invoked: cli.InteractiveLoginPrompt")
+		err = cli.InteractiveLoginMCP(ctx, client, cluster, common.MCPDevelopmentClient)
+		if err != nil {
+			var noBrowserErr auth.ErrNoBrowser
+			if errors.As(err, &noBrowserErr) {
+				return noBrowserErr.Error(), nil
+			}
+			return "", err
+		}
+	}
+
+	stack, err = setupStack(ctx, ec)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup stack: %w", err)
 	}
+
+	providerId.Set(stack.Provider)
 
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
@@ -159,14 +182,6 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, provi
 
 		return "", fmt.Errorf("local deployment failed: %v. Please provide a valid compose file path.", err)
 	}
-
-	term.Debug("Function invoked: cli.Connect")
-	client, err := cli.Connect(ctx, cluster)
-	if err != nil {
-		return "", fmt.Errorf("could not connect: %w", err)
-	}
-
-	term.Debug("Function invoked: cli.NewProvider")
 
 	provider, err := cli.CheckProviderConfigured(ctx, client, *providerId, project.Name, "", len(project.Services))
 	if err != nil {

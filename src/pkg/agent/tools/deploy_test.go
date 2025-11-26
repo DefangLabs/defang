@@ -11,6 +11,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -192,6 +193,7 @@ func TestHandleDeployTool(t *testing.T) {
 			// Call the function
 			loader := &client.MockLoader{}
 			ec := &mockElicitationsController{}
+			stack = &stacks.StackListItem{Name: "test-stack", Provider: tt.providerID.String()}
 			result, err := HandleDeployTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI, ec)
 
 			// Verify error expectations
