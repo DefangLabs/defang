@@ -99,12 +99,14 @@ func createNewStack(ctx context.Context, ec ElicitationsController) (*stacks.Sta
 	if err != nil {
 		return nil, err
 	}
+	// TODO: use cliClient.GetRegion(providerID)
 	defaultRegion := stacks.DefaultRegion(providerID)
 	region, err := ElicitStringWithDefault(ctx, ec, "Which region do you want to deploy to?", "region", defaultRegion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to elicit region choice: %w", err)
 	}
 
+	// TODO: use the helper function (stacks.MakeDefaultName or something)
 	defaultName := fmt.Sprintf("%s-%s", strings.ToLower(providerID.String()), region)
 	name, err := ElicitStringWithDefault(ctx, ec, "Enter a name for your stack:", "stack_name", defaultName)
 	if err != nil {
@@ -175,6 +177,8 @@ func setupStack(ctx context.Context, ec ElicitationsController) (*stacks.StackLi
 }
 
 func SetupAWSAuthentication(ctx context.Context, ec ElicitationsController) error {
+	// TODO: check the fs for AWS credentials file or config for profile names
+	// TODO: add support for aws sso strategy
 	strategy, err := ElicitEnum(ctx, ec, "How do you authenticate to AWS?", "strategy", []string{"access_key", "profile"})
 	if err != nil {
 		return fmt.Errorf("failed to elicit AWS Access Key ID: %w", err)

@@ -17,6 +17,7 @@ func TeeTerm(f func() (any, error)) (string, error) {
 	return captureTerm(true, f)
 }
 
+// TODO: consider using generics or string instead of any
 func captureTerm(tee bool, f func() (any, error)) (string, error) {
 	// replace the default term with a new term that writes to a buffer
 	originalTerm := term.DefaultTerm
