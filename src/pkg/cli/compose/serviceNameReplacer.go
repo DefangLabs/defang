@@ -74,7 +74,7 @@ func (s *ServiceNameReplacer) replaceServiceNameWithDNS(value string) string {
 			serviceEnd := match[3]
 			serviceName := value[serviceStart:serviceEnd]
 			if s.skipPublicReplacement {
-				term.Warnf("service %q: reference to public DNS could not be replaced in %q", serviceName, value)
+				term.Warnf("service %q: reference to public DNS cannot be replaced in %q, use `defang login` and try again", serviceName, value)
 			} else {
 				return value[:serviceStart] + s.dnsResolver.ServicePublicDNS(NormalizeServiceName(serviceName), s.projectName) + value[serviceEnd:]
 			}
