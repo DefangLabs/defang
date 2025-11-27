@@ -26,7 +26,7 @@ func (m serviceNameReplacerMockProvider) UpdateShardDomain(ctx context.Context) 
 	return nil
 }
 
-func setup() (ServiceNameReplacer, error) {
+func setup() ServiceNameReplacer {
 	services := composeTypes.Services{}
 	services["host-serviceA"] = composeTypes.ServiceConfig{
 		Name: "host-serviceA",
@@ -61,12 +61,9 @@ func setup() (ServiceNameReplacer, error) {
 		Services: services,
 	}
 
-	svcNameReplacer, err := NewServiceNameReplacer(context.Background(), serviceNameReplacerMockProvider{}, project)
-	if err != nil {
-		return ServiceNameReplacer{}, err
-	}
+	svcNameReplacer := NewServiceNameReplacer(context.Background(), serviceNameReplacerMockProvider{}, project)
 
-	return svcNameReplacer, nil
+	return svcNameReplacer
 }
 
 func TestServiceNameReplacer(t *testing.T) {
@@ -103,10 +100,7 @@ func TestServiceNameReplacer(t *testing.T) {
 	}
 
 	// Create a service name replacer
-	replacer, err := setup()
-	if err != nil {
-		t.Error(err)
-	}
+	replacer := setup()
 
 	for _, tc := range testCases {
 		got := replacer.ReplaceServiceNameWithDNS(tc.service, tc.key, tc.value, tc.fixUpTarget)
@@ -117,10 +111,7 @@ func TestServiceNameReplacer(t *testing.T) {
 }
 
 func TestServiceNameReplacerHasService(t *testing.T) {
-	replacer, err := setup()
-	if err != nil {
-		t.Error(err)
-	}
+	replacer := setup()
 
 	if !replacer.HasServiceName("host-serviceA") {
 		t.Error("Expected to have host-serviceA")
