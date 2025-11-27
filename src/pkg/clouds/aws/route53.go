@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/dns"
@@ -140,6 +141,7 @@ func ListResourceRecords(ctx context.Context, zoneId, recordName string, recordT
 }
 
 func GetHostedZoneTags(ctx context.Context, zoneId string, r53 Route53API) (map[string]string, error) {
+	zoneId = strings.TrimPrefix(zoneId, "/hostedzone/")
 	listResp, err := r53.ListTagsForResource(ctx, &route53.ListTagsForResourceInput{
 		ResourceType: types.TagResourceTypeHostedzone,
 		ResourceId:   ptr.String(zoneId),

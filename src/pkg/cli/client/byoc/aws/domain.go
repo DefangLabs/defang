@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/route53/types"
 )
 
-func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, stack string, r53Client aws.Route53API) (nsServers []string, delegationSetId string, err error) {
+func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, stack string, r53Client aws.Route53API, resolverAt func(string) dns.Resolver) (nsServers []string, delegationSetId string, err error) {
 	// There's four cases to consider:
 	//  1. The subdomain zone does not exist: we create/get a delegation set and get its NS records and let CD/Pulumi create the hosted zone
 	//  2. The subdomain zone exists:
@@ -40,7 +40,7 @@ func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, st
 		// Case 1, 2c and 2d: zone of the projectDomain and stack doesn't exist: we'll create/get a delegation set and let CD/Pulumi create the hosted zone
 		// Create a new delegation set. There's a race condition here, where two deployments could create two different delegation sets,
 		// but this is acceptable because the next time the zone is deployed, we'll get the existing delegation set from the zone.
-		delegationSet, err = createUsableDelegationSet(ctx, projectDomain, r53Client, dns.ResolverAt)
+		delegationSet, err = createUsableDelegationSet(ctx, projectDomain, r53Client, resolverAt)
 		if err != nil {
 			return nil, "", err
 		}
@@ -57,7 +57,7 @@ func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, st
 	return delegationSet.NameServers, delegationSetId, nil
 }
 
-func createUsableDelegationSet(ctx context.Context, domain string, r53Client aws.Route53API, getResolverAt func(string) dns.Resolver) (*types.DelegationSet, error) {
+func createUsableDelegationSet(ctx context.Context, domain string, r53Client aws.Route53API, resolverAt func(string) dns.Resolver) (*types.DelegationSet, error) {
 	// Try up to 10 times to create a delegation set that is usable (i.e., none of its NS servers have conflicting records for the domain)
 	// Chances of a conflict happened in a single try if aws have 2000 dns servers is about (1 - (1-4/2000)^4) ~ 0.8%
 	// Chances of this happening in 10 consecutive tries if servers are randomly chosen is about 0.8%^5 ~ 3.2e-13, virtually impossible
@@ -69,7 +69,7 @@ func createUsableDelegationSet(ctx context.Context, domain string, r53Client aws
 		// Verify that the delegation set is usable by checking if any of its NS servers contains conflicting records
 		conflictFound := false
 		for _, nsServer := range delegationSet.NameServers {
-			resolver := getResolverAt(nsServer)
+			resolver := resolverAt(nsServer)
 			records, err := resolver.LookupNS(ctx, domain)
 			if err != nil {
 				return nil, err
