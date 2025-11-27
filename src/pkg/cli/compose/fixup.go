@@ -166,7 +166,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 
 			// Check if the environment variable is an existing config; if so, mark it as such
 			if _, ok := slices.BinarySearch(config.Names, key); ok {
-				if svcNameReplacer.HasServiceName(*value) {
+				if svcNameReplacer.ContainsPrivateServiceName(*value) {
 					notAdjusted = append(notAdjusted, key)
 				} else {
 					overridden = append(overridden, key)

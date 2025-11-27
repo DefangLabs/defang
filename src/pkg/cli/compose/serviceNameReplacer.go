@@ -19,16 +19,18 @@ const (
 )
 
 type ServiceNameReplacer struct {
-	dnsResolver         client.DNSResolver
-	projectName         string
-	privateServiceNames *regexp.Regexp
-	publicServiceNames  *regexp.Regexp
+	dnsResolver           client.DNSResolver
+	skipPublicReplacement bool
+	projectName           string
+	privateServiceNames   *regexp.Regexp
+	publicServiceNames    *regexp.Regexp
 }
 
 func NewServiceNameReplacer(ctx context.Context, dnsResolver client.DNSResolver, project *composeTypes.Project) ServiceNameReplacer {
+	var skipPublicReplacement bool
 	if err := dnsResolver.UpdateShardDomain(ctx); err != nil {
-		// If the DNS resolver fails to update the shard domain, we proceed without the real shard domain.
-		term.Warnf("failed to update shard domain: %v", err)
+		term.Debugf("failed to update shard domain: %v", err)
+		skipPublicReplacement = true
 	}
 	// Create a regexp to detect private service names in environment variable and build arg values
 	var privateServiceNames []string // services with private "host" ports
@@ -43,10 +45,11 @@ func NewServiceNameReplacer(ctx context.Context, dnsResolver client.DNSResolver,
 	}
 
 	return ServiceNameReplacer{
-		dnsResolver:         dnsResolver,
-		projectName:         project.Name,
-		privateServiceNames: makeServiceNameRegex(privateServiceNames),
-		publicServiceNames:  makeServiceNameRegex(publicServiceNames),
+		dnsResolver:           dnsResolver,
+		projectName:           project.Name,
+		privateServiceNames:   makeServiceNameRegex(privateServiceNames),
+		publicServiceNames:    makeServiceNameRegex(publicServiceNames),
+		skipPublicReplacement: skipPublicReplacement,
 	}
 }
 
@@ -58,7 +61,8 @@ func (s *ServiceNameReplacer) replaceServiceNameWithDNS(value string) string {
 			// [0] and [1] are the start and end of full match, resp. [2] and [3] are the start and end of the first submatch, etc.
 			serviceStart := match[2]
 			serviceEnd := match[3]
-			return value[:serviceStart] + s.dnsResolver.ServicePrivateDNS(NormalizeServiceName(value[serviceStart:serviceEnd])) + value[serviceEnd:]
+			serviceName := value[serviceStart:serviceEnd]
+			return value[:serviceStart] + s.dnsResolver.ServicePrivateDNS(NormalizeServiceName(serviceName)) + value[serviceEnd:]
 		}
 	}
 
@@ -68,7 +72,12 @@ func (s *ServiceNameReplacer) replaceServiceNameWithDNS(value string) string {
 		if match != nil {
 			serviceStart := match[2]
 			serviceEnd := match[3]
-			return value[:serviceStart] + s.dnsResolver.ServicePublicDNS(NormalizeServiceName(value[serviceStart:serviceEnd]), s.projectName) + value[serviceEnd:]
+			serviceName := value[serviceStart:serviceEnd]
+			if s.skipPublicReplacement {
+				term.Warnf("service %q: reference to public DNS could not be replaced in %q", serviceName, value)
+			} else {
+				return value[:serviceStart] + s.dnsResolver.ServicePublicDNS(NormalizeServiceName(serviceName), s.projectName) + value[serviceEnd:]
+			}
 		}
 	}
 
@@ -87,7 +96,7 @@ func (s *ServiceNameReplacer) ReplaceServiceNameWithDNS(serviceName string, key,
 	return val
 }
 
-func (s *ServiceNameReplacer) HasServiceName(name string) bool {
+func (s *ServiceNameReplacer) ContainsPrivateServiceName(name string) bool {
 	return s.privateServiceNames != nil && s.privateServiceNames.MatchString(name)
 }
 
