@@ -27,7 +27,8 @@ type ServiceNameReplacer struct {
 
 func NewServiceNameReplacer(ctx context.Context, dnsResolver client.DNSResolver, project *composeTypes.Project) (ServiceNameReplacer, error) {
 	if err := dnsResolver.UpdateShardDomain(ctx); err != nil {
-		return ServiceNameReplacer{}, err
+		// If the DNS resolver fails to update the shard domain, we proceed without the real shard domain.
+		term.Debugf("failed to update shard domain: %v", err)
 	}
 	// Create a regexp to detect private service names in environment variable and build arg values
 	var privateServiceNames []string // services with private "host" ports
