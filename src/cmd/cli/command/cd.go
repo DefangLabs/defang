@@ -26,7 +26,7 @@ var cdCmd = &cobra.Command{
 		}
 
 		if json {
-			os.Setenv("DEFANG_JSON", "1")
+			os.Setenv("DEFANG_JSON", "1") // FIXME: ugly way to set this globally
 			global.Verbose = true
 		}
 	},
