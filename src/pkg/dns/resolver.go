@@ -183,7 +183,16 @@ func (r DirectResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS,
 	}
 
 	var result []*net.NS
+	// When the name server is not the authoritative server for the domain,
+	// the authoritative NS records are in the authority section.
 	for _, rr := range res.Ns {
+		if ns, ok := rr.(*dns.NS); ok {
+			result = append(result, &net.NS{Host: ns.Ns})
+		}
+	}
+	// When the name server is authoritative for the domain,
+	// the NS records are in the answer section.
+	for _, rr := range res.Answer {
 		if ns, ok := rr.(*dns.NS); ok {
 			result = append(result, &net.NS{Host: ns.Ns})
 		}

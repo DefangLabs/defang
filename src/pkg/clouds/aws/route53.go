@@ -5,7 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/route53/types"
@@ -21,10 +20,14 @@ var (
 type Route53API interface {
 	CreateHostedZone(ctx context.Context, params *route53.CreateHostedZoneInput, optFns ...func(*route53.Options)) (*route53.CreateHostedZoneOutput, error)
 	CreateReusableDelegationSet(ctx context.Context, params *route53.CreateReusableDelegationSetInput, optFns ...func(*route53.Options)) (*route53.CreateReusableDelegationSetOutput, error)
+	DeleteReusableDelegationSet(ctx context.Context, params *route53.DeleteReusableDelegationSetInput, optFns ...func(*route53.Options)) (*route53.DeleteReusableDelegationSetOutput, error)
 	GetHostedZone(ctx context.Context, params *route53.GetHostedZoneInput, optFns ...func(*route53.Options)) (*route53.GetHostedZoneOutput, error)
 	ListReusableDelegationSets(ctx context.Context, params *route53.ListReusableDelegationSetsInput, optFns ...func(*route53.Options)) (*route53.ListReusableDelegationSetsOutput, error)
+
+	ListHostedZones(ctx context.Context, params *route53.ListHostedZonesInput, optFns ...func(*route53.Options)) (*route53.ListHostedZonesOutput, error)
 	ListHostedZonesByName(ctx context.Context, params *route53.ListHostedZonesByNameInput, optFns ...func(*route53.Options)) (*route53.ListHostedZonesByNameOutput, error)
 	ListResourceRecordSets(ctx context.Context, params *route53.ListResourceRecordSetsInput, optFns ...func(*route53.Options)) (*route53.ListResourceRecordSetsOutput, error)
+	ListTagsForResource(ctx context.Context, params *route53.ListTagsForResourceInput, optFns ...func(*route53.Options)) (*route53.ListTagsForResourceOutput, error)
 }
 
 func CreateDelegationSet(ctx context.Context, zoneId *string, r53 Route53API) (*types.DelegationSet, error) {
@@ -39,6 +42,14 @@ func CreateDelegationSet(ctx context.Context, zoneId *string, r53 Route53API) (*
 	return resp.DelegationSet, err
 }
 
+func DeleteDelegationSet(ctx context.Context, delegationSetId *string, r53 Route53API) error {
+	params := &route53.DeleteReusableDelegationSetInput{
+		Id: delegationSetId,
+	}
+	_, err := r53.DeleteReusableDelegationSet(ctx, params)
+	return err
+}
+
 func GetDelegationSetByZone(ctx context.Context, zoneId *string, r53 Route53API) (*types.DelegationSet, error) {
 	params := &route53.GetHostedZoneInput{
 		Id: zoneId,
@@ -50,40 +61,39 @@ func GetDelegationSetByZone(ctx context.Context, zoneId *string, r53 Route53API)
 	return resp.DelegationSet, nil
 }
 
-func GetDelegationSet(ctx context.Context, r53 Route53API) (*types.DelegationSet, error) {
-	params := &route53.ListReusableDelegationSetsInput{}
-	resp, err := r53.ListReusableDelegationSets(ctx, params)
-	if err != nil {
-		return nil, err
-	}
-	if len(resp.DelegationSets) == 0 {
-		return nil, ErrNoDelegationSetFound
-	}
-	// Return a random delegation set, to work around the 100 zones-per-delegation-set limit,
-	// because we can't easily tell how many zones are using each delegation set.
-	return &resp.DelegationSets[pkg.RandomIndex(len(resp.DelegationSets))], nil
-}
+func GetHostedZonesByName(ctx context.Context, domain string, r53 Route53API) ([]*types.HostedZone, error) {
+	var nextHostedZoneId *string
+	var zones []*types.HostedZone
+	for {
+		params := &route53.ListHostedZonesByNameInput{
+			DNSName:      &domain,
+			HostedZoneId: nextHostedZoneId,
+		}
+		resp, err := r53.ListHostedZonesByName(ctx, params)
+		if err != nil {
+			return nil, err
+		}
 
-func GetHostedZoneByName(ctx context.Context, domain string, r53 Route53API) (*types.HostedZone, error) {
-	params := &route53.ListHostedZonesByNameInput{
-		DNSName:  ptr.String(domain),
-		MaxItems: ptr.Int32(1),
+		for _, zone := range resp.HostedZones {
+			// ListHostedZonesByName returns all zones that is after the specified domain, we need to check the domain is the same
+			if isSameDomain(*zone.Name, domain) {
+				zones = append(zones, &zone)
+			} else {
+				// Since the zones are returned in alphabetical order, we can stop searching once we find a zone that does not match
+				break
+			}
+		}
+		// Ignore subsequent zones that do not exactly match the domain, as the zones are returned alphabetically
+		if !resp.IsTruncated || (resp.NextDNSName != nil && !isSameDomain(*resp.NextDNSName, domain)) {
+			break
+		}
+		nextHostedZoneId = resp.NextHostedZoneId
 	}
-	resp, err := r53.ListHostedZonesByName(ctx, params)
-	if err != nil {
-		return nil, err
-	}
-	if len(resp.HostedZones) == 0 {
+
+	if len(zones) == 0 {
 		return nil, ErrZoneNotFound
 	}
-
-	// ListHostedZonesByName returns all zones that is after the specified domain, we need to check the domain is the same
-	zone := resp.HostedZones[0]
-	if !isSameDomain(*zone.Name, domain) {
-		return nil, ErrZoneNotFound
-	}
-
-	return &zone, nil
+	return zones, nil
 }
 
 const CreateHostedZoneCommentLegacy = "Created by defang cli"
@@ -127,6 +137,32 @@ func ListResourceRecords(ctx context.Context, zoneId, recordName string, recordT
 		values[i] = dns.Normalize(*record.Value)
 	}
 	return values, nil
+}
+
+func GetHostedZoneTags(ctx context.Context, zoneId string, r53 Route53API) (map[string]string, error) {
+	listResp, err := r53.ListTagsForResource(ctx, &route53.ListTagsForResourceInput{
+		ResourceType: types.TagResourceTypeHostedzone,
+		ResourceId:   ptr.String(zoneId),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if listResp == nil || listResp.ResourceTagSet == nil {
+		return nil, nil
+	}
+
+	tags := make(map[string]string)
+	for _, tag := range listResp.ResourceTagSet.Tags {
+		if tag.Key != nil {
+			value := ""
+			if tag.Value != nil {
+				value = *tag.Value
+			}
+			tags[*tag.Key] = value
+		}
+	}
+	return tags, nil
 }
 
 func isSameDomain(domain1 string, domain2 string) bool {
