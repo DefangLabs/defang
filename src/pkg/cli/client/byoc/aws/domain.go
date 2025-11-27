@@ -15,7 +15,7 @@ func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, st
 	// There's four cases to consider:
 	//  1. The subdomain zone does not exist: we create/get a delegation set and get its NS records and let CD/Pulumi create the hosted zone
 	//  2. The subdomain zone exists:
-	//    a. DEPRECATED: The zone was created by the older CLI: we need to get the NS records from the existing zone and pass to Fabric; no delegation set
+	//    a. DEPRECATED: The zone was created by the older CLI: we consider the existing zone not usable, create a new delegation set and let CD/Pulumi create the hosted zone
 	//    b. The zone was created by the new CD/Pulumi of the same project and stack: we get the create or get the delegation set using the zone
 	//    c. The zone was created another way: we ignore it and create a new delegation set and let CD/Pulumi create the hosted zone
 	//    d. The zone was created by a different stack: We need to create a new delegation set and let CD/Pulumi create the hosted zone
