@@ -16,9 +16,9 @@ import (
 
 func makeStackCmd() *cobra.Command {
 	var stackCmd = &cobra.Command{
-		Use:   "stack",
-		Args:  cobra.NoArgs,
-		Short: "Manage Defang deployment stacks",
+		Use:     "stack",
+		Aliases: []string{"stacks"},
+		Short:   "Manage Defang deployment stacks",
 	}
 	stackNewCmd := makeStackNewCmd()
 	stackCmd.AddCommand(stackNewCmd)

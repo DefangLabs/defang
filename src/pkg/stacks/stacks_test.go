@@ -2,6 +2,7 @@ package stacks
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -49,7 +50,7 @@ func TestCreate(t *testing.T) {
 				Mode:     modes.ModeAffordable,
 			},
 			expectErr:        false,
-			expectedFilename: ".defang.teststack",
+			expectedFilename: ".defang/teststack",
 		},
 		{
 			name: "missing stack name",
@@ -77,7 +78,7 @@ func TestCreate(t *testing.T) {
 				Name: "a",
 			},
 			expectErr:        false,
-			expectedFilename: ".defang.a",
+			expectedFilename: ".defang/a",
 		},
 		{
 			name: "hyphen not ok",
@@ -98,7 +99,9 @@ func TestCreate(t *testing.T) {
 
 			// Cleanup created file if no error expected
 			if !tt.expectErr {
-				os.Remove(".defang." + tt.parameters.Name)
+				if err := os.Remove(filename); err != nil {
+					t.Errorf("Cleanup Remove() error = %v", err)
+				}
 			}
 
 			if filename != tt.expectedFilename {
@@ -123,8 +126,9 @@ func TestList(t *testing.T) {
 	t.Run("stacks present", func(t *testing.T) {
 		t.Chdir(t.TempDir())
 		// Create dummy stack files
-		os.Create(".defang.stack1")
-		os.Create(".defang.stack2")
+		os.Mkdir(dotDefang, 0700)
+		os.Create(filepath.Join(dotDefang, "stack1"))
+		os.Create(filepath.Join(dotDefang, "stack2"))
 
 		stacks, err := List()
 		if err != nil {
@@ -140,10 +144,13 @@ func TestRemove(t *testing.T) {
 	t.Run("remove existing stack", func(t *testing.T) {
 		t.Chdir(t.TempDir())
 		// Create dummy stack file
-		stackFile := ".defang.stack_to_remove"
-		os.Create(stackFile)
+		stackName := "stacktoremove"
+		stackFile, err := Create(StackParameters{Name: stackName})
+		if err != nil {
+			t.Errorf("Setup Create() error = %v", err)
+		}
 
-		err := Remove("stack_to_remove")
+		err = Remove(stackName)
 		if err != nil {
 			t.Errorf("Remove() error = %v", err)
 		}
@@ -157,7 +164,7 @@ func TestRemove(t *testing.T) {
 		err := Remove("non_existing_stack")
 		// expect an error when trying to remove a non-existing stack
 		assert.Error(t, err)
-		assert.ErrorContains(t, err, "remove .defang.non_existing_stack: no such file or directory")
+		assert.ErrorContains(t, err, "remove .defang/non_existing_stack: no such file or directory")
 	})
 }
 
