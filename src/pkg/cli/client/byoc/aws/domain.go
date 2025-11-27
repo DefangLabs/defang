@@ -58,7 +58,7 @@ func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, st
 }
 
 func createUsableDelegationSet(ctx context.Context, domain string, r53Client aws.Route53API, resolverAt func(string) dns.Resolver) (*types.DelegationSet, error) {
-	// Try up to 10 times to create a delegation set that is usable (i.e., none of its NS servers have conflicting records for the domain)
+	// Try up to 5 times to create a delegation set that is usable (i.e., none of its NS servers have conflicting records for the domain)
 	// Chances of a conflict happened in a single try if aws have 2000 dns servers is about (1 - (1-4/2000)^4) ~ 0.8%
 	// Chances of this happening in 10 consecutive tries if servers are randomly chosen is about 0.8%^5 ~ 3.2e-13, virtually impossible
 	for range 5 {

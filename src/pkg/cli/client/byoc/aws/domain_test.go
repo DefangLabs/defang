@@ -217,10 +217,6 @@ func (r *r53Mock) CreateHostedZone(ctx context.Context, params *route53.CreateHo
 }
 
 func TestPrepareDomainDelegation(t *testing.T) {
-	// There's four cases to consider:
-	//  2. The subdomain zone exists:
-	//    c. The zone was created another way: we ignore it and create a new delegation set and let CD/Pulumi create the hosted zone
-	//    d. The zone was created by a different stack: We need to create a new delegation set and let CD/Pulumi create the hosted zone
 	ctx := t.Context()
 	noResultResolver := func(domain string) func(nsServer string) dns.Resolver {
 		return func(nsServer string) dns.Resolver {
