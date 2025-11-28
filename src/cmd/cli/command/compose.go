@@ -93,7 +93,7 @@ func makeComposeUpCmd() *cobra.Command {
 			} else {
 				samePlace := slices.ContainsFunc(resp.Deployments, func(dep *defangv1.Deployment) bool {
 					// Old deployments may not have a region or account ID, so we check for empty values too
-					return dep.Provider == global.ProviderID.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
+					return dep.Provider == global.Stack.Provider.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
 				})
 				if !samePlace && len(resp.Deployments) > 0 {
 					if global.NonInteractive {

@@ -10,6 +10,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/joho/godotenv"
 	"github.com/spf13/pflag"
@@ -77,9 +78,8 @@ type GlobalConfig struct {
 	ModelID        string // only for debug/generate; Pro users
 	NonInteractive bool
 	Org            string
-	ProviderID     cliClient.ProviderID
 	SourcePlatform migrate.SourcePlatform // only used for 'defang init' command
-	Stack          string
+	Stack          stacks.StackParameters
 	Verbose        bool
 }
 
@@ -97,7 +97,9 @@ var global GlobalConfig = GlobalConfig{
 	HideUpdate:     false,
 	Mode:           modes.ModeUnspecified,
 	NonInteractive: !term.IsTerminal(),
-	ProviderID:     cliClient.ProviderAuto,
+	Stack: stacks.StackParameters{
+		Provider: cliClient.ProviderAuto,
+	},
 	SourcePlatform: migrate.SourcePlatformUnspecified, // default to auto-detecting the source platform
 	Verbose:        false,
 }
@@ -112,11 +114,11 @@ which will result in loading only the general .defang file.
 func (r *GlobalConfig) getStackName(flags *pflag.FlagSet) string {
 	if !flags.Changed("stack") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_STACK"); ok {
-			r.Stack = fromEnv
+			r.Stack.Name = fromEnv
 		}
 	}
 
-	return r.Stack
+	return r.Stack.Name
 }
 
 /*
@@ -162,7 +164,7 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 	var err error
 
 	// called once more in case stack name was changed by an RC file
-	r.Stack = r.getStackName(flags)
+	r.Stack.Name = r.getStackName(flags)
 
 	if !flags.Changed("verbose") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_VERBOSE"); ok {
@@ -197,7 +199,7 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 
 	if !flags.Changed("provider") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
-			err = r.ProviderID.Set(fromEnv)
+			err = r.Stack.Provider.Set(fromEnv)
 			if err != nil {
 				return err
 			}

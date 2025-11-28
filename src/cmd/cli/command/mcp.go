@@ -48,7 +48,7 @@ var mcpServerCmd = &cobra.Command{
 
 		// Create a new MCP server
 		term.Debug("Creating MCP server")
-		s, err := mcp.NewDefangMCPServer(RootCmd.Version, getCluster(), &global.ProviderID, mcpClient, tools.DefaultToolCLI{})
+		s, err := mcp.NewDefangMCPServer(RootCmd.Version, getCluster(), &global.Stack.Provider, mcpClient, tools.DefaultToolCLI{})
 		if err != nil {
 			return fmt.Errorf("failed to create MCP server: %w", err)
 		}

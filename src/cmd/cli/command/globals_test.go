@@ -9,6 +9,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/spf13/pflag"
 )
 
@@ -73,12 +74,13 @@ func Test_configurationPrecedence(t *testing.T) {
 		HideUpdate:     false,
 		Mode:           modes.ModeUnspecified,
 		NonInteractive: false, // set to false just for test instead of !term.IsTerminal() for consistency
-		ProviderID:     cliClient.ProviderAuto,
 		SourcePlatform: migrate.SourcePlatformUnspecified,
 		Verbose:        false,
-		Stack:          "",
-		Cluster:        "",
-		Org:            "",
+		Stack: stacks.StackParameters{
+			Provider: cliClient.ProviderAuto,
+		},
+		Cluster: "",
+		Org:     "",
 	}
 
 	type stack struct {
@@ -143,9 +145,8 @@ func Test_configurationPrecedence(t *testing.T) {
 				Mode:           modes.ModeHighAvailability,
 				Verbose:        false,
 				Debug:          true,
-				Stack:          "from-flags",
+				Stack:          stacks.StackParameters{Name: "from-flags", Provider: cliClient.ProviderAWS},
 				Cluster:        "from-flags-cluster",
-				ProviderID:     cliClient.ProviderAWS,
 				Org:            "from-flags-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAlways,
@@ -191,9 +192,8 @@ func Test_configurationPrecedence(t *testing.T) {
 				Mode:           modes.ModeBalanced,
 				Verbose:        true,
 				Debug:          false,
-				Stack:          "from-env",
+				Stack:          stacks.StackParameters{Name: "from-env", Provider: cliClient.ProviderGCP},
 				Cluster:        "from-env-cluster",
-				ProviderID:     cliClient.ProviderGCP,
 				Org:            "from-env-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAuto,
@@ -226,9 +226,8 @@ func Test_configurationPrecedence(t *testing.T) {
 				Mode:           modes.ModeAffordable, // env file values
 				Verbose:        true,
 				Debug:          false,
-				Stack:          "from-env",
+				Stack:          stacks.StackParameters{Name: "from-env", Provider: cliClient.ProviderDefang},
 				Cluster:        "from-env-cluster",
-				ProviderID:     cliClient.ProviderDefang,
 				Org:            "from-env-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAlways,
@@ -269,9 +268,8 @@ func Test_configurationPrecedence(t *testing.T) {
 				Mode:           modes.ModeAffordable, // env file values
 				Verbose:        true,
 				Debug:          false,
-				Stack:          "from-env",
+				Stack:          stacks.StackParameters{Name: "from-env", Provider: cliClient.ProviderDefang},
 				Cluster:        "from-env-cluster",
-				ProviderID:     cliClient.ProviderDefang,
 				Org:            "from-env-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAlways,
@@ -309,11 +307,11 @@ func Test_configurationPrecedence(t *testing.T) {
 
 			// simulate SetupCommands()
 			flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
-			flags.StringVarP(&testConfig.Stack, "stack", "s", testConfig.Stack, "stack name (for BYOC providers)")
+			flags.StringVarP(&testConfig.Stack.Name, "stack", "s", testConfig.Stack.Name, "stack name (for BYOC providers)")
 			flags.Var(&testConfig.ColorMode, "color", "colorize output")
 			flags.StringVar(&testConfig.Cluster, "cluster", testConfig.Cluster, "Defang cluster to connect to")
 			flags.StringVar(&testConfig.Org, "org", testConfig.Org, "override GitHub organization name (tenant)")
-			flags.VarP(&testConfig.ProviderID, "provider", "P", "bring-your-own-cloud provider")
+			flags.VarP(&testConfig.Stack.Provider, "provider", "P", "bring-your-own-cloud provider")
 			flags.BoolVarP(&testConfig.Verbose, "verbose", "v", testConfig.Verbose, "verbose logging")
 			flags.BoolVar(&testConfig.Debug, "debug", testConfig.Debug, "debug logging for troubleshooting the CLI")
 			flags.BoolVar(&testConfig.NonInteractive, "non-interactive", testConfig.NonInteractive, "disable interactive prompts / no TTY")
@@ -398,8 +396,8 @@ func Test_configurationPrecedence(t *testing.T) {
 			if testConfig.Cluster != tt.expected.Cluster {
 				t.Errorf("expected Cluster to be '%s', got '%s'", tt.expected.Cluster, testConfig.Cluster)
 			}
-			if testConfig.ProviderID != tt.expected.ProviderID {
-				t.Errorf("expected ProviderID to be '%s', got '%s'", tt.expected.ProviderID, testConfig.ProviderID)
+			if testConfig.Stack.Provider != tt.expected.Stack.Provider {
+				t.Errorf("expected Provider to be '%s', got '%s'", tt.expected.Stack.Provider, testConfig.Stack.Provider)
 			}
 			if testConfig.Org != tt.expected.Org {
 				t.Errorf("expected Org to be '%s', got '%s'", tt.expected.Org, testConfig.Org)
