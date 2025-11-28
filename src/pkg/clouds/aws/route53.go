@@ -76,7 +76,7 @@ func GetHostedZonesByName(ctx context.Context, domain string, r53 Route53API) ([
 		}
 
 		for _, zone := range resp.HostedZones {
-			// ListHostedZonesByName returns all zones that is after the specified domain, we need to check the domain is the same
+			// ListHostedZonesByName returns all zones that are after the specified domain, we need to check the domain is the same
 			if isSameDomain(*zone.Name, domain) {
 				zones = append(zones, &zone)
 			} else {

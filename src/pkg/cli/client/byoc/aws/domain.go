@@ -16,7 +16,7 @@ func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, st
 	//  1. The subdomain zone does not exist: we create/get a delegation set and get its NS records and let CD/Pulumi create the hosted zone
 	//  2. The subdomain zone exists:
 	//    a. DEPRECATED: The zone was created by the older CLI: we consider the existing zone not usable, create a new delegation set and let CD/Pulumi create the hosted zone
-	//    b. The zone was created by the new CD/Pulumi of the same project and stack: we get the create or get the delegation set using the zone
+	//    b. The zone was created by the new CD/Pulumi of the same project and stack: we create or get the delegation set using the zone
 	//    c. The zone was created another way: we ignore it and create a new delegation set and let CD/Pulumi create the hosted zone
 	//    d. The zone was created by a different stack: We need to create a new delegation set and let CD/Pulumi create the hosted zone
 
@@ -25,7 +25,7 @@ func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, st
 	if err != nil {
 		// The only acceptable error is that the zone was not found
 		if !errors.Is(err, aws.ErrZoneNotFound) {
-			return nil, "", err // TODO: we should not fail deployment if GetHostedZoneByName fails
+			return nil, "", err // TODO: we should not fail deployment if GetHostedZonesByName fails
 		}
 		term.Debugf("Zone %q not found, delegation set will be created", projectDomain)
 	} else {
@@ -58,15 +58,20 @@ func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, st
 }
 
 func createUsableDelegationSet(ctx context.Context, domain string, r53Client aws.Route53API, resolverAt func(string) dns.Resolver) (*types.DelegationSet, error) {
-	// Try up to 5 times to create a delegation set that is usable (i.e., none of its NS servers have conflicting records for the domain)
-	// Chances of a conflict happened in a single try if aws have 2000 dns servers is about (1 - (1-4/2000)^4) ~ 0.8%
-	// Chances of this happening in 10 consecutive tries if servers are randomly chosen is about 0.8%^5 ~ 3.2e-13, virtually impossible
+	// route53 assigns a random selection of name servers when creating a
+	// delegation set. If we get a delegation set which contains a name server
+	// which already has an NS record for this hosted zone, we cannot use it
+	// because [...] @edwardrf help describe this more clearly
+	// Try up to 5 times to create a delegation set that is usable (i.e., none
+	// of its NS servers have conflicting records for the domain)
+	// Chances of a conflict happening in a single try if aws have 2000 dns servers is about (1 - (1-4/2000)^4) ~ 0.8%
+	// Chances of this happening in 5 consecutive tries if servers are randomly chosen is about 0.8%^5 ~ 3.2e-13, virtually impossible
 	for range 5 {
 		delegationSet, err := aws.CreateDelegationSet(ctx, nil, r53Client)
 		if err != nil {
 			return nil, err
 		}
-		// Verify that the delegation set is usable by checking if any of its NS servers contains conflicting records
+		// Verify that the delegation set is usable by checking that none of its NS servers contain records for this domain
 		conflictFound := false
 		for _, nsServer := range delegationSet.NameServers {
 			resolver := resolverAt(nsServer)
@@ -100,7 +105,7 @@ func getOrCreateDelegationSetByZones(ctx context.Context, zones []*types.HostedZ
 		if err != nil {
 			return nil, err // TODO: we should not fail deployment if GetHostedZoneTags fails
 		}
-		// Ignore zones that was created by an older CLI (2a), or another way (2c) or belong to a different project/stack (2d)
+		// Ignore zones that were created by an older CLI (2a), or another way (2c) or belong to a different project/stack (2d)
 		if tags["defang:project"] != projectName || tags["defang:stack"] != stack {
 			term.Debugf("ignored zone %q as it belongs to a different project/stack (%q/%q), skipping", projectDomain, tags["defang:project"], tags["defang:stack"])
 			continue
@@ -118,7 +123,7 @@ func getOrCreateDelegationSetByZones(ctx context.Context, zones []*types.HostedZ
 			return nil, err
 		}
 
-		return delegationSet, err
+		return delegationSet, nil
 	}
 	return nil, nil
 }

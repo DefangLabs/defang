@@ -348,7 +348,7 @@ func TestPrepareDomainDelegation(t *testing.T) {
 		hz := createHostedZone(t, r53Client, projectDomain, aws.CreateHostedZoneCommentLegacy, &delegationSetId)
 		r53Client.setTagsForHostedZone(*hz.HostedZone.Id, map[string]string{"defang:project": "projectname", "defang:stack": "stack"})
 
-		// Now prepare domain delegation again, it should reuse the existing delegation set
+		// Now prepare domain delegation again, it should create a new delegation set since the stack is different
 		nsServers2, delegationSetId2, err := prepareDomainDelegation(ctx, projectDomain, "projectname", "stack2", r53Client, noResultResolver(projectDomain))
 		if err != nil {
 			t.Fatal(err)
