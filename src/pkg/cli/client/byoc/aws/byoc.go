@@ -289,6 +289,11 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 }
 
 func (b *ByocAws) FixupServices(ctx context.Context, project *composeTypes.Project) error {
+	// HACK: Use ServiceFixupper interface callback used in fixup.go to check if Docker Hub credentials are needed
+	return b.checkRequiresDockerHubToken(ctx, project)
+}
+
+func (b *ByocAws) checkRequiresDockerHubToken(ctx context.Context, project *composeTypes.Project) error {
 	images, err := compose.FindAllBaseImages(project)
 	if err != nil {
 		return err
@@ -313,6 +318,11 @@ func (b *ByocAws) FixupServices(ctx context.Context, project *composeTypes.Proje
 			return err
 		}
 		if !found {
+			// TODO: Make provider stateless: This is a hack to get around the fact that we have lost
+			// access to the service build context by the time we reach deploy as it has been uploaded
+			// to S3. The last place we have access to the build context is during fixup, since only
+			// AWS BYOC requires this info, we use a state variable to be set during fixup to indicate
+			// that Docker Hub creds are needed, since our provider is already stateful.
 			b.needDockerHubCreds = true
 		}
 	}
@@ -332,7 +342,7 @@ func (b *ByocAws) getDockerHubCredentials(ctx context.Context, projectName strin
 	}
 
 	// Try to retrieve existing Docker Hub credentials from secrets manager based on the stack state file
-	if creds, err := b.getExistingDockerHubCredentials(ctx, projectName); err == nil {
+	if creds, err := b.getExistingDockerHubCredentials(ctx, projectName); err != nil {
 		term.Debugf("Could not get existing Docker Hub credentials: %v", err)
 	} else {
 		return creds, nil
