@@ -48,7 +48,7 @@ func makeStackNewCmd() *cobra.Command {
 				Name:     stackName,
 				Provider: global.Stack.Provider, // default provider
 				Region:   region,
-				Mode:     global.Mode,
+				Mode:     global.Stack.Mode,
 			}
 
 			if global.NonInteractive {
@@ -147,7 +147,7 @@ func makeStackNewCmd() *cobra.Command {
 			return nil
 		},
 	}
-	stackNewCmd.Flags().VarP(&global.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
+	stackNewCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	stackNewCmd.Flags().StringP("region", "r", "", "Cloud region for the stack deployment")
 
 	return stackNewCmd

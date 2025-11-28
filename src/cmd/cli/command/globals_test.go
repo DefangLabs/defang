@@ -72,12 +72,12 @@ func Test_configurationPrecedence(t *testing.T) {
 		Debug:          false,
 		HasTty:         true, // set to true just for test instead of term.IsTerminal() for consistency
 		HideUpdate:     false,
-		Mode:           modes.ModeUnspecified,
 		NonInteractive: false, // set to false just for test instead of !term.IsTerminal() for consistency
 		SourcePlatform: migrate.SourcePlatformUnspecified,
 		Verbose:        false,
 		Stack: stacks.StackParameters{
 			Provider: cliClient.ProviderAuto,
+			Mode:     modes.ModeUnspecified,
 		},
 		Cluster: "",
 		Org:     "",
@@ -142,10 +142,9 @@ func Test_configurationPrecedence(t *testing.T) {
 				"non-interactive": "false",
 			},
 			expected: GlobalConfig{
-				Mode:           modes.ModeHighAvailability,
 				Verbose:        false,
 				Debug:          true,
-				Stack:          stacks.StackParameters{Name: "from-flags", Provider: cliClient.ProviderAWS},
+				Stack:          stacks.StackParameters{Name: "from-flags", Provider: cliClient.ProviderAWS, Mode: modes.ModeHighAvailability},
 				Cluster:        "from-flags-cluster",
 				Org:            "from-flags-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
@@ -189,10 +188,9 @@ func Test_configurationPrecedence(t *testing.T) {
 				"DEFANG_HIDE_UPDATE":     "false",
 			},
 			expected: GlobalConfig{
-				Mode:           modes.ModeBalanced,
 				Verbose:        true,
 				Debug:          false,
-				Stack:          stacks.StackParameters{Name: "from-env", Provider: cliClient.ProviderGCP},
+				Stack:          stacks.StackParameters{Name: "from-env", Provider: cliClient.ProviderGCP, Mode: modes.ModeBalanced},
 				Cluster:        "from-env-cluster",
 				Org:            "from-env-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
@@ -223,10 +221,9 @@ func Test_configurationPrecedence(t *testing.T) {
 				},
 			},
 			expected: GlobalConfig{
-				Mode:           modes.ModeAffordable, // env file values
 				Verbose:        true,
 				Debug:          false,
-				Stack:          stacks.StackParameters{Name: "from-env", Provider: cliClient.ProviderDefang},
+				Stack:          stacks.StackParameters{Name: "from-env", Provider: cliClient.ProviderDefang, Mode: modes.ModeAffordable},
 				Cluster:        "from-env-cluster",
 				Org:            "from-env-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
@@ -265,10 +262,9 @@ func Test_configurationPrecedence(t *testing.T) {
 				},
 			},
 			expected: GlobalConfig{
-				Mode:           modes.ModeAffordable, // env file values
 				Verbose:        true,
 				Debug:          false,
-				Stack:          stacks.StackParameters{Name: "from-env", Provider: cliClient.ProviderDefang},
+				Stack:          stacks.StackParameters{Name: "from-env", Provider: cliClient.ProviderDefang, Mode: modes.ModeAffordable},
 				Cluster:        "from-env-cluster",
 				Org:            "from-env-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
@@ -316,7 +312,7 @@ func Test_configurationPrecedence(t *testing.T) {
 			flags.BoolVar(&testConfig.Debug, "debug", testConfig.Debug, "debug logging for troubleshooting the CLI")
 			flags.BoolVar(&testConfig.NonInteractive, "non-interactive", testConfig.NonInteractive, "disable interactive prompts / no TTY")
 			flags.Var(&testConfig.SourcePlatform, "from", "the platform from which to migrate the project")
-			flags.VarP(&testConfig.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
+			flags.VarP(&testConfig.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 
 			// Set flags based on user input (these override env and env file values)
 			for flagName, flagValue := range tt.flags {
@@ -381,8 +377,8 @@ func Test_configurationPrecedence(t *testing.T) {
 			}
 
 			// verify the final configuration matches expectations
-			if testConfig.Mode.String() != tt.expected.Mode.String() {
-				t.Errorf("expected Mode to be '%s', got '%s'", tt.expected.Mode.String(), testConfig.Mode.String())
+			if testConfig.Stack.Mode.String() != tt.expected.Stack.Mode.String() {
+				t.Errorf("expected Mode to be '%s', got '%s'", tt.expected.Stack.Mode.String(), testConfig.Stack.Mode.String())
 			}
 			if testConfig.Verbose != tt.expected.Verbose {
 				t.Errorf("expected Verbose to be %v, got %v", tt.expected.Verbose, testConfig.Verbose)

@@ -165,7 +165,7 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.Preview(cmd.Context(), project, global.Client, provider, global.Mode)
+		return cli.Preview(cmd.Context(), project, global.Client, provider, global.Stack.Mode)
 	},
 }
 
