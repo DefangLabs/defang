@@ -132,7 +132,7 @@ winget:
     homepage: https://github.com/DefangLabs/defang/
     publisher_support_url: https://github.com/DefangLabs/defang/issues/
     repository:
-      token: "{{ .Env.GH_PAT_WINGET }}"
+      token: "{{ .Env.GH_PAT_WINGET }}" # Make sure this token is still valid and is a Github PAT (Classic) with repo permissions; https://github.com/orgs/community/discussions/106661
       owner: DefangLabs
       name: winget-pkgs
       branch: "Defang-{{.Version}}"
