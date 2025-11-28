@@ -9,5 +9,3 @@ func SafeLabel(fqn string) string {
 func Normalize(domain string) string {
 	return strings.ToLower(strings.TrimSuffix(domain, "."))
 }
-
-

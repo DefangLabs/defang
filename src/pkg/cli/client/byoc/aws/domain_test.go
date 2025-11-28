@@ -56,7 +56,7 @@ func (r r53Mock) ListTagsForResource(ctx context.Context, params *route53.ListTa
 	}
 }
 
-func (r r53Mock) setTagsForHostedZone(hostedZoneId string, tags map[string]string) {
+func (r *r53Mock) setTagsForHostedZone(hostedZoneId string, tags map[string]string) {
 	for i, hz := range r.hostedZones {
 		if *hz.HostedZone.Id == hostedZoneId {
 			for k, v := range tags {
@@ -363,7 +363,7 @@ func TestPrepareDomainDelegation(t *testing.T) {
 }
 
 func createHostedZone(t *testing.T, r53Client route53API, projectDomain, comment string, delegationSetId *string) *route53.CreateHostedZoneOutput {
-	hz, err := r53Client.CreateHostedZone(ctx, &route53.CreateHostedZoneInput{
+	hz, err := r53Client.CreateHostedZone(t.Context(), &route53.CreateHostedZoneInput{
 		CallerReference: ptr.String(projectDomain + " from " + comment + pkg.RandomID()),
 		Name:            ptr.String(projectDomain),
 		HostedZoneConfig: &types.HostedZoneConfig{
@@ -375,7 +375,7 @@ func createHostedZone(t *testing.T, r53Client route53API, projectDomain, comment
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		_, err := r53Client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{
+		_, err := r53Client.DeleteHostedZone(t.Context(), &route53.DeleteHostedZoneInput{
 			Id: hz.HostedZone.Id,
 		})
 		if err != nil {

@@ -60,8 +60,8 @@ func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, st
 func createUsableDelegationSet(ctx context.Context, domain string, r53Client aws.Route53API, resolverAt func(string) dns.Resolver) (*types.DelegationSet, error) {
 	// route53 assigns a random selection of name servers when creating a
 	// delegation set. If we get a delegation set which contains a name server
-	// which already has an NS record for this hosted zone, we cannot use it
-	// because [...] @edwardrf help describe this more clearly
+	// which already has an NS record for this hosted zone, its a conflict since
+	// the server cannot serve more than one hosted zone for the same domain.
 	// Try up to 5 times to create a delegation set that is usable (i.e., none
 	// of its NS servers have conflicting records for the domain)
 	// Chances of a conflict happening in a single try if aws have 2000 dns servers is about (1 - (1-4/2000)^4) ~ 0.8%
@@ -88,6 +88,9 @@ func createUsableDelegationSet(ctx context.Context, domain string, r53Client aws
 		}
 		if conflictFound {
 			if err := aws.DeleteDelegationSet(ctx, delegationSet.Id, r53Client); err != nil {
+				// up to 100 delegation sets can be created per account, failure is non-fatal
+				// there is no direct actionable remedy for the user too.
+				// TODO: find and reuse empty delegation sets to avoid hitt the limit
 				term.Debugf("Failed to delete conflicting delegation set %q: %v", *delegationSet.Id, err)
 			}
 		} else {
