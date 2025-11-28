@@ -66,7 +66,7 @@ func (to TailOptions) String() string {
 	if !to.Until.IsZero() {
 		cmd += " --until=" + to.Until.UTC().Format(time.RFC3339Nano)
 	}
-	if to.Follow {
+	if to.Follow && to.Until.IsZero() {
 		cmd += " --follow"
 	}
 	if to.Deployment != "" {
