@@ -15,6 +15,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/agent"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
@@ -405,6 +406,23 @@ var RootCmd = &cobra.Command{
 		}
 
 		return err
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if global.NonInteractive {
+			return cmd.Help()
+		}
+
+		ctx := cmd.Context()
+		err := login.InteractiveRequireLoginAndToS(ctx, global.Client, getCluster())
+		if err != nil {
+			return err
+		}
+		prompt := "Welcome to Defang. I can help you deploy your project to the cloud"
+		ag, err := agent.New(ctx, getCluster(), &global.ProviderID)
+		if err != nil {
+			return err
+		}
+		return ag.StartWithUserPrompt(ctx, prompt)
 	},
 }
 
