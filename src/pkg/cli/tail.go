@@ -143,7 +143,6 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 		return dryrun.ErrDryRun
 	}
 
-	options.PrintBookends = true
 	return streamLogs(ctx, provider, projectName, options, logEntryPrintHandler)
 }
 

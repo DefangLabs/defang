@@ -124,7 +124,7 @@ func TestTail(t *testing.T) {
 		},
 	}
 
-	err := Tail(t.Context(), p, projectName, TailOptions{Verbose: true}) // Output host
+	err := Tail(t.Context(), p, projectName, TailOptions{Verbose: true, PrintBookends: true}) // Output host
 	if err != io.EOF {
 		t.Errorf("Tail() error = %v, want io.EOF", err)
 	}
@@ -231,7 +231,7 @@ func TestUTC(t *testing.T) {
 	localMock = localMock.MockTimestamp(localTime)
 
 	// Start the terminal for local time test
-	err := Tail(t.Context(), localMock, projectName, TailOptions{Verbose: true}) // Output host
+	err := Tail(t.Context(), localMock, projectName, TailOptions{Verbose: true, PrintBookends: true}) // Output host
 	if err != nil {
 		t.Errorf("Tail() error = %v, want io.EOF", err)
 	}
@@ -265,7 +265,7 @@ func TestUTC(t *testing.T) {
 	utcMock := &mockTailProvider{}
 	utcMock = utcMock.MockTimestamp(utcTime)
 
-	err = Tail(t.Context(), utcMock, projectName, TailOptions{Verbose: true})
+	err = Tail(t.Context(), utcMock, projectName, TailOptions{PrintBookends: true, Verbose: true})
 	if err != nil {
 		t.Errorf("Tail() error = %v, want io.EOF", err)
 	}
