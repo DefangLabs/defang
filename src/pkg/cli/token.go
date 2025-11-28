@@ -6,7 +6,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/globals"
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -14,8 +14,8 @@ import (
 )
 
 func Token(ctx context.Context, client client.FabricClient, tenant types.TenantName, dur time.Duration, s scope.Scope) error {
-	if dryrun.DoDryRun {
-		return dryrun.ErrDryRun
+	if globals.Config.DoDryRun {
+		return globals.ErrDryRun
 	}
 
 	code, err := auth.StartAuthCodeFlow(ctx, false, func(token string) {

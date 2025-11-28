@@ -7,6 +7,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/agent/tools"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/globals"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/server"
@@ -18,7 +19,7 @@ var mcpCmd = &cobra.Command{
 	Short: "Manage MCP Server for defang",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		//set global nonInteractive to false
-		global.NonInteractive = false
+		globals.Config.NonInteractive = false
 	},
 }
 
@@ -48,7 +49,7 @@ var mcpServerCmd = &cobra.Command{
 
 		// Create a new MCP server
 		term.Debug("Creating MCP server")
-		s, err := mcp.NewDefangMCPServer(RootCmd.Version, getCluster(), &global.ProviderID, mcpClient, tools.DefaultToolCLI{})
+		s, err := mcp.NewDefangMCPServer(RootCmd.Version, getCluster(), &globals.Config.ProviderID, mcpClient, tools.DefaultToolCLI{})
 		if err != nil {
 			return fmt.Errorf("failed to create MCP server: %w", err)
 		}

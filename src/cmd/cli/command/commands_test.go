@@ -15,6 +15,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	pkg "github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	gcpdriver "github.com/DefangLabs/defang/src/pkg/clouds/gcp"
+	"github.com/DefangLabs/defang/src/pkg/globals"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
@@ -244,7 +245,7 @@ func TestGetProvider(t *testing.T) {
 		canIUseResponse: defangv1.CanIUseResponse{},
 	}
 	mockClient.SetClient(mockCtrl)
-	global.Client = &mockClient
+	globals.Config.Client = &mockClient
 	loader := cliClient.MockLoader{Project: compose.Project{Name: "empty"}}
 	oldRootCmd := RootCmd
 	t.Cleanup(func() {
@@ -252,7 +253,7 @@ func TestGetProvider(t *testing.T) {
 	})
 	FakeRootWithProviderParam := func(provider string) *cobra.Command {
 		cmd := &cobra.Command{}
-		cmd.PersistentFlags().VarP(&global.ProviderID, "provider", "P", "fake provider flag")
+		cmd.PersistentFlags().VarP(&globals.Config.ProviderID, "provider", "P", "fake provider flag")
 		if provider != "" {
 			cmd.ParseFlags([]string{"--provider", provider})
 		}
@@ -262,7 +263,7 @@ func TestGetProvider(t *testing.T) {
 	ctx := t.Context()
 
 	t.Run("Nil loader auto provider non-interactive should load playground provider", func(t *testing.T) {
-		global.ProviderID = "auto"
+		globals.Config.ProviderID = "auto"
 		os.Unsetenv("DEFANG_PROVIDER")
 		RootCmd = FakeRootWithProviderParam("")
 
@@ -276,19 +277,19 @@ func TestGetProvider(t *testing.T) {
 	})
 
 	t.Run("Auto provider should get provider from client", func(t *testing.T) {
-		global.ProviderID = "auto"
+		globals.Config.ProviderID = "auto"
 		os.Unsetenv("DEFANG_PROVIDER")
 		t.Setenv("AWS_REGION", "us-west-2")
 		RootCmd = FakeRootWithProviderParam("")
 
 		mockCtrl.savedProvider = map[string]defangv1.Provider{"empty": defangv1.Provider_AWS}
 
-		ni := global.NonInteractive
+		ni := globals.Config.NonInteractive
 		sts := aws.StsClient
 		aws.StsClient = &mockStsProviderAPI{}
-		global.NonInteractive = false
+		globals.Config.NonInteractive = false
 		t.Cleanup(func() {
-			global.NonInteractive = ni
+			globals.Config.NonInteractive = ni
 			aws.StsClient = sts
 			mockCtrl.savedProvider = nil
 		})
@@ -303,16 +304,16 @@ func TestGetProvider(t *testing.T) {
 	})
 
 	t.Run("Auto provider from param with saved provider should go interactive and save", func(t *testing.T) {
-		global.ProviderID = "auto"
+		globals.Config.ProviderID = "auto"
 		os.Unsetenv("DEFANG_PROVIDER")
 		t.Setenv("AWS_REGION", "us-west-2")
 		mockCtrl.savedProvider = map[string]defangv1.Provider{"someotherproj": defangv1.Provider_AWS}
 		RootCmd = FakeRootWithProviderParam("")
 
-		ni := global.NonInteractive
+		ni := globals.Config.NonInteractive
 		sts := aws.StsClient
 		aws.StsClient = &mockStsProviderAPI{}
-		global.NonInteractive = false
+		globals.Config.NonInteractive = false
 		oldTerm := term.DefaultTerm
 		term.DefaultTerm = term.NewTerm(
 			&FakeStdin{bytes.NewReader([]byte("aws\n"))},
@@ -320,7 +321,7 @@ func TestGetProvider(t *testing.T) {
 			new(bytes.Buffer),
 		)
 		t.Cleanup(func() {
-			global.NonInteractive = ni
+			globals.Config.NonInteractive = ni
 			aws.StsClient = sts
 			mockCtrl.savedProvider = nil
 			term.DefaultTerm = oldTerm
@@ -342,7 +343,7 @@ func TestGetProvider(t *testing.T) {
 		if testing.Short() {
 			t.Skip("Skip digitalocean test")
 		}
-		global.ProviderID = "auto"
+		globals.Config.ProviderID = "auto"
 		os.Unsetenv("DEFANG_PROVIDER")
 		os.Unsetenv("AWS_PROFILE")
 		t.Setenv("AWS_REGION", "us-west-2")
@@ -350,10 +351,10 @@ func TestGetProvider(t *testing.T) {
 		mockCtrl.savedProvider = map[string]defangv1.Provider{"someotherproj": defangv1.Provider_AWS}
 		RootCmd = FakeRootWithProviderParam("")
 
-		ni := global.NonInteractive
+		ni := globals.Config.NonInteractive
 		sts := aws.StsClient
 		aws.StsClient = &mockStsProviderAPI{}
-		global.NonInteractive = false
+		globals.Config.NonInteractive = false
 		oldTerm := term.DefaultTerm
 		term.DefaultTerm = term.NewTerm(
 			&FakeStdin{bytes.NewReader([]byte("\n"))}, // Use default option, which should be DO from env var
@@ -361,7 +362,7 @@ func TestGetProvider(t *testing.T) {
 			new(bytes.Buffer),
 		)
 		t.Cleanup(func() {
-			global.NonInteractive = ni
+			globals.Config.NonInteractive = ni
 			aws.StsClient = sts
 			mockCtrl.savedProvider = nil
 			term.DefaultTerm = oldTerm
@@ -379,14 +380,14 @@ func TestGetProvider(t *testing.T) {
 	t.Run("Auto provider from param with saved provider should go interactive and save", func(t *testing.T) {
 		os.Unsetenv("GCP_PROJECT_ID") // To trigger error
 		os.Unsetenv("DEFANG_PROVIDER")
-		global.ProviderID = "auto"
+		globals.Config.ProviderID = "auto"
 		mockCtrl.savedProvider = map[string]defangv1.Provider{"empty": defangv1.Provider_AWS}
 		RootCmd = FakeRootWithProviderParam("auto")
 
-		ni := global.NonInteractive
+		ni := globals.Config.NonInteractive
 		sts := aws.StsClient
 		aws.StsClient = &mockStsProviderAPI{}
-		global.NonInteractive = false
+		globals.Config.NonInteractive = false
 		oldTerm := term.DefaultTerm
 		term.DefaultTerm = term.NewTerm(
 			&FakeStdin{bytes.NewReader([]byte("gcp\n"))},
@@ -394,7 +395,7 @@ func TestGetProvider(t *testing.T) {
 			new(bytes.Buffer),
 		)
 		t.Cleanup(func() {
-			global.NonInteractive = ni
+			globals.Config.NonInteractive = ni
 			aws.StsClient = sts
 			mockCtrl.savedProvider = nil
 			term.DefaultTerm = oldTerm
@@ -414,10 +415,10 @@ func TestGetProvider(t *testing.T) {
 		os.Unsetenv("DEFANG_PROVIDER")
 		mockCtrl.savedProvider = map[string]defangv1.Provider{"empty": defangv1.Provider_AWS}
 		RootCmd = FakeRootWithProviderParam("digitalocean")
-		ni := global.NonInteractive
-		global.NonInteractive = false
+		ni := globals.Config.NonInteractive
+		globals.Config.NonInteractive = false
 		t.Cleanup(func() {
-			global.NonInteractive = ni
+			globals.Config.NonInteractive = ni
 			mockCtrl.savedProvider = nil
 		})
 

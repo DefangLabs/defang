@@ -7,7 +7,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/globals"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -34,7 +34,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 	project := params.Project
 	mode := params.Mode
 
-	if dryrun.DoDryRun {
+	if globals.Config.DoDryRun {
 		upload = compose.UploadModeIgnore
 	}
 
@@ -84,7 +84,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 
 	if upload == compose.UploadModeIgnore {
 		term.Println(string(bytes))
-		return nil, project, dryrun.ErrDryRun
+		return nil, project, globals.ErrDryRun
 	}
 
 	delegateDomain, err := fabric.GetDelegateSubdomainZone(ctx, &defangv1.GetDelegateSubdomainZoneRequest{Project: project.Name})

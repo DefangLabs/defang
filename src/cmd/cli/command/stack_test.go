@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/globals"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -115,9 +116,9 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 			stackCreateCmd.Flags().Set("region", tt.parameters.Region)
 
 			// Mock non-interactive mode
-			ni := global.NonInteractive
-			global.NonInteractive = true
-			t.Cleanup(func() { global.NonInteractive = ni })
+			ni := globals.Config.NonInteractive
+			globals.Config.NonInteractive = true
+			t.Cleanup(func() { globals.Config.NonInteractive = ni })
 
 			err := stackCreateCmd.RunE(stackCreateCmd, args)
 			if (err != nil) != tt.expectErr {

@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/globals"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -14,8 +14,8 @@ import (
 func Delete(ctx context.Context, projectName string, c client.FabricClient, provider client.Provider, names ...string) (types.ETag, error) {
 	term.Debug("Deleting service", names)
 
-	if dryrun.DoDryRun {
-		return "", dryrun.ErrDryRun
+	if globals.Config.DoDryRun {
+		return "", globals.ErrDryRun
 	}
 
 	delegateDomain, err := c.GetDelegateSubdomainZone(ctx, &defangv1.GetDelegateSubdomainZoneRequest{}) // TODO: pass projectName

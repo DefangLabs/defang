@@ -8,7 +8,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/globals"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
@@ -19,8 +19,8 @@ func BootstrapCommand(ctx context.Context, projectName string, verbose bool, pro
 	} else {
 		term.Infof("Running CD command %q in project %q", cmd, projectName)
 	}
-	if dryrun.DoDryRun {
-		return dryrun.ErrDryRun
+	if globals.Config.DoDryRun {
+		return globals.ErrDryRun
 	}
 
 	since := time.Now()
@@ -68,8 +68,8 @@ func SplitProjectStack(name string) (projectName string, stackName string) {
 
 func BootstrapLocalList(ctx context.Context, provider client.Provider, allRegions bool) error {
 	term.Debug("Running CD list")
-	if dryrun.DoDryRun {
-		return dryrun.ErrDryRun
+	if globals.Config.DoDryRun {
+		return globals.ErrDryRun
 	}
 
 	stacks, err := provider.BootstrapList(ctx, allRegions)

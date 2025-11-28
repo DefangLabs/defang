@@ -10,8 +10,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cluster"
-	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/github"
+	"github.com/DefangLabs/defang/src/pkg/globals"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -66,8 +66,8 @@ func interactiveLogin(ctx context.Context, client client.FabricClient, fabric st
 		}
 		// We continue even if we can't save the token; we just won't have it saved for next time
 	}
-	if dryrun.DoDryRun {
-		return dryrun.ErrDryRun
+	if globals.Config.DoDryRun {
+		return globals.ErrDryRun
 	}
 	// The new login page shows the ToS so a successful login implies the user agreed
 	if err := NonInteractiveAgreeToS(ctx, client); err != nil {

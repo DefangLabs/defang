@@ -15,7 +15,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/globals"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -57,7 +57,7 @@ func makeComposeUpCmd() *cobra.Command {
 			ctx := cmd.Context()
 			project, loadErr := loader.LoadProject(ctx)
 			if loadErr != nil {
-				if global.NonInteractive {
+				if globals.Config.NonInteractive {
 					return loadErr
 				}
 
@@ -68,7 +68,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				return cli.InteractiveDebugForClientError(ctx, global.Client, project, loadErr)
+				return cli.InteractiveDebugForClientError(ctx, globals.Config.Client, project, loadErr)
 			}
 
 			provider, err := newProviderChecked(ctx, loader)
@@ -83,7 +83,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			// Check if the project is already deployed and warn the user if they're deploying it elsewhere
-			if resp, err := global.Client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
+			if resp, err := globals.Config.Client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
 				Project: project.Name,
 				Type:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
 			}); err != nil {
@@ -93,10 +93,10 @@ func makeComposeUpCmd() *cobra.Command {
 			} else {
 				samePlace := slices.ContainsFunc(resp.Deployments, func(dep *defangv1.Deployment) bool {
 					// Old deployments may not have a region or account ID, so we check for empty values too
-					return dep.Provider == global.ProviderID.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
+					return dep.Provider == globals.Config.ProviderID.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
 				})
 				if !samePlace && len(resp.Deployments) > 0 {
-					if global.NonInteractive {
+					if globals.Config.NonInteractive {
 						term.Warnf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", project.Name)
 					} else {
 						help := "Active deployments of this project:"
@@ -130,10 +130,10 @@ func makeComposeUpCmd() *cobra.Command {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
 			}
 
-			deploy, project, err := cli.ComposeUp(ctx, global.Client, provider, cli.ComposeUpParams{
+			deploy, project, err := cli.ComposeUp(ctx, globals.Config.Client, provider, cli.ComposeUpParams{
 				Project:    project,
 				UploadMode: upload,
-				Mode:       global.Mode,
+				Mode:       globals.Config.Mode,
 			})
 			if err != nil {
 				return handleComposeUpErr(ctx, err, project, provider)
@@ -157,12 +157,12 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 
-			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, global.Verbose)
+			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, globals.Config.Verbose)
 			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
-				handleTailAndMonitorErr(ctx, err, global.Client, cli.DebugConfig{
+				handleTailAndMonitorErr(ctx, err, globals.Config.Client, cli.DebugConfig{
 					Deployment: deploy.Etag,
-					ModelId:    global.ModelID,
+					ModelId:    globals.Config.ModelID,
 					Project:    project,
 					Provider:   provider,
 					Since:      since,
@@ -190,7 +190,7 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // obsolete, but keep for backwards compatibility
 	_ = composeUpCmd.Flags().MarkHidden("tail")
-	composeUpCmd.Flags().VarP(&global.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
+	composeUpCmd.Flags().VarP(&globals.Config.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	composeUpCmd.Flags().Bool("build", true, "build the image before starting the service") // docker-compose compatibility
 	_ = composeUpCmd.Flags().MarkHidden("build")
 	composeUpCmd.Flags().Bool("wait", true, "wait for services to be running|healthy") // docker-compose compatibility
@@ -205,7 +205,7 @@ func handleComposeUpErr(ctx context.Context, err error, project *compose.Project
 		printDefangHint("To start a new project, do:", "new")
 	}
 
-	if global.NonInteractive || errors.Is(err, byoc.ErrLocalPulumiStopped) {
+	if globals.Config.NonInteractive || errors.Is(err, byoc.ErrLocalPulumiStopped) {
 		return err
 	}
 
@@ -226,7 +226,7 @@ func handleComposeUpErr(ctx context.Context, err error, project *compose.Project
 
 	term.Error("Error:", cliClient.PrettyError(err))
 	track.Evt("Debug Prompted", P("composeErr", err))
-	return cli.InteractiveDebugForClientError(ctx, global.Client, project, err)
+	return cli.InteractiveDebugForClientError(ctx, globals.Config.Client, project, err)
 }
 
 func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.GrpcClient, debugConfig cli.DebugConfig) {
@@ -237,7 +237,7 @@ func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.G
 		if errDeploymentFailed.Service != "" {
 			debugConfig.FailedServices = []string{errDeploymentFailed.Service}
 		}
-		if global.NonInteractive {
+		if globals.Config.NonInteractive {
 			printDefangHint("To debug the deployment, do:", debugConfig.String())
 		} else {
 			track.Evt("Debug Prompted", P("failedServices", debugConfig.FailedServices), P("etag", debugConfig.Deployment), P("reason", errDeploymentFailed))
@@ -274,7 +274,7 @@ func newTailOptionsForDeploy(deployment string, since time.Time, verbose bool) c
 }
 
 func flushWarnings() {
-	if global.HasTty && term.HadWarnings() {
+	if globals.Config.HasTty && term.HadWarnings() {
 		term.Println("\n\u26A0\uFE0F Some warnings were seen during this command:")
 		term.FlushWarnings()
 	}
@@ -353,7 +353,7 @@ func makeComposeDownCmd() *cobra.Command {
 			}
 
 			since := time.Now()
-			deployment, err := cli.ComposeDown(cmd.Context(), projectName, global.Client, provider, args...)
+			deployment, err := cli.ComposeDown(cmd.Context(), projectName, globals.Config.Client, provider, args...)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
@@ -422,7 +422,7 @@ func newTailOptionsForDown(deployment string, since time.Time) cli.TailOptions {
 			}
 			return nil // keep tailing logs
 		},
-		Verbose: global.Verbose,
+		Verbose: globals.Config.Verbose,
 		LogType: logs.LogTypeAll,
 	}
 }
@@ -438,7 +438,7 @@ func makeComposeConfigCmd() *cobra.Command {
 			ctx := cmd.Context()
 			project, loadErr := loader.LoadProject(ctx)
 			if loadErr != nil {
-				if global.NonInteractive {
+				if globals.Config.NonInteractive {
 					return loadErr
 				}
 
@@ -449,7 +449,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				return cli.InteractiveDebugForClientError(ctx, global.Client, project, loadErr)
+				return cli.InteractiveDebugForClientError(ctx, globals.Config.Client, project, loadErr)
 			}
 
 			provider, err := newProvider(ctx, loader)
@@ -457,12 +457,12 @@ func makeComposeConfigCmd() *cobra.Command {
 				return err
 			}
 
-			_, _, err = cli.ComposeUp(ctx, global.Client, provider, cli.ComposeUpParams{
+			_, _, err = cli.ComposeUp(ctx, globals.Config.Client, provider, cli.ComposeUpParams{
 				Project:    project,
 				UploadMode: compose.UploadModeIgnore,
 				Mode:       modes.ModeUnspecified,
 			})
-			if !errors.Is(err, dryrun.ErrDryRun) {
+			if !errors.Is(err, globals.ErrDryRun) {
 				return err
 			}
 			return nil

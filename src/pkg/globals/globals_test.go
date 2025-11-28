@@ -1,4 +1,4 @@
-package command
+package globals
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/color"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/spf13/pflag"
@@ -18,7 +19,7 @@ func Test_readGlobals(t *testing.T) {
 	t.Run("OS env beats any .defang file", func(t *testing.T) {
 		t.Chdir("testdata/with-stack")
 		t.Setenv("VALUE", "from OS env")
-		err := testConfig.loadDotDefang("test")
+		err := testConfig.LoadDotDefang("test")
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -30,7 +31,7 @@ func Test_readGlobals(t *testing.T) {
 
 	t.Run(".defang/test beats .defang", func(t *testing.T) {
 		t.Chdir("testdata/with-stack")
-		err := testConfig.loadDotDefang("test")
+		err := testConfig.LoadDotDefang("test")
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -42,7 +43,7 @@ func Test_readGlobals(t *testing.T) {
 
 	t.Run(".defang used if no stack", func(t *testing.T) {
 		t.Chdir("testdata/no-stack")
-		err := testConfig.loadDotDefang("")
+		err := testConfig.LoadDotDefang("")
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -53,7 +54,7 @@ func Test_readGlobals(t *testing.T) {
 	})
 
 	t.Run("incorrect stackname used if no stack", func(t *testing.T) {
-		err := testConfig.loadDotDefang("non-existent-stack")
+		err := testConfig.LoadDotDefang("non-existent-stack")
 		if err == nil {
 			t.Fatalf("this test should fail for non-existent stack: %v", err)
 		}
@@ -67,7 +68,7 @@ func Test_configurationPrecedence(t *testing.T) {
 
 	// make a default config for comparison and copying
 	defaultConfig := GlobalConfig{
-		ColorMode:      ColorAuto,
+		ColorMode:      color.ColorAuto,
 		Debug:          false,
 		HasTty:         true, // set to true just for test instead of term.IsTerminal() for consistency
 		HideUpdate:     false,
@@ -148,7 +149,7 @@ func Test_configurationPrecedence(t *testing.T) {
 				ProviderID:     cliClient.ProviderAWS,
 				Org:            "from-flags-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
-				ColorMode:      ColorAlways,
+				ColorMode:      color.ColorAlways,
 				HasTty:         false, // from env override
 				NonInteractive: false, // from flags override
 				HideUpdate:     false, // from env override (env false beats env true)
@@ -196,7 +197,7 @@ func Test_configurationPrecedence(t *testing.T) {
 				ProviderID:     cliClient.ProviderGCP,
 				Org:            "from-env-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
-				ColorMode:      ColorAuto,
+				ColorMode:      color.ColorAuto,
 				HasTty:         true,  // from env
 				NonInteractive: false, // from env
 				HideUpdate:     false, // from env (env overrides env)
@@ -231,7 +232,7 @@ func Test_configurationPrecedence(t *testing.T) {
 				ProviderID:     cliClient.ProviderDefang,
 				Org:            "from-env-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
-				ColorMode:      ColorAlways,
+				ColorMode:      color.ColorAlways,
 				HasTty:         false, // from env
 				NonInteractive: true,  // from env
 				HideUpdate:     true,  // from env
@@ -274,7 +275,7 @@ func Test_configurationPrecedence(t *testing.T) {
 				ProviderID:     cliClient.ProviderDefang,
 				Org:            "from-env-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
-				ColorMode:      ColorAlways,
+				ColorMode:      color.ColorAlways,
 				HasTty:         false, // from env
 				NonInteractive: true,  // from env
 				HideUpdate:     true,  // from env
@@ -372,12 +373,12 @@ func Test_configurationPrecedence(t *testing.T) {
 			t.Chdir(tempDir)
 
 			// simulates the actual loading sequence
-			err := testConfig.loadDotDefang(tt.rcStack.stackname)
+			err := testConfig.LoadDotDefang(tt.rcStack.stackname)
 			if err != nil {
 				t.Fatalf("failed to load env file: %v", err)
 			}
 
-			err = testConfig.syncFlagsWithEnv(flags)
+			err = testConfig.SyncFlagsWithEnv(flags)
 			if err != nil {
 				t.Fatalf("failed to sync flags with env vars: %v", err)
 			}

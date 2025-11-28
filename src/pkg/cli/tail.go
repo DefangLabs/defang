@@ -15,7 +15,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/globals"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/spinner"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -139,8 +139,8 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 		}
 	}
 
-	if dryrun.DoDryRun {
-		return dryrun.ErrDryRun
+	if globals.Config.DoDryRun {
+		return globals.ErrDryRun
 	}
 
 	options.PrintBookends = true

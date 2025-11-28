@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/globals"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -21,9 +21,9 @@ type GenerateArgs struct {
 }
 
 func GenerateWithAI(ctx context.Context, client client.FabricClient, args GenerateArgs) ([]string, error) {
-	if dryrun.DoDryRun {
+	if globals.Config.DoDryRun {
 		term.Warn("Dry run, no project files will be generated")
-		return nil, dryrun.ErrDryRun
+		return nil, globals.ErrDryRun
 	}
 
 	response, err := client.GenerateFiles(ctx, &defangv1.GenerateFilesRequest{

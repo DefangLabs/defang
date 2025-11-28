@@ -1,4 +1,4 @@
-package command
+package color
 
 import "fmt"
 
@@ -15,7 +15,7 @@ const (
 	// ColorRaw ColorMode = "raw"
 )
 
-var allColorModes = []ColorMode{
+var AllColorModes = []ColorMode{
 	ColorNever,
 	ColorAuto,
 	ColorAlways,
@@ -26,13 +26,13 @@ func (c ColorMode) String() string {
 }
 
 func (c *ColorMode) Set(value string) error {
-	for _, colorMode := range allColorModes {
+	for _, colorMode := range AllColorModes {
 		if colorMode.String() == value {
 			*c = colorMode
 			return nil
 		}
 	}
-	return fmt.Errorf("color mode not one of %v", allColorModes)
+	return fmt.Errorf("color mode not one of %v", AllColorModes)
 }
 
 func (c ColorMode) Type() string {

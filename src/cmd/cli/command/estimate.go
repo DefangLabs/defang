@@ -5,6 +5,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/globals"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/cobra"
@@ -26,7 +27,7 @@ func makeEstimateCmd() *cobra.Command {
 				return err
 			}
 
-			if global.ProviderID == cliClient.ProviderAuto {
+			if globals.Config.ProviderID == cliClient.ProviderAuto {
 				_, err = interactiveSelectProvider([]cliClient.ProviderID{
 					cliClient.ProviderAWS,
 					cliClient.ProviderGCP,
@@ -36,29 +37,29 @@ func makeEstimateCmd() *cobra.Command {
 				}
 			}
 
-			var previewProvider cliClient.Provider = &cliClient.PlaygroundProvider{FabricClient: global.Client}
+			var previewProvider cliClient.Provider = &cliClient.PlaygroundProvider{FabricClient: globals.Config.Client}
 
 			// default to development mode if not specified; TODO: when mode is not specified, show an interactive prompt
-			if global.Mode == modes.ModeUnspecified {
-				global.Mode = modes.ModeAffordable
+			if globals.Config.Mode == modes.ModeUnspecified {
+				globals.Config.Mode = modes.ModeAffordable
 			}
 			if region == "" {
-				region = cliClient.GetRegion(global.ProviderID) // This sets the default region based on the provider
+				region = cliClient.GetRegion(globals.Config.ProviderID) // This sets the default region based on the provider
 			}
 
-			estimate, err := cli.RunEstimate(ctx, project, global.Client, previewProvider, global.ProviderID, region, global.Mode)
+			estimate, err := cli.RunEstimate(ctx, project, globals.Config.Client, previewProvider, globals.Config.ProviderID, region, globals.Config.Mode)
 			if err != nil {
 				return fmt.Errorf("failed to run estimate: %w", err)
 			}
 			term.Debugf("Estimate: %+v", estimate)
 
-			cli.PrintEstimate(global.Mode, estimate, term.DefaultTerm)
+			cli.PrintEstimate(globals.Config.Mode, estimate, term.DefaultTerm)
 
 			return nil
 		},
 	}
 
-	estimateCmd.Flags().VarP(&global.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
+	estimateCmd.Flags().VarP(&globals.Config.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	estimateCmd.Flags().StringP("region", "r", "", "which cloud region to estimate")
 	return estimateCmd
 }

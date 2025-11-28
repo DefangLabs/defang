@@ -7,7 +7,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/globals"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -18,8 +18,8 @@ import (
 func ComposeDown(ctx context.Context, projectName string, fabric client.FabricClient, provider client.Provider, names ...string) (types.ETag, error) {
 	term.Debugf("Destroying project %q %q", projectName, names)
 
-	if dryrun.DoDryRun {
-		return "", dryrun.ErrDryRun
+	if globals.Config.DoDryRun {
+		return "", globals.ErrDryRun
 	}
 
 	if len(names) == 0 {

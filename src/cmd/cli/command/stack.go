@@ -8,6 +8,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/globals"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -46,12 +47,12 @@ func makeStackNewCmd() *cobra.Command {
 
 			params := stacks.StackParameters{
 				Name:     stackName,
-				Provider: global.ProviderID, // default provider
+				Provider: globals.Config.ProviderID, // default provider
 				Region:   region,
-				Mode:     global.Mode,
+				Mode:     globals.Config.Mode,
 			}
 
-			if global.NonInteractive {
+			if globals.Config.NonInteractive {
 				_, err := stacks.Create(params)
 				return err
 			}
@@ -74,11 +75,11 @@ func makeStackNewCmd() *cobra.Command {
 					return errors.New("a cloud provider must be selected")
 				}
 
-				err = global.ProviderID.Set(provider)
+				err = globals.Config.ProviderID.Set(provider)
 				if err != nil {
 					return err
 				}
-				params.Provider = global.ProviderID
+				params.Provider = globals.Config.ProviderID
 			}
 
 			if params.Region == "" && params.Provider != cliClient.ProviderDefang {
@@ -147,7 +148,7 @@ func makeStackNewCmd() *cobra.Command {
 			return nil
 		},
 	}
-	stackNewCmd.Flags().VarP(&global.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
+	stackNewCmd.Flags().VarP(&globals.Config.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	stackNewCmd.Flags().StringP("region", "r", "", "Cloud region for the stack deployment")
 
 	return stackNewCmd

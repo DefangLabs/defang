@@ -7,6 +7,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
+	"github.com/DefangLabs/defang/src/pkg/globals"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/cobra"
 )
@@ -27,7 +28,7 @@ var cdCmd = &cobra.Command{
 
 		if json {
 			os.Setenv("DEFANG_JSON", "1") // FIXME: ugly way to set this globally
-			global.Verbose = true
+			globals.Config.Verbose = true
 		}
 	},
 }
@@ -54,7 +55,7 @@ func bootstrapCommand(cmd *cobra.Command, args []string, command string) error {
 		if err != nil {
 			return err
 		}
-		errs = append(errs, cli.BootstrapCommand(ctx, projectName, global.Verbose, provider, command))
+		errs = append(errs, cli.BootstrapCommand(ctx, projectName, globals.Config.Verbose, provider, command))
 	}
 	return errors.Join(errs...)
 }
@@ -137,7 +138,7 @@ var cdListCmd = &cobra.Command{
 			}
 
 			// FIXME: this needs auth because it spawns the CD task
-			return cli.BootstrapCommand(cmd.Context(), "", global.Verbose, provider, "list")
+			return cli.BootstrapCommand(cmd.Context(), "", globals.Config.Verbose, provider, "list")
 		}
 		return cli.BootstrapLocalList(cmd.Context(), provider, all)
 	},
@@ -165,7 +166,7 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.Preview(cmd.Context(), project, global.Client, provider, global.Mode)
+		return cli.Preview(cmd.Context(), project, globals.Config.Client, provider, globals.Config.Mode)
 	},
 }
 
@@ -198,7 +199,7 @@ var cdCloudformationCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Hidden:      true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		provider := aws.NewByocProvider(cmd.Context(), global.Client.GetTenantName(), global.Stack)
+		provider := aws.NewByocProvider(cmd.Context(), globals.Config.Client.GetTenantName(), globals.Config.Stack)
 
 		if err := canIUseProvider(cmd.Context(), provider, "", 0); err != nil {
 			return err

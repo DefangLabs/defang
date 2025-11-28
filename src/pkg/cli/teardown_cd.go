@@ -6,12 +6,12 @@ import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/globals"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 func TearDownCD(ctx context.Context, provider client.Provider, force bool) error {
-	if dryrun.DoDryRun {
+	if globals.Config.DoDryRun {
 		return errors.New("dry run")
 	}
 	if !force {

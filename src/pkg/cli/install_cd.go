@@ -5,12 +5,12 @@ import (
 	"errors"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/globals"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 func InstallCD(ctx context.Context, provider client.Provider) error {
-	if dryrun.DoDryRun {
+	if globals.Config.DoDryRun {
 		return errors.New("dry run")
 	}
 	term.Info("Installing the CD resources into the cluster")

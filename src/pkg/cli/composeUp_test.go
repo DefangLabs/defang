@@ -13,7 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/globals"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -327,7 +327,7 @@ func TestComposeConfigWithoutLogin(t *testing.T) {
 		Project:    project,
 		UploadMode: compose.UploadModeIgnore,
 	})
-	if !errors.Is(err, dryrun.ErrDryRun) {
+	if !errors.Is(err, globals.ErrDryRun) {
 		t.Fatalf("ComposeUp() failed: %v", err)
 	}
 }

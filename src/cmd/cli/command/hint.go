@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/globals"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
@@ -42,7 +43,7 @@ func prettyExecutable(def string) string {
 }
 
 func printDefangHint(hint string, cmds ...string) {
-	if pkg.GetenvBool("DEFANG_HIDE_HINTS") || !global.HasTty {
+	if pkg.GetenvBool("DEFANG_HIDE_HINTS") || !globals.Config.HasTty {
 		return
 	}
 
