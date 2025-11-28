@@ -60,10 +60,14 @@ func New(ctx context.Context, clusterAddr string, providerId *client.ProviderID)
 	)
 
 	printer := printer{outStream: os.Stdout}
+	toolManager := NewToolManager(gk, printer)
+	fsTools := CollectFsTools()
+	toolManager.RegisterTools(fsTools...)
 
 	generator := NewGenerator(
 		gk,
 		printer,
+		toolManager,
 	)
 
 	preparedSystemPrompt, err := prepareSystemPrompt()
@@ -131,11 +135,18 @@ func (a *Agent) startSession(ctx context.Context) error {
 }
 
 func (a *Agent) handleUserMessage(ctx context.Context, msg string) error {
+	maxTurns := 8
 	for {
-		a.generator.HandleMessage(ctx, a.system, ai.NewUserMessage(ai.NewTextPart(msg)))
+		err := a.generator.HandleMessage(ctx, a.system, maxTurns, ai.NewUserMessage(ai.NewTextPart(msg)))
+		if err == nil {
+			return nil
+		}
+		if _, ok := err.(*maxTurnsReachedError); !ok {
+			return err
+		}
 
 		var continueSession bool
-		err := survey.AskOne(&survey.Confirm{
+		err = survey.AskOne(&survey.Confirm{
 			Message: "Defang is still working on this, would you like to continue?",
 			Default: true,
 		}, &continueSession, survey.WithStdio(term.DefaultTerm.Stdio()))
