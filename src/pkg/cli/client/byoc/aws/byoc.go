@@ -364,7 +364,7 @@ func (b *ByocAws) getExistingDockerHubCredentials(ctx context.Context, projectNa
 	var found *byoc.PulumiState
 	for stack, state := range stackAndStates {
 		parts := strings.SplitN(stack, "/", 2)
-		if parts[0] == projectName {
+		if parts[0] == projectName && parts[1] == b.PulumiStack {
 			found = state
 			break
 		}
