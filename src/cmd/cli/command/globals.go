@@ -1,7 +1,6 @@
 package command
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -10,6 +9,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/joho/godotenv"
 	"github.com/spf13/pflag"
@@ -254,17 +254,11 @@ godotenv.Load respects existing environment variables. Stack-specific RC files
 are considered required when specified, while the general RC file is optional.
 */
 func (r *GlobalConfig) loadDotDefang(stackName string) error {
-	dotfile := ".defang"
 	if stackName != "" {
 		// If a stack name is provided, load the stack-specific RC file but return error if it fails or does not exist
-		dotfile = filepath.Join(dotfile, stackName)
-		if abs, err := filepath.Abs(dotfile); err == nil {
-			dotfile = abs
-		}
-		if err := godotenv.Load(dotfile); err != nil {
-			return fmt.Errorf("could not load stack %q: %w", stackName, err)
-		}
+		stacks.Load(stackName) // ensure stack exists
 	} else {
+		dotfile := ".defang"
 		// If no stack name is provided, trying load the general .defang file
 		if abs, err := filepath.Abs(dotfile); err == nil {
 			dotfile = abs
@@ -274,8 +268,8 @@ func (r *GlobalConfig) loadDotDefang(stackName string) error {
 			term.Debugf("could not load stack %q; continuing without env file: %v", stackName, err)
 			return nil // continue if no general env file
 		}
+		term.Debugf("loaded globals from %s", dotfile)
 	}
 
-	term.Debugf("loaded globals from %s", dotfile)
 	return nil
 }
