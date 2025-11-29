@@ -25,18 +25,6 @@ var multipleComposeFilesOptions = mcp.WithArray("compose_file_paths",
 func CollectTools(cluster string, providerId *client.ProviderID, cli CLIInterface) []server.ServerTool {
 	tools := []server.ServerTool{
 		{
-			Tool: mcp.NewTool("login",
-				mcp.WithDescription("Login to Defang"),
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				output, err := HandleLoginTool(ctx, cluster, cli)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to login", err), err
-				}
-				return mcp.NewToolResultText(output), nil
-			},
-		},
-		{
 			Tool: mcp.NewTool("services",
 				mcp.WithDescription("List deployed services for the project in the current working directory"),
 				workingDirectoryOption,
