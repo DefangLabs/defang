@@ -224,57 +224,6 @@ func CollectTools(cluster string, providerId *client.ProviderID, cli CLIInterfac
 				return mcp.NewToolResultText(output), nil
 			},
 		},
-		{
-			Tool: mcp.NewTool("set_aws_provider",
-				mcp.WithDescription("Set the AWS provider for the defang project"),
-				workingDirectoryOption,
-				mcp.WithString("accessKeyId",
-					mcp.Description("Your AWS Access Key ID"),
-				),
-				mcp.WithString("secretAccessKey",
-					mcp.Description("Your AWS Secret Access Key"),
-				),
-				mcp.WithString("region",
-					mcp.Description("Your AWS Region"),
-				),
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				output, err := HandleSetAWSProvider(ctx, request, providerId, cluster)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to set AWS provider", err), err
-				}
-				return mcp.NewToolResultText(output), nil
-			},
-		},
-		{
-			Tool: mcp.NewTool("set_gcp_provider",
-				mcp.WithDescription("Set the GCP provider for the defang project"),
-				workingDirectoryOption,
-				mcp.WithString("gcpProjectId",
-					mcp.Description("Your GCP Project ID"),
-				),
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				output, err := HandleSetGCPProvider(ctx, request, providerId, cluster)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to set GCP provider", err), err
-				}
-				return mcp.NewToolResultText(output), nil
-			},
-		},
-		{
-			Tool: mcp.NewTool("set_playground_provider",
-				mcp.WithDescription("Set the Playground provider for the defang project"),
-				workingDirectoryOption,
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				output, err := HandleSetPlaygroundProvider(providerId)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to set Playground provider", err), err
-				}
-				return mcp.NewToolResultText(output), nil
-			},
-		},
 	}
 	return tools
 }
