@@ -323,6 +323,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is limited to the current repository
           DISCORD_WEBHOOK_ID: ${{ secrets.DISCORD_WEBHOOK_ID }}
           DISCORD_WEBHOOK_TOKEN: ${{ secrets.DISCORD_WEBHOOK_TOKEN }}
+          # Make sure this "GH_PAT_WINGET" is still valid and is a Github PAT (Classic) with repo permissions
+          # https://github.com/orgs/community/discussions/106661
 
   push-docker:
     runs-on: ubuntu-latest
