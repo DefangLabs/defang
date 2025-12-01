@@ -6,14 +6,13 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/agent/tools"
-	"github.com/DefangLabs/defang/src/pkg/mcp/prompts"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 
-	// NewDefangMCPServer returns a new MCPServer instance with all resources, tools, and prompts registered.
+	// NewDefangMCPServer returns a new MCPServer instance with all resources, tools registered.
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 )
 
@@ -58,13 +57,11 @@ func NewDefangMCPServer(version string, cluster string, providerID *cliClient.Pr
 		"Deploy with Defang",
 		version,
 		server.WithResourceCapabilities(true, true),
-		server.WithPromptCapabilities(true),
 		server.WithToolCapabilities(true),
 		server.WithInstructions(prepareInstructions(defangTools)),
 	)
 
 	resources.SetupResources(s)
-	prompts.SetupPrompts(s, cluster, providerID)
 
 	// This is used to pass down information of what MCP client we are using
 	common.MCPDevelopmentClient = string(client)
