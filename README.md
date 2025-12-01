@@ -161,6 +161,7 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_PULUMI_BACKEND` - The Pulumi backend URL or `"pulumi-cloud"`; defaults to a self-hosted backend
 - `DEFANG_PULUMI_DIR` - Run Pulumi from this folder, instead of spawning a cloud task; requires `--debug` (BYOC only)
 - `DEFANG_PULUMI_VERSION` - Override the version of the Pulumi image to use (`aws` provider only)
+- `DEFANG_SUFFIX` - The suffix to use for all BYOC resources; defaults to the stack name, or `beta` if unset.
 - `NO_COLOR` - If set to any value, disables color output; by default, color output is enabled depending on the terminal
 - `PULUMI_ACCESS_TOKEN` - The Pulumi access token to use for authentication to Pulumi Cloud; see `DEFANG_PULUMI_BACKEND`
 - `PULUMI_CONFIG_PASSPHRASE` - Passphrase used to generate a unique key for your stack, and configuration and encrypted state values

@@ -63,10 +63,11 @@ func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 	}
 
 	err = cli.Tail(ctx, provider, project, cliTypes.TailOptions{
-		Deployment: params.DeploymentID,
-		Since:      sinceTime,
-		Until:      untilTime,
-		Limit:      100,
+		Deployment:    params.DeploymentID,
+		Since:         sinceTime,
+		Until:         untilTime,
+		Limit:         100,
+		PrintBookends: true,
 	})
 
 	if err != nil {

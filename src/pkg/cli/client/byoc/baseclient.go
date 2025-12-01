@@ -65,7 +65,7 @@ func NewByocBaseClient(tenantName types.TenantName, backend ProjectBackend, stac
 	b := &ByocBaseClient{
 		Prefix:         pkg.Getenv("DEFANG_PREFIX", "Defang"), // prefix for all resources created by Defang
 		TenantName:     string(tenantName),
-		PulumiStack:    stack,
+		PulumiStack:    pkg.Getenv("DEFANG_SUFFIX", stack),
 		projectBackend: backend,
 	}
 	return b

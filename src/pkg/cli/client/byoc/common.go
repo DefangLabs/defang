@@ -5,7 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -99,7 +99,7 @@ func DebugPulumiGolang(ctx context.Context, env []string, cmd ...string) error {
 		"USER=" + pkg.GetCurrentUser(), // needed for Pulumi
 		"HOME=" + os.Getenv("HOME"),    // needed for go
 	}, env...)
-	if err := runLocalCommand(ctx, path.Join(dir, "cd", "gcp"), env, localCmd...); err != nil {
+	if err := runLocalCommand(ctx, filepath.Join(dir, "cd", "gcp"), env, localCmd...); err != nil {
 		return err
 	}
 	// We always return an error to stop the CLI from "tailing" the cloud logs

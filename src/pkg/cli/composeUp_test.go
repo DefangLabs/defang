@@ -13,6 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -312,5 +313,21 @@ func TestComposeUpStops(t *testing.T) {
 				t.Errorf("expected ErrDeploymentFailed: %v, got: %v", tt.isErrDeploymentFailed, err)
 			}
 		})
+	}
+}
+
+func TestComposeConfigWithoutLogin(t *testing.T) {
+	fabric := client.MockFabricClient{}
+	provider := &client.PlaygroundProvider{FabricClient: fabric}
+
+	project := &compose.Project{}
+
+	_, _, err := ComposeUp(t.Context(), fabric, provider, ComposeUpParams{
+		Mode:       modes.ModeUnspecified,
+		Project:    project,
+		UploadMode: compose.UploadModeIgnore,
+	})
+	if !errors.Is(err, dryrun.ErrDryRun) {
+		t.Fatalf("ComposeUp() failed: %v", err)
 	}
 }

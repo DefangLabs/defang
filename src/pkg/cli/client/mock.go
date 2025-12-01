@@ -2,9 +2,13 @@ package client
 
 import (
 	"context"
+	"errors"
+	"net/http"
 
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
+	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -105,6 +109,14 @@ func (m *MockWaitStream[T]) Close() error {
 type MockFabricClient struct {
 	FabricClient
 	DelegateDomain string
+}
+
+func (m MockFabricClient) GetController() defangv1connect.FabricControllerClient {
+	return defangv1connect.NewFabricControllerClient(http.DefaultClient, "localhost")
+}
+
+func (m MockFabricClient) GetPlaygroundProjectDomain(ctx context.Context) (*defangv1.GetPlaygroundProjectDomainResponse, error) {
+	return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("missing bearer token"))
 }
 
 func (m MockFabricClient) AgreeToS(ctx context.Context) error {

@@ -13,11 +13,10 @@ import (
 )
 
 func Test_readGlobals(t *testing.T) {
-	t.Chdir("testdata")
-
 	testConfig := GlobalConfig{}
 
 	t.Run("OS env beats any .defang file", func(t *testing.T) {
+		t.Chdir("testdata/with-stack")
 		t.Setenv("VALUE", "from OS env")
 		err := testConfig.loadDotDefang("test")
 		if err != nil {
@@ -29,18 +28,20 @@ func Test_readGlobals(t *testing.T) {
 		os.Unsetenv("VALUE")
 	})
 
-	t.Run(".defang.test beats .defang", func(t *testing.T) {
+	t.Run(".defang/test beats .defang", func(t *testing.T) {
+		t.Chdir("testdata/with-stack")
 		err := testConfig.loadDotDefang("test")
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		if v := os.Getenv("VALUE"); v != "from .defang.test" {
-			t.Errorf("expected VALUE to be 'from .defang.test', got '%s'", v)
+		if v := os.Getenv("VALUE"); v != "from .defang/test" {
+			t.Errorf("expected VALUE to be 'from .defang/test', got '%s'", v)
 		}
 		os.Unsetenv("VALUE")
 	})
 
 	t.Run(".defang used if no stack", func(t *testing.T) {
+		t.Chdir("testdata/no-stack")
 		err := testConfig.loadDotDefang("")
 		if err != nil {
 			t.Fatalf("%v", err)
@@ -94,7 +95,7 @@ func Test_configurationPrecedence(t *testing.T) {
 		expected     GlobalConfig
 	}{
 		{
-			name:         "Flags override env and rc file",
+			name:         "Flags override env and env file",
 			createRCFile: true,
 			rcStack: stack{
 				stackname: "test",
@@ -102,10 +103,10 @@ func Test_configurationPrecedence(t *testing.T) {
 					"DEFANG_MODE":            "AFFORDABLE",
 					"DEFANG_VERBOSE":         "false",
 					"DEFANG_DEBUG":           "true",
-					"DEFANG_STACK":           "from-rc",
-					"DEFANG_FABRIC":          "from-rc-cluster",
+					"DEFANG_STACK":           "from-env",
+					"DEFANG_FABRIC":          "from-env-cluster",
 					"DEFANG_PROVIDER":        "defang",
-					"DEFANG_ORG":             "from-rc-org",
+					"DEFANG_ORG":             "from-env-org",
 					"DEFANG_SOURCE_PLATFORM": "heroku",
 					"DEFANG_COLOR":           "never",
 					"DEFANG_TTY":             "false",
@@ -150,11 +151,11 @@ func Test_configurationPrecedence(t *testing.T) {
 				ColorMode:      ColorAlways,
 				HasTty:         false, // from env override
 				NonInteractive: false, // from flags override
-				HideUpdate:     false, // from env override (env false beats rc true)
+				HideUpdate:     false, // from env override (env false beats env true)
 			},
 		},
 		{
-			name:         "Env overrides rc files when no flags set",
+			name:         "Env overrides env files when no flags set",
 			createRCFile: true,
 			rcStack: stack{
 				stackname: "test",
@@ -162,10 +163,10 @@ func Test_configurationPrecedence(t *testing.T) {
 					"DEFANG_MODE":            "AFFORDABLE",
 					"DEFANG_VERBOSE":         "false",
 					"DEFANG_DEBUG":           "true",
-					"DEFANG_STACK":           "from-rc",
-					"DEFANG_FABRIC":          "from-rc-cluster",
+					"DEFANG_STACK":           "from-env",
+					"DEFANG_FABRIC":          "from-env-cluster",
 					"DEFANG_PROVIDER":        "defang",
-					"DEFANG_ORG":             "from-rc-org",
+					"DEFANG_ORG":             "from-env-org",
 					"DEFANG_SOURCE_PLATFORM": "heroku",
 					"DEFANG_COLOR":           "never",
 					"DEFANG_TTY":             "false",
@@ -198,11 +199,11 @@ func Test_configurationPrecedence(t *testing.T) {
 				ColorMode:      ColorAuto,
 				HasTty:         true,  // from env
 				NonInteractive: false, // from env
-				HideUpdate:     false, // from env (env overrides rc)
+				HideUpdate:     false, // from env (env overrides env)
 			},
 		},
 		{
-			name:         "RC file used when no env vars or flags set",
+			name:         "env file used when no env vars or flags set",
 			createRCFile: true,
 			rcStack: stack{
 				stackname: "test",
@@ -210,10 +211,10 @@ func Test_configurationPrecedence(t *testing.T) {
 					"DEFANG_MODE":            "AFFORDABLE",
 					"DEFANG_VERBOSE":         "true",
 					"DEFANG_DEBUG":           "false",
-					"DEFANG_STACK":           "from-rc",
-					"DEFANG_FABRIC":          "from-rc-cluster",
+					"DEFANG_STACK":           "from-env",
+					"DEFANG_FABRIC":          "from-env-cluster",
 					"DEFANG_PROVIDER":        "defang",
-					"DEFANG_ORG":             "from-rc-org",
+					"DEFANG_ORG":             "from-env-org",
 					"DEFANG_SOURCE_PLATFORM": "heroku",
 					"DEFANG_COLOR":           "always",
 					"DEFANG_TTY":             "false",
@@ -222,22 +223,22 @@ func Test_configurationPrecedence(t *testing.T) {
 				},
 			},
 			expected: GlobalConfig{
-				Mode:           modes.ModeAffordable, // RC file values
+				Mode:           modes.ModeAffordable, // env file values
 				Verbose:        true,
 				Debug:          false,
-				Stack:          "from-rc",
-				Cluster:        "from-rc-cluster",
+				Stack:          "from-env",
+				Cluster:        "from-env-cluster",
 				ProviderID:     cliClient.ProviderDefang,
-				Org:            "from-rc-org",
+				Org:            "from-env-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAlways,
-				HasTty:         false, // from rc
-				NonInteractive: true,  // from rc
-				HideUpdate:     true,  // from rc
+				HasTty:         false, // from env
+				NonInteractive: true,  // from env
+				HideUpdate:     true,  // from env
 			},
 		},
 		{
-			name:         "RC file with no values used when no env vars or flags set",
+			name:         "env file with no values used when no env vars or flags set",
 			createRCFile: true,
 			rcStack: stack{
 				stackname: "test",
@@ -253,10 +254,10 @@ func Test_configurationPrecedence(t *testing.T) {
 					"DEFANG_MODE":            "AFFORDABLE",
 					"DEFANG_VERBOSE":         "true",
 					"DEFANG_DEBUG":           "false",
-					"DEFANG_STACK":           "from-rc",
-					"DEFANG_FABRIC":          "from-rc-cluster",
+					"DEFANG_STACK":           "from-env",
+					"DEFANG_FABRIC":          "from-env-cluster",
 					"DEFANG_PROVIDER":        "defang",
-					"DEFANG_ORG":             "from-rc-org",
+					"DEFANG_ORG":             "from-env-org",
 					"DEFANG_SOURCE_PLATFORM": "heroku",
 					"DEFANG_COLOR":           "always",
 					"DEFANG_TTY":             "false",
@@ -265,18 +266,18 @@ func Test_configurationPrecedence(t *testing.T) {
 				},
 			},
 			expected: GlobalConfig{
-				Mode:           modes.ModeAffordable, // RC file values
+				Mode:           modes.ModeAffordable, // env file values
 				Verbose:        true,
 				Debug:          false,
-				Stack:          "from-rc",
-				Cluster:        "from-rc-cluster",
+				Stack:          "from-env",
+				Cluster:        "from-env-cluster",
 				ProviderID:     cliClient.ProviderDefang,
-				Org:            "from-rc-org",
+				Org:            "from-env-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAlways,
-				HasTty:         false, // from rc
-				NonInteractive: true,  // from rc
-				HideUpdate:     true,  // from rc
+				HasTty:         false, // from env
+				NonInteractive: true,  // from env
+				HideUpdate:     true,  // from env
 			},
 		},
 		{
@@ -288,7 +289,7 @@ func Test_configurationPrecedence(t *testing.T) {
 			expected: defaultConfig,
 		},
 		{
-			name:         "no rc file, no env vars and no flags",
+			name:         "no env file, no env vars and no flags",
 			createRCFile: false,
 			expected:     defaultConfig, // should match the initialized defaults above
 		},
@@ -319,29 +320,28 @@ func Test_configurationPrecedence(t *testing.T) {
 			flags.Var(&testConfig.SourcePlatform, "from", "the platform from which to migrate the project")
 			flags.VarP(&testConfig.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 
-			// Set flags based on user input (these override env and RC file values)
+			// Set flags based on user input (these override env and env file values)
 			for flagName, flagValue := range tt.flags {
 				if err := flags.Set(flagName, flagValue); err != nil {
 					t.Fatalf("failed to set flag %s=%s: %v", flagName, flagValue, err)
 				}
 			}
 
-			// Set environment variables (these override RC file values)
+			// Set environment variables (these override env file values)
 			for key, value := range tt.envVars {
 				t.Setenv(key, value)
 			}
 
-			// Make rc files in a temporary directory
+			// Make env files in a temporary directory
 			tempDir := t.TempDir()
 
 			var rcEnvs []string
-			// Create RC files in the temporary directory
+			// Create env files in the temporary directory
 			if tt.createRCFile {
-				var path string
+				path := filepath.Join(tempDir, ".defang")
 				if tt.rcStack.stackname != "" {
-					path = filepath.Join(tempDir, ".defang."+tt.rcStack.stackname)
-				} else {
-					path = filepath.Join(tempDir, ".defang")
+					os.Mkdir(path, 0700)
+					path = filepath.Join(path, tt.rcStack.stackname)
 				}
 
 				f, err := os.Create(path)
@@ -363,7 +363,7 @@ func Test_configurationPrecedence(t *testing.T) {
 				// Unseting env vars set for this test is handled by t.Setenv automatically
 				// t.tempDir() will clean up created files
 
-				// Unset all RC env vars created by loadDotDefang since it uses os.Setenv
+				// Unset all env vars created by loadDotDefang since it uses os.Setenv
 				for _, rcEnv := range rcEnvs {
 					os.Unsetenv(rcEnv)
 				}
@@ -374,7 +374,7 @@ func Test_configurationPrecedence(t *testing.T) {
 			// simulates the actual loading sequence
 			err := testConfig.loadDotDefang(tt.rcStack.stackname)
 			if err != nil {
-				t.Fatalf("failed to load RC file: %v", err)
+				t.Fatalf("failed to load env file: %v", err)
 			}
 
 			err = testConfig.syncFlagsWithEnv(flags)
