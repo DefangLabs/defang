@@ -155,7 +155,7 @@ func TestListSecrets(t *testing.T) {
 	})
 }
 
-func TestFixupServices(t *testing.T) {
+func TestFixupServicesDetectDockerHubTokenNeeded(t *testing.T) {
 	tests := []struct {
 		name    string
 		project string
@@ -173,7 +173,12 @@ func TestFixupServices(t *testing.T) {
 		},
 		{
 			name:    "docker hub image in docker file",
-			project: "bun",
+			project: "bun-in-dockerfile",
+			want:    true,
+		},
+		{
+			name:    "docker hub image in docker file",
+			project: "bun-in-compose",
 			want:    true,
 		},
 	}
