@@ -659,7 +659,7 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	}
 
 	var err error
-	cw, err := ecs.NewCloudWatchLogsClient(ctx, b.driver.Region)
+	cw, err := ecs.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region
 	if err != nil {
 		return nil, err
 	}
@@ -681,34 +681,21 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	if req.Until.IsValid() {
 		end = req.Until.AsTime()
 	}
-	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is a task ID
+	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is the task ID of the CD task
+		b.cdTaskArn, err = b.driver.GetTaskArn(etag) // only fails on missing task ID
+		if err != nil {
+			return nil, err
+		}
 		if req.Follow {
 			tailStream, err = b.driver.TailTaskID(ctx, cw, etag)
-			if err == nil {
-				b.cdTaskArn, err = b.driver.GetTaskArn(etag)
-				etag = "" // no need to filter by etag
-				if err != nil {
-					return nil, AnnotateAwsError(err)
-				}
-			}
 		} else {
 			tailStream, err = b.driver.QueryTaskID(ctx, cw, etag, start, end, req.Limit)
-			if err == nil {
-				b.cdTaskArn, err = b.driver.GetTaskArn(etag)
-				etag = "" // no need to filter by etag
-				if err != nil {
-					return nil, AnnotateAwsError(err)
-				}
-			}
 		}
+		etag = "" // no need to filter events by etag because we only show logs from the specified task ID
 	} else {
 		var service string
 		if len(req.Services) == 1 {
 			service = req.Services[0]
-		}
-		cw, err := ecs.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region
-		if err != nil {
-			return nil, err
 		}
 		lgis := b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))
 		if req.Follow {
@@ -719,9 +706,6 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 				end,
 				lgis...,
 			)
-			if err != nil {
-				return nil, AnnotateAwsError(err)
-			}
 		} else {
 			evtsChan, errsChan := ecs.QueryLogGroups(
 				ctx,
@@ -732,17 +716,20 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 				lgis...,
 			)
 			if evtsChan == nil {
-				err = <-errsChan // TODO: there could be multiple errors
-				if err != nil {
-					return nil, AnnotateAwsError(err)
+				var errs []error
+				for err = range errsChan {
+					errs = append(errs, err)
 				}
-			} else {
-				// TODO: any errors from errsChan should be reported
-				tailStream = ecs.NewStaticLogStream(evtsChan, func() {})
+				return nil, AnnotateAwsError(errors.Join(errs...))
 			}
+			// TODO: any errors from errsChan should be reported but get dropped
+			tailStream = ecs.NewStaticLogStream(evtsChan, func() {})
 		}
 	}
 
+	if err != nil {
+		return nil, AnnotateAwsError(err)
+	}
 	return newByocServerStream(tailStream, etag, req.GetServices(), b), nil
 }
 
