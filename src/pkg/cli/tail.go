@@ -66,7 +66,7 @@ func (to TailOptions) String() string {
 	if !to.Until.IsZero() {
 		cmd += " --until=" + to.Until.UTC().Format(time.RFC3339Nano)
 	}
-	if to.Follow {
+	if to.Follow && to.Until.IsZero() {
 		cmd += " --follow"
 	}
 	if to.Deployment != "" {
@@ -143,7 +143,6 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 		return dryrun.ErrDryRun
 	}
 
-	options.PrintBookends = true
 	return streamLogs(ctx, provider, projectName, options, logEntryPrintHandler)
 }
 
