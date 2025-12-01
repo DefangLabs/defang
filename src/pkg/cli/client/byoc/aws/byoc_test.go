@@ -7,7 +7,7 @@ import (
 	"embed"
 	"encoding/json"
 	"io"
-	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -131,7 +131,7 @@ func TestSubscribe(t *testing.T) {
 			go func() {
 				defer wg.Done()
 
-				filename := path.Join("testdata", name+".events")
+				filename := filepath.Join("testdata", name+".events")
 				ef, _ := expectedDir.ReadFile(filename)
 				dec := json.NewDecoder(bytes.NewReader(ef))
 
@@ -154,7 +154,7 @@ func TestSubscribe(t *testing.T) {
 				}
 			}()
 
-			data, err := testDir.ReadFile(path.Join("testdata", tt.Name()))
+			data, err := testDir.ReadFile(filepath.Join("testdata", tt.Name()))
 			if err != nil {
 				t.Fatalf("failed to read test file: %v", err)
 			}

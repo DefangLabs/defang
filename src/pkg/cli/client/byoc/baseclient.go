@@ -63,7 +63,7 @@ func NewByocBaseClient(tenantName types.TenantName, backend ProjectBackend, stac
 	}
 	b := &ByocBaseClient{
 		TenantName:     string(tenantName),
-		PulumiStack:    stack,
+		PulumiStack:    pkg.Getenv("DEFANG_SUFFIX", stack),
 		projectBackend: backend,
 	}
 	return b

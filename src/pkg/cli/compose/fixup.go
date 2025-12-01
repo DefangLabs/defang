@@ -75,10 +75,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 		project.Services[svccfg.Name] = *svccfg
 	}
 
-	svcNameReplacer, err := NewServiceNameReplacer(ctx, provider, project)
-	if err != nil {
-		return err
-	}
+	svcNameReplacer := NewServiceNameReplacer(ctx, provider, project)
 
 	for _, svccfg := range project.Services {
 		// Upload the build context, if any; TODO: parallelize
@@ -169,7 +166,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 
 			// Check if the environment variable is an existing config; if so, mark it as such
 			if _, ok := slices.BinarySearch(config.Names, key); ok {
-				if svcNameReplacer.HasServiceName(*value) {
+				if svcNameReplacer.ContainsPrivateServiceName(*value) {
 					notAdjusted = append(notAdjusted, key)
 				} else {
 					overridden = append(overridden, key)
