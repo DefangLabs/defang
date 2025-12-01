@@ -236,11 +236,12 @@ func (e *KanikoTaskStateChangeEvent) Status() string {
 }
 
 var kanikoTaskStateMap = map[string]defangv1.ServiceState{
-	// "STOPPED":        defangv1.ServiceState_BUILD_STOPPING, // Ignored
-	"DEPROVISIONING": defangv1.ServiceState_BUILD_STOPPING,
-	"RUNNING":        defangv1.ServiceState_BUILD_RUNNING,
-	"PENDING":        defangv1.ServiceState_BUILD_PENDING,
 	"PROVISIONING":   defangv1.ServiceState_BUILD_PROVISIONING,
+	"PENDING":        defangv1.ServiceState_BUILD_PENDING,
+	"ACTIVATING":     defangv1.ServiceState_BUILD_ACTIVATING,
+	"RUNNING":        defangv1.ServiceState_BUILD_RUNNING,
+	"DEPROVISIONING": defangv1.ServiceState_BUILD_STOPPING,
+	// "STOPPED":        defangv1.ServiceState_BUILD_STOPPING, // Ignored
 }
 
 func (e *KanikoTaskStateChangeEvent) State() defangv1.ServiceState {

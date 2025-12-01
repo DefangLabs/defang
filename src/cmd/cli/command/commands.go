@@ -22,6 +22,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/github"
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
@@ -128,7 +129,7 @@ func Execute(ctx context.Context) error {
 	}
 
 	if global.HasTty && !global.HideUpdate && pkg.RandomIndex(10) == 0 {
-		if latest, err := GetLatestVersion(ctx); err == nil && isNewer(GetCurrentVersion(), latest) {
+		if latest, err := github.GetLatestReleaseTag(ctx); err == nil && isNewer(GetCurrentVersion(), latest) {
 			term.Debug("Latest Version:", latest, "Current Version:", GetCurrentVersion())
 			term.Println("A newer version of the CLI is available at https://github.com/DefangLabs/defang/releases/latest")
 			if pkg.RandomIndex(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
@@ -638,7 +639,7 @@ var versionCmd = &cobra.Command{
 		term.Println(GetCurrentVersion())
 
 		term.Printc(term.BrightCyan, "Latest CLI:    ")
-		ver, err := GetLatestVersion(cmd.Context())
+		ver, err := github.GetLatestReleaseTag(cmd.Context())
 		term.Println(ver)
 
 		term.Printc(term.BrightCyan, "Defang Fabric: ")
@@ -766,7 +767,7 @@ var configSetCmd = &cobra.Command{
 			value = strings.TrimSuffix(string(bytes), "\n")
 		} else if random {
 			// Generate a random value for the config
-			value = CreateRandomConfigValue()
+			value = cli.CreateRandomConfigValue()
 			term.Info("Generated random value: " + value)
 		} else {
 			// Prompt for sensitive value

@@ -30,8 +30,8 @@ func (d mockDeployProvider) Deploy(ctx context.Context, req *defangv1.DeployRequ
 }
 
 func (mockDeployProvider) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	if req.Compose == nil && req.Services == nil {
-		return nil, errors.New("DeployRequest needs Compose or Services")
+	if len(req.Compose) == 0 {
+		return nil, errors.New("DeployRequest needs Compose")
 	}
 
 	project, err := compose.LoadFromContent(ctx, req.Compose, "")
