@@ -8,21 +8,11 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/bufbuild/connect-go"
-	"github.com/mark3labs/mcp-go/mcp"
 )
 
 type RemoveConfigParams struct {
-	Name string
-}
-
-func ParseRemoveConfigParams(request mcp.CallToolRequest) (RemoveConfigParams, error) {
-	name, err := request.RequireString("name")
-	if err != nil || name == "" {
-		return RemoveConfigParams{}, fmt.Errorf("missing config `name`: %w", err)
-	}
-	return RemoveConfigParams{
-		Name: name,
-	}, nil
+	common.LoaderParams
+	Name string `json:"name" jsonschema:"required"`
 }
 
 // HandleRemoveConfigTool handles the remove config tool logic

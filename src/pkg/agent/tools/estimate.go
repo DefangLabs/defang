@@ -8,46 +8,13 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/mark3labs/mcp-go/mcp"
 )
 
 type EstimateParams struct {
-	DeploymentMode modes.Mode           `json:"deployment_mode"`
-	Provider       cliClient.ProviderID `json:"provider"`
-	Region         string               `json:"region"`
-}
-
-func ParseEstimateParams(request mcp.CallToolRequest, providerId *cliClient.ProviderID) (EstimateParams, error) {
-	modeString, err := request.RequireString("deployment_mode")
-	if err != nil {
-		modeString = "AFFORDABLE" // Default to AFFORDABLE if not provided
-	}
-
-	mode, err := modes.Parse(modeString) // Validate the mode string
-	if err != nil {
-		term.Warnf("Unknown deployment mode provided - %q", modeString)
-		return EstimateParams{}, fmt.Errorf("unknown deployment mode %q, please use one of %s", modeString, strings.Join(modes.AllDeploymentModes(), ", "))
-	}
-
-	providerString, err := request.RequireString("provider")
-	if err != nil {
-		providerString = "auto" // Default to auto if not provided
-	}
-	err = providerId.Set(providerString)
-	if err != nil {
-		return EstimateParams{}, fmt.Errorf("invalid provider specified: %w", err)
-	}
-
-	var region string
-	if region == "" {
-		region = cliClient.GetRegion(*providerId) // This sets the default region based on the provider
-	}
-
-	return EstimateParams{
-		DeploymentMode: mode,
-		Provider:       *providerId,
-		Region:         region,
-	}, nil
+	common.LoaderParams
+	DeploymentMode string `json:"deployment_mode,omit_empty" jsonschema:"default=affordable,enum=affordable,enum=balanced,enum=high_availability,description=The deployment mode for which to estimate costs (e.g., AFFORDABLE, BALANCED, HIGH_AVAILABILITY)."`
+	Provider       string `json:"provider" jsonschema:"required,enum=aws,enum=gcp description=The cloud provider for which to estimate costs."`
+	Region         string `json:"region,omit_empty" jsonschema:"description=The region in which to estimate costs."`
 }
 
 func HandleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, params EstimateParams, cluster string, cli CLIInterface) (string, error) {

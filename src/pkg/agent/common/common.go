@@ -28,32 +28,35 @@ func GetStringArg(args map[string]string, key, defaultValue string) string {
 	return defaultValue
 }
 
-func ConfigureLoader(request mcp.CallToolRequest) (*compose.Loader, error) {
-	wd, err := request.RequireString("working_directory")
-	if err != nil || wd == "" {
-		return nil, fmt.Errorf("invalid working directory: %w", err)
+type LoaderParams struct {
+	WorkingDirectory string   `json:"working_directory" jsonschema:"description=The working directory containing the compose files. Usually the current directory."`
+	ProjectName      string   `json:"project_name,omitempty" jsonschema:"description=Optional: The name of the project. Useful when working with projects that are not in the current directory."`
+	ComposeFilePaths []string `json:"compose_file_paths,omitempty" jsonschema:"description=Optional: Paths to the compose files to use for the project. If not provided, defaults to the compose file in the working directory."`
+}
+
+func ConfigureAgentLoader(params LoaderParams) (*compose.Loader, error) {
+	if params.WorkingDirectory == "" {
+		params.WorkingDirectory = "."
 	}
 
-	err = os.Chdir(wd)
-	if err != nil {
-		return nil, fmt.Errorf("failed to change working directory: %w", err)
+	if params.WorkingDirectory != "." {
+		err := os.Chdir(params.WorkingDirectory)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to change working directory: %w", err)
+		}
 	}
 
-	projectName, err := request.RequireString("project_name")
-	if err == nil {
+	projectName := params.ProjectName
+	if projectName != "" {
 		term.Debugf("Project name provided: %s", projectName)
 		term.Debug("Function invoked: compose.NewLoader")
 		return compose.NewLoader(compose.WithProjectName(projectName)), nil
 	}
-	arguments := request.GetArguments()
-	composeFilePathsArgs, ok := arguments["compose_file_paths"]
-	if ok {
-		composeFilePaths, ok := composeFilePathsArgs.([]string)
-		if ok {
-			term.Debugf("Compose file paths provided: %s", composeFilePaths)
-			term.Debug("Function invoked: compose.NewLoader")
-			return compose.NewLoader(compose.WithPath(composeFilePaths...)), nil
-		}
+	composeFilePaths := params.ComposeFilePaths
+	if len(composeFilePaths) > 0 {
+		term.Debugf("Compose file paths provided: %s", composeFilePaths)
+		term.Debug("Function invoked: compose.NewLoader")
+		return compose.NewLoader(compose.WithPath(composeFilePaths...)), nil
 	}
 
 	//TODO: Talk about using both project name and compose file paths

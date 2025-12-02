@@ -9,24 +9,13 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
-	"github.com/mark3labs/mcp-go/mcp"
 )
 
 type LogsParams struct {
-	DeploymentID string
-	Since        string
-	Until        string
-}
-
-func ParseLogsParams(request mcp.CallToolRequest) LogsParams {
-	deploymentId := request.GetString("deployment_id", "")
-	since := request.GetString("since", "")
-	until := request.GetString("until", "")
-	return LogsParams{
-		DeploymentID: deploymentId,
-		Since:        since,
-		Until:        until,
-	}
+	common.LoaderParams
+	DeploymentID string `json:"deployment_id,omitempty" jsonschema:"description=Optional: Retrieve logs from a specific deployment."`
+	Since        string `json:"since,omitempty" jsonschema:"description=Optional: Retrieve logs written after this time. Format as RFC3339 or duration (e.g., '2023-10-01T15:04:05Z' or '1h')."`
+	Until        string `json:"until,omitempty" jsonschema:"description=Optional: Retrieve logs written before this time. Format as RFC3339 or duration (e.g., '2023-10-01T15:04:05Z' or '1h')."`
 }
 
 func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, cluster string, providerId *cliClient.ProviderID, cli CLIInterface) (string, error) {

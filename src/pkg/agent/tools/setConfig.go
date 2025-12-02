@@ -8,27 +8,12 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/mark3labs/mcp-go/mcp"
 )
 
 type SetConfigParams struct {
-	Name  string
-	Value string
-}
-
-func ParseSetConfigParams(request mcp.CallToolRequest) (SetConfigParams, error) {
-	name, err := request.RequireString("name")
-	if err != nil || name == "" {
-		return SetConfigParams{}, fmt.Errorf("missing 'name' parameter: %w", err)
-	}
-	value, err := request.RequireString("value")
-	if err != nil || value == "" {
-		return SetConfigParams{}, fmt.Errorf("missing 'value' parameter: %w", err)
-	}
-	return SetConfigParams{
-		Name:  name,
-		Value: value,
-	}, nil
+	common.LoaderParams
+	Name  string `json:"name" jsonschema:"required"`
+	Value string `json:"value" jsonschema:"required"`
 }
 
 // HandleSetConfig handles the set config MCP tool request

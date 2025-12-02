@@ -5,9 +5,10 @@ import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	"github.com/DefangLabs/defang/src/pkg/agent/tools"
+	agentTools "github.com/DefangLabs/defang/src/pkg/agent/tools"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
+	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/mark3labs/mcp-go/mcp"

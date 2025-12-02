@@ -14,6 +14,10 @@ import (
 	"github.com/bufbuild/connect-go"
 )
 
+type ServicesParams struct {
+	common.LoaderParams
+}
+
 func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
