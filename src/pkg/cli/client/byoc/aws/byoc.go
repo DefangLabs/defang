@@ -288,7 +288,7 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 
 	domain = dns.Normalize(strings.ToLower(domain))
 	for {
-		zone, err := aws.GetHostedZoneByName(ctx, domain, r53Client)
+		zones, err := aws.GetHostedZonesByName(ctx, domain, r53Client)
 		if errors.Is(err, aws.ErrZoneNotFound) {
 			if strings.Count(domain, ".") <= 1 {
 				return "", nil
@@ -298,7 +298,10 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 		} else if err != nil {
 			return "", err
 		}
-		return *zone.Id, nil
+		if len(zones) > 1 {
+			term.Warnf("Multiple hosted zones found for domain %q, using the first one: %v", domain, zones[0].Id)
+		}
+		return *zones[0].Id, nil
 	}
 }
 
@@ -310,7 +313,7 @@ func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 	r53Client := route53.NewFromConfig(cfg)
 
 	projectDomain := b.GetProjectDomain(req.Project, req.DelegateDomain)
-	nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, r53Client)
+	nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, req.Project, b.PulumiStack, r53Client, dns.ResolverAt)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
