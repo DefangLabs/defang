@@ -3,25 +3,23 @@ package aws
 import (
 	"context"
 	"errors"
+	"net"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/aws/smithy-go/ptr"
 )
 
-func TestPrepareDomainDelegationMocked(t *testing.T) {
-	testPrepareDomainDelegationNew(t, &r53Mock{})
-	testPrepareDomainDelegationLegacy(t, &r53Mock{})
-}
-
 type r53HostedZone struct {
 	types.HostedZone
 	types.DelegationSet // no ID => not reusable
+	tags                []types.Tag
 }
 
 type route53API interface {
@@ -32,6 +30,49 @@ type route53API interface {
 type r53Mock struct {
 	hostedZones    []r53HostedZone
 	delegationSets []types.DelegationSet
+}
+
+func (r r53Mock) DeleteReusableDelegationSet(ctx context.Context, params *route53.DeleteReusableDelegationSetInput, optFns ...func(*route53.Options)) (*route53.DeleteReusableDelegationSetOutput, error) {
+	// TODO: implement if needed
+	return nil, nil
+}
+
+func (r r53Mock) ListTagsForResource(ctx context.Context, params *route53.ListTagsForResourceInput, optFns ...func(*route53.Options)) (*route53.ListTagsForResourceOutput, error) {
+	switch params.ResourceType {
+	case types.TagResourceTypeHostedzone:
+		for _, hz := range r.hostedZones {
+			if strings.TrimPrefix(*hz.HostedZone.Id, "/hostedzone/") == strings.TrimPrefix(*params.ResourceId, "/hostedzone/") {
+				return &route53.ListTagsForResourceOutput{
+					ResourceTagSet: &types.ResourceTagSet{
+						ResourceType: types.TagResourceTypeHostedzone,
+						ResourceId:   params.ResourceId,
+						Tags:         hz.tags,
+					},
+				}, nil
+			}
+		}
+		return nil, errors.New("hosted zone not found")
+	default:
+		return nil, errors.New("unsupported resource type")
+	}
+}
+
+func (r *r53Mock) setTagsForHostedZone(hostedZoneId string, tags map[string]string) {
+	for i, hz := range r.hostedZones {
+		if *hz.HostedZone.Id == hostedZoneId {
+			for k, v := range tags {
+				r.hostedZones[i].tags = append(r.hostedZones[i].tags, types.Tag{
+					Key:   ptr.String(k),
+					Value: ptr.String(v),
+				})
+			}
+		}
+	}
+}
+
+func (r r53Mock) ListHostedZones(ctx context.Context, params *route53.ListHostedZonesInput, optFns ...func(*route53.Options)) (*route53.ListHostedZonesOutput, error) {
+	// TODO: implement if needed
+	return nil, nil
 }
 
 func (r r53Mock) ListHostedZonesByName(ctx context.Context, params *route53.ListHostedZonesByNameInput, optFns ...func(*route53.Options)) (*route53.ListHostedZonesByNameOutput, error) {
@@ -176,103 +217,248 @@ func (r *r53Mock) CreateHostedZone(ctx context.Context, params *route53.CreateHo
 	}, nil
 }
 
-func testPrepareDomainDelegationNew(t *testing.T, r53Client route53API) {
-	const projectDomain = "byoc.example.internal"
+type CallbackMockResolver struct {
+	MockResolver dns.MockResolver
+	Callback     (func(string))
+}
 
-	nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, r53Client)
-	if err != nil {
-		t.Fatal(err)
+func (r *CallbackMockResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS, error) {
+	if r.Callback != nil {
+		r.Callback(domain)
 	}
-	if len(nsServers) == 0 {
-		t.Error("expected name servers")
+	return r.MockResolver.LookupNS(ctx, domain)
+}
+
+func (r *CallbackMockResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
+	if r.Callback != nil {
+		r.Callback(domain)
 	}
-	if delegationSetId == "" {
-		t.Fatal("expected delegation set id")
+	return r.MockResolver.LookupIPAddr(ctx, domain)
+}
+func (r *CallbackMockResolver) LookupCNAME(ctx context.Context, domain string) (string, error) {
+	if r.Callback != nil {
+		r.Callback(domain)
+	}
+	return r.MockResolver.LookupCNAME(ctx, domain)
+}
+
+func TestPrepareDomainDelegation(t *testing.T) {
+	ctx := t.Context()
+	noResultResolver := func(domain string) func(nsServer string) dns.Resolver {
+		return func(nsServer string) dns.Resolver {
+			return dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+				{Type: "NS", Domain: domain}:       {Records: []string{}, Error: nil},
+				{Type: "NS", Domain: "defang.app"}: {Records: []string{}, Error: nil},
+			}}
+		}
 	}
 
-	t.Run("reuse existing delegation set", func(t *testing.T) {
-		nsServers2, delegationSetId2, err := prepareDomainDelegation(ctx, projectDomain, r53Client)
+	t.Run("case 1: subdomain zone does not exist", func(t *testing.T) {
+		r53Client := &r53Mock{}
+		const projectDomain = "byoc.example.internal"
+		lookUpCount := 0
+		resolverAt := func(nsServer string) dns.Resolver {
+			defer func() { lookUpCount++ }()
+			switch lookUpCount {
+			case 1: // 2nd server in first delegation set contains conflicting NS records
+				return dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+					{Type: "NS", Domain: projectDomain}: {Records: []string{"ns1.t.net", "ns2.t.net", "ns3.t.net", "ns4.t.net"}, Error: nil},
+					{Type: "NS", Domain: "defang.app"}:  {Records: []string{}, Error: nil},
+				}}
+			default:
+				return dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+					{Type: "NS", Domain: projectDomain}: {Records: []string{}, Error: nil},
+					{Type: "NS", Domain: "defang.app"}:  {Records: []string{}, Error: nil},
+				}}
+			}
+		}
+		nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, "projectname", "stack", r53Client, resolverAt)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !slicesEqualUnordered(nsServers, nsServers2) {
-			t.Error("expected same name servers")
+		if len(nsServers) == 0 {
+			t.Error("expected name servers")
 		}
-		if delegationSetId != delegationSetId2 {
-			t.Error("expected same delegation set id")
+		if delegationSetId == "" {
+			t.Fatal("expected delegation set id")
 		}
 	})
 
-	t.Run("reuse existing hosted zone", func(t *testing.T) {
-		// Now create the hosted zone like Pulumi would
-		hz, err := r53Client.CreateHostedZone(ctx, &route53.CreateHostedZoneInput{
-			CallerReference:  ptr.String(projectDomain + " from testPrepareDomainDelegationNew " + pkg.RandomID()),
-			Name:             ptr.String(projectDomain),
-			DelegationSetId:  ptr.String(delegationSetId),
-			HostedZoneConfig: &types.HostedZoneConfig{},
-		})
+	t.Run("case 2a: subdomain zone exists, created by legacy CLI", func(t *testing.T) {
+		r53Client := &r53Mock{}
+		const projectDomain = "byoc-legacy.example.internal"
+
+		// "Create" the legacy hosted zone
+		hz := createHostedZone(t, r53Client, projectDomain, aws.CreateHostedZoneCommentLegacy, nil)
+
+		nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, "projectname", "stack", r53Client, noResultResolver(projectDomain))
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Cleanup(func() {
-			_, err := r53Client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{
-				Id: hz.HostedZone.Id,
-			})
-			if err != nil {
-				t.Error(err)
-			}
-		})
+		if len(nsServers) == 0 {
+			t.Error("expected name servers")
+		}
 
-		nsServers2, delegationSetId2, err := prepareDomainDelegation(ctx, projectDomain, r53Client)
+		// Ignore the delegation set of the legacy hosted zone
+		if slicesEqualUnordered(nsServers, hz.DelegationSet.NameServers) {
+			t.Errorf("expected different name servers, got the same: %v <=> %v", nsServers, hz.DelegationSet.NameServers)
+		}
+		if delegationSetId == "" {
+			t.Fatal("expected delegation set id, got empty")
+		}
+	})
+
+	t.Run("case 2b: subdomain zone exist from same project and stack", func(t *testing.T) {
+		r53Client := &r53Mock{}
+		const projectDomain = "byoc.example.internal"
+		nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, "projectname", "stack", r53Client, noResultResolver(projectDomain))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(nsServers) == 0 {
+			t.Error("expected name servers")
+		}
+		if delegationSetId == "" {
+			t.Fatal("expected delegation set id")
+		}
+
+		// Simulate CD creating the hosted zone using the delegation set
+		hz := createHostedZone(t, r53Client, projectDomain, aws.CreateHostedZoneCommentLegacy, &delegationSetId)
+		r53Client.setTagsForHostedZone(*hz.HostedZone.Id, map[string]string{"defang:project": "projectname", "defang:stack": "stack"})
+
+		// Now prepare domain delegation again, it should reuse the existing delegation set
+		nsServers2, delegationSetId2, err := prepareDomainDelegation(ctx, projectDomain, "projectname", "stack", r53Client, noResultResolver(projectDomain))
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !slicesEqualUnordered(nsServers, nsServers2) {
-			t.Error("expected same name servers")
+			t.Errorf("expected same name servers, got %v and %v", nsServers, nsServers2)
 		}
 		if delegationSetId != delegationSetId2 {
-			t.Error("expected same delegation set id")
+			t.Fatalf("expected same delegation set id, got %v and %v", delegationSetId, delegationSetId2)
+		}
+	})
+
+	t.Run("case 2c: subdomain zone exist created by other tools", func(t *testing.T) {
+		r53Client := &r53Mock{}
+		const projectDomain = "byoc.example.internal"
+		// Simulate creating the hosted zone using other tools
+		hz := createHostedZone(t, r53Client, projectDomain, "some other tools", ptr.String("OTHER-TOOL-DS-ID"))
+		r53Client.setTagsForHostedZone(*hz.HostedZone.Id, map[string]string{"othertool:project": "projectname", "othertools:stack": "stack"})
+
+		// Now prepare domain delegation again, it should create a new delegation set
+		nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, "projectname", "stack", r53Client, noResultResolver(projectDomain))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(nsServers) == 0 {
+			t.Error("expected name servers")
+		}
+		if delegationSetId == "OTHER-TOOL-DS-ID" {
+			t.Fatalf("expected different delegation set id, got the same: %v", delegationSetId)
+		}
+	})
+
+	t.Run("case 2d: subdomain zone exist from different project and stack", func(t *testing.T) {
+		r53Client := &r53Mock{}
+		const projectDomain = "byoc.example.internal"
+		nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, "projectname", "stack1", r53Client, noResultResolver(projectDomain))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(nsServers) == 0 {
+			t.Error("expected name servers")
+		}
+		if delegationSetId == "" {
+			t.Fatal("expected delegation set id")
+		}
+
+		// Simulate CD creating the hosted zone using the delegation set
+		hz := createHostedZone(t, r53Client, projectDomain, aws.CreateHostedZoneCommentLegacy, &delegationSetId)
+		r53Client.setTagsForHostedZone(*hz.HostedZone.Id, map[string]string{"defang:project": "projectname", "defang:stack": "stack"})
+
+		// Now prepare domain delegation again, it should create a new delegation set since the stack is different
+		nsServers2, delegationSetId2, err := prepareDomainDelegation(ctx, projectDomain, "projectname", "stack2", r53Client, noResultResolver(projectDomain))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if slicesEqualUnordered(nsServers, nsServers2) {
+			t.Errorf("expected different name servers, got the same: %v", nsServers)
+		}
+		if delegationSetId == delegationSetId2 {
+			t.Fatalf("expected different delegation set id, got the same: %v", delegationSetId)
+		}
+	})
+
+	t.Run("do not use delegation set with NS server conflicting defang.app", func(t *testing.T) {
+		r53Client := &r53Mock{}
+		const projectDomain = "byoc.example.internal"
+		lookUpCount := 0
+		var rejectedNSServers []string
+		resolverAt := func(nsServer string) dns.Resolver {
+			defer func() { lookUpCount++ }()
+			switch {
+			case lookUpCount < 4: // First few servers in first delegation set contains conflicting NS records with defang.app
+				return &CallbackMockResolver{MockResolver: dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+					{Type: "NS", Domain: projectDomain}: {Records: []string{}, Error: nil},            // No conflicts when looking up project domain
+					{Type: "NS", Domain: "defang.app"}:  {Records: []string{"ns1.t.net"}, Error: nil}, // Conflict when looking up defang.app
+				}},
+					Callback: func(domain string) {
+						if domain == "defang.app" {
+							rejectedNSServers = append(rejectedNSServers, nsServer)
+						}
+					},
+				}
+			default:
+				return &CallbackMockResolver{MockResolver: dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+					{Type: "NS", Domain: projectDomain}: {Records: []string{}, Error: nil},
+					{Type: "NS", Domain: "defang.app"}:  {Records: []string{}, Error: nil},
+				}}}
+			}
+		}
+		nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, "projectname", "stack", r53Client, resolverAt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(nsServers) == 0 {
+			t.Error("expected name servers")
+		}
+		if delegationSetId == "" {
+			t.Fatal("expected delegation set id")
+		}
+		for _, ns := range nsServers {
+			if slices.Contains(rejectedNSServers, ns) {
+				t.Errorf("expected no rejected name servers in final delegation set, but found %q", ns)
+			}
 		}
 	})
 }
 
-func testPrepareDomainDelegationLegacy(t *testing.T, r53Client route53API) {
-	const projectDomain = "byoc-legacy.example.internal"
-
-	ctx := t.Context()
-
-	// "Create" the legacy hosted zone
-	hz, err := r53Client.CreateHostedZone(ctx, &route53.CreateHostedZoneInput{
-		CallerReference: ptr.String(projectDomain + " from testPrepareDomainDelegationLegacy " + pkg.RandomID()),
+func createHostedZone(t *testing.T, r53Client route53API, projectDomain, comment string, delegationSetId *string) *route53.CreateHostedZoneOutput {
+	hz, err := r53Client.CreateHostedZone(t.Context(), &route53.CreateHostedZoneInput{
+		CallerReference: ptr.String(projectDomain + " from " + comment + pkg.RandomID()),
 		Name:            ptr.String(projectDomain),
 		HostedZoneConfig: &types.HostedZoneConfig{
-			Comment: ptr.String(aws.CreateHostedZoneCommentLegacy),
+			Comment: ptr.String(comment),
 		},
+		DelegationSetId: delegationSetId,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		_, err := r53Client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{
+		_, err := r53Client.DeleteHostedZone(t.Context(), &route53.DeleteHostedZoneInput{
 			Id: hz.HostedZone.Id,
 		})
 		if err != nil {
 			t.Error(err)
 		}
 	})
+	return hz
+}
 
-	nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, r53Client)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(nsServers) == 0 {
-		t.Error("expected name servers")
-	}
-
-	if !slicesEqualUnordered(nsServers, hz.DelegationSet.NameServers) {
-		t.Error("expected same name servers")
-	}
-	if delegationSetId != "" {
-		t.Fatal("expected no delegation set id")
-	}
+func slicesEqualUnordered(a, b []string) bool {
+	slices.Sort(a)
+	slices.Sort(b)
+	return slices.Equal(a, b)
 }
