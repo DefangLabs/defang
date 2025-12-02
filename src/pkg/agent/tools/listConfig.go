@@ -7,6 +7,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
@@ -15,20 +16,18 @@ type ListConfigsParams struct {
 }
 
 // HandleListConfigTool handles the list config tool logic
-func HandleListConfigTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (string, error) {
-	err := common.ProviderNotConfiguredError(*providerId)
-	if err != nil {
-		return "", err
-	}
-
+func HandleListConfigTool(ctx context.Context, loader cliClient.ProjectLoader, cli CLIInterface, ec elicitations.Controller, tc StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
-	client, err := cli.Connect(ctx, cluster)
+	client, err := cli.Connect(ctx, tc.Cluster)
 	if err != nil {
 		return "", fmt.Errorf("Could not connect: %w", err)
 	}
 
-	term.Debug("Function invoked: cli.NewProvider")
-	provider := cli.NewProvider(ctx, *providerId, client, "")
+	pp := NewProviderPreparer(cli, ec, client)
+	_, provider, err := pp.SetupProvider(ctx, tc.Stack)
+	if err != nil {
+		return "", fmt.Errorf("failed to setup provider: %w", err)
+	}
 
 	term.Debug("Function invoked: cliClient.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)

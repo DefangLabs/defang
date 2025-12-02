@@ -8,6 +8,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,7 +20,6 @@ type MockDestroyCLI struct {
 	ConnectError                     error
 	ComposeDownError                 error
 	LoadProjectNameWithFallbackError error
-	CanIUseProviderError             error
 	ComposeDownResult                string
 	ProjectName                      string
 	CallLog                          []string
@@ -54,11 +54,6 @@ func (m *MockDestroyCLI) LoadProjectNameWithFallback(ctx context.Context, loader
 	return m.ProjectName, nil
 }
 
-func (m *MockDestroyCLI) CanIUseProvider(ctx context.Context, grpcClient *client.GrpcClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("CanIUseProvider(%s, %s, %d)", providerId, projectName, serviceCount))
-	return m.CanIUseProviderError
-}
-
 func TestHandleDestroyTool(t *testing.T) {
 	tests := []struct {
 		name                 string
@@ -88,7 +83,6 @@ func TestHandleDestroyTool(t *testing.T) {
 			providerID: client.ProviderAWS,
 			setupMock: func(m *MockDestroyCLI) {
 				m.ProjectName = "test-project"
-				m.CanIUseProviderError = errors.New("provider not available")
 			},
 			expectedError: "failed to use provider: provider not available",
 		},
@@ -137,7 +131,12 @@ func TestHandleDestroyTool(t *testing.T) {
 
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := HandleDestroyTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI)
+			ec := elicitations.NewController(&mockElicitationsClient{})
+			result, err := HandleDestroyTool(t.Context(), loader, mockCLI, ec, StackConfig{
+				Cluster:    "test-cluster",
+				ProviderID: &tt.providerID,
+				Stack:      "test-stack",
+			})
 
 			// Verify error expectations
 			if tt.expectedError != "" {
@@ -155,7 +154,6 @@ func TestHandleDestroyTool(t *testing.T) {
 					"Connect(test-cluster)",
 					"NewProvider(aws)",
 					"LoadProjectNameWithFallback",
-					"CanIUseProvider(aws, test-project, 0)",
 					"ComposeDown(test-project)",
 				}
 				assert.Equal(t, expectedCalls, mockCLI.CallLog)

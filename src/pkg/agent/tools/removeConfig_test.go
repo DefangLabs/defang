@@ -8,8 +8,8 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/bufbuild/connect-go"
-	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -149,26 +149,18 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				args["name"] = tt.configName
 			}
 
-			request := mcp.CallToolRequest{
-				Params: mcp.CallToolParams{
-					Name:      "remove_config",
-					Arguments: args,
-				},
-			}
-
-			params, err := ParseRemoveConfigParams(request)
-			if err != nil {
-				if tt.expectError {
-					assert.EqualError(t, err, tt.expectedError)
-					return
-				} else {
-					require.NoError(t, err)
-				}
+			params := RemoveConfigParams{
+				Name: tt.configName,
 			}
 
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := HandleRemoveConfigTool(t.Context(), loader, params, &tt.providerID, "test-cluster", mockCLI)
+			ec := elicitations.NewController(&mockElicitationsClient{})
+			result, err := HandleRemoveConfigTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
+				Cluster:    "test-cluster",
+				ProviderID: &tt.providerID,
+				Stack:      "test-stack",
+			})
 
 			// Verify error expectations
 			if tt.expectError {

@@ -16,7 +16,6 @@ import (
 
 type CLIInterface interface {
 	CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, provider cliClient.Provider, serviceCount int) error
-	CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName, stack string, serviceCount int) (cliClient.Provider, error)
 	ComposeDown(ctx context.Context, projectName string, client *cliClient.GrpcClient, provider cliClient.Provider) (string, error)
 	ComposeUp(ctx context.Context, client *cliClient.GrpcClient, provider cliClient.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error)
 	ConfigDelete(ctx context.Context, projectName string, provider cliClient.Provider, name string) error

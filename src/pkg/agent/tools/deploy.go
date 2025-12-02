@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
+	"github.com/DefangLabs/defang/src/pkg/auth"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
@@ -18,12 +20,7 @@ type DeployParams struct {
 	common.LoaderParams
 }
 
-func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (string, error) {
-	err := common.ProviderNotConfiguredError(*providerId)
-	if err != nil {
-		return "", err
-	}
-
+func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
@@ -33,16 +30,27 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, provi
 	}
 
 	term.Debug("Function invoked: cli.Connect")
-	client, err := cli.Connect(ctx, cluster)
+	client, err := cli.Connect(ctx, config.Cluster)
 	if err != nil {
-		return "", fmt.Errorf("could not connect: %w", err)
+		err = cli.InteractiveLoginMCP(ctx, client, config.Cluster, common.MCPDevelopmentClient)
+		if err != nil {
+			var noBrowserErr auth.ErrNoBrowser
+			if errors.As(err, &noBrowserErr) {
+				return noBrowserErr.Error(), nil
+			}
+			return "", err
+		}
 	}
 
-	term.Debug("Function invoked: cli.NewProvider")
-
-	provider, err := cli.CheckProviderConfigured(ctx, client, *providerId, project.Name, "", len(project.Services))
+	pp := NewProviderPreparer(cli, ec, client)
+	_, provider, err := pp.SetupProvider(ctx, config.Stack)
 	if err != nil {
-		return "", fmt.Errorf("provider not configured correctly: %w", err)
+		return "", fmt.Errorf("failed to setup provider: %w", err)
+	}
+
+	err = cliClient.CanIUseProvider(ctx, client, provider, project.Name, config.Stack, len(project.Services))
+	if err != nil {
+		return "", fmt.Errorf("failed to use provider: %w", err)
 	}
 
 	// Deploy the services

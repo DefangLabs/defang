@@ -8,6 +8,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -126,7 +127,12 @@ func TestHandleListConfigTool(t *testing.T) {
 
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := HandleListConfigTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI)
+			ec := elicitations.NewController(&mockElicitationsClient{})
+			result, err := HandleListConfigTool(t.Context(), loader, mockCLI, ec, StackConfig{
+				Cluster:    "test-cluster",
+				ProviderID: &tt.providerID,
+				Stack:      "test-stack",
+			})
 
 			// Verify error expectations
 			if tt.expectedError != "" {

@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
 )
@@ -18,8 +21,35 @@ type LogsParams struct {
 	Until        string `json:"until,omitempty" jsonschema:"description=Optional: Retrieve logs written before this time. Format as RFC3339 or duration (e.g., '2023-10-01T15:04:05Z' or '1h')."`
 }
 
-func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, cluster string, providerId *cliClient.ProviderID, cli CLIInterface) (string, error) {
-	provider := cli.NewProvider(ctx, providerId, client, "")
+func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
+	var sinceTime, untilTime time.Time
+	var err error
+	now := time.Now()
+	if params.Since != "" {
+		sinceTime, err = timeutils.ParseTimeOrDuration(params.Since, now)
+		if err != nil {
+			return "", fmt.Errorf("invalid parameter 'since', must be in RFC3339 format: %w", err)
+		}
+	}
+	if params.Until != "" {
+		untilTime, err = timeutils.ParseTimeOrDuration(params.Until, now)
+		if err != nil {
+			return "", fmt.Errorf("invalid parameter 'until', must be in RFC3339 format: %w", err)
+		}
+	}
+
+	term.Debug("Function invoked: cli.Connect")
+	client, err := cli.Connect(ctx, config.Cluster)
+	if err != nil {
+		return "", fmt.Errorf("could not connect: %w", err)
+	}
+
+	pp := NewProviderPreparer(cli, ec, client)
+	_, provider, err := pp.SetupProvider(ctx, config.Stack)
+	if err != nil {
+		return "", fmt.Errorf("failed to setup provider: %w", err)
+	}
+
 	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
@@ -27,30 +57,9 @@ func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 	}
 	term.Debug("Project name loaded:", projectName)
 
-		return "", fmt.Errorf("local deployment failed: %v. Please provide a valid compose file path.", err)
-	}
-
-	term.Debug("Function invoked: cli.Connect")
-	client, err := cli.Connect(ctx, cluster)
+	err = cli.CanIUseProvider(ctx, client, *config.ProviderID, projectName, provider, 0)
 	if err != nil {
-		return "", fmt.Errorf("could not connect: %w", err)
-	}
-
-	term.Debug("Function invoked: cli.NewProvider")
-
-	provider, err := cli.CheckProviderConfigured(ctx, client, *providerId, project.Name, "", len(project.Services))
-	if err != nil {
-		return "", fmt.Errorf("provider not configured correctly: %w", err)
-	}
-
-	sinceTime, err := timeutils.ParseTimeOrDuration(params.Since, time.Now())
-	if err != nil {
-		return "", fmt.Errorf("failed to parse 'since' parameter: %w", err)
-	}
-
-	untilTime, err := timeutils.ParseTimeOrDuration(params.Until, time.Now())
-	if err != nil {
-		return "", fmt.Errorf("failed to parse 'until' parameter: %w", err)
+		return "", fmt.Errorf("failed to use provider: %w", err)
 	}
 
 	err = cli.Tail(ctx, provider, projectName, cliTypes.TailOptions{
@@ -58,7 +67,9 @@ func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 		Since:         sinceTime,
 		Until:         untilTime,
 		Limit:         100,
+		LogType:       logs.LogTypeAll,
 		PrintBookends: true,
+		Verbose:       true,
 	})
 
 	if err != nil {
@@ -67,5 +78,5 @@ func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 		return "", fmt.Errorf("failed to fetch logs: %w", err)
 	}
 
-	return "EOF", nil
+	return "", nil
 }

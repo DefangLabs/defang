@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -12,7 +11,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	_type "github.com/DefangLabs/defang/src/protos/google/type"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -58,11 +56,6 @@ func (m *MockEstimateCLI) RunEstimate(ctx context.Context, project *compose.Proj
 	return m.EstimateResponse, nil
 }
 
-func (m *MockEstimateCLI) ConfigureLoader(request mcp.CallToolRequest) client.Loader {
-	m.CallLog = append(m.CallLog, "ConfigureLoader")
-	return nil
-}
-
 func (m *MockEstimateCLI) CreatePlaygroundProvider(grpcClient *client.GrpcClient) client.Provider {
 	m.CallLog = append(m.CallLog, "CreatePlaygroundProvider")
 	return nil
@@ -99,7 +92,7 @@ func TestHandleEstimateTool(t *testing.T) {
 				}
 				m.CapturedOutput = "Estimated cost: $15.00/month"
 			},
-			expectedError: "unknown deployment mode \"unknown-mode\", please use one of " + strings.Join(modes.AllDeploymentModes(), ", "),
+			expectedError: "invalid mode: unknown-mode, not one of [AFFORDABLE BALANCED HIGH_AVAILABILITY]",
 		},
 		{
 			name: "load_project_error",
@@ -192,28 +185,21 @@ func TestHandleEstimateTool(t *testing.T) {
 			}
 			tt.setupMock(mockCLI)
 
-			request := mcp.CallToolRequest{
-				Params: mcp.CallToolParams{
-					Name:      "estimate",
-					Arguments: tt.arguments,
-				},
-			}
-
 			providerID := client.ProviderAuto // Default provider ID
+
+			params := EstimateParams{
+				Provider:       tt.arguments["provider"].(string),
+				Region:         tt.arguments["region"].(string),
+				DeploymentMode: tt.arguments["deployment_mode"].(string),
+			}
 
 			// Call the function
 			loader := &client.MockLoader{}
-			params, err := ParseEstimateParams(request, &providerID)
-			if err != nil {
-				// If parsing params fails, check if this was the expected error
-				if tt.expectedError != "" {
-					assert.EqualError(t, err, tt.expectedError)
-					return
-				} else {
-					require.NoError(t, err)
-				}
-			}
-			result, err := HandleEstimateTool(t.Context(), loader, params, "test-cluster", mockCLI)
+			result, err := HandleEstimateTool(t.Context(), loader, params, mockCLI, StackConfig{
+				Cluster:    "test-cluster",
+				ProviderID: &providerID,
+				Stack:      "test-stack",
+			})
 
 			// Verify error expectations
 			if tt.expectedError != "" {

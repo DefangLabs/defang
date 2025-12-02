@@ -1,18 +1,13 @@
 package common
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg/cli"
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/mark3labs/mcp-go/mcp"
 )
 
 var MCPDevelopmentClient = "" // set by NewDefangMCPServer
@@ -74,22 +69,4 @@ func FixupConfigError(err error) error {
 		return fmt.Errorf("The operation failed due to missing configs not being set, use the Defang tool called set_config to set the variable: %w", err)
 	}
 	return err
-}
-
-func ProviderNotConfiguredError(providerId client.ProviderID) error {
-	if providerId == client.ProviderAuto {
-		return ErrNoProviderSet
-	}
-	return nil
-}
-
-func CheckProviderConfigured(ctx context.Context, client cliClient.FabricClient, providerId cliClient.ProviderID, projectName, stack string, serviceCount int) (cliClient.Provider, error) {
-	provider := cli.NewProvider(ctx, providerId, client, stack)
-
-	err := cliClient.CanIUseProvider(ctx, client, provider, projectName, stack, serviceCount)
-	if err != nil {
-		return nil, fmt.Errorf("failed to use provider: %w", err)
-	}
-
-	return provider, nil
 }

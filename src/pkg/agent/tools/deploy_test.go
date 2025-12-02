@@ -11,6 +11,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,7 +43,7 @@ type MockDeployCLI struct {
 func (m *MockDeployCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("Connect(%s)", cluster))
 	if m.ConnectError != nil {
-		return nil, m.ConnectError
+		return &client.GrpcClient{}, m.ConnectError
 	}
 	// Return a base GrpcClient - we need to handle Track method differently
 	return &client.GrpcClient{}, nil
@@ -53,17 +54,17 @@ func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.Provi
 	return nil
 }
 
+func (m *MockDeployCLI) InteractiveLoginMCP(ctx context.Context, client *client.GrpcClient, cluster string, mcpClient string) error {
+	m.CallLog = append(m.CallLog, "InteractiveLoginMCP")
+	return nil
+}
+
 func (m *MockDeployCLI) ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	m.CallLog = append(m.CallLog, "ComposeUp")
 	if m.ComposeUpError != nil {
 		return nil, nil, m.ComposeUpError
 	}
 	return m.ComposeUpResponse, m.Project, nil
-}
-
-func (m *MockDeployCLI) CheckProviderConfigured(ctx context.Context, grpcClient *client.GrpcClient, providerId client.ProviderID, projectName, stack string, serviceCount int) (client.Provider, error) {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("CheckProviderConfigured(%s, %s, %d)", providerId, projectName, serviceCount))
-	return nil, m.CheckProviderConfiguredError
 }
 
 func (m *MockDeployCLI) LoadProject(ctx context.Context, loader client.Loader) (*compose.Project, error) {
@@ -180,7 +181,12 @@ func TestHandleDeployTool(t *testing.T) {
 
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := HandleDeployTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI)
+			ec := elicitations.NewController(&mockElicitationsClient{})
+			result, err := HandleDeployTool(t.Context(), loader, mockCLI, ec, StackConfig{
+				Cluster:    "test-cluster",
+				ProviderID: &tt.providerID,
+				Stack:      "test-stack",
+			})
 
 			// Verify error expectations
 			if tt.expectedError != "" {
@@ -197,7 +203,6 @@ func TestHandleDeployTool(t *testing.T) {
 				expectedCalls := []string{
 					"LoadProject",
 					"Connect(test-cluster)",
-					"CheckProviderConfigured(defang, test-project, 0)",
 					"ComposeUp",
 					"TailAndMonitor",
 				}

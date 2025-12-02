@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
@@ -73,10 +72,6 @@ func (DefaultToolCLI) ConfigDelete(ctx context.Context, projectName string, prov
 
 func (DefaultToolCLI) GetServices(ctx context.Context, projectName string, provider cliClient.Provider) ([]deployment_info.Service, error) {
 	return deployment_info.GetServices(ctx, projectName, provider)
-}
-
-func (DefaultToolCLI) CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName, stack string, serviceCount int) (cliClient.Provider, error) {
-	return common.CheckProviderConfigured(ctx, client, providerId, projectName, stack, serviceCount)
 }
 
 func (DefaultToolCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string {

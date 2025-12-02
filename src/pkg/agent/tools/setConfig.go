@@ -7,6 +7,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
@@ -16,21 +17,18 @@ type SetConfigParams struct {
 	Value string `json:"value" jsonschema:"required"`
 }
 
-// HandleSetConfig handles the set config MCP tool request
-func HandleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params SetConfigParams, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (string, error) {
-	err := common.ProviderNotConfiguredError(*providerId)
-	if err != nil {
-		return "", err
-	}
-
+func HandleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params SetConfigParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
-	client, err := cli.Connect(ctx, cluster)
+	client, err := cli.Connect(ctx, sc.Cluster)
 	if err != nil {
 		return "", fmt.Errorf("Could not connect: %w", err)
 	}
 
-	term.Debug("Function invoked: cli.NewProvider")
-	provider := cli.NewProvider(ctx, *providerId, client, "")
+	pp := NewProviderPreparer(cli, ec, client)
+	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
+	if err != nil {
+		return "", fmt.Errorf("Failed to setup provider: %w", err)
+	}
 
 	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)

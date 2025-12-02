@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -81,15 +81,6 @@ func (m *MockSetConfigCLI) ConfigSet(ctx context.Context, projectName string, pr
 	return m.ConfigSetError
 }
 
-func createCallToolRequest(args map[string]interface{}) mcp.CallToolRequest {
-	return mcp.CallToolRequest{
-		Params: mcp.CallToolParams{
-			Name:      "setConfig",
-			Arguments: args,
-		},
-	}
-}
-
 func TestHandleSetConfig(t *testing.T) {
 	// Common test data
 	const (
@@ -97,8 +88,6 @@ func TestHandleSetConfig(t *testing.T) {
 		testConfigName = "test-config"
 		testValue      = "test-value"
 	)
-	testContext := t.Context()
-
 	tests := []struct {
 		name                     string
 		cluster                  string
@@ -217,18 +206,17 @@ func TestHandleSetConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			request := createCallToolRequest(tt.requestArgs)
 			loader := &client.MockLoader{}
-			params, err := ParseSetConfigParams(request)
-			if err != nil {
-				if tt.expectedError {
-					assert.EqualError(t, err, tt.errorMessage)
-					return
-				} else {
-					require.NoError(t, err)
-				}
+			params := SetConfigParams{
+				Name:  tt.requestArgs["name"].(string),
+				Value: tt.requestArgs["value"].(string),
 			}
-			result, err := HandleSetConfig(testContext, loader, params, &tt.providerId, tt.cluster, tt.mockCLI)
+			ec := elicitations.NewController(&mockElicitationsClient{})
+			result, err := HandleSetConfig(t.Context(), loader, params, tt.mockCLI, ec, StackConfig{
+				Cluster:    tt.cluster,
+				ProviderID: &tt.providerId,
+				Stack:      "test-stack",
+			})
 
 			if tt.expectedError {
 				assert.Error(t, err)
