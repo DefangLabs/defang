@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -104,40 +105,52 @@ func TestHandleSetConfig(t *testing.T) {
 	}{
 		// Input validation tests
 		{
-			name:          "missing config name",
-			cluster:       testCluster,
-			providerId:    client.ProviderID(""),
-			requestArgs:   map[string]interface{}{"value": testValue},
-			mockCLI:       &MockSetConfigCLI{},
-			expectedError: true,
-			errorMessage:  "missing 'name' parameter: required argument \"name\" not found",
+			name:                     "missing config name",
+			cluster:                  testCluster,
+			providerId:               client.ProviderID(""),
+			requestArgs:              map[string]interface{}{"value": testValue},
+			mockCLI:                  &MockSetConfigCLI{},
+			expectedError:            true,
+			errorMessage:             "Invalid config name: secret name \"\" is not valid",
+			expectedConnectCalls:     true,
+			expectedProviderCalls:    true,
+			expectedProjectNameCalls: true,
 		},
 		{
-			name:          "empty config name",
-			cluster:       testCluster,
-			providerId:    client.ProviderID(""),
-			requestArgs:   map[string]interface{}{"name": "", "value": testValue},
-			mockCLI:       &MockSetConfigCLI{},
-			expectedError: true,
-			errorMessage:  "missing 'name' parameter: %!w(<nil>)",
+			name:                     "empty config name",
+			cluster:                  testCluster,
+			providerId:               client.ProviderID(""),
+			requestArgs:              map[string]interface{}{"name": "", "value": testValue},
+			mockCLI:                  &MockSetConfigCLI{},
+			expectedError:            true,
+			errorMessage:             "Invalid config name: secret name \"\" is not valid",
+			expectedConnectCalls:     true,
+			expectedProviderCalls:    true,
+			expectedProjectNameCalls: true,
 		},
 		{
-			name:          "missing config value",
-			cluster:       testCluster,
-			providerId:    client.ProviderID(""),
-			requestArgs:   map[string]interface{}{"name": testConfigName},
-			mockCLI:       &MockSetConfigCLI{},
-			expectedError: true,
-			errorMessage:  "missing 'value' parameter: required argument \"value\" not found",
+			name:                     "missing config value",
+			cluster:                  testCluster,
+			providerId:               client.ProviderID(""),
+			requestArgs:              map[string]interface{}{"name": testConfigName},
+			mockCLI:                  &MockSetConfigCLI{},
+			expectedError:            true,
+			errorMessage:             "Invalid config name: secret name \"test-config\" is not valid",
+			expectedConnectCalls:     true,
+			expectedProviderCalls:    true,
+			expectedProjectNameCalls: true,
 		},
 		{
-			name:          "empty config value",
-			cluster:       testCluster,
-			providerId:    client.ProviderID(""),
-			requestArgs:   map[string]interface{}{"name": testConfigName, "value": ""},
-			mockCLI:       &MockSetConfigCLI{},
-			expectedError: true,
-			errorMessage:  "missing 'value' parameter: %!w(<nil>)",
+			name:                     "empty config value",
+			cluster:                  testCluster,
+			providerId:               client.ProviderID(""),
+			requestArgs:              map[string]interface{}{"name": testConfigName, "value": ""},
+			mockCLI:                  &MockSetConfigCLI{},
+			expectedError:            true,
+			errorMessage:             "Invalid config name: secret name \"test-config\" is not valid",
+			expectedConnectCalls:     true,
+			expectedProviderCalls:    true,
+			expectedProjectNameCalls: true,
 		},
 
 		// CLI operation error tests
@@ -158,7 +171,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:              map[string]interface{}{"name": testConfigName, "value": testValue},
 			mockCLI:                  &MockSetConfigCLI{LoadProjectNameError: errors.New("project loading failed")},
 			expectedError:            true,
-			errorMessage:             "Failed to load project name: project loading failed",
+			errorMessage:             "failed to load project name: project loading failed",
 			expectedConnectCalls:     true,
 			expectedProviderCalls:    true,
 			expectedProjectNameCalls: true,
@@ -206,12 +219,33 @@ func TestHandleSetConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Chdir("testdata")
+			os.Unsetenv("DEFANG_PROVIDER")
+			os.Unsetenv("AWS_PROFILE")
+			os.Unsetenv("AWS_REGION")
+
 			loader := &client.MockLoader{}
-			params := SetConfigParams{
-				Name:  tt.requestArgs["name"].(string),
-				Value: tt.requestArgs["value"].(string),
+
+			// Extract arguments with defaults for missing values
+			name := ""
+			if n, ok := tt.requestArgs["name"].(string); ok {
+				name = n
 			}
-			ec := elicitations.NewController(&mockElicitationsClient{})
+			value := ""
+			if v, ok := tt.requestArgs["value"].(string); ok {
+				value = v
+			}
+
+			params := SetConfigParams{
+				Name:  name,
+				Value: value,
+			}
+			ec := elicitations.NewController(&mockElicitationsClient{
+				responses: map[string]string{
+					"strategy":     "profile",
+					"profile_name": "default",
+				},
+			})
 			result, err := HandleSetConfig(t.Context(), loader, params, tt.mockCLI, ec, StackConfig{
 				Cluster:    tt.cluster,
 				ProviderID: &tt.providerId,

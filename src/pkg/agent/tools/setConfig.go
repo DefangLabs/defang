@@ -30,21 +30,23 @@ func HandleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params
 		return "", fmt.Errorf("Failed to setup provider: %w", err)
 	}
 
-	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
-	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
-	if err != nil {
-		return "", fmt.Errorf("Failed to load project name: %w", err)
+	if params.ProjectName == "" {
+		term.Debug("Function invoked: cliClient.LoadProjectNameWithFallback")
+		projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
+		if err != nil {
+			return "", fmt.Errorf("failed to load project name: %w", err)
+		}
+		params.ProjectName = projectName
 	}
-	term.Debug("Project name loaded:", projectName)
 
 	if !pkg.IsValidSecretName(params.Name) {
 		return "", fmt.Errorf("Invalid config name: secret name %q is not valid", params.Name)
 	}
 
 	term.Debug("Function invoked: cli.ConfigSet")
-	if err := cli.ConfigSet(ctx, projectName, provider, params.Name, params.Value); err != nil {
+	if err := cli.ConfigSet(ctx, params.ProjectName, provider, params.Name, params.Value); err != nil {
 		return "", fmt.Errorf("Failed to set config: %w", err)
 	}
 
-	return fmt.Sprintf("Successfully set the config variable %q for project %q", params.Name, projectName), nil
+	return fmt.Sprintf("Successfully set the config variable %q for project %q", params.Name, params.ProjectName), nil
 }

@@ -3,10 +3,10 @@ package tools
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
@@ -123,21 +123,33 @@ func createConnectError(code connect.Code, message string) error {
 	return connect.NewError(code, errors.New(message))
 }
 
-type mockElicitationsClient struct{}
+type mockElicitationsClient struct {
+	responses map[string]string
+}
 
 func (m *mockElicitationsClient) Request(ctx context.Context, req elicitations.Request) (elicitations.Response, error) {
+	properties, ok := req.Schema["properties"].(map[string]any)
+	if !ok || len(properties) == 0 {
+		panic("invalid schema properties")
+	}
+	fields := make([]string, 0)
+	for field := range properties {
+		fields = append(fields, field)
+	}
+
+	if len(fields) > 1 {
+		panic("mockElicitationsClient only supports single-field requests")
+	}
+
 	return elicitations.Response{
-		Action:  "accept",
-		Content: map[string]any{},
+		Action: "accept",
+		Content: map[string]any{
+			fields[0]: m.responses[fields[0]],
+		},
 	}, nil
 }
 
 func TestHandleServicesToolWithMockCLI(t *testing.T) {
-	// Common test data
-	const (
-		testCluster = "test-cluster"
-	)
-
 	tests := []struct {
 		name                string
 		providerId          client.ProviderID
@@ -159,17 +171,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 
 			expectedError:       true,
 			errorMessage:        "connection failed",
-			expectedGetServices: false,
-		},
-		{
-			name:       "auto_provider_not_configured",
-			providerId: client.ProviderAuto,
-			mockCLI: &MockCLI{
-				MockClient: &client.GrpcClient{},
-			},
-
-			expectedError:       true,
-			errorMessage:        common.ErrNoProviderSet.Error(),
 			expectedGetServices: false,
 		},
 		{
@@ -255,8 +256,17 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Chdir("testdata")
+			os.Unsetenv("DEFANG_PROVIDER")
+			os.Unsetenv("AWS_PROFILE")
+			os.Unsetenv("AWS_REGION")
 			loader := &client.MockLoader{}
-			ec := elicitations.NewController(&mockElicitationsClient{})
+			ec := elicitations.NewController(&mockElicitationsClient{
+				responses: map[string]string{
+					"strategy":     "profile",
+					"profile_name": "default",
+				},
+			})
 			result, err := HandleServicesTool(t.Context(), loader, tt.mockCLI, ec, StackConfig{
 				Cluster:    "test-cluster",
 				ProviderID: &tt.providerId,

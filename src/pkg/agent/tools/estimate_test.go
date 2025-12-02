@@ -77,6 +77,7 @@ func TestHandleEstimateTool(t *testing.T) {
 		{
 			name: "unknown_deployment_mode_fails",
 			arguments: map[string]interface{}{
+				"provider":        "aws",
 				"deployment_mode": "unknown-mode",
 				"region":          "us-west-2",
 			},
@@ -120,13 +121,14 @@ func TestHandleEstimateTool(t *testing.T) {
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
 			},
-			expectedError: "invalid provider specified: provider not one of [auto defang aws digitalocean gcp]",
+			expectedError: "provider not one of [auto defang aws digitalocean gcp]",
 		},
 		{
 			name: "run_estimate_error",
 			arguments: map[string]interface{}{
-				"provider": "aws",
-				"region":   "us-west-2",
+				"provider":        "aws",
+				"region":          "us-west-2",
+				"deployment_mode": "AFFORDABLE",
 			},
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
@@ -137,8 +139,9 @@ func TestHandleEstimateTool(t *testing.T) {
 		{
 			name: "successful_estimate_default_mode",
 			arguments: map[string]interface{}{
-				"provider": "aws",
-				"region":   "us-west-2",
+				"provider":        "aws",
+				"region":          "us-west-2",
+				"deployment_mode": "AFFORDABLE",
 			},
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
@@ -187,10 +190,24 @@ func TestHandleEstimateTool(t *testing.T) {
 
 			providerID := client.ProviderAuto // Default provider ID
 
+			// Extract arguments with defaults for missing values
+			provider := ""
+			if p, ok := tt.arguments["provider"].(string); ok {
+				provider = p
+			}
+			region := ""
+			if r, ok := tt.arguments["region"].(string); ok {
+				region = r
+			}
+			deploymentMode := ""
+			if d, ok := tt.arguments["deployment_mode"].(string); ok {
+				deploymentMode = d
+			}
+
 			params := EstimateParams{
-				Provider:       tt.arguments["provider"].(string),
-				Region:         tt.arguments["region"].(string),
-				DeploymentMode: tt.arguments["deployment_mode"].(string),
+				Provider:       provider,
+				Region:         region,
+				DeploymentMode: deploymentMode,
 			}
 
 			// Call the function

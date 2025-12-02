@@ -184,6 +184,7 @@ func Read(name string) (*StackParameters, error) {
 	if err != nil {
 		return nil, err
 	}
+	parsed.Name = name
 	return &parsed, nil
 }
 

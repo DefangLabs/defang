@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 
-	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/bufbuild/connect-go"
@@ -20,6 +20,7 @@ type MockDestroyCLI struct {
 	ConnectError                     error
 	ComposeDownError                 error
 	LoadProjectNameWithFallbackError error
+	CanIUseProviderError             error
 	ComposeDownResult                string
 	ProjectName                      string
 	CallLog                          []string
@@ -54,6 +55,14 @@ func (m *MockDestroyCLI) LoadProjectNameWithFallback(ctx context.Context, loader
 	return m.ProjectName, nil
 }
 
+func (m *MockDestroyCLI) CanIUseProvider(ctx context.Context, grpcClient *client.GrpcClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {
+	m.CallLog = append(m.CallLog, fmt.Sprintf("CanIUseProvider(%s, %s)", providerId, projectName))
+	if m.CanIUseProviderError != nil {
+		return m.CanIUseProviderError
+	}
+	return nil
+}
+
 func TestHandleDestroyTool(t *testing.T) {
 	tests := []struct {
 		name                 string
@@ -83,6 +92,7 @@ func TestHandleDestroyTool(t *testing.T) {
 			providerID: client.ProviderAWS,
 			setupMock: func(m *MockDestroyCLI) {
 				m.ProjectName = "test-project"
+				m.CanIUseProviderError = errors.New("provider not available")
 			},
 			expectedError: "failed to use provider: provider not available",
 		},
@@ -113,16 +123,14 @@ func TestHandleDestroyTool(t *testing.T) {
 			},
 			expectedTextContains: "The project is in the process of being destroyed: test-project",
 		},
-		{
-			name:          "provider_auto_not_configured",
-			providerID:    client.ProviderAuto,
-			setupMock:     func(m *MockDestroyCLI) {},
-			expectedError: common.ErrNoProviderSet.Error(),
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Chdir("testdata")
+			os.Unsetenv("DEFANG_PROVIDER")
+			os.Unsetenv("AWS_PROFILE")
+			os.Unsetenv("AWS_REGION")
 			// Create mock and configure it
 			mockCLI := &MockDestroyCLI{
 				CallLog: []string{},
@@ -131,7 +139,12 @@ func TestHandleDestroyTool(t *testing.T) {
 
 			// Call the function
 			loader := &client.MockLoader{}
-			ec := elicitations.NewController(&mockElicitationsClient{})
+			ec := elicitations.NewController(&mockElicitationsClient{
+				responses: map[string]string{
+					"strategy":     "profile",
+					"profile_name": "default",
+				},
+			})
 			result, err := HandleDestroyTool(t.Context(), loader, mockCLI, ec, StackConfig{
 				Cluster:    "test-cluster",
 				ProviderID: &tt.providerID,
@@ -154,6 +167,7 @@ func TestHandleDestroyTool(t *testing.T) {
 					"Connect(test-cluster)",
 					"NewProvider(aws)",
 					"LoadProjectNameWithFallback",
+					"CanIUseProvider(aws, test-project)",
 					"ComposeDown(test-project)",
 				}
 				assert.Equal(t, expectedCalls, mockCLI.CallLog)

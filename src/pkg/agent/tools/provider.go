@@ -52,14 +52,15 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, stackName string)
 			return nil, nil, fmt.Errorf("failed to setup stack: %w", err)
 		}
 	}
-	err = pp.setupProviderAuthentication(ctx, providerID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to setup provider authentication: %w", err)
-	}
 
 	err = providerID.Set(stack.Provider.Name())
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to set provider ID: %w", err)
+	}
+
+	err = pp.setupProviderAuthentication(ctx, providerID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to setup provider authentication: %w", err)
 	}
 
 	term.Debug("Function invoked: cli.NewProvider")

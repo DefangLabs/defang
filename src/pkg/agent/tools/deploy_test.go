@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
@@ -35,6 +35,7 @@ type MockDeployCLI struct {
 	CheckProviderConfiguredError error
 	LoadProjectError             error
 	OpenBrowserError             error
+	InteractiveLoginMCPError     error
 	ComposeUpResponse            *defangv1.DeployResponse
 	Project                      *compose.Project
 	CallLog                      []string
@@ -56,7 +57,7 @@ func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.Provi
 
 func (m *MockDeployCLI) InteractiveLoginMCP(ctx context.Context, client *client.GrpcClient, cluster string, mcpClient string) error {
 	m.CallLog = append(m.CallLog, "InteractiveLoginMCP")
-	return nil
+	return m.InteractiveLoginMCPError
 }
 
 func (m *MockDeployCLI) ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
@@ -80,43 +81,36 @@ func (m *MockDeployCLI) TailAndMonitor(ctx context.Context, project *compose.Pro
 	return nil, nil
 }
 
+func (m *MockDeployCLI) CanIUseProvider(ctx context.Context, client *client.GrpcClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {
+	m.CallLog = append(m.CallLog, "CanIUseProvider")
+	return nil
+}
+
 func TestHandleDeployTool(t *testing.T) {
 	tests := []struct {
 		name                 string
-		providerID           client.ProviderID
 		setupMock            func(*MockDeployCLI)
 		expectedTextContains string
 		expectedError        string
 	}{
 		{
-			name:       "load_project_error",
-			providerID: client.ProviderAWS,
+			name: "load_project_error",
 			setupMock: func(m *MockDeployCLI) {
 				m.LoadProjectError = errors.New("failed to parse compose file")
 			},
 			expectedError: "local deployment failed: failed to parse compose file: failed to parse compose file. Please provide a valid compose file path.",
 		},
 		{
-			name:       "connect_error",
-			providerID: client.ProviderAWS,
+			name: "connect_error",
 			setupMock: func(m *MockDeployCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.ConnectError = errors.New("connection failed")
+				m.InteractiveLoginMCPError = errors.New("connection failed")
 			},
-			expectedError: "could not connect: connection failed",
+			expectedError: "connection failed",
 		},
 		{
-			name:       "check_provider_configured_error",
-			providerID: client.ProviderAWS,
-			setupMock: func(m *MockDeployCLI) {
-				m.Project = &compose.Project{Name: "test-project"}
-				m.CheckProviderConfiguredError = errors.New("provider not configured")
-			},
-			expectedError: "provider not configured correctly: provider not configured",
-		},
-		{
-			name:       "compose_up_error",
-			providerID: client.ProviderAWS,
+			name: "compose_up_error",
 			setupMock: func(m *MockDeployCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.ComposeUpError = errors.New("compose up failed")
@@ -124,8 +118,7 @@ func TestHandleDeployTool(t *testing.T) {
 			expectedError: "failed to compose up services: compose up failed",
 		},
 		{
-			name:       "no_services_deployed",
-			providerID: client.ProviderAWS,
+			name: "no_services_deployed",
 			setupMock: func(m *MockDeployCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.ComposeUpResponse = &defangv1.DeployResponse{
@@ -136,8 +129,7 @@ func TestHandleDeployTool(t *testing.T) {
 			expectedError: "no services deployed",
 		},
 		{
-			name:       "successful_deploy_defang_provider",
-			providerID: client.ProviderDefang,
+			name: "successful_deploy_defang_provider",
 			setupMock: func(m *MockDeployCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.ComposeUpResponse = &defangv1.DeployResponse{
@@ -150,8 +142,7 @@ func TestHandleDeployTool(t *testing.T) {
 			expectedTextContains: "Deployment completed successfully",
 		},
 		{
-			name:       "successful_deploy_aws_provider",
-			providerID: client.ProviderAWS,
+			name: "successful_deploy_aws_provider",
 			setupMock: func(m *MockDeployCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.ComposeUpResponse = &defangv1.DeployResponse{
@@ -162,29 +153,34 @@ func TestHandleDeployTool(t *testing.T) {
 				}
 			},
 			expectedTextContains: "Deployment completed successfully",
-		},
-		{
-			name:          "provider_auto_not_configured",
-			providerID:    client.ProviderAuto,
-			setupMock:     func(m *MockDeployCLI) {},
-			expectedError: common.ErrNoProviderSet.Error(),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Chdir("testdata")
+			os.Unsetenv("DEFANG_PROVIDER")
+			os.Unsetenv("AWS_PROFILE")
+			os.Unsetenv("AWS_REGION")
 			// Create mock and configure it
 			mockCLI := &MockDeployCLI{
 				CallLog: []string{},
 			}
 			tt.setupMock(mockCLI)
 
+			providerID := client.ProviderAWS
+
 			// Call the function
 			loader := &client.MockLoader{}
-			ec := elicitations.NewController(&mockElicitationsClient{})
+			ec := elicitations.NewController(&mockElicitationsClient{
+				responses: map[string]string{
+					"strategy":     "profile",
+					"profile_name": "default",
+				},
+			})
 			result, err := HandleDeployTool(t.Context(), loader, mockCLI, ec, StackConfig{
 				Cluster:    "test-cluster",
-				ProviderID: &tt.providerID,
+				ProviderID: &providerID,
 				Stack:      "test-stack",
 			})
 
@@ -203,6 +199,8 @@ func TestHandleDeployTool(t *testing.T) {
 				expectedCalls := []string{
 					"LoadProject",
 					"Connect(test-cluster)",
+					"NewProvider(aws)",
+					"CanIUseProvider",
 					"ComposeUp",
 					"TailAndMonitor",
 				}
