@@ -656,6 +656,8 @@ loop:
 
 func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	// FillOutputs is needed to get the CD task ARN or the LogGroup ARNs
+	// if the cloud formation stack has been destroyed, we can still query
+	// logs for builds and services
 	if err := b.driver.FillOutputs(ctx); err != nil {
 		term.Debugf("Failed to retrieve stack outputs: %v", err)
 	}
