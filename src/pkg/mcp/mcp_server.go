@@ -16,11 +16,8 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 )
 
-func prepareInstructions(defangTools []server.ServerTool) string {
+func prepareInstructions() string {
 	instructions := "Defang provides tools for deploying web applications to cloud providers (AWS, GCP, Digital Ocean) using a compose.yaml file."
-	for _, tool := range defangTools {
-		instructions += "\n\n" + tool.Tool.Name + " - " + tool.Tool.Description
-	}
 	return instructions
 }
 
@@ -58,7 +55,7 @@ func NewDefangMCPServer(version string, cluster string, providerID *cliClient.Pr
 		version,
 		server.WithResourceCapabilities(true, true),
 		server.WithToolCapabilities(true),
-		server.WithInstructions(prepareInstructions(defangTools)),
+		server.WithInstructions(prepareInstructions()),
 	)
 
 	resources.SetupResources(s)
