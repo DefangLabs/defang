@@ -22,7 +22,7 @@ var multipleComposeFilesOptions = mcp.WithArray("compose_file_paths",
 	mcp.Items(map[string]string{"type": "string"}),
 )
 
-func CollectTools(cluster string, providerId *client.ProviderID, cli CLIInterface) []server.ServerTool {
+func CollectTools(cluster string, providerId *client.ProviderID, cli CLIInterface, _ elicitations.Controller) []server.ServerTool {
 	tools := []server.ServerTool{
 		{
 			Tool: mcp.NewTool("services",

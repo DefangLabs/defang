@@ -49,7 +49,6 @@ func NewDefangMCPServer(version string, cluster string, providerID *cliClient.Pr
 		return nil, fmt.Errorf("failed to setup knowledge base: %w", err)
 	}
 
-	defangTools := tools.CollectTools(cluster, providerID, cli)
 	s := server.NewMCPServer(
 		"Deploy with Defang",
 		version,
@@ -68,6 +67,9 @@ func NewDefangMCPServer(version string, cluster string, providerID *cliClient.Pr
 		cluster:    cluster,
 		client:     common.MCPDevelopmentClient,
 	}
+	elicitationsClient := NewMCPElicitationsController(s)
+	ec := elicitations.NewController(elicitationsClient)
+	defangTools := tools.CollectTools(cluster, providerID, cli, ec)
 	for i := range defangTools {
 		defangTools[i].Handler = toolTracker.TrackTool(defangTools[i].Tool.Name, defangTools[i].Handler)
 	}
