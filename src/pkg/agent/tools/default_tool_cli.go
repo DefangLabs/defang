@@ -18,6 +18,12 @@ import (
 	"github.com/pkg/browser"
 )
 
+type StackConfig struct {
+	Cluster    string
+	ProviderID *cliClient.ProviderID
+	Stack      string
+}
+
 // DefaultToolCLI implements all tool interfaces as passthroughs to the real CLI logic
 // This consolidates all Default<tool>CLI structs into one
 // Implements: CLIInterface

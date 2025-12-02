@@ -6,6 +6,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/agent/tools"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -43,7 +44,9 @@ func (t *ToolTracker) TrackTool(name string, handler server.ToolHandlerFunc) ser
 	}
 }
 
-func NewDefangMCPServer(version string, cluster string, providerID *cliClient.ProviderID, client MCPClient, cli tools.CLIInterface) (*server.MCPServer, error) {
+type StackConfig = tools.StackConfig
+
+func NewDefangMCPServer(version string, client MCPClient, cli agentTools.CLIInterface, config StackConfig) (*server.MCPServer, error) {
 	// Setup knowledge base
 	if err := SetupKnowledgeBase(); err != nil {
 		return nil, fmt.Errorf("failed to setup knowledge base: %w", err)
@@ -63,13 +66,13 @@ func NewDefangMCPServer(version string, cluster string, providerID *cliClient.Pr
 	common.MCPDevelopmentClient = string(client)
 
 	toolTracker := ToolTracker{
-		providerId: providerID,
-		cluster:    cluster,
+		providerId: config.ProviderID,
+		cluster:    config.Cluster,
 		client:     common.MCPDevelopmentClient,
 	}
 	elicitationsClient := NewMCPElicitationsController(s)
 	ec := elicitations.NewController(elicitationsClient)
-	defangTools := tools.CollectTools(cluster, providerID, cli, ec)
+	defangTools := tools.CollectTools(ec, config)
 	for i := range defangTools {
 		defangTools[i].Handler = toolTracker.TrackTool(defangTools[i].Tool.Name, defangTools[i].Handler)
 	}

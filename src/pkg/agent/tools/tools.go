@@ -7,6 +7,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -22,7 +23,7 @@ var multipleComposeFilesOptions = mcp.WithArray("compose_file_paths",
 	mcp.Items(map[string]string{"type": "string"}),
 )
 
-func CollectTools(cluster string, providerId *client.ProviderID, cli CLIInterface, _ elicitations.Controller) []server.ServerTool {
+func CollectTools(ec elicitations.Controller, config StackConfig) []server.ServerTool {
 	tools := []server.ServerTool{
 		{
 			Tool: mcp.NewTool("services",
@@ -35,7 +36,7 @@ func CollectTools(cluster string, providerId *client.ProviderID, cli CLIInterfac
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
-				output, err := HandleServicesTool(ctx, loader, providerId, cluster, cli)
+				output, err := HandleServicesTool(ctx, loader, config.ProviderID, config.Cluster, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to list services", err), err
 				}
@@ -53,7 +54,7 @@ func CollectTools(cluster string, providerId *client.ProviderID, cli CLIInterfac
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
-				output, err := HandleDeployTool(ctx, loader, providerId, cluster, cli)
+				output, err := HandleDeployTool(ctx, loader, config.ProviderID, config.Cluster, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to deploy services", err), err
 				}
@@ -71,7 +72,7 @@ func CollectTools(cluster string, providerId *client.ProviderID, cli CLIInterfac
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
-				output, err := HandleDestroyTool(ctx, loader, providerId, cluster, cli)
+				output, err := HandleDestroyTool(ctx, loader, config.ProviderID, config.Cluster, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to destroy services", err), err
 				}
@@ -102,7 +103,7 @@ func CollectTools(cluster string, providerId *client.ProviderID, cli CLIInterfac
 					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
 				params := ParseLogsParams(request)
-				output, err := HandleLogsTool(ctx, loader, params, cluster, providerId, cli)
+				output, err := HandleLogsTool(ctx, loader, params, config.ProviderID, config.Cluster, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to fetch logs", err), err
 				}
@@ -116,7 +117,7 @@ func CollectTools(cluster string, providerId *client.ProviderID, cli CLIInterfac
 				multipleComposeFilesOptions,
 				mcp.WithString("provider",
 					mcp.Description("The cloud provider to estimate costs for. Supported options are AWS or GCP"),
-					mcp.DefaultString(strings.ToUpper(providerId.String())),
+					mcp.DefaultString(strings.ToUpper(config.ProviderID.String())),
 					mcp.Enum("AWS", "GCP"),
 				),
 				mcp.WithString("deployment_mode",
@@ -130,11 +131,11 @@ func CollectTools(cluster string, providerId *client.ProviderID, cli CLIInterfac
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
 				}
-				params, err := ParseEstimateParams(request, providerId)
+				params, err := ParseEstimateParams(request, config.ProviderID)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to parse estimate parameters", err), err
 				}
-				output, err := HandleEstimateTool(ctx, loader, params, cluster, cli)
+				output, err := HandleEstimateTool(ctx, loader, params, config.Cluster, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to estimate costs", err), err
 				}
@@ -162,7 +163,7 @@ func CollectTools(cluster string, providerId *client.ProviderID, cli CLIInterfac
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to parse set config parameters", err), err
 				}
-				output, err := HandleSetConfig(ctx, loader, params, providerId, cluster, cli)
+				output, err := HandleSetConfig(ctx, loader, params, config.ProviderID, config.Cluster, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to set config", err), err
 				}
@@ -187,7 +188,7 @@ func CollectTools(cluster string, providerId *client.ProviderID, cli CLIInterfac
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to parse remove config parameters", err), err
 				}
-				output, err := HandleRemoveConfigTool(ctx, loader, params, providerId, cluster, cli)
+				output, err := HandleRemoveConfigTool(ctx, loader, params, config.ProviderID, config.Cluster, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to remove config", err), err
 				}
