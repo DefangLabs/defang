@@ -617,16 +617,17 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	tailOptions := cli.TailOptions{
-		Deployment: deployment,
-		Filter:     filter,
-		LogType:    logType,
-		Raw:        raw,
-		Services:   services,
-		Since:      sinceTs,
-		Until:      untilTs,
-		Verbose:    verbose,
-		Follow:     follow,
-		Limit:      limit,
+		Deployment:    deployment,
+		Filter:        filter,
+		LogType:       logType,
+		Raw:           raw,
+		Services:      services,
+		Since:         sinceTs,
+		Until:         untilTs,
+		Verbose:       verbose,
+		Follow:        follow,
+		Limit:         limit,
+		PrintBookends: true,
 	}
 	return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 }

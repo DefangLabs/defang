@@ -3,6 +3,8 @@ package timeutils
 import (
 	"strings"
 	"time"
+
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // ParseTimeOrDuration parses a time string or duration string (e.g. 1h30m) and returns a time.Time.
@@ -32,4 +34,11 @@ func ParseTimeOrDuration(str string, now time.Time) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return now.Add(-dur), nil // - because we want to go back in time
+}
+
+func AsTime(ts *timestamppb.Timestamp, def time.Time) time.Time {
+	if !ts.IsValid() { // handles nil too
+		return def
+	}
+	return ts.AsTime()
 }
