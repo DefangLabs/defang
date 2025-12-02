@@ -12,8 +12,10 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/agent/plugins/fabric"
+	"github.com/DefangLabs/defang/src/pkg/agent/tools"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cluster"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/core/api"
@@ -30,7 +32,7 @@ type Agent struct {
 	system    string
 }
 
-func New(ctx context.Context, clusterAddr string, providerId *client.ProviderID) (*Agent, error) {
+func New(ctx context.Context, clusterAddr string, providerId *client.ProviderID, stack string) (*Agent, error) {
 	accessToken := cluster.GetExistingToken(clusterAddr)
 	provider := "fabric"
 	var providerPlugin api.Plugin
@@ -59,8 +61,17 @@ func New(ctx context.Context, clusterAddr string, providerId *client.ProviderID)
 		genkit.WithPlugins(providerPlugin),
 	)
 
+	elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
+	ec := elicitations.NewController(elicitationsClient)
+
 	printer := printer{outStream: os.Stdout}
 	toolManager := NewToolManager(gk, printer)
+	defangTools := tools.CollectDefangTools(ec, tools.StackConfig{
+		Cluster:    clusterAddr,
+		ProviderID: providerId,
+		Stack:      stack,
+	})
+	toolManager.RegisterTools(defangTools...)
 	fsTools := CollectFsTools()
 	toolManager.RegisterTools(fsTools...)
 
