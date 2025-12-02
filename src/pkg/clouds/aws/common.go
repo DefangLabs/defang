@@ -9,12 +9,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/processcreds"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
 type Region string
 
 type Aws struct {
-	Region Region
+	AccountID string
+	Region    Region
 }
 
 func (r Region) String() string {
@@ -30,6 +32,10 @@ func (a *Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
 		return cfg, errors.New("missing AWS region: set AWS_REGION or edit your AWS profile at ~/.aws/config")
 	}
 	a.Region = Region(cfg.Region)
+	// Get caller identity to determine account ID
+	if output, err := sts.NewFromConfig(cfg).GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{}); err == nil {
+		a.AccountID = *output.Account
+	}
 	return cfg, err
 }
 
@@ -58,7 +64,7 @@ func LoadDefaultConfig(ctx context.Context, region Region) (aws.Config, error) {
 
 func GetAccountID(arn string) string {
 	parts := strings.Split(arn, ":")
-	return parts[4]
+	return parts[4] // panics if the ARN is malformed
 }
 
 func newChainProvider(providers ...aws.CredentialsProvider) aws.CredentialsProvider {

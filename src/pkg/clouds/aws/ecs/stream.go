@@ -11,7 +11,7 @@ import (
 // QueryAndTailLogGroup queries the log group from the give start time and initiates a Live Tail session.
 // This function also handles the case where the log group does not exist yet.
 // The caller should call `Close()` on the returned EventStream when done.
-func QueryAndTailLogGroup(ctx context.Context, cw FiltererTailer, lgi LogGroupInput, start, end time.Time) (LiveTailStream, error) {
+func QueryAndTailLogGroup(ctx context.Context, cw LogsClient, lgi LogGroupInput, start, end time.Time) (LiveTailStream, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	es := &eventStream{
@@ -70,7 +70,7 @@ func QueryAndTailLogGroup(ctx context.Context, cw FiltererTailer, lgi LogGroupIn
 }
 
 // pollTailLogGroup polls the log group and starts the Live Tail session once it's available
-func pollTailLogGroup(ctx context.Context, cw LogTailer, lgi LogGroupInput) (LiveTailStream, error) {
+func pollTailLogGroup(ctx context.Context, cw StartLiveTailAPI, lgi LogGroupInput) (LiveTailStream, error) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 

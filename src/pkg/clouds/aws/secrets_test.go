@@ -55,7 +55,7 @@ func TestPutSecret(t *testing.T) {
 		t.Fatal(err)
 	}
 	if value != *gsv.Parameter.Value {
-		t.Fatalf("expected %s, got %s", value, *gsv.Parameter.Value)
+		t.Fatalf("expected %s, got: %s", value, *gsv.Parameter.Value)
 	}
 
 	exist, err = a.IsValidSecret(ctx, name)

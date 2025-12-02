@@ -17,7 +17,7 @@ func TestGetExistingToken(t *testing.T) {
 
 		accessToken := GetExistingToken(fabric)
 		if accessToken != expectedToken {
-			t.Errorf("expected %s, got %s", expectedToken, accessToken)
+			t.Errorf("expected %s, got: %s", expectedToken, accessToken)
 		}
 	})
 
@@ -33,7 +33,7 @@ func TestGetExistingToken(t *testing.T) {
 
 		accessToken := GetExistingToken(fabric)
 		if accessToken != expectedToken {
-			t.Errorf("expected %s, got %s", expectedToken, accessToken)
+			t.Errorf("expected %s, got: %s", expectedToken, accessToken)
 		}
 	})
 }

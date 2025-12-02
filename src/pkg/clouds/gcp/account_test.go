@@ -33,7 +33,7 @@ func TestGetCurrentAccountPrincipal(t *testing.T) {
 		}
 		expected := "user:test@email.com"
 		if principal != expected {
-			t.Errorf("expected principal to be %s, got %s", expected, principal)
+			t.Errorf("expected principal to be %s, got: %s", expected, principal)
 		}
 	})
 
@@ -50,7 +50,7 @@ func TestGetCurrentAccountPrincipal(t *testing.T) {
 		}
 		expected := "serviceAccount:test@someproject.iam.gserviceaccount.com"
 		if principal != expected {
-			t.Errorf("expected principal to be %s, got %s", expected, principal)
+			t.Errorf("expected principal to be %s, got: %s", expected, principal)
 		}
 	})
 
@@ -72,7 +72,7 @@ func TestGetCurrentAccountPrincipal(t *testing.T) {
 		}
 		expected := "user:test@email.com"
 		if principal != expected {
-			t.Errorf("expected principal to be %s, got %s", expected, principal)
+			t.Errorf("expected principal to be %s, got: %s", expected, principal)
 		}
 	})
 
@@ -94,7 +94,7 @@ func TestGetCurrentAccountPrincipal(t *testing.T) {
 		}
 		expected := "serviceAccount:1234567890-compute@developer.gserviceaccount.com"
 		if principal != expected {
-			t.Errorf("expected principal to be %s, got %s", expected, principal)
+			t.Errorf("expected principal to be %s, got: %s", expected, principal)
 		}
 	})
 
@@ -114,7 +114,7 @@ func TestGetCurrentAccountPrincipal(t *testing.T) {
 		}
 		expected := "principalSet://iam.googleapis.com/projects/123456789012/locations/global/workloadIdentityPools/github/*"
 		if principal != expected {
-			t.Errorf("expected principal to be %s, got %s", expected, principal)
+			t.Errorf("expected principal to be %s, got: %s", expected, principal)
 		}
 	})
 
@@ -176,7 +176,7 @@ func TestExtractEmailFromIDToken(t *testing.T) {
 		}
 		expected := "test@email.com"
 		if email != expected {
-			t.Errorf("expected email to be %s, got %s", expected, email)
+			t.Errorf("expected email to be %s, got: %s", expected, email)
 		}
 	})
 
@@ -214,7 +214,7 @@ func TestExtractEmailFromIDToken(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if email != "" {
-			t.Errorf("expected empty email, got %s", email)
+			t.Errorf("expected empty email, got: %s", email)
 		}
 	})
 }
@@ -228,7 +228,7 @@ func TestParseServiceAccountFromURL(t *testing.T) {
 		}
 		expected := "test@project.iam.gserviceaccount.com"
 		if principal != expected {
-			t.Errorf("expected principal to be %s, got %s", expected, principal)
+			t.Errorf("expected principal to be %s, got: %s", expected, principal)
 		}
 	})
 

@@ -19,7 +19,7 @@ func TestMoney(t *testing.T) {
 	for _, test := range tests {
 		m := NewMoney(test.amount, test.currency)
 		if m.String() != test.expected {
-			t.Errorf("Expected %s but got %s", test.expected, m.String())
+			t.Errorf("Expected %s but got: %s", test.expected, m.String())
 		}
 	}
 }

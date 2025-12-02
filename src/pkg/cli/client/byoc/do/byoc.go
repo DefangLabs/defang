@@ -657,7 +657,7 @@ func (b *ByocDo) environment(projectName, delegateDomain string, mode defangv1.D
 		},
 		{
 			Key:   "DEFANG_PREFIX",
-			Value: byoc.DefangPrefix,
+			Value: b.Prefix,
 		},
 		{
 			Key:   "DEFANG_DEBUG",

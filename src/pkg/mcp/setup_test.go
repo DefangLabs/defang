@@ -290,7 +290,7 @@ func TestGetClientConfigPath(t *testing.T) {
 				if err != nil {
 					t.Errorf("Unexpected error for client %s: %v", tt.client, err)
 				} else if configPath != tt.expectedPath {
-					t.Errorf("Expected path %s for client %s, but got %s", tt.expectedPath, tt.client, configPath)
+					t.Errorf("Expected path %s for client %s, but got: %s", tt.expectedPath, tt.client, configPath)
 				}
 			}
 		})

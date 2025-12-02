@@ -292,7 +292,7 @@ func TestGetDockerIgnorePatterns(t *testing.T) {
 
 			// Verify the returned file name
 			if fileName != tt.expectedFileName {
-				t.Errorf("Expected file name %s, but got %s", tt.expectedFileName, fileName)
+				t.Errorf("Expected file name %s, but got: %s", tt.expectedFileName, fileName)
 			}
 
 			// Verify the content of the patterns

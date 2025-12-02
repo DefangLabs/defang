@@ -99,7 +99,7 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) *defangv1.TailRes
 		response.Host = "codebuild"
 		response.Service = "cd"
 		parseCodeBuildRecords = true
-	case strings.HasSuffix(*first.LogGroupIdentifier, "/builds") && strings.Contains(*first.LogStreamName, "-firelens-"):
+	case strings.Contains(*first.LogStreamName, "-firelens-"):
 		// These events are from the Firelens sidecar "<service>/<kaniko>-firelens-<taskID>"; try to parse the JSON
 		// or ""
 		// LogStreams: "app-image/kaniko-firelens-babe6cdb246b4c10b5b7093bb294e6c7"

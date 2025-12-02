@@ -86,7 +86,7 @@ func TestLoadFromContent(t *testing.T) {
 				t.Fatal(err)
 			}
 			if project.Name != tt.wantProject {
-				t.Errorf("Expected project name to be project1, got %s", project.Name)
+				t.Errorf("Expected project name to be project1, got: %s", project.Name)
 			}
 			if len(project.Services) != 1 {
 				t.Errorf("Expected 1 service, got %d", len(project.Services))
@@ -95,7 +95,7 @@ func TestLoadFromContent(t *testing.T) {
 				t.Errorf("Expected service1 to be present, got %v", project.Services)
 			}
 			if project.Services["service1"].Image != "nginx" {
-				t.Errorf("Expected service1 image to be nginx, got %s", project.Services["service1"].Image)
+				t.Errorf("Expected service1 image to be nginx, got: %s", project.Services["service1"].Image)
 			}
 			if config, ok := project.Services["service1"].Environment["CONFIG"]; ok {
 				if config != nil {

@@ -22,7 +22,7 @@ func TestGetExistingToken(t *testing.T) {
 
 		accessToken := cluster.GetExistingToken(fabric)
 		if accessToken != expectedToken {
-			t.Errorf("expected %s, got %s", expectedToken, accessToken)
+			t.Errorf("expected %s, got: %s", expectedToken, accessToken)
 		}
 	})
 
@@ -37,7 +37,7 @@ func TestGetExistingToken(t *testing.T) {
 
 		accessToken := cluster.GetExistingToken(fabric)
 		if accessToken != expectedToken {
-			t.Errorf("expected %s, got %s", expectedToken, accessToken)
+			t.Errorf("expected %s, got: %s", expectedToken, accessToken)
 		}
 	})
 }
@@ -78,7 +78,7 @@ func TestInteractiveLogin(t *testing.T) {
 			t.Fatalf("expected no error, got %v", err)
 		}
 		if string(savedToken) != accessToken {
-			t.Errorf("expected %s, got %s", accessToken, string(savedToken))
+			t.Errorf("expected %s, got: %s", accessToken, string(savedToken))
 		}
 	})
 

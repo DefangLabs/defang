@@ -48,7 +48,7 @@ func TestServiceNameRestorer(t *testing.T) {
 		t.Run(test.input, func(t *testing.T) {
 			result := restorer(HasName{name: test.input})
 			if result.Name() != test.expected {
-				t.Errorf("Expected %s, got %s", test.expected, result.Name())
+				t.Errorf("Expected %s, got: %s", test.expected, result.Name())
 			}
 		})
 	}

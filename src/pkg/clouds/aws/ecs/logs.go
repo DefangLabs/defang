@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -45,12 +46,12 @@ func NewStaticLogStream(ch <-chan LogEvent, cancel func()) EventStream[types.Sta
 	return es
 }
 
-type FiltererTailer interface {
-	LogFilterer
-	LogTailer
+type LogsClient interface {
+	FilterLogEventsAPI
+	StartLiveTailAPI
 }
 
-func QueryAndTailLogGroups(ctx context.Context, cw FiltererTailer, start, end time.Time, logGroups ...LogGroupInput) (LiveTailStream, error) {
+func QueryAndTailLogGroups(ctx context.Context, cw LogsClient, start, end time.Time, logGroups ...LogGroupInput) (LiveTailStream, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	e := &eventStream{
@@ -65,7 +66,7 @@ func QueryAndTailLogGroups(ctx context.Context, cw FiltererTailer, start, end ti
 		var es LiveTailStream
 		es, err = QueryAndTailLogGroup(ctx, cw, lgi, start, end)
 		if err != nil {
-			break // abort if there is any fatal error
+			continue
 		}
 		wg.Add(1)
 		go func() {
@@ -97,11 +98,14 @@ type LogGroupInput struct {
 	LogEventFilterPattern string
 }
 
-type LogTailer interface {
+type StartLiveTailAPI interface {
 	StartLiveTail(ctx context.Context, params *cloudwatchlogs.StartLiveTailInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.StartLiveTailOutput, error)
 }
 
-func TailLogGroup(ctx context.Context, cw LogTailer, input LogGroupInput) (LiveTailStream, error) {
+func TailLogGroup(ctx context.Context, cw StartLiveTailAPI, input LogGroupInput) (LiveTailStream, error) {
+	if input.LogGroupARN == "" {
+		return nil, errors.New("LogGroupARN is required")
+	}
 	var pattern *string
 	if input.LogEventFilterPattern != "" {
 		pattern = &input.LogEventFilterPattern
@@ -126,11 +130,11 @@ func TailLogGroup(ctx context.Context, cw LogTailer, input LogGroupInput) (LiveT
 	return slto.GetStream(), nil
 }
 
-type LogFilterer interface {
+type FilterLogEventsAPI interface {
 	FilterLogEvents(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error)
 }
 
-func QueryLogGroups(ctx context.Context, cw LogFilterer, start, end time.Time, limit int32, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
+func QueryLogGroups(ctx context.Context, cw FilterLogEventsAPI, start, end time.Time, limit int32, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
 	var evtsChan chan LogEvent
 	errChan := make(chan error, len(logGroups))
 	var wg sync.WaitGroup
@@ -176,11 +180,14 @@ func QueryLogGroups(ctx context.Context, cw LogFilterer, start, end time.Time, l
 	return evtsChan, errChan
 }
 
-func QueryLogGroup(ctx context.Context, cw LogFilterer, input LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
+func QueryLogGroup(ctx context.Context, cw FilterLogEventsAPI, input LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
 	return filterLogEvents(ctx, cw, input, start, end, limit, cb)
 }
 
-func filterLogEvents(ctx context.Context, cw LogFilterer, lgi LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
+func filterLogEvents(ctx context.Context, cw FilterLogEventsAPI, lgi LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
+	if lgi.LogGroupARN == "" {
+		return errors.New("LogGroupARN is required")
+	}
 	var pattern *string
 	if lgi.LogEventFilterPattern != "" {
 		pattern = &lgi.LogEventFilterPattern
