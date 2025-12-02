@@ -30,11 +30,13 @@ func ParseLogsParams(request mcp.CallToolRequest) LogsParams {
 }
 
 func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, cluster string, providerId *cliClient.ProviderID, cli CLIInterface) (string, error) {
-	term.Debug("Function invoked: loader.LoadProject")
-	project, err := cli.LoadProject(ctx, loader)
+	provider := cli.NewProvider(ctx, providerId, client, "")
+	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
+	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
-		err = fmt.Errorf("failed to parse compose file: %w", err)
-		term.Error("Failed to deploy services", "error", err)
+		return "", fmt.Errorf("Failed to load project name: %w", err)
+	}
+	term.Debug("Project name loaded:", projectName)
 
 		return "", fmt.Errorf("local deployment failed: %v. Please provide a valid compose file path.", err)
 	}
@@ -62,7 +64,7 @@ func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 		return "", fmt.Errorf("failed to parse 'until' parameter: %w", err)
 	}
 
-	err = cli.Tail(ctx, provider, project, cliTypes.TailOptions{
+	err = cli.Tail(ctx, provider, projectName, cliTypes.TailOptions{
 		Deployment:    params.DeploymentID,
 		Since:         sinceTime,
 		Until:         untilTime,

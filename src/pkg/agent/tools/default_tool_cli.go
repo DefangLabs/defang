@@ -49,8 +49,8 @@ func (DefaultToolCLI) ComposeUp(ctx context.Context, client *cliClient.GrpcClien
 	return cli.ComposeUp(ctx, client, provider, params)
 }
 
-func (DefaultToolCLI) Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cli.TailOptions) error {
-	return cli.Tail(ctx, provider, project.Name, options)
+func (DefaultToolCLI) Tail(ctx context.Context, provider cliClient.Provider, projectName string, options cli.TailOptions) error {
+	return cli.Tail(ctx, provider, projectName, options)
 }
 
 func (DefaultToolCLI) ComposeDown(ctx context.Context, projectName string, client *cliClient.GrpcClient, provider cliClient.Provider) (string, error) {

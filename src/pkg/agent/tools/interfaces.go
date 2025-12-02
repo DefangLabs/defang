@@ -32,5 +32,5 @@ type CLIInterface interface {
 	OpenBrowser(url string) error
 	PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string
 	RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error)
-	Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cliTypes.TailOptions) error
+	Tail(ctx context.Context, provider cliClient.Provider, projectName string, options cliTypes.TailOptions) error
 }
