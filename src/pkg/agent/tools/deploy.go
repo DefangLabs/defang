@@ -64,5 +64,16 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, provi
 
 	term.Debugf("Deployment ID: %s", deployResp.Etag)
 
+	_, err = cli.TailAndMonitor(ctx, project, provider, 0, cliTypes.TailOptions{
+		Follow:     true,
+		Deployment: deployResp.Etag,
+		Verbose:    true,
+		LogType:    logs.LogTypeAll,
+		Raw:        true,
+	})
+	if err != nil {
+		return "", err
+	}
+
 	return "Deployment completed successfully", nil
 }

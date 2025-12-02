@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -71,6 +72,11 @@ func (m *MockDeployCLI) LoadProject(ctx context.Context, loader client.Loader) (
 		return nil, m.LoadProjectError
 	}
 	return m.Project, nil
+}
+
+func (m *MockDeployCLI) TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, options cli.TailOptions) (cli.ServiceStates, error) {
+	m.CallLog = append(m.CallLog, "TailAndMonitor")
+	return nil, nil
 }
 
 func TestHandleDeployTool(t *testing.T) {
@@ -193,6 +199,7 @@ func TestHandleDeployTool(t *testing.T) {
 					"Connect(test-cluster)",
 					"CheckProviderConfigured(defang, test-project, 0)",
 					"ComposeUp",
+					"TailAndMonitor",
 				}
 				assert.Equal(t, expectedCalls, mockCLI.CallLog)
 			}
