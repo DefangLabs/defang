@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -11,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 )
 
@@ -204,4 +206,34 @@ func makeStackRemoveCmd() *cobra.Command {
 		},
 	}
 	return stackRemoveCmd
+}
+
+/*
+loadDotDefang loads configuration values from stack files in the .defang directory into environment variables.
+
+Loading order:
+
+ 1. If stackName is provided, loads .defang.<stackName> first (required - returns error if missing/invalid)
+ 2. If no stackName provided then we skip loading stack-specific file and continue
+
+Important: RC files have the lowest priority in the configuration hierarchy.
+They will NOT override environment variables that are already set, since
+godotenv.Load respects existing environment variables. Stack-specific RC files
+are considered required when specified.
+*/
+func loadDotDefang(stackName string) error {
+	dotfile := ".defang"
+	if stackName != "" {
+		// If a stack name is provided, load the stack-specific RC file but return error if it fails or does not exist
+		dotfile = filepath.Join(dotfile, stackName)
+		if abs, err := filepath.Abs(dotfile); err == nil {
+			dotfile = abs
+		}
+		if err := godotenv.Load(dotfile); err != nil {
+			return fmt.Errorf("could not load stack %q: %w", stackName, err)
+		}
+	}
+
+	term.Debugf("No stack name provided; continuing without loading a stack file.")
+	return nil
 }
