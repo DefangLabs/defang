@@ -1,11 +1,12 @@
 #######################################################################################
 #                                                                                     #
-# This script installs the latest release of defang from GitHub. It is designed       #
+# This script installs the latest release of Defang from GitHub. It is designed       #
 # to be run like this:                                                                #
 #                                                                                     #
 # eval "$(curl -fsSL s.defang.io/install)"                                            #
 #                                                                                     #
-# This allows us to do some interactive stuff where we can prompt the user for input. #
+# This allows us to do some interactive stuff where we can prompt the user for input  #
+# and have the user run the defang executable from the updated PATH environment var.  #
 #                                                                                     #
 #######################################################################################
 
@@ -27,6 +28,8 @@ fi
 # check if DEFANG_INSTALL_VERSION is set and set the release path accordingly
 if [[ -z "$DEFANG_INSTALL_VERSION" ]]; then
     RELEASE_PATH="latest"
+elif [[ "$DEFANG_INSTALL_VERSION" == "nightly" ]]; then
+    RELEASE_PATH="tags/nightly"
 else
     RELEASE_PATH="tags/v${DEFANG_INSTALL_VERSION#v}"
 fi
@@ -70,9 +73,9 @@ DOWNLOAD_URL=""
 
 # Based on the OS, filter the download URL
 if [ "$OS" = "Darwin" ]; then
-    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o "https://github.com/DefangLabs/defang/releases/download/v[0-9.]*/defang_[0-9.]*_macOS.zip" | head -n 1)
+    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o "https://github.com/DefangLabs/defang/releases/download/.*/defang_.*_macOS.zip" | head -n 1)
 elif [ "$OS" = "Linux" ]; then
-    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o "https://github.com/DefangLabs/defang/releases/download/v[0-9.]*/defang_[0-9.]*_linux_${ARCH_SUFFIX}.tar.gz" | head -n 1)
+    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o "https://github.com/DefangLabs/defang/releases/download/.*/defang_.*_linux_${ARCH_SUFFIX}.tar.gz" | head -n 1)
 fi
 
 # Abort if the download URL is not found
@@ -250,6 +253,7 @@ rm -r "$EXTRACT_DIR"
 rm "$FILENAME"
 
 echo "Installation completed. You can now use defang by typing '$BINARY_NAME' in the terminal."
+echo "Run '$BINARY_NAME mcp setup' to install the Defang MCP server."
 
 # Unset the variables and functions to avoid polluting the user's environment
 unset EXTRACT_DIR DOWNLOAD_URL RELEASE_JSON RELEASE_PATH ARCH_SUFFIX ARCH OS FILENAME INSTALL_DIR BINARY_NAME REPLY EXPORT_PATH CURRENT_SHELL FOUND_PROFILE_FILE AUTH_HEADER

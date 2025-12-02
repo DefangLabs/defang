@@ -4,53 +4,53 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	common "github.com/DefangLabs/defang/src/pkg/clouds/aws"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn/outputs"
+	awsecs "github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
-	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfnTypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/ptr"
 )
 
-type AwsEcs struct {
-	ecs.AwsEcs
+type AwsEcsCfn struct {
+	awsecs.AwsEcs
 	stackName string
 }
 
-// var _ types.Driver = (*AwsEcs)(nil)
-
 const stackTimeout = time.Minute * 3
 
-func OptionVPCAndSubnetID(ctx context.Context, vpcID, subnetID string) func(types.Driver) error {
-	return func(d types.Driver) error {
-		if ecs, ok := d.(*AwsEcs); ok {
+func OptionVPCAndSubnetID(ctx context.Context, vpcID, subnetID string) func(clouds.Driver) error {
+	return func(d clouds.Driver) error {
+		if ecs, ok := d.(*AwsEcsCfn); ok {
 			return ecs.PopulateVPCandSubnetID(ctx, vpcID, subnetID)
 		}
 		return errors.New("only AwsEcs driver supports VPC ID and Subnet ID option")
 	}
 }
 
-func New(stack string, region region.Region) *AwsEcs {
+func New(stack string, region region.Region) *AwsEcsCfn {
 	if stack == "" {
 		panic("stack must be set")
 	}
-	return &AwsEcs{
+	return &AwsEcsCfn{
 		stackName: stack,
-		AwsEcs: ecs.AwsEcs{
-			Aws:  common.Aws{Region: region},
-			Spot: true,
+		AwsEcs: awsecs.AwsEcs{
+			Aws:          common.Aws{Region: region},
+			RetainBucket: true,
+			// Spot: true,
 		},
 	}
 }
 
-func (a *AwsEcs) newClient(ctx context.Context) (*cloudformation.Client, error) {
+func (a *AwsEcsCfn) newClient(ctx context.Context) (*cloudformation.Client, error) {
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return nil, err
@@ -59,26 +59,41 @@ func (a *AwsEcs) newClient(ctx context.Context) (*cloudformation.Client, error) 
 	return cloudformation.NewFromConfig(cfg), nil
 }
 
-func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) error {
+func (a *AwsEcsCfn) updateStackAndWait(ctx context.Context, templateBody string, parameters []cfnTypes.Parameter) error {
 	cfn, err := a.newClient(ctx)
 	if err != nil {
 		return err
 	}
 
 	// Check the template version first, to avoid updating to an outdated template; TODO: can we use StackPolicy/Conditions instead?
+	// TODO: should check all regions
 	if dso, err := cfn.DescribeStacks(ctx, &cloudformation.DescribeStacksInput{StackName: &a.stackName}); err == nil && len(dso.Stacks) == 1 {
 		for _, output := range dso.Stacks[0].Outputs {
-			if *output.OutputKey == outputs.TemplateVersion {
+			if *output.OutputKey == OutputsTemplateVersion {
 				deployedRev, _ := strconv.Atoi(*output.OutputValue)
 				if deployedRev > TemplateRevision {
-					return fmt.Errorf("CloudFormation stack %s is newer than the current template: update the CLI", a.stackName)
+					return fmt.Errorf("This CLI has an older CloudFormation template than the deployed %s stack: please update the CLI", a.stackName)
 				}
+			}
+		}
+		// Set "Use previous value" for parameters not in the new parameters list
+		newParams := map[string]struct{}{}
+		for _, newParam := range parameters {
+			newParams[*newParam.ParameterKey] = struct{}{}
+		}
+		for _, param := range dso.Stacks[0].Parameters {
+			if _, ok := newParams[*param.ParameterKey]; !ok {
+				parameters = append(parameters, cfnTypes.Parameter{
+					ParameterKey:     param.ParameterKey,
+					UsePreviousValue: ptr.Bool(true),
+				})
 			}
 		}
 	}
 
 	uso, err := cfn.UpdateStack(ctx, &cloudformation.UpdateStackInput{
 		Capabilities: []cfnTypes.Capability{cfnTypes.CapabilityCapabilityNamedIam},
+		Parameters:   parameters,
 		StackName:    ptr.String(a.stackName),
 		TemplateBody: ptr.String(templateBody),
 	})
@@ -97,12 +112,12 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 		StackName: uso.StackId,
 	}, stackTimeout)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to update CloudFormation stack: check the CloudFormation console (https://%s.console.aws.amazon.com/cloudformation/home) for the %q stack to learn more: %w", a.AwsEcs.Region, a.stackName, err)
 	}
 	return a.fillWithOutputs(dso)
 }
 
-func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) error {
+func (a *AwsEcsCfn) createStackAndWait(ctx context.Context, templateBody string, parameters []cfnTypes.Parameter) error {
 	cfn, err := a.newClient(ctx)
 	if err != nil {
 		return err
@@ -112,6 +127,7 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 		Capabilities:                []cfnTypes.Capability{cfnTypes.CapabilityCapabilityNamedIam},
 		EnableTerminationProtection: ptr.Bool(true),
 		OnFailure:                   cfnTypes.OnFailureDelete,
+		Parameters:                  parameters,
 		StackName:                   ptr.String(a.stackName),
 		TemplateBody:                ptr.String(templateBody),
 	})
@@ -128,32 +144,76 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 		StackName: ptr.String(a.stackName),
 	}, stackTimeout)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create CloudFormation stack: check the CloudFormation console (https://%s.console.aws.amazon.com/cloudformation/home) for the %q stack to learn more: %w", a.AwsEcs.Region, a.stackName, err)
 	}
 	return a.fillWithOutputs(dso)
 }
 
-func (a *AwsEcs) SetUp(ctx context.Context, containers []types.Container) error {
-	template, err := createTemplate(a.stackName, containers, TemplateOverrides{VpcID: a.VpcID, Spot: a.Spot}).YAML()
+func (a *AwsEcsCfn) SetUp(ctx context.Context, containers []clouds.Container) error {
+	template, err := CreateTemplate(a.stackName, containers)
+	if err != nil {
+		return fmt.Errorf("failed to create CloudFormation template: %w", err)
+	}
+
+	templateBody, err := template.YAML()
 	if err != nil {
 		return err
 	}
 
-	// Upsert
-	if err := a.updateStackAndWait(ctx, string(template)); err != nil {
+	return a.upsertStackAndWait(ctx, templateBody)
+}
+
+func (a *AwsEcsCfn) upsertStackAndWait(ctx context.Context, templateBody []byte) error {
+	// Set parameter values based on current configuration
+	parameters := []cfnTypes.Parameter{
+		// {
+		// 	ParameterKey:   ptr.String(ParamsCIRoleName),
+		// 	ParameterValue: ptr.String("defang-cd-CDIRole-us-west-2"),
+		// },
+		{
+			ParameterKey:   ptr.String(ParamsExistingVpcId),
+			ParameterValue: ptr.String(a.VpcID),
+		},
+		{
+			ParameterKey:   ptr.String(ParamsRetainBucket),
+			ParameterValue: ptr.String(strconv.FormatBool(a.RetainBucket)),
+		},
+		{
+			ParameterKey:   ptr.String(ParamsEnablePullThroughCache),
+			ParameterValue: ptr.String(strconv.FormatBool(!pkg.GetenvBool("DEFANG_NO_CACHE"))),
+		},
+	}
+
+	// Add Docker Hub credentials if available from environment
+	if dockerHubUsername := os.Getenv("DOCKERHUB_USERNAME"); dockerHubUsername != "" {
+		parameters = append(parameters, cfnTypes.Parameter{
+			ParameterKey:   ptr.String(ParamsDockerHubUsername),
+			ParameterValue: ptr.String(dockerHubUsername),
+		})
+	}
+	if dockerHubToken := os.Getenv("DOCKERHUB_ACCESS_TOKEN"); dockerHubToken != "" {
+		parameters = append(parameters, cfnTypes.Parameter{
+			ParameterKey:   ptr.String(ParamsDockerHubAccessToken),
+			ParameterValue: ptr.String(dockerHubToken),
+		})
+	}
+	// TODO: support DOCKER_AUTH_CONFIG
+
+	// Upsert with parameters
+	if err := a.updateStackAndWait(ctx, string(templateBody), parameters); err != nil {
 		// Check if the stack doesn't exist; if so, create it, otherwise return the error
 		var apiError smithy.APIError
 		if ok := errors.As(err, &apiError); !ok || (apiError.ErrorCode() != "ValidationError") || !strings.HasSuffix(apiError.ErrorMessage(), "does not exist") {
 			return err
 		}
-		return a.createStackAndWait(ctx, string(template))
+		return a.createStackAndWait(ctx, string(templateBody), parameters)
 	}
 	return nil
 }
 
 type ErrStackNotFoundException = cfnTypes.StackNotFoundException
 
-func (a *AwsEcs) FillOutputs(ctx context.Context) error {
+func (a *AwsEcsCfn) FillOutputs(ctx context.Context) error {
 	cfn, err := a.newClient(ctx)
 	if err != nil {
 		return err
@@ -175,26 +235,28 @@ func (a *AwsEcs) FillOutputs(ctx context.Context) error {
 	return a.fillWithOutputs(dso)
 }
 
-func (a *AwsEcs) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) error {
+func (a *AwsEcsCfn) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) error {
 	if len(dso.Stacks) != 1 {
 		return fmt.Errorf("expected 1 CloudFormation stack, got %d", len(dso.Stacks))
 	}
 	for _, output := range dso.Stacks[0].Outputs {
 		switch *output.OutputKey {
-		case outputs.SubnetID:
+		case OutputsSubnetID:
 			// Only set the SubNetID if it's not already set; this allows the user to override the subnet
 			if a.SubNetID == "" {
 				a.SubNetID = *output.OutputValue
 			}
-		case outputs.TaskDefArn:
+		case OutputsDefaultSecurityGroupID:
+			a.DefaultSecurityGroupID = *output.OutputValue
+		case OutputsTaskDefArn:
 			a.TaskDefARN = *output.OutputValue
-		case outputs.ClusterName:
+		case OutputsClusterName:
 			a.ClusterName = *output.OutputValue
-		case outputs.LogGroupARN:
+		case OutputsLogGroupARN:
 			a.LogGroupARN = *output.OutputValue
-		case outputs.SecurityGroupID:
+		case OutputsSecurityGroupID:
 			a.SecurityGroupID = *output.OutputValue
-		case outputs.BucketName:
+		case OutputsBucketName:
 			a.BucketName = *output.OutputValue
 		}
 	}
@@ -202,7 +264,7 @@ func (a *AwsEcs) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) error
 	return nil
 }
 
-func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) (ecs.TaskArn, error) {
+func (a *AwsEcsCfn) Run(ctx context.Context, env map[string]string, cmd ...string) (awsecs.TaskArn, error) {
 	if err := a.FillOutputs(ctx); err != nil {
 		return nil, err
 	}
@@ -210,28 +272,28 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 	return a.AwsEcs.Run(ctx, env, cmd...)
 }
 
-func (a *AwsEcs) Tail(ctx context.Context, taskArn ecs.TaskArn) error {
+func (a *AwsEcsCfn) Tail(ctx context.Context, taskArn awsecs.TaskArn) error {
 	if err := a.FillOutputs(ctx); err != nil {
 		return err
 	}
 	return a.AwsEcs.Tail(ctx, taskArn)
 }
 
-func (a *AwsEcs) Stop(ctx context.Context, taskArn ecs.TaskArn) error {
+func (a *AwsEcsCfn) Stop(ctx context.Context, taskArn awsecs.TaskArn) error {
 	if err := a.FillOutputs(ctx); err != nil {
 		return err
 	}
 	return a.AwsEcs.Stop(ctx, taskArn)
 }
 
-func (a *AwsEcs) GetInfo(ctx context.Context, taskArn ecs.TaskArn) (*types.TaskInfo, error) {
+func (a *AwsEcsCfn) GetInfo(ctx context.Context, taskArn awsecs.TaskArn) (*clouds.TaskInfo, error) {
 	if err := a.FillOutputs(ctx); err != nil {
 		return nil, err
 	}
 	return a.AwsEcs.Info(ctx, taskArn)
 }
 
-func (a *AwsEcs) TearDown(ctx context.Context) error {
+func (a *AwsEcsCfn) TearDown(ctx context.Context) error {
 	cfn, err := a.newClient(ctx)
 	if err != nil {
 		return err

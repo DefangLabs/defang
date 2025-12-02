@@ -1,0 +1,6 @@
+(
+logName=~"logs/run.googleapis.com%2F(stdout|stderr)$" OR
+logName="projects/test-project/logs/cloudbuild" OR
+logName="projects/test-project/logs/cos_containers" OR
+logName="projects/test-project/logs/docker-logs"
+) AND ("error")

@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,7 +15,6 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
-	_ "github.com/DefangLabs/defang/src/cmd/cli/autoload"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -29,15 +29,18 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/setup"
 	"github.com/DefangLabs/defang/src/pkg/surveyor"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 )
 
@@ -46,28 +49,11 @@ var authNeededAnnotation = map[string]string{authNeeded: ""}
 
 var P = track.P
 
-// GLOBALS
-var (
-	client         *cliClient.GrpcClient
-	cluster        string
-	colorMode      = ColorAuto
-	sourcePlatform = migrate.SourcePlatformUnspecified // default to auto-detecting the source platform
-	doDebug        = pkg.GetenvBool("DEFANG_DEBUG")
-	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
-	hideUpdate     = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
-	mode           = Mode(defangv1.DeploymentMode_MODE_UNSPECIFIED)
-	modelId        = os.Getenv("DEFANG_MODEL_ID") // for Pro users only
-	nonInteractive = !hasTty
-	org            = os.Getenv("DEFANG_ORG")
-	providerID     = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", "auto"))
-	verbose        = pkg.GetenvBool("DEFANG_VERBOSE")
-)
-
-func getOrgCluster() string {
-	if org == "" {
-		return cluster
+func getCluster() string {
+	if global.Org == "" {
+		return global.Cluster
 	}
-	return org + "@" + cluster
+	return global.Org + "@" + global.Cluster
 }
 
 func Execute(ctx context.Context) error {
@@ -100,7 +86,7 @@ func Execute(ctx context.Context) error {
 
 		if strings.Contains(err.Error(), "maximum number of projects") {
 			projectName := "<name>"
-			provider, err := newProvider(ctx, nil)
+			provider, err := newProviderChecked(ctx, nil)
 			if err != nil {
 				return err
 			}
@@ -134,22 +120,22 @@ func Execute(ctx context.Context) error {
 		}
 
 		if credError := new(gcp.CredentialsError); errors.As(err, &credError) {
-			fmt.Print("\nPlease log in by running: \n\n\t gcloud auth application-default login\n\n")
+			term.Print("\nPlease log in by running: \n\n\t gcloud auth application-default login\n\n")
 		}
 
 		return ExitCode(code)
 	}
 
-	if hasTty && term.HadWarnings() {
-		fmt.Println("For help with warnings, check our FAQ at https://s.defang.io/warnings")
+	if global.HasTty && term.HadWarnings() {
+		term.Println("For help with warnings, check our FAQ at https://s.defang.io/warnings")
 	}
 
-	if hasTty && !hideUpdate && pkg.RandomIndex(10) == 0 {
+	if global.HasTty && !global.HideUpdate && pkg.RandomIndex(10) == 0 {
 		if latest, err := GetLatestVersion(ctx); err == nil && isNewer(GetCurrentVersion(), latest) {
 			term.Debug("Latest Version:", latest, "Current Version:", GetCurrentVersion())
-			fmt.Println("A newer version of the CLI is available at https://github.com/DefangLabs/defang/releases/latest")
+			term.Println("A newer version of the CLI is available at https://github.com/DefangLabs/defang/releases/latest")
 			if pkg.RandomIndex(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
-				fmt.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
+				term.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
 			}
 		}
 	}
@@ -157,20 +143,26 @@ func Execute(ctx context.Context) error {
 	return nil
 }
 
+/*
+SetupCommands initializes and configures the entire Defang CLI command structure.
+It registers all global flags that bind to GlobalConfig, sets up all subcommands with their
+specific flags, and establishes the command hierarchy.
+*/
 func SetupCommands(ctx context.Context, version string) {
 	cobra.EnableTraverseRunHooks = true // we always need to run the RootCmd's pre-run hook
 
 	RootCmd.Version = version
-	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
-	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", pcluster.DefangFabric, "Defang cluster to connect to")
+	RootCmd.PersistentFlags().StringVarP(&global.Stack, "stack", "s", global.Stack, "stack name (for BYOC providers)")
+	RootCmd.PersistentFlags().Var(&global.ColorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
+	RootCmd.PersistentFlags().StringVar(&global.Cluster, "cluster", global.Cluster, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
-	RootCmd.PersistentFlags().StringVar(&org, "org", "", "override organization name (tenant)")
-	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
+	RootCmd.PersistentFlags().StringVar(&global.Org, "org", global.Org, "override GitHub organization name (tenant)")
+	RootCmd.PersistentFlags().VarP(&global.ProviderID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
-	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
-	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", false, "debug logging for troubleshooting the CLI")
+	RootCmd.PersistentFlags().BoolVarP(&global.Verbose, "verbose", "v", global.Verbose, "verbose logging") // backwards compat: only used by tail
+	RootCmd.PersistentFlags().BoolVar(&global.Debug, "debug", global.Debug, "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&dryrun.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
-	RootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "disable interactive prompts / no TTY")
+	RootCmd.PersistentFlags().BoolVar(&global.NonInteractive, "non-interactive", global.NonInteractive, "disable interactive prompts / no TTY")
 	RootCmd.PersistentFlags().StringP("project-name", "p", "", "project name")
 	RootCmd.PersistentFlags().StringP("cwd", "C", "", "change directory before running the command")
 	_ = RootCmd.MarkPersistentFlagDirname("cwd")
@@ -178,7 +170,7 @@ func SetupCommands(ctx context.Context, version string) {
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
 	// Create a temporary gRPC client for tracking events before login
-	cli.Connect(ctx, cluster)
+	cli.Connect(ctx, global.Cluster)
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
@@ -190,11 +182,14 @@ func SetupCommands(ctx context.Context, version string) {
 	cdCmd.AddCommand(cdRefreshCmd)
 	cdTearDownCmd.Flags().Bool("force", false, "force the teardown of the CD stack")
 	cdCmd.AddCommand(cdTearDownCmd)
+	cdListCmd.Flags().BoolP("all", "a", false, "list projects and stacks in all regions")
 	cdListCmd.Flags().Bool("remote", false, "invoke the command on the remote cluster")
 	cdCmd.AddCommand(cdListCmd)
 	cdCmd.AddCommand(cdCancelCmd)
-	cdPreviewCmd.Flags().VarP(&mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", allModes()))
+	cdPreviewCmd.Flags().VarP(&global.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	cdCmd.AddCommand(cdPreviewCmd)
+	cdCmd.AddCommand(cdInstallCmd)
+	cdCmd.AddCommand(cdCloudformationCmd)
 
 	// Eula command
 	tosCmd.Flags().Bool("agree-tos", false, "agree to the Defang terms of service")
@@ -214,20 +209,21 @@ func SetupCommands(ctx context.Context, version string) {
 	// loginCmd.Flags().Bool("skip-prompt", false, "skip the login prompt if already logged in"); TODO: Implement this
 	RootCmd.AddCommand(loginCmd)
 
-	// Whoami Command
-	RootCmd.AddCommand(whoamiCmd)
-
 	// Tenants Command
 	RootCmd.AddCommand(tenantsCmd)
+
+	// Whoami Command
+	whoamiCmd.PersistentFlags().Bool("json", pkg.GetenvBool("DEFANG_JSON"), "print output in JSON format")
+	RootCmd.AddCommand(whoamiCmd)
 
 	// Logout Command
 	RootCmd.AddCommand(logoutCmd)
 
 	// Generate Command
-	generateCmd.Flags().StringVar(&modelId, "model", modelId, "LLM model to use for generating the code (Pro users only)")
+	generateCmd.Flags().StringVar(&global.ModelID, "model", global.ModelID, "LLM model to use for generating the code (Pro users only)")
 	RootCmd.AddCommand(generateCmd)
 	// new command
-	initCmd.PersistentFlags().Var(&sourcePlatform, "from", fmt.Sprintf(`the platform from which to migrate the project; one of %v`, migrate.AllSourcePlatforms))
+	initCmd.PersistentFlags().Var(&global.SourcePlatform, "from", fmt.Sprintf(`the platform from which to migrate the project; one of %v`, migrate.AllSourcePlatforms))
 	RootCmd.AddCommand(initCmd)
 
 	// Get Services Command
@@ -238,13 +234,14 @@ func SetupCommands(ctx context.Context, version string) {
 	lsCommand.Aliases = []string{"getServices", "ps", "ls", "list"}
 	RootCmd.AddCommand(lsCommand)
 
-	// Get Status Command
-	RootCmd.AddCommand(getVersionCmd)
+	// Version Command
+	RootCmd.AddCommand(versionCmd)
 
 	// Config Command (was: secrets)
 	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
 	configSetCmd.Flags().BoolP("env", "e", false, "set the config from an environment variable")
 	configSetCmd.Flags().Bool("random", false, "set a secure randomly generated value for config")
+	configSetCmd.Flags().String("env-file", "", "load config values from an .env file")
 	_ = configSetCmd.Flags().MarkHidden("name")
 
 	configCmd.AddCommand(configSetCmd)
@@ -278,14 +275,16 @@ func SetupCommands(ctx context.Context, version string) {
 	debugCmd.Flags().String("deployment", "", "deployment ID of the service")
 	debugCmd.Flags().String("since", "", "start time for logs (RFC3339 format)")
 	debugCmd.Flags().String("until", "", "end time for logs (RFC3339 format)")
-	debugCmd.Flags().StringVar(&modelId, "model", modelId, "LLM model to use for debugging (Pro users only)")
+	debugCmd.Flags().StringVar(&global.ModelID, "model", global.ModelID, "LLM model to use for debugging (Pro users only)")
 	RootCmd.AddCommand(debugCmd)
 
 	// Tail Command
-	tailCmd := makeComposeLogsCmd()
-	tailCmd.Use = "tail [SERVICE...]"
-	tailCmd.Aliases = []string{"logs"}
+	tailCmd := makeTailCmd()
 	RootCmd.AddCommand(tailCmd)
+
+	// Logs Command
+	logsCmd := makeLogsCmd()
+	RootCmd.AddCommand(logsCmd)
 
 	// Delete Command
 	deleteCmd.Flags().BoolP("name", "n", false, "name of the service(s) (backwards compat)")
@@ -299,11 +298,11 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(deploymentsCmd)
 
 	// MCP Command
-	mcpCmd.AddCommand(mcpSetupCmd)
-	mcpCmd.AddCommand(mcpServerCmd)
-	mcpSetupCmd.Flags().String("client", "", fmt.Sprintf("MCP setup client %v", mcp.ValidClients))
 	mcpServerCmd.Flags().Int("auth-server", 0, "auth server port")
-	mcpSetupCmd.MarkFlagRequired("client")
+	mcpServerCmd.Flags().MarkDeprecated("auth-server", "we now reach out to the auth server: https://auth.defang.io directly")
+	mcpCmd.AddCommand(mcpServerCmd)
+	mcpCmd.PersistentFlags().String("client", "", fmt.Sprintf("MCP setup client %v", mcp.ValidClients))
+	mcpCmd.AddCommand(mcpSetupCmd)
 	RootCmd.AddCommand(mcpCmd)
 
 	// Send Command
@@ -320,6 +319,9 @@ func SetupCommands(ctx context.Context, version string) {
 	// TODO: Add list, renew etc.
 	certCmd.AddCommand(certGenerateCmd)
 	RootCmd.AddCommand(certCmd)
+
+	stackCmd := makeStackCmd()
+	RootCmd.AddCommand(stackCmd)
 
 	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
 		// Add some emphasis to the help command
@@ -343,20 +345,22 @@ var RootCmd = &cobra.Command{
 	Short:         "Defang CLI is used to take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
 		ctx := cmd.Context()
-		term.SetDebug(doDebug)
+		term.SetDebug(global.Debug)
 
-		// Don't track/connect the completion commands
 		if IsCompletionCommand(cmd) {
 			return nil
 		}
 
-		// Use "defer" to track any errors that occur during the command
 		defer func() {
-			track.Cmd(cmd, "Invoked", P("args", args), P("err", err), P("non-interactive", nonInteractive), P("provider", providerID))
+			var errString = ""
+			if err != nil {
+				errString = err.Error()
+			}
+
+			track.Cmd(cmd, "Invoked", P("args", args), P("err", errString), P("non-interactive", global.NonInteractive), P("provider", global.ProviderID))
 		}()
 
-		// Do this first, since any errors will be printed to the console
-		switch colorMode {
+		switch global.ColorMode {
 		case ColorNever:
 			term.ForceColor(false)
 		case ColorAlways:
@@ -364,49 +368,55 @@ var RootCmd = &cobra.Command{
 		}
 
 		if cwd, _ := cmd.Flags().GetString("cwd"); cwd != "" {
-			// Change directory before running the command
 			if err = os.Chdir(cwd); err != nil {
 				return err
 			}
 		}
 
-		// Configure tenant selection based on --org flag
-		auth.SetSelectedTenantName(org)
+		err = global.loadDotDefang(global.getStackName(cmd.Flags()))
+		if err != nil {
+			return err
+		}
 
-		client, err = cli.Connect(ctx, getOrgCluster())
+		err = global.syncFlagsWithEnv(cmd.Flags())
+		if err != nil {
+			return err
+		}
 
-		if v, err := client.GetVersions(ctx); err == nil {
-			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
+		auth.SetSelectedTenantName(global.Org)
+
+		global.Client, err = cli.Connect(ctx, getCluster())
+		if err != nil {
+			return err
+		}
+
+		if v, err := global.Client.GetVersions(ctx); err == nil {
+			version := cmd.Root().Version
 			term.Debug("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
-			if hasTty && isNewer(version, v.CliMin) && !isUpgradeCommand(cmd) {
+			if global.HasTty && isNewer(version, v.CliMin) && !isUpgradeCommand(cmd) {
 				term.Warn("Your CLI version is outdated. Please upgrade to the latest version by running:\n\n  defang upgrade\n")
-				hideUpdate = true // hide the upgrade hint at the end
+				global.HideUpdate = true
 			}
 		}
 
-		// (deliberately skip tenant resolution here to avoid blocking non-auth commands)
-
-		// Check if we are correctly logged in, but only if the command needs authorization
 		if _, ok := cmd.Annotations[authNeeded]; !ok {
 			return nil
 		}
 
-		if nonInteractive {
-			err = client.CheckLoginAndToS(ctx)
+		if global.NonInteractive {
+			err = global.Client.CheckLoginAndToS(ctx)
 		} else {
-			err = login.InteractiveRequireLoginAndToS(ctx, client, getOrgCluster())
+			err = login.InteractiveRequireLoginAndToS(ctx, global.Client, getCluster())
 		}
 
 		if err != nil {
 			return err
 		}
 
-		// Ensure tenant is resolved post-login as we now have a token
-		if tok := pcluster.GetExistingToken(getOrgCluster()); tok != "" {
+		if tok := pcluster.GetExistingToken(getCluster()); tok != "" {
 			if err2 := auth.ResolveAndSetTenantFromToken(ctx, tok); err2 != nil {
 				return err2
 			}
-			// log the tenant name and id
 			term.Debugf("Selected tenant: %q (%s)", auth.GetSelectedTenantName(), auth.GetSelectedTenantID())
 		}
 
@@ -423,7 +433,7 @@ var tenantsCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		tok := pcluster.GetExistingToken(getOrgCluster())
+		tok := pcluster.GetExistingToken(getCluster())
 		tenants, err := auth.ListTenantsFromToken(ctx, tok)
 		if err != nil {
 			return err
@@ -434,7 +444,6 @@ var tenantsCmd = &cobra.Command{
 			return nil
 		}
 
-		// Sort by name for stable output
 		slices.SortStableFunc(tenants, func(a, b auth.Tenant) int {
 			return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 		})
@@ -455,7 +464,7 @@ var tenantsCmd = &cobra.Command{
 		}
 
 		attrs := []string{"Active", "Name"}
-		if verbose {
+		if global.Verbose {
 			attrs = append(attrs, "ID")
 		}
 		return term.Table(printTenants, attrs)
@@ -469,12 +478,12 @@ var loginCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		trainingOptOut, _ := cmd.Flags().GetBool("training-opt-out")
 
-		if nonInteractive {
-			if err := login.NonInteractiveGitHubLogin(cmd.Context(), client, getOrgCluster()); err != nil {
+		if global.NonInteractive {
+			if err := login.NonInteractiveGitHubLogin(cmd.Context(), global.Client, getCluster()); err != nil {
 				return err
 			}
 		} else {
-			err := login.InteractiveLogin(cmd.Context(), client, getOrgCluster())
+			err := login.InteractiveLogin(cmd.Context(), global.Client, getCluster())
 			if err != nil {
 				return err
 			}
@@ -484,7 +493,7 @@ var loginCmd = &cobra.Command{
 
 		if trainingOptOut {
 			req := &defangv1.SetOptionsRequest{TrainingOptOut: trainingOptOut}
-			if err := client.SetOptions(cmd.Context(), req); err != nil {
+			if err := global.Client.SetOptions(cmd.Context(), req); err != nil {
 				return err
 			}
 			term.Info("Options updated successfully")
@@ -499,19 +508,36 @@ var whoamiCmd = &cobra.Command{
 	Short: "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		nonInteractive = true // don't show provider prompt
+		global.NonInteractive = true // don't show provider prompt
 		provider, err := newProvider(cmd.Context(), loader)
 		if err != nil {
 			term.Debug("unable to get provider:", err)
 		}
 
-		str, err := cli.Whoami(cmd.Context(), client, provider)
+		jsonMode, _ := cmd.Flags().GetBool("json")
+
+		data, err := cli.Whoami(cmd.Context(), global.Client, provider)
 		if err != nil {
 			return err
 		}
 
-		term.Info(str)
-		return nil
+		if jsonMode {
+			bytes, err := json.Marshal(data)
+			if err != nil {
+				return err
+			}
+			_, err = term.Println(string(bytes))
+			return err
+		} else {
+			return term.Table([]cli.ShowAccountData{data},
+				"Provider",
+				"AccountID",
+				"Tenant",
+				"TenantID",
+				"SubscriberTier",
+				"Region",
+			)
+		}
 	},
 }
 
@@ -533,12 +559,12 @@ var certGenerateCmd = &cobra.Command{
 			return err
 		}
 
-		provider, err := newProvider(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
 
-		if err := cli.GenerateLetsEncryptCert(cmd.Context(), project, client, provider); err != nil {
+		if err := cli.GenerateLetsEncryptCert(cmd.Context(), project, global.Client, provider); err != nil {
 			return err
 		}
 		return nil
@@ -586,15 +612,22 @@ var generateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
+		if global.NonInteractive {
+			if len(args) == 0 {
+				return errors.New("cannot run in non-interactive mode")
+			}
+			return cli.InitFromSamples(ctx, args[0], args)
+		}
+
 		setupClient := setup.SetupClient{
 			Surveyor: surveyor.NewDefaultSurveyor(),
 			Heroku:   migrate.NewHerokuClient(),
-			ModelID:  modelId,
-			Fabric:   client,
-			Cluster:  getOrgCluster(),
+			ModelID:  global.ModelID,
+			Fabric:   global.Client,
+			Cluster:  getCluster(),
 		}
 
-		sample := ""
+		var sample string
 		if len(args) > 0 {
 			sample = args[0]
 		}
@@ -614,21 +647,25 @@ var initCmd = &cobra.Command{
 	Short:   "Create a new Defang project from a sample",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
+
+		if global.NonInteractive {
+			if len(args) == 0 {
+				return errors.New("cannot run in non-interactive mode")
+			}
+			return cli.InitFromSamples(ctx, args[0], args)
+		}
+
 		setupClient := setup.SetupClient{
 			Surveyor: surveyor.NewDefaultSurveyor(),
 			Heroku:   migrate.NewHerokuClient(),
-			ModelID:  modelId,
-			Fabric:   client,
-			Cluster:  getOrgCluster(),
+			ModelID:  global.ModelID,
+			Fabric:   global.Client,
+			Cluster:  getCluster(),
 		}
 
 		if len(args) > 0 {
 			_, err := setupClient.CloneSample(ctx, args[0])
 			return err
-		}
-
-		if nonInteractive {
-			return errors.New("cannot run in non-interactive mode")
 		}
 
 		result, err := setupClient.Start(ctx)
@@ -654,22 +691,22 @@ func collectUnsetEnvVars(project *composeTypes.Project) []string {
 	return nil
 }
 
-var getVersionCmd = &cobra.Command{
+var versionCmd = &cobra.Command{
 	Use:     "version",
 	Args:    cobra.NoArgs,
 	Aliases: []string{"ver", "stat", "status"}, // for backwards compatibility
 	Short:   "Get version information for the CLI and Fabric service",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		term.Printc(term.BrightCyan, "Defang CLI:    ")
-		fmt.Println(GetCurrentVersion())
+		term.Println(GetCurrentVersion())
 
 		term.Printc(term.BrightCyan, "Latest CLI:    ")
 		ver, err := GetLatestVersion(cmd.Context())
-		fmt.Println(ver)
+		term.Println(ver)
 
 		term.Printc(term.BrightCyan, "Defang Fabric: ")
-		ver, err2 := cli.GetVersion(cmd.Context(), client)
-		fmt.Println(ver)
+		ver, err2 := cli.GetVersion(cmd.Context(), global.Client)
+		term.Println(ver)
 		return errors.Join(err, err2)
 	},
 }
@@ -684,16 +721,17 @@ var configCmd = &cobra.Command{
 var configSetCmd = &cobra.Command{
 	Use:         "create CONFIG [file|-]", // like Docker
 	Annotations: authNeededAnnotation,
-	Args:        cobra.RangeArgs(1, 2),
+	Args:        cobra.RangeArgs(0, 2), // Allow 0 args when using --env-file
 	Aliases:     []string{"set", "add", "put"},
 	Short:       "Adds or updates a sensitive config value",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fromEnv, _ := cmd.Flags().GetBool("env")
 		random, _ := cmd.Flags().GetBool("random")
+		envFile, _ := cmd.Flags().GetString("env-file")
 
 		// Make sure we have a project to set config for before asking for a value
 		loader := configureLoader(cmd)
-		provider, err := newProvider(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -701,6 +739,55 @@ var configSetCmd = &cobra.Command{
 		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 		if err != nil {
 			return err
+		}
+
+		// Handle --env-file flag
+		if envFile != "" {
+			if fromEnv || random {
+				return errors.New("cannot use --env-file with --env or --random")
+			}
+			if len(args) > 0 {
+				return errors.New("cannot specify CONFIG arguments with --env-file")
+			}
+
+			envMap, err := godotenv.Read(envFile)
+			if err != nil {
+				return fmt.Errorf("failed to read env file %q: %w", envFile, err)
+			}
+
+			if len(envMap) == 0 {
+				return errors.New("no config found in env file")
+			}
+
+			// Set each config from the env file
+			successCount := 0
+			for name, value := range envMap {
+				if !pkg.IsValidSecretName(name) {
+					term.Warnf("Skipping invalid config name: %q", name)
+					continue
+				}
+
+				if err := cli.ConfigSet(cmd.Context(), projectName, provider, name, value); err != nil {
+					term.Warnf("Failed to set %q: %v", name, err)
+				} else {
+					term.Info("Updated value for", name)
+					successCount++
+				}
+			}
+
+			if successCount == 0 {
+				return errors.New("failed to set any config values")
+			}
+
+			term.Infof("Successfully set %d config value(s)", successCount)
+
+			printDefangHint("To update the deployed values, do:", "compose up")
+			return nil
+		}
+
+		// Original single config logic
+		if len(args) == 0 {
+			return errors.New("CONFIG argument is required when not using --env-file")
 		}
 
 		parts := strings.SplitN(args[0], "=", 2)
@@ -726,7 +813,7 @@ var configSetCmd = &cobra.Command{
 				return errors.New("cannot specify both config value and input file")
 			}
 			value = parts[1]
-		} else if nonInteractive || len(args) == 2 {
+		} else if global.NonInteractive || len(args) == 2 {
 			// Read the value from a file or stdin
 			var err error
 			var bytes []byte
@@ -775,7 +862,7 @@ var configDeleteCmd = &cobra.Command{
 	Short:       "Removes one or more config values",
 	RunE: func(cmd *cobra.Command, names []string) error {
 		loader := configureLoader(cmd)
-		provider, err := newProvider(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -808,7 +895,7 @@ var configListCmd = &cobra.Command{
 	Short:       "List configs",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := newProvider(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -838,7 +925,7 @@ var debugCmd = &cobra.Command{
 		}
 
 		loader := configureLoader(cmd)
-		provider, err := newProvider(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -849,11 +936,11 @@ var debugCmd = &cobra.Command{
 		}
 
 		now := time.Now()
-		sinceTs, err := cli.ParseTimeOrDuration(since, now)
+		sinceTs, err := timeutils.ParseTimeOrDuration(since, now)
 		if err != nil {
 			return fmt.Errorf("invalid 'since' time: %w", err)
 		}
-		untilTs, err := cli.ParseTimeOrDuration(until, now)
+		untilTs, err := timeutils.ParseTimeOrDuration(until, now)
 		if err != nil {
 			return fmt.Errorf("invalid 'until' time: %w", err)
 		}
@@ -861,13 +948,13 @@ var debugCmd = &cobra.Command{
 		debugConfig := cli.DebugConfig{
 			Deployment:     deployment,
 			FailedServices: args,
-			ModelId:        modelId,
+			ModelId:        global.ModelID,
 			Project:        project,
 			Provider:       provider,
 			Since:          sinceTs.UTC(),
 			Until:          untilTs.UTC(),
 		}
-		return cli.DebugDeployment(cmd.Context(), client, debugConfig)
+		return cli.DebugDeployment(cmd.Context(), global.Client, debugConfig)
 	},
 }
 
@@ -883,7 +970,7 @@ var deleteCmd = &cobra.Command{
 		var tail, _ = cmd.Flags().GetBool("tail")
 
 		loader := configureLoader(cmd)
-		provider, err := newProvider(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -899,7 +986,7 @@ var deleteCmd = &cobra.Command{
 		}
 
 		since := time.Now()
-		deployment, err := cli.Delete(cmd.Context(), projectName, client, provider, names...)
+		deployment, err := cli.Delete(cmd.Context(), projectName, global.Client, provider, names...)
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
@@ -922,7 +1009,7 @@ var deleteCmd = &cobra.Command{
 			Deployment: deployment,
 			LogType:    logs.LogTypeAll,
 			Since:      since,
-			Verbose:    verbose,
+			Verbose:    global.Verbose,
 		}
 		tailCtx := cmd.Context() // FIXME: stop Tail when the deployment is done
 		return cli.TailAndWaitForCD(tailCtx, provider, projectName, tailOptions)
@@ -944,13 +1031,13 @@ var deploymentsCmd = &cobra.Command{
 			cli.EnableUTCMode()
 		}
 
-		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, projectName, client, 0)
+		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, projectName, global.Client, 0)
 	},
 }
 
 var deploymentsListCmd = &cobra.Command{
-	Use:         "list",
-	Aliases:     []string{"ls"},
+	Use:         "history",
+	Aliases:     []string{"ls", "list"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "List deployment history for a project",
@@ -967,7 +1054,7 @@ var deploymentsListCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY, projectName, client, 10)
+		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY, projectName, global.Client, 10)
 	},
 }
 
@@ -985,7 +1072,7 @@ var sendCmd = &cobra.Command{
 		var contenttype, _ = cmd.Flags().GetString("content-type")
 		var subject, _ = cmd.Flags().GetString("subject")
 
-		return cli.SendMsg(cmd.Context(), client, subject, _type, id, []byte(data), contenttype)
+		return cli.SendMsg(cmd.Context(), global.Client, subject, _type, id, []byte(data), contenttype)
 	},
 }
 
@@ -999,7 +1086,7 @@ var tokenCmd = &cobra.Command{
 		var expires, _ = cmd.Flags().GetDuration("expires")
 
 		// TODO: should default to use the current tenant, not the default tenant
-		return cli.Token(cmd.Context(), client, types.TenantName(org), expires, scope.Scope(s))
+		return cli.Token(cmd.Context(), global.Client, types.TenantName(global.Org), expires, scope.Scope(s))
 	},
 }
 
@@ -1009,7 +1096,7 @@ var logoutCmd = &cobra.Command{
 	Aliases: []string{"logoff", "revoke"},
 	Short:   "Log out",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := cli.Logout(cmd.Context(), client); err != nil {
+		if err := cli.Logout(cmd.Context(), global.Client); err != nil {
 			return err
 		}
 		term.Info("Successfully logged out")
@@ -1024,22 +1111,22 @@ var tosCmd = &cobra.Command{
 	Short:   "Read and/or agree the Defang terms of service",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check if we are correctly logged in
-		if _, err := client.WhoAmI(cmd.Context()); err != nil {
+		if _, err := global.Client.WhoAmI(cmd.Context()); err != nil {
 			return err
 		}
 
 		agree, _ := cmd.Flags().GetBool("agree-tos")
 
 		if agree {
-			return login.NonInteractiveAgreeToS(cmd.Context(), client)
+			return login.NonInteractiveAgreeToS(cmd.Context(), global.Client)
 		}
 
-		if nonInteractive {
+		if global.NonInteractive {
 			printDefangHint("To agree to the terms of service, do:", cmd.CalledAs()+" --agree-tos")
 			return nil
 		}
 
-		return login.InteractiveAgreeToS(cmd.Context(), client)
+		return login.InteractiveAgreeToS(cmd.Context(), global.Client)
 	},
 }
 
@@ -1049,7 +1136,7 @@ var upgradeCmd = &cobra.Command{
 	Aliases: []string{"update"},
 	Short:   "Upgrade the Defang CLI to the latest version",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		hideUpdate = true
+		global.HideUpdate = true
 		return cli.Upgrade(cmd.Context())
 	},
 }
@@ -1084,7 +1171,7 @@ func configureLoader(cmd *cobra.Command) *compose.Loader {
 }
 
 func doubleCheckProjectName(projectName string) {
-	if nonInteractive {
+	if global.NonInteractive {
 		return
 	}
 	var confirm bool
@@ -1138,15 +1225,15 @@ func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 		whence = "command line flag"
 	} else if val, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
 		// Sanitize the provider value from the environment variable
-		if err := providerID.Set(val); err != nil {
+		if err := global.ProviderID.Set(val); err != nil {
 			return fmt.Errorf("invalid provider '%v' in environment variable DEFANG_PROVIDER, supported providers are: %v", val, cliClient.AllProviders())
 		}
 		whence = "environment variable"
 	}
 
-	switch providerID {
+	switch global.ProviderID {
 	case cliClient.ProviderAuto:
-		if nonInteractive {
+		if global.NonInteractive {
 			// Defaults to defang provider in non-interactive mode
 			if awsInEnv() {
 				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")
@@ -1157,7 +1244,7 @@ func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 			if gcpInEnv() {
 				term.Warn("Using Defang playground, but GCP_PROJECT_ID/CLOUDSDK_CORE_PROJECT environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
 			}
-			providerID = cliClient.ProviderDefang
+			global.ProviderID = cliClient.ProviderDefang
 		} else {
 			var err error
 			if whence, err = determineProviderID(ctx, loader); err != nil {
@@ -1181,7 +1268,7 @@ func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
 	}
 
-	term.Infof("Using %s provider from %s%s", providerID.Name(), whence, extraMsg)
+	term.Infof("Using %s provider from %s%s", global.ProviderID.Name(), whence, extraMsg)
 	return nil
 }
 
@@ -1190,22 +1277,21 @@ func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 		return nil, err
 	}
 
-	return cli.NewProvider(ctx, providerID, client)
+	provider := cli.NewProvider(ctx, global.ProviderID, global.Client, global.Stack)
+	return provider, nil
+}
+
+func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient.Provider, error) {
+	provider, err := newProvider(ctx, loader)
+	if err != nil {
+		return nil, err
+	}
+	_, err = provider.AccountInfo(ctx)
+	return provider, err
 }
 
 func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string, serviceCount int) error {
-	canUseReq := defangv1.CanIUseRequest{
-		Project:      projectName,
-		Provider:     providerID.Value(),
-		ServiceCount: int32(serviceCount), // #nosec G115 - service count will not overflow int32
-	}
-
-	resp, err := client.CanIUse(ctx, &canUseReq)
-	if err != nil {
-		return err
-	}
-	provider.SetCanIUseConfig(resp)
-	return nil
+	return cliClient.CanIUseProvider(ctx, global.Client, provider, projectName, global.Stack, serviceCount)
 }
 
 func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, error) {
@@ -1218,11 +1304,11 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 		}
 
 		if projectName != "" && !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
-			resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projectName})
+			resp, err := global.Client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projectName})
 			if err != nil {
 				term.Debugf("Unable to get selected provider: %v", err)
 			} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
-				providerID.SetValue(resp.Provider)
+				global.ProviderID.SetValue(resp.Provider)
 				return "stored preference", nil
 			}
 		}
@@ -1232,10 +1318,10 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 
 	// Save the selected provider to the fabric
 	if projectName != "" {
-		if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projectName, Provider: providerID.Value()}); err != nil {
+		if err := global.Client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projectName, Provider: global.ProviderID.Value()}); err != nil {
 			term.Debugf("Unable to save selected provider to defang server: %v", err)
 		} else {
-			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, projectName)
+			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", global.ProviderID, projectName)
 		}
 	}
 
@@ -1273,7 +1359,7 @@ func interactiveSelectProvider(providers []cliClient.ProviderID) (string, error)
 		return "", fmt.Errorf("failed to select provider: %w", err)
 	}
 	track.Evt("ProviderSelected", P("provider", optionValue))
-	if err := providerID.Set(optionValue); err != nil {
+	if err := global.ProviderID.Set(optionValue); err != nil {
 		panic(err)
 	}
 

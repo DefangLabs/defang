@@ -3,29 +3,31 @@ package ecs
 import (
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
-	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 const (
 	CdContainerName   = "main"
 	DockerRegistry    = "docker.io"
 	EcrPublicRegistry = "public.ecr.aws"
-	CrunProjectName   = types.ProjectName
+	CrunProjectName   = "defang"
 )
 
-type TaskArn = types.TaskID
+type TaskArn = clouds.TaskID
 
 type AwsEcs struct {
 	aws.Aws
-	BucketName      string
-	ClusterName     string
-	LogGroupARN     string
-	SecurityGroupID string
-	Spot            bool
-	SubNetID        string
-	TaskDefARN      string
-	VpcID           string
+	BucketName             string
+	ClusterName            string
+	DefaultSecurityGroupID string
+	LogGroupARN            string
+	RetainBucket           bool
+	SecurityGroupID        string
+	Spot                   bool
+	SubNetID               string
+	TaskDefARN             string
+	VpcID                  string
 }
 
 func PlatformToArchOS(platform string) (string, string) {

@@ -1,0 +1,45 @@
+---
+name: Bug Report
+labels: bug
+description: "Describe the bug, how to reproduce it and what expected results are. Include any specifics on how the fix should be implemented, if any."
+assignees: []
+body:
+  - type: textarea
+    id: issue-description
+    attributes:
+      label: Describe the issue
+      description: Provide a clear and concise description of the problem.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repo-steps
+    attributes:
+      label: Repo steps
+      description: List the steps to reproduce the issue.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-results
+    attributes:
+      label: Expected results
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-results
+    attributes:
+      label: Actual results
+      description: What actually happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional notes
+      description: Any other information that may be helpful in resolving the issue.
+    validations:
+      required: false

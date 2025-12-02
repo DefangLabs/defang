@@ -1,0 +1,63 @@
+{
+  "autoscaled": {
+    "command": null,
+    "entrypoint": null,
+    "image": "nginx:latest",
+    "networks": {
+      "default": null
+    }
+  },
+  "default": {
+    "command": null,
+    "entrypoint": null,
+    "image": "nginx:latest",
+    "networks": {
+      "default": null
+    }
+  },
+  "deploy": {
+    "command": null,
+    "deploy": {
+      "resources": {
+        "reservations": {
+          "cpus": 0.25,
+          "memory": "268435456"
+        }
+      },
+      "placement": {}
+    },
+    "entrypoint": null,
+    "image": "nginx:latest",
+    "networks": {
+      "default": null
+    }
+  },
+  "managed": {
+    "command": null,
+    "entrypoint": null,
+    "image": "redis:latest",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 6379,
+        "protocol": "tcp"
+      }
+    ]
+  },
+  "replicated": {
+    "command": null,
+    "deploy": {
+      "replicas": 3,
+      "resources": {},
+      "placement": {}
+    },
+    "entrypoint": null,
+    "image": "nginx:latest",
+    "networks": {
+      "default": null
+    }
+  }
+}

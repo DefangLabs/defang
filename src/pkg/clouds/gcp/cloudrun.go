@@ -12,7 +12,7 @@ import (
 	run "cloud.google.com/go/run/apiv2"
 	"cloud.google.com/go/run/apiv2/runpb"
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -20,7 +20,7 @@ const (
 	JobNameCD = "defang-cd"
 )
 
-func (gcp Gcp) SetupJob(ctx context.Context, jobId, serviceAccount string, containers []types.Container) error {
+func (gcp Gcp) SetupJob(ctx context.Context, jobId, serviceAccount string, containers []clouds.Container) error {
 	client, err := run.NewJobsClient(ctx)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create cloud run jobs client: %v\n", err)

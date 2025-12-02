@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	_type "github.com/DefangLabs/defang/src/protos/google/type"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -123,7 +124,7 @@ func TestPrintEstimate(t *testing.T) {
 	}
 
 	stdout, _ := term.SetupTestTerm(t)
-	cli.PrintEstimate(defangv1.DeploymentMode_DEVELOPMENT, estimate)
+	cli.PrintEstimate(modes.ModeAffordable, estimate, term.DefaultTerm)
 
 	expectedOutput := `
 Estimate for Deployment Mode: AFFORDABLE
@@ -148,7 +149,7 @@ $32.85   730 Hours         shared   AmazonEC2 USW2-NatGateway-Hours
 Estimated Monthly Cost: $118.55 (+ usage)
 
 Estimate does not include taxes or Discount Programs.
-To estimate other modes, use defang estimate --mode=affordable|balanced|high_availability
+To estimate other modes, use defang estimate --mode=AFFORDABLE|BALANCED|HIGH_AVAILABILITY
 `
 
 	outputLines := strings.Split(term.StripAnsi(stdout.String()), "\n")

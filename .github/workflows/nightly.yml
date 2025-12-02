@@ -2,8 +2,8 @@ name: Nightly Build
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # every day at 6 AM UTC
-  workflow_dispatch:     # optional: allows manual runs
+    - cron: "0 6 * * *" # every day at 6 AM UTC
+  workflow_dispatch: # optional: allows manual runs
 
 permissions:
   contents: write
@@ -11,9 +11,10 @@ permissions:
 jobs:
   goreleaser-nightly:
     runs-on: ubuntu-latest
+    environment: release
 
     steps:
-        # Checkout the repository
+      # Checkout the repository
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -34,3 +35,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
           NIGHTLY: true
+
+      - name: Slack Notification
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          MSG_MINIMAL: actions url
+          SLACK_COLOR: failure
+          SLACK_FOOTER: ""
+          SLACK_MESSAGE: ""
+          SLACK_TITLE: Defang CLI Nightly Build failed
+          SLACK_WEBHOOK: ${{ secrets.SLACK_NOTIFIER_WEBHOOK_URL }}

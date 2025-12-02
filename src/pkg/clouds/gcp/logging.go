@@ -12,7 +12,7 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-func (gcp Gcp) NewTailer(ctx context.Context) (*Tailer, error) {
+func (gcp Gcp) NewTailer(ctx context.Context) (Tailer, error) {
 	client, err := logging.NewClient(ctx)
 	if err != nil {
 		return nil, err
@@ -21,7 +21,7 @@ func (gcp Gcp) NewTailer(ctx context.Context) (*Tailer, error) {
 	if err != nil {
 		return nil, err
 	}
-	t := &Tailer{
+	t := &gcpLoggingTailer{
 		projectId: gcp.ProjectId,
 		tleClient: tleClient,
 		client:    client,
@@ -29,7 +29,13 @@ func (gcp Gcp) NewTailer(ctx context.Context) (*Tailer, error) {
 	return t, nil
 }
 
-type Tailer struct {
+type Tailer interface {
+	Start(ctx context.Context, query string) error
+	Next(ctx context.Context) (*loggingpb.LogEntry, error)
+	Close() error
+}
+
+type gcpLoggingTailer struct {
 	projectId string
 	tleClient loggingpb.LoggingServiceV2_TailLogEntriesClient
 	client    *logging.Client
@@ -37,7 +43,7 @@ type Tailer struct {
 	cache []*loggingpb.LogEntry
 }
 
-func (t *Tailer) Start(ctx context.Context, query string) error {
+func (t *gcpLoggingTailer) Start(ctx context.Context, query string) error {
 	req := &loggingpb.TailLogEntriesRequest{
 		ResourceNames: []string{"projects/" + t.projectId},
 		Filter:        query,
@@ -48,7 +54,7 @@ func (t *Tailer) Start(ctx context.Context, query string) error {
 	return nil
 }
 
-func (t *Tailer) Next(ctx context.Context) (*loggingpb.LogEntry, error) {
+func (t *gcpLoggingTailer) Next(ctx context.Context) (*loggingpb.LogEntry, error) {
 	if len(t.cache) == 0 {
 		resp, err := t.tleClient.Recv()
 		if err != nil {
@@ -65,7 +71,7 @@ func (t *Tailer) Next(ctx context.Context) (*loggingpb.LogEntry, error) {
 	return entry, nil
 }
 
-func (t Tailer) Close() error {
+func (t *gcpLoggingTailer) Close() error {
 	// TODO: find out how to properly close the client
 	term.Debugf("Closing log tailer")
 	e1 := t.tleClient.CloseSend()
@@ -74,12 +80,23 @@ func (t Tailer) Close() error {
 	return errors.Join(e1, e2)
 }
 
-type Lister struct {
+type Lister interface {
+	Next() (*loggingpb.LogEntry, error)
+}
+
+type gcpLoggingLister struct {
 	it     *logging.LogEntryIterator
 	client *logging.Client
 }
 
-func (gcp Gcp) ListLogEntries(ctx context.Context, query string) (*Lister, error) {
+type Order string
+
+const (
+	OrderDescending Order = "desc"
+	OrderAscending  Order = "asc"
+)
+
+func (gcp Gcp) ListLogEntries(ctx context.Context, query string, order Order) (Lister, error) {
 	client, err := logging.NewClient(ctx)
 	if err != nil {
 		return nil, err
@@ -88,12 +105,13 @@ func (gcp Gcp) ListLogEntries(ctx context.Context, query string) (*Lister, error
 	req := &loggingpb.ListLogEntriesRequest{
 		ResourceNames: []string{"projects/" + gcp.ProjectId},
 		Filter:        query,
+		OrderBy:       fmt.Sprintf("timestamp %s", order),
 	}
 	it := client.ListLogEntries(ctx, req)
-	return &Lister{it: it, client: client}, nil
+	return &gcpLoggingLister{it: it, client: client}, nil
 }
 
-func (l *Lister) Next() (*loggingpb.LogEntry, error) {
+func (l *gcpLoggingLister) Next() (*loggingpb.LogEntry, error) {
 	entry, err := l.it.Next()
 	if err == iterator.Done {
 		term.Debugf("Closing log lister client")

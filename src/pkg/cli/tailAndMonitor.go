@@ -18,6 +18,7 @@ import (
 const targetServiceState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 
 func TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, tailOptions TailOptions) (ServiceStates, error) {
+	tailOptions.Follow = true
 	if tailOptions.Deployment == "" {
 		panic("tailOptions.Deployment must be a valid deployment ID")
 	}
@@ -65,6 +66,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 		cancelTail(errMonitoringDone)            // cancel the tail when both goroutines are done
 	}()
 
+	tailOptions.PrintBookends = false
 	// blocking call to tail
 	var tailErr error
 	if err := Tail(tailCtx, provider, project.Name, tailOptions); err != nil {
@@ -101,7 +103,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 	return serviceStates, errors.Join(cdErr, svcErr, tailErr)
 }
 
-func CanMonitorService(service compose.ServiceConfig) bool {
+func CanMonitorService(service *compose.ServiceConfig) bool {
 	// Services with "restart: no" are assumed to be one-off
 	// tasks, so they are not monitored.
 	if service.Restart == "no" {
@@ -112,17 +114,14 @@ func CanMonitorService(service compose.ServiceConfig) bool {
 		return true
 	}
 
-	return service.Extensions["x-defang-static-files"] == nil &&
-		service.Extensions["x-defang-redis"] == nil &&
-		service.Extensions["x-defang-mongodb"] == nil &&
-		service.Extensions["x-defang-postgres"] == nil
+	return compose.IsComputeService(service)
 }
 
 func splitManagedAndUnmanagedServices(serviceInfos compose.Services) ([]string, []string) {
 	var managedServices []string
 	var unmanagedServices []string
 	for _, service := range serviceInfos {
-		if CanMonitorService(service) {
+		if CanMonitorService(&service) {
 			unmanagedServices = append(unmanagedServices, service.Name)
 		} else {
 			managedServices = append(managedServices, service.Name)

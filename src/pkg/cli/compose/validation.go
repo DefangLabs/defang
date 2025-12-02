@@ -14,6 +14,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
@@ -28,7 +29,7 @@ func (e ErrMissingConfig) Error() string {
 
 var ErrDockerfileNotFound = errors.New("dockerfile not found")
 
-func ValidateProject(project *composeTypes.Project) error {
+func ValidateProject(project *composeTypes.Project, mode modes.Mode) error {
 	if project == nil {
 		return errors.New("no project found")
 	}
@@ -43,14 +44,10 @@ func ValidateProject(project *composeTypes.Project) error {
 
 	var errs []error
 	for _, svccfg := range services {
-		errs = append(errs, validateService(&svccfg, project))
+		errs = append(errs, validateService(&svccfg, project, mode))
 	}
 	for i, svccfg := range services {
 		for j := i + 1; j < len(services); j++ {
-			if svccfg.Name == services[j].Name {
-				errs = append(errs, fmt.Errorf("service %q defined multiple times", svccfg.Name))
-				continue
-			}
 			if gcp.SafeLabelValue(svccfg.Name) == gcp.SafeLabelValue(services[j].Name) { // TODO: Shouldn't be just gcp specific
 				errs = append(errs, fmt.Errorf("the service names %q and %q normalize to the same value, which causes a conflict. Please use distinct names that differ after normalization", svccfg.Name, services[j].Name))
 			}
@@ -59,7 +56,7 @@ func ValidateProject(project *composeTypes.Project) error {
 	return errors.Join(errs...)
 }
 
-func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project) error {
+func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, mode modes.Mode) error {
 	if svccfg.ReadOnly {
 		term.Debugf("service %q: unsupported compose directive: read_only", svccfg.Name)
 	}
@@ -233,8 +230,8 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 	if svccfg.HealthCheck == nil || svccfg.HealthCheck.Disable {
 		// Show a warning when we have ingress ports but no explicit healthcheck
 		for _, port := range svccfg.Ports {
-			if port.Mode == "ingress" {
-				term.Warnf("service %q: ingress port without healthcheck defaults to GET / HTTP/1.1", svccfg.Name)
+			if port.Mode == Mode_INGRESS {
+				term.Warnf("service %q: ingress port %d without healthcheck; defaults to GET / HTTP/1.1", svccfg.Name, port.Target)
 				break
 			}
 		}
@@ -264,6 +261,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			term.Debugf("service %q: unsupported compose directive: healthcheck start_interval", svccfg.Name)
 		}
 	}
+	var replicas int
 	var reservations *composeTypes.Resource
 	if svccfg.Deploy != nil {
 		if svccfg.Deploy.Mode != "" && svccfg.Deploy.Mode != "replicated" {
@@ -294,6 +292,12 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		if len(svccfg.Deploy.Placement.Constraints) != 0 || len(svccfg.Deploy.Placement.Preferences) != 0 || svccfg.Deploy.Placement.MaxReplicas != 0 {
 			term.Debugf("service %q: unsupported compose directive: deploy placement", svccfg.Name)
 		}
+		if svccfg.Deploy.Replicas != nil {
+			replicas = *svccfg.Deploy.Replicas
+		}
+	}
+	if mode == modes.ModeHighAvailability && replicas < 2 && svccfg.Extensions["x-defang-autoscaling"] == nil {
+		term.Warnf("service %q: high-availability mode requires at least 2 replicas or x-defang-autoscaling", svccfg.Name)
 	}
 	if reservations == nil || reservations.MemoryBytes == 0 {
 		// Don't show this warning for managed pseudo-services like CDN
@@ -321,8 +325,8 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 	redisExtension, managedRedis := svccfg.Extensions["x-defang-redis"]
 	if managedRedis {
 		// Ensure the repo is a valid Redis repo
-		if !strings.HasSuffix(repo, "redis") {
-			term.Warnf("service %q: managed Redis service should use a redis image", svccfg.Name)
+		if !IsRedisRepo(repo) {
+			term.Warnf("service %q: managed Redis service should use a redis or valkey image", svccfg.Name)
 		}
 		if _, err = validateManagedStore(redisExtension); err != nil {
 			return fmt.Errorf("service %q: %w", svccfg.Name, err)
@@ -332,7 +336,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 	postgresExtension, managedPostgres := svccfg.Extensions["x-defang-postgres"]
 	if managedPostgres {
 		// Ensure the repo is a valid Postgres repo
-		if !strings.HasSuffix(repo, "postgres") && !strings.HasSuffix(repo, "pgvector") {
+		if !IsPostgresRepo(repo) {
 			term.Warnf("service %q: managed Postgres service should use a postgres image", svccfg.Name)
 		}
 		if _, err = validateManagedStore(postgresExtension); err != nil {
@@ -343,7 +347,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 	mongodbExtension, managedMongodb := svccfg.Extensions["x-defang-mongodb"]
 	if managedMongodb {
 		// Ensure the repo is a valid MongoDB repo
-		if !strings.HasSuffix(repo, "mongo") {
+		if !IsMongoRepo(repo) {
 			term.Warnf("service %q: managed MongoDB service should use a mongo image", svccfg.Name)
 		}
 		if _, err = validateManagedStore(mongodbExtension); err != nil {
@@ -499,4 +503,15 @@ func validateManagedStore(managedStore any) (bool, error) {
 	default:
 		return false, errors.New("expected parameters in managed storage definition field")
 	}
+}
+
+func IsComputeService(service *composeTypes.ServiceConfig) bool {
+	if service.Extensions == nil {
+		return true
+	}
+
+	return service.Extensions["x-defang-static-files"] == nil &&
+		service.Extensions["x-defang-redis"] == nil &&
+		service.Extensions["x-defang-mongodb"] == nil &&
+		service.Extensions["x-defang-postgres"] == nil
 }

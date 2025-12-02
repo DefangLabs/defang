@@ -48,7 +48,7 @@ func (mockListDeploymentsHandler) ListDeployments(ctx context.Context, req *conn
 }
 
 func TestDeploymentsList(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	fabricServer := &mockListDeploymentsHandler{}
 	_, handler := defangv1connect.NewFabricControllerHandler(fabricServer)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -25,7 +26,7 @@ func (mp ErrMultipleProjects) Error() string {
 }
 
 type ProjectBackend interface {
-	BootstrapList(context.Context) ([]string, error)
+	BootstrapList(context.Context, bool) (iter.Seq[string], error)
 	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 }
 
@@ -56,30 +57,16 @@ type ByocBaseClient struct {
 	projectBackend ProjectBackend
 }
 
-func NewByocBaseClient(ctx context.Context, tenantName types.TenantName, backend ProjectBackend) *ByocBaseClient {
+func NewByocBaseClient(tenantName types.TenantName, backend ProjectBackend, stack string) *ByocBaseClient {
+	if stack == "" {
+		stack = "beta" // backwards compat
+	}
 	b := &ByocBaseClient{
 		TenantName:     string(tenantName),
-		PulumiStack:    "beta", // TODO: make customizable
+		PulumiStack:    pkg.Getenv("DEFANG_SUFFIX", stack),
 		projectBackend: backend,
 	}
 	return b
-}
-
-func MakeEnv(key string, value any) string {
-	return fmt.Sprintf("%s=%q", key, value)
-}
-
-func (b *ByocBaseClient) GetProjectLastCDImage(ctx context.Context, projectName string) (string, error) {
-	projUpdate, err := b.projectBackend.GetProjectUpdate(ctx, projectName)
-	if err != nil {
-		return "", err
-	}
-
-	if projUpdate == nil {
-		return "", nil
-	}
-
-	return projUpdate.CdVersion, nil
 }
 
 func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
@@ -87,25 +74,26 @@ func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defang
 }
 
 func (b *ByocBaseClient) SetCanIUseConfig(quotas *defangv1.CanIUseResponse) {
-	// Allow local override of the CD image
-	b.CDImage = pkg.Getenv("DEFANG_CD_IMAGE", quotas.CdImage)
-	b.AllowScaling = quotas.AllowScaling
-	b.AllowGPU = quotas.Gpu
-	b.PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", quotas.PulumiVersion)
+	b.CanIUseConfig.AllowGPU = quotas.Gpu
+	b.CanIUseConfig.AllowScaling = quotas.AllowScaling
+	b.CanIUseConfig.CDImage = quotas.CdImage
+	b.CanIUseConfig.PulumiVersion = quotas.PulumiVersion
 }
 
-func (b *ByocBaseClient) ServiceDNS(name string) string {
+func (b *ByocBaseClient) ServicePrivateDNS(name string) string {
 	return dns.SafeLabel(name) // TODO: consider merging this with getPrivateFqdn
 }
 
 func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) {
 	// Get the list of projects from remote
-	projectNames, err := b.projectBackend.BootstrapList(ctx)
+	stacks, err := b.projectBackend.BootstrapList(ctx, false)
 	if err != nil {
 		return "", fmt.Errorf("no cloud projects found: %w", err)
 	}
-	for i, name := range projectNames {
-		projectNames[i] = strings.Split(name, "/")[0] // Remove the stack name
+	var projectNames []string
+	for name := range stacks {
+		projectName := strings.Split(name, "/")[0] // Remove the stack name
+		projectNames = append(projectNames, projectName)
 	}
 
 	if len(projectNames) == 0 {
@@ -211,12 +199,14 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 	}
 
 	pkg.Ensure(projectName != "", "ProjectName not set")
+	healthCheckPath, _ := compose.GetHealthCheckPathAndPort(service.HealthCheck)
 	si := &defangv1.ServiceInfo{
-		AllowScaling: b.AllowScaling,
-		Domainname:   service.DomainName,
-		Etag:         pkg.RandomID(), // TODO: could be hash for dedup/idempotency
-		Project:      projectName,    // was: tenant
-		Service:      &defangv1.Service{Name: service.Name},
+		AllowScaling:    b.AllowScaling,
+		Domainname:      service.DomainName,
+		Etag:            pkg.RandomID(), // TODO: could be hash for dedup/idempotency
+		Project:         projectName,    // was: tenant
+		Service:         &defangv1.Service{Name: service.Name},
+		HealthcheckPath: healthCheckPath,
 	}
 
 	hasHost := false
@@ -284,8 +274,13 @@ func (b *ByocBaseClient) GetEndpoint(fqn string, projectName, delegateDomain str
 	return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, projectDomain)
 }
 
+func (b *ByocBaseClient) UpdateShardDomain(ctx context.Context) error {
+	// BYOC providers manage their own domains and don't use shard domains
+	return nil
+}
+
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocBaseClient) GetPublicFqdn(projectName, delegateDomain, fqn string) string {
+func (b ByocBaseClient) GetPublicFqdn(projectName, delegateDomain, fqn string) string {
 	if projectName == "" {
 		return "" //b.fqdn
 	}
@@ -296,5 +291,5 @@ func (b *ByocBaseClient) GetPublicFqdn(projectName, delegateDomain, fqn string) 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func (b ByocBaseClient) GetPrivateFqdn(projectName string, fqn string) string {
 	safeFqn := dns.SafeLabel(fqn)
-	return fmt.Sprintf("%s.%s", safeFqn, GetPrivateDomain(projectName)) // TODO: consider merging this with ServiceDNS
+	return fmt.Sprintf("%s.%s", safeFqn, GetPrivateDomain(projectName)) // TODO: consider merging this with ServicePrivateDNS
 }

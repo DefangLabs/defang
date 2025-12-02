@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"al.essio.dev/pkg/shellescape"
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -26,13 +26,6 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 		config = &defangv1.Secrets{}
 	}
 	slices.Sort(config.Names) // sort for binary search
-
-	// Fixup ports first (which affects service name replacement by ReplaceServiceNameWithDNS)
-	for _, svccfg := range project.Services {
-		for i, port := range svccfg.Ports {
-			svccfg.Ports[i] = fixupPort(port)
-		}
-	}
 
 	// Fixup any pseudo services (this might create port configs, which will affect service name replacement by ReplaceServiceNameWithDNS)
 	for _, svccfg := range project.Services {
@@ -67,6 +60,11 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 			fixupLLM(&svccfg)
 		}
 
+		// Fixup ports, which affects service name replacement by ReplaceServiceNameWithDNS below
+		for i, port := range svccfg.Ports {
+			svccfg.Ports[i] = fixupPort(port)
+		}
+
 		// update the concrete service with the fixed up object
 		project.Services[svccfg.Name] = svccfg
 	}
@@ -77,7 +75,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 		project.Services[svccfg.Name] = *svccfg
 	}
 
-	svcNameReplacer := NewServiceNameReplacer(provider, project)
+	svcNameReplacer := NewServiceNameReplacer(ctx, provider, project)
 
 	for _, svccfg := range project.Services {
 		// Upload the build context, if any; TODO: parallelize
@@ -108,7 +106,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 					// command is run as intended by replacing `command: [ "npm", "start" ]`
 					// with `command: [ "npm start" ]`.
 					if len(svccfg.Command) > 1 {
-						svccfg.Command = []string{shellescape.QuoteCommand(svccfg.Command)}
+						svccfg.Command = []string{pkg.ShellQuote(svccfg.Command...)}
 					}
 				}
 			}
@@ -168,7 +166,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 
 			// Check if the environment variable is an existing config; if so, mark it as such
 			if _, ok := slices.BinarySearch(config.Names, key); ok {
-				if svcNameReplacer.HasServiceName(*value) {
+				if svcNameReplacer.ContainsPrivateServiceName(*value) {
 					notAdjusted = append(notAdjusted, key)
 				} else {
 					overridden = append(overridden, key)
@@ -241,6 +239,8 @@ func fixupPostgresService(svccfg *composeTypes.ServiceConfig, provider client.Pr
 		}
 		term.Debugf("service %q: adding postgres host port %d", svccfg.Name, port)
 		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
+	} else {
+		fixupIngressPorts(svccfg)
 	}
 	return nil
 }
@@ -277,6 +277,8 @@ func fixupMongoService(svccfg *composeTypes.ServiceConfig, provider client.Provi
 		}
 		term.Debugf("service %q: adding mongodb host port %d", svccfg.Name, port)
 		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
+	} else {
+		fixupIngressPorts(svccfg)
 	}
 	return nil
 }
@@ -303,8 +305,19 @@ func fixupRedisService(svccfg *composeTypes.ServiceConfig, provider client.Provi
 		}
 		term.Debugf("service %q: adding redis host port %d", svccfg.Name, port)
 		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
+	} else {
+		fixupIngressPorts(svccfg)
 	}
 	return nil
+}
+
+func fixupIngressPorts(svccfg *composeTypes.ServiceConfig) {
+	for i, port := range svccfg.Ports {
+		if port.Mode == Mode_INGRESS || port.Mode == "" {
+			term.Debugf("service %q: changing port %d to host mode", svccfg.Name, port.Target)
+			svccfg.Ports[i].Mode = Mode_HOST
+		}
+	}
 }
 
 // Declare a private network for the model provider
@@ -415,7 +428,10 @@ func fixupPort(port composeTypes.ServicePortConfig) composeTypes.ServicePortConf
 		fallthrough
 	case Mode_INGRESS:
 		// This code is unnecessarily complex because compose-go silently converts short `ports:` syntax to ingress+tcp
-		if port.Protocol != Protocol_UDP {
+		if port.Protocol == Protocol_UDP {
+			term.Warnf("port %d: UDP ports default to 'host' mode (add 'mode: host' to silence)", port.Target)
+			port.Mode = Mode_HOST
+		} else {
 			if port.Published != "" {
 				term.Debugf("port %d: ignoring 'published: %s' in 'ingress' mode", port.Target, port.Published)
 			}
@@ -423,9 +439,6 @@ func fixupPort(port composeTypes.ServicePortConfig) composeTypes.ServicePortConf
 				// TCP ingress is not supported; assuming HTTP (add 'app_protocol: http' to silence)"
 				port.AppProtocol = "http"
 			}
-		} else {
-			term.Warnf("port %d: UDP ports default to 'host' mode (add 'mode: host' to silence)", port.Target)
-			port.Mode = Mode_HOST
 		}
 	case Mode_HOST:
 		// no-op
@@ -441,7 +454,8 @@ func IsPostgresRepo(repo string) bool {
 }
 
 func IsRedisRepo(repo string) bool {
-	return strings.HasSuffix(repo, "redis") || strings.HasSuffix(repo, "valkey")
+	return strings.HasSuffix(repo, "redis") || strings.HasSuffix(repo, "redis-stack") ||
+		strings.HasSuffix(repo, "valkey") || strings.HasSuffix(repo, "valkey-bundle")
 }
 
 func IsMongoRepo(repo string) bool {

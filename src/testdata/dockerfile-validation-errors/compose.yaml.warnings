@@ -1,0 +1,2 @@
+ ! service "invalid-dockerfile": ingress port 8080 without healthcheck; defaults to GET / HTTP/1.1
+ ! service "invalid-dockerfile": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors

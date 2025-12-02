@@ -7,7 +7,7 @@ import (
 	"embed"
 	"encoding/json"
 	"io"
-	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -55,7 +55,7 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 			b := &ByocAws{
 				driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 			}
-			b.ByocBaseClient = byoc.NewByocBaseClient(context.Background(), tt.TenantName, b)
+			b.ByocBaseClient = byoc.NewByocBaseClient(tt.TenantName, b, "")
 
 			delegateDomain := "example.com"
 			projectLabel := dns.SafeLabel(tt.ProjectName)
@@ -118,7 +118,7 @@ func TestSubscribe(t *testing.T) {
 
 			byoc := &ByocAws{}
 
-			resp, err := byoc.Subscribe(context.Background(), &defangv1.SubscribeRequest{
+			resp, err := byoc.Subscribe(t.Context(), &defangv1.SubscribeRequest{
 				Etag:     etag,
 				Services: []string{"api", "web"},
 			})
@@ -131,7 +131,7 @@ func TestSubscribe(t *testing.T) {
 			go func() {
 				defer wg.Done()
 
-				filename := path.Join("testdata", name+".events")
+				filename := filepath.Join("testdata", name+".events")
 				ef, _ := expectedDir.ReadFile(filename)
 				dec := json.NewDecoder(bytes.NewReader(ef))
 
@@ -154,7 +154,7 @@ func TestSubscribe(t *testing.T) {
 				}
 			}()
 
-			data, err := testDir.ReadFile(path.Join("testdata", tt.Name()))
+			data, err := testDir.ReadFile(filepath.Join("testdata", tt.Name()))
 			if err != nil {
 				t.Fatalf("failed to read test file: %v", err)
 			}

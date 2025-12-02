@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -40,6 +39,7 @@ func BootstrapCommand(ctx context.Context, projectName string, verbose bool, pro
 }
 
 func TailAndWaitForCD(ctx context.Context, provider client.Provider, projectName string, tailOptions TailOptions) error {
+	tailOptions.Follow = true
 	ctx, cancelTail := context.WithCancelCause(ctx)
 	defer cancelTail(nil) // to cancel tail and clean-up context
 
@@ -66,29 +66,34 @@ func SplitProjectStack(name string) (projectName string, stackName string) {
 	return parts[0], parts[1]
 }
 
-func BootstrapLocalList(ctx context.Context, provider client.Provider) error {
+func BootstrapLocalList(ctx context.Context, provider client.Provider, allRegions bool) error {
 	term.Debug("Running CD list")
 	if dryrun.DoDryRun {
 		return dryrun.ErrDryRun
 	}
 
-	stacks, err := provider.BootstrapList(ctx)
+	stacks, err := provider.BootstrapList(ctx, allRegions)
 	if err != nil {
 		return err
 	}
 
-	if len(stacks) == 0 {
+	var count int
+	for stack := range stacks {
+		count++
+		if !allRegions {
+			stack, _ = SplitProjectStack(stack)
+		}
+		term.Println(" -", stack) // TODO: json output mode
+	}
+	if count == 0 {
 		accountInfo, err := provider.AccountInfo(ctx)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("No projects found in %v\n", accountInfo)
+		if allRegions {
+			accountInfo.Region = ""
+		}
+		term.Printf("No projects found in %v\n", accountInfo)
 	}
-
-	for _, stack := range stacks {
-		projectName, _ := SplitProjectStack(stack)
-		fmt.Println(" -", projectName)
-	}
-
 	return nil
 }

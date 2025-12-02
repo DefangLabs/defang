@@ -1,8 +1,9 @@
  ! service "Mistral": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
- ! service "env-in-config": environment variable(s) ["CONFIG1"] will use the `defang config` value instead of adjusted service name
- ! service "env-in-config": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "fixup-args": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
- ! service "ingress-service": ingress port without healthcheck defaults to GET / HTTP/1.1
+ ! service "ingress-service": ingress port 5432 without healthcheck; defaults to GET / HTTP/1.1
  ! service "ingress-service": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "refer-self-build-arg": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "refer-self-env": ingress port 5678 without healthcheck; defaults to GET / HTTP/1.1
+ ! service "refer-self-env": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "ui": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "use-ingress-service": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors

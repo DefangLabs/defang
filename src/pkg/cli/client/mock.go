@@ -2,8 +2,13 @@ package client
 
 import (
 	"context"
+	"errors"
+	"net/http"
 
+	"github.com/DefangLabs/defang/src/pkg/dns"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
+	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -21,8 +26,16 @@ func (m MockProvider) ListConfig(ctx context.Context, req *defangv1.ListConfigsR
 	return &defangv1.Secrets{Names: []string{"CONFIG1", "CONFIG2", "dummy", "ENV1", "SENSITIVE_DATA", "VAR1"}}, nil
 }
 
-func (m MockProvider) ServiceDNS(service string) string {
+func (m MockProvider) ServicePrivateDNS(service string) string {
 	return "mock-" + service
+}
+
+func (m MockProvider) ServicePublicDNS(service string, projectName string) string {
+	return dns.SafeLabel(service) + "." + dns.SafeLabel(projectName) + ".tenant2.defang.app"
+}
+
+func (m MockProvider) UpdateShardDomain(ctx context.Context) error {
+	return nil
 }
 
 // MockServerStream mocks a ServerStream.
@@ -96,6 +109,14 @@ func (m *MockWaitStream[T]) Close() error {
 type MockFabricClient struct {
 	FabricClient
 	DelegateDomain string
+}
+
+func (m MockFabricClient) GetController() defangv1connect.FabricControllerClient {
+	return defangv1connect.NewFabricControllerClient(http.DefaultClient, "localhost")
+}
+
+func (m MockFabricClient) GetPlaygroundProjectDomain(ctx context.Context) (*defangv1.GetPlaygroundProjectDomainResponse, error) {
+	return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("missing bearer token"))
 }
 
 func (m MockFabricClient) AgreeToS(ctx context.Context) error {

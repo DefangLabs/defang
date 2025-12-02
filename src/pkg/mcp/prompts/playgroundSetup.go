@@ -2,24 +2,17 @@ package prompts
 
 import (
 	"context"
-	"os"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/mcp/actions"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-func setupPlaygroundPrompt(s *server.MCPServer, providerId *client.ProviderID) {
-	playgroundPrompt := mcp.NewPrompt("Playground Setup",
-		mcp.WithPromptDescription("Setup for Playground"),
-	)
-
-	s.AddPrompt(playgroundPrompt, func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-		*providerId = client.ProviderDefang
-
-		//FIXME: Should not be setting both the global and env var
-		err := os.Setenv("DEFANG_PROVIDER", "defang")
-		if err != nil {
+func playgroundPromptHandler(providerId *client.ProviderID) func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+	return func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+		if err := actions.SetPlaygroundProvider(providerId); err != nil {
 			return nil, err
 		}
 
@@ -28,9 +21,17 @@ func setupPlaygroundPrompt(s *server.MCPServer, providerId *client.ProviderID) {
 			Messages: []mcp.PromptMessage{
 				{
 					Role:    mcp.RoleUser,
-					Content: mcp.NewTextContent(postPrompt),
+					Content: mcp.NewTextContent(common.PostPrompt),
 				},
 			},
 		}, nil
-	})
+	}
+}
+
+func setupPlaygroundPrompt(s *server.MCPServer, providerId *client.ProviderID) {
+	playgroundPrompt := mcp.NewPrompt("Playground Setup",
+		mcp.WithPromptDescription("Setup for Playground"),
+	)
+
+	s.AddPrompt(playgroundPrompt, playgroundPromptHandler(providerId))
 }

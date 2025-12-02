@@ -4,13 +4,16 @@ package auth
 // https://github.com/toolbeam/openauth/blob/%40openauthjs/openauth%400.4.3/packages/openauth/src/client.ts
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
 
+	defangHttp "github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
@@ -26,7 +29,17 @@ var (
 	ErrInvalidAccessToken       = errors.New("invalid access token")
 	ErrInvalidAuthorizationCode = errors.New("invalid authorization code")
 	ErrInvalidRefreshToken      = errors.New("invalid refresh token")
+	ErrPollTimeout              = errors.New("polling timed out")
 )
+
+type ErrUnexpectedStatus struct {
+	StatusCode int
+	Status     string
+}
+
+func (e ErrUnexpectedStatus) Error() string {
+	return "unexpected status code: " + e.Status
+}
 
 type AuthorizeOptions struct {
 	pkce     bool
@@ -145,6 +158,52 @@ func NewClient(clientID, issuer string) *client {
 		clientID: clientID,
 		issuer:   issuer,
 	}
+}
+
+func (c client) GetPollRedirectURI() string {
+	return c.issuer + "/clients/auth"
+}
+
+func (c client) Poll(ctx context.Context, state string) (string, error) {
+	// Poll the server for the auth result
+	pollUrl := fmt.Sprintf("%s/clients/auth/poll?state=%s", c.issuer, state)
+
+	resp, err := defangHttp.PostFormWithContext(ctx, pollUrl, nil)
+	if err != nil {
+		return "", fmt.Errorf("poll request failed: %w", err)
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusRequestTimeout {
+		return "", ErrPollTimeout
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", ErrUnexpectedStatus{StatusCode: resp.StatusCode, Status: resp.Status}
+	}
+
+	// Parse the response body as form-urlencoded
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %w", err)
+	}
+
+	query, err := url.ParseQuery(string(body))
+	if err != nil {
+		return "", fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if errorMsg := query.Get("error"); errorMsg != "" {
+		return "", fmt.Errorf("authentication failed: %s", query.Get("error_description"))
+	}
+
+	code := query.Get("code")
+	if code == "" {
+		return "", errors.New("no code received from auth server")
+	}
+
+	return code, nil
 }
 
 func (c client) Authorize(redirectURI string, response ResponseType, opts ...AuthorizeOption) (*AuthorizeResult, error) {

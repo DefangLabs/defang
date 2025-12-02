@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/smithy-go/ptr"
@@ -26,7 +25,32 @@ func getLogGroupIdentifier(arnOrId string) string {
 	return strings.TrimSuffix(arnOrId, ":*")
 }
 
-func QueryAndTailLogGroups(ctx context.Context, start, end time.Time, logGroups ...LogGroupInput) (LiveTailStream, error) {
+func NewStaticLogStream(ch <-chan LogEvent, cancel func()) EventStream[types.StartLiveTailResponseStream] {
+	es := &eventStream{
+		cancel: cancel,
+		ch:     make(chan types.StartLiveTailResponseStream),
+	}
+
+	go func() {
+		defer close(es.ch)
+		for evt := range ch {
+			es.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
+				Value: types.LiveTailSessionUpdate{
+					SessionResults: []types.LiveTailSessionLogEvent{evt},
+				},
+			}
+		}
+	}()
+
+	return es
+}
+
+type FiltererTailer interface {
+	LogFilterer
+	LogTailer
+}
+
+func QueryAndTailLogGroups(ctx context.Context, cw FiltererTailer, start, end time.Time, logGroups ...LogGroupInput) (LiveTailStream, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	e := &eventStream{
@@ -39,7 +63,7 @@ func QueryAndTailLogGroups(ctx context.Context, start, end time.Time, logGroups 
 	var err error
 	for _, lgi := range logGroups {
 		var es LiveTailStream
-		es, err = QueryAndTailLogGroup(ctx, lgi, start, end)
+		es, err = QueryAndTailLogGroup(ctx, cw, lgi, start, end)
 		if err != nil {
 			break // abort if there is any fatal error
 		}
@@ -73,7 +97,11 @@ type LogGroupInput struct {
 	LogEventFilterPattern string
 }
 
-func TailLogGroup(ctx context.Context, input LogGroupInput) (LiveTailStream, error) {
+type LogTailer interface {
+	StartLiveTail(ctx context.Context, params *cloudwatchlogs.StartLiveTailInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.StartLiveTailOutput, error)
+}
+
+func TailLogGroup(ctx context.Context, cw LogTailer, input LogGroupInput) (LiveTailStream, error) {
 	var pattern *string
 	if input.LogEventFilterPattern != "" {
 		pattern = &input.LogEventFilterPattern
@@ -90,12 +118,6 @@ func TailLogGroup(ctx context.Context, input LogGroupInput) (LiveTailStream, err
 		LogEventFilterPattern: pattern,
 	}
 
-	region := region.FromArn(slti.LogGroupIdentifiers[0]) // must have at least one log group
-	cw, err := newCloudWatchLogsClient(ctx, region)       // assume all log groups are in the same region
-	if err != nil {
-		return nil, err
-	}
-
 	slto, err := cw.StartLiveTail(ctx, slti)
 	if err != nil {
 		return nil, err
@@ -104,56 +126,94 @@ func TailLogGroup(ctx context.Context, input LogGroupInput) (LiveTailStream, err
 	return slto.GetStream(), nil
 }
 
-func QueryLogGroups(ctx context.Context, start, end time.Time, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
-	errsChan := make(chan error)
+type LogFilterer interface {
+	FilterLogEvents(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error)
+}
 
-	// Gather logs from the CD task, kaniko, ECS events, and all services
+func QueryLogGroups(ctx context.Context, cw LogFilterer, start, end time.Time, limit int32, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
 	var evtsChan chan LogEvent
+	errChan := make(chan error, len(logGroups))
+	var wg sync.WaitGroup
 	for _, lgi := range logGroups {
+		wg.Add(1)
 		lgEvtChan := make(chan LogEvent)
 		// Start a go routine for each log group
 		go func(lgi LogGroupInput) {
 			defer close(lgEvtChan)
-			if err := QueryLogGroup(ctx, lgi, start, end, func(logEvents []LogEvent) error {
+			defer wg.Done()
+			// CloudWatch only supports querying a LogGroup from a timestamp in
+			// ascending order. After we query each LogGroup, we merge the results
+			// and take the last N events. Because we can't tell in advance which
+			// LogGroup will have the most recent events, we have to query all
+			// log groups without limit, and then apply the limit after merging.
+			// TODO: optimize this by simulating a descending query by doing
+			// multiple queries with time windows, starting from the end time
+			// and moving backwards until we have enough events.
+			err := QueryLogGroup(ctx, cw, lgi, start, end, 0, func(logEvents []LogEvent) error {
 				for _, event := range logEvents {
 					lgEvtChan <- event
 				}
 				return nil
-			}); err != nil {
-				errsChan <- err
+			})
+			if err != nil {
+				errChan <- fmt.Errorf("error querying log group %q: %w", lgi.LogGroupARN, err)
 			}
 		}(lgi)
 		evtsChan = mergeLogEventChan(evtsChan, lgEvtChan) // Merge sort the log events based on timestamp
+		// take the last n events only
+		if limit > 0 {
+			if start.IsZero() {
+				evtsChan = takeLastN(evtsChan, int(limit))
+			} else {
+				evtsChan = takeFirstN(evtsChan, int(limit))
+			}
+		}
 	}
-	return evtsChan, errsChan
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
+	return evtsChan, errChan
 }
 
-func QueryLogGroup(ctx context.Context, input LogGroupInput, start, end time.Time, cb func([]LogEvent) error) error {
-	region := region.FromArn(input.LogGroupARN)
-	cw, err := newCloudWatchLogsClient(ctx, region)
-	if err != nil {
-		return err
-	}
-	return filterLogEvents(ctx, cw, input, start, end, cb)
+func QueryLogGroup(ctx context.Context, cw LogFilterer, input LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
+	return filterLogEvents(ctx, cw, input, start, end, limit, cb)
 }
 
-func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGroupInput, start, end time.Time, cb func([]LogEvent) error) error {
+func filterLogEvents(ctx context.Context, cw LogFilterer, lgi LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
 	var pattern *string
 	if lgi.LogEventFilterPattern != "" {
 		pattern = &lgi.LogEventFilterPattern
 	}
 	logGroupIdentifier := getLogGroupIdentifier(lgi.LogGroupARN)
 	params := &cloudwatchlogs.FilterLogEventsInput{
-		StartTime:          ptr.Int64(start.UnixMilli()),
-		EndTime:            ptr.Int64(end.UnixMilli()),
 		LogGroupIdentifier: &logGroupIdentifier,
 		LogStreamNames:     lgi.LogStreamNames,
 		FilterPattern:      pattern,
+	}
+
+	if !start.IsZero() {
+		params.StartTime = ptr.Int64(start.UnixMilli())
+	}
+	if !end.IsZero() {
+		params.EndTime = ptr.Int64(end.UnixMilli())
+	}
+	if start.IsZero() && end.IsZero() {
+		// If no time range is specified, limit to the last 60 minutes
+		now := time.Now()
+		start = now.Add(-60 * time.Minute)
+		params.StartTime = ptr.Int64(start.UnixMilli())
+		params.EndTime = ptr.Int64(now.UnixMilli())
 	}
 	if lgi.LogStreamNamePrefix != "" {
 		params.LogStreamNamePrefix = &lgi.LogStreamNamePrefix
 	}
 	for {
+		if limit > 0 {
+			// Specifying the limit parameter only guarantees that a single page doesn't return more log events than the
+			// specified limit, but it might return fewer events than the limit. This is the expected API behavior.
+			params.Limit = ptr.Int32(limit)
+		}
 		fleo, err := cw.FilterLogEvents(ctx, params)
 		if err != nil {
 			return err
@@ -174,11 +234,15 @@ func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGrou
 		if fleo.NextToken == nil {
 			return nil
 		}
+		if limit > 0 && len(events) >= int(limit) {
+			return nil
+		}
+		limit -= int32(len(events)) // #nosec G115 - always safe because len(events) <= limit
 		params.NextToken = fleo.NextToken
 	}
 }
 
-func newCloudWatchLogsClient(ctx context.Context, region aws.Region) (*cloudwatchlogs.Client, error) {
+func NewCloudWatchLogsClient(ctx context.Context, region aws.Region) (*cloudwatchlogs.Client, error) {
 	cfg, err := aws.LoadDefaultConfig(ctx, region)
 	if err != nil {
 		return nil, err
@@ -211,4 +275,44 @@ func GetLogEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {
 	default:
 		return nil, fmt.Errorf("unexpected event: %T", ev)
 	}
+}
+
+func takeLastN[T any](input chan T, n int) chan T {
+	if n <= 0 {
+		return input
+	}
+	out := make(chan T)
+	go func() {
+		defer close(out)
+		var buffer []T
+		for evt := range input {
+			buffer = append(buffer, evt)
+			if len(buffer) > n {
+				buffer = buffer[1:] // remove oldest
+			}
+		}
+		for _, evt := range buffer {
+			out <- evt
+		}
+	}()
+	return out
+}
+
+func takeFirstN[T any](input chan T, n int) chan T {
+	if n <= 0 {
+		return input
+	}
+	out := make(chan T)
+	go func() {
+		defer close(out)
+		count := 0
+		for evt := range input {
+			out <- evt
+			count++
+			if count >= n {
+				break
+			}
+		}
+	}()
+	return out
 }

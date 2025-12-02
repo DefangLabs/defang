@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"os"
 	"path"
 	"strings"
@@ -21,6 +22,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/dns"
@@ -41,8 +43,9 @@ import (
 var _ client.Provider = (*ByocGcp)(nil)
 
 const (
-	DefangCDProjectName = "defang-cd"
-	UploadPrefix        = "uploads/"
+	DefangCDProjectName            = "defang-cd"
+	DefangUploadServiceAccountName = "defang-upload"
+	UploadPrefix                   = "uploads/"
 )
 
 var (
@@ -100,11 +103,11 @@ type ByocGcp struct {
 	cdEtag      string
 }
 
-func NewByocProvider(ctx context.Context, tenantName types.TenantName) *ByocGcp {
+func NewByocProvider(ctx context.Context, tenantName types.TenantName, stack string) *ByocGcp {
 	region := pkg.Getenv("GCP_LOCATION", "us-central1") // Defaults to us-central1 for lower price
 	projectId := getGcpProjectID()
 	b := &ByocGcp{driver: &gcp.Gcp{Region: region, ProjectId: projectId}}
-	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantName, b)
+	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
 	return b
 }
 
@@ -116,7 +119,7 @@ func getGcpProjectID() string {
 	return projectId
 }
 
-func (b *ByocGcp) setUpCD(ctx context.Context) error {
+func (b *ByocGcp) SetUpCD(ctx context.Context) error {
 	if b.setupDone {
 		return nil
 	}
@@ -165,7 +168,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		b.cdServiceAccount = path.Base(cdServiceAccount)
 	}
 	//   3.2 Give CD service account roles needed
-	if err := b.driver.EnsureServiceAccountHasRoles(ctx, b.cdServiceAccount, []string{
+	if err := b.driver.EnsurePrincipalHasRoles(ctx, "serviceAccount:"+b.cdServiceAccount, []string{
 		"roles/run.admin",                       // For creating and running cloudrun jobs and services (admin needed for `setIamPolicy` permission)
 		"roles/iam.serviceAccountAdmin",         // For creating service accounts
 		"roles/iam.serviceAccountUser",          // For impersonating service accounts
@@ -188,26 +191,26 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		return err
 	}
 	//   3.2 Give CD role access to CD bucket
-	if err := b.driver.EnsureServiceAccountHasBucketRoles(ctx, b.bucket, b.cdServiceAccount, []string{"roles/storage.admin"}); err != nil {
+	if err := b.driver.EnsurePrincipalHasBucketRoles(ctx, b.bucket, "serviceAccount:"+b.cdServiceAccount, []string{"roles/storage.admin"}); err != nil {
 		return err
 	}
 
 	// 4 Setup service account for upload and give ability to create signed URLs using it to current user
-	if uploadServiceAccount, err := b.driver.EnsureServiceAccountExists(ctx, "defang-upload", "defang upload", "Service account for defang cli to generate pre-signed URL to upload artifacts"); err != nil {
+	if uploadServiceAccount, err := b.driver.EnsureServiceAccountExists(ctx, DefangUploadServiceAccountName, "defang upload", "Service account for defang cli to generate pre-signed URL to upload artifacts"); err != nil {
 		return err
 	} else {
 		b.uploadServiceAccount = path.Base(uploadServiceAccount)
 	}
 	//  4.1 Give upload service account access to cd bucket
-	if err := b.driver.EnsureServiceAccountHasBucketRoles(ctx, b.bucket, b.uploadServiceAccount, []string{"roles/storage.objectUser"}); err != nil {
+	if err := b.driver.EnsurePrincipalHasBucketRoles(ctx, b.bucket, "serviceAccount:"+b.uploadServiceAccount, []string{"roles/storage.objectUser"}); err != nil {
 		return err
 	}
-	//  4.2 Give current user the token creator role on the upload service account
-	user, err := b.driver.GetCurrentAccountEmail(ctx)
+	//  4.2 Give current principal the token creator role on the upload service account
+	principal, err := b.driver.GetCurrentPrincipal(ctx)
 	if err != nil {
 		return err
 	}
-	if err := b.driver.EnsureUserHasServiceAccountRoles(ctx, user, b.uploadServiceAccount, []string{"roles/iam.serviceAccountTokenCreator"}); err != nil {
+	if err := b.driver.EnsurePrincipalHasServiceAccountRoles(ctx, principal, b.uploadServiceAccount, []string{"roles/iam.serviceAccountTokenCreator"}); err != nil {
 		return err
 	}
 	//  4.3 Wait until we can sign bytes with the upload service account
@@ -216,7 +219,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		if _, err := b.driver.SignBytes(ctx, []byte("testdata"), b.uploadServiceAccount); err != nil {
 			if strings.Contains(err.Error(), "Permission 'iam.serviceAccounts.signBlob' denied on resource") {
 				if time.Since(start) > 5*time.Minute {
-					return errors.New("could not wait for adding serviceAccountTokenCreator role to current user to take effect, please try again later")
+					return errors.New("could not wait for adding serviceAccountTokenCreator role to current principal to take effect, please try again later")
 				}
 				pkg.SleepWithContext(ctx, 30*time.Second)
 				continue
@@ -231,7 +234,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 	term.Debugf("Using CD image: %q", b.CDImage)
 
 	serviceAccount := path.Base(b.cdServiceAccount)
-	if err := b.driver.SetupJob(ctx, "defang-cd", serviceAccount, []types.Container{
+	if err := b.driver.SetupJob(ctx, "defang-cd", serviceAccount, []clouds.Container{
 		{
 			Image:     b.CDImage,
 			Name:      ecs.CdContainerName,
@@ -258,7 +261,7 @@ func (o gcpObj) Size() int64 {
 	return o.obj.Size
 }
 
-func (b *ByocGcp) BootstrapList(ctx context.Context) ([]string, error) {
+func (b *ByocGcp) BootstrapList(ctx context.Context, _allRegions bool) (iter.Seq[string], error) {
 	bucketName, err := b.driver.GetBucketWithPrefix(ctx, "defang-cd")
 	if err != nil {
 		return nil, annotateGcpError(err)
@@ -269,21 +272,33 @@ func (b *ByocGcp) BootstrapList(ctx context.Context) ([]string, error) {
 
 	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
 
-	var stacks []string
-	err = b.driver.IterateBucketObjects(ctx, bucketName, prefix, func(obj *storage.ObjectAttrs) error {
-		stack, err := byoc.ParsePulumiStackObject(ctx, gcpObj{obj}, bucketName, prefix, b.driver.GetBucketObject)
-		if err != nil {
-			return err
-		}
-		if stack != "" {
-			stacks = append(stacks, stack)
-		}
-		return nil
-	})
+	uploadSA := b.driver.GetServiceAccountEmail(DefangUploadServiceAccountName)
+	term.Debug("Getting services from pulumi stacks bucket:", bucketName, prefix, uploadSA)
+	objLoader := func(ctx context.Context, bucket, object string) ([]byte, error) {
+		return b.driver.GetBucketObjectWithServiceAccount(ctx, bucket, object, uploadSA)
+	}
+	seq, err := b.driver.IterateBucketObjects(ctx, bucketName, prefix)
 	if err != nil {
 		return nil, annotateGcpError(err)
 	}
-	return stacks, nil
+	return func(yield func(string) bool) {
+		for obj, err := range seq {
+			if err != nil {
+				term.Debugf("Error listing object in bucket %s: %v", bucketName, annotateGcpError(err))
+				continue
+			}
+			stack, err := byoc.ParsePulumiStackObject(ctx, gcpObj{obj}, bucketName, prefix, objLoader)
+			if err != nil {
+				term.Debugf("Skipping %q in bucket %s: %v", obj.Name, bucketName, annotateGcpError(err))
+				continue
+			}
+			if stack != "" {
+				if !yield(stack) {
+					break
+				}
+			}
+		}
+	}, nil
 }
 
 func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
@@ -293,7 +308,7 @@ func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 	}
 
 	// check whether the ADC is logged in by trying to get the current account email
-	email, err := b.driver.GetCurrentAccountEmail(ctx)
+	email, err := b.driver.GetCurrentPrincipal(ctx)
 	if err != nil {
 		// not logged in, get email from gcloud
 		email, gcloudErr := GetUserEmail()
@@ -313,26 +328,26 @@ func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 }
 
 func (b *ByocGcp) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (types.ETag, error) {
-	if err := b.setUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx); err != nil {
 		return "", err
 	}
 	cmd := cdCommand{
-		Project: req.Project,
-		Command: []string{req.Command},
+		project: req.Project,
+		command: []string{req.Command},
 	}
-	cdTaskId, err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
+	cdExecutionId, err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
 	if err != nil {
 		return "", err
 	}
-	return cdTaskId, nil
+	return cdExecutionId, nil
 }
 
 type cdCommand struct {
-	Project        string
-	Command        []string
-	EnvOverride    map[string]string
-	Mode           defangv1.DeploymentMode
-	DelegateDomain string
+	command        []string
+	delegateDomain string
+	envOverride    map[string]string
+	mode           defangv1.DeploymentMode
+	project        string
 }
 
 func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, error) {
@@ -344,12 +359,12 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 	env := map[string]string{
 		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_JSON":              os.Getenv("DEFANG_JSON"),
-		"DEFANG_MODE":              strings.ToLower(cmd.Mode.String()),
+		"DEFANG_MODE":              strings.ToLower(cmd.mode.String()),
 		"DEFANG_ORG":               "defang",
 		"DEFANG_PREFIX":            byoc.DefangPrefix,
 		"DEFANG_STATE_URL":         defangStateUrl,
 		"GCP_PROJECT":              b.driver.ProjectId,
-		"PROJECT":                  cmd.Project,
+		"PROJECT":                  cmd.project,
 		pulumiBackendKey:           pulumiBackendValue,          // TODO: make secret
 		"PULUMI_CONFIG_PASSPHRASE": byoc.PulumiConfigPassphrase, // TODO: make secret
 		"PULUMI_COPILOT":           "false",
@@ -362,13 +377,13 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		env["NO_COLOR"] = "1"
 	}
 
-	if cmd.DelegateDomain != "" {
-		env["DOMAIN"] = b.GetProjectDomain(cmd.Project, cmd.DelegateDomain)
+	if cmd.delegateDomain != "" {
+		env["DOMAIN"] = b.GetProjectDomain(cmd.project, cmd.delegateDomain)
 	} else {
 		env["DOMAIN"] = "dummy.domain"
 	}
 
-	for k, v := range cmd.EnvOverride {
+	for k, v := range cmd.envOverride {
 		env[k] = v
 	}
 
@@ -380,22 +395,22 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		for k, v := range env {
 			debugEnv = append(debugEnv, k+"="+v)
 		}
-		if err := byoc.DebugPulumiGolang(ctx, debugEnv, cmd.Command...); err != nil {
+		if err := byoc.DebugPulumiGolang(ctx, debugEnv, cmd.command...); err != nil {
 			return "", err
 		}
 	}
 
-	execution, err := b.driver.Run(ctx, gcp.JobNameCD, env, cmd.Command...)
+	execution, err := b.driver.Run(ctx, gcp.JobNameCD, env, cmd.command...)
 	if err != nil {
 		return "", err
 	}
 	b.cdExecution = execution
-	// fmt.Printf("CD Execution: %s\n", execution)
+	// term.Printf("CD Execution: %s\n", execution)
 	return execution, nil
 }
 
 func (b *ByocGcp) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	if err := b.setUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx); err != nil {
 		return nil, err
 	}
 
@@ -460,7 +475,7 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 
 	// FIXME: Get cd image tag for the project
 
-	if err := b.setUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx); err != nil {
 		return nil, err
 	}
 
@@ -502,15 +517,14 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 		payload = strings.Replace(payload, "https://storage.googleapis.com/", "gs://", 1)
 	}
 
-	cmd := cdCommand{
-		Mode:           req.Mode,
-		Project:        project.Name,
-		Command:        []string{command, payload},
-		EnvOverride:    map[string]string{"DEFANG_ETAG": etag},
-		DelegateDomain: req.DelegateDomain,
+	cdCmd := cdCommand{
+		command:        []string{command, payload},
+		delegateDomain: req.DelegateDomain,
+		envOverride:    map[string]string{"DEFANG_ETAG": etag},
+		mode:           req.Mode,
+		project:        project.Name,
 	}
-
-	execution, err := b.runCdCommand(ctx, cmd)
+	execution, err := b.runCdCommand(ctx, cdCmd)
 	if err != nil {
 		return nil, err
 	}
@@ -544,82 +558,103 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 	// TODO: update stack (1st param) to b.PulumiStack
 	subscribeStream.AddJobStatusUpdate("", req.Project, req.Etag, req.Services)
 	subscribeStream.AddServiceStatusUpdate("", req.Project, req.Etag, req.Services)
-	subscribeStream.Start(time.Now())
+	subscribeStream.StartFollow(time.Now())
 	return subscribeStream, nil
 }
 
 func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	if b.cdExecution != "" && req.Etag == b.cdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
-		subscribeStream, err := NewSubscribeStream(ctx, b.driver, true, req.Etag, req.Services)
+	// BootstrapCommand returns the job execution ID as the eTag, which subsequently passed in as eTag in TailRequest,
+	// in those cases, we need a way to detect when the CD task has finished running and stop tailing thg logs by cancelling the logging context.
+	if b.cdExecution != "" && req.Etag == b.cdExecution {
+		var err error
+		ctx, err = b.getCDExecutionContext(ctx, b.driver, req)
 		if err != nil {
 			return nil, err
 		}
-		subscribeStream.AddJobExecutionUpdate(path.Base(b.cdExecution))
-		var since time.Time
-		if req.Since.IsValid() {
-			since = req.Since.AsTime()
-		}
-		subscribeStream.Start(since)
-
-		var cancel context.CancelCauseFunc
-		ctx, cancel = context.WithCancelCause(ctx)
-		go func() {
-			defer subscribeStream.Close()
-			for subscribeStream.Receive() {
-				msg := subscribeStream.Msg()
-				if msg.State == defangv1.ServiceState_BUILD_FAILED || msg.State == defangv1.ServiceState_DEPLOYMENT_FAILED {
-					pkg.SleepWithContext(ctx, 3*time.Second) // Make sure the logs are flushed, gcp logs has a longer delay, thus 3s
-					cancel(fmt.Errorf("CD job failed %s", msg.Status))
-					return
-				}
-				if msg.State == defangv1.ServiceState_DEPLOYMENT_COMPLETED {
-					pkg.SleepWithContext(ctx, 3*time.Second) // Make sure the logs are flushed, gcp logs has a longer delay, thus 3s
-					cancel(io.EOF)
-					return
-				}
-			}
-			cancel(subscribeStream.Err())
-		}()
 	}
+	return b.getLogStream(ctx, b.driver, req)
+}
 
-	logStream, err := NewLogStream(ctx, b.driver, req.Services)
+func (b *ByocGcp) getLogStream(ctx context.Context, gcpLogsClient GcpLogsClient, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+	logStream, err := NewLogStream(ctx, gcpLogsClient, req.Services)
 	if err != nil {
 		return nil, err
 	}
 
-	startTime := time.Now()
 	if req.Since.IsValid() {
-		startTime = req.Since.AsTime()
+		logStream.AddSince(req.Since.AsTime())
 	}
-	var endTime time.Time
 	if req.Until.IsValid() {
-		endTime = req.Until.AsTime()
+		logStream.AddUntil(req.Until.AsTime())
 	}
-	if req.Since.IsValid() || req.Etag != "" {
+	etag := req.Etag
+	if etag == b.cdExecution { // Do not pass the cd execution name as etag
+		etag = ""
+	}
+	if logs.LogType(req.LogType).Has(logs.LogTypeBuild) {
 		execName := path.Base(b.cdExecution)
 		if execName == "." {
 			execName = ""
 		}
-		etag := req.Etag
-		if etag == b.cdExecution { // Do not pass the cd execution name as etag
-			etag = ""
-		}
-		if logs.LogType(req.LogType).Has(logs.LogTypeBuild) {
-			logStream.AddJobExecutionLog(execName) // CD log when there is an execution name
-			// TODO: update stack (1st param) to b.PulumiStack
-			logStream.AddJobLog("", req.Project, etag, req.Services)        // Kaniko or CD logs when there is no execution name
-			logStream.AddCloudBuildLog("", req.Project, etag, req.Services) // CloudBuild logs
-		}
-		if logs.LogType(req.LogType).Has(logs.LogTypeRun) {
-			// TODO: update stack (1st param) to b.PulumiStack
-			logStream.AddServiceLog("", req.Project, etag, req.Services) // Service logs
-		}
-		logStream.AddSince(startTime)
-		logStream.AddUntil(endTime)
-		logStream.AddFilter(req.Pattern)
+		logStream.AddJobExecutionLog(execName) // CD log when there is an execution name
+		// TODO: update stack (1st param) to b.PulumiStack
+		logStream.AddJobLog("", req.Project, etag, req.Services)        // Kaniko or CD logs when there is no execution name
+		logStream.AddCloudBuildLog("", req.Project, etag, req.Services) // CloudBuild logs
 	}
-	logStream.Start(startTime)
+	if logs.LogType(req.LogType).Has(logs.LogTypeRun) {
+		// TODO: update stack (1st param) to b.PulumiStack
+		logStream.AddServiceLog("", req.Project, etag, req.Services) // Service logs
+	}
+	logStream.AddFilter(req.Pattern)
+	if req.Follow {
+		logStream.StartFollow(req.Since.AsTime())
+	} else if req.Since.IsValid() {
+		logStream.StartHead(req.Limit)
+	} else {
+		logStream.StartTail(req.Limit)
+	}
 	return logStream, nil
+}
+
+func (b *ByocGcp) getCDExecutionContext(ctx context.Context, gcpLogsClient GcpLogsClient, req *defangv1.TailRequest) (context.Context, error) {
+	subscribeStream, err := NewSubscribeStream(ctx, gcpLogsClient, true, req.Etag, req.Services)
+	if err != nil {
+		return nil, err
+	}
+	subscribeStream.AddJobExecutionUpdate(path.Base(b.cdExecution))
+	var since time.Time
+	if req.Since.IsValid() {
+		since = req.Since.AsTime()
+	}
+	if req.Follow {
+		subscribeStream.StartFollow(since)
+	} else if req.Since.IsValid() {
+		subscribeStream.StartHead(req.Limit)
+	} else {
+		subscribeStream.StartTail(req.Limit)
+	}
+
+	var cancel context.CancelCauseFunc
+	ctx, cancel = context.WithCancelCause(ctx)
+	// Note: No defer cancel as cancel will always be called in the goroutine below
+	go func() {
+		defer subscribeStream.Close()
+		for subscribeStream.Receive() {
+			msg := subscribeStream.Msg()
+			if msg.State == defangv1.ServiceState_BUILD_FAILED || msg.State == defangv1.ServiceState_DEPLOYMENT_FAILED {
+				pkg.SleepWithContext(ctx, 3*time.Second) // Make sure the logs are flushed, gcp logs has a longer delay, thus 3s
+				cancel(fmt.Errorf("CD job failed %s", msg.Status))
+				return
+			}
+			if msg.State == defangv1.ServiceState_DEPLOYMENT_COMPLETED {
+				pkg.SleepWithContext(ctx, 3*time.Second) // Make sure the logs are flushed, gcp logs has a longer delay, thus 3s
+				cancel(io.EOF)
+				return
+			}
+		}
+		cancel(subscribeStream.Err())
+	}()
+	return ctx, nil
 }
 
 func (b *ByocGcp) GetService(ctx context.Context, req *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
@@ -725,7 +760,7 @@ func (b *ByocGcp) ListConfig(ctx context.Context, req *defangv1.ListConfigsReque
 
 func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
 	if !pkg.IsValidSecretName(req.Name) {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", req.Name))
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid config name; must be alphanumeric or _, cannot start with a number: %q", req.Name))
 	}
 	secretId := b.StackName(req.Project, req.Name)
 	term.Debugf("Creating secret %q", secretId)
@@ -737,10 +772,12 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 			}
 			_, err = b.driver.CreateSecret(ctx, secretId)
 		}
-		if stat, ok := status.FromError(err); ok && stat.Code() == codes.AlreadyExists {
-			term.Debugf("Secret %q already exists", secretId)
-		} else {
-			return fmt.Errorf("failed to create secret %q: %w", secretId, err)
+		if err != nil {
+			if stat, ok := status.FromError(err); ok && stat.Code() == codes.AlreadyExists {
+				term.Debugf("Secret %q already exists", secretId)
+			} else {
+				return fmt.Errorf("failed to create secret %q: %w", secretId, err)
+			}
 		}
 	}
 	term.Debugf("Adding a new secret version for %q", secretId)
@@ -761,7 +798,7 @@ func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
 	if req.Until.IsValid() {
 		until = req.Until.AsTime()
 	}
-	query := NewLogQuery(b.driver.ProjectId)
+	query := NewLogQuery(b.driver.GetProjectID())
 	if b.cdExecution != "" {
 		query.AddJobExecutionQuery(path.Base(b.cdExecution))
 	}
@@ -826,7 +863,7 @@ func LogEntriesToString(logEntries []*loggingpb.LogEntry) string {
 func (b *ByocGcp) query(ctx context.Context, query string) ([]*loggingpb.LogEntry, error) {
 	term.Debugf("Querying logs with filter: \n %s", query)
 	var entries []*loggingpb.LogEntry
-	lister, err := b.driver.ListLogEntries(ctx, query)
+	lister, err := b.driver.ListLogEntries(ctx, query, gcp.OrderAscending)
 	if err != nil {
 		return nil, err
 	}
@@ -863,7 +900,7 @@ func (b *ByocGcp) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 	return nil, client.ErrNotImplemented("GCP Delete")
 }
 
-func (b *ByocGcp) TearDown(ctx context.Context) error {
+func (b *ByocGcp) TearDownCD(ctx context.Context) error {
 	// FIXME: implement
 	return client.ErrNotImplemented("GCP TearDown")
 }
@@ -921,10 +958,13 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 
 	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/byoc/aws/index.ts#L89
 	path := fmt.Sprintf("projects/%s/%s/project.pb", projectName, b.PulumiStack)
-	term.Debug("Getting services from bucket:", bucketName, path)
-	pbBytes, err := b.driver.GetBucketObject(ctx, bucketName, path)
+
+	// Current user might not have object viewer access to the bucket, use the upload service account to get the object
+	uploadSA := b.driver.GetServiceAccountEmail(DefangUploadServiceAccountName)
+	term.Debug("Getting services from bucket:", bucketName, path, uploadSA)
+	pbBytes, err := b.driver.GetBucketObjectWithServiceAccount(ctx, bucketName, path, uploadSA)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get project bucket object, try bootstrap the project with a deployment: %w", err)
 	}
 
 	projUpdate := defangv1.ProjectUpdate{}
@@ -938,4 +978,8 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 func (b *ByocGcp) StackName(projectName, name string) string {
 	pkg.Ensure(projectName != "", "ProjectName not set")
 	return fmt.Sprintf("%s_%s_%s_%s", byoc.DefangPrefix, projectName, b.PulumiStack, name)
+}
+
+func (b *ByocGcp) ServicePublicDNS(name string, projectName string) string {
+	return dns.SafeLabel(name) + "." + b.PulumiStack + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(b.TenantName) + ".defang.app"
 }

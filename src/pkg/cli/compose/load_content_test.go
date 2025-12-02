@@ -1,14 +1,13 @@
 package compose
 
 import (
-	"context"
 	"testing"
 )
 
 func TestRoundTrip(t *testing.T) {
-	testRunCompose(t, func(t *testing.T, path string) {
+	testAllComposeFiles(t, func(t *testing.T, path string) {
 		loader := NewLoader(WithPath(path))
-		p, err := loader.LoadProject(context.Background())
+		p, err := loader.LoadProject(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -16,7 +15,7 @@ func TestRoundTrip(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		rt, err := LoadFromContent(context.Background(), content, "should-not-be-used")
+		rt, err := LoadFromContent(t.Context(), content, "should-not-be-used")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -82,7 +81,7 @@ func TestLoadFromContent(t *testing.T) {
 
 	for _, tt := range tdt {
 		t.Run(tt.desc, func(t *testing.T) {
-			project, err := LoadFromContent(context.Background(), []byte(tt.compose), tt.fallback)
+			project, err := LoadFromContent(t.Context(), []byte(tt.compose), tt.fallback)
 			if err != nil {
 				t.Fatal(err)
 			}

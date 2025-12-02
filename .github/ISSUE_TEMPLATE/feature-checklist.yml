@@ -1,0 +1,43 @@
+---
+name: Feature Request
+labels: feature
+description: "Describe the feature, include what a complete solution looks like, how to test it, and if there are any implementation specifics."
+assignees: []
+body:
+  - type: input
+    id: feature-description
+    attributes:
+      label: What does the feature do?
+      description: Briefly describe the purpose and value of the feature.
+    validations:
+      required: true
+
+  - type: textarea
+    id: desired-solution
+    attributes:
+      label: What does the desired solution look like?
+      description: Describe the ideal implementation or user experience.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: List the conditions that must be met for this feature to be considered complete.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: done-tasks
+    attributes:
+      label: Checklist of tasks to complete
+      description: Tick each item as you complete it. All must be checked before closing the issue.
+      options:
+        - label: Implementation is complete
+        - label: Tests are written and passing
+        - label: Samples added/update, if needed 
+        - label: Documentation is updated (including Breaking Changes doc), if needed
+        - label: Deployed to staging/production (if applicable)
+        - label: Someone else has confirmed feature is functioning as expected
+        - label: Confirmed on AWS, GCP, DO, and Playground (where applicable)

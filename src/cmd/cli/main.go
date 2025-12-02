@@ -17,7 +17,7 @@ import (
 func main() {
 	defer func() {
 		if r := recover(); r != nil {
-			track.Evt("Panic", track.P("version", version), track.P("error", r), track.P("stack", string(skipLines(debug.Stack(), 6))))
+			track.Evt("Panic", track.P("version", version), track.P("error", r), track.P("callstack", string(skipLines(debug.Stack(), 6))))
 			track.FlushAllTracking()
 			panic(r)
 		}

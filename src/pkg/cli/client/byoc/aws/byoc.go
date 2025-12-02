@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"os"
 	"slices"
 	"strconv"
@@ -18,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
@@ -25,17 +27,17 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/proto"
@@ -51,7 +53,7 @@ var StsClient StsProviderAPI
 type ByocAws struct {
 	*byoc.ByocBaseClient
 
-	driver *cfn.AwsEcs // TODO: ecs is stateful, contains the output of the cd cfn stack after setUpCD
+	driver *cfn.AwsEcsCfn // TODO: ecs is stateful, contains the output of the cd cfn stack after SetUpCD
 
 	ecsEventHandlers []ECSEventHandler
 	handlersLock     sync.RWMutex
@@ -113,18 +115,14 @@ func AnnotateAwsError(err error) error {
 	return err
 }
 
-type NewByocInterface func(ctx context.Context, tenantName types.TenantName) *ByocAws
-
-func newByocProvider(ctx context.Context, tenantName types.TenantName) *ByocAws {
+func NewByocProvider(ctx context.Context, tenantName types.TenantName, stack string) *ByocAws {
 	b := &ByocAws{
 		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
-	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantName, b)
+	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
 
 	return b
 }
-
-var NewByocProvider NewByocInterface = newByocProvider
 
 func initStsClient(cfg awssdk.Config) {
 	if StsClient == nil {
@@ -132,49 +130,36 @@ func initStsClient(cfg awssdk.Config) {
 	}
 }
 
-func (b *ByocAws) setUpCD(ctx context.Context) error {
+func (b *ByocAws) makeContainers() []clouds.Container {
+	return makeContainers(b.PulumiVersion, b.CDImage)
+}
+
+func (b *ByocAws) PrintCloudFormationTemplate() ([]byte, error) {
+	containers := b.makeContainers()
+	template, err := cfn.CreateTemplate(byoc.CdTaskPrefix, containers)
+	if err != nil {
+		return nil, err
+	}
+	return template.YAML()
+}
+
+func (b *ByocAws) SetUpCD(ctx context.Context) error {
 	if b.SetupDone {
 		return nil
 	}
 
 	term.Debugf("Using CD image: %q", b.CDImage)
 
-	cdTaskName := byoc.CdTaskPrefix
-	containers := []types.Container{
-		{
-			// FIXME: get the Pulumi image or version from Fabric: https://github.com/DefangLabs/defang/issues/1027
-			Image:     "public.ecr.aws/pulumi/pulumi-nodejs:" + b.PulumiVersion,
-			Name:      ecs.CdContainerName,
-			Cpus:      2.0,
-			Memory:    2048_000_000, // 2G
-			Essential: ptr.Bool(true),
-			VolumesFrom: []string{
-				cdTaskName,
-			},
-			WorkDir:    "/app",
-			DependsOn:  map[string]types.ContainerCondition{cdTaskName: "START"},
-			EntryPoint: []string{"node", "lib/index.js"},
-		},
-		{
-			Image:     b.CDImage,
-			Name:      cdTaskName,
-			Essential: ptr.Bool(false),
-			Volumes: []types.TaskVolume{
-				{
-					Source:   "pulumi-plugins",
-					Target:   "/root/.pulumi/plugins",
-					ReadOnly: true,
-				},
-				{
-					Source:   "cd",
-					Target:   "/app",
-					ReadOnly: true,
-				},
-			},
-		},
-	}
-	if err := b.driver.SetUp(ctx, containers); err != nil {
+	if err := b.driver.SetUp(ctx, b.makeContainers()); err != nil {
 		return AnnotateAwsError(err)
+	}
+
+	// Delete default SecurityGroup rules to comply with stricter AWS account security policies
+	if sgId := b.driver.DefaultSecurityGroupID; sgId != "" {
+		term.Debugf("Cleaning up default Security Group rules (%s)", sgId)
+		if err := b.driver.RevokeDefaultSecurityGroupRules(ctx, sgId); err != nil {
+			term.Warnf("Could not clean up default Security Group rules: %v", err)
+		}
 	}
 
 	b.SetupDone = true
@@ -212,7 +197,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		return nil, err
 	}
 
-	if err := b.setUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx); err != nil {
 		return nil, err
 	}
 
@@ -260,14 +245,14 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		payloadString = http.RemoveQueryParam(payloadUrl)
 	}
 
-	cdCommand := cdCmd{
-		mode:            req.Mode,
-		project:         project.Name,
+	cdCmd := cdCommand{
+		command:         []string{cmd, payloadString},
 		delegateDomain:  req.DelegateDomain,
 		delegationSetId: req.DelegationSetId,
-		cmd:             []string{cmd, payloadString},
+		mode:            req.Mode,
+		project:         project.Name,
 	}
-	cdTaskArn, err := b.runCdCommand(ctx, cdCommand)
+	cdTaskArn, err := b.runCdCommand(ctx, cdCmd)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
@@ -406,15 +391,15 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 	return env, nil
 }
 
-type cdCmd struct {
-	mode            defangv1.DeploymentMode
-	project         string
+type cdCommand struct {
+	command         []string
 	delegateDomain  string
 	delegationSetId string
-	cmd             []string
+	mode            defangv1.DeploymentMode
+	project         string
 }
 
-func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCmd) (ecs.TaskArn, error) {
+func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn, error) {
 	// Setup the deployment environment
 	env, err := b.environment(cmd.project)
 	if err != nil {
@@ -439,26 +424,25 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCmd) (ecs.TaskArn, err
 		for k, v := range env {
 			debugEnv = append(debugEnv, k+"="+v)
 		}
-		if err := byoc.DebugPulumiNodeJS(ctx, debugEnv, cmd.cmd...); err != nil {
+		if err := byoc.DebugPulumiNodeJS(ctx, debugEnv, cmd.command...); err != nil {
 			return nil, err
 		}
 	}
-	return b.driver.Run(ctx, env, cmd.cmd...)
+	return b.driver.Run(ctx, env, cmd.command...)
 }
 
 func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
 	if len(req.Names) > 0 {
 		return nil, client.ErrNotImplemented("per-service deletion is not supported for BYOC")
 	}
-	if err := b.setUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx); err != nil {
 		return nil, err
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
-	cmd := cdCmd{
-		mode:           defangv1.DeploymentMode_MODE_UNSPECIFIED,
+	cmd := cdCommand{
 		project:        req.Project,
 		delegateDomain: req.DelegateDomain,
-		cmd:            []string{"up", ""}, // 2nd empty string is a empty payload
+		command:        []string{"up", ""}, // 2nd empty string is a empty payload
 	}
 	cdTaskArn, err := b.runCdCommand(ctx, cmd)
 	if err != nil {
@@ -547,7 +531,7 @@ func (b *ByocAws) getSecretID(projectName, name string) string {
 
 func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.PutConfigRequest) error {
 	if !pkg.IsValidSecretName(secret.Name) {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", secret.Name))
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid config name; must be alphanumeric or _, cannot start with a number: %q", secret.Name))
 	}
 	fqn := b.getSecretID(secret.Project, secret.Name)
 	term.Debugf("Putting parameter %q", fqn)
@@ -570,7 +554,7 @@ func (b *ByocAws) ListConfig(ctx context.Context, req *defangv1.ListConfigsReque
 }
 
 func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	if err := b.setUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx); err != nil {
 		return nil, err
 	}
 
@@ -616,10 +600,15 @@ func (b *ByocAws) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest)
 		return AnnotateAwsError(err)
 	}
 
+	cw, err := ecs.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region
+	if err != nil {
+		return err
+	}
+
 	// Gather logs from the CD task, kaniko, ECS events, and all services
-	evtsChan, errsChan := ecs.QueryLogGroups(ctx, start, end, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
+	evtsChan, errsChan := ecs.QueryLogGroups(ctx, cw, start, end, 0, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
 	if evtsChan == nil {
-		return <-errsChan
+		return <-errsChan // TODO: there could be multiple errors
 	}
 
 	const maxQuerySizePerLogGroup = 128 * 1024 // 128KB per LogGroup (to stay well below the 1MB gRPC payload limit)
@@ -671,44 +660,82 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		return nil, AnnotateAwsError(err)
 	}
 
-	etag := req.Etag
-	// if etag == "" && req.Service == "cd" {
-	// 	etag = awsecs.GetTaskID(b.cdTaskArn); TODO: find the last CD task
-	// }
+	var err error
+	cw, err := ecs.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region
+	if err != nil {
+		return nil, AnnotateAwsError(err)
+	}
+
 	// How to tail multiple tasks/services at once?
 	//  * No Etag, no service:	tail all tasks/services
 	//  * Etag, no service: 	tail all tasks/services with that Etag
 	//  * No Etag, service:		tail all tasks/services with that service name
 	//  * Etag, service:		tail that task/service
-	var err error
 	var tailStream ecs.LiveTailStream
-
-	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is a task ID
-		tailStream, err = b.driver.TailTaskID(ctx, etag)
-		if err == nil {
-			b.cdTaskArn, err = b.driver.GetTaskArn(etag)
-			etag = "" // no need to filter by etag
-		}
+	etag := req.Etag
+	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is the task ID of the CD task
+		tailStream, err = b.queryCdLogs(ctx, cw, req)
+		etag = "" // no need to filter events by etag because we only show logs from the specified task ID
 	} else {
-		var service string
-		if len(req.Services) == 1 {
-			service = req.Services[0]
-		}
-		var start, end time.Time
-		if req.Since.IsValid() {
-			start = req.Since.AsTime()
-		}
-		if req.Until.IsValid() {
-			end = req.Until.AsTime()
-		}
-		tailStream, err = ecs.QueryAndTailLogGroups(ctx, start, end, b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))...)
+		tailStream, err = b.queryLogs(ctx, cw, req)
 	}
-
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
+	return newByocServerStream(tailStream, etag, req.Services, b), nil
+}
 
-	return newByocServerStream(tailStream, etag, req.GetServices(), b), nil
+func (b *ByocAws) queryCdLogs(ctx context.Context, cw *cloudwatchlogs.Client, req *defangv1.TailRequest) (ecs.LiveTailStream, error) {
+	var err error
+	b.cdTaskArn, err = b.driver.GetTaskArn(req.Etag) // only fails on missing task ID
+	if err != nil {
+		return nil, err
+	}
+	if req.Follow {
+		return b.driver.TailTaskID(ctx, cw, req.Etag)
+	} else {
+		start := timeutils.AsTime(req.Since, time.Time{})
+		end := timeutils.AsTime(req.Until, time.Time{})
+		return b.driver.QueryTaskID(ctx, cw, req.Etag, start, end, req.Limit)
+	}
+}
+
+func (b *ByocAws) queryLogs(ctx context.Context, cw *cloudwatchlogs.Client, req *defangv1.TailRequest) (ecs.LiveTailStream, error) {
+	start := timeutils.AsTime(req.Since, time.Time{})
+	end := timeutils.AsTime(req.Until, time.Time{})
+
+	var service string
+	if len(req.Services) == 1 {
+		service = req.Services[0]
+	}
+	lgis := b.getLogGroupInputs(req.Etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))
+	if req.Follow {
+		return ecs.QueryAndTailLogGroups(
+			ctx,
+			cw,
+			start,
+			end,
+			lgis...,
+		)
+	} else {
+		evtsChan, errsChan := ecs.QueryLogGroups(
+			ctx,
+			cw,
+			start,
+			end,
+			req.Limit,
+			lgis...,
+		)
+		if evtsChan == nil {
+			var errs []error
+			for err := range errsChan {
+				errs = append(errs, err)
+			}
+			return nil, errors.Join(errs...)
+		}
+		// TODO: any errors from errsChan should be reported but get dropped
+		return ecs.NewStaticLogStream(evtsChan, func() {}), nil
+	}
 }
 
 func (b *ByocAws) makeLogGroupARN(name string) string {
@@ -772,18 +799,17 @@ func (b *ByocAws) UpdateServiceInfo(ctx context.Context, si *defangv1.ServiceInf
 	return nil
 }
 
-func (b *ByocAws) TearDown(ctx context.Context) error {
+func (b *ByocAws) TearDownCD(ctx context.Context) error {
 	return b.driver.TearDown(ctx)
 }
 
 func (b *ByocAws) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (string, error) {
-	if err := b.setUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx); err != nil {
 		return "", err
 	}
-	cmd := cdCmd{
-		mode:    defangv1.DeploymentMode_MODE_UNSPECIFIED,
+	cmd := cdCommand{
 		project: req.Project,
-		cmd:     []string{req.Command},
+		command: []string{req.Command},
 	}
 	cdTaskArn, err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
 	if err != nil {
@@ -812,69 +838,23 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	return nil
 }
 
-type s3Obj struct{ obj s3types.Object }
-
-func (a s3Obj) Name() string {
-	return *a.obj.Key
-}
-
-func (a s3Obj) Size() int64 {
-	return *a.obj.Size
-}
-
-func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
-	bucketName := b.bucketName()
-	if bucketName == "" {
-		if err := b.driver.FillOutputs(ctx); err != nil {
+func (b *ByocAws) BootstrapList(ctx context.Context, allRegions bool) (iter.Seq[string], error) {
+	if allRegions {
+		s3Client, err := newS3Client(ctx, b.driver.Region)
+		if err != nil {
 			return nil, AnnotateAwsError(err)
 		}
-		bucketName = b.bucketName()
-	}
-
-	cfg, err := b.driver.LoadConfig(ctx)
-	if err != nil {
-		return nil, AnnotateAwsError(err)
-	}
-
-	s3client := s3.NewFromConfig(cfg)
-	return ListPulumiStacks(ctx, s3client, bucketName)
-}
-
-func ListPulumiStacks(ctx context.Context, s3client *s3.Client, bucketName string) ([]string, error) {
-	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
-
-	term.Debug("Listing stacks in bucket:", bucketName)
-	out, err := s3client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
-		Bucket: &bucketName,
-		Prefix: &prefix,
-	})
-	if err != nil {
-		return nil, AnnotateAwsError(err)
-	}
-	var stacks []string
-	for _, obj := range out.Contents {
-		if obj.Key == nil || obj.Size == nil {
-			continue
-		}
-		stack, err := byoc.ParsePulumiStackObject(ctx, s3Obj{obj}, bucketName, prefix, func(ctx context.Context, bucket, path string) ([]byte, error) {
-			getObjectOutput, err := s3client.GetObject(ctx, &s3.GetObjectInput{
-				Bucket: &bucket,
-				Key:    &path,
-			})
-			if err != nil {
-				return nil, err
+		return listPulumiStacksAllRegions(ctx, s3Client)
+	} else {
+		bucketName := b.bucketName()
+		if bucketName == "" {
+			if err := b.driver.FillOutputs(ctx); err != nil {
+				return nil, AnnotateAwsError(err)
 			}
-			return io.ReadAll(getObjectOutput.Body)
-		})
-		if err != nil {
-			return nil, err
+			bucketName = b.bucketName()
 		}
-		if stack != "" {
-			stacks = append(stacks, stack)
-		}
-		// TODO: check for lock files
+		return listPulumiStacksInBucket(ctx, b.driver.Region, bucketName)
 	}
-	return stacks, nil
 }
 
 type ECSEventHandler interface {
@@ -886,7 +866,8 @@ func (b *ByocAws) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 		services: req.Services,
 		etag:     req.Etag,
 
-		ch: make(chan *defangv1.SubscribeResponse),
+		ch:   make(chan *defangv1.SubscribeResponse),
+		done: make(chan struct{}),
 	}
 	b.AddEcsEventHandler(s)
 	return s, nil
@@ -904,4 +885,8 @@ func (b *ByocAws) AddEcsEventHandler(handler ECSEventHandler) {
 	b.handlersLock.Lock()
 	defer b.handlersLock.Unlock()
 	b.ecsEventHandlers = append(b.ecsEventHandlers, handler)
+}
+
+func (b *ByocAws) ServicePublicDNS(name string, projectName string) string {
+	return dns.SafeLabel(name) + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(b.TenantName) + ".defang.app"
 }

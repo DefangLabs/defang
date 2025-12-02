@@ -58,10 +58,20 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 	// 	return nil, err
 	// }
 
-	securityGroups := []string{a.SecurityGroupID} // TODO: only if ports are mapped
+	var securityGroups []string
+	if a.SecurityGroupID != "" {
+		securityGroups = []string{a.SecurityGroupID}
+	}
+	capacityProvider := "FARGATE"
+	if a.Spot {
+		capacityProvider = "FARGATE_SPOT"
+	}
 	rti := ecs.RunTaskInput{
-		Count:          ptr.Int32(taskCount),
-		LaunchType:     types.LaunchTypeFargate,
+		CapacityProviderStrategy: []types.CapacityProviderStrategyItem{
+			{CapacityProvider: ptr.String(capacityProvider), Weight: 1},
+		},
+		Count: ptr.Int32(taskCount),
+		// LaunchType:     types.LaunchTypeFargate, mutually exclusive with CapacityProviderStrategy
 		TaskDefinition: ptr.String(a.TaskDefARN),
 		PropagateTags:  types.PropagateTagsTaskDefinition,
 		Cluster:        ptr.String(a.ClusterName),
@@ -69,8 +79,8 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 		NetworkConfiguration: &types.NetworkConfiguration{
 			AwsvpcConfiguration: &types.AwsVpcConfiguration{
 				AssignPublicIp: types.AssignPublicIpEnabled, // only works with public subnets
+				SecurityGroups: securityGroups,              // If you don't specify a security group, the default security group for the VPC is used
 				Subnets:        []string{a.SubNetID},        // TODO: make configurable; must this match the VPC of the SecGroup?
-				SecurityGroups: securityGroups,
 			},
 		},
 		Overrides: &types.TaskOverride{

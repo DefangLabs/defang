@@ -6,6 +6,10 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPendingStream(t *testing.T) {
@@ -13,9 +17,17 @@ func TestPendingStream(t *testing.T) {
 		t.Skip("skipping slow integration test")
 	}
 
-	ps, _ := QueryAndTailLogGroup(context.Background(), LogGroupInput{
+	// Load AWS config for real integration test
+	cfg, err := config.LoadDefaultConfig(context.Background())
+	if err != nil {
+		t.Skipf("Failed to load AWS config: %v", err)
+	}
+
+	cw := cloudwatchlogs.NewFromConfig(cfg)
+	ps, err := QueryAndTailLogGroup(context.Background(), cw, LogGroupInput{
 		LogGroupARN: "arn:aws:logs:us-west-2:532501343364:log-group:/ecs/lio/logss:*",
 	}, time.Now().Add(-time.Minute), time.Time{})
+	assert.NoError(t, err)
 
 	go func() {
 		time.Sleep(5 * time.Second)

@@ -71,7 +71,8 @@ Dockerfile
 defang
 defang.exe
 # Ignore our project-level state
-.defang`
+.defang*
+` // keep the final newline
 )
 
 type ArchiveType struct {
@@ -355,7 +356,7 @@ func walkContextFolder(root, dockerfile string, writeIgnore writeIgnoreFile, fn 
 
 	if dockerignore == "" && writeIgnore {
 		// Generate a default .dockerignore file if none exists (to be included in the context)
-		term.Warn("No .dockerignore file found; creating default .dockerignore")
+		term.Warn("No .dockerignore file found; creating default .dockerignore; you may add this to source control (git)")
 		var err error
 		dockerignore, err = writeDefaultIgnoreFile(root, dotdockerignore)
 		if err != nil {

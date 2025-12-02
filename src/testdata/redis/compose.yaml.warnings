@@ -2,6 +2,8 @@
  ! service "no-ext": stateful service will lose data on restart; use a managed service instead
  ! service "no-ports": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "no-ports-override": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "short-ports": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "valkey-service": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "with-ext": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
- ! service "wrong-image": managed Redis service should use a redis image
+ ! service "wrong-image": managed Redis service should use a redis or valkey image
  ! service "wrong-image": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors

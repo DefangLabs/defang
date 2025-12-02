@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -55,7 +54,7 @@ func GenerateWithAI(ctx context.Context, client client.FabricClient, args Genera
 	}
 	for _, file := range response.Files {
 		// Print the files that were generated
-		fmt.Println("   -", file.Name)
+		term.Println("   -", file.Name)
 		// TODO: this will overwrite existing files
 		if err = os.WriteFile(filepath.Join(args.Folder, file.Name), []byte(file.Content), 0644); err != nil {
 			return nil, err

@@ -44,24 +44,30 @@ var (
 type TailDetectStopEventFunc func(eventLog *defangv1.LogEntry) error
 
 type TailOptions struct {
-	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe and GetDeploymentStatus instead #851
 	Deployment         types.ETag
+	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe and GetDeploymentStatus instead #851
 	Filter             string
+	Follow             bool
+	Limit              int32
 	LogType            logs.LogType
 	Raw                bool
 	Services           []string
 	Since              time.Time
 	Until              time.Time
 	Verbose            bool
+	PrintBookends      bool
 }
 
 func (to TailOptions) String() string {
-	cmd := " --since=" + to.Since.UTC().Format(time.RFC3339Nano)
-	if to.Until.IsZero() {
-		// No --until implies --follow
-		cmd = "tail" + cmd
-	} else {
-		cmd = "logs" + cmd + " --until=" + to.Until.UTC().Format(time.RFC3339Nano)
+	cmd := ""
+	if !to.Since.IsZero() {
+		cmd += " --since=" + to.Since.UTC().Format(time.RFC3339Nano)
+	}
+	if !to.Until.IsZero() {
+		cmd += " --until=" + to.Until.UTC().Format(time.RFC3339Nano)
+	}
+	if to.Follow && to.Until.IsZero() {
+		cmd += " --follow"
 	}
 	if to.Deployment != "" {
 		cmd += " --deployment=" + to.Deployment
@@ -73,7 +79,7 @@ func (to TailOptions) String() string {
 	if !to.Verbose {
 		cmd += " --verbose=0"
 	}
-	if to.LogType != logs.LogTypeUnspecified {
+	if to.LogType != logs.LogTypeUnspecified && to.LogType != logs.LogTypeAll {
 		cmd += " --type=" + to.LogType.String()
 	}
 	if to.Filter != "" {
@@ -92,35 +98,6 @@ func EnableUTCMode() {
 	time.Local = time.UTC
 }
 
-// ParseTimeOrDuration parses a time string or duration string (e.g. 1h30m) and returns a time.Time.
-// At a minimum, this function supports RFC3339Nano, Go durations, and our own TimestampFormat (local).
-func ParseTimeOrDuration(str string, now time.Time) (time.Time, error) {
-	if str == "" {
-		return time.Time{}, nil
-	}
-	if strings.ContainsAny(str, "TZ") {
-		return time.Parse(time.RFC3339Nano, str)
-	}
-	if strings.Contains(str, ":") {
-		local, err := time.ParseInLocation("15:04:05.999999", str, time.Local)
-		if err != nil {
-			return time.Time{}, err
-		}
-		// Replace the year, month, and day of t with today's date
-		now := now.Local()
-		sincet := time.Date(now.Year(), now.Month(), now.Day(), local.Hour(), local.Minute(), local.Second(), local.Nanosecond(), local.Location())
-		if sincet.After(now) {
-			sincet = sincet.AddDate(0, 0, -1) // yesterday; subtract 1 day
-		}
-		return sincet, nil
-	}
-	dur, err := time.ParseDuration(str)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return now.Add(-dur), nil // - because we want to go back in time
-}
-
 type CancelError struct {
 	TailOptions
 	ProjectName string
@@ -128,7 +105,7 @@ type CancelError struct {
 }
 
 func (cerr CancelError) Error() string {
-	cmd := cerr.String()
+	cmd := "logs" + cerr.String()
 	if cerr.ProjectName != "" {
 		cmd += " --project-name=" + cerr.ProjectName
 	}
@@ -141,7 +118,7 @@ func (cerr CancelError) Unwrap() error {
 
 func Tail(ctx context.Context, provider client.Provider, projectName string, options TailOptions) error {
 	if options.LogType == logs.LogTypeUnspecified {
-		options.LogType = logs.LogTypeRun
+		options.LogType = logs.LogTypeAll
 	}
 
 	term.Debugf("Tailing %s logs in project %q", options.LogType, projectName)
@@ -200,7 +177,7 @@ func isTransientError(err error) bool {
 	return false
 }
 
-type LogEntryHandler func(*defangv1.LogEntry, *TailOptions) error
+type LogEntryHandler func(*defangv1.LogEntry, *TailOptions, *term.Term) error
 
 func streamLogs(ctx context.Context, provider client.Provider, projectName string, options TailOptions, handler LogEntryHandler) error {
 	var sinceTs, untilTs *timestamppb.Timestamp
@@ -228,7 +205,11 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 		Services: options.Services,
 		Since:    sinceTs, // this is also used to continue from the last timestamp
 		Until:    untilTs,
+		Follow:   options.Follow,
+		Limit:    options.Limit,
 	}
+
+	term.Debug("Tail request:", tailRequest)
 
 	serverStream, err := provider.QueryLogs(ctx, tailRequest)
 	if err != nil {
@@ -275,7 +256,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 						case 3: // Ctrl-C
 							cancel() // cancel the tail context
 						case 10, 13: // Enter or Return
-							fmt.Println(" ") // empty line, but overwrite the spinner
+							term.Println(" ") // empty line, but overwrite the spinner
 						case 'v', 'V':
 							verbose := !options.Verbose
 							options.Verbose = verbose
@@ -295,11 +276,57 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 		}
 	}
 
+	return receiveLogs(ctx, provider, projectName, tailRequest, serverStream, &options, doSpinner, handler)
+}
+
+func makeHeadBookendOptions(options *TailOptions, firstLogTime time.Time) *TailOptions {
+	newOptions := *options
+	if !firstLogTime.IsZero() {
+		newOptions.Until = firstLogTime
+	} else {
+		newOptions.Until = newOptions.Since
+	}
+	newOptions.Since = time.Time{}
+	return &newOptions
+}
+
+func printHeadBookend(options *TailOptions, firstLogTime time.Time) {
+	newOptions := makeHeadBookendOptions(options, firstLogTime)
+	if !newOptions.Until.IsZero() {
+		term.Info("To view older logs, run: `defang logs" + newOptions.String() + "`")
+	}
+}
+
+func makeTailBookendOptions(options *TailOptions, lastLogTime time.Time) *TailOptions {
+	newOptions := *options
+	if !lastLogTime.IsZero() {
+		newOptions.Since = lastLogTime
+	} else {
+		newOptions.Since = newOptions.Until
+	}
+	newOptions.Until = time.Time{}
+	return &newOptions
+}
+
+func printTailBookend(options *TailOptions, lastLogTime time.Time) {
+	newOptions := makeTailBookendOptions(options, lastLogTime)
+	if !newOptions.Since.IsZero() {
+		term.Info("To view more recent logs, run: `defang logs" + newOptions.String() + "`")
+	}
+}
+
+func receiveLogs(ctx context.Context, provider client.Provider, projectName string, tailRequest *defangv1.TailRequest, serverStream client.ServerStream[defangv1.TailResponse], options *TailOptions, doSpinner bool, handler LogEntryHandler) error {
+	headBookendPrinted := false
+	lastLogTime := time.Time{}
 	skipDuplicate := false
+	var err error
 	for {
 		if !serverStream.Receive() {
 			if errors.Is(serverStream.Err(), context.Canceled) || errors.Is(serverStream.Err(), context.DeadlineExceeded) {
-				return &CancelError{TailOptions: options, error: serverStream.Err(), ProjectName: projectName}
+				return &CancelError{TailOptions: *options, error: serverStream.Err(), ProjectName: projectName}
+			}
+			if errors.Is(serverStream.Err(), io.EOF) {
+				return serverStream.Err()
 			}
 
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
@@ -325,7 +352,13 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 				continue
 			}
 
-			return serverStream.Err() // returns nil on EOF
+			if serverStream.Err() == nil { // returns nil on EOF
+				if options.PrintBookends {
+					printTailBookend(options, lastLogTime)
+				}
+				return nil
+			}
+			return serverStream.Err()
 		}
 		msg := serverStream.Msg()
 
@@ -333,50 +366,67 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 			continue
 		}
 
-		for _, e := range msg.Entries {
-			// Replace service progress messages with our own spinner
-			if doSpinner && isProgressDot(e.Message) {
-				continue
-			}
-			ts := e.Timestamp.AsTime()
-			// Skip duplicate logs (e.g. after reconnecting we might get the same log once more)
-			if skipDuplicate && ts.Equal(options.Since) {
-				skipDuplicate = false
-				continue
-			}
-			e.Service = valueOrDefault(e.Service, msg.Service)
-			e.Host = valueOrDefault(e.Host, msg.Host)
-			e.Etag = valueOrDefault(e.Etag, msg.Etag)
-			host := e.Host
-			service := e.Service
+		if options.PrintBookends && !headBookendPrinted && len(msg.Entries) > 0 {
+			printHeadBookend(options, msg.Entries[0].Timestamp.AsTime())
+			headBookendPrinted = true
+		}
 
-			// HACK: skip noisy CI/CD logs (except errors)
-			isInternal := service == "cd" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric" || host == "ecs" || host == "cloudbuild" || host == "pulumi"
-			onlyErrors := !options.Verbose && isInternal
-			if onlyErrors && !e.Stderr {
-				if options.EndEventDetectFunc != nil {
-					if err := options.EndEventDetectFunc(e); err != nil {
-						cancel() // TODO: stuck on defer Close() if we don't do this
-						return err
-					}
-				}
-				continue
-			}
+		if len(msg.Entries) > 0 {
+			lastLogTime = msg.Entries[len(msg.Entries)-1].Timestamp.AsTime()
+		}
 
-			if ts.After(options.Since) {
-				options.Since = ts
-			}
-			err := handler(e, &options)
-			if err != nil {
-				term.Debug("Ending tail loop", err)
-				cancel() // TODO: stuck on defer Close() if we don't do this
-				return err
-			}
+		if err = handleLogEntryMsgs(msg, doSpinner, skipDuplicate, options, handler); err != nil {
+			return err
 		}
 	}
 }
 
-func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions) error {
+func handleLogEntryMsgs(msg *defangv1.TailResponse, doSpinner bool, skipDuplicate bool, options *TailOptions, handler LogEntryHandler) error {
+	for _, e := range msg.Entries {
+		// Replace service progress messages with our own spinner
+		if doSpinner && isProgressDot(e.Message) {
+			continue
+		}
+		ts := e.Timestamp.AsTime()
+		// Skip duplicate logs (e.g. after reconnecting we might get the same log once more)
+		if skipDuplicate && ts.Equal(options.Since) {
+			skipDuplicate = false
+			continue
+		}
+		e.Service = valueOrDefault(e.Service, msg.Service)
+		e.Host = valueOrDefault(e.Host, msg.Host)
+		e.Etag = valueOrDefault(e.Etag, msg.Etag)
+
+		if ts.After(options.Since) {
+			options.Since = ts
+		}
+
+		err := handler(e, options, term.DefaultTerm)
+		if err != nil {
+			term.Debug("Ending tail loop", err)
+			return err
+		}
+
+		// Detect end logging event
+		if options.EndEventDetectFunc != nil {
+			if err := options.EndEventDetectFunc(e); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions, t *term.Term) error {
+	// HACK: skip noisy CI/CD logs (except errors)
+	var internalServices = []string{"cd", "kaniko", "fabric", "ecs", "codebuild", "cloudbuild", "pulumi"}
+	var internalHosts = []string{"kaniko", "fabric", "ecs", "codebuild", "cloudbuild", "pulumi"}
+	isInternal := slices.Contains(internalServices, e.Service) || slices.Contains(internalHosts, e.Host)
+	onlyErrors := !options.Verbose && isInternal
+	if onlyErrors && !e.Stderr {
+		return nil
+	}
+
 	if options.Raw {
 		if e.Stderr {
 			term.Error(e.Message)
@@ -386,18 +436,24 @@ func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions) error {
 		return nil
 	}
 
+	printLogEntry(e, options, t)
+	return nil
+}
+
+func printLogEntry(e *defangv1.LogEntry, options *TailOptions, t *term.Term) {
 	ts := e.Timestamp.AsTime()
 	tsString := ts.Local().Format(RFC3339Milli)
 	tsColor := termenv.ANSIBrightBlack
-	if term.HasDarkBackground() {
+	if t.HasDarkBackground() {
 		tsColor = termenv.ANSIWhite
 	}
 	if e.Stderr {
 		tsColor = termenv.ANSIBrightRed
 	}
+
 	var prefixLen int
 	trimmed := strings.TrimRight(e.Message, "\t\r\n ")
-	buf := term.NewMessageBuilder(term.StdoutCanColor())
+	buf := term.NewMessageBuilder(t.StdoutCanColor())
 	for i, line := range strings.Split(trimmed, "\n") {
 		if i == 0 {
 			prefixLen, _ = buf.Printc(tsColor, tsString, " ")
@@ -416,7 +472,7 @@ func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions) error {
 		} else {
 			buf.WriteString(strings.Repeat(" ", prefixLen))
 		}
-		if term.StdoutCanColor() {
+		if t.StdoutCanColor() {
 			if !strings.Contains(line, "\033[") {
 				line = colorKeyRegex.ReplaceAllString(line, replaceString) // add some color
 			}
@@ -426,15 +482,8 @@ func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions) error {
 		buf.WriteString(line)
 		buf.WriteRune('\n')
 	}
-	term.Print(buf.String())
 
-	// Detect end logging event
-	if options.EndEventDetectFunc != nil {
-		if err := options.EndEventDetectFunc(e); err != nil {
-			return err
-		}
-	}
-	return nil
+	t.Print(buf.String())
 }
 
 func valueOrDefault(value, def string) string {

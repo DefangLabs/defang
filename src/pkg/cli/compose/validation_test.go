@@ -11,6 +11,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go/ptr"
@@ -25,40 +26,43 @@ func TestValidationAndConvert(t *testing.T) {
 
 	t.Setenv("NODE_ENV", "if-you-see-this-env-was-used") // for interpolate/compose.yaml; should be ignored
 
-	mockClient := client.MockProvider{}
+	mockClient := &client.MockProvider{}
 	listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
 		configs, err := mockClient.ListConfig(ctx, &defangv1.ListConfigsRequest{})
 		if err != nil {
 			return nil, err
 		}
-
 		return configs.Names, nil
 	}
 
-	testRunCompose(t, func(t *testing.T, path string) {
+	testAllComposeFiles(t, func(t *testing.T, path string) {
 		logs := new(bytes.Buffer)
 		term.DefaultTerm = term.NewTerm(os.Stdin, logs, logs)
 
 		options := LoaderOptions{ConfigPaths: []string{path}}
 		loader := Loader{options: options}
-		project, err := loader.LoadProject(context.Background())
+		project, err := loader.LoadProject(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if err := ValidateProjectConfig(context.Background(), project, listConfigNamesFunc); err != nil {
-			t.Logf("Project config validation failed: %v", err)
-			logs.WriteString(err.Error() + "\n")
-		}
-
-		if err := ValidateProject(project); err != nil {
-			t.Logf("Project validation failed: %v", err)
-			logs.WriteString(err.Error() + "\n")
-		}
-
-		if err := FixupServices(context.Background(), mockClient, project, UploadModeIgnore); err != nil {
+		if err := FixupServices(t.Context(), mockClient, project, UploadModeIgnore); err != nil {
 			t.Logf("Service conversion failed: %v", err)
-			logs.WriteString(err.Error() + "\n")
+			logs.WriteString("Error: " + err.Error() + "\n") // no coverage!
+		}
+
+		if err := ValidateProjectConfig(t.Context(), project, listConfigNamesFunc); err != nil {
+			t.Logf("Project config validation failed: %v", err)
+			logs.WriteString("Error: " + err.Error() + "\n")
+		}
+
+		mode := modes.ModeAffordable
+		if strings.Contains(path, "replicas") {
+			mode = modes.ModeHighAvailability
+		}
+		if err := ValidateProject(project, mode); err != nil {
+			t.Logf("Project validation failed: %v", err)
+			logs.WriteString("Error: " + err.Error() + "\n") // no coverage!
 		}
 
 		// The order of the services is not guaranteed, so we sort the logs before comparing
@@ -80,7 +84,7 @@ func makeListConfigNamesFunc(configs ...string) func(context.Context) ([]string,
 }
 
 func TestValidateConfig(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	testProject := composeTypes.Project{
 		Services: composeTypes.Services{},

@@ -21,54 +21,36 @@ import (
 type LoginFlow = auth.LoginFlow
 
 type AuthService interface {
-	login(ctx context.Context, client client.FabricClient, fabric string, flow LoginFlow) (string, error)
-	serveAuthServer(ctx context.Context, fabric string, authPort int) error
+	login(ctx context.Context, client client.FabricClient, fabric string, flow LoginFlow, mcpClient string) (string, error)
 }
 
 type OpenAuthService struct{}
 
-func (g OpenAuthService) login(ctx context.Context, client client.FabricClient, fabric string, flow LoginFlow) (string, error) {
+func (OpenAuthService) login(ctx context.Context, client client.FabricClient, fabric string, flow LoginFlow, mcpClient string) (string, error) {
 	term.Debug("Logging in to", fabric)
 
-	code, err := auth.StartAuthCodeFlow(ctx, flow)
+	code, err := auth.StartAuthCodeFlow(ctx, flow, func(token string) {
+		cluster.SaveAccessToken(fabric, token)
+	}, mcpClient)
 	if err != nil {
 		return "", err
 	}
 
-	tenant, _ := cluster.SplitTenantHost(fabric)
-	return auth.ExchangeCodeForToken(ctx, code, tenant, 0) // no scopes = unrestricted
-}
-
-func (g OpenAuthService) serveAuthServer(ctx context.Context, fabric string, authPort int) error {
-	term.Debug("Logging in to", fabric)
-
-	tenant, _ := cluster.SplitTenantHost(fabric)
-
-	err := auth.ServeAuthCodeFlowServer(ctx, authPort, tenant, func(token string) {
-		cluster.SaveAccessToken(fabric, token)
-	})
-	if err != nil {
-		term.Error("failed to start auth server", "error", err)
-	}
-	return nil
+	return auth.ExchangeCodeForToken(ctx, code) // no scopes = unrestricted
 }
 
 var authService AuthService = OpenAuthService{}
 
 func InteractiveLogin(ctx context.Context, client client.FabricClient, fabric string) error {
-	return interactiveLogin(ctx, client, fabric, auth.CliFlow)
+	return interactiveLogin(ctx, client, fabric, auth.CliFlow, "CLI-Flow")
 }
 
-func InteractiveLoginMCP(ctx context.Context, client client.FabricClient, fabric string) error {
-	return interactiveLogin(ctx, client, fabric, auth.McpFlow)
+func InteractiveLoginMCP(ctx context.Context, client client.FabricClient, fabric string, mcpClient string) error {
+	return interactiveLogin(ctx, client, fabric, auth.McpFlow, mcpClient)
 }
 
-func InteractiveLoginInsideDocker(ctx context.Context, fabric string, authPort int) error {
-	return authService.serveAuthServer(ctx, fabric, authPort)
-}
-
-func interactiveLogin(ctx context.Context, client client.FabricClient, fabric string, flow LoginFlow) error {
-	token, err := authService.login(ctx, client, fabric, flow)
+func interactiveLogin(ctx context.Context, client client.FabricClient, fabric string, flow LoginFlow, mcpClient string) error {
+	token, err := authService.login(ctx, client, fabric, flow, mcpClient)
 	if err != nil {
 		return err
 	}
@@ -96,7 +78,7 @@ func interactiveLogin(ctx context.Context, client client.FabricClient, fabric st
 
 func NonInteractiveGitHubLogin(ctx context.Context, client client.FabricClient, fabric string) error {
 	term.Debug("Non-interactive login using GitHub Actions id-token")
-	idToken, err := github.GetIdToken(ctx)
+	idToken, err := github.GetIdToken(ctx, "") // default audience (ie. https://github.com/ORG)
 	if err != nil {
 		return fmt.Errorf("non-interactive login failed: %w", err)
 	}
@@ -108,7 +90,27 @@ func NonInteractiveGitHubLogin(ctx context.Context, client client.FabricClient, 
 	if err != nil {
 		return err
 	}
-	return cluster.SaveAccessToken(fabric, resp.AccessToken)
+
+	err = cluster.SaveAccessToken(fabric, resp.AccessToken) // creates the state folder too
+
+	if roleArn := os.Getenv("AWS_ROLE_ARN"); roleArn != "" {
+		// If AWS_ROLE_ARN is set, we're doing "Assume Role with Web Identity"
+		if os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") == "" {
+			// AWS_ROLE_ARN is set, but AWS_WEB_IDENTITY_TOKEN_FILE is empty: write the token to a new file
+			jwtPath, _ := cluster.GetWebIdentityTokenFile(fabric)
+			term.Debugf("writing web identity token to %s for role %s", jwtPath, roleArn)
+			if err := os.WriteFile(jwtPath, []byte(idToken), 0600); err != nil {
+				return fmt.Errorf("failed to save web identity token: %w", err)
+			}
+			// Set AWS env vars for this CLI invocation
+			os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath)
+			os.Setenv("AWS_ROLE_SESSION_NAME", "testyml") // TODO: from WhoAmI
+		} else {
+			term.Debugf("AWS_WEB_IDENTITY_TOKEN_FILE is already set; not writing token to a new file")
+		}
+	}
+
+	return err
 }
 
 func InteractiveRequireLoginAndToS(ctx context.Context, fabric *client.GrpcClient, addr string) error {

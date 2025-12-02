@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
-	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -57,7 +56,7 @@ func TestUploadArchive(t *testing.T) {
 	defer server.Close()
 
 	t.Run("upload tar with digest", func(t *testing.T) {
-		url, err := uploadArchive(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeGzip, digest)
+		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeGzip, digest)
 		if err != nil {
 			t.Fatalf("uploadArchive() failed: %v", err)
 		}
@@ -68,7 +67,7 @@ func TestUploadArchive(t *testing.T) {
 	})
 
 	t.Run("upload zip with digest", func(t *testing.T) {
-		url, err := uploadArchive(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeZip, digest)
+		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeZip, digest)
 		if err != nil {
 			t.Fatalf("uploadArchive() failed: %v", err)
 		}
@@ -79,7 +78,7 @@ func TestUploadArchive(t *testing.T) {
 	})
 
 	t.Run("upload with zip", func(t *testing.T) {
-		url, err := uploadArchive(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeZip, "")
+		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeZip, "")
 		if err != nil {
 			t.Fatalf("uploadContent() failed: %v", err)
 		}
@@ -89,7 +88,7 @@ func TestUploadArchive(t *testing.T) {
 	})
 
 	t.Run("upload with tar", func(t *testing.T) {
-		url, err := uploadArchive(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeGzip, "")
+		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeGzip, "")
 		if err != nil {
 			t.Fatalf("uploadContent() failed: %v", err)
 		}
@@ -99,7 +98,7 @@ func TestUploadArchive(t *testing.T) {
 	})
 
 	t.Run("force upload tar without digest", func(t *testing.T) {
-		url, err := uploadArchive(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeGzip, "")
+		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeGzip, "")
 		if err != nil {
 			t.Fatalf("uploadArchive() failed: %v", err)
 		}
@@ -109,7 +108,7 @@ func TestUploadArchive(t *testing.T) {
 	})
 
 	t.Run("force upload zip without digest", func(t *testing.T) {
-		url, err := uploadArchive(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeZip, "")
+		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeZip, "")
 		if err != nil {
 			t.Fatalf("uploadArchive() failed: %v", err)
 		}
@@ -175,7 +174,7 @@ func TestWalkContextFolder(t *testing.T) {
 
 func TestCreateTarballReader(t *testing.T) {
 	t.Run("Default Dockerfile", func(t *testing.T) {
-		buffer, err := createArchive(context.Background(), "../../../testdata/testproj", "", ArchiveTypeGzip)
+		buffer, err := createArchive(t.Context(), "../../../testdata/testproj", "", ArchiveTypeGzip)
 		if err != nil {
 			t.Fatalf("createTarballReader() failed: %v", err)
 		}
@@ -212,14 +211,14 @@ func TestCreateTarballReader(t *testing.T) {
 	})
 
 	t.Run("Missing Dockerfile", func(t *testing.T) {
-		_, err := createArchive(context.Background(), "../../testdata", "Dockerfile.missing", ArchiveTypeGzip)
+		_, err := createArchive(t.Context(), "../../testdata", "Dockerfile.missing", ArchiveTypeGzip)
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}
 	})
 
 	t.Run("Missing Context", func(t *testing.T) {
-		_, err := createArchive(context.Background(), "asdfqwer", "", ArchiveTypeGzip)
+		_, err := createArchive(t.Context(), "asdfqwer", "", ArchiveTypeGzip)
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}

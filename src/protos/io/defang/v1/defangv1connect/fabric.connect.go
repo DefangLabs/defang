@@ -55,6 +55,9 @@ const (
 	FabricControllerDeployProcedure = "/io.defang.v1.FabricController/Deploy"
 	// FabricControllerGetProcedure is the fully-qualified name of the FabricController's Get RPC.
 	FabricControllerGetProcedure = "/io.defang.v1.FabricController/Get"
+	// FabricControllerGetPlaygroundProjectDomainProcedure is the fully-qualified name of the
+	// FabricController's GetPlaygroundProjectDomain RPC.
+	FabricControllerGetPlaygroundProjectDomainProcedure = "/io.defang.v1.FabricController/GetPlaygroundProjectDomain"
 	// FabricControllerDeleteProcedure is the fully-qualified name of the FabricController's Delete RPC.
 	FabricControllerDeleteProcedure = "/io.defang.v1.FabricController/Delete"
 	// FabricControllerDestroyProcedure is the fully-qualified name of the FabricController's Destroy
@@ -169,6 +172,7 @@ type FabricControllerClient interface {
 	Update(context.Context, *connect_go.Request[v1.Service]) (*connect_go.Response[v1.ServiceInfo], error)
 	Deploy(context.Context, *connect_go.Request[v1.DeployRequest]) (*connect_go.Response[v1.DeployResponse], error)
 	Get(context.Context, *connect_go.Request[v1.GetRequest]) (*connect_go.Response[v1.ServiceInfo], error)
+	GetPlaygroundProjectDomain(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.GetPlaygroundProjectDomainResponse], error)
 	// Deprecated: do not use.
 	Delete(context.Context, *connect_go.Request[v1.DeleteRequest]) (*connect_go.Response[v1.DeleteResponse], error)
 	Destroy(context.Context, *connect_go.Request[v1.DestroyRequest]) (*connect_go.Response[v1.DestroyResponse], error)
@@ -268,6 +272,12 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
+		getPlaygroundProjectDomain: connect_go.NewClient[emptypb.Empty, v1.GetPlaygroundProjectDomainResponse](
+			httpClient,
+			baseURL+FabricControllerGetPlaygroundProjectDomainProcedure,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
+		),
 		delete: connect_go.NewClient[v1.DeleteRequest, v1.DeleteResponse](
 			httpClient,
 			baseURL+FabricControllerDeleteProcedure,
@@ -314,7 +324,8 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		debug: connect_go.NewClient[v1.DebugRequest, v1.DebugResponse](
 			httpClient,
 			baseURL+FabricControllerDebugProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
 		),
 		signEULA: connect_go.NewClient[emptypb.Empty, emptypb.Empty](
 			httpClient,
@@ -330,12 +341,14 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		putSecret: connect_go.NewClient[v1.PutConfigRequest, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerPutSecretProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+			connect_go.WithClientOptions(opts...),
 		),
 		deleteSecrets: connect_go.NewClient[v1.Secrets, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerDeleteSecretsProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+			connect_go.WithClientOptions(opts...),
 		),
 		listSecrets: connect_go.NewClient[v1.ListConfigsRequest, v1.Secrets](
 			httpClient,
@@ -451,7 +464,8 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		estimate: connect_go.NewClient[v1.EstimateRequest, v1.EstimateResponse](
 			httpClient,
 			baseURL+FabricControllerEstimateProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
 		),
 		preview: connect_go.NewClient[v1.PreviewRequest, v1.PreviewResponse](
 			httpClient,
@@ -469,49 +483,50 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 
 // fabricControllerClient implements FabricControllerClient.
 type fabricControllerClient struct {
-	getStatus                *connect_go.Client[emptypb.Empty, v1.Status]
-	getVersion               *connect_go.Client[emptypb.Empty, v1.Version]
-	token                    *connect_go.Client[v1.TokenRequest, v1.TokenResponse]
-	revokeToken              *connect_go.Client[emptypb.Empty, emptypb.Empty]
-	tail                     *connect_go.Client[v1.TailRequest, v1.TailResponse]
-	update                   *connect_go.Client[v1.Service, v1.ServiceInfo]
-	deploy                   *connect_go.Client[v1.DeployRequest, v1.DeployResponse]
-	get                      *connect_go.Client[v1.GetRequest, v1.ServiceInfo]
-	delete                   *connect_go.Client[v1.DeleteRequest, v1.DeleteResponse]
-	destroy                  *connect_go.Client[v1.DestroyRequest, v1.DestroyResponse]
-	publish                  *connect_go.Client[v1.PublishRequest, emptypb.Empty]
-	subscribe                *connect_go.Client[v1.SubscribeRequest, v1.SubscribeResponse]
-	getServices              *connect_go.Client[v1.GetServicesRequest, v1.GetServicesResponse]
-	generateFiles            *connect_go.Client[v1.GenerateFilesRequest, v1.GenerateFilesResponse]
-	startGenerate            *connect_go.Client[v1.GenerateFilesRequest, v1.StartGenerateResponse]
-	generateStatus           *connect_go.Client[v1.GenerateStatusRequest, v1.GenerateFilesResponse]
-	debug                    *connect_go.Client[v1.DebugRequest, v1.DebugResponse]
-	signEULA                 *connect_go.Client[emptypb.Empty, emptypb.Empty]
-	checkToS                 *connect_go.Client[emptypb.Empty, emptypb.Empty]
-	putSecret                *connect_go.Client[v1.PutConfigRequest, emptypb.Empty]
-	deleteSecrets            *connect_go.Client[v1.Secrets, emptypb.Empty]
-	listSecrets              *connect_go.Client[v1.ListConfigsRequest, v1.Secrets]
-	getConfigs               *connect_go.Client[v1.GetConfigsRequest, v1.GetConfigsResponse]
-	putConfig                *connect_go.Client[v1.PutConfigRequest, emptypb.Empty]
-	deleteConfigs            *connect_go.Client[v1.DeleteConfigsRequest, emptypb.Empty]
-	listConfigs              *connect_go.Client[v1.ListConfigsRequest, v1.ListConfigsResponse]
-	putDeployment            *connect_go.Client[v1.PutDeploymentRequest, emptypb.Empty]
-	listDeployments          *connect_go.Client[v1.ListDeploymentsRequest, v1.ListDeploymentsResponse]
-	createUploadURL          *connect_go.Client[v1.UploadURLRequest, v1.UploadURLResponse]
-	delegateSubdomainZone    *connect_go.Client[v1.DelegateSubdomainZoneRequest, v1.DelegateSubdomainZoneResponse]
-	deleteSubdomainZone      *connect_go.Client[v1.DeleteSubdomainZoneRequest, emptypb.Empty]
-	getDelegateSubdomainZone *connect_go.Client[v1.GetDelegateSubdomainZoneRequest, v1.DelegateSubdomainZoneResponse]
-	setOptions               *connect_go.Client[v1.SetOptionsRequest, emptypb.Empty]
-	whoAmI                   *connect_go.Client[emptypb.Empty, v1.WhoAmIResponse]
-	track                    *connect_go.Client[v1.TrackRequest, emptypb.Empty]
-	deleteMe                 *connect_go.Client[emptypb.Empty, emptypb.Empty]
-	verifyDNSSetup           *connect_go.Client[v1.VerifyDNSSetupRequest, emptypb.Empty]
-	getSelectedProvider      *connect_go.Client[v1.GetSelectedProviderRequest, v1.GetSelectedProviderResponse]
-	setSelectedProvider      *connect_go.Client[v1.SetSelectedProviderRequest, emptypb.Empty]
-	canIUse                  *connect_go.Client[v1.CanIUseRequest, v1.CanIUseResponse]
-	estimate                 *connect_go.Client[v1.EstimateRequest, v1.EstimateResponse]
-	preview                  *connect_go.Client[v1.PreviewRequest, v1.PreviewResponse]
-	generateCompose          *connect_go.Client[v1.GenerateComposeRequest, v1.GenerateComposeResponse]
+	getStatus                  *connect_go.Client[emptypb.Empty, v1.Status]
+	getVersion                 *connect_go.Client[emptypb.Empty, v1.Version]
+	token                      *connect_go.Client[v1.TokenRequest, v1.TokenResponse]
+	revokeToken                *connect_go.Client[emptypb.Empty, emptypb.Empty]
+	tail                       *connect_go.Client[v1.TailRequest, v1.TailResponse]
+	update                     *connect_go.Client[v1.Service, v1.ServiceInfo]
+	deploy                     *connect_go.Client[v1.DeployRequest, v1.DeployResponse]
+	get                        *connect_go.Client[v1.GetRequest, v1.ServiceInfo]
+	getPlaygroundProjectDomain *connect_go.Client[emptypb.Empty, v1.GetPlaygroundProjectDomainResponse]
+	delete                     *connect_go.Client[v1.DeleteRequest, v1.DeleteResponse]
+	destroy                    *connect_go.Client[v1.DestroyRequest, v1.DestroyResponse]
+	publish                    *connect_go.Client[v1.PublishRequest, emptypb.Empty]
+	subscribe                  *connect_go.Client[v1.SubscribeRequest, v1.SubscribeResponse]
+	getServices                *connect_go.Client[v1.GetServicesRequest, v1.GetServicesResponse]
+	generateFiles              *connect_go.Client[v1.GenerateFilesRequest, v1.GenerateFilesResponse]
+	startGenerate              *connect_go.Client[v1.GenerateFilesRequest, v1.StartGenerateResponse]
+	generateStatus             *connect_go.Client[v1.GenerateStatusRequest, v1.GenerateFilesResponse]
+	debug                      *connect_go.Client[v1.DebugRequest, v1.DebugResponse]
+	signEULA                   *connect_go.Client[emptypb.Empty, emptypb.Empty]
+	checkToS                   *connect_go.Client[emptypb.Empty, emptypb.Empty]
+	putSecret                  *connect_go.Client[v1.PutConfigRequest, emptypb.Empty]
+	deleteSecrets              *connect_go.Client[v1.Secrets, emptypb.Empty]
+	listSecrets                *connect_go.Client[v1.ListConfigsRequest, v1.Secrets]
+	getConfigs                 *connect_go.Client[v1.GetConfigsRequest, v1.GetConfigsResponse]
+	putConfig                  *connect_go.Client[v1.PutConfigRequest, emptypb.Empty]
+	deleteConfigs              *connect_go.Client[v1.DeleteConfigsRequest, emptypb.Empty]
+	listConfigs                *connect_go.Client[v1.ListConfigsRequest, v1.ListConfigsResponse]
+	putDeployment              *connect_go.Client[v1.PutDeploymentRequest, emptypb.Empty]
+	listDeployments            *connect_go.Client[v1.ListDeploymentsRequest, v1.ListDeploymentsResponse]
+	createUploadURL            *connect_go.Client[v1.UploadURLRequest, v1.UploadURLResponse]
+	delegateSubdomainZone      *connect_go.Client[v1.DelegateSubdomainZoneRequest, v1.DelegateSubdomainZoneResponse]
+	deleteSubdomainZone        *connect_go.Client[v1.DeleteSubdomainZoneRequest, emptypb.Empty]
+	getDelegateSubdomainZone   *connect_go.Client[v1.GetDelegateSubdomainZoneRequest, v1.DelegateSubdomainZoneResponse]
+	setOptions                 *connect_go.Client[v1.SetOptionsRequest, emptypb.Empty]
+	whoAmI                     *connect_go.Client[emptypb.Empty, v1.WhoAmIResponse]
+	track                      *connect_go.Client[v1.TrackRequest, emptypb.Empty]
+	deleteMe                   *connect_go.Client[emptypb.Empty, emptypb.Empty]
+	verifyDNSSetup             *connect_go.Client[v1.VerifyDNSSetupRequest, emptypb.Empty]
+	getSelectedProvider        *connect_go.Client[v1.GetSelectedProviderRequest, v1.GetSelectedProviderResponse]
+	setSelectedProvider        *connect_go.Client[v1.SetSelectedProviderRequest, emptypb.Empty]
+	canIUse                    *connect_go.Client[v1.CanIUseRequest, v1.CanIUseResponse]
+	estimate                   *connect_go.Client[v1.EstimateRequest, v1.EstimateResponse]
+	preview                    *connect_go.Client[v1.PreviewRequest, v1.PreviewResponse]
+	generateCompose            *connect_go.Client[v1.GenerateComposeRequest, v1.GenerateComposeResponse]
 }
 
 // GetStatus calls io.defang.v1.FabricController.GetStatus.
@@ -554,6 +569,11 @@ func (c *fabricControllerClient) Deploy(ctx context.Context, req *connect_go.Req
 // Get calls io.defang.v1.FabricController.Get.
 func (c *fabricControllerClient) Get(ctx context.Context, req *connect_go.Request[v1.GetRequest]) (*connect_go.Response[v1.ServiceInfo], error) {
 	return c.get.CallUnary(ctx, req)
+}
+
+// GetPlaygroundProjectDomain calls io.defang.v1.FabricController.GetPlaygroundProjectDomain.
+func (c *fabricControllerClient) GetPlaygroundProjectDomain(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.GetPlaygroundProjectDomainResponse], error) {
+	return c.getPlaygroundProjectDomain.CallUnary(ctx, req)
 }
 
 // Delete calls io.defang.v1.FabricController.Delete.
@@ -752,6 +772,7 @@ type FabricControllerHandler interface {
 	Update(context.Context, *connect_go.Request[v1.Service]) (*connect_go.Response[v1.ServiceInfo], error)
 	Deploy(context.Context, *connect_go.Request[v1.DeployRequest]) (*connect_go.Response[v1.DeployResponse], error)
 	Get(context.Context, *connect_go.Request[v1.GetRequest]) (*connect_go.Response[v1.ServiceInfo], error)
+	GetPlaygroundProjectDomain(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.GetPlaygroundProjectDomainResponse], error)
 	// Deprecated: do not use.
 	Delete(context.Context, *connect_go.Request[v1.DeleteRequest]) (*connect_go.Response[v1.DeleteResponse], error)
 	Destroy(context.Context, *connect_go.Request[v1.DestroyRequest]) (*connect_go.Response[v1.DestroyResponse], error)
@@ -847,6 +868,12 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 		connect_go.WithHandlerOptions(opts...),
 	)
+	fabricControllerGetPlaygroundProjectDomainHandler := connect_go.NewUnaryHandler(
+		FabricControllerGetPlaygroundProjectDomainProcedure,
+		svc.GetPlaygroundProjectDomain,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
+	)
 	fabricControllerDeleteHandler := connect_go.NewUnaryHandler(
 		FabricControllerDeleteProcedure,
 		svc.Delete,
@@ -893,7 +920,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerDebugHandler := connect_go.NewUnaryHandler(
 		FabricControllerDebugProcedure,
 		svc.Debug,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerSignEULAHandler := connect_go.NewUnaryHandler(
 		FabricControllerSignEULAProcedure,
@@ -909,12 +937,14 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerPutSecretHandler := connect_go.NewUnaryHandler(
 		FabricControllerPutSecretProcedure,
 		svc.PutSecret,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerDeleteSecretsHandler := connect_go.NewUnaryHandler(
 		FabricControllerDeleteSecretsProcedure,
 		svc.DeleteSecrets,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerListSecretsHandler := connect_go.NewUnaryHandler(
 		FabricControllerListSecretsProcedure,
@@ -1030,7 +1060,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerEstimateHandler := connect_go.NewUnaryHandler(
 		FabricControllerEstimateProcedure,
 		svc.Estimate,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerPreviewHandler := connect_go.NewUnaryHandler(
 		FabricControllerPreviewProcedure,
@@ -1061,6 +1092,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerDeployHandler.ServeHTTP(w, r)
 		case FabricControllerGetProcedure:
 			fabricControllerGetHandler.ServeHTTP(w, r)
+		case FabricControllerGetPlaygroundProjectDomainProcedure:
+			fabricControllerGetPlaygroundProjectDomainHandler.ServeHTTP(w, r)
 		case FabricControllerDeleteProcedure:
 			fabricControllerDeleteHandler.ServeHTTP(w, r)
 		case FabricControllerDestroyProcedure:
@@ -1170,6 +1203,10 @@ func (UnimplementedFabricControllerHandler) Deploy(context.Context, *connect_go.
 
 func (UnimplementedFabricControllerHandler) Get(context.Context, *connect_go.Request[v1.GetRequest]) (*connect_go.Response[v1.ServiceInfo], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Get is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) GetPlaygroundProjectDomain(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.GetPlaygroundProjectDomainResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetPlaygroundProjectDomain is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) Delete(context.Context, *connect_go.Request[v1.DeleteRequest]) (*connect_go.Response[v1.DeleteResponse], error) {

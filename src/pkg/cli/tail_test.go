@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
@@ -41,34 +44,6 @@ func TestIsProgressDot(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isProgressDot(tt.line); got != tt.want {
 				t.Errorf("isProgressDot() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestParseTimeOrDuration(t *testing.T) {
-	now := time.Now()
-	tdt := []struct {
-		td   string
-		want time.Time
-	}{
-		{"", time.Time{}},
-		{"1s", now.Add(-time.Second)},
-		{"2m3s", now.Add(-2*time.Minute - 3*time.Second)},
-		{"2024-01-01T00:00:00Z", time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
-		{"2024-02-01T00:00:00.500Z", time.Date(2024, 2, 1, 0, 0, 0, 5e8, time.UTC)},
-		{"2024-03-01T00:00:00+07:00", time.Date(2024, 3, 1, 0, 0, 0, 0, time.FixedZone("", 7*60*60))},
-		{"00:01:02.040", time.Date(now.Year(), now.Month(), now.Day(), 0, 1, 2, 4e7, now.Location())}, // this test will fail if it's run at midnight UTC :(
-	}
-	for _, tt := range tdt {
-		t.Run(tt.td, func(t *testing.T) {
-			got, err := ParseTimeOrDuration(tt.td, now)
-			if err != nil {
-				t.Errorf("ParseTimeOrDuration() error = %v", err)
-				return
-			}
-			if !got.Equal(tt.want) {
-				t.Errorf("ParseTimeOrDuration() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -149,7 +124,7 @@ func TestTail(t *testing.T) {
 		},
 	}
 
-	err := Tail(context.Background(), p, projectName, TailOptions{Verbose: true}) // Output host
+	err := Tail(t.Context(), p, projectName, TailOptions{Verbose: true, PrintBookends: true}) // Output host
 	if err != io.EOF {
 		t.Errorf("Tail() error = %v, want io.EOF", err)
 	}
@@ -169,6 +144,14 @@ func TestTail(t *testing.T) {
 	}
 
 	got := strings.SplitAfter(stdout.String(), "\n")
+
+	// expect the first line to be a message about fetching older logs
+	if !strings.Contains(got[0], "To view older logs, run: `defang logs --until=") {
+		t.Errorf("Expected first line to contain 'To view older logs, run: `defang logs --until=', got %q", got[0])
+	}
+
+	// Remove the first line which is a hint
+	got = got[1:]
 
 	if len(got) != len(expectedLogs) {
 		t.Log(got)
@@ -190,8 +173,8 @@ func TestTail(t *testing.T) {
 	if p.Reqs[0].Project != projectName {
 		t.Errorf("Tail() sent request with project %v, want %v", p.Reqs[0].Project, projectName)
 	}
-	if p.Reqs[0].LogType != 2 {
-		t.Errorf("Tail() sent request with log type %v, want 2", p.Reqs[0].LogType)
+	if p.Reqs[0].LogType != uint32(logs.LogTypeAll) {
+		t.Errorf("Tail() sent request with log type %v, want %v", p.Reqs[0].LogType, logs.LogTypeAll)
 	}
 	if p.Reqs[0].Since != nil {
 		t.Errorf("Tail() sent request with since %v, want nil", p.Reqs[0].Since)
@@ -205,8 +188,8 @@ func TestTail(t *testing.T) {
 	if p.Reqs[1].Project != projectName {
 		t.Errorf("Tail() sent request with project %v, want %v", p.Reqs[0].Project, projectName)
 	}
-	if p.Reqs[1].LogType != 2 {
-		t.Errorf("Tail() sent request with log type %v, want 2", p.Reqs[0].LogType)
+	if p.Reqs[1].LogType != uint32(logs.LogTypeAll) {
+		t.Errorf("Tail() sent request with log type %v, want %v", p.Reqs[1].LogType, logs.LogTypeAll)
 	}
 	if p.Reqs[1].Since == nil {
 		t.Errorf("Tail() sent request with since nil, want not nil")
@@ -248,12 +231,14 @@ func TestUTC(t *testing.T) {
 	localMock = localMock.MockTimestamp(localTime)
 
 	// Start the terminal for local time test
-	err := Tail(context.Background(), localMock, projectName, TailOptions{Verbose: true}) // Output host
+	err := Tail(t.Context(), localMock, projectName, TailOptions{Verbose: true, PrintBookends: true}) // Output host
 	if err != nil {
 		t.Errorf("Tail() error = %v, want io.EOF", err)
 	}
 
-	localTimeparse := strings.TrimSpace(term.StripAnsi(stdout.String()))
+	output := stdout.String()
+	lines := strings.Split(output, "\n")
+	localTimeparse := strings.TrimSpace(term.StripAnsi(lines[1])) // skip first line which is a hint
 	convertedLocalTime, err := time.Parse(format, localTimeparse)
 	if err != nil {
 		t.Error("Error parsing time:", err)
@@ -280,13 +265,15 @@ func TestUTC(t *testing.T) {
 	utcMock := &mockTailProvider{}
 	utcMock = utcMock.MockTimestamp(utcTime)
 
-	err = Tail(context.Background(), utcMock, projectName, TailOptions{Verbose: true})
+	err = Tail(t.Context(), utcMock, projectName, TailOptions{PrintBookends: true, Verbose: true})
 	if err != nil {
 		t.Errorf("Tail() error = %v, want io.EOF", err)
 	}
 
+	output2 := stdout2.String()
+	lines2 := strings.Split(output2, "\n")
 	// Parse the time from the terminal for UTC time
-	utcTimeParse := strings.TrimSpace(term.StripAnsi(stdout2.String()))
+	utcTimeParse := strings.TrimSpace(term.StripAnsi(lines2[1])) // skip first line which is a hint
 	convertedUTCTime, err := time.Parse(format, utcTimeParse)
 	if err != nil {
 		t.Error("Error parsing time:", err)
@@ -307,7 +294,7 @@ func (m mockQueryErrorProvider) QueryLogs(ctx context.Context, req *defangv1.Tai
 }
 
 func TestTailError(t *testing.T) {
-	const cancelError = "tail --since=2024-01-02T03:04:05Z --verbose=0 --type=RUN --project-name=project"
+	const cancelError = "logs --since=2024-01-02T03:04:05Z --verbose=0 --project-name=project"
 	tailOptions := TailOptions{
 		Since: time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC),
 	}
@@ -329,7 +316,7 @@ func TestTailError(t *testing.T) {
 			mock := &mockQueryErrorProvider{
 				TailStreamError: tt.err,
 			}
-			err := Tail(context.Background(), mock, "project", tailOptions)
+			err := Tail(t.Context(), mock, "project", tailOptions)
 			if err != nil {
 				if err.Error() != tt.wantError {
 					t.Errorf("Tail() error = %q, want: %q", err.Error(), tt.wantError)
@@ -342,7 +329,7 @@ func TestTailError(t *testing.T) {
 }
 
 func TestTailContext(t *testing.T) {
-	const cancelError = "tail --since=2024-01-02T03:04:05Z --verbose=0 --type=RUN --project-name=project"
+	const cancelError = "logs --since=2024-01-02T03:04:05Z --verbose=0 --project-name=project"
 	tailOptions := TailOptions{
 		Since: time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC),
 	}
@@ -359,7 +346,7 @@ func TestTailContext(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			t.Cleanup(cancel)
 
 			time.AfterFunc(10*time.Millisecond, func() {
@@ -368,6 +355,201 @@ func TestTailContext(t *testing.T) {
 			err := Tail(ctx, mock, "project", tailOptions)
 			if err.Error() != tt.wantError {
 				t.Errorf("Tail() error = %q, want: %q", err.Error(), tt.wantError)
+			}
+		})
+	}
+}
+
+func TestPrintHandler(t *testing.T) {
+	var testdata = []struct {
+		inputfile  string
+		outputfile string
+	}{
+		{
+			inputfile:  "../../test-datasets/crew_input.jsonl",
+			outputfile: "../../test-datasets/crew_output.data",
+		},
+		{
+			inputfile:  "../../test-datasets/flask_railpack_input.jsonl",
+			outputfile: "../../test-datasets/flask_railpack_output.data",
+		},
+	}
+
+	loc, err := time.LoadLocation("America/Vancouver")
+	if err != nil {
+		t.Fatalf("Failed to load location: %v", err)
+	}
+	time.Local = loc
+	for _, tc := range testdata {
+		logEntries := jsonFileToLogEntry(t, tc.inputfile)
+
+		// Create buffers to capture output and set up terminal
+		var stdout, stderr bytes.Buffer
+		mockTerm := term.NewTerm(os.Stdin, &stdout, &stderr)
+
+		for _, entry := range logEntries {
+			logEntryPrintHandler(entry, &TailOptions{
+				Deployment: entry.Etag,
+				Services:   []string{},
+				Verbose:    false,
+			}, mockTerm)
+		}
+
+		// Convert output to string array
+		outputLines := strings.Split(strings.TrimSuffix(stdout.String(), "\n"), "\n")
+
+		// Read expected output from file as plain text
+		expectedLines := fileToStringArray(t, tc.outputfile)
+
+		// Compare line by line
+		t.Logf("Got %d output lines, expected %d lines for %s", len(outputLines), len(expectedLines), tc.outputfile)
+
+		maxLines := max(len(outputLines), len(expectedLines))
+		for i := range maxLines {
+			var actualLine, expectedLine string
+
+			if i < len(outputLines) {
+				actualLine = strings.TrimSpace(outputLines[i])
+			}
+			if i < len(expectedLines) {
+				expectedLine = strings.TrimSpace(expectedLines[i])
+			}
+
+			// Strip ANSI codes from actual output
+			actualLineClean := term.StripAnsi(actualLine)
+			expectedLineClean := term.StripAnsi(expectedLine)
+
+			// Normalize whitespace: convert tabs to spaces for consistent comparison
+			actualLineClean = strings.ReplaceAll(actualLineClean, "\t", "    ")
+			expectedLineClean = strings.ReplaceAll(expectedLineClean, "\t", "    ")
+
+			// Normalize \
+			// actualLineClean = strings.ReplaceAll(actualLineClean, "\", "    ")
+			expectedLineClean = strings.ReplaceAll(expectedLineClean, "\\\"", "\"")
+			expectedLineClean = strings.ReplaceAll(expectedLineClean, "\t", "    ")
+			if actualLineClean != expectedLineClean {
+				t.Errorf("File %s Line %d mismatch:\nActual:   %q\nExpected: %q", tc.outputfile, i, actualLineClean, expectedLineClean)
+			}
+		}
+	}
+}
+
+func fileToStringArray(t *testing.T, fileName string) []string {
+	expectedFile, err := os.Open(fileName)
+	if err != nil {
+		t.Fatalf("Failed to open expected output file: %v", err)
+	}
+	defer expectedFile.Close()
+
+	var expectedLines []string
+	scanner := bufio.NewScanner(expectedFile)
+	for scanner.Scan() {
+		expectedLines = append(expectedLines, scanner.Text())
+	}
+	return expectedLines
+}
+
+func jsonFileToLogEntry(t *testing.T, fileName string) []*defangv1.LogEntry {
+	file, err := os.Open(fileName)
+	if err != nil {
+		t.Fatalf("Failed to open test data file: %v", err)
+	}
+	defer file.Close()
+
+	var logEntries []*defangv1.LogEntry
+	scanner := bufio.NewScanner(file)
+	lineNum := 0
+
+	// Read each line and unmarshal it
+	for scanner.Scan() {
+		lineNum++
+		line := scanner.Text()
+
+		// Skip empty lines
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		var logEntry defangv1.LogEntry
+		if err := json.Unmarshal([]byte(line), &logEntry); err != nil {
+			t.Fatalf("Failed to unmarshal line %d: %v\nLine content: %s", lineNum, err, line)
+		}
+
+		logEntries = append(logEntries, &logEntry)
+	}
+
+	if err := scanner.Err(); err != nil {
+		t.Fatalf("Error while reading file: %v", err)
+	}
+
+	t.Logf("Successfully loaded %d log entries from %s", len(logEntries), fileName)
+	return logEntries
+}
+
+func TestTailOptions_String(t *testing.T) {
+	tests := []struct {
+		name string
+		to   TailOptions
+		want string
+	}{
+		{
+			name: "with deployment",
+			to: TailOptions{
+				Verbose:    true,
+				Deployment: "deploy123",
+			},
+			want: " --deployment=deploy123",
+		},
+		{
+			name: "with services",
+			to: TailOptions{
+				Verbose:  true,
+				Services: []string{"svc1", "svc2"},
+			},
+			want: " svc1 svc2",
+		},
+		{
+			name: "with services and follow",
+			to: TailOptions{
+				Verbose:  true,
+				Services: []string{"svc1", "svc2"},
+				Follow:   true,
+			},
+			want: " --follow svc1 svc2",
+		},
+		{
+			name: "with since and until",
+			to: TailOptions{
+				Verbose: true,
+				Since:   time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC),
+				Until:   time.Date(2024, 1, 2, 4, 4, 5, 0, time.UTC),
+			},
+			want: " --since=2024-01-02T03:04:05Z --until=2024-01-02T04:04:05Z",
+		},
+		{
+			name: "with since and follow",
+			to: TailOptions{
+				Verbose: true,
+				Since:   time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC),
+				Follow:  true,
+			},
+			want: " --since=2024-01-02T03:04:05Z --follow",
+		},
+		{
+			name: "with until and follow",
+			to: TailOptions{
+				Verbose: true,
+				Until:   time.Date(2024, 1, 2, 5, 4, 5, 0, time.UTC),
+				Follow:  true,
+			},
+			want: " --until=2024-01-02T05:04:05Z",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.to.String(); got != tt.want {
+				t.Errorf("TailOptions.String() = %v, want %v", got, tt.want)
 			}
 		})
 	}

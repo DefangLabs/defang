@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"io"
+	"iter"
 	"os"
 
+	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -15,6 +17,7 @@ import (
 type PlaygroundProvider struct {
 	FabricClient
 	RetryDelayer
+	shardDomain string
 }
 
 var _ Provider = (*PlaygroundProvider)(nil)
@@ -92,16 +95,33 @@ func (g *PlaygroundProvider) Destroy(ctx context.Context, req *defangv1.DestroyR
 	return resp.Etag, nil
 }
 
-func (g *PlaygroundProvider) TearDown(ctx context.Context) error {
+func (g *PlaygroundProvider) TearDownCD(ctx context.Context) error {
 	return errors.New("the teardown command is not valid for the Defang playground; did you forget --provider?")
 }
 
-func (g *PlaygroundProvider) BootstrapList(context.Context) ([]string, error) {
+func (g *PlaygroundProvider) SetUpCD(ctx context.Context) error {
+	return errors.New("this command is not valid for the Defang playground; did you forget --provider?")
+}
+
+func (g *PlaygroundProvider) BootstrapList(context.Context, bool) (iter.Seq[string], error) {
 	return nil, errors.New("this command is not valid for the Defang playground; did you forget --provider?")
 }
 
-func (g PlaygroundProvider) ServiceDNS(name string) string {
+func (g PlaygroundProvider) ServicePrivateDNS(name string) string {
 	return string(g.GetTenantName()) + "-" + name
+}
+
+func (g *PlaygroundProvider) UpdateShardDomain(ctx context.Context) error {
+	resp, err := g.GetPlaygroundProjectDomain(ctx)
+	if err != nil {
+		return err
+	}
+	g.shardDomain = resp.GetDomain()
+	return nil
+}
+
+func (g PlaygroundProvider) ServicePublicDNS(name string, projectName string) string {
+	return dns.SafeLabel(string(g.GetTenantName())) + "-" + dns.SafeLabel(name) + "." + g.shardDomain
 }
 
 func (g PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, error) {
@@ -132,4 +152,5 @@ func (g *PlaygroundProvider) QueryForDebug(ctx context.Context, req *defangv1.De
 func (g *PlaygroundProvider) PrepareDomainDelegation(ctx context.Context, req PrepareDomainDelegationRequest) (*PrepareDomainDelegationResponse, error) {
 	return nil, nil // Playground does not support delegate domains
 }
+
 func (g *PlaygroundProvider) SetCanIUseConfig(*defangv1.CanIUseResponse) {}

@@ -66,9 +66,9 @@ func (m mockGetServiceInfosProvider) GetProjectUpdate(context.Context, string) (
 	return nil, nil
 }
 
-func NewMockGetServiceInfosProvider() *mockGetServiceInfosProvider {
+func NewMockGetServiceInfosProvider(stack string) *mockGetServiceInfosProvider {
 	p := &mockGetServiceInfosProvider{}
-	p.ByocBaseClient = NewByocBaseClient(context.Background(), "test-tenant", p)
+	p.ByocBaseClient = NewByocBaseClient("test-tenant", p, stack)
 	return p
 }
 
@@ -82,7 +82,8 @@ var expectedServiceInfosJson = `[
     "etag": "test-etag",
     "status": "UPDATE_QUEUED",
     "zone_id": "test-zone-id",
-    "state": 7
+    "state": 7,
+    "healthcheck_path": "/"
   },
   {
     "service": {
@@ -92,7 +93,8 @@ var expectedServiceInfosJson = `[
     "etag": "test-etag",
     "status": "UPDATE_QUEUED",
     "zone_id": "test-zone-id",
-    "state": 7
+    "state": 7,
+    "healthcheck_path": "/"
   },
   {
     "service": {
@@ -102,14 +104,15 @@ var expectedServiceInfosJson = `[
     "etag": "test-etag",
     "status": "UPDATE_QUEUED",
     "zone_id": "test-zone-id",
-    "state": 7
+    "state": 7,
+    "healthcheck_path": "/"
   }
 ]`
 
 func TestGetServiceInfos(t *testing.T) {
-	testProvider := NewMockGetServiceInfosProvider()
+	testProvider := NewMockGetServiceInfosProvider("")
 
-	serviceInfos, err := testProvider.GetServiceInfos(context.Background(), "test-project", "test-delegate-domain", "test-etag",
+	serviceInfos, err := testProvider.GetServiceInfos(t.Context(), "test-project", "test-delegate-domain", "test-etag",
 		map[string]composeTypes.ServiceConfig{
 			"service1": {
 				Name:      "service1",
@@ -146,13 +149,13 @@ func TestGetServiceInfosWithTestData(t *testing.T) {
 	for name, path := range tests {
 		t.Run(name, func(t *testing.T) {
 			loader := compose.NewLoader(compose.WithPath(path))
-			proj, err := loader.LoadProject(context.Background())
+			proj, err := loader.LoadProject(t.Context())
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			testProvider := NewMockGetServiceInfosProvider()
-			serviceInfos, err := testProvider.GetServiceInfos(context.Background(), proj.Name, "test-delegate-domain", "test-etag", proj.Services)
+			testProvider := NewMockGetServiceInfosProvider("")
+			serviceInfos, err := testProvider.GetServiceInfos(t.Context(), proj.Name, "test-delegate-domain", "test-etag", proj.Services)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

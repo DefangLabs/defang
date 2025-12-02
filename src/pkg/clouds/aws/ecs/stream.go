@@ -11,7 +11,7 @@ import (
 // QueryAndTailLogGroup queries the log group from the give start time and initiates a Live Tail session.
 // This function also handles the case where the log group does not exist yet.
 // The caller should call `Close()` on the returned EventStream when done.
-func QueryAndTailLogGroup(ctx context.Context, lgi LogGroupInput, start, end time.Time) (LiveTailStream, error) {
+func QueryAndTailLogGroup(ctx context.Context, cw FiltererTailer, lgi LogGroupInput, start, end time.Time) (LiveTailStream, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	es := &eventStream{
@@ -19,45 +19,39 @@ func QueryAndTailLogGroup(ctx context.Context, lgi LogGroupInput, start, end tim
 		ch:     make(chan types.StartLiveTailResponseStream),
 	}
 
-	doTail := end.IsZero()
-
 	var tailStream LiveTailStream
-	if doTail {
-		// First call TailLogGroup once to check if the log group exists or we have another error
-		var err error
-		tailStream, err = TailLogGroup(ctx, lgi)
-		if err != nil {
-			var resourceNotFound *types.ResourceNotFoundException
-			if !errors.As(err, &resourceNotFound) {
-				return nil, err
-			}
-			// Doesn't exist yet, continue to poll for it
+	// First call TailLogGroup once to check if the log group exists or we have another error
+	var err error
+	tailStream, err = TailLogGroup(ctx, cw, lgi)
+	if err != nil {
+		var resourceNotFound *types.ResourceNotFoundException
+		if !errors.As(err, &resourceNotFound) {
+			return nil, err
 		}
+		// Doesn't exist yet, continue to poll for it
 	}
 
 	// Start goroutine to wait for the log group to be created and then tail it
 	go func() {
 		defer close(es.ch)
 
-		if doTail {
-			// If the log group does not exist yet, poll until it does
-			if tailStream == nil {
-				var err error
-				tailStream, err = pollTailLogGroup(ctx, lgi)
-				if err != nil {
-					es.err = err
-					return
-				}
+		// If the log group does not exist yet, poll until it does
+		if tailStream == nil {
+			var err error
+			tailStream, err = pollTailLogGroup(ctx, cw, lgi)
+			if err != nil {
+				es.err = err
+				return
 			}
-			defer tailStream.Close()
 		}
+		defer tailStream.Close()
 
 		if !start.IsZero() {
 			if end.IsZero() {
 				end = time.Now()
 			}
 			// Query the logs between the start time and now; TODO: could use a single CloudWatch client for all queries in same region
-			if err := QueryLogGroup(ctx, lgi, start, end, func(events []LogEvent) error {
+			if err := QueryLogGroup(ctx, cw, lgi, start, end, 0, func(events []LogEvent) error {
 				es.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
 					Value: types.LiveTailSessionUpdate{SessionResults: events},
 				}
@@ -68,17 +62,15 @@ func QueryAndTailLogGroup(ctx context.Context, lgi LogGroupInput, start, end tim
 			}
 		}
 
-		if doTail {
-			// Pipe the events from the tail stream to the internal channel
-			es.err = es.pipeEvents(ctx, tailStream)
-		}
+		// Pipe the events from the tail stream to the internal channel
+		es.err = es.pipeEvents(ctx, tailStream)
 	}()
 
 	return es, nil
 }
 
 // pollTailLogGroup polls the log group and starts the Live Tail session once it's available
-func pollTailLogGroup(ctx context.Context, lgi LogGroupInput) (LiveTailStream, error) {
+func pollTailLogGroup(ctx context.Context, cw LogTailer, lgi LogGroupInput) (LiveTailStream, error) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
@@ -88,7 +80,7 @@ func pollTailLogGroup(ctx context.Context, lgi LogGroupInput) (LiveTailStream, e
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		case <-ticker.C:
-			eventStream, err := TailLogGroup(ctx, lgi)
+			eventStream, err := TailLogGroup(ctx, cw, lgi)
 			if errors.As(err, &resourceNotFound) {
 				continue // keep trying
 			}

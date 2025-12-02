@@ -10,7 +10,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
@@ -46,7 +46,7 @@ func TestPreviewStops(t *testing.T) {
 				deploymentStatus: tt.err,
 			}
 
-			err := Preview(context.Background(), project, fabric, provider, defangv1.DeploymentMode_MODE_UNSPECIFIED)
+			err := Preview(t.Context(), project, fabric, provider, modes.ModeUnspecified)
 			if err != nil {
 				if err.Error() != tt.wantError {
 					t.Errorf("got error: %v, want: %v", err, tt.wantError)
@@ -58,7 +58,7 @@ func TestPreviewStops(t *testing.T) {
 	}
 
 	t.Run("Context cancellation", func(t *testing.T) {
-		ctx, cancel := context.WithCancelCause(context.Background())
+		ctx, cancel := context.WithCancelCause(t.Context())
 		defer cancel(nil) // to cancel tail and clean-up context
 
 		cancelErr := errors.New("custom error")
@@ -68,7 +68,7 @@ func TestPreviewStops(t *testing.T) {
 
 		provider := &mockDeployProvider{}
 
-		err := Preview(ctx, project, fabric, provider, defangv1.DeploymentMode_MODE_UNSPECIFIED)
+		err := Preview(ctx, project, fabric, provider, modes.ModeUnspecified)
 		if err != nil {
 			t.Errorf("got error: %v, want nil", err)
 		}

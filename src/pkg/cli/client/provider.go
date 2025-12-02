@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"iter"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -9,6 +10,12 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
+
+type DNSResolver interface {
+	ServicePrivateDNS(name string) string
+	ServicePublicDNS(name string, projectName string) string
+	UpdateShardDomain(ctx context.Context) error
+}
 
 type BootstrapCommandRequest struct {
 	Command string
@@ -34,9 +41,10 @@ type ServerStream[Res any] interface {
 }
 
 type Provider interface {
+	DNSResolver
 	AccountInfo(context.Context) (*AccountInfo, error)
 	BootstrapCommand(context.Context, BootstrapCommandRequest) (types.ETag, error)
-	BootstrapList(context.Context) ([]string, error)
+	BootstrapList(context.Context, bool) (iter.Seq[string], error)
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
 	DelayBeforeRetry(context.Context) error
 	Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error)
@@ -54,10 +62,10 @@ type Provider interface {
 	QueryForDebug(context.Context, *defangv1.DebugRequest) error
 	QueryLogs(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	RemoteProjectName(context.Context) (string, error)
-	ServiceDNS(string) string
 	SetCanIUseConfig(*defangv1.CanIUseResponse)
+	SetUpCD(context.Context) error
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)
-	TearDown(context.Context) error
+	TearDownCD(context.Context) error
 }
 
 type Loader interface {

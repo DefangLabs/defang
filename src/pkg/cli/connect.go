@@ -32,19 +32,18 @@ func Connect(ctx context.Context, addr string) (*client.GrpcClient, error) {
 	return grpcClient, err
 }
 
-func NewProvider(ctx context.Context, providerID client.ProviderID, fabricClient client.FabricClient) (client.Provider, error) {
+func NewProvider(ctx context.Context, providerID client.ProviderID, fabricClient client.FabricClient, stack string) client.Provider {
 	var provider client.Provider
 	term.Debugf("Creating %s provider", providerID)
 	switch providerID {
 	case client.ProviderAWS:
-		provider = aws.NewByocProvider(ctx, fabricClient.GetTenantName())
+		provider = aws.NewByocProvider(ctx, fabricClient.GetTenantName(), stack)
 	case client.ProviderDO:
-		provider = do.NewByocProvider(ctx, fabricClient.GetTenantName())
+		provider = do.NewByocProvider(ctx, fabricClient.GetTenantName(), stack)
 	case client.ProviderGCP:
-		provider = gcp.NewByocProvider(ctx, fabricClient.GetTenantName())
+		provider = gcp.NewByocProvider(ctx, fabricClient.GetTenantName(), stack)
 	default:
 		provider = &client.PlaygroundProvider{FabricClient: fabricClient}
 	}
-	_, err := provider.AccountInfo(ctx)
-	return provider, err
+	return provider
 }

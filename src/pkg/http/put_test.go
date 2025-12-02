@@ -1,7 +1,6 @@
 package http
 
 import (
-	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -26,7 +25,7 @@ func TestPutRetries(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	resp, err := Put(context.Background(), server.URL, "text/plain", strings.NewReader(body))
+	resp, err := Put(t.Context(), server.URL, "text/plain", strings.NewReader(body))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

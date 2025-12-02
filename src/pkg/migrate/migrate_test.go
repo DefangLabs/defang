@@ -12,6 +12,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // MockSurveyor implements the Surveyor interface for testing
@@ -350,14 +351,14 @@ func TestInteractiveSetup(t *testing.T) {
 			mockHerokuClient.On("GetReleaseTasks", mock.Anything, mock.Anything).Return(tt.herokuReleaseTasks, nil)
 
 			// Execute the function under test
-			ctx := context.Background()
+			ctx := t.Context()
 			composeFileContents, err := InteractiveSetup(ctx, mockFabricClient, mockSurveyor, mockHerokuClient, tt.sourcePlatform)
 
 			// Assertions
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			// Verify mock expectations
@@ -376,7 +377,7 @@ func TestInteractiveSetup(t *testing.T) {
 				// Verify the data payload contains expected Heroku application info
 				var appInfo HerokuApplicationInfo
 				err := json.Unmarshal(req.Data, &appInfo)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.herokuDynos, appInfo.Dynos)
 				assert.Equal(t, tt.herokuAddons, appInfo.Addons)
 				assert.Equal(t, tt.herokuConfigVars, appInfo.ConfigVars)
@@ -480,7 +481,7 @@ services:
 			if tt.expectingError {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expected, result)
 			}
 		})
@@ -549,7 +550,7 @@ func TestExtractFirstCodeBlock(t *testing.T) {
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 			assert.Equal(t, tt.expected, result)
 		})
