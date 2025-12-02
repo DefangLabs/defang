@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"net"
 	"slices"
 	"strings"
 	"testing"
@@ -216,12 +217,38 @@ func (r *r53Mock) CreateHostedZone(ctx context.Context, params *route53.CreateHo
 	}, nil
 }
 
+type CallbackMockResolver struct {
+	MockResolver dns.MockResolver
+	Callback     (func(string))
+}
+
+func (r *CallbackMockResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS, error) {
+	if r.Callback != nil {
+		r.Callback(domain)
+	}
+	return r.MockResolver.LookupNS(ctx, domain)
+}
+
+func (r *CallbackMockResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
+	if r.Callback != nil {
+		r.Callback(domain)
+	}
+	return r.MockResolver.LookupIPAddr(ctx, domain)
+}
+func (r *CallbackMockResolver) LookupCNAME(ctx context.Context, domain string) (string, error) {
+	if r.Callback != nil {
+		r.Callback(domain)
+	}
+	return r.MockResolver.LookupCNAME(ctx, domain)
+}
+
 func TestPrepareDomainDelegation(t *testing.T) {
 	ctx := t.Context()
 	noResultResolver := func(domain string) func(nsServer string) dns.Resolver {
 		return func(nsServer string) dns.Resolver {
 			return dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
-				{Type: "NS", Domain: domain}: {Records: []string{}, Error: nil},
+				{Type: "NS", Domain: domain}:       {Records: []string{}, Error: nil},
+				{Type: "NS", Domain: "defang.app"}: {Records: []string{}, Error: nil},
 			}}
 		}
 	}
@@ -236,10 +263,12 @@ func TestPrepareDomainDelegation(t *testing.T) {
 			case 1: // 2nd server in first delegation set contains conflicting NS records
 				return dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
 					{Type: "NS", Domain: projectDomain}: {Records: []string{"ns1.t.net", "ns2.t.net", "ns3.t.net", "ns4.t.net"}, Error: nil},
+					{Type: "NS", Domain: "defang.app"}:  {Records: []string{}, Error: nil},
 				}}
 			default:
 				return dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
 					{Type: "NS", Domain: projectDomain}: {Records: []string{}, Error: nil},
+					{Type: "NS", Domain: "defang.app"}:  {Records: []string{}, Error: nil},
 				}}
 			}
 		}
@@ -358,6 +387,49 @@ func TestPrepareDomainDelegation(t *testing.T) {
 		}
 		if delegationSetId == delegationSetId2 {
 			t.Fatalf("expected different delegation set id, got the same: %v", delegationSetId)
+		}
+	})
+
+	t.Run("do not use delegation set with NS server conflicting defang.app", func(t *testing.T) {
+		r53Client := &r53Mock{}
+		const projectDomain = "byoc.example.internal"
+		lookUpCount := 0
+		var rejectedNSServers []string
+		resolverAt := func(nsServer string) dns.Resolver {
+			defer func() { lookUpCount++ }()
+			switch {
+			case lookUpCount < 4: // First few servers in first delegation set contains conflicting NS records with defang.app
+				return &CallbackMockResolver{MockResolver: dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+					{Type: "NS", Domain: projectDomain}: {Records: []string{}, Error: nil},            // No conflicts when looking up project domain
+					{Type: "NS", Domain: "defang.app"}:  {Records: []string{"ns1.t.net"}, Error: nil}, // Conflict when looking up defang.app
+				}},
+					Callback: func(domain string) {
+						if domain == "defang.app" {
+							rejectedNSServers = append(rejectedNSServers, nsServer)
+						}
+					},
+				}
+			default:
+				return &CallbackMockResolver{MockResolver: dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+					{Type: "NS", Domain: projectDomain}: {Records: []string{}, Error: nil},
+					{Type: "NS", Domain: "defang.app"}:  {Records: []string{}, Error: nil},
+				}}}
+			}
+		}
+		nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, "projectname", "stack", r53Client, resolverAt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(nsServers) == 0 {
+			t.Error("expected name servers")
+		}
+		if delegationSetId == "" {
+			t.Fatal("expected delegation set id")
+		}
+		for _, ns := range nsServers {
+			if slices.Contains(rejectedNSServers, ns) {
+				t.Errorf("expected no rejected name servers in final delegation set, but found %q", ns)
+			}
 		}
 	})
 }

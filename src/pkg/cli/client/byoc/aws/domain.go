@@ -75,13 +75,23 @@ func createUsableDelegationSet(ctx context.Context, domain string, r53Client aws
 		conflictFound := false
 		for _, nsServer := range delegationSet.NameServers {
 			resolver := resolverAt(nsServer)
-			records, err := resolver.LookupNS(ctx, domain)
-			if err != nil {
+
+			if records, err := resolver.LookupNS(ctx, domain); err != nil {
 				return nil, err
-			}
-			if len(records) > 0 {
+			} else if len(records) > 0 {
 				// Records found, meaning the NS server is conflicting
 				term.Debugf("Delegation set NS server %q has conflicting records: %v", nsServer, records)
+				conflictFound = true
+				break
+			}
+
+			// Also check for conflicts with defang.app domain as it is considered a conflict
+			// for NS server to share parent domains
+			if records, err := resolver.LookupNS(ctx, "defang.app"); err != nil {
+				return nil, err
+			} else if len(records) > 0 {
+				// Records found, meaning the NS server is conflicting
+				term.Debugf("Delegation set NS server %q has conflicting records with defang.app: %v", nsServer, records)
 				conflictFound = true
 				break
 			}
