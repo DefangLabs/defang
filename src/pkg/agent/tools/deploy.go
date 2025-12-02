@@ -62,50 +62,7 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, provi
 		return "", errors.New("no services deployed")
 	}
 
-	// Success case
-	term.Debugf("Successfully started deployed services with etag: %s", deployResp.Etag)
-
-	// Log deployment success
-	term.Debug("Deployment Started!")
 	term.Debugf("Deployment ID: %s", deployResp.Etag)
 
-	var portal string
-	if *providerId == cliClient.ProviderDefang {
-		// Get the portal URL for browser preview
-		portalURL := "https://portal.defang.io/"
-
-		// Open the portal URL in the browser
-		term.Debugf("Opening portal URL in browser: %s", portalURL)
-		go func() {
-			err := cli.OpenBrowser(portalURL)
-			if err != nil {
-				term.Error("Failed to open URL in browser", "error", err, "url", portalURL)
-			}
-		}()
-
-		// Log browser preview information
-		term.Debugf("🌐 %s available", portalURL)
-		portal = "Please use the web portal url: %s" + portalURL
-	} else {
-		// portalURL := fmt.Sprintf("https://%s.signin.aws.amazon.com/console")
-		portal = fmt.Sprintf("Please use the %s console", providerId)
-	}
-
-	// Log service details
-	term.Debug("Services:")
-	for _, serviceInfo := range deployResp.Services {
-		term.Debugf("- %s", serviceInfo.Service.Name)
-		term.Debugf("  Public URL: %s", serviceInfo.PublicFqdn)
-		term.Debugf("  Status: %s", serviceInfo.Status)
-	}
-
-	urls := strings.Builder{}
-	for _, serviceInfo := range deployResp.Services {
-		if serviceInfo.PublicFqdn != "" {
-			urls.WriteString(fmt.Sprintf("- %s: %s %s\n", serviceInfo.Service.Name, serviceInfo.PublicFqdn, serviceInfo.Domainname))
-		}
-	}
-
-	// Return the etag data as text
-	return fmt.Sprintf("%s to follow the deployment of %s, with the deployment ID of %s:\n%s", portal, project.Name, deployResp.Etag, urls.String()), nil
+	return "Deployment completed successfully", nil
 }

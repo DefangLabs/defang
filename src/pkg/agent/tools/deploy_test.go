@@ -73,11 +73,6 @@ func (m *MockDeployCLI) LoadProject(ctx context.Context, loader client.Loader) (
 	return m.Project, nil
 }
 
-func (m *MockDeployCLI) OpenBrowser(url string) error {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("OpenBrowser(%s)", url))
-	return m.OpenBrowserError
-}
-
 func TestHandleDeployTool(t *testing.T) {
 	tests := []struct {
 		name                 string
@@ -145,7 +140,7 @@ func TestHandleDeployTool(t *testing.T) {
 					},
 				}
 			},
-			expectedTextContains: "Please use the web portal url:",
+			expectedTextContains: "Deployment completed successfully",
 		},
 		{
 			name:       "successful_deploy_aws_provider",
@@ -159,7 +154,7 @@ func TestHandleDeployTool(t *testing.T) {
 					},
 				}
 			},
-			expectedTextContains: "Please use the aws console",
+			expectedTextContains: "Deployment completed successfully",
 		},
 		{
 			name:          "provider_auto_not_configured",
@@ -198,7 +193,6 @@ func TestHandleDeployTool(t *testing.T) {
 					"Connect(test-cluster)",
 					"CheckProviderConfigured(defang, test-project, 0)",
 					"ComposeUp",
-					// Note: OpenBrowser is called in a goroutine, so it may not be tracked in time
 				}
 				assert.Equal(t, expectedCalls, mockCLI.CallLog)
 			}

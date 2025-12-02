@@ -280,19 +280,10 @@ func startMockFabricServer(mockService *mockFabricService) *httptest.Server {
 	return httptest.NewServer(handler)
 }
 
-type cliWithoutBrowser struct {
-	tools.DefaultToolCLI
-}
-
-func (cliWithoutBrowser) OpenBrowser(url string) error {
-	// no-op to avoid opening a browser during tests
-	return nil
-}
-
 // startInProcessMCPServer sets up an in-process MCP server and returns a connected client and a cleanup function.
 func startInProcessMCPServer(ctx context.Context, fabric *httptest.Server) (*testClient, error) {
 	providerId := cliClient.ProviderDefang
-	srv, err := mcp.NewDefangMCPServer("0.0.1-test", "", cliWithoutBrowser{}, mcp.StackConfig{
+	srv, err := mcp.NewDefangMCPServer("0.0.1-test", "", tools.DefaultToolCLI{}, mcp.StackConfig{
 		Cluster:    strings.TrimPrefix(fabric.URL, "http://"),
 		ProviderID: &providerId,
 		Stack:      "default",

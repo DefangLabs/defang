@@ -15,7 +15,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/pkg/browser"
 )
 
 type StackConfig struct {
@@ -102,10 +101,6 @@ func (DefaultToolCLI) CreatePlaygroundProvider(client *cliClient.GrpcClient) cli
 
 func (DefaultToolCLI) NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient, stack string) cliClient.Provider {
 	return cli.NewProvider(ctx, providerId, client, stack)
-}
-
-func (DefaultToolCLI) OpenBrowser(url string) error {
-	return browser.OpenURL(url)
 }
 
 func (DefaultToolCLI) GenerateAuthURL(authPort int) string {
