@@ -1,9 +1,11 @@
 package tools
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -174,13 +176,20 @@ func (pp *providerPreparer) setupProviderAuthentication(ctx context.Context, pro
 func (pp *providerPreparer) SetupAWSAuthentication(ctx context.Context) error {
 	// TODO: check the fs for AWS credentials file or config for profile names
 	// TODO: add support for aws sso strategy
-	strategy, err := pp.ec.RequestEnum(ctx, "How do you authenticate to AWS?", "strategy", []string{"access_key", "profile"})
+	strategy, err := pp.ec.RequestEnum(ctx, "How do you authenticate to AWS?", "strategy", []string{
+		"profile",
+		"access_key",
+	})
 	if err != nil {
 		return fmt.Errorf("failed to elicit AWS Access Key ID: %w", err)
 	}
 	if strategy == "profile" {
 		if os.Getenv("AWS_PROFILE") == "" {
-			profile, err := pp.ec.RequestString(ctx, "Enter your AWS Profile Name:", "profile_name")
+			knownProfiles, err := listAWSProfiles()
+			if err != nil {
+				return fmt.Errorf("failed to list AWS profiles: %w", err)
+			}
+			profile, err := pp.ec.RequestEnum(ctx, "Select your profile", "profile_name", knownProfiles)
 			if err != nil {
 				return fmt.Errorf("failed to elicit AWS Profile Name: %w", err)
 			}
@@ -255,4 +264,46 @@ func (pp *providerPreparer) SetupDOAuthentication(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func listAWSProfiles() ([]string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	files := []string{
+		homeDir + "/.aws/credentials",
+		homeDir + "/.aws/config",
+	}
+
+	profiles := make(map[string]struct{})
+
+	for _, file := range files {
+		f, err := os.Open(file)
+		if err != nil {
+			continue // skip missing files
+		}
+		defer f.Close()
+
+		var section string
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			line := scanner.Text()
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+				section = strings.Trim(line, "[]")
+				// In config, profiles are named "profile NAME"
+				section = strings.TrimPrefix(section, "profile ")
+				profiles[section] = struct{}{}
+			}
+		}
+	}
+
+	result := make([]string, 0, len(profiles))
+	for p := range profiles {
+		result = append(result, p)
+	}
+	sort.Strings(result)
+	return result, nil
 }
