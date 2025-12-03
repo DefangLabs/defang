@@ -132,10 +132,12 @@ func TestHandleListConfigTool(t *testing.T) {
 					"profile_name": "default",
 				},
 			})
+
+			stackName := "test-stack"
 			result, err := HandleListConfigTool(t.Context(), loader, mockCLI, ec, StackConfig{
 				Cluster:    "test-cluster",
 				ProviderID: &tt.providerID,
-				Stack:      "test-stack",
+				Stack:      &stackName,
 			})
 
 			// Verify error expectations

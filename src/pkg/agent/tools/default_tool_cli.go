@@ -20,7 +20,7 @@ import (
 type StackConfig struct {
 	Cluster    string
 	ProviderID *cliClient.ProviderID
-	Stack      string
+	Stack      *string
 }
 
 // DefaultToolCLI implements all tool interfaces as passthroughs to the real CLI logic

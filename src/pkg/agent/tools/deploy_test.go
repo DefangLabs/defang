@@ -178,10 +178,11 @@ func TestHandleDeployTool(t *testing.T) {
 					"profile_name": "default",
 				},
 			})
+			stackName := "test-stack"
 			result, err := HandleDeployTool(t.Context(), loader, mockCLI, ec, StackConfig{
 				Cluster:    "test-cluster",
 				ProviderID: &providerID,
-				Stack:      "test-stack",
+				Stack:      &stackName,
 			})
 
 			// Verify error expectations

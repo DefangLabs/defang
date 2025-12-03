@@ -246,10 +246,11 @@ func TestHandleSetConfig(t *testing.T) {
 					"profile_name": "default",
 				},
 			})
+			stackName := "test-stack"
 			result, err := HandleSetConfig(t.Context(), loader, params, tt.mockCLI, ec, StackConfig{
 				Cluster:    tt.cluster,
 				ProviderID: &tt.providerId,
-				Stack:      "test-stack",
+				Stack:      &stackName,
 			})
 
 			if tt.expectedError {

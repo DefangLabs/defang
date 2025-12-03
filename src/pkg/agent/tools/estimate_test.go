@@ -215,7 +215,6 @@ func TestHandleEstimateTool(t *testing.T) {
 			result, err := HandleEstimateTool(t.Context(), loader, params, mockCLI, StackConfig{
 				Cluster:    "test-cluster",
 				ProviderID: &providerID,
-				Stack:      "test-stack",
 			})
 
 			// Verify error expectations

@@ -35,16 +35,16 @@ func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc cliC
 }
 
 // TODO: call this in each tool which requires a provider
-func (pp *providerPreparer) SetupProvider(ctx context.Context, stackName string) (*cliClient.ProviderID, cliClient.Provider, error) {
+func (pp *providerPreparer) SetupProvider(ctx context.Context, stackName *string) (*cliClient.ProviderID, cliClient.Provider, error) {
 	var providerID cliClient.ProviderID
 	var err error
 	var stack *stacks.StackParameters
-	if stackName != "" {
-		stack, err = stacks.Read(stackName)
+	if *stackName != "" {
+		stack, err = stacks.Read(*stackName)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to read stack: %w", err)
 		}
-		err = stacks.Load(stackName)
+		err = stacks.Load(*stackName)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to load stack: %w", err)
 		}
@@ -66,7 +66,7 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, stackName string)
 	}
 
 	term.Debug("Function invoked: cli.NewProvider")
-	provider := pp.pc.NewProvider(ctx, providerID, pp.fc, stackName)
+	provider := pp.pc.NewProvider(ctx, providerID, pp.fc, *stackName)
 	return &providerID, provider, nil
 }
 

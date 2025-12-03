@@ -150,10 +150,11 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				},
 			})
 			provider := client.ProviderAWS
+			stackName := "test-stack"
 			result, err := HandleRemoveConfigTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
 				Cluster:    "test-cluster",
 				ProviderID: &provider,
-				Stack:      "test-stack",
+				Stack:      &stackName,
 			})
 
 			// Verify error expectations

@@ -419,7 +419,7 @@ var RootCmd = &cobra.Command{
 		}
 
 		prompt := "Welcome to Defang. I can help you deploy your project to the cloud"
-		ag, err := agent.New(ctx, getCluster(), &global.ProviderID, global.Stack)
+		ag, err := agent.New(ctx, getCluster(), &global.ProviderID, &global.Stack)
 		if err != nil {
 			return err
 		}

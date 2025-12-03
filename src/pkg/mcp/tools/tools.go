@@ -14,7 +14,7 @@ import (
 type StackConfig struct {
 	Cluster    string
 	ProviderID *client.ProviderID
-	Stack      string
+	Stack      *string
 }
 
 func translateSchema(schema map[string]any) mcp.ToolInputSchema {
