@@ -44,6 +44,7 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_PREFIX` - The prefix to use for all BYOC resources; defaults to `Defang`
 - `DEFANG_PROVIDER` - The name of the cloud provider to use, `auto` (default), `aws`, `digitalocean`, `gcp`, or `defang`
 - `DEFANG_PULUMI_BACKEND` - The Pulumi backend URL or `"pulumi-cloud"`; defaults to a self-hosted backend
+- `DEFANG_PULUMI_DIFF` - If set to `true`, shows the Pulumi diff during deployments; defaults to `false`
 - `DEFANG_PULUMI_DIR` - Run Pulumi from this folder, instead of spawning a cloud task; requires `--debug` (BYOC only)
 - `DEFANG_PULUMI_VERSION` - Override the version of the Pulumi image to use (`aws` provider only)
 - `DEFANG_SUFFIX` - The suffix to use for all BYOC resources; defaults to the stack name, or `beta` if unset.

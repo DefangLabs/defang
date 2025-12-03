@@ -698,6 +698,10 @@ func (b *ByocDo) environment(projectName, delegateDomain string, mode defangv1.D
 			Type:  godo.AppVariableType_Secret,
 		},
 		{
+			Key:   "DEFANG_PULUMI_DIFF",
+			Value: os.Getenv("DEFANG_PULUMI_DIFF"),
+		},
+		{
 			Key:   "STACK",
 			Value: b.PulumiStack,
 		},

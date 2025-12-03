@@ -361,6 +361,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"DEFANG_MODE":              strings.ToLower(cmd.mode.String()),
 		"DEFANG_ORG":               "defang",
 		"DEFANG_PREFIX":            b.Prefix,
+		"DEFANG_PULUMI_DIFF":       os.Getenv("DEFANG_PULUMI_DIFF"),
 		"DEFANG_STATE_URL":         defangStateUrl,
 		"GCP_PROJECT":              b.driver.ProjectId,
 		"PROJECT":                  cmd.project,

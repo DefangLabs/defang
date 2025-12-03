@@ -375,6 +375,7 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 		"DEFANG_JSON":                os.Getenv("DEFANG_JSON"),
 		"DEFANG_ORG":                 b.TenantName,
 		"DEFANG_PREFIX":              b.Prefix,
+		"DEFANG_PULUMI_DIFF":         os.Getenv("DEFANG_PULUMI_DIFF"),
 		"DEFANG_STATE_URL":           defangStateUrl,
 		"NODE_NO_WARNINGS":           "1",
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
