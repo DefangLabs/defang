@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -39,8 +38,8 @@ func ValidateProject(project *composeTypes.Project, mode modes.Mode) error {
 	for _, svccfg := range project.Services {
 		services = append(services, svccfg)
 	}
-	sort.Slice(services, func(i, j int) bool {
-		return services[i].Name < services[j].Name
+	slices.SortFunc(services, func(a, b composeTypes.ServiceConfig) int {
+		return strings.Compare(a.Name, b.Name)
 	})
 
 	var errs []error
