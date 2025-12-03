@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"regexp"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/agent/plugins/fabric"
 	"github.com/DefangLabs/defang/src/pkg/agent/tools"
@@ -112,31 +112,32 @@ func (a *Agent) StartWithMessage(ctx context.Context, msg string) error {
 }
 
 func (a *Agent) startSession(ctx context.Context) error {
-	reader := NewInputReader()
-	defer reader.Close()
-
 	for {
-		a.printer.Printf("> ")
-
-		input, err := reader.ReadLine()
+		var input string
+		err := survey.AskOne(
+			&survey.Input{
+				Message: "",
+			},
+			&input,
+			survey.WithStdio(term.DefaultTerm.Stdio()),
+			survey.WithIcons(func(icons *survey.IconSet) {
+				icons.Question.Text = ">"
+			}),
+		)
 		if err != nil {
-			if errors.Is(err, ErrInterrupted) {
-				a.printer.Printf("\nReceived termination signal, shutting down...\n")
-				return nil
-			}
-			if errors.Is(err, io.EOF) {
+			if errors.Is(err, terminal.InterruptErr) {
 				return nil
 			}
 			return fmt.Errorf("error reading input: %w", err)
 		}
 
-		if input == "/exit" {
-			return nil
-		}
-
 		// if input is empty or all whitespace, continue
 		if whitespacePattern.MatchString(input) {
 			continue
+		}
+
+		if input == "/exit" {
+			return nil
 		}
 
 		if err := a.handleUserMessage(ctx, input); err != nil {
