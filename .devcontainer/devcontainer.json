@@ -1,6 +1,6 @@
 {
     "name": "Defang CLI Dev Container",
-    "image": "ubuntu:latest",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
     "features": {
         "ghcr.io/devcontainers/features/nix:1": {
             "extraNixConfig": "experimental-features = nix-command flakes"
@@ -14,8 +14,23 @@
             "extensions": [
                 "golang.go",
                 "ms-vscode.makefile-tools"
-            ]
+            ],
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "nix develop",
+                "terminal.integrated.profiles.linux": {
+                    "nix develop": {
+                        "path": "nix",
+                        "args": [
+                            "develop",
+                            "--command",
+                            "bash"
+                        ],
+                        "icon": "terminal-bash"
+                    }
+                }
+            }
         }
     },
-    "postAttachCommand": "nix develop --command bash && make setup"
+    "remoteUser": "vscode",
+    "postCreateCommand": "nix develop --command make setup"
 }
