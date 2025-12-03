@@ -17,6 +17,7 @@
           with pkgs;
           mkShell {
             buildInputs = [
+              bashInteractive # full bash with readline/completion so prompts render correctly
               buf
               crane
               git
@@ -34,6 +35,13 @@
               google-cloud-sdk
               vim
             ];
+            shellHook = ''
+              export SHELL=${bashInteractive}/bin/bash
+              export PATH="${bashInteractive}/bin:$PATH"
+              if [ -t 1 ]; then
+                export PS1="[defang:nix] \w$ "
+              fi
+            '';
           };
         packages.defang-cli = pkgs.callPackage ./pkgs/defang/cli.nix { };
         packages.defang-bin = pkgs.callPackage ./pkgs/defang { };
