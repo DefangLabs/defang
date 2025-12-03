@@ -139,7 +139,7 @@ func TestHandleDeployTool(t *testing.T) {
 					},
 				}
 			},
-			expectedTextContains: "Deployment completed successfully",
+			expectedTextContains: "Deployment \"test-etag\" completed successfully",
 		},
 		{
 			name: "successful_deploy_aws_provider",
@@ -152,7 +152,7 @@ func TestHandleDeployTool(t *testing.T) {
 					},
 				}
 			},
-			expectedTextContains: "Deployment completed successfully",
+			expectedTextContains: "Deployment \"test-etag\" completed successfully",
 		},
 	}
 

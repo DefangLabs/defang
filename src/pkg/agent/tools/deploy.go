@@ -84,8 +84,8 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, cli C
 		Raw:        true,
 	})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error during deployment %q: %w", deployResp.Etag, err)
 	}
 
-	return "Deployment completed successfully", nil
+	return fmt.Sprintf("Deployment %q completed successfully", deployResp.Etag), nil
 }
