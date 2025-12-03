@@ -53,6 +53,7 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, stackName *string
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to setup stack: %w", err)
 		}
+		*stackName = stack.Name
 	}
 
 	err = providerID.Set(stack.Provider.Name())
@@ -174,6 +175,10 @@ func (pp *providerPreparer) setupProviderAuthentication(ctx context.Context, pro
 }
 
 func (pp *providerPreparer) SetupAWSAuthentication(ctx context.Context) error {
+	if os.Getenv("AWS_PROFILE") != "" || (os.Getenv("AWS_ACCESS_KEY_ID") != "" && os.Getenv("AWS_SECRET_ACCESS_KEY") != "") {
+		return nil
+	}
+
 	// TODO: check the fs for AWS credentials file or config for profile names
 	// TODO: add support for aws sso strategy
 	strategy, err := pp.ec.RequestEnum(ctx, "How do you authenticate to AWS?", "strategy", []string{
