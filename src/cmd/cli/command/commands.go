@@ -22,6 +22,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -871,6 +872,7 @@ var debugCmd = &cobra.Command{
 	Hidden:      true,
 	Short:       "Debug a build, deployment, or service failure",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
 		etag, _ := cmd.Flags().GetString("etag")
 		deployment, _ := cmd.Flags().GetString("deployment")
 		since, _ := cmd.Flags().GetString("since")
@@ -881,12 +883,17 @@ var debugCmd = &cobra.Command{
 		}
 
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		_, err := newProviderChecked(ctx, loader)
 		if err != nil {
 			return err
 		}
 
-		project, err := loader.LoadProject(cmd.Context())
+		project, err := loader.LoadProject(ctx)
+		if err != nil {
+			return err
+		}
+
+		debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
 		if err != nil {
 			return err
 		}
@@ -901,16 +908,15 @@ var debugCmd = &cobra.Command{
 			return fmt.Errorf("invalid 'until' time: %w", err)
 		}
 
-		debugConfig := cli.DebugConfig{
+		debugConfig := debug.DebugConfig{
 			Deployment:     deployment,
 			FailedServices: args,
-			ModelId:        global.ModelID,
 			Project:        project,
-			Provider:       provider,
+			ProviderID:     &global.ProviderID,
 			Since:          sinceTs.UTC(),
 			Until:          untilTs.UTC(),
 		}
-		return cli.DebugDeployment(cmd.Context(), global.Client, debugConfig)
+		return debugger.DebugDeployment(ctx, debugConfig)
 	},
 }
 
