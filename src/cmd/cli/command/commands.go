@@ -10,17 +10,20 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	pcluster "github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -206,6 +209,9 @@ func SetupCommands(ctx context.Context, version string) {
 	// loginCmd.Flags().Bool("skip-prompt", false, "skip the login prompt if already logged in"); TODO: Implement this
 	RootCmd.AddCommand(loginCmd)
 
+	// Tenants Command
+	RootCmd.AddCommand(tenantsCmd)
+
 	// Whoami Command
 	whoamiCmd.PersistentFlags().Bool("json", pkg.GetenvBool("DEFANG_JSON"), "print output in JSON format")
 	RootCmd.AddCommand(whoamiCmd)
@@ -341,12 +347,10 @@ var RootCmd = &cobra.Command{
 		ctx := cmd.Context()
 		term.SetDebug(global.Debug)
 
-		// Don't track/connect the completion commands
 		if IsCompletionCommand(cmd) {
 			return nil
 		}
 
-		// Use "defer" to track any errors that occur during the command
 		defer func() {
 			var errString = ""
 			if err != nil {
@@ -356,7 +360,6 @@ var RootCmd = &cobra.Command{
 			track.Cmd(cmd, "Invoked", P("args", args), P("err", errString), P("non-interactive", global.NonInteractive), P("provider", global.ProviderID))
 		}()
 
-		// Do this first, since any errors will be printed to the console
 		switch global.ColorMode {
 		case ColorNever:
 			term.ForceColor(false)
@@ -365,13 +368,11 @@ var RootCmd = &cobra.Command{
 		}
 
 		if cwd, _ := cmd.Flags().GetString("cwd"); cwd != "" {
-			// Change directory before running the command
 			if err = os.Chdir(cwd); err != nil {
 				return err
 			}
 		}
 
-		// Read the global flags again from any .defang files in the cwd
 		err = global.loadDotDefang(global.getStackName(cmd.Flags()))
 		if err != nil {
 			return err
@@ -382,18 +383,22 @@ var RootCmd = &cobra.Command{
 			return err
 		}
 
+		auth.SetSelectedTenantName(global.Org)
+
 		global.Client, err = cli.Connect(ctx, getCluster())
+		if err != nil {
+			return err
+		}
 
 		if v, err := global.Client.GetVersions(ctx); err == nil {
-			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
+			version := cmd.Root().Version
 			term.Debug("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
 			if global.HasTty && isNewer(version, v.CliMin) && !isUpgradeCommand(cmd) {
 				term.Warn("Your CLI version is outdated. Please upgrade to the latest version by running:\n\n  defang upgrade\n")
-				global.HideUpdate = true // hide the upgrade hint at the end
+				global.HideUpdate = true
 			}
 		}
 
-		// Check if we are correctly logged in, but only if the command needs authorization
 		if _, ok := cmd.Annotations[authNeeded]; !ok {
 			return nil
 		}
@@ -404,7 +409,65 @@ var RootCmd = &cobra.Command{
 			err = login.InteractiveRequireLoginAndToS(ctx, global.Client, getCluster())
 		}
 
-		return err
+		if err != nil {
+			return err
+		}
+
+		if tok := pcluster.GetExistingToken(getCluster()); tok != "" {
+			if err2 := auth.ResolveAndSetTenantFromToken(ctx, tok); err2 != nil {
+				return err2
+			}
+			term.Debugf("Selected tenant: %q (%s)", auth.GetSelectedTenantName(), auth.GetSelectedTenantID())
+		}
+
+		return nil
+	},
+}
+
+var tenantsCmd = &cobra.Command{
+	Use:         "tenants",
+	Aliases:     []string{"tenant", "orgs", "org"},
+	Args:        cobra.NoArgs,
+	Annotations: authNeededAnnotation,
+	Short:       "List tenants available to the logged-in user",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
+
+		tok := pcluster.GetExistingToken(getCluster())
+		tenants, err := auth.ListTenantsFromToken(ctx, tok)
+		if err != nil {
+			return err
+		}
+
+		if len(tenants) == 0 {
+			term.Warn("No tenants found")
+			return nil
+		}
+
+		slices.SortStableFunc(tenants, func(a, b auth.Tenant) int {
+			return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+		})
+
+		printTenants := make([]struct {
+			Active string
+			auth.Tenant
+		}, len(tenants))
+
+		currentID := auth.GetSelectedTenantID()
+		currentName := auth.GetSelectedTenantName()
+		for i, t := range tenants {
+			printTenants[i].Tenant = t
+			selected := t.ID == currentID || (currentID == "" && t.Name == currentName && strings.TrimSpace(currentName) != "")
+			if selected {
+				printTenants[i].Active = "*" // highlight selected
+			}
+		}
+
+		attrs := []string{"Active", "Name"}
+		if global.Verbose {
+			attrs = append(attrs, "ID")
+		}
+		return term.Table(printTenants, attrs)
 	},
 }
 
