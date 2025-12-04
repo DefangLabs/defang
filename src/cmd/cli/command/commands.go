@@ -373,6 +373,19 @@ func SetupCommands(ctx context.Context, version string) {
 	})
 }
 
+func getCwd(args []string) string {
+	for i, arg := range args {
+		if i > 0 && (args[i-1] == "--cwd" || args[i-1] == "-C") {
+			return arg
+		} else if dir, ok := strings.CutPrefix(arg, "-C="); ok {
+			return dir
+		} else if dir, ok := strings.CutPrefix(arg, "--cwd="); ok {
+			return dir
+		}
+	}
+	return ""
+}
+
 var RootCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -380,13 +393,18 @@ var RootCmd = &cobra.Command{
 	Args:          cobra.NoArgs,
 	Short:         "Defang CLI is used to take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
-		ctx := cmd.Context()
-		term.SetDebug(global.Debug)
-
-		// Don't track/connect the completion commands
+		// Don't track/connect the shell completion commands
 		if IsCompletionCommand(cmd) {
+			// but do change the directory for file completions to work correctly.
+			// Unfortunately, Cobra will not have parsed the "cwd" flag.
+			if cwd := getCwd(os.Args); cwd != "" {
+				return os.Chdir(cwd)
+			}
 			return nil
 		}
+
+		ctx := cmd.Context()
+		term.SetDebug(global.Debug)
 
 		// Use "defer" to track any errors that occur during the command
 		defer func() {
