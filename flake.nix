@@ -25,6 +25,7 @@
               less
               gnused # force Linux `sed` everywhere
               go_1_24 # must match GO_VERSION in Dockerfile
+              gopls
               golangci-lint
               goreleaser
               nixfmt-rfc-style
