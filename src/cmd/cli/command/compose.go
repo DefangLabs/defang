@@ -141,6 +141,7 @@ func makeComposeUpCmd() *cobra.Command {
 				Project:    project,
 				UploadMode: upload,
 				Mode:       global.Mode,
+				Stack:      global.Stack,
 			})
 			if err != nil {
 				composeErr := err
@@ -489,6 +490,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				Project:    project,
 				UploadMode: compose.UploadModeIgnore,
 				Mode:       modes.ModeUnspecified,
+				Stack:      global.Stack,
 			})
 			if !errors.Is(err, dryrun.ErrDryRun) {
 				return err
