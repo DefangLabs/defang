@@ -676,14 +676,28 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	//  * Etag, no service: 	tail all tasks/services with that Etag
 	//  * No Etag, service:		tail all tasks/services with that service name
 	//  * Etag, service:		tail that task/service
+	var etag types.ETag
 	var tailStream ecs.LiveTailStream
-	etag := req.Etag
-	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is the task ID of the CD task
+	if req.Etag == "" {
+		tailStream, err = b.queryLogs(ctx, cw, req)
+		if err != nil {
+			return nil, AnnotateAwsError(err)
+		}
+		return newByocServerStream(tailStream, etag, req.Services, b), nil
+	}
+
+	etag, err = types.ParseEtag(req.Etag)
+	if err != nil {
+		// Assume invalid "etag" is the task ID of the CD task
 		tailStream, err = b.queryCdLogs(ctx, cw, req)
 		etag = "" // no need to filter events by etag because we only show logs from the specified task ID
-	} else {
-		tailStream, err = b.queryLogs(ctx, cw, req)
+		if err != nil {
+			return nil, AnnotateAwsError(err)
+		}
+		return newByocServerStream(tailStream, etag, req.Services, b), nil
 	}
+
+	tailStream, err = b.queryLogs(ctx, cw, req)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
