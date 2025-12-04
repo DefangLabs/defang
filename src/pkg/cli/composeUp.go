@@ -159,6 +159,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 			ProviderString:    string(accountInfo.Provider),
 			Region:            accountInfo.Region,
 			ServiceCount:      int32(len(fixedProject.Services)), // #nosec G115 - service count will not overflow int32
+			Stack:             params.Stack,
 			Timestamp:         timestamppb.Now(),
 		},
 	})
