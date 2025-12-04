@@ -2,6 +2,7 @@ package stacks
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -46,21 +47,16 @@ func Create(params StackParameters) (string, error) {
 		return "", err
 	}
 	filename := filename(params.Name)
-	file, err := os.CreateTemp(dotDefang, params.Name+".tmp.")
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return "", fmt.Errorf("stack file already exists for %q", params.Name)
+		}
 		return "", err
 	}
-	defer file.Close()
+	defer f.Close()
 
-	_, err = file.WriteString(content)
-	if err != nil {
-		return "", err
-	}
-
-	term.Debugf("Created tmp stack configuration file: %s\n", file.Name())
-
-	// move to final name
-	err = os.Rename(file.Name(), filename)
+	_, err = f.WriteString(content)
 	if err != nil {
 		return "", err
 	}
