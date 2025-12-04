@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
@@ -66,7 +68,17 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, cli C
 	if err != nil {
 		err = fmt.Errorf("failed to compose up services: %w", err)
 
-		err = common.FixupConfigError(err)
+		var missing compose.ErrMissingConfig
+		if errors.As(err, &missing) {
+			err := requestMissingConfig(ctx, ec, cli, provider, project.Name, missing)
+			if err != nil {
+				return "", fmt.Errorf("failed to request missing config: %w", err)
+			}
+
+			// try again
+			return HandleDeployTool(ctx, loader, cli, ec, config)
+		}
+
 		return "", err
 	}
 
@@ -87,5 +99,28 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, cli C
 		return "", fmt.Errorf("error during deployment %q: %w", deployResp.Etag, err)
 	}
 
-	return fmt.Sprintf("Deployment %q completed successfully", deployResp.Etag), nil
+	urls := strings.Builder{}
+	for _, serviceInfo := range deployResp.Services {
+		if serviceInfo.PublicFqdn != "" {
+			urls.WriteString(fmt.Sprintf("- %s: %s %s\n", serviceInfo.Service.Name, serviceInfo.PublicFqdn, serviceInfo.Domainname))
+		}
+	}
+
+	return fmt.Sprintf("Deployment %q completed successfully\n%s", deployResp.Etag, urls.String()), nil
+}
+
+func requestMissingConfig(ctx context.Context, ec elicitations.Controller, cli CLIInterface, provider client.Provider, projectName string, names []string) error {
+	for _, name := range names {
+		value, err := ec.RequestString(ctx, "This config value needs to be set", name)
+		if err != nil {
+			return fmt.Errorf("failed to request config %q: %w", name, err)
+		}
+
+		err = cli.ConfigSet(ctx, projectName, provider, name, value)
+		if err != nil {
+			return fmt.Errorf("failed to set config %q: %w", name, err)
+		}
+	}
+
+	return nil
 }

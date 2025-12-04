@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -62,11 +61,4 @@ func ConfigureAgentLoader(params LoaderParams) (*compose.Loader, error) {
 
 	term.Debug("Function invoked: compose.NewLoader")
 	return compose.NewLoader(), nil
-}
-
-func FixupConfigError(err error) error {
-	if strings.Contains(err.Error(), "missing configs") {
-		return fmt.Errorf("The operation failed due to missing configs not being set, use the Defang tool called set_config to set the variable: %w", err)
-	}
-	return err
 }
