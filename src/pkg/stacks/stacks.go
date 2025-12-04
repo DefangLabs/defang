@@ -50,7 +50,17 @@ func Create(params StackParameters) (string, error) {
 	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		if errors.Is(err, os.ErrExist) {
-			return "", fmt.Errorf("stack file already exists for %q", params.Name)
+			instructions := fmt.Sprintf(
+				"If you want to overwrite it, please spin down the stack and remove stackfile first.\n"+
+					"    defang down --stack %s && rm .defang/%s",
+				params.Name,
+				params.Name,
+			)
+			return "", fmt.Errorf(
+				"stack file already exists for %q.\n%s",
+				params.Name,
+				instructions,
+			)
 		}
 		return "", err
 	}
