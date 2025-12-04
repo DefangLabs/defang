@@ -19,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -96,16 +97,15 @@ func makeComposeUpCmd() *cobra.Command {
 				term.Debugf("ListDeployments failed: %v", err)
 			} else if accountInfo, err := provider.AccountInfo(ctx); err != nil {
 				term.Debugf("AccountInfo failed: %v", err)
-			} else {
-				samePlace := slices.ContainsFunc(resp.Deployments, func(dep *defangv1.Deployment) bool {
-					// Old deployments may not have a region or account ID, so we check for empty values too
-					return dep.Provider == global.ProviderID.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
+			} else if len(resp.Deployments) > 0 {
+				handleExistingDeployments(resp.Deployments, accountInfo, project.Name)
+			} else if global.Stack == "" {
+				promptToCreateStack(stacks.StackParameters{
+					Name:     "production",
+					Provider: accountInfo.Provider,
+					Region:   accountInfo.Region,
+					Mode:     global.Mode,
 				})
-				if !samePlace && len(resp.Deployments) > 0 {
-					if err := confirmDeploymentToNewLocation(project.Name, resp.Deployments); err != nil {
-						return err
-					}
-				}
 			}
 
 			// Show a warning for any (managed) services that we cannot monitor
@@ -202,6 +202,28 @@ func makeComposeUpCmd() *cobra.Command {
 	return composeUpCmd
 }
 
+func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accountInfo *cliClient.AccountInfo, projectName string) error {
+	samePlace := slices.ContainsFunc(existingDeployments, func(dep *defangv1.Deployment) bool {
+		// Old deployments may not have a region or account ID, so we check for empty values too
+		return dep.Provider == global.ProviderID.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
+	})
+	if samePlace {
+		return nil
+	}
+	if err := confirmDeploymentToNewLocation(projectName, existingDeployments); err != nil {
+		return err
+	}
+	if global.Stack == "" {
+		promptToCreateStack(stacks.StackParameters{
+			Name:     "production",
+			Provider: accountInfo.Provider,
+			Region:   accountInfo.Region,
+			Mode:     global.Mode,
+		})
+	}
+	return nil
+}
+
 func confirmDeploymentToNewLocation(projectName string, existingDeployments []*defangv1.Deployment) error {
 	if global.NonInteractive {
 		term.Warnf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", projectName)
@@ -225,6 +247,17 @@ func confirmDeploymentToNewLocation(projectName string, existingDeployments []*d
 		return fmt.Errorf("deployment of project %q was canceled", projectName)
 	}
 	return nil
+}
+
+func promptToCreateStack(params stacks.StackParameters) error {
+	if global.NonInteractive {
+		// print a message suggesting stack creation
+		return nil
+	}
+	// TODO: use survey to prompt user to confirm stack properties
+	// create a new stack
+	_, err := stacks.Create(params)
+	return err
 }
 
 func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *compose.Project, provider cliClient.Provider, err error) error {
