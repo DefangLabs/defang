@@ -68,6 +68,7 @@ func Create(params StackParameters) (string, error) {
 
 	_, err = f.WriteString(content)
 	if err != nil {
+		os.Remove(filename)
 		return "", err
 	}
 
