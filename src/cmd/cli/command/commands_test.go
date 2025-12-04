@@ -252,7 +252,7 @@ func TestGetProvider(t *testing.T) {
 	})
 	FakeRootWithProviderParam := func(provider string) *cobra.Command {
 		cmd := &cobra.Command{}
-		cmd.PersistentFlags().VarP(&global.ProviderID, "provider", "P", "fake provider flag")
+		cmd.PersistentFlags().VarP(&global.Stack.Provider, "provider", "P", "fake provider flag")
 		if provider != "" {
 			cmd.ParseFlags([]string{"--provider", provider})
 		}
@@ -262,7 +262,7 @@ func TestGetProvider(t *testing.T) {
 	ctx := t.Context()
 
 	t.Run("Nil loader auto provider non-interactive should load playground provider", func(t *testing.T) {
-		global.ProviderID = "auto"
+		global.Stack.Provider = "auto"
 		os.Unsetenv("DEFANG_PROVIDER")
 		RootCmd = FakeRootWithProviderParam("")
 
@@ -276,7 +276,7 @@ func TestGetProvider(t *testing.T) {
 	})
 
 	t.Run("Auto provider should get provider from client", func(t *testing.T) {
-		global.ProviderID = "auto"
+		global.Stack.Provider = "auto"
 		os.Unsetenv("DEFANG_PROVIDER")
 		t.Setenv("AWS_REGION", "us-west-2")
 		RootCmd = FakeRootWithProviderParam("")
@@ -303,7 +303,7 @@ func TestGetProvider(t *testing.T) {
 	})
 
 	t.Run("Auto provider from param with saved provider should go interactive and save", func(t *testing.T) {
-		global.ProviderID = "auto"
+		global.Stack.Provider = "auto"
 		os.Unsetenv("DEFANG_PROVIDER")
 		t.Setenv("AWS_REGION", "us-west-2")
 		mockCtrl.savedProvider = map[string]defangv1.Provider{"someotherproj": defangv1.Provider_AWS}
@@ -342,7 +342,7 @@ func TestGetProvider(t *testing.T) {
 		if testing.Short() {
 			t.Skip("Skip digitalocean test")
 		}
-		global.ProviderID = "auto"
+		global.Stack.Provider = "auto"
 		os.Unsetenv("DEFANG_PROVIDER")
 		os.Unsetenv("AWS_PROFILE")
 		t.Setenv("AWS_REGION", "us-west-2")
@@ -379,7 +379,7 @@ func TestGetProvider(t *testing.T) {
 	t.Run("Auto provider from param with saved provider should go interactive and save", func(t *testing.T) {
 		os.Unsetenv("GCP_PROJECT_ID") // To trigger error
 		os.Unsetenv("DEFANG_PROVIDER")
-		global.ProviderID = "auto"
+		global.Stack.Provider = "auto"
 		mockCtrl.savedProvider = map[string]defangv1.Provider{"empty": defangv1.Provider_AWS}
 		RootCmd = FakeRootWithProviderParam("auto")
 
