@@ -751,7 +751,10 @@ message DelegateSubdomainZoneRequest {
 
 message DelegateSubdomainZoneResponse { string zone = 1; }
 
-message DeleteSubdomainZoneRequest { string project = 1; }
+message DeleteSubdomainZoneRequest {
+  string project = 1;
+  string stack = 2;
+}
 
 message GetDelegateSubdomainZoneRequest {
   string project = 1;
