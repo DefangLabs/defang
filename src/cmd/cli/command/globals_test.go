@@ -44,7 +44,6 @@ func Test_readGlobals(t *testing.T) {
 	})
 
 	t.Run("no stackname provided", func(t *testing.T) {
-		t.Chdir("testdata/no-stack")
 
 		prevTerm := term.DefaultTerm
 		var stdout, stderr bytes.Buffer
