@@ -102,25 +102,8 @@ func makeComposeUpCmd() *cobra.Command {
 					return dep.Provider == global.ProviderID.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
 				})
 				if !samePlace && len(resp.Deployments) > 0 {
-					if global.NonInteractive {
-						term.Warnf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", project.Name)
-					} else {
-						help := "Active deployments of this project:"
-						for _, dep := range resp.Deployments {
-							var providerId cliClient.ProviderID
-							providerId.SetValue(dep.Provider)
-							help += fmt.Sprintf("\n - %v", cliClient.AccountInfo{Provider: providerId, AccountID: dep.ProviderAccountId, Region: dep.Region})
-						}
-						var confirm bool
-						if err := survey.AskOne(&survey.Confirm{
-							Message: "This project appears to be already deployed elsewhere. Are you sure you want to continue?",
-							Help:    help,
-							Default: false,
-						}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
-							return err
-						} else if !confirm {
-							return fmt.Errorf("deployment of project %q was canceled", project.Name)
-						}
+					if err := confirmDeploymentToNewLocation(project.Name, resp.Deployments); err != nil {
+						return err
 					}
 				}
 			}
@@ -217,6 +200,31 @@ func makeComposeUpCmd() *cobra.Command {
 	_ = composeUpCmd.Flags().MarkHidden("wait")
 	composeUpCmd.Flags().Int("wait-timeout", -1, "maximum duration to wait for the project to be running|healthy") // docker-compose compatibility
 	return composeUpCmd
+}
+
+func confirmDeploymentToNewLocation(projectName string, existingDeployments []*defangv1.Deployment) error {
+	if global.NonInteractive {
+		term.Warnf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", projectName)
+		return nil
+	}
+
+	help := "Active deployments of this project:"
+	for _, dep := range existingDeployments {
+		var providerId cliClient.ProviderID
+		providerId.SetValue(dep.Provider)
+		help += fmt.Sprintf("\n - %v", cliClient.AccountInfo{Provider: providerId, AccountID: dep.ProviderAccountId, Region: dep.Region})
+	}
+	var confirm bool
+	if err := survey.AskOne(&survey.Confirm{
+		Message: "This project appears to be already deployed elsewhere. Are you sure you want to continue?",
+		Help:    help,
+		Default: false,
+	}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
+		return err
+	} else if !confirm {
+		return fmt.Errorf("deployment of project %q was canceled", projectName)
+	}
+	return nil
 }
 
 func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *compose.Project, provider cliClient.Provider, err error) error {
