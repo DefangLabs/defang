@@ -47,7 +47,7 @@ func Create(params StackParameters) (string, error) {
 		return "", err
 	}
 	filename := filename(params.Name)
-	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
 		if errors.Is(err, os.ErrExist) {
 			instructions := fmt.Sprintf(
