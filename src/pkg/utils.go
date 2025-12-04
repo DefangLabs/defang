@@ -58,6 +58,15 @@ func GetenvBool(key string) bool {
 	return val
 }
 
+func GetFirstEnv(keys ...string) string {
+	for _, key := range keys {
+		if value, ok := os.LookupEnv(key); ok {
+			return value
+		}
+	}
+	return ""
+}
+
 func SplitByComma(s string) []string {
 	if s == "" {
 		return nil
