@@ -147,7 +147,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 		return nil, err
 	}
 
-	etag := pkg.RandomID()
+	etag := types.NewEtag()
 	serviceInfos, err := b.GetServiceInfos(ctx, project.Name, req.DelegateDomain, etag, project.Services)
 	if err != nil {
 		return nil, err
@@ -238,7 +238,7 @@ func (b *ByocDo) BootstrapCommand(ctx context.Context, req client.BootstrapComma
 		return "", err
 	}
 
-	etag := pkg.RandomID()
+	etag := types.NewEtag()
 	b.cdEtag = etag
 	return etag, nil
 }
