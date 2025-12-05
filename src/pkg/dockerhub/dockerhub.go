@@ -19,7 +19,7 @@ import (
 	"github.com/docker/cli/cli/config"
 )
 
-var ErrNoCredentials = errors.New("no Docker Hub credentials found in docker config")
+var ErrNoCredentials = errors.New("no Docker Hub credentials found in Docker config")
 var ErrInvalidCredential = errors.New("invalid Docker Hub credentials")
 
 func GetDockerHubCredentials(ctx context.Context) (string, string, error) {
