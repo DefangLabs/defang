@@ -487,7 +487,7 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn,
 	}
 	env["DEFANG_MODE"] = strings.ToLower(cmd.mode.String())
 	if cmd.dockerHubUsername != "" && cmd.dockerHubAccessToken != "" {
-		env["CI_REGISTRY_USERNAME"] = cmd.dockerHubUsername
+		env["CI_REGISTRY_USER"] = cmd.dockerHubUsername
 		env["CI_REGISTRY_PASSWORD"] = cmd.dockerHubAccessToken
 	}
 
