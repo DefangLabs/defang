@@ -12,6 +12,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
+	"github.com/DefangLabs/defang/src/pkg/dockerhub"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -90,7 +91,7 @@ func (d *DoApp) SetUpBucket(ctx context.Context) error {
 
 func getImageSourceSpec(cdImagePath string) (*godo.ImageSourceSpec, error) {
 	term.Debugf("Using CD image: %q", cdImagePath)
-	image, err := ParseImage(cdImagePath)
+	image, err := dockerhub.ParseImage(cdImagePath)
 	if err != nil {
 		return nil, err
 	}

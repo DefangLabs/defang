@@ -254,7 +254,17 @@ func (b *ByocDo) BootstrapList(ctx context.Context, _allRegions bool) (iter.Seq[
 		return nil, err
 	}
 
-	return awsbyoc.ListPulumiStacks(ctx, s3client, bucketName)
+	stacks, err := awsbyoc.ListPulumiStacks(ctx, s3client, bucketName)
+	if err != nil {
+		return nil, err
+	}
+	return func(yield func(string) bool) {
+		for stackName := range stacks {
+			if !yield(stackName) {
+				break
+			}
+		}
+	}, nil
 }
 
 func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
