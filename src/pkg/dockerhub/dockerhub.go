@@ -78,6 +78,8 @@ func GenerateNewPAT(ctx context.Context, label string) (string, string, error) {
 			// Fallback to use the password as PAT
 			pat = password
 		}
+	} else {
+		pat = password
 	}
 
 	if err := ValidatePATWithRepo(username, pat, "library/alpine"); err != nil {
@@ -196,7 +198,7 @@ func (c *DockerHubClient) request(ctx context.Context, method, api string, req a
 	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
 		out, err := io.ReadAll(httpResp.Body)
 		if err != nil {
-			out = []byte(fmt.Sprintf("unable to read response body: %v", err))
+			out = fmt.Appendf(nil, "unable to read response body: %v", err)
 		}
 		return fmt.Errorf("request failed: %s", out)
 	}
@@ -215,8 +217,8 @@ func (c *DockerHubClient) request(ctx context.Context, method, api string, req a
 	return nil
 }
 
-func (c *DockerHubClient) CreatePAT(ctx context.Context, label string, scope []string) (string, error) {
-	req := CreatePATRequest{TokenLabel: label, Scopes: []string{"repo:public_read"}}
+func (c *DockerHubClient) CreatePAT(ctx context.Context, label string, scopes []string) (string, error) {
+	req := CreatePATRequest{TokenLabel: label, Scopes: scopes}
 	var resp CreatePATResponse
 	if err := c.request(ctx, "POST", "/v2/access-tokens", req, &resp); err != nil {
 		return "", err

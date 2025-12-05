@@ -163,22 +163,27 @@ func TestFixupServicesDetectDockerHubTokenNeeded(t *testing.T) {
 	}{
 		{
 			name:    "no docker hub images",
-			project: "debugproj",
+			project: "emptyenv", // alpine exist in public ECR dockerhub mirror
 			want:    false,
 		},
 		{
 			name:    "docker hub image in compose file",
-			project: "testproj",
+			project: "compose-go-warn", // ealen/echo-server does not have a public ECR mirror
 			want:    true,
 		},
 		{
-			name:    "docker hub image in docker file",
-			project: "bun-in-dockerfile",
+			name:    "arg image considered docker hub",
+			project: "build", // Both nginx and alpine exist in public ECR dockerhub mirror, but we cannot parse args in dockerfile let alone from compose as build args
 			want:    true,
 		},
 		{
-			name:    "docker hub image in docker file",
-			project: "bun-in-compose",
+			name:    "docker hub image (oven/bun) in docker file with multi-line",
+			project: "bun-in-dockerfile", // oven/bun does not have a public ECR mirror
+			want:    true,
+		},
+		{
+			name:    "docker hub image (oven/bun) in compose file",
+			project: "bun-in-compose", // oven/bun does not have a public ECR mirror
 			want:    true,
 		},
 	}

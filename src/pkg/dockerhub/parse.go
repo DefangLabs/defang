@@ -31,23 +31,8 @@ func (i Image) String() string {
 	return result
 }
 
-func (i Image) GoString() string {
-	return fmt.Sprintf("Image: %q, Registry: %q, Repo: %q, Tag: %q, Digest: %q", i.Image, i.Registry, i.Repo, i.Tag, i.Digest)
-}
-
 func (i Image) FullImage() string {
-	result := ""
-	if i.Registry != "" {
-		result += i.Registry + "/"
-	}
-	result += i.Repo
-	if i.Tag != "" {
-		result += ":" + i.Tag
-	}
-	if i.Digest != "" {
-		result += "@" + i.Digest
-	}
-	return result
+	return i.String()
 }
 
 func ParseImage(image string) (*Image, error) {

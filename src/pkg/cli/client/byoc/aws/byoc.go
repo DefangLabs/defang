@@ -258,14 +258,14 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 
 	if b.needDockerHubCreds {
 		term.Debugf("Docker Hub credentials are needed for image pulls")
-		dockerHubUser, dockeHubPass, err := dockerhub.GetDockerHubCredentials(ctx)
+		dockerHubUser, dockerHubPass, err := dockerhub.GetDockerHubCredentials(ctx)
 		if err != nil {
 			term.Debugf("Could not retrieve Docker Hub credentials: %v", err)
 			term.Warnf("Please set the DOCKERHUB_USERNAME and DOCKERHUB_TOKEN environment variables, or run docker login so Defang can generate a Personal Access Token for pulling images. Without credentials, image pulls may fail.")
 		} else {
-			term.Debugf("Using Docker Hub credentials: %v:%v", dockerHubUser, dockeHubPass[:4]+strings.Repeat("*", len(dockeHubPass)-4))
+			term.Debugf("Using Docker Hub credentials with user %v", dockerHubUser)
 			cdCmd.dockerHubUsername = dockerHubUser
-			cdCmd.dockerHubAccessToken = dockeHubPass
+			cdCmd.dockerHubAccessToken = dockerHubPass
 		}
 	}
 
@@ -308,10 +308,17 @@ func (b *ByocAws) checkRequiresDockerHubToken(ctx context.Context, project *comp
 		if err != nil {
 			return err
 		}
-		ecrRepo := "docker/" + parsed.Repo
+		repo := parsed.Repo
+		if !strings.HasPrefix(repo, "library/") {
+			repo = "library/" + repo
+		}
+		ecrRepo := "docker/" + repo
 		tag := parsed.Tag
 		if tag == "" {
 			tag = parsed.Digest
+		}
+		if tag == "" {
+			tag = "latest"
 		}
 
 		found, err := b.driver.CheckImageExistOnPublicECR(ctx, ecrRepo, tag)

@@ -17,6 +17,14 @@ func TestParseImage(t *testing.T) {
 			},
 		},
 		{
+			image: "alpine:latest",
+			want: Image{
+				Image: "alpine",
+				Repo:  "alpine",
+				Tag:   "latest",
+			},
+		},
+		{
 			image: "redis",
 			want: Image{
 				Image: "redis",

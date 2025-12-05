@@ -49,7 +49,6 @@ func (a *Aws) CheckImageExistOnPublicECR(ctx context.Context, repo, tag string) 
 
 	manifestURL := fmt.Sprintf("https://public.ecr.aws/v2/%s/manifests/%s", repo, tag)
 
-	// Attempt without auth first
 	header := http.Header{
 		"Accept":        []string{"application/vnd.docker.distribution.manifest.v2+json"},
 		"Authorization": []string{"Bearer " + ecrPublicAuthToken},

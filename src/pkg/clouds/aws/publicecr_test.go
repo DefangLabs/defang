@@ -68,7 +68,7 @@ func TestCheckImageExistOnPublicECR(t *testing.T) {
 			expectedExists: false,
 		},
 		{
-			name:           "Throtted",
+			name:           "Throttled",
 			repo:           "public.ecr.aws/mock/repo",
 			tag:            "latest",
 			mockStatusCode: 429,
@@ -90,8 +90,12 @@ func TestCheckImageExistOnPublicECR(t *testing.T) {
 
 			awsInstance := &Aws{Region: "us-west-2"}
 			exists, err := awsInstance.CheckImageExistOnPublicECR(t.Context(), tt.repo, tt.tag)
-			if err != nil && tt.expectedError == "" {
-				t.Fatalf("unexpected error: %v", err)
+			if err != nil {
+				if tt.expectedError == "" {
+					t.Fatalf("unexpected error: %v", err)
+				} else if err.Error() != tt.expectedError {
+					t.Fatalf("expected error to be %q, got %v", tt.expectedError, err)
+				}
 			}
 			if exists != tt.expectedExists {
 				t.Fatalf("expected exists to be %v, got %v", tt.expectedExists, exists)

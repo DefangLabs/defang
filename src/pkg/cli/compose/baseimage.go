@@ -1,13 +1,14 @@
 package compose
 
 import (
-	"bufio"
+	"fmt"
 	"maps"
 	"os"
 	"slices"
-	"strings"
 
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+	"github.com/moby/buildkit/frontend/dockerfile/parser"
 )
 
 func FindAllBaseImages(project *composeTypes.Project) ([]string, error) {
@@ -39,20 +40,23 @@ func extractDockerfileBaseImages(dockerfilePath string) ([]string, error) {
 		return nil, err
 	}
 	defer f.Close()
+	result, err := parser.Parse(f)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse Dockerfile: %w", err)
+	}
+
+	stages, metaArgs, err := instructions.Parse(result.AST, nil) // 2nd param is linter, can be nil
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse instructions: %w", err)
+	}
+
+	// TODO: use metaArgs to resolve ARGs in FROM statements
+	_ = metaArgs
 
 	var images []string
-	sc := bufio.NewScanner(f)
-
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if strings.HasPrefix(strings.ToUpper(line), "FROM ") {
-			img := strings.TrimSpace(line[5:])
-			// remove AS part
-			if idx := strings.Index(strings.ToUpper(img), " AS "); idx != -1 {
-				img = strings.TrimSpace(img[:idx])
-			}
-			images = append(images, img)
-		}
+	for _, s := range stages {
+		images = append(images, s.BaseName)
 	}
-	return images, sc.Err()
+
+	return images, nil
 }
