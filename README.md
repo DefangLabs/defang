@@ -12,6 +12,21 @@ Take your app from Docker Compose to a secure and scalable deployment on your fa
 
 The Defang Command-Line Interface [(CLI)](https://docs.defang.io/docs/getting-started) is designed for developers who prefer to manage their workflows directly from the terminal. It offers full access to Defang’s capabilities, allowing you to build, test, and deploy applications efficiently to the cloud.
 
+### Deploying with Defang
+
+If you already have a Docker Compose file, create a new stack and then deploy it. For example:
+
+```shell
+$ defang stack new
+? Which cloud provider do you want to deploy to? AWS
+? Which AWS region do you want to deploy to? us-west-2
+? Which deployment mode do you want to use? AFFORDABLE
+? What do you want to call this stack? awsuswest2
+ * Created new stack configuration file: `.defang/awsuswest2`. Check this file into version control. You can now deploy this stack using `defang up --stack=awsuswest2`
+
+$ defang up --stack=awsuswest2
+```
+
 ## Defang MCP Server
 
 [![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_defang-0098FF?style=flat&logo=visualstudiocode&logoColor=ffffff)](https://vscode.dev/redirect?url=vscode:mcp/install?%7B%22name%22%3A%22defang%22%2C%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22defang%22%2C%22mcp%22%2C%22serve%22%2C%22--client%22%2C%22vscode%22%5D%7D)
