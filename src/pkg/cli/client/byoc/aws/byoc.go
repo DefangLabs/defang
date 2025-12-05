@@ -24,6 +24,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/dns"
+	"github.com/DefangLabs/defang/src/pkg/dockerhub"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -60,6 +61,8 @@ type ByocAws struct {
 	cdEtag           types.ETag
 	cdStart          time.Time
 	cdTaskArn        ecs.TaskArn
+
+	needDockerHubCreds bool
 }
 
 var _ client.Provider = (*ByocAws)(nil)
@@ -252,6 +255,20 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		mode:            req.Mode,
 		project:         project.Name,
 	}
+
+	if b.needDockerHubCreds {
+		term.Debugf("Docker Hub credentials are needed for image pulls")
+		dockerHubUser, dockerHubPass, err := dockerhub.GetDockerHubCredentials(ctx)
+		if err != nil {
+			term.Debugf("Could not retrieve Docker Hub credentials: %v", err)
+			term.Warnf("Please set the DOCKERHUB_USERNAME and DOCKERHUB_TOKEN environment variables, or run docker login so Defang can generate a Personal Access Token for pulling images. Without credentials, image pulls may fail.")
+		} else {
+			term.Debugf("Using Docker Hub credentials with user %v", dockerHubUser)
+			cdCmd.dockerHubUsername = dockerHubUser
+			cdCmd.dockerHubAccessToken = dockerHubPass
+		}
+	}
+
 	cdTaskArn, err := b.runCdCommand(ctx, cdCmd)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
@@ -270,6 +287,54 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		Services: serviceInfos, // TODO: Should we use the retrieved services instead?
 		Etag:     etag,
 	}, nil
+}
+
+func (b *ByocAws) FixupServices(ctx context.Context, project *composeTypes.Project) error {
+	// HACK: Use ServiceFixupper interface callback used in fixup.go to check if Docker Hub credentials are needed
+	return b.checkRequiresDockerHubToken(ctx, project)
+}
+
+func (b *ByocAws) checkRequiresDockerHubToken(ctx context.Context, project *composeTypes.Project) error {
+	images, err := compose.FindAllBaseImages(project)
+	if err != nil {
+		return err
+	}
+
+	for _, image := range images {
+		if !dockerhub.IsDockerHubImage(image) {
+			continue
+		}
+		parsed, err := dockerhub.ParseImage(image)
+		if err != nil {
+			return err
+		}
+		repo := parsed.Repo
+		if !strings.HasPrefix(repo, "library/") {
+			repo = "library/" + repo
+		}
+		ecrRepo := "docker/" + repo
+		tag := parsed.Tag
+		if tag == "" {
+			tag = parsed.Digest
+		}
+		if tag == "" {
+			tag = "latest"
+		}
+
+		found, err := b.driver.CheckImageExistOnPublicECR(ctx, ecrRepo, tag)
+		if err != nil {
+			return err
+		}
+		if !found {
+			// TODO: Make provider stateless: This is a hack to get around the fact that we have lost
+			// access to the service build context by the time we reach deploy as it has been uploaded
+			// to S3. The last place we have access to the build context is during fixup, since only
+			// AWS BYOC requires this info, we use a state variable to be set during fixup to indicate
+			// that Docker Hub creds are needed, since our provider is already stateful.
+			b.needDockerHubCreds = true
+		}
+	}
+	return nil
 }
 
 func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string, error) {
@@ -405,6 +470,9 @@ type cdCommand struct {
 	delegationSetId string
 	mode            defangv1.DeploymentMode
 	project         string
+
+	dockerHubUsername    string
+	dockerHubAccessToken string
 }
 
 func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn, error) {
@@ -422,6 +490,10 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn,
 		env["DOMAIN"] = "dummy.domain"
 	}
 	env["DEFANG_MODE"] = strings.ToLower(cmd.mode.String())
+	if cmd.dockerHubUsername != "" && cmd.dockerHubAccessToken != "" {
+		env["CI_REGISTRY_USER"] = cmd.dockerHubUsername
+		env["CI_REGISTRY_PASSWORD"] = cmd.dockerHubAccessToken // FIXME: use config for this
+	}
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging

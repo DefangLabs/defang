@@ -1,4 +1,4 @@
-package appPlatform
+package dockerhub
 
 import "testing"
 
@@ -10,32 +10,53 @@ func TestParseImage(t *testing.T) {
 		{
 			image: "docker.io/pulumi/pulumi:latest",
 			want: Image{
+				Image:    "docker.io/pulumi/pulumi",
 				Registry: "docker.io",
 				Repo:     "pulumi/pulumi",
 				Tag:      "latest",
 			},
 		},
 		{
+			image: "alpine:latest",
+			want: Image{
+				Image: "alpine",
+				Repo:  "alpine",
+				Tag:   "latest",
+			},
+		},
+		{
 			image: "redis",
 			want: Image{
-				Repo: "redis",
+				Image: "redis",
+				Repo:  "redis",
 			},
 		},
 		{
 			image: "defangio/cd@sha256:2e671c45664af2a40cc9e78dfbf3c985c7f89746b8a62712273c158f3436266a",
 			want: Image{
-				Registry: "defangio",
-				Repo:     "cd",
+				Image:    "defangio/cd",
+				Registry: "",
+				Repo:     "defangio/cd",
 				Digest:   "sha256:2e671c45664af2a40cc9e78dfbf3c985c7f89746b8a62712273c158f3436266a",
 			},
 		},
 		{
 			image: "docker.io/pulumi/pulumi:latest@sha256:2e671c45664af2a40cc9e78dfbf3c985c7f89746b8a62712273c158f3436266a",
 			want: Image{
+				Image:    "docker.io/pulumi/pulumi",
 				Registry: "docker.io",
 				Repo:     "pulumi/pulumi",
 				Tag:      "latest",
 				Digest:   "sha256:2e671c45664af2a40cc9e78dfbf3c985c7f89746b8a62712273c158f3436266a",
+			},
+		},
+		{
+			image: "public.ecr.aws/docker/library/alpine:latest",
+			want: Image{
+				Image:    "public.ecr.aws/docker/library/alpine",
+				Registry: "public.ecr.aws",
+				Repo:     "docker/library/alpine",
+				Tag:      "latest",
 			},
 		},
 	}
@@ -46,8 +67,8 @@ func TestParseImage(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ParseImage(%s) got error: %v", tt.image, err)
 			}
-			if got.Registry != tt.want.Registry || got.Repo != tt.want.Repo || got.Tag != tt.want.Tag || got.Digest != tt.want.Digest {
-				t.Errorf("ParseImage(%s) got %v, want %v", tt.image, got, tt.want)
+			if *got != tt.want {
+				t.Errorf("ParseImage(%s) got %#v, want %#v", tt.image, got, tt.want)
 			}
 		})
 	}
