@@ -205,8 +205,8 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 	si := &defangv1.ServiceInfo{
 		AllowScaling:    b.AllowScaling,
 		Domainname:      service.DomainName,
-		Etag:            pkg.RandomID(), // TODO: could be hash for dedup/idempotency
-		Project:         projectName,    // was: tenant
+		Etag:            types.NewEtag(), // TODO: could be hash for dedup/idempotency
+		Project:         projectName,     // was: tenant
 		Service:         &defangv1.Service{Name: service.Name},
 		HealthcheckPath: healthCheckPath,
 	}

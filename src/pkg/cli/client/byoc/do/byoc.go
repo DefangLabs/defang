@@ -745,7 +745,7 @@ func (b *ByocDo) ServicePublicDNS(name string, projectName string) string {
 func processServiceInfo(service *godo.AppServiceSpec, projectName string) *defangv1.ServiceInfo {
 	serviceInfo := &defangv1.ServiceInfo{
 		Project: projectName,
-		Etag:    pkg.RandomID(), // TODO: get the real etag from spec somehow
+		Etag:    types.NewEtag(), // TODO: get the real etag from spec somehow
 		Service: &defangv1.Service{
 			Name: service.Name,
 		},

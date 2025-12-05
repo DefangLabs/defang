@@ -2,7 +2,6 @@ package types
 
 import (
 	"errors"
-	"strconv"
 
 	"github.com/DefangLabs/defang/src/pkg"
 )
@@ -15,11 +14,10 @@ func NewEtag() ETag {
 
 func ParseEtag(s string) (ETag, error) {
 	if len(s) != 12 {
-		return "", errors.New("invalid etag: must be 12 characters long")
+		return "", errors.New("invalid deployment etag: must be 12 characters long")
 	}
-	_, err := strconv.ParseUint(s, 36, 64)
-	if err != nil {
-		return "", errors.New("invalid etag: must be base36")
+	if !pkg.IsValidRandomID(s) {
+		return "", errors.New("invalid deployment etag: must be base-36")
 	}
 	return s, nil
 }
