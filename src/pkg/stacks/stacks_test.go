@@ -111,6 +111,30 @@ func TestCreate(t *testing.T) {
 	}
 }
 
+func TestRepeatCreate(t *testing.T) {
+	t.Chdir(t.TempDir())
+	params := StackParameters{
+		Name:     "repeattest",
+		Provider: cliClient.ProviderGCP,
+		Region:   "us-central1",
+		Mode:     modes.ModeBalanced,
+	}
+
+	_, err := Create(params)
+	if err != nil {
+		t.Errorf("First Create() error = %v", err)
+	}
+
+	_, err = Create(params)
+	if err == nil {
+		t.Errorf("Expected error on duplicate Create(), got nil")
+	} else {
+		assert.ErrorContains(t, err, "stack file already exists for \"repeattest\".")
+		assert.ErrorContains(t, err, "If you want to overwrite it, please spin down the stack and remove stackfile first.")
+		assert.ErrorContains(t, err, "defang down --stack repeattest && rm .defang/repeattest")
+	}
+}
+
 func TestList(t *testing.T) {
 	t.Run("no stacks present", func(t *testing.T) {
 		t.Chdir(t.TempDir())
