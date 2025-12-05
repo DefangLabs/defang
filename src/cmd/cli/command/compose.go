@@ -61,6 +61,11 @@ func makeComposeUpCmd() *cobra.Command {
 					return loadErr
 				}
 
+				// Don't trigger the debugger if the operation was canceled by the user (e.g., Ctrl-C)
+				if errors.Is(ctx.Err(), context.Canceled) {
+					return loadErr
+				}
+
 				term.Error("Cannot load project:", loadErr)
 				project, err := loader.CreateProjectForDebug()
 				if err != nil {
@@ -225,12 +230,22 @@ func handleComposeUpErr(ctx context.Context, err error, project *compose.Project
 		return err
 	}
 
+	// Don't trigger the debugger if the operation was canceled by the user (e.g., Ctrl-C)
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return err
+	}
+
 	term.Error("Error:", cliClient.PrettyError(err))
 	track.Evt("Debug Prompted", P("composeErr", err))
 	return cli.InteractiveDebugForClientError(ctx, global.Client, project, err)
 }
 
 func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.GrpcClient, debugConfig cli.DebugConfig) {
+	// Don't trigger the debugger if the operation was canceled by the user (e.g., Ctrl-C)
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return
+	}
+
 	var errDeploymentFailed cliClient.ErrDeploymentFailed
 	if errors.As(err, &errDeploymentFailed) {
 		// Tail got canceled because of deployment failure: prompt to show the debugger
@@ -440,6 +455,11 @@ func makeComposeConfigCmd() *cobra.Command {
 			project, loadErr := loader.LoadProject(ctx)
 			if loadErr != nil {
 				if global.NonInteractive {
+					return loadErr
+				}
+
+				// Don't trigger the debugger if the operation was canceled by the user (e.g., Ctrl-C)
+				if errors.Is(ctx.Err(), context.Canceled) {
 					return loadErr
 				}
 
