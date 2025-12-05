@@ -206,7 +206,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		return nil, err
 	}
 
-	etag := pkg.RandomID()
+	etag := types.NewEtag()
 	serviceInfos, err := b.GetServiceInfos(ctx, project.Name, req.DelegateDomain, etag, project.Services)
 	if err != nil {
 		return nil, err

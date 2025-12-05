@@ -123,6 +123,13 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 
 	term.Debugf("Tailing %s logs in project %q", options.LogType, projectName)
 
+	if options.Deployment != "" {
+		_, err := types.ParseEtag(options.Deployment)
+		if err != nil {
+			return fmt.Errorf("invalid deployment etag: %w", err)
+		}
+	}
+
 	if len(options.Services) > 0 {
 		for _, service := range options.Services {
 			// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives

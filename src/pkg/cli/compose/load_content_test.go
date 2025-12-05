@@ -1,13 +1,20 @@
 package compose
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRoundTrip(t *testing.T) {
-	testAllComposeFiles(t, func(t *testing.T, path string) {
+	testAllComposeFiles(t, func(t *testing.T, name, path string) {
 		loader := NewLoader(WithPath(path))
 		p, err := loader.LoadProject(t.Context())
+		if strings.HasPrefix(name, "invalid-") {
+			assert.Error(t, err, "Expected error for invalid compose file: %s", path)
+			return
+		}
 		if err != nil {
 			t.Fatal(err)
 		}

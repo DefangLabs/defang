@@ -3,12 +3,17 @@ package tools
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
+	"time"
 
-	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
+	"github.com/DefangLabs/defang/src/pkg/modes"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -61,19 +66,90 @@ func (m *MockCLI) GetServices(ctx context.Context, projectName string, provider 
 	return m.MockServices, nil
 }
 
+func (m *MockCLI) ComposeDown(ctx context.Context, projectName string, client *client.GrpcClient, provider client.Provider) (string, error) {
+	return "", nil
+}
+
+func (m *MockCLI) ComposeUp(ctx context.Context, client *client.GrpcClient, provider client.Provider, params defangcli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
+	return nil, nil, nil
+}
+
+func (m *MockCLI) ConfigDelete(ctx context.Context, projectName string, provider client.Provider, name string) error {
+	return nil
+}
+
+func (m *MockCLI) ConfigSet(ctx context.Context, projectName string, provider client.Provider, name, value string) error {
+	return nil
+}
+
+func (m *MockCLI) CreatePlaygroundProvider(client *client.GrpcClient) client.Provider {
+	return m.MockProvider
+}
+
+func (m *MockCLI) GenerateAuthURL(authPort int) string {
+	return ""
+}
+
+func (m *MockCLI) InteractiveLoginMCP(ctx context.Context, client *client.GrpcClient, cluster string, mcpClient string) error {
+	return nil
+}
+
+func (m *MockCLI) ListConfig(ctx context.Context, provider client.Provider, projectName string) (*defangv1.Secrets, error) {
+	return nil, nil
+}
+
+func (m *MockCLI) LoadProject(ctx context.Context, loader client.Loader) (*compose.Project, error) {
+	return nil, nil
+}
+
+func (m *MockCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string {
+	return ""
+}
+
+func (m *MockCLI) RunEstimate(ctx context.Context, project *compose.Project, client *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
+	return nil, nil
+}
+
+func (m *MockCLI) Tail(ctx context.Context, provider client.Provider, projectName string, options defangcli.TailOptions) error {
+	return nil
+}
+
+func (m *MockCLI) TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, options defangcli.TailOptions) (defangcli.ServiceStates, error) {
+	return nil, nil
+}
+
 // createConnectError creates a connect error with the specified code and message
 func createConnectError(code connect.Code, message string) error {
 	return connect.NewError(code, errors.New(message))
 }
 
+type mockElicitationsClient struct {
+	responses map[string]string
+}
+
+func (m *mockElicitationsClient) Request(ctx context.Context, req elicitations.Request) (elicitations.Response, error) {
+	properties, ok := req.Schema["properties"].(map[string]any)
+	if !ok || len(properties) == 0 {
+		panic("invalid schema properties")
+	}
+	fields := make([]string, 0)
+	for field := range properties {
+		fields = append(fields, field)
+	}
+
+	if len(fields) > 1 {
+		panic("mockElicitationsClient only supports single-field requests")
+	}
+
+	return elicitations.Response{
+		Action: "accept",
+		Content: map[string]any{
+			fields[0]: m.responses[fields[0]],
+		},
+	}, nil
+}
+
 func TestHandleServicesToolWithMockCLI(t *testing.T) {
-	ctx := t.Context()
-
-	// Common test data
-	const (
-		testCluster = "test-cluster"
-	)
-
 	tests := []struct {
 		name                string
 		providerId          client.ProviderID
@@ -95,17 +171,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 
 			expectedError:       true,
 			errorMessage:        "connection failed",
-			expectedGetServices: false,
-		},
-		{
-			name:       "auto_provider_not_configured",
-			providerId: client.ProviderAuto,
-			mockCLI: &MockCLI{
-				MockClient: &client.GrpcClient{},
-			},
-
-			expectedError:       true,
-			errorMessage:        common.ErrNoProviderSet.Error(),
 			expectedGetServices: false,
 		},
 		{
@@ -132,8 +197,8 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				MockProjectName:  "test-project",
 				GetServicesError: defangcli.ErrNoServices{ProjectName: "test-project"},
 			},
-			expectedError:       true, // Go error is returned
-			errorMessage:        "no services found in project",
+			expectedError:       false, // Returns successful result with message
+			resultTextContains:  "no services found for the specified project",
 			expectedGetServices: true,
 			expectedProjectName: "test-project",
 		},
@@ -146,8 +211,8 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				MockProjectName:  "test-project",
 				GetServicesError: createConnectError(connect.CodeNotFound, "project test-project is not deployed in Playground"),
 			},
-			expectedError:       true,
-			errorMessage:        "is not deployed in Playground",
+			expectedError:       false, // Returns successful result with message
+			resultTextContains:  "is not deployed in Playground",
 			expectedGetServices: true,
 			expectedProjectName: "test-project",
 		},
@@ -191,8 +256,23 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Chdir("testdata")
+			os.Unsetenv("DEFANG_PROVIDER")
+			os.Unsetenv("AWS_PROFILE")
+			os.Unsetenv("AWS_REGION")
 			loader := &client.MockLoader{}
-			result, err := HandleServicesTool(ctx, loader, &tt.providerId, testCluster, tt.mockCLI)
+			ec := elicitations.NewController(&mockElicitationsClient{
+				responses: map[string]string{
+					"strategy":     "profile",
+					"profile_name": "default",
+				},
+			})
+			stackName := "test-stack"
+			result, err := HandleServicesTool(t.Context(), loader, tt.mockCLI, ec, StackConfig{
+				Cluster:    "test-cluster",
+				ProviderID: &tt.providerId,
+				Stack:      &stackName,
+			})
 
 			// Check Go error expectation
 			if tt.expectedError {

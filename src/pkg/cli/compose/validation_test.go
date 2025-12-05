@@ -16,6 +16,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go/ptr"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestValidationAndConvert(t *testing.T) {
@@ -35,13 +36,17 @@ func TestValidationAndConvert(t *testing.T) {
 		return configs.Names, nil
 	}
 
-	testAllComposeFiles(t, func(t *testing.T, path string) {
+	testAllComposeFiles(t, func(t *testing.T, name, path string) {
 		logs := new(bytes.Buffer)
 		term.DefaultTerm = term.NewTerm(os.Stdin, logs, logs)
 
 		options := LoaderOptions{ConfigPaths: []string{path}}
 		loader := Loader{options: options}
 		project, err := loader.LoadProject(t.Context())
+		if strings.HasPrefix(name, "invalid-") {
+			assert.Error(t, err, "Expected error for invalid compose file: %s", path)
+			return
+		}
 		if err != nil {
 			t.Fatal(err)
 		}
