@@ -85,9 +85,6 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 	if len(svccfg.Devices) != 0 {
 		return fmt.Errorf("service %q: unsupported compose directive: devices", svccfg.Name)
 	}
-	if len(svccfg.DependsOn) != 0 {
-		term.Debugf("service %q: unsupported compose directive: depends_on", svccfg.Name)
-	}
 	if len(svccfg.DeviceCgroupRules) != 0 {
 		return fmt.Errorf("service %q: unsupported compose directive: device_cgroup_rules", svccfg.Name)
 	}

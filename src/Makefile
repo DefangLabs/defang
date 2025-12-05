@@ -65,7 +65,7 @@ $(PROTOS) &: $(BUF) $(PROTOS-DEPS)
 	buf generate protos
 
 .PHONY: install
-install: $(BINARY_NAME) test
+install: $(BINARY_NAME)
 	install $(BINARY_NAME) "${HOME}/.local/bin/"
 
 .PHONY: test

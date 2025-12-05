@@ -375,16 +375,21 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 		"DEFANG_JSON":                os.Getenv("DEFANG_JSON"),
 		"DEFANG_ORG":                 b.TenantName,
 		"DEFANG_PREFIX":              b.Prefix,
+		"DEFANG_PULUMI_DEBUG":        os.Getenv("DEFANG_PULUMI_DEBUG"),
+		"DEFANG_PULUMI_DIFF":         os.Getenv("DEFANG_PULUMI_DIFF"),
 		"DEFANG_STATE_URL":           defangStateUrl,
 		"NODE_NO_WARNINGS":           "1",
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
 		"PRIVATE_DOMAIN":             byoc.GetPrivateDomain(projectName),
 		"PROJECT":                    projectName,                 // may be empty
-		pulumiBackendKey:             pulumiBackendValue,          // TODO: make secret
 		"PULUMI_CONFIG_PASSPHRASE":   byoc.PulumiConfigPassphrase, // TODO: make secret
 		"PULUMI_COPILOT":             "false",
 		"PULUMI_SKIP_UPDATE_CHECK":   "true",
 		"STACK":                      b.PulumiStack,
+		pulumiBackendKey:             pulumiBackendValue, // TODO: make secret
+	}
+	if targets := os.Getenv("DEFANG_PULUMI_TARGETS"); targets != "" {
+		env["DEFANG_PULUMI_TARGETS"] = targets
 	}
 
 	if !term.StdoutCanColor() {
