@@ -213,12 +213,16 @@ func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accou
 		return err
 	}
 	if global.Stack == "" {
-		promptToCreateStack(stacks.StackParameters{
-			Name:     "beta",
+		stackName := "beta"
+		_, err := stacks.Create(stacks.StackParameters{
+			Name:     stackName,
 			Provider: accountInfo.Provider,
 			Region:   accountInfo.Region,
 			Mode:     global.Mode,
 		})
+		if err == nil {
+			term.Info(stacks.PostCreateMessage(stackName))
+		}
 	}
 	return nil
 }
