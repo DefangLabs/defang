@@ -212,7 +212,8 @@ func PostCreateMessage(stackName string) string {
 		"A stackfile has been created at `.defang/%s`.\n"+
 			"This file contains the configuration for this stack.\n"+
 			"We recommend you commit this file to source control, so it can be used by everyone on your team.\n"+
-			"You can now deploy using `defang [compose] up --stack %q`.\n",
+			"You can now deploy using `defang [compose] up --stack %q`.\n"+
+			"To learn more about stacks, visit https://docs.defang.io/docs/concepts/stacks",
 		stackName, stackName,
 	)
 }

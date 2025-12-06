@@ -101,7 +101,7 @@ func makeComposeUpCmd() *cobra.Command {
 				handleExistingDeployments(resp.Deployments, accountInfo, project.Name)
 			} else if global.Stack == "" {
 				promptToCreateStack(stacks.StackParameters{
-					Name:     "production",
+					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
 					Provider: accountInfo.Provider,
 					Region:   accountInfo.Region,
 					Mode:     global.Mode,
@@ -257,10 +257,20 @@ func promptToCreateStack(params stacks.StackParameters) error {
 		// print a message suggesting stack creation
 		return nil
 	}
-	// TODO: use survey to prompt user to confirm stack properties
-	// create a new stack
-	_, err := stacks.Create(params)
-	return err
+
+	err := PromptForStackParameters(&params)
+	if err != nil {
+		return err
+	}
+
+	_, err = stacks.Create(params)
+	if err != nil {
+		return err
+	}
+
+	term.Info(stacks.PostCreateMessage(params.Name))
+
+	return nil
 }
 
 func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *compose.Project, provider cliClient.Provider, err error) error {
