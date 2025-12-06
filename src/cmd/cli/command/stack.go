@@ -133,17 +133,12 @@ func makeStackNewCmd() *cobra.Command {
 
 			term.Debugf("Creating stack with parameters: %+v\n", params)
 
-			filename, err := stacks.Create(params)
+			_, err := stacks.Create(params)
 			if err != nil {
 				return err
 			}
 
-			term.Infof(
-				"Created new stack configuration file: `%s`. "+
-					"Check this file into version control. "+
-					"You can now deploy this stack using `defang up --stack=%s`\n",
-				filename, params.Name,
-			)
+			term.Info(stacks.PostCreateMessage(params.Name))
 			return nil
 		},
 	}
