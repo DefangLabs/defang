@@ -124,7 +124,6 @@ func makeComposeUpCmd() *cobra.Command {
 				Project:    project,
 				UploadMode: upload,
 				Mode:       global.Mode,
-				Stack:      global.Stack,
 			})
 			if err != nil {
 				composeErr := err
@@ -215,7 +214,7 @@ func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accou
 	}
 	if global.Stack == "" {
 		promptToCreateStack(stacks.StackParameters{
-			Name:     "production",
+			Name:     "beta",
 			Provider: accountInfo.Provider,
 			Region:   accountInfo.Region,
 			Mode:     global.Mode,
