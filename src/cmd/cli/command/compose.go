@@ -207,18 +207,19 @@ func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accou
 
 func confirmDeploymentToNewLocation(projectName string, existingDeployments []*defangv1.Deployment) error {
 	if global.NonInteractive {
-		term.Warnf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", project.Name)
+		term.Warnf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", projectName)
 	} else {
-		help := "Active deployments of this project:"
+		term.Warn("This project has already deployed elsewhere:")
+		help := ""
 		for _, dep := range existingDeployments {
 			var providerId cliClient.ProviderID
 			providerId.SetValue(dep.Provider)
 			help += fmt.Sprintf("\n - %v", cliClient.AccountInfo{Provider: providerId, AccountID: dep.ProviderAccountId, Region: dep.Region})
 		}
+		term.Println(help)
 		var confirm bool
 		if err := survey.AskOne(&survey.Confirm{
-			Message: "This project appears to be already deployed elsewhere. Are you sure you want to continue?",
-			Help:    help,
+			Message: "Are you sure you want to continue?",
 			Default: false,
 		}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
 			return err
