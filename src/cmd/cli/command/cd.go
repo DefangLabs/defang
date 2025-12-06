@@ -7,6 +7,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/cobra"
 )
@@ -165,7 +166,12 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.Preview(cmd.Context(), project, global.Client, provider, global.Mode)
+		return cli.Preview(cmd.Context(), project, global.Client, provider, cli.ComposeUpParams{
+			Mode:       global.Mode,
+			Project:    project,
+			UploadMode: compose.UploadModePreview,
+			Stack:      global.Stack,
+		})
 	},
 }
 
