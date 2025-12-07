@@ -47,22 +47,28 @@ func Create(params StackParameters) (string, error) {
 		return "", err
 	}
 	filename := filename(params.Name)
-	file, err := os.CreateTemp(directory, params.Name+".tmp.")
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			instructions := fmt.Sprintf(
+				"If you want to overwrite it, please spin down the stack and remove stackfile first.\n"+
+					"    defang down --stack %s && rm .defang/%s",
+				params.Name,
+				params.Name,
+			)
+			return "", fmt.Errorf(
+				"stack file already exists for %q.\n%s",
+				params.Name,
+				instructions,
+			)
+		}
 		return "", err
 	}
-	defer file.Close()
+	defer f.Close()
 
-	_, err = file.WriteString(content)
+	_, err = f.WriteString(content)
 	if err != nil {
-		return "", err
-	}
-
-	term.Debugf("Created tmp stack configuration file: %s\n", file.Name())
-
-	// move to final name
-	err = os.Rename(file.Name(), filename)
-	if err != nil {
+		os.Remove(filename)
 		return "", err
 	}
 

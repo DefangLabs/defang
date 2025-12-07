@@ -23,6 +23,7 @@ func (e ComposeError) Unwrap() error {
 }
 
 type ComposeUpParams struct {
+	Stack      string
 	Project    *compose.Project
 	UploadMode compose.UploadMode
 	Mode       modes.Mode
@@ -87,7 +88,11 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 		return nil, project, dryrun.ErrDryRun
 	}
 
-	delegateDomain, err := fabric.GetDelegateSubdomainZone(ctx, &defangv1.GetDelegateSubdomainZoneRequest{Project: project.Name})
+	req := &defangv1.GetDelegateSubdomainZoneRequest{
+		Project: project.Name,
+		Stack:   params.Stack,
+	}
+	delegateDomain, err := fabric.GetDelegateSubdomainZone(ctx, req)
 	if err != nil {
 		term.Debug("GetDelegateSubdomainZone failed:", err)
 		return nil, project, errors.New("failed to get delegate domain")
@@ -126,7 +131,11 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 		action = defangv1.DeploymentAction_DEPLOYMENT_ACTION_PREVIEW
 	} else {
 		if delegation != nil && len(delegation.NameServers) > 0 {
-			req := &defangv1.DelegateSubdomainZoneRequest{NameServerRecords: delegation.NameServers, Project: project.Name}
+			req := &defangv1.DelegateSubdomainZoneRequest{
+				NameServerRecords: delegation.NameServers,
+				Project:           project.Name,
+				Stack:             params.Stack,
+			}
 			_, err = fabric.DelegateSubdomainZone(ctx, req)
 			if err != nil {
 				return nil, project, err

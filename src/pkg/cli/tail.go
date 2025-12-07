@@ -126,7 +126,7 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 	if options.Deployment != "" {
 		_, err := types.ParseEtag(options.Deployment)
 		if err != nil {
-			return fmt.Errorf("invalid deployment etag: %w", err)
+			return err
 		}
 	}
 

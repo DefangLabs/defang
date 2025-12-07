@@ -32,7 +32,7 @@ func makeStackCmd() *cobra.Command {
 
 func makeStackNewCmd() *cobra.Command {
 	var stackNewCmd = &cobra.Command{
-		Use:     "new STACK_NAME",
+		Use:     "new [STACK_NAME]",
 		Aliases: []string{"init", "create"},
 		Args:    cobra.MaximumNArgs(1),
 		Short:   "Create a new Defang deployment stack",

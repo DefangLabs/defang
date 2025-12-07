@@ -132,6 +132,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			deploy, project, err := cli.ComposeUp(ctx, global.Client, provider, cli.ComposeUpParams{
+				Stack:      global.Stack,
 				Project:    project,
 				UploadMode: upload,
 				Mode:       global.Mode,

@@ -1,23 +1,21 @@
 package types
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestNewEtag(t *testing.T) {
 	etag := NewEtag()
-	if len(etag) != 12 {
-		t.Errorf("NewEtag() length = %d, want 12", len(etag))
-	}
-	if !isBase36(etag) {
-		t.Errorf("NewEtag() = %s, want base36 string", etag)
-	}
+	_, err := ParseEtag(etag)
+	assert.NoError(t, err, "NewEtag() produced invalid etag: %s", etag)
 }
 
 func TestParseEtag(t *testing.T) {
 	validEtag := "abc123def456"
 	etag, err := ParseEtag(validEtag)
-	if err != nil {
-		t.Errorf("ParseEtag(%s) returned error: %v", validEtag, err)
-	}
+	assert.NoError(t, err)
 	if etag != validEtag {
 		t.Errorf("ParseEtag(%s) = %s, want %s", validEtag, etag, validEtag)
 	}
@@ -31,8 +29,6 @@ func TestParseEtag(t *testing.T) {
 
 	for _, invalid := range invalidEtags {
 		_, err := ParseEtag(invalid)
-		if err == nil {
-			t.Errorf("ParseEtag(%s) = nil error, want error", invalid)
-		}
+		assert.Error(t, err)
 	}
 }
