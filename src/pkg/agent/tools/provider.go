@@ -292,7 +292,6 @@ func listAWSProfiles() ([]string, error) {
 		if err != nil {
 			continue // skip missing files
 		}
-		defer f.Close()
 
 		var section string
 		scanner := bufio.NewScanner(f)
@@ -306,6 +305,7 @@ func listAWSProfiles() ([]string, error) {
 				profiles[section] = struct{}{}
 			}
 		}
+		f.Close()
 	}
 
 	result := make([]string, 0, len(profiles))
