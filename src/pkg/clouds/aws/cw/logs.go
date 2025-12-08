@@ -162,17 +162,22 @@ func QueryLogGroup(ctx context.Context, cwClient FilterLogEventsAPI, input LogGr
 
 func QueryLogGroupStream(ctx context.Context, cwClient FilterLogEventsAPI, input LogGroupInput, start, end time.Time, limit int32) (EventStream[types.StartLiveTailResponseStream], error) {
 	ctx, cancel := context.WithCancel(ctx)
-	es := newEventStream(cancel)
+	es := newEventStream(cancel) // calling Close on the stream will cancel the context
 
-	// TODO: this QueryLogGroup function doesn't return until all logs are fetched, so returning a stream is not very useful
-	if err := QueryLogGroup(ctx, cwClient, input, start, end, limit, func(events []LogEvent) error {
-		es.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
-			Value: types.LiveTailSessionUpdate{SessionResults: events},
+	go func() {
+		defer close(es.ch)
+		// TODO: this QueryLogGroup function doesn't return until all logs are fetched, so returning a stream is not very useful
+		if err := QueryLogGroup(ctx, cwClient, input, start, end, limit, func(events []LogEvent) error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case es.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{Value: types.LiveTailSessionUpdate{SessionResults: events}}:
+				return nil
+			}
+		}); err != nil {
+			es.err = err
 		}
-		return nil
-	}); err != nil {
-		es.err = err
-	}
+	}()
 
 	return es, nil
 }

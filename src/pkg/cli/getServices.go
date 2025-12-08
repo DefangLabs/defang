@@ -17,7 +17,10 @@ type ErrNoServices struct {
 }
 
 func (e ErrNoServices) Error() string {
-	return "no services found in project " + e.ProjectName // ProjectName may be empty
+	if e.ProjectName == "" {
+		return "no services found"
+	}
+	return "no services found in project " + e.ProjectName
 }
 
 func GetServices(ctx context.Context, projectName string, provider client.Provider, long bool) error {

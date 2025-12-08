@@ -52,12 +52,12 @@ func TestGetLatestVersion(t *testing.T) {
 
 	v, err := GetLatestReleaseTag(ctx)
 	if err != nil {
-		t.Fatalf("GetLatestVersion() error = %v; want nil", err)
+		t.Fatalf("GetLatestReleaseTag() error = %v; want nil", err)
 	}
 	if v == "" {
-		t.Fatalf("GetLatestVersion() = %v; want non-empty", v)
+		t.Fatalf("GetLatestReleaseTag() = %v; want non-empty", v)
 	}
 	if v != version {
-		t.Errorf("GetLatestVersion() = %v; want %v", v, version)
+		t.Errorf("GetLatestReleaseTag() = %v; want %v", v, version)
 	}
 }

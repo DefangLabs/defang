@@ -661,7 +661,7 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	}
 
 	var err error
-	cwClient, err := cw.NewCloudWatchLogsClient(ctx, b.driver.Region)
+	cwClient, err := cw.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region
 	if err != nil {
 		return nil, err
 	}
@@ -707,10 +707,6 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		var service string
 		if len(req.Services) == 1 {
 			service = req.Services[0]
-		}
-		cwClient, err := cw.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region
-		if err != nil {
-			return nil, err
 		}
 		lgis := b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))
 		if req.Follow {
