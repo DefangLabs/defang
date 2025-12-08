@@ -68,8 +68,13 @@ func makeComposeUpCmd() *cobra.Command {
 					return err
 				}
 
-				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				return cli.InteractiveDebugForClientError(ctx, global.Client, project, loadErr)
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+				if err != nil {
+					return err
+				}
+				return debugger.DebugComposeLoadError(ctx, debug.DebugConfig{
+					Project: project,
+				}, loadErr)
 			}
 
 			provider, err := newProviderChecked(ctx, loader)
@@ -138,7 +143,12 @@ func makeComposeUpCmd() *cobra.Command {
 				Mode:       global.Mode,
 			})
 			if err != nil {
-				return handleComposeUpErr(ctx, err, project, provider)
+				composeErr := err
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+				if err != nil {
+					return err
+				}
+				return handleComposeUpErr(ctx, debugger, project, provider, composeErr)
 			}
 
 			if len(deploy.Services) == 0 {
@@ -208,7 +218,7 @@ func makeComposeUpCmd() *cobra.Command {
 	return composeUpCmd
 }
 
-func handleComposeUpErr(ctx context.Context, err error, project *compose.Project, provider cliClient.Provider) error {
+func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *compose.Project, provider cliClient.Provider, err error) error {
 	if errors.Is(err, types.ErrComposeFileNotFound) {
 		// TODO: generate a compose file based on the current project
 		printDefangHint("To start a new project, do:", "new")
@@ -234,8 +244,9 @@ func handleComposeUpErr(ctx context.Context, err error, project *compose.Project
 	}
 
 	term.Error("Error:", cliClient.PrettyError(err))
-	track.Evt("Debug Prompted", P("composeErr", err))
-	return cli.InteractiveDebugForClientError(ctx, global.Client, project, err)
+	return debugger.DebugDeploymentError(ctx, debug.DebugConfig{
+		Project: project,
+	}, err)
 }
 
 func handleTailAndMonitorErr(ctx context.Context, err error, debugger *debug.Debugger, debugConfig debug.DebugConfig) {
@@ -252,10 +263,8 @@ func handleTailAndMonitorErr(ctx context.Context, err error, debugger *debug.Deb
 			return
 		}
 
-		track.Evt("Debug Prompted", P("failedServices", debugConfig.FailedServices), P("etag", debugConfig.Deployment), P("reason", errDeploymentFailed))
-
 		// Call the AI debug endpoint using the original command context (not the tail ctx which is canceled)
-		if nil != debugger.DebugDeployment(ctx, debugConfig) {
+		if nil != debugger.DebugDeploymentError(ctx, debugConfig, errDeploymentFailed) {
 			// don't show this defang hint if debugging was successful
 			tailOptions := newTailOptionsForDeploy(debugConfig.Deployment, debugConfig.Since, true)
 			printDefangHint("To see the logs of the failed service, run:", "logs "+tailOptions.String())

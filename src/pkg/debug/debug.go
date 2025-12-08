@@ -92,14 +92,23 @@ func (d *Debugger) DebugDeployment(ctx context.Context, debugConfig DebugConfig)
 	}, "Debug Deployment", P("etag", debugConfig.Deployment))
 }
 
+func (d *Debugger) DebugDeploymentError(ctx context.Context, debugConfig DebugConfig, deployErr error) error {
+	return d.promptAndTrackDebugSession(func() error {
+		prompt := buildDeploymentDebugPrompt(debugConfig) + " The error encountered was: " + deployErr.Error()
+		return d.agent.StartWithMessage(ctx, prompt)
+	}, "Debug Deployment Error", P("etag", debugConfig.Deployment), P("deployErr", deployErr))
+}
+
 func (d *Debugger) DebugComposeLoadError(ctx context.Context, debugConfig DebugConfig, loadErr error) error {
 	return d.promptAndTrackDebugSession(func() error {
 		prompt := "The following error occurred while loading the compose file. Help troubleshoot and recommend a solution." + loadErr.Error()
 		return d.agent.StartWithMessage(ctx, prompt)
-	}, "Debug Load", P("etag", debugConfig.Deployment))
+	}, "Debug Load", P("etag", debugConfig.Deployment), P("composeErr", loadErr))
 }
 
 func (d *Debugger) promptAndTrackDebugSession(fn func() error, eventName string, eventProperty ...track.Property) error {
+	track.Evt("Debug Prompted", eventProperty...)
+	track.Evt(eventName+" Prompted", eventProperty...)
 	aiDebug, err := d.promptForPermission()
 	if err != nil {
 		track.Evt(eventName+" Prompt Failed", append([]track.Property{P("reason", err)}, eventProperty...)...)
