@@ -183,7 +183,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:              map[string]interface{}{"name": "valid_config_name", "value": testValue},
 			mockCLI:                  &MockSetConfigCLI{ConfigSetError: errors.New("config set failed")},
 			expectedError:            true,
-			errorMessage:             "Failed to set config: config set failed",
+			errorMessage:             "failed to set config: config set failed",
 			expectedConnectCalls:     true,
 			expectedProviderCalls:    true,
 			expectedProjectNameCalls: true,
