@@ -121,14 +121,22 @@ func (t *ToolManager) EqualPrevious(toolRequests []*ai.ToolRequest) bool {
 		inputs, err := json.Marshal(req.Input)
 		if err != nil {
 			term.Debugf("error marshaling tool request input: %v", err)
+			continue
 		}
 		currJSON := fmt.Sprintf("%s:%s", req.Name, inputs)
 		newToolsRequestsJSON[currJSON] = true
-		if t.prevTurnToolRequestsJSON[currJSON] {
-			return true
+	}
+
+	isEqual := len(newToolsRequestsJSON) == len(t.prevTurnToolRequestsJSON)
+	if isEqual {
+		for key := range newToolsRequestsJSON {
+			if !t.prevTurnToolRequestsJSON[key] {
+				isEqual = false
+				break
+			}
 		}
 	}
 
 	t.prevTurnToolRequestsJSON = newToolsRequestsJSON
-	return false
+	return isEqual
 }
