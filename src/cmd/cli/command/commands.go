@@ -538,9 +538,10 @@ var loginCmd = &cobra.Command{
 }
 
 var whoamiCmd = &cobra.Command{
-	Use:   "whoami",
-	Args:  cobra.NoArgs,
-	Short: "Show the current user",
+	Use:         "whoami",
+	Args:        cobra.NoArgs,
+	Short:       "Show the current user",
+	Annotations: authNeededAnnotation,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		verbose := global.Verbose
 		loader := configureLoader(cmd)
