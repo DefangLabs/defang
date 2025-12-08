@@ -34,7 +34,7 @@ type Agent struct {
 
 func New(ctx context.Context, clusterAddr string, providerId *client.ProviderID, stack *string) (*Agent, error) {
 	accessToken := cluster.GetExistingToken(clusterAddr)
-	provider := "fabric"
+	aiProvider := "fabric"
 	var providerPlugin api.Plugin
 	_, addr := cluster.SplitTenantHost(clusterAddr)
 	// Generate a random session ID prepended with timestamp for easier sorting
@@ -49,7 +49,7 @@ func New(ctx context.Context, clusterAddr string, providerId *client.ProviderID,
 	defaultModel := "google/gemini-2.5-flash"
 
 	if os.Getenv("GOOGLE_API_KEY") != "" {
-		provider = "googleai"
+		aiProvider = "googleai"
 		providerPlugin = &googlegenai.GoogleAI{}
 		defaultModel = "gemini-2.5-flash"
 	}
@@ -57,7 +57,7 @@ func New(ctx context.Context, clusterAddr string, providerId *client.ProviderID,
 	model := pkg.Getenv("DEFANG_MODEL_ID", defaultModel)
 
 	gk := genkit.Init(ctx,
-		genkit.WithDefaultModel(fmt.Sprintf("%s/%s", provider, model)),
+		genkit.WithDefaultModel(fmt.Sprintf("%s/%s", aiProvider, model)),
 		genkit.WithPlugins(providerPlugin),
 	)
 
