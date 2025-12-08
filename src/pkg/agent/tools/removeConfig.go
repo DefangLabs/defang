@@ -27,19 +27,19 @@ func HandleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader,
 	pp := NewProviderPreparer(cli, ec, client)
 	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
 	if err != nil {
-		return "", fmt.Errorf("Failed to setup provider: %w", err)
+		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
 	term.Debug("Function invoked: cliClient.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
-		return "", fmt.Errorf("Failed to load project name: %w", err)
+		return "", fmt.Errorf("failed to load project name: %w", err)
 	}
 	if err := cli.ConfigDelete(ctx, projectName, provider, params.Name); err != nil {
 		// Show a warning (not an error) if the config was not found
 		if connect.CodeOf(err) == connect.CodeNotFound {
 			return fmt.Sprintf("Config variable %q not found in project %q", params.Name, projectName), nil
 		}
-		return "", fmt.Errorf("Failed to remove config variable %q from project %q: %w", params.Name, projectName, err)
+		return "", fmt.Errorf("failed to remove config variable %q from project %q: %w", params.Name, projectName, err)
 	}
 
 	return fmt.Sprintf("Successfully remove the config variable %q from project %q", params.Name, projectName), nil

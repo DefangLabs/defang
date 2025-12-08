@@ -26,7 +26,7 @@ func HandleDestroyTool(ctx context.Context, loader cliClient.ProjectLoader, cli 
 	pp := NewProviderPreparer(cli, ec, client)
 	_, provider, err := pp.SetupProvider(ctx, config.Stack)
 	if err != nil {
-		return "", fmt.Errorf("Failed to setup provider: %w", err)
+		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
 	term.Debug("Function invoked: cliClient.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)

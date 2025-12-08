@@ -32,14 +32,14 @@ func HandleListConfigTool(ctx context.Context, loader cliClient.ProjectLoader, c
 	term.Debug("Function invoked: cliClient.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
-		return "", fmt.Errorf("Failed to load project name: %w", err)
+		return "", fmt.Errorf("failed to load project name: %w", err)
 	}
 	term.Debug("Project name loaded:", projectName)
 
 	term.Debug("Function invoked: cli.ConfigList")
 	config, err := cli.ListConfig(ctx, provider, projectName)
 	if err != nil {
-		return "", fmt.Errorf("Failed to list config variables: %w", err)
+		return "", fmt.Errorf("failed to list config variables: %w", err)
 	}
 
 	numConfigs := len(config.Names)

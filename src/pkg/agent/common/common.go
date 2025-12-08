@@ -36,7 +36,7 @@ func ConfigureAgentLoader(params LoaderParams) (*compose.Loader, error) {
 	if params.WorkingDirectory != "." {
 		err := os.Chdir(params.WorkingDirectory)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to change working directory: %w", err)
+			return nil, fmt.Errorf("failed to change working directory: %w", err)
 		}
 	}
 

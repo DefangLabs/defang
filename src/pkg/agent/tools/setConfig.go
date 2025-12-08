@@ -27,7 +27,7 @@ func HandleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params
 	pp := NewProviderPreparer(cli, ec, client)
 	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
 	if err != nil {
-		return "", fmt.Errorf("Failed to setup provider: %w", err)
+		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
 
 	if params.ProjectName == "" {
@@ -45,7 +45,7 @@ func HandleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params
 
 	term.Debug("Function invoked: cli.ConfigSet")
 	if err := cli.ConfigSet(ctx, params.ProjectName, provider, params.Name, params.Value); err != nil {
-		return "", fmt.Errorf("Failed to set config: %w", err)
+		return "", fmt.Errorf("failed to set config: %w", err)
 	}
 
 	return fmt.Sprintf("Successfully set the config variable %q for project %q", params.Name, params.ProjectName), nil
