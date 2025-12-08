@@ -29,7 +29,7 @@ func (n *nonBlockingStdin) Close() error {
 func NewNonBlockingStdin() io.ReadCloser {
 	cr, err := cancelreader.NewReader(os.Stdin)
 	if err != nil {
-		return os.NewFile(uintptr(syscall.Stdin), "/dev/stdin")
+		return os.Stdin // FIXME: this risks closing the stdin handle #1240
 	}
 	return &nonBlockingStdin{cr}
 }
