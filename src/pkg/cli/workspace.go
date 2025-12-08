@@ -11,24 +11,17 @@ type WorkspaceRow struct {
 	Current bool   `json:"current"`
 }
 
-// WorkspaceRows marks the current workspace using tenant selection and optional WhoAmI tenant data.
-// The caller can pass an empty currentTenantID when only token/flag selection is available.
-func WorkspaceRows(info *auth.UserInfo, tenantSelection types.TenantNameOrID, currentTenantID string) []WorkspaceRow {
+// WorkspaceRows marks the current workspace using the provided tenant selection.
+func WorkspaceRows(info *auth.UserInfo, tenantSelection types.TenantNameOrID) []WorkspaceRow {
 	if info == nil {
 		return nil
 	}
 
 	currentWorkspace := tenantSelection
-	if !currentWorkspace.IsSet() && currentTenantID != "" {
-		currentWorkspace = types.TenantNameOrID(currentTenantID)
-	}
-
 	rows := make([]WorkspaceRow, 0, len(info.AllTenants))
 	for _, t := range info.AllTenants {
 		isCurrent := false
-		if currentTenantID != "" && (t.ID == currentTenantID || t.Name == currentTenantID) {
-			isCurrent = true
-		} else if currentWorkspace.IsSet() && (t.ID == string(currentWorkspace) || t.Name == string(currentWorkspace)) {
+		if currentWorkspace.IsSet() && (t.ID == string(currentWorkspace) || t.Name == string(currentWorkspace)) {
 			isCurrent = true
 		}
 		rows = append(rows, WorkspaceRow{

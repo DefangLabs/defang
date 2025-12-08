@@ -29,7 +29,7 @@ func ListWorkspaces(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	rows := cli.WorkspaceRows(info, currentWorkspace, "")
+	rows := cli.WorkspaceRows(info, currentWorkspace)
 	if !verbose {
 		for i := range rows {
 			rows[i].ID = ""
