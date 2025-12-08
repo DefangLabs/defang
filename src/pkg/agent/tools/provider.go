@@ -3,6 +3,7 @@ package tools
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -34,11 +35,13 @@ func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc cliC
 	}
 }
 
-// TODO: call this in each tool which requires a provider
 func (pp *providerPreparer) SetupProvider(ctx context.Context, stackName *string) (*cliClient.ProviderID, cliClient.Provider, error) {
 	var providerID cliClient.ProviderID
 	var err error
 	var stack *stacks.StackParameters
+	if stackName == nil {
+		return nil, nil, errors.New("stackName cannot be nil")
+	}
 	if *stackName != "" {
 		stack, err = stacks.Read(*stackName)
 		if err != nil {
