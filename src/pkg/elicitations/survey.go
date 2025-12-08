@@ -72,57 +72,62 @@ func (c *surveyClient) Request(_ context.Context, req Request) (Response, error)
 
 func prepareQuestions(req Request) ([]*survey.Question, error) {
 	questions := []*survey.Question{}
-	// for each property in the schema, create a survey question
 	schemaPropMap, ok := req.Schema["properties"].(map[string]any)
 	if !ok {
 		return nil, errors.New("invalid schema properties")
 	}
 	for key, prop := range schemaPropMap {
-		propMap, ok := prop.(map[string]any)
-		if !ok {
-			return nil, errors.New("invalid property schema")
+		question, err := questionFromSchemaProp(key, prop)
+		if err != nil {
+			return nil, err
 		}
-		description, ok := propMap["description"].(string)
-		if !ok {
-			description = key
-		}
-		if propMap["enum"] != nil {
-			var options []string
-			switch enumValues := propMap["enum"].(type) {
-			case []string:
-				options = enumValues
-			case []any:
-				for _, v := range enumValues {
-					s, ok := v.(string)
-					if !ok {
-						return nil, errors.New("invalid enum value type")
-					}
-					options = append(options, s)
-				}
-			default:
-				return nil, errors.New("invalid enum values")
-			}
-			prompt := &survey.Select{
-				Message: description,
-				Options: options,
-			}
-			question := &survey.Question{
-				Name:   key,
-				Prompt: prompt,
-			}
-			questions = append(questions, question)
-		} else {
-			inputPrompt := &survey.Input{
-				Message: description,
-			}
-			if defaultValue, ok := propMap["default"].(string); ok {
-				inputPrompt.Default = defaultValue
-			}
-			questions = append(questions, &survey.Question{
-				Name:   key,
-				Prompt: inputPrompt,
-			})
-		}
+		questions = append(questions, question)
 	}
 	return questions, nil
+}
+
+func questionFromSchemaProp(key string, prop any) (*survey.Question, error) {
+	propMap, ok := prop.(map[string]any)
+	if !ok {
+		return nil, errors.New("invalid property schema")
+	}
+	description, ok := propMap["description"].(string)
+	if !ok {
+		description = key
+	}
+	if propMap["enum"] != nil {
+		var options []string
+		switch enumValues := propMap["enum"].(type) {
+		case []string:
+			options = enumValues
+		case []any:
+			for _, v := range enumValues {
+				s, ok := v.(string)
+				if !ok {
+					return nil, errors.New("invalid enum value type")
+				}
+				options = append(options, s)
+			}
+		default:
+			return nil, errors.New("invalid enum values")
+		}
+		return &survey.Question{
+			Name: key,
+			Prompt: &survey.Select{
+				Message: description,
+				Options: options,
+			},
+		}, nil
+	} else {
+		inputPrompt := &survey.Input{
+			Message: description,
+		}
+		if defaultValue, ok := propMap["default"].(string); ok {
+			inputPrompt.Default = defaultValue
+		}
+		return &survey.Question{
+			Name:   key,
+			Prompt: inputPrompt,
+		}, nil
+	}
 }
