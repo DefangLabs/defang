@@ -34,9 +34,16 @@ func translateSchema(schema map[string]any) mcp.ToolInputSchema {
 	if !ok {
 		schemaProperties = map[string]any{}
 	}
-	schemaRequired, ok := schema["required"].([]string)
-	if !ok {
-		schemaRequired = []string{}
+
+	var schemaRequired []string
+	if reqRaw, ok := schema["required"].([]any); ok {
+		for _, r := range reqRaw {
+			if s, ok := r.(string); ok {
+				schemaRequired = append(schemaRequired, s)
+			}
+		}
+	} else if req, ok := schema["required"].([]string); ok {
+		schemaRequired = req
 	}
 
 	return mcp.ToolInputSchema{

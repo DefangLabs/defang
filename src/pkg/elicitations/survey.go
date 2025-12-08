@@ -87,13 +87,20 @@ func prepareQuestions(req Request) ([]*survey.Question, error) {
 			description = key
 		}
 		if propMap["enum"] != nil {
-			enumValues, ok := propMap["enum"].([]string)
-			if !ok {
+			var options []string
+			switch enumValues := propMap["enum"].(type) {
+			case []string:
+				options = enumValues
+			case []any:
+				for _, v := range enumValues {
+					s, ok := v.(string)
+					if !ok {
+						return nil, errors.New("invalid enum value type")
+					}
+					options = append(options, s)
+				}
+			default:
 				return nil, errors.New("invalid enum values")
-			}
-			options := []string{}
-			for _, v := range enumValues {
-				options = append(options, v)
 			}
 			prompt := &survey.Select{
 				Message: description,
