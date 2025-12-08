@@ -6,13 +6,13 @@ import (
 )
 
 type Controller interface {
-	RequestString(context.Context, string, string) (string, error)
-	RequestStringWithDefault(context.Context, string, string, string) (string, error)
-	RequestEnum(context.Context, string, string, []string) (string, error)
+	RequestString(ctx context.Context, message, field string) (string, error)
+	RequestStringWithDefault(ctx context.Context, message, field, defaultValue string) (string, error)
+	RequestEnum(ctx context.Context, message, field string, options []string) (string, error)
 }
 
 type Client interface {
-	Request(context.Context, Request) (Response, error)
+	Request(ctx context.Context, req Request) (Response, error)
 }
 
 type controller struct {
