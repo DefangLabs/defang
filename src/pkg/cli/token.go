@@ -13,7 +13,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func Token(ctx context.Context, client client.FabricClient, tenant types.TenantName, dur time.Duration, s scope.Scope) error {
+func Token(ctx context.Context, client client.FabricClient, tenant types.TenantNameOrID, dur time.Duration, s scope.Scope) error {
 	if dryrun.DoDryRun {
 		return dryrun.ErrDryRun
 	}

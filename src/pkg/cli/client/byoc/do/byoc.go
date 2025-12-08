@@ -64,7 +64,7 @@ type ByocDo struct {
 
 var _ client.Provider = (*ByocDo)(nil)
 
-func NewByocProvider(ctx context.Context, tenantName types.TenantName, stack string) *ByocDo {
+func NewByocProvider(ctx context.Context, tenantName types.TenantNameOrID, stack string) *ByocDo {
 	doRegion := do.Region(os.Getenv("REGION"))
 	if doRegion == "" {
 		doRegion = region.SFO3 // TODO: change default

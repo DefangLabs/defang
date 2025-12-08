@@ -1,17 +1,15 @@
 package command
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
 	"github.com/DefangLabs/defang/src/pkg/modes"
-	"github.com/DefangLabs/defang/src/pkg/stacks"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/pflag"
 )
 
@@ -57,7 +55,7 @@ func Test_configurationPrecedence(t *testing.T) {
 		Verbose:        false,
 		Stack:          "",
 		Cluster:        "",
-		Org:            "",
+		Tenant:         "",
 	}
 
 	type stack struct {
@@ -85,7 +83,6 @@ func Test_configurationPrecedence(t *testing.T) {
 					"DEFANG_STACK":           "from-env",
 					"DEFANG_FABRIC":          "from-env-cluster",
 					"DEFANG_PROVIDER":        "defang",
-					"DEFANG_ORG":             "from-env-org",
 					"DEFANG_SOURCE_PLATFORM": "heroku",
 					"DEFANG_COLOR":           "never",
 					"DEFANG_TTY":             "false",
@@ -100,7 +97,6 @@ func Test_configurationPrecedence(t *testing.T) {
 				"DEFANG_STACK":           "from-env",
 				"DEFANG_FABRIC":          "from-env-cluster",
 				"DEFANG_PROVIDER":        "gcp",
-				"DEFANG_ORG":             "from-env-org",
 				"DEFANG_SOURCE_PLATFORM": "heroku",
 				"DEFANG_COLOR":           "auto",
 				"DEFANG_TTY":             "false",
@@ -113,7 +109,6 @@ func Test_configurationPrecedence(t *testing.T) {
 				"stack":           "from-flags",
 				"cluster":         "from-flags-cluster",
 				"provider":        "aws",
-				"org":             "from-flags-org",
 				"from":            "heroku",
 				"color":           "always",
 				"non-interactive": "false",
@@ -125,7 +120,7 @@ func Test_configurationPrecedence(t *testing.T) {
 				Stack:          "from-flags",
 				Cluster:        "from-flags-cluster",
 				ProviderID:     cliClient.ProviderAWS,
-				Org:            "from-flags-org",
+				Tenant:         "",
 				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAlways,
 				HasTty:         false, // from env override
@@ -145,7 +140,6 @@ func Test_configurationPrecedence(t *testing.T) {
 					"DEFANG_STACK":           "from-env",
 					"DEFANG_FABRIC":          "from-env-cluster",
 					"DEFANG_PROVIDER":        "defang",
-					"DEFANG_ORG":             "from-env-org",
 					"DEFANG_SOURCE_PLATFORM": "heroku",
 					"DEFANG_COLOR":           "never",
 					"DEFANG_TTY":             "false",
@@ -159,7 +153,6 @@ func Test_configurationPrecedence(t *testing.T) {
 				"DEFANG_STACK":           "from-env",
 				"DEFANG_FABRIC":          "from-env-cluster",
 				"DEFANG_PROVIDER":        "gcp",
-				"DEFANG_ORG":             "from-env-org",
 				"DEFANG_SOURCE_PLATFORM": "heroku",
 				"DEFANG_COLOR":           "auto",
 				"DEFANG_TTY":             "true",
@@ -173,7 +166,7 @@ func Test_configurationPrecedence(t *testing.T) {
 				Stack:          "from-env",
 				Cluster:        "from-env-cluster",
 				ProviderID:     cliClient.ProviderGCP,
-				Org:            "from-env-org",
+				Tenant:         "",
 				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAuto,
 				HasTty:         true,  // from env
@@ -193,7 +186,6 @@ func Test_configurationPrecedence(t *testing.T) {
 					"DEFANG_STACK":           "from-env",
 					"DEFANG_FABRIC":          "from-env-cluster",
 					"DEFANG_PROVIDER":        "defang",
-					"DEFANG_ORG":             "from-env-org",
 					"DEFANG_SOURCE_PLATFORM": "heroku",
 					"DEFANG_COLOR":           "always",
 					"DEFANG_TTY":             "false",
@@ -208,7 +200,7 @@ func Test_configurationPrecedence(t *testing.T) {
 				Stack:          "from-env",
 				Cluster:        "from-env-cluster",
 				ProviderID:     cliClient.ProviderDefang,
-				Org:            "from-env-org",
+				Tenant:         "",
 				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAlways,
 				HasTty:         false, // from env
@@ -223,6 +215,40 @@ func Test_configurationPrecedence(t *testing.T) {
 				stackname: "test",
 			},
 			expected: defaultConfig,
+		},
+		{
+			name:         "default .defang name, when no env vars or flags",
+			createRCFile: true,
+			rcStack: stack{
+				stackname: "",
+				entries: map[string]string{
+					"DEFANG_MODE":            "AFFORDABLE",
+					"DEFANG_VERBOSE":         "true",
+					"DEFANG_DEBUG":           "false",
+					"DEFANG_STACK":           "from-env",
+					"DEFANG_FABRIC":          "from-env-cluster",
+					"DEFANG_PROVIDER":        "defang",
+					"DEFANG_SOURCE_PLATFORM": "heroku",
+					"DEFANG_COLOR":           "always",
+					"DEFANG_TTY":             "false",
+					"DEFANG_NON_INTERACTIVE": "true",
+					"DEFANG_HIDE_UPDATE":     "true",
+				},
+			},
+			expected: GlobalConfig{
+				Mode:           modes.ModeAffordable, // env file values
+				Verbose:        true,
+				Debug:          false,
+				Stack:          "from-env",
+				Cluster:        "from-env-cluster",
+				ProviderID:     cliClient.ProviderDefang,
+				Tenant:         "",
+				SourcePlatform: migrate.SourcePlatformHeroku,
+				ColorMode:      ColorAlways,
+				HasTty:         false, // from env
+				NonInteractive: true,  // from env
+				HideUpdate:     true,  // from env
+			},
 		},
 		{
 			name:         "default .defang name and no values, when no env vars or flags",
@@ -256,7 +282,7 @@ func Test_configurationPrecedence(t *testing.T) {
 			flags.StringVarP(&testConfig.Stack, "stack", "s", testConfig.Stack, "stack name (for BYOC providers)")
 			flags.Var(&testConfig.ColorMode, "color", "colorize output")
 			flags.StringVar(&testConfig.Cluster, "cluster", testConfig.Cluster, "Defang cluster to connect to")
-			flags.StringVar(&testConfig.Org, "org", testConfig.Org, "override GitHub organization name (tenant)")
+			flags.StringVar(&testConfig.Tenant, "workspace", testConfig.Tenant, "workspace name (tenant)")
 			flags.VarP(&testConfig.ProviderID, "provider", "P", "bring-your-own-cloud provider")
 			flags.BoolVarP(&testConfig.Verbose, "verbose", "v", testConfig.Verbose, "verbose logging")
 			flags.BoolVar(&testConfig.Debug, "debug", testConfig.Debug, "debug logging for troubleshooting the CLI")
@@ -345,8 +371,8 @@ func Test_configurationPrecedence(t *testing.T) {
 			if testConfig.ProviderID != tt.expected.ProviderID {
 				t.Errorf("expected ProviderID to be '%s', got '%s'", tt.expected.ProviderID, testConfig.ProviderID)
 			}
-			if testConfig.Org != tt.expected.Org {
-				t.Errorf("expected Org to be '%s', got '%s'", tt.expected.Org, testConfig.Org)
+			if testConfig.Tenant != tt.expected.Tenant {
+				t.Errorf("expected Tenant to be '%s', got '%s'", tt.expected.Tenant, testConfig.Tenant)
 			}
 			if testConfig.SourcePlatform != tt.expected.SourcePlatform {
 				t.Errorf("expected SourcePlatform to be '%s', got '%s'", tt.expected.SourcePlatform, testConfig.SourcePlatform)
@@ -367,104 +393,47 @@ func Test_configurationPrecedence(t *testing.T) {
 	}
 }
 
-/*
-Test_checkEnvConflicts tests the checkEnvConflicts function to ensure it correctly identifies
-conflicts between environment variables set in the shell and those defined in a stack file.
-It verifies that warnings are issued when conflicts are detected and that no warnings are issued
-when there are no conflicts.
-*/
-func Test_checkEnvConflicts(t *testing.T) {
-	tests := []struct {
-		name           string
-		stackContent   string
-		shellEnv       map[string]string
-		expectConflict bool
-	}{
-		{
-			name: "Conflict detected - AWS_PROFILE",
-			stackContent: `AWS_REGION="us-west-2"
-DEFANG_MODE="affordable"
-DEFANG_PROVIDER="aws"
-AWS_PROFILE="defang-lab"`,
-			shellEnv: map[string]string{
-				"AWS_PROFILE": "defang-sandbox",
-			},
-			expectConflict: true,
-		},
-		{
-			name: "No conflict - different values in different vars",
-			stackContent: `AWS_REGION="us-west-2"
-DEFANG_MODE="affordable"
-DEFANG_PROVIDER="aws"`,
-			shellEnv: map[string]string{
-				"AWS_PROFILE": "defang-sandbox",
-			},
-			expectConflict: false,
-		},
-		{
-			name: "No conflict - same value",
-			stackContent: `AWS_PROFILE="defang-lab"
-AWS_REGION="us-west-2"`,
-			shellEnv: map[string]string{
-				"AWS_PROFILE": "defang-lab",
-			},
-			expectConflict: false,
-		},
-		{
-			name: "Conflict detected - multiple vars",
-			stackContent: `AWS_PROFILE="defang-lab"
-AWS_REGION="us-east-1"`,
-			shellEnv: map[string]string{
-				"AWS_PROFILE": "defang-sandbox",
-				"AWS_REGION":  "us-west-2",
-			},
-			expectConflict: true,
-		},
+func TestTenantFlagWinsOverEnv(t *testing.T) {
+	cfg := GlobalConfig{
+		Cluster: cluster.DefangFabric,
+	}
+	flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	flags.StringVar(&cfg.Tenant, "workspace", cfg.Tenant, "workspace name")
+	flags.StringVar(&cfg.Cluster, "cluster", cfg.Cluster, "cluster")
+	flags.StringVar(&cfg.Stack, "stack", cfg.Stack, "stack")
+
+	if err := flags.Set("workspace", "flag-workspace"); err != nil {
+		t.Fatalf("failed to set workspace flag: %v", err)
+	}
+	t.Setenv("DEFANG_WORKSPACE", "env-workspace")
+	t.Setenv("DEFANG_TENANT", "env-tenant")
+
+	if err := cfg.syncFlagsWithEnv(flags); err != nil {
+		t.Fatalf("failed to sync flags with env vars: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	if cfg.Tenant != "flag-workspace" {
+		t.Fatalf("expected tenant from flag, got %q", cfg.Tenant)
+	}
+}
 
-			prevTerm := term.DefaultTerm
-			var stdout, stderr bytes.Buffer
-			term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
-			t.Cleanup(func() {
-				term.DefaultTerm = prevTerm
-			})
+func TestTenantFromEnvAliases(t *testing.T) {
+	cfg := GlobalConfig{
+		Cluster: cluster.DefangFabric,
+	}
+	flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	flags.StringVar(&cfg.Tenant, "workspace", cfg.Tenant, "workspace name")
+	flags.StringVar(&cfg.Cluster, "cluster", cfg.Cluster, "cluster")
+	flags.StringVar(&cfg.Stack, "stack", cfg.Stack, "stack")
 
-			// Create a temporary directory and stack file
-			tempDir := t.TempDir()
-			t.Chdir(tempDir)
-			stackName := "test"
-			stackFile := filepath.Join(tempDir, stacks.Directory, stackName)
+	t.Setenv("DEFANG_WORKSPACE", "workspace-env")
+	t.Setenv("DEFANG_TENANT", "tenant-env")
 
-			// Create the .defang subdirectory
-			err := os.MkdirAll(filepath.Join(tempDir, stacks.Directory), 0700)
-			if err != nil {
-				t.Fatalf("failed to create .defang directory: %v", err)
-			}
+	if err := cfg.syncFlagsWithEnv(flags); err != nil {
+		t.Fatalf("failed to sync flags with env vars: %v", err)
+	}
 
-			// Write the stack file
-			err = os.WriteFile(stackFile, []byte(tt.stackContent), 0644)
-			if err != nil {
-				t.Fatalf("failed to write stack file: %v", err)
-			}
-
-			// Set shell environment variables
-			for key, value := range tt.shellEnv {
-				t.Setenv(key, value)
-			}
-
-			// Call checkEnvConflicts - it displays warnings but doesn't return errors
-			checkEnvConflicts(stackName)
-
-			if tt.expectConflict && !term.HadWarnings() {
-				t.Errorf("Expected warning conflicts, but no warnings were generated")
-			}
-
-			if !tt.expectConflict && term.HadWarnings() {
-				t.Errorf("Expected no warning conflicts, but warnings were generated: %s", stderr.String())
-			}
-		})
+	if cfg.Tenant != "workspace-env" {
+		t.Fatalf("expected tenant from DEFANG_WORKSPACE, got %q", cfg.Tenant)
 	}
 }
