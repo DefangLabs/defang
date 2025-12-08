@@ -104,7 +104,8 @@ func (g GrpcClient) DelegateSubdomainZone(ctx context.Context, req *defangv1.Del
 }
 
 func (g GrpcClient) DeleteSubdomainZone(ctx context.Context, req *defangv1.DeleteSubdomainZoneRequest) error {
-	// see the comment in GetDelegateSubdomainZone for explanation
+	// Normalize "beta" to "" for backward compatibility with pre-stack projects.
+	// See the comment in GetDelegateSubdomainZone for explanation.
 	if req.Stack == "beta" {
 		req.Stack = ""
 	}
