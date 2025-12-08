@@ -120,6 +120,10 @@ func (g *ModelGenerator) WithMessages(messages []*ai.Message) *ModelGenerator {
 			oaiMessages = append(oaiMessages, openai.UserMessage(content))
 
 			parts := []openai.ChatCompletionContentPartUnionParam{}
+			if content != "" {
+				parts = append(parts, openai.TextContentPart(content))
+			}
+
 			for _, p := range msg.Content {
 				if p.IsMedia() {
 					part := openai.ImageContentPart(
@@ -130,13 +134,11 @@ func (g *ModelGenerator) WithMessages(messages []*ai.Message) *ModelGenerator {
 					continue
 				}
 			}
-			if len(parts) > 0 {
-				oaiMessages = append(oaiMessages, openai.ChatCompletionMessageParamUnion{
-					OfUser: &openai.ChatCompletionUserMessageParam{
-						Content: openai.ChatCompletionUserMessageParamContentUnion{OfArrayOfContentParts: parts},
-					},
-				})
-			}
+			oaiMessages = append(oaiMessages, openai.ChatCompletionMessageParamUnion{
+				OfUser: &openai.ChatCompletionUserMessageParam{
+					Content: openai.ChatCompletionUserMessageParamContentUnion{OfArrayOfContentParts: parts},
+				},
+			})
 		default:
 			// ignore parts from not supported roles
 			continue
