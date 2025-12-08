@@ -162,7 +162,7 @@ func buildDeploymentDebugPrompt(debugConfig DebugConfig) string {
 	prompt += " Help troubleshoot and recommend a solution. Look at the logs to understand what happened."
 
 	if debugConfig.Deployment != "" {
-		prompt += fmt.Sprintf("The deployment ID is %q.", debugConfig.Deployment)
+		prompt += fmt.Sprintf(" The deployment ID is %q.", debugConfig.Deployment)
 	}
 
 	if len(debugConfig.FailedServices) > 0 {
