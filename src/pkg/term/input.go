@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"syscall"
 
 	"github.com/ross96D/cancelreader"
 )

@@ -2,7 +2,6 @@ package command
 
 import (
 	"fmt"
-	"net/http"
 	"testing"
 )
 
@@ -47,20 +46,4 @@ func TestGetCurrentVersion(t *testing.T) {
 	if ref != "1234567" {
 		t.Errorf("GetCurrentVersion() = %v; want 1234567", ref)
 	}
-}
-
-type mockRoundTripper struct {
-	method string
-	url    string
-	resp   *http.Response
-}
-
-func (rt *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	if rt.method != "" && rt.method != req.Method {
-		return nil, fmt.Errorf("expected method %q; got %q", rt.method, req.Method)
-	}
-	if rt.url != "" && rt.url != req.URL.String() {
-		return nil, fmt.Errorf("expected URL %q; got %q", rt.url, req.URL.String())
-	}
-	return rt.resp, nil
 }

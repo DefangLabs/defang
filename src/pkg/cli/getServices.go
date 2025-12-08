@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -18,7 +17,7 @@ type ErrNoServices struct {
 }
 
 func (e ErrNoServices) Error() string {
-	return fmt.Sprintf("no services found in project %s", e.ProjectName)
+	return "no services found in project " + e.ProjectName // ProjectName may be empty
 }
 
 func GetServices(ctx context.Context, projectName string, provider client.Provider, long bool) error {

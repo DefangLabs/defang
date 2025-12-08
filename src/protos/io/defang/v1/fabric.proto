@@ -339,9 +339,8 @@ message ServiceInfo {
   string domainname = 16;  // domain name for the service
   string lb_dns_name = 17; // fully qualified domain name for the load-balancer
   bool allow_scaling = 18; // true if service is allowed to autoscale
-  string healthcheck = 19; // healthcheck path
+  string healthcheck_path = 19;
   ResourceType type = 21;
-  string healthcheck_path = 22;
 }
 
 enum ResourceType {
