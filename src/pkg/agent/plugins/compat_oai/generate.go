@@ -117,8 +117,6 @@ func (g *ModelGenerator) WithMessages(messages []*ai.Message) *ModelGenerator {
 				oaiMessages = append(oaiMessages, tm)
 			}
 		case ai.RoleUser:
-			oaiMessages = append(oaiMessages, openai.UserMessage(content))
-
 			parts := []openai.ChatCompletionContentPartUnionParam{}
 			if content != "" {
 				parts = append(parts, openai.TextContentPart(content))
