@@ -76,7 +76,7 @@ func TestHandleListConfigTool(t *testing.T) {
 			setupMock: func(m *MockListConfigCLI) {
 				m.LoadProjectNameError = errors.New("failed to load project name")
 			},
-			expectedError: "Failed to load project name: failed to load project name",
+			expectedError: "failed to load project name: failed to load project name",
 		},
 		{
 			name:       "list_config_error",
@@ -85,7 +85,7 @@ func TestHandleListConfigTool(t *testing.T) {
 				m.ProjectName = "test-project"
 				m.ListConfigError = errors.New("failed to list configs")
 			},
-			expectedError: "Failed to list config variables: failed to list configs",
+			expectedError: "failed to list config variables: failed to list configs",
 		},
 		{
 			name:       "no_config_variables_found",

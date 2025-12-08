@@ -82,7 +82,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				m.LoadProjectNameError = errors.New("failed to load project name")
 			},
 			expectError:   true,
-			expectedError: "Failed to load project name: failed to load project name",
+			expectedError: "failed to load project name: failed to load project name",
 		},
 		{
 			name:       "config_not_found",
@@ -102,7 +102,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				m.ConfigDeleteError = errors.New("failed to delete config")
 			},
 			expectError:   true,
-			expectedError: "Failed to remove config variable \"DATABASE_URL\" from project \"test-project\": failed to delete config",
+			expectedError: "failed to remove config variable \"DATABASE_URL\" from project \"test-project\": failed to delete config",
 		},
 		{
 			name:       "successful_config_removal",
