@@ -554,10 +554,6 @@ var whoamiCmd = &cobra.Command{
 		jsonMode, _ := cmd.Flags().GetBool("json")
 
 		token := cluster.GetExistingToken(getCluster())
-		if token == "" {
-			return errors.New("no access token found; please log in with `defang login`")
-		}
-
 		userInfo, err := auth.FetchUserInfo(cmd.Context(), token)
 		if err != nil {
 			return err
