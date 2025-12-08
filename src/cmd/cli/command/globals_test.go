@@ -217,40 +217,6 @@ func Test_configurationPrecedence(t *testing.T) {
 			expected: defaultConfig,
 		},
 		{
-			name:         "default .defang name, when no env vars or flags",
-			createRCFile: true,
-			rcStack: stack{
-				stackname: "",
-				entries: map[string]string{
-					"DEFANG_MODE":            "AFFORDABLE",
-					"DEFANG_VERBOSE":         "true",
-					"DEFANG_DEBUG":           "false",
-					"DEFANG_STACK":           "from-env",
-					"DEFANG_FABRIC":          "from-env-cluster",
-					"DEFANG_PROVIDER":        "defang",
-					"DEFANG_SOURCE_PLATFORM": "heroku",
-					"DEFANG_COLOR":           "always",
-					"DEFANG_TTY":             "false",
-					"DEFANG_NON_INTERACTIVE": "true",
-					"DEFANG_HIDE_UPDATE":     "true",
-				},
-			},
-			expected: GlobalConfig{
-				Mode:           modes.ModeAffordable, // env file values
-				Verbose:        true,
-				Debug:          false,
-				Stack:          "from-env",
-				Cluster:        "from-env-cluster",
-				ProviderID:     cliClient.ProviderDefang,
-				Tenant:         "",
-				SourcePlatform: migrate.SourcePlatformHeroku,
-				ColorMode:      ColorAlways,
-				HasTty:         false, // from env
-				NonInteractive: true,  // from env
-				HideUpdate:     true,  // from env
-			},
-		},
-		{
 			name:         "default .defang name and no values, when no env vars or flags",
 			createRCFile: true,
 			rcStack: stack{
