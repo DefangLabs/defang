@@ -522,51 +522,6 @@ func (b *ByocAws) GetServices(ctx context.Context, req *defangv1.GetServicesRequ
 		listServiceResp.Services = projUpdate.Services
 		listServiceResp.Project = projUpdate.Project
 	}
-
-	/*if len(listServiceResp.Services) > 0 {
-		cfg, err := b.driver.LoadConfig(ctx)
-		if err != nil {
-			return nil, AnnotateAwsError(err)
-		}
-
-		ecsClient := awsecs.NewFromConfig(cfg) // Ensure the ECS client is initialized
-		lso, err := ecsClient.ListServices(ctx, &awsecs.ListServicesInput{
-			Cluster:    ptr.String(b.driver.ClusterName),
-			MaxResults: ptr.Int32(100), // 100=maximum
-		})
-		if err != nil {
-			return nil, AnnotateAwsError(err)
-		}
-
-		var services []string
-		for _, service := range listServiceResp.Services {
-			// Find the physical service name
-			for _, ecsService := range lso.ServiceArns {
-				if strings.HasSuffix(*ecsService, service.Service.Name) {
-					// The physical service name is the one with the Pulumi suffix
-			services = append(services, service.Service.Name) //this is wrong, since the physical name has the Pulumi suffix
-		}
-		dso, err := ecsClient.DescribeServices(ctx, &awsecs.DescribeServicesInput{
-			Cluster:  ptr.String(b.driver.ClusterName),
-			Services: services,
-		})
-		if err != nil {
-			return nil, AnnotateAwsError(err)
-		}
-		bytes, _ := json.Marshal(dso)
-		term.Debug(string(bytes))
-		for _, service := range projUpdate.Services {
-			for _, ecsService := range dso.Services {
-				if *ecsService.ServiceName != service.Service.Name {
-					continue
-				}
-				ecsService.Deployments[0].
-					service.Status = *ecsService.Status
-				break
-			}
-		}
-	}*/
-
 	return &listServiceResp, nil
 }
 
