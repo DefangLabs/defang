@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -26,7 +27,7 @@ type UserInfo struct {
 
 func FetchUserInfo(ctx context.Context, accessToken string) (*UserInfo, error) {
 	if accessToken == "" {
-		return nil, fmt.Errorf("access token is required to fetch user info")
+		return nil, errors.New("access token is required to fetch user info")
 	}
 
 	issuer := pkg.Getenv("DEFANG_ISSUER", openAuthClient.issuer)
