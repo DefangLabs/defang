@@ -258,16 +258,6 @@ func (r *GlobalConfig) loadDotDefang(stackName string) error {
 		// If a stack name is provided, load the stack-specific RC file but return error if it fails or does not exist
 		return stacks.Load(stackName) // ensure stack exists
 	}
-	dotfile := ".defang"
-	// If no stack name is provided, trying load the general .defang file
-	if abs, err := filepath.Abs(dotfile); err == nil {
-		dotfile = abs
-	}
-	// An error here is non-fatal since the file is optional
-	if err := godotenv.Load(dotfile); err != nil {
-		term.Debugf("could not load stack %q; continuing without env file: %v", stackName, err)
-		return nil // continue if no general env file
-	}
 	term.Debugf("loaded globals from %s", dotfile)
 
 	return nil
