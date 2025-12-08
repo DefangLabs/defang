@@ -16,12 +16,14 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/agent"
+	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/login"
@@ -50,10 +52,22 @@ var authNeededAnnotation = map[string]string{authNeeded: ""}
 var P = track.P
 
 func getCluster() string {
-	if global.Org == "" {
-		return global.Cluster
+	return global.Cluster
+}
+
+// getTenantSelection resolves the tenant to use for this invocation (flag > env > token subject),
+// leaving it unset when we should rely on the personal tenant from the token subject.
+func getTenantSelection() types.TenantNameOrID {
+	if global.Tenant != "" {
+		return types.TenantNameOrID(global.Tenant)
 	}
-	return global.Org + "@" + global.Cluster
+	if token := cluster.GetExistingToken(getCluster()); token != "" {
+		if t := cli.TenantFromToken(token); t.IsSet() {
+			return t
+		}
+	}
+	// No explicit tenant: defer to token subject or server defaults.
+	return types.TenantUnset
 }
 
 func Execute(ctx context.Context) error {
@@ -174,7 +188,7 @@ func SetupCommands(ctx context.Context, version string) {
 	})
 	RootCmd.PersistentFlags().StringVar(&global.Cluster, "cluster", global.Cluster, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster") // only for Defang use
-	RootCmd.PersistentFlags().StringVar(&global.Org, "org", global.Org, "override GitHub organization name (tenant)")
+	RootCmd.PersistentFlags().StringVar(&global.Tenant, "workspace", global.Tenant, "workspace to use (tenant name or ID)")
 	RootCmd.PersistentFlags().VarP(&global.ProviderID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	RootCmd.RegisterFlagCompletionFunc("provider", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var completions []cobra.Completion
@@ -195,7 +209,8 @@ func SetupCommands(ctx context.Context, version string) {
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
 	// Create a temporary gRPC client for tracking events before login
-	cli.Connect(ctx, global.Cluster)
+	// getTenantSelection defaults to types.TenantUnset when no tenant is specified
+	cli.ConnectWithTenant(ctx, getCluster(), getTenantSelection())
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
@@ -245,6 +260,9 @@ func SetupCommands(ctx context.Context, version string) {
 	// Whoami Command
 	whoamiCmd.PersistentFlags().Bool("json", pkg.GetenvBool("DEFANG_JSON"), "print output in JSON format")
 	RootCmd.AddCommand(whoamiCmd)
+
+	// Workspace Command
+	RootCmd.AddCommand(workspaceCmd)
 
 	// Logout Command
 	RootCmd.AddCommand(logoutCmd)
@@ -444,7 +462,7 @@ var RootCmd = &cobra.Command{
 			return err
 		}
 
-		global.Client, err = cli.Connect(ctx, getCluster())
+		global.Client, err = cli.ConnectWithTenant(ctx, getCluster(), getTenantSelection())
 
 		if v, err := global.Client.GetVersions(ctx); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
@@ -524,6 +542,7 @@ var whoamiCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		verbose := global.Verbose
 		loader := configureLoader(cmd)
 		global.NonInteractive = true // don't show provider prompt
 		provider, err := newProvider(cmd.Context(), loader)
@@ -533,7 +552,38 @@ var whoamiCmd = &cobra.Command{
 
 		jsonMode, _ := cmd.Flags().GetBool("json")
 
-		data, err := cli.Whoami(cmd.Context(), global.Client, provider)
+		token := cluster.GetExistingToken(getCluster())
+		if token == "" {
+			return errors.New("no access token found; please log in with `defang login`")
+		}
+
+		userInfo, err := auth.FetchUserInfo(cmd.Context(), token)
+		if err != nil {
+			return err
+		}
+
+		tenantSelection := getTenantSelection()
+		data, err := cli.Whoami(cmd.Context(), global.Client, provider, userInfo, tenantSelection, verbose)
+		if err != nil {
+			return err
+		}
+		if verbose && userInfo != nil {
+			if tenantID := cli.ResolveWorkspaceID(userInfo, tenantSelection); tenantID != "" {
+				data.TenantID = tenantID
+			}
+		}
+		if !verbose {
+			data.Tenant = ""
+			data.TenantID = ""
+		}
+
+		if verbose && data.Workspace == "" && userInfo != nil {
+			// If we didn't resolve a workspace name, try to display the raw selection for transparency.
+			if tenantSelection.IsSet() {
+				data.Workspace = tenantSelection.String()
+			}
+		}
+
 		if err != nil {
 			return err
 		}
@@ -546,14 +596,18 @@ var whoamiCmd = &cobra.Command{
 			_, err = term.Println(string(bytes))
 			return err
 		} else {
-			return term.Table([]cli.ShowAccountData{data},
+			cols := []string{
+				"Name",
+				"Email",
+				"Workspace",
 				"Provider",
-				"AccountID",
-				"Tenant",
-				"TenantID",
 				"SubscriberTier",
 				"Region",
-			)
+			}
+			if verbose {
+				cols = append(cols, "Tenant", "TenantID")
+			}
+			return term.Table([]cli.ShowAccountData{data}, cols...)
 		}
 	},
 }
@@ -1107,8 +1161,7 @@ var tokenCmd = &cobra.Command{
 		var s, _ = cmd.Flags().GetString("scope")
 		var expires, _ = cmd.Flags().GetDuration("expires")
 
-		// TODO: should default to use the current tenant, not the default tenant
-		return cli.Token(cmd.Context(), global.Client, types.TenantName(global.Org), expires, scope.Scope(s))
+		return cli.Token(cmd.Context(), global.Client, getTenantSelection(), expires, scope.Scope(s))
 	},
 }
 

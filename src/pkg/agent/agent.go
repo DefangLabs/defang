@@ -36,7 +36,7 @@ func New(ctx context.Context, clusterAddr string, providerId *client.ProviderID,
 	accessToken := cluster.GetExistingToken(clusterAddr)
 	aiProvider := "fabric"
 	var providerPlugin api.Plugin
-	_, addr := cluster.SplitTenantHost(clusterAddr)
+	addr := cluster.NormalizeHost(clusterAddr)
 	// Generate a random session ID prepended with timestamp for easier sorting
 	sessionID := fmt.Sprintf("%s-%s", time.Now().Format("20060102T150405Z"), pkg.RandomID())
 	providerPlugin = &fabric.OpenAI{

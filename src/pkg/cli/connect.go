@@ -11,25 +11,52 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func Connect(ctx context.Context, addr string) (*client.GrpcClient, error) {
-	tenantName, host := cluster.SplitTenantHost(addr)
-	accessToken := cluster.GetExistingToken(addr)
-	term.Debug("Using tenant", tenantName, "for cluster", host)
-	grpcClient := client.NewGrpcClient(host, accessToken, tenantName)
+	return ConnectWithTenant(ctx, addr, types.TenantUnset)
+}
+
+// ConnectWithTenant builds a client carrying the requested tenant (name or ID),
+// falling back to the token subject when unset so the server can resolve the personal tenant.
+func ConnectWithTenant(ctx context.Context, addr string, requestedTenant types.TenantNameOrID) (*client.GrpcClient, error) {
+	host := cluster.NormalizeHost(addr)
+	accessToken := cluster.GetExistingToken(host)
+	tokenTenant := TenantFromToken(accessToken)
+	effectiveTenant := requestedTenant
+	if !effectiveTenant.IsSet() {
+		effectiveTenant = tokenTenant
+	}
+
+	// Carry all tenant sources so we can emit the requested value (or token fallback) consistently.
+	term.Debug("Using tenant", effectiveTenant, "for cluster", host)
+	grpcClient := client.NewGrpcClient(host, accessToken, client.TenantContext{
+		RequestedTenant: requestedTenant,
+		TokenTenant:     tokenTenant,
+	})
 	track.Tracker = grpcClient // Update track client
 
-	resp, err := grpcClient.WhoAmI(ctx)
-	if err != nil {
-		term.Debug("Unable to validate tenant ID with server:", err)
-	} else if string(tenantName) != resp.Tenant {
-		if tenantName != types.DEFAULT_TENANT {
-			term.Debugf("Overriding tenant %q with server provided value %q", tenantName, resp.Tenant)
-		}
-		grpcClient.TenantName = types.TenantName(resp.Tenant)
+	if _, err := grpcClient.WhoAmI(ctx); err != nil {
+		term.Debug("Unable to validate tenant with server:", err)
+		return grpcClient, err
 	}
-	return grpcClient, err
+	return grpcClient, nil
+}
+
+// TenantFromToken extracts the subject (tenant id) from an access token without verification.
+func TenantFromToken(accessToken string) types.TenantNameOrID {
+	if accessToken == "" {
+		return types.TenantUnset
+	}
+	var claims jwt.RegisteredClaims
+	if _, _, err := jwt.NewParser().ParseUnverified(accessToken, &claims); err != nil {
+		return types.TenantUnset
+	}
+	if claims.Subject == "" {
+		return types.TenantUnset
+	}
+	return types.TenantNameOrID(claims.Subject)
 }
 
 func NewProvider(ctx context.Context, providerID client.ProviderID, fabricClient client.FabricClient, stack string) client.Provider {

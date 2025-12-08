@@ -74,10 +74,10 @@ type GlobalConfig struct {
 	Mode           modes.Mode
 	ModelID        string // only for debug/generate; Pro users
 	NonInteractive bool
-	Org            string
 	ProviderID     cliClient.ProviderID
 	SourcePlatform migrate.SourcePlatform // only used for 'defang init' command
 	Stack          string
+	Tenant         string
 	Verbose        bool
 }
 
@@ -202,9 +202,11 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 		}
 	}
 
-	if !flags.Changed("org") {
-		if fromEnv, ok := os.LookupEnv("DEFANG_ORG"); ok {
-			r.Org = fromEnv
+	if !flags.Changed("workspace") {
+		if fromEnv, ok := os.LookupEnv("DEFANG_WORKSPACE"); ok {
+			r.Tenant = fromEnv
+		} else if fromEnv, ok := os.LookupEnv("DEFANG_TENANT"); ok {
+			r.Tenant = fromEnv
 		}
 	}
 

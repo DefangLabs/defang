@@ -28,7 +28,7 @@ type FabricClient interface {
 	GetDelegateSubdomainZone(context.Context, *defangv1.GetDelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
 	GetPlaygroundProjectDomain(context.Context) (*defangv1.GetPlaygroundProjectDomainResponse, error)
 	GetSelectedProvider(context.Context, *defangv1.GetSelectedProviderRequest) (*defangv1.GetSelectedProviderResponse, error)
-	GetTenantName() types.TenantName
+	GetTenantName() types.TenantNameOrID // TODO: This type should probably be something like TenantShortID
 	GetVersions(context.Context) (*defangv1.Version, error)
 	ListDeployments(context.Context, *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error)
 	Preview(context.Context, *defangv1.PreviewRequest) (*defangv1.PreviewResponse, error)
