@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -27,6 +28,9 @@ func NormalizeHost(cluster string) string {
 
 func tokenStorageName(fabric string) string {
 	// Token files are keyed by normalized host (no tenant prefix, no port) to avoid duplication.
+	if at := strings.LastIndex(fabric, "@"); at >= 0 && at < len(fabric)-1 {
+		fabric = fabric[at+1:] // drop legacy tenant prefix
+	}
 	host := NormalizeHost(fabric)
 	if parsedHost, _, err := net.SplitHostPort(host); err == nil && parsedHost != "" {
 		host = parsedHost
