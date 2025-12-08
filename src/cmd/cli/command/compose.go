@@ -165,7 +165,8 @@ func makeComposeUpCmd() *cobra.Command {
 				deploymentErr := err
 				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
 				if err != nil {
-					return err
+					term.Warn("Failed to initialize debugger:", err)
+					return deploymentErr
 				}
 				handleTailAndMonitorErr(ctx, deploymentErr, debugger, debug.DebugConfig{
 					Deployment: deploy.Etag,
@@ -455,13 +456,15 @@ func makeComposeConfigCmd() *cobra.Command {
 				term.Error("Cannot load project:", loadErr)
 				project, err := loader.CreateProjectForDebug()
 				if err != nil {
-					return err
+					term.Warn("Failed to create project for debug:", err)
+					return loadErr
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
 				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
 				if err != nil {
-					return err
+					term.Warn("Failed to initialize debugger:", err)
+					return loadErr
 				}
 				return debugger.DebugComposeLoadError(ctx, debug.DebugConfig{
 					Project: project,
