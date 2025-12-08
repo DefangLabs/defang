@@ -458,6 +458,7 @@ func makeComposeConfigCmd() *cobra.Command {
 					return err
 				}
 
+				track.Evt("Debug Prompted", P("loadErr", loadErr))
 				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
 				if err != nil {
 					return err
