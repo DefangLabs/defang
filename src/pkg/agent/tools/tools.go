@@ -1,17 +1,10 @@
 package tools
 
 import (
-	"context"
-
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/firebase/genkit/go/ai"
 )
-
-type Connecter interface {
-	Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error)
-}
 
 func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Tool {
 	return []ai.Tool{
