@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
-	"strings"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cluster"
@@ -302,20 +301,10 @@ func (r *GlobalConfig) checkEnvConflicts(stackFile string) {
 		return
 	}
 	
-	// Get the existing shell environment
-	shellEnv := make(map[string]string)
-	for _, env := range os.Environ() {
-		if idx := strings.Index(env, "="); idx > 0 {
-			key := env[:idx]
-			value := env[idx+1:]
-			shellEnv[key] = value
-		}
-	}
-	
-	// Check for conflicts
+	// Check for conflicts with existing shell environment
 	var conflicts []string
 	for key, stackValue := range stackEnv {
-		if shellValue, exists := shellEnv[key]; exists && shellValue != stackValue {
+		if shellValue, ok := os.LookupEnv(key); ok && shellValue != stackValue {
 			conflicts = append(conflicts, key)
 		}
 	}
@@ -327,7 +316,7 @@ func (r *GlobalConfig) checkEnvConflicts(stackFile string) {
 		
 		term.Warnf("The following environment variables from the stack file will be ignored because they are already set in your shell environment:")
 		for _, key := range conflicts {
-			term.Warnf("  - %s (shell: %q, stack: %q)", key, shellEnv[key], stackEnv[key])
+			term.Warnf("  - %s (shell: %q, stack: %q)", key, os.Getenv(key), stackEnv[key])
 		}
 		term.Warnf("The shell environment variables will take precedence. To use the stack file values, unset these variables in your shell.")
 	}
