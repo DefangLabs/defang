@@ -101,7 +101,7 @@ func (d *Debugger) DebugDeploymentError(ctx context.Context, debugConfig DebugCo
 
 func (d *Debugger) DebugComposeLoadError(ctx context.Context, debugConfig DebugConfig, loadErr error) error {
 	return d.promptAndTrackDebugSession(func() error {
-		prompt := "The following error occurred while loading the compose file. Help troubleshoot and recommend a solution." + loadErr.Error()
+		prompt := "The following error occurred while loading the compose file. Help troubleshoot and recommend a solution.\n\n" + loadErr.Error()
 		return d.agent.StartWithMessage(ctx, prompt)
 	}, "Debug Load", P("etag", debugConfig.Deployment), P("composeErr", loadErr))
 }

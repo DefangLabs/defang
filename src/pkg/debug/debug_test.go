@@ -132,7 +132,7 @@ func TestDebugComposeLoadError(t *testing.T) {
 			debugConfig: DebugConfig{
 				Deployment: "load-error-deployment",
 			},
-			expectedPrompt: "The following error occurred while loading the compose file. Help troubleshoot and recommend a solution.validating %s/compose.yaml:  additional properties 'foo' not allowed",
+			expectedPrompt: "The following error occurred while loading the compose file. Help troubleshoot and recommend a solution.\n\nvalidating %s/compose.yaml:  additional properties 'foo' not allowed",
 			permission:     true,
 		},
 	}
