@@ -24,14 +24,14 @@ func HandleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader,
 		return "", fmt.Errorf("Could not connect: %w", err)
 	}
 
-	pp := NewProviderPreparer(cli, ec, client)
-	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
-	if err != nil {
-		return "", fmt.Errorf("failed to setup provider: %w", err)
-	}
 	projectName, err := cli.LoadProjectName(ctx, loader)
 	if err != nil {
 		return "", fmt.Errorf("failed to load project name: %w", err)
+	}
+	pp := NewProviderPreparer(cli, ec, client)
+	_, provider, err := pp.SetupProvider(ctx, projectName, sc.Stack)
+	if err != nil {
+		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
 	if err := cli.ConfigDelete(ctx, projectName, provider, params.Name); err != nil {
 		// Show a warning (not an error) if the config was not found

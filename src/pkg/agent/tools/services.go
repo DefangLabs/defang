@@ -26,11 +26,6 @@ func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, cli
 		return "", fmt.Errorf("could not connect: %w", err)
 	}
 
-	pp := NewProviderPreparer(cli, ec, client)
-	_, provider, err := pp.SetupProvider(ctx, config.Stack)
-	if err != nil {
-		return "", fmt.Errorf("failed to setup provider: %w", err)
-	}
 	projectName, err := cli.LoadProjectName(ctx, loader)
 	term.Debugf("Project name loaded: %s", projectName)
 	if err != nil {
@@ -38,6 +33,11 @@ func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, cli
 			return "no projects found on Playground", nil
 		}
 		return "", fmt.Errorf("failed to load project name: %w", err)
+	}
+	pp := NewProviderPreparer(cli, ec, client)
+	_, provider, err := pp.SetupProvider(ctx, projectName, config.Stack)
+	if err != nil {
+		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
 
 	serviceResponse, err := cli.GetServices(ctx, projectName, provider)

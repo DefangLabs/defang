@@ -25,17 +25,17 @@ func HandleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params
 	}
 
 	pp := NewProviderPreparer(cli, ec, client)
-	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
-	if err != nil {
-		return "", fmt.Errorf("failed to setup provider: %w", err)
-	}
-
 	if params.ProjectName == "" {
 		projectName, err := cli.LoadProjectName(ctx, loader)
 		if err != nil {
 			return "", fmt.Errorf("failed to load project name: %w", err)
 		}
 		params.ProjectName = projectName
+	}
+
+	_, provider, err := pp.SetupProvider(ctx, params.ProjectName, sc.Stack)
+	if err != nil {
+		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
 
 	if !pkg.IsValidSecretName(params.Name) {

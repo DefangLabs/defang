@@ -45,16 +45,17 @@ func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 		return "", fmt.Errorf("could not connect: %w", err)
 	}
 
-	pp := NewProviderPreparer(cli, ec, client)
-	_, provider, err := pp.SetupProvider(ctx, config.Stack)
-	if err != nil {
-		return "", fmt.Errorf("failed to setup provider: %w", err)
-	}
 	projectName, err := cli.LoadProjectName(ctx, loader)
 	if err != nil {
 		return "", fmt.Errorf("failed to load project name: %w", err)
 	}
 	term.Debug("Project name loaded:", projectName)
+
+	pp := NewProviderPreparer(cli, ec, client)
+	_, provider, err := pp.SetupProvider(ctx, projectName, config.Stack)
+	if err != nil {
+		return "", fmt.Errorf("failed to setup provider: %w", err)
+	}
 
 	if config.ProviderID == nil {
 		return "", errors.New("provider ID is required to fetch logs")

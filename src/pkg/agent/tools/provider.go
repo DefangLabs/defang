@@ -13,6 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 const CreateNewStack = "Create new stack"
@@ -35,7 +36,7 @@ func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc cliC
 	}
 }
 
-func (pp *providerPreparer) SetupProvider(ctx context.Context, stackName *string) (*cliClient.ProviderID, cliClient.Provider, error) {
+func (pp *providerPreparer) SetupProvider(ctx context.Context, projectName string, stackName *string) (*cliClient.ProviderID, cliClient.Provider, error) {
 	var providerID cliClient.ProviderID
 	var err error
 	var stack *stacks.StackParameters
@@ -43,16 +44,12 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, stackName *string
 		return nil, nil, errors.New("stackName cannot be nil")
 	}
 	if *stackName != "" {
-		stack, err = stacks.Read(*stackName)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to read stack: %w", err)
-		}
-		err = stacks.Load(*stackName)
+		stack, err = loadStack(*stackName)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to load stack: %w", err)
 		}
 	} else {
-		stack, err = pp.setupStack(ctx)
+		stack, err = pp.selectOrCreateStack(ctx, projectName)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to setup stack: %w", err)
 		}
@@ -74,19 +71,42 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, stackName *string
 	return &providerID, provider, nil
 }
 
-func selectStack(ctx context.Context, ec elicitations.Controller) (string, error) {
-	stackList, err := stacks.List()
+type StackOption struct {
+	Name  string
+	Local bool
+}
+
+func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Controller, projectName string) (string, error) {
+	remoteStackList, err := pp.collectExistingStacks(ctx, projectName)
+	if err != nil {
+		return "", fmt.Errorf("failed to collect existing stacks: %w", err)
+	}
+	localStackList, err := stacks.List()
 	if err != nil {
 		return "", fmt.Errorf("failed to list stacks: %w", err)
 	}
 
-	if len(stackList) == 0 {
+	// Merge remote and local stacks into a single list of type StackOption,
+	// prefer local if both exist
+	stackMap := make(map[string]StackOption)
+	for _, remoteStack := range remoteStackList {
+		stackMap[remoteStack] = StackOption{Name: remoteStack, Local: false}
+	}
+	for _, localStack := range localStackList {
+		stackMap[localStack.Name] = StackOption{Name: localStack.Name, Local: true}
+	}
+	if len(stackMap) == 0 {
 		return CreateNewStack, nil
 	}
 
-	stackNames := make([]string, 0, len(stackList)+1)
-	for _, s := range stackList {
-		stackNames = append(stackNames, s.Name)
+	// Convert map back to slice
+	stackNames := make([]string, 0, len(stackMap)+1)
+	for _, stackOption := range stackMap {
+		name := stackOption.Name
+		if !stackOption.Local {
+			name += " (remote)"
+		}
+		stackNames = append(stackNames, name)
 	}
 	stackNames = append(stackNames, CreateNewStack)
 
@@ -98,8 +118,31 @@ func selectStack(ctx context.Context, ec elicitations.Controller) (string, error
 	return selectedStackName, nil
 }
 
-func (pp *providerPreparer) setupStack(ctx context.Context) (*stacks.StackParameters, error) {
-	selectedStackName, err := selectStack(ctx, pp.ec)
+func (pp *providerPreparer) collectExistingStacks(ctx context.Context, projectName string) ([]string, error) {
+	resp, err := pp.fc.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
+		Project: projectName,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list deployments: %w", err)
+	}
+	deployments := resp.GetDeployments()
+	stackNameMap := make(map[string]bool, 0)
+	for _, d := range deployments {
+		stackName := d.GetStack()
+		if stackName == "" {
+			stackName = "beta"
+		}
+		stackNameMap[stackName] = true
+	}
+	stackNames := make([]string, 0, len(stackNameMap))
+	for stackName := range stackNameMap {
+		stackNames = append(stackNames, stackName)
+	}
+	return stackNames, nil
+}
+
+func (pp *providerPreparer) selectOrCreateStack(ctx context.Context, projectName string) (*stacks.StackParameters, error) {
+	selectedStackName, err := pp.selectStack(ctx, pp.ec, projectName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select stack: %w", err)
 	}
@@ -112,12 +155,19 @@ func (pp *providerPreparer) setupStack(ctx context.Context) (*stacks.StackParame
 		selectedStackName = newStack.Name
 	}
 
-	err = stacks.Load(selectedStackName)
+	return loadStack(selectedStackName)
+}
+
+func loadStack(stackName string) (*stacks.StackParameters, error) {
+	stack, err := stacks.Read(stackName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read stack: %w", err)
+	}
+	err = stacks.Load(stackName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load stack: %w", err)
 	}
-
-	return stacks.Read(selectedStackName)
+	return stack, nil
 }
 
 func (pp *providerPreparer) createNewStack(ctx context.Context) (*stacks.StackListItem, error) {
