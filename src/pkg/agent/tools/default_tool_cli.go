@@ -62,10 +62,6 @@ func (DefaultToolCLI) ComposeDown(ctx context.Context, projectName string, clien
 	return cli.ComposeDown(ctx, projectName, client, provider)
 }
 
-func (DefaultToolCLI) LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error) {
-	return cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
-}
-
 func (DefaultToolCLI) ConfigDelete(ctx context.Context, projectName string, provider cliClient.Provider, name string) error {
 	return cli.ConfigDelete(ctx, projectName, provider, name)
 }
@@ -89,6 +85,10 @@ func (DefaultToolCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.Estimate
 
 func (DefaultToolCLI) LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error) {
 	return loader.LoadProject(ctx)
+}
+
+func (DefaultToolCLI) LoadProjectName(ctx context.Context, loader cliClient.Loader) (string, error) {
+	return loader.LoadProjectName(ctx)
 }
 
 func (DefaultToolCLI) CreatePlaygroundProvider(client *cliClient.GrpcClient) cliClient.Provider {

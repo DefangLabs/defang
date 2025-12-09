@@ -22,11 +22,11 @@ import (
 // MockCLI implements CLIInterface for testing
 type MockCLI struct {
 	CLIInterface
-	ConnectError                     error
-	LoadProjectNameWithFallbackError error
-	MockClient                       *client.GrpcClient
-	MockProvider                     client.Provider
-	MockProjectName                  string
+	ConnectError         error
+	LoadProjectNameError error
+	MockClient           *client.GrpcClient
+	MockProvider         client.Provider
+	MockProjectName      string
 
 	GetServicesError    error
 	MockServices        []deployment_info.Service
@@ -46,9 +46,9 @@ func (m *MockCLI) NewProvider(ctx context.Context, providerId client.ProviderID,
 	return m.MockProvider
 }
 
-func (m *MockCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
-	if m.LoadProjectNameWithFallbackError != nil {
-		return "", m.LoadProjectNameWithFallbackError
+func (m *MockCLI) LoadProjectName(ctx context.Context, loader client.Loader) (string, error) {
+	if m.LoadProjectNameError != nil {
+		return "", m.LoadProjectNameError
 	}
 	if m.MockProjectName != "" {
 		return m.MockProjectName, nil
@@ -177,9 +177,9 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			name:       "load_project_name_error",
 			providerId: client.ProviderDefang,
 			mockCLI: &MockCLI{
-				MockClient:                       &client.GrpcClient{},
-				MockProvider:                     &client.PlaygroundProvider{},
-				LoadProjectNameWithFallbackError: errors.New("failed to load project name"),
+				MockClient:           &client.GrpcClient{},
+				MockProvider:         &client.PlaygroundProvider{},
+				LoadProjectNameError: errors.New("failed to load project name"),
 			},
 
 			expectedError:       true,

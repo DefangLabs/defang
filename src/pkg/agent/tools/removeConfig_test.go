@@ -39,8 +39,8 @@ func (m *MockRemoveConfigCLI) NewProvider(ctx context.Context, providerId client
 	return nil // Mock provider
 }
 
-func (m *MockRemoveConfigCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
-	m.CallLog = append(m.CallLog, "LoadProjectNameWithFallback")
+func (m *MockRemoveConfigCLI) LoadProjectName(ctx context.Context, loader client.Loader) (string, error) {
+	m.CallLog = append(m.CallLog, "LoadProjectName")
 	if m.LoadProjectNameError != nil {
 		return "", m.LoadProjectNameError
 	}
@@ -174,8 +174,8 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			if !tt.expectError && tt.name == "successful_config_removal" {
 				expectedCalls := []string{
 					"Connect(test-cluster)",
+					"LoadProjectName",
 					"NewProvider(aws)",
-					"LoadProjectNameWithFallback",
 					"ConfigDelete(test-project, DATABASE_URL)",
 				}
 				assert.Equal(t, expectedCalls, mockCLI.CallLog)

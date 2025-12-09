@@ -17,13 +17,13 @@ import (
 // MockDestroyCLI implements CLIInterface for testing
 type MockDestroyCLI struct {
 	CLIInterface
-	ConnectError                     error
-	ComposeDownError                 error
-	LoadProjectNameWithFallbackError error
-	CanIUseProviderError             error
-	ComposeDownResult                string
-	ProjectName                      string
-	CallLog                          []string
+	ConnectError         error
+	ComposeDownError     error
+	LoadProjectNameError error
+	CanIUseProviderError error
+	ComposeDownResult    string
+	ProjectName          string
+	CallLog              []string
 }
 
 func (m *MockDestroyCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
@@ -47,10 +47,10 @@ func (m *MockDestroyCLI) ComposeDown(ctx context.Context, projectName string, gr
 	return m.ComposeDownResult, nil
 }
 
-func (m *MockDestroyCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
-	m.CallLog = append(m.CallLog, "LoadProjectNameWithFallback")
-	if m.LoadProjectNameWithFallbackError != nil {
-		return "", m.LoadProjectNameWithFallbackError
+func (m *MockDestroyCLI) LoadProjectName(ctx context.Context, loader client.Loader) (string, error) {
+	m.CallLog = append(m.CallLog, "LoadProjectName")
+	if m.LoadProjectNameError != nil {
+		return "", m.LoadProjectNameError
 	}
 	return m.ProjectName, nil
 }
@@ -83,7 +83,7 @@ func TestHandleDestroyTool(t *testing.T) {
 			name:       "load_project_name_error",
 			providerID: client.ProviderAWS,
 			setupMock: func(m *MockDestroyCLI) {
-				m.LoadProjectNameWithFallbackError = errors.New("failed to load project name")
+				m.LoadProjectNameError = errors.New("failed to load project name")
 			},
 			expectedError: "failed to load project name: failed to load project name",
 		},
@@ -166,8 +166,8 @@ func TestHandleDestroyTool(t *testing.T) {
 			if tt.expectedError == "" && tt.name == "successful_destroy" {
 				expectedCalls := []string{
 					"Connect(test-cluster)",
+					"LoadProjectName",
 					"NewProvider(aws)",
-					"LoadProjectNameWithFallback",
 					"CanIUseProvider(aws, test-project)",
 					"ComposeDown(test-project)",
 				}

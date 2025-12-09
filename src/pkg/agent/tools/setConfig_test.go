@@ -62,7 +62,7 @@ func (p *MockProvider) AccountInfo(context.Context) (*client.AccountInfo, error)
 	return &client.AccountInfo{}, nil
 }
 
-func (m *MockSetConfigCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
+func (m *MockSetConfigCLI) LoadProjectName(ctx context.Context, loader client.Loader) (string, error) {
 	m.LoadProjectNameCalled = true
 	if m.LoadProjectNameError != nil {
 		return "", m.LoadProjectNameError
@@ -173,7 +173,7 @@ func TestHandleSetConfig(t *testing.T) {
 			expectedError:            true,
 			errorMessage:             "failed to load project name: project loading failed",
 			expectedConnectCalls:     true,
-			expectedProviderCalls:    true,
+			expectedProviderCalls:    false,
 			expectedProjectNameCalls: true,
 		},
 		{

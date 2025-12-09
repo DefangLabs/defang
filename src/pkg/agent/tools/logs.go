@@ -50,9 +50,7 @@ func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
-
-	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
-	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
+	projectName, err := cli.LoadProjectName(ctx, loader)
 	if err != nil {
 		return "", fmt.Errorf("failed to load project name: %w", err)
 	}

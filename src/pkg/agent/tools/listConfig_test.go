@@ -38,8 +38,8 @@ func (m *MockListConfigCLI) NewProvider(ctx context.Context, providerId client.P
 	return nil // Mock provider
 }
 
-func (m *MockListConfigCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
-	m.CallLog = append(m.CallLog, "LoadProjectNameWithFallback")
+func (m *MockListConfigCLI) LoadProjectName(ctx context.Context, loader client.Loader) (string, error) {
+	m.CallLog = append(m.CallLog, "LoadProjectName")
 	if m.LoadProjectNameError != nil {
 		return "", m.LoadProjectNameError
 	}
@@ -154,8 +154,8 @@ func TestHandleListConfigTool(t *testing.T) {
 			if tt.expectedError == "" && tt.name == "successful_list_single_config" {
 				expectedCalls := []string{
 					"Connect(test-cluster)",
+					"LoadProjectName",
 					"NewProvider(aws)",
-					"LoadProjectNameWithFallback",
 					"ListConfig(test-project)",
 				}
 				assert.Equal(t, expectedCalls, mockCLI.CallLog)
