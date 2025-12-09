@@ -14,16 +14,14 @@ var ErrNothingToMonitor = errors.New("no services to monitor")
 
 type ServiceStates = map[string]defangv1.ServiceState
 
-func WaitServiceState(
+func WatchServiceState(
 	ctx context.Context,
 	provider client.Provider,
-	targetState defangv1.ServiceState,
 	projectName string,
 	etag types.ETag,
 	services []string,
+	cb func(*defangv1.SubscribeResponse, *ServiceStates) error,
 ) (ServiceStates, error) {
-	term.Debugf("waiting for services %v to reach state %s\n", services, targetState) // TODO: don't print in Go-routine
-
 	if len(services) == 0 {
 		return nil, ErrNothingToMonitor
 	}
@@ -79,17 +77,39 @@ func WaitServiceState(
 		}
 
 		serviceStates[msg.Name] = msg.State
+		err := cb(msg, &serviceStates)
+		if err != nil {
+			if errors.Is(err, client.ErrDeploymentSucceeded) {
+				return serviceStates, nil
+			}
+			return serviceStates, err
+		}
+	}
+}
 
+func WaitServiceState(
+	ctx context.Context,
+	provider client.Provider,
+	targetState defangv1.ServiceState,
+	projectName string,
+	etag types.ETag,
+	services []string,
+) (ServiceStates, error) {
+	term.Debugf("waiting for services %v to reach state %s\n", services, targetState) // TODO: don't print in Go-routine
+
+	return WatchServiceState(ctx, provider, projectName, etag, services, func(msg *defangv1.SubscribeResponse, serviceStates *ServiceStates) error {
 		// exit early on detecting a FAILED state
 		switch msg.State {
 		case defangv1.ServiceState_BUILD_FAILED, defangv1.ServiceState_DEPLOYMENT_FAILED:
-			return serviceStates, client.ErrDeploymentFailed{Service: msg.Name, Message: msg.Status}
+			return client.ErrDeploymentFailed{Service: msg.Name, Message: msg.Status}
 		}
 
-		if allInState(targetState, serviceStates) {
-			return serviceStates, nil // all services are in the target state
+		if allInState(targetState, *serviceStates) {
+			return client.ErrDeploymentSucceeded // signal successful completion
 		}
-	}
+
+		return nil
+	})
 }
 
 func allInState(targetState defangv1.ServiceState, serviceStates ServiceStates) bool {
