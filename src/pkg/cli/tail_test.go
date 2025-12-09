@@ -124,7 +124,7 @@ func TestTail(t *testing.T) {
 		},
 	}
 
-	err := Tail(t.Context(), p, projectName, TailOptions{Verbose: true}) // Output host
+	err := Tail(t.Context(), p, projectName, TailOptions{Verbose: true, PrintBookends: true}) // Output host
 	if err != io.EOF {
 		t.Errorf("Tail() error = %v, want io.EOF", err)
 	}
@@ -231,7 +231,7 @@ func TestUTC(t *testing.T) {
 	localMock = localMock.MockTimestamp(localTime)
 
 	// Start the terminal for local time test
-	err := Tail(t.Context(), localMock, projectName, TailOptions{Verbose: true}) // Output host
+	err := Tail(t.Context(), localMock, projectName, TailOptions{Verbose: true, PrintBookends: true}) // Output host
 	if err != nil {
 		t.Errorf("Tail() error = %v, want io.EOF", err)
 	}
@@ -265,7 +265,7 @@ func TestUTC(t *testing.T) {
 	utcMock := &mockTailProvider{}
 	utcMock = utcMock.MockTimestamp(utcTime)
 
-	err = Tail(t.Context(), utcMock, projectName, TailOptions{Verbose: true})
+	err = Tail(t.Context(), utcMock, projectName, TailOptions{PrintBookends: true, Verbose: true})
 	if err != nil {
 		t.Errorf("Tail() error = %v, want io.EOF", err)
 	}
@@ -484,4 +484,73 @@ func jsonFileToLogEntry(t *testing.T, fileName string) []*defangv1.LogEntry {
 
 	t.Logf("Successfully loaded %d log entries from %s", len(logEntries), fileName)
 	return logEntries
+}
+
+func TestTailOptions_String(t *testing.T) {
+	tests := []struct {
+		name string
+		to   TailOptions
+		want string
+	}{
+		{
+			name: "with deployment",
+			to: TailOptions{
+				Verbose:    true,
+				Deployment: "deploy123",
+			},
+			want: " --deployment=deploy123",
+		},
+		{
+			name: "with services",
+			to: TailOptions{
+				Verbose:  true,
+				Services: []string{"svc1", "svc2"},
+			},
+			want: " svc1 svc2",
+		},
+		{
+			name: "with services and follow",
+			to: TailOptions{
+				Verbose:  true,
+				Services: []string{"svc1", "svc2"},
+				Follow:   true,
+			},
+			want: " --follow svc1 svc2",
+		},
+		{
+			name: "with since and until",
+			to: TailOptions{
+				Verbose: true,
+				Since:   time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC),
+				Until:   time.Date(2024, 1, 2, 4, 4, 5, 0, time.UTC),
+			},
+			want: " --since=2024-01-02T03:04:05Z --until=2024-01-02T04:04:05Z",
+		},
+		{
+			name: "with since and follow",
+			to: TailOptions{
+				Verbose: true,
+				Since:   time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC),
+				Follow:  true,
+			},
+			want: " --since=2024-01-02T03:04:05Z --follow",
+		},
+		{
+			name: "with until and follow",
+			to: TailOptions{
+				Verbose: true,
+				Until:   time.Date(2024, 1, 2, 5, 4, 5, 0, time.UTC),
+				Follow:  true,
+			},
+			want: " --until=2024-01-02T05:04:05Z",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.to.String(); got != tt.want {
+				t.Errorf("TailOptions.String() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

@@ -111,6 +111,30 @@ func TestCreate(t *testing.T) {
 	}
 }
 
+func TestRepeatCreate(t *testing.T) {
+	t.Chdir(t.TempDir())
+	params := StackParameters{
+		Name:     "repeattest",
+		Provider: cliClient.ProviderGCP,
+		Region:   "us-central1",
+		Mode:     modes.ModeBalanced,
+	}
+
+	_, err := Create(params)
+	if err != nil {
+		t.Errorf("First Create() error = %v", err)
+	}
+
+	_, err = Create(params)
+	if err == nil {
+		t.Errorf("Expected error on duplicate Create(), got nil")
+	} else {
+		assert.ErrorContains(t, err, "stack file already exists for \"repeattest\".")
+		assert.ErrorContains(t, err, "If you want to overwrite it, please spin down the stack and remove stackfile first.")
+		assert.ErrorContains(t, err, "defang down --stack repeattest && rm .defang/repeattest")
+	}
+}
+
 func TestList(t *testing.T) {
 	t.Run("no stacks present", func(t *testing.T) {
 		t.Chdir(t.TempDir())
@@ -126,9 +150,9 @@ func TestList(t *testing.T) {
 	t.Run("stacks present", func(t *testing.T) {
 		t.Chdir(t.TempDir())
 		// Create dummy stack files
-		os.Mkdir(dotDefang, 0700)
-		os.Create(filepath.Join(dotDefang, "stack1"))
-		os.Create(filepath.Join(dotDefang, "stack2"))
+		os.Mkdir(directory, 0700)
+		os.Create(filepath.Join(directory, "stack1"))
+		os.Create(filepath.Join(directory, "stack2"))
 
 		stacks, err := List()
 		if err != nil {
@@ -273,4 +297,85 @@ DEFANG_MODE=affordable
 			}
 		})
 	}
+}
+
+func TestRead(t *testing.T) {
+	t.Run("read existing stack", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		// Create dummy stack file
+		stackName := "stacktoread"
+		expectedParams := StackParameters{
+			Name:     stackName,
+			Provider: cliClient.ProviderAWS,
+			Region:   "us-west-2",
+			Mode:     modes.ModeAffordable,
+		}
+		_, err := Create(expectedParams)
+		if err != nil {
+			t.Errorf("Setup Create() error = %v", err)
+		}
+
+		params, err := Read(stackName)
+		if err != nil {
+			t.Errorf("Read() error = %v", err)
+		}
+		if params.Provider != expectedParams.Provider ||
+			params.Region != expectedParams.Region ||
+			params.Mode != expectedParams.Mode {
+			t.Errorf("Read() = %v, want %v", params, expectedParams)
+		}
+	})
+}
+
+func TestLoad(t *testing.T) {
+	t.Run("load existing stack sets env vars", func(t *testing.T) {
+		os.Unsetenv("DEFANG_PROVIDER")
+		os.Unsetenv("GCP_LOCATION")
+
+		t.Chdir(t.TempDir())
+		// Create dummy stack file
+		stackName := "stacktoload"
+		expectedParams := StackParameters{
+			Name:     stackName,
+			Provider: cliClient.ProviderGCP,
+			Region:   "us-central1",
+		}
+		_, err := Create(expectedParams)
+		if err != nil {
+			t.Errorf("Setup Create() error = %v", err)
+		}
+
+		err = Load(stackName)
+		if err != nil {
+			t.Errorf("Load() error = %v", err)
+		}
+		assert.Equal(t, os.Getenv("DEFANG_PROVIDER"), expectedParams.Provider.String())
+		assert.Equal(t, os.Getenv("GCP_LOCATION"), expectedParams.Region)
+	})
+
+	t.Run("load existing stack does not overwrite env vars", func(t *testing.T) {
+		t.Setenv("DEFANG_PROVIDER", "aws")
+		t.Setenv("AWS_REGION", "us-west-2")
+
+		t.Chdir(t.TempDir())
+		// Create dummy stack file
+		stackName := "stacktoload"
+		stackParams := StackParameters{
+			Name:     stackName,
+			Provider: cliClient.ProviderGCP,
+			Region:   "us-central1",
+		}
+		_, err := Create(stackParams)
+		if err != nil {
+			t.Errorf("Setup Create() error = %v", err)
+		}
+
+		err = Load(stackName)
+		if err != nil {
+			t.Errorf("Load() error = %v", err)
+		}
+		assert.Equal(t, os.Getenv("DEFANG_PROVIDER"), "aws")
+		assert.Equal(t, os.Getenv("AWS_REGION"), "us-west-2")
+		assert.Equal(t, os.Getenv("GCP_LOCATION"), stackParams.Region)
+	})
 }

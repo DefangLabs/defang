@@ -15,12 +15,14 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/agent"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/github"
 	"github.com/DefangLabs/defang/src/pkg/login"
@@ -30,6 +32,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/setup"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/surveyor"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
@@ -151,11 +154,36 @@ func SetupCommands(ctx context.Context, version string) {
 
 	RootCmd.Version = version
 	RootCmd.PersistentFlags().StringVarP(&global.Stack, "stack", "s", global.Stack, "stack name (for BYOC providers)")
+	RootCmd.RegisterFlagCompletionFunc("stack", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		stacks, err := stacks.List()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		var completions []cobra.Completion
+		for _, stack := range stacks {
+			completions = append(completions, stack.Name)
+		}
+		return completions, cobra.ShellCompDirectiveNoFileComp
+	})
 	RootCmd.PersistentFlags().Var(&global.ColorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
+	RootCmd.RegisterFlagCompletionFunc("color", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		var completions []cobra.Completion
+		for _, mode := range allColorModes {
+			completions = append(completions, mode.String())
+		}
+		return completions, cobra.ShellCompDirectiveNoFileComp
+	})
 	RootCmd.PersistentFlags().StringVar(&global.Cluster, "cluster", global.Cluster, "Defang cluster to connect to")
-	RootCmd.PersistentFlags().MarkHidden("cluster")
+	RootCmd.PersistentFlags().MarkHidden("cluster") // only for Defang use
 	RootCmd.PersistentFlags().StringVar(&global.Org, "org", global.Org, "override GitHub organization name (tenant)")
 	RootCmd.PersistentFlags().VarP(&global.ProviderID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
+	RootCmd.RegisterFlagCompletionFunc("provider", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		var completions []cobra.Completion
+		for _, provider := range cliClient.AllProviders() {
+			completions = append(completions, provider.String())
+		}
+		return completions, cobra.ShellCompDirectiveNoFileComp
+	})
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
 	RootCmd.PersistentFlags().BoolVarP(&global.Verbose, "verbose", "v", global.Verbose, "verbose logging") // backwards compat: only used by tail
 	RootCmd.PersistentFlags().BoolVar(&global.Debug, "debug", global.Debug, "debug logging for troubleshooting the CLI")
@@ -185,6 +213,7 @@ func SetupCommands(ctx context.Context, version string) {
 	cdCmd.AddCommand(cdListCmd)
 	cdCmd.AddCommand(cdCancelCmd)
 	cdPreviewCmd.Flags().VarP(&global.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
+	cdPreviewCmd.RegisterFlagCompletionFunc("mode", cobra.FixedCompletions(modes.AllDeploymentModes(), cobra.ShellCompDirectiveNoFileComp))
 	cdCmd.AddCommand(cdPreviewCmd)
 	cdCmd.AddCommand(cdInstallCmd)
 	cdCmd.AddCommand(cdCloudformationCmd)
@@ -200,6 +229,13 @@ func SetupCommands(ctx context.Context, version string) {
 	tokenCmd.Flags().Duration("expires", 24*time.Hour, "validity duration of the token")
 	tokenCmd.Flags().String("scope", "", fmt.Sprintf("scope of the token; one of %v (required)", scope.All())) // TODO: make it an Option
 	_ = tokenCmd.MarkFlagRequired("scope")
+	tokenCmd.RegisterFlagCompletionFunc("scope", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		var completions []cobra.Completion
+		for _, s := range scope.All() {
+			completions = append(completions, s.String())
+		}
+		return completions, cobra.ShellCompDirectiveNoFileComp
+	})
 	RootCmd.AddCommand(tokenCmd)
 
 	// Login Command
@@ -237,6 +273,7 @@ func SetupCommands(ctx context.Context, version string) {
 	configSetCmd.Flags().BoolP("env", "e", false, "set the config from an environment variable")
 	configSetCmd.Flags().Bool("random", false, "set a secure randomly generated value for config")
 	configSetCmd.Flags().String("env-file", "", "load config values from an .env file")
+	configSetCmd.MarkFlagFilename("env-file")
 	_ = configSetCmd.Flags().MarkHidden("name")
 
 	configCmd.AddCommand(configSetCmd)
@@ -297,6 +334,13 @@ func SetupCommands(ctx context.Context, version string) {
 	mcpServerCmd.Flags().MarkDeprecated("auth-server", "we now reach out to the auth server: https://auth.defang.io directly")
 	mcpCmd.AddCommand(mcpServerCmd)
 	mcpCmd.PersistentFlags().String("client", "", fmt.Sprintf("MCP setup client %v", mcp.ValidClients))
+	_ = mcpCmd.RegisterFlagCompletionFunc("client", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		var completions []string
+		for _, client := range mcp.ValidClients {
+			completions = append(completions, string(client))
+		}
+		return completions, cobra.ShellCompDirectiveNoFileComp
+	})
 	mcpCmd.AddCommand(mcpSetupCmd)
 	RootCmd.AddCommand(mcpCmd)
 
@@ -332,6 +376,19 @@ func SetupCommands(ctx context.Context, version string) {
 	})
 }
 
+func getCwd(args []string) string {
+	for i, arg := range args {
+		if i > 0 && (args[i-1] == "--cwd" || args[i-1] == "-C") {
+			return arg
+		} else if dir, ok := strings.CutPrefix(arg, "-C="); ok {
+			return dir
+		} else if dir, ok := strings.CutPrefix(arg, "--cwd="); ok {
+			return dir
+		}
+	}
+	return ""
+}
+
 var RootCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -339,13 +396,18 @@ var RootCmd = &cobra.Command{
 	Args:          cobra.NoArgs,
 	Short:         "Defang CLI is used to take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
-		ctx := cmd.Context()
-		term.SetDebug(global.Debug)
-
-		// Don't track/connect the completion commands
+		// Don't track/connect the shell completion commands
 		if IsCompletionCommand(cmd) {
+			// but do change the directory for file completions to work correctly.
+			// Unfortunately, Cobra will not have parsed the "cwd" flag.
+			if cwd := getCwd(os.Args); cwd != "" {
+				return os.Chdir(cwd)
+			}
 			return nil
 		}
+
+		ctx := cmd.Context()
+		term.SetDebug(global.Debug)
 
 		// Use "defer" to track any errors that occur during the command
 		defer func() {
@@ -406,6 +468,24 @@ var RootCmd = &cobra.Command{
 		}
 
 		return err
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if global.NonInteractive {
+			return cmd.Help()
+		}
+
+		ctx := cmd.Context()
+		err := login.InteractiveRequireLoginAndToS(ctx, global.Client, getCluster())
+		if err != nil {
+			return err
+		}
+
+		prompt := "Welcome to Defang. I can help you deploy your project to the cloud"
+		ag, err := agent.New(ctx, getCluster(), &global.ProviderID, &global.Stack)
+		if err != nil {
+			return err
+		}
+		return ag.StartWithUserPrompt(ctx, prompt)
 	},
 }
 
@@ -853,6 +933,7 @@ var debugCmd = &cobra.Command{
 	Hidden:      true,
 	Short:       "Debug a build, deployment, or service failure",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
 		etag, _ := cmd.Flags().GetString("etag")
 		deployment, _ := cmd.Flags().GetString("deployment")
 		since, _ := cmd.Flags().GetString("since")
@@ -863,12 +944,17 @@ var debugCmd = &cobra.Command{
 		}
 
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		_, err := newProviderChecked(ctx, loader)
 		if err != nil {
 			return err
 		}
 
-		project, err := loader.LoadProject(cmd.Context())
+		project, err := loader.LoadProject(ctx)
+		if err != nil {
+			return err
+		}
+
+		debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
 		if err != nil {
 			return err
 		}
@@ -883,16 +969,15 @@ var debugCmd = &cobra.Command{
 			return fmt.Errorf("invalid 'until' time: %w", err)
 		}
 
-		debugConfig := cli.DebugConfig{
+		debugConfig := debug.DebugConfig{
 			Deployment:     deployment,
 			FailedServices: args,
-			ModelId:        global.ModelID,
 			Project:        project,
-			Provider:       provider,
+			ProviderID:     &global.ProviderID,
 			Since:          sinceTs.UTC(),
 			Until:          untilTs.UTC(),
 		}
-		return cli.DebugDeployment(cmd.Context(), global.Client, debugConfig)
+		return debugger.DebugDeployment(ctx, debugConfig)
 	},
 }
 

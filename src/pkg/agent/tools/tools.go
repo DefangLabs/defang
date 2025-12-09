@@ -1,280 +1,101 @@
 package tools
 
 import (
-	"context"
-	"strings"
-	"time"
-
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/modes"
-	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/firebase/genkit/go/ai"
 )
 
-var workingDirectoryOption = mcp.WithString("working_directory",
-	mcp.Description("Path to project's working directory"),
-	mcp.Required(),
-)
-
-var multipleComposeFilesOptions = mcp.WithArray("compose_file_paths",
-	mcp.Description("Path(s) to docker-compose files"),
-	mcp.Items(map[string]string{"type": "string"}),
-)
-
-func CollectTools(cluster string, providerId *client.ProviderID, cli CLIInterface) []server.ServerTool {
-	tools := []server.ServerTool{
-		{
-			Tool: mcp.NewTool("login",
-				mcp.WithDescription("Login to Defang"),
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				output, err := HandleLoginTool(ctx, cluster, cli)
+func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Tool {
+	return []ai.Tool{
+		ai.NewTool[ServicesParams, string](
+			"services",
+			"List deployed services for the project in the current working directory",
+			func(ctx *ai.ToolContext, params ServicesParams) (string, error) {
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to login", err), err
+					return "Failed to configure loader", err
 				}
-				return mcp.NewToolResultText(output), nil
+				var cli CLIInterface = &DefaultToolCLI{}
+				return HandleServicesTool(ctx.Context, loader, cli, ec, config)
 			},
-		},
-		{
-			Tool: mcp.NewTool("services",
-				mcp.WithDescription("List deployed services for the project in the current working directory"),
-				workingDirectoryOption,
-				multipleComposeFilesOptions,
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				loader, err := common.ConfigureLoader(request)
+		),
+		ai.NewTool("deploy",
+			"Initiate deployment of the application defined in the docker-compose files in the current working directory",
+			func(ctx *ai.ToolContext, params DeployParams) (string, error) {
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
+					return "Failed to configure loader", err
 				}
-				output, err := HandleServicesTool(ctx, loader, providerId, cluster, cli)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to list services", err), err
-				}
-				return mcp.NewToolResultText(output), nil
+				cli := &DefaultToolCLI{}
+				return HandleDeployTool(ctx.Context, loader, cli, ec, config)
 			},
-		},
-		{
-			Tool: mcp.NewTool("deploy",
-				mcp.WithDescription("Deploy services using defang"),
-				workingDirectoryOption,
-				multipleComposeFilesOptions,
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				loader, err := common.ConfigureLoader(request)
+		),
+		ai.NewTool("destroy",
+			"Destroy the deployed application defined in the docker-compose files in the current working directory",
+			func(ctx *ai.ToolContext, params DestroyParams) (string, error) {
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
+					return "Failed to configure loader", err
 				}
-				output, err := HandleDeployTool(ctx, loader, providerId, cluster, cli)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to deploy services", err), err
-				}
-				return mcp.NewToolResultText(output), nil
+				cli := &DefaultToolCLI{}
+				return HandleDestroyTool(ctx.Context, loader, cli, ec, config)
 			},
-		},
-		{
-			Tool: mcp.NewTool("destroy",
-				mcp.WithDescription("Destroy deployed services for the project in the current working directory"),
-				workingDirectoryOption,
-				multipleComposeFilesOptions,
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				loader, err := common.ConfigureLoader(request)
+		),
+		ai.NewTool("logs",
+			"Fetch logs for the application in pages of up to 100 lines. You can use the 'since' and 'until' parameters to page through logs by time.",
+			func(ctx *ai.ToolContext, params LogsParams) (string, error) {
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
+					return "Failed to configure loader", err
 				}
-				output, err := HandleDestroyTool(ctx, loader, providerId, cluster, cli)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to destroy services", err), err
-				}
-				return mcp.NewToolResultText(output), nil
+				cli := &DefaultToolCLI{}
+				return HandleLogsTool(ctx.Context, loader, params, cli, ec, config)
 			},
-		},
-		{
-			Tool: mcp.NewTool("logs",
-				mcp.WithDescription("Fetch logs for a deployment."),
-				workingDirectoryOption,
-				mcp.WithString("deployment_id",
-					mcp.Description("The deployment ID for which to fetch logs"),
-				),
-				mcp.WithString("since",
-					mcp.Description("The start time in RFC3339 format (e.g., 2006-01-02T15:04:05Z07:00)"),
-					mcp.Required(),
-					mcp.DefaultString(time.Now().Add(-1*time.Hour).Format(time.RFC3339)),
-				),
-				mcp.WithString("until",
-					mcp.Description("The end time in RFC3339 format (e.g., 2006-01-02T15:04:05Z07:00)"),
-					mcp.Required(),
-					mcp.DefaultString(time.Now().Format(time.RFC3339)),
-				),
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				loader, err := common.ConfigureLoader(request)
+		),
+		ai.NewTool("estimate",
+			"Estimate the cost of deploying a Defang project to AWS or GCP",
+			func(ctx *ai.ToolContext, params EstimateParams) (string, error) {
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
+					return "Failed to configure loader", err
 				}
-				params := ParseLogsParams(request)
-				output, err := HandleLogsTool(ctx, loader, params, cluster, providerId, cli)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to fetch logs", err), err
-				}
-				return mcp.NewToolResultText(output), nil
+				cli := &DefaultToolCLI{}
+				return HandleEstimateTool(ctx.Context, loader, params, cli, config)
 			},
-		},
-		{
-			Tool: mcp.NewTool("estimate",
-				mcp.WithDescription("Estimate the cost of deployed a Defang project."),
-				workingDirectoryOption,
-				multipleComposeFilesOptions,
-				mcp.WithString("provider",
-					mcp.Description("The cloud provider to estimate costs for. Supported options are AWS or GCP"),
-					mcp.DefaultString(strings.ToUpper(providerId.String())),
-					mcp.Enum("AWS", "GCP"),
-				),
-				mcp.WithString("deployment_mode",
-					mcp.Description("The deployment mode for the estimate. Options are: "+strings.Join(modes.AllDeploymentModes(), ", ")),
-					mcp.DefaultString("AFFORDABLE"),
-					mcp.Enum(modes.AllDeploymentModes()...),
-				),
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				loader, err := common.ConfigureLoader(request)
+		),
+		ai.NewTool("set_config",
+			"Set a config variable for the defang project",
+			func(ctx *ai.ToolContext, params SetConfigParams) (string, error) {
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
+					return "Failed to configure loader", err
 				}
-				params, err := ParseEstimateParams(request, providerId)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to parse estimate parameters", err), err
-				}
-				output, err := HandleEstimateTool(ctx, loader, params, cluster, cli)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to estimate costs", err), err
-				}
-				return mcp.NewToolResultText(output), nil
+				cli := &DefaultToolCLI{}
+				return HandleSetConfig(ctx.Context, loader, params, cli, ec, config)
 			},
-		},
-		{
-			Tool: mcp.NewTool("set_config",
-				mcp.WithDescription("Tail logs for a deployment."),
-				workingDirectoryOption,
-				multipleComposeFilesOptions,
-				mcp.WithString("key",
-					mcp.Description("The config key to set"),
-				),
-				mcp.WithString("value",
-					mcp.Description("The config value to set"),
-				),
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				loader, err := common.ConfigureLoader(request)
+		),
+		ai.NewTool("remove_config",
+			"Remove a config variable from the defang project",
+			func(ctx *ai.ToolContext, params RemoveConfigParams) (string, error) {
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
+					return "Failed to configure loader", err
 				}
-				params, err := ParseSetConfigParams(request)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to parse set config parameters", err), err
-				}
-				output, err := HandleSetConfig(ctx, loader, params, providerId, cluster, cli)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to set config", err), err
-				}
-				return mcp.NewToolResultText(output), nil
+				cli := &DefaultToolCLI{}
+				return HandleRemoveConfigTool(ctx.Context, loader, params, cli, ec, config)
 			},
-		},
-		{
-			Tool: mcp.NewTool("remove_config",
-				mcp.WithDescription("Remove a config variable from the defang project"),
-				workingDirectoryOption,
-				multipleComposeFilesOptions,
-				mcp.WithString("key",
-					mcp.Description("The config key to remove"),
-				),
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				loader, err := common.ConfigureLoader(request)
+		),
+		ai.NewTool("list_configs",
+			"List config variables for the defang project",
+			func(ctx *ai.ToolContext, params ListConfigsParams) (string, error) {
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
+					return "Failed to configure loader", err
 				}
-				params, err := ParseRemoveConfigParams(request)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to parse remove config parameters", err), err
-				}
-				output, err := HandleRemoveConfigTool(ctx, loader, params, providerId, cluster, cli)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to remove config", err), err
-				}
-				return mcp.NewToolResultText(output), nil
+				cli := &DefaultToolCLI{}
+				return HandleListConfigTool(ctx.Context, loader, cli, ec, config)
 			},
-		},
-		{
-			Tool: mcp.NewTool("list_configs",
-				mcp.WithDescription("List config variables for the defang project"),
-				workingDirectoryOption,
-				multipleComposeFilesOptions,
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				loader, err := common.ConfigureLoader(request)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to configure loader", err), err
-				}
-				output, err := HandleListConfigTool(ctx, loader, providerId, cluster, cli)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to list config", err), err
-				}
-				return mcp.NewToolResultText(output), nil
-			},
-		},
-		{
-			Tool: mcp.NewTool("set_aws_provider",
-				mcp.WithDescription("Set the AWS provider for the defang project"),
-				workingDirectoryOption,
-				mcp.WithString("accessKeyId",
-					mcp.Description("Your AWS Access Key ID"),
-				),
-				mcp.WithString("secretAccessKey",
-					mcp.Description("Your AWS Secret Access Key"),
-				),
-				mcp.WithString("region",
-					mcp.Description("Your AWS Region"),
-				),
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				output, err := HandleSetAWSProvider(ctx, request, providerId, cluster)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to set AWS provider", err), err
-				}
-				return mcp.NewToolResultText(output), nil
-			},
-		},
-		{
-			Tool: mcp.NewTool("set_gcp_provider",
-				mcp.WithDescription("Set the GCP provider for the defang project"),
-				workingDirectoryOption,
-				mcp.WithString("gcpProjectId",
-					mcp.Description("Your GCP Project ID"),
-				),
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				output, err := HandleSetGCPProvider(ctx, request, providerId, cluster)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to set GCP provider", err), err
-				}
-				return mcp.NewToolResultText(output), nil
-			},
-		},
-		{
-			Tool: mcp.NewTool("set_playground_provider",
-				mcp.WithDescription("Set the Playground provider for the defang project"),
-				workingDirectoryOption,
-			),
-			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				output, err := HandleSetPlaygroundProvider(providerId)
-				if err != nil {
-					return mcp.NewToolResultErrorFromErr("Failed to set Playground provider", err), err
-				}
-				return mcp.NewToolResultText(output), nil
-			},
-		},
+		),
 	}
-	return tools
 }

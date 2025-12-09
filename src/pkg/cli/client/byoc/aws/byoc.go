@@ -28,10 +28,12 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -205,7 +207,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		return nil, err
 	}
 
-	etag := pkg.RandomID()
+	etag := types.NewEtag()
 	serviceInfos, err := b.GetServiceInfos(ctx, project.Name, req.DelegateDomain, etag, project.Services)
 	if err != nil {
 		return nil, err
@@ -287,7 +289,7 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 
 	domain = dns.Normalize(strings.ToLower(domain))
 	for {
-		zone, err := aws.GetHostedZoneByName(ctx, domain, r53Client)
+		zones, err := aws.GetHostedZonesByName(ctx, domain, r53Client)
 		if errors.Is(err, aws.ErrZoneNotFound) {
 			if strings.Count(domain, ".") <= 1 {
 				return "", nil
@@ -297,7 +299,10 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 		} else if err != nil {
 			return "", err
 		}
-		return *zone.Id, nil
+		if len(zones) > 1 {
+			term.Warnf("Multiple hosted zones found for domain %q, using the first one: %v", domain, zones[0].Id)
+		}
+		return *zones[0].Id, nil
 	}
 }
 
@@ -309,7 +314,7 @@ func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 	r53Client := route53.NewFromConfig(cfg)
 
 	projectDomain := b.GetProjectDomain(req.Project, req.DelegateDomain)
-	nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, r53Client)
+	nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, req.Project, b.PulumiStack, r53Client, dns.ResolverAt)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
@@ -336,7 +341,7 @@ func (b *ByocAws) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 	return &client.AccountInfo{
 		Region:    cfg.Region,
 		AccountID: *identity.Account,
-		Details:   *identity.Arn,
+		Details:   *identity.Arn, // contains the user role
 		Provider:  client.ProviderAWS,
 	}, nil
 }
@@ -370,7 +375,9 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_JSON":                os.Getenv("DEFANG_JSON"),
 		"DEFANG_ORG":                 b.TenantName,
-		"DEFANG_PREFIX":              byoc.DefangPrefix,
+		"DEFANG_PREFIX":              b.Prefix,
+		"DEFANG_PULUMI_DEBUG":        os.Getenv("DEFANG_PULUMI_DEBUG"),
+		"DEFANG_PULUMI_DIFF":         os.Getenv("DEFANG_PULUMI_DIFF"),
 		"DEFANG_STATE_URL":           defangStateUrl,
 		"NODE_NO_WARNINGS":           "1",
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
@@ -383,6 +390,10 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 		"PULUMI_DIY_BACKEND_DISABLE_CHECKPOINT_BACKUPS": "true", // versioned bucket is used
 		"PULUMI_SKIP_UPDATE_CHECK":                      "true",
 		"STACK":                                         b.PulumiStack,
+	}
+
+	if targets := os.Getenv("DEFANG_PULUMI_TARGETS"); targets != "" {
+		env["DEFANG_PULUMI_TARGETS"] = targets
 	}
 
 	if !term.StdoutCanColor() {
@@ -594,7 +605,7 @@ func (b *ByocAws) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest)
 		end = req.Until.AsTime()
 	}
 
-	// get stack information (for log group ARN)
+	// get stack information (for CD log group ARN)
 	err := b.driver.FillOutputs(ctx)
 	if err != nil {
 		return AnnotateAwsError(err)
@@ -605,7 +616,7 @@ func (b *ByocAws) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest)
 		return err
 	}
 
-	// Gather logs from the CD task, kaniko, ECS events, and all services
+	// Gather logs from the CD task, builds, ECS events, and all services
 	evtsChan, errsChan := cw.QueryLogGroups(ctx, cwClient, start, end, 0, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
 	if evtsChan == nil {
 		return <-errsChan // TODO: there could be multiple errors
@@ -656,92 +667,91 @@ loop:
 
 func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	// FillOutputs is needed to get the CD task ARN or the LogGroup ARNs
+	// if the cloud formation stack has been destroyed, we can still query
+	// logs for builds and services
 	if err := b.driver.FillOutputs(ctx); err != nil {
-		return nil, AnnotateAwsError(err)
+		term.Warnf("Unable to show CD logs: %v", err) // TODO: could skip this warning if the user wasn't asking for CD logs
 	}
 
 	var err error
-	cwClient, err := cw.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region
+	cwClient, err := cw.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region // assume all log groups are in the same region
+	if err != nil {
+		return nil, AnnotateAwsError(err)
+	}
+
+	// How to tail multiple tasks/services at once?
+	//  * Etag is invalid:		treat Etag as CD task ID and tail only that task's logs
+	//  * No Etag, no services:	tail all tasks/services
+	//  * No Etag, service:		tail all tasks/services with that service name
+	//  * Etag, no services: 	tail all tasks/services with that Etag
+	//  * Etag, service:		tail that task/service
+	var tailStream cw.LiveTailStream
+	etag, err := types.ParseEtag(req.Etag)
+	if err != nil && req.Etag != "" {
+		// Assume invalid "etag" is the task ID of the CD task
+		tailStream, err = b.queryCdLogs(ctx, cwClient, req)
+		// no need to filter events by etag because we only show logs from the specified task ID
+	} else {
+		tailStream, err = b.queryLogs(ctx, cwClient, req)
+	}
+
+	if err != nil {
+		return nil, AnnotateAwsError(err)
+	}
+	return newByocServerStream(tailStream, etag, req.Services, b), nil
+}
+
+func (b *ByocAws) queryCdLogs(ctx context.Context, cwClient *cloudwatchlogs.Client, req *defangv1.TailRequest) (cw.LiveTailStream, error) {
+	var err error
+	b.cdTaskArn, err = b.driver.GetTaskArn(req.Etag) // only fails on missing task ID
 	if err != nil {
 		return nil, err
 	}
-
-	etag := req.Etag
-	// if etag == "" && req.Service == "cd" {
-	// 	etag = awsecs.GetTaskID(b.cdTaskArn); TODO: find the last CD task
-	// }
-	// How to tail multiple tasks/services at once?
-	//  * No Etag, no service:	tail all tasks/services
-	//  * Etag, no service: 	tail all tasks/services with that Etag
-	//  * No Etag, service:		tail all tasks/services with that service name
-	//  * Etag, service:		tail that task/service
-	var tailStream cw.LiveTailStream
-	var start, end time.Time
-	if req.Since.IsValid() {
-		start = req.Since.AsTime()
-	}
-	if req.Until.IsValid() {
-		end = req.Until.AsTime()
-	}
-	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is a task ID
-		if req.Follow {
-			tailStream, err = b.driver.TailTaskID(ctx, cwClient, etag)
-			if err == nil {
-				b.cdTaskArn, err = b.driver.GetTaskArn(etag)
-				etag = "" // no need to filter by etag
-				if err != nil {
-					return nil, AnnotateAwsError(err)
-				}
-			}
-		} else {
-			tailStream, err = b.driver.QueryTaskID(ctx, cwClient, etag, start, end, req.Limit)
-			if err == nil {
-				b.cdTaskArn, err = b.driver.GetTaskArn(etag)
-				etag = "" // no need to filter by etag
-				if err != nil {
-					return nil, AnnotateAwsError(err)
-				}
-			}
-		}
+	if req.Follow {
+		return b.driver.TailTaskID(ctx, cwClient, req.Etag)
 	} else {
-		var service string
-		if len(req.Services) == 1 {
-			service = req.Services[0]
-		}
-		lgis := b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))
-		if req.Follow {
-			tailStream, err = cw.QueryAndTailLogGroups(
-				ctx,
-				cwClient,
-				start,
-				end,
-				lgis...,
-			)
-			if err != nil {
-				return nil, AnnotateAwsError(err)
-			}
-		} else {
-			evtsChan, errsChan := cw.QueryLogGroups(
-				ctx,
-				cwClient,
-				start,
-				end,
-				req.Limit,
-				lgis...,
-			)
-			if evtsChan == nil {
-				err = <-errsChan // TODO: there could be multiple errors
-				if err != nil {
-					return nil, AnnotateAwsError(err)
-				}
-			} else {
-				// TODO: any errors from errsChan should be reported
-				tailStream = cw.NewStaticLogStream(evtsChan, func() {})
-			}
-		}
+		start := timeutils.AsTime(req.Since, time.Time{})
+		end := timeutils.AsTime(req.Until, time.Time{})
+		return b.driver.QueryTaskID(ctx, cwClient, req.Etag, start, end, req.Limit)
 	}
+}
 
-	return newByocServerStream(tailStream, etag, req.GetServices(), b), nil
+func (b *ByocAws) queryLogs(ctx context.Context, cwClient *cloudwatchlogs.Client, req *defangv1.TailRequest) (cw.LiveTailStream, error) {
+	start := timeutils.AsTime(req.Since, time.Time{})
+	end := timeutils.AsTime(req.Until, time.Time{})
+
+	var service string
+	if len(req.Services) == 1 {
+		service = req.Services[0]
+	}
+	lgis := b.getLogGroupInputs(req.Etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))
+	if req.Follow {
+		return cw.QueryAndTailLogGroups(
+			ctx,
+			cwClient,
+			start,
+			end,
+			lgis...,
+		)
+	} else {
+		evtsChan, errsChan := cw.QueryLogGroups(
+			ctx,
+			cwClient,
+			start,
+			end,
+			req.Limit,
+			lgis...,
+		)
+		if evtsChan == nil {
+			var errs []error
+			for err := range errsChan {
+				errs = append(errs, err)
+			}
+			return nil, errors.Join(errs...)
+		}
+		// TODO: any errors from errsChan should be reported but get dropped
+		return cw.NewStaticLogStream(evtsChan, func() {}), nil
+	}
 }
 
 func (b *ByocAws) makeLogGroupARN(name string) string {
@@ -757,18 +767,22 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 	}
 
 	var groups []cw.LogGroupInput
-	// Tail CD and kaniko
+	// Tail CD and builds
 	if logType.Has(logs.LogTypeBuild) {
-		cdTail := cw.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern} // TODO: filter by etag
-		// If we know the CD task ARN, only tail the logstream for that CD task
-		if b.cdTaskArn != nil && b.cdEtag == etag {
-			cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.cdTaskArn))}
+		if b.driver.LogGroupARN == "" {
+			term.Debug("CD stack LogGroupARN is not set; skipping CD logs")
+		} else {
+			cdTail := cw.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern} // TODO: filter by etag
+			// If we know the CD task ARN, only tail the logstream for that CD task
+			if b.cdTaskArn != nil && b.cdEtag == etag {
+				cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.cdTaskArn))}
+			}
+			groups = append(groups, cdTail)
+			term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames, filter)
 		}
-		groups = append(groups, cdTail)
-		term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames, filter)
-		kanikoTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "builds")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service
-		term.Debug("Query kaniko logs", kanikoTail.LogGroupARN, filter)
-		groups = append(groups, kanikoTail)
+		buildsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "builds")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service
+		term.Debug("Query builds logs", buildsTail.LogGroupARN, filter)
+		groups = append(groups, buildsTail)
 		ecsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "ecs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
 		term.Debug("Query ecs events logs", ecsTail.LogGroupARN, filter)
 		groups = append(groups, ecsTail)

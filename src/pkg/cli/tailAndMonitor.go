@@ -66,6 +66,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 		cancelTail(errMonitoringDone)            // cancel the tail when both goroutines are done
 	}()
 
+	tailOptions.PrintBookends = false
 	// blocking call to tail
 	var tailErr error
 	if err := Tail(tailCtx, provider, project.Name, tailOptions); err != nil {

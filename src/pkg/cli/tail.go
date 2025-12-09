@@ -66,7 +66,7 @@ func (to TailOptions) String() string {
 	if !to.Until.IsZero() {
 		cmd += " --until=" + to.Until.UTC().Format(time.RFC3339Nano)
 	}
-	if to.Follow {
+	if to.Follow && to.Until.IsZero() {
 		cmd += " --follow"
 	}
 	if to.Deployment != "" {
@@ -123,6 +123,13 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 
 	term.Debugf("Tailing %s logs in project %q", options.LogType, projectName)
 
+	if options.Deployment != "" {
+		_, err := types.ParseEtag(options.Deployment)
+		if err != nil {
+			return err
+		}
+	}
+
 	if len(options.Services) > 0 {
 		for _, service := range options.Services {
 			// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
@@ -143,7 +150,6 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 		return dryrun.ErrDryRun
 	}
 
-	options.PrintBookends = true
 	return streamLogs(ctx, provider, projectName, options, logEntryPrintHandler)
 }
 

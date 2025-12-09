@@ -68,6 +68,14 @@ func (a *AwsEcsCfn) updateStackAndWait(ctx context.Context, templateBody string,
 	// Check the template version first, to avoid updating to an outdated template; TODO: can we use StackPolicy/Conditions instead?
 	// TODO: should check all regions
 	if dso, err := cfn.DescribeStacks(ctx, &cloudformation.DescribeStacksInput{StackName: &a.stackName}); err == nil && len(dso.Stacks) == 1 {
+		for _, output := range dso.Stacks[0].Outputs {
+			if *output.OutputKey == OutputsTemplateVersion {
+				deployedRev, _ := strconv.Atoi(*output.OutputValue)
+				if deployedRev > TemplateRevision {
+					return fmt.Errorf("This CLI has an older CloudFormation template than the deployed %s stack: please update the CLI", a.stackName)
+				}
+			}
+		}
 		// Set "Use previous value" for parameters not in the new parameters list
 		newParams := map[string]struct{}{}
 		for _, newParam := range parameters {
@@ -79,14 +87,6 @@ func (a *AwsEcsCfn) updateStackAndWait(ctx context.Context, templateBody string,
 					ParameterKey:     param.ParameterKey,
 					UsePreviousValue: ptr.Bool(true),
 				})
-			}
-		}
-		for _, output := range dso.Stacks[0].Outputs {
-			if *output.OutputKey == OutputsTemplateVersion {
-				deployedRev, _ := strconv.Atoi(*output.OutputValue)
-				if deployedRev > TemplateRevision {
-					return fmt.Errorf("CloudFormation stack %s is newer than the current template: update the CLI", a.stackName)
-				}
 			}
 		}
 	}
@@ -261,6 +261,9 @@ func (a *AwsEcsCfn) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) er
 		}
 	}
 
+	if a.AccountID == "" && a.LogGroupARN != "" {
+		a.AccountID = common.GetAccountID(a.LogGroupARN)
+	}
 	return nil
 }
 

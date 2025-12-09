@@ -18,9 +18,9 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
-	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2/google"
@@ -89,8 +89,8 @@ type mockStsProviderAPI struct{}
 
 func (s *mockStsProviderAPI) GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
 	callIdOutput := sts.GetCallerIdentityOutput{}
-	callIdOutput.Account = awssdk.String("123456789012")
-	callIdOutput.Arn = awssdk.String("arn:aws:iam::123456789012:user/test")
+	callIdOutput.Account = ptr.String("123456789012")
+	callIdOutput.Arn = ptr.String("arn:aws:iam::123456789012:user/test")
 
 	return &callIdOutput, nil
 }
@@ -494,7 +494,7 @@ func TestGetProvider(t *testing.T) {
 			t.Errorf("Expected provider to be of type *aws.ByocAws, got %T", p)
 		} else {
 			if awsProvider.CDImage != cdImageTag {
-				t.Errorf("Expected cd image tag to be %s, got %s", cdImageTag, awsProvider.CDImage)
+				t.Errorf("Expected cd image tag to be %s, got: %s", cdImageTag, awsProvider.CDImage)
 			}
 		}
 	})
@@ -527,7 +527,7 @@ func TestGetProvider(t *testing.T) {
 			t.Errorf("Expected provider to be of type *aws.ByocAws, got %T", p)
 		} else {
 			if awsProvider.CDImage != overrideImageTag {
-				t.Errorf("Expected cd image tag to be %s, got %s", cdImageTag, awsProvider.CDImage)
+				t.Errorf("Expected cd image tag to be %s, got: %s", cdImageTag, awsProvider.CDImage)
 			}
 		}
 	})

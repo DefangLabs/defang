@@ -137,7 +137,7 @@ func TestGetServiceInfos(t *testing.T) {
 		t.Fatalf("unexpected error while marshalling serviceInfos to json: %v", err)
 	}
 	if string(b) != expectedServiceInfosJson {
-		t.Errorf("expected %s, got %s", expectedServiceInfosJson, string(b))
+		t.Errorf("expected %s, got: %s", expectedServiceInfosJson, string(b))
 	}
 }
 

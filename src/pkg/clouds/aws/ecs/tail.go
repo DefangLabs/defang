@@ -56,13 +56,16 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 
 func (a *AwsEcs) GetTaskArn(taskID string) (TaskArn, error) {
 	if taskID == "" {
-		return nil, errors.New("taskID is empty")
+		return nil, errors.New("taskID is required")
+	}
+	if a.ClusterName == "" {
+		return nil, errors.New("ClusterName is required")
 	}
 	taskArn := a.MakeARN("ecs", "task/"+a.ClusterName+"/"+taskID)
 	return &taskArn, nil
 }
 
-func (a *AwsEcs) QueryTaskID(ctx context.Context, cwClient cw.FilterLogEventsAPI, taskID string, start, end time.Time, limit int32) (cw.EventStream[types.StartLiveTailResponseStream], error) {
+func (a *AwsEcs) QueryTaskID(ctx context.Context, cwClient cw.FilterLogEventsAPI, taskID string, start, end time.Time, limit int32) (cw.LiveTailStream, error) {
 	if taskID == "" {
 		return nil, errors.New("taskID is empty")
 	}
@@ -71,9 +74,15 @@ func (a *AwsEcs) QueryTaskID(ctx context.Context, cwClient cw.FilterLogEventsAPI
 	return cw.QueryLogGroupStream(ctx, cwClient, lgi, start, end, limit)
 }
 
-func (a *AwsEcs) TailTaskID(ctx context.Context, cwClient cw.StartLiveTailAPI, taskID string) (cw.EventStream[types.StartLiveTailResponseStream], error) {
+func (a *AwsEcs) TailTaskID(ctx context.Context, cwClient cw.StartLiveTailAPI, taskID string) (cw.LiveTailStream, error) {
 	if taskID == "" {
-		return nil, errors.New("taskID is empty")
+		return nil, errors.New("taskID is required")
+	}
+	if a.LogGroupARN == "" {
+		return nil, errors.New("LogGroupARN is required")
+	}
+	if a.ClusterName == "" {
+		return nil, errors.New("ClusterName is required")
 	}
 
 	lgi := cw.LogGroupInput{LogGroupARN: a.LogGroupARN, LogStreamNames: []string{GetCDLogStreamForTaskID(taskID)}}

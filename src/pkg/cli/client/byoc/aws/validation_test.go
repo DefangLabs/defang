@@ -6,14 +6,13 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
-	aws "github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	awssdk "github.com/aws/aws-sdk-go-v2/aws"
-
 	"github.com/aws/aws-sdk-go-v2/service/servicequotas"
 	quotaTypes "github.com/aws/aws-sdk-go-v2/service/servicequotas/types"
 	"github.com/aws/smithy-go"
+	"github.com/aws/smithy-go/ptr"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
@@ -92,8 +91,8 @@ func TestValidateGPUResources(t *testing.T) {
 		mockQuotaClient.output = &servicequotas.ListServiceQuotasOutput{
 			Quotas: []quotaTypes.ServiceQuota{
 				{
-					QuotaCode: awssdk.String("AWS_ECS_GPU_LIMIT"),
-					Value:     awssdk.Float64(0),
+					QuotaCode: ptr.String("AWS_ECS_GPU_LIMIT"),
+					Value:     ptr.Float64(0),
 				},
 			},
 		}

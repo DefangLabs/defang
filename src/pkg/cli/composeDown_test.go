@@ -70,7 +70,7 @@ func TestComposeDown(t *testing.T) {
 				t.Fatalf("ComposeDown() failed: %v", err)
 			}
 			if etag != "eTagDestroy" {
-				t.Errorf("ComposeDown() failed: expected eTagSomething, got %s", etag)
+				t.Errorf("ComposeDown() failed: expected eTagSomething, got: %s", etag)
 			}
 			if req, ok := mockProvider.request["DestroyRequest"]; ok {
 				req, err := req.(*defangv1.DestroyRequest)
@@ -78,7 +78,7 @@ func TestComposeDown(t *testing.T) {
 					t.Errorf("ComposeDown() failed: expected DestroyRequest, got %v", req)
 				}
 				if req.Project != proj.Name {
-					t.Errorf("ComposeDown() failed: expected project %s, got %s", proj.Name, req.Project)
+					t.Errorf("ComposeDown() failed: expected project %s, got: %s", proj.Name, req.Project)
 				}
 			}
 		})
@@ -95,7 +95,7 @@ func TestComposeDown(t *testing.T) {
 				t.Fatalf("ComposeDown() failed: %v", err)
 			}
 			if etag != "eTagDelete" {
-				t.Errorf("ComposeDown() failed: expected eTagSomething, got %s", etag)
+				t.Errorf("ComposeDown() failed: expected eTagSomething, got: %s", etag)
 			}
 			if req, ok := mockProvider.request["DeleteRequest"]; ok {
 				req, err := req.(*defangv1.DeleteRequest)
@@ -103,7 +103,7 @@ func TestComposeDown(t *testing.T) {
 					t.Errorf("ComposeDown() failed: expected DestroyRequest, got %v", req)
 				}
 				if req.Project != proj.Name || len(req.Names) != len(services) {
-					t.Errorf("ComposeDown() failed: expected project %s, got %s", proj.Name, req.Project)
+					t.Errorf("ComposeDown() failed: expected project %s, got: %s", proj.Name, req.Project)
 				}
 			}
 		})

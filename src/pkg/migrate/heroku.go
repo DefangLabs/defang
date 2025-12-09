@@ -276,7 +276,7 @@ func (h *HerokuClient) GetPGInfo(ctx context.Context, addonID string) (PGInfo, e
 func herokuGet[T any](ctx context.Context, h *HerokuClient, url string) (T, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return *new(T), fmt.Errorf("Failed to create request: %v", err)
+		return *new(T), fmt.Errorf("failed to create request: %v", err)
 	}
 
 	// Set headers

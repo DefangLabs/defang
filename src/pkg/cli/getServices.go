@@ -66,7 +66,7 @@ func UpdateServiceStates(ctx context.Context, serviceInfos []*defangv1.ServiceIn
 					// Use the regular net/http package to make the request without retries
 					req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 					if err != nil {
-						term.Errorf("Failed to create healthcheck request for %q at %s: %s", serviceInfo.Service.Name, url, err.Error())
+						term.Errorf("failed to create healthcheck request for %q at %s: %s", serviceInfo.Service.Name, url, err.Error())
 						return
 					}
 					term.Debugf("[%s] checking health at %s", serviceInfo.Service.Name, url)

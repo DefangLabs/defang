@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
@@ -39,7 +39,7 @@ func (mockDeployProvider) Preview(ctx context.Context, req *defangv1.DeployReque
 		return nil, err
 	}
 
-	etag := pkg.RandomID()
+	etag := types.NewEtag()
 	var services []*defangv1.ServiceInfo
 	for _, service := range project.Services {
 		services = append(services, &defangv1.ServiceInfo{
@@ -91,7 +91,7 @@ func TestComposeUp(t *testing.T) {
 	gotContext := atomic.Bool{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPut {
-			t.Errorf("ComposeStart() failed: expected PUT request, got %s", r.Method)
+			t.Errorf("ComposeStart() failed: expected PUT request, got: %s", r.Method)
 		}
 		gotContext.Store(true)
 		w.WriteHeader(http.StatusOK) // return 200 OK same as S3

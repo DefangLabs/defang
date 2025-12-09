@@ -69,10 +69,10 @@ func TestByocSubscribeServerStream(t *testing.T) {
 			t.Errorf("expected a message, but got none")
 		}
 		if ss.Msg().Name != "service2" {
-			t.Errorf("expected service2, but got %s", ss.Msg().Name)
+			t.Errorf("expected service2, but got: %s", ss.Msg().Name)
 		}
 		if ss.Msg().State != defangv1.ServiceState_DEPLOYMENT_COMPLETED {
-			t.Errorf("expected state RUNNING, but got %s", ss.Msg().State)
+			t.Errorf("expected state RUNNING, but got: %s", ss.Msg().State)
 		}
 	})
 

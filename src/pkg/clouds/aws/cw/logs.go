@@ -2,6 +2,7 @@ package cw
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -25,12 +26,12 @@ func getLogGroupIdentifier(arnOrId string) string {
 	return strings.TrimSuffix(arnOrId, ":*")
 }
 
-type FiltererTailer interface {
+type LogsClient interface {
 	FilterLogEventsAPI
 	StartLiveTailAPI
 }
 
-func QueryAndTailLogGroups(ctx context.Context, cwClient FiltererTailer, start, end time.Time, logGroups ...LogGroupInput) (LiveTailStream, error) {
+func QueryAndTailLogGroups(ctx context.Context, cwClient LogsClient, start, end time.Time, logGroups ...LogGroupInput) (LiveTailStream, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	e := &eventStream{
@@ -45,7 +46,7 @@ func QueryAndTailLogGroups(ctx context.Context, cwClient FiltererTailer, start, 
 		var es LiveTailStream
 		es, err = QueryAndTailLogGroup(ctx, cwClient, lgi, start, end)
 		if err != nil {
-			break // abort if there is any fatal error
+			continue
 		}
 		wg.Add(1)
 		go func() {
@@ -82,6 +83,9 @@ type StartLiveTailAPI interface {
 }
 
 func TailLogGroup(ctx context.Context, cwClient StartLiveTailAPI, input LogGroupInput) (LiveTailStream, error) {
+	if input.LogGroupARN == "" {
+		return nil, errors.New("LogGroupARN is required")
+	}
 	var pattern *string
 	if input.LogEventFilterPattern != "" {
 		pattern = &input.LogEventFilterPattern
@@ -183,6 +187,9 @@ func QueryLogGroupStream(ctx context.Context, cwClient FilterLogEventsAPI, input
 }
 
 func filterLogEvents(ctx context.Context, cw FilterLogEventsAPI, lgi LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
+	if lgi.LogGroupARN == "" {
+		return errors.New("LogGroupARN is required")
+	}
 	var pattern *string
 	if lgi.LogEventFilterPattern != "" {
 		pattern = &lgi.LogEventFilterPattern

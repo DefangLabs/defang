@@ -48,6 +48,7 @@ type CanIUseConfig struct {
 type ByocBaseClient struct {
 	client.RetryDelayer
 
+	Prefix                  string
 	PulumiStack             string
 	SetupDone               bool
 	ShouldDelegateSubdomain bool
@@ -62,8 +63,9 @@ func NewByocBaseClient(tenantName types.TenantName, backend ProjectBackend, stac
 		stack = "beta" // backwards compat
 	}
 	b := &ByocBaseClient{
+		Prefix:         pkg.Getenv("DEFANG_PREFIX", "Defang"), // prefix for all resources created by Defang
 		TenantName:     string(tenantName),
-		PulumiStack:    stack,
+		PulumiStack:    pkg.Getenv("DEFANG_SUFFIX", stack),
 		projectBackend: backend,
 	}
 	return b
@@ -203,8 +205,8 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 	si := &defangv1.ServiceInfo{
 		AllowScaling:    b.AllowScaling,
 		Domainname:      service.DomainName,
-		Etag:            pkg.RandomID(), // TODO: could be hash for dedup/idempotency
-		Project:         projectName,    // was: tenant
+		Etag:            types.NewEtag(), // TODO: could be hash for dedup/idempotency
+		Project:         projectName,     // was: tenant
 		Service:         &defangv1.Service{Name: service.Name},
 		HealthcheckPath: healthCheckPath,
 	}
@@ -249,7 +251,11 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 // stackDir returns a stack-qualified path, like the Pulumi TS function `stackDir`
 func (b *ByocBaseClient) StackDir(projectName, name string) string {
 	pkg.Ensure(projectName != "", "ProjectName not set")
-	return fmt.Sprintf("/%s/%s/%s/%s", DefangPrefix, projectName, b.PulumiStack, name) // same as shared/common.ts
+	prefix := []string{""} // for leading slash
+	if b.Prefix != "" {
+		prefix = []string{"", b.Prefix}
+	}
+	return strings.Join(append(prefix, projectName, b.PulumiStack, name), "/") // same as shared/common.ts
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC

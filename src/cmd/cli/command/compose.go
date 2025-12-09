@@ -16,9 +16,11 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	pcluster "github.com/DefangLabs/defang/src/pkg/cluster"
+	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -81,8 +83,13 @@ func makeComposeUpCmd() *cobra.Command {
 					return err
 				}
 
-				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				return cli.InteractiveDebugForClientError(ctx, global.Client, project, loadErr)
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+				if err != nil {
+					return err
+				}
+				return debugger.DebugComposeLoadError(ctx, debug.DebugConfig{
+					Project: project,
+				}, loadErr)
 			}
 
 			provider, err := newProviderChecked(ctx, loader)
@@ -104,33 +111,15 @@ func makeComposeUpCmd() *cobra.Command {
 				term.Debugf("ListDeployments failed: %v", err)
 			} else if accountInfo, err := provider.AccountInfo(ctx); err != nil {
 				term.Debugf("AccountInfo failed: %v", err)
-			} else {
-				samePlace := slices.ContainsFunc(resp.Deployments, func(dep *defangv1.Deployment) bool {
-					// Old deployments may not have a region or account ID, so we check for empty values too
-					return dep.Provider == global.ProviderID.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
+			} else if len(resp.Deployments) > 0 {
+				handleExistingDeployments(resp.Deployments, accountInfo, project.Name)
+			} else if global.Stack == "" {
+				promptToCreateStack(stacks.StackParameters{
+					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
+					Provider: accountInfo.Provider,
+					Region:   accountInfo.Region,
+					Mode:     global.Mode,
 				})
-				if !samePlace && len(resp.Deployments) > 0 {
-					if global.NonInteractive {
-						term.Warnf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", project.Name)
-					} else {
-						help := "Active deployments of this project:"
-						for _, dep := range resp.Deployments {
-							var providerId cliClient.ProviderID
-							providerId.SetValue(dep.Provider)
-							help += fmt.Sprintf("\n - %v", cliClient.AccountInfo{Provider: providerId, AccountID: dep.ProviderAccountId, Region: dep.Region})
-						}
-						var confirm bool
-						if err := survey.AskOne(&survey.Confirm{
-							Message: "This project appears to be already deployed elsewhere. Are you sure you want to continue?",
-							Help:    help,
-							Default: false,
-						}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
-							return err
-						} else if !confirm {
-							return fmt.Errorf("deployment of project %q was canceled", project.Name)
-						}
-					}
-				}
 			}
 
 			// Show a warning for any (managed) services that we cannot monitor
@@ -145,12 +134,18 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			deploy, project, err := cli.ComposeUp(ctx, global.Client, provider, cli.ComposeUpParams{
+				Stack:      global.Stack,
 				Project:    project,
 				UploadMode: upload,
 				Mode:       global.Mode,
 			})
 			if err != nil {
-				return handleComposeUpErr(ctx, err, project, provider)
+				composeErr := err
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+				if err != nil {
+					return err
+				}
+				return handleComposeUpErr(ctx, debugger, project, provider, composeErr)
 			}
 
 			if len(deploy.Services) == 0 {
@@ -174,14 +169,21 @@ func makeComposeUpCmd() *cobra.Command {
 			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, global.Verbose)
 			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
-				handleTailAndMonitorErr(ctx, err, global.Client, cli.DebugConfig{
+				deploymentErr := err
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+				if err != nil {
+					term.Warn("Failed to initialize debugger:", err)
+					return deploymentErr
+				}
+				handleTailAndMonitorErr(ctx, deploymentErr, debugger, debug.DebugConfig{
 					Deployment: deploy.Etag,
-					ModelId:    global.ModelID,
 					Project:    project,
-					Provider:   provider,
+					ProviderID: &global.ProviderID,
+					Stack:      &global.Stack,
 					Since:      since,
+					Until:      time.Now(),
 				})
-				return err
+				return deploymentErr
 			}
 
 			for _, service := range deploy.Services {
@@ -213,7 +215,82 @@ func makeComposeUpCmd() *cobra.Command {
 	return composeUpCmd
 }
 
-func handleComposeUpErr(ctx context.Context, err error, project *compose.Project, provider cliClient.Provider) error {
+func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accountInfo *cliClient.AccountInfo, projectName string) error {
+	samePlace := slices.ContainsFunc(existingDeployments, func(dep *defangv1.Deployment) bool {
+		// Old deployments may not have a region or account ID, so we check for empty values too
+		return dep.Provider == global.ProviderID.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
+	})
+	if samePlace {
+		return nil
+	}
+	if err := confirmDeploymentToNewLocation(projectName, existingDeployments); err != nil {
+		return err
+	}
+	if global.Stack == "" {
+		stackName := "beta"
+		_, err := stacks.Create(stacks.StackParameters{
+			Name:     stackName,
+			Provider: accountInfo.Provider,
+			Region:   accountInfo.Region,
+			Mode:     global.Mode,
+		})
+		if err != nil {
+			term.Debugf("Failed to create stack %v", err)
+		} else {
+			term.Info(stacks.PostCreateMessage(stackName))
+		}
+	}
+	return nil
+}
+
+func confirmDeploymentToNewLocation(projectName string, existingDeployments []*defangv1.Deployment) error {
+	if global.NonInteractive {
+		term.Warnf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", projectName)
+		return nil
+	}
+	term.Warn("This project has already deployed elsewhere:")
+	help := ""
+	for _, dep := range existingDeployments {
+		var providerId cliClient.ProviderID
+		providerId.SetValue(dep.Provider)
+		help += fmt.Sprintf("\n - %v", cliClient.AccountInfo{Provider: providerId, AccountID: dep.ProviderAccountId, Region: dep.Region})
+	}
+	term.Println(help)
+	var confirm bool
+	if err := survey.AskOne(&survey.Confirm{
+		Message: "Are you sure you want to continue?",
+		Default: false,
+	}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
+		return err
+	} else if !confirm {
+		return fmt.Errorf("deployment of project %q was canceled", projectName)
+	}
+	return nil
+}
+
+func promptToCreateStack(params stacks.StackParameters) error {
+	if global.NonInteractive {
+		term.Info("Consider creating a stack to manage your deployments.")
+		printDefangHint("To create a stack, do:", "stack new --name="+params.Name)
+		return nil
+	}
+
+	err := PromptForStackParameters(&params)
+	if err != nil {
+		return err
+	}
+
+	_, err = stacks.Create(params)
+	if err != nil {
+		return err
+	}
+
+	term.Info(stacks.PostCreateMessage(params.Name))
+
+	return nil
+}
+
+func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *compose.Project, provider cliClient.Provider, err error) error {
 	if errors.Is(err, types.ErrComposeFileNotFound) {
 		// TODO: generate a compose file based on the current project
 		printDefangHint("To start a new project, do:", "new")
@@ -239,11 +316,12 @@ func handleComposeUpErr(ctx context.Context, err error, project *compose.Project
 	}
 
 	term.Error("Error:", cliClient.PrettyError(err))
-	track.Evt("Debug Prompted", P("composeErr", err))
-	return cli.InteractiveDebugForClientError(ctx, global.Client, project, err)
+	return debugger.DebugDeploymentError(ctx, debug.DebugConfig{
+		Project: project,
+	}, err)
 }
 
-func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.GrpcClient, debugConfig cli.DebugConfig) {
+func handleTailAndMonitorErr(ctx context.Context, err error, debugger *debug.Debugger, debugConfig debug.DebugConfig) {
 	var errDeploymentFailed cliClient.ErrDeploymentFailed
 	if errors.As(err, &errDeploymentFailed) {
 		// Tail got canceled because of deployment failure: prompt to show the debugger
@@ -251,17 +329,17 @@ func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.G
 		if errDeploymentFailed.Service != "" {
 			debugConfig.FailedServices = []string{errDeploymentFailed.Service}
 		}
+
 		if global.NonInteractive {
 			printDefangHint("To debug the deployment, do:", debugConfig.String())
-		} else {
-			track.Evt("Debug Prompted", P("failedServices", debugConfig.FailedServices), P("etag", debugConfig.Deployment), P("reason", errDeploymentFailed))
+			return
+		}
 
-			// Call the AI debug endpoint using the original command context (not the tail ctx which is canceled)
-			if nil != cli.InteractiveDebugDeployment(ctx, client, debugConfig) {
-				// don't show this defang hint if debugging was successful
-				tailOptions := newTailOptionsForDeploy(debugConfig.Deployment, debugConfig.Since, true)
-				printDefangHint("To see the logs of the failed service, run:", "logs "+tailOptions.String())
-			}
+		// Call the AI debug endpoint using the original command context (not the tail ctx which is canceled)
+		if nil != debugger.DebugDeploymentError(ctx, debugConfig, errDeploymentFailed) {
+			// don't show this defang hint if debugging was successful
+			tailOptions := newTailOptionsForDeploy(debugConfig.Deployment, debugConfig.Since, true)
+			printDefangHint("To see the logs of the failed service, run:", "logs "+tailOptions.String())
 		}
 	}
 }
@@ -459,11 +537,19 @@ func makeComposeConfigCmd() *cobra.Command {
 				term.Error("Cannot load project:", loadErr)
 				project, err := loader.CreateProjectForDebug()
 				if err != nil {
-					return err
+					term.Warn("Failed to create project for debug:", err)
+					return loadErr
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				return cli.InteractiveDebugForClientError(ctx, global.Client, project, loadErr)
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+				if err != nil {
+					term.Warn("Failed to initialize debugger:", err)
+					return loadErr
+				}
+				return debugger.DebugComposeLoadError(ctx, debug.DebugConfig{
+					Project: project,
+				}, loadErr)
 			}
 
 			provider, err := newProvider(ctx, loader)
@@ -475,6 +561,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				Project:    project,
 				UploadMode: compose.UploadModeIgnore,
 				Mode:       modes.ModeUnspecified,
+				Stack:      global.Stack,
 			})
 			if !errors.Is(err, dryrun.ErrDryRun) {
 				return err
@@ -631,16 +718,17 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	tailOptions := cli.TailOptions{
-		Deployment: deployment,
-		Filter:     filter,
-		LogType:    logType,
-		Raw:        raw,
-		Services:   services,
-		Since:      sinceTs,
-		Until:      untilTs,
-		Verbose:    verbose,
-		Follow:     follow,
-		Limit:      limit,
+		Deployment:    deployment,
+		Filter:        filter,
+		LogType:       logType,
+		Raw:           raw,
+		Services:      services,
+		Since:         sinceTs,
+		Until:         untilTs,
+		Verbose:       verbose,
+		Follow:        follow,
+		Limit:         limit,
+		PrintBookends: true,
 	}
 	return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 }

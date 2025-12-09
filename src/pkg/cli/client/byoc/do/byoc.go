@@ -147,7 +147,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 		return nil, err
 	}
 
-	etag := pkg.RandomID()
+	etag := types.NewEtag()
 	serviceInfos, err := b.GetServiceInfos(ctx, project.Name, req.DelegateDomain, etag, project.Services)
 	if err != nil {
 		return nil, err
@@ -238,7 +238,7 @@ func (b *ByocDo) BootstrapCommand(ctx context.Context, req client.BootstrapComma
 		return "", err
 	}
 
-	etag := pkg.RandomID()
+	etag := types.NewEtag()
 	b.cdEtag = etag
 	return etag, nil
 }
@@ -651,109 +651,32 @@ func (b *ByocDo) environment(projectName, delegateDomain string, mode defangv1.D
 		return nil, err
 	}
 	env := []*godo.AppVariableDefinition{
-		{
-			Key:   "DEFANG_MODE",
-			Value: strings.ToLower(mode.String()),
-		},
-		{
-			Key:   "DEFANG_PREFIX",
-			Value: byoc.DefangPrefix,
-		},
-		{
-			Key:   "DEFANG_DEBUG",
-			Value: os.Getenv("DEFANG_DEBUG"),
-		},
-		{
-			Key:   "DEFANG_JSON",
-			Value: os.Getenv("DEFANG_JSON"),
-		},
-		{
-			Key:   "DEFANG_ORG",
-			Value: b.TenantName,
-		},
-		{
-			Key:   "DOMAIN",
-			Value: b.GetProjectDomain(projectName, delegateDomain),
-		},
-		{
-			Key:   "PRIVATE_DOMAIN",
-			Value: byoc.GetPrivateDomain(projectName),
-		},
-		{
-			Key:   "PROJECT",
-			Value: projectName,
-		},
-		{
-			Key:   pulumiBackendKey,
-			Value: pulumiBackendValue,
-			Type:  godo.AppVariableType_Secret,
-		},
-		{
-			Key:   "DEFANG_STATE_URL",
-			Value: defangStateUrl,
-		},
-		{
-			Key:   "PULUMI_CONFIG_PASSPHRASE",
-			Value: byoc.PulumiConfigPassphrase,
-			Type:  godo.AppVariableType_Secret,
-		},
-		{
-			Key:   "STACK",
-			Value: b.PulumiStack,
-		},
-		{
-			Key:   "NODE_NO_WARNINGS",
-			Value: "1",
-		},
-		{
-			Key:   "NPM_CONFIG_UPDATE_NOTIFIER",
-			Value: "false",
-		},
-		{
-			Key:   "PULUMI_COPILOT",
-			Value: "false",
-		},
-		{
-			Key:   "PULUMI_SKIP_UPDATE_CHECK",
-			Value: "true",
-		},
-		{
-			Key:   "DIGITALOCEAN_TOKEN",
-			Value: os.Getenv("DIGITALOCEAN_TOKEN"),
-			Type:  godo.AppVariableType_Secret,
-		},
-		{
-			Key:   "SPACES_ACCESS_KEY_ID",
-			Value: os.Getenv("SPACES_ACCESS_KEY_ID"),
-			Type:  godo.AppVariableType_Secret,
-		},
-		{
-			Key:   "SPACES_SECRET_ACCESS_KEY",
-			Value: os.Getenv("SPACES_SECRET_ACCESS_KEY"),
-			Type:  godo.AppVariableType_Secret,
-		},
-		{
-			Key:   "REGION",
-			Value: region.String(),
-		},
-		{
-			Key:   "DEFANG_BUILD_REPO",
-			Value: b.buildRepo,
-		},
-		{
-			Key:   "AWS_REGION", // Needed for CD S3 functions; FIXME: remove this
-			Value: region.String(),
-		},
-		{
-			Key:   "AWS_ACCESS_KEY_ID", // Needed for CD S3 functions; FIXME: remove this
-			Value: os.Getenv("SPACES_ACCESS_KEY_ID"),
-			Type:  godo.AppVariableType_Secret,
-		},
-		{
-			Key:   "AWS_SECRET_ACCESS_KEY", // Needed for CD S3 functions; FIXME: remove this
-			Value: os.Getenv("SPACES_SECRET_ACCESS_KEY"),
-			Type:  godo.AppVariableType_Secret,
-		},
+		{Key: "AWS_ACCESS_KEY_ID", Value: os.Getenv("SPACES_ACCESS_KEY_ID"), Type: godo.AppVariableType_Secret},         // Needed for CD S3 functions; FIXME: remove this
+		{Key: "AWS_REGION", Value: region.String()},                                                                     // Needed for CD S3 functions; FIXME: remove this
+		{Key: "AWS_SECRET_ACCESS_KEY", Value: os.Getenv("SPACES_SECRET_ACCESS_KEY"), Type: godo.AppVariableType_Secret}, // Needed for CD S3 functions; FIXME: remove this
+		{Key: "DEFANG_BUILD_REPO", Value: b.buildRepo},
+		{Key: "DEFANG_DEBUG", Value: os.Getenv("DEFANG_DEBUG")},
+		{Key: "DEFANG_JSON", Value: os.Getenv("DEFANG_JSON")},
+		{Key: "DEFANG_MODE", Value: strings.ToLower(mode.String())},
+		{Key: "DEFANG_ORG", Value: b.TenantName},
+		{Key: "DEFANG_PREFIX", Value: b.Prefix},
+		{Key: "DEFANG_PULUMI_DEBUG", Value: os.Getenv("DEFANG_PULUMI_DEBUG")},
+		{Key: "DEFANG_PULUMI_DIFF", Value: os.Getenv("DEFANG_PULUMI_DIFF")},
+		{Key: "DEFANG_STATE_URL", Value: defangStateUrl},
+		{Key: "DIGITALOCEAN_TOKEN", Value: os.Getenv("DIGITALOCEAN_TOKEN"), Type: godo.AppVariableType_Secret},
+		{Key: "DOMAIN", Value: b.GetProjectDomain(projectName, delegateDomain)},
+		{Key: "NODE_NO_WARNINGS", Value: "1"},
+		{Key: "NPM_CONFIG_UPDATE_NOTIFIER", Value: "false"},
+		{Key: "PRIVATE_DOMAIN", Value: byoc.GetPrivateDomain(projectName)},
+		{Key: "PROJECT", Value: projectName},
+		{Key: "PULUMI_CONFIG_PASSPHRASE", Value: byoc.PulumiConfigPassphrase, Type: godo.AppVariableType_Secret},
+		{Key: "PULUMI_COPILOT", Value: "false"},
+		{Key: "PULUMI_SKIP_UPDATE_CHECK", Value: "true"},
+		{Key: "REGION", Value: region.String()},
+		{Key: "SPACES_ACCESS_KEY_ID", Value: os.Getenv("SPACES_ACCESS_KEY_ID"), Type: godo.AppVariableType_Secret},
+		{Key: "SPACES_SECRET_ACCESS_KEY", Value: os.Getenv("SPACES_SECRET_ACCESS_KEY"), Type: godo.AppVariableType_Secret},
+		{Key: "STACK", Value: b.PulumiStack},
+		{Key: pulumiBackendKey, Value: pulumiBackendValue, Type: godo.AppVariableType_Secret},
 	}
 	if !term.StdoutCanColor() {
 		env = append(env, &godo.AppVariableDefinition{Key: "NO_COLOR", Value: "1"})
@@ -822,7 +745,7 @@ func (b *ByocDo) ServicePublicDNS(name string, projectName string) string {
 func processServiceInfo(service *godo.AppServiceSpec, projectName string) *defangv1.ServiceInfo {
 	serviceInfo := &defangv1.ServiceInfo{
 		Project: projectName,
-		Etag:    pkg.RandomID(), // TODO: get the real etag from spec somehow
+		Etag:    types.NewEtag(), // TODO: get the real etag from spec somehow
 		Service: &defangv1.Service{
 			Name: service.Name,
 		},

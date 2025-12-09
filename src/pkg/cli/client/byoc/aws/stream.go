@@ -8,13 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -100,7 +100,7 @@ func (bs *byocServerStream) parseEvents(events []cw.LogEvent) *defangv1.TailResp
 		response.Host = "codebuild"
 		response.Service = "cd"
 		parseCodeBuildRecords = true
-	case strings.HasSuffix(*first.LogGroupIdentifier, "/builds") && strings.Contains(*first.LogStreamName, "-firelens-"):
+	case strings.Contains(*first.LogStreamName, "-firelens-"):
 		// These events are from the Firelens sidecar "<service>/<kaniko>-firelens-<taskID>"; try to parse the JSON
 		// or ""
 		// LogStreams: "app-image/kaniko-firelens-babe6cdb246b4c10b5b7093bb294e6c7"
@@ -119,7 +119,8 @@ func (bs *byocServerStream) parseEvents(events []cw.LogEvent) *defangv1.TailResp
 			// LogStreams: "app/app_hg2xsgvsldqk/198f58c08c734bda924edc516f93b2d5"
 			response.Host = parts[2] // TODO: figure out actual hostname/IP for Task ID
 			underscore := strings.LastIndexByte(parts[1], '_')
-			if etag := parts[1][underscore+1:]; pkg.IsValidRandomID(etag) {
+			etag, err := types.ParseEtag(parts[1][underscore+1:])
+			if err == nil {
 				response.Service = parts[1][:underscore]
 				response.Etag = etag
 				break

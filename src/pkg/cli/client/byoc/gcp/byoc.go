@@ -19,7 +19,6 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds"
@@ -361,16 +360,18 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"DEFANG_JSON":              os.Getenv("DEFANG_JSON"),
 		"DEFANG_MODE":              strings.ToLower(cmd.mode.String()),
 		"DEFANG_ORG":               "defang",
-		"DEFANG_PREFIX":            byoc.DefangPrefix,
+		"DEFANG_PREFIX":            b.Prefix,
+		"DEFANG_PULUMI_DEBUG":      os.Getenv("DEFANG_PULUMI_DEBUG"),
+		"DEFANG_PULUMI_DIFF":       os.Getenv("DEFANG_PULUMI_DIFF"),
 		"DEFANG_STATE_URL":         defangStateUrl,
 		"GCP_PROJECT":              b.driver.ProjectId,
 		"PROJECT":                  cmd.project,
-		pulumiBackendKey:           pulumiBackendValue,          // TODO: make secret
 		"PULUMI_CONFIG_PASSPHRASE": byoc.PulumiConfigPassphrase, // TODO: make secret
 		"PULUMI_COPILOT":           "false",
 		"PULUMI_SKIP_UPDATE_CHECK": "true",
 		"REGION":                   b.driver.Region,
 		"STACK":                    b.PulumiStack,
+		pulumiBackendKey:           pulumiBackendValue, // TODO: make secret
 	}
 
 	if !term.StdoutCanColor() {
@@ -432,13 +433,13 @@ func (b *ByocGcp) Preview(ctx context.Context, req *defangv1.DeployRequest) (*de
 }
 
 func (b *ByocGcp) GetDeploymentStatus(ctx context.Context) error {
-	client, err := run.NewExecutionsClient(ctx)
+	execClient, err := run.NewExecutionsClient(ctx)
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer execClient.Close()
 
-	execution, err := client.GetExecution(ctx, &runpb.GetExecutionRequest{Name: b.cdExecution})
+	execution, err := execClient.GetExecution(ctx, &runpb.GetExecutionRequest{Name: b.cdExecution})
 	if err != nil {
 		return err
 	}
@@ -455,7 +456,7 @@ func (b *ByocGcp) GetDeploymentStatus(ctx context.Context) error {
 				}
 			}
 
-			return cliClient.ErrDeploymentFailed{Message: strings.Join(msgs, ",")}
+			return client.ErrDeploymentFailed{Message: strings.Join(msgs, ",")}
 		}
 
 		// completed successfully
@@ -479,7 +480,7 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 		return nil, err
 	}
 
-	etag := pkg.RandomID()
+	etag := types.NewEtag()
 	serviceInfos, err := b.GetServiceInfos(ctx, project.Name, req.DelegateDomain, etag, project.Services)
 	if err != nil {
 		return nil, err
@@ -977,7 +978,11 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 
 func (b *ByocGcp) StackName(projectName, name string) string {
 	pkg.Ensure(projectName != "", "ProjectName not set")
-	return fmt.Sprintf("%s_%s_%s_%s", byoc.DefangPrefix, projectName, b.PulumiStack, name)
+	var parts []string
+	if b.Prefix != "" {
+		parts = []string{b.Prefix}
+	}
+	return strings.Join(append(parts, projectName, b.PulumiStack, name), "_") // same as fullDefangResourceName in gcpcd/up.go
 }
 
 func (b *ByocGcp) ServicePublicDNS(name string, projectName string) string {

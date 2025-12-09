@@ -32,7 +32,7 @@ func makeStackCmd() *cobra.Command {
 
 func makeStackNewCmd() *cobra.Command {
 	var stackNewCmd = &cobra.Command{
-		Use:     "new STACK_NAME",
+		Use:     "new [STACK_NAME]",
 		Aliases: []string{"init", "create"},
 		Args:    cobra.MaximumNArgs(1),
 		Short:   "Create a new Defang deployment stack",
@@ -56,94 +56,19 @@ func makeStackNewCmd() *cobra.Command {
 				return err
 			}
 
-			if params.Provider == cliClient.ProviderAuto {
-				var options []string
-				for _, p := range cliClient.AllProviders() {
-					options = append(options, p.Name())
-				}
-				var provider string
-				err := survey.AskOne(&survey.Select{
-					Message: "Which cloud provider do you want to deploy to?",
-					Options: options,
-				}, &provider, survey.WithStdio(term.DefaultTerm.Stdio()))
-				if err != nil {
-					return err
-				}
-
-				if provider == "" {
-					return errors.New("a cloud provider must be selected")
-				}
-
-				err = global.ProviderID.Set(provider)
-				if err != nil {
-					return err
-				}
-				params.Provider = global.ProviderID
-			}
-
-			if params.Region == "" && params.Provider != cliClient.ProviderDefang {
-				defaultRegion := cliClient.GetRegion(params.Provider)
-
-				var region string
-
-				err := survey.AskOne(&survey.Input{
-					Message: fmt.Sprintf("Which %s region do you want to deploy to?", strings.ToUpper(params.Provider.String())),
-					Default: defaultRegion,
-				}, &region, survey.WithStdio(term.DefaultTerm.Stdio()))
-				if err != nil {
-					return err
-				}
-
-				params.Region = region
-			}
-
-			if params.Mode == modes.ModeUnspecified {
-				var selectedMode string
-				err := survey.AskOne(&survey.Select{
-					Message: "Which deployment mode do you want to use?",
-					Help:    "Learn about the different deployment modes at https://docs.defang.io/docs/concepts/deployment-modes",
-					Options: modes.AllDeploymentModes(),
-					Default: modes.ModeAffordable.String(),
-				},
-					&selectedMode, survey.WithStdio(term.DefaultTerm.Stdio()))
-				if err != nil {
-					return err
-				}
-
-				modeParsed, err := modes.Parse(selectedMode)
-				if err != nil {
-					return err
-				}
-				params.Mode = modeParsed
-			}
-
-			if stackName == "" {
-				defaultName := stacks.MakeDefaultName(params.Provider, params.Region)
-				var name string
-				err := survey.AskOne(&survey.Input{
-					Message: "What do you want to call this stack?",
-					Default: defaultName,
-				}, &name, survey.WithStdio(term.DefaultTerm.Stdio()))
-				if err != nil {
-					return err
-				}
-
-				params.Name = name
-			}
-
-			term.Debugf("Creating stack with parameters: %+v\n", params)
-
-			filename, err := stacks.Create(params)
+			err := PromptForStackParameters(&params)
 			if err != nil {
 				return err
 			}
 
-			term.Infof(
-				"Created new stack configuration file: `%s`. "+
-					"Check this file into version control. "+
-					"You can now deploy this stack using `defang up --stack=%s`\n",
-				filename, params.Name,
-			)
+			term.Debugf("Creating stack with parameters: %+v\n", params)
+
+			_, err = stacks.Create(params)
+			if err != nil {
+				return err
+			}
+
+			term.Info(stacks.PostCreateMessage(params.Name))
 			return nil
 		},
 	}
@@ -204,4 +129,83 @@ func makeStackRemoveCmd() *cobra.Command {
 		},
 	}
 	return stackRemoveCmd
+}
+
+func PromptForStackParameters(params *stacks.StackParameters) error {
+	if params.Provider == cliClient.ProviderAuto {
+		var options []string
+		for _, p := range cliClient.AllProviders() {
+			options = append(options, p.Name())
+		}
+		var provider string
+		err := survey.AskOne(&survey.Select{
+			Message: "Which cloud provider do you want to deploy to?",
+			Options: options,
+		}, &provider, survey.WithStdio(term.DefaultTerm.Stdio()))
+		if err != nil {
+			return err
+		}
+
+		if provider == "" {
+			return errors.New("a cloud provider must be selected")
+		}
+
+		err = global.ProviderID.Set(provider)
+		if err != nil {
+			return err
+		}
+		params.Provider = global.ProviderID
+	}
+
+	if params.Region == "" && params.Provider != cliClient.ProviderDefang {
+		defaultRegion := cliClient.GetRegion(params.Provider)
+
+		var region string
+
+		err := survey.AskOne(&survey.Input{
+			Message: fmt.Sprintf("Which %s region do you want to deploy to?", strings.ToUpper(params.Provider.String())),
+			Default: defaultRegion,
+		}, &region, survey.WithStdio(term.DefaultTerm.Stdio()))
+		if err != nil {
+			return err
+		}
+
+		params.Region = region
+	}
+
+	if params.Mode == modes.ModeUnspecified {
+		var selectedMode string
+		err := survey.AskOne(&survey.Select{
+			Message: "Which deployment mode do you want to use?",
+			Help:    "Learn about the different deployment modes at https://docs.defang.io/docs/concepts/deployment-modes",
+			Options: modes.AllDeploymentModes(),
+			Default: modes.ModeAffordable.String(),
+		},
+			&selectedMode, survey.WithStdio(term.DefaultTerm.Stdio()))
+		if err != nil {
+			return err
+		}
+
+		modeParsed, err := modes.Parse(selectedMode)
+		if err != nil {
+			return err
+		}
+		params.Mode = modeParsed
+	}
+
+	if params.Name == "" {
+		defaultName := stacks.MakeDefaultName(params.Provider, params.Region)
+		var name string
+		err := survey.AskOne(&survey.Input{
+			Message: "What do you want to call this stack?",
+			Default: defaultName,
+		}, &name, survey.WithStdio(term.DefaultTerm.Stdio()))
+		if err != nil {
+			return err
+		}
+
+		params.Name = name
+	}
+
+	return nil
 }
