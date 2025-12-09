@@ -31,7 +31,7 @@ func Monitor(ctx context.Context, project *compose.Project, provider client.Prov
 	_, computeServices := splitManagedAndUnmanagedServices(project.Services)
 
 	for _, svc := range computeServices {
-		term.Infof("%s [%s] %s\n", time.Now().Format(time.TimeOnly), svc, "PENDING")
+		term.Infof("[%s] %s\n", svc, "DEPLOYMENT_PENDING")
 	}
 
 	var (
@@ -46,7 +46,7 @@ func Monitor(ctx context.Context, project *compose.Project, provider client.Prov
 		serviceStates, svcErr = WatchServiceState(svcStatusCtx, provider, project.Name, deploymentID, computeServices, func(msg *defangv1.SubscribeResponse, states *ServiceStates) error {
 			// Print service status updates as they arrive
 			for name, state := range *states {
-				term.Infof("%s [%s] %s\n", time.Now().Format(time.TimeOnly), name, state.String())
+				term.Infof("[%s] %s\n", name, state.String())
 			}
 			return nil
 		})

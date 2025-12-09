@@ -185,8 +185,8 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 
-			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, global.Verbose)
-			serviceStates, err := cli.TailAndMonitor(ctx, project, session.Provider, time.Duration(waitTimeout)*time.Second, tailOptions)
+			term.Info("Live tail logs with `defang tail --deployment=" + deploy.Etag + "`")
+			serviceStates, err := cli.Monitor(ctx, project, session.Provider, time.Duration(waitTimeout)*time.Second, deploy.Etag)
 			if err != nil && !errors.Is(err, context.Canceled) {
 				deploymentErr := err
 				debugger, err := debug.NewDebugger(ctx, global.Cluster, &global.Stack)
