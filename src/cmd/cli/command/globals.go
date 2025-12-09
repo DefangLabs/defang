@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -321,6 +322,9 @@ func (r *GlobalConfig) checkEnvConflicts(stackFile string) {
 	
 	// Warn about conflicts
 	if len(conflicts) > 0 {
+		// Sort conflicts for deterministic output
+		sort.Strings(conflicts)
+		
 		term.Warnf("The following environment variables from the stack file will be ignored because they are already set in your shell environment:")
 		for _, key := range conflicts {
 			term.Warnf("  - %s (shell: %q, stack: %q)", key, shellEnv[key], stackEnv[key])
