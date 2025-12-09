@@ -274,7 +274,7 @@ func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.D
 }
 
 func printExistingDeployments(existingDeployments []*defangv1.Deployment) {
-	term.Info("This project was previously deployed to the following locations:")
+	term.Info("This project has already deployed to the following locations:")
 	deploymentStrings := make([]string, 0, len(existingDeployments))
 	for _, dep := range existingDeployments {
 		var providerId client.ProviderID
