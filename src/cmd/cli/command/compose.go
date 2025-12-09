@@ -19,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -96,33 +97,15 @@ func makeComposeUpCmd() *cobra.Command {
 				term.Debugf("ListDeployments failed: %v", err)
 			} else if accountInfo, err := provider.AccountInfo(ctx); err != nil {
 				term.Debugf("AccountInfo failed: %v", err)
-			} else {
-				samePlace := slices.ContainsFunc(resp.Deployments, func(dep *defangv1.Deployment) bool {
-					// Old deployments may not have a region or account ID, so we check for empty values too
-					return dep.Provider == global.ProviderID.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
+			} else if len(resp.Deployments) > 0 {
+				handleExistingDeployments(resp.Deployments, accountInfo, project.Name)
+			} else if global.Stack == "" {
+				promptToCreateStack(stacks.StackParameters{
+					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
+					Provider: accountInfo.Provider,
+					Region:   accountInfo.Region,
+					Mode:     global.Mode,
 				})
-				if !samePlace && len(resp.Deployments) > 0 {
-					if global.NonInteractive {
-						term.Warnf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", project.Name)
-					} else {
-						help := "Active deployments of this project:"
-						for _, dep := range resp.Deployments {
-							var providerId cliClient.ProviderID
-							providerId.SetValue(dep.Provider)
-							help += fmt.Sprintf("\n - %v", cliClient.AccountInfo{Provider: providerId, AccountID: dep.ProviderAccountId, Region: dep.Region})
-						}
-						var confirm bool
-						if err := survey.AskOne(&survey.Confirm{
-							Message: "This project appears to be already deployed elsewhere. Are you sure you want to continue?",
-							Help:    help,
-							Default: false,
-						}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
-							return err
-						} else if !confirm {
-							return fmt.Errorf("deployment of project %q was canceled", project.Name)
-						}
-					}
-				}
 			}
 
 			// Show a warning for any (managed) services that we cannot monitor
@@ -216,6 +199,81 @@ func makeComposeUpCmd() *cobra.Command {
 	_ = composeUpCmd.Flags().MarkHidden("wait")
 	composeUpCmd.Flags().Int("wait-timeout", -1, "maximum duration to wait for the project to be running|healthy") // docker-compose compatibility
 	return composeUpCmd
+}
+
+func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accountInfo *cliClient.AccountInfo, projectName string) error {
+	samePlace := slices.ContainsFunc(existingDeployments, func(dep *defangv1.Deployment) bool {
+		// Old deployments may not have a region or account ID, so we check for empty values too
+		return dep.Provider == global.ProviderID.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
+	})
+	if samePlace {
+		return nil
+	}
+	if err := confirmDeploymentToNewLocation(projectName, existingDeployments); err != nil {
+		return err
+	}
+	if global.Stack == "" {
+		stackName := "beta"
+		_, err := stacks.Create(stacks.StackParameters{
+			Name:     stackName,
+			Provider: accountInfo.Provider,
+			Region:   accountInfo.Region,
+			Mode:     global.Mode,
+		})
+		if err != nil {
+			term.Debugf("Failed to create stack %v", err)
+		} else {
+			term.Info(stacks.PostCreateMessage(stackName))
+		}
+	}
+	return nil
+}
+
+func confirmDeploymentToNewLocation(projectName string, existingDeployments []*defangv1.Deployment) error {
+	if global.NonInteractive {
+		term.Warnf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", projectName)
+		return nil
+	}
+	term.Warn("This project has already deployed elsewhere:")
+	help := ""
+	for _, dep := range existingDeployments {
+		var providerId cliClient.ProviderID
+		providerId.SetValue(dep.Provider)
+		help += fmt.Sprintf("\n - %v", cliClient.AccountInfo{Provider: providerId, AccountID: dep.ProviderAccountId, Region: dep.Region})
+	}
+	term.Println(help)
+	var confirm bool
+	if err := survey.AskOne(&survey.Confirm{
+		Message: "Are you sure you want to continue?",
+		Default: false,
+	}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
+		return err
+	} else if !confirm {
+		return fmt.Errorf("deployment of project %q was canceled", projectName)
+	}
+	return nil
+}
+
+func promptToCreateStack(params stacks.StackParameters) error {
+	if global.NonInteractive {
+		term.Info("Consider creating a stack to manage your deployments.")
+		printDefangHint("To create a stack, do:", "stack new --name="+params.Name)
+		return nil
+	}
+
+	err := PromptForStackParameters(&params)
+	if err != nil {
+		return err
+	}
+
+	_, err = stacks.Create(params)
+	if err != nil {
+		return err
+	}
+
+	term.Info(stacks.PostCreateMessage(params.Name))
+
+	return nil
 }
 
 func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *compose.Project, provider cliClient.Provider, err error) error {
@@ -489,6 +547,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				Project:    project,
 				UploadMode: compose.UploadModeIgnore,
 				Mode:       modes.ModeUnspecified,
+				Stack:      global.Stack,
 			})
 			if !errors.Is(err, dryrun.ErrDryRun) {
 				return err
