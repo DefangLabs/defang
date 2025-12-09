@@ -169,6 +169,14 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 			if err != nil && !errors.Is(err, context.Canceled) {
 				deploymentErr := err
+
+				options := tailOptionsForDeploymentFailure(deploy.Etag, since, serviceStates)
+				err := cli.Tail(ctx, session.Provider, project.Name, options)
+				if err != nil && !errors.Is(err, io.EOF) {
+					term.Warn("Failed to tail logs for deployment error", err)
+					return deploymentErr
+				}
+
 				debugger, err := debug.NewDebugger(ctx, global.FabricAddr, session.Stack)
 				if err != nil {
 					term.Warn("Failed to initialize debugger:", err)
@@ -216,6 +224,37 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().Int("wait-timeout", -1, "maximum duration to wait for the project to be running|healthy") // docker-compose compatibility
 	composeUpCmd.Flags().Bool("allow-upgrade", pkg.GetenvBool("DEFANG_ALLOW_UPGRADE"), "allow upgrading the CD image and Pulumi version to the latest available")
 	return composeUpCmd
+}
+
+func tailOptionsForDeploymentFailure(etag types.ETag, since time.Time, serviceStates map[string]defangv1.ServiceState) cli.TailOptions {
+	options := cli.TailOptions{
+		Deployment: etag,
+		LogType:    logs.LogTypeCD,
+		Since:      since,
+		Verbose:    true,
+		Follow:     false,
+	}
+
+	// if any services failed to build, only show build logs for those services
+	var unbuiltServices = make([]string, 0, len(serviceStates))
+	var unhealthyServices = make([]string, 0, len(serviceStates))
+	for service, state := range serviceStates {
+		if state <= defangv1.ServiceState_BUILD_STOPPING {
+			unbuiltServices = append(unbuiltServices, service)
+		} else if state != defangv1.ServiceState_DEPLOYMENT_COMPLETED {
+			unhealthyServices = append(unhealthyServices, service)
+		}
+	}
+
+	if len(unbuiltServices) > 0 {
+		options.LogType = logs.LogTypeBuild
+		options.Services = unbuiltServices
+	} else {
+		options.LogType = logs.LogTypeCD & logs.LogTypeRun
+		options.Services = unhealthyServices
+	}
+
+	return options
 }
 
 func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.Deployment, accountInfo *client.AccountInfo, stackName string) (bool, error) {
