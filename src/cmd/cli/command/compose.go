@@ -162,15 +162,8 @@ func makeComposeUpCmd() *cobra.Command {
 				return nil
 			}
 
-			// show users the current streaming logs
-			tailSource := "all services"
-			if deploy.Etag != "" {
-				tailSource = "deployment ID " + deploy.Etag
-			}
-			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
-
-			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, global.Verbose)
-			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
+			term.Info("Live tail logs with `defang tail --deployment=" + deploy.Etag + "`")
+			serviceStates, err := cli.Monitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, deploy.Etag)
 			if err != nil {
 				deploymentErr := err
 				debugger, err := debug.NewDebugger(ctx, global.Cluster, &global.Stack)
