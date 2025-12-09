@@ -231,7 +231,7 @@ func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accou
 
 func printExistingDeployments(existingDeployments []*defangv1.Deployment) {
 	term.Info("This project has already deployed to the following locations:")
-	deploymentStrings := []string{}
+	deploymentStrings := make([]string, 0, len(existingDeployments))
 	for _, dep := range existingDeployments {
 		var providerId cliClient.ProviderID
 		providerId.SetValue(dep.Provider)
