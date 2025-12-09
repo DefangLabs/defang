@@ -2,6 +2,8 @@ package command
 
 import (
 	"os"
+	"path/filepath"
+	"sort"
 	"strconv"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -10,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/joho/godotenv"
 	"github.com/spf13/pflag"
 )
 
@@ -257,9 +260,12 @@ and existing shell environment variables, and warns the user if any are found.
 func (r *GlobalConfig) loadDotDefang(stackName string) error {
 	if stackName != "" {
 		// Check for conflicts before loading
-		r.checkEnvConflicts(dotfile)
+		err := checkEnvConflicts(stackName)
+		if err != nil {
+			return err
+		}
 
-    return stacks.Load(stackName) // ensure stack exists
+		return stacks.Load(stackName) // ensure stack exists
 	}
 
 	return nil
@@ -270,14 +276,20 @@ checkEnvConflicts reads the stack file and checks if any environment variables
 in the file conflict with existing shell environment variables. If conflicts are
 found, it warns the user that the shell environment variable will take precedence.
 */
-func (r *GlobalConfig) checkEnvConflicts(stackFile string) {
-	// Read the stack file
-	stackEnv, err := godotenv.Read(stackFile)
+func checkEnvConflicts(stackName string) error {
+
+	path, err := filepath.Abs(filepath.Join(stacks.Directory, stackName))
 	if err != nil {
-		// If we can't read the file, the subsequent godotenv.Load will fail too
-		return
+		return err
 	}
-	
+
+	// Read the stack file
+	stackEnv, err := godotenv.Read(path)
+	if err != nil {
+		// If we can't read the file, the subsequent stacks.Load which calls godotenv.Load will not work either
+		return err
+	}
+
 	// Check for conflicts with existing shell environment
 	var conflicts []string
 	for key, stackValue := range stackEnv {
@@ -285,16 +297,17 @@ func (r *GlobalConfig) checkEnvConflicts(stackFile string) {
 			conflicts = append(conflicts, key)
 		}
 	}
-	
+
 	// Warn about conflicts
 	if len(conflicts) > 0 {
 		// Sort conflicts for deterministic output
 		sort.Strings(conflicts)
-		
+
 		term.Warnf("The following environment variables from the stack file will be ignored because they are already set in your shell environment:")
 		for _, key := range conflicts {
 			term.Warnf("  - %s (shell: %q, stack: %q)", key, os.Getenv(key), stackEnv[key])
 		}
 		term.Warnf("The shell environment variables will take precedence. To use the stack file values, unset these variables in your shell.")
 	}
+	return nil
 }

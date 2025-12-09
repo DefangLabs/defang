@@ -1,6 +1,7 @@
 package command
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,8 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/pflag"
 )
 
@@ -364,10 +367,13 @@ func Test_configurationPrecedence(t *testing.T) {
 	}
 }
 
+/*
+Test_checkEnvConflicts tests the checkEnvConflicts function to ensure it correctly identifies
+conflicts between environment variables set in the shell and those defined in a stack file.
+It verifies that warnings are issued when conflicts are detected and that no warnings are issued
+when there are no conflicts.
+*/
 func Test_checkEnvConflicts(t *testing.T) {
-	// Test that environment variable conflicts are detected and warnings are generated
-	testConfig := GlobalConfig{}
-
 	tests := []struct {
 		name           string
 		stackContent   string
@@ -418,16 +424,26 @@ AWS_REGION="us-east-1"`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+
+			prevTerm := term.DefaultTerm
+			var stdout, stderr bytes.Buffer
+			term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
+			t.Cleanup(func() {
+				term.DefaultTerm = prevTerm
+			})
+
 			// Create a temporary directory and stack file
 			tempDir := t.TempDir()
-			stackFile := filepath.Join(tempDir, ".defang", "test")
-			
+			t.Chdir(tempDir)
+			stackName := "test"
+			stackFile := filepath.Join(tempDir, stacks.Directory, stackName)
+
 			// Create the .defang subdirectory
-			err := os.MkdirAll(filepath.Join(tempDir, ".defang"), 0700)
+			err := os.MkdirAll(filepath.Join(tempDir, stacks.Directory), 0700)
 			if err != nil {
 				t.Fatalf("failed to create .defang directory: %v", err)
 			}
-			
+
 			// Write the stack file
 			err = os.WriteFile(stackFile, []byte(tt.stackContent), 0644)
 			if err != nil {
@@ -440,10 +456,15 @@ AWS_REGION="us-east-1"`,
 			}
 
 			// Call checkEnvConflicts - it displays warnings but doesn't return errors
-			testConfig.checkEnvConflicts(stackFile)
-			
-			// Note: We can't easily test the warnings output in this test,
-			// but the function should run without errors
+			checkEnvConflicts(stackName)
+
+			if tt.expectConflict && !term.HadWarnings() {
+				t.Errorf("Expected warning conflicts, but no warnings were generated")
+			}
+
+			if !tt.expectConflict && term.HadWarnings() {
+				t.Errorf("Expected no warning conflicts, but warnings were generated: %s", stderr.String())
+			}
 		})
 	}
 }
