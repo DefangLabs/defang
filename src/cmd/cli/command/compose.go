@@ -189,6 +189,22 @@ func makeComposeUpCmd() *cobra.Command {
 			serviceStates, err := cli.Monitor(ctx, project, session.Provider, time.Duration(waitTimeout)*time.Second, deploy.Etag)
 			if err != nil && !errors.Is(err, context.Canceled) {
 				deploymentErr := err
+				// TODO: only show the most relevant logs:
+				// * avoid showing service logs if the failure was during the build stage
+				// * avoid showing build logs for services that built successfully
+				// * only show cd logs if the failure was during deployment
+				err := cli.Tail(ctx, provider, project.Name, cli.TailOptions{
+					Deployment: deploy.Etag,
+					LogType:    logs.LogTypeAll,
+					Since:      since,
+					Verbose:    true,
+					Follow:     false,
+				})
+				if err != nil && !errors.Is(err, io.EOF) {
+					term.Warn("Failed to tail logs for deployment error", err)
+					return deploymentErr
+				}
+
 				debugger, err := debug.NewDebugger(ctx, global.Cluster, &global.Stack)
 				if err != nil {
 					term.Warn("Failed to initialize debugger:", err)
