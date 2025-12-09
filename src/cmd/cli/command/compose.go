@@ -220,8 +220,9 @@ func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accou
 			Region:   accountInfo.Region,
 			Mode:     global.Mode,
 		})
-		if err == nil {
+		if err != nil {
 			term.Debugf("Failed to create stack %v", err)
+		} else {
 			term.Info(stacks.PostCreateMessage(stackName))
 		}
 	}
@@ -256,7 +257,7 @@ func confirmDeploymentToNewLocation(projectName string, existingDeployments []*d
 func promptToCreateStack(params stacks.StackParameters) error {
 	if global.NonInteractive {
 		term.Info("Consider creating a stack to manage your deployments.")
-		printDefangHint("To create a stack, do:", fmt.Sprintf("stack new --name=%s", params.Name))
+		printDefangHint("To create a stack, do:", "stack new --name="+params.Name)
 		return nil
 	}
 
