@@ -235,13 +235,16 @@ func confirmDeploymentToNewLocation(projectName string, existingDeployments []*d
 		return nil
 	}
 	term.Warn("This project has already deployed elsewhere:")
-	help := ""
+	deploymentStrings := []string{}
 	for _, dep := range existingDeployments {
 		var providerId cliClient.ProviderID
 		providerId.SetValue(dep.Provider)
-		help += fmt.Sprintf("\n - %v", cliClient.AccountInfo{Provider: providerId, AccountID: dep.ProviderAccountId, Region: dep.Region})
+		deploymentStrings = append(deploymentStrings, fmt.Sprintf(" - %v", cliClient.AccountInfo{Provider: providerId, AccountID: dep.ProviderAccountId, Region: dep.Region}))
 	}
-	term.Println(help)
+	// sort and remove duplicates
+	slices.Sort(deploymentStrings)
+	deploymentStrings = slices.Compact(deploymentStrings)
+	term.Println(strings.Join(deploymentStrings, "\n"))
 	var confirm bool
 	if err := survey.AskOne(&survey.Confirm{
 		Message: "Are you sure you want to continue?",
