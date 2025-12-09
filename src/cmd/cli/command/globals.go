@@ -267,9 +267,7 @@ func (r *GlobalConfig) loadDotDefang(stackName string) error {
 		}
 		
 		// Check for conflicts before loading
-		if err := r.checkEnvConflicts(dotfile); err != nil {
-			return err
-		}
+		r.checkEnvConflicts(dotfile)
 		
 		if err := godotenv.Load(dotfile); err != nil {
 			return fmt.Errorf("could not load stack %q: %w", stackName, err)
@@ -295,12 +293,12 @@ checkEnvConflicts reads the stack file and checks if any environment variables
 in the file conflict with existing shell environment variables. If conflicts are
 found, it warns the user that the shell environment variable will take precedence.
 */
-func (r *GlobalConfig) checkEnvConflicts(stackFile string) error {
+func (r *GlobalConfig) checkEnvConflicts(stackFile string) {
 	// Read the stack file
 	stackEnv, err := godotenv.Read(stackFile)
 	if err != nil {
 		// If we can't read the file, the subsequent godotenv.Load will fail too
-		return nil
+		return
 	}
 	
 	// Get the existing shell environment
@@ -329,6 +327,4 @@ func (r *GlobalConfig) checkEnvConflicts(stackFile string) error {
 		}
 		term.Warnf("The shell environment variables will take precedence. To use the stack file values, unset these variables in your shell.")
 	}
-	
-	return nil
 }

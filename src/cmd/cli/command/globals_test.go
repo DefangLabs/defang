@@ -481,7 +481,7 @@ AWS_REGION="us-east-1"`,
 			tempDir := t.TempDir()
 			stackFile := filepath.Join(tempDir, ".defang", "test")
 			
-			// Create the .defang directory (and any parent directories if needed)
+			// Create the .defang subdirectory
 			err := os.MkdirAll(filepath.Join(tempDir, ".defang"), 0700)
 			if err != nil {
 				t.Fatalf("failed to create .defang directory: %v", err)
@@ -498,11 +498,8 @@ AWS_REGION="us-east-1"`,
 				t.Setenv(key, value)
 			}
 
-			// Call checkEnvConflicts - it should not return an error, just warnings
-			err = testConfig.checkEnvConflicts(stackFile)
-			if err != nil {
-				t.Errorf("checkEnvConflicts returned unexpected error: %v", err)
-			}
+			// Call checkEnvConflicts - it displays warnings but doesn't return errors
+			testConfig.checkEnvConflicts(stackFile)
 			
 			// Note: We can't easily test the warnings output in this test,
 			// but the function should run without errors
