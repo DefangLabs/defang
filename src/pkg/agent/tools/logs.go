@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -56,6 +57,10 @@ func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 		return "", fmt.Errorf("failed to load project name: %w", err)
 	}
 	term.Debug("Project name loaded:", projectName)
+
+	if config.ProviderID == nil {
+		return "", errors.New("provider ID is required to fetch logs")
+	}
 
 	err = cli.CanIUseProvider(ctx, client, *config.ProviderID, projectName, provider, 0)
 	if err != nil {

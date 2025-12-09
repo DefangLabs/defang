@@ -17,6 +17,7 @@ package compat_oai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -397,6 +398,9 @@ func (g *ModelGenerator) generateComplete(ctx context.Context, req *ai.ModelRequ
 		},
 	}
 
+	if len(completion.Choices) == 0 {
+		return nil, errors.New("no choices returned from completion")
+	}
 	choice := completion.Choices[0]
 
 	switch choice.FinishReason {
