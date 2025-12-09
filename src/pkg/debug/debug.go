@@ -40,11 +40,11 @@ func (dc DebugConfig) String() string {
 	if !dc.Until.IsZero() {
 		cmd += " --until=" + dc.Until.UTC().Format(time.RFC3339Nano)
 	}
-	if dc.Project.WorkingDir != "" {
-		cmd += " --cwd=" + dc.Project.WorkingDir
-	}
 	if dc.Project != nil {
 		cmd += " --project-name=" + dc.Project.Name
+		if dc.Project.WorkingDir != "" {
+			cmd += " --cwd=" + dc.Project.WorkingDir
+		}
 	}
 	if len(dc.FailedServices) > 0 {
 		cmd += " " + strings.Join(dc.FailedServices, " ")
