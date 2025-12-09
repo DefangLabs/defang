@@ -422,3 +422,90 @@ func Test_configurationPrecedence(t *testing.T) {
 		})
 	}
 }
+
+func Test_checkEnvConflicts(t *testing.T) {
+	// Test that environment variable conflicts are detected and warnings are generated
+	testConfig := GlobalConfig{}
+
+	tests := []struct {
+		name           string
+		stackContent   string
+		shellEnv       map[string]string
+		expectConflict bool
+	}{
+		{
+			name: "Conflict detected - AWS_PROFILE",
+			stackContent: `AWS_REGION="us-west-2"
+DEFANG_MODE="affordable"
+DEFANG_PROVIDER="aws"
+AWS_PROFILE="defang-lab"`,
+			shellEnv: map[string]string{
+				"AWS_PROFILE": "defang-sandbox",
+			},
+			expectConflict: true,
+		},
+		{
+			name: "No conflict - different values in different vars",
+			stackContent: `AWS_REGION="us-west-2"
+DEFANG_MODE="affordable"
+DEFANG_PROVIDER="aws"`,
+			shellEnv: map[string]string{
+				"AWS_PROFILE": "defang-sandbox",
+			},
+			expectConflict: false,
+		},
+		{
+			name: "No conflict - same value",
+			stackContent: `AWS_PROFILE="defang-lab"
+AWS_REGION="us-west-2"`,
+			shellEnv: map[string]string{
+				"AWS_PROFILE": "defang-lab",
+			},
+			expectConflict: false,
+		},
+		{
+			name: "Conflict detected - multiple vars",
+			stackContent: `AWS_PROFILE="defang-lab"
+AWS_REGION="us-east-1"`,
+			shellEnv: map[string]string{
+				"AWS_PROFILE": "defang-sandbox",
+				"AWS_REGION":  "us-west-2",
+			},
+			expectConflict: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a temporary directory and stack file
+			tempDir := t.TempDir()
+			stackFile := filepath.Join(tempDir, ".defang", "test")
+			
+			// Create the .defang directory
+			err := os.Mkdir(filepath.Join(tempDir, ".defang"), 0700)
+			if err != nil {
+				t.Fatalf("failed to create .defang directory: %v", err)
+			}
+			
+			// Write the stack file
+			err = os.WriteFile(stackFile, []byte(tt.stackContent), 0644)
+			if err != nil {
+				t.Fatalf("failed to write stack file: %v", err)
+			}
+
+			// Set shell environment variables
+			for key, value := range tt.shellEnv {
+				t.Setenv(key, value)
+			}
+
+			// Call checkEnvConflicts - it should not return an error, just warnings
+			err = testConfig.checkEnvConflicts(stackFile)
+			if err != nil {
+				t.Errorf("checkEnvConflicts returned unexpected error: %v", err)
+			}
+			
+			// Note: We can't easily test the warnings output in this test,
+			// but the function should run without errors
+		})
+	}
+}

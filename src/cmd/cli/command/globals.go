@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cluster"
@@ -252,6 +253,9 @@ Important: RC files have the lowest priority in the configuration hierarchy.
 They will NOT override environment variables that are already set, since
 godotenv.Load respects existing environment variables. Stack-specific RC files
 are considered required when specified, while the general RC file is optional.
+
+This function also checks for conflicts between environment variables in the stack file
+and existing shell environment variables, and warns the user if any are found.
 */
 func (r *GlobalConfig) loadDotDefang(stackName string) error {
 	dotfile := ".defang"
@@ -261,6 +265,12 @@ func (r *GlobalConfig) loadDotDefang(stackName string) error {
 		if abs, err := filepath.Abs(dotfile); err == nil {
 			dotfile = abs
 		}
+		
+		// Check for conflicts before loading
+		if err := r.checkEnvConflicts(dotfile); err != nil {
+			return err
+		}
+		
 		if err := godotenv.Load(dotfile); err != nil {
 			return fmt.Errorf("could not load stack %q: %w", stackName, err)
 		}
@@ -277,5 +287,48 @@ func (r *GlobalConfig) loadDotDefang(stackName string) error {
 	}
 
 	term.Debugf("loaded globals from %s", dotfile)
+	return nil
+}
+
+/*
+checkEnvConflicts reads the stack file and checks if any environment variables
+in the file conflict with existing shell environment variables. If conflicts are
+found, it warns the user that the shell environment variable will take precedence.
+*/
+func (r *GlobalConfig) checkEnvConflicts(stackFile string) error {
+	// Read the stack file
+	stackEnv, err := godotenv.Read(stackFile)
+	if err != nil {
+		// If we can't read the file, the subsequent godotenv.Load will fail too
+		return nil
+	}
+	
+	// Get the existing shell environment
+	shellEnv := make(map[string]string)
+	for _, env := range os.Environ() {
+		if idx := strings.Index(env, "="); idx > 0 {
+			key := env[:idx]
+			value := env[idx+1:]
+			shellEnv[key] = value
+		}
+	}
+	
+	// Check for conflicts
+	var conflicts []string
+	for key, stackValue := range stackEnv {
+		if shellValue, exists := shellEnv[key]; exists && shellValue != stackValue {
+			conflicts = append(conflicts, key)
+		}
+	}
+	
+	// Warn about conflicts
+	if len(conflicts) > 0 {
+		term.Warnf("The following environment variables from the stack file will be ignored because they are already set in your shell environment:\n")
+		for _, key := range conflicts {
+			term.Warnf("  - %s (shell: %q, stack: %q)\n", key, shellEnv[key], stackEnv[key])
+		}
+		term.Warnf("The shell environment variables will take precedence. To use the stack file values, unset these variables in your shell.\n")
+	}
+	
 	return nil
 }
