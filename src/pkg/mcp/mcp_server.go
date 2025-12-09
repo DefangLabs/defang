@@ -5,23 +5,21 @@ import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	"github.com/DefangLabs/defang/src/pkg/agent/tools"
-	"github.com/DefangLabs/defang/src/pkg/mcp/prompts"
+	agentTools "github.com/DefangLabs/defang/src/pkg/agent/tools"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
+	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 
-	// NewDefangMCPServer returns a new MCPServer instance with all resources, tools, and prompts registered.
+	// NewDefangMCPServer returns a new MCPServer instance with all resources, tools registered.
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 )
 
-func prepareInstructions(defangTools []server.ServerTool) string {
+func prepareInstructions() string {
 	instructions := "Defang provides tools for deploying web applications to cloud providers (AWS, GCP, Digital Ocean) using a compose.yaml file."
-	for _, tool := range defangTools {
-		instructions += "\n\n" + tool.Tool.Name + " - " + tool.Tool.Description
-	}
 	return instructions
 }
 
@@ -47,33 +45,35 @@ func (t *ToolTracker) TrackTool(name string, handler server.ToolHandlerFunc) ser
 	}
 }
 
-func NewDefangMCPServer(version string, cluster string, providerID *cliClient.ProviderID, client MCPClient, cli tools.CLIInterface) (*server.MCPServer, error) {
+type StackConfig = tools.StackConfig
+
+func NewDefangMCPServer(version string, client MCPClient, cli agentTools.CLIInterface, config StackConfig) (*server.MCPServer, error) {
 	// Setup knowledge base
 	if err := SetupKnowledgeBase(); err != nil {
 		return nil, fmt.Errorf("failed to setup knowledge base: %w", err)
 	}
 
-	defangTools := tools.CollectTools(cluster, providerID, cli)
 	s := server.NewMCPServer(
 		"Deploy with Defang",
 		version,
 		server.WithResourceCapabilities(true, true),
-		server.WithPromptCapabilities(true),
 		server.WithToolCapabilities(true),
-		server.WithInstructions(prepareInstructions(defangTools)),
+		server.WithInstructions(prepareInstructions()),
 	)
 
 	resources.SetupResources(s)
-	prompts.SetupPrompts(s, cluster, providerID)
 
 	// This is used to pass down information of what MCP client we are using
 	common.MCPDevelopmentClient = string(client)
 
 	toolTracker := ToolTracker{
-		providerId: providerID,
-		cluster:    cluster,
+		providerId: config.ProviderID,
+		cluster:    config.Cluster,
 		client:     common.MCPDevelopmentClient,
 	}
+	elicitationsClient := NewMCPElicitationsController(s)
+	ec := elicitations.NewController(elicitationsClient)
+	defangTools := tools.CollectTools(ec, config)
 	for i := range defangTools {
 		defangTools[i].Handler = toolTracker.TrackTool(defangTools[i].Tool.Name, defangTools[i].Handler)
 	}

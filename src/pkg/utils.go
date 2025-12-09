@@ -153,7 +153,7 @@ func Compare(actual []byte, goldenFile string) error {
 	golden, err := os.ReadFile(goldenFile)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return fmt.Errorf("Failed to read golden file: %w", err)
+			return fmt.Errorf("failed to read golden file: %w", err)
 		}
 		return os.WriteFile(goldenFile, actual, 0644)
 	} else {
