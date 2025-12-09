@@ -323,11 +323,11 @@ func (r *GlobalConfig) checkEnvConflicts(stackFile string) error {
 	
 	// Warn about conflicts
 	if len(conflicts) > 0 {
-		term.Warnf("The following environment variables from the stack file will be ignored because they are already set in your shell environment:\n")
+		term.Warnf("The following environment variables from the stack file will be ignored because they are already set in your shell environment:")
 		for _, key := range conflicts {
-			term.Warnf("  - %s (shell: %q, stack: %q)\n", key, shellEnv[key], stackEnv[key])
+			term.Warnf("  - %s (shell: %q, stack: %q)", key, shellEnv[key], stackEnv[key])
 		}
-		term.Warnf("The shell environment variables will take precedence. To use the stack file values, unset these variables in your shell.\n")
+		term.Warnf("The shell environment variables will take precedence. To use the stack file values, unset these variables in your shell.")
 	}
 	
 	return nil
