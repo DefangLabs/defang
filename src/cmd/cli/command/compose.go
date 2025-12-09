@@ -221,6 +221,7 @@ func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accou
 			Mode:     global.Mode,
 		})
 		if err == nil {
+			term.Debugf("Failed to create stack %v", err)
 			term.Info(stacks.PostCreateMessage(stackName))
 		}
 	}
