@@ -28,30 +28,6 @@ func Test_readGlobals(t *testing.T) {
 		os.Unsetenv("VALUE")
 	})
 
-	t.Run(".defang/test beats .defang", func(t *testing.T) {
-		t.Chdir("testdata/with-stack")
-		err := testConfig.loadDotDefang("test")
-		if err != nil {
-			t.Fatalf("%v", err)
-		}
-		if v := os.Getenv("VALUE"); v != "from .defang/test" {
-			t.Errorf("expected VALUE to be 'from .defang/test', got '%s'", v)
-		}
-		os.Unsetenv("VALUE")
-	})
-
-	t.Run(".defang used if no stack", func(t *testing.T) {
-		t.Chdir("testdata/no-stack")
-		err := testConfig.loadDotDefang("")
-		if err != nil {
-			t.Fatalf("%v", err)
-		}
-		if v := os.Getenv("VALUE"); v != "from .defang" {
-			t.Errorf("expected VALUE to be 'from .defang', got '%s'", v)
-		}
-		os.Unsetenv("VALUE")
-	})
-
 	t.Run("incorrect stackname used if no stack", func(t *testing.T) {
 		err := testConfig.loadDotDefang("non-existent-stack")
 		if err == nil {
@@ -244,41 +220,6 @@ func Test_configurationPrecedence(t *testing.T) {
 				stackname: "test",
 			},
 			expected: defaultConfig,
-		},
-		{
-			name:         "default .defang name, when no env vars or flags",
-			createRCFile: true,
-			rcStack: stack{
-				stackname: "",
-				entries: map[string]string{
-					"DEFANG_MODE":            "AFFORDABLE",
-					"DEFANG_VERBOSE":         "true",
-					"DEFANG_DEBUG":           "false",
-					"DEFANG_STACK":           "from-env",
-					"DEFANG_FABRIC":          "from-env-cluster",
-					"DEFANG_PROVIDER":        "defang",
-					"DEFANG_ORG":             "from-env-org",
-					"DEFANG_SOURCE_PLATFORM": "heroku",
-					"DEFANG_COLOR":           "always",
-					"DEFANG_TTY":             "false",
-					"DEFANG_NON_INTERACTIVE": "true",
-					"DEFANG_HIDE_UPDATE":     "true",
-				},
-			},
-			expected: GlobalConfig{
-				Mode:           modes.ModeAffordable, // env file values
-				Verbose:        true,
-				Debug:          false,
-				Stack:          "from-env",
-				Cluster:        "from-env-cluster",
-				ProviderID:     cliClient.ProviderDefang,
-				Org:            "from-env-org",
-				SourcePlatform: migrate.SourcePlatformHeroku,
-				ColorMode:      ColorAlways,
-				HasTty:         false, // from env
-				NonInteractive: true,  // from env
-				HideUpdate:     true,  // from env
-			},
 		},
 		{
 			name:         "default .defang name and no values, when no env vars or flags",

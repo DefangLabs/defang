@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 
-	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -62,12 +63,6 @@ func TestHandleListConfigTool(t *testing.T) {
 		expectedError        string
 	}{
 		{
-			name:          "provider_auto_not_configured",
-			providerID:    client.ProviderAuto,
-			setupMock:     func(m *MockListConfigCLI) {},
-			expectedError: common.ErrNoProviderSet.Error(),
-		},
-		{
 			name:       "connect_error",
 			providerID: client.ProviderAWS,
 			setupMock: func(m *MockListConfigCLI) {
@@ -81,7 +76,7 @@ func TestHandleListConfigTool(t *testing.T) {
 			setupMock: func(m *MockListConfigCLI) {
 				m.LoadProjectNameError = errors.New("failed to load project name")
 			},
-			expectedError: "Failed to load project name: failed to load project name",
+			expectedError: "failed to load project name: failed to load project name",
 		},
 		{
 			name:       "list_config_error",
@@ -90,7 +85,7 @@ func TestHandleListConfigTool(t *testing.T) {
 				m.ProjectName = "test-project"
 				m.ListConfigError = errors.New("failed to list configs")
 			},
-			expectedError: "Failed to list config variables: failed to list configs",
+			expectedError: "failed to list config variables: failed to list configs",
 		},
 		{
 			name:       "no_config_variables_found",
@@ -118,6 +113,11 @@ func TestHandleListConfigTool(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Chdir("testdata")
+			os.Unsetenv("DEFANG_PROVIDER")
+			os.Unsetenv("AWS_PROFILE")
+			os.Unsetenv("AWS_REGION")
+
 			// Create mock and configure it
 			mockCLI := &MockListConfigCLI{
 				CallLog: []string{},
@@ -126,7 +126,19 @@ func TestHandleListConfigTool(t *testing.T) {
 
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := HandleListConfigTool(t.Context(), loader, &tt.providerID, "test-cluster", mockCLI)
+			ec := elicitations.NewController(&mockElicitationsClient{
+				responses: map[string]string{
+					"strategy":     "profile",
+					"profile_name": "default",
+				},
+			})
+
+			stackName := "test-stack"
+			result, err := HandleListConfigTool(t.Context(), loader, mockCLI, ec, StackConfig{
+				Cluster:    "test-cluster",
+				ProviderID: &tt.providerID,
+				Stack:      &stackName,
+			})
 
 			// Verify error expectations
 			if tt.expectedError != "" {

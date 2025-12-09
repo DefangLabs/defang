@@ -455,6 +455,7 @@ message Deployment {
   string region = 7;
   Provider provider = 8;
   int32 service_count = 9;
+  string stack = 10;
 }
 
 message PutDeploymentRequest { Deployment deployment = 1; }
