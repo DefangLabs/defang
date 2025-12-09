@@ -255,7 +255,8 @@ func confirmDeploymentToNewLocation(projectName string, existingDeployments []*d
 
 func promptToCreateStack(params stacks.StackParameters) error {
 	if global.NonInteractive {
-		// print a message suggesting stack creation
+		term.Info("Consider creating a stack to manage your deployments.")
+		printDefangHint("To create a stack, do:", fmt.Sprintf("stack new --name=%s", params.Name))
 		return nil
 	}
 
