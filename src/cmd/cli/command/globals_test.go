@@ -481,8 +481,8 @@ AWS_REGION="us-east-1"`,
 			tempDir := t.TempDir()
 			stackFile := filepath.Join(tempDir, ".defang", "test")
 			
-			// Create the .defang directory
-			err := os.Mkdir(filepath.Join(tempDir, ".defang"), 0700)
+			// Create the .defang directory (and any parent directories if needed)
+			err := os.MkdirAll(filepath.Join(tempDir, ".defang"), 0700)
 			if err != nil {
 				t.Fatalf("failed to create .defang directory: %v", err)
 			}
