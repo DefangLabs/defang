@@ -112,7 +112,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				// No errors, successful removal
 			},
 			expectError:          false,
-			expectedTextContains: "Successfully remove the config variable \"DATABASE_URL\" from project \"test-project\"",
+			expectedTextContains: "Successfully removed the config variable \"DATABASE_URL\" from project \"test-project\"",
 		},
 	}
 

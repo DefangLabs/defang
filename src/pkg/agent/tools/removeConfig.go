@@ -42,5 +42,5 @@ func HandleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader,
 		return "", fmt.Errorf("failed to remove config variable %q from project %q: %w", params.Name, projectName, err)
 	}
 
-	return fmt.Sprintf("Successfully remove the config variable %q from project %q", params.Name, projectName), nil
+	return fmt.Sprintf("Successfully removed the config variable %q from project %q", params.Name, projectName), nil
 }

@@ -54,7 +54,7 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 			},
 		),
 		ai.NewTool("estimate",
-			"Estimate the cost of deployed a Defang project to AWS or GCP",
+			"Estimate the cost of deploying a Defang project to AWS or GCP",
 			func(ctx *ai.ToolContext, params EstimateParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
