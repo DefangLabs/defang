@@ -1252,24 +1252,17 @@ func updateProviderID(ctx context.Context) error {
 
 	switch global.ProviderID {
 	case cliClient.ProviderAuto:
-		if global.NonInteractive {
-			// Defaults to defang provider in non-interactive mode
-			if awsInEnv() {
-				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")
-			}
-			if doInEnv() {
-				term.Warn("Using Defang playground, but DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
-			}
-			if gcpInEnv() {
-				term.Warn("Using Defang playground, but GCP_PROJECT_ID/CLOUDSDK_CORE_PROJECT environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
-			}
-			global.ProviderID = cliClient.ProviderDefang
-		} else {
-			var err error
-			if whence, err = interactiveSelectProvider(cliClient.AllProviders()); err != nil {
-				return err
-			}
+		// Defaults to defang provider in non-interactive mode
+		if awsInEnv() {
+			term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")
 		}
+		if doInEnv() {
+			term.Warn("Using Defang playground, but DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
+		}
+		if gcpInEnv() {
+			term.Warn("Using Defang playground, but GCP_PROJECT_ID/CLOUDSDK_CORE_PROJECT environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
+		}
+		global.ProviderID = cliClient.ProviderDefang
 	case cliClient.ProviderAWS:
 		if !awsInConfig(ctx) {
 			term.Warn("AWS provider was selected, but AWS environment is not set")
@@ -1307,6 +1300,9 @@ func (pc *providerCreator) NewProvider(ctx context.Context, providerId cliClient
 }
 
 func newProviderChecked(ctx context.Context, projectName string) (cliClient.Provider, error) {
+	if global.NonInteractive {
+		return newProvider(ctx)
+	}
 	pc := &providerCreator{}
 	elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
 	ec := elicitations.NewController(elicitationsClient)
