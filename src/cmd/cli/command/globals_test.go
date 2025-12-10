@@ -372,7 +372,6 @@ func TestTenantFlagWinsOverEnv(t *testing.T) {
 		t.Fatalf("failed to set workspace flag: %v", err)
 	}
 	t.Setenv("DEFANG_WORKSPACE", "env-workspace")
-	t.Setenv("DEFANG_TENANT", "env-tenant")
 
 	if err := cfg.syncFlagsWithEnv(flags); err != nil {
 		t.Fatalf("failed to sync flags with env vars: %v", err)
@@ -383,23 +382,58 @@ func TestTenantFlagWinsOverEnv(t *testing.T) {
 	}
 }
 
-func TestTenantFromEnvAliases(t *testing.T) {
-	cfg := GlobalConfig{
-		Cluster: cluster.DefangFabric,
+func TestTenantEnvSources(t *testing.T) {
+	tests := []struct {
+		name     string
+		envVars  map[string]string
+		expected string
+	}{
+		{
+			name: "workspace env wins",
+			envVars: map[string]string{
+				"DEFANG_WORKSPACE": "workspace-env",
+				"DEFANG_TENANT":    "tenant-env",
+				"DEFANG_ORG":       "org-env",
+			},
+			expected: "workspace-env",
+		},
+		{
+			name: "tenant env ignored",
+			envVars: map[string]string{
+				"DEFANG_TENANT": "tenant-env",
+			},
+			expected: "",
+		},
+		{
+			name: "org env fallback",
+			envVars: map[string]string{
+				"DEFANG_ORG": "org-env",
+			},
+			expected: "org-env",
+		},
 	}
-	flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	flags.StringVar(&cfg.Tenant, "workspace", cfg.Tenant, "workspace name")
-	flags.StringVar(&cfg.Cluster, "cluster", cfg.Cluster, "cluster")
-	flags.StringVar(&cfg.Stack, "stack", cfg.Stack, "stack")
 
-	t.Setenv("DEFANG_WORKSPACE", "workspace-env")
-	t.Setenv("DEFANG_TENANT", "tenant-env")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := GlobalConfig{
+				Cluster: cluster.DefangFabric,
+			}
+			flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
+			flags.StringVar(&cfg.Tenant, "workspace", cfg.Tenant, "workspace name")
+			flags.StringVar(&cfg.Cluster, "cluster", cfg.Cluster, "cluster")
+			flags.StringVar(&cfg.Stack, "stack", cfg.Stack, "stack")
 
-	if err := cfg.syncFlagsWithEnv(flags); err != nil {
-		t.Fatalf("failed to sync flags with env vars: %v", err)
-	}
+			for key, value := range tt.envVars {
+				t.Setenv(key, value)
+			}
 
-	if cfg.Tenant != "workspace-env" {
-		t.Fatalf("expected tenant from DEFANG_WORKSPACE, got %q", cfg.Tenant)
+			if err := cfg.syncFlagsWithEnv(flags); err != nil {
+				t.Fatalf("failed to sync flags with env vars: %v", err)
+			}
+
+			if cfg.Tenant != tt.expected {
+				t.Fatalf("expected tenant %q, got %q", tt.expected, cfg.Tenant)
+			}
+		})
 	}
 }

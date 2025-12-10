@@ -64,4 +64,16 @@ func TestFetchUserInfoErrors(t *testing.T) {
 	if _, err := FetchUserInfo(context.Background(), "token"); err == nil {
 		t.Fatalf("expected error for non-200 response")
 	}
+	server.Close()
+
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{invalid json`))
+	}))
+	defer server.Close()
+	openAuthClient = NewClient("defang-cli", server.URL)
+
+	if _, err := FetchUserInfo(context.Background(), "token"); err == nil {
+		t.Fatalf("expected error for malformed JSON")
+	}
 }
