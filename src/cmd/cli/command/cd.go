@@ -36,7 +36,7 @@ var cdCmd = &cobra.Command{
 func bootstrapCommand(cmd *cobra.Command, args []string, command string) error {
 	ctx := cmd.Context()
 	loader := configureLoader(cmd)
-	provider, err := newProviderChecked(ctx, loader)
+	provider, err := newProviderChecked(ctx)
 	if err != nil {
 		return err
 	}
@@ -103,8 +103,7 @@ var cdTearDownCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		force, _ := cmd.Flags().GetBool("force")
 
-		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context())
 		if err != nil {
 			return err
 		}
@@ -122,7 +121,7 @@ var cdListCmd = &cobra.Command{
 		remote, _ := cmd.Flags().GetBool("remote")
 		all, _ := cmd.Flags().GetBool("all")
 
-		provider, err := newProviderChecked(cmd.Context(), nil)
+		provider, err := newProviderChecked(cmd.Context())
 		if err != nil {
 			return err
 		}
@@ -156,7 +155,7 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context())
 		if err != nil {
 			return err
 		}
@@ -183,8 +182,7 @@ var cdInstallCmd = &cobra.Command{
 	Short:       "Install the CD resources into the cluster",
 	Hidden:      true, // users shouldn't have to run this manually, because it's done on deploy
 	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context())
 		if err != nil {
 			return err
 		}

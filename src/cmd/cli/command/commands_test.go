@@ -12,7 +12,6 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	pkg "github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	gcpdriver "github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -245,7 +244,6 @@ func TestGetProvider(t *testing.T) {
 	}
 	mockClient.SetClient(mockCtrl)
 	global.Client = &mockClient
-	loader := cliClient.MockLoader{Project: compose.Project{Name: "empty"}}
 	oldRootCmd := RootCmd
 	t.Cleanup(func() {
 		RootCmd = oldRootCmd
@@ -266,7 +264,7 @@ func TestGetProvider(t *testing.T) {
 		os.Unsetenv("DEFANG_PROVIDER")
 		RootCmd = FakeRootWithProviderParam("")
 
-		p, err := newProvider(ctx, nil)
+		p, err := newProvider(ctx)
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -293,7 +291,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.savedProvider = nil
 		})
 
-		p, err := newProvider(ctx, loader)
+		p, err := newProvider(ctx)
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -326,7 +324,7 @@ func TestGetProvider(t *testing.T) {
 			term.DefaultTerm = oldTerm
 		})
 
-		p, err := newProvider(ctx, loader)
+		p, err := newProvider(ctx)
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -367,7 +365,7 @@ func TestGetProvider(t *testing.T) {
 			term.DefaultTerm = oldTerm
 		})
 
-		_, err := newProvider(ctx, loader)
+		_, err := newProvider(ctx)
 		if err != nil && !strings.HasPrefix(err.Error(), "GET https://api.digitalocean.com/v2/account: 401") {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -400,7 +398,7 @@ func TestGetProvider(t *testing.T) {
 			term.DefaultTerm = oldTerm
 		})
 
-		_, err := newProvider(ctx, loader)
+		_, err := newProvider(ctx)
 		if err != nil && err.Error() != "GCP_PROJECT_ID or CLOUDSDK_CORE_PROJECT must be set for GCP projects" {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -421,7 +419,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.savedProvider = nil
 		})
 
-		_, err := newProvider(ctx, loader)
+		_, err := newProvider(ctx)
 		if err != nil && !strings.HasPrefix(err.Error(), "DIGITALOCEAN_TOKEN must be set") {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -440,7 +438,7 @@ func TestGetProvider(t *testing.T) {
 			aws.StsClient = sts
 		})
 
-		p, err := newProvider(ctx, loader)
+		p, err := newProvider(ctx)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -459,7 +457,7 @@ func TestGetProvider(t *testing.T) {
 			}, nil
 		}
 
-		p, err := newProvider(ctx, loader)
+		p, err := newProvider(ctx)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -480,7 +478,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.canIUseResponse.CdImage = ""
 		})
 
-		p, err := newProvider(ctx, loader)
+		p, err := newProvider(ctx)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -513,7 +511,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.canIUseResponse.CdImage = ""
 		})
 
-		p, err := newProvider(ctx, loader)
+		p, err := newProvider(ctx)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}

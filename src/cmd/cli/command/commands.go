@@ -86,7 +86,7 @@ func Execute(ctx context.Context) error {
 
 		if strings.Contains(err.Error(), "maximum number of projects") {
 			projectName := "<name>"
-			provider, err := newProviderChecked(ctx, nil)
+			provider, err := newProviderChecked(ctx)
 			if err != nil {
 				return err
 			}
@@ -524,9 +524,8 @@ var whoamiCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
 		global.NonInteractive = true // don't show provider prompt
-		provider, err := newProvider(cmd.Context(), loader)
+		provider, err := newProvider(cmd.Context())
 		if err != nil {
 			term.Debug("unable to get provider:", err)
 		}
@@ -576,7 +575,7 @@ var certGenerateCmd = &cobra.Command{
 			return err
 		}
 
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context())
 		if err != nil {
 			return err
 		}
@@ -748,7 +747,7 @@ var configSetCmd = &cobra.Command{
 
 		// Make sure we have a project to set config for before asking for a value
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context())
 		if err != nil {
 			return err
 		}
@@ -879,7 +878,7 @@ var configDeleteCmd = &cobra.Command{
 	Short:       "Removes one or more config values",
 	RunE: func(cmd *cobra.Command, names []string) error {
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context())
 		if err != nil {
 			return err
 		}
@@ -912,7 +911,7 @@ var configListCmd = &cobra.Command{
 	Short:       "List configs",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context())
 		if err != nil {
 			return err
 		}
@@ -943,7 +942,7 @@ var debugCmd = &cobra.Command{
 		}
 
 		loader := configureLoader(cmd)
-		_, err := newProviderChecked(ctx, loader)
+		_, err := newProviderChecked(ctx)
 		if err != nil {
 			return err
 		}
@@ -992,7 +991,7 @@ var deleteCmd = &cobra.Command{
 		var tail, _ = cmd.Flags().GetBool("tail")
 
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context())
 		if err != nil {
 			return err
 		}
@@ -1238,7 +1237,7 @@ var providerDescription = map[cliClient.ProviderID]string{
 	cliClient.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
 }
 
-func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
+func updateProviderID(ctx context.Context) error {
 	extraMsg := ""
 	whence := "default project"
 
@@ -1269,7 +1268,7 @@ func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 			global.ProviderID = cliClient.ProviderDefang
 		} else {
 			var err error
-			if whence, err = determineProviderID(ctx, loader); err != nil {
+			if whence, err = interactiveSelectProvider(cliClient.AllProviders()); err != nil {
 				return err
 			}
 		}
@@ -1294,8 +1293,8 @@ func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 	return nil
 }
 
-func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provider, error) {
-	if err := updateProviderID(ctx, loader); err != nil {
+func newProvider(ctx context.Context) (cliClient.Provider, error) {
+	if err := updateProviderID(ctx); err != nil {
 		return nil, err
 	}
 
@@ -1303,8 +1302,8 @@ func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 	return provider, nil
 }
 
-func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient.Provider, error) {
-	provider, err := newProvider(ctx, loader)
+func newProviderChecked(ctx context.Context) (cliClient.Provider, error) {
+	provider, err := newProvider(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1314,40 +1313,6 @@ func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient
 
 func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string, serviceCount int) error {
 	return cliClient.CanIUseProvider(ctx, global.Client, provider, projectName, global.Stack, serviceCount)
-}
-
-func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, error) {
-	var projectName string
-	if loader != nil {
-		var err error
-		projectName, err = loader.LoadProjectName(ctx)
-		if err != nil {
-			term.Warnf("Unable to load project: %v", err)
-		}
-
-		if projectName != "" && !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
-			resp, err := global.Client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projectName})
-			if err != nil {
-				term.Debugf("Unable to get selected provider: %v", err)
-			} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
-				global.ProviderID.SetValue(resp.Provider)
-				return "stored preference", nil
-			}
-		}
-	}
-
-	whence, err := interactiveSelectProvider(cliClient.AllProviders())
-
-	// Save the selected provider to the fabric
-	if projectName != "" {
-		if err := global.Client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projectName, Provider: global.ProviderID.Value()}); err != nil {
-			term.Debugf("Unable to save selected provider to defang server: %v", err)
-		} else {
-			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", global.ProviderID, projectName)
-		}
-	}
-
-	return whence, err
 }
 
 func interactiveSelectProvider(providers []cliClient.ProviderID) (string, error) {
