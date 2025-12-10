@@ -303,11 +303,11 @@ func checkEnvConflicts(stackName string) error {
 		// Sort conflicts for deterministic output
 		sort.Strings(conflicts)
 
-		term.Warnf("The following environment variables from the stack file will be ignored because they are already set in your shell environment:")
+		term.Warnf("Some variables from the stack file %q are overridden by your shell environment.", stackName)
 		for _, key := range conflicts {
-			term.Warnf("  - %s (shell: %q, stack: %q)", key, os.Getenv(key), stackEnv[key])
+			term.Printf("  %s=%q", key, os.Getenv(key))
 		}
-		term.Warnf("The shell environment variables will take precedence. To use the stack file values, unset these variables in your shell.")
+		term.Println("Unset these variables in your shell to use stack values instead.")
 	}
 	return nil
 }
