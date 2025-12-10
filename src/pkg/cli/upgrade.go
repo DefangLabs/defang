@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -41,11 +42,17 @@ func Upgrade(ctx context.Context) error {
 		return nil
 	}
 
-	// Check if we're running in PowerShell
-	if _, exists := os.LookupEnv("PSModulePath"); exists {
-		printInstructions(`pwsh -c "iwr https://s.defang.io/defang_win_amd64.zip -OutFile defang.zip"`)
-
-		return nil
+	// Check if we're running on Windows
+	if runtime.GOOS == "windows" {
+		if strings.Contains(ex, "WinGet") {
+			printInstructions("winget upgrade defang")
+			return nil
+		}
+		// Check if we're running in PowerShell; TODO: might also be true when running GIT bash
+		if _, exists := os.LookupEnv("PSModulePath"); exists {
+			printInstructions(`iwr https://s.defang.io/defang_win_amd64.zip -OutFile defang.zip; Expand-Archive defang.zip -Force -DestinationPath .`)
+			return nil
+		}
 	}
 
 	// Default to the shell script
