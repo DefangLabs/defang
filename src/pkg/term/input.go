@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"syscall"
 
 	"github.com/ross96D/cancelreader"
 )
@@ -28,7 +29,8 @@ func (n *nonBlockingStdin) Close() error {
 func NewNonBlockingStdin() io.ReadCloser {
 	cr, err := cancelreader.NewReader(os.Stdin)
 	if err != nil {
-		return os.Stdin
+		// Don't return os.Stdin directly as it may result in it being closed
+		return os.NewFile(uintptr(syscall.Stdin), "/dev/stdin")
 	}
 	return &nonBlockingStdin{cr}
 }
