@@ -42,15 +42,24 @@ func Upgrade(ctx context.Context) error {
 		return nil
 	}
 
+	// Check if we're running via npx (npm_execpath is set by npx/npm/yarn/etc)
+	if _, exists := os.LookupEnv("npm_execpath"); exists {
+		printInstructions("npx defang@latest")
+		return nil
+	}
+
 	// Check if we're running on Windows
 	if runtime.GOOS == "windows" {
 		if strings.Contains(ex, "WinGet") {
 			printInstructions("winget upgrade defang")
 			return nil
 		}
-		// Check if we're running in PowerShell; TODO: might also be true when running GIT bash
-		if _, exists := os.LookupEnv("PSModulePath"); exists {
-			printInstructions(`iwr https://s.defang.io/defang_win_amd64.zip -OutFile defang.zip; Expand-Archive defang.zip -Force -DestinationPath .`)
+		// Check if we're running in PowerShell (and not CMD or Git Bash)
+		_, hasMSYSTEM := os.LookupEnv("MSYSTEM")           // Git Bash/MINGW/MSYS
+		_, hasPrompt := os.LookupEnv("PROMPT")             // CMD
+		_, hasPSModulePath := os.LookupEnv("PSModulePath") // CMD and Powershell
+		if !hasMSYSTEM && !hasPrompt && hasPSModulePath {
+			printInstructions(`iwr https://s.defang.io/defang_win_amd64.zip -OutFile defang.zip; Expand-Archive defang.zip . -Force`)
 			return nil
 		}
 	}
