@@ -46,7 +46,7 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, projectName strin
 		return nil, nil, errors.New("stackName cannot be nil")
 	}
 	if *stackName != "" {
-		stack, err = loadStack(*stackName)
+		stack, err = pp.loadStack(ctx, projectName, *stackName)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to load stack: %w", err)
 		}
@@ -163,6 +163,7 @@ func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Con
 			return "", fmt.Errorf("failed to find remote stack parameters for stack: %s", selectedStackName)
 		}
 
+		term.Debugf("Importing stack %s from remote", selectedStackName)
 		_, err := stacks.Create(*remoteStackParameters)
 		if err != nil {
 			return "", fmt.Errorf("failed to create local stack from remote: %w", err)
@@ -226,14 +227,36 @@ func (pp *providerPreparer) selectOrCreateStack(ctx context.Context, projectName
 		selectedStackName = newStack.Name
 	}
 
-	return loadStack(selectedStackName)
+	return pp.loadStack(ctx, projectName, selectedStackName)
 }
 
-func loadStack(stackName string) (*stacks.StackParameters, error) {
+func (pp *providerPreparer) loadStack(ctx context.Context, projectName, stackName string) (*stacks.StackParameters, error) {
 	stack, err := stacks.Read(stackName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read stack: %w", err)
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("failed to read stack: %w", err)
+		}
+		// call collectExistingStacks to see if it exists remotely
+		existingStacks, err := pp.collectExistingStacks(ctx, projectName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to collect existing stacks: %w", err)
+		}
+		for _, existingStack := range existingStacks {
+			if existingStack.Name == stackName {
+				stack = &existingStack.StackParameters
+				break
+			}
+		}
+		if stack == nil {
+			return nil, fmt.Errorf("stack %q does not exist locally or remotely", stackName)
+		}
+		term.Debugf("Importing stack %s from remote", stackName)
+		_, err = stacks.Create(*stack)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create local stack from remote: %w", err)
+		}
 	}
+	term.Debugf("Loading stack %s", stackName)
 	err = stacks.Load(stackName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load stack: %w", err)
@@ -282,6 +305,7 @@ func (pp *providerPreparer) createNewStack(ctx context.Context, useWkDir bool) (
 		Name:     name,
 	}
 	if useWkDir {
+		term.Debugf("Creating stack %s", name)
 		_, err = stacks.Create(params)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create stack: %w", err)
