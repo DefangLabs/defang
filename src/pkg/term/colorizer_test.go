@@ -159,13 +159,13 @@ func TestIsTerminal(t *testing.T) {
 }
 func TestWarn(t *testing.T) {
 	tests := []struct {
-		msgs     []string
-		expected []string
+		msgs     []warning
+		expected []warning
 	}{
-		{[]string{"", ""}, []string{" ! \n"}},
-		{[]string{"A", "A"}, []string{" ! A\n"}},
-		{[]string{"A", "B"}, []string{" ! A\n", " ! B\n"}},
-		{[]string{"B", "C", "A"}, []string{" ! A\n", " ! B\n", " ! C\n"}},
+		{[]warning{{message: "", color: WarnColor}, {message: "", color: WarnColor}}, []warning{{message: " ! \n", color: WarnColor}}},
+		{[]warning{{message: "A", color: WarnColor}, {message: "A", color: WarnColor}}, []warning{{message: " ! A\n", color: WarnColor}}},
+		{[]warning{{message: "A", color: WarnColor}, {message: "B", color: WarnColor}}, []warning{{message: " ! A\n", color: WarnColor}, {message: " ! B\n", color: WarnColor}}},
+		{[]warning{{message: "B", color: WarnColor}, {message: "C", color: WarnColor}, {message: "A", color: WarnColor}}, []warning{{message: " ! A\n", color: WarnColor}, {message: " ! B\n", color: WarnColor}, {message: " ! C\n", color: WarnColor}}},
 	}
 
 	for i, test := range tests {
@@ -181,7 +181,7 @@ func TestWarn(t *testing.T) {
 			}
 			for j, expected := range test.expected {
 				if uniqueWarnings[j] != expected {
-					t.Errorf("Expected %s unique warnings, got: %s", expected, uniqueWarnings[j])
+					t.Errorf("Expected %s unique warnings, got: %s", expected.message, uniqueWarnings[j].message)
 				}
 			}
 		})

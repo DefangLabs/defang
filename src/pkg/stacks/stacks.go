@@ -23,7 +23,7 @@ type StackParameters struct {
 
 var validStackName = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
 
-const directory = ".defang"
+const Directory = ".defang"
 
 func MakeDefaultName(providerId client.ProviderID, region string) string {
 	compressedRegion := strings.ReplaceAll(region, "-", "")
@@ -43,7 +43,7 @@ func Create(params StackParameters) (string, error) {
 		return "", err
 	}
 
-	if err := os.Mkdir(directory, 0700); err != nil && !errors.Is(err, os.ErrExist) {
+	if err := os.Mkdir(Directory, 0700); err != nil && !errors.Is(err, os.ErrExist) {
 		return "", err
 	}
 	filename := filename(params.Name)
@@ -83,7 +83,7 @@ type StackListItem struct {
 }
 
 func List() ([]StackListItem, error) {
-	files, err := os.ReadDir(directory)
+	files, err := os.ReadDir(Directory)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, nil
@@ -93,7 +93,7 @@ func List() ([]StackListItem, error) {
 
 	var stacks []StackListItem
 	for _, file := range files {
-		filename := filepath.Join(directory, file.Name())
+		filename := filepath.Join(Directory, file.Name())
 		content, err := os.ReadFile(filename)
 		if err != nil {
 			term.Warnf("Skipping unreadable stack file %s: %v\n", filename, err)
@@ -174,11 +174,11 @@ func Remove(name string) error {
 }
 
 func filename(stackname string) string {
-	return filepath.Join(directory, stackname)
+	return filepath.Join(Directory, stackname)
 }
 
 func Read(name string) (*StackParameters, error) {
-	path, err := filepath.Abs(filepath.Join(directory, name))
+	path, err := filepath.Abs(filepath.Join(Directory, name))
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +195,7 @@ func Read(name string) (*StackParameters, error) {
 }
 
 func Load(name string) error {
-	path, err := filepath.Abs(filepath.Join(directory, name))
+	path, err := filepath.Abs(filepath.Join(Directory, name))
 	if err != nil {
 		return err
 	}

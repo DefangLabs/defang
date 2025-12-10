@@ -150,9 +150,9 @@ func TestList(t *testing.T) {
 	t.Run("stacks present", func(t *testing.T) {
 		t.Chdir(t.TempDir())
 		// Create dummy stack files
-		os.Mkdir(directory, 0700)
-		os.Create(filepath.Join(directory, "stack1"))
-		os.Create(filepath.Join(directory, "stack2"))
+		os.Mkdir(Directory, 0700)
+		os.Create(filepath.Join(Directory, "stack1"))
+		os.Create(filepath.Join(Directory, "stack2"))
 
 		stacks, err := List()
 		if err != nil {
