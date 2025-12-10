@@ -276,7 +276,7 @@ func (h *HerokuClient) GetPGInfo(ctx context.Context, addonID string) (PGInfo, e
 // herokuGet performs an HTTP GET to the given URL using the HerokuClient's token,
 // decodes the JSON response into a value of type T, and returns that value.
 // The request uses the provided context and sets Heroku-specific Accept and
-// Content-Type headers. If the response has a non-2xx status or the body cannot
+// Content-Type headers. If the response status is >= 400 or the body cannot
 // be decoded as JSON, an error is returned describing the failure.
 func herokuGet[T any](ctx context.Context, h *HerokuClient, url string) (T, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
