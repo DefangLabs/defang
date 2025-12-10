@@ -34,7 +34,7 @@ func Upgrade(ctx context.Context) error {
 
 	if strings.HasPrefix(ex, "/nix/store/") {
 		// Detect whether the user has used Flakes or nix-env
-		if strings.Contains("-defang-cli-", ex) {
+		if strings.Contains(ex, "-defang-cli-") {
 			printInstructions("nix-env -if https://github.com/DefangLabs/defang/archive/main.tar.gz")
 		} else {
 			printInstructions("nix profile install github:DefangLabs/defang#defang-bin --refresh")
