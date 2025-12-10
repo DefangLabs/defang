@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"syscall"
 
 	"github.com/ross96D/cancelreader"
 )
@@ -15,22 +14,23 @@ type nonBlockingStdin struct {
 	cancelreader.CancelReader
 }
 
-func (n *nonBlockingStdin) Close() error {
-	if !n.CancelReader.Cancel() {
-		// Could not cancel; try closing the underlying handle
-		if err := os.Stdin.Close(); err != nil {
-			return err
-		}
-		return ErrClosed
-	}
-	return nil
-}
-
 func NewNonBlockingStdin() io.ReadCloser {
 	cr, err := cancelreader.NewReader(os.Stdin)
 	if err != nil {
-		// Don't return os.Stdin directly as it may result in it being closed
-		return os.NewFile(uintptr(syscall.Stdin), "/dev/stdin")
+		// Don't return os.Stdin directly as it may result in it being closed.
+		// (This hack appears to work for Windows, but not on Unix.)
+		fd, err := dupFd(os.Stdin.Fd())
+		if err != nil {
+			panic(err)
+		}
+		return os.NewFile(fd, "stdin-dup")
 	}
 	return &nonBlockingStdin{cr}
+}
+
+func (n *nonBlockingStdin) Close() error {
+	if !n.CancelReader.Cancel() {
+		return ErrClosed
+	}
+	return nil
 }
