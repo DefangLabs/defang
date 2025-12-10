@@ -55,10 +55,14 @@ func GetDockerHubCredentials(ctx context.Context) (string, string, error) {
 		return "", "", ErrNoCredentials
 	}
 
+	if err := ValidateCredsWithRepo(auth.Username, auth.Password, "library/alpine"); err != nil {
+		return "", "", ErrInvalidCredential
+	}
+
 	return auth.Username, auth.Password, nil
 }
 
-func GenerateNewPAT(ctx context.Context, label string) (string, string, error) {
+func GenerateNewPublicOnlyPAT(ctx context.Context, label string) (string, string, error) {
 	username, password, err := GetDockerHubCredentials(ctx)
 	if err != nil {
 		return "", "", err
@@ -82,14 +86,14 @@ func GenerateNewPAT(ctx context.Context, label string) (string, string, error) {
 		pat = password
 	}
 
-	if err := ValidatePATWithRepo(username, pat, "library/alpine"); err != nil {
+	if err := ValidateCredsWithRepo(username, pat, "library/alpine"); err != nil {
 		return "", "", ErrInvalidCredential
 	}
 	return username, pat, nil
 }
 
-func ValidatePATWithRepo(user, pat string, repo string) error {
-	if pat == "" {
+func ValidateCredsWithRepo(user, pass string, repo string) error {
+	if pass == "" {
 		return errors.New("empty PAT provided")
 	}
 	if repo == "" {
@@ -100,7 +104,7 @@ func ValidatePATWithRepo(user, pat string, repo string) error {
 	if err != nil {
 		return err
 	}
-	authHeader := "Basic " + base64.StdEncoding.EncodeToString([]byte(user+":"+pat))
+	authHeader := "Basic " + base64.StdEncoding.EncodeToString([]byte(user+":"+pass))
 	req.Header.Set("Authorization", authHeader)
 	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
 
