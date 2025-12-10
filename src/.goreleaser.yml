@@ -88,7 +88,7 @@ release:
     2. Extract the archive. This should reveal the binary file for Defang.
     3. Manually place the binary file in a directory that's included in your system's `PATH` environment variable.
     ### Additional Step for MacOS Users
-    If you're having trouble running the binary on MacOS, please check our [FAQs](https://docs.defang.io/docs/faq#im-having-trouble-running-the-binary-on-my-mac-what-should-i-do).
+    If you're having trouble running the binary on MacOS, please check our [FAQs](https://docs.defang.io/docs/intro/faq/questions#im-having-trouble-running-the-binary-on-my-mac-what-should-i-do).
 
     Please remember this software is in beta, so please report any issues or feedback through our GitHub page. Your help in improving Defang is greatly appreciated!
   # mode: keep-existing
