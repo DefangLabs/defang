@@ -59,11 +59,12 @@ func ListWorkspaces(cmd *cobra.Command, args []string) error {
 }
 
 var workspaceCmd = &cobra.Command{
-	Use:     "workspace",
-	Aliases: []string{"workspaces", "ws"},
-	Args:    cobra.NoArgs,
-	Short:   "Manage workspaces",
-	RunE:    ListWorkspaces,
+	Use:         "workspace",
+	Aliases:     []string{"workspaces", "ws"},
+	Args:        cobra.NoArgs,
+	Annotations: authNeededAnnotation,
+	Short:       "Manage workspaces",
+	RunE:        ListWorkspaces,
 }
 
 var workspaceListCmd = &cobra.Command{
@@ -76,6 +77,7 @@ var workspaceListCmd = &cobra.Command{
 }
 
 func init() {
+	workspaceCmd.Flags().Bool("json", pkg.GetenvBool("DEFANG_JSON"), "print output in JSON format")
 	workspaceListCmd.Flags().Bool("json", pkg.GetenvBool("DEFANG_JSON"), "print output in JSON format")
 	workspaceCmd.AddCommand(workspaceListCmd)
 }
