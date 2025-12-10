@@ -78,7 +78,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}, loadErr)
 			}
 
-			provider, err := newProviderChecked(ctx)
+			provider, err := newProviderChecked(ctx, project.Name)
 			if err != nil {
 				return err
 			}
@@ -418,12 +418,11 @@ func makeComposeDownCmd() *cobra.Command {
 			}
 
 			loader := configureLoader(cmd)
-			provider, err := newProviderChecked(cmd.Context())
+			projectName, err := loader.LoadProjectName(cmd.Context())
 			if err != nil {
 				return err
 			}
-
-			projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+			provider, err := newProviderChecked(cmd.Context(), projectName)
 			if err != nil {
 				return err
 			}
@@ -571,12 +570,11 @@ func makeComposePsCmd() *cobra.Command {
 			long, _ := cmd.Flags().GetBool("long")
 
 			loader := configureLoader(cmd)
-			provider, err := newProviderChecked(cmd.Context())
+			projectName, err := loader.LoadProjectName(cmd.Context())
 			if err != nil {
 				return err
 			}
-
-			projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+			provider, err := newProviderChecked(cmd.Context(), projectName)
 			if err != nil {
 				return err
 			}
@@ -696,12 +694,11 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	loader := configureLoader(cmd)
-	provider, err := newProviderChecked(cmd.Context())
+	projectName, err := loader.LoadProjectName(cmd.Context())
 	if err != nil {
 		return err
 	}
-
-	projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+	provider, err := newProviderChecked(cmd.Context(), projectName)
 	if err != nil {
 		return err
 	}

@@ -16,6 +16,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/agent"
+	agentTools "github.com/DefangLabs/defang/src/pkg/agent/tools"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
@@ -24,6 +25,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
@@ -86,7 +88,7 @@ func Execute(ctx context.Context) error {
 
 		if strings.Contains(err.Error(), "maximum number of projects") {
 			projectName := "<name>"
-			provider, err := newProviderChecked(ctx)
+			provider, err := newProviderChecked(ctx, projectName)
 			if err != nil {
 				return err
 			}
@@ -575,7 +577,7 @@ var certGenerateCmd = &cobra.Command{
 			return err
 		}
 
-		provider, err := newProviderChecked(cmd.Context())
+		provider, err := newProviderChecked(cmd.Context(), project.Name)
 		if err != nil {
 			return err
 		}
@@ -747,12 +749,11 @@ var configSetCmd = &cobra.Command{
 
 		// Make sure we have a project to set config for before asking for a value
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context())
+		projectName, err := loader.LoadProjectName(cmd.Context())
 		if err != nil {
 			return err
 		}
-
-		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		provider, err := newProviderChecked(cmd.Context(), projectName)
 		if err != nil {
 			return err
 		}
@@ -878,12 +879,11 @@ var configDeleteCmd = &cobra.Command{
 	Short:       "Removes one or more config values",
 	RunE: func(cmd *cobra.Command, names []string) error {
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context())
+		projectName, err := loader.LoadProjectName(cmd.Context())
 		if err != nil {
 			return err
 		}
-
-		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		provider, err := newProviderChecked(cmd.Context(), projectName)
 		if err != nil {
 			return err
 		}
@@ -911,12 +911,12 @@ var configListCmd = &cobra.Command{
 	Short:       "List configs",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context())
+
+		projectName, err := loader.LoadProjectName(cmd.Context())
 		if err != nil {
 			return err
 		}
-
-		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		provider, err := newProviderChecked(cmd.Context(), projectName)
 		if err != nil {
 			return err
 		}
@@ -942,12 +942,11 @@ var debugCmd = &cobra.Command{
 		}
 
 		loader := configureLoader(cmd)
-		_, err := newProviderChecked(ctx)
+		project, err := loader.LoadProject(ctx)
 		if err != nil {
 			return err
 		}
-
-		project, err := loader.LoadProject(ctx)
+		_, err = newProviderChecked(ctx, project.Name)
 		if err != nil {
 			return err
 		}
@@ -991,12 +990,11 @@ var deleteCmd = &cobra.Command{
 		var tail, _ = cmd.Flags().GetBool("tail")
 
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context())
+		projectName, err := loader.LoadProjectName(cmd.Context())
 		if err != nil {
 			return err
 		}
-
-		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		provider, err := newProviderChecked(cmd.Context(), projectName)
 		if err != nil {
 			return err
 		}
@@ -1302,10 +1300,20 @@ func newProvider(ctx context.Context) (cliClient.Provider, error) {
 	return provider, nil
 }
 
-func newProviderChecked(ctx context.Context) (cliClient.Provider, error) {
-	provider, err := newProvider(ctx)
+type providerCreator struct{}
+
+func (pc *providerCreator) NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient, stack string) cliClient.Provider {
+	return cli.NewProvider(ctx, providerId, client, stack)
+}
+
+func newProviderChecked(ctx context.Context, projectName string) (cliClient.Provider, error) {
+	pc := &providerCreator{}
+	elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
+	ec := elicitations.NewController(elicitationsClient)
+	pp := agentTools.NewProviderPreparer(pc, ec, global.Client)
+	_, provider, err := pp.SetupProvider(ctx, projectName, &global.Stack)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to setup provider: %w", err)
 	}
 	_, err = provider.AccountInfo(ctx)
 	return provider, err
