@@ -172,7 +172,7 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_NO_CACHE` - If set to `true`, disables pull-through caching of container images; defaults to `false`
 - `DEFANG_ORG` - The name of the organization to use; defaults to the user's GitHub name
 - `DEFANG_PREFIX` - The prefix to use for all BYOC resources; defaults to `Defang`
-- `DEFANG_PROVIDER` - The name of the cloud provider to use, `auto` (default), `aws`, `digitalocean`, `gcp`, or `defang`
+- `DEFANG_PROVIDER` - The name of the cloud provider to use, `aws`, `digitalocean`, `gcp`, or `defang`
 - `DEFANG_PULUMI_BACKEND` - The Pulumi backend URL or `"pulumi-cloud"`; defaults to a self-hosted backend
 - `DEFANG_PULUMI_DEBUG` - If set to `true`, enables debug logging for Pulumi operations; defaults to `false`
 - `DEFANG_PULUMI_DIFF` - If set to `true`, shows the Pulumi diff during deployments; defaults to `false`

@@ -121,7 +121,7 @@ func TestHandleEstimateTool(t *testing.T) {
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
 			},
-			expectedError: "provider not one of [auto defang aws digitalocean gcp]",
+			expectedError: "provider not one of [defang aws digitalocean gcp]",
 		},
 		{
 			name: "run_estimate_error",
