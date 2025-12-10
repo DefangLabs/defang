@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"regexp"
-	"slices"
 	"strings"
 
 	"github.com/muesli/termenv"
@@ -21,12 +20,17 @@ type Term struct {
 	isTerminal bool
 	hasDarkBg  bool
 
-	warnings []string
+	warnings []warning
 }
 
 var DefaultTerm = NewTerm(os.Stdin, os.Stdout, os.Stderr)
 
 type Color = termenv.ANSIColor
+
+type warning struct {
+	message string
+	color   Color
+}
 
 const (
 	BrightCyan = termenv.ANSIBrightCyan
@@ -34,6 +38,7 @@ const (
 	ErrorColor = termenv.ANSIBrightRed
 	WarnColor  = termenv.ANSIYellow      // not bright to improve readability on light backgrounds
 	DebugColor = termenv.ANSIBrightBlack // Gray
+	Uncolored  = termenv.ANSIBlack       // Special value indicating no color
 
 	boldColorStr  = termenv.CSI + termenv.BoldSeq + "m"
 	resetColorStr = termenv.CSI + termenv.ResetSeq + "m"
@@ -218,14 +223,28 @@ func (t *Term) Infof(format string, v ...any) (int, error) {
 
 func (t *Term) Warn(v ...any) (int, error) {
 	msg := ensurePrefix(fmt.Sprintln(v...), " ! ")
-	t.warnings = append(t.warnings, msg)
+	t.warnings = append(t.warnings, warning{message: msg, color: WarnColor})
 	return output(t.out, WarnColor, msg)
 }
 
 func (t *Term) Warnf(format string, v ...any) (int, error) {
 	msg := ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " ! "))
-	t.warnings = append(t.warnings, msg)
+	t.warnings = append(t.warnings, warning{message: msg, color: WarnColor})
 	return output(t.out, WarnColor, msg)
+}
+
+// WarnPlain outputs a warning without color formatting
+func (t *Term) WarnPlain(v ...any) (int, error) {
+	msg := ensurePrefix(fmt.Sprintln(v...), " ! ")
+	t.warnings = append(t.warnings, warning{message: msg, color: Uncolored})
+	return output(t.out, Uncolored, msg)
+}
+
+// WarnfPlain outputs a formatted warning without color formatting
+func (t *Term) WarnfPlain(format string, v ...any) (int, error) {
+	msg := ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " ! "))
+	t.warnings = append(t.warnings, warning{message: msg, color: Uncolored})
+	return output(t.out, Uncolored, msg)
 }
 
 func (t *Term) Error(v ...any) (int, error) {
@@ -249,9 +268,16 @@ func (t *Term) Fatalf(format string, v ...any) {
 	os.Exit(1)
 }
 
-func (t *Term) getAllWarnings() []string {
-	slices.Sort(t.warnings)
-	return slices.Compact(t.warnings)
+func (t *Term) getAllWarnings() []warning {
+	seen := make(map[warning]bool)
+	var unique []warning
+	for _, w := range t.warnings {
+		if !seen[w] {
+			seen[w] = true
+			unique = append(unique, w)
+		}
+	}
+	return unique
 }
 
 func (t *Term) FlushWarnings() (int, error) {
@@ -261,7 +287,7 @@ func (t *Term) FlushWarnings() (int, error) {
 
 	// unique warnings only
 	for _, w := range uniqueWarnings {
-		bytes, err := output(t.out, WarnColor, w)
+		bytes, err := output(t.out, w.color, w.message)
 		bytesWritten += bytes
 		if err != nil {
 			return bytesWritten, err
@@ -313,6 +339,14 @@ func Warn(v ...any) (int, error) {
 
 func Warnf(format string, v ...any) (int, error) {
 	return DefaultTerm.Warnf(format, v...)
+}
+
+func WarnPlain(v ...any) (int, error) {
+	return DefaultTerm.WarnPlain(v...)
+}
+
+func WarnfPlain(format string, v ...any) (int, error) {
+	return DefaultTerm.WarnfPlain(format, v...)
 }
 
 func Error(v ...any) (int, error) {
