@@ -5,11 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"slices"
 	"strings"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -19,7 +17,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
-	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -87,25 +84,6 @@ func makeComposeUpCmd() *cobra.Command {
 			err = canIUseProvider(ctx, provider, project.Name, len(project.Services))
 			if err != nil {
 				return err
-			}
-
-			// Check if the project is already deployed and warn the user if they're deploying it elsewhere
-			if resp, err := global.Client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
-				Project: project.Name,
-				Type:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
-			}); err != nil {
-				term.Debugf("ListDeployments failed: %v", err)
-			} else if accountInfo, err := provider.AccountInfo(ctx); err != nil {
-				term.Debugf("AccountInfo failed: %v", err)
-			} else if len(resp.Deployments) > 0 {
-				handleExistingDeployments(resp.Deployments, accountInfo, project.Name)
-			} else if global.Stack == "" {
-				promptToCreateStack(stacks.StackParameters{
-					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
-					Provider: accountInfo.Provider,
-					Region:   accountInfo.Region,
-					Mode:     global.Mode,
-				})
 			}
 
 			// Show a warning for any (managed) services that we cannot monitor
@@ -199,84 +177,6 @@ func makeComposeUpCmd() *cobra.Command {
 	_ = composeUpCmd.Flags().MarkHidden("wait")
 	composeUpCmd.Flags().Int("wait-timeout", -1, "maximum duration to wait for the project to be running|healthy") // docker-compose compatibility
 	return composeUpCmd
-}
-
-func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accountInfo *cliClient.AccountInfo, projectName string) error {
-	samePlace := slices.ContainsFunc(existingDeployments, func(dep *defangv1.Deployment) bool {
-		// Old deployments may not have a region or account ID, so we check for empty values too
-		return dep.Provider == global.ProviderID.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
-	})
-	if samePlace {
-		return nil
-	}
-	if err := confirmDeploymentToNewLocation(projectName, existingDeployments); err != nil {
-		return err
-	}
-	if global.Stack == "" {
-		stackName := "beta"
-		_, err := stacks.Create(stacks.StackParameters{
-			Name:     stackName,
-			Provider: accountInfo.Provider,
-			Region:   accountInfo.Region,
-			Mode:     global.Mode,
-		})
-		if err != nil {
-			term.Debugf("Failed to create stack %v", err)
-		} else {
-			term.Info(stacks.PostCreateMessage(stackName))
-		}
-	}
-	return nil
-}
-
-func printExistingDeployments(existingDeployments []*defangv1.Deployment) {
-	term.Info("This project has already deployed to the following locations:")
-	deploymentStrings := make([]string, 0, len(existingDeployments))
-	for _, dep := range existingDeployments {
-		var providerId cliClient.ProviderID
-		providerId.SetValue(dep.Provider)
-		deploymentStrings = append(deploymentStrings, fmt.Sprintf(" - %v", cliClient.AccountInfo{Provider: providerId, AccountID: dep.ProviderAccountId, Region: dep.Region}))
-	}
-	// sort and remove duplicates
-	slices.Sort(deploymentStrings)
-	deploymentStrings = slices.Compact(deploymentStrings)
-	term.Println(strings.Join(deploymentStrings, "\n"))
-}
-
-func confirmDeploymentToNewLocation(projectName string, existingDeployments []*defangv1.Deployment) error {
-	printExistingDeployments(existingDeployments)
-	var confirm bool
-	if err := survey.AskOne(&survey.Confirm{
-		Message: "Are you sure you want to continue?",
-		Default: false,
-	}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
-		return err
-	} else if !confirm {
-		return fmt.Errorf("deployment of project %q was canceled", projectName)
-	}
-	return nil
-}
-
-func promptToCreateStack(params stacks.StackParameters) error {
-	if global.NonInteractive {
-		term.Info("Consider creating a stack to manage your deployments.")
-		printDefangHint("To create a stack, do:", "stack new --name="+params.Name)
-		return nil
-	}
-
-	err := PromptForStackParameters(&params)
-	if err != nil {
-		return err
-	}
-
-	_, err = stacks.Create(params)
-	if err != nil {
-		return err
-	}
-
-	term.Info(stacks.PostCreateMessage(params.Name))
-
-	return nil
 }
 
 func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *compose.Project, provider cliClient.Provider, err error) error {
