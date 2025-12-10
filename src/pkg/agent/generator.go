@@ -61,6 +61,8 @@ func (e *maxTurnsReachedError) Error() string {
 }
 
 func (g *Generator) HandleMessage(ctx context.Context, prompt string, maxTurns int, message *ai.Message) error {
+	g.toolManager.ClearPrevious()
+
 	if message != nil {
 		g.messages = append(g.messages, message)
 	}

@@ -129,8 +129,8 @@ func (t *ToolManager) EqualPrevious(toolRequests []*ai.ToolRequest) bool {
 
 	isEqual := len(newToolsRequestsJSON) == len(t.prevTurnToolRequestsJSON)
 	if isEqual {
-		for key := range newToolsRequestsJSON {
-			if !t.prevTurnToolRequestsJSON[key] {
+		for prevJSON := range newToolsRequestsJSON {
+			if !t.prevTurnToolRequestsJSON[prevJSON] {
 				isEqual = false
 				break
 			}
@@ -139,4 +139,8 @@ func (t *ToolManager) EqualPrevious(toolRequests []*ai.ToolRequest) bool {
 
 	t.prevTurnToolRequestsJSON = newToolsRequestsJSON
 	return isEqual
+}
+
+func (t *ToolManager) ClearPrevious() {
+	t.prevTurnToolRequestsJSON = make(map[string]bool)
 }
