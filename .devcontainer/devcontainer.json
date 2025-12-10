@@ -18,7 +18,8 @@
         "vscode": {
             "extensions": [
                 "golang.go",
-                "ms-vscode.makefile-tools"
+                "ms-vscode.makefile-tools",
+                "eamodio.gitlens"
             ],
             "settings": {
                 "terminal.integrated.defaultProfile.linux": "nix develop",
