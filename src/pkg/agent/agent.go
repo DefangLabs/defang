@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"regexp"
 	"time"
 
@@ -97,27 +98,29 @@ func New(ctx context.Context, clusterAddr string, providerId *client.ProviderID,
 
 func (a *Agent) StartWithUserPrompt(ctx context.Context, userPrompt string) error {
 	a.printer.Printf("\n%s\n", userPrompt)
-	a.printer.Printf("Type '/exit' to quit.\n")
-	return a.startSession(ctx)
+	// The userPrompt is for the user only. Start the session with an empty message for the agent.
+	return a.startSession(ctx, "")
 }
 
 func (a *Agent) StartWithMessage(ctx context.Context, msg string) error {
-	a.printer.Printf("Type '/exit' to quit.\n")
-
-	if err := a.handleUserMessage(ctx, msg); err != nil {
-		return fmt.Errorf("error handling initial message: %w", err)
-	}
-
-	return a.startSession(ctx)
+	return a.startSession(ctx, msg)
 }
 
-func (a *Agent) startSession(ctx context.Context) error {
+func (a *Agent) startSession(ctx context.Context, initialMessage string) error {
+	signal.Reset(os.Interrupt) // unsubscribe the top-level signal handler
+
+	a.printer.Printf("Type '/exit' to quit.\n")
+
+	if initialMessage != "" {
+		if err := a.handleUserMessage(ctx, initialMessage); err != nil {
+			return fmt.Errorf("error handling initial message: %w", err)
+		}
+	}
+
 	for {
 		var input string
 		err := survey.AskOne(
-			&survey.Input{
-				Message: "",
-			},
+			&survey.Input{Message: ""},
 			&input,
 			survey.WithStdio(term.DefaultTerm.Stdio()),
 			survey.WithIcons(func(icons *survey.IconSet) {
@@ -141,13 +144,20 @@ func (a *Agent) startSession(ctx context.Context) error {
 		}
 
 		if err := a.handleUserMessage(ctx, input); err != nil {
-			a.printer.Println("Error handling message: %v", err)
+			if errors.Is(err, context.Canceled) {
+				continue
+			}
+			a.printer.Println("Error handling message:", err)
 		}
 	}
 }
 
 func (a *Agent) handleUserMessage(ctx context.Context, msg string) error {
-	maxTurns := 8
+	// Handle Ctrl+C during message handling / tool calls
+	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
+	defer cancel()
+
+	const maxTurns = 8
 	for {
 		err := a.generator.HandleMessage(ctx, a.system, maxTurns, ai.NewUserMessage(ai.NewTextPart(msg)))
 		if err == nil {
