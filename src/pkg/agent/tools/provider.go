@@ -121,11 +121,15 @@ func (pp *providerPreparer) setupStack(ctx context.Context) (*stacks.StackParame
 }
 
 func (pp *providerPreparer) createNewStack(ctx context.Context) (*stacks.StackListItem, error) {
+	var providerNames []string
+	for _, p := range cliClient.AllProviders() {
+		providerNames = append(providerNames, p.Name())
+	}
 	providerName, err := pp.ec.RequestEnum(
 		ctx,
 		"Where do you want to deploy?",
 		"provider",
-		[]string{"aws", "gcp", "digitalocean", "playground"},
+		providerNames,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to elicit provider choice: %w", err)
@@ -143,7 +147,7 @@ func (pp *providerPreparer) createNewStack(ctx context.Context) (*stacks.StackLi
 	}
 
 	// TODO: use the helper function (stacks.MakeDefaultName or something)
-	defaultName := "production"
+	defaultName := stacks.MakeDefaultName(providerID, region)
 	name, err := pp.ec.RequestStringWithDefault(ctx, "Enter a name for your stack:", "stack_name", defaultName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to elicit stack name: %w", err)
