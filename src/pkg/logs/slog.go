@@ -29,7 +29,11 @@ func (h *termHandler) Handle(ctx context.Context, r slog.Record) error {
 			} else {
 				attrs += ", "
 			}
-			attrs += a.String()
+			strVal := a.String()
+			if len(strVal) > 80 {
+				strVal = strVal[:77] + "..."
+			}
+			attrs += strVal
 			return true
 		})
 		attrs += "}"
