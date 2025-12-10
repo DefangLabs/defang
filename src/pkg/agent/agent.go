@@ -143,10 +143,6 @@ func (a *Agent) startSession(ctx context.Context, initialMessage string) error {
 			return nil
 		}
 
-		// Handle Ctrl+C during message handling / tool calls
-		ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
-		defer cancel()
-
 		if err := a.handleUserMessage(ctx, input); err != nil {
 			if errors.Is(err, context.Canceled) {
 				continue
@@ -157,6 +153,10 @@ func (a *Agent) startSession(ctx context.Context, initialMessage string) error {
 }
 
 func (a *Agent) handleUserMessage(ctx context.Context, msg string) error {
+	// Handle Ctrl+C during message handling / tool calls
+	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
+	defer cancel()
+
 	const maxTurns = 8
 	for {
 		err := a.generator.HandleMessage(ctx, a.system, maxTurns, ai.NewUserMessage(ai.NewTextPart(msg)))
