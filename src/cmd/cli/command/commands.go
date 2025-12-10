@@ -581,9 +581,7 @@ var whoamiCmd = &cobra.Command{
 			}
 		}
 
-		if err != nil {
-			return err
-		}
+		if jsonMode {
 
 		if jsonMode {
 			bytes, err := json.Marshal(data)
