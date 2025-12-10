@@ -274,51 +274,52 @@ func (pp *providerPreparer) setupProviderAuthentication(ctx context.Context, pro
 }
 
 func (pp *providerPreparer) SetupAWSAuthentication(ctx context.Context) error {
-	if os.Getenv("AWS_PROFILE") != "" || (os.Getenv("AWS_ACCESS_KEY_ID") != "" && os.Getenv("AWS_SECRET_ACCESS_KEY") != "") {
+	if os.Getenv("AWS_PROFILE") != "" {
 		return nil
 	}
 
-	// TODO: check the fs for AWS credentials file or config for profile names
-	// TODO: add support for aws sso strategy
-	strategy, err := pp.ec.RequestEnum(ctx, "How do you authenticate to AWS?", "strategy", []string{
-		"profile",
-		"access_key",
-	})
-	if err != nil {
-		return fmt.Errorf("failed to elicit AWS Access Key ID: %w", err)
+	if os.Getenv("AWS_ACCESS_KEY_ID") != "" && os.Getenv("AWS_SECRET_ACCESS_KEY") != "" {
+		return nil
 	}
-	if strategy == "profile" {
-		if os.Getenv("AWS_PROFILE") == "" {
-			knownProfiles, err := listAWSProfiles()
-			if err != nil {
-				return fmt.Errorf("failed to list AWS profiles: %w", err)
-			}
+
+	// TODO: add support for aws sso strategy
+	if os.Getenv("AWS_PROFILE") == "" {
+		knownProfiles, err := listAWSProfiles()
+		if err != nil {
+			return fmt.Errorf("failed to list AWS profiles: %w", err)
+		}
+		if len(knownProfiles) > 0 {
+			const useAccessKeysOption = "Use Access Key ID and Secret Access Key"
+			knownProfiles = append(knownProfiles, useAccessKeysOption)
 			profile, err := pp.ec.RequestEnum(ctx, "Select your profile", "profile_name", knownProfiles)
 			if err != nil {
 				return fmt.Errorf("failed to elicit AWS Profile Name: %w", err)
 			}
-			if err := os.Setenv("AWS_PROFILE", profile); err != nil {
-				return fmt.Errorf("failed to set AWS_PROFILE environment variable: %w", err)
+			if profile != useAccessKeysOption {
+				err := os.Setenv("AWS_PROFILE", profile)
+				if err != nil {
+					return fmt.Errorf("failed to set AWS_PROFILE environment variable: %w", err)
+				}
+				return nil
 			}
 		}
-	} else {
-		if os.Getenv("AWS_ACCESS_KEY_ID") == "" {
-			accessKeyID, err := pp.ec.RequestString(ctx, "Enter your AWS Access Key ID:", "access_key_id")
-			if err != nil {
-				return fmt.Errorf("failed to elicit AWS Access Key ID: %w", err)
-			}
-			if err := os.Setenv("AWS_ACCESS_KEY_ID", accessKeyID); err != nil {
-				return fmt.Errorf("failed to set AWS_ACCESS_KEY_ID environment variable: %w", err)
-			}
+	}
+	if os.Getenv("AWS_ACCESS_KEY_ID") == "" {
+		accessKeyID, err := pp.ec.RequestString(ctx, "Enter your AWS Access Key ID:", "access_key_id")
+		if err != nil {
+			return fmt.Errorf("failed to elicit AWS Access Key ID: %w", err)
 		}
-		if os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
-			accessKeySecret, err := pp.ec.RequestString(ctx, "Enter your AWS Secret Access Key:", "access_key_secret")
-			if err != nil {
-				return fmt.Errorf("failed to elicit AWS Secret Access Key: %w", err)
-			}
-			if err := os.Setenv("AWS_SECRET_ACCESS_KEY", accessKeySecret); err != nil {
-				return fmt.Errorf("failed to set AWS_SECRET_ACCESS_KEY environment variable: %w", err)
-			}
+		if err := os.Setenv("AWS_ACCESS_KEY_ID", accessKeyID); err != nil {
+			return fmt.Errorf("failed to set AWS_ACCESS_KEY_ID environment variable: %w", err)
+		}
+	}
+	if os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
+		accessKeySecret, err := pp.ec.RequestString(ctx, "Enter your AWS Secret Access Key:", "access_key_secret")
+		if err != nil {
+			return fmt.Errorf("failed to elicit AWS Secret Access Key: %w", err)
+		}
+		if err := os.Setenv("AWS_SECRET_ACCESS_KEY", accessKeySecret); err != nil {
+			return fmt.Errorf("failed to set AWS_SECRET_ACCESS_KEY environment variable: %w", err)
 		}
 	}
 	return nil

@@ -242,7 +242,6 @@ func TestHandleSetConfig(t *testing.T) {
 			}
 			ec := elicitations.NewController(&mockElicitationsClient{
 				responses: map[string]string{
-					"strategy":     "profile",
 					"profile_name": "default",
 				},
 			})

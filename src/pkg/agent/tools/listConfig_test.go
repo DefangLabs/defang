@@ -128,7 +128,6 @@ func TestHandleListConfigTool(t *testing.T) {
 			loader := &client.MockLoader{}
 			ec := elicitations.NewController(&mockElicitationsClient{
 				responses: map[string]string{
-					"strategy":     "profile",
 					"profile_name": "default",
 				},
 			})
