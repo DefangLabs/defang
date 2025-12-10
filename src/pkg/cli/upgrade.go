@@ -50,7 +50,7 @@ func Upgrade(ctx context.Context) error {
 
 	// Check if we're running on Windows
 	if runtime.GOOS == "windows" {
-		if strings.Contains(ex, "WinGet") {
+		if strings.Contains(strings.ToLower(ex), "winget") {
 			printInstructions("winget upgrade defang")
 			return nil
 		}
