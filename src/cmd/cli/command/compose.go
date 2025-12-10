@@ -540,7 +540,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}, loadErr)
 			}
 
-			provider, err := newProvider(ctx)
+			provider, err := newProviderChecked(ctx, project.Name)
 			if err != nil {
 				return err
 			}

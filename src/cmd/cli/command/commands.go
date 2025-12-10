@@ -527,7 +527,7 @@ var whoamiCmd = &cobra.Command{
 	Short: "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		global.NonInteractive = true // don't show provider prompt
-		provider, err := newProvider(cmd.Context())
+		provider, err := newProviderChecked(cmd.Context(), "")
 		if err != nil {
 			term.Debug("unable to get provider:", err)
 		}
