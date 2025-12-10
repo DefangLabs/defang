@@ -174,6 +174,6 @@ type mockWhoAmI struct {
 }
 
 func (m *mockWhoAmI) WhoAmI(ctx context.Context, req *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.WhoAmIResponse], error) {
-	m.seenTenant = req.Header().Get(auth.XDefangTenantID)
+	m.seenTenant = req.Header().Get(auth.TenantHeader)
 	return connect.NewResponse(&defangv1.WhoAmIResponse{Tenant: m.tenant, TenantId: m.tenantID}), nil
 }
