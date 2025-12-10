@@ -305,7 +305,7 @@ func checkEnvConflicts(stackName string) error {
 
 		term.Warnf("Some variables from the stack file %q are overridden by your shell environment.", stackName)
 		for _, key := range conflicts {
-			term.Printf("  %s=%q", key, os.Getenv(key))
+			term.Printf("  %s=%q\n", key, os.Getenv(key))
 		}
 		term.Println("Unset these variables in your shell to use stack values instead.")
 	}
