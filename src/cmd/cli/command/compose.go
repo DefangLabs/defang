@@ -229,19 +229,22 @@ func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accou
 	return nil
 }
 
-func confirmDeploymentToNewLocation(projectName string, existingDeployments []*defangv1.Deployment) error {
-	if global.NonInteractive {
-		term.Warnf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", projectName)
-		return nil
-	}
-	term.Warn("This project has already deployed elsewhere:")
-	help := ""
+func printExistingDeployments(existingDeployments []*defangv1.Deployment) {
+	term.Info("This project has already deployed to the following locations:")
+	deploymentStrings := make([]string, 0, len(existingDeployments))
 	for _, dep := range existingDeployments {
 		var providerId cliClient.ProviderID
 		providerId.SetValue(dep.Provider)
-		help += fmt.Sprintf("\n - %v", cliClient.AccountInfo{Provider: providerId, AccountID: dep.ProviderAccountId, Region: dep.Region})
+		deploymentStrings = append(deploymentStrings, fmt.Sprintf(" - %v", cliClient.AccountInfo{Provider: providerId, AccountID: dep.ProviderAccountId, Region: dep.Region}))
 	}
-	term.Println(help)
+	// sort and remove duplicates
+	slices.Sort(deploymentStrings)
+	deploymentStrings = slices.Compact(deploymentStrings)
+	term.Println(strings.Join(deploymentStrings, "\n"))
+}
+
+func confirmDeploymentToNewLocation(projectName string, existingDeployments []*defangv1.Deployment) error {
+	printExistingDeployments(existingDeployments)
 	var confirm bool
 	if err := survey.AskOne(&survey.Confirm{
 		Message: "Are you sure you want to continue?",
