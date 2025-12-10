@@ -140,10 +140,14 @@ func (pp *providerPreparer) createNewStack(ctx context.Context) (*stacks.StackLi
 	if err != nil {
 		return nil, err
 	}
-	defaultRegion := cliClient.GetRegion(providerID)
-	region, err := pp.ec.RequestStringWithDefault(ctx, "Which region do you want to deploy to?", "region", defaultRegion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to elicit region choice: %w", err)
+
+	var region string
+	if providerID != cliClient.ProviderDefang { // no region for playground
+		defaultRegion := cliClient.GetRegion(providerID)
+		region, err = pp.ec.RequestStringWithDefault(ctx, "Which region do you want to deploy to?", "region", defaultRegion)
+		if err != nil {
+			return nil, fmt.Errorf("failed to elicit region choice: %w", err)
+		}
 	}
 
 	// TODO: use the helper function (stacks.MakeDefaultName or something)
