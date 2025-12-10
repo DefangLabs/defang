@@ -90,7 +90,7 @@ func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Con
 	// prefer local if both exist
 	stackMap := make(map[string]StackOption)
 	for _, remoteStack := range remoteStackList {
-		stackMap[remoteStack] = StackOption{Name: remoteStack, Local: false}
+		stackMap[remoteStack.Name] = StackOption{Name: remoteStack.Name, Local: false}
 	}
 	for _, localStack := range localStackList {
 		stackMap[localStack.Name] = StackOption{Name: localStack.Name, Local: true}
@@ -115,10 +115,34 @@ func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Con
 		return "", fmt.Errorf("failed to elicit stack choice: %w", err)
 	}
 
+	// check if the selected stack is remote
+	if strings.HasSuffix(selectedStackName, " (remote)") {
+		selectedStackName = strings.TrimSuffix(selectedStackName, " (remote)")
+
+		// find the stack parameters from the remoteStackList
+		remoteStackParameters := &stacks.StackParameters{}
+		found := false
+		for _, remoteStack := range remoteStackList {
+			if remoteStack.Name == selectedStackName {
+				remoteStackParameters = remoteStack
+				found = true
+				break
+			}
+		}
+		if !found {
+			return "", fmt.Errorf("failed to find remote stack parameters for stack: %s", selectedStackName)
+		}
+
+		_, err := stacks.Create(*remoteStackParameters)
+		if err != nil {
+			return "", fmt.Errorf("failed to create local stack from remote: %w", err)
+		}
+	}
+
 	return selectedStackName, nil
 }
 
-func (pp *providerPreparer) collectExistingStacks(ctx context.Context, projectName string) ([]string, error) {
+func (pp *providerPreparer) collectExistingStacks(ctx context.Context, projectName string) ([]*stacks.StackParameters, error) {
 	resp, err := pp.fc.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
 		Project: projectName,
 	})
@@ -126,19 +150,26 @@ func (pp *providerPreparer) collectExistingStacks(ctx context.Context, projectNa
 		return nil, fmt.Errorf("failed to list deployments: %w", err)
 	}
 	deployments := resp.GetDeployments()
-	stackNameMap := make(map[string]bool, 0)
-	for _, d := range deployments {
-		stackName := d.GetStack()
+	stackMap := make(map[string]*stacks.StackParameters)
+	for _, deployment := range deployments {
+		stackName := deployment.GetStack()
 		if stackName == "" {
 			stackName = "beta"
 		}
-		stackNameMap[stackName] = true
+		var providerID cliClient.ProviderID
+		providerID.SetValue(deployment.GetProvider())
+		// overwrite existing entries to prefer the latest deployment
+		stackMap[stackName] = &stacks.StackParameters{
+			Name:     stackName,
+			Provider: providerID,
+			Region:   deployment.GetRegion(),
+		}
 	}
-	stackNames := make([]string, 0, len(stackNameMap))
-	for stackName := range stackNameMap {
-		stackNames = append(stackNames, stackName)
+	stackParams := make([]*stacks.StackParameters, 0, len(stackMap))
+	for _, params := range stackMap {
+		stackParams = append(stackParams, params)
 	}
-	return stackNames, nil
+	return stackParams, nil
 }
 
 func (pp *providerPreparer) selectOrCreateStack(ctx context.Context, projectName string) (*stacks.StackParameters, error) {
