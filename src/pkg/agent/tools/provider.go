@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
@@ -72,8 +74,9 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, projectName strin
 }
 
 type StackOption struct {
-	Name  string
-	Local bool
+	Name           string
+	Local          bool
+	LastDeployedAt time.Time
 }
 
 func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Controller, projectName string, useWkDir bool) (string, error) {
@@ -85,7 +88,11 @@ func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Con
 		return "", fmt.Errorf("failed to collect existing stacks: %w", err)
 	}
 	for _, remoteStack := range remoteStackList {
-		stackMap[remoteStack.Name] = StackOption{Name: remoteStack.Name, Local: false}
+		stackMap[remoteStack.Name] = StackOption{
+			Name:           remoteStack.Name,
+			Local:          false,
+			LastDeployedAt: remoteStack.DeployedAt,
+		}
 	}
 
 	if useWkDir {
@@ -95,7 +102,11 @@ func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Con
 		}
 
 		for _, localStack := range localStackList {
-			stackMap[localStack.Name] = StackOption{Name: localStack.Name, Local: true}
+			stackMap[localStack.Name] = StackOption{
+				Name:           localStack.Name,
+				Local:          true,
+				LastDeployedAt: time.Time{},
+			}
 		}
 	}
 
@@ -103,12 +114,25 @@ func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Con
 		return CreateNewStack, nil
 	}
 
+	_, betaExists := stackMap["beta"]
+	if betaExists {
+		infoLine := "This project was deployed with an implicit Stack called 'beta' before Stacks were introduced."
+		if len(stackMap) == 1 {
+			infoLine += "\n   To update your existing deployment, select the 'beta' Stack.\n" +
+				"Creating a new Stack will result in a separate deployment instance."
+		}
+		infoLine += "\n   To learn more about Stacks, visit: https://docs.defang.io/docs/concepts/stacks"
+		term.Info(infoLine + "\n")
+	}
+	executable, _ := os.Executable()
+	term.Infof("To skip this prompt, run %s %s --stack=%s", filepath.Base(executable), os.Args[1], "<stack_name>")
+
 	// Convert map back to slice
 	stackNames := make([]string, 0, len(stackMap)+1)
 	for _, stackOption := range stackMap {
 		name := stackOption.Name
 		if !stackOption.Local {
-			name += " (remote)"
+			name += fmt.Sprintf(" (last deployed %s)", stackOption.LastDeployedAt.Local().Format(time.RFC822))
 		}
 		stackNames = append(stackNames, name)
 	}
@@ -121,16 +145,16 @@ func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Con
 		return "", fmt.Errorf("failed to elicit stack choice: %w", err)
 	}
 
-	// check if the selected stack is remote
-	if strings.HasSuffix(selectedStackName, " (remote)") {
-		selectedStackName = strings.TrimSuffix(selectedStackName, " (remote)")
+	// check if the selected stack has parentheses indicating it's remote
+	if strings.Contains(selectedStackName, "(") && strings.Contains(selectedStackName, ")") {
+		selectedStackName = strings.TrimSpace(selectedStackName[:strings.Index(selectedStackName, "(")])
 
 		// find the stack parameters from the remoteStackList
 		remoteStackParameters := &stacks.StackParameters{}
 		found := false
 		for _, remoteStack := range remoteStackList {
 			if remoteStack.Name == selectedStackName {
-				remoteStackParameters = remoteStack
+				remoteStackParameters = &remoteStack.StackParameters
 				found = true
 				break
 			}
@@ -148,7 +172,12 @@ func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Con
 	return selectedStackName, nil
 }
 
-func (pp *providerPreparer) collectExistingStacks(ctx context.Context, projectName string) ([]*stacks.StackParameters, error) {
+type ExistingStack struct {
+	stacks.StackParameters
+	DeployedAt time.Time
+}
+
+func (pp *providerPreparer) collectExistingStacks(ctx context.Context, projectName string) ([]*ExistingStack, error) {
 	resp, err := pp.fc.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
 		Project: projectName,
 	})
@@ -156,7 +185,7 @@ func (pp *providerPreparer) collectExistingStacks(ctx context.Context, projectNa
 		return nil, fmt.Errorf("failed to list deployments: %w", err)
 	}
 	deployments := resp.GetDeployments()
-	stackMap := make(map[string]*stacks.StackParameters)
+	stackMap := make(map[string]*ExistingStack)
 	for _, deployment := range deployments {
 		stackName := deployment.GetStack()
 		if stackName == "" {
@@ -164,14 +193,19 @@ func (pp *providerPreparer) collectExistingStacks(ctx context.Context, projectNa
 		}
 		var providerID cliClient.ProviderID
 		providerID.SetValue(deployment.GetProvider())
-		// overwrite existing entries to prefer the latest deployment
-		stackMap[stackName] = &stacks.StackParameters{
-			Name:     stackName,
-			Provider: providerID,
-			Region:   deployment.GetRegion(),
+		// avoid overwriting existing entries, deployments are already sorted by deployed_at desc
+		if _, exists := stackMap[stackName]; !exists {
+			stackMap[stackName] = &ExistingStack{
+				StackParameters: stacks.StackParameters{
+					Name:     stackName,
+					Provider: providerID,
+					Region:   deployment.GetRegion(),
+				},
+				DeployedAt: deployment.GetTimestamp().AsTime(),
+			}
 		}
 	}
-	stackParams := make([]*stacks.StackParameters, 0, len(stackMap))
+	stackParams := make([]*ExistingStack, 0, len(stackMap))
 	for _, params := range stackMap {
 		stackParams = append(stackParams, params)
 	}
