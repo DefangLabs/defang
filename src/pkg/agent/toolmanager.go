@@ -58,13 +58,13 @@ func (t *ToolManager) RegisterTools(tools ...ai.Tool) {
 	}
 }
 
-func (t *ToolManager) HandleToolCalls(ctx context.Context, requests []*ai.ToolRequest) *ai.Message {
+func (t *ToolManager) HandleToolCalls(ctx context.Context, requests []*ai.ToolRequest) (*ai.Message, error) {
 	if t.EqualPrevious(requests) {
 		return ai.NewMessage(ai.RoleTool, nil, ai.NewToolResponsePart(&ai.ToolResponse{
 			Name:   "error",
 			Ref:    "error",
 			Output: "The same tool request was made in the previous turn. To prevent infinite loops, no action was taken.",
-		}))
+		})), nil
 	}
 
 	parts := []*ai.Part{}
@@ -72,7 +72,11 @@ func (t *ToolManager) HandleToolCalls(ctx context.Context, requests []*ai.ToolRe
 		var part *ai.Part
 		toolResp, err := t.handleToolRequest(ctx, req)
 		if err != nil {
-			t.printer.Printf("! %v", err)
+			if errors.Is(err, context.Canceled) {
+				return nil, err
+			}
+			// If the error is not context.Canceled, let the agent know and respond
+			t.printer.Println("!", err)
 			part = ai.NewToolResponsePart(&ai.ToolResponse{
 				Name:   req.Name,
 				Ref:    req.Ref,
@@ -85,7 +89,7 @@ func (t *ToolManager) HandleToolCalls(ctx context.Context, requests []*ai.ToolRe
 		parts = append(parts, part)
 	}
 
-	return ai.NewMessage(ai.RoleTool, nil, parts...)
+	return ai.NewMessage(ai.RoleTool, nil, parts...), nil
 }
 
 func (t *ToolManager) handleToolRequest(ctx context.Context, req *ai.ToolRequest) (*ai.ToolResponse, error) {

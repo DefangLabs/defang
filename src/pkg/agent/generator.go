@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/firebase/genkit/go/ai"
@@ -69,6 +70,9 @@ func (g *Generator) HandleMessage(ctx context.Context, prompt string, maxTurns i
 	for range maxTurns {
 		resp, err := g.generate(ctx, prompt, g.messages)
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return err
+			}
 			term.Debugf("error: %v", err)
 			continue
 		}
@@ -80,7 +84,11 @@ func (g *Generator) HandleMessage(ctx context.Context, prompt string, maxTurns i
 			return nil
 		}
 
-		toolResp := g.toolManager.HandleToolCalls(ctx, toolRequests)
+		toolResp, err := g.toolManager.HandleToolCalls(ctx, toolRequests)
+		if err != nil {
+			// HandleToolCalls only ever returns "fatal" errors
+			return err
+		}
 		g.messages = append(g.messages, toolResp)
 	}
 
