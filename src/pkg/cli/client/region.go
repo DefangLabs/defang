@@ -11,6 +11,6 @@ func GetRegion(provider ProviderID) string {
 	case ProviderDO:
 		return pkg.Getenv("REGION", "nyc3") // Default region for DigitalOcean
 	default:
-		return "" // No default region for unsupported providers
+		return "" // No default region for unsupported providers or playground
 	}
 }

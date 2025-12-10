@@ -72,11 +72,19 @@ esac
 DOWNLOAD_URL=""
 
 # Based on the OS, filter the download URL
-if [ "$OS" = "Darwin" ]; then
-    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o "https://github.com/DefangLabs/defang/releases/download/.*/defang_.*_macOS.zip" | head -n 1)
-elif [ "$OS" = "Linux" ]; then
-    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o "https://github.com/DefangLabs/defang/releases/download/.*/defang_.*_linux_${ARCH_SUFFIX}.tar.gz" | head -n 1)
-fi
+case "$OS" in
+    Darwin)
+        DOWNLOAD_URL="defang_.*_macOS.zip"
+        ;;
+    Linux)
+        DOWNLOAD_URL="defang_.*_linux_${ARCH_SUFFIX}.tar.gz"
+        ;;
+    MINGW*|MSYS*|CYGWIN*)
+        DOWNLOAD_URL="defang_.*_windows_${ARCH_SUFFIX}.zip"
+        ;;
+esac
+
+DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o "https://github.com/DefangLabs/defang/releases/download/.*/${DOWNLOAD_URL}" | head -n 1)
 
 # Abort if the download URL is not found
 if [ -z "$DOWNLOAD_URL" ]; then
@@ -86,13 +94,16 @@ fi
 
 echo "Downloading $DOWNLOAD_URL..."
 
-# Define the output file name based on OS and ARCH_SUFFIX
+# Define the output file name based on the download URL extension
 FILENAME="defang_latest"
-if [ "$OS" = "Darwin" ]; then
-    FILENAME="$FILENAME.zip"
-elif [ "$OS" = "Linux" ]; then
-    FILENAME="$FILENAME.tar.gz"
-fi
+case "$DOWNLOAD_URL" in
+    *.zip)
+        FILENAME="$FILENAME.zip"
+        ;;
+    *.tar.gz)
+        FILENAME="$FILENAME.tar.gz"
+        ;;
+esac
 
 # Download the file
 if ! curl -fsSL "$DOWNLOAD_URL" -o "$FILENAME"; then
@@ -105,17 +116,20 @@ EXTRACT_DIR=$(mktemp -d)
 
 # Extract the downloaded file to the temporary directory
 echo "Extracting the downloaded file to $EXTRACT_DIR..."
-if [ "$OS" = "Darwin" ]; then
-    if ! unzip -q "$FILENAME" -d "$EXTRACT_DIR"; then
-        echo "Failed to extract the downloaded file. The file might be corrupted."
-        return 5
-    fi
-elif [ "$OS" = "Linux" ]; then
-    if ! tar -xzf "$FILENAME" -C "$EXTRACT_DIR"; then
-        echo "Failed to extract the downloaded file. The file might be corrupted."
-        return 6
-    fi
-fi
+case "$FILENAME" in
+    *.zip)
+        if ! unzip -q "$FILENAME" -d "$EXTRACT_DIR"; then
+            echo "Failed to extract the downloaded file. The file might be corrupted."
+            return 5
+        fi
+        ;;
+    *.tar.gz)
+        if ! tar -xzf "$FILENAME" -C "$EXTRACT_DIR"; then
+            echo "Failed to extract the downloaded file. The file might be corrupted."
+            return 6
+        fi
+        ;;
+esac
 
 # Determine the installation directory
 if [ -z "$INSTALL_DIR" ]; then
