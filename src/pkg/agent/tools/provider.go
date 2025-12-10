@@ -150,7 +150,6 @@ func (pp *providerPreparer) createNewStack(ctx context.Context) (*stacks.StackLi
 		}
 	}
 
-	// TODO: use the helper function (stacks.MakeDefaultName or something)
 	defaultName := stacks.MakeDefaultName(providerID, region)
 	name, err := pp.ec.RequestStringWithDefault(ctx, "Enter a name for your stack:", "stack_name", defaultName)
 	if err != nil {
