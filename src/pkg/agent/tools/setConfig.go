@@ -33,7 +33,7 @@ func HandleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params
 		params.ProjectName = projectName
 	}
 
-	_, provider, err := pp.SetupProvider(ctx, params.ProjectName, sc.Stack)
+	_, provider, err := pp.SetupProvider(ctx, params.ProjectName, sc.Stack, false)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}

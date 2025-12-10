@@ -88,7 +88,7 @@ func Execute(ctx context.Context) error {
 
 		if strings.Contains(err.Error(), "maximum number of projects") {
 			projectName := "<name>"
-			provider, err := newProviderChecked(ctx, projectName)
+			provider, err := newProviderChecked(ctx, projectName, false)
 			if err != nil {
 				return err
 			}
@@ -527,7 +527,7 @@ var whoamiCmd = &cobra.Command{
 	Short: "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		global.NonInteractive = true // don't show provider prompt
-		provider, err := newProviderChecked(cmd.Context(), "")
+		provider, err := newProviderChecked(cmd.Context(), "", false)
 		if err != nil {
 			term.Debug("unable to get provider:", err)
 		}
@@ -577,7 +577,9 @@ var certGenerateCmd = &cobra.Command{
 			return err
 		}
 
-		provider, err := newProviderChecked(cmd.Context(), project.Name)
+		projectNameFlag, _ := cmd.Flags().GetString("project-name")
+		saveStacksToWkDir := projectNameFlag == ""
+		provider, err := newProviderChecked(cmd.Context(), project.Name, saveStacksToWkDir)
 		if err != nil {
 			return err
 		}
@@ -753,7 +755,9 @@ var configSetCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		provider, err := newProviderChecked(cmd.Context(), projectName)
+		projectNameFlag, _ := cmd.Flags().GetString("project-name")
+		saveStacksToWkDir := projectNameFlag == ""
+		provider, err := newProviderChecked(cmd.Context(), projectName, saveStacksToWkDir)
 		if err != nil {
 			return err
 		}
@@ -883,7 +887,9 @@ var configDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		provider, err := newProviderChecked(cmd.Context(), projectName)
+		projectNameFlag, _ := cmd.Flags().GetString("project-name")
+		saveStacksToWkDir := projectNameFlag == ""
+		provider, err := newProviderChecked(cmd.Context(), projectName, saveStacksToWkDir)
 		if err != nil {
 			return err
 		}
@@ -916,7 +922,9 @@ var configListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		provider, err := newProviderChecked(cmd.Context(), projectName)
+		projectNameFlag, _ := cmd.Flags().GetString("project-name")
+		saveStacksToWkDir := projectNameFlag == ""
+		provider, err := newProviderChecked(cmd.Context(), projectName, saveStacksToWkDir)
 		if err != nil {
 			return err
 		}
@@ -946,7 +954,9 @@ var debugCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		_, err = newProviderChecked(ctx, project.Name)
+		projectNameFlag, _ := cmd.Flags().GetString("project-name")
+		saveStacksToWkDir := projectNameFlag == ""
+		_, err = newProviderChecked(ctx, project.Name, saveStacksToWkDir)
 		if err != nil {
 			return err
 		}
@@ -994,7 +1004,9 @@ var deleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		provider, err := newProviderChecked(cmd.Context(), projectName)
+		projectNameFlag, _ := cmd.Flags().GetString("project-name")
+		saveStacksToWkDir := projectNameFlag == ""
+		provider, err := newProviderChecked(cmd.Context(), projectName, saveStacksToWkDir)
 		if err != nil {
 			return err
 		}
@@ -1299,7 +1311,7 @@ func (pc *providerCreator) NewProvider(ctx context.Context, providerId cliClient
 	return cli.NewProvider(ctx, providerId, client, stack)
 }
 
-func newProviderChecked(ctx context.Context, projectName string) (cliClient.Provider, error) {
+func newProviderChecked(ctx context.Context, projectName string, useWkDir bool) (cliClient.Provider, error) {
 	if global.NonInteractive {
 		return newProvider(ctx)
 	}
@@ -1307,7 +1319,7 @@ func newProviderChecked(ctx context.Context, projectName string) (cliClient.Prov
 	elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
 	ec := elicitations.NewController(elicitationsClient)
 	pp := agentTools.NewProviderPreparer(pc, ec, global.Client)
-	_, provider, err := pp.SetupProvider(ctx, projectName, &global.Stack)
+	_, provider, err := pp.SetupProvider(ctx, projectName, &global.Stack, useWkDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup provider: %w", err)
 	}

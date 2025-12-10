@@ -36,7 +36,7 @@ func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc cliC
 	}
 }
 
-func (pp *providerPreparer) SetupProvider(ctx context.Context, projectName string, stackName *string) (*cliClient.ProviderID, cliClient.Provider, error) {
+func (pp *providerPreparer) SetupProvider(ctx context.Context, projectName string, stackName *string, useWkDir bool) (*cliClient.ProviderID, cliClient.Provider, error) {
 	var providerID cliClient.ProviderID
 	var err error
 	var stack *stacks.StackParameters
@@ -49,7 +49,7 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, projectName strin
 			return nil, nil, fmt.Errorf("failed to load stack: %w", err)
 		}
 	} else {
-		stack, err = pp.selectOrCreateStack(ctx, projectName)
+		stack, err = pp.selectOrCreateStack(ctx, projectName, useWkDir)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to setup stack: %w", err)
 		}
@@ -76,25 +76,29 @@ type StackOption struct {
 	Local bool
 }
 
-func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Controller, projectName string) (string, error) {
+func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Controller, projectName string, useWkDir bool) (string, error) {
+	// Merge remote and local stacks into a single list of type StackOption,
+	// prefer local if both exist
+	stackMap := make(map[string]StackOption)
 	remoteStackList, err := pp.collectExistingStacks(ctx, projectName)
 	if err != nil {
 		return "", fmt.Errorf("failed to collect existing stacks: %w", err)
 	}
-	localStackList, err := stacks.List()
-	if err != nil {
-		return "", fmt.Errorf("failed to list stacks: %w", err)
-	}
-
-	// Merge remote and local stacks into a single list of type StackOption,
-	// prefer local if both exist
-	stackMap := make(map[string]StackOption)
 	for _, remoteStack := range remoteStackList {
 		stackMap[remoteStack.Name] = StackOption{Name: remoteStack.Name, Local: false}
 	}
-	for _, localStack := range localStackList {
-		stackMap[localStack.Name] = StackOption{Name: localStack.Name, Local: true}
+
+	if useWkDir {
+		localStackList, err := stacks.List()
+		if err != nil {
+			return "", fmt.Errorf("failed to list stacks: %w", err)
+		}
+
+		for _, localStack := range localStackList {
+			stackMap[localStack.Name] = StackOption{Name: localStack.Name, Local: true}
+		}
 	}
+
 	if len(stackMap) == 0 {
 		return CreateNewStack, nil
 	}
@@ -108,7 +112,9 @@ func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Con
 		}
 		stackNames = append(stackNames, name)
 	}
-	stackNames = append(stackNames, CreateNewStack)
+	if useWkDir {
+		stackNames = append(stackNames, CreateNewStack)
+	}
 
 	selectedStackName, err := ec.RequestEnum(ctx, "Select a stack", "stack", stackNames)
 	if err != nil {
@@ -172,14 +178,14 @@ func (pp *providerPreparer) collectExistingStacks(ctx context.Context, projectNa
 	return stackParams, nil
 }
 
-func (pp *providerPreparer) selectOrCreateStack(ctx context.Context, projectName string) (*stacks.StackParameters, error) {
-	selectedStackName, err := pp.selectStack(ctx, pp.ec, projectName)
+func (pp *providerPreparer) selectOrCreateStack(ctx context.Context, projectName string, useWkDir bool) (*stacks.StackParameters, error) {
+	selectedStackName, err := pp.selectStack(ctx, pp.ec, projectName, useWkDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select stack: %w", err)
 	}
 
 	if selectedStackName == CreateNewStack {
-		newStack, err := pp.createNewStack(ctx)
+		newStack, err := pp.createNewStack(ctx, useWkDir)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new stack: %w", err)
 		}
@@ -201,7 +207,7 @@ func loadStack(stackName string) (*stacks.StackParameters, error) {
 	return stack, nil
 }
 
-func (pp *providerPreparer) createNewStack(ctx context.Context) (*stacks.StackListItem, error) {
+func (pp *providerPreparer) createNewStack(ctx context.Context, useWkDir bool) (*stacks.StackListItem, error) {
 	var providerNames []string
 	for _, p := range cliClient.AllProviders() {
 		providerNames = append(providerNames, p.Name())
@@ -241,9 +247,11 @@ func (pp *providerPreparer) createNewStack(ctx context.Context) (*stacks.StackLi
 		Region:   region,
 		Name:     name,
 	}
-	_, err = stacks.Create(params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stack: %w", err)
+	if useWkDir {
+		_, err = stacks.Create(params)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create stack: %w", err)
+		}
 	}
 
 	return &stacks.StackListItem{

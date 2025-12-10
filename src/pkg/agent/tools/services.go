@@ -35,7 +35,7 @@ func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, cli
 		return "", fmt.Errorf("failed to load project name: %w", err)
 	}
 	pp := NewProviderPreparer(cli, ec, client)
-	_, provider, err := pp.SetupProvider(ctx, projectName, config.Stack)
+	_, provider, err := pp.SetupProvider(ctx, projectName, config.Stack, false)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}

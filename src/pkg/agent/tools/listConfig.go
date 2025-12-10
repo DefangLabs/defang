@@ -29,7 +29,7 @@ func HandleListConfigTool(ctx context.Context, loader cliClient.ProjectLoader, c
 	}
 	term.Debug("Project name loaded:", projectName)
 	pp := NewProviderPreparer(cli, ec, client)
-	_, provider, err := pp.SetupProvider(ctx, projectName, sc.Stack)
+	_, provider, err := pp.SetupProvider(ctx, projectName, sc.Stack, false)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}

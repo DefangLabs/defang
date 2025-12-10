@@ -75,7 +75,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}, loadErr)
 			}
 
-			provider, err := newProviderChecked(ctx, project.Name)
+			provider, err := newProviderChecked(ctx, project.Name, true)
 			if err != nil {
 				return err
 			}
@@ -322,7 +322,9 @@ func makeComposeDownCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			provider, err := newProviderChecked(cmd.Context(), projectName)
+			projectNameFlag, _ := cmd.Flags().GetString("project-name")
+			saveStacksToWkDir := projectNameFlag == ""
+			provider, err := newProviderChecked(cmd.Context(), projectName, saveStacksToWkDir)
 			if err != nil {
 				return err
 			}
@@ -440,7 +442,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}, loadErr)
 			}
 
-			provider, err := newProviderChecked(ctx, project.Name)
+			provider, err := newProviderChecked(ctx, project.Name, true)
 			if err != nil {
 				return err
 			}
@@ -474,7 +476,9 @@ func makeComposePsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			provider, err := newProviderChecked(cmd.Context(), projectName)
+			projectNameFlag, _ := cmd.Flags().GetString("project-name")
+			saveStacksToWkDir := projectNameFlag == ""
+			provider, err := newProviderChecked(cmd.Context(), projectName, saveStacksToWkDir)
 			if err != nil {
 				return err
 			}
@@ -598,7 +602,9 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	provider, err := newProviderChecked(cmd.Context(), projectName)
+	projectNameFlag, _ := cmd.Flags().GetString("project-name")
+	saveStacksToWkDir := projectNameFlag == ""
+	provider, err := newProviderChecked(cmd.Context(), projectName, saveStacksToWkDir)
 	if err != nil {
 		return err
 	}
