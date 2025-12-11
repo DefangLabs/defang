@@ -265,7 +265,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		dockerHubUser, dockerHubPass, err := dockerhub.GetDockerHubCredentials(ctx)
 		if err != nil {
 			term.Debugf("Could not retrieve Docker Hub credentials: %v", err)
-			term.Warnf("Please set the DOCKERHUB_USERNAME and DOCKERHUB_TOKEN environment variables, or run docker login so Defang can generate a Personal Access Token for pulling images. Without credentials, image pulls may fail.")
+			term.Warnf("Docker Hub credentials are required to avoid pull throttling. Please run `docker login` or set the DOCKERHUB_USERNAME and DOCKERHUB_TOKEN environment variables. Without valid credentials, image pulls may be rate-limited or fail.")
 		} else {
 			term.Debugf("Using Docker Hub credentials with user %v", dockerHubUser)
 			cdCmd.dockerHubUsername = dockerHubUser

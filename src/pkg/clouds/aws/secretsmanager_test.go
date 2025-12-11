@@ -13,6 +13,7 @@ import (
 type mockSM struct {
 	UpdateFn func(ctx context.Context, params *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error)
 	CreateFn func(ctx context.Context, params *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error)
+	ResoreFn func(ctx context.Context, params *secretsmanager.RestoreSecretInput) (*secretsmanager.RestoreSecretOutput, error)
 }
 
 func (m *mockSM) UpdateSecret(ctx context.Context, in *secretsmanager.UpdateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.UpdateSecretOutput, error) {
@@ -20,6 +21,9 @@ func (m *mockSM) UpdateSecret(ctx context.Context, in *secretsmanager.UpdateSecr
 }
 func (m *mockSM) CreateSecret(ctx context.Context, in *secretsmanager.CreateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error) {
 	return m.CreateFn(ctx, in)
+}
+func (m *mockSM) RestoreSecret(ctx context.Context, in *secretsmanager.RestoreSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.RestoreSecretOutput, error) {
+	return m.ResoreFn(ctx, in)
 }
 
 func TestPutSecretManagerSecret(t *testing.T) {
@@ -65,6 +69,41 @@ func TestPutSecretManagerSecret(t *testing.T) {
 					CreateFn: func(ctx context.Context, p *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
 						calledCreate = true
 						return &secretsmanager.CreateSecretOutput{}, nil
+					},
+				}
+			},
+			wantErr:     false,
+			wantVersion: "arn:aws:secret:new::v2",
+		},
+		{
+			name: "update returns secret marked for deletion, restore succeeds, second update succeeds",
+			mock: func() *mockSM {
+				calledCreate, calledRestore := false, false
+
+				return &mockSM{
+					UpdateFn: func(ctx context.Context, p *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error) {
+						if !calledRestore {
+							// First call - simulate secret was marked for deletion
+							return nil, &types.InvalidRequestException{
+								Message: ptr.String("You can't perform this operation on the secret because it was marked for deletion."),
+							}
+						}
+						if calledCreate {
+							return nil, errors.New("should not call create when secret is marked for deletion")
+						}
+						// Second call - success
+						return &secretsmanager.UpdateSecretOutput{
+							ARN:       ptr.String("arn:aws:secret:new"),
+							VersionId: ptr.String("v2"),
+						}, nil
+					},
+					CreateFn: func(ctx context.Context, p *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
+						calledCreate = true
+						return &secretsmanager.CreateSecretOutput{}, nil
+					},
+					ResoreFn: func(ctx context.Context, p *secretsmanager.RestoreSecretInput) (*secretsmanager.RestoreSecretOutput, error) {
+						calledRestore = true
+						return &secretsmanager.RestoreSecretOutput{}, nil
 					},
 				}
 			},
