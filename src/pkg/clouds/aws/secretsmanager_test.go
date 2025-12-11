@@ -11,9 +11,9 @@ import (
 )
 
 type mockSM struct {
-	UpdateFn func(ctx context.Context, params *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error)
-	CreateFn func(ctx context.Context, params *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error)
-	ResoreFn func(ctx context.Context, params *secretsmanager.RestoreSecretInput) (*secretsmanager.RestoreSecretOutput, error)
+	UpdateFn  func(ctx context.Context, params *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error)
+	CreateFn  func(ctx context.Context, params *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error)
+	RestoreFn func(ctx context.Context, params *secretsmanager.RestoreSecretInput) (*secretsmanager.RestoreSecretOutput, error)
 }
 
 func (m *mockSM) UpdateSecret(ctx context.Context, in *secretsmanager.UpdateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.UpdateSecretOutput, error) {
@@ -23,7 +23,7 @@ func (m *mockSM) CreateSecret(ctx context.Context, in *secretsmanager.CreateSecr
 	return m.CreateFn(ctx, in)
 }
 func (m *mockSM) RestoreSecret(ctx context.Context, in *secretsmanager.RestoreSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.RestoreSecretOutput, error) {
-	return m.ResoreFn(ctx, in)
+	return m.RestoreFn(ctx, in)
 }
 
 func TestPutSecretManagerSecret(t *testing.T) {
@@ -101,7 +101,7 @@ func TestPutSecretManagerSecret(t *testing.T) {
 						calledCreate = true
 						return &secretsmanager.CreateSecretOutput{}, nil
 					},
-					ResoreFn: func(ctx context.Context, p *secretsmanager.RestoreSecretInput) (*secretsmanager.RestoreSecretOutput, error) {
+					RestoreFn: func(ctx context.Context, p *secretsmanager.RestoreSecretInput) (*secretsmanager.RestoreSecretOutput, error) {
 						calledRestore = true
 						return &secretsmanager.RestoreSecretOutput{}, nil
 					},

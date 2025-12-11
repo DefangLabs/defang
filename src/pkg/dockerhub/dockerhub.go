@@ -155,10 +155,12 @@ type DockerHubClient struct {
 
 func (c *DockerHubClient) Login(ctx context.Context, username, password string) error {
 	var resp CreateAccessTokenResponse
-	c.request(ctx, "POST", "/v2/auth/token/", CreateAccessTokenRequest{
+	if err := c.request(ctx, "POST", "/v2/auth/token/", CreateAccessTokenRequest{
 		Identifier: username,
 		Secret:     password,
-	}, &resp)
+	}, &resp); err != nil {
+		return err
+	}
 	c.jwt = resp.AccessToken
 	return nil
 }

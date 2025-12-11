@@ -340,7 +340,8 @@ func (b *ByocAws) checkRequiresDockerHubToken(ctx context.Context, project *comp
 			return err
 		}
 		repo := parsed.Repo
-		if !strings.HasPrefix(repo, "library/") {
+		//If a image does not have a repo, it is assumed to be in the official "library" repo
+		if !strings.Contains(repo, "/") {
 			repo = "library/" + repo
 		}
 		ecrRepo := "docker/" + repo
@@ -528,8 +529,8 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn,
 			term.Warnf("Could not store Docker Hub credentials in Secrets Manager, images from dockerhub may be throttled during build: %v", err)
 		} else {
 			env["CI_REGISTRY_CREDENTIALS_ARN"] = arn
+			term.Debugf("Stored Docker Hub credentials in Secrets Manager: %s", arn)
 		}
-		term.Debugf("Stored Docker Hub credentials in Secrets Manager: %s", arn)
 	}
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
