@@ -77,47 +77,64 @@ type StackOption struct {
 	Name           string
 	Local          bool
 	LastDeployedAt time.Time
+	Parameters     *stacks.StackParameters
 }
 
-func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Controller, projectName string, useWkDir bool) (string, error) {
+func (pp *providerPreparer) collectStackOptions(ctx context.Context, projectName string, useWkDir bool) (map[string]StackOption, error) {
 	// Merge remote and local stacks into a single list of type StackOption,
 	// prefer local if both exist
 	stackMap := make(map[string]StackOption)
-	remoteStackList, err := pp.collectExistingStacks(ctx, projectName)
+	remoteStackList, err := pp.collectPreviouslyDeployedStacks(ctx, projectName)
 	if err != nil {
-		return "", fmt.Errorf("failed to collect existing stacks: %w", err)
+		return nil, fmt.Errorf("failed to collect existing stacks: %w", err)
 	}
 	for _, remoteStack := range remoteStackList {
 		stackMap[remoteStack.Name] = StackOption{
 			Name:           remoteStack.Name,
 			Local:          false,
 			LastDeployedAt: remoteStack.DeployedAt,
+			Parameters:     &remoteStack.StackParameters,
 		}
 	}
 
 	if useWkDir {
 		localStackList, err := stacks.List()
 		if err != nil {
-			return "", fmt.Errorf("failed to list stacks: %w", err)
+			return nil, fmt.Errorf("failed to list stacks: %w", err)
 		}
 
 		for _, localStack := range localStackList {
+			existing, exists := stackMap[localStack.Name]
+			lastDeployedAt := time.Time{}
+			if exists {
+				lastDeployedAt = existing.LastDeployedAt
+			}
 			stackMap[localStack.Name] = StackOption{
 				Name:           localStack.Name,
 				Local:          true,
-				LastDeployedAt: time.Time{},
+				LastDeployedAt: lastDeployedAt,
+				Parameters:     nil,
 			}
 		}
 	}
 
-	if len(stackMap) == 0 {
-		return CreateNewStack, nil
+	stackLabelMap := make(map[string]StackOption)
+	for _, stackOption := range stackMap {
+		label := stackOption.Name
+		if !stackOption.LastDeployedAt.IsZero() {
+			label = fmt.Sprintf("%s (last deployed %s)", stackOption.Name, stackOption.LastDeployedAt.Local().Format(time.RFC822))
+		}
+		stackLabelMap[label] = stackOption
 	}
 
-	_, betaExists := stackMap["beta"]
+	return stackLabelMap, nil
+}
+
+func printStacksInfoMessage(stacks map[string]StackOption) {
+	_, betaExists := stacks["beta"]
 	if betaExists {
 		infoLine := "This project was deployed with an implicit Stack called 'beta' before Stacks were introduced."
-		if len(stackMap) == 1 {
+		if len(stacks) == 1 {
 			infoLine += "\n   To update your existing deployment, select the 'beta' Stack.\n" +
 				"Creating a new Stack will result in a separate deployment instance."
 		}
@@ -126,51 +143,57 @@ func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Con
 	}
 	executable, _ := os.Executable()
 	term.Infof("To skip this prompt, run %s %s --stack=%s", filepath.Base(executable), os.Args[1], "<stack_name>")
+}
+
+func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Controller, projectName string, useWkDir bool) (string, error) {
+	stackOptions, err := pp.collectStackOptions(ctx, projectName, useWkDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to collect stack options: %w", err)
+	}
+	if len(stackOptions) == 0 {
+		return CreateNewStack, nil
+	}
+
+	printStacksInfoMessage(stackOptions)
 
 	// Convert map back to slice
-	stackNames := make([]string, 0, len(stackMap)+1)
-	for _, stackOption := range stackMap {
-		name := stackOption.Name
-		if !stackOption.Local {
-			name += fmt.Sprintf(" (last deployed %s)", stackOption.LastDeployedAt.Local().Format(time.RFC822))
-		}
-		stackNames = append(stackNames, name)
+	stackLabels := make([]string, 0, len(stackOptions)+1)
+	for label := range stackOptions {
+		stackLabels = append(stackLabels, label)
 	}
 	if useWkDir {
-		stackNames = append(stackNames, CreateNewStack)
+		stackLabels = append(stackLabels, CreateNewStack)
 	}
 
-	selectedStackName, err := ec.RequestEnum(ctx, "Select a stack", "stack", stackNames)
+	selectedStackLabel, err := ec.RequestEnum(ctx, "Select a stack", "stack", stackLabels)
 	if err != nil {
 		return "", fmt.Errorf("failed to elicit stack choice: %w", err)
 	}
 
-	// check if the selected stack has parentheses indicating it's remote
-	if strings.Contains(selectedStackName, "(") && strings.Contains(selectedStackName, ")") {
-		selectedStackName = strings.TrimSpace(selectedStackName[:strings.Index(selectedStackName, "(")])
-
-		// find the stack parameters from the remoteStackList
-		remoteStackParameters := &stacks.StackParameters{}
-		found := false
-		for _, remoteStack := range remoteStackList {
-			if remoteStack.Name == selectedStackName {
-				remoteStackParameters = &remoteStack.StackParameters
-				found = true
-				break
-			}
-		}
-		if !found {
-			return "", fmt.Errorf("failed to find remote stack parameters for stack: %s", selectedStackName)
-		}
-
-		term.Debugf("Importing stack %s from remote", selectedStackName)
-		_, err := stacks.Create(*remoteStackParameters)
-		if err != nil {
-			return "", fmt.Errorf("failed to create local stack from remote: %w", err)
-		}
+	// Handle special case where user selects "Create new stack"
+	if selectedStackLabel == CreateNewStack {
+		return CreateNewStack, nil
 	}
 
-	return selectedStackName, nil
+	selectedStackOption, ok := stackOptions[selectedStackLabel]
+	if !ok {
+		return "", fmt.Errorf("selected stack label %q not found in stack options map", selectedStackLabel)
+	}
+	if selectedStackOption.Local {
+		return selectedStackOption.Name, nil
+	}
+
+	if selectedStackOption.Parameters == nil {
+		return "", fmt.Errorf("stack parameters for remote stack %q are nil", selectedStackLabel)
+	}
+
+	term.Debugf("Importing stack %s from remote", selectedStackLabel)
+	_, err = stacks.Create(*selectedStackOption.Parameters)
+	if err != nil {
+		return "", fmt.Errorf("failed to create local stack from remote: %w", err)
+	}
+
+	return selectedStackOption.Name, nil
 }
 
 type ExistingStack struct {
@@ -178,7 +201,7 @@ type ExistingStack struct {
 	DeployedAt time.Time
 }
 
-func (pp *providerPreparer) collectExistingStacks(ctx context.Context, projectName string) ([]*ExistingStack, error) {
+func (pp *providerPreparer) collectPreviouslyDeployedStacks(ctx context.Context, projectName string) ([]*ExistingStack, error) {
 	resp, err := pp.fc.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
 		Project: projectName,
 	})
@@ -237,7 +260,7 @@ func (pp *providerPreparer) loadStack(ctx context.Context, projectName, stackNam
 			return nil, fmt.Errorf("failed to read stack: %w", err)
 		}
 		// call collectExistingStacks to see if it exists remotely
-		existingStacks, err := pp.collectExistingStacks(ctx, projectName)
+		existingStacks, err := pp.collectPreviouslyDeployedStacks(ctx, projectName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to collect existing stacks: %w", err)
 		}
