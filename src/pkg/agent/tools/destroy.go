@@ -23,15 +23,14 @@ func HandleDestroyTool(ctx context.Context, loader cliClient.ProjectLoader, cli 
 		return "", fmt.Errorf("could not connect: %w", err)
 	}
 
-	pp := NewProviderPreparer(cli, ec, client)
-	_, provider, err := pp.SetupProvider(ctx, config.Stack)
-	if err != nil {
-		return "", fmt.Errorf("failed to setup provider: %w", err)
-	}
-	term.Debug("Function invoked: cliClient.LoadProjectNameWithFallback")
-	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
+	projectName, err := cli.LoadProjectName(ctx, loader)
 	if err != nil {
 		return "", fmt.Errorf("failed to load project name: %w", err)
+	}
+	pp := NewProviderPreparer(cli, ec, client)
+	_, provider, err := pp.SetupProvider(ctx, projectName, config.Stack, false)
+	if err != nil {
+		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
 
 	if config.ProviderID == nil {

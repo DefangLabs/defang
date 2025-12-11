@@ -21,22 +21,21 @@ func HandleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, sc.Cluster)
 	if err != nil {
-		return "", fmt.Errorf("Could not connect: %w", err)
+		return "", fmt.Errorf("could not connect: %w", err)
 	}
 
 	pp := NewProviderPreparer(cli, ec, client)
-	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
-	if err != nil {
-		return "", fmt.Errorf("failed to setup provider: %w", err)
-	}
-
 	if params.ProjectName == "" {
-		term.Debug("Function invoked: cliClient.LoadProjectNameWithFallback")
-		projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
+		projectName, err := cli.LoadProjectName(ctx, loader)
 		if err != nil {
 			return "", fmt.Errorf("failed to load project name: %w", err)
 		}
 		params.ProjectName = projectName
+	}
+
+	_, provider, err := pp.SetupProvider(ctx, params.ProjectName, sc.Stack, false)
+	if err != nil {
+		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
 
 	if !pkg.IsValidSecretName(params.Name) {

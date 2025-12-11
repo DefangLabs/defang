@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -36,19 +35,19 @@ var cdCmd = &cobra.Command{
 func bootstrapCommand(cmd *cobra.Command, args []string, command string) error {
 	ctx := cmd.Context()
 	loader := configureLoader(cmd)
-	provider, err := newProviderChecked(ctx, loader)
-	if err != nil {
-		return err
-	}
 
 	if len(args) == 0 {
-		projectName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
+		projectName, err := loader.LoadProjectName(ctx)
 		if err != nil {
 			return err
 		}
 		args = []string{projectName}
 	}
 
+	provider, err := newProviderChecked(ctx, args[0], false)
+	if err != nil {
+		return err
+	}
 	var errs []error
 	for _, projectName := range args {
 		err := canIUseProvider(ctx, provider, projectName, 0)
@@ -103,8 +102,7 @@ var cdTearDownCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		force, _ := cmd.Flags().GetBool("force")
 
-		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), "", false)
 		if err != nil {
 			return err
 		}
@@ -122,7 +120,7 @@ var cdListCmd = &cobra.Command{
 		remote, _ := cmd.Flags().GetBool("remote")
 		all, _ := cmd.Flags().GetBool("all")
 
-		provider, err := newProviderChecked(cmd.Context(), nil)
+		provider, err := newProviderChecked(cmd.Context(), "", false)
 		if err != nil {
 			return err
 		}
@@ -156,7 +154,9 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		projectNameFlag, _ := cmd.Flags().GetString("project-name")
+		saveStacksToWkDir := projectNameFlag == ""
+		provider, err := newProviderChecked(cmd.Context(), project.Name, saveStacksToWkDir)
 		if err != nil {
 			return err
 		}
@@ -183,8 +183,7 @@ var cdInstallCmd = &cobra.Command{
 	Short:       "Install the CD resources into the cluster",
 	Hidden:      true, // users shouldn't have to run this manually, because it's done on deploy
 	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), "", false)
 		if err != nil {
 			return err
 		}

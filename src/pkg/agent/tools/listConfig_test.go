@@ -11,6 +11,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,12 +26,12 @@ type MockListConfigCLI struct {
 	CallLog              []string
 }
 
-func (m *MockListConfigCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
+func (m *MockListConfigCLI) Connect(ctx context.Context, cluster string) (client.FabricClient, error) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("Connect(%s)", cluster))
 	if m.ConnectError != nil {
 		return nil, m.ConnectError
 	}
-	return &client.GrpcClient{}, nil
+	return mockFC, nil
 }
 
 func (m *MockListConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient, stack string) client.Provider {
@@ -38,8 +39,8 @@ func (m *MockListConfigCLI) NewProvider(ctx context.Context, providerId client.P
 	return nil // Mock provider
 }
 
-func (m *MockListConfigCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
-	m.CallLog = append(m.CallLog, "LoadProjectNameWithFallback")
+func (m *MockListConfigCLI) LoadProjectName(ctx context.Context, loader client.Loader) (string, error) {
+	m.CallLog = append(m.CallLog, "LoadProjectName")
 	if m.LoadProjectNameError != nil {
 		return "", m.LoadProjectNameError
 	}
@@ -55,6 +56,7 @@ func (m *MockListConfigCLI) ListConfig(ctx context.Context, provider client.Prov
 }
 
 func TestHandleListConfigTool(t *testing.T) {
+	mockFC = &mockFabricClient{}
 	tests := []struct {
 		name                 string
 		providerID           client.ProviderID
@@ -68,7 +70,7 @@ func TestHandleListConfigTool(t *testing.T) {
 			setupMock: func(m *MockListConfigCLI) {
 				m.ConnectError = errors.New("connection failed")
 			},
-			expectedError: "Could not connect: connection failed",
+			expectedError: "could not connect: connection failed",
 		},
 		{
 			name:       "load_project_name_error",
@@ -128,12 +130,24 @@ func TestHandleListConfigTool(t *testing.T) {
 			loader := &client.MockLoader{}
 			ec := elicitations.NewController(&mockElicitationsClient{
 				responses: map[string]string{
-					"strategy":     "profile",
 					"profile_name": "default",
 				},
 			})
 
 			stackName := "test-stack"
+			mockFC.On("ListDeployments", mock.Anything, mock.Anything).Return(&defangv1.ListDeploymentsResponse{
+				Deployments: []*defangv1.Deployment{
+					{
+						Id:                "deployment-123",
+						Project:           "test-project",
+						Stack:             stackName,
+						Region:            "us-test-2",
+						Provider:          defangv1.Provider_AWS,
+						ProviderAccountId: "123456789012",
+					},
+				},
+			}, nil)
+
 			result, err := HandleListConfigTool(t.Context(), loader, mockCLI, ec, StackConfig{
 				Cluster:    "test-cluster",
 				ProviderID: &tt.providerID,
@@ -154,8 +168,8 @@ func TestHandleListConfigTool(t *testing.T) {
 			if tt.expectedError == "" && tt.name == "successful_list_single_config" {
 				expectedCalls := []string{
 					"Connect(test-cluster)",
+					"LoadProjectName",
 					"NewProvider(aws)",
-					"LoadProjectNameWithFallback",
 					"ListConfig(test-project)",
 				}
 				assert.Equal(t, expectedCalls, mockCLI.CallLog)

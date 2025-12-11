@@ -12,10 +12,8 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	pkg "github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	gcpdriver "github.com/DefangLabs/defang/src/pkg/clouds/gcp"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
@@ -79,6 +77,12 @@ func (m *mockFabricService) GetSelectedProvider(context.Context, *connect.Reques
 
 func (m *mockFabricService) SetSelectedProvider(context.Context, *connect.Request[defangv1.SetSelectedProviderRequest]) (*connect.Response[emptypb.Empty], error) {
 	return connect.NewResponse(&emptypb.Empty{}), nil
+}
+
+func (m *mockFabricService) ListDeployments(context.Context, *connect.Request[defangv1.ListDeploymentsRequest]) (*connect.Response[defangv1.ListDeploymentsResponse], error) {
+	return connect.NewResponse(&defangv1.ListDeploymentsResponse{
+		Deployments: []*defangv1.Deployment{},
+	}), nil
 }
 
 func init() {
@@ -245,7 +249,6 @@ func TestGetProvider(t *testing.T) {
 	}
 	mockClient.SetClient(mockCtrl)
 	global.Client = &mockClient
-	loader := cliClient.MockLoader{Project: compose.Project{Name: "empty"}}
 	oldRootCmd := RootCmd
 	t.Cleanup(func() {
 		RootCmd = oldRootCmd
@@ -261,154 +264,6 @@ func TestGetProvider(t *testing.T) {
 
 	ctx := t.Context()
 
-	t.Run("Nil loader auto provider non-interactive should load playground provider", func(t *testing.T) {
-		global.ProviderID = "auto"
-		os.Unsetenv("DEFANG_PROVIDER")
-		RootCmd = FakeRootWithProviderParam("")
-
-		p, err := newProvider(ctx, nil)
-		if err != nil {
-			t.Fatalf("getProvider() failed: %v", err)
-		}
-		if _, ok := p.(*cliClient.PlaygroundProvider); !ok {
-			t.Errorf("Expected provider to be of type *cliClient.PlaygroundProvider, got %T", p)
-		}
-	})
-
-	t.Run("Auto provider should get provider from client", func(t *testing.T) {
-		global.ProviderID = "auto"
-		os.Unsetenv("DEFANG_PROVIDER")
-		t.Setenv("AWS_REGION", "us-west-2")
-		RootCmd = FakeRootWithProviderParam("")
-
-		mockCtrl.savedProvider = map[string]defangv1.Provider{"empty": defangv1.Provider_AWS}
-
-		ni := global.NonInteractive
-		sts := aws.StsClient
-		aws.StsClient = &mockStsProviderAPI{}
-		global.NonInteractive = false
-		t.Cleanup(func() {
-			global.NonInteractive = ni
-			aws.StsClient = sts
-			mockCtrl.savedProvider = nil
-		})
-
-		p, err := newProvider(ctx, loader)
-		if err != nil {
-			t.Fatalf("getProvider() failed: %v", err)
-		}
-		if _, ok := p.(*aws.ByocAws); !ok {
-			t.Errorf("Expected provider to be of type *aws.ByocAws, got %T", p)
-		}
-	})
-
-	t.Run("Auto provider from param with saved provider should go interactive and save", func(t *testing.T) {
-		global.ProviderID = "auto"
-		os.Unsetenv("DEFANG_PROVIDER")
-		t.Setenv("AWS_REGION", "us-west-2")
-		mockCtrl.savedProvider = map[string]defangv1.Provider{"someotherproj": defangv1.Provider_AWS}
-		RootCmd = FakeRootWithProviderParam("")
-
-		ni := global.NonInteractive
-		sts := aws.StsClient
-		aws.StsClient = &mockStsProviderAPI{}
-		global.NonInteractive = false
-		oldTerm := term.DefaultTerm
-		term.DefaultTerm = term.NewTerm(
-			&FakeStdin{bytes.NewReader([]byte("aws\n"))},
-			&FakeStdout{new(bytes.Buffer)},
-			new(bytes.Buffer),
-		)
-		t.Cleanup(func() {
-			global.NonInteractive = ni
-			aws.StsClient = sts
-			mockCtrl.savedProvider = nil
-			term.DefaultTerm = oldTerm
-		})
-
-		p, err := newProvider(ctx, loader)
-		if err != nil {
-			t.Fatalf("getProvider() failed: %v", err)
-		}
-		if _, ok := p.(*aws.ByocAws); !ok {
-			t.Errorf("Expected provider to be of type *aws.ByocAws, got %T", p)
-		}
-		if mockCtrl.savedProvider["empty"] != defangv1.Provider_AWS {
-			t.Errorf("Expected provider to be saved as AWS, got %v", mockCtrl.savedProvider["empty"])
-		}
-	})
-
-	t.Run("Interactive provider prompt infer default provider from environment variable", func(t *testing.T) {
-		if testing.Short() {
-			t.Skip("Skip digitalocean test")
-		}
-		global.ProviderID = "auto"
-		os.Unsetenv("DEFANG_PROVIDER")
-		os.Unsetenv("AWS_PROFILE")
-		t.Setenv("AWS_REGION", "us-west-2")
-		t.Setenv("DIGITALOCEAN_TOKEN", "test-token")
-		mockCtrl.savedProvider = map[string]defangv1.Provider{"someotherproj": defangv1.Provider_AWS}
-		RootCmd = FakeRootWithProviderParam("")
-
-		ni := global.NonInteractive
-		sts := aws.StsClient
-		aws.StsClient = &mockStsProviderAPI{}
-		global.NonInteractive = false
-		oldTerm := term.DefaultTerm
-		term.DefaultTerm = term.NewTerm(
-			&FakeStdin{bytes.NewReader([]byte("\n"))}, // Use default option, which should be DO from env var
-			&FakeStdout{new(bytes.Buffer)},
-			new(bytes.Buffer),
-		)
-		t.Cleanup(func() {
-			global.NonInteractive = ni
-			aws.StsClient = sts
-			mockCtrl.savedProvider = nil
-			term.DefaultTerm = oldTerm
-		})
-
-		_, err := newProvider(ctx, loader)
-		if err != nil && !strings.HasPrefix(err.Error(), "GET https://api.digitalocean.com/v2/account: 401") {
-			t.Fatalf("getProvider() failed: %v", err)
-		}
-		if mockCtrl.savedProvider["empty"] != defangv1.Provider_DIGITALOCEAN {
-			t.Errorf("Expected provider to be saved as DIGITALOCEAN, got %v", mockCtrl.savedProvider["empty"])
-		}
-	})
-
-	t.Run("Auto provider from param with saved provider should go interactive and save", func(t *testing.T) {
-		os.Unsetenv("GCP_PROJECT_ID") // To trigger error
-		os.Unsetenv("DEFANG_PROVIDER")
-		global.ProviderID = "auto"
-		mockCtrl.savedProvider = map[string]defangv1.Provider{"empty": defangv1.Provider_AWS}
-		RootCmd = FakeRootWithProviderParam("auto")
-
-		ni := global.NonInteractive
-		sts := aws.StsClient
-		aws.StsClient = &mockStsProviderAPI{}
-		global.NonInteractive = false
-		oldTerm := term.DefaultTerm
-		term.DefaultTerm = term.NewTerm(
-			&FakeStdin{bytes.NewReader([]byte("gcp\n"))},
-			&FakeStdout{new(bytes.Buffer)},
-			new(bytes.Buffer),
-		)
-		t.Cleanup(func() {
-			global.NonInteractive = ni
-			aws.StsClient = sts
-			mockCtrl.savedProvider = nil
-			term.DefaultTerm = oldTerm
-		})
-
-		_, err := newProvider(ctx, loader)
-		if err != nil && err.Error() != "GCP_PROJECT_ID or CLOUDSDK_CORE_PROJECT must be set for GCP projects" {
-			t.Fatalf("getProvider() failed: %v", err)
-		}
-		if mockCtrl.savedProvider["empty"] != defangv1.Provider_GCP {
-			t.Errorf("Expected provider to be saved as GCP, got %v", mockCtrl.savedProvider["empty"])
-		}
-	})
-
 	t.Run("Should take provider from param without updating saved provider", func(t *testing.T) {
 		os.Unsetenv("DIGITALOCEAN_TOKEN")
 		os.Unsetenv("DEFANG_PROVIDER")
@@ -421,7 +276,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.savedProvider = nil
 		})
 
-		_, err := newProvider(ctx, loader)
+		_, err := newProvider(ctx)
 		if err != nil && !strings.HasPrefix(err.Error(), "DIGITALOCEAN_TOKEN must be set") {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -440,7 +295,7 @@ func TestGetProvider(t *testing.T) {
 			aws.StsClient = sts
 		})
 
-		p, err := newProvider(ctx, loader)
+		p, err := newProvider(ctx)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -459,7 +314,7 @@ func TestGetProvider(t *testing.T) {
 			}, nil
 		}
 
-		p, err := newProvider(ctx, loader)
+		p, err := newProvider(ctx)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -480,7 +335,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.canIUseResponse.CdImage = ""
 		})
 
-		p, err := newProvider(ctx, loader)
+		p, err := newProvider(ctx)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -513,7 +368,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.canIUseResponse.CdImage = ""
 		})
 
-		p, err := newProvider(ctx, loader)
+		p, err := newProvider(ctx)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}

@@ -8,7 +8,9 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,7 +24,6 @@ type MockSetConfigCLI struct {
 	NewProviderCalled     bool
 	LoadProjectNameCalled bool
 	ConfigSetCalled       bool
-	ReturnedGrpcClient    *client.GrpcClient
 	ReturnedProvider      client.Provider
 	ReturnedProjectName   string
 	ConfigSetProjectName  string
@@ -31,16 +32,12 @@ type MockSetConfigCLI struct {
 	ConfigSetValue        string
 }
 
-func (m *MockSetConfigCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
+func (m *MockSetConfigCLI) Connect(ctx context.Context, cluster string) (client.FabricClient, error) {
 	m.ConnectCalled = true
 	if m.ConnectError != nil {
 		return nil, m.ConnectError
 	}
-	if m.ReturnedGrpcClient == nil {
-		// Return a non-nil client to avoid nil pointer issues
-		m.ReturnedGrpcClient = &client.GrpcClient{}
-	}
-	return m.ReturnedGrpcClient, nil
+	return mockFC, nil
 }
 
 func (m *MockSetConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabricClient client.FabricClient, stack string) client.Provider {
@@ -62,7 +59,7 @@ func (p *MockProvider) AccountInfo(context.Context) (*client.AccountInfo, error)
 	return &client.AccountInfo{}, nil
 }
 
-func (m *MockSetConfigCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
+func (m *MockSetConfigCLI) LoadProjectName(ctx context.Context, loader client.Loader) (string, error) {
 	m.LoadProjectNameCalled = true
 	if m.LoadProjectNameError != nil {
 		return "", m.LoadProjectNameError
@@ -83,6 +80,7 @@ func (m *MockSetConfigCLI) ConfigSet(ctx context.Context, projectName string, pr
 }
 
 func TestHandleSetConfig(t *testing.T) {
+	mockFC = &mockFabricClient{}
 	// Common test data
 	const (
 		testCluster    = "test-cluster"
@@ -161,7 +159,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:          map[string]interface{}{"name": testConfigName, "value": testValue},
 			mockCLI:              &MockSetConfigCLI{ConnectError: errors.New("connection failed")},
 			expectedError:        true,
-			errorMessage:         "Could not connect: connection failed",
+			errorMessage:         "could not connect: connection failed",
 			expectedConnectCalls: true,
 		},
 		{
@@ -173,7 +171,7 @@ func TestHandleSetConfig(t *testing.T) {
 			expectedError:            true,
 			errorMessage:             "failed to load project name: project loading failed",
 			expectedConnectCalls:     true,
-			expectedProviderCalls:    true,
+			expectedProviderCalls:    false,
 			expectedProjectNameCalls: true,
 		},
 		{
@@ -242,11 +240,22 @@ func TestHandleSetConfig(t *testing.T) {
 			}
 			ec := elicitations.NewController(&mockElicitationsClient{
 				responses: map[string]string{
-					"strategy":     "profile",
 					"profile_name": "default",
 				},
 			})
 			stackName := "test-stack"
+			mockFC.On("ListDeployments", mock.Anything, mock.Anything).Return(&defangv1.ListDeploymentsResponse{
+				Deployments: []*defangv1.Deployment{
+					{
+						Id:                "deployment-123",
+						Project:           "test-project",
+						Stack:             stackName,
+						Region:            "us-test-2",
+						Provider:          defangv1.Provider_AWS,
+						ProviderAccountId: "123456789012",
+					},
+				},
+			}, nil)
 			result, err := HandleSetConfig(t.Context(), loader, params, tt.mockCLI, ec, StackConfig{
 				Cluster:    tt.cluster,
 				ProviderID: &tt.providerId,
