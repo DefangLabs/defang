@@ -55,7 +55,7 @@ func GetDockerHubCredentials(ctx context.Context) (string, string, error) {
 		return "", "", ErrNoCredentials
 	}
 
-	if err := ValidateCredsWithRepo(auth.Username, auth.Password, "library/alpine"); err != nil {
+	if err := ValidateCredsWithRepo(ctx, auth.Username, auth.Password, "library/alpine"); err != nil {
 		return "", "", ErrInvalidCredential
 	}
 
@@ -86,13 +86,16 @@ func GenerateNewPublicOnlyPAT(ctx context.Context, label string) (string, string
 		pat = password
 	}
 
-	if err := ValidateCredsWithRepo(username, pat, "library/alpine"); err != nil {
+	if err := ValidateCredsWithRepo(ctx, username, pat, "library/alpine"); err != nil {
 		return "", "", ErrInvalidCredential
 	}
 	return username, pat, nil
 }
 
-func ValidateCredsWithRepo(user, pass string, repo string) error {
+func ValidateCredsWithRepo(ctx context.Context, user, pass string, repo string) error {
+	if user == "" {
+		return errors.New("empty username provided")
+	}
 	if pass == "" {
 		return errors.New("empty PAT provided")
 	}
@@ -100,7 +103,7 @@ func ValidateCredsWithRepo(user, pass string, repo string) error {
 		repo = "library/alpine"
 	}
 	url := fmt.Sprintf("https://auth.docker.io/token?service=registry.docker.io&scope=repository:%s:pull", repo)
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return err
 	}
@@ -119,13 +122,12 @@ func ValidateCredsWithRepo(user, pass string, repo string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read response body: %v", err)
 	}
-	var bb bytes.Buffer
-	json.Indent(&bb, b, "", "  ")
-
 	if resp.StatusCode == 200 {
 		return nil
 	}
-	return fmt.Errorf("failed to access repo: status %d : %v", resp.StatusCode, bb.String())
+	var bb bytes.Buffer
+	json.Indent(&bb, b, "", "  ")
+	return fmt.Errorf("failed to access repo: status %d :\n%v", resp.StatusCode, bb.String())
 }
 
 type CreatePATRequest struct {
@@ -165,11 +167,6 @@ func (c *DockerHubClient) Login(ctx context.Context, username, password string) 
 	return nil
 }
 
-type ListPATRequest struct {
-	Page     int `json:"page,omitempty"`
-	PageSize int `json:"page_size,omitempty"`
-}
-
 func (c *DockerHubClient) request(ctx context.Context, method, api string, req any, resp any) error {
 	var body io.Reader
 	if req != nil {
@@ -201,23 +198,17 @@ func (c *DockerHubClient) request(ctx context.Context, method, api string, req a
 		return err
 	}
 	defer httpResp.Body.Close()
+	out, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		out = fmt.Appendf(nil, "unable to read response body: %v", err)
+	}
 	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
-		out, err := io.ReadAll(httpResp.Body)
-		if err != nil {
-			out = fmt.Appendf(nil, "unable to read response body: %v", err)
-		}
 		return fmt.Errorf("request failed: %s", out)
 	}
 	if resp == nil {
 		return nil
 	}
-	b, err := io.ReadAll(httpResp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read response body: %v", err)
-	}
-	var bb bytes.Buffer
-	json.Indent(&bb, b, "", "  ")
-	if err := json.Unmarshal(b, resp); err != nil {
+	if err := json.Unmarshal(out, resp); err != nil {
 		return fmt.Errorf("failed to decode response: %v", err)
 	}
 	return nil

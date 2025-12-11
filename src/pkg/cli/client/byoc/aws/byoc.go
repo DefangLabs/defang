@@ -355,7 +355,8 @@ func (b *ByocAws) checkRequiresDockerHubToken(ctx context.Context, project *comp
 
 		found, err := b.driver.CheckImageExistOnPublicECR(ctx, ecrRepo, tag)
 		if err != nil {
-			return err
+			term.Debugf("Error checking image %q on Public ECR: %v, assuming credentials needed", image, err)
+			found = false
 		}
 		if !found {
 			// TODO: Make provider stateless: This is a hack to get around the fact that we have lost
