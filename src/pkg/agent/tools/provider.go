@@ -173,7 +173,7 @@ func printStacksInfoMessage(stacks map[string]StackOption) {
 		term.Info(infoLine + "\n")
 	}
 	executable, _ := os.Executable()
-	term.Infof("To skip this prompt, run %s %s --stack=%s", filepath.Base(executable), os.Args[1], "<stack_name>")
+	term.Infof("To skip this prompt, run %s up --stack=%s", filepath.Base(executable), "<stack_name>")
 }
 
 func (pp *providerPreparer) selectStack(ctx context.Context, projectName string, useWkDir bool) (string, error) {
