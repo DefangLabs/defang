@@ -79,10 +79,12 @@ func Create(params StackParameters) (string, error) {
 
 // for shell printing for converting to string format of StackParameters
 type StackListItem struct {
-	Name     string
-	Provider string
-	Region   string
-	Mode     string
+	Name         string
+	AWSProfile   string
+	GCPProjectID string
+	Provider     string
+	Region       string
+	Mode         string
 }
 
 func List() ([]StackListItem, error) {
@@ -164,6 +166,13 @@ func Marshal(params StackParameters) (string, error) {
 	}
 	if params.Mode != modes.ModeUnspecified {
 		properties["DEFANG_MODE"] = strings.ToLower(params.Mode.String())
+	}
+
+	if params.AWSProfile != "" {
+		properties["AWS_PROFILE"] = params.AWSProfile
+	}
+	if params.GCPProjectID != "" {
+		properties["GCP_PROJECT_ID"] = params.GCPProjectID
 	}
 	return godotenv.Marshal(properties)
 }
