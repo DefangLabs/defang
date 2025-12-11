@@ -58,6 +58,7 @@ func NewDefangMCPServer(version string, client MCPClient, cli agentTools.CLIInte
 		version,
 		server.WithResourceCapabilities(true, true),
 		server.WithToolCapabilities(true),
+		server.WithElicitation(),
 		server.WithInstructions(prepareInstructions()),
 	)
 
