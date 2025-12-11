@@ -77,7 +77,7 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, projectName strin
 		return nil, nil, errors.New("stackName cannot be nil")
 	}
 	if *stackName != "" {
-		stack, err = pp.loadStack(ctx, projectName, *stackName)
+		stack, err = pp.loadStack(ctx, projectName, *stackName, useWkDir)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to load stack: %w", err)
 		}
@@ -218,10 +218,12 @@ func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Con
 		return "", fmt.Errorf("stack parameters for remote stack %q are nil", selectedStackLabel)
 	}
 
-	term.Debugf("Importing stack %s from remote", selectedStackLabel)
-	_, err = pp.sm.Create(*selectedStackOption.Parameters)
-	if err != nil {
-		return "", fmt.Errorf("failed to create local stack from remote: %w", err)
+	if useWkDir {
+		term.Debugf("Importing stack %s from remote", selectedStackLabel)
+		_, err = pp.sm.Create(*selectedStackOption.Parameters)
+		if err != nil {
+			return "", fmt.Errorf("failed to create local stack from remote: %w", err)
+		}
 	}
 
 	return selectedStackOption.Name, nil
@@ -281,10 +283,10 @@ func (pp *providerPreparer) selectOrCreateStack(ctx context.Context, projectName
 		selectedStackName = newStack.Name
 	}
 
-	return pp.loadStack(ctx, projectName, selectedStackName)
+	return pp.loadStack(ctx, projectName, selectedStackName, useWkDir)
 }
 
-func (pp *providerPreparer) loadStack(ctx context.Context, projectName, stackName string) (*stacks.StackParameters, error) {
+func (pp *providerPreparer) loadStack(ctx context.Context, projectName, stackName string, useWkDir bool) (*stacks.StackParameters, error) {
 	stack, err := pp.sm.Read(stackName)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
@@ -304,10 +306,12 @@ func (pp *providerPreparer) loadStack(ctx context.Context, projectName, stackNam
 		if stack == nil {
 			return nil, fmt.Errorf("stack %q does not exist locally or remotely", stackName)
 		}
-		term.Debugf("Importing stack %s from remote", stackName)
-		_, err = pp.sm.Create(*stack)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create local stack from remote: %w", err)
+		if useWkDir {
+			term.Debugf("Importing stack %s from remote", stackName)
+			_, err = pp.sm.Create(*stack)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create local stack from remote: %w", err)
+			}
 		}
 	}
 	term.Debugf("Loading stack %s", stackName)
