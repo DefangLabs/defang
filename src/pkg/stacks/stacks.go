@@ -144,7 +144,7 @@ func Parse(content string) (StackParameters, error) {
 	return params, nil
 }
 
-func Marshal(params StackParameters) (string, error) {
+func paramsToMap(params *StackParameters) map[string]string {
 	var properties map[string]string = make(map[string]string)
 	properties["DEFANG_PROVIDER"] = strings.ToLower(params.Provider.String())
 	if params.Region != "" {
@@ -162,6 +162,11 @@ func Marshal(params StackParameters) (string, error) {
 	if params.Mode != modes.ModeUnspecified {
 		properties["DEFANG_MODE"] = strings.ToLower(params.Mode.String())
 	}
+	return properties
+}
+
+func Marshal(params StackParameters) (string, error) {
+	properties := paramsToMap(&params)
 	return godotenv.Marshal(properties)
 }
 
@@ -205,6 +210,23 @@ func Load(name string) error {
 
 	term.Debugf("loaded globals from %s", path)
 	return nil
+}
+
+func LoadParameters(params *StackParameters) {
+	// copied from godotenv Load function with slight modification to load from StackParameters
+	currentEnv := map[string]bool{}
+	rawEnv := os.Environ()
+	for _, rawEnvLine := range rawEnv {
+		key := strings.Split(rawEnvLine, "=")[0]
+		currentEnv[key] = true
+	}
+
+	properties := paramsToMap(params)
+	for key, value := range properties {
+		if !currentEnv[key] {
+			_ = os.Setenv(key, value)
+		}
+	}
 }
 
 func PostCreateMessage(stackName string) string {

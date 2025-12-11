@@ -27,7 +27,7 @@ type ProviderCreator interface {
 type StacksManager interface {
 	Create(params stacks.StackParameters) (string, error)
 	Read(stackName string) (*stacks.StackParameters, error)
-	Load(stackName string) error
+	LoadParameters(*stacks.StackParameters)
 	List() ([]stacks.StackListItem, error)
 }
 
@@ -45,8 +45,8 @@ func (sm *stacksManager) Read(stackName string) (*stacks.StackParameters, error)
 	return stacks.Read(stackName)
 }
 
-func (sm *stacksManager) Load(stackName string) error {
-	return stacks.Load(stackName)
+func (sm *stacksManager) LoadParameters(params *stacks.StackParameters) {
+	stacks.LoadParameters(params)
 }
 
 func (sm *stacksManager) List() ([]stacks.StackListItem, error) {

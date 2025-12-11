@@ -139,10 +139,7 @@ func (m *mockStacksManager) Read(stackName string) (*stacks.StackParameters, err
 	return param, args.Error(1)
 }
 
-func (m *mockStacksManager) Load(stackName string) error {
-	args := m.Called(stackName)
-	return args.Error(0)
-}
+func (m *mockStacksManager) LoadParameters(params *stacks.StackParameters) {}
 
 func (m *mockStacksManager) List() ([]stacks.StackListItem, error) {
 	args := m.Called()
