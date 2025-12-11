@@ -176,7 +176,7 @@ func printStacksInfoMessage(stacks map[string]StackOption) {
 	term.Infof("To skip this prompt, run %s %s --stack=%s", filepath.Base(executable), os.Args[1], "<stack_name>")
 }
 
-func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Controller, projectName string, useWkDir bool) (string, error) {
+func (pp *providerPreparer) selectStack(ctx context.Context, projectName string, useWkDir bool) (string, error) {
 	stackOptions, err := pp.collectStackOptions(ctx, projectName, useWkDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to collect stack options: %w", err)
@@ -196,7 +196,7 @@ func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Con
 		stackLabels = append(stackLabels, CreateNewStack)
 	}
 
-	selectedStackLabel, err := ec.RequestEnum(ctx, "Select a stack", "stack", stackLabels)
+	selectedStackLabel, err := pp.ec.RequestEnum(ctx, "Select a stack", "stack", stackLabels)
 	if err != nil {
 		return "", fmt.Errorf("failed to elicit stack choice: %w", err)
 	}
@@ -270,7 +270,7 @@ func (pp *providerPreparer) collectPreviouslyDeployedStacks(ctx context.Context,
 }
 
 func (pp *providerPreparer) selectOrCreateStack(ctx context.Context, projectName string, useWkDir bool) (*stacks.StackParameters, error) {
-	selectedStackName, err := pp.selectStack(ctx, pp.ec, projectName, useWkDir)
+	selectedStackName, err := pp.selectStack(ctx, projectName, useWkDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select stack: %w", err)
 	}
