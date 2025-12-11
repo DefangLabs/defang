@@ -435,14 +435,16 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		// TODO: consider connecting to fabric before loading the stack
-		// so we can support loading stacks from remote
-		// Read the global flags again from any .defang files in the cwd
-		err = global.loadDotDefang(global.getStackName(cmd.Flags()))
-		if err != nil {
-			// if the stack file does not exist, continue without error, we will load it from the remote later.
-			if !errors.Is(err, os.ErrNotExist) {
-				return err
+		if !cmd.Flags().Changed("project-name") {
+			// TODO: consider connecting to fabric before loading the stack
+			// so we can support loading stacks from remote
+			// Read the global flags from the selected stack file
+			err = global.loadStackFile(global.getStackName(cmd.Flags()))
+			if err != nil {
+				// if the stack file does not exist, continue without error, we will load it from the remote later.
+				if !errors.Is(err, os.ErrNotExist) {
+					return err
+				}
 			}
 		}
 

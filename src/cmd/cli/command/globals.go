@@ -242,7 +242,7 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 }
 
 /*
-loadDotDefang loads configuration values from .defang files into environment variables.
+loadStackFile loads configuration values from .defang files into environment variables.
 
 Loading order:
 
@@ -257,7 +257,7 @@ are considered required when specified, while the general RC file is optional.
 This function also checks for conflicts between environment variables in the stack file
 and existing shell environment variables, and warns the user if any are found.
 */
-func (r *GlobalConfig) loadDotDefang(stackName string) error {
+func (r *GlobalConfig) loadStackFile(stackName string) error {
 	if stackName != "" {
 		// Check for conflicts before loading
 		err := checkEnvConflicts(stackName)
