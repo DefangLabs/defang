@@ -19,7 +19,7 @@ type ServicesParams struct {
 	common.LoaderParams
 }
 
-func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
+func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, cli CLIInterface, ec elicitations.Controller, config *StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, config.Cluster)
 	if err != nil {

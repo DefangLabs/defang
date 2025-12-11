@@ -147,7 +147,7 @@ func TestHandleDestroyTool(t *testing.T) {
 				},
 			})
 			stackName := stacks.StackParameters{Name: "test-stack"}
-			result, err := HandleDestroyTool(t.Context(), loader, mockCLI, ec, StackConfig{
+			result, err := HandleDestroyTool(t.Context(), loader, mockCLI, ec, &StackConfig{
 				Cluster:    "test-cluster",
 				ProviderID: &tt.providerID,
 				Stack:      &stackName,

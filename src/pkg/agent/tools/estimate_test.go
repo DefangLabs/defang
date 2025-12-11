@@ -212,7 +212,7 @@ func TestHandleEstimateTool(t *testing.T) {
 
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := HandleEstimateTool(t.Context(), loader, params, mockCLI, StackConfig{
+			result, err := HandleEstimateTool(t.Context(), loader, params, mockCLI, &StackConfig{
 				Cluster:    "test-cluster",
 				ProviderID: &providerID,
 			})

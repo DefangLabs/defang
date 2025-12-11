@@ -135,7 +135,7 @@ func TestHandleListConfigTool(t *testing.T) {
 			})
 
 			stackName := stacks.StackParameters{Name: "test-stack"}
-			result, err := HandleListConfigTool(t.Context(), loader, mockCLI, ec, StackConfig{
+			result, err := HandleListConfigTool(t.Context(), loader, mockCLI, ec, &StackConfig{
 				Cluster:    "test-cluster",
 				ProviderID: &tt.providerID,
 				Stack:      &stackName,

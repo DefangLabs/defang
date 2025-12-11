@@ -180,7 +180,7 @@ func TestHandleDeployTool(t *testing.T) {
 				},
 			})
 			stackName := stacks.StackParameters{Name: "test-stack"}
-			result, err := HandleDeployTool(t.Context(), loader, mockCLI, ec, StackConfig{
+			result, err := HandleDeployTool(t.Context(), loader, mockCLI, ec, &StackConfig{
 				Cluster:    "test-cluster",
 				ProviderID: &providerID,
 				Stack:      &stackName,

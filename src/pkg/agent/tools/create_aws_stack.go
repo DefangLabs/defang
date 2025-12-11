@@ -11,13 +11,13 @@ import (
 
 type CreateAWSStackParams struct {
 	common.LoaderParams
-	Stack       *string `json:"stack" jsonschema:"description=The name of the stack to use for all tool calls."`
+	Name        *string `json:"stack" jsonschema:"description=The name of the stack to use for all tool calls."`
 	Region      *string `json:"region" jsonschema:"description=The AWS region to create the stack in."`
 	AWS_Profile *string `json:"aws_profile" jsonschema:"description=The AWS profile to use when creating the stack."`
 	Mode        *string `json:"mode" jsonschema:"description=The deployment mode for the stack."`
 }
 
-func HandleCreateAWSStackTool(ctx context.Context, loader cliClient.ProjectLoader, cli CLIInterface, params CreateAWSStackParams, sc StackConfig) (string, error) {
+func HandleCreateAWSStackTool(ctx context.Context, loader cliClient.ProjectLoader, cli CLIInterface, params CreateAWSStackParams, sc *StackConfig) (string, error) {
 
 	mode, err := modes.Parse(*params.Mode)
 	if err != nil {
@@ -25,7 +25,7 @@ func HandleCreateAWSStackTool(ctx context.Context, loader cliClient.ProjectLoade
 	}
 
 	newStack := stacks.StackParameters{
-		Name:       *params.Stack,
+		Name:       *params.Name,
 		AWSProfile: *params.AWS_Profile,
 		Provider:   cliClient.ProviderAWS,
 		Region:     *params.Region,

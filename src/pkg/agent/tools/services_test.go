@@ -269,7 +269,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				},
 			})
 			stackName := stacks.StackParameters{Name: "test-stack"}
-			result, err := HandleServicesTool(t.Context(), loader, tt.mockCLI, ec, StackConfig{
+			result, err := HandleServicesTool(t.Context(), loader, tt.mockCLI, ec, &StackConfig{
 				Cluster:    "test-cluster",
 				ProviderID: &tt.providerId,
 				Stack:      &stackName,

@@ -248,7 +248,7 @@ func TestHandleSetConfig(t *testing.T) {
 				},
 			})
 			stackName := stacks.StackParameters{Name: "test-stack"}
-			result, err := HandleSetConfig(t.Context(), loader, params, tt.mockCLI, ec, StackConfig{
+			result, err := HandleSetConfig(t.Context(), loader, params, tt.mockCLI, ec, &StackConfig{
 				Cluster:    tt.cluster,
 				ProviderID: &tt.providerId,
 				Stack:      &stackName,
