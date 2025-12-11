@@ -562,8 +562,9 @@ func setupMocks(t *testing.T, tc TestCase, ctx context.Context, projectName stri
 	}
 
 	// For new stack creation scenarios, need to mock the final loadStack calls
+	// Only when useWkDir=true, since ephemeral stacks (useWkDir=false) skip loadStack
 	expectedStack := createTestStackParameters(tc.expectedStackName, tc.expectedProvider, tc.expectedRegion)
-	if tc.expectNewStackCreated {
+	if tc.expectNewStackCreated && tc.useWkDir {
 		mockSM.On("Read", tc.expectedStackName).Return(expectedStack, nil)
 		mockSM.On("Load", tc.expectedStackName).Return(nil)
 	}

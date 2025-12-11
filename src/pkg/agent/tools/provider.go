@@ -76,22 +76,31 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, projectName strin
 	if stackName == nil {
 		return nil, nil, errors.New("stackName cannot be nil")
 	}
-	if *stackName != "" {
-		stack, err = pp.loadStack(ctx, projectName, *stackName, useWkDir)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to load stack: %w", err)
-		}
-	} else {
+	if *stackName == "" {
 		stack, err = pp.selectOrCreateStack(ctx, projectName, useWkDir)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to setup stack: %w", err)
 		}
 		*stackName = stack.Name
+	} else {
+		stack, err = pp.getStackParameters(ctx, projectName, *stackName, useWkDir)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to load stack: %w", err)
+		}
 	}
 
+	term.Debugf("Loading stack params %v", stack)
+	pp.sm.LoadParameters(stack)
 	err = providerID.Set(stack.Provider.Name())
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to set provider ID: %w", err)
+	}
+
+	if useWkDir {
+		_, err = pp.sm.Create(*stack)
+		if err != nil {
+			term.Warnf("Failed to create stackfile: %v", err)
+		}
 	}
 
 	err = pp.setupProviderAuthentication(ctx, providerID)
@@ -176,13 +185,13 @@ func printStacksInfoMessage(stacks map[string]StackOption) {
 	term.Infof("To skip this prompt, run %s up --stack=%s", filepath.Base(executable), "<stack_name>")
 }
 
-func (pp *providerPreparer) selectStack(ctx context.Context, projectName string, useWkDir bool) (string, error) {
+func (pp *providerPreparer) selectStack(ctx context.Context, projectName string, useWkDir bool) (*StackOption, error) {
 	stackOptions, err := pp.collectStackOptions(ctx, projectName, useWkDir)
 	if err != nil {
-		return "", fmt.Errorf("failed to collect stack options: %w", err)
+		return nil, fmt.Errorf("failed to collect stack options: %w", err)
 	}
 	if len(stackOptions) == 0 {
-		return CreateNewStack, nil
+		return &StackOption{Name: CreateNewStack}, nil
 	}
 
 	printStacksInfoMessage(stackOptions)
@@ -198,35 +207,35 @@ func (pp *providerPreparer) selectStack(ctx context.Context, projectName string,
 
 	selectedStackLabel, err := pp.ec.RequestEnum(ctx, "Select a stack", "stack", stackLabels)
 	if err != nil {
-		return "", fmt.Errorf("failed to elicit stack choice: %w", err)
+		return nil, fmt.Errorf("failed to elicit stack choice: %w", err)
 	}
 
 	// Handle special case where user selects "Create new stack"
 	if selectedStackLabel == CreateNewStack {
-		return CreateNewStack, nil
+		return &StackOption{Name: CreateNewStack}, nil
 	}
 
 	selectedStackOption, ok := stackOptions[selectedStackLabel]
 	if !ok {
-		return "", fmt.Errorf("selected stack label %q not found in stack options map", selectedStackLabel)
+		return nil, fmt.Errorf("selected stack label %q not found in stack options map", selectedStackLabel)
 	}
 	if selectedStackOption.Local {
-		return selectedStackOption.Name, nil
+		return &selectedStackOption, nil
 	}
 
 	if selectedStackOption.Parameters == nil {
-		return "", fmt.Errorf("stack parameters for remote stack %q are nil", selectedStackLabel)
+		return nil, fmt.Errorf("stack parameters for remote stack %q are nil", selectedStackLabel)
 	}
 
 	if useWkDir {
 		term.Debugf("Importing stack %s from remote", selectedStackLabel)
 		_, err = pp.sm.Create(*selectedStackOption.Parameters)
 		if err != nil {
-			return "", fmt.Errorf("failed to create local stack from remote: %w", err)
+			return nil, fmt.Errorf("failed to create local stack from remote: %w", err)
 		}
 	}
 
-	return selectedStackOption.Name, nil
+	return &selectedStackOption, nil
 }
 
 type ExistingStack struct {
@@ -274,59 +283,60 @@ func (pp *providerPreparer) collectPreviouslyDeployedStacks(ctx context.Context,
 }
 
 func (pp *providerPreparer) selectOrCreateStack(ctx context.Context, projectName string, useWkDir bool) (*stacks.StackParameters, error) {
-	selectedStackName, err := pp.selectStack(ctx, projectName, useWkDir)
+	selectedStack, err := pp.selectStack(ctx, projectName, useWkDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select stack: %w", err)
 	}
 
-	if selectedStackName == CreateNewStack {
+	if selectedStack.Name == CreateNewStack {
 		newStack, err := pp.createNewStack(ctx, useWkDir)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new stack: %w", err)
 		}
-		selectedStackName = newStack.Name
+		return newStack, nil
 	}
 
-	return pp.loadStack(ctx, projectName, selectedStackName, useWkDir)
+	return selectedStack.Parameters, nil
 }
 
-func (pp *providerPreparer) loadStack(ctx context.Context, projectName, stackName string, useWkDir bool) (*stacks.StackParameters, error) {
+func (pp *providerPreparer) getStackParameters(ctx context.Context, projectName, stackName string, useWkDir bool) (*stacks.StackParameters, error) {
+	if !useWkDir {
+		return pp.importRemoteStack(ctx, projectName, stackName)
+	}
+
 	stack, err := pp.sm.Read(stackName)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("failed to read stack: %w", err)
 		}
-		// call collectExistingStacks to see if it exists remotely
-		existingStacks, err := pp.collectPreviouslyDeployedStacks(ctx, projectName)
+		stack, err = pp.importRemoteStack(ctx, projectName, stackName)
 		if err != nil {
-			return nil, fmt.Errorf("failed to collect existing stacks: %w", err)
-		}
-		for _, existingStack := range existingStacks {
-			if existingStack.Name == stackName {
-				stack = &existingStack.StackParameters
-				break
-			}
+			return nil, fmt.Errorf("failed to import remote stack: %w", err)
 		}
 		if stack == nil {
 			return nil, fmt.Errorf("stack %q does not exist locally or remotely", stackName)
 		}
-		if useWkDir {
-			term.Debugf("Importing stack %s from remote", stackName)
-			_, err = pp.sm.Create(*stack)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create local stack from remote: %w", err)
-			}
-		}
+		return stack, nil
 	}
-	term.Debugf("Loading stack %s", stackName)
-	err = pp.sm.Load(stackName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load stack: %w", err)
-	}
+
 	return stack, nil
 }
 
-func (pp *providerPreparer) createNewStack(ctx context.Context, useWkDir bool) (*stacks.StackListItem, error) {
+func (pp *providerPreparer) importRemoteStack(ctx context.Context, projectName, stackName string) (*stacks.StackParameters, error) {
+	existingStacks, err := pp.collectPreviouslyDeployedStacks(ctx, projectName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect existing stacks: %w", err)
+	}
+	for _, existingStack := range existingStacks {
+		if existingStack.Name == stackName {
+			return &existingStack.StackParameters, nil
+		}
+	}
+
+	return nil, fmt.Errorf("stack %q does not exist remotely", stackName)
+}
+
+func (pp *providerPreparer) createNewStack(ctx context.Context, useWkDir bool) (*stacks.StackParameters, error) {
 	var providerNames []string
 	for _, p := range cliClient.AllProviders() {
 		providerNames = append(providerNames, p.Name())
@@ -374,11 +384,7 @@ func (pp *providerPreparer) createNewStack(ctx context.Context, useWkDir bool) (
 		}
 	}
 
-	return &stacks.StackListItem{
-		Name:     name,
-		Provider: providerID.Name(),
-		Region:   region,
-	}, nil
+	return &params, nil
 }
 
 func (pp *providerPreparer) setupProviderAuthentication(ctx context.Context, providerId cliClient.ProviderID) error {
