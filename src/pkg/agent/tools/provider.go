@@ -516,6 +516,10 @@ func listAWSProfiles() ([]string, error) {
 				profiles[section] = struct{}{}
 			}
 		}
+		if err := scanner.Err(); err != nil {
+			f.Close()
+			return nil, fmt.Errorf("error reading %s: %w", file, err)
+		}
 		f.Close()
 	}
 
