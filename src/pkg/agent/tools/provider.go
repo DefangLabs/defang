@@ -24,10 +24,40 @@ type ProviderCreator interface {
 	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient, stack string) cliClient.Provider
 }
 
+type StacksManager interface {
+	Create(params stacks.StackParameters) (string, error)
+	Read(stackName string) (*stacks.StackParameters, error)
+	Load(stackName string) error
+	List() ([]stacks.StackListItem, error)
+}
+
+type stacksManager struct{}
+
+func NewStacksManager() *stacksManager {
+	return &stacksManager{}
+}
+
+func (sm *stacksManager) Create(params stacks.StackParameters) (string, error) {
+	return stacks.Create(params)
+}
+
+func (sm *stacksManager) Read(stackName string) (*stacks.StackParameters, error) {
+	return stacks.Read(stackName)
+}
+
+func (sm *stacksManager) Load(stackName string) error {
+	return stacks.Load(stackName)
+}
+
+func (sm *stacksManager) List() ([]stacks.StackListItem, error) {
+	return stacks.List()
+}
+
 type providerPreparer struct {
 	pc ProviderCreator
 	ec elicitations.Controller
 	fc cliClient.FabricClient
+	sm StacksManager
 }
 
 func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc cliClient.FabricClient) *providerPreparer {
@@ -35,6 +65,7 @@ func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc cliC
 		pc: pc,
 		ec: ec,
 		fc: fc,
+		sm: NewStacksManager(),
 	}
 }
 
@@ -98,7 +129,7 @@ func (pp *providerPreparer) collectStackOptions(ctx context.Context, projectName
 	}
 
 	if useWkDir {
-		localStackList, err := stacks.List()
+		localStackList, err := pp.sm.List()
 		if err != nil {
 			return nil, fmt.Errorf("failed to list stacks: %w", err)
 		}
@@ -188,7 +219,7 @@ func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Con
 	}
 
 	term.Debugf("Importing stack %s from remote", selectedStackLabel)
-	_, err = stacks.Create(*selectedStackOption.Parameters)
+	_, err = pp.sm.Create(*selectedStackOption.Parameters)
 	if err != nil {
 		return "", fmt.Errorf("failed to create local stack from remote: %w", err)
 	}
@@ -254,7 +285,7 @@ func (pp *providerPreparer) selectOrCreateStack(ctx context.Context, projectName
 }
 
 func (pp *providerPreparer) loadStack(ctx context.Context, projectName, stackName string) (*stacks.StackParameters, error) {
-	stack, err := stacks.Read(stackName)
+	stack, err := pp.sm.Read(stackName)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("failed to read stack: %w", err)
@@ -274,13 +305,13 @@ func (pp *providerPreparer) loadStack(ctx context.Context, projectName, stackNam
 			return nil, fmt.Errorf("stack %q does not exist locally or remotely", stackName)
 		}
 		term.Debugf("Importing stack %s from remote", stackName)
-		_, err = stacks.Create(*stack)
+		_, err = pp.sm.Create(*stack)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create local stack from remote: %w", err)
 		}
 	}
 	term.Debugf("Loading stack %s", stackName)
-	err = stacks.Load(stackName)
+	err = pp.sm.Load(stackName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load stack: %w", err)
 	}
@@ -329,7 +360,7 @@ func (pp *providerPreparer) createNewStack(ctx context.Context, useWkDir bool) (
 	}
 	if useWkDir {
 		term.Debugf("Creating stack %s", name)
-		_, err = stacks.Create(params)
+		_, err = pp.sm.Create(params)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create stack: %w", err)
 		}
