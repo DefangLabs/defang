@@ -289,7 +289,7 @@ func (pp *providerPreparer) selectOrCreateStack(ctx context.Context, projectName
 	}
 
 	if selectedStack.Name == CreateNewStack {
-		newStack, err := pp.createNewStack(ctx, useWkDir)
+		newStack, err := pp.promptForStackParameters(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new stack: %w", err)
 		}
@@ -345,7 +345,7 @@ func (pp *providerPreparer) importRemoteStack(ctx context.Context, projectName, 
 	return nil, fmt.Errorf("stack %q does not exist remotely", stackName)
 }
 
-func (pp *providerPreparer) createNewStack(ctx context.Context, useWkDir bool) (*stacks.StackParameters, error) {
+func (pp *providerPreparer) promptForStackParameters(ctx context.Context) (*stacks.StackParameters, error) {
 	var providerNames []string
 	for _, p := range cliClient.AllProviders() {
 		providerNames = append(providerNames, p.Name())
@@ -384,13 +384,6 @@ func (pp *providerPreparer) createNewStack(ctx context.Context, useWkDir bool) (
 		Provider: providerID,
 		Region:   region,
 		Name:     name,
-	}
-	if useWkDir {
-		term.Debugf("Creating stack %s", name)
-		_, err = pp.sm.Create(params)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create stack: %w", err)
-		}
 	}
 
 	return &params, nil
