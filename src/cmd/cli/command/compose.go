@@ -83,7 +83,7 @@ func makeComposeUpCmd() *cobra.Command {
 					return err
 				}
 
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack.Name)
 				if err != nil {
 					return err
 				}
@@ -113,7 +113,7 @@ func makeComposeUpCmd() *cobra.Command {
 				term.Debugf("AccountInfo failed: %v", err)
 			} else if len(resp.Deployments) > 0 {
 				handleExistingDeployments(resp.Deployments, accountInfo, project.Name)
-			} else if global.Stack == "" {
+			} else if global.Stack.Name == "" {
 				promptToCreateStack(stacks.StackParameters{
 					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
 					Provider: accountInfo.Provider,
@@ -134,14 +134,14 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			deploy, project, err := cli.ComposeUp(ctx, global.Client, provider, cli.ComposeUpParams{
-				Stack:      global.Stack,
+				Stack:      global.Stack.Name,
 				Project:    project,
 				UploadMode: upload,
 				Mode:       global.Mode,
 			})
 			if err != nil {
 				composeErr := err
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack.Name)
 				if err != nil {
 					return err
 				}
@@ -170,7 +170,7 @@ func makeComposeUpCmd() *cobra.Command {
 			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
 				deploymentErr := err
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack.Name)
 				if err != nil {
 					term.Warn("Failed to initialize debugger:", err)
 					return deploymentErr
@@ -179,7 +179,7 @@ func makeComposeUpCmd() *cobra.Command {
 					Deployment: deploy.Etag,
 					Project:    project,
 					ProviderID: &global.ProviderID,
-					Stack:      &global.Stack,
+					Stack:      &global.Stack.Name,
 					Since:      since,
 					Until:      time.Now(),
 				})
@@ -226,7 +226,7 @@ func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accou
 	if err := confirmDeploymentToNewLocation(projectName, existingDeployments); err != nil {
 		return err
 	}
-	if global.Stack == "" {
+	if global.Stack.Name == "" {
 		stackName := "beta"
 		_, err := stacks.Create(stacks.StackParameters{
 			Name:     stackName,
@@ -545,7 +545,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack.Name)
 				if err != nil {
 					term.Warn("Failed to initialize debugger:", err)
 					return loadErr
@@ -564,7 +564,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				Project:    project,
 				UploadMode: compose.UploadModeIgnore,
 				Mode:       modes.ModeUnspecified,
-				Stack:      global.Stack,
+				Stack:      global.Stack.Name,
 			})
 			if !errors.Is(err, dryrun.ErrDryRun) {
 				return err

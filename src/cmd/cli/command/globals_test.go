@@ -55,9 +55,9 @@ func Test_configurationPrecedence(t *testing.T) {
 		ProviderID:     cliClient.ProviderAuto,
 		SourcePlatform: migrate.SourcePlatformUnspecified,
 		Verbose:        false,
-		Stack:          "",
-		Cluster:        "",
-		Org:            "",
+		// Stack:          stacks.StackParameters{},
+		Cluster: "",
+		Org:     "",
 	}
 
 	type stack struct {
@@ -119,10 +119,10 @@ func Test_configurationPrecedence(t *testing.T) {
 				"non-interactive": "false",
 			},
 			expected: GlobalConfig{
-				Mode:           modes.ModeHighAvailability,
-				Verbose:        false,
-				Debug:          true,
-				Stack:          "from-flags",
+				Mode:    modes.ModeHighAvailability,
+				Verbose: false,
+				Debug:   true,
+				// Stack:          "from-flags",
 				Cluster:        "from-flags-cluster",
 				ProviderID:     cliClient.ProviderAWS,
 				Org:            "from-flags-org",
@@ -167,10 +167,10 @@ func Test_configurationPrecedence(t *testing.T) {
 				"DEFANG_HIDE_UPDATE":     "false",
 			},
 			expected: GlobalConfig{
-				Mode:           modes.ModeBalanced,
-				Verbose:        true,
-				Debug:          false,
-				Stack:          "from-env",
+				Mode:    modes.ModeBalanced,
+				Verbose: true,
+				Debug:   false,
+				// Stack:          "from-env",
 				Cluster:        "from-env-cluster",
 				ProviderID:     cliClient.ProviderGCP,
 				Org:            "from-env-org",
@@ -202,10 +202,10 @@ func Test_configurationPrecedence(t *testing.T) {
 				},
 			},
 			expected: GlobalConfig{
-				Mode:           modes.ModeAffordable, // env file values
-				Verbose:        true,
-				Debug:          false,
-				Stack:          "from-env",
+				Mode:    modes.ModeAffordable, // env file values
+				Verbose: true,
+				Debug:   false,
+				// Stack:          "from-env",
 				Cluster:        "from-env-cluster",
 				ProviderID:     cliClient.ProviderDefang,
 				Org:            "from-env-org",
@@ -253,7 +253,7 @@ func Test_configurationPrecedence(t *testing.T) {
 
 			// simulate SetupCommands()
 			flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
-			flags.StringVarP(&testConfig.Stack, "stack", "s", testConfig.Stack, "stack name (for BYOC providers)")
+			// flags.StringVarP(&testConfig.Stack, "stack", "s", testConfig.Stack, "stack name (for BYOC providers)")
 			flags.Var(&testConfig.ColorMode, "color", "colorize output")
 			flags.StringVar(&testConfig.Cluster, "cluster", testConfig.Cluster, "Defang cluster to connect to")
 			flags.StringVar(&testConfig.Org, "org", testConfig.Org, "override GitHub organization name (tenant)")

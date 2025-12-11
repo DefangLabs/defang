@@ -170,7 +170,7 @@ var cdPreviewCmd = &cobra.Command{
 			Mode:       global.Mode,
 			Project:    project,
 			UploadMode: compose.UploadModePreview,
-			Stack:      global.Stack,
+			Stack:      global.Stack.Name,
 		})
 	},
 }
@@ -204,7 +204,7 @@ var cdCloudformationCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Hidden:      true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		provider := aws.NewByocProvider(cmd.Context(), global.Client.GetTenantName(), global.Stack)
+		provider := aws.NewByocProvider(cmd.Context(), global.Client.GetTenantName(), global.Stack.Name)
 
 		if err := canIUseProvider(cmd.Context(), provider, "", 0); err != nil {
 			return err

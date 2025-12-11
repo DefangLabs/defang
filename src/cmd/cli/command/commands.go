@@ -153,7 +153,7 @@ func SetupCommands(ctx context.Context, version string) {
 	cobra.EnableTraverseRunHooks = true // we always need to run the RootCmd's pre-run hook
 
 	RootCmd.Version = version
-	RootCmd.PersistentFlags().StringVarP(&global.Stack, "stack", "s", global.Stack, "stack name (for BYOC providers)")
+	RootCmd.PersistentFlags().StringVarP(&global.Stack.Name, "stack", "s", global.Stack.Name, "stack name (for BYOC providers)")
 	RootCmd.RegisterFlagCompletionFunc("stack", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		stacks, err := stacks.List()
 		if err != nil {
@@ -481,7 +481,7 @@ var RootCmd = &cobra.Command{
 		}
 
 		prompt := "Welcome to Defang. I can help you deploy your project to the cloud."
-		ag, err := agent.New(ctx, getCluster(), &global.ProviderID, &global.Stack)
+		ag, err := agent.New(ctx, getCluster(), &global.ProviderID, &global.Stack.Name)
 		if err != nil {
 			return err
 		}
@@ -954,7 +954,7 @@ var debugCmd = &cobra.Command{
 			return err
 		}
 
-		debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+		debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack.Name)
 		if err != nil {
 			return err
 		}
@@ -1300,7 +1300,7 @@ func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 		return nil, err
 	}
 
-	provider := cli.NewProvider(ctx, global.ProviderID, global.Client, global.Stack)
+	provider := cli.NewProvider(ctx, global.ProviderID, global.Client, global.Stack.Name)
 	return provider, nil
 }
 
@@ -1314,7 +1314,7 @@ func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient
 }
 
 func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string, serviceCount int) error {
-	return cliClient.CanIUseProvider(ctx, global.Client, provider, projectName, global.Stack, serviceCount)
+	return cliClient.CanIUseProvider(ctx, global.Client, provider, projectName, global.Stack.Name, serviceCount)
 }
 
 func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, error) {

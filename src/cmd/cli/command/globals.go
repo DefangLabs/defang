@@ -80,7 +80,7 @@ type GlobalConfig struct {
 	Org            string
 	ProviderID     cliClient.ProviderID
 	SourcePlatform migrate.SourcePlatform // only used for 'defang init' command
-	Stack          string
+	Stack          stacks.StackParameters
 	Verbose        bool
 }
 
@@ -113,11 +113,11 @@ which will result in loading only the general .defang file.
 func (r *GlobalConfig) getStackName(flags *pflag.FlagSet) string {
 	if !flags.Changed("stack") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_STACK"); ok {
-			r.Stack = fromEnv
+			r.Stack.Name = fromEnv
 		}
 	}
 
-	return r.Stack
+	return r.Stack.Name
 }
 
 /*
@@ -163,7 +163,7 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 	var err error
 
 	// called once more in case stack name was changed by an RC file
-	r.Stack = r.getStackName(flags)
+	r.Stack.Name = r.getStackName(flags)
 
 	if !flags.Changed("verbose") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_VERBOSE"); ok {
