@@ -86,6 +86,17 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 				return HandleSelectStackTool(ctx.Context, loader, cli, params, config)
 			},
 		),
+		ai.NewTool("create_aws_stack",
+			"Create a defang stack file to deploy to AWS",
+			func(ctx *ai.ToolContext, params CreateAWSStackParams) (string, error) {
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
+				if err != nil {
+					return "Failed to configure loader", err
+				}
+				cli := &DefaultToolCLI{}
+				return HandleCreateAWSStackTool(ctx.Context, loader, cli, params, config)
+			},
+		),
 		ai.NewTool("remove_config",
 			"Remove a config variable from the defang project",
 			func(ctx *ai.ToolContext, params RemoveConfigParams) (string, error) {
