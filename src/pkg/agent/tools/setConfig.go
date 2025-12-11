@@ -21,7 +21,7 @@ func HandleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, sc.Cluster)
 	if err != nil {
-		return "", fmt.Errorf("Could not connect: %w", err)
+		return "", fmt.Errorf("could not connect: %w", err)
 	}
 
 	pp := NewProviderPreparer(cli, ec, client)

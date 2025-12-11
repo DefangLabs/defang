@@ -20,7 +20,7 @@ func HandleListConfigTool(ctx context.Context, loader cliClient.ProjectLoader, c
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, sc.Cluster)
 	if err != nil {
-		return "", fmt.Errorf("Could not connect: %w", err)
+		return "", fmt.Errorf("could not connect: %w", err)
 	}
 
 	projectName, err := cli.LoadProjectName(ctx, loader)

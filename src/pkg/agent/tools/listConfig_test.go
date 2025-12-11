@@ -68,7 +68,7 @@ func TestHandleListConfigTool(t *testing.T) {
 			setupMock: func(m *MockListConfigCLI) {
 				m.ConnectError = errors.New("connection failed")
 			},
-			expectedError: "Could not connect: connection failed",
+			expectedError: "could not connect: connection failed",
 		},
 		{
 			name:       "load_project_name_error",

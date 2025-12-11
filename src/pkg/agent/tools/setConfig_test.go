@@ -161,7 +161,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:          map[string]interface{}{"name": testConfigName, "value": testValue},
 			mockCLI:              &MockSetConfigCLI{ConnectError: errors.New("connection failed")},
 			expectedError:        true,
-			errorMessage:         "Could not connect: connection failed",
+			errorMessage:         "could not connect: connection failed",
 			expectedConnectCalls: true,
 		},
 		{

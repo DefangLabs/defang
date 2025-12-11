@@ -72,7 +72,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				m.ConnectError = errors.New("connection failed")
 			},
 			expectError:   true,
-			expectedError: "Could not connect: connection failed",
+			expectedError: "could not connect: connection failed",
 		},
 		{
 			name:       "load_project_name_error",
