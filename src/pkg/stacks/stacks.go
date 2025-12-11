@@ -15,10 +15,12 @@ import (
 )
 
 type StackParameters struct {
-	Name     string
-	Provider client.ProviderID
-	Region   string
-	Mode     modes.Mode
+	Name         string
+	Provider     client.ProviderID
+	Region       string
+	AWSProfile   string
+	GCPProjectID string
+	Mode         modes.Mode
 }
 
 var validStackName = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
@@ -75,6 +77,7 @@ func Create(params StackParameters) (string, error) {
 	return filename, nil
 }
 
+// for shell printing for converting to string format of StackParameters
 type StackListItem struct {
 	Name     string
 	Provider string
