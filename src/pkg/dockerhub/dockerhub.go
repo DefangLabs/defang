@@ -125,7 +125,7 @@ func ValidateCredsWithRepo(user, pass string, repo string) error {
 	if resp.StatusCode == 200 {
 		return nil
 	}
-	return fmt.Errorf("failed to access repo: status %d", resp.StatusCode)
+	return fmt.Errorf("failed to access repo: status %d : %v", resp.StatusCode, bb.String())
 }
 
 type CreatePATRequest struct {
