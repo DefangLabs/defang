@@ -53,23 +53,12 @@ func NewDefangMCPServer(version string, client MCPClient, cli agentTools.CLIInte
 		return nil, fmt.Errorf("failed to setup knowledge base: %w", err)
 	}
 
-	var clientCapabilities *mcp.ServerCapabilities
-
 	s := server.NewMCPServer(
 		"Deploy with Defang",
 		version,
 		server.WithResourceCapabilities(true, true),
 		server.WithToolCapabilities(true),
 		server.WithInstructions(prepareInstructions()),
-		server.WithElicitation(),
-		server.WithHooks(&server.Hooks{
-			OnAfterInitialize: []server.OnAfterInitializeFunc{
-				func(ctx context.Context, id any, message *mcp.InitializeRequest, result *mcp.InitializeResult) {
-					term.Debug("MCP Server initialized")
-					*clientCapabilities = result.Capabilities
-				},
-			},
-		}),
 	)
 
 	resources.SetupResources(s)
