@@ -2,6 +2,8 @@ package command
 
 import (
 	"os"
+	"path/filepath"
+	"sort"
 	"strconv"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -10,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/joho/godotenv"
 	"github.com/spf13/pflag"
 )
 
@@ -250,12 +253,61 @@ Important: RC files have the lowest priority in the configuration hierarchy.
 They will NOT override environment variables that are already set, since
 godotenv.Load respects existing environment variables. Stack-specific RC files
 are considered required when specified, while the general RC file is optional.
+
+This function also checks for conflicts between environment variables in the stack file
+and existing shell environment variables, and warns the user if any are found.
 */
 func (r *GlobalConfig) loadDotDefang(stackName string) error {
 	if stackName != "" {
-		// If a stack name is provided, load the stack-specific RC file but return error if it fails or does not exist
+		// Check for conflicts before loading
+		err := checkEnvConflicts(stackName)
+		if err != nil {
+			return err
+		}
+
 		return stacks.Load(stackName) // ensure stack exists
 	}
 
+	return nil
+}
+
+/*
+checkEnvConflicts reads the stack file and checks if any environment variables
+in the file conflict with existing shell environment variables. If conflicts are
+found, it warns the user that the shell environment variable will take precedence.
+*/
+func checkEnvConflicts(stackName string) error {
+
+	path, err := filepath.Abs(filepath.Join(stacks.Directory, stackName))
+	if err != nil {
+		return err
+	}
+
+	// Read the stack file
+	stackEnv, err := godotenv.Read(path)
+	if err != nil {
+		// If we can't read the file, the subsequent stacks.Load which calls godotenv.Load will not work either
+		return err
+	}
+
+	// Check for conflicts with existing shell environment
+	var conflicts []string
+	for key, stackValue := range stackEnv {
+		if shellValue, ok := os.LookupEnv(key); ok && shellValue != stackValue {
+			conflicts = append(conflicts, key)
+		}
+	}
+
+	// Warn about conflicts
+	if len(conflicts) > 0 {
+		// Sort conflicts for deterministic output
+		sort.Strings(conflicts)
+
+		term.Warnf("Some variables from the stack file %q are overridden by your shell environment.", stackName)
+		for _, key := range conflicts {
+			term.Printf("  %s=%q\n", key, os.Getenv(key))
+		}
+		term.Println("Unset these variables in your shell to use stack values instead.")
+	}
 	return nil
 }

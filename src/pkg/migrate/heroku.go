@@ -273,10 +273,15 @@ func (h *HerokuClient) GetPGInfo(ctx context.Context, addonID string) (PGInfo, e
 	return herokuGet[PGInfo](ctx, h, url)
 }
 
+// herokuGet performs an HTTP GET to the given URL using the HerokuClient's token,
+// decodes the JSON response into a value of type T, and returns that value.
+// The request uses the provided context and sets Heroku-specific Accept and
+// Content-Type headers. If the response status is >= 400 or the body cannot
+// be decoded as JSON, an error is returned describing the failure.
 func herokuGet[T any](ctx context.Context, h *HerokuClient, url string) (T, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return *new(T), fmt.Errorf("failed to create request: %v", err)
+		return *new(T), fmt.Errorf("failed to create request: %w", err)
 	}
 
 	// Set headers
@@ -301,7 +306,7 @@ func herokuGet[T any](ctx context.Context, h *HerokuClient, url string) (T, erro
 	var data T
 	decoder := json.NewDecoder(resp.Body)
 	if err := decoder.Decode(&data); err != nil {
-		return *new(T), fmt.Errorf("failed to unmarshal JSON: %v", err)
+		return *new(T), fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
 
 	return data, nil
@@ -328,10 +333,17 @@ func authenticateHerokuCLI() error {
 	return nil
 }
 
+// getHerokuAuthTokenFromCLI obtains a short-lived Heroku API token by invoking the local Heroku CLI.
+// 
+// It checks that the `heroku` executable is available, ensures the CLI is authenticated, runs
+// `heroku authorizations:create --expires-in=300 --json`, and parses the resulting JSON for the token.
+// 
+// The returned string is the extracted access token. An error is returned if the CLI is not installed,
+// authentication fails, the command cannot be executed, or the command output cannot be parsed.
 func getHerokuAuthTokenFromCLI() (string, error) {
 	_, err := exec.LookPath("heroku")
 	if err != nil {
-		return "", fmt.Errorf("Heroku CLI is not installed: %v", err)
+		return "", fmt.Errorf("Heroku CLI is not installed: %w", err)
 	}
 	term.Info("The Heroku CLI is installed, we'll use it to generate a short-lived authorization token")
 	err = authenticateHerokuCLI()

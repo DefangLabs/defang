@@ -772,8 +772,8 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 		if b.driver.LogGroupARN == "" {
 			term.Debug("CD stack LogGroupARN is not set; skipping CD logs")
 		} else {
-			cdTail := cw.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern} // TODO: filter by etag
-			// If we know the CD task ARN, only tail the logstream for that CD task
+			cdTail := cw.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern}
+			// If we know the CD task ARN, only tail the logstream for that CD task; FIXME: store the task ID in the project's ProjectUpdate in S3 and use that
 			if b.cdTaskArn != nil && b.cdEtag == etag {
 				cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.cdTaskArn))}
 			}
