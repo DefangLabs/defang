@@ -1269,7 +1269,6 @@ func updateProviderID(ctx context.Context) error {
 
 	switch global.ProviderID {
 	case cliClient.ProviderAuto:
-		// Defaults to defang provider in non-interactive mode
 		if awsInEnv() {
 			term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")
 		}
