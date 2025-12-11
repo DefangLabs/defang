@@ -8,7 +8,9 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,7 +24,6 @@ type MockSetConfigCLI struct {
 	NewProviderCalled     bool
 	LoadProjectNameCalled bool
 	ConfigSetCalled       bool
-	ReturnedGrpcClient    *client.GrpcClient
 	ReturnedProvider      client.Provider
 	ReturnedProjectName   string
 	ConfigSetProjectName  string
@@ -31,16 +32,12 @@ type MockSetConfigCLI struct {
 	ConfigSetValue        string
 }
 
-func (m *MockSetConfigCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
+func (m *MockSetConfigCLI) Connect(ctx context.Context, cluster string) (client.FabricClient, error) {
 	m.ConnectCalled = true
 	if m.ConnectError != nil {
 		return nil, m.ConnectError
 	}
-	if m.ReturnedGrpcClient == nil {
-		// Return a non-nil client to avoid nil pointer issues
-		m.ReturnedGrpcClient = &client.GrpcClient{}
-	}
-	return m.ReturnedGrpcClient, nil
+	return mockFC, nil
 }
 
 func (m *MockSetConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabricClient client.FabricClient, stack string) client.Provider {
@@ -83,6 +80,7 @@ func (m *MockSetConfigCLI) ConfigSet(ctx context.Context, projectName string, pr
 }
 
 func TestHandleSetConfig(t *testing.T) {
+	mockFC = &mockFabricClient{}
 	// Common test data
 	const (
 		testCluster    = "test-cluster"
@@ -246,6 +244,18 @@ func TestHandleSetConfig(t *testing.T) {
 				},
 			})
 			stackName := "test-stack"
+			mockFC.On("ListDeployments", mock.Anything, mock.Anything).Return(&defangv1.ListDeploymentsResponse{
+				Deployments: []*defangv1.Deployment{
+					{
+						Id:                "deployment-123",
+						Project:           "test-project",
+						Stack:             stackName,
+						Region:            "us-test-2",
+						Provider:          defangv1.Provider_AWS,
+						ProviderAccountId: "123456789012",
+					},
+				},
+			}, nil)
 			result, err := HandleSetConfig(t.Context(), loader, params, tt.mockCLI, ec, StackConfig{
 				Cluster:    tt.cluster,
 				ProviderID: &tt.providerId,

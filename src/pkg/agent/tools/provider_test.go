@@ -139,7 +139,9 @@ func (m *mockStacksManager) Read(stackName string) (*stacks.StackParameters, err
 	return param, args.Error(1)
 }
 
-func (m *mockStacksManager) LoadParameters(params *stacks.StackParameters) {}
+func (m *mockStacksManager) LoadParameters(params *stacks.StackParameters) {
+	m.Called(params)
+}
 
 func (m *mockStacksManager) List() ([]stacks.StackListItem, error) {
 	args := m.Called()
@@ -283,7 +285,7 @@ func TestSetupProvider(t *testing.T) {
 			inputStackName:         "teststack",
 			useWkDir:               false,
 			localStackExists:       true,
-			remoteStackExists:      false,
+			remoteStackExists:      true, // Need remote stack for useWkDir=false case
 			expectedStackName:      "teststack",
 			expectedProvider:       cliClient.ProviderDefang,
 			expectedRegion:         "",
@@ -479,20 +481,39 @@ func setupMocks(t *testing.T, tc TestCase, ctx context.Context, projectName stri
 	if tc.inputStackName != "" {
 		expectedStack := createTestStackParameters(tc.inputStackName, tc.expectedProvider, tc.expectedRegion)
 
-		if tc.localStackExists {
+		if tc.localStackExists && tc.useWkDir {
+			// When useWkDir=true, it first tries to Read from local
 			mockSM.On("Read", tc.inputStackName).Return(expectedStack, nil)
-		} else if tc.remoteStackExists {
-			mockSM.On("Read", tc.inputStackName).Return((*stacks.StackParameters)(nil), os.ErrNotExist)
-			mockFC.On("ListDeployments", ctx, &defangv1.ListDeploymentsRequest{
-				Project: projectName,
-			}).Return(createDeploymentResponse(tc.inputStackName, "defang", tc.expectedRegion, deployTime), nil)
+		} else if tc.remoteStackExists || !tc.useWkDir {
+			// When useWkDir=false, it goes directly to importRemoteStack
+			// When useWkDir=true but local doesn't exist, it tries to Read first then importRemoteStack
+			if tc.useWkDir && !tc.localStackExists {
+				mockSM.On("Read", tc.inputStackName).Return((*stacks.StackParameters)(nil), os.ErrNotExist)
+			}
+
+			// Mock ListDeployments for importRemoteStack
+			if tc.remoteStackExists {
+				mockFC.On("ListDeployments", ctx, &defangv1.ListDeploymentsRequest{
+					Project: projectName,
+				}).Return(createDeploymentResponse(tc.inputStackName, "defang", tc.expectedRegion, deployTime), nil)
+			} else {
+				mockFC.On("ListDeployments", ctx, &defangv1.ListDeploymentsRequest{
+					Project: projectName,
+				}).Return(&defangv1.ListDeploymentsResponse{Deployments: []*defangv1.Deployment{}}, nil)
+			}
 
 			if tc.expectStackFileWritten {
 				mockSM.On("Create", *expectedStack).Return(".defang/"+tc.inputStackName, nil)
 			}
 		}
 
-		mockSM.On("Load", tc.inputStackName).Return(nil)
+		mockSM.On("LoadParameters", expectedStack).Return()
+
+		// When useWkDir is true, SetupProvider always calls Create to ensure the stack file exists
+		if tc.useWkDir {
+			mockSM.On("Create", *expectedStack).Return(".defang/"+tc.inputStackName, nil)
+		}
+
 		mockPC.On("NewProvider", ctx, tc.expectedProvider, mockFC, tc.inputStackName).Return(mockProv)
 		return
 	}
@@ -553,20 +574,35 @@ func setupMocks(t *testing.T, tc TestCase, ctx context.Context, projectName stri
 			setupNewStackCreationMocks(tc, ctx, mockEC, mockSM)
 		} else if tc.userStackSelection == "existingstack" {
 			setupExistingLocalStackMocks("existingstack", tc.expectedProvider, tc.expectedRegion, mockSM)
+			// Add Create mock for useWkDir case
+			if tc.useWkDir {
+				expectedStack := createTestStackParameters("existingstack", tc.expectedProvider, tc.expectedRegion)
+				mockSM.On("Create", *expectedStack).Return(".defang/existingstack", nil)
+			}
 		} else if strings.Contains(tc.userStackSelection, "remotestack") {
 			setupExistingRemoteStackMocks("remotestack", tc.expectedProvider, tc.expectedRegion, tc.expectStackFileWritten, mockSM)
+			// Add Create mock for useWkDir case
+			if tc.useWkDir && !tc.expectStackFileWritten {
+				expectedStack := createTestStackParameters("remotestack", tc.expectedProvider, tc.expectedRegion)
+				mockSM.On("Create", *expectedStack).Return(".defang/remotestack", nil)
+			}
 		}
 	} else if shouldCreateNewStack(tc) {
 		// No stack selection needed, directly create new stack
 		setupNewStackCreationMocks(tc, ctx, mockEC, mockSM)
 	}
 
-	// For new stack creation scenarios, need to mock the final loadStack calls
-	// Only when useWkDir=true, since ephemeral stacks (useWkDir=false) skip loadStack
+	// For new stack creation scenarios, need to mock LoadParameters
 	expectedStack := createTestStackParameters(tc.expectedStackName, tc.expectedProvider, tc.expectedRegion)
-	if tc.expectNewStackCreated && tc.useWkDir {
-		mockSM.On("Read", tc.expectedStackName).Return(expectedStack, nil)
-		mockSM.On("Load", tc.expectedStackName).Return(nil)
+	if tc.expectNewStackCreated {
+		mockSM.On("LoadParameters", expectedStack).Return()
+
+		// When useWkDir=true, SetupProvider always calls Create to ensure the stack file exists
+		if tc.useWkDir {
+			// Note: Create call is already mocked in setupNewStackCreationMocks
+			// but we may need a second call from SetupProvider line 100
+			mockSM.On("Create", *expectedStack).Return(".defang/"+tc.expectedStackName, nil)
+		}
 	}
 
 	mockPC.On("NewProvider", ctx, tc.expectedProvider, mockFC, tc.expectedStackName).Return(mockProv)
@@ -575,7 +611,7 @@ func setupMocks(t *testing.T, tc TestCase, ctx context.Context, projectName stri
 func setupExistingLocalStackMocks(stackName string, expectedProvider cliClient.ProviderID, expectedRegion string, mockSM *mockStacksManager) {
 	expectedStack := createTestStackParameters(stackName, expectedProvider, expectedRegion)
 	mockSM.On("Read", stackName).Return(expectedStack, nil)
-	mockSM.On("Load", stackName).Return(nil)
+	mockSM.On("LoadParameters", expectedStack).Return()
 }
 
 func setupExistingRemoteStackMocks(stackName string, expectedProvider cliClient.ProviderID, expectedRegion string, expectStackFileWritten bool, mockSM *mockStacksManager) {
@@ -583,8 +619,7 @@ func setupExistingRemoteStackMocks(stackName string, expectedProvider cliClient.
 	if expectStackFileWritten {
 		mockSM.On("Create", *expectedStack).Return(".defang/"+stackName, nil)
 	}
-	mockSM.On("Read", stackName).Return(expectedStack, nil)
-	mockSM.On("Load", stackName).Return(nil)
+	mockSM.On("LoadParameters", expectedStack).Return()
 }
 
 func shouldCreateNewStack(tc TestCase) bool {

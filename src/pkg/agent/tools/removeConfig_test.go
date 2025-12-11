@@ -10,8 +10,10 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,12 +28,12 @@ type MockRemoveConfigCLI struct {
 	CallLog                   []string
 }
 
-func (m *MockRemoveConfigCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
+func (m *MockRemoveConfigCLI) Connect(ctx context.Context, cluster string) (client.FabricClient, error) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("Connect(%s)", cluster))
 	if m.ConnectError != nil {
 		return nil, m.ConnectError
 	}
-	return &client.GrpcClient{}, nil
+	return mockFC, nil
 }
 
 func (m *MockRemoveConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient, stack string) client.Provider {
@@ -56,6 +58,7 @@ func (m *MockRemoveConfigCLI) ConfigDelete(ctx context.Context, projectName stri
 }
 
 func TestHandleRemoveConfigTool(t *testing.T) {
+	mockFC = &mockFabricClient{}
 	tests := []struct {
 		name                 string
 		configName           string
@@ -150,6 +153,18 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			})
 			provider := client.ProviderAWS
 			stackName := "test-stack"
+			mockFC.On("ListDeployments", mock.Anything, mock.Anything).Return(&defangv1.ListDeploymentsResponse{
+				Deployments: []*defangv1.Deployment{
+					{
+						Id:                "deployment-123",
+						Project:           "test-project",
+						Stack:             stackName,
+						Region:            "us-test-2",
+						Provider:          defangv1.Provider_AWS,
+						ProviderAccountId: "123456789012",
+					},
+				},
+			}, nil)
 			result, err := HandleRemoveConfigTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
 				Cluster:    "test-cluster",
 				ProviderID: &provider,

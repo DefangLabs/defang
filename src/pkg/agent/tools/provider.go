@@ -296,6 +296,15 @@ func (pp *providerPreparer) selectOrCreateStack(ctx context.Context, projectName
 		return newStack, nil
 	}
 
+	// For local stacks, parameters need to be loaded from the stack manager
+	if selectedStack.Local && selectedStack.Parameters == nil {
+		params, err := pp.sm.Read(selectedStack.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read local stack %q: %w", selectedStack.Name, err)
+		}
+		return params, nil
+	}
+
 	return selectedStack.Parameters, nil
 }
 

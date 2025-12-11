@@ -28,7 +28,7 @@ type MockEstimateCLI struct {
 	ProviderIDAfterSet client.ProviderID // Track the providerID that gets set
 }
 
-func (m *MockEstimateCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
+func (m *MockEstimateCLI) Connect(ctx context.Context, cluster string) (client.FabricClient, error) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("Connect(%s)", cluster))
 	if m.ConnectError != nil {
 		return nil, m.ConnectError
@@ -44,7 +44,7 @@ func (m *MockEstimateCLI) LoadProject(ctx context.Context, loader client.Loader)
 	return m.Project, nil
 }
 
-func (m *MockEstimateCLI) RunEstimate(ctx context.Context, project *compose.Project, grpcClient *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
+func (m *MockEstimateCLI) RunEstimate(ctx context.Context, project *compose.Project, FabricClient client.FabricClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
 	projectName := ""
 	if project != nil {
 		projectName = project.Name
@@ -56,7 +56,7 @@ func (m *MockEstimateCLI) RunEstimate(ctx context.Context, project *compose.Proj
 	return m.EstimateResponse, nil
 }
 
-func (m *MockEstimateCLI) CreatePlaygroundProvider(grpcClient *client.GrpcClient) client.Provider {
+func (m *MockEstimateCLI) CreatePlaygroundProvider(FabricClient client.FabricClient) client.Provider {
 	m.CallLog = append(m.CallLog, "CreatePlaygroundProvider")
 	return nil
 }

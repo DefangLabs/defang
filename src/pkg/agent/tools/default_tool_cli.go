@@ -29,7 +29,7 @@ type StackConfig struct {
 
 type DefaultToolCLI struct{}
 
-func (DefaultToolCLI) CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, provider cliClient.Provider, serviceCount int) error {
+func (DefaultToolCLI) CanIUseProvider(ctx context.Context, client cliClient.FabricClient, providerId cliClient.ProviderID, projectName string, provider cliClient.Provider, serviceCount int) error {
 	return cliClient.CanIUseProvider(ctx, client, provider, projectName, "", serviceCount) // TODO: add stack
 }
 
@@ -37,7 +37,7 @@ func (DefaultToolCLI) ConfigSet(ctx context.Context, projectName string, provide
 	return cli.ConfigSet(ctx, projectName, provider, name, value)
 }
 
-func (DefaultToolCLI) RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
+func (DefaultToolCLI) RunEstimate(ctx context.Context, project *compose.Project, client cliClient.FabricClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
 	return cli.RunEstimate(ctx, project, client, provider, providerId, region, mode)
 }
 
@@ -46,11 +46,11 @@ func (DefaultToolCLI) ListConfig(ctx context.Context, provider cliClient.Provide
 	return provider.ListConfig(ctx, req)
 }
 
-func (DefaultToolCLI) Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error) {
+func (DefaultToolCLI) Connect(ctx context.Context, cluster string) (cliClient.FabricClient, error) {
 	return cli.Connect(ctx, cluster)
 }
 
-func (DefaultToolCLI) ComposeUp(ctx context.Context, client *cliClient.GrpcClient, provider cliClient.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
+func (DefaultToolCLI) ComposeUp(ctx context.Context, client cliClient.FabricClient, provider cliClient.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	return cli.ComposeUp(ctx, client, provider, params)
 }
 
@@ -58,7 +58,7 @@ func (DefaultToolCLI) Tail(ctx context.Context, provider cliClient.Provider, pro
 	return cli.Tail(ctx, provider, projectName, options)
 }
 
-func (DefaultToolCLI) ComposeDown(ctx context.Context, projectName string, client *cliClient.GrpcClient, provider cliClient.Provider) (string, error) {
+func (DefaultToolCLI) ComposeDown(ctx context.Context, projectName string, client cliClient.FabricClient, provider cliClient.Provider) (string, error) {
 	return cli.ComposeDown(ctx, projectName, client, provider)
 }
 
@@ -91,7 +91,7 @@ func (DefaultToolCLI) LoadProjectName(ctx context.Context, loader cliClient.Load
 	return loader.LoadProjectName(ctx)
 }
 
-func (DefaultToolCLI) CreatePlaygroundProvider(client *cliClient.GrpcClient) cliClient.Provider {
+func (DefaultToolCLI) CreatePlaygroundProvider(client cliClient.FabricClient) cliClient.Provider {
 	return &cliClient.PlaygroundProvider{FabricClient: client}
 }
 
@@ -104,7 +104,7 @@ func (DefaultToolCLI) GenerateAuthURL(authPort int) string {
 	return "Please open this URL in your browser: http://127.0.0.1:" + strconv.Itoa(authPort) + " to login"
 }
 
-func (DefaultToolCLI) InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string, mcpClient string) error {
+func (DefaultToolCLI) InteractiveLoginMCP(ctx context.Context, client cliClient.FabricClient, cluster string, mcpClient string) error {
 	return login.InteractiveLoginMCP(ctx, client, cluster, mcpClient)
 }
 

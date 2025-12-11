@@ -41,7 +41,7 @@ type MockDeployCLI struct {
 	CallLog                      []string
 }
 
-func (m *MockDeployCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
+func (m *MockDeployCLI) Connect(ctx context.Context, cluster string) (client.FabricClient, error) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("Connect(%s)", cluster))
 	if m.ConnectError != nil {
 		return &client.GrpcClient{}, m.ConnectError
@@ -55,12 +55,12 @@ func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.Provi
 	return nil
 }
 
-func (m *MockDeployCLI) InteractiveLoginMCP(ctx context.Context, client *client.GrpcClient, cluster string, mcpClient string) error {
+func (m *MockDeployCLI) InteractiveLoginMCP(ctx context.Context, client client.FabricClient, cluster string, mcpClient string) error {
 	m.CallLog = append(m.CallLog, "InteractiveLoginMCP")
 	return m.InteractiveLoginMCPError
 }
 
-func (m *MockDeployCLI) ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
+func (m *MockDeployCLI) ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	m.CallLog = append(m.CallLog, "ComposeUp")
 	if m.ComposeUpError != nil {
 		return nil, nil, m.ComposeUpError
@@ -81,7 +81,7 @@ func (m *MockDeployCLI) TailAndMonitor(ctx context.Context, project *compose.Pro
 	return nil, nil
 }
 
-func (m *MockDeployCLI) CanIUseProvider(ctx context.Context, client *client.GrpcClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {
+func (m *MockDeployCLI) CanIUseProvider(ctx context.Context, client client.FabricClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {
 	m.CallLog = append(m.CallLog, "CanIUseProvider")
 	return nil
 }

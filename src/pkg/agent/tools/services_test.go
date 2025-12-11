@@ -16,6 +16,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,7 +25,7 @@ type MockCLI struct {
 	CLIInterface
 	ConnectError         error
 	LoadProjectNameError error
-	MockClient           *client.GrpcClient
+	MockClient           client.FabricClient
 	MockProvider         client.Provider
 	MockProjectName      string
 
@@ -35,7 +36,7 @@ type MockCLI struct {
 	GetServicesProvider client.Provider
 }
 
-func (m *MockCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
+func (m *MockCLI) Connect(ctx context.Context, cluster string) (client.FabricClient, error) {
 	if m.ConnectError != nil {
 		return nil, m.ConnectError
 	}
@@ -66,11 +67,11 @@ func (m *MockCLI) GetServices(ctx context.Context, projectName string, provider 
 	return m.MockServices, nil
 }
 
-func (m *MockCLI) ComposeDown(ctx context.Context, projectName string, client *client.GrpcClient, provider client.Provider) (string, error) {
+func (m *MockCLI) ComposeDown(ctx context.Context, projectName string, client client.FabricClient, provider client.Provider) (string, error) {
 	return "", nil
 }
 
-func (m *MockCLI) ComposeUp(ctx context.Context, client *client.GrpcClient, provider client.Provider, params defangcli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
+func (m *MockCLI) ComposeUp(ctx context.Context, client client.FabricClient, provider client.Provider, params defangcli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	return nil, nil, nil
 }
 
@@ -82,7 +83,7 @@ func (m *MockCLI) ConfigSet(ctx context.Context, projectName string, provider cl
 	return nil
 }
 
-func (m *MockCLI) CreatePlaygroundProvider(client *client.GrpcClient) client.Provider {
+func (m *MockCLI) CreatePlaygroundProvider(client client.FabricClient) client.Provider {
 	return m.MockProvider
 }
 
@@ -90,7 +91,7 @@ func (m *MockCLI) GenerateAuthURL(authPort int) string {
 	return ""
 }
 
-func (m *MockCLI) InteractiveLoginMCP(ctx context.Context, client *client.GrpcClient, cluster string, mcpClient string) error {
+func (m *MockCLI) InteractiveLoginMCP(ctx context.Context, client client.FabricClient, cluster string, mcpClient string) error {
 	return nil
 }
 
@@ -106,7 +107,7 @@ func (m *MockCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResp
 	return ""
 }
 
-func (m *MockCLI) RunEstimate(ctx context.Context, project *compose.Project, client *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
+func (m *MockCLI) RunEstimate(ctx context.Context, project *compose.Project, client client.FabricClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
 	return nil, nil
 }
 
@@ -150,6 +151,7 @@ func (m *mockElicitationsClient) Request(ctx context.Context, req elicitations.R
 }
 
 func TestHandleServicesToolWithMockCLI(t *testing.T) {
+	mockFC = &mockFabricClient{}
 	tests := []struct {
 		name                string
 		providerId          client.ProviderID
@@ -177,7 +179,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			name:       "load_project_name_error",
 			providerId: client.ProviderDefang,
 			mockCLI: &MockCLI{
-				MockClient:           &client.GrpcClient{},
+				MockClient:           mockFC,
 				MockProvider:         &client.PlaygroundProvider{},
 				LoadProjectNameError: errors.New("failed to load project name"),
 			},
@@ -192,7 +194,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			name:       "get_services_no_services_error",
 			providerId: client.ProviderDefang,
 			mockCLI: &MockCLI{
-				MockClient:       &client.GrpcClient{},
+				MockClient:       mockFC,
 				MockProvider:     &client.PlaygroundProvider{},
 				MockProjectName:  "test-project",
 				GetServicesError: defangcli.ErrNoServices{ProjectName: "test-project"},
@@ -206,7 +208,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			name:       "get_services_project_not_deployed",
 			providerId: client.ProviderDefang,
 			mockCLI: &MockCLI{
-				MockClient:       &client.GrpcClient{},
+				MockClient:       mockFC,
 				MockProvider:     &client.PlaygroundProvider{},
 				MockProjectName:  "test-project",
 				GetServicesError: createConnectError(connect.CodeNotFound, "project test-project is not deployed in Playground"),
@@ -220,7 +222,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			name:       "get_services_generic_error",
 			providerId: client.ProviderDefang,
 			mockCLI: &MockCLI{
-				MockClient:       &client.GrpcClient{},
+				MockClient:       mockFC,
 				MockProvider:     &client.PlaygroundProvider{},
 				MockProjectName:  "test-project",
 				GetServicesError: errors.New("generic GetServices failure"),
@@ -235,7 +237,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			name:       "successful_cli_operations_until_get_services",
 			providerId: client.ProviderDefang,
 			mockCLI: &MockCLI{
-				MockClient:      &client.GrpcClient{},
+				MockClient:      mockFC,
 				MockProvider:    &client.PlaygroundProvider{},
 				MockProjectName: "test-project",
 				MockServices: []deployment_info.Service{
@@ -267,6 +269,18 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				},
 			})
 			stackName := "test-stack"
+			mockFC.On("ListDeployments", mock.Anything, mock.Anything).Return(&defangv1.ListDeploymentsResponse{
+				Deployments: []*defangv1.Deployment{
+					{
+						Id:                "deployment-123",
+						Project:           "test-project",
+						Stack:             stackName,
+						Region:            "us-test-2",
+						Provider:          defangv1.Provider_AWS,
+						ProviderAccountId: "123456789012",
+					},
+				},
+			}, nil)
 			result, err := HandleServicesTool(t.Context(), loader, tt.mockCLI, ec, StackConfig{
 				Cluster:    "test-cluster",
 				ProviderID: &tt.providerId,
