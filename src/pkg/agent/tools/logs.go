@@ -46,7 +46,7 @@ func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 	}
 
 	pp := NewProviderPreparer(cli, ec, client)
-	_, provider, err := pp.SetupProvider(ctx, config.Stack)
+	_, provider, err := pp.SetupProvider(ctx, &config.Stack.Name)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}

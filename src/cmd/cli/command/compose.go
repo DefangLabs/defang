@@ -83,7 +83,7 @@ func makeComposeUpCmd() *cobra.Command {
 					return err
 				}
 
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack.Name)
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
 				if err != nil {
 					return err
 				}
@@ -141,7 +141,7 @@ func makeComposeUpCmd() *cobra.Command {
 			})
 			if err != nil {
 				composeErr := err
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack.Name)
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
 				if err != nil {
 					return err
 				}
@@ -170,7 +170,7 @@ func makeComposeUpCmd() *cobra.Command {
 			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
 				deploymentErr := err
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack.Name)
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
 				if err != nil {
 					term.Warn("Failed to initialize debugger:", err)
 					return deploymentErr
@@ -545,7 +545,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack.Name)
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
 				if err != nil {
 					term.Warn("Failed to initialize debugger:", err)
 					return loadErr

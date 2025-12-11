@@ -481,7 +481,7 @@ var RootCmd = &cobra.Command{
 		}
 
 		prompt := "Welcome to Defang. I can help you deploy your project to the cloud."
-		ag, err := agent.New(ctx, getCluster(), &global.ProviderID, &global.Stack.Name)
+		ag, err := agent.New(ctx, getCluster(), &global.ProviderID, &global.Stack)
 		if err != nil {
 			return err
 		}
@@ -954,7 +954,7 @@ var debugCmd = &cobra.Command{
 			return err
 		}
 
-		debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack.Name)
+		debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
 		if err != nil {
 			return err
 		}

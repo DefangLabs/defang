@@ -17,6 +17,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/core/api"
@@ -33,7 +34,7 @@ type Agent struct {
 	system    string
 }
 
-func New(ctx context.Context, clusterAddr string, providerId *client.ProviderID, stack *string) (*Agent, error) {
+func New(ctx context.Context, clusterAddr string, providerId *client.ProviderID, stack *stacks.StackParameters) (*Agent, error) {
 	accessToken := cluster.GetExistingToken(clusterAddr)
 	aiProvider := "fabric"
 	var providerPlugin api.Plugin
