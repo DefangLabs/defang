@@ -40,7 +40,7 @@ func Create(params StackParameters) (string, error) {
 		return "", errors.New("stack name must start with a letter and contain only lowercase letters and numbers")
 	}
 
-	content, err := Marshal(params)
+	content, err := Marshal(&params)
 	if err != nil {
 		return "", err
 	}
@@ -149,7 +149,7 @@ func Parse(content string) (StackParameters, error) {
 	return params, nil
 }
 
-func Marshal(params StackParameters) (string, error) {
+func Marshal(params *StackParameters) (string, error) {
 	var properties map[string]string = make(map[string]string)
 	properties["DEFANG_PROVIDER"] = strings.ToLower(params.Provider.String())
 	if params.Region != "" {
@@ -168,10 +168,10 @@ func Marshal(params StackParameters) (string, error) {
 		properties["DEFANG_MODE"] = strings.ToLower(params.Mode.String())
 	}
 
-	if params.AWSProfile != "" {
+	if params.Provider == client.ProviderAWS && params.AWSProfile != "" {
 		properties["AWS_PROFILE"] = params.AWSProfile
 	}
-	if params.GCPProjectID != "" {
+	if params.Provider == client.ProviderGCP && params.GCPProjectID != "" {
 		properties["GCP_PROJECT_ID"] = params.GCPProjectID
 	}
 	return godotenv.Marshal(properties)

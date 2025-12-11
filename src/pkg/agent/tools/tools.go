@@ -97,14 +97,10 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 				return HandleCreateAWSStackTool(ctx.Context, loader, cli, params, &config)
 			},
 		),
-		ai.NewTool("access_data",
-			"Access stack data for the defang project",
-			func(ctx *ai.ToolContext, params AccessDataParams) (string, error) {
-				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
-				if err != nil {
-					return "Failed to configure loader", err
-				}
-				return HandleAccessDataTool(ctx.Context, loader, params, &config)
+		ai.NewTool("current_stack",
+			"Get the currently selected stack",
+			func(ctx *ai.ToolContext, params struct{}) (string, error) {
+				return HandleCurrentStackTool(ctx.Context, &config)
 			},
 		),
 		ai.NewTool("remove_config",
