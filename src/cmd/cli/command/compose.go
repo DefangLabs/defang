@@ -83,7 +83,7 @@ func makeComposeUpCmd() *cobra.Command {
 					return err
 				}
 
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.Stack.Provider, &global.Stack)
 				if err != nil {
 					return err
 				}
@@ -141,7 +141,7 @@ func makeComposeUpCmd() *cobra.Command {
 			})
 			if err != nil {
 				composeErr := err
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.Stack.Provider, &global.Stack)
 				if err != nil {
 					return err
 				}
@@ -170,7 +170,7 @@ func makeComposeUpCmd() *cobra.Command {
 			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
 				deploymentErr := err
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.Stack.Provider, &global.Stack)
 				if err != nil {
 					term.Warn("Failed to initialize debugger:", err)
 					return deploymentErr
@@ -178,7 +178,7 @@ func makeComposeUpCmd() *cobra.Command {
 				handleTailAndMonitorErr(ctx, deploymentErr, debugger, debug.DebugConfig{
 					Deployment: deploy.Etag,
 					Project:    project,
-					ProviderID: &global.ProviderID,
+					ProviderID: &global.Stack.Provider,
 					Stack:      &global.Stack.Name,
 					Since:      since,
 					Until:      time.Now(),
@@ -218,7 +218,7 @@ func makeComposeUpCmd() *cobra.Command {
 func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accountInfo *cliClient.AccountInfo, projectName string) error {
 	samePlace := slices.ContainsFunc(existingDeployments, func(dep *defangv1.Deployment) bool {
 		// Old deployments may not have a region or account ID, so we check for empty values too
-		return dep.Provider == global.ProviderID.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
+		return dep.Provider == global.Stack.Provider.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
 	})
 	if samePlace {
 		return nil
@@ -545,7 +545,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.Stack.Provider, &global.Stack)
 				if err != nil {
 					term.Warn("Failed to initialize debugger:", err)
 					return loadErr

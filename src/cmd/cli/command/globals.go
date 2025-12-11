@@ -78,7 +78,6 @@ type GlobalConfig struct {
 	ModelID        string // only for debug/generate; Pro users
 	NonInteractive bool
 	Org            string
-	ProviderID     cliClient.ProviderID
 	SourcePlatform migrate.SourcePlatform // only used for 'defang init' command
 	Stack          stacks.StackParameters
 	Verbose        bool
@@ -98,7 +97,7 @@ var global GlobalConfig = GlobalConfig{
 	HideUpdate:     false,
 	Mode:           modes.ModeUnspecified,
 	NonInteractive: !term.IsTerminal(),
-	ProviderID:     cliClient.ProviderAuto,
+	Stack:          stacks.StackParameters{Provider: cliClient.ProviderAuto},
 	SourcePlatform: migrate.SourcePlatformUnspecified, // default to auto-detecting the source platform
 	Verbose:        false,
 }
@@ -198,7 +197,7 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 
 	if !flags.Changed("provider") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
-			err = r.ProviderID.Set(fromEnv)
+			err = r.Stack.Provider.Set(fromEnv)
 			if err != nil {
 				return err
 			}
