@@ -252,13 +252,17 @@ func (pp *providerPreparer) collectPreviouslyDeployedStacks(ctx context.Context,
 		providerID.SetValue(deployment.GetProvider())
 		// avoid overwriting existing entries, deployments are already sorted by deployed_at desc
 		if _, exists := stackMap[stackName]; !exists {
+			var deployedAt time.Time
+			if ts := deployment.GetTimestamp(); ts != nil {
+				deployedAt = ts.AsTime()
+			}
 			stackMap[stackName] = &ExistingStack{
 				StackParameters: stacks.StackParameters{
 					Name:     stackName,
 					Provider: providerID,
 					Region:   deployment.GetRegion(),
 				},
-				DeployedAt: deployment.GetTimestamp().AsTime(),
+				DeployedAt: deployedAt,
 			}
 		}
 	}
