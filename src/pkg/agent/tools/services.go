@@ -27,13 +27,13 @@ func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, cli
 	}
 
 	projectName, err := cli.LoadProjectName(ctx, loader)
-	term.Debugf("Project name loaded: %s", projectName)
 	if err != nil {
 		if strings.Contains(err.Error(), "no projects found") {
 			return "no projects found on Playground", nil
 		}
 		return "", fmt.Errorf("failed to load project name: %w", err)
 	}
+	term.Debugf("Project name loaded: %s", projectName)
 	pp := NewProviderPreparer(cli, ec, client)
 	_, provider, err := pp.SetupProvider(ctx, projectName, config.Stack, false)
 	if err != nil {
