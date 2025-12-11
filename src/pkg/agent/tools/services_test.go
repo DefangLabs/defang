@@ -268,11 +268,14 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 					"profile_name": "default",
 				},
 			})
-			stackName := stacks.StackParameters{Name: "test-stack"}
+			stack := stacks.StackParameters{
+				Name:     "test-stack",
+				Provider: client.ProviderAWS,
+			}
 			result, err := HandleServicesTool(t.Context(), loader, tt.mockCLI, ec, &StackConfig{
 				Cluster:    "test-cluster",
 				ProviderID: &tt.providerId,
-				Stack:      &stackName,
+				Stack:      &stack,
 			})
 
 			// Check Go error expectation

@@ -25,7 +25,7 @@ func HandleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader,
 	}
 
 	pp := NewProviderPreparer(cli, ec, client)
-	_, provider, err := pp.SetupProvider(ctx, &sc.Stack.Name)
+	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}

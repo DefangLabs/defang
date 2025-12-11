@@ -24,7 +24,7 @@ func HandleDestroyTool(ctx context.Context, loader cliClient.ProjectLoader, cli 
 	}
 
 	pp := NewProviderPreparer(cli, ec, client)
-	_, provider, err := pp.SetupProvider(ctx, &config.Stack.Name)
+	_, provider, err := pp.SetupProvider(ctx, config.Stack)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}

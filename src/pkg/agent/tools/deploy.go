@@ -45,7 +45,7 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, cli C
 	}
 
 	pp := NewProviderPreparer(cli, ec, client)
-	providerID, provider, err := pp.SetupProvider(ctx, &config.Stack.Name)
+	providerID, provider, err := pp.SetupProvider(ctx, config.Stack)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}

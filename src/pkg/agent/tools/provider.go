@@ -3,7 +3,6 @@ package tools
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -35,28 +34,15 @@ func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc cliC
 	}
 }
 
-func (pp *providerPreparer) SetupProvider(ctx context.Context, stackName *string) (*cliClient.ProviderID, cliClient.Provider, error) {
+func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.StackParameters) (*cliClient.ProviderID, cliClient.Provider, error) {
 	var providerID cliClient.ProviderID
 	var err error
-	var stack *stacks.StackParameters
-	if stackName == nil {
-		return nil, nil, errors.New("stackName cannot be nil")
-	}
-	if *stackName != "" {
-		stack, err = stacks.Read(*stackName)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to read stack: %w", err)
-		}
-		err = stacks.Load(*stackName)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to load stack: %w", err)
-		}
-	} else {
-		stack, err = pp.setupStack(ctx)
+	if stack == nil {
+		newStack, err := pp.setupStack(ctx)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to setup stack: %w", err)
 		}
-		*stackName = stack.Name
+		stack = newStack
 	}
 
 	err = providerID.Set(stack.Provider.Name())
@@ -70,7 +56,7 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, stackName *string
 	}
 
 	term.Debug("Function invoked: cli.NewProvider")
-	provider := pp.pc.NewProvider(ctx, providerID, pp.fc, *stackName)
+	provider := pp.pc.NewProvider(ctx, providerID, pp.fc, stack.Name)
 	return &providerID, provider, nil
 }
 

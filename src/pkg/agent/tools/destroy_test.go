@@ -146,11 +146,14 @@ func TestHandleDestroyTool(t *testing.T) {
 					"profile_name": "default",
 				},
 			})
-			stackName := stacks.StackParameters{Name: "test-stack"}
+			stack := stacks.StackParameters{
+				Name:     "test-stack",
+				Provider: client.ProviderAWS,
+			}
 			result, err := HandleDestroyTool(t.Context(), loader, mockCLI, ec, &StackConfig{
 				Cluster:    "test-cluster",
 				ProviderID: &tt.providerID,
-				Stack:      &stackName,
+				Stack:      &stack,
 			})
 
 			// Verify error expectations
