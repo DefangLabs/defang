@@ -2,6 +2,7 @@ package stacks
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -22,7 +23,7 @@ type StackParameters struct {
 
 var validStackName = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
 
-const dotDefang = ".defang"
+const Directory = ".defang"
 
 func MakeDefaultName(providerId client.ProviderID, region string) string {
 	compressedRegion := strings.ReplaceAll(region, "-", "")
@@ -42,26 +43,32 @@ func Create(params StackParameters) (string, error) {
 		return "", err
 	}
 
-	if err := os.Mkdir(dotDefang, 0700); err != nil && !errors.Is(err, os.ErrExist) {
+	if err := os.Mkdir(Directory, 0700); err != nil && !errors.Is(err, os.ErrExist) {
 		return "", err
 	}
 	filename := filename(params.Name)
-	file, err := os.CreateTemp(dotDefang, params.Name+".tmp.")
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			instructions := fmt.Sprintf(
+				"If you want to overwrite it, please spin down the stack and remove stackfile first.\n"+
+					"    defang down --stack %s && rm .defang/%s",
+				params.Name,
+				params.Name,
+			)
+			return "", fmt.Errorf(
+				"stack file already exists for %q.\n%s",
+				params.Name,
+				instructions,
+			)
+		}
 		return "", err
 	}
-	defer file.Close()
+	defer f.Close()
 
-	_, err = file.WriteString(content)
+	_, err = f.WriteString(content)
 	if err != nil {
-		return "", err
-	}
-
-	term.Debugf("Created tmp stack configuration file: %s\n", file.Name())
-
-	// move to final name
-	err = os.Rename(file.Name(), filename)
-	if err != nil {
+		os.Remove(filename)
 		return "", err
 	}
 
@@ -76,7 +83,7 @@ type StackListItem struct {
 }
 
 func List() ([]StackListItem, error) {
-	files, err := os.ReadDir(dotDefang)
+	files, err := os.ReadDir(Directory)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, nil
@@ -86,7 +93,7 @@ func List() ([]StackListItem, error) {
 
 	var stacks []StackListItem
 	for _, file := range files {
-		filename := filepath.Join(dotDefang, file.Name())
+		filename := filepath.Join(Directory, file.Name())
 		content, err := os.ReadFile(filename)
 		if err != nil {
 			term.Warnf("Skipping unreadable stack file %s: %v\n", filename, err)
@@ -167,5 +174,46 @@ func Remove(name string) error {
 }
 
 func filename(stackname string) string {
-	return filepath.Join(dotDefang, stackname)
+	return filepath.Join(Directory, stackname)
+}
+
+func Read(name string) (*StackParameters, error) {
+	path, err := filepath.Abs(filepath.Join(Directory, name))
+	if err != nil {
+		return nil, err
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not read stack %q from %q: %w", name, path, err)
+	}
+	parsed, err := Parse(string(content))
+	if err != nil {
+		return nil, err
+	}
+	parsed.Name = name
+	return &parsed, nil
+}
+
+func Load(name string) error {
+	path, err := filepath.Abs(filepath.Join(Directory, name))
+	if err != nil {
+		return err
+	}
+	if err := godotenv.Load(path); err != nil {
+		return fmt.Errorf("could not load stack %q from %q %w", name, path, err)
+	}
+
+	term.Debugf("loaded globals from %s", path)
+	return nil
+}
+
+func PostCreateMessage(stackName string) string {
+	return fmt.Sprintf(
+		"A stackfile has been created at `.defang/%s`.\n"+
+			"This file contains the configuration for this stack.\n"+
+			"We recommend you commit this file to source control, so it can be used by everyone on your team.\n"+
+			"You can now deploy using `defang up --stack=%s`.\n"+
+			"To learn more about stacks, visit https://docs.defang.io/docs/concepts/stacks",
+		stackName, stackName,
+	)
 }

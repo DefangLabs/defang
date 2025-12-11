@@ -83,9 +83,9 @@ func RandomIndex(n int) int {
 }
 
 func RandomID() string {
-	const uint64msb = 1 << 63 // always set the MSB to ensure we get ≥12 digits
+	const uint64msb = 1 << 63 // always set the MSB to ensure we get 13 digits
 	// #nosec G404 - this is not a security-sensitive ID, just a random identifier
-	return strconv.FormatUint(rand.Uint64()|uint64msb, 36)[1:]
+	return strconv.FormatUint(rand.Uint64()|uint64msb, 36)[1:] // first digit only has 2 bits of entropy, so skip it
 }
 
 func IsValidRandomID(s string) bool {
@@ -162,7 +162,7 @@ func Compare(actual []byte, goldenFile string) error {
 	golden, err := os.ReadFile(goldenFile)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return fmt.Errorf("Failed to read golden file: %w", err)
+			return fmt.Errorf("failed to read golden file: %w", err)
 		}
 		return os.WriteFile(goldenFile, actual, 0644)
 	} else {

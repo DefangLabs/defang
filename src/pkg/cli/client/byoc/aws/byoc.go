@@ -213,7 +213,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		return nil, err
 	}
 
-	etag := pkg.RandomID()
+	etag := types.NewEtag()
 	serviceInfos, err := b.GetServiceInfos(ctx, project.Name, req.DelegateDomain, etag, project.Services)
 	if err != nil {
 		return nil, err
@@ -477,17 +477,21 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 		"DEFANG_JSON":                os.Getenv("DEFANG_JSON"),
 		"DEFANG_ORG":                 b.TenantName,
 		"DEFANG_PREFIX":              b.Prefix,
+		"DEFANG_PULUMI_DEBUG":        os.Getenv("DEFANG_PULUMI_DEBUG"),
 		"DEFANG_PULUMI_DIFF":         os.Getenv("DEFANG_PULUMI_DIFF"),
 		"DEFANG_STATE_URL":           defangStateUrl,
 		"NODE_NO_WARNINGS":           "1",
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
 		"PRIVATE_DOMAIN":             byoc.GetPrivateDomain(projectName),
 		"PROJECT":                    projectName,                 // may be empty
-		pulumiBackendKey:             pulumiBackendValue,          // TODO: make secret
 		"PULUMI_CONFIG_PASSPHRASE":   byoc.PulumiConfigPassphrase, // TODO: make secret
 		"PULUMI_COPILOT":             "false",
 		"PULUMI_SKIP_UPDATE_CHECK":   "true",
 		"STACK":                      b.PulumiStack,
+		pulumiBackendKey:             pulumiBackendValue, // TODO: make secret
+	}
+	if targets := os.Getenv("DEFANG_PULUMI_TARGETS"); targets != "" {
+		env["DEFANG_PULUMI_TARGETS"] = targets
 	}
 
 	if !term.StdoutCanColor() {
@@ -791,14 +795,28 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	//  * Etag, no service: 	tail all tasks/services with that Etag
 	//  * No Etag, service:		tail all tasks/services with that service name
 	//  * Etag, service:		tail that task/service
+	var etag types.ETag
 	var tailStream ecs.LiveTailStream
-	etag := req.Etag
-	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is the task ID of the CD task
+	if req.Etag == "" {
+		tailStream, err = b.queryLogs(ctx, cw, req)
+		if err != nil {
+			return nil, AnnotateAwsError(err)
+		}
+		return newByocServerStream(tailStream, etag, req.Services, b), nil
+	}
+
+	etag, err = types.ParseEtag(req.Etag)
+	if err != nil {
+		// Assume invalid "etag" is the task ID of the CD task
 		tailStream, err = b.queryCdLogs(ctx, cw, req)
 		etag = "" // no need to filter events by etag because we only show logs from the specified task ID
-	} else {
-		tailStream, err = b.queryLogs(ctx, cw, req)
+		if err != nil {
+			return nil, AnnotateAwsError(err)
+		}
+		return newByocServerStream(tailStream, etag, req.Services, b), nil
 	}
+
+	tailStream, err = b.queryLogs(ctx, cw, req)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
@@ -876,8 +894,8 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 		if b.driver.LogGroupARN == "" {
 			term.Debug("CD stack LogGroupARN is not set; skipping CD logs")
 		} else {
-			cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern} // TODO: filter by etag
-			// If we know the CD task ARN, only tail the logstream for that CD task
+			cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern}
+			// If we know the CD task ARN, only tail the logstream for that CD task; FIXME: store the task ID in the project's ProjectUpdate in S3 and use that
 			if b.cdTaskArn != nil && b.cdEtag == etag {
 				cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.cdTaskArn))}
 			}

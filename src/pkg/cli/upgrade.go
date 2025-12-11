@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -33,7 +34,7 @@ func Upgrade(ctx context.Context) error {
 
 	if strings.HasPrefix(ex, "/nix/store/") {
 		// Detect whether the user has used Flakes or nix-env
-		if strings.Contains("-defang-cli-", ex) {
+		if strings.Contains(ex, "-defang-cli-") {
 			printInstructions("nix-env -if https://github.com/DefangLabs/defang/archive/main.tar.gz")
 		} else {
 			printInstructions("nix profile install github:DefangLabs/defang#defang-bin --refresh")
@@ -41,11 +42,26 @@ func Upgrade(ctx context.Context) error {
 		return nil
 	}
 
-	// Check if we're running in PowerShell
-	if _, exists := os.LookupEnv("PSModulePath"); exists {
-		printInstructions(`pwsh -c "iwr https://s.defang.io/defang_win_amd64.zip -OutFile defang.zip"`)
-
+	// Check if we're running via npx (npm_execpath is set by npx/npm/yarn/etc)
+	if _, exists := os.LookupEnv("npm_execpath"); exists {
+		printInstructions("npx defang@latest")
 		return nil
+	}
+
+	// Check if we're running on Windows
+	if runtime.GOOS == "windows" {
+		if strings.Contains(strings.ToLower(ex), "winget") {
+			printInstructions("winget upgrade defang")
+			return nil
+		}
+		// Check if we're running in PowerShell (and not CMD or Git Bash)
+		_, hasMSYSTEM := os.LookupEnv("MSYSTEM")           // Git Bash/MINGW/MSYS
+		_, hasPrompt := os.LookupEnv("PROMPT")             // CMD
+		_, hasPSModulePath := os.LookupEnv("PSModulePath") // CMD and Powershell
+		if !hasMSYSTEM && !hasPrompt && hasPSModulePath {
+			printInstructions(`iwr https://s.defang.io/defang_win_amd64.zip -OutFile defang.zip; Expand-Archive defang.zip . -Force`)
+			return nil
+		}
 	}
 
 	// Default to the shell script

@@ -3,6 +3,7 @@ package logs
 import (
 	"context"
 	"log/slog"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
@@ -20,22 +21,30 @@ func NewTermLogger(t *term.Term) *slog.Logger {
 }
 
 func (h *termHandler) Handle(ctx context.Context, r slog.Record) error {
+	msg := r.Message
 	// Format attrs if any
-	var attrs string
 	if r.NumAttrs() > 0 {
+		var builder strings.Builder
+		builder.WriteString(msg)
+		opened := false
 		r.Attrs(func(a slog.Attr) bool {
-			if attrs == "" {
-				attrs = " {"
+			if !opened {
+				builder.WriteString(" {")
+				opened = true
 			} else {
-				attrs += ", "
+				builder.WriteString(", ")
 			}
-			attrs += a.String()
+			strVal := a.String()
+			if len(strVal) > 80 {
+				runes := []rune(strVal)
+				strVal = string(runes[:77]) + "..."
+			}
+			builder.WriteString(strVal)
 			return true
 		})
-		attrs += "}"
+		builder.WriteString("}")
+		msg = builder.String()
 	}
-
-	msg := r.Message + attrs
 
 	switch r.Level {
 	case slog.LevelDebug:

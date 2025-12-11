@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -118,7 +118,8 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) *defangv1.TailRes
 			// LogStreams: "app/app_hg2xsgvsldqk/198f58c08c734bda924edc516f93b2d5"
 			response.Host = parts[2] // TODO: figure out actual hostname/IP for Task ID
 			underscore := strings.LastIndexByte(parts[1], '_')
-			if etag := parts[1][underscore+1:]; pkg.IsValidRandomID(etag) {
+			etag, err := types.ParseEtag(parts[1][underscore+1:])
+			if err == nil {
 				response.Service = parts[1][:underscore]
 				response.Etag = etag
 				break

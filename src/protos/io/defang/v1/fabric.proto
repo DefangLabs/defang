@@ -455,6 +455,7 @@ message Deployment {
   string region = 7;
   Provider provider = 8;
   int32 service_count = 9;
+  string stack = 10;
 }
 
 message PutDeploymentRequest { Deployment deployment = 1; }
@@ -746,13 +747,20 @@ message GetServicesRequest { string project = 1; }
 message DelegateSubdomainZoneRequest {
   repeated string name_server_records = 1;
   string project = 2;
+  string stack = 3;
 }
 
 message DelegateSubdomainZoneResponse { string zone = 1; }
 
-message DeleteSubdomainZoneRequest { string project = 1; }
+message DeleteSubdomainZoneRequest {
+  string project = 1;
+  string stack = 2;
+}
 
-message GetDelegateSubdomainZoneRequest { string project = 1; }
+message GetDelegateSubdomainZoneRequest {
+  string project = 1;
+  string stack = 2;
+}
 
 enum SubscriptionTier {
   SUBSCRIPTION_TIER_UNSPECIFIED = 0;

@@ -361,16 +361,17 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"DEFANG_MODE":              strings.ToLower(cmd.mode.String()),
 		"DEFANG_ORG":               "defang",
 		"DEFANG_PREFIX":            b.Prefix,
+		"DEFANG_PULUMI_DEBUG":      os.Getenv("DEFANG_PULUMI_DEBUG"),
 		"DEFANG_PULUMI_DIFF":       os.Getenv("DEFANG_PULUMI_DIFF"),
 		"DEFANG_STATE_URL":         defangStateUrl,
 		"GCP_PROJECT":              b.driver.ProjectId,
 		"PROJECT":                  cmd.project,
-		pulumiBackendKey:           pulumiBackendValue,          // TODO: make secret
 		"PULUMI_CONFIG_PASSPHRASE": byoc.PulumiConfigPassphrase, // TODO: make secret
 		"PULUMI_COPILOT":           "false",
 		"PULUMI_SKIP_UPDATE_CHECK": "true",
 		"REGION":                   b.driver.Region,
 		"STACK":                    b.PulumiStack,
+		pulumiBackendKey:           pulumiBackendValue, // TODO: make secret
 	}
 
 	if !term.StdoutCanColor() {
@@ -479,7 +480,7 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 		return nil, err
 	}
 
-	etag := pkg.RandomID()
+	etag := types.NewEtag()
 	serviceInfos, err := b.GetServiceInfos(ctx, project.Name, req.DelegateDomain, etag, project.Services)
 	if err != nil {
 		return nil, err

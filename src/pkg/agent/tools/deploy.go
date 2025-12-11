@@ -7,19 +7,22 @@ import (
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
+	"github.com/DefangLabs/defang/src/pkg/auth"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (string, error) {
-	err := common.ProviderNotConfiguredError(*providerId)
-	if err != nil {
-		return "", err
-	}
+type DeployParams struct {
+	common.LoaderParams
+}
 
+func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
@@ -29,16 +32,27 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, provi
 	}
 
 	term.Debug("Function invoked: cli.Connect")
-	client, err := cli.Connect(ctx, cluster)
+	client, err := cli.Connect(ctx, config.Cluster)
 	if err != nil {
-		return "", fmt.Errorf("could not connect: %w", err)
+		err = cli.InteractiveLoginMCP(ctx, client, config.Cluster, common.MCPDevelopmentClient)
+		if err != nil {
+			var noBrowserErr auth.ErrNoBrowser
+			if errors.As(err, &noBrowserErr) {
+				return noBrowserErr.Error(), nil
+			}
+			return "", err
+		}
 	}
 
-	term.Debug("Function invoked: cli.NewProvider")
-
-	provider, err := cli.CheckProviderConfigured(ctx, client, *providerId, project.Name, "", len(project.Services))
+	pp := NewProviderPreparer(cli, ec, client)
+	providerID, provider, err := pp.SetupProvider(ctx, config.Stack)
 	if err != nil {
-		return "", fmt.Errorf("provider not configured correctly: %w", err)
+		return "", fmt.Errorf("failed to setup provider: %w", err)
+	}
+
+	err = cli.CanIUseProvider(ctx, client, *providerID, project.Name, provider, len(project.Services))
+	if err != nil {
+		return "", fmt.Errorf("failed to use provider: %w", err)
 	}
 
 	// Deploy the services
@@ -54,7 +68,17 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, provi
 	if err != nil {
 		err = fmt.Errorf("failed to compose up services: %w", err)
 
-		err = common.FixupConfigError(err)
+		var missing compose.ErrMissingConfig
+		if errors.As(err, &missing) {
+			err := requestMissingConfig(ctx, ec, cli, provider, project.Name, missing)
+			if err != nil {
+				return "", fmt.Errorf("failed to request missing config: %w", err)
+			}
+
+			// try again
+			return HandleDeployTool(ctx, loader, cli, ec, config)
+		}
+
 		return "", err
 	}
 
@@ -62,41 +86,17 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, provi
 		return "", errors.New("no services deployed")
 	}
 
-	// Success case
-	term.Debugf("Successfully started deployed services with etag: %s", deployResp.Etag)
-
-	// Log deployment success
-	term.Debug("Deployment Started!")
 	term.Debugf("Deployment ID: %s", deployResp.Etag)
 
-	var portal string
-	if *providerId == cliClient.ProviderDefang {
-		// Get the portal URL for browser preview
-		portalURL := "https://portal.defang.io/"
-
-		// Open the portal URL in the browser
-		term.Debugf("Opening portal URL in browser: %s", portalURL)
-		go func() {
-			err := cli.OpenBrowser(portalURL)
-			if err != nil {
-				term.Error("Failed to open URL in browser", "error", err, "url", portalURL)
-			}
-		}()
-
-		// Log browser preview information
-		term.Debugf("🌐 %s available", portalURL)
-		portal = "Please use the web portal url: %s" + portalURL
-	} else {
-		// portalURL := fmt.Sprintf("https://%s.signin.aws.amazon.com/console")
-		portal = fmt.Sprintf("Please use the %s console", providerId)
-	}
-
-	// Log service details
-	term.Debug("Services:")
-	for _, serviceInfo := range deployResp.Services {
-		term.Debugf("- %s", serviceInfo.Service.Name)
-		term.Debugf("  Public URL: %s", serviceInfo.PublicFqdn)
-		term.Debugf("  Status: %s", serviceInfo.Status)
+	_, err = cli.TailAndMonitor(ctx, project, provider, 0, cliTypes.TailOptions{
+		Follow:     true,
+		Deployment: deployResp.Etag,
+		Verbose:    true,
+		LogType:    logs.LogTypeAll,
+		Raw:        true,
+	})
+	if err != nil {
+		return "", fmt.Errorf("error during deployment %q: %w", deployResp.Etag, err)
 	}
 
 	urls := strings.Builder{}
@@ -106,6 +106,21 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, provi
 		}
 	}
 
-	// Return the etag data as text
-	return fmt.Sprintf("%s to follow the deployment of %s, with the deployment ID of %s:\n%s", portal, project.Name, deployResp.Etag, urls.String()), nil
+	return fmt.Sprintf("Deployment %q completed successfully\n%s", deployResp.Etag, urls.String()), nil
+}
+
+func requestMissingConfig(ctx context.Context, ec elicitations.Controller, cli CLIInterface, provider client.Provider, projectName string, names []string) error {
+	for _, name := range names {
+		value, err := ec.RequestString(ctx, "This config value needs to be set", name)
+		if err != nil {
+			return fmt.Errorf("failed to request config %q: %w", name, err)
+		}
+
+		err = cli.ConfigSet(ctx, projectName, provider, name, value)
+		if err != nil {
+			return fmt.Errorf("failed to set config %q: %w", name, err)
+		}
+	}
+
+	return nil
 }

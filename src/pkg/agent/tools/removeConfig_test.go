@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 
-	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/bufbuild/connect-go"
-	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -58,33 +59,16 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 	tests := []struct {
 		name                 string
 		configName           string
-		providerID           client.ProviderID
 		setupMock            func(*MockRemoveConfigCLI)
 		expectError          bool
 		expectedTextContains string
 		expectedError        string
 	}{
 		{
-			name:          "provider_auto_not_configured",
-			configName:    "DATABASE_URL",
-			providerID:    client.ProviderAuto,
-			setupMock:     func(m *MockRemoveConfigCLI) {},
-			expectError:   true,
-			expectedError: common.ErrNoProviderSet.Error(),
-		},
-		{
-			name:          "missing_config_name",
-			configName:    "",
-			providerID:    client.ProviderAWS,
-			setupMock:     func(m *MockRemoveConfigCLI) {},
-			expectError:   true,
-			expectedError: "missing config `name`: required argument \"name\" not found",
-		},
-		{
 			name:       "connect_error",
 			configName: "DATABASE_URL",
-			providerID: client.ProviderAWS,
 			setupMock: func(m *MockRemoveConfigCLI) {
+				m.ProjectName = "test-project"
 				m.ConnectError = errors.New("connection failed")
 			},
 			expectError:   true,
@@ -93,17 +77,16 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 		{
 			name:       "load_project_name_error",
 			configName: "DATABASE_URL",
-			providerID: client.ProviderAWS,
 			setupMock: func(m *MockRemoveConfigCLI) {
+				m.ProjectName = "test-project"
 				m.LoadProjectNameError = errors.New("failed to load project name")
 			},
 			expectError:   true,
-			expectedError: "Failed to load project name: failed to load project name",
+			expectedError: "failed to load project name: failed to load project name",
 		},
 		{
 			name:       "config_not_found",
 			configName: "NONEXISTENT_CONFIG",
-			providerID: client.ProviderAWS,
 			setupMock: func(m *MockRemoveConfigCLI) {
 				m.ProjectName = "test-project"
 				m.ConfigDeleteNotFoundError = true
@@ -114,29 +97,32 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 		{
 			name:       "config_delete_error",
 			configName: "DATABASE_URL",
-			providerID: client.ProviderAWS,
 			setupMock: func(m *MockRemoveConfigCLI) {
 				m.ProjectName = "test-project"
 				m.ConfigDeleteError = errors.New("failed to delete config")
 			},
 			expectError:   true,
-			expectedError: "Failed to remove config variable \"DATABASE_URL\" from project \"test-project\": failed to delete config",
+			expectedError: "failed to remove config variable \"DATABASE_URL\" from project \"test-project\": failed to delete config",
 		},
 		{
 			name:       "successful_config_removal",
 			configName: "DATABASE_URL",
-			providerID: client.ProviderAWS,
 			setupMock: func(m *MockRemoveConfigCLI) {
 				m.ProjectName = "test-project"
 				// No errors, successful removal
 			},
 			expectError:          false,
-			expectedTextContains: "Successfully remove the config variable \"DATABASE_URL\" from project \"test-project\"",
+			expectedTextContains: "Successfully removed the config variable \"DATABASE_URL\" from project \"test-project\"",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Chdir("testdata")
+			os.Unsetenv("DEFANG_PROVIDER")
+			os.Unsetenv("AWS_PROFILE")
+			os.Unsetenv("AWS_REGION")
+
 			// Create mock and configure it
 			mockCLI := &MockRemoveConfigCLI{
 				CallLog: []string{},
@@ -149,26 +135,27 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				args["name"] = tt.configName
 			}
 
-			request := mcp.CallToolRequest{
-				Params: mcp.CallToolParams{
-					Name:      "remove_config",
-					Arguments: args,
-				},
-			}
-
-			params, err := ParseRemoveConfigParams(request)
-			if err != nil {
-				if tt.expectError {
-					assert.EqualError(t, err, tt.expectedError)
-					return
-				} else {
-					require.NoError(t, err)
-				}
+			params := RemoveConfigParams{
+				Name: tt.configName,
 			}
 
 			// Call the function
-			loader := &client.MockLoader{}
-			result, err := HandleRemoveConfigTool(t.Context(), loader, params, &tt.providerID, "test-cluster", mockCLI)
+			loader := &client.MockLoader{
+				Project: compose.Project{Name: "test-project"},
+			}
+			ec := elicitations.NewController(&mockElicitationsClient{
+				responses: map[string]string{
+					"strategy":     "profile",
+					"profile_name": "default",
+				},
+			})
+			provider := client.ProviderAWS
+			stackName := "test-stack"
+			result, err := HandleRemoveConfigTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
+				Cluster:    "test-cluster",
+				ProviderID: &provider,
+				Stack:      &stackName,
+			})
 
 			// Verify error expectations
 			if tt.expectError {

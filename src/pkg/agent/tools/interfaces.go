@@ -3,6 +3,7 @@ package tools
 
 import (
 	"context"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
@@ -15,7 +16,6 @@ import (
 
 type CLIInterface interface {
 	CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, provider cliClient.Provider, serviceCount int) error
-	CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName, stack string, serviceCount int) (cliClient.Provider, error)
 	ComposeDown(ctx context.Context, projectName string, client *cliClient.GrpcClient, provider cliClient.Provider) (string, error)
 	ComposeUp(ctx context.Context, client *cliClient.GrpcClient, provider cliClient.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error)
 	ConfigDelete(ctx context.Context, projectName string, provider cliClient.Provider, name string) error
@@ -29,8 +29,8 @@ type CLIInterface interface {
 	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
 	LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error)
 	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient, stack string) cliClient.Provider
-	OpenBrowser(url string) error
 	PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string
 	RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error)
-	Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cliTypes.TailOptions) error
+	Tail(ctx context.Context, provider cliClient.Provider, projectName string, options cliTypes.TailOptions) error
+	TailAndMonitor(ctx context.Context, project *compose.Project, provider cliClient.Provider, waitTimeout time.Duration, options cliTypes.TailOptions) (cli.ServiceStates, error)
 }

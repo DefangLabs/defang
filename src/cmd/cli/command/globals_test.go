@@ -1,6 +1,7 @@
 package command
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,8 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/pflag"
 )
 
@@ -24,30 +27,6 @@ func Test_readGlobals(t *testing.T) {
 		}
 		if v := os.Getenv("VALUE"); v != "from OS env" {
 			t.Errorf("expected VALUE to be 'from OS env', got '%s'", v)
-		}
-		os.Unsetenv("VALUE")
-	})
-
-	t.Run(".defang/test beats .defang", func(t *testing.T) {
-		t.Chdir("testdata/with-stack")
-		err := testConfig.loadDotDefang("test")
-		if err != nil {
-			t.Fatalf("%v", err)
-		}
-		if v := os.Getenv("VALUE"); v != "from .defang/test" {
-			t.Errorf("expected VALUE to be 'from .defang/test', got '%s'", v)
-		}
-		os.Unsetenv("VALUE")
-	})
-
-	t.Run(".defang used if no stack", func(t *testing.T) {
-		t.Chdir("testdata/no-stack")
-		err := testConfig.loadDotDefang("")
-		if err != nil {
-			t.Fatalf("%v", err)
-		}
-		if v := os.Getenv("VALUE"); v != "from .defang" {
-			t.Errorf("expected VALUE to be 'from .defang', got '%s'", v)
 		}
 		os.Unsetenv("VALUE")
 	})
@@ -246,41 +225,6 @@ func Test_configurationPrecedence(t *testing.T) {
 			expected: defaultConfig,
 		},
 		{
-			name:         "default .defang name, when no env vars or flags",
-			createRCFile: true,
-			rcStack: stack{
-				stackname: "",
-				entries: map[string]string{
-					"DEFANG_MODE":            "AFFORDABLE",
-					"DEFANG_VERBOSE":         "true",
-					"DEFANG_DEBUG":           "false",
-					"DEFANG_STACK":           "from-env",
-					"DEFANG_FABRIC":          "from-env-cluster",
-					"DEFANG_PROVIDER":        "defang",
-					"DEFANG_ORG":             "from-env-org",
-					"DEFANG_SOURCE_PLATFORM": "heroku",
-					"DEFANG_COLOR":           "always",
-					"DEFANG_TTY":             "false",
-					"DEFANG_NON_INTERACTIVE": "true",
-					"DEFANG_HIDE_UPDATE":     "true",
-				},
-			},
-			expected: GlobalConfig{
-				Mode:           modes.ModeAffordable, // env file values
-				Verbose:        true,
-				Debug:          false,
-				Stack:          "from-env",
-				Cluster:        "from-env-cluster",
-				ProviderID:     cliClient.ProviderDefang,
-				Org:            "from-env-org",
-				SourcePlatform: migrate.SourcePlatformHeroku,
-				ColorMode:      ColorAlways,
-				HasTty:         false, // from env
-				NonInteractive: true,  // from env
-				HideUpdate:     true,  // from env
-			},
-		},
-		{
 			name:         "default .defang name and no values, when no env vars or flags",
 			createRCFile: true,
 			rcStack: stack{
@@ -418,6 +362,107 @@ func Test_configurationPrecedence(t *testing.T) {
 			}
 			if testConfig.HideUpdate != tt.expected.HideUpdate {
 				t.Errorf("expected HideUpdate to be %v, got %v", tt.expected.HideUpdate, testConfig.HideUpdate)
+			}
+		})
+	}
+}
+
+/*
+Test_checkEnvConflicts tests the checkEnvConflicts function to ensure it correctly identifies
+conflicts between environment variables set in the shell and those defined in a stack file.
+It verifies that warnings are issued when conflicts are detected and that no warnings are issued
+when there are no conflicts.
+*/
+func Test_checkEnvConflicts(t *testing.T) {
+	tests := []struct {
+		name           string
+		stackContent   string
+		shellEnv       map[string]string
+		expectConflict bool
+	}{
+		{
+			name: "Conflict detected - AWS_PROFILE",
+			stackContent: `AWS_REGION="us-west-2"
+DEFANG_MODE="affordable"
+DEFANG_PROVIDER="aws"
+AWS_PROFILE="defang-lab"`,
+			shellEnv: map[string]string{
+				"AWS_PROFILE": "defang-sandbox",
+			},
+			expectConflict: true,
+		},
+		{
+			name: "No conflict - different values in different vars",
+			stackContent: `AWS_REGION="us-west-2"
+DEFANG_MODE="affordable"
+DEFANG_PROVIDER="aws"`,
+			shellEnv: map[string]string{
+				"AWS_PROFILE": "defang-sandbox",
+			},
+			expectConflict: false,
+		},
+		{
+			name: "No conflict - same value",
+			stackContent: `AWS_PROFILE="defang-lab"
+AWS_REGION="us-west-2"`,
+			shellEnv: map[string]string{
+				"AWS_PROFILE": "defang-lab",
+			},
+			expectConflict: false,
+		},
+		{
+			name: "Conflict detected - multiple vars",
+			stackContent: `AWS_PROFILE="defang-lab"
+AWS_REGION="us-east-1"`,
+			shellEnv: map[string]string{
+				"AWS_PROFILE": "defang-sandbox",
+				"AWS_REGION":  "us-west-2",
+			},
+			expectConflict: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prevTerm := term.DefaultTerm
+			var stdout, stderr bytes.Buffer
+			term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
+			t.Cleanup(func() {
+				term.DefaultTerm = prevTerm
+			})
+
+			// Create a temporary directory and stack file
+			tempDir := t.TempDir()
+			t.Chdir(tempDir)
+			stackName := "test"
+			stackFile := filepath.Join(tempDir, stacks.Directory, stackName)
+
+			// Create the .defang subdirectory
+			err := os.MkdirAll(filepath.Join(tempDir, stacks.Directory), 0700)
+			if err != nil {
+				t.Fatalf("failed to create .defang directory: %v", err)
+			}
+
+			// Write the stack file
+			err = os.WriteFile(stackFile, []byte(tt.stackContent), 0644)
+			if err != nil {
+				t.Fatalf("failed to write stack file: %v", err)
+			}
+
+			// Set shell environment variables
+			for key, value := range tt.shellEnv {
+				t.Setenv(key, value)
+			}
+
+			// Call checkEnvConflicts - it displays warnings but doesn't return errors
+			checkEnvConflicts(stackName)
+
+			if tt.expectConflict && !term.HadWarnings() {
+				t.Errorf("Expected warning conflicts, but no warnings were generated")
+			}
+
+			if !tt.expectConflict && term.HadWarnings() {
+				t.Errorf("Expected no warning conflicts, but warnings were generated: %s", stderr.String())
 			}
 		})
 	}
