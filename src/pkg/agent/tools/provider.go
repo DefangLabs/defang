@@ -399,25 +399,23 @@ func (pp *providerPreparer) SetupAWSAuthentication(ctx context.Context) error {
 	}
 
 	// TODO: add support for aws sso strategy
-	if os.Getenv("AWS_PROFILE") == "" {
-		knownProfiles, err := listAWSProfiles()
+	knownProfiles, err := listAWSProfiles()
+	if err != nil {
+		return fmt.Errorf("failed to list AWS profiles: %w", err)
+	}
+	if len(knownProfiles) > 0 {
+		const useAccessKeysOption = "Use Access Key ID and Secret Access Key"
+		knownProfiles = append(knownProfiles, useAccessKeysOption)
+		profile, err := pp.ec.RequestEnum(ctx, "Select your profile", "profile_name", knownProfiles)
 		if err != nil {
-			return fmt.Errorf("failed to list AWS profiles: %w", err)
+			return fmt.Errorf("failed to elicit AWS Profile Name: %w", err)
 		}
-		if len(knownProfiles) > 0 {
-			const useAccessKeysOption = "Use Access Key ID and Secret Access Key"
-			knownProfiles = append(knownProfiles, useAccessKeysOption)
-			profile, err := pp.ec.RequestEnum(ctx, "Select your profile", "profile_name", knownProfiles)
+		if profile != useAccessKeysOption {
+			err := os.Setenv("AWS_PROFILE", profile)
 			if err != nil {
-				return fmt.Errorf("failed to elicit AWS Profile Name: %w", err)
+				return fmt.Errorf("failed to set AWS_PROFILE environment variable: %w", err)
 			}
-			if profile != useAccessKeysOption {
-				err := os.Setenv("AWS_PROFILE", profile)
-				if err != nil {
-					return fmt.Errorf("failed to set AWS_PROFILE environment variable: %w", err)
-				}
-				return nil
-			}
+			return nil
 		}
 	}
 	if os.Getenv("AWS_ACCESS_KEY_ID") == "" {
