@@ -74,7 +74,6 @@ type GlobalConfig struct {
 	Debug          bool
 	HasTty         bool
 	HideUpdate     bool
-	Mode           modes.Mode
 	ModelID        string // only for debug/generate; Pro users
 	NonInteractive bool
 	Org            string
@@ -95,9 +94,8 @@ var global GlobalConfig = GlobalConfig{
 	Debug:          false,
 	HasTty:         term.IsTerminal(),
 	HideUpdate:     false,
-	Mode:           modes.ModeUnspecified,
 	NonInteractive: !term.IsTerminal(),
-	Stack:          stacks.StackParameters{Provider: cliClient.ProviderAuto},
+	Stack:          stacks.StackParameters{Provider: cliClient.ProviderAuto, Mode: modes.ModeUnspecified},
 	SourcePlatform: migrate.SourcePlatformUnspecified, // default to auto-detecting the source platform
 	Verbose:        false,
 }
@@ -182,7 +180,7 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 
 	if !flags.Changed("mode") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_MODE"); ok {
-			err := r.Mode.Set(fromEnv)
+			err := r.Stack.Mode.Set(fromEnv)
 			if err != nil {
 				term.Debugf("invalid DEFANG_MODE value: %v", err)
 			}

@@ -167,7 +167,7 @@ var cdPreviewCmd = &cobra.Command{
 		}
 
 		return cli.Preview(cmd.Context(), project, global.Client, provider, cli.ComposeUpParams{
-			Mode:       global.Mode,
+			Mode:       global.Stack.Mode,
 			Project:    project,
 			UploadMode: compose.UploadModePreview,
 			Stack:      global.Stack.Name,

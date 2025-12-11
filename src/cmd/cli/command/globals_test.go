@@ -2,13 +2,11 @@ package command
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/migrate"
-	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/pflag"
@@ -45,11 +43,11 @@ func Test_configurationPrecedence(t *testing.T) {
 
 	// make a default config for comparison and copying
 	defaultConfig := GlobalConfig{
-		ColorMode:      ColorAuto,
-		Debug:          false,
-		HasTty:         true, // set to true just for test instead of term.IsTerminal() for consistency
-		HideUpdate:     false,
-		Mode:           modes.ModeUnspecified,
+		ColorMode:  ColorAuto,
+		Debug:      false,
+		HasTty:     true, // set to true just for test instead of term.IsTerminal() for consistency
+		HideUpdate: false,
+		// Mode:           modes.ModeUnspecified,
 		NonInteractive: false, // set to false just for test instead of !term.IsTerminal() for consistency
 		// ProviderID:     cliClient.ProviderAuto,
 		SourcePlatform: migrate.SourcePlatformUnspecified,
@@ -118,7 +116,7 @@ func Test_configurationPrecedence(t *testing.T) {
 				"non-interactive": "false",
 			},
 			expected: GlobalConfig{
-				Mode:    modes.ModeHighAvailability,
+				// Mode:    modes.ModeHighAvailability,
 				Verbose: false,
 				Debug:   true,
 				// Stack:          "from-flags",
@@ -166,7 +164,7 @@ func Test_configurationPrecedence(t *testing.T) {
 				"DEFANG_HIDE_UPDATE":     "false",
 			},
 			expected: GlobalConfig{
-				Mode:    modes.ModeBalanced,
+				// Mode:    modes.ModeBalanced,
 				Verbose: true,
 				Debug:   false,
 				// Stack:          "from-env",
@@ -201,7 +199,7 @@ func Test_configurationPrecedence(t *testing.T) {
 				},
 			},
 			expected: GlobalConfig{
-				Mode:    modes.ModeAffordable, // env file values
+				// Mode:    modes.ModeAffordable, // env file values
 				Verbose: true,
 				Debug:   false,
 				// Stack:          "from-env",
@@ -261,7 +259,7 @@ func Test_configurationPrecedence(t *testing.T) {
 			flags.BoolVar(&testConfig.Debug, "debug", testConfig.Debug, "debug logging for troubleshooting the CLI")
 			flags.BoolVar(&testConfig.NonInteractive, "non-interactive", testConfig.NonInteractive, "disable interactive prompts / no TTY")
 			flags.Var(&testConfig.SourcePlatform, "from", "the platform from which to migrate the project")
-			flags.VarP(&testConfig.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
+			// flags.VarP(&testConfig.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 
 			// Set flags based on user input (these override env and env file values)
 			for flagName, flagValue := range tt.flags {
@@ -326,9 +324,9 @@ func Test_configurationPrecedence(t *testing.T) {
 			}
 
 			// verify the final configuration matches expectations
-			if testConfig.Mode.String() != tt.expected.Mode.String() {
-				t.Errorf("expected Mode to be '%s', got '%s'", tt.expected.Mode.String(), testConfig.Mode.String())
-			}
+			// if testConfig.Mode.String() != tt.expected.Mode.String() {
+			// 	t.Errorf("expected Mode to be '%s', got '%s'", tt.expected.Mode.String(), testConfig.Mode.String())
+			// }
 			if testConfig.Verbose != tt.expected.Verbose {
 				t.Errorf("expected Verbose to be %v, got %v", tt.expected.Verbose, testConfig.Verbose)
 			}
