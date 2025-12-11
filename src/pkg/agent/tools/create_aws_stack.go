@@ -18,7 +18,6 @@ type CreateAWSStackParams struct {
 }
 
 func HandleCreateAWSStackTool(ctx context.Context, loader cliClient.ProjectLoader, cli CLIInterface, params CreateAWSStackParams, sc *StackConfig) (string, error) {
-
 	mode, err := modes.Parse(*params.Mode)
 	if err != nil {
 		return "Invalid mode provided", err

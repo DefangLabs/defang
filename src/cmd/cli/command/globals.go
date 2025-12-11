@@ -274,7 +274,6 @@ in the file conflict with existing shell environment variables. If conflicts are
 found, it warns the user that the shell environment variable will take precedence.
 */
 func checkEnvConflicts(stackName string) error {
-
 	path, err := filepath.Abs(filepath.Join(stacks.Directory, stackName))
 	if err != nil {
 		return err

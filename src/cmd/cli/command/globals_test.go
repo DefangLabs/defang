@@ -421,7 +421,6 @@ AWS_REGION="us-east-1"`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			prevTerm := term.DefaultTerm
 			var stdout, stderr bytes.Buffer
 			term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
