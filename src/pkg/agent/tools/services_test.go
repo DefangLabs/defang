@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"testing"
-	"time"
 
 	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -113,10 +112,6 @@ func (m *MockCLI) RunEstimate(ctx context.Context, project *compose.Project, cli
 
 func (m *MockCLI) Tail(ctx context.Context, provider client.Provider, projectName string, options defangcli.TailOptions) error {
 	return nil
-}
-
-func (m *MockCLI) TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, options defangcli.TailOptions) (defangcli.ServiceStates, error) {
-	return nil, nil
 }
 
 // createConnectError creates a connect error with the specified code and message

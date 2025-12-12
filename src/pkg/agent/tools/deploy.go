@@ -13,7 +13,6 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
-	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
@@ -86,19 +85,6 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, cli C
 		return "", errors.New("no services deployed")
 	}
 
-	term.Debugf("Deployment ID: %s", deployResp.Etag)
-
-	_, err = cli.TailAndMonitor(ctx, project, provider, 0, cliTypes.TailOptions{
-		Follow:     true,
-		Deployment: deployResp.Etag,
-		Verbose:    true,
-		LogType:    logs.LogTypeAll,
-		Raw:        true,
-	})
-	if err != nil {
-		return "", fmt.Errorf("error during deployment %q: %w", deployResp.Etag, err)
-	}
-
 	urls := strings.Builder{}
 	for _, serviceInfo := range deployResp.Services {
 		if serviceInfo.PublicFqdn != "" {
@@ -106,7 +92,14 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, cli C
 		}
 	}
 
-	return fmt.Sprintf("Deployment %q completed successfully\n%s", deployResp.Etag, urls.String()), nil
+	return fmt.Sprintf(
+		"The deployment is not complete, but it has been started successfully.\n"+
+			"To follow progress, tail the logs for deployment %q.\n"+
+			"Your application will be available at the following url(s) when the deployment is complete:\n"+
+			"%s\n",
+		deployResp.Etag,
+		urls.String(),
+	), nil
 }
 
 func requestMissingConfig(ctx context.Context, ec elicitations.Controller, cli CLIInterface, provider client.Provider, projectName string, names []string) error {

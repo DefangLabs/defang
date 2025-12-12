@@ -5,7 +5,6 @@ import (
 	"context"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -106,8 +105,4 @@ func (DefaultToolCLI) GenerateAuthURL(authPort int) string {
 
 func (DefaultToolCLI) InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string, mcpClient string) error {
 	return login.InteractiveLoginMCP(ctx, client, cluster, mcpClient)
-}
-
-func (DefaultToolCLI) TailAndMonitor(ctx context.Context, project *compose.Project, provider cliClient.Provider, waitTimeout time.Duration, options cli.TailOptions) (cli.ServiceStates, error) {
-	return cli.TailAndMonitor(ctx, project, provider, waitTimeout, options)
 }

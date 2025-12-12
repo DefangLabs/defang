@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -77,11 +76,6 @@ func (m *MockDeployCLI) LoadProject(ctx context.Context, loader client.Loader) (
 	return m.Project, nil
 }
 
-func (m *MockDeployCLI) TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, options cli.TailOptions) (cli.ServiceStates, error) {
-	m.CallLog = append(m.CallLog, "TailAndMonitor")
-	return nil, nil
-}
-
 func (m *MockDeployCLI) CanIUseProvider(ctx context.Context, client *client.GrpcClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {
 	m.CallLog = append(m.CallLog, "CanIUseProvider")
 	return nil
@@ -140,7 +134,7 @@ func TestHandleDeployTool(t *testing.T) {
 					},
 				}
 			},
-			expectedTextContains: "Deployment \"test-etag\" completed successfully",
+			expectedTextContains: "The deployment is not complete, but it has been started successfully",
 		},
 		{
 			name: "successful_deploy_aws_provider",
@@ -153,7 +147,7 @@ func TestHandleDeployTool(t *testing.T) {
 					},
 				}
 			},
-			expectedTextContains: "Deployment \"test-etag\" completed successfully",
+			expectedTextContains: "The deployment is not complete, but it has been started successfully",
 		},
 	}
 
@@ -204,7 +198,6 @@ func TestHandleDeployTool(t *testing.T) {
 					"NewProvider(aws)",
 					"CanIUseProvider",
 					"ComposeUp",
-					"TailAndMonitor",
 				}
 				assert.Equal(t, expectedCalls, mockCLI.CallLog)
 			}

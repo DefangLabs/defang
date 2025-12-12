@@ -15,7 +15,6 @@ import (
 )
 
 func Test_readGlobals(t *testing.T) {
-
 	t.Run("OS env beats any .defang file", func(t *testing.T) {
 		t.Chdir("testdata/with-stack")
 		t.Setenv("VALUE", "from OS env")
