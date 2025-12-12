@@ -89,12 +89,7 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 		ai.NewTool("create_aws_stack",
 			"Create a defang stack file to deploy to AWS",
 			func(ctx *ai.ToolContext, params CreateAWSStackParams) (string, error) {
-				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
-				if err != nil {
-					return "Failed to configure loader", err
-				}
-				cli := &DefaultToolCLI{}
-				return HandleCreateAWSStackTool(ctx.Context, loader, cli, params, &config)
+				return HandleCreateAWSStackTool(ctx.Context, params, &config)
 			},
 		),
 		ai.NewTool("current_stack",

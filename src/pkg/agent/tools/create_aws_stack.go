@@ -17,7 +17,7 @@ type CreateAWSStackParams struct {
 	Mode        *string `json:"mode" jsonschema:"description=The deployment mode for the stack."`
 }
 
-func HandleCreateAWSStackTool(ctx context.Context, loader cliClient.ProjectLoader, cli CLIInterface, params CreateAWSStackParams, sc *StackConfig) (string, error) {
+func HandleCreateAWSStackTool(ctx context.Context, params CreateAWSStackParams, sc *StackConfig) (string, error) {
 	mode, err := modes.Parse(*params.Mode)
 	if err != nil {
 		return "Invalid mode provided", err
