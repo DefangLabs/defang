@@ -38,6 +38,7 @@ func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc cliC
 func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.StackParameters) (*cliClient.ProviderID, cliClient.Provider, error) {
 	var providerID cliClient.ProviderID
 	var err error
+	// TODO: should never be nil
 	if stack == nil {
 		newStack, err := pp.setupStack(ctx)
 		if err != nil {

@@ -9,7 +9,7 @@ import (
 )
 
 func HandleCurrentStackTool(ctx context.Context, sc StackConfig) (string, error) {
-	if sc.Stack == nil {
+	if sc.Stack.Name == "" {
 		return "", errors.New("No stack is currently selected.")
 	}
 
