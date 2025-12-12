@@ -3,6 +3,7 @@ package tools
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -85,6 +86,9 @@ func selectStack(ctx context.Context, ec elicitations.Controller) (string, error
 }
 
 func (pp *providerPreparer) setupStack(ctx context.Context) (*stacks.StackParameters, error) {
+	if !pp.ec.IsSupported() {
+		return nil, errors.New("your mcp client does not support elicitations, use the 'select_stack' tool to choose a stack")
+	}
 	selectedStackName, err := selectStack(ctx, pp.ec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select stack: %w", err)
@@ -171,6 +175,9 @@ func (pp *providerPreparer) setupProviderAuthentication(ctx context.Context, pro
 }
 
 func (pp *providerPreparer) SetupAWSAuthentication(ctx context.Context) error {
+	if !pp.ec.IsSupported() {
+		return errors.New("your mcp client does not support elicitations, restart your mcp client with the AWS_PROFILE env var set")
+	}
 	if os.Getenv("AWS_PROFILE") != "" || (os.Getenv("AWS_ACCESS_KEY_ID") != "" && os.Getenv("AWS_SECRET_ACCESS_KEY") != "") {
 		return nil
 	}
@@ -222,6 +229,10 @@ func (pp *providerPreparer) SetupAWSAuthentication(ctx context.Context) error {
 }
 
 func (pp *providerPreparer) SetupGCPAuthentication(ctx context.Context) error {
+	if !pp.ec.IsSupported() {
+		return errors.New("your mcp client does not support elicitations, restart your mcp client with the GCP_PROJECT_ID env var set")
+	}
+
 	if os.Getenv("GCP_PROJECT_ID") == "" {
 		gcpProjectID, err := pp.ec.RequestString(ctx, "Enter your GCP Project ID:", "gcp_project_id")
 		if err != nil {
@@ -235,6 +246,10 @@ func (pp *providerPreparer) SetupGCPAuthentication(ctx context.Context) error {
 }
 
 func (pp *providerPreparer) SetupDOAuthentication(ctx context.Context) error {
+	if !pp.ec.IsSupported() {
+		return errors.New("your mcp client does not support elicitations, restart your mcp client with the DIGITALOCEAN_TOKEN, SPACES_ACCESS_KEY_ID, and SPACES_SECRET_ACCESS_KEY env vars set")
+	}
+
 	if os.Getenv("DIGITALOCEAN_TOKEN") == "" {
 		pat, err := pp.ec.RequestString(ctx, "Enter your DigitalOcean Personal Access Token:", "personal_access_token")
 		if err != nil {
