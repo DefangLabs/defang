@@ -26,5 +26,5 @@ func HandleSelectStackTool(ctx context.Context, params SelectStackParams, sc Sta
 
 	*sc.Stack = *stack
 
-	return fmt.Sprintf("Stack %q selected for tool calls.", sc.Stack), nil
+	return fmt.Sprintf("Stack %q selected.", sc.Stack.Name), nil
 }

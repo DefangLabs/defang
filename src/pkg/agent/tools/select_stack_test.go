@@ -35,7 +35,7 @@ func TestHandleSelectStackTool(t *testing.T) {
 				Region:   "placeholder",
 				Mode:     modes.ModeAffordable,
 			},
-			expectedResult: "Stack &{\"test-stack\" \"aws\" \"us-test-2\" \"\" \"\" \"\"} selected for tool calls.",
+			expectedResult: "Stack \"test-stack\" selected.",
 			expectedError:  false,
 		},
 		{
@@ -53,7 +53,7 @@ func TestHandleSelectStackTool(t *testing.T) {
 				Mode:         modes.ModeAffordable,
 				GCPProjectID: "old-project",
 			},
-			expectedResult: "Stack &{\"test-stack\" \"aws\" \"us-test-2\" \"\" \"\" \"\"} selected for tool calls.",
+			expectedResult: "Stack \"test-stack\" selected.",
 			expectedError:  false,
 		},
 		{
