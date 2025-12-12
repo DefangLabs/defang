@@ -52,7 +52,7 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.Sta
 		return nil, nil, fmt.Errorf("failed to set provider ID: %w", err)
 	}
 
-	err = pp.setupProviderAuthentication(ctx, *stack)
+	err = pp.setupProviderAuthentication(ctx, providerID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to setup provider authentication: %w", err)
 	}
@@ -163,28 +163,20 @@ func (pp *providerPreparer) createNewStack(ctx context.Context) (*stacks.StackLi
 	}, nil
 }
 
-func (pp *providerPreparer) setupProviderAuthentication(ctx context.Context, stack stacks.StackParameters) error {
-	switch stack.Provider {
+func (pp *providerPreparer) setupProviderAuthentication(ctx context.Context, providerId cliClient.ProviderID) error {
+	switch providerId {
 	case cliClient.ProviderAWS:
-		return pp.SetupAWSAuthentication(ctx, stack)
+		return pp.SetupAWSAuthentication(ctx)
 	case cliClient.ProviderGCP:
-		return pp.SetupGCPAuthentication(ctx, stack)
+		return pp.SetupGCPAuthentication(ctx)
 	case cliClient.ProviderDO:
 		return pp.SetupDOAuthentication(ctx)
 	}
 	return nil
 }
 
-func (pp *providerPreparer) SetupAWSAuthentication(ctx context.Context, stack stacks.StackParameters) error {
+func (pp *providerPreparer) SetupAWSAuthentication(ctx context.Context) error {
 	if os.Getenv("AWS_PROFILE") != "" || (os.Getenv("AWS_ACCESS_KEY_ID") != "" && os.Getenv("AWS_SECRET_ACCESS_KEY") != "") {
-		return nil
-	}
-
-	if stack.AWSProfile != "" {
-		if err := os.Setenv("AWS_PROFILE", stack.AWSProfile); err != nil {
-			return fmt.Errorf("failed to set AWS_PROFILE environment variable: %w", err)
-		}
-
 		return nil
 	}
 
@@ -238,16 +230,8 @@ func (pp *providerPreparer) SetupAWSAuthentication(ctx context.Context, stack st
 	return nil
 }
 
-func (pp *providerPreparer) SetupGCPAuthentication(ctx context.Context, stack stacks.StackParameters) error {
+func (pp *providerPreparer) SetupGCPAuthentication(ctx context.Context) error {
 	if os.Getenv("GCP_PROJECT_ID") != "" {
-		return nil
-	}
-
-	if stack.GCPProjectID != "" {
-		if err := os.Setenv("GCP_PROJECT_ID", stack.GCPProjectID); err != nil {
-			return fmt.Errorf("failed to set GCP_PROJECT_ID environment variable: %w", err)
-		}
-
 		return nil
 	}
 
