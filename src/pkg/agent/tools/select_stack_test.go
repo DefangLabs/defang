@@ -142,33 +142,3 @@ func TestHandleSelectStackTool(t *testing.T) {
 		})
 	}
 }
-
-func TestSelectStackParams(t *testing.T) {
-	t.Run("Stack parameter validation", func(t *testing.T) {
-		params := SelectStackParams{
-			LoaderParams: common.LoaderParams{
-				WorkingDirectory: ".",
-			},
-			Stack: "test-stack",
-		}
-
-		assert.Equal(t, "test-stack", params.Stack)
-		assert.Equal(t, ".", params.WorkingDirectory)
-	})
-
-	t.Run("Inherits LoaderParams fields", func(t *testing.T) {
-		params := SelectStackParams{
-			LoaderParams: common.LoaderParams{
-				WorkingDirectory: "/some/path",
-				ProjectName:      "my-project",
-				ComposeFilePaths: []string{"docker-compose.yml", "docker-compose.override.yml"},
-			},
-			Stack: "production-stack",
-		}
-
-		assert.Equal(t, "production-stack", params.Stack)
-		assert.Equal(t, "/some/path", params.WorkingDirectory)
-		assert.Equal(t, "my-project", params.ProjectName)
-		assert.Equal(t, []string{"docker-compose.yml", "docker-compose.override.yml"}, params.ComposeFilePaths)
-	})
-}
