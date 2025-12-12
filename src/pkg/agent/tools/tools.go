@@ -1,8 +1,6 @@
 package tools
 
 import (
-	"os"
-
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/firebase/genkit/go/ai"
@@ -14,12 +12,6 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 			"services",
 			"List deployed services for the project in the current working directory",
 			func(ctx *ai.ToolContext, params ServicesParams) (string, error) {
-				if params.WorkingDirectory != "" {
-					err := os.Chdir(params.WorkingDirectory)
-					if err != nil {
-						return "Failed to change working directory", err
-					}
-				}
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
@@ -31,12 +23,6 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 		ai.NewTool("deploy",
 			"Initiate deployment of the application defined in the docker-compose files in the current working directory",
 			func(ctx *ai.ToolContext, params DeployParams) (string, error) {
-				if params.WorkingDirectory != "" {
-					err := os.Chdir(params.WorkingDirectory)
-					if err != nil {
-						return "Failed to change working directory", err
-					}
-				}
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
@@ -48,12 +34,6 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 		ai.NewTool("destroy",
 			"Destroy the deployed application defined in the docker-compose files in the current working directory",
 			func(ctx *ai.ToolContext, params DestroyParams) (string, error) {
-				if params.WorkingDirectory != "" {
-					err := os.Chdir(params.WorkingDirectory)
-					if err != nil {
-						return "Failed to change working directory", err
-					}
-				}
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
@@ -65,12 +45,6 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 		ai.NewTool("logs",
 			"Fetch logs for the application in pages of up to 100 lines. You can use the 'since' and 'until' parameters to page through logs by time.",
 			func(ctx *ai.ToolContext, params LogsParams) (string, error) {
-				if params.WorkingDirectory != "" {
-					err := os.Chdir(params.WorkingDirectory)
-					if err != nil {
-						return "Failed to change working directory", err
-					}
-				}
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
@@ -82,12 +56,6 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 		ai.NewTool("estimate",
 			"Estimate the cost of deploying a Defang project to AWS or GCP",
 			func(ctx *ai.ToolContext, params EstimateParams) (string, error) {
-				if params.WorkingDirectory != "" {
-					err := os.Chdir(params.WorkingDirectory)
-					if err != nil {
-						return "Failed to change working directory", err
-					}
-				}
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
@@ -99,12 +67,6 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 		ai.NewTool("set_config",
 			"Set a config variable for the defang project",
 			func(ctx *ai.ToolContext, params SetConfigParams) (string, error) {
-				if params.WorkingDirectory != "" {
-					err := os.Chdir(params.WorkingDirectory)
-					if err != nil {
-						return "Failed to change working directory", err
-					}
-				}
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
@@ -116,72 +78,36 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 		ai.NewTool("select_stack",
 			"Select the deployment stack for the defang project",
 			func(ctx *ai.ToolContext, params SelectStackParams) (string, error) {
-				if params.WorkingDirectory != "" {
-					err := os.Chdir(params.WorkingDirectory)
-					if err != nil {
-						return "Failed to change working directory", err
-					}
-				}
 				return HandleSelectStackTool(ctx.Context, params, config)
 			},
 		),
 		ai.NewTool("create_aws_stack",
 			"Create a defang stack file to deploy to AWS",
 			func(ctx *ai.ToolContext, params CreateAWSStackParams) (string, error) {
-				if params.WorkingDirectory != "" {
-					err := os.Chdir(params.WorkingDirectory)
-					if err != nil {
-						return "Failed to change working directory", err
-					}
-				}
 				return HandleCreateAWSStackTool(ctx.Context, params, config)
 			},
 		),
 		ai.NewTool("create_gcp_stack",
 			"Create a defang stack file to deploy to GCP",
 			func(ctx *ai.ToolContext, params CreateGCPStackParams) (string, error) {
-				if params.WorkingDirectory != "" {
-					err := os.Chdir(params.WorkingDirectory)
-					if err != nil {
-						return "Failed to change working directory", err
-					}
-				}
 				return HandleCreateGCPStackTool(ctx.Context, params, config)
 			},
 		),
 		ai.NewTool("list_stacks",
 			"List all the Defang stack(s) for the current project",
-			func(ctx *ai.ToolContext, params common.LoaderParams) (string, error) {
-				if params.WorkingDirectory != "" {
-					err := os.Chdir(params.WorkingDirectory)
-					if err != nil {
-						return "Failed to change working directory", err
-					}
-				}
+			func(ctx *ai.ToolContext, params struct{}) (string, error) {
 				return HandleListStacksTool(ctx.Context)
 			},
 		),
 		ai.NewTool("current_stack",
 			"Get the currently selected stack",
-			func(ctx *ai.ToolContext, params common.LoaderParams) (string, error) {
-				if params.WorkingDirectory != "" {
-					err := os.Chdir(params.WorkingDirectory)
-					if err != nil {
-						return "Failed to change working directory", err
-					}
-				}
+			func(ctx *ai.ToolContext, params struct{}) (string, error) {
 				return HandleCurrentStackTool(ctx.Context, config)
 			},
 		),
 		ai.NewTool("remove_config",
 			"Remove a config variable from the defang project",
 			func(ctx *ai.ToolContext, params RemoveConfigParams) (string, error) {
-				if params.WorkingDirectory != "" {
-					err := os.Chdir(params.WorkingDirectory)
-					if err != nil {
-						return "Failed to change working directory", err
-					}
-				}
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
@@ -193,12 +119,6 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 		ai.NewTool("list_configs",
 			"List config variables for the defang project",
 			func(ctx *ai.ToolContext, params ListConfigsParams) (string, error) {
-				if params.WorkingDirectory != "" {
-					err := os.Chdir(params.WorkingDirectory)
-					if err != nil {
-						return "Failed to change working directory", err
-					}
-				}
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
