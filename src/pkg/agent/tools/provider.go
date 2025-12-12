@@ -43,7 +43,7 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.Sta
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to setup stack: %w", err)
 		}
-		stack = newStack
+		*stack = *newStack
 	}
 
 	err = providerID.Set(stack.Provider.Name())
