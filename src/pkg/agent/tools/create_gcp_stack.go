@@ -18,7 +18,7 @@ type CreateGCPStackParams struct {
 	Mode         string `json:"mode" jsonschema:"enum=affordable,enum=balaned,enum=high_availability,description=The deployment mode for the stack."`
 }
 
-func HandleCreateGCPStackTool(ctx context.Context, params CreateGCPStackParams, sc *StackConfig) (string, error) {
+func HandleCreateGCPStackTool(ctx context.Context, params CreateGCPStackParams, sc StackConfig) (string, error) {
 	var mode modes.Mode
 	var err error
 	if params.Mode == "" {

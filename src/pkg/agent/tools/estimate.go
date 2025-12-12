@@ -17,7 +17,7 @@ type EstimateParams struct {
 	Region         string `json:"region,omitempty" jsonschema:"description=The region in which to estimate costs."`
 }
 
-func HandleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, params EstimateParams, cli CLIInterface, sc *StackConfig) (string, error) {
+func HandleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, params EstimateParams, cli CLIInterface, sc StackConfig) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {

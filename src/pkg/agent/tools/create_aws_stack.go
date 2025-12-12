@@ -18,7 +18,7 @@ type CreateAWSStackParams struct {
 	Mode        string `json:"mode" jsonschema:"enum=affordable,enum=balaned,enum=high_availability,description=The deployment mode for the stack."`
 }
 
-func HandleCreateAWSStackTool(ctx context.Context, params CreateAWSStackParams, sc *StackConfig) (string, error) {
+func HandleCreateAWSStackTool(ctx context.Context, params CreateAWSStackParams, sc StackConfig) (string, error) {
 	var mode modes.Mode
 	var err error
 	if params.Mode == "" {

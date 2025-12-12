@@ -183,7 +183,7 @@ func TestHandleDeployTool(t *testing.T) {
 				Name:     "test-stack",
 				Provider: client.ProviderAWS,
 			}
-			result, err := HandleDeployTool(t.Context(), loader, mockCLI, ec, &StackConfig{
+			result, err := HandleDeployTool(t.Context(), loader, mockCLI, ec, StackConfig{
 				Cluster:    "test-cluster",
 				ProviderID: &providerID,
 				Stack:      &stack,

@@ -8,8 +8,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 )
 
-func HandleCurrentStackTool(ctx context.Context, sc *StackConfig) (string, error) {
-	if sc == nil || sc.Stack == nil {
+func HandleCurrentStackTool(ctx context.Context, sc StackConfig) (string, error) {
+	if sc.Stack == nil {
 		return "", errors.New("No stack is currently selected.")
 	}
 

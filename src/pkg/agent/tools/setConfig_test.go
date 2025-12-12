@@ -251,7 +251,7 @@ func TestHandleSetConfig(t *testing.T) {
 				Name:     "test-stack",
 				Provider: client.ProviderAWS,
 			}
-			result, err := HandleSetConfig(t.Context(), loader, params, tt.mockCLI, ec, &StackConfig{
+			result, err := HandleSetConfig(t.Context(), loader, params, tt.mockCLI, ec, StackConfig{
 				Cluster:    tt.cluster,
 				ProviderID: &tt.providerId,
 				Stack:      &stack,

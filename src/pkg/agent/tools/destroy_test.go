@@ -150,7 +150,7 @@ func TestHandleDestroyTool(t *testing.T) {
 				Name:     "test-stack",
 				Provider: client.ProviderAWS,
 			}
-			result, err := HandleDestroyTool(t.Context(), loader, mockCLI, ec, &StackConfig{
+			result, err := HandleDestroyTool(t.Context(), loader, mockCLI, ec, StackConfig{
 				Cluster:    "test-cluster",
 				ProviderID: &tt.providerID,
 				Stack:      &stack,

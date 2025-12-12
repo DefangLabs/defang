@@ -13,13 +13,13 @@ import (
 func TestHandleCurrentStackTool(t *testing.T) {
 	tests := []struct {
 		name          string
-		stackConfig   *StackConfig
+		stackConfig   StackConfig
 		expected      string
 		expectedError bool
 	}{
 		{
 			name: "Stack is set",
-			stackConfig: &StackConfig{
+			stackConfig: StackConfig{
 				Stack: &stacks.StackParameters{
 					Name:       "test-stack",
 					Provider:   client.ProviderAWS,
@@ -32,14 +32,8 @@ func TestHandleCurrentStackTool(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name:          "StackConfig is nil",
-			stackConfig:   nil,
-			expected:      "",
-			expectedError: true,
-		},
-		{
 			name:          "Stack is nil",
-			stackConfig:   &StackConfig{},
+			stackConfig:   StackConfig{},
 			expected:      "",
 			expectedError: true,
 		},

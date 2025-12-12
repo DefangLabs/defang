@@ -17,7 +17,7 @@ type RemoveConfigParams struct {
 }
 
 // HandleRemoveConfigTool handles the remove config tool logic
-func HandleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader, params RemoveConfigParams, cli CLIInterface, ec elicitations.Controller, sc *StackConfig) (string, error) {
+func HandleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader, params RemoveConfigParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, sc.Cluster)
 	if err != nil {

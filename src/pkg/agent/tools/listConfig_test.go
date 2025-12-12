@@ -138,7 +138,7 @@ func TestHandleListConfigTool(t *testing.T) {
 				Name:     "test-stack",
 				Provider: client.ProviderAWS,
 			}
-			result, err := HandleListConfigTool(t.Context(), loader, mockCLI, ec, &StackConfig{
+			result, err := HandleListConfigTool(t.Context(), loader, mockCLI, ec, StackConfig{
 				Cluster:    "test-cluster",
 				ProviderID: &tt.providerID,
 				Stack:      &stack,

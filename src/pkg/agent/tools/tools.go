@@ -17,7 +17,7 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 					return "Failed to configure loader", err
 				}
 				var cli CLIInterface = &DefaultToolCLI{}
-				return HandleServicesTool(ctx.Context, loader, cli, ec, &config)
+				return HandleServicesTool(ctx.Context, loader, cli, ec, config)
 			},
 		),
 		ai.NewTool("deploy",
@@ -28,7 +28,7 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 					return "Failed to configure loader", err
 				}
 				cli := &DefaultToolCLI{}
-				return HandleDeployTool(ctx.Context, loader, cli, ec, &config)
+				return HandleDeployTool(ctx.Context, loader, cli, ec, config)
 			},
 		),
 		ai.NewTool("destroy",
@@ -39,7 +39,7 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 					return "Failed to configure loader", err
 				}
 				cli := &DefaultToolCLI{}
-				return HandleDestroyTool(ctx.Context, loader, cli, ec, &config)
+				return HandleDestroyTool(ctx.Context, loader, cli, ec, config)
 			},
 		),
 		ai.NewTool("logs",
@@ -50,7 +50,7 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 					return "Failed to configure loader", err
 				}
 				cli := &DefaultToolCLI{}
-				return HandleLogsTool(ctx.Context, loader, params, cli, ec, &config)
+				return HandleLogsTool(ctx.Context, loader, params, cli, ec, config)
 			},
 		),
 		ai.NewTool("estimate",
@@ -61,7 +61,7 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 					return "Failed to configure loader", err
 				}
 				cli := &DefaultToolCLI{}
-				return HandleEstimateTool(ctx.Context, loader, params, cli, &config)
+				return HandleEstimateTool(ctx.Context, loader, params, cli, config)
 			},
 		),
 		ai.NewTool("set_config",
@@ -72,7 +72,7 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 					return "Failed to configure loader", err
 				}
 				cli := &DefaultToolCLI{}
-				return HandleSetConfig(ctx.Context, loader, params, cli, ec, &config)
+				return HandleSetConfig(ctx.Context, loader, params, cli, ec, config)
 			},
 		),
 		ai.NewTool("select_stack",
@@ -83,25 +83,25 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 					return "Failed to configure loader", err
 				}
 				cli := &DefaultToolCLI{}
-				return HandleSelectStackTool(ctx.Context, loader, cli, params, &config)
+				return HandleSelectStackTool(ctx.Context, loader, cli, params, config)
 			},
 		),
 		ai.NewTool("create_aws_stack",
 			"Create a defang stack file to deploy to AWS",
 			func(ctx *ai.ToolContext, params CreateAWSStackParams) (string, error) {
-				return HandleCreateAWSStackTool(ctx.Context, params, &config)
+				return HandleCreateAWSStackTool(ctx.Context, params, config)
 			},
 		),
 		ai.NewTool("create_gcp_stack",
 			"Create a defang stack file to deploy to GCP",
 			func(ctx *ai.ToolContext, params CreateGCPStackParams) (string, error) {
-				return HandleCreateGCPStackTool(ctx.Context, params, &config)
+				return HandleCreateGCPStackTool(ctx.Context, params, config)
 			},
 		),
 		ai.NewTool("current_stack",
 			"Get the currently selected stack",
 			func(ctx *ai.ToolContext, params struct{}) (string, error) {
-				return HandleCurrentStackTool(ctx.Context, &config)
+				return HandleCurrentStackTool(ctx.Context, config)
 			},
 		),
 		ai.NewTool("remove_config",
@@ -112,7 +112,7 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 					return "Failed to configure loader", err
 				}
 				cli := &DefaultToolCLI{}
-				return HandleRemoveConfigTool(ctx.Context, loader, params, cli, ec, &config)
+				return HandleRemoveConfigTool(ctx.Context, loader, params, cli, ec, config)
 			},
 		),
 		ai.NewTool("list_configs",
@@ -123,7 +123,7 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 					return "Failed to configure loader", err
 				}
 				cli := &DefaultToolCLI{}
-				return HandleListConfigTool(ctx.Context, loader, cli, ec, &config)
+				return HandleListConfigTool(ctx.Context, loader, cli, ec, config)
 			},
 		),
 	}
