@@ -6,7 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/pflag"
@@ -116,12 +118,14 @@ func Test_configurationPrecedence(t *testing.T) {
 				"non-interactive": "false",
 			},
 			expected: GlobalConfig{
-				// Mode:    modes.ModeHighAvailability,
 				Verbose: false,
 				Debug:   true,
-				// Stack:          "from-flags",
-				Cluster: "from-flags-cluster",
-				// ProviderID:     cliClient.ProviderAWS,
+				Stack: stacks.StackParameters{
+					Name:     "from-flags",
+					Provider: cliClient.ProviderAWS,
+					Mode:     modes.ModeHighAvailability,
+				},
+				Cluster:        "from-flags-cluster",
 				Org:            "from-flags-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAlways,
@@ -164,12 +168,14 @@ func Test_configurationPrecedence(t *testing.T) {
 				"DEFANG_HIDE_UPDATE":     "false",
 			},
 			expected: GlobalConfig{
-				// Mode:    modes.ModeBalanced,
 				Verbose: true,
 				Debug:   false,
-				// Stack:          "from-env",
-				Cluster: "from-env-cluster",
-				// ProviderID:     cliClient.ProviderGCP,
+				Stack: stacks.StackParameters{
+					Name:     "from-env",
+					Provider: cliClient.ProviderGCP,
+					Mode:     modes.ModeBalanced,
+				},
+				Cluster:        "from-env-cluster",
 				Org:            "from-env-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAuto,
@@ -199,12 +205,14 @@ func Test_configurationPrecedence(t *testing.T) {
 				},
 			},
 			expected: GlobalConfig{
-				// Mode:    modes.ModeAffordable, // env file values
 				Verbose: true,
 				Debug:   false,
-				// Stack:          "from-env",
-				Cluster: "from-env-cluster",
-				// ProviderID:     cliClient.ProviderDefang,
+				Stack: stacks.StackParameters{
+					Name:     "from-env",
+					Provider: cliClient.ProviderDefang,
+					Mode:     modes.ModeAffordable,
+				},
+				Cluster:        "from-env-cluster",
 				Org:            "from-env-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAlways,
@@ -250,16 +258,16 @@ func Test_configurationPrecedence(t *testing.T) {
 
 			// simulate SetupCommands()
 			flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
-			// flags.StringVarP(&testConfig.Stack, "stack", "s", testConfig.Stack, "stack name (for BYOC providers)")
+			flags.StringVarP(&testConfig.Stack.Name, "stack", "s", testConfig.Stack.Name, "stack name (for BYOC providers)")
 			flags.Var(&testConfig.ColorMode, "color", "colorize output")
 			flags.StringVar(&testConfig.Cluster, "cluster", testConfig.Cluster, "Defang cluster to connect to")
 			flags.StringVar(&testConfig.Org, "org", testConfig.Org, "override GitHub organization name (tenant)")
-			// flags.VarP(&testConfig.ProviderID, "provider", "P", "bring-your-own-cloud provider")
+			flags.VarP(&testConfig.Stack.Provider, "provider", "P", "bring-your-own-cloud provider")
 			flags.BoolVarP(&testConfig.Verbose, "verbose", "v", testConfig.Verbose, "verbose logging")
 			flags.BoolVar(&testConfig.Debug, "debug", testConfig.Debug, "debug logging for troubleshooting the CLI")
 			flags.BoolVar(&testConfig.NonInteractive, "non-interactive", testConfig.NonInteractive, "disable interactive prompts / no TTY")
 			flags.Var(&testConfig.SourcePlatform, "from", "the platform from which to migrate the project")
-			// flags.VarP(&testConfig.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
+			flags.VarP(&testConfig.Stack.Mode, "mode", "m", "deployment mode")
 
 			// Set flags based on user input (these override env and env file values)
 			for flagName, flagValue := range tt.flags {
@@ -333,8 +341,14 @@ func Test_configurationPrecedence(t *testing.T) {
 			if testConfig.Debug != tt.expected.Debug {
 				t.Errorf("expected Debug to be %v, got %v", tt.expected.Debug, testConfig.Debug)
 			}
-			if testConfig.Stack != tt.expected.Stack {
-				t.Errorf("expected Stack to be '%s', got '%s'", tt.expected.Stack, testConfig.Stack)
+			if testConfig.Stack.Name != tt.expected.Stack.Name {
+				t.Errorf("expected Stack.Name to be '%s', got '%s'", tt.expected.Stack.Name, testConfig.Stack.Name)
+			}
+			if testConfig.Stack.Provider != tt.expected.Stack.Provider {
+				t.Errorf("expected Stack.Provider to be '%s', got '%s'", tt.expected.Stack.Provider, testConfig.Stack.Provider)
+			}
+			if testConfig.Stack.Mode != tt.expected.Stack.Mode {
+				t.Errorf("expected Stack.Mode to be '%s', got '%s'", tt.expected.Stack.Mode, testConfig.Stack.Mode)
 			}
 			if testConfig.Cluster != tt.expected.Cluster {
 				t.Errorf("expected Cluster to be '%s', got '%s'", tt.expected.Cluster, testConfig.Cluster)
