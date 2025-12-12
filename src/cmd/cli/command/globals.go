@@ -254,7 +254,7 @@ are considered required when specified, while the general RC file is optional.
 This function also checks for conflicts between environment variables in the stack file
 and existing shell environment variables, and warns the user if any are found.
 */
-func (r *GlobalConfig) loadStackFile(stackName string) error {
+func loadStackFile(stackName string) error {
 	if stackName != "" {
 		// Check for conflicts before loading
 		err := checkEnvConflicts(stackName)
