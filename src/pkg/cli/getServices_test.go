@@ -58,7 +58,7 @@ func (mockGetServicesHandler) GetServices(ctx context.Context, req *connect.Requ
 	}), nil
 }
 
-func TestGetServices(t *testing.T) {
+func TestPrintServices(t *testing.T) {
 	ctx := t.Context()
 
 	fabricServer := &mockGetServicesHandler{}
@@ -74,7 +74,7 @@ func TestGetServices(t *testing.T) {
 		err := PrintServices(ctx, "empty", &provider, false)
 		var expectedError ErrNoServices
 		if !errors.As(err, &expectedError) {
-			t.Fatalf("expected GetServices() error to be of type ErrNoServices, got: %v", err)
+			t.Fatalf("expected PrintServices error to be of type ErrNoServices, got: %v", err)
 		}
 	})
 
@@ -83,7 +83,7 @@ func TestGetServices(t *testing.T) {
 
 		err := PrintServices(ctx, "test", &provider, false)
 		if err != nil {
-			t.Fatalf("GetServices() error = %v", err)
+			t.Fatalf("PrintServices error = %v", err)
 		}
 		expectedOutput := "\x1b[95m * Checking service health...\n\x1b[0m\x1b[1m\nSERVICE  DEPLOYMENT  STATE          FQDN                       ENDPOINT                           STATUS\x1b[0m" + `
 foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.prod1.defang.dev  NOT_SPECIFIED
@@ -108,7 +108,7 @@ foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.
 		err := PrintServices(ctx, "empty", &provider, false)
 		var expectedError ErrNoServices
 		if !errors.As(err, &expectedError) {
-			t.Fatalf("expected GetServices() error to be of type ErrNoServices, got: %v", err)
+			t.Fatalf("expected PrintServices error to be of type ErrNoServices, got: %v", err)
 		}
 	})
 
@@ -117,7 +117,7 @@ foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.
 
 		err := PrintServices(ctx, "test", &provider, true)
 		if err != nil {
-			t.Fatalf("GetServices() error = %v", err)
+			t.Fatalf("PrintServices error = %v", err)
 		}
 		expectedOutput := "\x1b[95m * Checking service health...\n\x1b[0mexpiresAt: \"2021-09-02T12:34:56Z\"\n" +
 			"project: test\n" +
