@@ -223,6 +223,19 @@ func Load(name string) error {
 	return nil
 }
 
+func Overload(name string) error {
+	path, err := filepath.Abs(filepath.Join(Directory, name))
+	if err != nil {
+		return err
+	}
+	if err := godotenv.Overload(path); err != nil {
+		return fmt.Errorf("could not load stack %q from %q %w", name, path, err)
+	}
+
+	term.Debugf("loaded globals from %s", path)
+	return nil
+}
+
 func PostCreateMessage(stackName string) string {
 	return fmt.Sprintf(
 		"A stackfile has been created at `.defang/%s`.\n"+
