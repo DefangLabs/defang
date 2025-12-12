@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 )
 
@@ -14,7 +13,7 @@ type SelectStackParams struct {
 	Stack *string `json:"stack" jsonschema:"description=The name of the stack to use for all tool calls."`
 }
 
-func HandleSelectStackTool(ctx context.Context, loader cliClient.ProjectLoader, cli CLIInterface, params SelectStackParams, sc StackConfig) (string, error) {
+func HandleSelectStackTool(ctx context.Context, params SelectStackParams, sc StackConfig) (string, error) {
 	// User shouldn't need to be require to select a stack
 	if params.Stack != nil {
 		stack, err := stacks.Read(*params.Stack)

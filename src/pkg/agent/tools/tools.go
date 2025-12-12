@@ -78,12 +78,7 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 		ai.NewTool("select_stack",
 			"Select the deployment stack for the defang project",
 			func(ctx *ai.ToolContext, params SelectStackParams) (string, error) {
-				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
-				if err != nil {
-					return "Failed to configure loader", err
-				}
-				cli := &DefaultToolCLI{}
-				return HandleSelectStackTool(ctx.Context, loader, cli, params, config)
+				return HandleSelectStackTool(ctx.Context, params, config)
 			},
 		),
 		ai.NewTool("create_aws_stack",
