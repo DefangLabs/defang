@@ -138,6 +138,10 @@ func Parse(content string) (StackParameters, error) {
 			params.Region = value
 		case "GCP_LOCATION":
 			params.Region = value
+		case "AWS_PROFILE":
+			params.AWSProfile = value
+		case "GCP_PROJECT_ID":
+			params.GCPProjectID = value
 		case "DEFANG_MODE":
 			mode, err := modes.Parse(value)
 			if err != nil {
