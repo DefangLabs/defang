@@ -43,5 +43,5 @@ func HandleCreateAWSStackTool(ctx context.Context, params CreateAWSStackParams, 
 		return "Failed to create stack", err
 	}
 
-	return fmt.Sprintf("Successfully created stack %q", params.Name), nil
+	return fmt.Sprintf("Successfully created stack %q. Use the 'select_stack' tool to activate it for use.", params.Name), nil
 }
