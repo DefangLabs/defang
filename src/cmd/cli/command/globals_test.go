@@ -18,7 +18,7 @@ func Test_readGlobals(t *testing.T) {
 	t.Run("OS env beats any .defang file", func(t *testing.T) {
 		t.Chdir("testdata/with-stack")
 		t.Setenv("VALUE", "from OS env")
-		err := testConfig.loadDotDefang("test")
+		err := testConfig.loadStackFile("test")
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -29,7 +29,7 @@ func Test_readGlobals(t *testing.T) {
 	})
 
 	t.Run("incorrect stackname used if no stack", func(t *testing.T) {
-		err := testConfig.loadDotDefang("non-existent-stack")
+		err := testConfig.loadStackFile("non-existent-stack")
 		if err == nil {
 			t.Fatalf("this test should fail for non-existent stack: %v", err)
 		}
@@ -313,7 +313,7 @@ func Test_configurationPrecedence(t *testing.T) {
 			t.Chdir(tempDir)
 
 			// simulates the actual loading sequence
-			err := testConfig.loadDotDefang(tt.rcStack.stackname)
+			err := testConfig.loadStackFile(tt.rcStack.stackname)
 			if err != nil {
 				t.Fatalf("failed to load env file: %v", err)
 			}

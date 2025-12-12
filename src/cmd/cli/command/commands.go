@@ -435,7 +435,7 @@ var RootCmd = &cobra.Command{
 		}
 
 		// Read the global flags again from any .defang files in the cwd
-		err = global.loadDotDefang(global.getStackName(cmd.Flags()))
+		err = global.loadStackFile(global.getStackName(cmd.Flags()))
 		if err != nil {
 			return err
 		}
