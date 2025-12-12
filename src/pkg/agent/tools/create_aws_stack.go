@@ -14,7 +14,7 @@ type CreateAWSStackParams struct {
 	Name        string `json:"stack" jsonschema:"required,description=The name of the stack to use for all tool calls."`
 	Region      string `json:"region" jsonschema:"required,description=The AWS region to create the stack in."`
 	AWS_Profile string `json:"aws_profile" jsonschema:"required,description=The AWS profile to use when creating the stack."`
-	Mode        string `json:"mode" jsonschema:"description=The deployment mode for the stack."`
+	Mode        string `json:"mode" jsonschema:"enum=affordable,enum=balaned,enum=high_availability,description=The deployment mode for the stack."`
 }
 
 func HandleCreateAWSStackTool(ctx context.Context, params CreateAWSStackParams, sc *StackConfig) (string, error) {
