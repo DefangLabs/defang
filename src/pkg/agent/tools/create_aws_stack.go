@@ -18,9 +18,15 @@ type CreateAWSStackParams struct {
 }
 
 func HandleCreateAWSStackTool(ctx context.Context, params CreateAWSStackParams, sc *StackConfig) (string, error) {
-	mode, err := modes.Parse(params.Mode)
-	if err != nil {
-		return "Invalid mode provided", err
+	var mode modes.Mode
+	var err error
+	if params.Mode == "" {
+		mode = modes.ModeAffordable
+	} else {
+		mode, err = modes.Parse(params.Mode)
+		if err != nil {
+			return "Invalid mode provided", err
+		}
 	}
 
 	newStack := stacks.StackParameters{
