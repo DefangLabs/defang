@@ -1,2 +1,3 @@
 DEFANG_PROVIDER=aws
 AWS_REGION=us-test-2
+AWS_PROFILE=default
