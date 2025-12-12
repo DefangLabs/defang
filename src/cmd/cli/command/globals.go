@@ -77,10 +77,10 @@ type GlobalConfig struct {
 	Mode           modes.Mode
 	ModelID        string // only for debug/generate; Pro users
 	NonInteractive bool
-	Org            string
 	ProviderID     cliClient.ProviderID
 	SourcePlatform migrate.SourcePlatform // only used for 'defang init' command
 	Stack          string
+	Tenant         string
 	Verbose        bool
 }
 
@@ -205,9 +205,14 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 		}
 	}
 
-	if !flags.Changed("org") {
-		if fromEnv, ok := os.LookupEnv("DEFANG_ORG"); ok {
-			r.Org = fromEnv
+	if !flags.Changed("workspace") {
+		if fromEnv, ok := os.LookupEnv("DEFANG_WORKSPACE"); ok {
+			r.Tenant = fromEnv
+		} else if fromEnv, ok := os.LookupEnv("DEFANG_ORG"); ok {
+			r.Tenant = fromEnv
+			term.Warn("DEFANG_ORG is deprecated; use DEFANG_WORKSPACE instead")
+		} else if _, ok := os.LookupEnv("DEFANG_TENANT"); ok {
+			term.Warn("DEFANG_TENANT is no longer supported; use DEFANG_WORKSPACE instead")
 		}
 	}
 
@@ -277,7 +282,6 @@ in the file conflict with existing shell environment variables. If conflicts are
 found, it warns the user that the shell environment variable will take precedence.
 */
 func checkEnvConflicts(stackName string) error {
-
 	path, err := filepath.Abs(filepath.Join(stacks.Directory, stackName))
 	if err != nil {
 		return err

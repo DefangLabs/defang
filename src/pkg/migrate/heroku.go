@@ -334,10 +334,10 @@ func authenticateHerokuCLI() error {
 }
 
 // getHerokuAuthTokenFromCLI obtains a short-lived Heroku API token by invoking the local Heroku CLI.
-// 
+//
 // It checks that the `heroku` executable is available, ensures the CLI is authenticated, runs
 // `heroku authorizations:create --expires-in=300 --json`, and parses the resulting JSON for the token.
-// 
+//
 // The returned string is the extracted access token. An error is returned if the CLI is not installed,
 // authentication fails, the command cannot be executed, or the command output cannot be parsed.
 func getHerokuAuthTokenFromCLI() (string, error) {

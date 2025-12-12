@@ -52,13 +52,13 @@ type ByocBaseClient struct {
 	PulumiStack             string
 	SetupDone               bool
 	ShouldDelegateSubdomain bool
-	TenantName              string
+	TenantName              string // tenant identifier (name or ID)
 	CanIUseConfig
 
 	projectBackend ProjectBackend
 }
 
-func NewByocBaseClient(tenantName types.TenantName, backend ProjectBackend, stack string) *ByocBaseClient {
+func NewByocBaseClient(tenantName types.TenantNameOrID, backend ProjectBackend, stack string) *ByocBaseClient {
 	if stack == "" {
 		stack = "beta" // backwards compat
 	}

@@ -20,15 +20,26 @@ type GrpcClient struct {
 	anonID string
 	client defangv1connect.FabricControllerClient
 
-	TenantName types.TenantName
+	Tenant          types.TenantNameOrID // effective tenant sent to the server (requested or token-derived)
+	RequestedTenant types.TenantNameOrID // explicitly requested tenant (name or ID)
+	TokenTenant     types.TenantNameOrID // tenant derived from the access token subject, if any
 }
 
-func NewGrpcClient(host, accessToken string, tenantName types.TenantName) *GrpcClient {
+type TenantContext struct {
+	RequestedTenant types.TenantNameOrID // CLI-provided tenant (name or ID)
+	TokenTenant     types.TenantNameOrID // tenant derived from access token subject, if any
+}
+
+func NewGrpcClient(host, accessToken string, tenantCtx TenantContext) *GrpcClient {
 	baseUrl := "http://"
 	if strings.HasSuffix(host, ":443") {
 		baseUrl = "https://"
 	}
 	baseUrl += host
+	effectiveTenant := tenantCtx.RequestedTenant
+	if !effectiveTenant.IsSet() {
+		effectiveTenant = tenantCtx.TokenTenant
+	}
 	// Debug(" - Connecting to", baseUrl)
 	fabricClient := defangv1connect.NewFabricControllerClient(
 		http.DefaultClient,
@@ -36,12 +47,18 @@ func NewGrpcClient(host, accessToken string, tenantName types.TenantName) *GrpcC
 		connect.WithGRPC(),
 		connect.WithInterceptors(
 			grpcLogger{"fabricClient"},
-			auth.NewAuthInterceptor(accessToken, string(tenantName)),
+			auth.NewAuthInterceptor(accessToken, string(effectiveTenant)),
 			Retrier{},
 		),
 	)
 
-	return &GrpcClient{client: fabricClient, anonID: GetAnonID(), TenantName: tenantName}
+	return &GrpcClient{
+		client:          fabricClient,
+		anonID:          GetAnonID(),
+		Tenant:          effectiveTenant,
+		RequestedTenant: tenantCtx.RequestedTenant,
+		TokenTenant:     tenantCtx.TokenTenant,
+	}
 }
 
 func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
@@ -55,8 +72,21 @@ func (g GrpcClient) GetController() defangv1connect.FabricControllerClient {
 	return g.client
 }
 
-func (g GrpcClient) GetTenantName() types.TenantName {
-	return g.TenantName
+func (g GrpcClient) GetTenantName() types.TenantNameOrID {
+	if g.Tenant.IsSet() {
+		return g.Tenant
+	}
+	if g.RequestedTenant.IsSet() {
+		return g.RequestedTenant
+	}
+	if g.TokenTenant.IsSet() {
+		return g.TokenTenant
+	}
+	return types.TenantUnset
+}
+
+func (g GrpcClient) GetRequestedTenant() types.TenantNameOrID {
+	return g.RequestedTenant
 }
 
 func (g *GrpcClient) SetClient(client defangv1connect.FabricControllerClient) {

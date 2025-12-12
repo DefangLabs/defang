@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
@@ -140,6 +141,20 @@ func TestCommandGates(t *testing.T) {
 	t.Chdir("../../../../src/testdata/sanity")
 
 	t.Setenv("AWS_REGION", "us-west-2")
+
+	userinfoServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/userinfo" {
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"allTenants":[{"id":"default","name":"Default Workspace"}],
+			"userinfo":{"email":"cli@example.com","name":"CLI Tester"}
+		}`))
+	}))
+	t.Cleanup(userinfoServer.Close)
+	t.Setenv("DEFANG_ISSUER", userinfoServer.URL)
+	t.Setenv("DEFANG_ACCESS_TOKEN", "token-123")
 
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)

@@ -1,11 +1,16 @@
 {
     "name": "Defang CLI Dev Container",
-    "image": "ubuntu:latest",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
     "features": {
         "ghcr.io/devcontainers/features/nix:1": {
             "extraNixConfig": "experimental-features = nix-command flakes"
-        }
+        },
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+        "ghcr.io/devcontainers/features/aws-cli:1": {}
     },
+    "mounts": [
+        "source=${localEnv:HOME}/.aws,target=/home/vscode/.aws,type=bind,consistency=cached"
+    ],
     "containerEnv": {
         "EDITOR": "vim"
     },
@@ -13,9 +18,25 @@
         "vscode": {
             "extensions": [
                 "golang.go",
-                "ms-vscode.makefile-tools"
-            ]
+                "ms-vscode.makefile-tools",
+                "eamodio.gitlens"
+            ],
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "nix develop",
+                "terminal.integrated.profiles.linux": {
+                    "nix develop": {
+                        "path": "nix",
+                        "args": [
+                            "develop",
+                            "--command",
+                            "bash"
+                        ],
+                        "icon": "terminal-bash"
+                    }
+                }
+            }
         }
     },
-    "postAttachCommand": "nix develop --command bash && make setup"
+    "remoteUser": "vscode",
+    "postCreateCommand": "bash .devcontainer/post-create.sh"
 }
