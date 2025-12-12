@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -37,10 +38,10 @@ func HandleCreateAWSStackTool(ctx context.Context, params CreateAWSStackParams, 
 		Mode:       mode,
 	}
 
-	fileName, err := stacks.Create(newStack)
+	_, err = stacks.Create(newStack)
 	if err != nil {
-		return "Failed to create AWS stack", err
+		return "Failed to create stack", err
 	}
 
-	return "AWS stack created successfully: " + fileName, nil
+	return fmt.Sprintf("Successfully created stack %q", params.Name), nil
 }
