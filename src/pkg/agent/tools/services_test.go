@@ -198,7 +198,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				GetServicesError: defangcli.ErrNoServices{ProjectName: "test-project"},
 			},
 			expectedError:       false, // Returns successful result with message
-			resultTextContains:  "no services found for the specified project",
+			resultTextContains:  "no services found in project",
 			expectedGetServices: true,
 			expectedProjectName: "test-project",
 		},

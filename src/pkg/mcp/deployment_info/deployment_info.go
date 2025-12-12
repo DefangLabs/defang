@@ -2,20 +2,12 @@ package deployment_info
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
-
-type ErrNoServices struct {
-	ProjectName string // may be empty
-}
-
-func (e ErrNoServices) Error() string {
-	return fmt.Sprintf("no services found in project %q", e.ProjectName)
-}
 
 type Service struct {
 	Service      string
@@ -37,7 +29,7 @@ func GetServices(ctx context.Context, projectName string, provider client.Provid
 	numServices := len(getServicesResponse.Services)
 
 	if numServices == 0 {
-		return nil, ErrNoServices{ProjectName: projectName}
+		return nil, cli.ErrNoServices{ProjectName: projectName}
 	}
 
 	result := make([]Service, numServices)
