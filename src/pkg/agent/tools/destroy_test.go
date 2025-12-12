@@ -126,6 +126,12 @@ func TestHandleDestroyTool(t *testing.T) {
 		},
 	}
 
+	loader := &client.MockLoader{}
+	stack := stacks.StackParameters{
+		Name:     "test-stack",
+		Provider: client.ProviderAWS,
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Chdir("testdata")
@@ -138,18 +144,13 @@ func TestHandleDestroyTool(t *testing.T) {
 			}
 			tt.setupMock(mockCLI)
 
-			// Call the function
-			loader := &client.MockLoader{}
 			ec := elicitations.NewController(&mockElicitationsClient{
 				responses: map[string]string{
 					"strategy":     "profile",
 					"profile_name": "default",
 				},
 			})
-			stack := stacks.StackParameters{
-				Name:     "test-stack",
-				Provider: client.ProviderAWS,
-			}
+			// Call the function
 			result, err := HandleDestroyTool(t.Context(), loader, mockCLI, ec, StackConfig{
 				Cluster: "test-cluster",
 				Stack:   &stack,
