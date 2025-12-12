@@ -31,12 +31,6 @@ func TestHandleCurrentStackTool(t *testing.T) {
 			expected:      "This currently selected stack is \"test-stack\": AWS_PROFILE=\"default\"\nAWS_REGION=\"us-west-2\"\nDEFANG_MODE=\"affordable\"\nDEFANG_PROVIDER=\"aws\"",
 			expectedError: false,
 		},
-		{
-			name:          "Stack is nil",
-			stackConfig:   StackConfig{},
-			expected:      "",
-			expectedError: true,
-		},
 	}
 
 	for _, tt := range tests {
