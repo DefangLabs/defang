@@ -86,19 +86,6 @@ func TestHandleSelectStackTool(t *testing.T) {
 			expectedError:  true,
 			errorContains:  "Unable to load stack \"\"",
 		},
-		{
-			name: "Error when StackConfig.Stack is nil",
-			params: SelectStackParams{
-				LoaderParams: common.LoaderParams{
-					WorkingDirectory: ".",
-				},
-				Stack: "test-stack",
-			},
-			initialStack:   nil,
-			expectedResult: "",
-			expectedError:  true,
-			errorContains:  "invariant violated: stack is nil, please restart the MCP server and try again",
-		},
 	}
 
 	for _, tt := range tests {
@@ -129,8 +116,6 @@ func TestHandleSelectStackTool(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expectedResult, result)
-				// With *sc.Stack = *stack, the content of the stack is copied to the existing pointer
-				// So stackConfig.Stack should be modified to have the new stack values
 				assert.NotNil(t, stackConfig.Stack)
 				assert.Equal(t, "test-stack", stackConfig.Stack.Name)
 				assert.Equal(t, client.ProviderAWS, stackConfig.Stack.Provider)
