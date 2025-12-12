@@ -19,9 +19,8 @@ import (
 )
 
 type StackConfig struct {
-	Cluster    string
-	ProviderID *cliClient.ProviderID
-	Stack      *stacks.StackParameters
+	Cluster string
+	Stack   *stacks.StackParameters
 }
 
 // DefaultToolCLI implements all tool interfaces as passthroughs to the real CLI logic

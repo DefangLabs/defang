@@ -84,9 +84,8 @@ func translateGenKitToolsToMCP(genkitTools []ai.Tool) []server.ServerTool {
 
 func CollectTools(ec elicitations.Controller, config StackConfig) []server.ServerTool {
 	genkitTools := agentTools.CollectDefangTools(ec, agentTools.StackConfig{
-		Cluster:    config.Cluster,
-		ProviderID: config.ProviderID,
-		Stack:      config.Stack,
+		Cluster: config.Cluster,
+		Stack:   config.Stack,
 	})
 	return translateGenKitToolsToMCP(genkitTools)
 }

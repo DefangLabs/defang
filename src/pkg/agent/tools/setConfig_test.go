@@ -252,9 +252,8 @@ func TestHandleSetConfig(t *testing.T) {
 				Provider: client.ProviderAWS,
 			}
 			result, err := HandleSetConfig(t.Context(), loader, params, tt.mockCLI, ec, StackConfig{
-				Cluster:    tt.cluster,
-				ProviderID: &tt.providerId,
-				Stack:      &stack,
+				Cluster: tt.cluster,
+				Stack:   &stack,
 			})
 
 			if tt.expectedError {

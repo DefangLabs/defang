@@ -169,8 +169,6 @@ func TestHandleDeployTool(t *testing.T) {
 			}
 			tt.setupMock(mockCLI)
 
-			providerID := client.ProviderAWS
-
 			// Call the function
 			loader := &client.MockLoader{}
 			ec := elicitations.NewController(&mockElicitationsClient{
@@ -184,9 +182,8 @@ func TestHandleDeployTool(t *testing.T) {
 				Provider: client.ProviderAWS,
 			}
 			result, err := HandleDeployTool(t.Context(), loader, mockCLI, ec, StackConfig{
-				Cluster:    "test-cluster",
-				ProviderID: &providerID,
-				Stack:      &stack,
+				Cluster: "test-cluster",
+				Stack:   &stack,
 			})
 
 			// Verify error expectations

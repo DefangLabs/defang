@@ -74,7 +74,7 @@ type Debugger struct {
 }
 
 func NewDebugger(ctx context.Context, addr string, providerID *client.ProviderID, stack *stacks.StackParameters) (*Debugger, error) {
-	agent, err := agent.New(ctx, addr, providerID, stack)
+	agent, err := agent.New(ctx, addr, stack)
 	if err != nil {
 		return nil, err
 	}

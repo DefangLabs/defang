@@ -14,7 +14,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/agent/plugins/fabric"
 	"github.com/DefangLabs/defang/src/pkg/agent/tools"
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
@@ -34,7 +33,7 @@ type Agent struct {
 	system    string
 }
 
-func New(ctx context.Context, clusterAddr string, providerId *client.ProviderID, stack *stacks.StackParameters) (*Agent, error) {
+func New(ctx context.Context, clusterAddr string, stack *stacks.StackParameters) (*Agent, error) {
 	accessToken := cluster.GetExistingToken(clusterAddr)
 	aiProvider := "fabric"
 	var providerPlugin api.Plugin
@@ -69,9 +68,8 @@ func New(ctx context.Context, clusterAddr string, providerId *client.ProviderID,
 	printer := printer{outStream: os.Stdout}
 	toolManager := NewToolManager(gk, printer)
 	defangTools := tools.CollectDefangTools(ec, tools.StackConfig{
-		Cluster:    clusterAddr,
-		ProviderID: providerId,
-		Stack:      stack,
+		Cluster: clusterAddr,
+		Stack:   stack,
 	})
 	toolManager.RegisterTools(defangTools...)
 	fsTools := CollectFsTools()
