@@ -954,7 +954,7 @@ var debugCmd = &cobra.Command{
 			return err
 		}
 
-		debugger, err := debug.NewDebugger(ctx, getCluster(), &global.Stack.Provider, &global.Stack)
+		debugger, err := debug.NewDebugger(ctx, getCluster(), &global.Stack)
 		if err != nil {
 			return err
 		}
