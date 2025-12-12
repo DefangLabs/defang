@@ -56,7 +56,7 @@ func NewDefangMCPServer(version string, client MCPClient, cli agentTools.CLIInte
 	var elicitationsController *elicitations.Controller
 
 	s := server.NewMCPServer(
-		"Defang MCP Server",
+		"Defang Version",
 		version,
 		server.WithResourceCapabilities(true, true),
 		server.WithToolCapabilities(true),
