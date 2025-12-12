@@ -45,18 +45,16 @@ func Test_configurationPrecedence(t *testing.T) {
 
 	// make a default config for comparison and copying
 	defaultConfig := GlobalConfig{
-		ColorMode:  ColorAuto,
-		Debug:      false,
-		HasTty:     true, // set to true just for test instead of term.IsTerminal() for consistency
-		HideUpdate: false,
-		// Mode:           modes.ModeUnspecified,
+		ColorMode:      ColorAuto,
+		Debug:          false,
+		HasTty:         true, // set to true just for test instead of term.IsTerminal() for consistency
+		HideUpdate:     false,
 		NonInteractive: false, // set to false just for test instead of !term.IsTerminal() for consistency
-		// ProviderID:     cliClient.ProviderAuto,
 		SourcePlatform: migrate.SourcePlatformUnspecified,
 		Verbose:        false,
-		// Stack:          stacks.StackParameters{},
-		Cluster: "",
-		Org:     "",
+		Stack:          stacks.StackParameters{Provider: cliClient.ProviderAuto, Mode: modes.ModeUnspecified},
+		Cluster:        "",
+		Org:            "",
 	}
 
 	type stack struct {
@@ -353,9 +351,6 @@ func Test_configurationPrecedence(t *testing.T) {
 			if testConfig.Cluster != tt.expected.Cluster {
 				t.Errorf("expected Cluster to be '%s', got '%s'", tt.expected.Cluster, testConfig.Cluster)
 			}
-			// if testConfig.ProviderID != tt.expected.ProviderID {
-			// 	t.Errorf("expected ProviderID to be '%s', got '%s'", tt.expected.ProviderID, testConfig.ProviderID)
-			// }
 			if testConfig.Org != tt.expected.Org {
 				t.Errorf("expected Org to be '%s', got '%s'", tt.expected.Org, testConfig.Org)
 			}
