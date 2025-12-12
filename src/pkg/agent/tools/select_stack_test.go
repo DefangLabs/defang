@@ -135,6 +135,9 @@ func TestHandleSelectStackTool(t *testing.T) {
 				assert.Equal(t, "test-stack", stackConfig.Stack.Name)
 				assert.Equal(t, client.ProviderAWS, stackConfig.Stack.Provider)
 				assert.Equal(t, "us-test-2", stackConfig.Stack.Region)
+				assert.Equal(t, os.Getenv("DEFANG_PROVIDER"), "aws")
+				assert.Equal(t, os.Getenv("AWS_PROFILE"), "default")
+				assert.Equal(t, os.Getenv("AWS_REGION"), "us-test-2")
 			}
 		})
 	}
