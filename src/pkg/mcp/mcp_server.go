@@ -69,7 +69,7 @@ func NewDefangMCPServer(version string, client MCPClient, cli agentTools.CLIInte
 						return
 					}
 
-					if result.Capabilities.Elicitation == nil {
+					if message.Params.Capabilities.Elicitation == nil {
 						(*elicitationsController).SetSupported(false)
 					}
 				},
