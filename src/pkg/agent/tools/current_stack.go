@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/stacks"
@@ -10,7 +9,7 @@ import (
 
 func HandleCurrentStackTool(ctx context.Context, sc StackConfig) (string, error) {
 	if sc.Stack.Name == "" {
-		return "", errors.New("No stack is currently selected.")
+		return "No stack is currently selected.", nil
 	}
 
 	details, err := stacks.Marshal(sc.Stack)

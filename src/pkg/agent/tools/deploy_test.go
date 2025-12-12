@@ -76,7 +76,7 @@ func (m *MockDeployCLI) LoadProject(ctx context.Context, loader client.Loader) (
 	return m.Project, nil
 }
 
-func (m *MockDeployCLI) CanIUseProvider(ctx context.Context, client *client.GrpcClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {
+func (m *MockDeployCLI) CanIUseProvider(ctx context.Context, client *client.GrpcClient, projectName string, provider client.Provider, serviceCount int) error {
 	m.CallLog = append(m.CallLog, "CanIUseProvider")
 	return nil
 }

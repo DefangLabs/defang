@@ -62,7 +62,7 @@ func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 		return "", errors.New("provider ID is required to fetch logs")
 	}
 
-	err = cli.CanIUseProvider(ctx, client, config.Stack.Provider, projectName, provider, 0)
+	err = cli.CanIUseProvider(ctx, client, projectName, provider, 0)
 	if err != nil {
 		return "", fmt.Errorf("failed to use provider: %w", err)
 	}

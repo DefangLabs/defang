@@ -56,8 +56,8 @@ func (m *MockDestroyCLI) LoadProjectNameWithFallback(ctx context.Context, loader
 	return m.ProjectName, nil
 }
 
-func (m *MockDestroyCLI) CanIUseProvider(ctx context.Context, grpcClient *client.GrpcClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("CanIUseProvider(%s, %s)", providerId, projectName))
+func (m *MockDestroyCLI) CanIUseProvider(ctx context.Context, grpcClient *client.GrpcClient, projectName string, provider client.Provider, serviceCount int) error {
+	m.CallLog = append(m.CallLog, fmt.Sprintf("CanIUseProvider(%s)", projectName))
 	if m.CanIUseProviderError != nil {
 		return m.CanIUseProviderError
 	}
@@ -172,7 +172,7 @@ func TestHandleDestroyTool(t *testing.T) {
 					"Connect(test-cluster)",
 					"NewProvider(aws)",
 					"LoadProjectNameWithFallback",
-					"CanIUseProvider(aws, test-project)",
+					"CanIUseProvider(test-project)",
 					"ComposeDown(test-project)",
 				}
 				assert.Equal(t, expectedCalls, mockCLI.CallLog)
