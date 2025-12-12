@@ -1,4 +1,4 @@
-package ecs
+package cw
 
 import (
 	"context"
@@ -134,4 +134,28 @@ func (es *eventStream) pipeEvents(ctx context.Context, tailStream LiveTailStream
 			return ctx.Err()
 		}
 	}
+}
+
+func newEventStream(cancel func()) *eventStream {
+	return &eventStream{
+		cancel: cancel,
+		ch:     make(chan types.StartLiveTailResponseStream),
+	}
+}
+
+func NewStaticLogStream(ch <-chan LogEvent, cancel func()) EventStream[types.StartLiveTailResponseStream] {
+	es := newEventStream(cancel)
+
+	go func() {
+		defer close(es.ch)
+		for evt := range ch {
+			es.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
+				Value: types.LiveTailSessionUpdate{
+					SessionResults: []types.LiveTailSessionLogEvent{evt},
+				},
+			}
+		}
+	}()
+
+	return es
 }

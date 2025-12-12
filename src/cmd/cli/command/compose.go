@@ -15,6 +15,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	pcluster "github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -28,6 +29,19 @@ import (
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
 )
+
+const DEFANG_PORTAL_HOST = "portal.defang.io"
+const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
+
+func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
+	// We can only show services deployed to the prod1 defang SaaS environment.
+	if global.ProviderID == cliClient.ProviderDefang && global.Cluster == pcluster.DefaultCluster {
+		term.Info("Monitor your services' status in the defang portal")
+		for _, serviceInfo := range serviceInfos {
+			term.Println("   -", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
+		}
+	}
+}
 
 var logType = logs.LogTypeAll
 
@@ -177,7 +191,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			// Print the current service states of the deployment
-			err = printServiceStatesAndEndpoints(deploy.Services)
+			err = cli.PrintServiceStatesAndEndpoints(deploy.Services)
 			if err != nil {
 				return err
 			}
