@@ -22,13 +22,13 @@ These options can be configured through multiple sources with the following prio
 
  1. Command-line flags (highest priority)
  2. Environment variables (DEFANG_* prefix)
- 3. Configuration files (.defang, .defang.<stack>) (lowest priority)
+ 3. Configuration files in the .defang directory (lowest priority)
 
 Configuration Flow:
 
   - Default values are set when initializing the global variable
-  - RC files are loaded to set environment variables (loadDotDefang)
-  - Environment variables and RC file values are synced to struct fields (syncFlagsWithEnv)
+  - Stack files are loaded to set environment variables (loadStackFile)
+  - Environment variables and Stack file values are synced to struct fields (syncFlagsWithEnv)
   - Command-line flags take precedence over all other sources
 
 Adding New Configuration Options:
@@ -85,7 +85,7 @@ type GlobalConfig struct {
 /*
 global is the singleton instance of GlobalConfig that holds all CLI configuration.
 This instance is initialized with default values and is modified throughout
-the application lifecycle as configuration sources are processed (RC files, environment
+the application lifecycle as configuration sources are processed (Stack files, environment
 variables, and command-line flags).
 */
 var global GlobalConfig = GlobalConfig{
@@ -102,10 +102,8 @@ var global GlobalConfig = GlobalConfig{
 
 /*
 getStackName determines the stack name to use
-The returned stack name is used to determine which stack-specific RC file
-(.defang.<stackName>) should be loaded during configuration initialization.
-If no stack name is provided it will return the default value from the GlobalConfig struct,
-which will result in loading only the general .defang file.
+The returned stack name is used to determine which stack-specific file
+should be loaded during configuration initialization.
 */
 func (r *GlobalConfig) getStackName(flags *pflag.FlagSet) string {
 	if !flags.Changed("stack") {
@@ -152,9 +150,9 @@ Logic for each configuration option:
   - If the flag was explicitly set by the user (flags.Changed), use the flag value (already set by cobra)
   - If the flag was NOT set by the user, check for the corresponding DEFANG_* environment variable
   - If the environment variable exists, parse it and update the struct field
-  - Environment variables can come from the shell environment or RC files loaded by loadDotDefang()
+  - Environment variables can come from the shell environment or stack files loaded by loadStackFile()
 
-This ensures the priority order: command-line flags > environment variables > RC file values > defaults
+This ensures the priority order: command-line flags > environment variables > stack file values > defaults
 */
 func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 	var err error
@@ -239,17 +237,14 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 }
 
 /*
-loadStackFile loads configuration values from .defang files into environment variables.
+loadStackFile loads configuration values from stack files into environment variables.
 
-Loading order:
+If stackName is provided, loads .defang.<stackName> (required - returns error if missing/invalid)
 
- 1. If stackName is provided, loads .defang.<stackName> first (required - returns error if missing/invalid)
- 2. Then loads the general .defang file (optional - missing file is not an error)
-
-Important: RC files have the lowest priority in the configuration hierarchy.
+Important: stack files have the lowest priority in the configuration hierarchy.
 They will NOT override environment variables that are already set, since
-godotenv.Load respects existing environment variables. Stack-specific RC files
-are considered required when specified, while the general RC file is optional.
+godotenv.Load respects existing environment variables. Stack-specific stack files
+are considered required when specified.
 
 This function also checks for conflicts between environment variables in the stack file
 and existing shell environment variables, and warns the user if any are found.
