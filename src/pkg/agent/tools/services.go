@@ -45,7 +45,7 @@ func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, cli
 	if err != nil {
 		var noServicesErr defangcli.ErrNoServices
 		if errors.As(err, &noServicesErr) {
-			return fmt.Sprintf("no services found for the specified project %q", projectName), nil
+			return noServicesErr.Error(), nil
 		}
 		if connect.CodeOf(err) == connect.CodeNotFound && strings.Contains(err.Error(), "is not deployed in Playground") {
 			return fmt.Sprintf("project %s is not deployed in Playground", projectName), nil

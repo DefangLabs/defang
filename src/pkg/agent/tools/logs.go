@@ -78,7 +78,6 @@ func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 	})
 
 	if err != nil {
-		err = fmt.Errorf("failed to fetch logs: %w", err)
 		term.Error("Failed to fetch logs", "error", err)
 		return "", fmt.Errorf("failed to fetch logs: %w", err)
 	}

@@ -957,8 +957,7 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 		return nil, errors.New("no defang cd bucket found")
 	}
 
-	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/byoc/aws/index.ts#L89
-	path := fmt.Sprintf("projects/%s/%s/project.pb", projectName, b.PulumiStack)
+	path := b.GetProjectUpdatePath(projectName)
 
 	// Current user might not have object viewer access to the bucket, use the upload service account to get the object
 	uploadSA := b.driver.GetServiceAccountEmail(DefangUploadServiceAccountName)

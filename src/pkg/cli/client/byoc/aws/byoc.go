@@ -491,9 +491,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 	}
 
 	s3Client := s3.NewFromConfig(cfg)
-	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/aws/byoc.ts#L104
-	pkg.Ensure(projectName != "", "ProjectName not set")
-	path := fmt.Sprintf("projects/%s/%s/project.pb", projectName, b.PulumiStack)
+	path := b.GetProjectUpdatePath(projectName)
 
 	term.Debug("Getting services from bucket:", bucketName, path)
 	getObjectOutput, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
