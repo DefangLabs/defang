@@ -11,7 +11,6 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/login"
-	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -70,8 +69,17 @@ func (DefaultToolCLI) ConfigDelete(ctx context.Context, projectName string, prov
 	return cli.ConfigDelete(ctx, projectName, provider, name)
 }
 
-func (DefaultToolCLI) GetServices(ctx context.Context, projectName string, provider cliClient.Provider) ([]deployment_info.Service, error) {
-	return deployment_info.GetServices(ctx, projectName, provider)
+func (DefaultToolCLI) GetServices(ctx context.Context, projectName string, provider cliClient.Provider) ([]*cli.Service, error) {
+	servicesResponse, err := cli.GetServices(ctx, projectName, provider)
+	if err != nil {
+		return nil, err
+	}
+
+	term.Debug("Checking service health...")
+	cli.UpdateServiceStates(ctx, servicesResponse.Services)
+
+	si, _, err := cli.GetServiceStatesAndEndpoints(servicesResponse.Services)
+	return si, err
 }
 
 func (DefaultToolCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string {

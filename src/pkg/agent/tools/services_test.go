@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg/cli"
 	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
-	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
@@ -29,7 +29,7 @@ type MockCLI struct {
 	MockProjectName                  string
 
 	GetServicesError    error
-	MockServices        []deployment_info.Service
+	MockServices        []*cli.Service
 	GetServicesCalled   bool
 	GetServicesProject  string
 	GetServicesProvider client.Provider
@@ -56,7 +56,7 @@ func (m *MockCLI) LoadProjectNameWithFallback(ctx context.Context, loader client
 	return "default-project", nil
 }
 
-func (m *MockCLI) GetServices(ctx context.Context, projectName string, provider client.Provider) ([]deployment_info.Service, error) {
+func (m *MockCLI) GetServices(ctx context.Context, projectName string, provider client.Provider) ([]*cli.Service, error) {
 	m.GetServicesCalled = true
 	m.GetServicesProject = projectName
 	m.GetServicesProvider = provider
@@ -238,13 +238,12 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				MockClient:      &client.GrpcClient{},
 				MockProvider:    &client.PlaygroundProvider{},
 				MockProjectName: "test-project",
-				MockServices: []deployment_info.Service{
+				MockServices: []*cli.Service{
 					{
-						Service:      "test-service",
-						DeploymentId: "test-deployment",
-						PublicFqdn:   "test.example.com",
-						PrivateFqdn:  "test.internal",
-						Status:       "running",
+						Service:    "test-service",
+						Deployment: "test-deployment",
+						Fqdn:       "test.example.com",
+						Status:     "running",
 					},
 				},
 			},

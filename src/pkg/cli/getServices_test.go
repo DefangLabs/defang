@@ -71,7 +71,7 @@ func TestGetServices(t *testing.T) {
 	provider := cliClient.PlaygroundProvider{FabricClient: grpcClient}
 
 	t.Run("no services", func(t *testing.T) {
-		err := GetServices(ctx, "empty", &provider, false)
+		err := PrintServices(ctx, "empty", &provider, false)
 		var expectedError ErrNoServices
 		if !errors.As(err, &expectedError) {
 			t.Fatalf("expected GetServices() error to be of type ErrNoServices, got: %v", err)
@@ -81,7 +81,7 @@ func TestGetServices(t *testing.T) {
 	t.Run("some services", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
 
-		err := GetServices(ctx, "test", &provider, false)
+		err := PrintServices(ctx, "test", &provider, false)
 		if err != nil {
 			t.Fatalf("GetServices() error = %v", err)
 		}
@@ -105,7 +105,7 @@ foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.
 	})
 
 	t.Run("no services long", func(t *testing.T) {
-		err := GetServices(ctx, "empty", &provider, false)
+		err := PrintServices(ctx, "empty", &provider, false)
 		var expectedError ErrNoServices
 		if !errors.As(err, &expectedError) {
 			t.Fatalf("expected GetServices() error to be of type ErrNoServices, got: %v", err)
@@ -115,7 +115,7 @@ foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.
 	t.Run("some services long", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
 
-		err := GetServices(ctx, "test", &provider, true)
+		err := PrintServices(ctx, "test", &provider, true)
 		if err != nil {
 			t.Fatalf("GetServices() error = %v", err)
 		}

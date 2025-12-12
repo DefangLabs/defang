@@ -595,7 +595,7 @@ func makeComposePsCmd() *cobra.Command {
 				return err
 			}
 
-			if err := cli.GetServices(cmd.Context(), projectName, provider, long); err != nil {
+			if err := cli.PrintServices(cmd.Context(), projectName, provider, long); err != nil {
 				if errNoServices := new(cli.ErrNoServices); !errors.As(err, errNoServices) {
 					return err
 				}
