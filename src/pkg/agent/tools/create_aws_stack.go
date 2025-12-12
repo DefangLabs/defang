@@ -11,9 +11,9 @@ import (
 
 type CreateAWSStackParams struct {
 	common.LoaderParams
-	Name        *string `json:"stack" jsonschema:"description=The name of the stack to use for all tool calls."`
-	Region      *string `json:"region" jsonschema:"description=The AWS region to create the stack in."`
-	AWS_Profile *string `json:"aws_profile" jsonschema:"description=The AWS profile to use when creating the stack."`
+	Name        *string `json:"stack" jsonschema:"required,description=The name of the stack to use for all tool calls."`
+	Region      *string `json:"region" jsonschema:"required,description=The AWS region to create the stack in."`
+	AWS_Profile *string `json:"aws_profile" jsonschema:"required,description=The AWS profile to use when creating the stack."`
 	Mode        *string `json:"mode" jsonschema:"description=The deployment mode for the stack."`
 }
 
