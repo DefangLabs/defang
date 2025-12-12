@@ -34,10 +34,6 @@ func HandleDestroyTool(ctx context.Context, loader cliClient.ProjectLoader, cli 
 		return "", fmt.Errorf("failed to load project name: %w", err)
 	}
 
-	if &config.Stack.Provider == nil {
-		return "", errors.New("provider ID is required to destroy a project")
-	}
-
 	err = cli.CanIUseProvider(ctx, client, projectName, provider, 0)
 	if err != nil {
 		return "", fmt.Errorf("failed to use provider: %w", err)
