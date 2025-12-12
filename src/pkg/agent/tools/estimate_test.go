@@ -9,6 +9,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	_type "github.com/DefangLabs/defang/src/protos/google/type"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
@@ -213,8 +214,8 @@ func TestHandleEstimateTool(t *testing.T) {
 			// Call the function
 			loader := &client.MockLoader{}
 			result, err := HandleEstimateTool(t.Context(), loader, params, mockCLI, StackConfig{
-				Cluster:    "test-cluster",
-				ProviderID: &providerID,
+				Cluster: "test-cluster",
+				Stack:   &stacks.StackParameters{Provider: providerID},
 			})
 
 			// Verify error expectations

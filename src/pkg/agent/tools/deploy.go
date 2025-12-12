@@ -69,7 +69,7 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, cli C
 		err = fmt.Errorf("failed to compose up services: %w", err)
 
 		var missing compose.ErrMissingConfig
-		if errors.As(err, &missing) {
+		if errors.As(err, &missing) && ec.IsSupported() {
 			err := requestMissingConfig(ctx, ec, cli, provider, project.Name, missing)
 			if err != nil {
 				return "", fmt.Errorf("failed to request missing config: %w", err)

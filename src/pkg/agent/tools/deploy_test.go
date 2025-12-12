@@ -12,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -168,8 +169,6 @@ func TestHandleDeployTool(t *testing.T) {
 			}
 			tt.setupMock(mockCLI)
 
-			providerID := client.ProviderAWS
-
 			// Call the function
 			loader := &client.MockLoader{}
 			ec := elicitations.NewController(&mockElicitationsClient{
@@ -178,11 +177,13 @@ func TestHandleDeployTool(t *testing.T) {
 					"profile_name": "default",
 				},
 			})
-			stackName := "test-stack"
+			stack := stacks.StackParameters{
+				Name:     "test-stack",
+				Provider: client.ProviderAWS,
+			}
 			result, err := HandleDeployTool(t.Context(), loader, mockCLI, ec, StackConfig{
-				Cluster:    "test-cluster",
-				ProviderID: &providerID,
-				Stack:      &stackName,
+				Cluster: "test-cluster",
+				Stack:   &stack,
 			})
 
 			// Verify error expectations

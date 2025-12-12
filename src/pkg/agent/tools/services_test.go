@@ -12,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
@@ -265,11 +266,13 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 					"profile_name": "default",
 				},
 			})
-			stackName := "test-stack"
+			stack := stacks.StackParameters{
+				Name:     "test-stack",
+				Provider: client.ProviderAWS,
+			}
 			result, err := HandleServicesTool(t.Context(), loader, tt.mockCLI, ec, StackConfig{
-				Cluster:    "test-cluster",
-				ProviderID: &tt.providerId,
-				Stack:      &stackName,
+				Cluster: "test-cluster",
+				Stack:   &stack,
 			})
 
 			// Check Go error expectation

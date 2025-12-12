@@ -12,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/agent"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -72,8 +73,8 @@ type Debugger struct {
 	surveyor Surveyor
 }
 
-func NewDebugger(ctx context.Context, addr string, providerID *client.ProviderID, stack *string) (*Debugger, error) {
-	agent, err := agent.New(ctx, addr, providerID, stack)
+func NewDebugger(ctx context.Context, addr string, stack *stacks.StackParameters) (*Debugger, error) {
+	agent, err := agent.New(ctx, addr, stack)
 	if err != nil {
 		return nil, err
 	}

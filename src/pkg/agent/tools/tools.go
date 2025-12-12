@@ -75,6 +75,30 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 				return HandleSetConfig(ctx.Context, loader, params, cli, ec, config)
 			},
 		),
+		ai.NewTool("select_stack",
+			"Select the deployment stack for the defang project",
+			func(ctx *ai.ToolContext, params SelectStackParams) (string, error) {
+				return HandleSelectStackTool(ctx.Context, params, config)
+			},
+		),
+		ai.NewTool("create_aws_stack",
+			"Create a defang stack file to deploy to AWS",
+			func(ctx *ai.ToolContext, params CreateAWSStackParams) (string, error) {
+				return HandleCreateAWSStackTool(ctx.Context, params, config)
+			},
+		),
+		ai.NewTool("create_gcp_stack",
+			"Create a defang stack file to deploy to GCP",
+			func(ctx *ai.ToolContext, params CreateGCPStackParams) (string, error) {
+				return HandleCreateGCPStackTool(ctx.Context, params, config)
+			},
+		),
+		ai.NewTool("current_stack",
+			"Get the currently selected stack",
+			func(ctx *ai.ToolContext, params struct{}) (string, error) {
+				return HandleCurrentStackTool(ctx.Context, config)
+			},
+		),
 		ai.NewTool("remove_config",
 			"Remove a config variable from the defang project",
 			func(ctx *ai.ToolContext, params RemoveConfigParams) (string, error) {

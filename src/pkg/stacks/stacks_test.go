@@ -242,7 +242,7 @@ func TestMarshal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			content, err := Marshal(tt.params)
+			content, err := Marshal(&tt.params)
 			assert.NoError(t, err)
 			if content != tt.expectedContent {
 				t.Errorf("Marshal() = %q, want %q", content, tt.expectedContent)

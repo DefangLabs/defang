@@ -12,14 +12,14 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 type StackConfig struct {
-	Cluster    string
-	ProviderID *cliClient.ProviderID
-	Stack      *string
+	Cluster string
+	Stack   *stacks.StackParameters
 }
 
 // DefaultToolCLI implements all tool interfaces as passthroughs to the real CLI logic

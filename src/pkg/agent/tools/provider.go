@@ -35,28 +35,15 @@ func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc cliC
 	}
 }
 
-func (pp *providerPreparer) SetupProvider(ctx context.Context, stackName *string) (*cliClient.ProviderID, cliClient.Provider, error) {
+func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.StackParameters) (*cliClient.ProviderID, cliClient.Provider, error) {
 	var providerID cliClient.ProviderID
 	var err error
-	var stack *stacks.StackParameters
-	if stackName == nil {
-		return nil, nil, errors.New("stackName cannot be nil")
-	}
-	if *stackName != "" {
-		stack, err = stacks.Read(*stackName)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to read stack: %w", err)
-		}
-		err = stacks.Load(*stackName)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to load stack: %w", err)
-		}
-	} else {
-		stack, err = pp.setupStack(ctx)
+	if stack == nil {
+		newStack, err := pp.setupStack(ctx)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to setup stack: %w", err)
 		}
-		*stackName = stack.Name
+		stack = newStack
 	}
 
 	err = providerID.Set(stack.Provider.Name())
@@ -64,13 +51,13 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, stackName *string
 		return nil, nil, fmt.Errorf("failed to set provider ID: %w", err)
 	}
 
-	err = pp.setupProviderAuthentication(ctx, providerID)
+	err = pp.setupProviderAuthentication(ctx, *stack)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to setup provider authentication: %w", err)
 	}
 
 	term.Debug("Function invoked: cli.NewProvider")
-	provider := pp.pc.NewProvider(ctx, providerID, pp.fc, *stackName)
+	provider := pp.pc.NewProvider(ctx, providerID, pp.fc, stack.Name)
 	return &providerID, provider, nil
 }
 
@@ -99,6 +86,9 @@ func selectStack(ctx context.Context, ec elicitations.Controller) (string, error
 }
 
 func (pp *providerPreparer) setupStack(ctx context.Context) (*stacks.StackParameters, error) {
+	if !pp.ec.IsSupported() {
+		return nil, errors.New("your mcp client does not support elicitations, use the 'select_stack' tool to choose a stack")
+	}
 	selectedStackName, err := selectStack(ctx, pp.ec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select stack: %w", err)
@@ -172,21 +162,33 @@ func (pp *providerPreparer) createNewStack(ctx context.Context) (*stacks.StackLi
 	}, nil
 }
 
-func (pp *providerPreparer) setupProviderAuthentication(ctx context.Context, providerId cliClient.ProviderID) error {
-	switch providerId {
+func (pp *providerPreparer) setupProviderAuthentication(ctx context.Context, stack stacks.StackParameters) error {
+	switch stack.Provider {
 	case cliClient.ProviderAWS:
-		return pp.SetupAWSAuthentication(ctx)
+		return pp.SetupAWSAuthentication(ctx, stack)
 	case cliClient.ProviderGCP:
-		return pp.SetupGCPAuthentication(ctx)
+		return pp.SetupGCPAuthentication(ctx, stack)
 	case cliClient.ProviderDO:
 		return pp.SetupDOAuthentication(ctx)
 	}
 	return nil
 }
 
-func (pp *providerPreparer) SetupAWSAuthentication(ctx context.Context) error {
+func (pp *providerPreparer) SetupAWSAuthentication(ctx context.Context, stack stacks.StackParameters) error {
 	if os.Getenv("AWS_PROFILE") != "" || (os.Getenv("AWS_ACCESS_KEY_ID") != "" && os.Getenv("AWS_SECRET_ACCESS_KEY") != "") {
 		return nil
+	}
+
+	if stack.AWSProfile != "" {
+		if err := os.Setenv("AWS_PROFILE", stack.AWSProfile); err != nil {
+			return fmt.Errorf("failed to set AWS_PROFILE environment variable: %w", err)
+		}
+
+		return nil
+	}
+
+	if !pp.ec.IsSupported() {
+		return errors.New("your mcp client does not support elicitations, restart your mcp client with the AWS_PROFILE env var set")
 	}
 
 	// TODO: check the fs for AWS credentials file or config for profile names
@@ -235,7 +237,23 @@ func (pp *providerPreparer) SetupAWSAuthentication(ctx context.Context) error {
 	return nil
 }
 
-func (pp *providerPreparer) SetupGCPAuthentication(ctx context.Context) error {
+func (pp *providerPreparer) SetupGCPAuthentication(ctx context.Context, stack stacks.StackParameters) error {
+	if os.Getenv("GCP_PROJECT_ID") != "" {
+		return nil
+	}
+
+	if stack.GCPProjectID != "" {
+		if err := os.Setenv("GCP_PROJECT_ID", stack.GCPProjectID); err != nil {
+			return fmt.Errorf("failed to set GCP_PROJECT_ID environment variable: %w", err)
+		}
+
+		return nil
+	}
+
+	if !pp.ec.IsSupported() {
+		return errors.New("your mcp client does not support elicitations, restart your mcp client with the GCP_PROJECT_ID env var set")
+	}
+
 	if os.Getenv("GCP_PROJECT_ID") == "" {
 		gcpProjectID, err := pp.ec.RequestString(ctx, "Enter your GCP Project ID:", "gcp_project_id")
 		if err != nil {
@@ -249,6 +267,14 @@ func (pp *providerPreparer) SetupGCPAuthentication(ctx context.Context) error {
 }
 
 func (pp *providerPreparer) SetupDOAuthentication(ctx context.Context) error {
+	if os.Getenv("DIGITALOCEAN_TOKEN") != "" || (os.Getenv("SPACES_ACCESS_KEY_ID") != "" && os.Getenv("SPACES_SECRET_ACCESS_KEY") != "") {
+		return nil
+	}
+
+	if !pp.ec.IsSupported() {
+		return errors.New("your mcp client does not support elicitations, restart your mcp client with the DIGITALOCEAN_TOKEN, SPACES_ACCESS_KEY_ID, and SPACES_SECRET_ACCESS_KEY env vars set")
+	}
+
 	if os.Getenv("DIGITALOCEAN_TOKEN") == "" {
 		pat, err := pp.ec.RequestString(ctx, "Enter your DigitalOcean Personal Access Token:", "personal_access_token")
 		if err != nil {

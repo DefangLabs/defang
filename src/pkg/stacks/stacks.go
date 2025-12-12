@@ -15,10 +15,12 @@ import (
 )
 
 type StackParameters struct {
-	Name     string
-	Provider client.ProviderID
-	Region   string
-	Mode     modes.Mode
+	Name         string
+	Provider     client.ProviderID
+	Region       string
+	AWSProfile   string
+	GCPProjectID string
+	Mode         modes.Mode
 }
 
 var validStackName = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
@@ -38,7 +40,7 @@ func Create(params StackParameters) (string, error) {
 		return "", errors.New("stack name must start with a letter and contain only lowercase letters and numbers")
 	}
 
-	content, err := Marshal(params)
+	content, err := Marshal(&params)
 	if err != nil {
 		return "", err
 	}
@@ -75,11 +77,14 @@ func Create(params StackParameters) (string, error) {
 	return filename, nil
 }
 
+// for shell printing for converting to string format of StackParameters
 type StackListItem struct {
-	Name     string
-	Provider string
-	Region   string
-	Mode     string
+	Name         string
+	AWSProfile   string
+	GCPProjectID string
+	Provider     string
+	Region       string
+	Mode         string
 }
 
 func List() ([]StackListItem, error) {
@@ -133,6 +138,10 @@ func Parse(content string) (StackParameters, error) {
 			params.Region = value
 		case "GCP_LOCATION":
 			params.Region = value
+		case "AWS_PROFILE":
+			params.AWSProfile = value
+		case "GCP_PROJECT_ID":
+			params.GCPProjectID = value
 		case "DEFANG_MODE":
 			mode, err := modes.Parse(value)
 			if err != nil {
@@ -144,7 +153,7 @@ func Parse(content string) (StackParameters, error) {
 	return params, nil
 }
 
-func Marshal(params StackParameters) (string, error) {
+func Marshal(params *StackParameters) (string, error) {
 	var properties map[string]string = make(map[string]string)
 	properties["DEFANG_PROVIDER"] = strings.ToLower(params.Provider.String())
 	if params.Region != "" {
@@ -161,6 +170,13 @@ func Marshal(params StackParameters) (string, error) {
 	}
 	if params.Mode != modes.ModeUnspecified {
 		properties["DEFANG_MODE"] = strings.ToLower(params.Mode.String())
+	}
+
+	if params.Provider == client.ProviderAWS && params.AWSProfile != "" {
+		properties["AWS_PROFILE"] = params.AWSProfile
+	}
+	if params.Provider == client.ProviderGCP && params.GCPProjectID != "" {
+		properties["GCP_PROJECT_ID"] = params.GCPProjectID
 	}
 	return godotenv.Marshal(properties)
 }

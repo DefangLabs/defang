@@ -9,6 +9,8 @@ type Controller interface {
 	RequestString(ctx context.Context, message, field string) (string, error)
 	RequestStringWithDefault(ctx context.Context, message, field, defaultValue string) (string, error)
 	RequestEnum(ctx context.Context, message, field string, options []string) (string, error)
+	SetSupported(supported bool)
+	IsSupported() bool
 }
 
 type Client interface {
@@ -16,7 +18,8 @@ type Client interface {
 }
 
 type controller struct {
-	client Client
+	client    Client
+	supported bool
 }
 
 type Request struct {
@@ -31,7 +34,8 @@ type Response struct {
 
 func NewController(client Client) Controller {
 	return &controller{
-		client: client,
+		client:    client,
+		supported: true,
 	}
 }
 
@@ -78,4 +82,12 @@ func (c *controller) requestField(ctx context.Context, message, field string, sc
 	}
 
 	return value, nil
+}
+
+func (c *controller) SetSupported(supported bool) {
+	c.supported = supported
+}
+
+func (c *controller) IsSupported() bool {
+	return c.supported
 }
