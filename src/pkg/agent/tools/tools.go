@@ -92,6 +92,12 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 				return HandleCreateAWSStackTool(ctx.Context, params, &config)
 			},
 		),
+		ai.NewTool("create_gcp_stack",
+			"Create a defang stack file to deploy to GCP",
+			func(ctx *ai.ToolContext, params CreateGCPStackParams) (string, error) {
+				return HandleCreateGCPStackTool(ctx.Context, params, &config)
+			},
+		),
 		ai.NewTool("current_stack",
 			"Get the currently selected stack",
 			func(ctx *ai.ToolContext, params struct{}) (string, error) {
