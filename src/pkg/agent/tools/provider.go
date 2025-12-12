@@ -175,11 +175,12 @@ func (pp *providerPreparer) setupProviderAuthentication(ctx context.Context, pro
 }
 
 func (pp *providerPreparer) SetupAWSAuthentication(ctx context.Context) error {
-	if !pp.ec.IsSupported() {
-		return errors.New("your mcp client does not support elicitations, restart your mcp client with the AWS_PROFILE env var set")
-	}
 	if os.Getenv("AWS_PROFILE") != "" || (os.Getenv("AWS_ACCESS_KEY_ID") != "" && os.Getenv("AWS_SECRET_ACCESS_KEY") != "") {
 		return nil
+	}
+
+	if !pp.ec.IsSupported() {
+		return errors.New("your mcp client does not support elicitations, restart your mcp client with the AWS_PROFILE env var set")
 	}
 
 	// TODO: check the fs for AWS credentials file or config for profile names
@@ -229,6 +230,10 @@ func (pp *providerPreparer) SetupAWSAuthentication(ctx context.Context) error {
 }
 
 func (pp *providerPreparer) SetupGCPAuthentication(ctx context.Context) error {
+	if os.Getenv("GCP_PROJECT_ID") != "" {
+		return nil
+	}
+
 	if !pp.ec.IsSupported() {
 		return errors.New("your mcp client does not support elicitations, restart your mcp client with the GCP_PROJECT_ID env var set")
 	}
@@ -246,6 +251,10 @@ func (pp *providerPreparer) SetupGCPAuthentication(ctx context.Context) error {
 }
 
 func (pp *providerPreparer) SetupDOAuthentication(ctx context.Context) error {
+	if os.Getenv("DIGITALOCEAN_TOKEN") != "" || (os.Getenv("SPACES_ACCESS_KEY_ID") != "" && os.Getenv("SPACES_SECRET_ACCESS_KEY") != "") {
+		return nil
+	}
+
 	if !pp.ec.IsSupported() {
 		return errors.New("your mcp client does not support elicitations, restart your mcp client with the DIGITALOCEAN_TOKEN, SPACES_ACCESS_KEY_ID, and SPACES_SECRET_ACCESS_KEY env vars set")
 	}
