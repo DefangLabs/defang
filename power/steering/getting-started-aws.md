@@ -28,7 +28,7 @@ A stack will need the following information:
 
 ## Step 3: Select the stack
 
-Now prompt user to select select the stack to deploy to by calling the defang MCP ""list-stacks" tool.
+Now prompt user to select the stack to deploy to by calling the defang MCP "list-stacks" tool.
 
 Present the user with the list of stacks to choose from.
 
