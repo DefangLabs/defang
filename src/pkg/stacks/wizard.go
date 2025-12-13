@@ -74,7 +74,6 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *StackPa
 	switch params.Provider {
 	case cliClient.ProviderAWS:
 		if params.AWSProfile == "" {
-			var profile string
 			if os.Getenv("AWS_PROFILE") != "" {
 				profile, err := w.ec.RequestStringWithDefault(ctx, "Which AWS profile do you want to use?", "aws_profile", os.Getenv("AWS_PROFILE"))
 				if err != nil {
@@ -85,21 +84,21 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *StackPa
 			}
 			profiles, err := listAWSProfiles()
 			if err != nil || len(profiles) == 0 {
-				profile, err = w.ec.RequestStringWithDefault(ctx, "Enter the AWS profile you want to use:", "aws_profile", "default")
+				profile, err := w.ec.RequestStringWithDefault(ctx, "Enter the AWS profile you want to use:", "aws_profile", "default")
 				if err != nil {
 					return nil, fmt.Errorf("failed to elicit AWS profile: %w", err)
 				}
+				params.AWSProfile = profile
 			} else {
-				profile, err = w.ec.RequestEnum(ctx, "Which AWS profile do you want to use?", "aws_profile", profiles)
+				profile, err := w.ec.RequestEnum(ctx, "Which AWS profile do you want to use?", "aws_profile", profiles)
 				if err != nil {
 					return nil, fmt.Errorf("failed to elicit AWS profile: %w", err)
 				}
+				params.AWSProfile = profile
 			}
-			params.AWSProfile = profile
 		}
 	case cliClient.ProviderGCP:
 		if params.GCPProjectID == "" {
-			var projectID string
 			if os.Getenv("GCP_PROJECT_ID") != "" {
 				projectID, err := w.ec.RequestStringWithDefault(ctx, "Enter your GCP Project ID:", "gcp_project_id", os.Getenv("GCP_PROJECT_ID"))
 				if err != nil {
