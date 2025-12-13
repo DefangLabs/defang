@@ -97,17 +97,22 @@ func (pp *providerPreparer) setupStack(ctx context.Context) (*stacks.StackParame
 	}
 
 	if selectedStackName == CreateNewStack {
-		newStack, err := pp.createNewStack(ctx)
+		params, err := pp.collectStackParameters(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new stack: %w", err)
 		}
-		selectedStackName = newStack.Name
+		_, err = pp.sm.Create(*params)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create stack: %w", err)
+		}
+
+		selectedStackName = params.Name
 	}
 
 	return pp.sm.Load(selectedStackName)
 }
 
-func (pp *providerPreparer) createNewStack(ctx context.Context) (*stacks.StackParameters, error) {
+func (pp *providerPreparer) collectStackParameters(ctx context.Context) (*stacks.StackParameters, error) {
 	var providerNames []string
 	for _, p := range cliClient.AllProviders() {
 		providerNames = append(providerNames, p.Name())
@@ -142,17 +147,11 @@ func (pp *providerPreparer) createNewStack(ctx context.Context) (*stacks.StackPa
 	if err != nil {
 		return nil, fmt.Errorf("failed to elicit stack name: %w", err)
 	}
-	params := stacks.StackParameters{
+	return &stacks.StackParameters{
 		Provider: providerID,
 		Region:   region,
 		Name:     name,
-	}
-	_, err = pp.sm.Create(params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stack: %w", err)
-	}
-
-	return &params, nil
+	}, nil
 }
 
 func (pp *providerPreparer) setupProviderAuthentication(ctx context.Context, providerId cliClient.ProviderID) error {
