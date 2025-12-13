@@ -14,6 +14,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
@@ -21,7 +22,7 @@ type DeployParams struct {
 	common.LoaderParams
 }
 
-func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
+func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, params DeployParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
@@ -43,7 +44,8 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, cli C
 		}
 	}
 
-	pp := NewProviderPreparer(cli, ec, client)
+	sm := stacks.NewManager(params.WorkingDirectory)
+	pp := NewProviderPreparer(cli, ec, client, sm)
 	_, provider, err := pp.SetupProvider(ctx, config.Stack)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
@@ -75,7 +77,7 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, cli C
 			}
 
 			// try again
-			return HandleDeployTool(ctx, loader, cli, ec, config)
+			return HandleDeployTool(ctx, loader, params, cli, ec, config)
 		}
 
 		return "", err

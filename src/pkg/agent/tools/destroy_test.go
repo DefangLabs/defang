@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
@@ -151,7 +152,12 @@ func TestHandleDestroyTool(t *testing.T) {
 				},
 			})
 			// Call the function
-			result, err := HandleDestroyTool(t.Context(), loader, mockCLI, ec, StackConfig{
+			params := DestroyParams{
+				LoaderParams: common.LoaderParams{
+					WorkingDirectory: ".",
+				},
+			}
+			result, err := HandleDestroyTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
 				Cluster: "test-cluster",
 				Stack:   &stack,
 			})

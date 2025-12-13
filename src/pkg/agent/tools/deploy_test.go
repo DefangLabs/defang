@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
@@ -175,7 +176,12 @@ func TestHandleDeployTool(t *testing.T) {
 				Name:     "test-stack",
 				Provider: client.ProviderAWS,
 			}
-			result, err := HandleDeployTool(t.Context(), loader, mockCLI, ec, StackConfig{
+			params := DeployParams{
+				common.LoaderParams{
+					WorkingDirectory: ".",
+				},
+			}
+			result, err := HandleDeployTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
 				Cluster: "test-cluster",
 				Stack:   &stack,
 			})

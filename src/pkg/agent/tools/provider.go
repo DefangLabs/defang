@@ -25,13 +25,15 @@ type providerPreparer struct {
 	pc ProviderCreator
 	ec elicitations.Controller
 	fc cliClient.FabricClient
+	sm stacks.Manager
 }
 
-func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc cliClient.FabricClient) *providerPreparer {
+func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc cliClient.FabricClient, sm stacks.Manager) *providerPreparer {
 	return &providerPreparer{
 		pc: pc,
 		ec: ec,
 		fc: fc,
+		sm: sm,
 	}
 }
 
@@ -61,8 +63,8 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.Sta
 	return &providerID, provider, nil
 }
 
-func selectStack(ctx context.Context, ec elicitations.Controller) (string, error) {
-	stackList, err := stacks.List()
+func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Controller) (string, error) {
+	stackList, err := pp.sm.List()
 	if err != nil {
 		return "", fmt.Errorf("failed to list stacks: %w", err)
 	}
@@ -89,7 +91,7 @@ func (pp *providerPreparer) setupStack(ctx context.Context) (*stacks.StackParame
 	if !pp.ec.IsSupported() {
 		return nil, errors.New("your mcp client does not support elicitations, use the 'select_stack' tool to choose a stack")
 	}
-	selectedStackName, err := selectStack(ctx, pp.ec)
+	selectedStackName, err := pp.selectStack(ctx, pp.ec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select stack: %w", err)
 	}
@@ -102,12 +104,7 @@ func (pp *providerPreparer) setupStack(ctx context.Context) (*stacks.StackParame
 		selectedStackName = newStack.Name
 	}
 
-	err = stacks.Load(selectedStackName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load stack: %w", err)
-	}
-
-	return stacks.Read(selectedStackName)
+	return pp.sm.Load(selectedStackName)
 }
 
 func (pp *providerPreparer) createNewStack(ctx context.Context) (*stacks.StackListItem, error) {
@@ -150,7 +147,7 @@ func (pp *providerPreparer) createNewStack(ctx context.Context) (*stacks.StackLi
 		Region:   region,
 		Name:     name,
 	}
-	_, err = stacks.Create(params)
+	_, err = pp.sm.Create(params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stack: %w", err)
 	}

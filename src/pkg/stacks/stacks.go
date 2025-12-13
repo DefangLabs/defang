@@ -33,6 +33,10 @@ func MakeDefaultName(providerId client.ProviderID, region string) string {
 }
 
 func Create(params StackParameters) (string, error) {
+	return CreateInDirectory(".", params)
+}
+
+func CreateInDirectory(workingDirectory string, params StackParameters) (string, error) {
 	if params.Name == "" {
 		return "", errors.New("stack name cannot be empty")
 	}
@@ -45,10 +49,11 @@ func Create(params StackParameters) (string, error) {
 		return "", err
 	}
 
-	if err := os.Mkdir(Directory, 0700); err != nil && !errors.Is(err, os.ErrExist) {
+	defangDir := filepath.Join(workingDirectory, Directory)
+	if err := os.MkdirAll(defangDir, 0700); err != nil {
 		return "", err
 	}
-	filename := filename(params.Name)
+	filename := filename(workingDirectory, params.Name)
 	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
 		if errors.Is(err, os.ErrExist) {
@@ -88,7 +93,12 @@ type StackListItem struct {
 }
 
 func List() ([]StackListItem, error) {
-	files, err := os.ReadDir(Directory)
+	return ListInDirectory(".")
+}
+
+func ListInDirectory(workingDirectory string) ([]StackListItem, error) {
+	defangDir := filepath.Join(workingDirectory, Directory)
+	files, err := os.ReadDir(defangDir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, nil
@@ -98,7 +108,7 @@ func List() ([]StackListItem, error) {
 
 	var stacks []StackListItem
 	for _, file := range files {
-		filename := filepath.Join(Directory, file.Name())
+		filename := filename(workingDirectory, file.Name())
 		content, err := os.ReadFile(filename)
 		if err != nil {
 			term.Warnf("Skipping unreadable stack file %s: %v\n", filename, err)
@@ -182,22 +192,24 @@ func Marshal(params *StackParameters) (string, error) {
 }
 
 func Remove(name string) error {
+	return RemoveInDirectory(".", name)
+}
+
+func RemoveInDirectory(workingDirectory, name string) error {
 	if name == "" {
 		return errors.New("stack name cannot be empty")
 	}
+	path := filename(workingDirectory, name)
 	// delete the stack file
-	return os.Remove(filename(name))
-}
-
-func filename(stackname string) string {
-	return filepath.Join(Directory, stackname)
+	return os.Remove(path)
 }
 
 func Read(name string) (*StackParameters, error) {
-	path, err := filepath.Abs(filepath.Join(Directory, name))
-	if err != nil {
-		return nil, err
-	}
+	return ReadInDirectory(".", name)
+}
+
+func ReadInDirectory(workingDirectory, name string) (*StackParameters, error) {
+	path := filename(workingDirectory, name)
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("could not read stack %q from %q: %w", name, path, err)
@@ -211,10 +223,11 @@ func Read(name string) (*StackParameters, error) {
 }
 
 func Load(name string) error {
-	path, err := filepath.Abs(filepath.Join(Directory, name))
-	if err != nil {
-		return err
-	}
+	return LoadInDirectory(".", name)
+}
+
+func LoadInDirectory(workingDirectory, name string) error {
+	path := filename(workingDirectory, name)
 	if err := godotenv.Load(path); err != nil {
 		return fmt.Errorf("could not load stack %q from %q %w", name, path, err)
 	}
@@ -224,16 +237,21 @@ func Load(name string) error {
 }
 
 func Overload(name string) error {
-	path, err := filepath.Abs(filepath.Join(Directory, name))
-	if err != nil {
-		return err
-	}
+	return OverloadInDirectory(".", name)
+}
+
+func OverloadInDirectory(workingDirectory, name string) error {
+	path := filename(workingDirectory, name)
 	if err := godotenv.Overload(path); err != nil {
 		return fmt.Errorf("could not load stack %q from %q %w", name, path, err)
 	}
 
 	term.Debugf("loaded globals from %s", path)
 	return nil
+}
+
+func filename(workingDirectory, stackname string) string {
+	return filepath.Join(workingDirectory, Directory, stackname)
 }
 
 func PostCreateMessage(stackName string) string {

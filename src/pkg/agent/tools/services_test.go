@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
@@ -267,7 +268,12 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				Name:     "test-stack",
 				Provider: client.ProviderAWS,
 			}
-			result, err := HandleServicesTool(t.Context(), loader, tt.mockCLI, ec, StackConfig{
+			params := ServicesParams{
+				LoaderParams: common.LoaderParams{
+					WorkingDirectory: ".",
+				},
+			}
+			result, err := HandleServicesTool(t.Context(), loader, params, tt.mockCLI, ec, StackConfig{
 				Cluster: "test-cluster",
 				Stack:   &stack,
 			})

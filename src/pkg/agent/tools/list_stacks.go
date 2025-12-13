@@ -4,11 +4,16 @@ import (
 	"context"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 )
 
-func HandleListStacksTool(ctx context.Context) (string, error) {
-	stacksList, err := stacks.List()
+type ListStacksParams struct {
+	common.LoaderParams
+}
+
+func HandleListStacksTool(ctx context.Context, params ListStacksParams) (string, error) {
+	stacksList, err := stacks.ListInDirectory(params.WorkingDirectory)
 	if err != nil {
 		return "", err
 	}

@@ -38,7 +38,7 @@ func HandleCreateAWSStackTool(ctx context.Context, params CreateAWSStackParams, 
 		Mode:       mode,
 	}
 
-	_, err = stacks.Create(newStack)
+	_, err = stacks.CreateInDirectory(params.WorkingDirectory, newStack)
 	if err != nil {
 		return "Failed to create stack", err
 	}
