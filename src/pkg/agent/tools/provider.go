@@ -107,7 +107,7 @@ func (pp *providerPreparer) setupStack(ctx context.Context) (*stacks.StackParame
 	return pp.sm.Load(selectedStackName)
 }
 
-func (pp *providerPreparer) createNewStack(ctx context.Context) (*stacks.StackListItem, error) {
+func (pp *providerPreparer) createNewStack(ctx context.Context) (*stacks.StackParameters, error) {
 	var providerNames []string
 	for _, p := range cliClient.AllProviders() {
 		providerNames = append(providerNames, p.Name())
@@ -152,11 +152,7 @@ func (pp *providerPreparer) createNewStack(ctx context.Context) (*stacks.StackLi
 		return nil, fmt.Errorf("failed to create stack: %w", err)
 	}
 
-	return &stacks.StackListItem{
-		Name:     name,
-		Provider: providerID.Name(),
-		Region:   region,
-	}, nil
+	return &params, nil
 }
 
 func (pp *providerPreparer) setupProviderAuthentication(ctx context.Context, providerId cliClient.ProviderID) error {
