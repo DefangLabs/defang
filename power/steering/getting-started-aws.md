@@ -38,6 +38,6 @@ Then we set the selected stack as the active stack by calling the defang MCP "se
 
 Now that the stack is selected, we can deploy the project using the defang MCP "deploy" tool.
 
-## Step 5: Post deployment
+## Step 5: Post-deployment
 
 After the defang MCP "deploy" tool call ends, present the return data from tool. Lastly, Kiro should not progress with any further steps unless user explicitly requests so.
