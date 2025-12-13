@@ -7,7 +7,7 @@ Guide on how to use Defang MCP server on how to set up and deploy to AWS.
 _IMPORTANT_:
 
 - This steering file assumes that the user has already completed the onboarding steps outlined in the #Onboarding section.
-- do not call the defang MCP "estimate" tool in this steering file, as it is not part of this getting started flow.
+- Do not call the defang MCP "estimate" tool in this steering file, as it is not part of this getting started flow.
 
 ## Trigger
 
