@@ -429,3 +429,342 @@ func TestWizardSetSupported(t *testing.T) {
 
 	_ = wizard // Suppress unused variable warning
 }
+
+func TestWizardCollectRemainingParameters(t *testing.T) {
+	tests := []struct {
+		name           string
+		initialParams  *StackParameters
+		setupMock      func(*mockElicitationsController)
+		setupEnv       func(*testing.T)
+		cleanupEnv     func()
+		expectError    bool
+		expectedResult *StackParameters
+	}{
+		{
+			name: "Only provider missing - AWS",
+			initialParams: &StackParameters{
+				Region: "us-east-1",
+				Name:   "my-stack",
+			},
+			setupMock: func(m *mockElicitationsController) {
+				m.enumResponses["provider"] = "AWS"
+				m.defaultResponses["aws_profile"] = "default"
+				m.enumResponses["aws_profile"] = "default"
+			},
+			setupEnv:    func(t *testing.T) {},
+			cleanupEnv:  func() {},
+			expectError: false,
+			expectedResult: &StackParameters{
+				Provider:   cliClient.ProviderAWS,
+				Region:     "us-east-1",
+				Name:       "my-stack",
+				AWSProfile: "default",
+			},
+		},
+		{
+			name: "Only region missing - AWS",
+			initialParams: &StackParameters{
+				Provider: cliClient.ProviderAWS,
+				Name:     "my-stack",
+			},
+			setupMock: func(m *mockElicitationsController) {
+				m.defaultResponses["region"] = "us-west-2"
+				m.defaultResponses["aws_profile"] = "default"
+				m.enumResponses["aws_profile"] = "default"
+			},
+			setupEnv:    func(t *testing.T) {},
+			cleanupEnv:  func() {},
+			expectError: false,
+			expectedResult: &StackParameters{
+				Provider:   cliClient.ProviderAWS,
+				Region:     "us-west-2",
+				Name:       "my-stack",
+				AWSProfile: "default",
+			},
+		},
+		{
+			name: "Only stack name missing - GCP",
+			initialParams: &StackParameters{
+				Provider: cliClient.ProviderGCP,
+				Region:   "us-central1",
+			},
+			setupMock: func(m *mockElicitationsController) {
+				m.defaultResponses["stack_name"] = "gcpuscentral1"
+				m.responses["gcp_project_id"] = "my-project"
+				m.defaultResponses["gcp_project_id"] = "my-project"
+			},
+			setupEnv:    func(t *testing.T) {},
+			cleanupEnv:  func() {},
+			expectError: false,
+			expectedResult: &StackParameters{
+				Provider:     cliClient.ProviderGCP,
+				Region:       "us-central1",
+				Name:         "gcpuscentral1",
+				GCPProjectID: "my-project",
+			},
+		},
+		{
+			name: "Only AWS profile missing - with AWS_PROFILE env",
+			initialParams: &StackParameters{
+				Provider: cliClient.ProviderAWS,
+				Region:   "eu-west-1",
+				Name:     "my-aws-stack",
+			},
+			setupMock: func(m *mockElicitationsController) {
+				m.defaultResponses["aws_profile"] = "production"
+			},
+			setupEnv: func(t *testing.T) {
+				t.Setenv("AWS_PROFILE", "production")
+			},
+			cleanupEnv: func() {
+				os.Unsetenv("AWS_PROFILE")
+			},
+			expectError: false,
+			expectedResult: &StackParameters{
+				Provider:   cliClient.ProviderAWS,
+				Region:     "eu-west-1",
+				Name:       "my-aws-stack",
+				AWSProfile: "production",
+			},
+		},
+		{
+			name: "Only GCP project ID missing - with GCP_PROJECT_ID env",
+			initialParams: &StackParameters{
+				Provider: cliClient.ProviderGCP,
+				Region:   "europe-west1",
+				Name:     "my-gcp-stack",
+			},
+			setupMock: func(m *mockElicitationsController) {
+				m.defaultResponses["gcp_project_id"] = "env-project-123"
+			},
+			setupEnv: func(t *testing.T) {
+				t.Setenv("GCP_PROJECT_ID", "env-project-123")
+			},
+			cleanupEnv: func() {
+				os.Unsetenv("GCP_PROJECT_ID")
+			},
+			expectError: false,
+			expectedResult: &StackParameters{
+				Provider:     cliClient.ProviderGCP,
+				Region:       "europe-west1",
+				Name:         "my-gcp-stack",
+				GCPProjectID: "env-project-123",
+			},
+		},
+		{
+			name: "Provider and region missing - DigitalOcean",
+			initialParams: &StackParameters{
+				Name: "do-stack",
+			},
+			setupMock: func(m *mockElicitationsController) {
+				m.enumResponses["provider"] = "DigitalOcean"
+				m.defaultResponses["region"] = "sfo3"
+			},
+			setupEnv:    func(t *testing.T) {},
+			cleanupEnv:  func() {},
+			expectError: false,
+			expectedResult: &StackParameters{
+				Provider: cliClient.ProviderDO,
+				Region:   "sfo3",
+				Name:     "do-stack",
+			},
+		},
+		{
+			name: "Provider and name missing - Defang (no region needed)",
+			initialParams: &StackParameters{
+				Region: "should-be-ignored",
+			},
+			setupMock: func(m *mockElicitationsController) {
+				m.enumResponses["provider"] = "Defang Playground"
+				m.defaultResponses["stack_name"] = "defang-playground"
+			},
+			setupEnv:    func(t *testing.T) {},
+			cleanupEnv:  func() {},
+			expectError: false,
+			expectedResult: &StackParameters{
+				Provider: cliClient.ProviderDefang,
+				Region:   "",
+				Name:     "defang-playground",
+			},
+		},
+		{
+			name: "Region and name missing - AWS",
+			initialParams: &StackParameters{
+				Provider: cliClient.ProviderAWS,
+			},
+			setupMock: func(m *mockElicitationsController) {
+				m.defaultResponses["region"] = "ap-southeast-1"
+				m.defaultResponses["stack_name"] = "awsapsoutheast1"
+				m.enumResponses["aws_profile"] = "staging"
+				m.defaultResponses["aws_profile"] = "staging"
+			},
+			setupEnv:    func(t *testing.T) {},
+			cleanupEnv:  func() {},
+			expectError: false,
+			expectedResult: &StackParameters{
+				Provider:   cliClient.ProviderAWS,
+				Region:     "ap-southeast-1",
+				Name:       "awsapsoutheast1",
+				AWSProfile: "staging",
+			},
+		},
+		{
+			name: "All parameters provided - AWS complete",
+			initialParams: &StackParameters{
+				Provider:   cliClient.ProviderAWS,
+				Region:     "us-west-1",
+				Name:       "complete-stack",
+				AWSProfile: "prod",
+			},
+			setupMock:   func(m *mockElicitationsController) {},
+			setupEnv:    func(t *testing.T) {},
+			cleanupEnv:  func() {},
+			expectError: false,
+			expectedResult: &StackParameters{
+				Provider:   cliClient.ProviderAWS,
+				Region:     "us-west-1",
+				Name:       "complete-stack",
+				AWSProfile: "prod",
+			},
+		},
+		{
+			name: "All parameters provided - GCP complete",
+			initialParams: &StackParameters{
+				Provider:     cliClient.ProviderGCP,
+				Region:       "asia-east1",
+				Name:         "gcp-complete",
+				GCPProjectID: "my-complete-project",
+			},
+			setupMock:   func(m *mockElicitationsController) {},
+			setupEnv:    func(t *testing.T) {},
+			cleanupEnv:  func() {},
+			expectError: false,
+			expectedResult: &StackParameters{
+				Provider:     cliClient.ProviderGCP,
+				Region:       "asia-east1",
+				Name:         "gcp-complete",
+				GCPProjectID: "my-complete-project",
+			},
+		},
+		{
+			name: "Defang provider with name - no region needed",
+			initialParams: &StackParameters{
+				Provider: cliClient.ProviderDefang,
+				Name:     "my-defang-stack",
+			},
+			setupMock:   func(m *mockElicitationsController) {},
+			setupEnv:    func(t *testing.T) {},
+			cleanupEnv:  func() {},
+			expectError: false,
+			expectedResult: &StackParameters{
+				Provider: cliClient.ProviderDefang,
+				Region:   "",
+				Name:     "my-defang-stack",
+			},
+		},
+		{
+			name:          "Everything missing - AWS from scratch",
+			initialParams: &StackParameters{},
+			setupMock: func(m *mockElicitationsController) {
+				m.enumResponses["provider"] = "AWS"
+				m.defaultResponses["region"] = "us-east-1"
+				m.defaultResponses["stack_name"] = "awsuseast1"
+				m.enumResponses["aws_profile"] = "default"
+				m.defaultResponses["aws_profile"] = "default"
+			},
+			setupEnv:    func(t *testing.T) {},
+			cleanupEnv:  func() {},
+			expectError: false,
+			expectedResult: &StackParameters{
+				Provider:   cliClient.ProviderAWS,
+				Region:     "us-east-1",
+				Name:       "awsuseast1",
+				AWSProfile: "default",
+			},
+		},
+		{
+			name:          "Everything missing - GCP from scratch",
+			initialParams: &StackParameters{},
+			setupMock: func(m *mockElicitationsController) {
+				m.enumResponses["provider"] = "Google Cloud Platform"
+				m.defaultResponses["region"] = "us-central1"
+				m.defaultResponses["stack_name"] = "gcpuscentral1"
+				m.responses["gcp_project_id"] = "my-gcp-project"
+				m.defaultResponses["gcp_project_id"] = "my-gcp-project"
+			},
+			setupEnv:    func(t *testing.T) {},
+			cleanupEnv:  func() {},
+			expectError: false,
+			expectedResult: &StackParameters{
+				Provider:     cliClient.ProviderGCP,
+				Region:       "us-central1",
+				Name:         "gcpuscentral1",
+				GCPProjectID: "my-gcp-project",
+			},
+		},
+		{
+			name: "Provider missing with error during selection",
+			initialParams: &StackParameters{
+				Region: "us-east-1",
+				Name:   "error-stack",
+			},
+			setupMock: func(m *mockElicitationsController) {
+				m.enumErrors["provider"] = errors.New("provider selection cancelled")
+			},
+			setupEnv:       func(t *testing.T) {},
+			cleanupEnv:     func() {},
+			expectError:    true,
+			expectedResult: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup
+			tt.setupEnv(t)
+			defer tt.cleanupEnv()
+
+			mockController := newMockElicitationsController()
+			tt.setupMock(mockController)
+
+			wizard := NewWizard(mockController)
+			ctx := context.Background()
+
+			// Execute
+			result, err := wizard.CollectRemainingParameters(ctx, tt.initialParams)
+
+			// Verify error expectation
+			if tt.expectError && err == nil {
+				t.Errorf("expected error but got none")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			// Verify result
+			if tt.expectedResult == nil && result != nil {
+				t.Errorf("expected nil result but got %+v", result)
+			}
+			if tt.expectedResult != nil && result == nil {
+				t.Errorf("expected result %+v but got nil", tt.expectedResult)
+			}
+			if tt.expectedResult != nil && result != nil {
+				if result.Provider != tt.expectedResult.Provider {
+					t.Errorf("expected Provider %v, got %v", tt.expectedResult.Provider, result.Provider)
+				}
+				if result.Region != tt.expectedResult.Region {
+					t.Errorf("expected Region %v, got %v", tt.expectedResult.Region, result.Region)
+				}
+				if result.Name != tt.expectedResult.Name {
+					t.Errorf("expected Name %v, got %v", tt.expectedResult.Name, result.Name)
+				}
+				if result.AWSProfile != tt.expectedResult.AWSProfile {
+					t.Errorf("expected AWSProfile %v, got %v", tt.expectedResult.AWSProfile, result.AWSProfile)
+				}
+				if result.GCPProjectID != tt.expectedResult.GCPProjectID {
+					t.Errorf("expected GCPProjectID %v, got %v", tt.expectedResult.GCPProjectID, result.GCPProjectID)
+				}
+			}
+		})
+	}
+}

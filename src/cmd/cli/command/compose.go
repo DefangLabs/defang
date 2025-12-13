@@ -114,7 +114,7 @@ func makeComposeUpCmd() *cobra.Command {
 			} else if len(resp.Deployments) > 0 {
 				handleExistingDeployments(resp.Deployments, accountInfo, project.Name)
 			} else if global.Stack.Name == "" {
-				promptToCreateStack(stacks.StackParameters{
+				promptToCreateStack(ctx, stacks.StackParameters{
 					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
 					Provider: accountInfo.Provider,
 					Region:   accountInfo.Region,
@@ -271,14 +271,14 @@ func confirmDeploymentToNewLocation(projectName string, existingDeployments []*d
 	return nil
 }
 
-func promptToCreateStack(params stacks.StackParameters) error {
+func promptToCreateStack(ctx context.Context, params stacks.StackParameters) error {
 	if global.NonInteractive {
 		term.Info("Consider creating a stack to manage your deployments.")
 		printDefangHint("To create a stack, do:", "stack new --name="+params.Name)
 		return nil
 	}
 
-	err := PromptForStackParameters(&params)
+	err := PromptForStackParameters(ctx, &params)
 	if err != nil {
 		return err
 	}
