@@ -15,7 +15,7 @@ When user runs the Defang power tool, or "I would like to deploy to aws".
 
 ## Step 1: Check if there is a stack in the current project
 
-Check if there are any stack in the current project by using the defang MCP tool called "list-stacks".
+Check if there are any stacks in the current project by using the defang MCP tool called "list-stacks".
 
 - If there is no stack, prompt user to create a new stack using defang MCP tool "create_aws_stack".
 
