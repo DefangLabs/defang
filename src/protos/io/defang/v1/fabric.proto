@@ -631,6 +631,7 @@ enum SubscriptionTier {
   PERSONAL = 2;
   PRO = 3;
   TEAM = 4;
+  EXPIRED = -1;
 }
 
 message SetOptionsRequest {
