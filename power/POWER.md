@@ -28,7 +28,7 @@ Before using Defang Local MCP, ensure the following are installed and running:
 
 # Available Steering Files
 
-- `getting-started-aws`: Guide on setting up and deploying to AWS using Defang MCP, which should be ran after #Onboarding is complete.
+- `getting-started-aws`: Guide on setting up and deploying to AWS using Defang MCP, which should be run after #Onboarding is complete.
 
 # Best Practices
 
