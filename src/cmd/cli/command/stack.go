@@ -135,7 +135,7 @@ func PromptForStackParameters(ctx context.Context, params *stacks.StackParameter
 	elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
 	ec := elicitations.NewController(elicitationsClient)
 	wizard := stacks.NewWizard(ec)
-	newParams, err := wizard.CollectParameters(ctx)
+	newParams, err := wizard.CollectRemainingParameters(ctx, params)
 	if err != nil {
 		return err
 	}
