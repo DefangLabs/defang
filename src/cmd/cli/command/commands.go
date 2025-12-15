@@ -1312,7 +1312,15 @@ func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 			global.Stack.Provider = cliClient.ProviderDefang
 		} else {
 			var err error
-			if whence, err = determineProviderID(ctx, loader); err != nil {
+			var projectName string
+			if loader != nil {
+				var err error
+				projectName, err = loader.LoadProjectName(ctx)
+				if err != nil {
+					term.Warnf("Unable to load project: %v", err)
+				}
+			}
+			if whence, err = determineProviderID(ctx, projectName); err != nil {
 				return err
 			}
 		}
@@ -1359,23 +1367,14 @@ func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectNa
 	return cliClient.CanIUseProvider(ctx, global.Client, provider, projectName, global.Stack.Name, serviceCount)
 }
 
-func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, error) {
-	var projectName string
-	if loader != nil {
-		var err error
-		projectName, err = loader.LoadProjectName(ctx)
+func determineProviderID(ctx context.Context, projectName string) (string, error) {
+	if projectName != "" && !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
+		resp, err := global.Client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projectName})
 		if err != nil {
-			term.Warnf("Unable to load project: %v", err)
-		}
-
-		if projectName != "" && !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
-			resp, err := global.Client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projectName})
-			if err != nil {
-				term.Debugf("Unable to get selected provider: %v", err)
-			} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
-				global.Stack.Provider.SetValue(resp.Provider)
-				return "stored preference", nil
-			}
+			term.Debugf("Unable to get selected provider: %v", err)
+		} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
+			global.Stack.Provider.SetValue(resp.Provider)
+			return "stored preference", nil
 		}
 	}
 
