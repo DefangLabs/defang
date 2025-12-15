@@ -1379,7 +1379,12 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 		}
 	}
 
-	whence, err := interactiveSelectProvider(cliClient.AllProviders())
+	providerID, err := interactiveSelectProvider(cliClient.AllProviders())
+	if err != nil {
+		return "", err
+	}
+
+	global.Stack.Provider = providerID
 
 	// Save the selected provider to the fabric
 	if projectName != "" {
@@ -1390,10 +1395,10 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 		}
 	}
 
-	return whence, err
+	return "interactive selection", err
 }
 
-func interactiveSelectProvider(providers []cliClient.ProviderID) (string, error) {
+func interactiveSelectProvider(providers []cliClient.ProviderID) (cliClient.ProviderID, error) {
 	if len(providers) < 2 {
 		panic("interactiveSelectProvider called with less than 2 providers")
 	}
@@ -1424,9 +1429,10 @@ func interactiveSelectProvider(providers []cliClient.ProviderID) (string, error)
 		return "", fmt.Errorf("failed to select provider: %w", err)
 	}
 	track.Evt("ProviderSelected", P("provider", optionValue))
-	if err := global.Stack.Provider.Set(optionValue); err != nil {
-		panic(err)
+	var providerID cliClient.ProviderID
+	err := providerID.Set(optionValue)
+	if err != nil {
+		return "", err
 	}
-
-	return "interactive prompt", nil
+	return providerID, nil
 }

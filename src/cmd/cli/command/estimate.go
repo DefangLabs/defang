@@ -27,13 +27,14 @@ func makeEstimateCmd() *cobra.Command {
 			}
 
 			if global.Stack.Provider == cliClient.ProviderAuto {
-				_, err = interactiveSelectProvider([]cliClient.ProviderID{
+				providerID, err := interactiveSelectProvider([]cliClient.ProviderID{
 					cliClient.ProviderAWS,
 					cliClient.ProviderGCP,
 				})
 				if err != nil {
 					return fmt.Errorf("failed to select provider: %w", err)
 				}
+				global.Stack.Provider = providerID
 			}
 
 			var previewProvider cliClient.Provider = &cliClient.PlaygroundProvider{FabricClient: global.Client}
