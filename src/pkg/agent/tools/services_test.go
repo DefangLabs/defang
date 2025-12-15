@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
+	cli "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
