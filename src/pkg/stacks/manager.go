@@ -20,16 +20,16 @@ type DeploymentLister interface {
 }
 
 type manager struct {
-	fabric           DeploymentLister
-	workingDirectory string
-	projectName      string
+	fabric          DeploymentLister
+	targetDirectory string
+	projectName     string
 }
 
-func NewManager(fabric DeploymentLister, workingDirectory string, projectName string) *manager {
+func NewManager(fabric DeploymentLister, targetDirectory string, projectName string) *manager {
 	return &manager{
-		fabric:           fabric,
-		workingDirectory: workingDirectory,
-		projectName:      projectName,
+		fabric:          fabric,
+		targetDirectory: targetDirectory,
+		projectName:     projectName,
 	}
 }
 
@@ -76,7 +76,7 @@ func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
 }
 
 func (sm *manager) ListLocal() ([]StackListItem, error) {
-	return ListInDirectory(sm.workingDirectory)
+	return ListInDirectory(sm.targetDirectory)
 }
 
 type RemoteStack struct {
@@ -124,11 +124,11 @@ func (sm *manager) ListRemote(ctx context.Context) ([]RemoteStack, error) {
 }
 
 func (sm *manager) Load(name string) (*StackParameters, error) {
-	params, err := ReadInDirectory(sm.workingDirectory, name)
+	params, err := ReadInDirectory(sm.targetDirectory, name)
 	if err != nil {
 		return nil, err
 	}
-	err = LoadInDirectory(sm.workingDirectory, name)
+	err = LoadInDirectory(sm.targetDirectory, name)
 	if err != nil {
 		return nil, err
 	}
@@ -136,5 +136,5 @@ func (sm *manager) Load(name string) (*StackParameters, error) {
 }
 
 func (sm *manager) Create(params StackParameters) (string, error) {
-	return CreateInDirectory(sm.workingDirectory, params)
+	return CreateInDirectory(sm.targetDirectory, params)
 }
