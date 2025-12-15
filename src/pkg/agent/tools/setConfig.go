@@ -25,7 +25,7 @@ func HandleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params
 		return "", fmt.Errorf("Could not connect: %w", err)
 	}
 
-	sm, err := stacks.NewManager(client, params.WorkingDirectory, "")
+	sm, err := stacks.NewManager(client, params.WorkingDirectory, params.ProjectName)
 	if err != nil {
 		return "", fmt.Errorf("failed to create stack manager: %w", err)
 	}
