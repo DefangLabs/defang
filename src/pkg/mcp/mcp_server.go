@@ -83,7 +83,7 @@ func NewDefangMCPServer(version string, client MCPClient, cli agentTools.CLIInte
 	common.MCPDevelopmentClient = string(client)
 
 	toolTracker := ToolTracker{
-		providerId: config.ProviderID,
+		providerId: &config.Stack.Provider,
 		cluster:    config.Cluster,
 		client:     common.MCPDevelopmentClient,
 	}

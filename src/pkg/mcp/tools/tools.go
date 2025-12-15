@@ -4,7 +4,6 @@ import (
 	"context"
 
 	agentTools "github.com/DefangLabs/defang/src/pkg/agent/tools"
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/firebase/genkit/go/ai"
@@ -13,9 +12,8 @@ import (
 )
 
 type StackConfig struct {
-	Cluster    string
-	ProviderID *client.ProviderID
-	Stack      *stacks.StackParameters
+	Cluster string
+	Stack   *stacks.StackParameters
 }
 
 func translateSchema(schema map[string]any) mcp.ToolInputSchema {
