@@ -44,7 +44,7 @@ func New(ctx context.Context, clusterAddr string, stack *stacks.StackParameters)
 		APIKey: accessToken,
 		Opts: []option.RequestOption{
 			option.WithBaseURL(fmt.Sprintf("https://%s/api/v1", addr)),
-			option.WithHeader("X-Defang-Agent-Session-Id", sessionID),
+			option.WithHeader("x-defang-llm-session-id", sessionID),
 		},
 	}
 	defaultModel := "google/gemini-2.5-flash"
