@@ -211,8 +211,6 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 		} else if fromEnv, ok := os.LookupEnv("DEFANG_ORG"); ok {
 			r.Tenant = fromEnv
 			term.Warn("DEFANG_ORG is deprecated; use DEFANG_WORKSPACE instead")
-		} else if _, ok := os.LookupEnv("DEFANG_TENANT"); ok {
-			term.Warn("DEFANG_TENANT is no longer supported; use DEFANG_WORKSPACE instead")
 		}
 	}
 
