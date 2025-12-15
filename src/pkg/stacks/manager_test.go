@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -45,6 +46,9 @@ func TestNewManager(t *testing.T) {
 func TestManager_CreateListLoad(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := t.TempDir()
+
+	// Change to temp directory so working directory matches target directory
+	t.Chdir(tmpDir)
 
 	mockClient := &mockFabricClient{}
 	manager, err := NewManager(mockClient, tmpDir, "test-project")
@@ -132,6 +136,9 @@ func TestManager_CreateGCPStack(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := t.TempDir()
 
+	// Change to temp directory so working directory matches target directory
+	t.Chdir(tmpDir)
+
 	mockClient := &mockFabricClient{}
 	manager, err := NewManager(mockClient, tmpDir, "test-project")
 	if err != nil {
@@ -176,6 +183,9 @@ func TestManager_CreateGCPStack(t *testing.T) {
 func TestManager_CreateMultipleStacks(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := t.TempDir()
+
+	// Change to temp directory so working directory matches target directory
+	t.Chdir(tmpDir)
 
 	mockClient := &mockFabricClient{}
 	manager, err := NewManager(mockClient, tmpDir, "test-project")
@@ -298,6 +308,9 @@ func TestManager_CreateDuplicateStack(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := t.TempDir()
 
+	// Change to temp directory so working directory matches target directory
+	t.Chdir(tmpDir)
+
 	mockClient := &mockFabricClient{}
 	manager, err := NewManager(mockClient, tmpDir, "test-project")
 	if err != nil {
@@ -397,6 +410,9 @@ func TestManager_ListRemoteError(t *testing.T) {
 
 func TestManager_ListMerged(t *testing.T) {
 	tmpDir := t.TempDir()
+
+	// Change to temp directory so working directory matches target directory
+	t.Chdir(tmpDir)
 
 	deployedAt := time.Now()
 	mockClient := &mockFabricClient{
@@ -564,5 +580,142 @@ func TestManager_ListRemoteDuplicateDeployments(t *testing.T) {
 	// Should use the first deployment (most recent) since they're already sorted
 	if remoteStacks[0].Region != "us-east-1" {
 		t.Errorf("Expected region from first deployment (us-east-1), got %s", remoteStacks[0].Region)
+	}
+}
+
+func TestManager_WorkingDirectoryMatches(t *testing.T) {
+	// Create a temporary directory for testing
+	tmpDir := t.TempDir()
+
+	// Change to temp directory so working directory matches target directory
+	t.Chdir(tmpDir)
+
+	mockClient := &mockFabricClient{}
+	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
+
+	// Test that local operations work when working directory matches target directory
+	params := StackParameters{
+		Name:       "teststack",
+		Provider:   client.ProviderAWS,
+		Region:     "us-east-1",
+		AWSProfile: "default",
+		Mode:       modes.ModeAffordable,
+	}
+
+	// Create should work
+	filename, err := manager.Create(params)
+	if err != nil {
+		t.Fatalf("Create() failed when directories match: %v", err)
+	}
+
+	expectedPath := filepath.Join(tmpDir, Directory, "teststack")
+	if filename != expectedPath {
+		t.Errorf("Expected filename %s, got %s", expectedPath, filename)
+	}
+
+	// List should work
+	stacks, err := manager.List(context.Background())
+	if err != nil {
+		t.Fatalf("List() failed when directories match: %v", err)
+	}
+
+	if len(stacks) != 1 {
+		t.Errorf("Expected 1 stack, got %d", len(stacks))
+	}
+
+	// Load should work
+	loadedParams, err := manager.Load("teststack")
+	if err != nil {
+		t.Fatalf("Load() failed when directories match: %v", err)
+	}
+
+	if loadedParams.Name != "teststack" {
+		t.Errorf("Expected loaded stack name 'teststack', got '%s'", loadedParams.Name)
+	}
+}
+
+func TestManager_WorkingDirectoryDifferent(t *testing.T) {
+	// Create a temporary directory for testing but don't change to it
+	tmpDir := t.TempDir()
+
+	mockClient := &mockFabricClient{}
+	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
+
+	// Test that local operations are blocked when working directory differs from target directory
+	params := StackParameters{
+		Name:       "teststack",
+		Provider:   client.ProviderAWS,
+		Region:     "us-east-1",
+		AWSProfile: "default",
+		Mode:       modes.ModeAffordable,
+	}
+
+	// Create should fail
+	_, err = manager.Create(params)
+	if err == nil {
+		t.Error("Create() should fail when target directory differs from working directory")
+	}
+	if !strings.Contains(err.Error(), "operation not allowed: target directory") {
+		t.Errorf("Expected specific error message about operation not allowed, got: %v", err)
+	}
+
+	// List should fail
+	_, err = manager.List(context.Background())
+	if err == nil {
+		t.Error("List() should fail when target directory differs from working directory")
+	}
+	if !strings.Contains(err.Error(), "operation not allowed: target directory") {
+		t.Errorf("Expected specific error message about operation not allowed, got: %v", err)
+	}
+
+	// Load should fail
+	_, err = manager.Load("teststack")
+	if err == nil {
+		t.Error("Load() should fail when target directory differs from working directory")
+	}
+	if !strings.Contains(err.Error(), "operation not allowed: target directory") {
+		t.Errorf("Expected specific error message about operation not allowed, got: %v", err)
+	}
+}
+
+func TestManager_RemoteOperationsWorkRegardlessOfDirectory(t *testing.T) {
+	// Create a temporary directory for testing but don't change to it
+	tmpDir := t.TempDir()
+
+	deployedAt := time.Now()
+	mockClient := &mockFabricClient{
+		deployments: []*defangv1.Deployment{
+			{
+				Stack:     "remotestack",
+				Provider:  defangv1.Provider_AWS,
+				Region:    "us-east-1",
+				Timestamp: timestamppb.New(deployedAt),
+			},
+		},
+	}
+
+	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
+
+	// Remote operations should work even when directories don't match
+	remoteStacks, err := manager.ListRemote(context.Background())
+	if err != nil {
+		t.Fatalf("ListRemote() should work even when directories don't match: %v", err)
+	}
+
+	if len(remoteStacks) != 1 {
+		t.Errorf("Expected 1 remote stack, got %d", len(remoteStacks))
+	}
+
+	if remoteStacks[0].Name != "remotestack" {
+		t.Errorf("Expected stack name 'remotestack', got '%s'", remoteStacks[0].Name)
 	}
 }

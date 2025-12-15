@@ -24,12 +24,13 @@ type DeploymentLister interface {
 type manager struct {
 	fabric           DeploymentLister
 	targetDirectory  string
-	workingDirectory string
 	projectName      string
+	outside          bool
+	workingDirectory string
 }
 
 func NewManager(fabric DeploymentLister, targetDirectory string, projectName string) (*manager, error) {
-	wd, err := os.Getwd()
+	workingDirectory, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get working directory: %w", err)
 	}
@@ -38,11 +39,25 @@ func NewManager(fabric DeploymentLister, targetDirectory string, projectName str
 	if err != nil {
 		return nil, fmt.Errorf("failed to get absolute path for target directory: %w", err)
 	}
+	// Resolve symlinks for consistent comparison
+	resolvedWorkingDirectory, err := filepath.EvalSymlinks(workingDirectory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve symlinks in working directory: %w", err)
+	}
+	// For target directory, only resolve symlinks if the path exists
+	resolvedTargetDirectory := absTargetDirectory
+	if _, err := os.Stat(absTargetDirectory); err == nil {
+		resolvedTargetDirectory, err = filepath.EvalSymlinks(absTargetDirectory)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve symlinks in target directory: %w", err)
+		}
+	}
 	return &manager{
 		fabric:           fabric,
 		targetDirectory:  absTargetDirectory,
 		projectName:      projectName,
-		workingDirectory: wd,
+		outside:          resolvedWorkingDirectory != resolvedTargetDirectory,
+		workingDirectory: workingDirectory,
 	}, nil
 }
 
@@ -89,6 +104,9 @@ func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
 }
 
 func (sm *manager) ListLocal() ([]StackListItem, error) {
+	if sm.outside {
+		return nil, &OutsideError{TargetDirectory: sm.targetDirectory, WorkingDirectory: sm.workingDirectory}
+	}
 	return ListInDirectory(sm.targetDirectory)
 }
 
@@ -136,7 +154,19 @@ func (sm *manager) ListRemote(ctx context.Context) ([]RemoteStack, error) {
 	return stackParams, nil
 }
 
+type OutsideError struct {
+	TargetDirectory  string
+	WorkingDirectory string
+}
+
+func (e *OutsideError) Error() string {
+	return fmt.Sprintf("operation not allowed: target directory (%s) is different from working directory (%s)", e.TargetDirectory, e.WorkingDirectory)
+}
+
 func (sm *manager) Load(name string) (*StackParameters, error) {
+	if sm.outside {
+		return nil, &OutsideError{TargetDirectory: sm.targetDirectory, WorkingDirectory: sm.workingDirectory}
+	}
 	params, err := ReadInDirectory(sm.targetDirectory, name)
 	if err != nil {
 		return nil, err
@@ -149,5 +179,8 @@ func (sm *manager) Load(name string) (*StackParameters, error) {
 }
 
 func (sm *manager) Create(params StackParameters) (string, error) {
+	if sm.outside {
+		return "", &OutsideError{TargetDirectory: sm.targetDirectory, WorkingDirectory: sm.workingDirectory}
+	}
 	return CreateInDirectory(sm.targetDirectory, params)
 }
