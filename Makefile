@@ -42,6 +42,8 @@ update-nix-vendor-hash:
 	$(MAKE) nix-run 2>&1 | grep -o 'sha256-[A-Za-z0-9+/=]\+' | tail -n1 | xargs -I {} sed -i.bak -E 's|(vendorHash = ")[^"]+(")|vendorHash = "{}"|' pkgs/defang/cli.nix
 	rm pkgs/defang/cli.nix.bak
 	git add pkgs/defang/cli.nix
+	@echo cli.nix vendorHash has been updated; commit and push
+	@false
 
 .PHONY: nix-run
 nix-run:
