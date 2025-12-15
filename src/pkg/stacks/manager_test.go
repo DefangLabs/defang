@@ -1,17 +1,38 @@
 package stacks
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+// mockFabricClient implements FabricClient interface for testing
+type mockFabricClient struct {
+	deployments []*defangv1.Deployment
+	listErr     error
+}
+
+func (m *mockFabricClient) ListDeployments(ctx context.Context, req *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error) {
+	if m.listErr != nil {
+		return nil, m.listErr
+	}
+	return &defangv1.ListDeploymentsResponse{
+		Deployments: m.deployments,
+	}, nil
+}
 
 func TestNewManager(t *testing.T) {
 	workingDir := "/tmp/test-dir"
-	manager := NewManager(workingDir)
+	mockClient := &mockFabricClient{}
+	manager := NewManager(mockClient, workingDir, "test-project")
 
 	if manager == nil {
 		t.Error("NewManager should not return nil")
@@ -22,10 +43,11 @@ func TestManager_CreateListLoad(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := t.TempDir()
 
-	manager := NewManager(tmpDir)
+	mockClient := &mockFabricClient{}
+	manager := NewManager(mockClient, tmpDir, "test-project")
 
 	// Test that listing returns empty when no stacks exist
-	stacks, err := manager.List()
+	stacks, err := manager.List(context.Background())
 	if err != nil {
 		t.Fatalf("List() should not error on empty directory: %v", err)
 	}
@@ -58,7 +80,7 @@ func TestManager_CreateListLoad(t *testing.T) {
 	}
 
 	// Test listing after creating a stack
-	stacks, err = manager.List()
+	stacks, err = manager.List(context.Background())
 	if err != nil {
 		t.Fatalf("List() failed: %v", err)
 	}
@@ -104,7 +126,8 @@ func TestManager_CreateGCPStack(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := t.TempDir()
 
-	manager := NewManager(tmpDir)
+	mockClient := &mockFabricClient{}
+	manager := NewManager(mockClient, tmpDir, "test-project")
 
 	// Test creating a GCP stack
 	params := StackParameters{
@@ -145,7 +168,8 @@ func TestManager_CreateMultipleStacks(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := t.TempDir()
 
-	manager := NewManager(tmpDir)
+	mockClient := &mockFabricClient{}
+	manager := NewManager(mockClient, tmpDir, "test-project")
 
 	// Create multiple stacks
 	stacks := []StackParameters{
@@ -180,7 +204,7 @@ func TestManager_CreateMultipleStacks(t *testing.T) {
 	}
 
 	// List all stacks
-	listedStacks, err := manager.List()
+	listedStacks, err := manager.List(context.Background())
 	if err != nil {
 		t.Fatalf("List() failed: %v", err)
 	}
@@ -208,7 +232,8 @@ func TestManager_LoadNonexistentStack(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := t.TempDir()
 
-	manager := NewManager(tmpDir)
+	mockClient := &mockFabricClient{}
+	manager := NewManager(mockClient, tmpDir, "test-project")
 
 	// Try to load a stack that doesn't exist
 	_, err := manager.Load("nonexistent")
@@ -221,7 +246,8 @@ func TestManager_CreateInvalidStackName(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := t.TempDir()
 
-	manager := NewManager(tmpDir)
+	mockClient := &mockFabricClient{}
+	manager := NewManager(mockClient, tmpDir, "test-project")
 
 	// Test with empty name
 	params := StackParameters{
@@ -254,7 +280,8 @@ func TestManager_CreateDuplicateStack(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := t.TempDir()
 
-	manager := NewManager(tmpDir)
+	mockClient := &mockFabricClient{}
+	manager := NewManager(mockClient, tmpDir, "test-project")
 
 	params := StackParameters{
 		Name:     "duplicatestack",
@@ -273,5 +300,233 @@ func TestManager_CreateDuplicateStack(t *testing.T) {
 	_, err = manager.Create(params)
 	if err == nil {
 		t.Error("Create() should return error for duplicate stack name")
+	}
+}
+
+func TestManager_ListRemote(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	deployedAt := time.Now()
+	mockClient := &mockFabricClient{
+		deployments: []*defangv1.Deployment{
+			{
+				Stack:     "remotestack1",
+				Provider:  defangv1.Provider_AWS,
+				Region:    "us-east-1",
+				Timestamp: timestamppb.New(deployedAt),
+			},
+			{
+				Stack:     "remotestack2",
+				Provider:  defangv1.Provider_GCP,
+				Region:    "us-central1",
+				Timestamp: timestamppb.New(deployedAt.Add(-time.Hour)),
+			},
+		},
+	}
+
+	manager := NewManager(mockClient, tmpDir, "test-project")
+
+	remoteStacks, err := manager.ListRemote(context.Background())
+	if err != nil {
+		t.Fatalf("ListRemote() failed: %v", err)
+	}
+
+	if len(remoteStacks) != 2 {
+		t.Errorf("Expected 2 remote stacks, got %d", len(remoteStacks))
+	}
+
+	// Check first remote stack
+	if remoteStacks[0].Name != "remotestack1" && remoteStacks[1].Name != "remotestack1" {
+		t.Error("Expected to find remotestack1")
+	}
+
+	// Check second remote stack
+	if remoteStacks[0].Name != "remotestack2" && remoteStacks[1].Name != "remotestack2" {
+		t.Error("Expected to find remotestack2")
+	}
+
+	// Verify deployed time is set
+	for _, stack := range remoteStacks {
+		if stack.DeployedAt.IsZero() {
+			t.Errorf("Expected DeployedAt to be set for stack %s", stack.Name)
+		}
+	}
+}
+
+func TestManager_ListRemoteError(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	mockClient := &mockFabricClient{
+		listErr: errors.New("network error"),
+	}
+
+	manager := NewManager(mockClient, tmpDir, "test-project")
+
+	_, err := manager.ListRemote(context.Background())
+	if err == nil {
+		t.Error("ListRemote() should return error when fabric client fails")
+	}
+}
+
+func TestManager_ListMerged(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	deployedAt := time.Now()
+	mockClient := &mockFabricClient{
+		deployments: []*defangv1.Deployment{
+			{
+				Stack:     "sharedstack",
+				Provider:  defangv1.Provider_AWS,
+				Region:    "us-east-1",
+				Timestamp: timestamppb.New(deployedAt),
+			},
+			{
+				Stack:     "remoteonlystack",
+				Provider:  defangv1.Provider_GCP,
+				Region:    "us-central1",
+				Timestamp: timestamppb.New(deployedAt),
+			},
+		},
+	}
+
+	manager := NewManager(mockClient, tmpDir, "test-project")
+
+	// Create a local stack that exists remotely too
+	localParams := StackParameters{
+		Name:       "sharedstack",
+		Provider:   client.ProviderAWS,
+		Region:     "us-west-2", // Different region locally
+		AWSProfile: "default",
+		Mode:       modes.ModeAffordable,
+	}
+	_, err := manager.Create(localParams)
+	if err != nil {
+		t.Fatalf("Create() failed: %v", err)
+	}
+
+	// Create a local-only stack
+	localOnlyParams := StackParameters{
+		Name:       "localonlystack",
+		Provider:   client.ProviderAWS,
+		Region:     "us-west-1",
+		AWSProfile: "default",
+		Mode:       modes.ModeAffordable,
+	}
+	_, err = manager.Create(localOnlyParams)
+	if err != nil {
+		t.Fatalf("Create() failed: %v", err)
+	}
+
+	// List merged stacks
+	stacks, err := manager.List(context.Background())
+	if err != nil {
+		t.Fatalf("List() failed: %v", err)
+	}
+
+	if len(stacks) != 3 {
+		t.Errorf("Expected 3 merged stacks, got %d", len(stacks))
+	}
+
+	stackMap := make(map[string]StackListItem)
+	for _, stack := range stacks {
+		stackMap[stack.Name] = stack
+	}
+
+	// Check shared stack prefers remote (should have deployed time and remote region)
+	sharedStack, exists := stackMap["sharedstack"]
+	if !exists {
+		t.Error("Expected to find sharedstack")
+	} else {
+		if sharedStack.Region != "us-east-1" {
+			t.Errorf("Expected shared stack to use remote region us-east-1, got %s", sharedStack.Region)
+		}
+		if sharedStack.DeployedAt.IsZero() {
+			t.Error("Expected shared stack to have deployment time from remote")
+		}
+	}
+
+	// Check remote-only stack exists
+	_, exists = stackMap["remoteonlystack"]
+	if !exists {
+		t.Error("Expected to find remoteonlystack")
+	}
+
+	// Check local-only stack exists and has no deployed time
+	localOnlyStack, exists := stackMap["localonlystack"]
+	if !exists {
+		t.Error("Expected to find localonlystack")
+	} else {
+		if !localOnlyStack.DeployedAt.IsZero() {
+			t.Error("Expected local-only stack to have zero deployed time")
+		}
+	}
+}
+
+func TestManager_ListRemoteWithBetaStack(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	deployedAt := time.Now()
+	mockClient := &mockFabricClient{
+		deployments: []*defangv1.Deployment{
+			{
+				Stack:     "", // Empty stack name should default to "beta"
+				Provider:  defangv1.Provider_AWS,
+				Region:    "us-east-1",
+				Timestamp: timestamppb.New(deployedAt),
+			},
+		},
+	}
+
+	manager := NewManager(mockClient, tmpDir, "test-project")
+
+	remoteStacks, err := manager.ListRemote(context.Background())
+	if err != nil {
+		t.Fatalf("ListRemote() failed: %v", err)
+	}
+
+	if len(remoteStacks) != 1 {
+		t.Errorf("Expected 1 remote stack, got %d", len(remoteStacks))
+	}
+
+	if remoteStacks[0].Name != "beta" {
+		t.Errorf("Expected stack name to be 'beta', got '%s'", remoteStacks[0].Name)
+	}
+}
+
+func TestManager_ListRemoteDuplicateDeployments(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	deployedAt := time.Now()
+	mockClient := &mockFabricClient{
+		deployments: []*defangv1.Deployment{
+			{
+				Stack:     "duplicatestack",
+				Provider:  defangv1.Provider_AWS,
+				Region:    "us-east-1",
+				Timestamp: timestamppb.New(deployedAt), // Most recent
+			},
+			{
+				Stack:     "duplicatestack",
+				Provider:  defangv1.Provider_AWS,
+				Region:    "us-west-2",
+				Timestamp: timestamppb.New(deployedAt.Add(-time.Hour)), // Older
+			},
+		},
+	}
+
+	manager := NewManager(mockClient, tmpDir, "test-project")
+
+	remoteStacks, err := manager.ListRemote(context.Background())
+	if err != nil {
+		t.Fatalf("ListRemote() failed: %v", err)
+	}
+
+	if len(remoteStacks) != 1 {
+		t.Errorf("Expected 1 remote stack (duplicates should be merged), got %d", len(remoteStacks))
+	}
+
+	// Should use the first deployment (most recent) since they're already sorted
+	if remoteStacks[0].Region != "us-east-1" {
+		t.Errorf("Expected region from first deployment (us-east-1), got %s", remoteStacks[0].Region)
 	}
 }

@@ -24,7 +24,7 @@ func HandleListConfigTool(ctx context.Context, loader cliClient.ProjectLoader, p
 		return "", fmt.Errorf("Could not connect: %w", err)
 	}
 
-	pp := NewProviderPreparer(cli, ec, client, stacks.NewManager(params.WorkingDirectory))
+	pp := NewProviderPreparer(cli, ec, client, stacks.NewManager(client, params.WorkingDirectory, ""))
 	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)

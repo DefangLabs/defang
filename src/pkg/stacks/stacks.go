@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
@@ -90,6 +91,7 @@ type StackListItem struct {
 	Provider     string
 	Region       string
 	Mode         string
+	DeployedAt   time.Time
 }
 
 func List() ([]StackListItem, error) {

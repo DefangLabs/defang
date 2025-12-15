@@ -55,7 +55,7 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.Sta
 }
 
 func (pp *providerPreparer) selectStack(ctx context.Context, ec elicitations.Controller) (string, error) {
-	stackList, err := pp.sm.List()
+	stackList, err := pp.sm.List(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to list stacks: %w", err)
 	}

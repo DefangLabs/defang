@@ -45,7 +45,7 @@ func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 		return "", fmt.Errorf("could not connect: %w", err)
 	}
 
-	sm := stacks.NewManager(params.WorkingDirectory)
+	sm := stacks.NewManager(client, params.WorkingDirectory, "")
 	pp := NewProviderPreparer(cli, ec, client, sm)
 	_, provider, err := pp.SetupProvider(ctx, config.Stack)
 	if err != nil {

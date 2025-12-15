@@ -25,7 +25,7 @@ func HandleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader,
 		return "", fmt.Errorf("Could not connect: %w", err)
 	}
 
-	sm := stacks.NewManager(params.WorkingDirectory)
+	sm := stacks.NewManager(client, params.WorkingDirectory, "")
 	pp := NewProviderPreparer(cli, ec, client, sm)
 	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
 	if err != nil {

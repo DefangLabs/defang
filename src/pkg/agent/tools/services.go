@@ -27,7 +27,7 @@ func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, par
 		return "", fmt.Errorf("could not connect: %w", err)
 	}
 
-	pp := NewProviderPreparer(cli, ec, client, stacks.NewManager(params.WorkingDirectory))
+	pp := NewProviderPreparer(cli, ec, client, stacks.NewManager(client, params.WorkingDirectory, ""))
 	_, provider, err := pp.SetupProvider(ctx, config.Stack)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
