@@ -49,8 +49,6 @@ const (
 	FabricControllerRevokeTokenProcedure = "/io.defang.v1.FabricController/RevokeToken"
 	// FabricControllerTailProcedure is the fully-qualified name of the FabricController's Tail RPC.
 	FabricControllerTailProcedure = "/io.defang.v1.FabricController/Tail"
-	// FabricControllerUpdateProcedure is the fully-qualified name of the FabricController's Update RPC.
-	FabricControllerUpdateProcedure = "/io.defang.v1.FabricController/Update"
 	// FabricControllerDeployProcedure is the fully-qualified name of the FabricController's Deploy RPC.
 	FabricControllerDeployProcedure = "/io.defang.v1.FabricController/Deploy"
 	// FabricControllerGetProcedure is the fully-qualified name of the FabricController's Get RPC.
@@ -168,8 +166,6 @@ type FabricControllerClient interface {
 	Token(context.Context, *connect_go.Request[v1.TokenRequest]) (*connect_go.Response[v1.TokenResponse], error)
 	RevokeToken(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	Tail(context.Context, *connect_go.Request[v1.TailRequest]) (*connect_go.ServerStreamForClient[v1.TailResponse], error)
-	// Deprecated: do not use.
-	Update(context.Context, *connect_go.Request[v1.Service]) (*connect_go.Response[v1.ServiceInfo], error)
 	Deploy(context.Context, *connect_go.Request[v1.DeployRequest]) (*connect_go.Response[v1.DeployResponse], error)
 	Get(context.Context, *connect_go.Request[v1.GetRequest]) (*connect_go.Response[v1.ServiceInfo], error)
 	GetPlaygroundProjectDomain(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.GetPlaygroundProjectDomainResponse], error)
@@ -255,11 +251,6 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		tail: connect_go.NewClient[v1.TailRequest, v1.TailResponse](
 			httpClient,
 			baseURL+FabricControllerTailProcedure,
-			opts...,
-		),
-		update: connect_go.NewClient[v1.Service, v1.ServiceInfo](
-			httpClient,
-			baseURL+FabricControllerUpdateProcedure,
 			opts...,
 		),
 		deploy: connect_go.NewClient[v1.DeployRequest, v1.DeployResponse](
@@ -489,7 +480,6 @@ type fabricControllerClient struct {
 	token                      *connect_go.Client[v1.TokenRequest, v1.TokenResponse]
 	revokeToken                *connect_go.Client[emptypb.Empty, emptypb.Empty]
 	tail                       *connect_go.Client[v1.TailRequest, v1.TailResponse]
-	update                     *connect_go.Client[v1.Service, v1.ServiceInfo]
 	deploy                     *connect_go.Client[v1.DeployRequest, v1.DeployResponse]
 	get                        *connect_go.Client[v1.GetRequest, v1.ServiceInfo]
 	getPlaygroundProjectDomain *connect_go.Client[emptypb.Empty, v1.GetPlaygroundProjectDomainResponse]
@@ -553,13 +543,6 @@ func (c *fabricControllerClient) RevokeToken(ctx context.Context, req *connect_g
 // Tail calls io.defang.v1.FabricController.Tail.
 func (c *fabricControllerClient) Tail(ctx context.Context, req *connect_go.Request[v1.TailRequest]) (*connect_go.ServerStreamForClient[v1.TailResponse], error) {
 	return c.tail.CallServerStream(ctx, req)
-}
-
-// Update calls io.defang.v1.FabricController.Update.
-//
-// Deprecated: do not use.
-func (c *fabricControllerClient) Update(ctx context.Context, req *connect_go.Request[v1.Service]) (*connect_go.Response[v1.ServiceInfo], error) {
-	return c.update.CallUnary(ctx, req)
 }
 
 // Deploy calls io.defang.v1.FabricController.Deploy.
@@ -771,8 +754,6 @@ type FabricControllerHandler interface {
 	Token(context.Context, *connect_go.Request[v1.TokenRequest]) (*connect_go.Response[v1.TokenResponse], error)
 	RevokeToken(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	Tail(context.Context, *connect_go.Request[v1.TailRequest], *connect_go.ServerStream[v1.TailResponse]) error
-	// Deprecated: do not use.
-	Update(context.Context, *connect_go.Request[v1.Service]) (*connect_go.Response[v1.ServiceInfo], error)
 	Deploy(context.Context, *connect_go.Request[v1.DeployRequest]) (*connect_go.Response[v1.DeployResponse], error)
 	Get(context.Context, *connect_go.Request[v1.GetRequest]) (*connect_go.Response[v1.ServiceInfo], error)
 	GetPlaygroundProjectDomain(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.GetPlaygroundProjectDomainResponse], error)
@@ -854,11 +835,6 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerTailHandler := connect_go.NewServerStreamHandler(
 		FabricControllerTailProcedure,
 		svc.Tail,
-		opts...,
-	)
-	fabricControllerUpdateHandler := connect_go.NewUnaryHandler(
-		FabricControllerUpdateProcedure,
-		svc.Update,
 		opts...,
 	)
 	fabricControllerDeployHandler := connect_go.NewUnaryHandler(
@@ -1090,8 +1066,6 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerRevokeTokenHandler.ServeHTTP(w, r)
 		case FabricControllerTailProcedure:
 			fabricControllerTailHandler.ServeHTTP(w, r)
-		case FabricControllerUpdateProcedure:
-			fabricControllerUpdateHandler.ServeHTTP(w, r)
 		case FabricControllerDeployProcedure:
 			fabricControllerDeployHandler.ServeHTTP(w, r)
 		case FabricControllerGetProcedure:
@@ -1195,10 +1169,6 @@ func (UnimplementedFabricControllerHandler) RevokeToken(context.Context, *connec
 
 func (UnimplementedFabricControllerHandler) Tail(context.Context, *connect_go.Request[v1.TailRequest], *connect_go.ServerStream[v1.TailResponse]) error {
 	return connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Tail is not implemented"))
-}
-
-func (UnimplementedFabricControllerHandler) Update(context.Context, *connect_go.Request[v1.Service]) (*connect_go.Response[v1.ServiceInfo], error) {
-	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Update is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) Deploy(context.Context, *connect_go.Request[v1.DeployRequest]) (*connect_go.Response[v1.DeployResponse], error) {

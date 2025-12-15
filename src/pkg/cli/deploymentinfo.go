@@ -5,7 +5,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-type printService struct {
+type Service struct {
 	Deployment string
 	Endpoint   string
 	Service    string
@@ -14,8 +14,8 @@ type printService struct {
 	Fqdn       string
 }
 
-func PrintServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) error {
-	var serviceTableItems []*printService
+func GetServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) ([]*Service, bool, error) {
+	var serviceTableItems []*Service
 
 	// showDomainNameColumn := false
 	showCertGenerateHint := false
@@ -38,7 +38,7 @@ func PrintServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) error 
 			domainname = serviceInfo.PrivateFqdn
 		}
 
-		ps := &printService{
+		ps := &Service{
 			Deployment: serviceInfo.Etag,
 			Service:    serviceInfo.Service.Name,
 			State:      serviceInfo.State,
@@ -49,12 +49,21 @@ func PrintServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) error 
 		serviceTableItems = append(serviceTableItems, ps)
 	}
 
+	return serviceTableItems, showCertGenerateHint, nil
+}
+
+func PrintServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) error {
+	services, showCertGenerateHint, err := GetServiceStatesAndEndpoints(serviceInfos)
+	if err != nil {
+		return err
+	}
+
 	attrs := []string{"Service", "Deployment", "State", "Fqdn", "Endpoint", "Status"}
 	// if showDomainNameColumn {
 	// 	attrs = append(attrs, "DomainName")
 	// }
 
-	err := term.Table(serviceTableItems, attrs...)
+	err = term.Table(services, attrs...)
 	if err != nil {
 		return err
 	}

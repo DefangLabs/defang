@@ -291,3 +291,9 @@ func (b ByocBaseClient) GetPrivateFqdn(projectName string, fqn string) string {
 	safeFqn := dns.SafeLabel(fqn)
 	return fmt.Sprintf("%s.%s", safeFqn, GetPrivateDomain(projectName)) // TODO: consider merging this with ServicePrivateDNS
 }
+
+func (b ByocBaseClient) GetProjectUpdatePath(projectName string) string {
+	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/aws/byoc.ts#L104
+	pkg.Ensure(projectName != "", "ProjectName not set")
+	return fmt.Sprintf("projects/%s/%s/project.pb", projectName, b.PulumiStack)
+}
