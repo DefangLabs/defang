@@ -1281,7 +1281,7 @@ var providerDescription = map[cliClient.ProviderID]string{
 	cliClient.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
 }
 
-func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
+func updateProviderID(ctx context.Context, projectName string) error {
 	extraMsg := ""
 	whence := "default project"
 
@@ -1312,14 +1312,6 @@ func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 			global.Stack.Provider = cliClient.ProviderDefang
 		} else {
 			var err error
-			var projectName string
-			if loader != nil {
-				var err error
-				projectName, err = loader.LoadProjectName(ctx)
-				if err != nil {
-					term.Warnf("Unable to load project: %v", err)
-				}
-			}
 			if whence, err = determineProviderID(ctx, projectName); err != nil {
 				return err
 			}
@@ -1346,7 +1338,15 @@ func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 }
 
 func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provider, error) {
-	if err := updateProviderID(ctx, loader); err != nil {
+	var projectName string
+	if loader != nil {
+		var err error
+		projectName, err = loader.LoadProjectName(ctx)
+		if err != nil {
+			term.Warnf("Unable to load project: %v", err)
+		}
+	}
+	if err := updateProviderID(ctx, projectName); err != nil {
 		return nil, err
 	}
 
