@@ -13,12 +13,21 @@ import (
 )
 
 type Wizard struct {
-	ec elicitations.Controller
+	ec            elicitations.Controller
+	profileLister AWSProfileLister
 }
 
 func NewWizard(ec elicitations.Controller) *Wizard {
 	return &Wizard{
-		ec: ec,
+		ec:            ec,
+		profileLister: &FileSystemAWSProfileLister{},
+	}
+}
+
+func NewWizardWithProfileLister(ec elicitations.Controller, profileLister AWSProfileLister) *Wizard {
+	return &Wizard{
+		ec:            ec,
+		profileLister: profileLister,
 	}
 }
 
@@ -82,7 +91,7 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *StackPa
 				params.AWSProfile = profile
 				break
 			}
-			profiles, err := listAWSProfiles()
+			profiles, err := w.profileLister.ListProfiles()
 			if err != nil || len(profiles) == 0 {
 				profile, err := w.ec.RequestStringWithDefault(ctx, "Enter the AWS profile you want to use:", "aws_profile", "default")
 				if err != nil {
@@ -118,7 +127,13 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *StackPa
 	return params, nil
 }
 
-func listAWSProfiles() ([]string, error) {
+type AWSProfileLister interface {
+	ListProfiles() ([]string, error)
+}
+
+type FileSystemAWSProfileLister struct{}
+
+func (f *FileSystemAWSProfileLister) ListProfiles() ([]string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home directory: %w", err)

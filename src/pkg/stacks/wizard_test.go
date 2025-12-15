@@ -70,6 +70,16 @@ func (m *mockElicitationsController) SetSupported(supported bool) {
 	m.supported = supported
 }
 
+// mockAWSProfileLister is a mock implementation of AWSProfileLister
+type mockAWSProfileLister struct {
+	profiles []string
+	err      error
+}
+
+func (m *mockAWSProfileLister) ListProfiles() ([]string, error) {
+	return m.profiles, m.err
+}
+
 func (m *mockElicitationsController) IsSupported() bool {
 	return m.supported
 }
@@ -90,6 +100,7 @@ func TestWizardCollectParameters(t *testing.T) {
 	tests := []struct {
 		name              string
 		setupMock         func(*mockElicitationsController)
+		mockProfileLister *mockAWSProfileLister
 		setupEnv          func(*testing.T)
 		cleanupEnv        func()
 		expectError       bool
@@ -306,6 +317,10 @@ func TestWizardCollectParameters(t *testing.T) {
 				m.defaultResponses["stack_name"] = "awsuswest2"
 				m.enumErrors["aws_profile"] = errors.New("AWS profile input failed")
 			},
+			mockProfileLister: &mockAWSProfileLister{
+				profiles: []string{"default", "staging", "prod"},
+				err:      nil,
+			},
 			setupEnv:       func(t *testing.T) {},
 			cleanupEnv:     func() {},
 			expectError:    true,
@@ -349,7 +364,17 @@ func TestWizardCollectParameters(t *testing.T) {
 			mockController := newMockElicitationsController()
 			tt.setupMock(mockController)
 
-			wizard := NewWizard(mockController)
+			var profileLister AWSProfileLister
+			if tt.mockProfileLister != nil {
+				profileLister = tt.mockProfileLister
+			} else {
+				profileLister = &mockAWSProfileLister{
+					profiles: []string{"default", "staging", "prod"},
+					err:      nil,
+				}
+			}
+
+			wizard := NewWizardWithProfileLister(mockController, profileLister)
 			ctx := context.Background()
 
 			// Execute
