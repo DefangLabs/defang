@@ -1,0 +1,4 @@
+services:
+  app:
+    image: myapp:latest
+    build: .
