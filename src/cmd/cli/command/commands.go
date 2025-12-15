@@ -1312,7 +1312,7 @@ func updateProviderID(ctx context.Context, projectName string) error {
 			global.Stack.Provider = cliClient.ProviderDefang
 		} else {
 			var err error
-			if whence, err = determineProviderID(ctx, projectName); err != nil {
+			if whence, err = loadOrSelectProviderID(ctx, projectName); err != nil {
 				return err
 			}
 		}
@@ -1367,7 +1367,7 @@ func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectNa
 	return cliClient.CanIUseProvider(ctx, global.Client, provider, projectName, global.Stack.Name, serviceCount)
 }
 
-func determineProviderID(ctx context.Context, projectName string) (string, error) {
+func loadOrSelectProviderID(ctx context.Context, projectName string) (string, error) {
 	if projectName != "" && !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
 		resp, err := global.Client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projectName})
 		if err != nil {
