@@ -3,6 +3,8 @@ package stacks
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -20,17 +22,28 @@ type DeploymentLister interface {
 }
 
 type manager struct {
-	fabric          DeploymentLister
-	targetDirectory string
-	projectName     string
+	fabric           DeploymentLister
+	targetDirectory  string
+	workingDirectory string
+	projectName      string
 }
 
-func NewManager(fabric DeploymentLister, targetDirectory string, projectName string) *manager {
-	return &manager{
-		fabric:          fabric,
-		targetDirectory: targetDirectory,
-		projectName:     projectName,
+func NewManager(fabric DeploymentLister, targetDirectory string, projectName string) (*manager, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get working directory: %w", err)
 	}
+	// abs path for targetDirectory
+	absTargetDirectory, err := filepath.Abs(targetDirectory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get absolute path for target directory: %w", err)
+	}
+	return &manager{
+		fabric:           fabric,
+		targetDirectory:  absTargetDirectory,
+		projectName:      projectName,
+		workingDirectory: wd,
+	}, nil
 }
 
 func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {

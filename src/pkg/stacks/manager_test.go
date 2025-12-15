@@ -32,7 +32,10 @@ func (m *mockFabricClient) ListDeployments(ctx context.Context, req *defangv1.Li
 func TestNewManager(t *testing.T) {
 	workingDir := "/tmp/test-dir"
 	mockClient := &mockFabricClient{}
-	manager := NewManager(mockClient, workingDir, "test-project")
+	manager, err := NewManager(mockClient, workingDir, "test-project")
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
 
 	if manager == nil {
 		t.Error("NewManager should not return nil")
@@ -44,7 +47,10 @@ func TestManager_CreateListLoad(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	mockClient := &mockFabricClient{}
-	manager := NewManager(mockClient, tmpDir, "test-project")
+	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
 
 	// Test that listing returns empty when no stacks exist
 	stacks, err := manager.List(context.Background())
@@ -127,7 +133,10 @@ func TestManager_CreateGCPStack(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	mockClient := &mockFabricClient{}
-	manager := NewManager(mockClient, tmpDir, "test-project")
+	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
 
 	// Test creating a GCP stack
 	params := StackParameters{
@@ -169,7 +178,10 @@ func TestManager_CreateMultipleStacks(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	mockClient := &mockFabricClient{}
-	manager := NewManager(mockClient, tmpDir, "test-project")
+	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
 
 	// Create multiple stacks
 	stacks := []StackParameters{
@@ -197,7 +209,7 @@ func TestManager_CreateMultipleStacks(t *testing.T) {
 
 	// Create all stacks
 	for _, params := range stacks {
-		_, err := manager.Create(params)
+		_, err = manager.Create(params)
 		if err != nil {
 			t.Fatalf("Create() failed for stack %s: %v", params.Name, err)
 		}
@@ -233,10 +245,13 @@ func TestManager_LoadNonexistentStack(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	mockClient := &mockFabricClient{}
-	manager := NewManager(mockClient, tmpDir, "test-project")
+	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
 
 	// Try to load a stack that doesn't exist
-	_, err := manager.Load("nonexistent")
+	_, err = manager.Load("nonexistent")
 	if err == nil {
 		t.Error("Load() should return error for nonexistent stack")
 	}
@@ -247,7 +262,10 @@ func TestManager_CreateInvalidStackName(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	mockClient := &mockFabricClient{}
-	manager := NewManager(mockClient, tmpDir, "test-project")
+	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
 
 	// Test with empty name
 	params := StackParameters{
@@ -256,7 +274,7 @@ func TestManager_CreateInvalidStackName(t *testing.T) {
 		Region:   "us-east-1",
 	}
 
-	_, err := manager.Create(params)
+	_, err = manager.Create(params)
 	if err == nil {
 		t.Error("Create() should return error for empty stack name")
 	}
@@ -281,7 +299,10 @@ func TestManager_CreateDuplicateStack(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	mockClient := &mockFabricClient{}
-	manager := NewManager(mockClient, tmpDir, "test-project")
+	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
 
 	params := StackParameters{
 		Name:     "duplicatestack",
@@ -291,7 +312,7 @@ func TestManager_CreateDuplicateStack(t *testing.T) {
 	}
 
 	// Create the first stack
-	_, err := manager.Create(params)
+	_, err = manager.Create(params)
 	if err != nil {
 		t.Fatalf("First Create() failed: %v", err)
 	}
@@ -324,7 +345,10 @@ func TestManager_ListRemote(t *testing.T) {
 		},
 	}
 
-	manager := NewManager(mockClient, tmpDir, "test-project")
+	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
 
 	remoteStacks, err := manager.ListRemote(context.Background())
 	if err != nil {
@@ -360,9 +384,12 @@ func TestManager_ListRemoteError(t *testing.T) {
 		listErr: errors.New("network error"),
 	}
 
-	manager := NewManager(mockClient, tmpDir, "test-project")
+	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
 
-	_, err := manager.ListRemote(context.Background())
+	_, err = manager.ListRemote(context.Background())
 	if err == nil {
 		t.Error("ListRemote() should return error when fabric client fails")
 	}
@@ -389,7 +416,10 @@ func TestManager_ListMerged(t *testing.T) {
 		},
 	}
 
-	manager := NewManager(mockClient, tmpDir, "test-project")
+	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
 
 	// Create a local stack that exists remotely too
 	localParams := StackParameters{
@@ -399,7 +429,7 @@ func TestManager_ListMerged(t *testing.T) {
 		AWSProfile: "default",
 		Mode:       modes.ModeAffordable,
 	}
-	_, err := manager.Create(localParams)
+	_, err = manager.Create(localParams)
 	if err != nil {
 		t.Fatalf("Create() failed: %v", err)
 	}
@@ -477,7 +507,10 @@ func TestManager_ListRemoteWithBetaStack(t *testing.T) {
 		},
 	}
 
-	manager := NewManager(mockClient, tmpDir, "test-project")
+	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
 
 	remoteStacks, err := manager.ListRemote(context.Background())
 	if err != nil {
@@ -514,7 +547,10 @@ func TestManager_ListRemoteDuplicateDeployments(t *testing.T) {
 		},
 	}
 
-	manager := NewManager(mockClient, tmpDir, "test-project")
+	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
 
 	remoteStacks, err := manager.ListRemote(context.Background())
 	if err != nil {

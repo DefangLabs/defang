@@ -24,7 +24,10 @@ func HandleDestroyTool(ctx context.Context, loader cliClient.ProjectLoader, para
 		return "", fmt.Errorf("could not connect: %w", err)
 	}
 
-	sm := stacks.NewManager(client, params.WorkingDirectory, "")
+	sm, err := stacks.NewManager(client, params.WorkingDirectory, "")
+	if err != nil {
+		return "", fmt.Errorf("failed to create stack manager: %w", err)
+	}
 	pp := NewProviderPreparer(cli, ec, client, sm)
 	_, provider, err := pp.SetupProvider(ctx, config.Stack)
 	if err != nil {

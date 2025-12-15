@@ -44,7 +44,10 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, param
 		}
 	}
 
-	sm := stacks.NewManager(client, params.WorkingDirectory, "")
+	sm, err := stacks.NewManager(client, params.WorkingDirectory, "")
+	if err != nil {
+		return "", fmt.Errorf("failed to create stack manager: %w", err)
+	}
 	pp := NewProviderPreparer(cli, ec, client, sm)
 	_, provider, err := pp.SetupProvider(ctx, config.Stack)
 	if err != nil {
