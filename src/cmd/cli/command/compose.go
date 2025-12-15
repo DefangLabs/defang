@@ -114,12 +114,15 @@ func makeComposeUpCmd() *cobra.Command {
 			} else if len(resp.Deployments) > 0 {
 				handleExistingDeployments(resp.Deployments, accountInfo, project.Name)
 			} else if global.Stack.Name == "" {
-				promptToCreateStack(ctx, stacks.StackParameters{
+				err = promptToCreateStack(ctx, stacks.StackParameters{
 					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
 					Provider: accountInfo.Provider,
 					Region:   accountInfo.Region,
 					Mode:     global.Stack.Mode,
 				})
+				if err != nil {
+					term.Debug("Failed to create stack:", err)
+				}
 			}
 
 			// Show a warning for any (managed) services that we cannot monitor
