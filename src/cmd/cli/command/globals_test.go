@@ -2,7 +2,6 @@ package command
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,12 +15,10 @@ import (
 )
 
 func Test_readGlobals(t *testing.T) {
-	testConfig := GlobalConfig{}
-
 	t.Run("OS env beats any .defang file", func(t *testing.T) {
 		t.Chdir("testdata/with-stack")
 		t.Setenv("VALUE", "from OS env")
-		err := testConfig.loadDotDefang("test")
+		err := loadStackFile("test")
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -32,7 +29,7 @@ func Test_readGlobals(t *testing.T) {
 	})
 
 	t.Run("incorrect stackname used if no stack", func(t *testing.T) {
-		err := testConfig.loadDotDefang("non-existent-stack")
+		err := loadStackFile("non-existent-stack")
 		if err == nil {
 			t.Fatalf("this test should fail for non-existent stack: %v", err)
 		}
@@ -50,12 +47,10 @@ func Test_configurationPrecedence(t *testing.T) {
 		Debug:          false,
 		HasTty:         true, // set to true just for test instead of term.IsTerminal() for consistency
 		HideUpdate:     false,
-		Mode:           modes.ModeUnspecified,
 		NonInteractive: false, // set to false just for test instead of !term.IsTerminal() for consistency
-		ProviderID:     cliClient.ProviderAuto,
 		SourcePlatform: migrate.SourcePlatformUnspecified,
 		Verbose:        false,
-		Stack:          "",
+		Stack:          stacks.StackParameters{Provider: cliClient.ProviderAuto, Mode: modes.ModeUnspecified},
 		Cluster:        "",
 		Org:            "",
 	}
@@ -119,12 +114,14 @@ func Test_configurationPrecedence(t *testing.T) {
 				"non-interactive": "false",
 			},
 			expected: GlobalConfig{
-				Mode:           modes.ModeHighAvailability,
-				Verbose:        false,
-				Debug:          true,
-				Stack:          "from-flags",
+				Verbose: false,
+				Debug:   true,
+				Stack: stacks.StackParameters{
+					Name:     "from-flags",
+					Provider: cliClient.ProviderAWS,
+					Mode:     modes.ModeHighAvailability,
+				},
 				Cluster:        "from-flags-cluster",
-				ProviderID:     cliClient.ProviderAWS,
 				Org:            "from-flags-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAlways,
@@ -167,12 +164,14 @@ func Test_configurationPrecedence(t *testing.T) {
 				"DEFANG_HIDE_UPDATE":     "false",
 			},
 			expected: GlobalConfig{
-				Mode:           modes.ModeBalanced,
-				Verbose:        true,
-				Debug:          false,
-				Stack:          "from-env",
+				Verbose: true,
+				Debug:   false,
+				Stack: stacks.StackParameters{
+					Name:     "from-env",
+					Provider: cliClient.ProviderGCP,
+					Mode:     modes.ModeBalanced,
+				},
 				Cluster:        "from-env-cluster",
-				ProviderID:     cliClient.ProviderGCP,
 				Org:            "from-env-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAuto,
@@ -202,12 +201,14 @@ func Test_configurationPrecedence(t *testing.T) {
 				},
 			},
 			expected: GlobalConfig{
-				Mode:           modes.ModeAffordable, // env file values
-				Verbose:        true,
-				Debug:          false,
-				Stack:          "from-env",
+				Verbose: true,
+				Debug:   false,
+				Stack: stacks.StackParameters{
+					Name:     "from-env",
+					Provider: cliClient.ProviderDefang,
+					Mode:     modes.ModeAffordable,
+				},
 				Cluster:        "from-env-cluster",
-				ProviderID:     cliClient.ProviderDefang,
 				Org:            "from-env-org",
 				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAlways,
@@ -253,16 +254,16 @@ func Test_configurationPrecedence(t *testing.T) {
 
 			// simulate SetupCommands()
 			flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
-			flags.StringVarP(&testConfig.Stack, "stack", "s", testConfig.Stack, "stack name (for BYOC providers)")
+			flags.StringVarP(&testConfig.Stack.Name, "stack", "s", testConfig.Stack.Name, "stack name (for BYOC providers)")
 			flags.Var(&testConfig.ColorMode, "color", "colorize output")
 			flags.StringVar(&testConfig.Cluster, "cluster", testConfig.Cluster, "Defang cluster to connect to")
 			flags.StringVar(&testConfig.Org, "org", testConfig.Org, "override GitHub organization name (tenant)")
-			flags.VarP(&testConfig.ProviderID, "provider", "P", "bring-your-own-cloud provider")
+			flags.VarP(&testConfig.Stack.Provider, "provider", "P", "bring-your-own-cloud provider")
 			flags.BoolVarP(&testConfig.Verbose, "verbose", "v", testConfig.Verbose, "verbose logging")
 			flags.BoolVar(&testConfig.Debug, "debug", testConfig.Debug, "debug logging for troubleshooting the CLI")
 			flags.BoolVar(&testConfig.NonInteractive, "non-interactive", testConfig.NonInteractive, "disable interactive prompts / no TTY")
 			flags.Var(&testConfig.SourcePlatform, "from", "the platform from which to migrate the project")
-			flags.VarP(&testConfig.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
+			flags.VarP(&testConfig.Stack.Mode, "mode", "m", "deployment mode")
 
 			// Set flags based on user input (these override env and env file values)
 			for flagName, flagValue := range tt.flags {
@@ -316,7 +317,7 @@ func Test_configurationPrecedence(t *testing.T) {
 			t.Chdir(tempDir)
 
 			// simulates the actual loading sequence
-			err := testConfig.loadDotDefang(tt.rcStack.stackname)
+			err := loadStackFile(tt.rcStack.stackname)
 			if err != nil {
 				t.Fatalf("failed to load env file: %v", err)
 			}
@@ -327,23 +328,26 @@ func Test_configurationPrecedence(t *testing.T) {
 			}
 
 			// verify the final configuration matches expectations
-			if testConfig.Mode.String() != tt.expected.Mode.String() {
-				t.Errorf("expected Mode to be '%s', got '%s'", tt.expected.Mode.String(), testConfig.Mode.String())
-			}
+			// if testConfig.Mode.String() != tt.expected.Mode.String() {
+			// 	t.Errorf("expected Mode to be '%s', got '%s'", tt.expected.Mode.String(), testConfig.Mode.String())
+			// }
 			if testConfig.Verbose != tt.expected.Verbose {
 				t.Errorf("expected Verbose to be %v, got %v", tt.expected.Verbose, testConfig.Verbose)
 			}
 			if testConfig.Debug != tt.expected.Debug {
 				t.Errorf("expected Debug to be %v, got %v", tt.expected.Debug, testConfig.Debug)
 			}
-			if testConfig.Stack != tt.expected.Stack {
-				t.Errorf("expected Stack to be '%s', got '%s'", tt.expected.Stack, testConfig.Stack)
+			if testConfig.Stack.Name != tt.expected.Stack.Name {
+				t.Errorf("expected Stack.Name to be '%s', got '%s'", tt.expected.Stack.Name, testConfig.Stack.Name)
+			}
+			if testConfig.Stack.Provider != tt.expected.Stack.Provider {
+				t.Errorf("expected Stack.Provider to be '%s', got '%s'", tt.expected.Stack.Provider, testConfig.Stack.Provider)
+			}
+			if testConfig.Stack.Mode != tt.expected.Stack.Mode {
+				t.Errorf("expected Stack.Mode to be '%s', got '%s'", tt.expected.Stack.Mode, testConfig.Stack.Mode)
 			}
 			if testConfig.Cluster != tt.expected.Cluster {
 				t.Errorf("expected Cluster to be '%s', got '%s'", tt.expected.Cluster, testConfig.Cluster)
-			}
-			if testConfig.ProviderID != tt.expected.ProviderID {
-				t.Errorf("expected ProviderID to be '%s', got '%s'", tt.expected.ProviderID, testConfig.ProviderID)
 			}
 			if testConfig.Org != tt.expected.Org {
 				t.Errorf("expected Org to be '%s', got '%s'", tt.expected.Org, testConfig.Org)

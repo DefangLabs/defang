@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"time"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -76,12 +77,7 @@ func (m *MockDeployCLI) LoadProject(ctx context.Context, loader client.Loader) (
 	return m.Project, nil
 }
 
-func (m *MockDeployCLI) TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, options cli.TailOptions) (cli.ServiceStates, error) {
-	m.CallLog = append(m.CallLog, "TailAndMonitor")
-	return nil, nil
-}
-
-func (m *MockDeployCLI) CanIUseProvider(ctx context.Context, client *client.GrpcClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {
+func (m *MockDeployCLI) CanIUseProvider(ctx context.Context, client *client.GrpcClient, projectName, stackName string, provider client.Provider, serviceCount int) error {
 	m.CallLog = append(m.CallLog, "CanIUseProvider")
 	return nil
 }
@@ -139,7 +135,7 @@ func TestHandleDeployTool(t *testing.T) {
 					},
 				}
 			},
-			expectedTextContains: "Deployment \"test-etag\" completed successfully",
+			expectedTextContains: "The deployment is not complete, but it has been started successfully",
 		},
 		{
 			name: "successful_deploy_aws_provider",
@@ -152,7 +148,7 @@ func TestHandleDeployTool(t *testing.T) {
 					},
 				}
 			},
-			expectedTextContains: "Deployment \"test-etag\" completed successfully",
+			expectedTextContains: "The deployment is not complete, but it has been started successfully",
 		},
 	}
 
@@ -168,8 +164,6 @@ func TestHandleDeployTool(t *testing.T) {
 			}
 			tt.setupMock(mockCLI)
 
-			providerID := client.ProviderAWS
-
 			// Call the function
 			loader := &client.MockLoader{}
 			ec := elicitations.NewController(&mockElicitationsClient{
@@ -178,11 +172,18 @@ func TestHandleDeployTool(t *testing.T) {
 					"profile_name": "default",
 				},
 			})
-			stackName := "test-stack"
-			result, err := HandleDeployTool(t.Context(), loader, mockCLI, ec, StackConfig{
-				Cluster:    "test-cluster",
-				ProviderID: &providerID,
-				Stack:      &stackName,
+			stack := stacks.StackParameters{
+				Name:     "test-stack",
+				Provider: client.ProviderAWS,
+			}
+			params := DeployParams{
+				common.LoaderParams{
+					WorkingDirectory: ".",
+				},
+			}
+			result, err := HandleDeployTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
+				Cluster: "test-cluster",
+				Stack:   &stack,
 			})
 
 			// Verify error expectations
@@ -203,7 +204,6 @@ func TestHandleDeployTool(t *testing.T) {
 					"NewProvider(aws)",
 					"CanIUseProvider",
 					"ComposeUp",
-					"TailAndMonitor",
 				}
 				assert.Equal(t, expectedCalls, mockCLI.CallLog)
 			}

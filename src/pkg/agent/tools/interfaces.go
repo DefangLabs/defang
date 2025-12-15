@@ -3,7 +3,6 @@ package tools
 
 import (
 	"context"
-	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -13,7 +12,7 @@ import (
 )
 
 type CLIInterface interface {
-	CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, provider cliClient.Provider, serviceCount int) error
+	CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, projectName, stackName string, provider cliClient.Provider, serviceCount int) error
 	ComposeDown(ctx context.Context, projectName string, client *cliClient.GrpcClient, provider cliClient.Provider) (string, error)
 	ComposeUp(ctx context.Context, client *cliClient.GrpcClient, provider cliClient.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error)
 	ConfigDelete(ctx context.Context, projectName string, provider cliClient.Provider, name string) error
@@ -30,5 +29,4 @@ type CLIInterface interface {
 	PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string
 	RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error)
 	Tail(ctx context.Context, provider cliClient.Provider, projectName string, options cli.TailOptions) error
-	TailAndMonitor(ctx context.Context, project *compose.Project, provider cliClient.Provider, waitTimeout time.Duration, options cli.TailOptions) (cli.ServiceStates, error)
 }

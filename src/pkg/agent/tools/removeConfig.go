@@ -7,6 +7,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/bufbuild/connect-go"
 )
@@ -24,7 +25,8 @@ func HandleRemoveConfigTool(ctx context.Context, loader cliClient.ProjectLoader,
 		return "", fmt.Errorf("Could not connect: %w", err)
 	}
 
-	pp := NewProviderPreparer(cli, ec, client)
+	sm := stacks.NewManager(params.WorkingDirectory)
+	pp := NewProviderPreparer(cli, ec, client, sm)
 	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
