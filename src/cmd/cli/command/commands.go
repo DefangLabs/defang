@@ -1335,6 +1335,9 @@ func getProviderID(ctx context.Context, projectName string, ec elicitations.Cont
 	if err != nil {
 		return "", "", fmt.Errorf("failed to select stack: %w", err)
 	}
+	// TODO: this function should be re-oriented around stacks by default, falling back to "beta" if stacks are not being used.
+	// avoid writing a global here.
+	global.Stack = *stackParameters
 	providerID = stackParameters.Provider
 	whence = "interactive selection"
 	saveSelectedProvider(ctx, projectName, providerID)
@@ -1416,6 +1419,7 @@ func newProvider(ctx context.Context, ec elicitations.Controller, sm stacks.Mana
 	term.Infof("Using %s provider from %s%s", global.Stack.Provider, whence, extraMsg)
 
 	printProviderMismatchWarnings(ctx)
+	// TODO: avoid reading the stack from the globals here
 	provider := cli.NewProvider(ctx, global.Stack.Provider, global.Client, global.Stack.Name)
 	return provider, nil
 }
