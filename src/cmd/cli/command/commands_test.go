@@ -14,10 +14,10 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	pkg "github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	gcpdriver "github.com/DefangLabs/defang/src/pkg/clouds/gcp"
-	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
@@ -246,6 +246,12 @@ func (m *MockFabricControllerClient) SetSelectedProvider(ctx context.Context, re
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
+func (m *MockFabricControllerClient) ListDeployments(ctx context.Context, req *connect.Request[defangv1.ListDeploymentsRequest]) (*connect.Response[defangv1.ListDeploymentsResponse], error) {
+	return connect.NewResponse(&defangv1.ListDeploymentsResponse{
+		Deployments: []*defangv1.Deployment{},
+	}), nil
+}
+
 type FakeStdin struct {
 	*bytes.Reader
 }
@@ -262,6 +268,53 @@ func (f *FakeStdout) Fd() uintptr {
 	return os.Stdout.Fd()
 }
 
+type mockElicitationsClient struct {
+	responses map[string]string
+}
+
+func (m *mockElicitationsClient) Request(ctx context.Context, req elicitations.Request) (elicitations.Response, error) {
+	properties, ok := req.Schema["properties"].(map[string]any)
+	if !ok || len(properties) == 0 {
+		panic("invalid schema properties")
+	}
+	fields := make([]string, 0)
+	for field := range properties {
+		fields = append(fields, field)
+	}
+
+	if len(fields) > 1 {
+		panic("mockElicitationsClient only supports single-field requests")
+	}
+
+	return elicitations.Response{
+		Action: "accept",
+		Content: map[string]any{
+			fields[0]: m.responses[fields[0]],
+		},
+	}, nil
+}
+
+type mockStacksManager struct {
+	stacks.Manager
+	expectedProvider cliClient.ProviderID
+}
+
+func (m *mockStacksManager) List(ctx context.Context) ([]stacks.StackListItem, error) {
+	return []stacks.StackListItem{}, nil
+}
+
+func (m *mockStacksManager) Load(name string) (*stacks.StackParameters, error) {
+	return &stacks.StackParameters{
+		Name:     name,
+		Provider: m.expectedProvider,
+		Region:   "us-west-2",
+	}, nil
+}
+
+func (m *mockStacksManager) Create(params stacks.StackParameters) (string, error) {
+	return params.Name, nil
+}
+
 func TestGetProvider(t *testing.T) {
 	mockClient := cliClient.GrpcClient{}
 	mockCtrl := &MockFabricControllerClient{
@@ -269,7 +322,6 @@ func TestGetProvider(t *testing.T) {
 	}
 	mockClient.SetClient(mockCtrl)
 	global.Client = &mockClient
-	loader := cliClient.MockLoader{Project: compose.Project{Name: "empty"}}
 	oldRootCmd := RootCmd
 	t.Cleanup(func() {
 		RootCmd = oldRootCmd
@@ -290,7 +342,7 @@ func TestGetProvider(t *testing.T) {
 		os.Unsetenv("DEFANG_PROVIDER")
 		RootCmd = FakeRootWithProviderParam("")
 
-		p, err := newProvider(ctx, nil)
+		p, err := newProvider(ctx, nil, nil, "empty")
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -317,7 +369,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.savedProvider = nil
 		})
 
-		p, err := newProvider(ctx, loader)
+		p, err := newProvider(ctx, nil, nil, "empty")
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -337,20 +389,23 @@ func TestGetProvider(t *testing.T) {
 		sts := aws.StsClient
 		aws.StsClient = &mockStsProviderAPI{}
 		global.NonInteractive = false
-		oldTerm := term.DefaultTerm
-		term.DefaultTerm = term.NewTerm(
-			&FakeStdin{bytes.NewReader([]byte("aws\n"))},
-			&FakeStdout{new(bytes.Buffer)},
-			new(bytes.Buffer),
-		)
 		t.Cleanup(func() {
 			global.NonInteractive = ni
 			aws.StsClient = sts
 			mockCtrl.savedProvider = nil
-			term.DefaultTerm = oldTerm
 		})
 
-		p, err := newProvider(ctx, loader)
+		mockElicitationsClient := &mockElicitationsClient{
+			responses: map[string]string{
+				"provider":    "AWS",
+				"region":      "us-west-2",
+				"stack_name":  "teststack",
+				"aws_profile": "default",
+			},
+		}
+		ec := elicitations.NewController(mockElicitationsClient)
+		sm := &mockStacksManager{expectedProvider: cliClient.ProviderAWS}
+		p, err := newProvider(ctx, ec, sm, "empty")
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -378,20 +433,21 @@ func TestGetProvider(t *testing.T) {
 		sts := aws.StsClient
 		aws.StsClient = &mockStsProviderAPI{}
 		global.NonInteractive = false
-		oldTerm := term.DefaultTerm
-		term.DefaultTerm = term.NewTerm(
-			&FakeStdin{bytes.NewReader([]byte("\n"))}, // Use default option, which should be DO from env var
-			&FakeStdout{new(bytes.Buffer)},
-			new(bytes.Buffer),
-		)
 		t.Cleanup(func() {
 			global.NonInteractive = ni
 			aws.StsClient = sts
 			mockCtrl.savedProvider = nil
-			term.DefaultTerm = oldTerm
 		})
 
-		_, err := newProvider(ctx, loader)
+		mockElicitationsClient := &mockElicitationsClient{
+			responses: map[string]string{
+				"provider": "DigitalOcean",
+				"region":   "nyc3",
+			},
+		}
+		ec := elicitations.NewController(mockElicitationsClient)
+		sm := &mockStacksManager{expectedProvider: cliClient.ProviderDO}
+		_, err := newProvider(ctx, ec, sm, "empty")
 		if err != nil && !strings.HasPrefix(err.Error(), "GET https://api.digitalocean.com/v2/account: 401") {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -411,20 +467,23 @@ func TestGetProvider(t *testing.T) {
 		sts := aws.StsClient
 		aws.StsClient = &mockStsProviderAPI{}
 		global.NonInteractive = false
-		oldTerm := term.DefaultTerm
-		term.DefaultTerm = term.NewTerm(
-			&FakeStdin{bytes.NewReader([]byte("gcp\n"))},
-			&FakeStdout{new(bytes.Buffer)},
-			new(bytes.Buffer),
-		)
 		t.Cleanup(func() {
 			global.NonInteractive = ni
 			aws.StsClient = sts
 			mockCtrl.savedProvider = nil
-			term.DefaultTerm = oldTerm
 		})
 
-		_, err := newProvider(ctx, loader)
+		mockElicitationsClient := &mockElicitationsClient{
+			responses: map[string]string{
+				"provider":       "Google Cloud Platform",
+				"region":         "us-central1",
+				"stack_name":     "teststack",
+				"gcp_project_id": "testproject",
+			},
+		}
+		ec := elicitations.NewController(mockElicitationsClient)
+		sm := &mockStacksManager{expectedProvider: cliClient.ProviderGCP}
+		_, err := newProvider(ctx, ec, sm, "empty")
 		if err != nil && err.Error() != "GCP_PROJECT_ID or CLOUDSDK_CORE_PROJECT must be set for GCP projects" {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -445,7 +504,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.savedProvider = nil
 		})
 
-		_, err := newProvider(ctx, loader)
+		_, err := newProvider(ctx, nil, nil, "")
 		if err != nil && !strings.HasPrefix(err.Error(), "DIGITALOCEAN_TOKEN must be set") {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -466,7 +525,7 @@ func TestGetProvider(t *testing.T) {
 			aws.StsClient = sts
 		})
 
-		p, err := newProvider(ctx, loader)
+		p, err := newProvider(ctx, nil, nil, "empty")
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -487,7 +546,7 @@ func TestGetProvider(t *testing.T) {
 			}, nil
 		}
 
-		p, err := newProvider(ctx, loader)
+		p, err := newProvider(ctx, nil, nil, "empty")
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -510,7 +569,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.canIUseResponse.CdImage = ""
 		})
 
-		p, err := newProvider(ctx, loader)
+		p, err := newProvider(ctx, nil, nil, "empty")
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -545,7 +604,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.canIUseResponse.CdImage = ""
 		})
 
-		p, err := newProvider(ctx, loader)
+		p, err := newProvider(ctx, nil, nil, "empty")
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}

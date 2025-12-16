@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ import (
 	pcluster "github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
@@ -558,7 +560,18 @@ func makeComposeConfigCmd() *cobra.Command {
 				}, loadErr)
 			}
 
-			provider, err := newProvider(ctx, loader)
+			elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
+			ec := elicitations.NewController(elicitationsClient)
+			wd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get working directory: %w", err)
+			}
+			sm, err := stacks.NewManager(global.Client, wd, project.Name)
+			if err != nil {
+				return fmt.Errorf("failed to create stack manager: %w", err)
+			}
+
+			provider, err := newProvider(ctx, ec, sm, project.Name)
 			if err != nil {
 				return err
 			}

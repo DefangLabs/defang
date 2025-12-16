@@ -26,6 +26,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/github"
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -552,7 +553,22 @@ var whoamiCmd = &cobra.Command{
 		loader := configureLoader(cmd)
 
 		global.NonInteractive = true // don't show provider prompt
-		provider, err := newProvider(cmd.Context(), loader)
+		ctx := cmd.Context()
+		projectName, err := loader.LoadProjectName(ctx)
+		if err != nil {
+			term.Warnf("Unable to load project: %v", err)
+		}
+		elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
+		ec := elicitations.NewController(elicitationsClient)
+		wd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get working directory: %w", err)
+		}
+		sm, err := stacks.NewManager(global.Client, wd, projectName)
+		if err != nil {
+			return fmt.Errorf("failed to create stack manager: %w", err)
+		}
+		provider, err := newProvider(cmd.Context(), ec, sm, projectName)
 		if err != nil {
 			term.Debug("unable to get provider:", err)
 		}
@@ -1281,7 +1297,7 @@ var providerDescription = map[cliClient.ProviderID]string{
 	cliClient.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
 }
 
-func getProviderID(ctx context.Context, projectName string) (cliClient.ProviderID, string, error) {
+func getProviderID(ctx context.Context, projectName string, ec elicitations.Controller, sm stacks.Manager) (cliClient.ProviderID, string, error) {
 	var providerID cliClient.ProviderID
 	whence := "default project"
 
@@ -1314,10 +1330,12 @@ func getProviderID(ctx context.Context, projectName string) (cliClient.ProviderI
 			return providerID, "stored preference", nil
 		}
 	}
-	providerID, err := interactiveSelectProvider(cliClient.AllProviders())
+	selector := stacks.NewSelector(ec, sm)
+	stackParameters, err := selector.SelectStack(ctx)
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("failed to select stack: %w", err)
 	}
+	providerID = stackParameters.Provider
 	whence = "interactive selection"
 	saveSelectedProvider(ctx, projectName, providerID)
 	return providerID, whence, nil
@@ -1383,17 +1401,8 @@ func printProviderMismatchWarnings(ctx context.Context) {
 	}
 }
 
-func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provider, error) {
-	var projectName string
-	if loader != nil {
-		var err error
-		projectName, err = loader.LoadProjectName(ctx)
-		if err != nil {
-			term.Warnf("Unable to load project: %v", err)
-		}
-	}
-
-	providerID, whence, err := getProviderID(ctx, projectName)
+func newProvider(ctx context.Context, ec elicitations.Controller, sm stacks.Manager, projectName string) (cliClient.Provider, error) {
+	providerID, whence, err := getProviderID(ctx, projectName, ec, sm)
 	if err != nil {
 		return nil, err
 	}
@@ -1412,7 +1421,21 @@ func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 }
 
 func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient.Provider, error) {
-	provider, err := newProvider(ctx, loader)
+	projectName, err := loader.LoadProjectName(ctx)
+	if err != nil {
+		term.Warnf("Unable to load project: %v", err)
+	}
+	elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
+	ec := elicitations.NewController(elicitationsClient)
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get working directory: %w", err)
+	}
+	sm, err := stacks.NewManager(global.Client, wd, projectName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stack manager: %w", err)
+	}
+	provider, err := newProvider(ctx, ec, sm, projectName)
 	if err != nil {
 		return nil, err
 	}
