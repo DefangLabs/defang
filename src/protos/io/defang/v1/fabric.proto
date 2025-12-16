@@ -452,6 +452,7 @@ message Deployment {
   Provider provider = 8;
   int32 service_count = 9;
   string stack = 10;
+  DeploymentMode mode = 11;
 }
 
 message PutDeploymentRequest { Deployment deployment = 1; }
