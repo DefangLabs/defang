@@ -465,6 +465,10 @@ var RootCmd = &cobra.Command{
 
 		global.Client, err = cli.ConnectWithTenant(ctx, getCluster(), getTenantSelection())
 
+		if err != nil {
+			return err
+		}
+
 		if v, err := global.Client.GetVersions(ctx); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
 			term.Debug("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
