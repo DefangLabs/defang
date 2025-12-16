@@ -17,7 +17,7 @@ type ListConfigParams struct {
 }
 
 // HandleListConfigTool handles the list config tool logic
-func HandleListConfigTool(ctx context.Context, loader cliClient.ProjectLoader, params ListConfigParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
+func HandleListConfigTool(ctx context.Context, loader cliClient.Loader, params ListConfigParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, sc.Cluster)
 	if err != nil {

@@ -71,6 +71,7 @@ type Provider interface {
 type Loader interface {
 	LoadProject(context.Context) (*composeTypes.Project, error)
 	LoadProjectName(context.Context) (string, error)
+	OutsideWorkingDirectory() bool
 }
 
 type RetryDelayer struct {

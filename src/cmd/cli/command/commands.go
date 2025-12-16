@@ -1453,13 +1453,21 @@ func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient
 	}
 	elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
 	ec := elicitations.NewController(elicitationsClient)
-	wd, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get working directory: %w", err)
-	}
-	sm, err := stacks.NewManager(global.Client, wd, projectName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stack manager: %w", err)
+	var sm stacks.Manager
+	if loader.OutsideWorkingDirectory() {
+		sm, err = stacks.NewManager(global.Client, "", projectName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create stack manager: %w", err)
+		}
+	} else {
+		wd, err := os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get working directory: %w", err)
+		}
+		sm, err = stacks.NewManager(global.Client, wd, projectName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create stack manager: %w", err)
+		}
 	}
 	provider, err := newProvider(ctx, ec, sm, projectName)
 	if err != nil {

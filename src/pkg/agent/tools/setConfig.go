@@ -18,7 +18,7 @@ type SetConfigParams struct {
 	Value string `json:"value" jsonschema:"required"`
 }
 
-func HandleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params SetConfigParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
+func HandleSetConfig(ctx context.Context, loader cliClient.Loader, params SetConfigParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, sc.Cluster)
 	if err != nil {

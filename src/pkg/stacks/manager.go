@@ -34,29 +34,38 @@ func NewManager(fabric DeploymentLister, targetDirectory string, projectName str
 	if err != nil {
 		return nil, fmt.Errorf("failed to get working directory: %w", err)
 	}
-	// abs path for targetDirectory
-	absTargetDirectory, err := filepath.Abs(targetDirectory)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get absolute path for target directory: %w", err)
-	}
-	// Resolve symlinks for consistent comparison
-	resolvedWorkingDirectory, err := filepath.EvalSymlinks(workingDirectory)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve symlinks in working directory: %w", err)
-	}
-	// For target directory, only resolve symlinks if the path exists
-	resolvedTargetDirectory := absTargetDirectory
-	if _, err := os.Stat(absTargetDirectory); err == nil {
-		resolvedTargetDirectory, err = filepath.EvalSymlinks(absTargetDirectory)
+	var outside bool
+	var absTargetDirectory string
+	if targetDirectory == "" {
+		outside = true
+		absTargetDirectory = ""
+	} else {
+		// abs path for targetDirectory
+		var err error
+		absTargetDirectory, err = filepath.Abs(targetDirectory)
 		if err != nil {
-			return nil, fmt.Errorf("failed to resolve symlinks in target directory: %w", err)
+			return nil, fmt.Errorf("failed to get absolute path for target directory: %w", err)
 		}
+		// Resolve symlinks for consistent comparison
+		resolvedWorkingDirectory, err := filepath.EvalSymlinks(workingDirectory)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve symlinks in working directory: %w", err)
+		}
+		// For target directory, only resolve symlinks if the path exists
+		resolvedTargetDirectory := absTargetDirectory
+		if _, err := os.Stat(absTargetDirectory); err == nil {
+			resolvedTargetDirectory, err = filepath.EvalSymlinks(absTargetDirectory)
+			if err != nil {
+				return nil, fmt.Errorf("failed to resolve symlinks in target directory: %w", err)
+			}
+		}
+		outside = resolvedWorkingDirectory != resolvedTargetDirectory
 	}
 	return &manager{
 		fabric:           fabric,
 		targetDirectory:  absTargetDirectory,
 		projectName:      projectName,
-		outside:          resolvedWorkingDirectory != resolvedTargetDirectory,
+		outside:          outside,
 		workingDirectory: workingDirectory,
 	}, nil
 }

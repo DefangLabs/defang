@@ -17,7 +17,7 @@ type DestroyParams struct {
 	common.LoaderParams
 }
 
-func HandleDestroyTool(ctx context.Context, loader cliClient.ProjectLoader, params DestroyParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
+func HandleDestroyTool(ctx context.Context, loader cliClient.Loader, params DestroyParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, config.Cluster)
 	if err != nil {
