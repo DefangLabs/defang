@@ -118,9 +118,6 @@ func (b *ByocBaseClient) GetProjectDomain(projectName, zone string) string {
 		return "" // no project name => no custom domain
 	}
 	domain := dns.Normalize(zone)
-	if hasStack, ok := b.projectBackend.(HasStackSupport); ok {
-		domain = hasStack.GetStackName() + "." + domain
-	}
 	return domain
 }
 
