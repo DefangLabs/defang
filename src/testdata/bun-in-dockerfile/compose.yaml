@@ -1,0 +1,9 @@
+name: bun
+services:
+  bun:
+    restart: unless-stopped
+    build:
+      context: app
+      dockerfile: Dockerfile
+  server:
+    image: alpine:latest

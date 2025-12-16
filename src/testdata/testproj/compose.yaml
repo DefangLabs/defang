@@ -1,5 +1,10 @@
 name: tests
 services:
+  test:
+    image: alpine:latest
+    command: ["sh", "-c", "while true; do echo hello world; sleep 1; done"]
+    profiles:
+      - donotstart
   dfnx:
     restart: unless-stopped
     build:
@@ -34,14 +39,6 @@ services:
       - DOTENV
       - DOT_ENV_INTERPOLATION=${DOTENV}
       # disable: true
-
-  # dfnx:
-  #   build:
-  #     context: .
-      # dockerfile: Dockerfile.dfn
-    # ports:
-      # - 80
-
   echo:
     image: ealen/echo-server
     ports:

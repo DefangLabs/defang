@@ -7,8 +7,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,8 +57,8 @@ func (m *MockDestroyCLI) LoadProjectNameWithFallback(ctx context.Context, loader
 	return m.ProjectName, nil
 }
 
-func (m *MockDestroyCLI) CanIUseProvider(ctx context.Context, grpcClient *client.GrpcClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("CanIUseProvider(%s, %s)", providerId, projectName))
+func (m *MockDestroyCLI) CanIUseProvider(ctx context.Context, grpcClient *client.GrpcClient, projectName, stackName string, provider client.Provider, serviceCount int) error {
+	m.CallLog = append(m.CallLog, fmt.Sprintf("CanIUseProvider(%s)", projectName))
 	if m.CanIUseProviderError != nil {
 		return m.CanIUseProviderError
 	}
@@ -125,6 +127,12 @@ func TestHandleDestroyTool(t *testing.T) {
 		},
 	}
 
+	loader := &client.MockLoader{}
+	stack := stacks.StackParameters{
+		Name:     "test-stack",
+		Provider: client.ProviderAWS,
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Chdir("testdata")
@@ -137,19 +145,21 @@ func TestHandleDestroyTool(t *testing.T) {
 			}
 			tt.setupMock(mockCLI)
 
-			// Call the function
-			loader := &client.MockLoader{}
 			ec := elicitations.NewController(&mockElicitationsClient{
 				responses: map[string]string{
 					"strategy":     "profile",
 					"profile_name": "default",
 				},
 			})
-			stackName := "test-stack"
-			result, err := HandleDestroyTool(t.Context(), loader, mockCLI, ec, StackConfig{
-				Cluster:    "test-cluster",
-				ProviderID: &tt.providerID,
-				Stack:      &stackName,
+			// Call the function
+			params := DestroyParams{
+				LoaderParams: common.LoaderParams{
+					WorkingDirectory: ".",
+				},
+			}
+			result, err := HandleDestroyTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
+				Cluster: "test-cluster",
+				Stack:   &stack,
 			})
 
 			// Verify error expectations
@@ -168,7 +178,7 @@ func TestHandleDestroyTool(t *testing.T) {
 					"Connect(test-cluster)",
 					"NewProvider(aws)",
 					"LoadProjectNameWithFallback",
-					"CanIUseProvider(aws, test-project)",
+					"CanIUseProvider(test-project)",
 					"ComposeDown(test-project)",
 				}
 				assert.Equal(t, expectedCalls, mockCLI.CallLog)

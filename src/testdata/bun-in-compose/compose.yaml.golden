@@ -1,0 +1,16 @@
+name: bun
+services:
+  bun:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    networks:
+      default: null
+    restart: unless-stopped
+  server:
+    image: oven/bun:latest
+    networks:
+      default: null
+networks:
+  default:
+    name: bun_default

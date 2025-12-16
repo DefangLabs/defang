@@ -1,13 +1,12 @@
 package command
 
 import (
+	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"strings"
+	"os"
 
-	"github.com/AlecAivazis/survey/v2"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -46,9 +45,9 @@ func makeStackNewCmd() *cobra.Command {
 
 			params := stacks.StackParameters{
 				Name:     stackName,
-				Provider: global.ProviderID, // default provider
+				Provider: global.Stack.Provider, // default provider
 				Region:   region,
-				Mode:     global.Mode,
+				Mode:     global.Stack.Mode,
 			}
 
 			if global.NonInteractive {
@@ -56,7 +55,8 @@ func makeStackNewCmd() *cobra.Command {
 				return err
 			}
 
-			err := PromptForStackParameters(&params)
+			ctx := cmd.Context()
+			err := PromptForStackParameters(ctx, &params)
 			if err != nil {
 				return err
 			}
@@ -72,8 +72,8 @@ func makeStackNewCmd() *cobra.Command {
 			return nil
 		},
 	}
-	stackNewCmd.Flags().VarP(&global.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
-	stackNewCmd.Flags().StringP("region", "r", "", "Cloud region for the stack deployment")
+	stackNewCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
+	stackNewCmd.Flags().StringVarP(&global.Stack.Region, "region", "r", "", "Cloud region for the stack deployment")
 
 	return stackNewCmd
 }
@@ -131,81 +131,16 @@ func makeStackRemoveCmd() *cobra.Command {
 	return stackRemoveCmd
 }
 
-func PromptForStackParameters(params *stacks.StackParameters) error {
-	if params.Provider == cliClient.ProviderAuto {
-		var options []string
-		for _, p := range cliClient.AllProviders() {
-			options = append(options, p.Name())
-		}
-		var provider string
-		err := survey.AskOne(&survey.Select{
-			Message: "Which cloud provider do you want to deploy to?",
-			Options: options,
-		}, &provider, survey.WithStdio(term.DefaultTerm.Stdio()))
-		if err != nil {
-			return err
-		}
-
-		if provider == "" {
-			return errors.New("a cloud provider must be selected")
-		}
-
-		err = global.ProviderID.Set(provider)
-		if err != nil {
-			return err
-		}
-		params.Provider = global.ProviderID
+func PromptForStackParameters(ctx context.Context, params *stacks.StackParameters) error {
+	elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
+	ec := elicitations.NewController(elicitationsClient)
+	wizard := stacks.NewWizard(ec)
+	newParams, err := wizard.CollectRemainingParameters(ctx, params)
+	if err != nil {
+		return err
 	}
 
-	if params.Region == "" && params.Provider != cliClient.ProviderDefang {
-		defaultRegion := cliClient.GetRegion(params.Provider)
-
-		var region string
-
-		err := survey.AskOne(&survey.Input{
-			Message: fmt.Sprintf("Which %s region do you want to deploy to?", strings.ToUpper(params.Provider.String())),
-			Default: defaultRegion,
-		}, &region, survey.WithStdio(term.DefaultTerm.Stdio()))
-		if err != nil {
-			return err
-		}
-
-		params.Region = region
-	}
-
-	if params.Mode == modes.ModeUnspecified {
-		var selectedMode string
-		err := survey.AskOne(&survey.Select{
-			Message: "Which deployment mode do you want to use?",
-			Help:    "Learn about the different deployment modes at https://docs.defang.io/docs/concepts/deployment-modes",
-			Options: modes.AllDeploymentModes(),
-			Default: modes.ModeAffordable.String(),
-		},
-			&selectedMode, survey.WithStdio(term.DefaultTerm.Stdio()))
-		if err != nil {
-			return err
-		}
-
-		modeParsed, err := modes.Parse(selectedMode)
-		if err != nil {
-			return err
-		}
-		params.Mode = modeParsed
-	}
-
-	if params.Name == "" {
-		defaultName := stacks.MakeDefaultName(params.Provider, params.Region)
-		var name string
-		err := survey.AskOne(&survey.Input{
-			Message: "What do you want to call this stack?",
-			Default: defaultName,
-		}, &name, survey.WithStdio(term.DefaultTerm.Stdio()))
-		if err != nil {
-			return err
-		}
-
-		params.Name = name
-	}
+	*params = *newParams
 
 	return nil
 }
