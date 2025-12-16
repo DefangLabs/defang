@@ -38,7 +38,7 @@
             ];
             shellHook = ''
               export SHELL=${bashInteractive}/bin/bash
-              export PATH="${bashInteractive}/bin:$PATH"
+
               if [ -t 1 ]; then
                 export PS1="[defang:nix] \w$ "
               fi
