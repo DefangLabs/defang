@@ -95,7 +95,7 @@ var global GlobalConfig = GlobalConfig{
 	HasTty:         term.IsTerminal(),
 	HideUpdate:     false,
 	NonInteractive: !term.IsTerminal(),
-	Stack:          stacks.StackParameters{Provider: cliClient.ProviderAuto, Mode: modes.ModeUnspecified},
+	Stack:          stacks.StackParameters{Name: "beta", Provider: cliClient.ProviderAuto, Mode: modes.ModeUnspecified},
 	SourcePlatform: migrate.SourcePlatformUnspecified, // default to auto-detecting the source platform
 	Verbose:        false,
 }

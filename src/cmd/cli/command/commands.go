@@ -1297,54 +1297,76 @@ var providerDescription = map[cliClient.ProviderID]string{
 	cliClient.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
 }
 
-func getProviderID(ctx context.Context, projectName string, ec elicitations.Controller, sm stacks.Manager) (cliClient.ProviderID, string, error) {
-	var providerID cliClient.ProviderID
+func getStack(ctx context.Context, projectName string, ec elicitations.Controller, sm stacks.Manager) (*stacks.StackParameters, string, error) {
 	whence := "default project"
+	stack := &stacks.StackParameters{
+		Name:     "beta",
+		Provider: cliClient.ProviderAuto,
+		Mode:     modes.ModeUnspecified,
+	}
 
 	// This code unfortunately replicates the provider precidence rules in the
-	// RoomCmd's PersistentPreRunE func
-	if RootCmd.PersistentFlags().Changed("provider") {
-		whence = "command line flag"
-		providerID = global.Stack.Provider
-	} else if _, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
-		providerID = global.Stack.Provider
-		whence = "environment variable"
-	} else if global.Stack.Provider != cliClient.ProviderAuto {
+	// RoomCmd's PersistentPreRunE func, I think we should avoid reading the
+	// stack file during startup, and only read it here instead.
+	if RootCmd.PersistentFlags().Changed("stack") {
 		whence = "stack file"
-		providerID = global.Stack.Provider
+		stackName := RootCmd.Flags().Lookup("stack").Value.String()
+		stackParams, err := sm.Load(stackName)
+		if err != nil {
+			return nil, "", fmt.Errorf("unable to load stack %q: %w", stackName, err)
+		}
+		stack = stackParams
+	} else if RootCmd.PersistentFlags().Changed("provider") {
+		whence = "command line flag"
+		providerIDString := RootCmd.Flags().Lookup("provider").Value.String()
+		err := stack.Provider.Set(providerIDString)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
+		}
+	} else if _, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
+		whence = "environment variable"
+		providerIDString := os.Getenv("DEFANG_PROVIDER")
+		err := stack.Provider.Set(providerIDString)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
+		}
 	}
 
-	if global.Stack.Provider != cliClient.ProviderAuto {
-		return providerID, whence, nil
+	if stack.Provider != cliClient.ProviderAuto {
+		return stack, whence, nil
 	}
+
 	if global.NonInteractive {
-		return cliClient.ProviderDefang, "non-interactive default", nil
+		whence = "non-interactive default"
+		stack.Provider = cliClient.ProviderDefang
+		return stack, whence, nil
 	}
+
 	// If user manually selected auto provider, do not load from remote
 	if !RootCmd.PersistentFlags().Changed("provider") {
-		providerID, err := getSelectedProvider(ctx, projectName)
+		providerID, err := getPreviouslyUsedProvider(ctx, projectName)
 		if err != nil {
-			return "", "", err
+			return nil, "", err
 		}
-		if providerID != cliClient.ProviderAuto {
-			return providerID, "stored preference", nil
+		stack.Provider = providerID
+		if stack.Provider != cliClient.ProviderAuto {
+			whence = "stored preference"
+			return stack, whence, nil
 		}
 	}
-	selector := stacks.NewSelector(ec, sm)
-	stackParameters, err := selector.SelectStack(ctx)
+
+	stackSelector := stacks.NewSelector(ec, sm)
+	stackParameters, err := stackSelector.SelectStack(ctx)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to select stack: %w", err)
+		return nil, "", fmt.Errorf("failed to select stack: %w", err)
 	}
-	// TODO: this function should be re-oriented around stacks by default, falling back to "beta" if stacks are not being used.
-	// avoid writing a global here.
-	global.Stack = *stackParameters
-	providerID = stackParameters.Provider
+	stack = stackParameters
 	whence = "interactive selection"
-	saveSelectedProvider(ctx, projectName, providerID)
-	return providerID, whence, nil
+	saveSelectedProvider(ctx, projectName, stack.Provider)
+	return stack, whence, nil
 }
 
-func getSelectedProvider(ctx context.Context, projectName string) (cliClient.ProviderID, error) {
+func getPreviouslyUsedProvider(ctx context.Context, projectName string) (cliClient.ProviderID, error) {
 	if projectName == "" {
 		return cliClient.ProviderAuto, nil
 	}
@@ -1405,22 +1427,22 @@ func printProviderMismatchWarnings(ctx context.Context) {
 }
 
 func newProvider(ctx context.Context, ec elicitations.Controller, sm stacks.Manager, projectName string) (cliClient.Provider, error) {
-	providerID, whence, err := getProviderID(ctx, projectName, ec, sm)
+	stack, whence, err := getStack(ctx, projectName, ec, sm)
 	if err != nil {
 		return nil, err
 	}
 
-	global.Stack.Provider = providerID
+	// TODO: avoid writing to this global variable once all readers are removed
+	global.Stack = *stack
 
 	extraMsg := ""
-	if global.Stack.Provider == cliClient.ProviderDefang {
+	if stack.Provider == cliClient.ProviderDefang {
 		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
 	}
-	term.Infof("Using %s provider from %s%s", global.Stack.Provider, whence, extraMsg)
+	term.Infof("Using %s provider from %s%s", stack.Provider, whence, extraMsg)
 
 	printProviderMismatchWarnings(ctx)
-	// TODO: avoid reading the stack from the globals here
-	provider := cli.NewProvider(ctx, global.Stack.Provider, global.Client, global.Stack.Name)
+	provider := cli.NewProvider(ctx, stack.Provider, global.Client, stack.Name)
 	return provider, nil
 }
 
