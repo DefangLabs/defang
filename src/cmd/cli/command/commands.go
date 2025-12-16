@@ -1301,8 +1301,19 @@ func updateProviderID(ctx context.Context, projectName string) error {
 			global.Stack.Provider = cliClient.ProviderDefang
 		} else {
 			var err error
-			if whence, err = loadOrSelectProviderID(ctx, projectName); err != nil {
-				return err
+			if projectName != "" && !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
+				resp, err := global.Client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projectName})
+				if err != nil {
+					term.Debugf("Unable to get selected provider: %v", err)
+				} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
+					global.Stack.Provider.SetValue(resp.Provider)
+					whence = "stored preference"
+				}
+			} else {
+				if err = selectProviderID(ctx, projectName); err != nil {
+					return err
+				}
+				whence = "interactive selection"
 			}
 		}
 	}
@@ -1376,20 +1387,10 @@ func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectNa
 	return cliClient.CanIUseProvider(ctx, global.Client, provider, projectName, global.Stack.Name, serviceCount)
 }
 
-func loadOrSelectProviderID(ctx context.Context, projectName string) (string, error) {
-	if projectName != "" && !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
-		resp, err := global.Client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projectName})
-		if err != nil {
-			term.Debugf("Unable to get selected provider: %v", err)
-		} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
-			global.Stack.Provider.SetValue(resp.Provider)
-			return "stored preference", nil
-		}
-	}
-
+func selectProviderID(ctx context.Context, projectName string) error {
 	providerID, err := interactiveSelectProvider(cliClient.AllProviders())
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	global.Stack.Provider = providerID
@@ -1403,7 +1404,7 @@ func loadOrSelectProviderID(ctx context.Context, projectName string) (string, er
 		}
 	}
 
-	return "interactive selection", err
+	return err
 }
 
 func interactiveSelectProvider(providers []cliClient.ProviderID) (cliClient.ProviderID, error) {
