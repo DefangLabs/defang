@@ -38,6 +38,7 @@ func (mockListDeploymentsHandler) ListDeployments(ctx context.Context, req *conn
 				ProviderString:    "playground",
 				Region:            "us-test-2",
 				Timestamp:         timestamppb.New(time.Time{}),
+				Mode:              defangv1.DeploymentMode_MODE_UNSPECIFIED,
 			},
 		}
 	}
@@ -79,8 +80,8 @@ func TestDeploymentsList(t *testing.T) {
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}
-		expectedOutput := "\x1b[1m\nPROJECTNAME  PROVIDER  ACCOUNTID   REGION     DEPLOYMENT  DEPLOYEDAT\x1b[0m" + `
-test         defang    1234567890  us-test-2  a1b2c3      ` + time.Time{}.Local().Format(time.RFC3339) + "\n"
+		expectedOutput := "\x1b[1m\nPROJECTNAME  PROVIDER  ACCOUNTID   REGION     DEPLOYMENT  MODE              DEPLOYEDAT\x1b[0m" + `
+test         defang    1234567890  us-test-2  a1b2c3      MODE_UNSPECIFIED  ` + time.Time{}.Local().Format(time.RFC3339) + "\n"
 
 		receivedLines := strings.Split(stdout.String(), "\n")
 		expectedLines := strings.Split(expectedOutput, "\n")
