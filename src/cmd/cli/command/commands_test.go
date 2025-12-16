@@ -239,6 +239,9 @@ func (m *MockFabricControllerClient) GetSelectedProvider(ctx context.Context, re
 }
 
 func (m *MockFabricControllerClient) SetSelectedProvider(ctx context.Context, req *connect.Request[defangv1.SetSelectedProviderRequest]) (*connect.Response[emptypb.Empty], error) {
+	if m.savedProvider == nil {
+		m.savedProvider = make(map[string]defangv1.Provider)
+	}
 	m.savedProvider[req.Msg.Project] = req.Msg.Provider
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
@@ -454,6 +457,8 @@ func TestGetProvider(t *testing.T) {
 	t.Run("Should take provider from env aws", func(t *testing.T) {
 		t.Setenv("DEFANG_PROVIDER", "aws")
 		t.Setenv("AWS_REGION", "us-west-2")
+		t.Setenv("DIGITALOCEAN_TOKEN", "") // Clear DO token to avoid interference
+		global.Stack.Provider = "aws"      // Manually update to reflect the environment variable
 		RootCmd = FakeRootWithProviderParam("")
 		sts := aws.StsClient
 		aws.StsClient = &mockStsProviderAPI{}
@@ -473,6 +478,8 @@ func TestGetProvider(t *testing.T) {
 	t.Run("Should take provider from env gcp", func(t *testing.T) {
 		t.Setenv("DEFANG_PROVIDER", "gcp")
 		t.Setenv("GCP_PROJECT_ID", "test_proj_id")
+		t.Setenv("DIGITALOCEAN_TOKEN", "") // Clear DO token to avoid interference
+		global.Stack.Provider = "gcp"      // Manually update to reflect the environment variable
 		RootCmd = FakeRootWithProviderParam("")
 		gcpdriver.FindGoogleDefaultCredentials = func(ctx context.Context, scopes ...string) (*google.Credentials, error) {
 			return &google.Credentials{
@@ -492,6 +499,8 @@ func TestGetProvider(t *testing.T) {
 	t.Run("Should set cd image from canIUse response", func(t *testing.T) {
 		t.Setenv("DEFANG_PROVIDER", "aws")
 		t.Setenv("AWS_REGION", "us-west-2")
+		t.Setenv("DIGITALOCEAN_TOKEN", "") // Clear DO token to avoid interference
+		global.Stack.Provider = "aws"      // Manually update to reflect the environment variable
 		sts := aws.StsClient
 		aws.StsClient = &mockStsProviderAPI{}
 		const cdImageTag = "site/registry/repo:tag@sha256:digest"
@@ -523,6 +532,8 @@ func TestGetProvider(t *testing.T) {
 	t.Run("Can override cd image from environment variable", func(t *testing.T) {
 		t.Setenv("DEFANG_PROVIDER", "aws")
 		t.Setenv("AWS_REGION", "us-west-2")
+		t.Setenv("DIGITALOCEAN_TOKEN", "") // Clear DO token to avoid interference
+		global.Stack.Provider = "aws"      // Manually update to reflect the environment variable
 		sts := aws.StsClient
 		aws.StsClient = &mockStsProviderAPI{}
 		const cdImageTag = "site/registry/repo:tag@sha256:digest"

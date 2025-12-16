@@ -1281,48 +1281,75 @@ var providerDescription = map[cliClient.ProviderID]string{
 	cliClient.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
 }
 
-func updateProviderID(ctx context.Context, projectName string) error {
-	extraMsg := ""
+func getProviderID(ctx context.Context, projectName string) (cliClient.ProviderID, string, error) {
+	var providerID cliClient.ProviderID
 	whence := "default project"
 
-	// Command line flag takes precedence over environment variable
+	// This code unfortunately replicates the provider precidence rules in the
+	// RoomCmd's PersistentPreRunE func
 	if RootCmd.PersistentFlags().Changed("provider") {
 		whence = "command line flag"
-	} else if val, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
-		// Sanitize the provider value from the environment variable
-		if err := global.Stack.Provider.Set(val); err != nil {
-			return fmt.Errorf("invalid provider '%v' in environment variable DEFANG_PROVIDER, supported providers are: %v", val, cliClient.AllProviders())
-		}
+		providerID = global.Stack.Provider
+	} else if _, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
+		providerID = global.Stack.Provider
 		whence = "environment variable"
+	} else if global.Stack.Provider != cliClient.ProviderAuto {
+		whence = "stack file"
+		providerID = global.Stack.Provider
 	}
 
-	if global.Stack.Provider == cliClient.ProviderAuto {
-		if global.NonInteractive {
-			global.Stack.Provider = cliClient.ProviderDefang
-		} else {
-			var err error
-			if projectName != "" && !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
-				resp, err := global.Client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projectName})
-				if err != nil {
-					term.Debugf("Unable to get selected provider: %v", err)
-				} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
-					global.Stack.Provider.SetValue(resp.Provider)
-					whence = "stored preference"
-				}
-			} else {
-				if err = selectProviderID(ctx, projectName); err != nil {
-					return err
-				}
-				whence = "interactive selection"
-			}
+	if global.Stack.Provider != cliClient.ProviderAuto {
+		return providerID, whence, nil
+	}
+	if global.NonInteractive {
+		return cliClient.ProviderDefang, "non-interactive default", nil
+	}
+	// If user manually selected auto provider, do not load from remote
+	if !RootCmd.PersistentFlags().Changed("provider") {
+		providerID, err := getSelectedProvider(ctx, projectName)
+		if err != nil {
+			return "", "", err
+		}
+		if providerID != cliClient.ProviderAuto {
+			return providerID, "stored preference", nil
 		}
 	}
-	if global.Stack.Provider == cliClient.ProviderDefang {
-		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
+	providerID, err := interactiveSelectProvider(cliClient.AllProviders())
+	if err != nil {
+		return "", "", err
 	}
-	term.Infof("Using %s provider from %s%s", global.Stack.Provider.Name(), whence, extraMsg)
+	whence = "interactive selection"
+	saveSelectedProvider(ctx, projectName, providerID)
+	return providerID, whence, nil
+}
 
-	return nil
+func getSelectedProvider(ctx context.Context, projectName string) (cliClient.ProviderID, error) {
+	if projectName == "" {
+		return cliClient.ProviderAuto, nil
+	}
+	resp, err := global.Client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{
+		Project: projectName,
+	})
+	if err != nil {
+		return cliClient.ProviderAuto, fmt.Errorf("unable to get selected provider: %w", err)
+	}
+	var providerID cliClient.ProviderID
+	providerID.SetValue(resp.Provider)
+	return providerID, nil
+}
+
+func saveSelectedProvider(ctx context.Context, projectName string, providerID cliClient.ProviderID) {
+	if projectName == "" {
+		return
+	}
+	if err := global.Client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{
+		Project:  projectName,
+		Provider: providerID.Value(),
+	}); err != nil {
+		term.Debugf("Unable to save selected provider to defang server: %v", err)
+	} else {
+		term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", global.Stack.Provider, projectName)
+	}
 }
 
 func printProviderMismatchWarnings(ctx context.Context) {
@@ -1365,9 +1392,19 @@ func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 			term.Warnf("Unable to load project: %v", err)
 		}
 	}
-	if err := updateProviderID(ctx, projectName); err != nil {
+
+	providerID, whence, err := getProviderID(ctx, projectName)
+	if err != nil {
 		return nil, err
 	}
+
+	global.Stack.Provider = providerID
+
+	extraMsg := ""
+	if global.Stack.Provider == cliClient.ProviderDefang {
+		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
+	}
+	term.Infof("Using %s provider from %s%s", global.Stack.Provider, whence, extraMsg)
 
 	printProviderMismatchWarnings(ctx)
 	provider := cli.NewProvider(ctx, global.Stack.Provider, global.Client, global.Stack.Name)
@@ -1385,26 +1422,6 @@ func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient
 
 func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string, serviceCount int) error {
 	return cliClient.CanIUseProvider(ctx, global.Client, provider, projectName, global.Stack.Name, serviceCount)
-}
-
-func selectProviderID(ctx context.Context, projectName string) error {
-	providerID, err := interactiveSelectProvider(cliClient.AllProviders())
-	if err != nil {
-		return err
-	}
-
-	global.Stack.Provider = providerID
-
-	// Save the selected provider to the fabric
-	if projectName != "" {
-		if err := global.Client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projectName, Provider: global.Stack.Provider.Value()}); err != nil {
-			term.Debugf("Unable to save selected provider to defang server: %v", err)
-		} else {
-			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", global.Stack.Provider, projectName)
-		}
-	}
-
-	return err
 }
 
 func interactiveSelectProvider(providers []cliClient.ProviderID) (cliClient.ProviderID, error) {
