@@ -1296,19 +1296,8 @@ func updateProviderID(ctx context.Context, projectName string) error {
 		whence = "environment variable"
 	}
 
-	switch global.Stack.Provider {
-	case cliClient.ProviderAuto:
+	if global.Stack.Provider == cliClient.ProviderAuto {
 		if global.NonInteractive {
-			// Defaults to defang provider in non-interactive mode
-			if awsInEnv() {
-				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")
-			}
-			if doInEnv() {
-				term.Warn("Using Defang playground, but DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
-			}
-			if gcpInEnv() {
-				term.Warn("Using Defang playground, but GCP_PROJECT_ID/CLOUDSDK_CORE_PROJECT environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
-			}
 			global.Stack.Provider = cliClient.ProviderDefang
 		} else {
 			var err error
@@ -1316,6 +1305,31 @@ func updateProviderID(ctx context.Context, projectName string) error {
 				return err
 			}
 		}
+	}
+	if global.Stack.Provider == cliClient.ProviderDefang {
+		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
+	}
+	term.Infof("Using %s provider from %s%s", global.Stack.Provider.Name(), whence, extraMsg)
+
+	return nil
+}
+
+func printProviderMismatchWarnings(ctx context.Context) {
+	if global.Stack.Provider == cliClient.ProviderDefang {
+		// Ignore any env vars when explicitly using the Defang playground provider
+		// Defaults to defang provider in non-interactive mode
+		if awsInEnv() {
+			term.Warn("AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")
+		}
+		if doInEnv() {
+			term.Warn("DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
+		}
+		if gcpInEnv() {
+			term.Warn("GCP_PROJECT_ID/CLOUDSDK_CORE_PROJECT environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
+		}
+	}
+
+	switch global.Stack.Provider {
 	case cliClient.ProviderAWS:
 		if !awsInConfig(ctx) {
 			term.Warn("AWS provider was selected, but AWS environment is not set")
@@ -1328,13 +1342,7 @@ func updateProviderID(ctx context.Context, projectName string) error {
 		if !gcpInEnv() {
 			term.Warn("GCP provider was selected, but GCP_PROJECT_ID environment variable is not set")
 		}
-	case cliClient.ProviderDefang:
-		// Ignore any env vars when explicitly using the Defang playground provider
-		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
 	}
-
-	term.Infof("Using %s provider from %s%s", global.Stack.Provider.Name(), whence, extraMsg)
-	return nil
 }
 
 func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provider, error) {
@@ -1350,6 +1358,7 @@ func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 		return nil, err
 	}
 
+	printProviderMismatchWarnings(ctx)
 	provider := cli.NewProvider(ctx, global.Stack.Provider, global.Client, global.Stack.Name)
 	return provider, nil
 }
