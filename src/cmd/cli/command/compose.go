@@ -15,6 +15,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	pcluster "github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -28,6 +29,19 @@ import (
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
 )
+
+const DEFANG_PORTAL_HOST = "portal.defang.io"
+const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
+
+func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
+	// We can only show services deployed to the prod1 defang SaaS environment.
+	if global.Stack.Provider == cliClient.ProviderDefang && global.Cluster == pcluster.DefaultCluster {
+		term.Info("Monitor your services' status in the defang portal")
+		for _, serviceInfo := range serviceInfos {
+			term.Println("   -", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
+		}
+	}
+}
 
 var logType = logs.LogTypeAll
 
@@ -69,7 +83,7 @@ func makeComposeUpCmd() *cobra.Command {
 					return err
 				}
 
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.Stack)
 				if err != nil {
 					return err
 				}
@@ -99,13 +113,16 @@ func makeComposeUpCmd() *cobra.Command {
 				term.Debugf("AccountInfo failed: %v", err)
 			} else if len(resp.Deployments) > 0 {
 				handleExistingDeployments(resp.Deployments, accountInfo, project.Name)
-			} else if global.Stack == "" {
-				promptToCreateStack(stacks.StackParameters{
+			} else if global.Stack.Name == "" {
+				err = promptToCreateStack(ctx, stacks.StackParameters{
 					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
 					Provider: accountInfo.Provider,
 					Region:   accountInfo.Region,
-					Mode:     global.Mode,
+					Mode:     global.Stack.Mode,
 				})
+				if err != nil {
+					term.Debug("Failed to create stack:", err)
+				}
 			}
 
 			// Show a warning for any (managed) services that we cannot monitor
@@ -120,14 +137,14 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			deploy, project, err := cli.ComposeUp(ctx, global.Client, provider, cli.ComposeUpParams{
-				Stack:      global.Stack,
+				Stack:      global.Stack.Name,
 				Project:    project,
 				UploadMode: upload,
-				Mode:       global.Mode,
+				Mode:       global.Stack.Mode,
 			})
 			if err != nil {
 				composeErr := err
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.Stack)
 				if err != nil {
 					return err
 				}
@@ -156,7 +173,7 @@ func makeComposeUpCmd() *cobra.Command {
 			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
 				deploymentErr := err
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.Stack)
 				if err != nil {
 					term.Warn("Failed to initialize debugger:", err)
 					return deploymentErr
@@ -164,8 +181,8 @@ func makeComposeUpCmd() *cobra.Command {
 				handleTailAndMonitorErr(ctx, deploymentErr, debugger, debug.DebugConfig{
 					Deployment: deploy.Etag,
 					Project:    project,
-					ProviderID: &global.ProviderID,
-					Stack:      &global.Stack,
+					ProviderID: &global.Stack.Provider,
+					Stack:      &global.Stack.Name,
 					Since:      since,
 					Until:      time.Now(),
 				})
@@ -177,7 +194,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			// Print the current service states of the deployment
-			err = printServiceStatesAndEndpoints(deploy.Services)
+			err = cli.PrintServiceStatesAndEndpoints(deploy.Services)
 			if err != nil {
 				return err
 			}
@@ -192,7 +209,7 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // obsolete, but keep for backwards compatibility
 	_ = composeUpCmd.Flags().MarkHidden("tail")
-	composeUpCmd.Flags().VarP(&global.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
+	composeUpCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	composeUpCmd.Flags().Bool("build", true, "build the image before starting the service") // docker-compose compatibility
 	_ = composeUpCmd.Flags().MarkHidden("build")
 	composeUpCmd.Flags().Bool("wait", true, "wait for services to be running|healthy") // docker-compose compatibility
@@ -204,7 +221,7 @@ func makeComposeUpCmd() *cobra.Command {
 func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accountInfo *cliClient.AccountInfo, projectName string) error {
 	samePlace := slices.ContainsFunc(existingDeployments, func(dep *defangv1.Deployment) bool {
 		// Old deployments may not have a region or account ID, so we check for empty values too
-		return dep.Provider == global.ProviderID.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
+		return dep.Provider == global.Stack.Provider.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
 	})
 	if samePlace {
 		return nil
@@ -212,13 +229,13 @@ func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accou
 	if err := confirmDeploymentToNewLocation(projectName, existingDeployments); err != nil {
 		return err
 	}
-	if global.Stack == "" {
+	if global.Stack.Name == "" {
 		stackName := "beta"
 		_, err := stacks.Create(stacks.StackParameters{
 			Name:     stackName,
 			Provider: accountInfo.Provider,
 			Region:   accountInfo.Region,
-			Mode:     global.Mode,
+			Mode:     global.Stack.Mode,
 		})
 		if err != nil {
 			term.Debugf("Failed to create stack %v", err)
@@ -230,7 +247,7 @@ func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accou
 }
 
 func printExistingDeployments(existingDeployments []*defangv1.Deployment) {
-	term.Info("This project has already deployed to the following locations:")
+	term.Info("This project was previously deployed to the following locations:")
 	deploymentStrings := make([]string, 0, len(existingDeployments))
 	for _, dep := range existingDeployments {
 		var providerId cliClient.ProviderID
@@ -257,14 +274,14 @@ func confirmDeploymentToNewLocation(projectName string, existingDeployments []*d
 	return nil
 }
 
-func promptToCreateStack(params stacks.StackParameters) error {
+func promptToCreateStack(ctx context.Context, params stacks.StackParameters) error {
 	if global.NonInteractive {
 		term.Info("Consider creating a stack to manage your deployments.")
 		printDefangHint("To create a stack, do:", "stack new --name="+params.Name)
 		return nil
 	}
 
-	err := PromptForStackParameters(&params)
+	err := PromptForStackParameters(ctx, &params)
 	if err != nil {
 		return err
 	}
@@ -531,7 +548,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.Stack)
 				if err != nil {
 					term.Warn("Failed to initialize debugger:", err)
 					return loadErr
@@ -550,7 +567,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				Project:    project,
 				UploadMode: compose.UploadModeIgnore,
 				Mode:       modes.ModeUnspecified,
-				Stack:      global.Stack,
+				Stack:      global.Stack.Name,
 			})
 			if !errors.Is(err, dryrun.ErrDryRun) {
 				return err
@@ -581,7 +598,7 @@ func makeComposePsCmd() *cobra.Command {
 				return err
 			}
 
-			if err := cli.GetServices(cmd.Context(), projectName, provider, long); err != nil {
+			if err := cli.PrintServices(cmd.Context(), projectName, provider, long); err != nil {
 				if errNoServices := new(cli.ErrNoServices); !errors.As(err, errNoServices) {
 					return err
 				}

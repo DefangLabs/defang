@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/logs"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
 )
@@ -45,7 +45,8 @@ func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 		return "", fmt.Errorf("could not connect: %w", err)
 	}
 
-	pp := NewProviderPreparer(cli, ec, client)
+	sm := stacks.NewManager(params.WorkingDirectory)
+	pp := NewProviderPreparer(cli, ec, client, sm)
 	_, provider, err := pp.SetupProvider(ctx, config.Stack)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
@@ -58,11 +59,7 @@ func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 	}
 	term.Debug("Project name loaded:", projectName)
 
-	if config.ProviderID == nil {
-		return "", errors.New("provider ID is required to fetch logs")
-	}
-
-	err = cli.CanIUseProvider(ctx, client, *config.ProviderID, projectName, provider, 0)
+	err = cli.CanIUseProvider(ctx, client, projectName, config.Stack.Name, provider, 0)
 	if err != nil {
 		return "", fmt.Errorf("failed to use provider: %w", err)
 	}
@@ -78,7 +75,6 @@ func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params 
 	})
 
 	if err != nil {
-		err = fmt.Errorf("failed to fetch logs: %w", err)
 		term.Error("Failed to fetch logs", "error", err)
 		return "", fmt.Errorf("failed to fetch logs: %w", err)
 	}

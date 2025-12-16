@@ -5,22 +5,20 @@ import (
 	"context"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/login"
-	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 type StackConfig struct {
-	Cluster    string
-	ProviderID *cliClient.ProviderID
-	Stack      *string
+	Cluster string
+	Stack   *stacks.StackParameters
 }
 
 // DefaultToolCLI implements all tool interfaces as passthroughs to the real CLI logic
@@ -29,8 +27,8 @@ type StackConfig struct {
 
 type DefaultToolCLI struct{}
 
-func (DefaultToolCLI) CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, provider cliClient.Provider, serviceCount int) error {
-	return cliClient.CanIUseProvider(ctx, client, provider, projectName, "", serviceCount) // TODO: add stack
+func (DefaultToolCLI) CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, projectName, stackName string, provider cliClient.Provider, serviceCount int) error {
+	return cliClient.CanIUseProvider(ctx, client, provider, projectName, stackName, serviceCount)
 }
 
 func (DefaultToolCLI) ConfigSet(ctx context.Context, projectName string, provider cliClient.Provider, name, value string) error {
@@ -70,8 +68,17 @@ func (DefaultToolCLI) ConfigDelete(ctx context.Context, projectName string, prov
 	return cli.ConfigDelete(ctx, projectName, provider, name)
 }
 
-func (DefaultToolCLI) GetServices(ctx context.Context, projectName string, provider cliClient.Provider) ([]deployment_info.Service, error) {
-	return deployment_info.GetServices(ctx, projectName, provider)
+func (DefaultToolCLI) GetServices(ctx context.Context, projectName string, provider cliClient.Provider) ([]*cli.Service, error) {
+	servicesResponse, err := cli.GetServices(ctx, projectName, provider)
+	if err != nil {
+		return nil, err
+	}
+
+	term.Debug("Checking service health...")
+	cli.UpdateServiceStates(ctx, servicesResponse.Services)
+
+	si, _, err := cli.GetServiceStatesAndEndpoints(servicesResponse.Services)
+	return si, err
 }
 
 func (DefaultToolCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string {
@@ -106,8 +113,4 @@ func (DefaultToolCLI) GenerateAuthURL(authPort int) string {
 
 func (DefaultToolCLI) InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string, mcpClient string) error {
 	return login.InteractiveLoginMCP(ctx, client, cluster, mcpClient)
-}
-
-func (DefaultToolCLI) TailAndMonitor(ctx context.Context, project *compose.Project, provider cliClient.Provider, waitTimeout time.Duration, options cli.TailOptions) (cli.ServiceStates, error) {
-	return cli.TailAndMonitor(ctx, project, provider, waitTimeout, options)
 }

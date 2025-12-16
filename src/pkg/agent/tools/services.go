@@ -11,6 +11,7 @@ import (
 	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/bufbuild/connect-go"
 )
@@ -19,14 +20,14 @@ type ServicesParams struct {
 	common.LoaderParams
 }
 
-func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
+func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, params ServicesParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, config.Cluster)
 	if err != nil {
 		return "", fmt.Errorf("could not connect: %w", err)
 	}
 
-	pp := NewProviderPreparer(cli, ec, client)
+	pp := NewProviderPreparer(cli, ec, client, stacks.NewManager(params.WorkingDirectory))
 	_, provider, err := pp.SetupProvider(ctx, config.Stack)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
@@ -45,7 +46,7 @@ func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, cli
 	if err != nil {
 		var noServicesErr defangcli.ErrNoServices
 		if errors.As(err, &noServicesErr) {
-			return fmt.Sprintf("no services found for the specified project %q", projectName), nil
+			return noServicesErr.Error(), nil
 		}
 		if connect.CodeOf(err) == connect.CodeNotFound && strings.Contains(err.Error(), "is not deployed in Playground") {
 			return fmt.Sprintf("project %s is not deployed in Playground", projectName), nil

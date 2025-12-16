@@ -26,6 +26,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/github"
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
@@ -145,7 +146,7 @@ func Execute(ctx context.Context) error {
 	}
 
 	if global.HasTty && !global.HideUpdate && pkg.RandomIndex(10) == 0 {
-		if latest, err := GetLatestVersion(ctx); err == nil && isNewer(GetCurrentVersion(), latest) {
+		if latest, err := github.GetLatestReleaseTag(ctx); err == nil && isNewer(GetCurrentVersion(), latest) {
 			term.Debug("Latest Version:", latest, "Current Version:", GetCurrentVersion())
 			term.Println("A newer version of the CLI is available at https://github.com/DefangLabs/defang/releases/latest")
 			if pkg.RandomIndex(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
@@ -166,7 +167,7 @@ func SetupCommands(ctx context.Context, version string) {
 	cobra.EnableTraverseRunHooks = true // we always need to run the RootCmd's pre-run hook
 
 	RootCmd.Version = version
-	RootCmd.PersistentFlags().StringVarP(&global.Stack, "stack", "s", global.Stack, "stack name (for BYOC providers)")
+	RootCmd.PersistentFlags().StringVarP(&global.Stack.Name, "stack", "s", global.Stack.Name, "stack name (for BYOC providers)")
 	RootCmd.RegisterFlagCompletionFunc("stack", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		stacks, err := stacks.List()
 		if err != nil {
@@ -189,7 +190,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().StringVar(&global.Cluster, "cluster", global.Cluster, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster") // only for Defang use
 	RootCmd.PersistentFlags().StringVar(&global.Tenant, "workspace", global.Tenant, "workspace to use (tenant name or ID)")
-	RootCmd.PersistentFlags().VarP(&global.ProviderID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
+	RootCmd.PersistentFlags().VarP(&global.Stack.Provider, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	RootCmd.RegisterFlagCompletionFunc("provider", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var completions []cobra.Completion
 		for _, provider := range cliClient.AllProviders() {
@@ -226,7 +227,7 @@ func SetupCommands(ctx context.Context, version string) {
 	cdListCmd.Flags().Bool("remote", false, "invoke the command on the remote cluster")
 	cdCmd.AddCommand(cdListCmd)
 	cdCmd.AddCommand(cdCancelCmd)
-	cdPreviewCmd.Flags().VarP(&global.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
+	cdPreviewCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	cdPreviewCmd.RegisterFlagCompletionFunc("mode", cobra.FixedCompletions(modes.AllDeploymentModes(), cobra.ShellCompDirectiveNoFileComp))
 	cdCmd.AddCommand(cdPreviewCmd)
 	cdCmd.AddCommand(cdInstallCmd)
@@ -433,7 +434,7 @@ var RootCmd = &cobra.Command{
 				errString = err.Error()
 			}
 
-			track.Cmd(cmd, "Invoked", P("args", args), P("err", errString), P("non-interactive", global.NonInteractive), P("provider", global.ProviderID))
+			track.Cmd(cmd, "Invoked", P("args", args), P("err", errString), P("non-interactive", global.NonInteractive), P("provider", global.Stack.Provider))
 		}()
 
 		// Do this first, since any errors will be printed to the console
@@ -452,7 +453,7 @@ var RootCmd = &cobra.Command{
 		}
 
 		// Read the global flags again from any .defang files in the cwd
-		err = global.loadDotDefang(global.getStackName(cmd.Flags()))
+		err = loadStackFile(global.getStackName(cmd.Flags()))
 		if err != nil {
 			return err
 		}
@@ -498,7 +499,7 @@ var RootCmd = &cobra.Command{
 		}
 
 		prompt := "Welcome to Defang. I can help you deploy your project to the cloud."
-		ag, err := agent.New(ctx, getCluster(), &global.ProviderID, &global.Stack)
+		ag, err := agent.New(ctx, getCluster(), &global.Stack)
 		if err != nil {
 			return err
 		}
@@ -765,7 +766,7 @@ var versionCmd = &cobra.Command{
 		term.Println(GetCurrentVersion())
 
 		term.Printc(term.BrightCyan, "Latest CLI:    ")
-		ver, err := GetLatestVersion(cmd.Context())
+		ver, err := github.GetLatestReleaseTag(cmd.Context())
 		term.Println(ver)
 
 		term.Printc(term.BrightCyan, "Defang Fabric: ")
@@ -893,7 +894,7 @@ var configSetCmd = &cobra.Command{
 			value = strings.TrimSuffix(string(bytes), "\n")
 		} else if random {
 			// Generate a random value for the config
-			value = CreateRandomConfigValue()
+			value = cli.CreateRandomConfigValue()
 			term.Info("Generated random value: " + value)
 		} else {
 			// Prompt for sensitive value
@@ -1000,7 +1001,7 @@ var debugCmd = &cobra.Command{
 			return err
 		}
 
-		debugger, err := debug.NewDebugger(ctx, getCluster(), &global.ProviderID, &global.Stack)
+		debugger, err := debug.NewDebugger(ctx, getCluster(), &global.Stack)
 		if err != nil {
 			return err
 		}
@@ -1019,7 +1020,7 @@ var debugCmd = &cobra.Command{
 			Deployment:     deployment,
 			FailedServices: args,
 			Project:        project,
-			ProviderID:     &global.ProviderID,
+			ProviderID:     &global.Stack.Provider,
 			Since:          sinceTs.UTC(),
 			Until:          untilTs.UTC(),
 		}
@@ -1293,13 +1294,13 @@ func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 		whence = "command line flag"
 	} else if val, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
 		// Sanitize the provider value from the environment variable
-		if err := global.ProviderID.Set(val); err != nil {
+		if err := global.Stack.Provider.Set(val); err != nil {
 			return fmt.Errorf("invalid provider '%v' in environment variable DEFANG_PROVIDER, supported providers are: %v", val, cliClient.AllProviders())
 		}
 		whence = "environment variable"
 	}
 
-	switch global.ProviderID {
+	switch global.Stack.Provider {
 	case cliClient.ProviderAuto:
 		if global.NonInteractive {
 			// Defaults to defang provider in non-interactive mode
@@ -1312,7 +1313,7 @@ func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 			if gcpInEnv() {
 				term.Warn("Using Defang playground, but GCP_PROJECT_ID/CLOUDSDK_CORE_PROJECT environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
 			}
-			global.ProviderID = cliClient.ProviderDefang
+			global.Stack.Provider = cliClient.ProviderDefang
 		} else {
 			var err error
 			if whence, err = determineProviderID(ctx, loader); err != nil {
@@ -1336,7 +1337,7 @@ func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
 	}
 
-	term.Infof("Using %s provider from %s%s", global.ProviderID.Name(), whence, extraMsg)
+	term.Infof("Using %s provider from %s%s", global.Stack.Provider.Name(), whence, extraMsg)
 	return nil
 }
 
@@ -1345,7 +1346,7 @@ func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 		return nil, err
 	}
 
-	provider := cli.NewProvider(ctx, global.ProviderID, global.Client, global.Stack)
+	provider := cli.NewProvider(ctx, global.Stack.Provider, global.Client, global.Stack.Name)
 	return provider, nil
 }
 
@@ -1359,7 +1360,7 @@ func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient
 }
 
 func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string, serviceCount int) error {
-	return cliClient.CanIUseProvider(ctx, global.Client, provider, projectName, global.Stack, serviceCount)
+	return cliClient.CanIUseProvider(ctx, global.Client, provider, projectName, global.Stack.Name, serviceCount)
 }
 
 func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, error) {
@@ -1376,7 +1377,7 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 			if err != nil {
 				term.Debugf("Unable to get selected provider: %v", err)
 			} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
-				global.ProviderID.SetValue(resp.Provider)
+				global.Stack.Provider.SetValue(resp.Provider)
 				return "stored preference", nil
 			}
 		}
@@ -1386,10 +1387,10 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 
 	// Save the selected provider to the fabric
 	if projectName != "" {
-		if err := global.Client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projectName, Provider: global.ProviderID.Value()}); err != nil {
+		if err := global.Client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projectName, Provider: global.Stack.Provider.Value()}); err != nil {
 			term.Debugf("Unable to save selected provider to defang server: %v", err)
 		} else {
-			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", global.ProviderID, projectName)
+			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", global.Stack.Provider, projectName)
 		}
 	}
 
@@ -1427,7 +1428,7 @@ func interactiveSelectProvider(providers []cliClient.ProviderID) (string, error)
 		return "", fmt.Errorf("failed to select provider: %w", err)
 	}
 	track.Evt("ProviderSelected", P("provider", optionValue))
-	if err := global.ProviderID.Set(optionValue); err != nil {
+	if err := global.Stack.Provider.Set(optionValue); err != nil {
 		panic(err)
 	}
 

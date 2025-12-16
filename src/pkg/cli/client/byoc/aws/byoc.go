@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,13 +22,16 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/dns"
+	"github.com/DefangLabs/defang/src/pkg/dockerhub"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
+	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
@@ -37,6 +41,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -60,6 +66,8 @@ type ByocAws struct {
 	cdEtag           types.ETag
 	cdStart          time.Time
 	cdTaskArn        ecs.TaskArn
+
+	needDockerHubCreds bool
 }
 
 var _ client.Provider = (*ByocAws)(nil)
@@ -252,6 +260,20 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		mode:            req.Mode,
 		project:         project.Name,
 	}
+
+	if b.needDockerHubCreds {
+		term.Debugf("Docker Hub credentials are needed for image pulls")
+		dockerHubUser, dockerHubPass, err := dockerhub.GetDockerHubCredentials(ctx)
+		if err != nil {
+			term.Debugf("Could not retrieve Docker Hub credentials: %v", err)
+			term.Warnf("Docker Hub credentials are required to avoid pull throttling. Please run `docker login` or set the DOCKERHUB_USERNAME and DOCKERHUB_TOKEN environment variables. Without valid credentials, image pulls may be rate-limited or fail.")
+		} else {
+			term.Debugf("Using Docker Hub credentials with user %v", dockerHubUser)
+			cdCmd.dockerHubUsername = dockerHubUser
+			cdCmd.dockerHubAccessToken = dockerHubPass
+		}
+	}
+
 	cdTaskArn, err := b.runCdCommand(ctx, cdCmd)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
@@ -270,6 +292,88 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		Services: serviceInfos, // TODO: Should we use the retrieved services instead?
 		Etag:     etag,
 	}, nil
+}
+
+func (b *ByocAws) putDockerHubSecret(ctx context.Context, projectName string, username, accessToken string) (string, error) {
+	type auth struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	cred := auth{Username: username, Password: accessToken}
+	secretKey := b.getSecretID(projectName, "CI_REGISTRY_AUTH")
+	credBytes, err := json.Marshal(cred)
+	if err != nil {
+		return "", err
+	}
+
+	cfg, err := b.driver.LoadConfig(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	secretsmanagerClient := secretsmanager.NewFromConfig(cfg)
+
+	arn, err := aws.PutSecretManagerSecret(ctx, secretKey, string(credBytes), secretsmanagerClient)
+	if err != nil {
+		return "", err
+	}
+	return arn, nil
+}
+
+func (b *ByocAws) FixupServices(ctx context.Context, project *composeTypes.Project) error {
+	// HACK: Use ServiceFixupper interface callback used in fixup.go to check if Docker Hub credentials are needed
+	return b.checkRequiresDockerHubToken(ctx, project)
+}
+
+func (b *ByocAws) checkRequiresDockerHubToken(ctx context.Context, project *composeTypes.Project) error {
+	images, err := compose.FindAllBaseImages(project)
+	if err != nil {
+		return err
+	}
+
+	var missingDockerhubImages []string
+	for _, image := range images {
+		if !dockerhub.IsDockerHubImage(image) {
+			continue
+		}
+		parsed, err := dockerhub.ParseImage(image)
+		if err != nil {
+			return err
+		}
+		repo := parsed.Repo
+		//If a image does not have a repo, it is assumed to be in the official "library" repo
+		if !strings.Contains(repo, "/") {
+			repo = "library/" + repo
+		}
+		ecrRepo := "docker/" + repo
+		tag := parsed.Tag
+		if tag == "" {
+			tag = parsed.Digest
+		}
+		if tag == "" {
+			tag = "latest"
+		}
+
+		found, err := b.driver.CheckImageExistOnPublicECR(ctx, ecrRepo, tag)
+		if err != nil {
+			term.Debugf("Error checking image %q on Public ECR: %v, assuming credentials needed", image, err)
+			found = false
+		}
+		if !found {
+			// TODO: Make provider stateless: This is a hack to get around the fact that we have lost
+			// access to the service build context by the time we reach deploy as it has been uploaded
+			// to S3. The last place we have access to the build context is during fixup, since only
+			// AWS BYOC requires this info, we use a state variable to be set during fixup to indicate
+			// that Docker Hub creds are needed, since our provider is already stateful.
+			missingDockerhubImages = append(missingDockerhubImages, image)
+		}
+	}
+	if len(missingDockerhubImages) > 0 {
+		b.needDockerHubCreds = true
+		term.Debugf("Docker Hub images not found on Public ECR: %v", missingDockerhubImages)
+		track.Evt("NeedsDockerHubCreds", track.P("images", strings.Join(missingDockerhubImages, ",")))
+	}
+	return nil
 }
 
 func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string, error) {
@@ -381,13 +485,16 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 		"NODE_NO_WARNINGS":           "1",
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
 		"PRIVATE_DOMAIN":             byoc.GetPrivateDomain(projectName),
-		"PROJECT":                    projectName,                 // may be empty
-		"PULUMI_CONFIG_PASSPHRASE":   byoc.PulumiConfigPassphrase, // TODO: make secret
-		"PULUMI_COPILOT":             "false",
-		"PULUMI_SKIP_UPDATE_CHECK":   "true",
-		"STACK":                      b.PulumiStack,
+		"PROJECT":                    projectName,        // may be empty
 		pulumiBackendKey:             pulumiBackendValue, // TODO: make secret
+		"PULUMI_AUTOMATION_API_SKIP_VERSION_CHECK":      "true",
+		"PULUMI_CONFIG_PASSPHRASE":                      byoc.PulumiConfigPassphrase, // TODO: make secret
+		"PULUMI_COPILOT":                                "false",
+		"PULUMI_DIY_BACKEND_DISABLE_CHECKPOINT_BACKUPS": "true", // versioned bucket is used
+		"PULUMI_SKIP_UPDATE_CHECK":                      "true",
+		"STACK":                                         b.PulumiStack,
 	}
+
 	if targets := os.Getenv("DEFANG_PULUMI_TARGETS"); targets != "" {
 		env["DEFANG_PULUMI_TARGETS"] = targets
 	}
@@ -405,6 +512,9 @@ type cdCommand struct {
 	delegationSetId string
 	mode            defangv1.DeploymentMode
 	project         string
+
+	dockerHubUsername    string
+	dockerHubAccessToken string
 }
 
 func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn, error) {
@@ -422,6 +532,15 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn,
 		env["DOMAIN"] = "dummy.domain"
 	}
 	env["DEFANG_MODE"] = strings.ToLower(cmd.mode.String())
+	if cmd.dockerHubUsername != "" && cmd.dockerHubAccessToken != "" {
+		arn, err := b.putDockerHubSecret(ctx, cmd.project, cmd.dockerHubUsername, cmd.dockerHubAccessToken)
+		if err != nil {
+			term.Warnf("Could not store Docker Hub credentials in Secrets Manager, images from dockerhub may be throttled during build: %v", err)
+		} else {
+			env["CI_REGISTRY_CREDENTIALS_ARN"] = arn
+			term.Debugf("Stored Docker Hub credentials in Secrets Manager: %s", arn)
+		}
+	}
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging
@@ -487,9 +606,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 	}
 
 	s3Client := s3.NewFromConfig(cfg)
-	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/aws/byoc.ts#L104
-	pkg.Ensure(projectName != "", "ProjectName not set")
-	path := fmt.Sprintf("projects/%s/%s/project.pb", projectName, b.PulumiStack)
+	path := b.GetProjectUpdatePath(projectName)
 
 	term.Debug("Getting services from bucket:", bucketName, path)
 	getObjectOutput, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
@@ -529,7 +646,6 @@ func (b *ByocAws) GetServices(ctx context.Context, req *defangv1.GetServicesRequ
 		listServiceResp.Services = projUpdate.Services
 		listServiceResp.Project = projUpdate.Project
 	}
-
 	return &listServiceResp, nil
 }
 
@@ -608,13 +724,13 @@ func (b *ByocAws) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest)
 		return AnnotateAwsError(err)
 	}
 
-	cw, err := ecs.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region
+	cwClient, err := cw.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region
 	if err != nil {
 		return err
 	}
 
 	// Gather logs from the CD task, builds, ECS events, and all services
-	evtsChan, errsChan := ecs.QueryLogGroups(ctx, cw, start, end, 0, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
+	evtsChan, errsChan := cw.QueryLogGroups(ctx, cwClient, start, end, 0, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
 	if evtsChan == nil {
 		return <-errsChan // TODO: there could be multiple errors
 	}
@@ -671,60 +787,49 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	}
 
 	var err error
-	cw, err := ecs.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region
+	cwClient, err := cw.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
 
 	// How to tail multiple tasks/services at once?
-	//  * No Etag, no service:	tail all tasks/services
-	//  * Etag, no service: 	tail all tasks/services with that Etag
+	//  * Etag is invalid:		treat Etag as CD task ID and tail only that task's logs
+	//  * No Etag, no services:	tail all tasks/services
 	//  * No Etag, service:		tail all tasks/services with that service name
+	//  * Etag, no services: 	tail all tasks/services with that Etag
 	//  * Etag, service:		tail that task/service
-	var etag types.ETag
-	var tailStream ecs.LiveTailStream
-	if req.Etag == "" {
-		tailStream, err = b.queryLogs(ctx, cw, req)
-		if err != nil {
-			return nil, AnnotateAwsError(err)
-		}
-		return newByocServerStream(tailStream, etag, req.Services, b), nil
-	}
-
-	etag, err = types.ParseEtag(req.Etag)
-	if err != nil {
+	var tailStream cw.LiveTailStream
+	etag, err := types.ParseEtag(req.Etag)
+	if err != nil && req.Etag != "" {
 		// Assume invalid "etag" is the task ID of the CD task
-		tailStream, err = b.queryCdLogs(ctx, cw, req)
-		etag = "" // no need to filter events by etag because we only show logs from the specified task ID
-		if err != nil {
-			return nil, AnnotateAwsError(err)
-		}
-		return newByocServerStream(tailStream, etag, req.Services, b), nil
+		tailStream, err = b.queryCdLogs(ctx, cwClient, req)
+		// no need to filter events by etag because we only show logs from the specified task ID
+	} else {
+		tailStream, err = b.queryLogs(ctx, cwClient, req)
 	}
 
-	tailStream, err = b.queryLogs(ctx, cw, req)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
 	return newByocServerStream(tailStream, etag, req.Services, b), nil
 }
 
-func (b *ByocAws) queryCdLogs(ctx context.Context, cw *cloudwatchlogs.Client, req *defangv1.TailRequest) (ecs.LiveTailStream, error) {
+func (b *ByocAws) queryCdLogs(ctx context.Context, cwClient *cloudwatchlogs.Client, req *defangv1.TailRequest) (cw.LiveTailStream, error) {
 	var err error
 	b.cdTaskArn, err = b.driver.GetTaskArn(req.Etag) // only fails on missing task ID
 	if err != nil {
 		return nil, err
 	}
 	if req.Follow {
-		return b.driver.TailTaskID(ctx, cw, req.Etag)
+		return b.driver.TailTaskID(ctx, cwClient, req.Etag)
 	} else {
 		start := timeutils.AsTime(req.Since, time.Time{})
 		end := timeutils.AsTime(req.Until, time.Time{})
-		return b.driver.QueryTaskID(ctx, cw, req.Etag, start, end, req.Limit)
+		return b.driver.QueryTaskID(ctx, cwClient, req.Etag, start, end, req.Limit)
 	}
 }
 
-func (b *ByocAws) queryLogs(ctx context.Context, cw *cloudwatchlogs.Client, req *defangv1.TailRequest) (ecs.LiveTailStream, error) {
+func (b *ByocAws) queryLogs(ctx context.Context, cwClient *cloudwatchlogs.Client, req *defangv1.TailRequest) (cw.LiveTailStream, error) {
 	start := timeutils.AsTime(req.Since, time.Time{})
 	end := timeutils.AsTime(req.Until, time.Time{})
 
@@ -734,17 +839,17 @@ func (b *ByocAws) queryLogs(ctx context.Context, cw *cloudwatchlogs.Client, req 
 	}
 	lgis := b.getLogGroupInputs(req.Etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))
 	if req.Follow {
-		return ecs.QueryAndTailLogGroups(
+		return cw.QueryAndTailLogGroups(
 			ctx,
-			cw,
+			cwClient,
 			start,
 			end,
 			lgis...,
 		)
 	} else {
-		evtsChan, errsChan := ecs.QueryLogGroups(
+		evtsChan, errsChan := cw.QueryLogGroups(
 			ctx,
-			cw,
+			cwClient,
 			start,
 			end,
 			req.Limit,
@@ -758,7 +863,7 @@ func (b *ByocAws) queryLogs(ctx context.Context, cw *cloudwatchlogs.Client, req 
 			return nil, errors.Join(errs...)
 		}
 		// TODO: any errors from errsChan should be reported but get dropped
-		return ecs.NewStaticLogStream(evtsChan, func() {}), nil
+		return cw.NewStaticLogStream(evtsChan, func() {}), nil
 	}
 }
 
@@ -766,7 +871,7 @@ func (b *ByocAws) makeLogGroupARN(name string) string {
 	return b.driver.MakeARN("logs", "log-group:"+name)
 }
 
-func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filter string, logType logs.LogType) []ecs.LogGroupInput {
+func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filter string, logType logs.LogType) []cw.LogGroupInput {
 	// Escape the filter pattern to avoid problems with the CloudWatch Logs pattern syntax
 	// See https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
 	var pattern string // TODO: add etag to filter
@@ -774,13 +879,13 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 		pattern = strconv.Quote(filter)
 	}
 
-	var groups []ecs.LogGroupInput
+	var groups []cw.LogGroupInput
 	// Tail CD and builds
 	if logType.Has(logs.LogTypeBuild) {
 		if b.driver.LogGroupARN == "" {
 			term.Debug("CD stack LogGroupARN is not set; skipping CD logs")
 		} else {
-			cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern}
+			cdTail := cw.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern}
 			// If we know the CD task ARN, only tail the logstream for that CD task; FIXME: store the task ID in the project's ProjectUpdate in S3 and use that
 			if b.cdTaskArn != nil && b.cdEtag == etag {
 				cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.cdTaskArn))}
@@ -788,16 +893,16 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 			groups = append(groups, cdTail)
 			term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames, filter)
 		}
-		buildsTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "builds")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service
+		buildsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "builds")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service
 		term.Debug("Query builds logs", buildsTail.LogGroupARN, filter)
 		groups = append(groups, buildsTail)
-		ecsTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "ecs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
+		ecsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "ecs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
 		term.Debug("Query ecs events logs", ecsTail.LogGroupARN, filter)
 		groups = append(groups, ecsTail)
 	}
 	// Tail services
 	if logType.Has(logs.LogTypeRun) {
-		servicesTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "logs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts
+		servicesTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "logs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts
 		if service != "" && etag != "" {
 			servicesTail.LogStreamNamePrefix = service + "/" + service + "_" + etag
 		}

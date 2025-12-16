@@ -96,7 +96,7 @@ func (b *ByocDo) GetProjectUpdate(ctx context.Context, projectName string) (*def
 		return nil, nil // no services yet
 	}
 
-	path := fmt.Sprintf("projects/%s/%s/project.pb", projectName, b.PulumiStack)
+	path := b.GetProjectUpdatePath(projectName)
 	getObjectOutput, err := s3client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: &bucketName,
 		Key:    &path,

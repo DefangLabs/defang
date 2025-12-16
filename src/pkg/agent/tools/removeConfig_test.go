@@ -10,6 +10,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -149,12 +150,14 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 					"profile_name": "default",
 				},
 			})
-			provider := client.ProviderAWS
-			stackName := "test-stack"
+
+			stack := stacks.StackParameters{
+				Name:     "test-stack",
+				Provider: client.ProviderAWS,
+			}
 			result, err := HandleRemoveConfigTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
-				Cluster:    "test-cluster",
-				ProviderID: &provider,
-				Stack:      &stackName,
+				Cluster: "test-cluster",
+				Stack:   &stack,
 			})
 
 			// Verify error expectations

@@ -5,14 +5,14 @@ import (
 	"errors"
 	"os"
 	"testing"
-	"time"
 
-	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
+	cli "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
-	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
@@ -29,7 +29,7 @@ type MockCLI struct {
 	MockProjectName                  string
 
 	GetServicesError    error
-	MockServices        []deployment_info.Service
+	MockServices        []*cli.Service
 	GetServicesCalled   bool
 	GetServicesProject  string
 	GetServicesProvider client.Provider
@@ -56,7 +56,7 @@ func (m *MockCLI) LoadProjectNameWithFallback(ctx context.Context, loader client
 	return "default-project", nil
 }
 
-func (m *MockCLI) GetServices(ctx context.Context, projectName string, provider client.Provider) ([]deployment_info.Service, error) {
+func (m *MockCLI) GetServices(ctx context.Context, projectName string, provider client.Provider) ([]*cli.Service, error) {
 	m.GetServicesCalled = true
 	m.GetServicesProject = projectName
 	m.GetServicesProvider = provider
@@ -70,7 +70,7 @@ func (m *MockCLI) ComposeDown(ctx context.Context, projectName string, client *c
 	return "", nil
 }
 
-func (m *MockCLI) ComposeUp(ctx context.Context, client *client.GrpcClient, provider client.Provider, params defangcli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
+func (m *MockCLI) ComposeUp(ctx context.Context, client *client.GrpcClient, provider client.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	return nil, nil, nil
 }
 
@@ -110,12 +110,8 @@ func (m *MockCLI) RunEstimate(ctx context.Context, project *compose.Project, cli
 	return nil, nil
 }
 
-func (m *MockCLI) Tail(ctx context.Context, provider client.Provider, projectName string, options defangcli.TailOptions) error {
+func (m *MockCLI) Tail(ctx context.Context, provider client.Provider, projectName string, options cli.TailOptions) error {
 	return nil
-}
-
-func (m *MockCLI) TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, options defangcli.TailOptions) (defangcli.ServiceStates, error) {
-	return nil, nil
 }
 
 // createConnectError creates a connect error with the specified code and message
@@ -152,7 +148,6 @@ func (m *mockElicitationsClient) Request(ctx context.Context, req elicitations.R
 func TestHandleServicesToolWithMockCLI(t *testing.T) {
 	tests := []struct {
 		name                string
-		providerId          client.ProviderID
 		requestArgs         map[string]interface{}
 		mockCLI             *MockCLI
 		expectedError       bool
@@ -163,8 +158,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 	}{
 		// Error cases
 		{
-			name:       "connect_error",
-			providerId: client.ProviderDefang,
+			name: "connect_error",
 			mockCLI: &MockCLI{
 				ConnectError: errors.New("connection failed"),
 			},
@@ -174,8 +168,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			expectedGetServices: false,
 		},
 		{
-			name:       "load_project_name_error",
-			providerId: client.ProviderDefang,
+			name: "load_project_name_error",
 			mockCLI: &MockCLI{
 				MockClient:                       &client.GrpcClient{},
 				MockProvider:                     &client.PlaygroundProvider{},
@@ -189,22 +182,20 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 
 		// GetServices error cases - these return different result types
 		{
-			name:       "get_services_no_services_error",
-			providerId: client.ProviderDefang,
+			name: "get_services_no_services_error",
 			mockCLI: &MockCLI{
 				MockClient:       &client.GrpcClient{},
 				MockProvider:     &client.PlaygroundProvider{},
 				MockProjectName:  "test-project",
-				GetServicesError: defangcli.ErrNoServices{ProjectName: "test-project"},
+				GetServicesError: cli.ErrNoServices{ProjectName: "test-project"},
 			},
 			expectedError:       false, // Returns successful result with message
-			resultTextContains:  "no services found for the specified project",
+			resultTextContains:  "no services found in project",
 			expectedGetServices: true,
 			expectedProjectName: "test-project",
 		},
 		{
-			name:       "get_services_project_not_deployed",
-			providerId: client.ProviderDefang,
+			name: "get_services_project_not_deployed",
 			mockCLI: &MockCLI{
 				MockClient:       &client.GrpcClient{},
 				MockProvider:     &client.PlaygroundProvider{},
@@ -217,8 +208,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			expectedProjectName: "test-project",
 		},
 		{
-			name:       "get_services_generic_error",
-			providerId: client.ProviderDefang,
+			name: "get_services_generic_error",
 			mockCLI: &MockCLI{
 				MockClient:       &client.GrpcClient{},
 				MockProvider:     &client.PlaygroundProvider{},
@@ -232,19 +222,17 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 
 		// Success case
 		{
-			name:       "successful_cli_operations_until_get_services",
-			providerId: client.ProviderDefang,
+			name: "successful_cli_operations_until_get_services",
 			mockCLI: &MockCLI{
 				MockClient:      &client.GrpcClient{},
 				MockProvider:    &client.PlaygroundProvider{},
 				MockProjectName: "test-project",
-				MockServices: []deployment_info.Service{
+				MockServices: []*cli.Service{
 					{
-						Service:      "test-service",
-						DeploymentId: "test-deployment",
-						PublicFqdn:   "test.example.com",
-						PrivateFqdn:  "test.internal",
-						Status:       "running",
+						Service:    "test-service",
+						Deployment: "test-deployment",
+						Fqdn:       "test.example.com",
+						Status:     "running",
 					},
 				},
 			},
@@ -267,11 +255,18 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 					"profile_name": "default",
 				},
 			})
-			stackName := "test-stack"
-			result, err := HandleServicesTool(t.Context(), loader, tt.mockCLI, ec, StackConfig{
-				Cluster:    "test-cluster",
-				ProviderID: &tt.providerId,
-				Stack:      &stackName,
+			stack := stacks.StackParameters{
+				Name:     "test-stack",
+				Provider: client.ProviderAWS,
+			}
+			params := ServicesParams{
+				LoaderParams: common.LoaderParams{
+					WorkingDirectory: ".",
+				},
+			}
+			result, err := HandleServicesTool(t.Context(), loader, params, tt.mockCLI, ec, StackConfig{
+				Cluster: "test-cluster",
+				Stack:   &stack,
 			})
 
 			// Check Go error expectation

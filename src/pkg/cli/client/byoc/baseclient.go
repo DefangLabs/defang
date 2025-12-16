@@ -219,14 +219,6 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 			hasIngress = hasIngress || port.Mode == compose.Mode_INGRESS
 			hasHost = hasHost || port.Mode == compose.Mode_HOST
 			si.Endpoints = append(si.Endpoints, b.GetEndpoint(fqn, projectName, delegateDomain, &port))
-			mode := defangv1.Mode_INGRESS
-			if port.Mode == compose.Mode_HOST {
-				mode = defangv1.Mode_HOST
-			}
-			si.Service.Ports = append(si.Service.Ports, &defangv1.Port{
-				Target: port.Target,
-				Mode:   mode,
-			})
 		}
 	} else {
 		si.PublicFqdn = b.GetPublicFqdn(projectName, delegateDomain, fqn)
@@ -298,4 +290,10 @@ func (b ByocBaseClient) GetPublicFqdn(projectName, delegateDomain, fqn string) s
 func (b ByocBaseClient) GetPrivateFqdn(projectName string, fqn string) string {
 	safeFqn := dns.SafeLabel(fqn)
 	return fmt.Sprintf("%s.%s", safeFqn, GetPrivateDomain(projectName)) // TODO: consider merging this with ServicePrivateDNS
+}
+
+func (b ByocBaseClient) GetProjectUpdatePath(projectName string) string {
+	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/aws/byoc.ts#L104
+	pkg.Ensure(projectName != "", "ProjectName not set")
+	return fmt.Sprintf("projects/%s/%s/project.pb", projectName, b.PulumiStack)
 }
