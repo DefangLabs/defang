@@ -7,7 +7,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func CanIUseProvider(ctx context.Context, client FabricClient, provider Provider, projectName, stack string, serviceCount int) error {
+func CanIUseProvider(ctx context.Context, client FabricClient, provider Provider, projectName string, serviceCount int) error {
 	info, err := provider.AccountInfo(ctx)
 	if err != nil {
 		return err
@@ -19,7 +19,7 @@ func CanIUseProvider(ctx context.Context, client FabricClient, provider Provider
 		ProviderAccountId: info.AccountID,
 		Region:            info.Region,
 		ServiceCount:      int32(serviceCount), // #nosec G115 - service count will not overflow int32
-		Stack:             stack,
+		Stack:             provider.GetStackName(),
 	}
 
 	resp, err := client.CanIUse(ctx, &canUseReq)

@@ -12,7 +12,7 @@ import (
 )
 
 type CLIInterface interface {
-	CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, projectName, stackName string, provider cliClient.Provider, serviceCount int) error
+	CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, projectName string, provider cliClient.Provider, serviceCount int) error
 	ComposeDown(ctx context.Context, projectName string, client *cliClient.GrpcClient, provider cliClient.Provider) (string, error)
 	ComposeUp(ctx context.Context, client *cliClient.GrpcClient, provider cliClient.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error)
 	ConfigDelete(ctx context.Context, projectName string, provider cliClient.Provider, name string) error

@@ -1478,7 +1478,7 @@ func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient
 }
 
 func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string, serviceCount int) error {
-	return cliClient.CanIUseProvider(ctx, global.Client, provider, projectName, global.Stack.Name, serviceCount)
+	return cliClient.CanIUseProvider(ctx, global.Client, provider, projectName, serviceCount)
 }
 
 func interactiveSelectProvider(providers []cliClient.ProviderID) (cliClient.ProviderID, error) {

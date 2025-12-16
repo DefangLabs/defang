@@ -71,6 +71,10 @@ func NewByocBaseClient(tenantName types.TenantNameOrID, backend ProjectBackend, 
 	return b
 }
 
+func (b *ByocBaseClient) GetStackName() string {
+	return b.PulumiStack
+}
+
 func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
 	return nil, client.ErrNotImplemented("AI debugging is not yet supported for BYOC")
 }

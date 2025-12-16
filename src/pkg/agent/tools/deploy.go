@@ -54,7 +54,7 @@ func HandleDeployTool(ctx context.Context, loader cliClient.Loader, params Deplo
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
 
-	err = cli.CanIUseProvider(ctx, client, project.Name, config.Stack.Name, provider, len(project.Services))
+	err = cli.CanIUseProvider(ctx, client, project.Name, provider, len(project.Services))
 	if err != nil {
 		return "", fmt.Errorf("failed to use provider: %w", err)
 	}
