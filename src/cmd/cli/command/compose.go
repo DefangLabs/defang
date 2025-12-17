@@ -574,7 +574,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				return fmt.Errorf("failed to create stack manager: %w", err)
 			}
 
-			provider, err := newProvider(ctx, ec, sm, project.Name)
+			provider, err := newProvider(ctx, ec, sm)
 			if err != nil {
 				return err
 			}

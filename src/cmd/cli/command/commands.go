@@ -568,7 +568,7 @@ var whoamiCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to create stack manager: %w", err)
 		}
-		provider, err := newProvider(cmd.Context(), ec, sm, projectName)
+		provider, err := newProvider(cmd.Context(), ec, sm)
 		if err != nil {
 			term.Debug("unable to get provider:", err)
 		}
@@ -1297,17 +1297,12 @@ var providerDescription = map[cliClient.ProviderID]string{
 	cliClient.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
 }
 
-type ProviderSelectionClient interface {
-	GetSelectedProvider(ctx context.Context, req *defangv1.GetSelectedProviderRequest) (*defangv1.GetSelectedProviderResponse, error)
-	SetSelectedProvider(ctx context.Context, req *defangv1.SetSelectedProviderRequest) error
-}
-
-func getStack(ctx context.Context, client ProviderSelectionClient, projectName string, ec elicitations.Controller, sm stacks.Manager) (*stacks.StackParameters, string, error) {
+func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager) (*stacks.StackParameters, string, error) {
 	stackSelector := stacks.NewSelector(ec, sm)
 
-	whence := "default project"
+	var whence string
 	stack := &stacks.StackParameters{
-		Name:     "beta",
+		Name:     "",
 		Provider: cliClient.ProviderAuto,
 		Mode:     modes.ModeUnspecified,
 	}
@@ -1315,68 +1310,76 @@ func getStack(ctx context.Context, client ProviderSelectionClient, projectName s
 	// This code unfortunately replicates the provider precedence rules in the
 	// RoomCmd's PersistentPreRunE func, I think we should avoid reading the
 	// stack file during startup, and only read it here instead.
-	if RootCmd.PersistentFlags().Changed("stack") {
+	if RootCmd.PersistentFlags().Changed("stack") || os.Getenv("DEFANG_STACK") != "" {
 		whence = "stack file"
 		stackName := RootCmd.Flags().Lookup("stack").Value.String()
+		if stackName == "" {
+			stackName = os.Getenv("DEFANG_STACK")
+		}
 		stackParams, err := sm.Load(stackName)
 		if err != nil {
 			return nil, "", fmt.Errorf("unable to load stack %q: %w", stackName, err)
 		}
 		stack = stackParams
-	} else {
-		knownStacks, err := sm.List(ctx)
-		if err != nil {
-			return nil, "", fmt.Errorf("unable to list stacks: %w", err)
-		}
-		if len(knownStacks) == 1 {
-			knownStack := knownStacks[0]
-			stack.Name = knownStack.Name
-			var providerID cliClient.ProviderID
-			err := providerID.Set(knownStack.Provider)
-			if err != nil {
-				return nil, "", fmt.Errorf("invalid provider %q in stack %q: %w", knownStack.Provider, knownStack.Name, err)
-			}
-			stack.Provider = providerID
-			whence = "stack file"
-		} else {
-			if RootCmd.PersistentFlags().Changed("provider") {
-				whence = "command line flag"
-				providerIDString := RootCmd.Flags().Lookup("provider").Value.String()
-				err := stack.Provider.Set(providerIDString)
-				if err != nil {
-					return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
-				}
-			} else if _, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
-				whence = "environment variable"
-				providerIDString := os.Getenv("DEFANG_PROVIDER")
-				err := stack.Provider.Set(providerIDString)
-				if err != nil {
-					return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
-				}
-			}
-		}
-	}
 
-	if stack.Provider != cliClient.ProviderAuto {
+		if stack.Provider == cliClient.ProviderAuto {
+			return nil, "", fmt.Errorf("stack %q has an invalid provider %q", stack.Name, stack.Provider)
+		}
 		return stack, whence, nil
 	}
 
-	if global.NonInteractive {
+	knownStacks, err := sm.List(ctx)
+	if err != nil {
+		return nil, "", fmt.Errorf("unable to list stacks: %w", err)
+	}
+	stackNames := make([]string, 0, len(knownStacks))
+	for _, s := range knownStacks {
+		stackNames = append(stackNames, s.Name)
+	}
+	if RootCmd.PersistentFlags().Changed("provider") {
+		term.Warn("Warning: --provider flag is being ignored. Please specify a stack instead using --stack.")
+		providerIDString := RootCmd.Flags().Lookup("provider").Value.String()
+		err := stack.Provider.Set(providerIDString)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
+		}
+	} else if _, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
+		term.Warn("Warning: DEFANG_PROVIDER environment variable is being ignored. Please specify a stack instead using --stack.")
+		providerIDString := os.Getenv("DEFANG_PROVIDER")
+		err := stack.Provider.Set(providerIDString)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
+		}
+	}
+	if global.NonInteractive && stack.Provider == cliClient.ProviderAuto {
 		whence = "non-interactive default"
+		stack.Name = "beta"
 		stack.Provider = cliClient.ProviderDefang
 		return stack, whence, nil
 	}
 
-	// If user manually selected auto provider, do not load from remote
-	if !RootCmd.PersistentFlags().Changed("provider") {
-		providerID, err := getPreviouslyUsedProvider(ctx, client, projectName)
+	// if there is exactly one stack with that provider, use it
+	if len(knownStacks) == 1 && knownStacks[0].Provider == stack.Provider.String() {
+		knownStack := knownStacks[0]
+		var providerID cliClient.ProviderID
+		err := providerID.Set(knownStack.Provider)
 		if err != nil {
-			return nil, "", err
+			return nil, "", fmt.Errorf("invalid provider %q in stack %q: %w", knownStack.Provider, knownStack.Name, err)
 		}
-		stack.Provider = providerID
-		if stack.Provider != cliClient.ProviderAuto {
-			whence = "stored preference"
-			return stack, whence, nil
+		stack = &stacks.StackParameters{
+			Name:     knownStack.Name,
+			Provider: stack.Provider,
+		}
+		whence = "only stack"
+		return stack, whence, nil
+	}
+
+	// if there are zero known stacks or more than one known stack, prompt the user to create or select a stack
+	if global.NonInteractive {
+		if len(stackNames) > 0 {
+			return nil, "", fmt.Errorf("please specify a stack using --stack. The following stacks are available: %v", stackNames)
+		} else {
+			return nil, "", fmt.Errorf("no stacks are configured; please create a stack using 'defang stack create --provider=%s'", stack.Provider)
 		}
 	}
 
@@ -1386,37 +1389,7 @@ func getStack(ctx context.Context, client ProviderSelectionClient, projectName s
 	}
 	stack = stackParameters
 	whence = "interactive selection"
-	saveSelectedProvider(ctx, client, projectName, stack.Provider)
 	return stack, whence, nil
-}
-
-func getPreviouslyUsedProvider(ctx context.Context, client ProviderSelectionClient, projectName string) (cliClient.ProviderID, error) {
-	if projectName == "" {
-		return cliClient.ProviderAuto, nil
-	}
-	resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{
-		Project: projectName,
-	})
-	if err != nil {
-		return cliClient.ProviderAuto, fmt.Errorf("unable to get selected provider: %w", err)
-	}
-	var providerID cliClient.ProviderID
-	providerID.SetValue(resp.Provider)
-	return providerID, nil
-}
-
-func saveSelectedProvider(ctx context.Context, client ProviderSelectionClient, projectName string, providerID cliClient.ProviderID) {
-	if projectName == "" {
-		return
-	}
-	if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{
-		Project:  projectName,
-		Provider: providerID.Value(),
-	}); err != nil {
-		term.Debugf("Unable to save selected provider to defang server: %v", err)
-	} else {
-		term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, projectName)
-	}
 }
 
 func printProviderMismatchWarnings(ctx context.Context, provider cliClient.ProviderID) {
@@ -1450,8 +1423,8 @@ func printProviderMismatchWarnings(ctx context.Context, provider cliClient.Provi
 	}
 }
 
-func newProvider(ctx context.Context, ec elicitations.Controller, sm stacks.Manager, projectName string) (cliClient.Provider, error) {
-	stack, whence, err := getStack(ctx, global.Client, projectName, ec, sm)
+func newProvider(ctx context.Context, ec elicitations.Controller, sm stacks.Manager) (cliClient.Provider, error) {
+	stack, whence, err := getStack(ctx, ec, sm)
 	if err != nil {
 		return nil, err
 	}
@@ -1499,7 +1472,7 @@ func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient
 			return nil, fmt.Errorf("failed to create stack manager: %w", err)
 		}
 	}
-	provider, err := newProvider(ctx, ec, sm, projectName)
+	provider, err := newProvider(ctx, ec, sm)
 	if err != nil {
 		return nil, err
 	}
