@@ -57,7 +57,7 @@ func (m *MockDestroyCLI) LoadProjectNameWithFallback(ctx context.Context, loader
 	return m.ProjectName, nil
 }
 
-func (m *MockDestroyCLI) CanIUseProvider(ctx context.Context, grpcClient *client.GrpcClient, projectName string, provider client.Provider, serviceCount int) error {
+func (m *MockDestroyCLI) CanIUseProvider(ctx context.Context, grpcClient *client.GrpcClient, provider client.Provider, projectName string, serviceCount int) error {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("CanIUseProvider(%s)", projectName))
 	if m.CanIUseProviderError != nil {
 		return m.CanIUseProviderError

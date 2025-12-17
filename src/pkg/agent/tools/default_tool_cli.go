@@ -27,7 +27,7 @@ type StackConfig struct {
 
 type DefaultToolCLI struct{}
 
-func (DefaultToolCLI) CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, projectName string, provider cliClient.Provider, serviceCount int) error {
+func (DefaultToolCLI) CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, provider cliClient.Provider, projectName string, serviceCount int) error {
 	return cliClient.CanIUseProvider(ctx, client, provider, projectName, serviceCount)
 }
 
