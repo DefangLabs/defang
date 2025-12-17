@@ -47,20 +47,7 @@ func NewManager(fabric DeploymentLister, targetDirectory string, projectName str
 		if err != nil {
 			return nil, fmt.Errorf("failed to get absolute path for target directory: %w", err)
 		}
-		// Resolve symlinks for consistent comparison
-		resolvedWorkingDirectory, err := filepath.EvalSymlinks(workingDirectory)
-		if err != nil {
-			return nil, fmt.Errorf("failed to resolve symlinks in working directory: %w", err)
-		}
-		// For target directory, only resolve symlinks if the path exists
-		resolvedTargetDirectory := absTargetDirectory
-		if _, err := os.Stat(absTargetDirectory); err == nil {
-			resolvedTargetDirectory, err = filepath.EvalSymlinks(absTargetDirectory)
-			if err != nil {
-				return nil, fmt.Errorf("failed to resolve symlinks in target directory: %w", err)
-			}
-		}
-		outside = resolvedWorkingDirectory != resolvedTargetDirectory
+		outside = workingDirectory != absTargetDirectory
 	}
 	return &manager{
 		fabric:           fabric,
