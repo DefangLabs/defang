@@ -88,7 +88,7 @@ func TestDebugPulumiGolang(t *testing.T) {
 		t.Skip("DEFANG_PULUMI_DIR not set; skipping local Pulumi Golang test")
 	}
 
-	// REGION=us-central1 GCP_PROJECT_ID=jordan-project-463223 PULUMI_COPILOT=false PROJECT=nodejs-http PULUMI_BACKEND_URL=gs://defang-cd-tk0ak2pj5jwi PULUMI_CONFIG_PASSPHRASE=asdf PULUMI_SKIP_UPDATE_CHECK=true DEFANG_PREFIX=Defang DEFANG_STATE_URL=gs://defang-cd-tk0ak2pj5jwi GCP_PROJECT=jordan-project-463223 STACK=beta DEFANG_DEBUG=1 DEFANG_MODE=mode_unspecified DOMAIN=beta.nodejs-http.jordanstephens.defang.app DEFANG_JSON= REGION=us-central1 DEFANG_ETAG=iqzc5ldbyhsg
+	// REGION=us-central1 GCP_PROJECT_ID=jordan-project-463223 PULUMI_COPILOT=false PROJECT=nodejs-http PULUMI_BACKEND_URL=gs://defang-cd-tk0ak2pj5jwi PULUMI_CONFIG_PASSPHRASE=asdf PULUMI_SKIP_UPDATE_CHECK=true DEFANG_PREFIX=Defang DEFANG_STATE_URL=gs://defang-cd-tk0ak2pj5jwi GCP_PROJECT=jordan-project-463223 STACK=beta DEFANG_ORG=defang DEFANG_DEBUG=1 DEFANG_MODE=mode_unspecified DOMAIN=beta.nodejs-http.jordanstephens.defang.app DEFANG_JSON= REGION=us-central1 DEFANG_ETAG=iqzc5ldbyhsg
 	envs := []string{
 		"REGION=us-central1",
 		"GCP_PROJECT_ID=jordan-project-463223",
@@ -101,7 +101,7 @@ func TestDebugPulumiGolang(t *testing.T) {
 		"DEFANG_STATE_URL=gs://defang-cd-tk0ak2pj5jwi",
 		"GCP_PROJECT=jordan-project-463223",
 		"STACK=beta",
-		"DEFANG_WORKSPACE=defang",
+		"DEFANG_ORG=defang",
 		"DEFANG_DEBUG=1",
 		"DEFANG_MODE=mode_unspecified",
 		"DOMAIN=beta.nodejs-http.jordanstephens.defang.app",

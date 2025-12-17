@@ -12,10 +12,13 @@ func TestFetchUserInfo(t *testing.T) {
 	t.Cleanup(func() { openAuthClient = originalClient })
 
 	var capturedAuth string
+	var capturedPath string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedAuth = r.Header.Get("Authorization")
-		if r.URL.Path != "/userinfo" {
-			t.Fatalf("unexpected path %q", r.URL.Path)
+		capturedPath = r.URL.Path
+		if capturedPath != "/userinfo" {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
@@ -28,6 +31,10 @@ func TestFetchUserInfo(t *testing.T) {
 	openAuthClient = NewClient("defang-cli", server.URL)
 
 	info, err := FetchUserInfo(context.Background(), "token-123")
+	if capturedPath != "/userinfo" {
+		t.Fatalf("unexpected path %q", capturedPath)
+	}
+
 	if err != nil {
 		t.Fatalf("FetchUserInfo returned error: %v", err)
 	}
