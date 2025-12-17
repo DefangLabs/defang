@@ -2,6 +2,11 @@ package cli
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -20,6 +25,7 @@ type ShowAccountData struct {
 	TenantID       string                    `json:"tenantId,omitempty"`
 	Email          string                    `json:"email"`
 	Name           string                    `json:"name"`
+	Subject        string                    `json:"subject,omitempty"`
 }
 
 func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Provider, userInfo *auth.UserInfo, tenantSelection types.TenantNameOrID, includeTenantDetails bool) (ShowAccountData, error) {
@@ -59,4 +65,40 @@ func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Pro
 	}
 
 	return showData, nil
+}
+
+func SubjectFromToken(token string) (string, error) {
+	claims, err := ParseTokenClaims(token)
+	if err != nil {
+		return "", err
+	}
+	return claims.Sub, nil
+}
+
+type TokenClaims struct {
+	Sub string `json:"sub"`
+	Iss string `json:"iss"`
+}
+
+func ParseTokenClaims(token string) (TokenClaims, error) {
+	if token == "" {
+		return TokenClaims{}, errors.New("token is empty")
+	}
+
+	parts := strings.Split(token, ".")
+	if len(parts) < 2 {
+		return TokenClaims{}, errors.New("token is not a JWT")
+	}
+
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return TokenClaims{}, fmt.Errorf("failed to decode JWT payload: %w", err)
+	}
+
+	var claims TokenClaims
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return TokenClaims{}, fmt.Errorf("failed to decode JWT claims: %w", err)
+	}
+
+	return claims, nil
 }

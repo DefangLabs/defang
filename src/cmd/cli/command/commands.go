@@ -562,15 +562,36 @@ var whoamiCmd = &cobra.Command{
 		jsonMode, _ := cmd.Flags().GetBool("json")
 
 		token := cluster.GetExistingToken(getCluster())
-		userInfo, err := auth.FetchUserInfo(cmd.Context(), token)
-		if err != nil {
-			return err
+		var (
+			userInfo *auth.UserInfo
+			subject  string
+			issuer   string
+		)
+		if token != "" {
+			if claims, err := cli.ParseTokenClaims(token); err == nil {
+				subject = claims.Sub
+				issuer = claims.Iss
+			} else {
+				term.Debug("unable to parse JWT claims:", err)
+			}
+		}
+
+		fabricToken := strings.Contains(strings.ToLower(issuer), "fabric")
+		if !fabricToken {
+			subject = "" // only show subject for Fabric tokens
+			userInfo, err = auth.FetchUserInfo(cmd.Context(), token)
+			if err != nil {
+				return err
+			}
 		}
 
 		tenantSelection := getTenantSelection()
 		data, err := cli.Whoami(cmd.Context(), global.Client, provider, userInfo, tenantSelection, verbose)
 		if err != nil {
 			return err
+		}
+		if subject != "" {
+			data.Subject = subject
 		}
 		if verbose && userInfo != nil {
 			if tenantID := cli.ResolveWorkspaceID(userInfo, tenantSelection); tenantID != "" {
@@ -600,11 +621,16 @@ var whoamiCmd = &cobra.Command{
 			cols := []string{
 				"Name",
 				"Email",
+			}
+			if data.Subject != "" {
+				cols = append(cols, "Subject")
+			}
+			cols = append(cols,
 				"Workspace",
 				"Provider",
 				"SubscriberTier",
 				"Region",
-			}
+			)
 			if verbose {
 				cols = append(cols, "Tenant", "TenantID")
 			}

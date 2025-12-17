@@ -84,6 +84,7 @@ func NonInteractiveGitHubLogin(ctx context.Context, client client.FabricClient, 
 		return fmt.Errorf("non-interactive login failed: %w", err)
 	}
 	term.Debug("Got GitHub Actions id-token")
+	// TODO: switch non-interactive login to authenticate via the auth server instead of Fabric, since we may need to use the token against endpoints that don't support Fabric auth.
 	resp, err := client.Token(ctx, &defangv1.TokenRequest{
 		Assertion: idToken,
 		Scope:     []string{"admin", "read", "delete", "tail"},
