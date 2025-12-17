@@ -1439,7 +1439,7 @@ func newProvider(ctx context.Context, ec elicitations.Controller, sm stacks.Mana
 	if stack.Provider == cliClient.ProviderDefang {
 		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
 	}
-	term.Infof("Using %s provider from %s%s", stack.Provider, whence, extraMsg)
+	term.Infof("Using the %q stack on %s from %s%s", stack.Name, stack.Provider, whence, extraMsg)
 
 	printProviderMismatchWarnings(ctx)
 	provider := cli.NewProvider(ctx, stack.Provider, global.Client, stack.Name)
