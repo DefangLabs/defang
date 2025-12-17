@@ -1410,7 +1410,7 @@ func saveSelectedProvider(ctx context.Context, projectName string, providerID cl
 	}); err != nil {
 		term.Debugf("Unable to save selected provider to defang server: %v", err)
 	} else {
-		term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", global.Stack.Provider, projectName)
+		term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, projectName)
 	}
 }
 
