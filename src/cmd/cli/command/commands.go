@@ -1298,6 +1298,8 @@ var providerDescription = map[cliClient.ProviderID]string{
 }
 
 func getStack(ctx context.Context, projectName string, ec elicitations.Controller, sm stacks.Manager) (*stacks.StackParameters, string, error) {
+	stackSelector := stacks.NewSelector(ec, sm)
+
 	whence := "default project"
 	stack := &stacks.StackParameters{
 		Name:     "beta",
@@ -1316,19 +1318,35 @@ func getStack(ctx context.Context, projectName string, ec elicitations.Controlle
 			return nil, "", fmt.Errorf("unable to load stack %q: %w", stackName, err)
 		}
 		stack = stackParams
-	} else if RootCmd.PersistentFlags().Changed("provider") {
-		whence = "command line flag"
-		providerIDString := RootCmd.Flags().Lookup("provider").Value.String()
-		err := stack.Provider.Set(providerIDString)
+	} else {
+		knownStacks, err := sm.List(ctx)
 		if err != nil {
-			return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
+			return nil, "", fmt.Errorf("unable to list stacks: %w", err)
 		}
-	} else if _, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
-		whence = "environment variable"
-		providerIDString := os.Getenv("DEFANG_PROVIDER")
-		err := stack.Provider.Set(providerIDString)
-		if err != nil {
-			return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
+		if len(knownStacks) > 1 && !global.NonInteractive {
+			stackParameters, err := stackSelector.SelectStack(ctx)
+			if err != nil {
+				return nil, "", fmt.Errorf("failed to select stack: %w", err)
+			}
+			stack = stackParameters
+			whence = "interactive selection"
+			saveSelectedProvider(ctx, projectName, stack.Provider)
+		} else {
+			if RootCmd.PersistentFlags().Changed("provider") {
+				whence = "command line flag"
+				providerIDString := RootCmd.Flags().Lookup("provider").Value.String()
+				err := stack.Provider.Set(providerIDString)
+				if err != nil {
+					return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
+				}
+			} else if _, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
+				whence = "environment variable"
+				providerIDString := os.Getenv("DEFANG_PROVIDER")
+				err := stack.Provider.Set(providerIDString)
+				if err != nil {
+					return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
+				}
+			}
 		}
 	}
 
@@ -1355,7 +1373,6 @@ func getStack(ctx context.Context, projectName string, ec elicitations.Controlle
 		}
 	}
 
-	stackSelector := stacks.NewSelector(ec, sm)
 	stackParameters, err := stackSelector.SelectStack(ctx)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to select stack: %w", err)
