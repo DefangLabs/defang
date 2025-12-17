@@ -1305,7 +1305,7 @@ func getStack(ctx context.Context, projectName string, ec elicitations.Controlle
 		Mode:     modes.ModeUnspecified,
 	}
 
-	// This code unfortunately replicates the provider precidence rules in the
+	// This code unfortunately replicates the provider precedence rules in the
 	// RoomCmd's PersistentPreRunE func, I think we should avoid reading the
 	// stack file during startup, and only read it here instead.
 	if RootCmd.PersistentFlags().Changed("stack") {
