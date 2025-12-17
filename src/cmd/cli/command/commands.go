@@ -1337,14 +1337,14 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 		stackNames = append(stackNames, s.Name)
 	}
 	if RootCmd.PersistentFlags().Changed("provider") {
-		term.Warn("Warning: --provider flag is being ignored. Please specify a stack instead using --stack.")
+		term.Warn("Warning: --provider flag is being ignored. Please use --stack instead. To learn about stacks, visit https://docs.defang.io/docs/concepts/stacks")
 		providerIDString := RootCmd.Flags().Lookup("provider").Value.String()
 		err := stack.Provider.Set(providerIDString)
 		if err != nil {
 			return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
 		}
 	} else if _, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
-		term.Warn("Warning: DEFANG_PROVIDER environment variable is being ignored. Please specify a stack instead using --stack.")
+		term.Warn("Warning: DEFANG_PROVIDER environment variable is being ignored. Please use --stack instead. To learn about stacks, visit https://docs.defang.io/docs/concepts/stacks")
 		providerIDString := os.Getenv("DEFANG_PROVIDER")
 		err := stack.Provider.Set(providerIDString)
 		if err != nil {
