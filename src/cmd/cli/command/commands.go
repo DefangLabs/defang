@@ -466,7 +466,10 @@ var RootCmd = &cobra.Command{
 		global.Client, err = cli.ConnectWithTenant(ctx, getCluster(), getTenantSelection())
 
 		if err != nil {
-			return err
+			if connect.CodeOf(err) != connect.CodeUnauthenticated {
+				return err
+			}
+			term.Debug("Using existing token failed; continuing to allow login/ToS flow:", err)
 		}
 
 		if v, err := global.Client.GetVersions(ctx); err == nil {
