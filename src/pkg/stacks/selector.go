@@ -70,7 +70,7 @@ func (ss *stackSelector) elicitStackSelection(ctx context.Context, ec elicitatio
 		if s.DeployedAt.IsZero() {
 			label = s.Name
 		} else {
-			label = fmt.Sprintf("%s (deployed %s)", s.Name, s.DeployedAt.Local().Format("Jan 2"))
+			label = fmt.Sprintf("%s (deployed %s)", s.Name, s.DeployedAt.Format("Jan 2"))
 		}
 		stackLabels = append(stackLabels, label)
 		stackNames = append(stackNames, s.Name)

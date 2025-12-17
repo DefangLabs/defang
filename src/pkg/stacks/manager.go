@@ -105,7 +105,7 @@ func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
 			Mode:         remote.StackParameters.Mode.String(),
 			AWSProfile:   remote.StackParameters.AWSProfile,
 			GCPProjectID: remote.StackParameters.GCPProjectID,
-			DeployedAt:   remote.DeployedAt,
+			DeployedAt:   remote.DeployedAt.Local(),
 		}
 	}
 
