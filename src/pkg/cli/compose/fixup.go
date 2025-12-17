@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -19,6 +20,12 @@ import (
 const RAILPACK = "*Railpack"
 
 func FixupServices(ctx context.Context, provider client.Provider, project *composeTypes.Project, upload UploadMode) error {
+	oldName := project.Name
+	project.Name = NormalizeProjectName(project.Name)
+	if project.Name != oldName {
+		term.Debugf("normalized project name %q -> %q", oldName, project.Name)
+	}
+
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
 	config, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
 	if err != nil {
@@ -460,4 +467,10 @@ func IsRedisRepo(repo string) bool {
 
 func IsMongoRepo(repo string) bool {
 	return strings.HasSuffix(repo, "mongo")
+}
+
+var safeProjectNameRE = regexp.MustCompile(`[^A-Za-z0-9-]+`)
+
+func NormalizeProjectName(name string) string {
+	return safeProjectNameRE.ReplaceAllString(name, "-")
 }

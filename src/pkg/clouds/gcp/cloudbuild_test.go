@@ -21,56 +21,26 @@ func TestBuildTagString(t *testing.T) {
 			want: "proj_svc_123",
 		},
 		{
-			name: "project name with underscores",
-			bt:   BuildTag{Stack: "stack1", Project: "my_proj_name", Service: "svc", Etag: "123"},
-			want: "stack1_my_proj_name_svc_123",
+			name: "service name with underscores",
+			bt:   BuildTag{Stack: "stack1", Project: "my-proj-name", Service: "svc_name", Etag: "123"},
+			want: "stack1_my-proj-name_svc_name_123",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.bt.String(); got != tt.want {
-				t.Errorf("String() = %q, want %q", got, tt.want)
+			tagStr := tt.bt.String()
+			if tagStr != tt.want {
+				t.Errorf("String() = %q, want %q", tagStr, tt.want)
 			}
-		})
-	}
-}
-
-//raphaeltm-prod1_zaoconnect_project_app_l1h2a8jygv35
-
-func TestBuildTagParseValid(t *testing.T) {
-	tests := []struct {
-		name string
-		tag  string
-		want BuildTag
-	}{
-		{
-			name: "3-part tag (backward compatible)",
-			tag:  "proj_svc_123",
-			want: BuildTag{Stack: "", Project: "proj", Service: "svc", Etag: "123"},
-		},
-		{
-			name: "4-part tag",
-			tag:  "stack1_proj_svc_123",
-			want: BuildTag{Stack: "stack1", Project: "proj", Service: "svc", Etag: "123"},
-		},
-		{
-			name: "project name with underscores",
-			tag:  "stack1_my_proj_name_svc_123",
-			want: BuildTag{Stack: "stack1", Project: "my_proj_name", Service: "svc", Etag: "123"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var bt BuildTag
-			err := bt.Parse(tt.tag)
+			var parsed BuildTag
+			err := parsed.Parse(tagStr)
 			if err != nil {
 				t.Fatalf("Parse() returned error: %v", err)
 			}
 
-			if bt != tt.want {
-				t.Errorf("Parse() = %+v, want %+v", bt, tt.want)
+			if parsed != tt.bt {
+				t.Errorf("Parse() = %+v, want %+v", parsed, tt.want)
 			}
 		})
 	}

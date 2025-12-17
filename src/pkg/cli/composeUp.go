@@ -89,7 +89,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 	}
 
 	req := &defangv1.GetDelegateSubdomainZoneRequest{
-		Project: project.Name,
+		Project: fixedProject.Name,
 		Stack:   params.Stack,
 	}
 	delegateDomain, err := fabric.GetDelegateSubdomainZone(ctx, req)
@@ -100,7 +100,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 
 	deployRequest := &defangv1.DeployRequest{
 		Mode:           mode.Value(),
-		Project:        project.Name,
+		Project:        fixedProject.Name,
 		Compose:        bytes,
 		DelegateDomain: delegateDomain.Zone,
 	}
@@ -108,7 +108,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 	delegation, err := provider.PrepareDomainDelegation(ctx, client.PrepareDomainDelegationRequest{
 		DelegateDomain: delegateDomain.Zone,
 		Preview:        upload == compose.UploadModePreview || upload == compose.UploadModeEstimate,
-		Project:        project.Name,
+		Project:        fixedProject.Name,
 	})
 	if err != nil {
 		return nil, project, err
@@ -133,7 +133,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 		if delegation != nil && len(delegation.NameServers) > 0 {
 			req := &defangv1.DelegateSubdomainZoneRequest{
 				NameServerRecords: delegation.NameServers,
-				Project:           project.Name,
+				Project:           fixedProject.Name,
 				Stack:             params.Stack,
 			}
 			_, err = fabric.DelegateSubdomainZone(ctx, req)

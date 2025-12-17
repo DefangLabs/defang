@@ -38,8 +38,8 @@ func (bt *BuildTag) Parse(tag string) error {
 		bt.Etag = parts[2]
 	} else {
 		bt.Stack = parts[0]
-		bt.Project = strings.Join(parts[1:n-2], "_")
-		bt.Service = parts[n-2]
+		bt.Project = parts[1]                        // Project names has been normalized to not contain underscores
+		bt.Service = strings.Join(parts[2:n-1], "_") // Service names may contain underscores, so join all parts except last which is the etag
 		bt.Etag = parts[n-1]
 	}
 	return nil
