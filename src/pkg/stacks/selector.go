@@ -63,18 +63,37 @@ func (ss *stackSelector) elicitStackSelection(ctx context.Context, ec elicitatio
 	}
 
 	stackNames := make([]string, 0, len(stackList)+1)
+	labelMap := make(map[string]string)
 	for _, s := range stackList {
-		stackNames = append(stackNames, s.Name)
+		var label string
+		if s.DeployedAt.IsZero() {
+			label = s.Name
+		} else {
+			label = fmt.Sprintf("%s (deployed %s)", s.Name, s.DeployedAt.Local().Format("Jan 2"))
+		}
+		stackNames = append(stackNames, label)
+		labelMap[label] = s.Name
 	}
 	stackNames = append(stackNames, CreateNewStack)
 
 	printStacksInfoMessage(stackNames)
-	selectedStackName, err := ec.RequestEnum(ctx, "Select a stack", "stack", stackNames)
+	selectedLabel, err := ec.RequestEnum(ctx, "Select a stack", "stack", stackNames)
 	if err != nil {
 		return "", fmt.Errorf("failed to elicit stack choice: %w", err)
 	}
 
-	return selectedStackName, nil
+	// If "Create new stack" was selected, return as-is
+	if selectedLabel == CreateNewStack {
+		return CreateNewStack, nil
+	}
+
+	// Otherwise, map back to the actual stack name
+	selectedName, exists := labelMap[selectedLabel]
+	if !exists {
+		return "", fmt.Errorf("invalid stack selection: %s", selectedLabel)
+	}
+
+	return selectedName, nil
 }
 
 func printStacksInfoMessage(stacks []string) {
