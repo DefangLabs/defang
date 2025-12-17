@@ -485,7 +485,7 @@ func printLogEntry(e *defangv1.LogEntry, options *TailOptions, t *term.Term) {
 			line = term.StripAnsi(line)
 		}
 		buf.WriteString(line)
-		buf.WriteRune('\n')
+		buf.WriteByte('\n')
 	}
 
 	t.Print(buf.String())

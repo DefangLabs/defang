@@ -366,12 +366,12 @@ func TestPrintHandler(t *testing.T) {
 		outputfile string
 	}{
 		{
-			inputfile:  "../../test-datasets/crew_input.jsonl",
-			outputfile: "../../test-datasets/crew_output.data",
+			inputfile:  "testdata/crew_input.jsonl",
+			outputfile: "testdata/crew_output.data",
 		},
 		{
-			inputfile:  "../../test-datasets/flask_railpack_input.jsonl",
-			outputfile: "../../test-datasets/flask_railpack_output.data",
+			inputfile:  "testdata/flask_railpack_input.jsonl",
+			outputfile: "testdata/flask_railpack_output.data",
 		},
 	}
 
