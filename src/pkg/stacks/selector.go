@@ -62,7 +62,8 @@ func (ss *stackSelector) elicitStackSelection(ctx context.Context, ec elicitatio
 		return CreateNewStack, nil
 	}
 
-	stackNames := make([]string, 0, len(stackList)+1)
+	stackLabels := make([]string, 0, len(stackList)+1)
+	stackNames := make([]string, 0, len(stackList))
 	labelMap := make(map[string]string)
 	for _, s := range stackList {
 		var label string
@@ -71,13 +72,14 @@ func (ss *stackSelector) elicitStackSelection(ctx context.Context, ec elicitatio
 		} else {
 			label = fmt.Sprintf("%s (deployed %s)", s.Name, s.DeployedAt.Local().Format("Jan 2"))
 		}
-		stackNames = append(stackNames, label)
+		stackLabels = append(stackLabels, label)
+		stackNames = append(stackNames, s.Name)
 		labelMap[label] = s.Name
 	}
-	stackNames = append(stackNames, CreateNewStack)
+	stackLabels = append(stackLabels, CreateNewStack)
 
 	printStacksInfoMessage(stackNames)
-	selectedLabel, err := ec.RequestEnum(ctx, "Select a stack", "stack", stackNames)
+	selectedLabel, err := ec.RequestEnum(ctx, "Select a stack", "stack", stackLabels)
 	if err != nil {
 		return "", fmt.Errorf("failed to elicit stack choice: %w", err)
 	}
