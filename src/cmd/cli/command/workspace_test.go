@@ -57,6 +57,9 @@ func TestWorkspaceListJSON(t *testing.T) {
 	oldGlobal := global
 	t.Cleanup(func() { global = oldGlobal })
 
+	// Reset stack name to prevent loading stack files
+	global.Stack.Name = ""
+
 	if err := testCommand([]string{"workspace", "ls", "--json", "--non-interactive"}, clusterURL); err != nil {
 		t.Fatalf("workspace ls --json failed: %v", err)
 	}
@@ -88,6 +91,9 @@ func TestWorkspaceListVerboseTable(t *testing.T) {
 
 	oldGlobal := global
 	t.Cleanup(func() { global = oldGlobal })
+
+	// Reset stack name to prevent loading stack files
+	global.Stack.Name = ""
 
 	if err := testCommand([]string{"workspace", "ls", "--verbose", "--json=false", "--non-interactive"}, clusterURL); err != nil {
 		t.Fatalf("workspace ls --verbose failed: %v", err)
