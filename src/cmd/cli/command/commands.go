@@ -1297,7 +1297,12 @@ var providerDescription = map[cliClient.ProviderID]string{
 	cliClient.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
 }
 
-func getStack(ctx context.Context, projectName string, ec elicitations.Controller, sm stacks.Manager) (*stacks.StackParameters, string, error) {
+type ProviderSelectionClient interface {
+	GetSelectedProvider(ctx context.Context, req *defangv1.GetSelectedProviderRequest) (*defangv1.GetSelectedProviderResponse, error)
+	SetSelectedProvider(ctx context.Context, req *defangv1.SetSelectedProviderRequest) error
+}
+
+func getStack(ctx context.Context, client ProviderSelectionClient, projectName string, ec elicitations.Controller, sm stacks.Manager) (*stacks.StackParameters, string, error) {
 	stackSelector := stacks.NewSelector(ec, sm)
 
 	whence := "default project"
@@ -1364,7 +1369,7 @@ func getStack(ctx context.Context, projectName string, ec elicitations.Controlle
 
 	// If user manually selected auto provider, do not load from remote
 	if !RootCmd.PersistentFlags().Changed("provider") {
-		providerID, err := getPreviouslyUsedProvider(ctx, projectName)
+		providerID, err := getPreviouslyUsedProvider(ctx, client, projectName)
 		if err != nil {
 			return nil, "", err
 		}
@@ -1381,15 +1386,15 @@ func getStack(ctx context.Context, projectName string, ec elicitations.Controlle
 	}
 	stack = stackParameters
 	whence = "interactive selection"
-	saveSelectedProvider(ctx, projectName, stack.Provider)
+	saveSelectedProvider(ctx, client, projectName, stack.Provider)
 	return stack, whence, nil
 }
 
-func getPreviouslyUsedProvider(ctx context.Context, projectName string) (cliClient.ProviderID, error) {
+func getPreviouslyUsedProvider(ctx context.Context, client ProviderSelectionClient, projectName string) (cliClient.ProviderID, error) {
 	if projectName == "" {
 		return cliClient.ProviderAuto, nil
 	}
-	resp, err := global.Client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{
+	resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{
 		Project: projectName,
 	})
 	if err != nil {
@@ -1400,11 +1405,11 @@ func getPreviouslyUsedProvider(ctx context.Context, projectName string) (cliClie
 	return providerID, nil
 }
 
-func saveSelectedProvider(ctx context.Context, projectName string, providerID cliClient.ProviderID) {
+func saveSelectedProvider(ctx context.Context, client ProviderSelectionClient, projectName string, providerID cliClient.ProviderID) {
 	if projectName == "" {
 		return
 	}
-	if err := global.Client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{
+	if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{
 		Project:  projectName,
 		Provider: providerID.Value(),
 	}); err != nil {
@@ -1446,7 +1451,7 @@ func printProviderMismatchWarnings(ctx context.Context) {
 }
 
 func newProvider(ctx context.Context, ec elicitations.Controller, sm stacks.Manager, projectName string) (cliClient.Provider, error) {
-	stack, whence, err := getStack(ctx, projectName, ec, sm)
+	stack, whence, err := getStack(ctx, global.Client, projectName, ec, sm)
 	if err != nil {
 		return nil, err
 	}
