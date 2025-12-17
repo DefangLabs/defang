@@ -6,7 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/auth"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/bufbuild/connect-go"
@@ -35,24 +37,34 @@ func TestWhoami(t *testing.T) {
 
 	ctx := t.Context()
 	url := strings.TrimPrefix(server.URL, "http://")
-	grpcClient, _ := Connect(ctx, url)
+	const requestedTenant = "tenant-1"
+	grpcClient, _ := ConnectWithTenant(ctx, url, requestedTenant)
 	client := cliClient.PlaygroundProvider{FabricClient: grpcClient}
 
-	got, err := Whoami(ctx, grpcClient, &client)
+	userInfo := &auth.UserInfo{
+		AllTenants: []auth.WorkspaceInfo{
+			{ID: "tenant-1", Name: "Tenant One"},
+		},
+		User: auth.UserDetails{
+			Email: "user@example.com",
+			Name:  "Test User",
+		},
+	}
+
+	got, err := Whoami(ctx, grpcClient, &client, userInfo, types.TenantNameOrID(requestedTenant), true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Playground provider is hardcoded to return "us-west-2" as the region
 	want := ShowAccountData{
-		AccountInfo: cliClient.AccountInfo{
-			AccountID: "tenant-1",
-			Provider:  "defang",
-			Region:    "us-west-2",
-		},
+		Provider:       cliClient.ProviderDefang,
 		SubscriberTier: defangv1.SubscriptionTier_PRO,
+		Region:         "us-west-2",
+		Workspace:      "Tenant One",
 		Tenant:         "tenant-1",
-		TenantID:       "",
+		TenantID:       "tenant-1",
+		Email:          "user@example.com",
+		Name:           "Test User",
 	}
 
 	if got != want {

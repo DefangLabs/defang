@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -25,10 +26,12 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/dns"
+	"github.com/DefangLabs/defang/src/pkg/dockerhub"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
+	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
@@ -38,6 +41,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -61,6 +66,8 @@ type ByocAws struct {
 	cdEtag           types.ETag
 	cdStart          time.Time
 	cdTaskArn        ecs.TaskArn
+
+	needDockerHubCreds bool
 }
 
 var _ client.Provider = (*ByocAws)(nil)
@@ -116,7 +123,7 @@ func AnnotateAwsError(err error) error {
 	return err
 }
 
-func NewByocProvider(ctx context.Context, tenantName types.TenantName, stack string) *ByocAws {
+func NewByocProvider(ctx context.Context, tenantName types.TenantNameOrID, stack string) *ByocAws {
 	b := &ByocAws{
 		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
@@ -253,6 +260,20 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		mode:            req.Mode,
 		project:         project.Name,
 	}
+
+	if b.needDockerHubCreds {
+		term.Debugf("Docker Hub credentials are needed for image pulls")
+		dockerHubUser, dockerHubPass, err := dockerhub.GetDockerHubCredentials(ctx)
+		if err != nil {
+			term.Debugf("Could not retrieve Docker Hub credentials: %v", err)
+			term.Warnf("Docker Hub credentials are required to avoid pull throttling. Please run `docker login` or set the DOCKERHUB_USERNAME and DOCKERHUB_TOKEN environment variables. Without valid credentials, image pulls may be rate-limited or fail.")
+		} else {
+			term.Debugf("Using Docker Hub credentials with user %v", dockerHubUser)
+			cdCmd.dockerHubUsername = dockerHubUser
+			cdCmd.dockerHubAccessToken = dockerHubPass
+		}
+	}
+
 	cdTaskArn, err := b.runCdCommand(ctx, cdCmd)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
@@ -271,6 +292,88 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		Services: serviceInfos, // TODO: Should we use the retrieved services instead?
 		Etag:     etag,
 	}, nil
+}
+
+func (b *ByocAws) putDockerHubSecret(ctx context.Context, projectName string, username, accessToken string) (string, error) {
+	type auth struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	cred := auth{Username: username, Password: accessToken}
+	secretKey := b.getSecretID(projectName, "CI_REGISTRY_AUTH")
+	credBytes, err := json.Marshal(cred)
+	if err != nil {
+		return "", err
+	}
+
+	cfg, err := b.driver.LoadConfig(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	secretsmanagerClient := secretsmanager.NewFromConfig(cfg)
+
+	arn, err := aws.PutSecretManagerSecret(ctx, secretKey, string(credBytes), secretsmanagerClient)
+	if err != nil {
+		return "", err
+	}
+	return arn, nil
+}
+
+func (b *ByocAws) FixupServices(ctx context.Context, project *composeTypes.Project) error {
+	// HACK: Use ServiceFixupper interface callback used in fixup.go to check if Docker Hub credentials are needed
+	return b.checkRequiresDockerHubToken(ctx, project)
+}
+
+func (b *ByocAws) checkRequiresDockerHubToken(ctx context.Context, project *composeTypes.Project) error {
+	images, err := compose.FindAllBaseImages(project)
+	if err != nil {
+		return err
+	}
+
+	var missingDockerhubImages []string
+	for _, image := range images {
+		if !dockerhub.IsDockerHubImage(image) {
+			continue
+		}
+		parsed, err := dockerhub.ParseImage(image)
+		if err != nil {
+			return err
+		}
+		repo := parsed.Repo
+		//If a image does not have a repo, it is assumed to be in the official "library" repo
+		if !strings.Contains(repo, "/") {
+			repo = "library/" + repo
+		}
+		ecrRepo := "docker/" + repo
+		tag := parsed.Tag
+		if tag == "" {
+			tag = parsed.Digest
+		}
+		if tag == "" {
+			tag = "latest"
+		}
+
+		found, err := b.driver.CheckImageExistOnPublicECR(ctx, ecrRepo, tag)
+		if err != nil {
+			term.Debugf("Error checking image %q on Public ECR: %v, assuming credentials needed", image, err)
+			found = false
+		}
+		if !found {
+			// TODO: Make provider stateless: This is a hack to get around the fact that we have lost
+			// access to the service build context by the time we reach deploy as it has been uploaded
+			// to S3. The last place we have access to the build context is during fixup, since only
+			// AWS BYOC requires this info, we use a state variable to be set during fixup to indicate
+			// that Docker Hub creds are needed, since our provider is already stateful.
+			missingDockerhubImages = append(missingDockerhubImages, image)
+		}
+	}
+	if len(missingDockerhubImages) > 0 {
+		b.needDockerHubCreds = true
+		term.Debugf("Docker Hub images not found on Public ECR: %v", missingDockerhubImages)
+		track.Evt("NeedsDockerHubCreds", track.P("images", strings.Join(missingDockerhubImages, ",")))
+	}
+	return nil
 }
 
 func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string, error) {
@@ -374,7 +477,7 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_JSON":                os.Getenv("DEFANG_JSON"),
-		"DEFANG_ORG":                 b.TenantName,
+		"DEFANG_ORG":                 b.TenantName, // Keep this as DEFANG_ORG for backward compatibility CD depends on this variable name
 		"DEFANG_PREFIX":              b.Prefix,
 		"DEFANG_PULUMI_DEBUG":        os.Getenv("DEFANG_PULUMI_DEBUG"),
 		"DEFANG_PULUMI_DIFF":         os.Getenv("DEFANG_PULUMI_DIFF"),
@@ -409,6 +512,9 @@ type cdCommand struct {
 	delegationSetId string
 	mode            defangv1.DeploymentMode
 	project         string
+
+	dockerHubUsername    string
+	dockerHubAccessToken string
 }
 
 func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn, error) {
@@ -426,6 +532,15 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn,
 		env["DOMAIN"] = "dummy.domain"
 	}
 	env["DEFANG_MODE"] = strings.ToLower(cmd.mode.String())
+	if cmd.dockerHubUsername != "" && cmd.dockerHubAccessToken != "" {
+		arn, err := b.putDockerHubSecret(ctx, cmd.project, cmd.dockerHubUsername, cmd.dockerHubAccessToken)
+		if err != nil {
+			term.Warnf("Could not store Docker Hub credentials in Secrets Manager, images from dockerhub may be throttled during build: %v", err)
+		} else {
+			env["CI_REGISTRY_CREDENTIALS_ARN"] = arn
+			term.Debugf("Stored Docker Hub credentials in Secrets Manager: %s", arn)
+		}
+	}
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging

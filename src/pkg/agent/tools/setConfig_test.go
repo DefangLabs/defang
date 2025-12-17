@@ -8,6 +8,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -246,11 +247,13 @@ func TestHandleSetConfig(t *testing.T) {
 					"profile_name": "default",
 				},
 			})
-			stackName := "test-stack"
+			stack := stacks.StackParameters{
+				Name:     "test-stack",
+				Provider: client.ProviderAWS,
+			}
 			result, err := HandleSetConfig(t.Context(), loader, params, tt.mockCLI, ec, StackConfig{
-				Cluster:    tt.cluster,
-				ProviderID: &tt.providerId,
-				Stack:      &stackName,
+				Cluster: tt.cluster,
+				Stack:   &stack,
 			})
 
 			if tt.expectedError {

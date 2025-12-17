@@ -17,7 +17,7 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 					return "Failed to configure loader", err
 				}
 				var cli CLIInterface = &DefaultToolCLI{}
-				return HandleServicesTool(ctx.Context, loader, cli, ec, config)
+				return HandleServicesTool(ctx.Context, loader, params, cli, ec, config)
 			},
 		),
 		ai.NewTool("deploy",
@@ -28,7 +28,7 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 					return "Failed to configure loader", err
 				}
 				cli := &DefaultToolCLI{}
-				return HandleDeployTool(ctx.Context, loader, cli, ec, config)
+				return HandleDeployTool(ctx.Context, loader, params, cli, ec, config)
 			},
 		),
 		ai.NewTool("destroy",
@@ -39,7 +39,7 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 					return "Failed to configure loader", err
 				}
 				cli := &DefaultToolCLI{}
-				return HandleDestroyTool(ctx.Context, loader, cli, ec, config)
+				return HandleDestroyTool(ctx.Context, loader, params, cli, ec, config)
 			},
 		),
 		ai.NewTool("logs",
@@ -75,6 +75,36 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 				return HandleSetConfig(ctx.Context, loader, params, cli, ec, config)
 			},
 		),
+		ai.NewTool("select_stack",
+			"Select the deployment stack for the defang project",
+			func(ctx *ai.ToolContext, params SelectStackParams) (string, error) {
+				return HandleSelectStackTool(ctx.Context, params, config)
+			},
+		),
+		ai.NewTool("create_aws_stack",
+			"Create a defang stack file to deploy to AWS",
+			func(ctx *ai.ToolContext, params CreateAWSStackParams) (string, error) {
+				return HandleCreateAWSStackTool(ctx.Context, params, config)
+			},
+		),
+		ai.NewTool("create_gcp_stack",
+			"Create a defang stack file to deploy to GCP",
+			func(ctx *ai.ToolContext, params CreateGCPStackParams) (string, error) {
+				return HandleCreateGCPStackTool(ctx.Context, params, config)
+			},
+		),
+		ai.NewTool("list_stacks",
+			"List all the Defang stack(s) for the current project",
+			func(ctx *ai.ToolContext, params ListStacksParams) (string, error) {
+				return HandleListStacksTool(ctx.Context, params)
+			},
+		),
+		ai.NewTool("current_stack",
+			"Get the currently selected stack",
+			func(ctx *ai.ToolContext, params CurrentStackParams) (string, error) {
+				return HandleCurrentStackTool(ctx.Context, config)
+			},
+		),
 		ai.NewTool("remove_config",
 			"Remove a config variable from the defang project",
 			func(ctx *ai.ToolContext, params RemoveConfigParams) (string, error) {
@@ -88,13 +118,13 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 		),
 		ai.NewTool("list_configs",
 			"List config variables for the defang project",
-			func(ctx *ai.ToolContext, params ListConfigsParams) (string, error) {
+			func(ctx *ai.ToolContext, params ListConfigParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
 				cli := &DefaultToolCLI{}
-				return HandleListConfigTool(ctx.Context, loader, cli, ec, config)
+				return HandleListConfigTool(ctx.Context, loader, params, cli, ec, config)
 			},
 		),
 	}

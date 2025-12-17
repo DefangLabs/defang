@@ -19,8 +19,18 @@ import (
 
 const RAILPACK = "*Railpack"
 
+type ServiceFixupper interface {
+	FixupServices(ctx context.Context, project *composeTypes.Project) error
+}
+
 func FixupServices(ctx context.Context, provider client.Provider, project *composeTypes.Project, upload UploadMode) error {
-	oldName := project.Name
+	if fixupper, ok := provider.(ServiceFixupper); ok {
+		if err := fixupper.FixupServices(ctx, project); err != nil {
+			return err
+		}
+	}
+
+  oldName := project.Name
 	project.Name = NormalizeProjectName(project.Name)
 	if project.Name != oldName {
 		term.Debugf("normalized project name %q -> %q", oldName, project.Name)

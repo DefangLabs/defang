@@ -18,6 +18,7 @@ type PrintDeployment struct {
 	ProjectName string
 	Provider    string
 	Region      string
+	Mode        string
 }
 
 func DeploymentsList(ctx context.Context, listType defangv1.DeploymentType, projectName string, client client.FabricClient, limit uint32) error {
@@ -51,6 +52,7 @@ func DeploymentsList(ctx context.Context, listType defangv1.DeploymentType, proj
 			ProjectName: d.Project,
 			Provider:    getProvider(d.Provider, d.ProviderString),
 			Region:      d.Region,
+			Mode:        d.Mode.String(),
 		}
 	}
 
@@ -64,7 +66,7 @@ func DeploymentsList(ctx context.Context, listType defangv1.DeploymentType, proj
 		return sortKeys[i] < sortKeys[j]
 	})
 
-	return term.Table(deployments, "ProjectName", "Provider", "AccountId", "Region", "Deployment", "DeployedAt")
+	return term.Table(deployments, "ProjectName", "Provider", "AccountId", "Region", "Deployment", "Mode", "DeployedAt")
 }
 
 func getProvider(provider defangv1.Provider, providerString string) string {

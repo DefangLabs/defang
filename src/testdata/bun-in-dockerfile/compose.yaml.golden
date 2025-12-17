@@ -1,0 +1,16 @@
+name: bun
+services:
+  bun:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    networks:
+      default: null
+    restart: unless-stopped
+  server:
+    image: alpine:latest
+    networks:
+      default: null
+networks:
+  default:
+    name: bun_default
