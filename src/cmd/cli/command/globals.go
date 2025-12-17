@@ -76,7 +76,7 @@ type GlobalConfig struct {
 	HideUpdate     bool
 	ModelID        string // only for debug/generate; Pro users
 	NonInteractive bool
-	Org            string
+	Tenant         string
 	SourcePlatform migrate.SourcePlatform // only used for 'defang init' command
 	Stack          stacks.StackParameters
 	Verbose        bool
@@ -200,9 +200,12 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 		}
 	}
 
-	if !flags.Changed("org") {
-		if fromEnv, ok := os.LookupEnv("DEFANG_ORG"); ok {
-			r.Org = fromEnv
+	if !flags.Changed("workspace") {
+		if fromEnv, ok := os.LookupEnv("DEFANG_WORKSPACE"); ok {
+			r.Tenant = fromEnv
+		} else if fromEnv, ok := os.LookupEnv("DEFANG_ORG"); ok {
+			r.Tenant = fromEnv
+			term.Warn("DEFANG_ORG is deprecated; use DEFANG_WORKSPACE instead")
 		}
 	}
 

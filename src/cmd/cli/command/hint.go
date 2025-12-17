@@ -51,15 +51,16 @@ func printDefangHint(hint string, cmds ...string) {
 	term.Printf("\n%s\n\n", hint)
 	if stackFlag := RootCmd.Flag("stack"); stackFlag.Changed {
 		executable += " --stack=" + stackFlag.Value.String()
-	} else if providerFlag := RootCmd.Flag("provider"); providerFlag.Changed {
+	} else if providerFlag := RootCmd.Flag("provider"); providerFlag != nil && providerFlag.Changed {
 		executable += " --provider=" + providerFlag.Value.String()
 	}
-	if clusterFlag := RootCmd.Flag("cluster"); clusterFlag.Changed {
+	if clusterFlag := RootCmd.Flag("cluster"); clusterFlag != nil && clusterFlag.Changed {
 		executable += " --cluster=" + clusterFlag.Value.String()
 	}
-	if orgFlag := RootCmd.Flag("org"); orgFlag.Changed {
-		executable += " --org=" + orgFlag.Value.String()
+	if workspaceFlag := RootCmd.Flag("workspace"); workspaceFlag != nil && workspaceFlag.Changed {
+		executable += " --workspace=" + workspaceFlag.Value.String()
 	}
+	// Legacy org flag was removed; intentionally not propagated in hints.
 	for _, arg := range cmds {
 		term.Printf("  %s %s\n\n", executable, arg)
 	}

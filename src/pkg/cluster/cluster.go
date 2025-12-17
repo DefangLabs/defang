@@ -10,33 +10,36 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 const DefaultCluster = "fabric-prod1.defang.dev"
 
 var DefangFabric = pkg.Getenv("DEFANG_FABRIC", DefaultCluster)
 
-func SplitTenantHost(cluster string) (types.TenantName, string) {
-	tenant := types.DEFAULT_TENANT
-	parts := strings.SplitN(cluster, "@", 2)
-	if len(parts) == 2 {
-		tenant, cluster = types.TenantName(parts[0]), parts[1]
-	}
+func NormalizeHost(cluster string) string {
 	if cluster == "" {
 		cluster = DefangFabric
 	}
 	if _, _, err := net.SplitHostPort(cluster); err != nil {
 		cluster = cluster + ":443" // default to https
 	}
-	return tenant, cluster
+	return cluster
+}
+
+func tokenStorageName(fabric string) string {
+	// Token files are keyed by normalized host (no tenant prefix, no port) to avoid duplication.
+	if at := strings.LastIndex(fabric, "@"); at >= 0 && at < len(fabric)-1 {
+		fabric = fabric[at+1:] // drop legacy tenant prefix
+	}
+	host := NormalizeHost(fabric)
+	if parsedHost, _, err := net.SplitHostPort(host); err == nil && parsedHost != "" {
+		host = parsedHost
+	}
+	return host
 }
 
 func GetTokenFile(fabric string) string {
-	if host, _, _ := net.SplitHostPort(fabric); host != "" {
-		fabric = host
-	}
-	return filepath.Join(client.StateDir, fabric)
+	return filepath.Join(client.StateDir, tokenStorageName(fabric))
 }
 
 func GetExistingToken(fabric string) string {

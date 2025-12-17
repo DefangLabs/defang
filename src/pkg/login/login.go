@@ -55,7 +55,8 @@ func interactiveLogin(ctx context.Context, client client.FabricClient, fabric st
 		return err
 	}
 
-	tenant, host := cluster.SplitTenantHost(fabric)
+	tenant := cli.TenantFromToken(token) // show the tenant implied by the freshly issued token
+	host := cluster.NormalizeHost(fabric)
 	term.Info("Successfully logged in to", host, "("+tenant.String()+" tenant)")
 
 	if err := cluster.SaveAccessToken(fabric, token); err != nil {
