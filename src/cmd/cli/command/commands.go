@@ -1419,8 +1419,8 @@ func saveSelectedProvider(ctx context.Context, client ProviderSelectionClient, p
 	}
 }
 
-func printProviderMismatchWarnings(ctx context.Context) {
-	if global.Stack.Provider == cliClient.ProviderDefang {
+func printProviderMismatchWarnings(ctx context.Context, provider cliClient.ProviderID) {
+	if provider == cliClient.ProviderDefang {
 		// Ignore any env vars when explicitly using the Defang playground provider
 		// Defaults to defang provider in non-interactive mode
 		if awsInEnv() {
@@ -1434,7 +1434,7 @@ func printProviderMismatchWarnings(ctx context.Context) {
 		}
 	}
 
-	switch global.Stack.Provider {
+	switch provider {
 	case cliClient.ProviderAWS:
 		if !awsInConfig(ctx) {
 			term.Warn("AWS provider was selected, but AWS environment is not set")
@@ -1465,7 +1465,7 @@ func newProvider(ctx context.Context, ec elicitations.Controller, sm stacks.Mana
 	}
 	term.Infof("Using the %q stack on %s from %s%s", stack.Name, stack.Provider, whence, extraMsg)
 
-	printProviderMismatchWarnings(ctx)
+	printProviderMismatchWarnings(ctx, stack.Provider)
 	provider := cli.NewProvider(ctx, stack.Provider, global.Client, stack.Name)
 	return provider, nil
 }
