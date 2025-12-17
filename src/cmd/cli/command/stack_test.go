@@ -72,9 +72,8 @@ func TestStackListCmd(t *testing.T) {
 			loader := compose.NewLoader()
 			projectName, err := loader.LoadProjectName(ctx)
 			if err != nil {
-				projectName = ""
+				return err
 			}
-
 			sm, err := stacks.NewManager(global.Client, wd, projectName)
 			if err != nil {
 				return err
