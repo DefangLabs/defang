@@ -3,10 +3,12 @@ package command
 import (
 	"fmt"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/spf13/cobra"
 )
 
@@ -62,4 +64,43 @@ func makeEstimateCmd() *cobra.Command {
 	estimateCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	estimateCmd.Flags().StringVarP(&global.Stack.Region, "region", "r", "", "which cloud region to estimate")
 	return estimateCmd
+}
+
+func interactiveSelectProvider(providers []cliClient.ProviderID) (cliClient.ProviderID, error) {
+	if len(providers) < 2 {
+		panic("interactiveSelectProvider called with less than 2 providers")
+	}
+	// Prompt the user to choose a provider if in interactive mode
+	options := []string{}
+	for _, p := range providers {
+		options = append(options, p.String())
+	}
+	// Default to the provider in the environment if available
+	var defaultOption any // not string!
+	if awsInEnv() {
+		defaultOption = cliClient.ProviderAWS.String()
+	} else if doInEnv() {
+		defaultOption = cliClient.ProviderDO.String()
+	} else if gcpInEnv() {
+		defaultOption = cliClient.ProviderGCP.String()
+	}
+	var optionValue string
+	if err := survey.AskOne(&survey.Select{
+		Default: defaultOption,
+		Message: "Choose a cloud provider:",
+		Options: options,
+		Help:    "The provider you choose will be used for deploying services.",
+		Description: func(value string, i int) string {
+			return providerDescription[cliClient.ProviderID(value)]
+		},
+	}, &optionValue, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
+		return "", fmt.Errorf("failed to select provider: %w", err)
+	}
+	track.Evt("ProviderSelected", P("provider", optionValue))
+	var providerID cliClient.ProviderID
+	err := providerID.Set(optionValue)
+	if err != nil {
+		return "", err
+	}
+	return providerID, nil
 }
