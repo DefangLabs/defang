@@ -72,36 +72,17 @@ func TestWhoami(t *testing.T) {
 	}
 }
 
-func TestSubjectFromToken(t *testing.T) {
-	t.Run("valid token", func(t *testing.T) {
-		token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTEyMyJ9.signature" // #nosec G101 -- test JWT token, not a real credential
-		subject, err := SubjectFromToken(token)
-		if err != nil {
-			t.Fatalf("SubjectFromToken() unexpected error: %v", err)
-		}
-		if subject != "user-123" {
-			t.Fatalf("SubjectFromToken() = %q, want %q", subject, "user-123")
-		}
-	})
-
-	t.Run("invalid token", func(t *testing.T) {
-		if _, err := SubjectFromToken("not-a-jwt"); err == nil {
-			t.Fatalf("SubjectFromToken() expected error for invalid token")
-		}
-	})
-}
-
 func TestParseTokenClaims(t *testing.T) {
-	token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJmYWJyaWMtZGV2IiwiYXVkIjoiZGVmYW5nLWF1ZCIsInN1YiI6InVzZXIxMjMifQ.signature" // #nosec G101 -- test JWT token, not a real credential
+	token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJmYWJyaWMtZGV2IiwiYXVkIjoiZGVmYW5nLWF1ZCIsInN1YiI6InVzZXIxMjMifQ.c2lnbmF0dXJl" // #nosec G101 -- test JWT token, not a real credential
 	claims, err := ParseTokenClaims(token)
 	if err != nil {
 		t.Fatalf("ParseTokenClaims() unexpected error: %v", err)
 	}
 
-	if claims.Sub != "user123" {
-		t.Fatalf("ParseTokenClaims().Sub = %q, want %q", claims.Sub, "user123")
+	if claims.Subject != "user123" {
+		t.Fatalf("ParseTokenClaims().Subject = %q, want %q", claims.Subject, "user123")
 	}
-	if claims.Iss != "fabric-dev" {
-		t.Fatalf("ParseTokenClaims().Iss = %q, want %q", claims.Iss, "fabric-dev")
+	if claims.Issuer != "fabric-dev" {
+		t.Fatalf("ParseTokenClaims().Issuer = %q, want %q", claims.Issuer, "fabric-dev")
 	}
 }

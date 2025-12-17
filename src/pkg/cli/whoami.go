@@ -2,16 +2,14 @@ package cli
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
+	"github.com/golang-jwt/jwt/v5"
 
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -67,17 +65,8 @@ func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Pro
 	return showData, nil
 }
 
-func SubjectFromToken(token string) (string, error) {
-	claims, err := ParseTokenClaims(token)
-	if err != nil {
-		return "", err
-	}
-	return claims.Sub, nil
-}
-
 type TokenClaims struct {
-	Sub string `json:"sub"`
-	Iss string `json:"iss"`
+	jwt.RegisteredClaims
 }
 
 func ParseTokenClaims(token string) (TokenClaims, error) {
@@ -85,19 +74,9 @@ func ParseTokenClaims(token string) (TokenClaims, error) {
 		return TokenClaims{}, errors.New("token is empty")
 	}
 
-	parts := strings.Split(token, ".")
-	if len(parts) < 2 {
-		return TokenClaims{}, errors.New("token is not a JWT")
-	}
-
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return TokenClaims{}, fmt.Errorf("failed to decode JWT payload: %w", err)
-	}
-
 	var claims TokenClaims
-	if err := json.Unmarshal(payload, &claims); err != nil {
-		return TokenClaims{}, fmt.Errorf("failed to decode JWT claims: %w", err)
+	if _, _, err := new(jwt.Parser).ParseUnverified(token, &claims); err != nil {
+		return TokenClaims{}, fmt.Errorf("failed to parse JWT: %w", err)
 	}
 
 	return claims, nil

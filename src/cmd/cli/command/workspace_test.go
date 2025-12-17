@@ -99,3 +99,19 @@ func TestWorkspaceListVerboseTable(t *testing.T) {
 		t.Fatalf("expected Workspace Two row with ID, got: %q", output)
 	}
 }
+
+func TestWorkspaceListWithFabricToken(t *testing.T) {
+	clusterURL := setupWorkspaceTestServers(t)
+	t.Setenv("DEFANG_ACCESS_TOKEN", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJmYWJyaWMtY2kiLCJzdWIiOiJ0ZXN0In0.c2lnbmF0dXJl") // #nosec G101 -- test JWT token, not a real credential
+
+	oldGlobal := global
+	t.Cleanup(func() { global = oldGlobal })
+
+	err := testCommand([]string{"workspace", "ls", "--json", "--non-interactive"}, clusterURL)
+	if err == nil {
+		t.Fatalf("expected workspace command to fail with Fabric token")
+	}
+	if !strings.Contains(err.Error(), "workspace command isn't currently supported in CI environments") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

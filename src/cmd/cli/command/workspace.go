@@ -3,6 +3,7 @@ package command
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/auth"
@@ -19,6 +20,14 @@ func ListWorkspaces(cmd *cobra.Command, args []string) error {
 	token := cluster.GetExistingToken(getCluster())
 	if token == "" {
 		return errors.New("no access token found; please log in with `defang login`")
+	}
+
+	claims, err := cli.ParseTokenClaims(token)
+	if err != nil {
+		term.Debug("unable to parse JWT claims:", err)
+	} else if strings.Contains(strings.ToLower(claims.Issuer), "fabric") {
+		// Assume Fabric-issued tokens are for CI environments
+		return errors.New("workspace command isn't currently supported in CI environments")
 	}
 
 	// Determine current selection from flag/env/token, then reconcile with WhoAmI.

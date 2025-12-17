@@ -569,8 +569,8 @@ var whoamiCmd = &cobra.Command{
 		)
 		if token != "" {
 			if claims, err := cli.ParseTokenClaims(token); err == nil {
-				subject = claims.Sub
-				issuer = claims.Iss
+				subject = claims.Subject
+				issuer = claims.Issuer
 			} else {
 				term.Debug("unable to parse JWT claims:", err)
 			}
