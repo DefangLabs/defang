@@ -303,7 +303,7 @@ func (b *ByocGcp) BootstrapList(ctx context.Context, _allRegions bool) (iter.Seq
 func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
 	projectId := getGcpProjectID()
 	if projectId == "" {
-		return nil, errors.New("GCP_PROJECT_ID or CLOUDSDK_CORE_PROJECT must be set for GCP projects")
+		return nil, errors.New("GCP_PROJECT_ID or CLOUDSDK_CORE_PROJECT must be set for GCP projects; use 'gcloud project list' to see available project ids")
 	}
 
 	// check whether the ADC is logged in by trying to get the current account email
