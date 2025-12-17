@@ -83,6 +83,12 @@ func (m *mockFabricService) SetSelectedProvider(context.Context, *connect.Reques
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
+func (m *mockFabricService) ListDeployments(context.Context, *connect.Request[defangv1.ListDeploymentsRequest]) (*connect.Response[defangv1.ListDeploymentsResponse], error) {
+	return connect.NewResponse(&defangv1.ListDeploymentsResponse{
+		Deployments: []*defangv1.Deployment{},
+	}), nil
+}
+
 func init() {
 	SetupCommands(context.Background(), "0.0.0-test")
 }
@@ -342,7 +348,10 @@ func TestGetProvider(t *testing.T) {
 		os.Unsetenv("DEFANG_PROVIDER")
 		RootCmd = FakeRootWithProviderParam("")
 
-		p, err := newProvider(ctx, nil, nil, "empty")
+		// Create a mock stacks manager that returns empty stack list
+		mockSM := &mockStacksManager{}
+
+		p, err := newProvider(ctx, nil, mockSM, "empty")
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -369,7 +378,8 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.savedProvider = nil
 		})
 
-		p, err := newProvider(ctx, nil, nil, "empty")
+		mockSM := &mockStacksManager{}
+		p, err := newProvider(ctx, nil, mockSM, "empty")
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -504,7 +514,8 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.savedProvider = nil
 		})
 
-		_, err := newProvider(ctx, nil, nil, "")
+		mockSM := &mockStacksManager{}
+		_, err := newProvider(ctx, nil, mockSM, "")
 		if err != nil && !strings.HasPrefix(err.Error(), "DIGITALOCEAN_TOKEN must be set") {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -525,7 +536,8 @@ func TestGetProvider(t *testing.T) {
 			aws.StsClient = sts
 		})
 
-		p, err := newProvider(ctx, nil, nil, "empty")
+		mockSM := &mockStacksManager{}
+		p, err := newProvider(ctx, nil, mockSM, "empty")
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -546,7 +558,8 @@ func TestGetProvider(t *testing.T) {
 			}, nil
 		}
 
-		p, err := newProvider(ctx, nil, nil, "empty")
+		mockSM := &mockStacksManager{}
+		p, err := newProvider(ctx, nil, mockSM, "empty")
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -569,7 +582,8 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.canIUseResponse.CdImage = ""
 		})
 
-		p, err := newProvider(ctx, nil, nil, "empty")
+		mockSM := &mockStacksManager{}
+		p, err := newProvider(ctx, nil, mockSM, "empty")
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -604,7 +618,8 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.canIUseResponse.CdImage = ""
 		})
 
-		p, err := newProvider(ctx, nil, nil, "empty")
+		mockSM := &mockStacksManager{}
+		p, err := newProvider(ctx, nil, mockSM, "empty")
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}

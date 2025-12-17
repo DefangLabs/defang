@@ -641,7 +641,23 @@ func TestManager_WorkingDirectoryDifferent(t *testing.T) {
 	// Create a temporary directory for testing but don't change to it
 	tmpDir := t.TempDir()
 
-	mockClient := &mockFabricClient{}
+	deployedAt := time.Now()
+	mockClient := &mockFabricClient{
+		deployments: []*defangv1.Deployment{
+			{
+				Stack:     "remotestack1",
+				Provider:  defangv1.Provider_AWS,
+				Region:    "us-east-1",
+				Timestamp: timestamppb.New(deployedAt),
+			},
+			{
+				Stack:     "remotestack2",
+				Provider:  defangv1.Provider_GCP,
+				Region:    "us-central1",
+				Timestamp: timestamppb.New(deployedAt),
+			},
+		},
+	}
 	manager, err := NewManager(mockClient, tmpDir, "test-project")
 	if err != nil {
 		t.Fatalf("NewManager failed: %v", err)
@@ -665,13 +681,28 @@ func TestManager_WorkingDirectoryDifferent(t *testing.T) {
 		t.Errorf("Expected specific error message about operation not allowed, got: %v", err)
 	}
 
-	// List should fail
-	_, err = manager.List(context.Background())
-	if err == nil {
-		t.Error("List() should fail when target directory differs from working directory")
+	// List should return only remote stacks (no error)
+	stacks, err := manager.List(context.Background())
+	if err != nil {
+		t.Fatalf("List() should not fail when target directory differs from working directory: %v", err)
 	}
-	if !strings.Contains(err.Error(), "operation not allowed: target directory") {
-		t.Errorf("Expected specific error message about operation not allowed, got: %v", err)
+	if len(stacks) != 2 {
+		t.Errorf("Expected 2 remote stacks, got %d", len(stacks))
+	}
+
+	// Verify the returned stacks are remote stacks
+	stackNames := make(map[string]bool)
+	for _, stack := range stacks {
+		stackNames[stack.Name] = true
+		if stack.DeployedAt.IsZero() {
+			t.Errorf("Expected remote stack %s to have deployment time", stack.Name)
+		}
+	}
+	if !stackNames["remotestack1"] {
+		t.Error("Expected to find remotestack1")
+	}
+	if !stackNames["remotestack2"] {
+		t.Error("Expected to find remotestack2")
 	}
 
 	// Load should fail

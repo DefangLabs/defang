@@ -1323,14 +1323,16 @@ func getStack(ctx context.Context, projectName string, ec elicitations.Controlle
 		if err != nil {
 			return nil, "", fmt.Errorf("unable to list stacks: %w", err)
 		}
-		if len(knownStacks) > 1 && !global.NonInteractive {
-			stackParameters, err := stackSelector.SelectStack(ctx)
+		if len(knownStacks) == 1 {
+			knownStack := knownStacks[0]
+			stack.Name = knownStack.Name
+			var providerID cliClient.ProviderID
+			err := providerID.Set(knownStack.Provider)
 			if err != nil {
-				return nil, "", fmt.Errorf("failed to select stack: %w", err)
+				return nil, "", fmt.Errorf("invalid provider %q in stack %q: %w", knownStack.Provider, knownStack.Name, err)
 			}
-			stack = stackParameters
-			whence = "interactive selection"
-			saveSelectedProvider(ctx, projectName, stack.Provider)
+			stack.Provider = providerID
+			whence = "stack file"
 		} else {
 			if RootCmd.PersistentFlags().Changed("provider") {
 				whence = "command line flag"

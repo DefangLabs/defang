@@ -2,6 +2,7 @@ package stacks
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -77,7 +78,10 @@ func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
 	}
 	localStacks, err := sm.ListLocal()
 	if err != nil {
-		return nil, fmt.Errorf("failed to list local stacks: %w", err)
+		var outsideErr *OutsideError
+		if !errors.As(err, &outsideErr) {
+			return nil, fmt.Errorf("failed to list local stacks: %w", err)
+		}
 	}
 	// Merge remote and local stacks into a single list of type StackOption,
 	// prefer remote if both exist, so we can show last deployed time
