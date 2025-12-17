@@ -1447,14 +1447,20 @@ func newProvider(ctx context.Context, ec elicitations.Controller, sm stacks.Mana
 }
 
 func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient.Provider, error) {
-	projectName, err := loader.LoadProjectName(ctx)
-	if err != nil {
-		term.Warnf("Unable to load project: %v", err)
+	var err error
+	projectName := ""
+	outside := true
+	if loader != nil {
+		projectName, err = loader.LoadProjectName(ctx)
+		if err != nil {
+			term.Warnf("Unable to load project: %v", err)
+		}
+		outside = loader.OutsideWorkingDirectory()
 	}
 	elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
 	ec := elicitations.NewController(elicitationsClient)
 	var sm stacks.Manager
-	if loader.OutsideWorkingDirectory() {
+	if outside {
 		sm, err = stacks.NewManager(global.Client, "", projectName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create stack manager: %w", err)
