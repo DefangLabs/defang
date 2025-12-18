@@ -107,6 +107,7 @@ func makeComposeUpCmd() *cobra.Command {
 			if resp, err := global.Client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
 				Project: project.Name,
 				Type:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
+				Stack:   global.Stack.Name,
 			}); err != nil {
 				term.Debugf("ListDeployments failed: %v", err)
 			} else if accountInfo, err := provider.AccountInfo(ctx); err != nil {
@@ -727,6 +728,7 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 	if deployment == "latest" {
 		resp, err := global.Client.ListDeployments(cmd.Context(), &defangv1.ListDeploymentsRequest{
 			Project: projectName,
+			Stack:   global.Stack.Name,
 			Type:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
 			Limit:   1,
 		})

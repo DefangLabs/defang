@@ -1104,7 +1104,10 @@ var deploymentsCmd = &cobra.Command{
 			cli.EnableUTCMode()
 		}
 
-		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, projectName, global.Client, 0)
+		return cli.DeploymentsList(cmd.Context(), global.Client, cli.ListDeploymentsParams{
+			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
+			ProjectName: projectName,
+		})
 	},
 }
 
@@ -1127,7 +1130,11 @@ var deploymentsListCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY, projectName, global.Client, 10)
+		return cli.DeploymentsList(cmd.Context(), global.Client, cli.ListDeploymentsParams{
+			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY,
+			ProjectName: projectName,
+			Limit:       10,
+		})
 	},
 }
 

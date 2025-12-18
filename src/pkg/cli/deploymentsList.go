@@ -21,11 +21,17 @@ type PrintDeployment struct {
 	Mode        string
 }
 
-func DeploymentsList(ctx context.Context, listType defangv1.DeploymentType, projectName string, client client.FabricClient, limit uint32) error {
+type ListDeploymentsParams struct {
+	ListType    defangv1.DeploymentType
+	ProjectName string
+	Limit       uint32
+}
+
+func DeploymentsList(ctx context.Context, client client.FabricClient, params ListDeploymentsParams) error {
 	response, err := client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
-		Type:    listType,
-		Project: projectName,
-		Limit:   limit,
+		Type:    params.ListType,
+		Project: params.ProjectName,
+		Limit:   params.Limit,
 	})
 	if err != nil {
 		return err
@@ -34,10 +40,10 @@ func DeploymentsList(ctx context.Context, listType defangv1.DeploymentType, proj
 	numDeployments := len(response.Deployments)
 	if numDeployments == 0 {
 		var err error
-		if projectName == "" {
+		if params.ProjectName == "" {
 			_, err = term.Warn("No deployments found")
 		} else {
-			_, err = term.Warnf("No deployments found for project %q", projectName)
+			_, err = term.Warnf("No deployments found for project %q", params.ProjectName)
 		}
 		return err
 	}
