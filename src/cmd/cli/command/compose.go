@@ -647,7 +647,7 @@ func setupLogsFlags(cmd *cobra.Command) {
 	cmd.Flags().MarkHidden("name")
 	cmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
 	cmd.Flags().MarkHidden("etag")
-	cmd.Flags().String("deployment", "", "deployment ID of the service")
+	cmd.Flags().String("deployment", "", "deployment ID of the service (use 'latest' for the most recent deployment)")
 	cmd.Flags().Bool("follow", false, "follow log output; incompatible with --until") // NOTE: -f is already used by --file
 	cmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
 	cmd.Flags().String("since", "", "show logs since duration/time")
@@ -721,6 +721,22 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 	projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 	if err != nil {
 		return err
+	}
+
+	// Handle 'latest' deployment flag
+	if deployment == "latest" {
+		resp, err := global.Client.ListDeployments(cmd.Context(), &defangv1.ListDeploymentsRequest{
+			Project: projectName,
+			Type:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
+			Limit:   1,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to fetch latest deployment: %w", err)
+		}
+		if len(resp.Deployments) == 0 {
+			return errors.New("no active deployments found")
+		}
+		deployment = resp.Deployments[0].Id
 	}
 
 	tailOptions := cli.TailOptions{
