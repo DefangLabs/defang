@@ -180,6 +180,14 @@ func TestLoadParameters(t *testing.T) {
 	os.Unsetenv("AWS_PROFILE")
 	os.Unsetenv("DEFANG_MODE")
 
+	defer func() {
+		// Clean up environment variables after test
+		os.Unsetenv("DEFANG_PROVIDER")
+		os.Unsetenv("AWS_REGION")
+		os.Unsetenv("AWS_PROFILE")
+		os.Unsetenv("DEFANG_MODE")
+	}()
+
 	err := stacks.LoadParameters(params, true)
 	if err != nil {
 		t.Fatalf("LoadParameters() error = %v", err)
