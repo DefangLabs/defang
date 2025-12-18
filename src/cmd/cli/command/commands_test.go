@@ -277,8 +277,18 @@ func (f *FakeStdout) Fd() uintptr {
 }
 
 type mockStacksManager struct {
+	t *testing.T
 	stacks.Manager
 	expectedProvider cliClient.ProviderID
+	expectedRegion   string
+}
+
+func NewMockStacksManager(t *testing.T, expectedProvider cliClient.ProviderID, expectedRegion string) *mockStacksManager {
+	return &mockStacksManager{
+		t:                t,
+		expectedProvider: expectedProvider,
+		expectedRegion:   expectedRegion,
+	}
 }
 
 func (m *mockStacksManager) List(ctx context.Context) ([]stacks.StackListItem, error) {
@@ -286,6 +296,8 @@ func (m *mockStacksManager) List(ctx context.Context) ([]stacks.StackListItem, e
 }
 
 func (m *mockStacksManager) Load(name string) (*stacks.StackParameters, error) {
+	m.t.Setenv("AWS_REGION", "us-west-2")
+	m.t.Setenv("DEFANG_PROVIDER", m.expectedProvider.String())
 	return &stacks.StackParameters{
 		Name:     name,
 		Provider: m.expectedProvider,
@@ -307,6 +319,7 @@ func TestNewProvider(t *testing.T) {
 	oldRootCmd := RootCmd
 	t.Cleanup(func() {
 		RootCmd = oldRootCmd
+		global.Stack = stacks.StackParameters{}
 	})
 	FakeRootWithProviderParam := func(provider string) *cobra.Command {
 		cmd := &cobra.Command{}
@@ -326,7 +339,7 @@ func TestNewProvider(t *testing.T) {
 
 		// Create a mock stacks manager that returns empty stack list
 		mockEC := &mockElicitationsController{}
-		mockSM := &mockStacksManager{}
+		mockSM := NewMockStacksManager(t, cliClient.ProviderAWS, "us-west-2")
 
 		p, err := newProvider(ctx, mockEC, mockSM)
 		if err != nil {
@@ -358,10 +371,11 @@ func TestNewProvider(t *testing.T) {
 		t.Cleanup(func() {
 			aws.StsClient = sts
 			mockCtrl.canIUseResponse.CdImage = ""
+			global.Stack = stacks.StackParameters{}
 		})
 
 		mockEC := &mockElicitationsController{}
-		mockSM := &mockStacksManager{expectedProvider: cliClient.ProviderAWS}
+		mockSM := NewMockStacksManager(t, cliClient.ProviderAWS, "us-west-2")
 		p, err := newProvider(ctx, mockEC, mockSM)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
@@ -393,10 +407,11 @@ func TestNewProvider(t *testing.T) {
 		t.Cleanup(func() {
 			aws.StsClient = sts
 			mockCtrl.canIUseResponse.CdImage = ""
+			global.Stack = stacks.StackParameters{}
 		})
 
 		mockEC := &mockElicitationsController{}
-		mockSM := &mockStacksManager{expectedProvider: cliClient.ProviderAWS}
+		mockSM := NewMockStacksManager(t, cliClient.ProviderAWS, "us-west-2")
 		p, err := newProvider(ctx, mockEC, mockSM)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
@@ -500,6 +515,7 @@ func TestGetStack(t *testing.T) {
 	defer func() {
 		RootCmd = origRootCmd
 		global.NonInteractive = origGlobalNonInteractive
+		global.Stack = stacks.StackParameters{}
 	}()
 
 	testCases := []struct {
