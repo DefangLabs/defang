@@ -2,12 +2,10 @@ package command
 
 import (
 	"bytes"
-	"encoding/json"
 	"os"
 	"testing"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -54,58 +52,7 @@ func TestStackListCmd(t *testing.T) {
 	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, "compose file path(s)")
 
 	// Create stackListCmd with manual RunE to avoid configureLoader call during test
-	stackListCmd := &cobra.Command{
-		Use:     "list",
-		Aliases: []string{"ls"},
-		Args:    cobra.NoArgs,
-		Short:   "List existing Defang deployment stacks",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			jsonMode, _ := cmd.Flags().GetBool("json")
-
-			wd, err := os.Getwd()
-			if err != nil {
-				return err
-			}
-
-			ctx := cmd.Context()
-			// Create a simple loader without using configureLoader to avoid flag issues
-			loader := compose.NewLoader()
-			projectName, err := loader.LoadProjectName(ctx)
-			if err != nil {
-				return err
-			}
-			sm, err := stacks.NewManager(global.Client, wd, projectName)
-			if err != nil {
-				return err
-			}
-
-			stacks, err := sm.List(ctx)
-			if err != nil {
-				return err
-			}
-
-			if jsonMode {
-				jsonData := []byte("[]")
-				if len(stacks) > 0 {
-					jsonData, err = json.MarshalIndent(stacks, "", "  ")
-					if err != nil {
-						return err
-					}
-				}
-				_, err = term.Print(string(jsonData) + "\n")
-				return err
-			}
-
-			if len(stacks) == 0 {
-				_, err = term.Infof("No Defang stacks found in the current directory.\n")
-				return err
-			}
-
-			columns := []string{"Name", "Provider", "Region", "Mode", "DeployedAt"}
-			return term.Table(stacks, columns...)
-		},
-	}
-	stackListCmd.Flags().Bool("json", false, "Output in JSON format")
+	var stackListCmd = makeStackListCmd()
 
 	// Add stackListCmd as a child of RootCmd
 	RootCmd.AddCommand(stackListCmd)
@@ -145,6 +92,14 @@ func TestStackListCmd(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup stacks
 			t.Chdir(t.TempDir())
+			// create a compose file so stackListCmd doesn't error out
+			os.WriteFile(
+				"compose.yaml",
+				[]byte(`services:
+  web:
+    image: nginx`),
+				os.FileMode(0644),
+			)
 			for _, stack := range tt.stacks {
 				stacks.Create(stack)
 			}
@@ -153,7 +108,8 @@ func TestStackListCmd(t *testing.T) {
 			mockStdin := bytes.NewReader([]byte{})
 			MockTerm(t, buffer, mockStdin)
 
-			err := stackListCmd.RunE(stackListCmd, []string{})
+			RootCmd.SetArgs([]string{"list"})
+			err := RootCmd.Execute()
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectOutput, buffer.String())
 		})
