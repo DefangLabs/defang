@@ -275,43 +275,80 @@ func (f *FakeStdout) Fd() uintptr {
 	return os.Stdout.Fd()
 }
 
-type mockStacksManager struct {
-	t *testing.T
-	stacks.Manager
+type mockStackManager struct {
+	t                *testing.T
 	expectedProvider cliClient.ProviderID
 	expectedRegion   string
+	listResult       []stacks.StackListItem
+	listError        error
+	loadResults      map[string]*stacks.StackParameters
+	loadResult       *stacks.StackParameters
+	loadError        error
+	createError      error
+	createResult     *stacks.StackParameters
 }
 
-func NewMockStacksManager(t *testing.T, expectedProvider cliClient.ProviderID, expectedRegion string) *mockStacksManager {
-	return &mockStacksManager{
+func NewMockStackManager(t *testing.T, expectedProvider cliClient.ProviderID, expectedRegion string) *mockStackManager {
+	return &mockStackManager{
 		t:                t,
 		expectedProvider: expectedProvider,
 		expectedRegion:   expectedRegion,
+		listResult:       []stacks.StackListItem{},
 	}
 }
 
-func (m *mockStacksManager) List(ctx context.Context) ([]stacks.StackListItem, error) {
-	return []stacks.StackListItem{}, nil
+func (m *mockStackManager) List(ctx context.Context) ([]stacks.StackListItem, error) {
+	if m.listError != nil {
+		return nil, m.listError
+	}
+	return m.listResult, nil
 }
 
-func (m *mockStacksManager) Load(name string) (*stacks.StackParameters, error) {
-	params := stacks.StackParameters{
-		Name:     name,
-		Provider: m.expectedProvider,
-		Region:   m.expectedRegion,
+func (m *mockStackManager) Load(name string) (*stacks.StackParameters, error) {
+	if m.loadError != nil {
+		return nil, m.loadError
 	}
 
-	m.LoadParameters(params.ToMap(), true)
+	// Check for specific stack name first
+	if m.loadResults != nil {
+		if result, exists := m.loadResults[name]; exists {
+			return result, nil
+		}
+	}
 
-	return &params, nil
+	// If we have an explicit loadResult, return it
+	if m.loadResult != nil {
+		return m.loadResult, nil
+	}
+
+	// If we have expected provider/region (from old NewMockStackManager usage), create default params
+	if m.expectedProvider != "" && m.expectedRegion != "" {
+		params := stacks.StackParameters{
+			Name:     name,
+			Provider: m.expectedProvider,
+			Region:   m.expectedRegion,
+			Mode:     modes.ModeAffordable,
+		}
+		stacks.LoadParameters(params.ToMap(), true)
+		return &params, nil
+	}
+
+	// Return nil to indicate stack file doesn't exist
+	return nil, nil
 }
 
-func (m *mockStacksManager) LoadParameters(params map[string]string, overload bool) error {
-	return stacks.LoadParameters(params, overload)
-}
-
-func (m *mockStacksManager) Create(params stacks.StackParameters) (string, error) {
+func (m *mockStackManager) Create(params stacks.StackParameters) (string, error) {
+	if m.createError != nil {
+		return "", m.createError
+	}
+	if m.createResult != nil {
+		m.loadResult = m.createResult
+	}
 	return params.Name, nil
+}
+
+func (m *mockStackManager) LoadParameters(params map[string]string, overload bool) error {
+	return stacks.LoadParameters(params, overload)
 }
 
 func TestNewProvider(t *testing.T) {
@@ -344,7 +381,7 @@ func TestNewProvider(t *testing.T) {
 
 		// Create a mock stacks manager that returns empty stack list
 		mockEC := &mockElicitationsController{}
-		mockSM := NewMockStacksManager(t, cliClient.ProviderAWS, "us-west-2")
+		mockSM := NewMockStackManager(t, cliClient.ProviderAWS, "us-west-2")
 
 		p, err := newProvider(ctx, mockEC, mockSM)
 		if err != nil {
@@ -380,7 +417,7 @@ func TestNewProvider(t *testing.T) {
 		})
 
 		mockEC := &mockElicitationsController{}
-		mockSM := NewMockStacksManager(t, cliClient.ProviderAWS, "us-west-2")
+		mockSM := NewMockStackManager(t, cliClient.ProviderAWS, "us-west-2")
 		p, err := newProvider(ctx, mockEC, mockSM)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
@@ -416,7 +453,7 @@ func TestNewProvider(t *testing.T) {
 		})
 
 		mockEC := &mockElicitationsController{}
-		mockSM := NewMockStacksManager(t, cliClient.ProviderAWS, "us-west-2")
+		mockSM := NewMockStackManager(t, cliClient.ProviderAWS, "us-west-2")
 		p, err := newProvider(ctx, mockEC, mockSM)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
@@ -466,53 +503,6 @@ func (m *mockElicitationsController) SetSupported(supported bool) {
 
 func (m *mockElicitationsController) IsSupported() bool {
 	return m.isSupported
-}
-
-type mockStackManager struct {
-	listResult   []stacks.StackListItem
-	listError    error
-	loadResults  map[string]*stacks.StackParameters
-	loadResult   *stacks.StackParameters
-	loadError    error
-	createError  error
-	createResult *stacks.StackParameters
-}
-
-func (m *mockStackManager) List(ctx context.Context) ([]stacks.StackListItem, error) {
-	if m.listError != nil {
-		return nil, m.listError
-	}
-	return m.listResult, nil
-}
-
-func (m *mockStackManager) Load(name string) (*stacks.StackParameters, error) {
-	if m.loadError != nil {
-		return nil, m.loadError
-	}
-
-	// Check for specific stack name first
-	if m.loadResults != nil {
-		if result, exists := m.loadResults[name]; exists {
-			return result, nil
-		}
-	}
-
-	// Fall back to default
-	return m.loadResult, nil
-}
-
-func (m *mockStackManager) Create(params stacks.StackParameters) (string, error) {
-	if m.createError != nil {
-		return "", m.createError
-	}
-	if m.createResult != nil {
-		m.loadResult = m.createResult
-	}
-	return params.Name, nil
-}
-
-func (m *mockStackManager) LoadParameters(params map[string]string, overload bool) error {
-	return stacks.LoadParameters(params, overload)
 }
 
 func TestGetStack(t *testing.T) {
@@ -664,7 +654,7 @@ func TestGetStack(t *testing.T) {
 				ec := &mockElicitationsController{}
 				sm := &mockStackManager{
 					listResult: []stacks.StackListItem{
-						{Name: "only-stack", Provider: "auto"},
+						{Name: "only-stack", Provider: "auto", Mode: "affordable"},
 					},
 				}
 				return ec, sm
@@ -672,6 +662,7 @@ func TestGetStack(t *testing.T) {
 			expectedStack: &stacks.StackParameters{
 				Name:     "only-stack",
 				Provider: cliClient.ProviderAuto,
+				Mode:     modes.ModeAffordable,
 			},
 			expectedWhence: "only stack",
 		},
