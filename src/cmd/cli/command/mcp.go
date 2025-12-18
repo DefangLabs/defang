@@ -49,7 +49,7 @@ var mcpServerCmd = &cobra.Command{
 		// Create a new MCP server
 		term.Debug("Creating MCP server")
 		s, err := mcp.NewDefangMCPServer(RootCmd.Version, mcpClient, tools.DefaultToolCLI{}, mcp.StackConfig{
-			Cluster: getCluster(),
+			Cluster: global.Cluster,
 			Stack:   &global.Stack,
 		})
 		if err != nil {

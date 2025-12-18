@@ -52,17 +52,13 @@ var authNeededAnnotation = map[string]string{authNeeded: ""}
 
 var P = track.P
 
-func getCluster() string {
-	return global.Cluster
-}
-
 // getTenantSelection resolves the tenant to use for this invocation (flag > env > token subject),
 // leaving it unset when we should rely on the personal tenant from the token subject.
 func getTenantSelection() types.TenantNameOrID {
 	if global.Tenant != "" {
 		return types.TenantNameOrID(global.Tenant)
 	}
-	if token := cluster.GetExistingToken(getCluster()); token != "" {
+	if token := cluster.GetExistingToken(global.Cluster); token != "" {
 		if t := cli.TenantFromToken(token); t.IsSet() {
 			return t
 		}
@@ -211,7 +207,7 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// Create a temporary gRPC client for tracking events before login
 	// getTenantSelection defaults to types.TenantUnset when no tenant is specified
-	cli.ConnectWithTenant(ctx, getCluster(), getTenantSelection())
+	cli.ConnectWithTenant(ctx, global.Cluster, getTenantSelection())
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
@@ -463,7 +459,7 @@ var RootCmd = &cobra.Command{
 			return err
 		}
 
-		global.Client, err = cli.ConnectWithTenant(ctx, getCluster(), getTenantSelection())
+		global.Client, err = cli.ConnectWithTenant(ctx, global.Cluster, getTenantSelection())
 
 		if err != nil {
 			if connect.CodeOf(err) != connect.CodeUnauthenticated {
@@ -489,7 +485,7 @@ var RootCmd = &cobra.Command{
 		if global.NonInteractive {
 			err = global.Client.CheckLoginAndToS(ctx)
 		} else {
-			err = login.InteractiveRequireLoginAndToS(ctx, global.Client, getCluster())
+			err = login.InteractiveRequireLoginAndToS(ctx, global.Client, global.Cluster)
 		}
 
 		return err
@@ -500,13 +496,13 @@ var RootCmd = &cobra.Command{
 		}
 
 		ctx := cmd.Context()
-		err := login.InteractiveRequireLoginAndToS(ctx, global.Client, getCluster())
+		err := login.InteractiveRequireLoginAndToS(ctx, global.Client, global.Cluster)
 		if err != nil {
 			return err
 		}
 
 		prompt := "Welcome to Defang. I can help you deploy your project to the cloud."
-		ag, err := agent.New(ctx, getCluster(), &global.Stack)
+		ag, err := agent.New(ctx, global.Cluster, &global.Stack)
 		if err != nil {
 			return err
 		}
@@ -522,11 +518,11 @@ var loginCmd = &cobra.Command{
 		trainingOptOut, _ := cmd.Flags().GetBool("training-opt-out")
 
 		if global.NonInteractive {
-			if err := login.NonInteractiveGitHubLogin(cmd.Context(), global.Client, getCluster()); err != nil {
+			if err := login.NonInteractiveGitHubLogin(cmd.Context(), global.Client, global.Cluster); err != nil {
 				return err
 			}
 		} else {
-			err := login.InteractiveLogin(cmd.Context(), global.Client, getCluster())
+			err := login.InteractiveLogin(cmd.Context(), global.Client, global.Cluster)
 			if err != nil {
 				return err
 			}
@@ -561,10 +557,10 @@ var whoamiCmd = &cobra.Command{
 
 		jsonMode, _ := cmd.Flags().GetBool("json")
 
-		token := cluster.GetExistingToken(getCluster())
+		token := cluster.GetExistingToken(global.Cluster)
 		userInfo, err := auth.FetchUserInfo(cmd.Context(), token)
 		if err != nil {
-			return err
+			term.Warn("unable to fetch user info:", err)
 		}
 
 		tenantSelection := getTenantSelection()
@@ -696,7 +692,7 @@ var generateCmd = &cobra.Command{
 			Heroku:   migrate.NewHerokuClient(),
 			ModelID:  global.ModelID,
 			Fabric:   global.Client,
-			Cluster:  getCluster(),
+			Cluster:  global.Cluster,
 		}
 
 		var sample string
@@ -732,7 +728,7 @@ var initCmd = &cobra.Command{
 			Heroku:   migrate.NewHerokuClient(),
 			ModelID:  global.ModelID,
 			Fabric:   global.Client,
-			Cluster:  getCluster(),
+			Cluster:  global.Cluster,
 		}
 
 		if len(args) > 0 {
@@ -1008,7 +1004,7 @@ var debugCmd = &cobra.Command{
 			return err
 		}
 
-		debugger, err := debug.NewDebugger(ctx, getCluster(), &global.Stack)
+		debugger, err := debug.NewDebugger(ctx, global.Cluster, &global.Stack)
 		if err != nil {
 			return err
 		}
