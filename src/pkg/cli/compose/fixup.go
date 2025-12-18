@@ -30,7 +30,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 		}
 	}
 
-  oldName := project.Name
+	oldName := project.Name
 	project.Name = NormalizeProjectName(project.Name)
 	if project.Name != oldName {
 		term.Debugf("normalized project name %q -> %q", oldName, project.Name)

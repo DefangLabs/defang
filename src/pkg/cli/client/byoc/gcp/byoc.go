@@ -578,7 +578,6 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 }
 
 func (b *ByocGcp) getLogStream(ctx context.Context, gcpLogsClient GcpLogsClient, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	fmt.Printf("Getting logs for project %s ===========\n", req.Project)
 	logStream, err := NewLogStream(ctx, gcpLogsClient, req.Services)
 	if err != nil {
 		return nil, err
