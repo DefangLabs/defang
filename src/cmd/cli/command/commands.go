@@ -1311,11 +1311,11 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 	// This code unfortunately replicates the provider precedence rules in the
 	// RoomCmd's PersistentPreRunE func, I think we should avoid reading the
 	// stack file during startup, and only read it here instead.
-	if RootCmd.PersistentFlags().Changed("stack") || os.Getenv("DEFANG_STACK") != "" {
+	if os.Getenv("DEFANG_STACK") != "" || RootCmd.PersistentFlags().Changed("stack") {
 		whence = "stack file"
-		stackName := RootCmd.Flags().Lookup("stack").Value.String()
+		stackName := os.Getenv("DEFANG_STACK")
 		if stackName == "" {
-			stackName = os.Getenv("DEFANG_STACK")
+			stackName = RootCmd.Flags().Lookup("stack").Value.String()
 		}
 		stackParams, err := sm.Load(stackName)
 		if err != nil {
