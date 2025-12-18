@@ -333,8 +333,7 @@ func (m *mockStackManager) Load(name string) (*stacks.StackParameters, error) {
 		return &params, nil
 	}
 
-	// Return nil to indicate stack file doesn't exist
-	return nil, nil
+	return nil, os.ErrNotExist
 }
 
 func (m *mockStackManager) Create(params stacks.StackParameters) (string, error) {
@@ -602,7 +601,7 @@ func TestGetStack(t *testing.T) {
 				Name:     "existing-stack",
 				Provider: cliClient.ProviderAWS,
 			},
-			expectedWhence: "interactive selection",
+			expectedWhence: "only stack",
 		},
 		{
 			name: "env provider with warning and existing stacks",
@@ -654,14 +653,14 @@ func TestGetStack(t *testing.T) {
 				ec := &mockElicitationsController{}
 				sm := &mockStackManager{
 					listResult: []stacks.StackListItem{
-						{Name: "only-stack", Provider: "auto", Mode: "affordable"},
+						{Name: "only-stack", Provider: "aws", Mode: "affordable"},
 					},
 				}
 				return ec, sm
 			},
 			expectedStack: &stacks.StackParameters{
 				Name:     "only-stack",
-				Provider: cliClient.ProviderAuto,
+				Provider: cliClient.ProviderAWS,
 				Mode:     modes.ModeAffordable,
 			},
 			expectedWhence: "only stack",
@@ -709,6 +708,7 @@ func TestGetStack(t *testing.T) {
 				sm := &mockStackManager{
 					listResult: []stacks.StackListItem{
 						{Name: "stack1", Provider: "aws"},
+						{Name: "stack2", Provider: "aws"},
 					},
 				}
 				return ec, sm
