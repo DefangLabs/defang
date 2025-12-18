@@ -24,6 +24,7 @@ type PrintDeployment struct {
 type ListDeploymentsParams struct {
 	ListType    defangv1.DeploymentType
 	ProjectName string
+	StackName   string
 	Limit       uint32
 }
 
@@ -31,6 +32,7 @@ func DeploymentsList(ctx context.Context, client client.FabricClient, params Lis
 	response, err := client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
 		Type:    params.ListType,
 		Project: params.ProjectName,
+		Stack:   params.StackName,
 		Limit:   params.Limit,
 	})
 	if err != nil {
