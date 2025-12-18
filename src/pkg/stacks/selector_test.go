@@ -71,6 +71,11 @@ func (m *MockStacksManager) Load(name string) (*StackParameters, error) {
 	return result, args.Error(1)
 }
 
+func (m *MockStacksManager) LoadParameters(params map[string]string, overload bool) error {
+	args := m.Called(params, overload)
+	return args.Error(0)
+}
+
 func (m *MockStacksManager) Create(params StackParameters) (string, error) {
 	args := m.Called(params)
 	return args.String(0), args.Error(1)

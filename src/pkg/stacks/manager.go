@@ -16,6 +16,7 @@ import (
 type Manager interface {
 	List(ctx context.Context) ([]StackListItem, error)
 	Load(name string) (*StackParameters, error)
+	LoadParameters(params map[string]string, overload bool) error
 	Create(params StackParameters) (string, error)
 }
 
@@ -189,6 +190,10 @@ func (sm *manager) Load(name string) (*StackParameters, error) {
 		return nil, err
 	}
 	return params, nil
+}
+
+func (sm *manager) LoadParameters(params map[string]string, overload bool) error {
+	return LoadParameters(params, overload)
 }
 
 func (sm *manager) Create(params StackParameters) (string, error) {

@@ -165,3 +165,28 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadParameters(t *testing.T) {
+	params := map[string]string{
+		"DEFANG_PROVIDER": "aws",
+		"AWS_REGION":      "us-west-2",
+		"AWS_PROFILE":     "default",
+		"DEFANG_MODE":     "AFFORDABLE",
+	}
+
+	// Clear any existing env vars that might interfere with the test
+	os.Unsetenv("DEFANG_PROVIDER")
+	os.Unsetenv("AWS_REGION")
+	os.Unsetenv("AWS_PROFILE")
+	os.Unsetenv("DEFANG_MODE")
+
+	err := stacks.LoadParameters(params, true)
+	if err != nil {
+		t.Fatalf("LoadParameters() error = %v", err)
+	}
+
+	assert.Equal(t, "aws", os.Getenv("DEFANG_PROVIDER"))
+	assert.Equal(t, "us-west-2", os.Getenv("AWS_REGION"))
+	assert.Equal(t, "default", os.Getenv("AWS_PROFILE"))
+	assert.Equal(t, "AFFORDABLE", os.Getenv("DEFANG_MODE"))
+}

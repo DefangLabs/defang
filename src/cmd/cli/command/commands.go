@@ -1367,9 +1367,22 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 		if err != nil {
 			return nil, "", fmt.Errorf("invalid provider %q in stack %q: %w", knownStack.Provider, knownStack.Name, err)
 		}
+		mode := modes.ModeUnspecified
+		if knownStack.Mode != "" {
+			err = mode.Set(knownStack.Mode)
+			if err != nil {
+				return nil, "", fmt.Errorf("invalid mode %q in stack %q: %w", knownStack.Mode, knownStack.Name, err)
+			}
+		}
 		stack = &stacks.StackParameters{
 			Name:     knownStack.Name,
 			Provider: stack.Provider,
+			Region:   knownStack.Region,
+			Mode:     mode,
+		}
+		err = sm.LoadParameters(stack.ToMap(), false)
+		if err != nil {
+			return nil, "", fmt.Errorf("unable to load parameters for stack %q: %w", knownStack.Name, err)
 		}
 		whence = "only stack"
 		return stack, whence, nil

@@ -86,6 +86,7 @@ func (m *mockFabricService) ListDeployments(context.Context, *connect.Request[de
 			{
 				Stack:    "beta",
 				Provider: defangv1.Provider_AWS,
+				Mode:     defangv1.DeploymentMode_DEVELOPMENT,
 			},
 		},
 	}), nil
@@ -148,8 +149,6 @@ func TestCommandGates(t *testing.T) {
 	mockService := &mockFabricService{}
 	_, handler := defangv1connect.NewFabricControllerHandler(mockService)
 	t.Chdir("../../../../src/testdata/sanity")
-
-	t.Setenv("AWS_REGION", "us-west-2")
 
 	userinfoServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/userinfo" {
@@ -296,13 +295,19 @@ func (m *mockStacksManager) List(ctx context.Context) ([]stacks.StackListItem, e
 }
 
 func (m *mockStacksManager) Load(name string) (*stacks.StackParameters, error) {
-	m.t.Setenv("AWS_REGION", "us-west-2")
-	m.t.Setenv("DEFANG_PROVIDER", m.expectedProvider.String())
-	return &stacks.StackParameters{
+	params := stacks.StackParameters{
 		Name:     name,
 		Provider: m.expectedProvider,
-		Region:   "us-west-2",
-	}, nil
+		Region:   m.expectedRegion,
+	}
+
+	m.LoadParameters(params.ToMap(), true)
+
+	return &params, nil
+}
+
+func (m *mockStacksManager) LoadParameters(params map[string]string, overload bool) error {
+	return stacks.LoadParameters(params, overload)
 }
 
 func (m *mockStacksManager) Create(params stacks.StackParameters) (string, error) {
@@ -504,6 +509,10 @@ func (m *mockStackManager) Create(params stacks.StackParameters) (string, error)
 		m.loadResult = m.createResult
 	}
 	return params.Name, nil
+}
+
+func (m *mockStackManager) LoadParameters(params map[string]string, overload bool) error {
+	return stacks.LoadParameters(params, overload)
 }
 
 func TestGetStack(t *testing.T) {
