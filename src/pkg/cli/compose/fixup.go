@@ -77,7 +77,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 
 		// Ignore "build" config if we have "image", unless in --build or --force mode
 		if svccfg.Image != "" && svccfg.Build != nil && upload != UploadModeDigest && upload != UploadModeForce {
-			term.Warnf("service %q: ignoring 'build' section because 'image' is specified; pass --build to use build instead", svccfg.Name)
+			term.Warnf("service %q: using published image instead of rebuilding; pass --build to build and publish a new image", svccfg.Name)
 			svccfg.Build = nil
 		}
 
