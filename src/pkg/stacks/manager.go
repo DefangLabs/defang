@@ -10,6 +10,7 @@ import (
 	"time"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
@@ -156,6 +157,7 @@ func (sm *manager) ListRemote(ctx context.Context) ([]RemoteStack, error) {
 					Name:     stackName,
 					Provider: providerID,
 					Region:   deployment.GetRegion(),
+					Mode:     modes.Mode(deployment.GetMode()),
 				},
 				DeployedAt: deployedAt,
 			}
