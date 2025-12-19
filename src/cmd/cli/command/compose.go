@@ -189,17 +189,28 @@ func makeComposeUpCmd() *cobra.Command {
 			serviceStates, err := cli.Monitor(ctx, project, session.Provider, time.Duration(waitTimeout)*time.Second, deploy.Etag)
 			if err != nil && !errors.Is(err, context.Canceled) {
 				deploymentErr := err
-				// TODO: only show the most relevant logs:
-				// * avoid showing service logs if the failure was during the build stage
-				// * avoid showing build logs for services that built successfully
-				// * only show cd logs if the failure was during deployment
-				err := cli.Tail(ctx, provider, project.Name, cli.TailOptions{
+
+				options := cli.TailOptions{
 					Deployment: deploy.Etag,
 					LogType:    logs.LogTypeAll,
 					Since:      since,
 					Verbose:    true,
 					Follow:     false,
-				})
+				}
+
+				// if any services failed to build, only show build logs for those
+				// services
+				var unbuiltServices = make([]string, 0, len(project.Services))
+				for service, state := range serviceStates {
+					if state <= defangv1.ServiceState_BUILD_STOPPING {
+						unbuiltServices = append(unbuiltServices, service)
+					}
+				}
+				if len(unbuiltServices) > 0 {
+					options.LogType = logs.LogTypeBuild
+					options.Services = unbuiltServices
+				}
+				err := cli.Tail(ctx, provider, project.Name, options)
 				if err != nil && !errors.Is(err, io.EOF) {
 					term.Warn("Failed to tail logs for deployment error", err)
 					return deploymentErr
