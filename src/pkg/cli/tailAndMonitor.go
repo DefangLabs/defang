@@ -56,8 +56,8 @@ func Monitor(ctx context.Context, project *compose.Project, provider client.Prov
 		defer wg.Done()
 		if err := WaitForCdTaskExit(ctx, provider); err != nil {
 			cdErr = err
-			cancelSvcStatus(cdErr)
 		}
+		cancelSvcStatus(cdErr)
 	}()
 
 	wg.Wait()

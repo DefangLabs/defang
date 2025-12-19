@@ -48,41 +48,65 @@ func WatchServiceState(
 	}
 
 	// Monitor for when all services are completed to end this command
-	for {
-		if !serverStream.Receive() {
-			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
-			if isTransientError(serverStream.Err()) {
-				if err := provider.DelayBeforeRetry(ctx); err != nil {
-					return serviceStates, err
+	msgChan := make(chan *defangv1.SubscribeResponse, 1)
+	errChan := make(chan error, 1)
+
+	// Run stream receiving in a separate goroutine
+	go func() {
+		for {
+			if !serverStream.Receive() {
+				// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
+				if isTransientError(serverStream.Err()) {
+					if err := provider.DelayBeforeRetry(ctx); err != nil {
+						errChan <- err
+						return
+					}
+					serverStream, err = provider.Subscribe(ctx, &subscribeRequest)
+					if err != nil {
+						errChan <- err
+						return
+					}
+					continue
 				}
-				serverStream, err = provider.Subscribe(ctx, &subscribeRequest)
-				if err != nil {
-					return serviceStates, err
-				}
+				errChan <- serverStream.Err()
+				return
+			}
+
+			msg := serverStream.Msg()
+			if msg == nil {
 				continue
 			}
-			return serviceStates, serverStream.Err()
-		}
 
-		msg := serverStream.Msg()
-		if msg == nil {
-			continue
-		}
-
-		term.Debugf("service %s with state ( %s ) and status: %s\n", msg.Name, msg.State, msg.Status) // TODO: don't print in Go-routine
-
-		if _, ok := serviceStates[msg.Name]; !ok {
-			term.Debugf("unexpected service %s update", msg.Name) // TODO: don't print in Go-routine
-			continue
-		}
-
-		serviceStates[msg.Name] = msg.State
-		err := cb(msg, &serviceStates)
-		if err != nil {
-			if errors.Is(err, client.ErrDeploymentSucceeded) {
-				return serviceStates, nil
+			select {
+			case msgChan <- msg:
+			case <-ctx.Done():
+				return
 			}
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return serviceStates, ctx.Err()
+		case err := <-errChan:
 			return serviceStates, err
+		case msg := <-msgChan:
+			term.Debugf("service %s with state ( %s ) and status: %s\n", msg.Name, msg.State, msg.Status) // TODO: don't print in Go-routine
+
+			if _, ok := serviceStates[msg.Name]; !ok {
+				term.Debugf("unexpected service %s update", msg.Name) // TODO: don't print in Go-routine
+				continue
+			}
+
+			serviceStates[msg.Name] = msg.State
+			err := cb(msg, &serviceStates)
+			if err != nil {
+				if errors.Is(err, client.ErrDeploymentSucceeded) {
+					return serviceStates, nil
+				}
+				return serviceStates, err
+			}
 		}
 	}
 }
