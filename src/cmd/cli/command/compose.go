@@ -187,7 +187,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, global.Verbose)
 			serviceStates, err := cli.TailAndMonitor(ctx, project, session.Provider, time.Duration(waitTimeout)*time.Second, tailOptions)
-			if err != nil {
+			if err != nil && !errors.Is(err, context.Canceled) {
 				deploymentErr := err
 				debugger, err := debug.NewDebugger(ctx, global.Cluster, &global.Stack)
 				if err != nil {
