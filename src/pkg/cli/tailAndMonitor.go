@@ -31,7 +31,7 @@ func Monitor(ctx context.Context, project *compose.Project, provider client.Prov
 	_, computeServices := splitManagedAndUnmanagedServices(project.Services)
 
 	for _, svc := range computeServices {
-		term.Infof("[%s] %s\n", svc, "DEPLOYMENT_PENDING")
+		term.Infof("[%s] %s\n", svc, "DEPLOYMENT_QUEUED")
 	}
 
 	var (
