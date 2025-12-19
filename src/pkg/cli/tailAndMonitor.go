@@ -15,7 +15,7 @@ import (
 	"github.com/bufbuild/connect-go"
 )
 
-func Monitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, deploymentID string) (ServiceStates, error) {
+func Monitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, deploymentID string, watchCallback func(*defangv1.SubscribeResponse, *ServiceStates) error) (ServiceStates, error) {
 	if deploymentID == "" {
 		panic("deploymentID must be a valid deployment ID")
 	}
@@ -30,10 +30,6 @@ func Monitor(ctx context.Context, project *compose.Project, provider client.Prov
 
 	_, computeServices := splitManagedAndUnmanagedServices(project.Services)
 
-	for _, svc := range computeServices {
-		term.Infof("[%s] %s\n", svc, "DEPLOYMENT_QUEUED")
-	}
-
 	var (
 		serviceStates ServiceStates
 		cdErr, svcErr error
@@ -43,13 +39,7 @@ func Monitor(ctx context.Context, project *compose.Project, provider client.Prov
 
 	go func() {
 		defer wg.Done()
-		serviceStates, svcErr = WatchServiceState(svcStatusCtx, provider, project.Name, deploymentID, computeServices, func(msg *defangv1.SubscribeResponse, states *ServiceStates) error {
-			// Print service status updates as they arrive
-			for name, state := range *states {
-				term.Infof("[%s] %s\n", name, state.String())
-			}
-			return nil
-		})
+		serviceStates, svcErr = WatchServiceState(svcStatusCtx, provider, project.Name, deploymentID, computeServices, watchCallback)
 	}()
 
 	go func() {
@@ -82,7 +72,10 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 
 	// Run Monitor in a goroutine
 	go func() {
-		serviceStates, monitorErr = Monitor(ctx, project, provider, waitTimeout, tailOptions.Deployment)
+		// Pass a NOOP function for the callback since TailAndMonitor doesn't use UI
+		serviceStates, monitorErr = Monitor(ctx, project, provider, waitTimeout, tailOptions.Deployment, func(*defangv1.SubscribeResponse, *ServiceStates) error {
+			return nil // NOOP - no UI updates needed when tailing
+		})
 		pkg.SleepWithContext(ctx, 2*time.Second) // a delay before cancelling tail to make sure we get last status messages
 		cancelTail(errMonitoringDone)            // cancel the tail when monitoring is done
 	}()
