@@ -165,7 +165,15 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 			} else {
 				term.Info("Live tail logs with `defang tail --deployment=" + deploy.Etag + "`")
-				serviceStates, err = cli.Monitor(ctx, project, session.Provider, waitTimeoutDuration, deploy.Etag)
+				for _, svc := range project.Services {
+					term.Infof("[%s] %s\n", svc.Name, "DEPLOYMENT_PENDING")
+				}
+				serviceStates, err = cli.Monitor(ctx, project, session.Provider, waitTimeoutDuration, deploy.Etag, func(msg *defangv1.SubscribeResponse, serviceStates *map[string]defangv1.ServiceState) error {
+					for svc, state := range *serviceStates {
+						term.Infof("[%s] %s\n", svc, state)
+					}
+					return nil
+				})
 			}
 			if err != nil && !errors.Is(err, context.Canceled) {
 				deploymentErr := err
