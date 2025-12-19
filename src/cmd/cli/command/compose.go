@@ -60,6 +60,7 @@ func makeComposeUpCmd() *cobra.Command {
 			var detach, _ = cmd.Flags().GetBool("detach")
 			var utc, _ = cmd.Flags().GetBool("utc")
 			var waitTimeout, _ = cmd.Flags().GetInt("wait-timeout")
+			var tail, _ = cmd.Flags().GetBool("tail")
 
 			if utc {
 				cli.EnableUTCMode()
@@ -177,26 +178,27 @@ func makeComposeUpCmd() *cobra.Command {
 				term.Info("Detached.")
 				return nil
 			}
-
-			// show users the current streaming logs
-			tailSource := "all services"
-			if deploy.Etag != "" {
-				tailSource = "deployment ID " + deploy.Etag
+			tailOptions := cli.TailOptions{
+				Deployment: deploy.Etag,
+				LogType:    logs.LogTypeAll,
+				Since:      since,
+				Verbose:    true,
 			}
-			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 
-			term.Info("Live tail logs with `defang tail --deployment=" + deploy.Etag + "`")
-			serviceStates, err := cli.Monitor(ctx, project, session.Provider, time.Duration(waitTimeout)*time.Second, deploy.Etag)
+			waitTimeoutDuration := time.Duration(waitTimeout) * time.Second
+			var serviceStates map[string]defangv1.ServiceState
+			if tail {
+				tailOptions.Follow = true
+				serviceStates, err = cli.TailAndMonitor(ctx, project, session.Provider, waitTimeoutDuration, tailOptions)
+				if err != nil {
+					return err
+				}
+			} else {
+				term.Info("Live tail logs with `defang tail --deployment=" + deploy.Etag + "`")
+				serviceStates, err = cli.Monitor(ctx, project, session.Provider, waitTimeoutDuration, deploy.Etag)
+			}
 			if err != nil && !errors.Is(err, context.Canceled) {
 				deploymentErr := err
-
-				options := cli.TailOptions{
-					Deployment: deploy.Etag,
-					LogType:    logs.LogTypeAll,
-					Since:      since,
-					Verbose:    true,
-					Follow:     false,
-				}
 
 				// if any services failed to build, only show build logs for those
 				// services
@@ -207,10 +209,10 @@ func makeComposeUpCmd() *cobra.Command {
 					}
 				}
 				if len(unbuiltServices) > 0 {
-					options.LogType = logs.LogTypeBuild
-					options.Services = unbuiltServices
+					tailOptions.LogType = logs.LogTypeBuild
+					tailOptions.Services = unbuiltServices
 				}
-				err := cli.Tail(ctx, provider, project.Name, options)
+				err := cli.Tail(ctx, session.Provider, project.Name, tailOptions)
 				if err != nil && !errors.Is(err, io.EOF) {
 					term.Warn("Failed to tail logs for deployment error", err)
 					return deploymentErr
@@ -255,8 +257,7 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed; implies --build")
 	composeUpCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
-	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // no-op, but keep for backwards compatibility
-	_ = composeUpCmd.Flags().MarkHidden("tail")
+	composeUpCmd.Flags().Bool("tail", false, "tail the logs while deploying")
 	composeUpCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	composeUpCmd.Flags().Bool("build", false, "build images before starting services") // docker-compose compatibility
 	composeUpCmd.Flags().Bool("wait", true, "wait for services to be running|healthy") // docker-compose compatibility
