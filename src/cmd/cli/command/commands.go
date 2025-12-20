@@ -964,7 +964,6 @@ var configListCmd = &cobra.Command{
 	},
 }
 
-type serviceName string
 type configOutput struct {
 	Service string `json:"service"`
 	Name    string `json:"name"`
@@ -977,7 +976,6 @@ type Source int
 const (
 	SourceUnknown Source = iota
 	SourceComposeFile
-	SourceEnvFile
 	SourceDefangConfig
 	SourceDefangAndComposeFile
 )
@@ -985,7 +983,6 @@ const (
 var sourceNames = map[Source]string{
 	SourceUnknown:              "unknown",
 	SourceComposeFile:          "compose_file",
-	SourceEnvFile:              "env_file",
 	SourceDefangConfig:         "defang_config",
 	SourceDefangAndComposeFile: "compose_file and defang_config",
 }
@@ -997,20 +994,19 @@ func (s Source) String() string {
 	return sourceNames[SourceUnknown]
 }
 
-func isdefangConfigReplaced(value string, defangConfigs map[string]string) map[string]bool {
-	result := make(map[string]bool)
+// containsDefangConfigRefs checks if the value contains any ${...} references
+// that match keys in the defangConfigs map
+func containsDefangConfigRefs(value string, defangConfigs map[string]string) bool {
 	// Match ${...} pattern to extract variable names
 	re := regexp.MustCompile(`\$\{([^}]+)\}`)
 	matches := re.FindAllStringSubmatch(value, -1)
 
-	// Check if all extracted variables exist in defangConfigs
+	// Check if any extracted variable exists in defangConfigs
 	for _, match := range matches {
 		if len(match) > 1 {
 			varName := match[1]
 			if _, exists := defangConfigs[varName]; exists {
-				result[varName] = true
-			} else {
-				result[varName] = false
+				return true
 			}
 		}
 	}
