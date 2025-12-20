@@ -1092,18 +1092,22 @@ var deploymentsCmd = &cobra.Command{
 	Short:       "List all active deployments",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var utc, _ = cmd.Flags().GetBool("utc")
-		var projectName, _ = cmd.Flags().GetString("project-name")
-		var stackName, _ = cmd.Flags().GetString("stack")
 		var limit, _ = cmd.Flags().GetUint32("limit")
 
 		if utc {
 			cli.EnableUTCMode()
 		}
 
+		loader := configureLoader(cmd)
+		projectName, err := loader.LoadProjectName(cmd.Context())
+		if err != nil {
+			return err
+		}
+
 		return cli.DeploymentsList(cmd.Context(), global.Client, cli.ListDeploymentsParams{
 			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
 			ProjectName: projectName,
-			StackName:   stackName,
+			StackName:   global.Stack.Name,
 			Limit:       limit,
 		})
 	},
@@ -1117,7 +1121,6 @@ var deploymentsListCmd = &cobra.Command{
 	Short:       "List deployment history for a project",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var utc, _ = cmd.Flags().GetBool("utc")
-		var stackName, _ = cmd.Flags().GetString("stack")
 		var limit, _ = cmd.Flags().GetUint32("limit")
 
 		if utc {
@@ -1133,7 +1136,7 @@ var deploymentsListCmd = &cobra.Command{
 		return cli.DeploymentsList(cmd.Context(), global.Client, cli.ListDeploymentsParams{
 			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY,
 			ProjectName: projectName,
-			StackName:   stackName,
+			StackName:   global.Stack.Name,
 			Limit:       limit,
 		})
 	},
