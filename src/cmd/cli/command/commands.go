@@ -341,6 +341,7 @@ func SetupCommands(ctx context.Context, version string) {
 	// Deployments Command
 	deploymentsCmd.AddCommand(deploymentsListCmd)
 	deploymentsCmd.PersistentFlags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
+	deploymentsCmd.PersistentFlags().Uint32P("limit", "l", 10, "maximum number of deployments to list")
 	RootCmd.AddCommand(deploymentsCmd)
 
 	// MCP Command
@@ -1088,27 +1089,10 @@ var deploymentsCmd = &cobra.Command{
 	Aliases:     []string{"deployment", "deploys", "deps", "dep"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "List active deployments across all projects",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		var projectName, _ = cmd.Flags().GetString("project-name")
-		var utc, _ = cmd.Flags().GetBool("utc")
-
-		if utc {
-			cli.EnableUTCMode()
-		}
-
-		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, projectName, global.Client, 0)
-	},
-}
-
-var deploymentsListCmd = &cobra.Command{
-	Use:         "history",
-	Aliases:     []string{"ls", "list"},
-	Annotations: authNeededAnnotation,
-	Args:        cobra.NoArgs,
-	Short:       "List deployment history for a project",
+	Short:       "List all active deployments",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var utc, _ = cmd.Flags().GetBool("utc")
+		var limit, _ = cmd.Flags().GetUint32("limit")
 
 		if utc {
 			cli.EnableUTCMode()
@@ -1120,7 +1104,41 @@ var deploymentsListCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY, projectName, global.Client, 10)
+		return cli.DeploymentsList(cmd.Context(), global.Client, cli.ListDeploymentsParams{
+			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
+			ProjectName: projectName,
+			StackName:   global.Stack.Name,
+			Limit:       limit,
+		})
+	},
+}
+
+var deploymentsListCmd = &cobra.Command{
+	Use:         "history",
+	Aliases:     []string{"ls", "list"},
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "List deployment history for a project",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		var utc, _ = cmd.Flags().GetBool("utc")
+		var limit, _ = cmd.Flags().GetUint32("limit")
+
+		if utc {
+			cli.EnableUTCMode()
+		}
+
+		loader := configureLoader(cmd)
+		projectName, err := loader.LoadProjectName(cmd.Context())
+		if err != nil {
+			return err
+		}
+
+		return cli.DeploymentsList(cmd.Context(), global.Client, cli.ListDeploymentsParams{
+			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY,
+			ProjectName: projectName,
+			StackName:   global.Stack.Name,
+			Limit:       limit,
+		})
 	},
 }
 
