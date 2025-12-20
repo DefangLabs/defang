@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
@@ -91,7 +92,7 @@ variables, and command-line flags).
 var global GlobalConfig = GlobalConfig{
 	ColorMode:      ColorAuto,
 	Cluster:        cluster.DefangFabric,
-	Debug:          false,
+	Debug:          pkg.GetenvBool("DEFANG_DEBUG"),
 	HasTty:         term.IsTerminal(),
 	HideUpdate:     false,
 	NonInteractive: !term.IsTerminal(),
