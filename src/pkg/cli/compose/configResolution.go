@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"slices"
 	"sort"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -92,6 +93,8 @@ func PrintConfigResolutionSummary(project Project, defangConfig []string) error 
 		}
 		return projectEnvVars[i].Name < projectEnvVars[j].Name
 	})
+
+	projectEnvVars = slices.Compact(projectEnvVars)
 
 	term.Println("\033[1mENVIRONMENT VARIABLES RESOLUTION SUMMARY:\033[0m")
 
