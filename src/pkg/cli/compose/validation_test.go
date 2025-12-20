@@ -56,7 +56,11 @@ func TestValidationAndConvert(t *testing.T) {
 			logs.WriteString("Error: " + err.Error() + "\n") // no coverage!
 		}
 
-		if err := ValidateProjectConfig(t.Context(), project, listConfigNamesFunc); err != nil {
+		listConfigNames, err := listConfigNamesFunc(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := ValidateProjectConfig(t.Context(), project, listConfigNames); err != nil {
 			t.Logf("Project config validation failed: %v", err)
 			logs.WriteString("Error: " + err.Error() + "\n")
 		}
@@ -82,12 +86,6 @@ func TestValidationAndConvert(t *testing.T) {
 	})
 }
 
-func makeListConfigNamesFunc(configs ...string) func(context.Context) ([]string, error) {
-	return func(context.Context) ([]string, error) {
-		return configs, nil
-	}
-}
-
 func TestValidateConfig(t *testing.T) {
 	ctx := t.Context()
 
@@ -101,7 +99,7 @@ func TestValidateConfig(t *testing.T) {
 		}
 		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
 
-		if err := ValidateProjectConfig(ctx, &testProject, makeListConfigNamesFunc()); err != nil {
+		if err := ValidateProjectConfig(ctx, &testProject, []string{}); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -116,7 +114,7 @@ func TestValidateConfig(t *testing.T) {
 		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
 
 		var missing ErrMissingConfig
-		if err := ValidateProjectConfig(ctx, &testProject, makeListConfigNamesFunc()); !errors.As(err, &missing) {
+		if err := ValidateProjectConfig(ctx, &testProject, []string{}); !errors.As(err, &missing) {
 			t.Fatalf("expected ErrMissingConfig, got: %v", err)
 		} else {
 			if len(missing) != 3 {
@@ -139,7 +137,7 @@ func TestValidateConfig(t *testing.T) {
 		}
 		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
 
-		if err := ValidateProjectConfig(ctx, &testProject, makeListConfigNamesFunc(CONFIG_VAR)); err != nil {
+		if err := ValidateProjectConfig(ctx, &testProject, []string{CONFIG_VAR}); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -151,7 +149,7 @@ func TestValidateConfig(t *testing.T) {
 		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
 
 		var missing ErrMissingConfig
-		if err := ValidateProjectConfig(ctx, &testProject, makeListConfigNamesFunc()); !errors.As(err, &missing) {
+		if err := ValidateProjectConfig(ctx, &testProject, []string{}); !errors.As(err, &missing) {
 			t.Fatalf("expected ErrMissingConfig, got: %v", err)
 		} else {
 			if len(missing) != 1 {

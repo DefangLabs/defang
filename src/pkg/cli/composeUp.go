@@ -59,8 +59,19 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 
 		// Ignore missing configs in preview mode, because we don't want to fail the preview if some configs are missing.
 		if upload != compose.UploadModeEstimate {
-			if err := compose.ValidateProjectConfig(ctx, project, listConfigNamesFunc); err != nil {
+			listConfigNames, err := listConfigNamesFunc(ctx)
+			if err != nil {
+				return nil, project, err
+			}
+
+			if err := compose.ValidateProjectConfig(ctx, project, listConfigNames); err != nil {
 				return nil, project, &ComposeError{err}
+			}
+
+			// Print config resolution summary
+			err = compose.PrintConfigResolutionSummary(*project, listConfigNames)
+			if err != nil {
+				return nil, project, err
 			}
 		}
 	}
