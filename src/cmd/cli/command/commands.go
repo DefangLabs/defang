@@ -280,6 +280,8 @@ func SetupCommands(version string) {
 
 	configCmd.AddCommand(configListCmd)
 
+	configCmd.AddCommand(configResolveCmd)
+
 	RootCmd.AddCommand(configCmd)
 
 	RootCmd.AddCommand(setupComposeCommand())
@@ -959,6 +961,142 @@ var configListCmd = &cobra.Command{
 		}
 
 		return cli.ConfigList(cmd.Context(), projectName, provider)
+	},
+}
+
+type serviceName string
+type configOutput struct {
+	Service string `json:"service"`
+	Name    string `json:"name"`
+	Value   string `json:"value,omitempty"`
+	Source  Source `json:"source,omitempty"`
+}
+
+type Source int
+
+const (
+	SourceUnknown Source = iota
+	SourceComposeFile
+	SourceEnvFile
+	SourceDefangConfig
+	SourceDefangAndComposeFile
+)
+
+var sourceNames = map[Source]string{
+	SourceUnknown:              "unknown",
+	SourceComposeFile:          "compose_file",
+	SourceEnvFile:              "env_file",
+	SourceDefangConfig:         "defang_config",
+	SourceDefangAndComposeFile: "compose_file and defang_config",
+}
+
+func (s Source) String() string {
+	if name, ok := sourceNames[s]; ok {
+		return name
+	}
+	return sourceNames[SourceUnknown]
+}
+
+func isdefangConfigReplaced(value string, defangConfigs map[string]string) map[string]bool {
+	result := make(map[string]bool)
+	// Match ${...} pattern to extract variable names
+	re := regexp.MustCompile(`\$\{([^}]+)\}`)
+	matches := re.FindAllStringSubmatch(value, -1)
+
+	// Check if all extracted variables exist in defangConfigs
+	for _, match := range matches {
+		if len(match) > 1 {
+			varName := match[1]
+			if _, exists := defangConfigs[varName]; exists {
+				result[varName] = true
+			} else {
+				result[varName] = false
+			}
+		}
+	}
+
+	return result
+}
+
+const configMaskedValue = "*****"
+
+var configResolveCmd = &cobra.Command{
+	Use:         "resolve",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"final"},
+	Short:       "Show the final resolved config for the project",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		loader := configureLoader(cmd)
+
+		provider, err := newProviderChecked(cmd.Context(), loader)
+		if err != nil {
+			return err
+		}
+
+		project, err := loader.LoadProject(cmd.Context())
+		if err != nil {
+			return err
+		}
+
+		config, err := provider.ListConfig(cmd.Context(), &defangv1.ListConfigsRequest{Project: project.Name})
+		if err != nil {
+			return err
+		}
+
+		configset := make(map[string]string)
+		for _, name := range config.Names {
+			configset[name] = ""
+		}
+
+		projectEnvVars := []configOutput{}
+
+		for serviceName, service := range project.Services {
+			// Process each environment variable for this service
+			for envKey, envValue := range service.Environment {
+				if _, ok := configset[envKey]; ok {
+					projectEnvVars = append(projectEnvVars, configOutput{
+						Service: serviceName,
+						Name:    envKey,
+						Value:   configMaskedValue,
+						Source:  SourceDefangConfig,
+					})
+				} else {
+					value := ""
+					if envValue != nil {
+						value = *envValue
+						defangConfigMap := isdefangConfigReplaced(*envValue, configset)
+						// Check if any extracted ${...} variables are defang configs
+						hasDefangRefs := false
+						for _, exists := range defangConfigMap {
+							if exists {
+								hasDefangRefs = true
+								break
+							}
+						}
+						if hasDefangRefs {
+							// Mixed value from defang config and compose file
+							projectEnvVars = append(projectEnvVars, configOutput{
+								Service: serviceName,
+								Name:    envKey,
+								Value:   value,
+								Source:  SourceDefangAndComposeFile,
+							})
+							continue
+						}
+					}
+					projectEnvVars = append(projectEnvVars, configOutput{
+						Service: serviceName,
+						Name:    envKey,
+						Value:   value,
+						Source:  SourceComposeFile,
+					})
+				}
+
+			}
+		}
+
+		return term.Table(projectEnvVars, "Service", "Name", "Value", "Source")
 	},
 }
 
