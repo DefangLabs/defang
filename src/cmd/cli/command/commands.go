@@ -1011,7 +1011,29 @@ func containsDefangConfigRefs(value string, defangConfigs map[string]string) boo
 		}
 	}
 
-	return result
+	return false
+}
+
+// determineConfigSource determines the source of an environment variable
+// and returns the appropriate source type and value to display
+func determineConfigSource(envKey string, envValue *string, defangConfigs map[string]string) (Source, string) {
+	// If the key itself is a defang config, mask it
+	if _, isDefangConfig := defangConfigs[envKey]; isDefangConfig {
+		return SourceDefangConfig, configMaskedValue
+	}
+
+	// If value is nil, it's from the compose file with empty value
+	if envValue == nil {
+		return SourceComposeFile, ""
+	}
+
+	// Check if the value contains references to defang configs
+	if containsDefangConfigRefs(*envValue, defangConfigs) {
+		return SourceDefangAndComposeFile, *envValue
+	}
+
+	// Otherwise, it's from the compose file
+	return SourceComposeFile, *envValue
 }
 
 const configMaskedValue = "*****"
