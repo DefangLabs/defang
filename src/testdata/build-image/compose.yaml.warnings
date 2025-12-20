@@ -1,0 +1,2 @@
+ ! service "app": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "app": using published image instead of rebuilding; pass --build to build and publish a new image

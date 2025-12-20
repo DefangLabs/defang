@@ -2,12 +2,8 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"net/http"
 
-	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 type WorkspaceInfo struct {
@@ -25,32 +21,18 @@ type UserInfo struct {
 	User       UserDetails     `json:"userinfo"`
 }
 
+func (ui *UserInfo) FindWorkspaceInfo(tenantSelection types.TenantNameOrID) *WorkspaceInfo {
+	if ui == nil || !tenantSelection.IsSet() {
+		return nil
+	}
+	for _, wi := range ui.AllTenants {
+		if wi.ID == string(tenantSelection) || wi.Name == string(tenantSelection) {
+			return &wi
+		}
+	}
+	return nil
+}
+
 func FetchUserInfo(ctx context.Context, accessToken string) (*UserInfo, error) {
-	if accessToken == "" {
-		return nil, errors.New("access token is required to fetch user info")
-	}
-
-	issuer := pkg.Getenv("DEFANG_ISSUER", openAuthClient.issuer)
-	userinfoURL := issuer + "/userinfo"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, userinfoURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build userinfo request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-
-	resp, err := http.DefaultClient.Do(req) // #nosec G107 - URL derived from trusted issuer
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch userinfo: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("userinfo request failed with status %s", resp.Status)
-	}
-
-	var info UserInfo
-	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
-		return nil, fmt.Errorf("failed to decode userinfo: %w", err)
-	}
-	return &info, nil
+	return OpenAuthClient.UserInfo(ctx, accessToken)
 }

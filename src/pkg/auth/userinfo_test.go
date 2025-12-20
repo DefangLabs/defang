@@ -1,16 +1,12 @@
 package auth
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
 func TestFetchUserInfo(t *testing.T) {
-	originalClient := openAuthClient
-	t.Cleanup(func() { openAuthClient = originalClient })
-
 	var capturedAuth string
 	var capturedPath string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -26,11 +22,11 @@ func TestFetchUserInfo(t *testing.T) {
 			"userinfo":{"email":"user@example.com","name":"Test User"}
 		}`))
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
 
-	openAuthClient = NewClient("defang-cli", server.URL)
+	client := NewClient("defang-cli", server.URL)
 
-	info, err := FetchUserInfo(context.Background(), "token-123")
+	info, err := client.UserInfo(t.Context(), "token-123")
 	if capturedPath != "/userinfo" {
 		t.Fatalf("unexpected path %q", capturedPath)
 	}
@@ -55,32 +51,34 @@ func TestFetchUserInfo(t *testing.T) {
 }
 
 func TestFetchUserInfoErrors(t *testing.T) {
-	originalClient := openAuthClient
-	t.Cleanup(func() { openAuthClient = originalClient })
+	t.Run("no access token", func(t *testing.T) {
+		if _, err := OpenAuthClient.UserInfo(t.Context(), ""); err == nil {
+			t.Fatalf("expected error for empty token")
+		}
+	})
 
-	if _, err := FetchUserInfo(context.Background(), ""); err == nil {
-		t.Fatalf("expected error for empty token")
-	}
+	t.Run("invalid token (unauthorized)", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusUnauthorized)
+		}))
+		t.Cleanup(server.Close)
+		openAuthClient := NewClient("defang-cli", server.URL)
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusUnauthorized)
-	}))
-	defer server.Close()
-	openAuthClient = NewClient("defang-cli", server.URL)
+		if _, err := openAuthClient.UserInfo(t.Context(), "token"); err == nil {
+			t.Fatalf("expected error for non-200 response")
+		}
+	})
 
-	if _, err := FetchUserInfo(context.Background(), "token"); err == nil {
-		t.Fatalf("expected error for non-200 response")
-	}
-	server.Close()
+	t.Run("invalid response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{invalid json`))
+		}))
+		t.Cleanup(server.Close)
+		client := NewClient("defang-cli", server.URL)
 
-	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{invalid json`))
-	}))
-	defer server.Close()
-	openAuthClient = NewClient("defang-cli", server.URL)
-
-	if _, err := FetchUserInfo(context.Background(), "token"); err == nil {
-		t.Fatalf("expected error for malformed JSON")
-	}
+		if _, err := client.UserInfo(t.Context(), "token"); err == nil {
+			t.Fatalf("expected error for malformed JSON")
+		}
+	})
 }

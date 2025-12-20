@@ -53,6 +53,7 @@ func makeComposeUpCmd() *cobra.Command {
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and deploy a new project or update an existing project",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			var build, _ = cmd.Flags().GetBool("build")
 			var force, _ = cmd.Flags().GetBool("force")
 			var detach, _ = cmd.Flags().GetBool("detach")
 			var utc, _ = cmd.Flags().GetBool("utc")
@@ -62,9 +63,11 @@ func makeComposeUpCmd() *cobra.Command {
 				cli.EnableUTCMode()
 			}
 
-			upload := compose.UploadModeDigest
+			upload := compose.UploadModeDefault
 			if force {
 				upload = compose.UploadModeForce
+			} else if build {
+				upload = compose.UploadModeDigest
 			}
 
 			since := time.Now()
@@ -212,7 +215,6 @@ func makeComposeUpCmd() *cobra.Command {
 	_ = composeUpCmd.Flags().MarkHidden("tail")
 	composeUpCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	composeUpCmd.Flags().Bool("build", true, "build the image before starting the service") // docker-compose compatibility
-	_ = composeUpCmd.Flags().MarkHidden("build")
 	composeUpCmd.Flags().Bool("wait", true, "wait for services to be running|healthy") // docker-compose compatibility
 	_ = composeUpCmd.Flags().MarkHidden("wait")
 	composeUpCmd.Flags().Int("wait-timeout", -1, "maximum duration to wait for the project to be running|healthy") // docker-compose compatibility

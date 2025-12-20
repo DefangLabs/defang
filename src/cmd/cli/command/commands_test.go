@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/auth"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
@@ -153,7 +154,12 @@ func TestCommandGates(t *testing.T) {
 		}`))
 	}))
 	t.Cleanup(userinfoServer.Close)
-	t.Setenv("DEFANG_ISSUER", userinfoServer.URL)
+
+	openAuthClient := auth.OpenAuthClient
+	t.Cleanup(func() {
+		auth.OpenAuthClient = openAuthClient
+	})
+	auth.OpenAuthClient = auth.NewClient("testclient", userinfoServer.URL)
 	t.Setenv("DEFANG_ACCESS_TOKEN", "token-123")
 
 	server := httptest.NewServer(handler)

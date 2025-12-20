@@ -37,36 +37,21 @@ func WorkspaceRows(info *auth.UserInfo, tenantSelection types.TenantNameOrID) []
 // ResolveWorkspaceName maps the selected tenant (flag/env/token subject) to a known workspace name when available.
 // If no selection is set, returns an empty string.
 func ResolveWorkspaceName(info *auth.UserInfo, tenantSelection types.TenantNameOrID) string {
-	if info == nil {
-		if tenantSelection.IsSet() {
-			return string(tenantSelection)
-		}
-		return ""
+	if wi := info.FindWorkspaceInfo(tenantSelection); wi != nil {
+		return wi.Name
 	}
-
-	for _, t := range info.AllTenants {
-		if tenantSelection.IsSet() && (t.ID == string(tenantSelection) || t.Name == string(tenantSelection)) {
-			return t.Name
-		}
-	}
-
+	// If we didn't resolve a workspace name, display the raw selection for transparency.
 	if tenantSelection.IsSet() {
 		return string(tenantSelection)
 	}
-
 	return ""
 }
 
 // ResolveWorkspaceID returns the workspace ID matching the provided selection (flag/env/token subject).
 // If no match is found, returns an empty string.
 func ResolveWorkspaceID(info *auth.UserInfo, tenantSelection types.TenantNameOrID) string {
-	if info == nil || !tenantSelection.IsSet() {
-		return ""
-	}
-	for _, t := range info.AllTenants {
-		if t.ID == string(tenantSelection) || t.Name == string(tenantSelection) {
-			return t.ID
-		}
+	if wi := info.FindWorkspaceInfo(tenantSelection); wi != nil {
+		return wi.ID
 	}
 	return ""
 }

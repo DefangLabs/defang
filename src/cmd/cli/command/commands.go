@@ -548,42 +548,35 @@ var whoamiCmd = &cobra.Command{
 	Short:       "Show the current user",
 	Annotations: authNeededAnnotation,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		verbose := global.Verbose
+		jsonMode, _ := cmd.Flags().GetBool("json")
+
 		loader := configureLoader(cmd)
+
 		global.NonInteractive = true // don't show provider prompt
 		provider, err := newProvider(cmd.Context(), loader)
 		if err != nil {
 			term.Debug("unable to get provider:", err)
 		}
 
-		jsonMode, _ := cmd.Flags().GetBool("json")
-
 		token := cluster.GetExistingToken(global.Cluster)
+
 		userInfo, err := auth.FetchUserInfo(cmd.Context(), token)
 		if err != nil {
-			term.Warn("unable to fetch user info:", err)
+			// Either the auth service is down, or we're using a Fabric JWT: skip workspace information
+			if !jsonMode {
+				term.Warn("Workspace information unavailable:", err)
+			}
 		}
 
 		tenantSelection := getTenantSelection()
-		data, err := cli.Whoami(cmd.Context(), global.Client, provider, userInfo, tenantSelection, verbose)
+		data, err := cli.Whoami(cmd.Context(), global.Client, provider, userInfo, tenantSelection)
 		if err != nil {
 			return err
 		}
-		if verbose && userInfo != nil {
-			if tenantID := cli.ResolveWorkspaceID(userInfo, tenantSelection); tenantID != "" {
-				data.TenantID = tenantID
-			}
-		}
-		if !verbose {
+
+		if !global.Verbose {
 			data.Tenant = ""
 			data.TenantID = ""
-		}
-
-		if verbose && data.Workspace == "" && userInfo != nil {
-			// If we didn't resolve a workspace name, try to display the raw selection for transparency.
-			if tenantSelection.IsSet() {
-				data.Workspace = tenantSelection.String()
-			}
 		}
 
 		if jsonMode {
@@ -595,14 +588,14 @@ var whoamiCmd = &cobra.Command{
 			return err
 		} else {
 			cols := []string{
+				"Workspace",
+				"SubscriberTier",
 				"Name",
 				"Email",
-				"Workspace",
 				"Provider",
-				"SubscriberTier",
 				"Region",
 			}
-			if verbose {
+			if global.Verbose {
 				cols = append(cols, "Tenant", "TenantID")
 			}
 			return term.Table([]cli.ShowAccountData{data}, cols...)

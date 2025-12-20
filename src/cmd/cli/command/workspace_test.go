@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
@@ -36,7 +37,11 @@ func setupWorkspaceTestServers(t *testing.T) (clusterURL string) {
 	}))
 	t.Cleanup(userinfoServer.Close)
 
-	t.Setenv("DEFANG_ISSUER", userinfoServer.URL)
+	openAuthClient := auth.OpenAuthClient
+	t.Cleanup(func() {
+		auth.OpenAuthClient = openAuthClient
+	})
+	auth.OpenAuthClient = auth.NewClient("testclient", userinfoServer.URL)
 	t.Setenv("DEFANG_ACCESS_TOKEN", "token-123")
 
 	return fabricServer.URL

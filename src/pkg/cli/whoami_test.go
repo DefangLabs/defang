@@ -51,7 +51,7 @@ func TestWhoami(t *testing.T) {
 		},
 	}
 
-	got, err := Whoami(ctx, grpcClient, &client, userInfo, types.TenantNameOrID(requestedTenant), true)
+	got, err := Whoami(ctx, grpcClient, &client, userInfo, types.TenantNameOrID(requestedTenant))
 	if err != nil {
 		t.Fatal(err)
 	}
