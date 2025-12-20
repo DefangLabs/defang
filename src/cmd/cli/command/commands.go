@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -1070,49 +1071,24 @@ var configResolveCmd = &cobra.Command{
 		projectEnvVars := []configOutput{}
 
 		for serviceName, service := range project.Services {
-			// Process each environment variable for this service
 			for envKey, envValue := range service.Environment {
-				if _, ok := configset[envKey]; ok {
-					projectEnvVars = append(projectEnvVars, configOutput{
-						Service: serviceName,
-						Name:    envKey,
-						Value:   configMaskedValue,
-						Source:  SourceDefangConfig,
-					})
-				} else {
-					value := ""
-					if envValue != nil {
-						value = *envValue
-						defangConfigMap := isdefangConfigReplaced(*envValue, configset)
-						// Check if any extracted ${...} variables are defang configs
-						hasDefangRefs := false
-						for _, exists := range defangConfigMap {
-							if exists {
-								hasDefangRefs = true
-								break
-							}
-						}
-						if hasDefangRefs {
-							// Mixed value from defang config and compose file
-							projectEnvVars = append(projectEnvVars, configOutput{
-								Service: serviceName,
-								Name:    envKey,
-								Value:   value,
-								Source:  SourceDefangAndComposeFile,
-							})
-							continue
-						}
-					}
-					projectEnvVars = append(projectEnvVars, configOutput{
-						Service: serviceName,
-						Name:    envKey,
-						Value:   value,
-						Source:  SourceComposeFile,
-					})
-				}
-
+				source, value := determineConfigSource(envKey, envValue, configset)
+				projectEnvVars = append(projectEnvVars, configOutput{
+					Service: serviceName,
+					Name:    envKey,
+					Value:   value,
+					Source:  source,
+				})
 			}
 		}
+
+		// Sort by Service, then by Name within each service
+		sort.Slice(projectEnvVars, func(i, j int) bool {
+			if projectEnvVars[i].Service != projectEnvVars[j].Service {
+				return projectEnvVars[i].Service < projectEnvVars[j].Service
+			}
+			return projectEnvVars[i].Name < projectEnvVars[j].Name
+		})
 
 		return term.Table(projectEnvVars, "Service", "Name", "Value", "Source")
 	},
