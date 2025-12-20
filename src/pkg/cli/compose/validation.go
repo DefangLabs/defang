@@ -449,7 +449,7 @@ func DetectInterpolationVariables(value string) []string {
 	return names
 }
 
-func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Project, listConfigNamesFunc ListConfigNamesFunc) error {
+func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Project, listConfigNames []string) error {
 	var names []string
 	// make list of secrets
 	for _, service := range composeProject.Services {
@@ -467,23 +467,13 @@ func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Pro
 		return nil // no secrets to check
 	}
 
-	configs, err := listConfigNamesFunc(ctx)
-	if err != nil {
-		return err
-	}
-
-	err = PrintConfigResolutionSummary(*composeProject, configs)
-	if err != nil {
-		return err
-	}
-
 	// Deduplicate (sort + uniq)
 	slices.Sort(names)
 	names = slices.Compact(names)
 
 	errMissingConfig := ErrMissingConfig{}
 	for _, name := range names {
-		if !slices.Contains(configs, name) {
+		if !slices.Contains(listConfigNames, name) {
 			errMissingConfig = append(errMissingConfig, name)
 		}
 	}
