@@ -341,7 +341,7 @@ func SetupCommands(ctx context.Context, version string) {
 	// Deployments Command
 	deploymentsCmd.AddCommand(deploymentsListCmd)
 	deploymentsCmd.PersistentFlags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
-	deploymentsListCmd.PersistentFlags().Uint32P("limit", "l", 10, "maximum number of deployments to list")
+	deploymentsCmd.PersistentFlags().Uint32P("limit", "l", 10, "maximum number of deployments to list")
 	RootCmd.AddCommand(deploymentsCmd)
 
 	// MCP Command
