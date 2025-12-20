@@ -10,3 +10,13 @@ if command -v gopls >/dev/null; then
 fi
 make setup
 '
+
+# Configure user-scoped global npm installs (no sudo, works outside nix shell).
+mkdir -p "$HOME/.npm-global"
+if ! grep -q "npm-global/bin" "$HOME/.bashrc" 2>/dev/null; then
+  echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> "$HOME/.bashrc"
+fi
+if ! [ -f "$HOME/.npmrc" ] || ! grep -q "^prefix=" "$HOME/.npmrc"; then
+  echo "prefix=$HOME/.npm-global" >> "$HOME/.npmrc"
+fi
+'

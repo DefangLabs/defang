@@ -22,7 +22,7 @@
                 "eamodio.gitlens"
             ],
             "settings": {
-                "terminal.integrated.defaultProfile.linux": "nix develop",
+                "terminal.integrated.defaultProfile.linux": "bash",
                 "terminal.integrated.profiles.linux": {
                     "nix develop": {
                         "path": "nix",

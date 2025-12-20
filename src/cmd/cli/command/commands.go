@@ -52,18 +52,12 @@ var authNeededAnnotation = map[string]string{authNeeded: ""}
 
 var P = track.P
 
-// getTenantSelection resolves the tenant to use for this invocation (flag > env > token subject),
-// leaving it unset when we should rely on the personal tenant from the token subject.
+// getTenantSelection returns the explicitly requested tenant (from --workspace flag or DEFANG_WORKSPACE env),
+// or TenantUnset to let the server infer the default from the access token.
 func getTenantSelection() types.TenantNameOrID {
 	if global.Tenant != "" {
 		return types.TenantNameOrID(global.Tenant)
 	}
-	if token := cluster.GetExistingToken(global.Cluster); token != "" {
-		if t := cli.TenantFromToken(token); t.IsSet() {
-			return t
-		}
-	}
-	// No explicit tenant: defer to token subject or server defaults.
 	return types.TenantUnset
 }
 

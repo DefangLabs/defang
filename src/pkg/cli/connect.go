@@ -18,23 +18,14 @@ func Connect(ctx context.Context, addr string) (*client.GrpcClient, error) {
 	return ConnectWithTenant(ctx, addr, types.TenantUnset)
 }
 
-// ConnectWithTenant builds a client carrying the requested tenant (name or ID),
-// falling back to the token subject when unset so the server can resolve the personal tenant.
+// ConnectWithTenant builds a client carrying the requested tenant (name or ID).
+// If no tenant is requested, the server will infer the default from the access token.
 func ConnectWithTenant(ctx context.Context, addr string, requestedTenant types.TenantNameOrID) (*client.GrpcClient, error) {
 	host := cluster.NormalizeHost(addr)
 	accessToken := cluster.GetExistingToken(host)
-	tokenTenant := TenantFromToken(accessToken)
-	effectiveTenant := requestedTenant
-	if !effectiveTenant.IsSet() {
-		effectiveTenant = tokenTenant
-	}
 
-	// Carry all tenant sources so we can emit the requested value (or token fallback) consistently.
-	term.Debug("Using tenant", effectiveTenant, "for cluster", host)
-	grpcClient := client.NewGrpcClient(host, accessToken, client.TenantContext{
-		RequestedTenant: requestedTenant,
-		TokenTenant:     tokenTenant,
-	})
+	term.Debug("Using tenant", requestedTenant.String(), "for cluster", host)
+	grpcClient := client.NewGrpcClient(host, accessToken, requestedTenant)
 	track.Tracker = grpcClient // Update track client
 
 	if _, err := grpcClient.WhoAmI(ctx); err != nil {
