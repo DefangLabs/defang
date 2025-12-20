@@ -435,6 +435,20 @@ func getResourceReservations(r composeTypes.Resources) *composeTypes.Resource {
 // Copied from shared/utils.ts but slightly modified to remove the negative-lookahead assertion
 var interpolationRegex = regexp.MustCompile(`(?i)\$(\$)|\$(?:{([^}]+)}|([_a-z][_a-z0-9]*))|([^$]+)`) // [1] escaped dollar, [2] curly braces, [3] variable name, [4] literal
 
+func DetectInterpolationVariables(value string) []string {
+	var names []string
+	// check for variables used during interpolation
+	for _, match := range interpolationRegex.FindAllStringSubmatch(value, -1) {
+		if match[2] != "" {
+			names = append(names, match[2])
+		}
+		if match[3] != "" {
+			names = append(names, match[3])
+		}
+	}
+	return names
+}
+
 func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Project, listConfigNamesFunc ListConfigNamesFunc) error {
 	var names []string
 	// make list of secrets
@@ -444,15 +458,8 @@ func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Pro
 				names = append(names, key)
 				continue
 			}
-			// check for variables used during interpolation
-			for _, match := range interpolationRegex.FindAllStringSubmatch(*value, -1) {
-				if match[2] != "" {
-					names = append(names, match[2])
-				}
-				if match[3] != "" {
-					names = append(names, match[3])
-				}
-			}
+			detectedNames := DetectInterpolationVariables(*value)
+			names = append(names, detectedNames...)
 		}
 	}
 
@@ -461,6 +468,11 @@ func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Pro
 	}
 
 	configs, err := listConfigNamesFunc(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = PrintConfigResolutionSummary(*composeProject, configs)
 	if err != nil {
 		return err
 	}
