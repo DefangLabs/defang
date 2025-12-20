@@ -341,8 +341,6 @@ func SetupCommands(ctx context.Context, version string) {
 	// Deployments Command
 	deploymentsCmd.AddCommand(deploymentsListCmd)
 	deploymentsCmd.PersistentFlags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
-	deploymentsListCmd.PersistentFlags().StringP("project-name", "p", "", "project name")
-	deploymentsListCmd.PersistentFlags().StringP("stack-name", "s", "", "stack name")
 	deploymentsListCmd.PersistentFlags().Uint32P("limit", "l", 10, "maximum number of deployments to list")
 	RootCmd.AddCommand(deploymentsCmd)
 
@@ -1102,7 +1100,7 @@ var deploymentsCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var utc, _ = cmd.Flags().GetBool("utc")
 		var projectName, _ = cmd.Flags().GetString("project-name")
-		var stackName, _ = cmd.Flags().GetString("stack-name")
+		var stackName, _ = cmd.Flags().GetString("stack")
 		var limit, _ = cmd.Flags().GetUint32("limit")
 
 		if utc {
