@@ -1124,7 +1124,7 @@ var deploymentsListCmd = &cobra.Command{
 	Short:       "List deployment history for a project",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var utc, _ = cmd.Flags().GetBool("utc")
-		var stackName, _ = cmd.Flags().GetString("stack-name")
+		var stackName, _ = cmd.Flags().GetString("stack")
 		var limit, _ = cmd.Flags().GetUint32("limit")
 
 		if utc {
