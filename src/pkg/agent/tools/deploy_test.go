@@ -56,7 +56,7 @@ func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.Provi
 	return nil
 }
 
-func (m *MockDeployCLI) InteractiveLoginMCP(ctx context.Context, client *client.GrpcClient, cluster string, mcpClient string) error {
+func (m *MockDeployCLI) InteractiveLoginMCP(ctx context.Context, fabric *client.GrpcClient, cluster string, mcpClient string) error {
 	m.CallLog = append(m.CallLog, "InteractiveLoginMCP")
 	return m.InteractiveLoginMCPError
 }
@@ -77,7 +77,7 @@ func (m *MockDeployCLI) LoadProject(ctx context.Context, loader client.Loader) (
 	return m.Project, nil
 }
 
-func (m *MockDeployCLI) CanIUseProvider(ctx context.Context, client *client.GrpcClient, projectName, stackName string, provider client.Provider, serviceCount int) error {
+func (m *MockDeployCLI) CanIUseProvider(ctx context.Context, fabric *client.GrpcClient, projectName, stackName string, provider client.Provider, serviceCount int) error {
 	m.CallLog = append(m.CallLog, "CanIUseProvider")
 	return nil
 }

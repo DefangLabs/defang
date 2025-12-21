@@ -12,10 +12,9 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	pcluster "github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -35,7 +34,7 @@ const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
 
 func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
 	// We can only show services deployed to the prod1 defang SaaS environment.
-	if global.Stack.Provider == cliClient.ProviderDefang && global.Cluster == pcluster.DefaultCluster {
+	if global.Stack.Provider == client.ProviderDefang && global.Cluster == client.DefaultCluster {
 		term.Info("Monitor your services' status in the defang portal")
 		for _, serviceInfo := range serviceInfos {
 			term.Println("   -", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
@@ -215,13 +214,13 @@ func makeComposeUpCmd() *cobra.Command {
 	_ = composeUpCmd.Flags().MarkHidden("tail")
 	composeUpCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	composeUpCmd.Flags().Bool("build", true, "build the image before starting the service") // docker-compose compatibility
-	composeUpCmd.Flags().Bool("wait", true, "wait for services to be running|healthy") // docker-compose compatibility
+	composeUpCmd.Flags().Bool("wait", true, "wait for services to be running|healthy")      // docker-compose compatibility
 	_ = composeUpCmd.Flags().MarkHidden("wait")
 	composeUpCmd.Flags().Int("wait-timeout", -1, "maximum duration to wait for the project to be running|healthy") // docker-compose compatibility
 	return composeUpCmd
 }
 
-func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accountInfo *cliClient.AccountInfo, projectName string) error {
+func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accountInfo *client.AccountInfo, projectName string) error {
 	samePlace := slices.ContainsFunc(existingDeployments, func(dep *defangv1.Deployment) bool {
 		// Old deployments may not have a region or account ID, so we check for empty values too
 		return dep.Provider == global.Stack.Provider.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
@@ -253,9 +252,9 @@ func printExistingDeployments(existingDeployments []*defangv1.Deployment) {
 	term.Info("This project was previously deployed to the following locations:")
 	deploymentStrings := make([]string, 0, len(existingDeployments))
 	for _, dep := range existingDeployments {
-		var providerId cliClient.ProviderID
+		var providerId client.ProviderID
 		providerId.SetValue(dep.Provider)
-		deploymentStrings = append(deploymentStrings, fmt.Sprintf(" - %v", cliClient.AccountInfo{Provider: providerId, AccountID: dep.ProviderAccountId, Region: dep.Region}))
+		deploymentStrings = append(deploymentStrings, fmt.Sprintf(" - %v", client.AccountInfo{Provider: providerId, AccountID: dep.ProviderAccountId, Region: dep.Region}))
 	}
 	// sort and remove duplicates
 	slices.Sort(deploymentStrings)
@@ -299,7 +298,7 @@ func promptToCreateStack(ctx context.Context, params stacks.StackParameters) err
 	return nil
 }
 
-func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *compose.Project, provider cliClient.Provider, err error) error {
+func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *compose.Project, provider client.Provider, err error) error {
 	if errors.Is(err, types.ErrComposeFileNotFound) {
 		// TODO: generate a compose file based on the current project
 		printDefangHint("To start a new project, do:", "new")
@@ -311,7 +310,7 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 
 	if strings.Contains(err.Error(), "maximum number of projects") {
 		if projectName, err2 := provider.RemoteProjectName(ctx); err2 == nil {
-			term.Error("Error:", cliClient.PrettyError(err))
+			term.Error("Error:", client.PrettyError(err))
 			if _, err := cli.InteractiveComposeDown(ctx, provider, projectName); err != nil {
 				term.Debug("ComposeDown failed:", err)
 				printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
@@ -324,14 +323,14 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 		return err
 	}
 
-	term.Error("Error:", cliClient.PrettyError(err))
+	term.Error("Error:", client.PrettyError(err))
 	return debugger.DebugDeploymentError(ctx, debug.DebugConfig{
 		Project: project,
 	}, err)
 }
 
 func handleTailAndMonitorErr(ctx context.Context, err error, debugger *debug.Debugger, debugConfig debug.DebugConfig) {
-	var errDeploymentFailed cliClient.ErrDeploymentFailed
+	var errDeploymentFailed client.ErrDeploymentFailed
 	if errors.As(err, &errDeploymentFailed) {
 		// Tail got canceled because of deployment failure: prompt to show the debugger
 		term.Warn(errDeploymentFailed)
@@ -443,7 +442,7 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 
-			projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+			projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 			if err != nil {
 				return err
 			}
@@ -458,7 +457,7 @@ func makeComposeDownCmd() *cobra.Command {
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
-					term.Warn(cliClient.PrettyError(err))
+					term.Warn(client.PrettyError(err))
 					return nil
 				}
 				return err
@@ -596,7 +595,7 @@ func makeComposePsCmd() *cobra.Command {
 				return err
 			}
 
-			projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+			projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 			if err != nil {
 				return err
 			}
@@ -721,7 +720,7 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+	projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 	if err != nil {
 		return err
 	}

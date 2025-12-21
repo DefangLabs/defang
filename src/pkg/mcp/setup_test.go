@@ -764,10 +764,6 @@ func TestWriteConfig(t *testing.T) {
 					t.Errorf("Expected error for %s but got none", client)
 				}
 				return // Don't continue with file comparison if we expected an error
-			} else {
-				if err != nil {
-					t.Fatalf("Unexpected error for %s: %v", client, err)
-				}
 			}
 
 			if err != nil {

@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -20,7 +20,7 @@ type ServicesParams struct {
 	common.LoaderParams
 }
 
-func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, params ServicesParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
+func HandleServicesTool(ctx context.Context, loader client.ProjectLoader, params ServicesParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, config.Cluster)
 	if err != nil {
@@ -44,7 +44,7 @@ func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, par
 
 	serviceResponse, err := cli.GetServices(ctx, projectName, provider)
 	if err != nil {
-		var noServicesErr defangcli.ErrNoServices
+		var noServicesErr cliTypes.ErrNoServices
 		if errors.As(err, &noServicesErr) {
 			return noServicesErr.Error(), nil
 		}

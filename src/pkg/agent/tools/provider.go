@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -14,17 +14,17 @@ import (
 const CreateNewStack = "Create new stack"
 
 type ProviderCreator interface {
-	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient, stack string) cliClient.Provider
+	NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient, stack string) client.Provider
 }
 
 type providerPreparer struct {
 	pc ProviderCreator
 	ec elicitations.Controller
-	fc cliClient.FabricClient
+	fc client.FabricClient
 	sm stacks.Manager
 }
 
-func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc cliClient.FabricClient, sm stacks.Manager) *providerPreparer {
+func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc client.FabricClient, sm stacks.Manager) *providerPreparer {
 	return &providerPreparer{
 		pc: pc,
 		ec: ec,
@@ -33,8 +33,8 @@ func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc cliC
 	}
 }
 
-func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.StackParameters) (*cliClient.ProviderID, cliClient.Provider, error) {
-	var providerID cliClient.ProviderID
+func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.StackParameters) (*client.ProviderID, client.Provider, error) {
+	var providerID client.ProviderID
 	var err error
 	if stack.Name == "" {
 		newStack, err := pp.setupStack(ctx)

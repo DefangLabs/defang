@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
@@ -68,7 +68,7 @@ func TestPrintServices(t *testing.T) {
 
 	url := strings.TrimPrefix(server.URL, "http://")
 	grpcClient, _ := Connect(ctx, url)
-	provider := cliClient.PlaygroundProvider{FabricClient: grpcClient}
+	provider := client.PlaygroundProvider{FabricClient: grpcClient}
 
 	t.Run("no services", func(t *testing.T) {
 		err := PrintServices(ctx, "empty", &provider, false)

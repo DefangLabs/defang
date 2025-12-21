@@ -6,7 +6,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -18,7 +18,7 @@ type SetConfigParams struct {
 	Value string `json:"value" jsonschema:"required"`
 }
 
-func HandleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params SetConfigParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
+func HandleSetConfig(ctx context.Context, loader client.ProjectLoader, params SetConfigParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, sc.Cluster)
 	if err != nil {
@@ -33,7 +33,7 @@ func HandleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, params
 	}
 
 	if params.ProjectName == "" {
-		term.Debug("Function invoked: cliClient.LoadProjectNameWithFallback")
+		term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
 		projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
 		if err != nil {
 			return "", fmt.Errorf("failed to load project name: %w", err)

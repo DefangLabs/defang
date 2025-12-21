@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
@@ -51,7 +51,7 @@ func TestConfigList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	provider := cliClient.PlaygroundProvider{FabricClient: grpcClient}
+	provider := client.PlaygroundProvider{FabricClient: grpcClient}
 
 	t.Run("no configs", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)

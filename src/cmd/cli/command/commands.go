@@ -18,12 +18,11 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/agent"
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
-	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/github"
@@ -58,7 +57,7 @@ func getTenantSelection() types.TenantNameOrID {
 	if global.Tenant != "" {
 		return types.TenantNameOrID(global.Tenant)
 	}
-	if token := cluster.GetExistingToken(global.Cluster); token != "" {
+	if token := client.GetExistingToken(global.Cluster); token != "" {
 		if t := cli.TenantFromToken(token); t.IsSet() {
 			return t
 		}
@@ -75,7 +74,7 @@ func Execute(ctx context.Context) error {
 
 	if err := RootCmd.ExecuteContext(ctx); err != nil {
 		if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
-			term.Error("Error:", cliClient.PrettyError(err))
+			term.Error("Error:", client.PrettyError(err))
 		}
 
 		if err == dryrun.ErrDryRun {
@@ -186,10 +185,10 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().StringVar(&global.Cluster, "cluster", global.Cluster, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster") // only for Defang use
 	RootCmd.PersistentFlags().StringVar(&global.Tenant, "workspace", global.Tenant, "workspace to use (tenant name or ID)")
-	RootCmd.PersistentFlags().VarP(&global.Stack.Provider, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
+	RootCmd.PersistentFlags().VarP(&global.Stack.Provider, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, client.AllProviders()))
 	RootCmd.RegisterFlagCompletionFunc("provider", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var completions []cobra.Completion
-		for _, provider := range cliClient.AllProviders() {
+		for _, provider := range client.AllProviders() {
 			completions = append(completions, provider.String())
 		}
 		return completions, cobra.ShellCompDirectiveNoFileComp
@@ -558,7 +557,7 @@ var whoamiCmd = &cobra.Command{
 			term.Debug("unable to get provider:", err)
 		}
 
-		token := cluster.GetExistingToken(global.Cluster)
+		token := client.GetExistingToken(global.Cluster)
 
 		userInfo, err := auth.FetchUserInfo(cmd.Context(), token)
 		if err != nil {
@@ -798,7 +797,7 @@ var configSetCmd = &cobra.Command{
 			return err
 		}
 
-		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 		if err != nil {
 			return err
 		}
@@ -929,7 +928,7 @@ var configDeleteCmd = &cobra.Command{
 			return err
 		}
 
-		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 		if err != nil {
 			return err
 		}
@@ -937,7 +936,7 @@ var configDeleteCmd = &cobra.Command{
 		if err := cli.ConfigDelete(cmd.Context(), projectName, provider, names...); err != nil {
 			// Show a warning (not an error) if the config was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
-				term.Warn(cliClient.PrettyError(err))
+				term.Warn(client.PrettyError(err))
 				return nil
 			}
 			return err
@@ -962,7 +961,7 @@ var configListCmd = &cobra.Command{
 			return err
 		}
 
-		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 		if err != nil {
 			return err
 		}
@@ -1042,7 +1041,7 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
-		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 		if err != nil {
 			return err
 		}
@@ -1057,7 +1056,7 @@ var deleteCmd = &cobra.Command{
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
-				term.Warn(cliClient.PrettyError(err))
+				term.Warn(client.PrettyError(err))
 				return nil
 			}
 			return err
@@ -1236,7 +1235,7 @@ func configureLoader(cmd *cobra.Command) *compose.Loader {
 	}
 
 	// Avoid common mistakes
-	var prov cliClient.ProviderID
+	var prov client.ProviderID
 	if prov.Set(projectName) == nil && !cmd.Flag("provider").Changed {
 		// using -p with a provider name instead of -P
 		term.Warnf("Project name %q looks like a provider name; did you mean to use -P=%s instead of -p?", projectName, projectName)
@@ -1292,14 +1291,14 @@ func isUpgradeCommand(cmd *cobra.Command) bool {
 	return cmd.Name() == "upgrade"
 }
 
-var providerDescription = map[cliClient.ProviderID]string{
-	cliClient.ProviderDefang: "The Defang Playground is a free platform intended for testing purposes only.",
-	cliClient.ProviderAWS:    "Deploy to AWS using the AWS_* environment variables or the AWS CLI configuration.",
-	cliClient.ProviderDO:     "Deploy to DigitalOcean using the DIGITALOCEAN_TOKEN, SPACES_ACCESS_KEY_ID, and SPACES_SECRET_ACCESS_KEY environment variables.",
-	cliClient.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
+var providerDescription = map[client.ProviderID]string{
+	client.ProviderDefang: "The Defang Playground is a free platform intended for testing purposes only.",
+	client.ProviderAWS:    "Deploy to AWS using the AWS_* environment variables or the AWS CLI configuration.",
+	client.ProviderDO:     "Deploy to DigitalOcean using the DIGITALOCEAN_TOKEN, SPACES_ACCESS_KEY_ID, and SPACES_SECRET_ACCESS_KEY environment variables.",
+	client.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
 }
 
-func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
+func updateProviderID(ctx context.Context, loader client.Loader) error {
 	extraMsg := ""
 	whence := "default project"
 
@@ -1309,13 +1308,13 @@ func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 	} else if val, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
 		// Sanitize the provider value from the environment variable
 		if err := global.Stack.Provider.Set(val); err != nil {
-			return fmt.Errorf("invalid provider '%v' in environment variable DEFANG_PROVIDER, supported providers are: %v", val, cliClient.AllProviders())
+			return fmt.Errorf("invalid provider '%v' in environment variable DEFANG_PROVIDER, supported providers are: %v", val, client.AllProviders())
 		}
 		whence = "environment variable"
 	}
 
 	switch global.Stack.Provider {
-	case cliClient.ProviderAuto:
+	case client.ProviderAuto:
 		if global.NonInteractive {
 			// Defaults to defang provider in non-interactive mode
 			if awsInEnv() {
@@ -1327,26 +1326,26 @@ func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 			if gcpInEnv() {
 				term.Warn("Using Defang playground, but GCP_PROJECT_ID/CLOUDSDK_CORE_PROJECT environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
 			}
-			global.Stack.Provider = cliClient.ProviderDefang
+			global.Stack.Provider = client.ProviderDefang
 		} else {
 			var err error
 			if whence, err = determineProviderID(ctx, loader); err != nil {
 				return err
 			}
 		}
-	case cliClient.ProviderAWS:
+	case client.ProviderAWS:
 		if !awsInConfig(ctx) {
 			term.Warn("AWS provider was selected, but AWS environment is not set")
 		}
-	case cliClient.ProviderDO:
+	case client.ProviderDO:
 		if !doInEnv() {
 			term.Warn("DigitalOcean provider was selected, but DIGITALOCEAN_TOKEN environment variable is not set")
 		}
-	case cliClient.ProviderGCP:
+	case client.ProviderGCP:
 		if !gcpInEnv() {
 			term.Warn("GCP provider was selected, but GCP_PROJECT_ID environment variable is not set")
 		}
-	case cliClient.ProviderDefang:
+	case client.ProviderDefang:
 		// Ignore any env vars when explicitly using the Defang playground provider
 		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
 	}
@@ -1355,7 +1354,7 @@ func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 	return nil
 }
 
-func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provider, error) {
+func newProvider(ctx context.Context, loader client.Loader) (client.Provider, error) {
 	if err := updateProviderID(ctx, loader); err != nil {
 		return nil, err
 	}
@@ -1364,7 +1363,7 @@ func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 	return provider, nil
 }
 
-func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient.Provider, error) {
+func newProviderChecked(ctx context.Context, loader client.Loader) (client.Provider, error) {
 	provider, err := newProvider(ctx, loader)
 	if err != nil {
 		return nil, err
@@ -1373,11 +1372,11 @@ func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient
 	return provider, err
 }
 
-func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string, serviceCount int) error {
-	return cliClient.CanIUseProvider(ctx, global.Client, provider, projectName, global.Stack.Name, serviceCount)
+func canIUseProvider(ctx context.Context, provider client.Provider, projectName string, serviceCount int) error {
+	return client.CanIUseProvider(ctx, global.Client, provider, projectName, global.Stack.Name, serviceCount)
 }
 
-func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, error) {
+func determineProviderID(ctx context.Context, loader client.Loader) (string, error) {
 	var projectName string
 	if loader != nil {
 		var err error
@@ -1397,7 +1396,7 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 		}
 	}
 
-	whence, err := interactiveSelectProvider(cliClient.AllProviders())
+	whence, err := interactiveSelectProvider(client.AllProviders())
 
 	// Save the selected provider to the fabric
 	if projectName != "" {
@@ -1411,7 +1410,7 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 	return whence, err
 }
 
-func interactiveSelectProvider(providers []cliClient.ProviderID) (string, error) {
+func interactiveSelectProvider(providers []client.ProviderID) (string, error) {
 	if len(providers) < 2 {
 		panic("interactiveSelectProvider called with less than 2 providers")
 	}
@@ -1423,11 +1422,11 @@ func interactiveSelectProvider(providers []cliClient.ProviderID) (string, error)
 	// Default to the provider in the environment if available
 	var defaultOption any // not string!
 	if awsInEnv() {
-		defaultOption = cliClient.ProviderAWS.String()
+		defaultOption = client.ProviderAWS.String()
 	} else if doInEnv() {
-		defaultOption = cliClient.ProviderDO.String()
+		defaultOption = client.ProviderDO.String()
 	} else if gcpInEnv() {
-		defaultOption = cliClient.ProviderGCP.String()
+		defaultOption = client.ProviderGCP.String()
 	}
 	var optionValue string
 	if err := survey.AskOne(&survey.Select{
@@ -1436,7 +1435,7 @@ func interactiveSelectProvider(providers []cliClient.ProviderID) (string, error)
 		Options: options,
 		Help:    "The provider you choose will be used for deploying services.",
 		Description: func(value string, i int) string {
-			return providerDescription[cliClient.ProviderID(value)]
+			return providerDescription[client.ProviderID(value)]
 		},
 	}, &optionValue, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
 		return "", fmt.Errorf("failed to select provider: %w", err)
