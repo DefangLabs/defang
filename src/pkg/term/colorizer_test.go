@@ -93,11 +93,7 @@ func TestAddingPrefix(t *testing.T) {
 	Warn(" ! Hello, World!")
 	Warnf(" ! Hello, %s!", "World")
 
-	expected := []string{
-		" - Hello, World!",
-		" - Hello, World!",
-		" - Hello, World!",
-		" - Hello, World!",
+	expectedOut := []string{
 		" * Hello, World!",
 		" * Hello, World!",
 		" * Hello, World!",
@@ -107,15 +103,24 @@ func TestAddingPrefix(t *testing.T) {
 		" ! Hello, World!",
 		" ! Hello, World!",
 	}
-	got := strings.Split(strings.TrimRight(stdout.String(), "\n"), "\n")
-	for i, line := range got {
-		if line != expected[i] {
-			t.Errorf("Expected line %v in stdout to be %q, got %q", i, expected[i], line)
+	gotOut := strings.Split(strings.TrimRight(stdout.String(), "\n"), "\n")
+	for i, line := range gotOut {
+		if line != expectedOut[i] {
+			t.Errorf("Expected line %v in stdout to be %q, got %q", i, expectedOut[i], line)
 		}
 	}
 
-	if stderr.String() != "" {
-		t.Errorf("Expected stderr to be empty, got %q", stderr.String())
+	expectedErr := []string{
+		" - Hello, World!",
+		" - Hello, World!",
+		" - Hello, World!",
+		" - Hello, World!",
+	}
+	gotErr := strings.Split(strings.TrimRight(stderr.String(), "\n"), "\n")
+	for i, line := range gotErr {
+		if line != expectedErr[i] {
+			t.Errorf("Expected line %v in stderr to be %q, got %q", i, expectedErr[i], line)
+		}
 	}
 }
 
