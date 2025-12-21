@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 )
@@ -33,7 +33,7 @@ func HandleCreateGCPStackTool(ctx context.Context, params CreateGCPStackParams, 
 	newStack := stacks.StackParameters{
 		Name:         params.Name,
 		GCPProjectID: params.GCPProjectID,
-		Provider:     cliClient.ProviderGCP,
+		Provider:     client.ProviderGCP,
 		Region:       params.Region,
 		Mode:         mode,
 	}

@@ -7,7 +7,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/do"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
-	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -21,8 +20,8 @@ func Connect(ctx context.Context, addr string) (*client.GrpcClient, error) {
 // ConnectWithTenant builds a client carrying the requested tenant (name or ID),
 // falling back to the token subject when unset so the server can resolve the personal tenant.
 func ConnectWithTenant(ctx context.Context, addr string, requestedTenant types.TenantNameOrID) (*client.GrpcClient, error) {
-	host := cluster.NormalizeHost(addr)
-	accessToken := cluster.GetExistingToken(host)
+	host := client.NormalizeHost(addr)
+	accessToken := client.GetExistingToken(host)
 	tokenTenant := TenantFromToken(accessToken)
 	effectiveTenant := requestedTenant
 	if !effectiveTenant.IsSet() {

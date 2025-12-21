@@ -1,4 +1,4 @@
-package cluster
+package client
 
 import (
 	"fmt"
@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
@@ -26,35 +25,35 @@ func NormalizeHost(cluster string) string {
 	return cluster
 }
 
-func tokenStorageName(fabric string) string {
+func tokenStorageName(cluster string) string {
 	// Token files are keyed by normalized host (no tenant prefix, no port) to avoid duplication.
-	if at := strings.LastIndex(fabric, "@"); at >= 0 && at < len(fabric)-1 {
-		fabric = fabric[at+1:] // drop legacy tenant prefix
+	if at := strings.LastIndex(cluster, "@"); at >= 0 && at < len(cluster)-1 {
+		cluster = cluster[at+1:] // drop legacy tenant prefix
 	}
-	host := NormalizeHost(fabric)
+	host := NormalizeHost(cluster)
 	if parsedHost, _, err := net.SplitHostPort(host); err == nil && parsedHost != "" {
 		host = parsedHost
 	}
 	return host
 }
 
-func GetTokenFile(fabric string) string {
-	return filepath.Join(client.StateDir, tokenStorageName(fabric))
+func GetTokenFile(cluster string) string {
+	return filepath.Join(StateDir, tokenStorageName(cluster))
 }
 
-func GetExistingToken(fabric string) string {
+func GetExistingToken(cluster string) string {
 	var accessToken = os.Getenv("DEFANG_ACCESS_TOKEN")
 
 	if accessToken != "" {
 		term.Debug("Using access token from env DEFANG_ACCESS_TOKEN")
 	} else {
-		tokenFile := GetTokenFile(fabric)
+		tokenFile := GetTokenFile(cluster)
 
 		term.Debug("Reading access token from file", tokenFile)
 		all, _ := os.ReadFile(tokenFile)
 		accessToken = string(all) // might be empty
 
-		if jwtPath, err := GetWebIdentityTokenFile(fabric); err == nil {
+		if jwtPath, err := GetWebIdentityTokenFile(cluster); err == nil {
 			if os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") == "" {
 				term.Debugf("using web identity token from %s", jwtPath)
 				// Set AWS env vars for this CLI invocation
@@ -69,16 +68,16 @@ func GetExistingToken(fabric string) string {
 	return accessToken
 }
 
-func GetWebIdentityTokenFile(fabric string) (string, error) {
-	jwtPath := GetTokenFile(fabric) + ".jwt"
+func GetWebIdentityTokenFile(cluster string) (string, error) {
+	jwtPath := GetTokenFile(cluster) + ".jwt"
 	_, err := os.Stat(jwtPath)
 	return jwtPath, err
 }
 
-func SaveAccessToken(fabric, token string) error {
-	tokenFile := GetTokenFile(fabric)
+func SaveAccessToken(cluster, token string) error {
+	tokenFile := GetTokenFile(cluster)
 	term.Debug("Saving access token to", tokenFile)
-	os.MkdirAll(client.StateDir, 0700)
+	os.MkdirAll(StateDir, 0700)
 	if err := os.WriteFile(tokenFile, []byte(token), 0600); err != nil {
 		return fmt.Errorf("failed to save access token: %w", err)
 	}

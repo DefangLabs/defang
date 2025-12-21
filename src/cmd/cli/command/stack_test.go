@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -42,13 +42,13 @@ func TestStackListCmd(t *testing.T) {
 			stacks: []stacks.StackParameters{
 				{
 					Name:     "teststack1",
-					Provider: cliClient.ProviderAWS,
+					Provider: client.ProviderAWS,
 					Region:   "us-west-2",
 					Mode:     modes.ModeAffordable,
 				},
 				{
 					Name:     "teststack2",
-					Provider: cliClient.ProviderGCP,
+					Provider: client.ProviderGCP,
 					Region:   "us-central1",
 					Mode:     modes.ModeBalanced,
 				},
@@ -89,7 +89,7 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 			name: "valid parameters",
 			parameters: stacks.StackParameters{
 				Name:     "teststack",
-				Provider: cliClient.ProviderAWS,
+				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
 				Mode:     modes.ModeAffordable,
 			},
@@ -99,7 +99,7 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 			name: "missing stack name",
 			parameters: stacks.StackParameters{
 				Name:     "",
-				Provider: cliClient.ProviderAWS,
+				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
 				Mode:     modes.ModeAffordable,
 			},

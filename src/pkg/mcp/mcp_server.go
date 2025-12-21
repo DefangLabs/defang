@@ -6,6 +6,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	agentTools "github.com/DefangLabs/defang/src/pkg/agent/tools"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
@@ -13,9 +14,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-
-	// NewDefangMCPServer returns a new MCPServer instance with all resources, tools registered.
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 )
 
 func prepareInstructions() string {
@@ -24,7 +22,7 @@ func prepareInstructions() string {
 }
 
 type ToolTracker struct {
-	providerId *cliClient.ProviderID
+	providerId *client.ProviderID
 	cluster    string
 	client     string
 }
@@ -47,6 +45,7 @@ func (t *ToolTracker) TrackTool(name string, handler server.ToolHandlerFunc) ser
 
 type StackConfig = tools.StackConfig
 
+// NewDefangMCPServer returns a new MCPServer instance with all resources, tools registered.
 func NewDefangMCPServer(version string, client MCPClient, cli agentTools.CLIInterface, config StackConfig) (*server.MCPServer, error) {
 	// Setup knowledge base
 	if err := SetupKnowledgeBase(); err != nil {

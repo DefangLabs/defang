@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cluster"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
@@ -20,7 +19,7 @@ func TestGetExistingToken(t *testing.T) {
 		expectedToken := "env-token"
 		t.Setenv("DEFANG_ACCESS_TOKEN", expectedToken)
 
-		accessToken := cluster.GetExistingToken(fabric)
+		accessToken := client.GetExistingToken(fabric)
 		if accessToken != expectedToken {
 			t.Errorf("expected %s, got: %s", expectedToken, accessToken)
 		}
@@ -28,14 +27,14 @@ func TestGetExistingToken(t *testing.T) {
 
 	t.Run("Get access token from file", func(t *testing.T) {
 		expectedToken := "file-token"
-		tokenFile := cluster.GetTokenFile(fabric)
+		tokenFile := client.GetTokenFile(fabric)
 		os.WriteFile(tokenFile, []byte(expectedToken), 0600)
 
 		t.Cleanup(func() {
 			os.Remove(tokenFile)
 		})
 
-		accessToken := cluster.GetExistingToken(fabric)
+		accessToken := client.GetExistingToken(fabric)
 		if accessToken != expectedToken {
 			t.Errorf("expected %s, got: %s", expectedToken, accessToken)
 		}
@@ -47,7 +46,7 @@ type mockGitHubAuthService struct {
 	err         error
 }
 
-func (g mockGitHubAuthService) login(ctx context.Context, client client.FabricClient, fabric string, prompt LoginFlow, mcpClient string) (string, error) {
+func (g mockGitHubAuthService) login(ctx context.Context, client client.FabricClient, cluster string, prompt LoginFlow, mcpClient string) (string, error) {
 	return g.accessToken, g.err
 }
 
@@ -64,7 +63,7 @@ func TestInteractiveLogin(t *testing.T) {
 		client.StateDir = prevStateDir
 	})
 
-	tokenFile := cluster.GetTokenFile(fabric)
+	tokenFile := client.GetTokenFile(fabric)
 
 	t.Run("Expect accessToken to be stored when InteractiveLogin() succeeds", func(t *testing.T) {
 		authService = mockGitHubAuthService{accessToken: accessToken}
@@ -123,7 +122,7 @@ func TestNonInteractiveLogin(t *testing.T) {
 			t.Fatalf("expected no error, got %v", err)
 		}
 
-		tokenFile := cluster.GetTokenFile(fabric)
+		tokenFile := client.GetTokenFile(fabric)
 		savedToken, err := os.ReadFile(tokenFile)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)

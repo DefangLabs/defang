@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/DefangLabs/defang/src/pkg"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -13,7 +13,7 @@ import (
 
 var disableAnalytics = pkg.GetenvBool("DEFANG_DISABLE_ANALYTICS")
 
-type Property = cliClient.Property
+type Property = client.Property
 
 // P creates a Property with the given name and value.
 func P(name string, value any) Property {

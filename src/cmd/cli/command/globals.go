@@ -7,8 +7,7 @@ import (
 	"strconv"
 
 	"github.com/DefangLabs/defang/src/pkg"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cluster"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
@@ -69,7 +68,7 @@ Note: Ensure the flag name, environment variable name, and struct field name are
 and follow the established naming conventions.
 */
 type GlobalConfig struct {
-	Client         *cliClient.GrpcClient
+	Client         *client.GrpcClient
 	Cluster        string
 	ColorMode      ColorMode
 	Debug          bool
@@ -91,12 +90,12 @@ variables, and command-line flags).
 */
 var global GlobalConfig = GlobalConfig{
 	ColorMode:      ColorAuto,
-	Cluster:        cluster.DefangFabric,
+	Cluster:        client.DefangFabric,
 	Debug:          pkg.GetenvBool("DEFANG_DEBUG"),
 	HasTty:         term.IsTerminal(),
 	HideUpdate:     false,
 	NonInteractive: !term.IsTerminal(),
-	Stack:          stacks.StackParameters{Provider: cliClient.ProviderAuto, Mode: modes.ModeUnspecified},
+	Stack:          stacks.StackParameters{Provider: client.ProviderAuto, Mode: modes.ModeUnspecified},
 	SourcePlatform: migrate.SourcePlatformUnspecified, // default to auto-detecting the source platform
 	Verbose:        false,
 }

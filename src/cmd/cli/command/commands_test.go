@@ -11,11 +11,11 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/auth"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	pkg "github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	awsdriver "github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	gcpdriver "github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -30,7 +30,7 @@ import (
 )
 
 type MockSsmClient struct {
-	pkg.SsmParametersAPI
+	awsdriver.SsmParametersAPI
 }
 
 func (m *MockSsmClient) PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
@@ -200,7 +200,7 @@ func TestCommandGates(t *testing.T) {
 	for _, tt := range testData {
 		t.Run(tt.name, func(t *testing.T) {
 			aws.StsClient = &mockStsProviderAPI{}
-			pkg.SsmClientOverride = &MockSsmClient{}
+			awsdriver.SsmClientOverride = &MockSsmClient{}
 			mockService.canIUseIsCalled = false
 
 			err := testCommand(tt.command, server.URL)
@@ -260,13 +260,13 @@ func (f *FakeStdout) Fd() uintptr {
 }
 
 func TestGetProvider(t *testing.T) {
-	mockClient := cliClient.GrpcClient{}
+	mockClient := client.GrpcClient{}
 	mockCtrl := &MockFabricControllerClient{
 		canIUseResponse: defangv1.CanIUseResponse{},
 	}
 	mockClient.SetClient(mockCtrl)
 	global.Client = &mockClient
-	loader := cliClient.MockLoader{Project: compose.Project{Name: "empty"}}
+	loader := client.MockLoader{Project: compose.Project{Name: "empty"}}
 	oldRootCmd := RootCmd
 	t.Cleanup(func() {
 		RootCmd = oldRootCmd
@@ -291,8 +291,8 @@ func TestGetProvider(t *testing.T) {
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
-		if _, ok := p.(*cliClient.PlaygroundProvider); !ok {
-			t.Errorf("Expected provider to be of type *cliClient.PlaygroundProvider, got %T", p)
+		if _, ok := p.(*client.PlaygroundProvider); !ok {
+			t.Errorf("Expected provider to be of type *client.PlaygroundProvider, got %T", p)
 		}
 	})
 

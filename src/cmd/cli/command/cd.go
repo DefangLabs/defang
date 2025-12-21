@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -42,7 +42,7 @@ func bootstrapCommand(cmd *cobra.Command, args []string, command string) error {
 	}
 
 	if len(args) == 0 {
-		projectName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
+		projectName, err := client.LoadProjectNameWithFallback(ctx, loader, provider)
 		if err != nil {
 			return err
 		}

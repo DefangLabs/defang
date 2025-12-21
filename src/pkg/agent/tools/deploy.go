@@ -10,7 +10,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/modes"
@@ -22,7 +21,7 @@ type DeployParams struct {
 	common.LoaderParams
 }
 
-func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, params DeployParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
+func HandleDeployTool(ctx context.Context, loader client.ProjectLoader, params DeployParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {

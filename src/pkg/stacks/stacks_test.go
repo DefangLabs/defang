@@ -5,20 +5,20 @@ import (
 	"path/filepath"
 	"testing"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestMakeDefaultName(t *testing.T) {
 	tests := []struct {
-		provider cliClient.ProviderID
+		provider client.ProviderID
 		region   string
 		expected string
 	}{
-		{cliClient.ProviderAWS, "us-west-2", "awsuswest2"},
-		{cliClient.ProviderGCP, "us-central1", "gcpuscentral1"},
-		{cliClient.ProviderDO, "NYC3", "digitaloceannyc3"},
+		{client.ProviderAWS, "us-west-2", "awsuswest2"},
+		{client.ProviderGCP, "us-central1", "gcpuscentral1"},
+		{client.ProviderDO, "NYC3", "digitaloceannyc3"},
 	}
 
 	for _, tt := range tests {
@@ -45,7 +45,7 @@ func TestCreate(t *testing.T) {
 			name: "valid parameters",
 			parameters: StackParameters{
 				Name:     "teststack",
-				Provider: cliClient.ProviderAWS,
+				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
 				Mode:     modes.ModeAffordable,
 			},
@@ -56,7 +56,7 @@ func TestCreate(t *testing.T) {
 			name: "missing stack name",
 			parameters: StackParameters{
 				Name:     "",
-				Provider: cliClient.ProviderAWS,
+				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
 				Mode:     modes.ModeAffordable,
 			},
@@ -66,7 +66,7 @@ func TestCreate(t *testing.T) {
 			name: "name with whitespaces",
 			parameters: StackParameters{
 				Name:     "invalid stack",
-				Provider: cliClient.ProviderAWS,
+				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
 				Mode:     modes.ModeAffordable,
 			},
@@ -115,7 +115,7 @@ func TestRepeatCreate(t *testing.T) {
 	t.Chdir(t.TempDir())
 	params := StackParameters{
 		Name:     "repeattest",
-		Provider: cliClient.ProviderGCP,
+		Provider: client.ProviderGCP,
 		Region:   "us-central1",
 		Mode:     modes.ModeBalanced,
 	}
@@ -202,7 +202,7 @@ func TestMarshal(t *testing.T) {
 			name: "GCP provider",
 			params: StackParameters{
 				Name:     "teststack",
-				Provider: cliClient.ProviderGCP,
+				Provider: client.ProviderGCP,
 				Region:   "us-central1",
 				Mode:     modes.ModeBalanced,
 			},
@@ -212,7 +212,7 @@ func TestMarshal(t *testing.T) {
 			name: "AWS provider",
 			params: StackParameters{
 				Name:     "awsstack",
-				Provider: cliClient.ProviderAWS,
+				Provider: client.ProviderAWS,
 				Region:   "us-east-1",
 				Mode:     modes.ModeAffordable,
 			},
@@ -222,7 +222,7 @@ func TestMarshal(t *testing.T) {
 			name: "Unspecified mode",
 			params: StackParameters{
 				Name:     "nomodestack",
-				Provider: cliClient.ProviderAWS,
+				Provider: client.ProviderAWS,
 				Region:   "us-west-1",
 				Mode:     modes.ModeUnspecified,
 			},
@@ -232,7 +232,7 @@ func TestMarshal(t *testing.T) {
 			name: "Empty region",
 			params: StackParameters{
 				Name:     "noregionstack",
-				Provider: cliClient.ProviderGCP,
+				Provider: client.ProviderGCP,
 				Region:   "",
 				Mode:     modes.ModeAffordable,
 			},
@@ -264,7 +264,7 @@ GCP_LOCATION=us-central1
 DEFANG_MODE=balanced
 `,
 			expectedParams: StackParameters{
-				Provider: cliClient.ProviderGCP,
+				Provider: client.ProviderGCP,
 				Region:   "us-central1",
 				Mode:     modes.ModeBalanced,
 			},
@@ -276,7 +276,7 @@ AWS_REGION=us-east-1
 DEFANG_MODE=affordable
 `,
 			expectedParams: StackParameters{
-				Provider: cliClient.ProviderAWS,
+				Provider: client.ProviderAWS,
 				Region:   "us-east-1",
 				Mode:     modes.ModeAffordable,
 			},
@@ -306,7 +306,7 @@ func TestRead(t *testing.T) {
 		stackName := "stacktoread"
 		expectedParams := StackParameters{
 			Name:     stackName,
-			Provider: cliClient.ProviderAWS,
+			Provider: client.ProviderAWS,
 			Region:   "us-west-2",
 			Mode:     modes.ModeAffordable,
 		}
@@ -337,7 +337,7 @@ func TestLoad(t *testing.T) {
 		stackName := "stacktoload"
 		expectedParams := StackParameters{
 			Name:     stackName,
-			Provider: cliClient.ProviderGCP,
+			Provider: client.ProviderGCP,
 			Region:   "us-central1",
 		}
 		_, err := Create(expectedParams)
@@ -362,7 +362,7 @@ func TestLoad(t *testing.T) {
 		stackName := "stacktoload"
 		stackParams := StackParameters{
 			Name:     stackName,
-			Provider: cliClient.ProviderGCP,
+			Provider: client.ProviderGCP,
 			Region:   "us-central1",
 		}
 		_, err := Create(stackParams)

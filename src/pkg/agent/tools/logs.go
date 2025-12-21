@@ -7,7 +7,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
@@ -22,7 +22,7 @@ type LogsParams struct {
 	Until        string `json:"until,omitempty" jsonschema:"description=Optional: Retrieve logs written before this time. Format as RFC3339 or duration (e.g., '2023-10-01T15:04:05Z' or '1h')."`
 }
 
-func HandleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
+func HandleLogsTool(ctx context.Context, loader client.ProjectLoader, params LogsParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
 	var sinceTime, untilTime time.Time
 	var err error
 	now := time.Now()
