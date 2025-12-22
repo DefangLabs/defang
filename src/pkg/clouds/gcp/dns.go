@@ -101,10 +101,13 @@ var safeZoneRE = regexp.MustCompile(`[^a-z0-9-]+`)
 
 // Zone names have the same requirements as label values.
 func SafeZoneName(input string) string {
-	input = strings.ToLower(input)                          // Rule 1: lowercase
-	safe := safeZoneRE.ReplaceAllString(input, "-")         // Rule 1: only letters, numbers, and hyphen
-	safe = strings.Trim(safe, "-")                          // Rule 3, 4: trim hyphens from start and end
-	if len(safe) == 0 || (safe[0] < 'a' || safe[0] > 'z') { // Rule 3: must start with a letter
+	input = strings.ToLower(input)                  // Rule 1: lowercase
+	safe := safeZoneRE.ReplaceAllString(input, "-") // Rule 1: only letters, numbers, and hyphen
+	safe = strings.Trim(safe, "-")                  // Rule 3, 4: trim hyphens from start and end
+	if len(safe) == 0 || safe[0] == '-' {
+		safe = "zone" + safe
+	}
+	if safe[0] < 'a' || safe[0] > 'z' { // Rule 3: must start with a letter
 		safe = "zone-" + safe
 	}
 	return hashTrim(safe, 63) // Rule 2: max length 63
