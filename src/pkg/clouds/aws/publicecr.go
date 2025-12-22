@@ -16,16 +16,11 @@ type PublicECRAPI interface {
 	GetAuthorizationToken(ctx context.Context, params *ecrpublic.GetAuthorizationTokenInput, optFns ...func(*ecrpublic.Options)) (*ecrpublic.GetAuthorizationTokenOutput, error)
 }
 
-var PublicECRClientOverride PublicECRAPI
 var ecrPublicAuthToken string
 
-func newPublicECRClientFromConfig(cfg aws.Config) PublicECRAPI {
-	var svc PublicECRAPI = PublicECRClientOverride
-	if svc == nil {
-		cfg.Region = "us-east-1" // ECR Public is only in us-east-1
-		svc = ecrpublic.NewFromConfig(cfg)
-	}
-	return svc
+var newPublicECRClientFromConfig = func(cfg aws.Config) PublicECRAPI {
+	cfg.Region = "us-east-1" // ECR Public is only in us-east-1
+	return ecrpublic.NewFromConfig(cfg)
 }
 
 func (a *Aws) CheckImageExistOnPublicECR(ctx context.Context, repo, tag string) (bool, error) {

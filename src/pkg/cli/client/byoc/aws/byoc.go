@@ -40,21 +40,15 @@ import (
 	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
-
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/proto"
 )
 
-type StsProviderAPI interface {
-	GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
-	AssumeRole(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error)
-}
-
-var StsClient StsProviderAPI
+type Config = awssdk.Config
 
 type ByocAws struct {
 	*byoc.ByocBaseClient
@@ -128,14 +122,7 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantNameOrID, stack
 		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
-
 	return b
-}
-
-func initStsClient(cfg awssdk.Config) {
-	if StsClient == nil {
-		StsClient = sts.NewFromConfig(cfg)
-	}
 }
 
 func (b *ByocAws) makeContainers() []clouds.Container {
@@ -383,8 +370,8 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 	}
 
 	if roleARN != "" {
-		initStsClient(cfg)
-		creds := stscreds.NewAssumeRoleProvider(StsClient, roleARN)
+		stsClient := aws.NewStsFromConfig(cfg)
+		creds := stscreds.NewAssumeRoleProvider(stsClient, roleARN)
 		cfg.Credentials = awssdk.NewCredentialsCache(creds)
 	}
 
@@ -434,9 +421,9 @@ func (b *ByocAws) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
-	initStsClient(cfg)
 
-	identity, err := StsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	stsClient := aws.NewStsFromConfig(cfg)
+	identity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}

@@ -23,12 +23,12 @@ func TestHandleCurrentStackTool(t *testing.T) {
 				Stack: &stacks.StackParameters{
 					Name:       "test-stack",
 					Provider:   client.ProviderAWS,
-					Region:     "us-west-2",
+					Region:     "us-test-2",
 					Mode:       modes.ModeAffordable,
 					AWSProfile: "default",
 				},
 			},
-			expected:      "This currently selected stack is \"test-stack\": AWS_PROFILE=\"default\"\nAWS_REGION=\"us-west-2\"\nDEFANG_MODE=\"affordable\"\nDEFANG_PROVIDER=\"aws\"",
+			expected:      "This currently selected stack is \"test-stack\": AWS_PROFILE=\"default\"\nAWS_REGION=\"us-test-2\"\nDEFANG_MODE=\"affordable\"\nDEFANG_PROVIDER=\"aws\"",
 			expectedError: false,
 		},
 	}

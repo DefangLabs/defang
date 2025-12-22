@@ -43,7 +43,7 @@ func TestStackListCmd(t *testing.T) {
 				{
 					Name:     "teststack1",
 					Provider: client.ProviderAWS,
-					Region:   "us-west-2",
+					Region:   "us-test-2",
 					Mode:     modes.ModeAffordable,
 				},
 				{
@@ -54,7 +54,7 @@ func TestStackListCmd(t *testing.T) {
 				},
 			},
 			expectOutput: "NAME        PROVIDER  REGION       MODE\n" +
-				"teststack1  aws       us-west-2    AFFORDABLE  \n" +
+				"teststack1  aws       us-test-2    AFFORDABLE  \n" +
 				"teststack2  gcp       us-central1  BALANCED    \n",
 		},
 	}
@@ -90,7 +90,7 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 			parameters: stacks.StackParameters{
 				Name:     "teststack",
 				Provider: client.ProviderAWS,
-				Region:   "us-west-2",
+				Region:   "us-test-2",
 				Mode:     modes.ModeAffordable,
 			},
 			expectErr: false,
@@ -100,7 +100,7 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 			parameters: stacks.StackParameters{
 				Name:     "",
 				Provider: client.ProviderAWS,
-				Region:   "us-west-2",
+				Region:   "us-test-2",
 				Mode:     modes.ModeAffordable,
 			},
 			expectErr: true,
