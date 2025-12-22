@@ -20,12 +20,12 @@ import (
 type LoginFlow = auth.LoginFlow
 
 type AuthService interface {
-	login(ctx context.Context, client client.FabricClient, cluster string, flow LoginFlow, mcpClient string) (string, error)
+	login(ctx context.Context, cluster string, flow LoginFlow, mcpClient string) (string, error)
 }
 
 type OpenAuthService struct{}
 
-func (OpenAuthService) login(ctx context.Context, fabric client.FabricClient, cluster string, flow LoginFlow, mcpClient string) (string, error) {
+func (OpenAuthService) login(ctx context.Context, cluster string, flow LoginFlow, mcpClient string) (string, error) {
 	term.Debug("Logging in to", cluster)
 
 	code, err := auth.StartAuthCodeFlow(ctx, flow, func(token string) {
@@ -40,23 +40,27 @@ func (OpenAuthService) login(ctx context.Context, fabric client.FabricClient, cl
 
 var authService AuthService = OpenAuthService{}
 
-func InteractiveLogin(ctx context.Context, fabric client.FabricClient, cluster string) error {
-	return interactiveLogin(ctx, fabric, cluster, auth.CliFlow, "CLI-Flow")
+func InteractiveLogin(ctx context.Context, cluster string) error {
+	return interactiveLogin(ctx, cluster, auth.CliFlow, "CLI-Flow")
 }
 
-func InteractiveLoginMCP(ctx context.Context, fabric client.FabricClient, cluster string, mcpClient string) error {
-	return interactiveLogin(ctx, fabric, cluster, auth.McpFlow, mcpClient)
+func InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
+	return interactiveLogin(ctx, cluster, auth.McpFlow, mcpClient)
 }
 
-func interactiveLogin(ctx context.Context, fabric client.FabricClient, cluster string, flow LoginFlow, mcpClient string) error {
-	token, err := authService.login(ctx, fabric, cluster, flow, mcpClient)
+func interactiveLogin(ctx context.Context, cluster string, flow LoginFlow, mcpClient string) error {
+	token, err := authService.login(ctx, cluster, flow, mcpClient)
 	if err != nil {
 		return err
 	}
 
-	tenant := cli.TenantFromToken(token) // show the tenant implied by the freshly issued token
-	host := client.NormalizeHost(cluster)
-	term.Info("Successfully logged in to", host, "("+tenant.String()+" tenant)")
+	// tenant := cli.TenantFromToken(token) // show the tenant implied by the freshly issued token
+	// host := client.NormalizeHost(cluster)
+	// term.Info("Successfully logged in to", host, "("+tenant.String()+" tenant)")
+
+	if dryrun.DoDryRun {
+		return dryrun.ErrDryRun
+	}
 
 	if err := client.SaveAccessToken(cluster, token); err != nil {
 		term.Warn(err)
@@ -66,13 +70,10 @@ func interactiveLogin(ctx context.Context, fabric client.FabricClient, cluster s
 		}
 		// We continue even if we can't save the token; we just won't have it saved for next time
 	}
-	if dryrun.DoDryRun {
-		return dryrun.ErrDryRun
-	}
 	// The new login page shows the ToS so a successful login implies the user agreed
-	if err := NonInteractiveAgreeToS(ctx, fabric); err != nil {
-		term.Debug("unable to agree to terms:", err) // not fatal
-	}
+	// if err := NonInteractiveAgreeToS(ctx, fabric); err != nil {
+	// 	term.Debug("unable to agree to terms:", err) // not fatal
+	// }
 	return nil
 }
 
@@ -123,15 +124,16 @@ func InteractiveRequireLoginAndToS(ctx context.Context, fabric *client.GrpcClien
 			term.ResetWarnings() // clear any previous warnings so we don't show them again
 
 			defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
-			if err = InteractiveLogin(ctx, fabric, addr); err != nil {
+			if err = InteractiveLogin(ctx, addr); err != nil {
 				return err
 			}
 
 			// Reconnect with the new token
-			if newFabric, err := cli.Connect(ctx, addr); err != nil {
+			if newFabric, err := cli.ConnectWithTenant(ctx, addr, fabric.GetRequestedTenant()); err != nil {
 				return err
 			} else {
 				*fabric = *newFabric
+				track.Tracker = fabric // update global tracker
 			}
 
 			if err = fabric.CheckLoginAndToS(ctx); err == nil { // recheck (new token = new user)

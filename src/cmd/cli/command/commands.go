@@ -38,7 +38,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	"github.com/DefangLabs/defang/src/pkg/track"
-	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -50,21 +49,6 @@ const authNeeded = "auth-needed" // annotation to indicate that a command needs 
 var authNeededAnnotation = map[string]string{authNeeded: ""}
 
 var P = track.P
-
-// getTenantSelection resolves the tenant to use for this invocation (flag > env > token subject),
-// leaving it unset when we should rely on the personal tenant from the token subject.
-func getTenantSelection() types.TenantNameOrID {
-	if global.Tenant != "" {
-		return types.TenantNameOrID(global.Tenant)
-	}
-	if token := client.GetExistingToken(global.Cluster); token != "" {
-		if t := cli.TenantFromToken(token); t.IsSet() {
-			return t
-		}
-	}
-	// No explicit tenant: defer to token subject or server defaults.
-	return types.TenantUnset
-}
 
 func Execute(ctx context.Context) error {
 	if term.StdoutCanColor() {
@@ -158,7 +142,7 @@ SetupCommands initializes and configures the entire Defang CLI command structure
 It registers all global flags that bind to GlobalConfig, sets up all subcommands with their
 specific flags, and establishes the command hierarchy.
 */
-func SetupCommands(ctx context.Context, version string) {
+func SetupCommands(version string) {
 	cobra.EnableTraverseRunHooks = true // we always need to run the RootCmd's pre-run hook
 
 	RootCmd.Version = version
@@ -184,7 +168,7 @@ func SetupCommands(ctx context.Context, version string) {
 	})
 	RootCmd.PersistentFlags().StringVar(&global.Cluster, "cluster", global.Cluster, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster") // only for Defang use
-	RootCmd.PersistentFlags().StringVar(&global.Tenant, "workspace", global.Tenant, "workspace to use (tenant name or ID)")
+	RootCmd.PersistentFlags().Var(&global.Tenant, "workspace", "workspace to use")
 	RootCmd.PersistentFlags().VarP(&global.Stack.Provider, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, client.AllProviders()))
 	RootCmd.RegisterFlagCompletionFunc("provider", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var completions []cobra.Completion
@@ -203,10 +187,6 @@ func SetupCommands(ctx context.Context, version string) {
 	_ = RootCmd.MarkPersistentFlagDirname("cwd")
 	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, `compose file path(s)`)
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
-
-	// Create a temporary gRPC client for tracking events before login
-	// getTenantSelection defaults to types.TenantUnset when no tenant is specified
-	cli.ConnectWithTenant(ctx, global.Cluster, getTenantSelection())
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
@@ -420,6 +400,9 @@ var RootCmd = &cobra.Command{
 			return nil
 		}
 
+		// Create a temporary gRPC client for tracking events before login
+		track.Tracker = cli.Connect(global.Cluster, global.Tenant)
+
 		ctx := cmd.Context()
 		term.SetDebug(global.Debug)
 
@@ -459,14 +442,15 @@ var RootCmd = &cobra.Command{
 			return err
 		}
 
-		global.Client, err = cli.ConnectWithTenant(ctx, global.Cluster, getTenantSelection())
-
+		global.Client, err = cli.ConnectWithTenant(ctx, global.Cluster, global.Tenant)
 		if err != nil {
 			if connect.CodeOf(err) != connect.CodeUnauthenticated {
 				return err
 			}
 			term.Debug("Using existing token failed; continuing to allow login/ToS flow:", err)
 		}
+
+		track.Tracker = global.Client // update tracker with the real client
 
 		if v, err := global.Client.GetVersions(ctx); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
@@ -522,7 +506,7 @@ var loginCmd = &cobra.Command{
 				return err
 			}
 		} else {
-			err := login.InteractiveLogin(cmd.Context(), global.Client, global.Cluster)
+			err := login.InteractiveLogin(cmd.Context(), global.Cluster)
 			if err != nil {
 				return err
 			}
@@ -567,8 +551,7 @@ var whoamiCmd = &cobra.Command{
 			}
 		}
 
-		tenantSelection := getTenantSelection()
-		data, err := cli.Whoami(cmd.Context(), global.Client, provider, userInfo, tenantSelection)
+		data, err := cli.Whoami(cmd.Context(), global.Client, provider, userInfo, global.Tenant)
 		if err != nil {
 			return err
 		}
@@ -1168,7 +1151,7 @@ var tokenCmd = &cobra.Command{
 		var s, _ = cmd.Flags().GetString("scope")
 		var expires, _ = cmd.Flags().GetDuration("expires")
 
-		return cli.Token(cmd.Context(), global.Client, getTenantSelection(), expires, scope.Scope(s))
+		return cli.Token(cmd.Context(), global.Client, global.Tenant, expires, scope.Scope(s))
 	},
 }
 

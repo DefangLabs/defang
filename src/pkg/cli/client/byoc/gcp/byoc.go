@@ -102,7 +102,7 @@ type ByocGcp struct {
 	cdEtag      string
 }
 
-func NewByocProvider(ctx context.Context, tenantName types.TenantNameOrID, stack string) *ByocGcp {
+func NewByocProvider(ctx context.Context, tenantName types.TenantName, stack string) *ByocGcp {
 	region := pkg.Getenv("GCP_LOCATION", "us-central1") // Defaults to us-central1 for lower price
 	projectId := getGcpProjectID()
 	b := &ByocGcp{driver: &gcp.Gcp{Region: region, ProjectId: projectId}}
@@ -983,8 +983,4 @@ func (b *ByocGcp) StackName(projectName, name string) string {
 		parts = []string{b.Prefix}
 	}
 	return strings.Join(append(parts, projectName, b.PulumiStack, name), "_") // same as fullDefangResourceName in gcpcd/up.go
-}
-
-func (b *ByocGcp) ServicePublicDNS(name string, projectName string) string {
-	return dns.SafeLabel(name) + "." + b.PulumiStack + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(b.TenantName) + ".defang.app"
 }

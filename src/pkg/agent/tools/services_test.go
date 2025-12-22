@@ -90,7 +90,7 @@ func (m *MockCLI) GenerateAuthURL(authPort int) string {
 	return ""
 }
 
-func (m *MockCLI) InteractiveLoginMCP(ctx context.Context, fabric *client.GrpcClient, cluster string, mcpClient string) error {
+func (m *MockCLI) InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
 	return nil
 }
 

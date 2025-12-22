@@ -1,5 +1,8 @@
 package types
 
+// TenantName is the tenant's DNS label
+type TenantName string
+
 // TenantNameOrID is the user-visible tenant identifier.
 // It can be either a tenant name or a tenant ID; the backend resolves it using userinfo.
 type TenantNameOrID string
@@ -22,4 +25,15 @@ func (t TenantNameOrID) String() string {
 // IsSet reports whether a tenant was explicitly provided.
 func (t TenantNameOrID) IsSet() bool {
 	return t != TenantUnset
+}
+
+// Type returns the string shown in Cobra help
+func (TenantNameOrID) Type() string {
+	return "name-or-id"
+}
+
+// Set is called by Cobra to parse the string argument
+func (t *TenantNameOrID) Set(s string) error {
+	*t = TenantNameOrID(s)
+	return nil
 }

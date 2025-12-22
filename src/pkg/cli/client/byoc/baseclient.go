@@ -52,19 +52,19 @@ type ByocBaseClient struct {
 	PulumiStack             string
 	SetupDone               bool
 	ShouldDelegateSubdomain bool
-	TenantName              string // tenant identifier (name or ID)
+	TenantName              types.TenantName
 	CanIUseConfig
 
 	projectBackend ProjectBackend
 }
 
-func NewByocBaseClient(tenantName types.TenantNameOrID, backend ProjectBackend, stack string) *ByocBaseClient {
+func NewByocBaseClient(tenantName types.TenantName, backend ProjectBackend, stack string) *ByocBaseClient {
 	if stack == "" {
 		stack = "beta" // backwards compat
 	}
 	b := &ByocBaseClient{
 		Prefix:         pkg.Getenv("DEFANG_PREFIX", "Defang"), // prefix for all resources created by Defang
-		TenantName:     string(tenantName),
+		TenantName:     tenantName,
 		PulumiStack:    pkg.Getenv("DEFANG_SUFFIX", stack),
 		projectBackend: backend,
 	}
@@ -296,4 +296,11 @@ func (b ByocBaseClient) GetProjectUpdatePath(projectName string) string {
 	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/aws/byoc.ts#L104
 	pkg.Ensure(projectName != "", "ProjectName not set")
 	return fmt.Sprintf("projects/%s/%s/project.pb", projectName, b.PulumiStack)
+}
+
+func (b ByocBaseClient) ServicePublicDNS(name string, projectName string) string {
+	if b.PulumiStack != "" && b.PulumiStack != "beta" {
+		projectName = projectName + "-" + b.PulumiStack
+	}
+	return dns.SafeLabel(name) + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(string(b.TenantName)) + ".defang.app"
 }

@@ -23,14 +23,12 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	awsbyoc "github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/dns"
-	"github.com/DefangLabs/defang/src/pkg/logs"
-
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do/appPlatform"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do/region"
 	"github.com/DefangLabs/defang/src/pkg/http"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -64,7 +62,7 @@ type ByocDo struct {
 
 var _ client.Provider = (*ByocDo)(nil)
 
-func NewByocProvider(ctx context.Context, tenantName types.TenantNameOrID, stack string) *ByocDo {
+func NewByocProvider(ctx context.Context, tenantName types.TenantName, stack string) *ByocDo {
 	doRegion := do.Region(os.Getenv("REGION"))
 	if doRegion == "" {
 		doRegion = region.SFO3 // TODO: change default
@@ -658,7 +656,7 @@ func (b *ByocDo) environment(projectName, delegateDomain string, mode defangv1.D
 		{Key: "DEFANG_DEBUG", Value: os.Getenv("DEFANG_DEBUG")},
 		{Key: "DEFANG_JSON", Value: os.Getenv("DEFANG_JSON")},
 		{Key: "DEFANG_MODE", Value: strings.ToLower(mode.String())},
-		{Key: "DEFANG_ORG", Value: b.TenantName},
+		{Key: "DEFANG_ORG", Value: string(b.TenantName)},
 		{Key: "DEFANG_PREFIX", Value: b.Prefix},
 		{Key: "DEFANG_PULUMI_DEBUG", Value: os.Getenv("DEFANG_PULUMI_DEBUG")},
 		{Key: "DEFANG_PULUMI_DIFF", Value: os.Getenv("DEFANG_PULUMI_DIFF")},
@@ -736,10 +734,6 @@ func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, erro
 	}
 
 	return nil, fmt.Errorf("app not found: %s", appName)
-}
-
-func (b *ByocDo) ServicePublicDNS(name string, projectName string) string {
-	return dns.SafeLabel(name) + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(b.TenantName) + ".defang.app"
 }
 
 func processServiceInfo(service *godo.AppServiceSpec, projectName string) *defangv1.ServiceInfo {

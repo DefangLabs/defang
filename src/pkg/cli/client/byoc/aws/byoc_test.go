@@ -28,7 +28,7 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 	hostModePort := &composeTypes.ServicePortConfig{Mode: "host", Target: 80}
 	tests := []struct {
 		ProjectName string
-		TenantName  types.TenantNameOrID
+		TenantName  types.TenantName
 		Fqn         string
 		Port        *composeTypes.ServicePortConfig
 		EndPoint    string

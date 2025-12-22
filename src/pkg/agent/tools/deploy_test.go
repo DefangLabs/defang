@@ -56,7 +56,7 @@ func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.Provi
 	return nil
 }
 
-func (m *MockDeployCLI) InteractiveLoginMCP(ctx context.Context, fabric *client.GrpcClient, cluster string, mcpClient string) error {
+func (m *MockDeployCLI) InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
 	m.CallLog = append(m.CallLog, "InteractiveLoginMCP")
 	return m.InteractiveLoginMCPError
 }

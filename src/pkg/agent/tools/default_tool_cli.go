@@ -13,6 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
@@ -45,7 +46,8 @@ func (DefaultToolCLI) ListConfig(ctx context.Context, provider client.Provider, 
 }
 
 func (DefaultToolCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
-	return cli.Connect(ctx, cluster)
+	// TODO: add workspace support to the MCP server
+	return cli.ConnectWithTenant(ctx, cluster, types.TenantUnset)
 }
 
 func (DefaultToolCLI) ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
@@ -111,6 +113,6 @@ func (DefaultToolCLI) GenerateAuthURL(authPort int) string {
 	return "Please open this URL in your browser: http://127.0.0.1:" + strconv.Itoa(authPort) + " to login"
 }
 
-func (DefaultToolCLI) InteractiveLoginMCP(ctx context.Context, fabric *client.GrpcClient, cluster string, mcpClient string) error {
-	return login.InteractiveLoginMCP(ctx, fabric, cluster, mcpClient)
+func (DefaultToolCLI) InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
+	return login.InteractiveLoginMCP(ctx, cluster, mcpClient)
 }

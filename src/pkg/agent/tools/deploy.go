@@ -33,12 +33,18 @@ func HandleDeployTool(ctx context.Context, loader client.ProjectLoader, params D
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, config.Cluster)
 	if err != nil {
-		err = cli.InteractiveLoginMCP(ctx, client, config.Cluster, common.MCPDevelopmentClient)
+		err = cli.InteractiveLoginMCP(ctx, config.Cluster, common.MCPDevelopmentClient)
 		if err != nil {
 			var noBrowserErr auth.ErrNoBrowser
 			if errors.As(err, &noBrowserErr) {
 				return noBrowserErr.Error(), nil
 			}
+			return "", err
+		}
+
+		// Reconnect with the new token
+		client, err = cli.Connect(ctx, config.Cluster)
+		if err != nil {
 			return "", err
 		}
 	}

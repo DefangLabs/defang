@@ -84,7 +84,7 @@ func (m *mockFabricService) SetSelectedProvider(context.Context, *connect.Reques
 }
 
 func init() {
-	SetupCommands(context.Background(), "0.0.0-test")
+	SetupCommands("0.0.0-test")
 }
 
 type mockStsProviderAPI struct{}
@@ -264,7 +264,7 @@ func TestGetProvider(t *testing.T) {
 	mockCtrl := &MockFabricControllerClient{
 		canIUseResponse: defangv1.CanIUseResponse{},
 	}
-	mockClient.SetClient(mockCtrl)
+	mockClient.SetFabricClient(mockCtrl)
 	global.Client = &mockClient
 	loader := client.MockLoader{Project: compose.Project{Name: "empty"}}
 	oldRootCmd := RootCmd

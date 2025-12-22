@@ -46,7 +46,7 @@ type mockGitHubAuthService struct {
 	err         error
 }
 
-func (g mockGitHubAuthService) login(ctx context.Context, client client.FabricClient, cluster string, prompt LoginFlow, mcpClient string) (string, error) {
+func (g mockGitHubAuthService) login(ctx context.Context, cluster string, prompt LoginFlow, mcpClient string) (string, error) {
 	return g.accessToken, g.err
 }
 
@@ -68,7 +68,7 @@ func TestInteractiveLogin(t *testing.T) {
 	t.Run("Expect accessToken to be stored when InteractiveLogin() succeeds", func(t *testing.T) {
 		authService = mockGitHubAuthService{accessToken: accessToken}
 
-		err := InteractiveLogin(t.Context(), client.MockFabricClient{}, fabric)
+		err := InteractiveLogin(t.Context(), fabric)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -84,7 +84,7 @@ func TestInteractiveLogin(t *testing.T) {
 	t.Run("Expect error when InteractiveLogin fails", func(t *testing.T) {
 		authService = mockGitHubAuthService{err: errors.New("test-error")}
 
-		err := InteractiveLogin(t.Context(), client.MockFabricClient{}, fabric)
+		err := InteractiveLogin(t.Context(), fabric)
 		if err == nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
