@@ -48,28 +48,19 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 	// Validate the project configuration against the provider's configuration, but only if we are going to deploy.
 	// FIXME: should not need to validate configs if we are doing preview, but preview will fail on missing configs.
 	if upload != compose.UploadModeIgnore {
-		listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
-			configs, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
-			if err != nil {
-				return nil, err
-			}
-
-			return configs.Names, nil
-		}
-
 		// Ignore missing configs in preview mode, because we don't want to fail the preview if some configs are missing.
 		if upload != compose.UploadModeEstimate {
-			listConfigNames, err := listConfigNamesFunc(ctx)
+			configs, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
 			if err != nil {
 				return nil, project, err
 			}
 
-			if err := compose.ValidateProjectConfig(ctx, project, listConfigNames); err != nil {
+			if err := compose.ValidateProjectConfig(ctx, project, configs.Names); err != nil {
 				return nil, project, &ComposeError{err}
 			}
 
 			// Print config resolution summary
-			err = PrintConfigResolutionSummary(project, listConfigNames)
+			err = PrintConfigResolutionSummary(project, configs.Names)
 			if err != nil {
 				return nil, project, err
 			}
