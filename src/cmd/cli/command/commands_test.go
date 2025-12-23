@@ -21,8 +21,6 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2/google"
@@ -68,7 +66,7 @@ func (m *mockFabricService) WhoAmI(context.Context, *connect.Request[emptypb.Emp
 	return connect.NewResponse(&defangv1.WhoAmIResponse{
 		Tenant:            "default",
 		ProviderAccountId: "default",
-		Region:            "us-west-2",
+		Region:            "us-test-2",
 		Tier:              defangv1.SubscriptionTier_HOBBY,
 	}), nil
 }
@@ -83,23 +81,9 @@ func (m *mockFabricService) SetSelectedProvider(context.Context, *connect.Reques
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
-func init() {
+func TestMain(m *testing.M) {
 	SetupCommands("0.0.0-test")
-}
-
-type mockStsProviderAPI struct{}
-
-func (s *mockStsProviderAPI) GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
-	callIdOutput := sts.GetCallerIdentityOutput{}
-	callIdOutput.Account = ptr.String("123456789012")
-	callIdOutput.Arn = ptr.String("arn:aws:iam::123456789012:user/test")
-
-	return &callIdOutput, nil
-}
-
-func (s *mockStsProviderAPI) AssumeRole(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
-	aro := sts.AssumeRoleOutput{}
-	return &aro, nil
+	os.Exit(m.Run())
 }
 
 func testCommand(args []string, cluster string) error {
@@ -141,7 +125,7 @@ func TestCommandGates(t *testing.T) {
 	_, handler := defangv1connect.NewFabricControllerHandler(mockService)
 	t.Chdir("../../../../src/testdata/sanity")
 
-	t.Setenv("AWS_REGION", "us-west-2")
+	t.Setenv("AWS_REGION", "us-test-2")
 
 	userinfoServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/userinfo" {
@@ -197,10 +181,16 @@ func TestCommandGates(t *testing.T) {
 		},
 	}
 
+	prevSts, prevSsm := awsdriver.NewStsFromConfig, awsdriver.NewSsmFromConfig
+	t.Cleanup(func() {
+		awsdriver.NewStsFromConfig = prevSts
+		awsdriver.NewSsmFromConfig = prevSsm
+	})
+	awsdriver.NewStsFromConfig = func(aws.Config) awsdriver.StsClientAPI { return &awsdriver.MockStsClientAPI{} }
+	awsdriver.NewSsmFromConfig = func(aws.Config) awsdriver.SsmParametersAPI { return &MockSsmClient{} }
+
 	for _, tt := range testData {
 		t.Run(tt.name, func(t *testing.T) {
-			aws.StsClient = &mockStsProviderAPI{}
-			awsdriver.SsmClientOverride = &MockSsmClient{}
 			mockService.canIUseIsCalled = false
 
 			err := testCommand(tt.command, server.URL)
@@ -265,12 +255,18 @@ func TestGetProvider(t *testing.T) {
 		canIUseResponse: defangv1.CanIUseResponse{},
 	}
 	mockClient.SetFabricClient(mockCtrl)
-	global.Client = &mockClient
-	loader := client.MockLoader{Project: compose.Project{Name: "empty"}}
-	oldRootCmd := RootCmd
+	oldRootCmd, oldClient, oldSts := RootCmd, global.Client, awsdriver.NewStsFromConfig
 	t.Cleanup(func() {
 		RootCmd = oldRootCmd
+		global.Client = oldClient
+		awsdriver.NewStsFromConfig = oldSts
+		mockCtrl.savedProvider = nil
 	})
+
+	awsdriver.NewStsFromConfig = func(aws.Config) awsdriver.StsClientAPI { return &awsdriver.MockStsClientAPI{} }
+	global.Client = &mockClient
+	loader := client.MockLoader{Project: compose.Project{Name: "empty"}}
+
 	FakeRootWithProviderParam := func(provider string) *cobra.Command {
 		cmd := &cobra.Command{}
 		cmd.PersistentFlags().VarP(&global.Stack.Provider, "provider", "P", "fake provider flag")
@@ -299,20 +295,11 @@ func TestGetProvider(t *testing.T) {
 	t.Run("Auto provider should get provider from client", func(t *testing.T) {
 		global.Stack.Provider = "auto"
 		os.Unsetenv("DEFANG_PROVIDER")
-		t.Setenv("AWS_REGION", "us-west-2")
+		t.Setenv("AWS_REGION", "us-test-2")
 		RootCmd = FakeRootWithProviderParam("")
 
 		mockCtrl.savedProvider = map[string]defangv1.Provider{"empty": defangv1.Provider_AWS}
-
-		ni := global.NonInteractive
-		sts := aws.StsClient
-		aws.StsClient = &mockStsProviderAPI{}
 		global.NonInteractive = false
-		t.Cleanup(func() {
-			global.NonInteractive = ni
-			aws.StsClient = sts
-			mockCtrl.savedProvider = nil
-		})
 
 		p, err := newProvider(ctx, loader)
 		if err != nil {
@@ -326,13 +313,13 @@ func TestGetProvider(t *testing.T) {
 	t.Run("Auto provider from param with saved provider should go interactive and save", func(t *testing.T) {
 		global.Stack.Provider = "auto"
 		os.Unsetenv("DEFANG_PROVIDER")
-		t.Setenv("AWS_REGION", "us-west-2")
+		t.Setenv("AWS_REGION", "us-test-2")
 		mockCtrl.savedProvider = map[string]defangv1.Provider{"someotherproj": defangv1.Provider_AWS}
 		RootCmd = FakeRootWithProviderParam("")
 
 		ni := global.NonInteractive
-		sts := aws.StsClient
-		aws.StsClient = &mockStsProviderAPI{}
+		sts := awsdriver.NewStsFromConfig
+		awsdriver.NewStsFromConfig = func(cfg aws.Config) awsdriver.StsClientAPI { return &awsdriver.MockStsClientAPI{} }
 		global.NonInteractive = false
 		oldTerm := term.DefaultTerm
 		term.DefaultTerm = term.NewTerm(
@@ -342,7 +329,7 @@ func TestGetProvider(t *testing.T) {
 		)
 		t.Cleanup(func() {
 			global.NonInteractive = ni
-			aws.StsClient = sts
+			awsdriver.NewStsFromConfig = sts
 			mockCtrl.savedProvider = nil
 			term.DefaultTerm = oldTerm
 		})
@@ -366,14 +353,14 @@ func TestGetProvider(t *testing.T) {
 		global.Stack.Provider = "auto"
 		os.Unsetenv("DEFANG_PROVIDER")
 		os.Unsetenv("AWS_PROFILE")
-		t.Setenv("AWS_REGION", "us-west-2")
+		t.Setenv("AWS_REGION", "us-test-2")
 		t.Setenv("DIGITALOCEAN_TOKEN", "test-token")
 		mockCtrl.savedProvider = map[string]defangv1.Provider{"someotherproj": defangv1.Provider_AWS}
 		RootCmd = FakeRootWithProviderParam("")
 
 		ni := global.NonInteractive
-		sts := aws.StsClient
-		aws.StsClient = &mockStsProviderAPI{}
+		prevSts := awsdriver.NewStsFromConfig
+		awsdriver.NewStsFromConfig = func(cfg aws.Config) awsdriver.StsClientAPI { return &awsdriver.MockStsClientAPI{} }
 		global.NonInteractive = false
 		oldTerm := term.DefaultTerm
 		term.DefaultTerm = term.NewTerm(
@@ -383,7 +370,7 @@ func TestGetProvider(t *testing.T) {
 		)
 		t.Cleanup(func() {
 			global.NonInteractive = ni
-			aws.StsClient = sts
+			awsdriver.NewStsFromConfig = prevSts
 			mockCtrl.savedProvider = nil
 			term.DefaultTerm = oldTerm
 		})
@@ -405,8 +392,8 @@ func TestGetProvider(t *testing.T) {
 		RootCmd = FakeRootWithProviderParam("auto")
 
 		ni := global.NonInteractive
-		sts := aws.StsClient
-		aws.StsClient = &mockStsProviderAPI{}
+		prevSts := awsdriver.NewStsFromConfig
+		awsdriver.NewStsFromConfig = func(cfg aws.Config) awsdriver.StsClientAPI { return &awsdriver.MockStsClientAPI{} }
 		global.NonInteractive = false
 		oldTerm := term.DefaultTerm
 		term.DefaultTerm = term.NewTerm(
@@ -416,7 +403,7 @@ func TestGetProvider(t *testing.T) {
 		)
 		t.Cleanup(func() {
 			global.NonInteractive = ni
-			aws.StsClient = sts
+			awsdriver.NewStsFromConfig = prevSts
 			mockCtrl.savedProvider = nil
 			term.DefaultTerm = oldTerm
 		})
@@ -453,12 +440,12 @@ func TestGetProvider(t *testing.T) {
 
 	t.Run("Should take provider from env aws", func(t *testing.T) {
 		t.Setenv("DEFANG_PROVIDER", "aws")
-		t.Setenv("AWS_REGION", "us-west-2")
+		t.Setenv("AWS_REGION", "us-test-2")
 		RootCmd = FakeRootWithProviderParam("")
-		sts := aws.StsClient
-		aws.StsClient = &mockStsProviderAPI{}
+		prevSts := awsdriver.NewStsFromConfig
+		awsdriver.NewStsFromConfig = func(cfg aws.Config) awsdriver.StsClientAPI { return &awsdriver.MockStsClientAPI{} }
 		t.Cleanup(func() {
-			aws.StsClient = sts
+			awsdriver.NewStsFromConfig = prevSts
 		})
 
 		p, err := newProvider(ctx, loader)
@@ -491,13 +478,13 @@ func TestGetProvider(t *testing.T) {
 
 	t.Run("Should set cd image from canIUse response", func(t *testing.T) {
 		t.Setenv("DEFANG_PROVIDER", "aws")
-		t.Setenv("AWS_REGION", "us-west-2")
-		sts := aws.StsClient
-		aws.StsClient = &mockStsProviderAPI{}
+		t.Setenv("AWS_REGION", "us-test-2")
+		prevSts := awsdriver.NewStsFromConfig
+		awsdriver.NewStsFromConfig = func(cfg aws.Config) awsdriver.StsClientAPI { return &awsdriver.MockStsClientAPI{} }
 		const cdImageTag = "site/registry/repo:tag@sha256:digest"
 		mockCtrl.canIUseResponse.CdImage = cdImageTag
 		t.Cleanup(func() {
-			aws.StsClient = sts
+			awsdriver.NewStsFromConfig = prevSts
 			mockCtrl.canIUseResponse.CdImage = ""
 		})
 
@@ -522,15 +509,15 @@ func TestGetProvider(t *testing.T) {
 
 	t.Run("Can override cd image from environment variable", func(t *testing.T) {
 		t.Setenv("DEFANG_PROVIDER", "aws")
-		t.Setenv("AWS_REGION", "us-west-2")
-		sts := aws.StsClient
-		aws.StsClient = &mockStsProviderAPI{}
+		t.Setenv("AWS_REGION", "us-test-2")
+		prevSts := awsdriver.NewStsFromConfig
+		awsdriver.NewStsFromConfig = func(cfg aws.Config) awsdriver.StsClientAPI { return &awsdriver.MockStsClientAPI{} }
 		const cdImageTag = "site/registry/repo:tag@sha256:digest"
 		const overrideImageTag = "site/override/replaced:tag@sha256:otherdigest"
 		t.Setenv("DEFANG_CD_IMAGE", overrideImageTag)
 		mockCtrl.canIUseResponse.CdImage = cdImageTag
 		t.Cleanup(func() {
-			aws.StsClient = sts
+			awsdriver.NewStsFromConfig = prevSts
 			mockCtrl.canIUseResponse.CdImage = ""
 		})
 
