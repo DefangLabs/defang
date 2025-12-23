@@ -255,11 +255,11 @@ func TestGetProvider(t *testing.T) {
 		canIUseResponse: defangv1.CanIUseResponse{},
 	}
 	mockClient.SetClient(mockCtrl)
-
-	oldRootCmd, oldClient := RootCmd, global.Client
+	oldRootCmd, oldClient, oldSts := RootCmd, global.Client, awsdriver.NewStsFromConfig
 	t.Cleanup(func() {
 		RootCmd = oldRootCmd
 		global.Client = oldClient
+		awsdriver.NewStsFromConfig = oldSts
 		mockCtrl.savedProvider = nil
 	})
 
