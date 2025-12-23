@@ -1,0 +1,12 @@
+services:
+  service2:
+    image: redis
+    environment:
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+  service1:
+    image: nginx
+    environment:
+      APP_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      LOG_LEVEL: info

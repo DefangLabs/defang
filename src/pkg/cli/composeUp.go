@@ -71,7 +71,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 			}
 
 			// Print config resolution summary
-			err = compose.PrintConfigResolutionSummary(*project, listConfigNames)
+			err = PrintConfigResolutionSummary(project, listConfigNames)
 			if err != nil {
 				return nil, project, err
 			}
