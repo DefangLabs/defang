@@ -19,7 +19,9 @@ type SsmParametersAPI interface {
 	GetParametersByPath(ctx context.Context, params *ssm.GetParametersByPathInput, optFns ...func(*ssm.Options)) (*ssm.GetParametersByPathOutput, error)
 }
 
-var SsmClientOverride SsmParametersAPI
+var NewSsmFromConfig = func(cfg aws.Config) SsmParametersAPI {
+	return ssm.NewFromConfig(cfg)
+}
 
 // TODO: this function is pretty useless, but it's here for consistency
 func getSecretID(name string) *string {
@@ -34,23 +36,13 @@ func IsParameterNotFoundError(err error) bool {
 	return errors.As(err, &e)
 }
 
-func newFromConfig(cfg aws.Config) SsmParametersAPI {
-	var svc SsmParametersAPI = SsmClientOverride
-
-	if svc == nil {
-		svc = ssm.NewFromConfig(cfg)
-	}
-
-	return svc
-}
-
 func (a *Aws) DeleteSecrets(ctx context.Context, names ...string) error {
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return err
 	}
 
-	svc := newFromConfig(cfg)
+	svc := NewSsmFromConfig(cfg)
 
 	o, err := svc.DeleteParameters(ctx, &ssm.DeleteParametersInput{
 		Names: names, // works because getSecretID is a no-op
@@ -72,7 +64,7 @@ func (a *Aws) IsValidSecret(ctx context.Context, name string) (bool, error) {
 
 	secretId := getSecretID(name)
 
-	svc := newFromConfig(cfg)
+	svc := NewSsmFromConfig(cfg)
 
 	res, err := svc.DescribeParameters(ctx, &ssm.DescribeParametersInput{
 		MaxResults: ptr.Int32(1),
@@ -99,7 +91,7 @@ func (a *Aws) PutSecret(ctx context.Context, name, value string) error {
 	secretId := getSecretID(name)
 	secretString := ptr.String(value)
 
-	svc := newFromConfig(cfg)
+	svc := NewSsmFromConfig(cfg)
 
 	// Call ssm:PutParameter
 	_, err = svc.PutParameter(ctx, &ssm.PutParameterInput{
@@ -125,7 +117,7 @@ func (a *Aws) ListSecretsByPrefix(ctx context.Context, prefix string) ([]string,
 		return nil, err
 	}
 
-	svc := newFromConfig(cfg)
+	svc := NewSsmFromConfig(cfg)
 
 	var filters []types.ParameterStringFilter
 	// DescribeParameters fails if the BeginsWith value is empty
