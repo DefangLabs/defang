@@ -986,7 +986,7 @@ var configResolveCmd = &cobra.Command{
 			return err
 		}
 
-		return compose.PrintConfigResolutionSummary(*project, config.Names)
+		return cli.PrintConfigResolutionSummary(project, config.Names)
 	},
 }
 

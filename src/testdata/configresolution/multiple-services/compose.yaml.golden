@@ -1,0 +1,8 @@
+[1mENVIRONMENT VARIABLES RESOLUTION SUMMARY:[0m
+[1m
+SERVICE   NAME            VALUE       SOURCE[0m
+service1  APP_ENV         production  compose_file   
+service1  DATABASE_URL    *****       defang_config  
+service1  LOG_LEVEL       info        compose_file   
+service2  REDIS_PASSWORD  *****       defang_config  
+service2  REDIS_PORT      6379        compose_file   

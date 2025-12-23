@@ -1,0 +1,6 @@
+services:
+  service1:
+    image: nginx
+    environment:
+      SECRET_KEY: ${SECRET_KEY}
+      API_TOKEN: ${API_TOKEN}

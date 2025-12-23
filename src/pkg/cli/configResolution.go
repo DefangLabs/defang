@@ -1,10 +1,12 @@
-package compose
+package cli
 
 import (
 	"slices"
 	"sort"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/compose-spec/compose-go/v2/types"
 )
 
 type configOutput struct {
@@ -51,7 +53,7 @@ func determineConfigSource(envKey string, envValue *string, defangConfigs map[st
 	}
 
 	// Check if the value contains references to defang configs
-	interpolatedVariables := DetectInterpolationVariables(*envValue)
+	interpolatedVariables := compose.DetectInterpolationVariables(*envValue)
 	if len(interpolatedVariables) > 0 {
 		for _, varName := range interpolatedVariables {
 			if _, isDefangConfig := defangConfigs[varName]; isDefangConfig {
@@ -66,7 +68,7 @@ func determineConfigSource(envKey string, envValue *string, defangConfigs map[st
 
 const configMaskedValue = "*****"
 
-func PrintConfigResolutionSummary(project Project, defangConfig []string) error {
+func PrintConfigResolutionSummary(project *types.Project, defangConfig []string) error {
 	configset := make(map[string]string)
 	for _, name := range defangConfig {
 		configset[name] = ""
