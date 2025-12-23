@@ -62,7 +62,7 @@ type ByocDo struct {
 
 var _ client.Provider = (*ByocDo)(nil)
 
-func NewByocProvider(ctx context.Context, tenantName types.TenantName, stack string) *ByocDo {
+func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string) *ByocDo {
 	doRegion := do.Region(os.Getenv("REGION"))
 	if doRegion == "" {
 		doRegion = region.SFO3 // TODO: change default
@@ -656,7 +656,7 @@ func (b *ByocDo) environment(projectName, delegateDomain string, mode defangv1.D
 		{Key: "DEFANG_DEBUG", Value: os.Getenv("DEFANG_DEBUG")},
 		{Key: "DEFANG_JSON", Value: os.Getenv("DEFANG_JSON")},
 		{Key: "DEFANG_MODE", Value: strings.ToLower(mode.String())},
-		{Key: "DEFANG_ORG", Value: string(b.TenantName)},
+		{Key: "DEFANG_ORG", Value: string(b.TenantLabel)},
 		{Key: "DEFANG_PREFIX", Value: b.Prefix},
 		{Key: "DEFANG_PULUMI_DEBUG", Value: os.Getenv("DEFANG_PULUMI_DEBUG")},
 		{Key: "DEFANG_PULUMI_DIFF", Value: os.Getenv("DEFANG_PULUMI_DIFF")},

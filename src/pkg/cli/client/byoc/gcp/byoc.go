@@ -102,7 +102,7 @@ type ByocGcp struct {
 	cdEtag      string
 }
 
-func NewByocProvider(ctx context.Context, tenantName types.TenantName, stack string) *ByocGcp {
+func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string) *ByocGcp {
 	region := pkg.Getenv("GCP_LOCATION", "us-central1") // Defaults to us-central1 for lower price
 	projectId := getGcpProjectID()
 	b := &ByocGcp{driver: &gcp.Gcp{Region: region, ProjectId: projectId}}
@@ -359,7 +359,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"DEFANG_DEBUG": os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_JSON":  os.Getenv("DEFANG_JSON"),
 		"DEFANG_MODE":  strings.ToLower(cmd.mode.String()),
-		// TODO: Check with @lionello why this is hardcoded instead of using b.TenantName
+		// TODO: Check with @lionello why this is hardcoded instead of using b.TenantLabel
 		"DEFANG_ORG":               "defang",
 		"DEFANG_PREFIX":            b.Prefix,
 		"DEFANG_PULUMI_DEBUG":      os.Getenv("DEFANG_PULUMI_DEBUG"),

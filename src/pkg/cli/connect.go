@@ -29,7 +29,7 @@ func ConnectWithTenant(ctx context.Context, addr string, requestedTenant types.T
 		return grpcClient, err
 	}
 
-	grpcClient.Tenant = types.TenantName(resp.Tenant)
+	grpcClient.Tenant = types.TenantLabel(resp.Tenant)
 	return grpcClient, nil
 }
 

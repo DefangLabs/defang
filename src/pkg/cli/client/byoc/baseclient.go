@@ -52,19 +52,19 @@ type ByocBaseClient struct {
 	PulumiStack             string
 	SetupDone               bool
 	ShouldDelegateSubdomain bool
-	TenantName              types.TenantName
+	TenantLabel             types.TenantLabel
 	CanIUseConfig
 
 	projectBackend ProjectBackend
 }
 
-func NewByocBaseClient(tenantName types.TenantName, backend ProjectBackend, stack string) *ByocBaseClient {
+func NewByocBaseClient(tenantName types.TenantLabel, backend ProjectBackend, stack string) *ByocBaseClient {
 	if stack == "" {
 		stack = "beta" // backwards compat
 	}
 	b := &ByocBaseClient{
 		Prefix:         pkg.Getenv("DEFANG_PREFIX", "Defang"), // prefix for all resources created by Defang
-		TenantName:     tenantName,
+		TenantLabel:    tenantName,
 		PulumiStack:    pkg.Getenv("DEFANG_SUFFIX", stack),
 		projectBackend: backend,
 	}
@@ -302,5 +302,5 @@ func (b ByocBaseClient) ServicePublicDNS(name string, projectName string) string
 	if b.PulumiStack != "" && b.PulumiStack != "beta" {
 		projectName = projectName + "-" + b.PulumiStack
 	}
-	return dns.SafeLabel(name) + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(string(b.TenantName)) + ".defang.app"
+	return dns.SafeLabel(name) + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(string(b.TenantLabel)) + ".defang.app"
 }

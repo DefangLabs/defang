@@ -1,7 +1,7 @@
 package types
 
-// TenantName is the tenant's DNS label
-type TenantName string
+// TenantLabel is the tenant's DNS label
+type TenantLabel string
 
 // TenantNameOrID is the user-visible tenant identifier.
 // It can be either a tenant name or a tenant ID; the backend resolves it using userinfo.

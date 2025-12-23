@@ -21,7 +21,7 @@ type GrpcClient struct {
 	client defangv1connect.FabricControllerClient
 
 	requestedTenant types.TenantNameOrID
-	Tenant          types.TenantName
+	Tenant          types.TenantLabel
 }
 
 func NewGrpcClient(host, accessToken string, requestedTenant types.TenantNameOrID) *GrpcClient {
@@ -64,7 +64,7 @@ func (g GrpcClient) GetRequestedTenant() types.TenantNameOrID {
 	return g.requestedTenant
 }
 
-func (g GrpcClient) GetTenantName() types.TenantName {
+func (g GrpcClient) GetTenantName() types.TenantLabel {
 	return g.Tenant
 }
 

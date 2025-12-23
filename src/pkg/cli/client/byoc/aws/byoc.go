@@ -123,7 +123,7 @@ func AnnotateAwsError(err error) error {
 	return err
 }
 
-func NewByocProvider(ctx context.Context, tenantName types.TenantName, stack string) *ByocAws {
+func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string) *ByocAws {
 	b := &ByocAws{
 		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
@@ -477,7 +477,7 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_JSON":                os.Getenv("DEFANG_JSON"),
-		"DEFANG_ORG":                 string(b.TenantName), // Keep this as DEFANG_ORG for backward compatibility CD depends on this variable name
+		"DEFANG_ORG":                 string(b.TenantLabel), // Keep this as DEFANG_ORG for backward compatibility CD depends on this variable name
 		"DEFANG_PREFIX":              b.Prefix,
 		"DEFANG_PULUMI_DEBUG":        os.Getenv("DEFANG_PULUMI_DEBUG"),
 		"DEFANG_PULUMI_DIFF":         os.Getenv("DEFANG_PULUMI_DIFF"),
