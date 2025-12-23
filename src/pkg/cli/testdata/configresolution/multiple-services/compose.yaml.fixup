@@ -1,0 +1,34 @@
+{
+  "service1": {
+    "command": null,
+    "entrypoint": null,
+    "environment": {
+      "APP_ENV": "production",
+      "DATABASE_URL": "${DATABASE_URL}",
+      "LOG_LEVEL": "info"
+    },
+    "image": "nginx",
+    "networks": {
+      "default": null
+    }
+  },
+  "service2": {
+    "command": null,
+    "entrypoint": null,
+    "environment": {
+      "REDIS_PASSWORD": "${REDIS_PASSWORD}",
+      "REDIS_PORT": "6379"
+    },
+    "image": "redis",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 6379,
+        "protocol": "tcp"
+      }
+    ]
+  }
+}

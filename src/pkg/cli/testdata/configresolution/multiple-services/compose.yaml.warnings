@@ -1,0 +1,4 @@
+ ! service "service1": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "service2": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "service2": stateful service will lose data on restart; use a managed service instead
+Error: missing configs ["DATABASE_URL" "REDIS_PASSWORD"] (https://docs.defang.io/docs/concepts/configuration)
