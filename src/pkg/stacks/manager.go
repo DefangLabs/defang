@@ -9,7 +9,7 @@ import (
 	"slices"
 	"time"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -144,7 +144,7 @@ func (sm *manager) ListRemote(ctx context.Context) ([]RemoteStack, error) {
 		if stackName == "" {
 			stackName = "beta"
 		}
-		var providerID cliClient.ProviderID
+		var providerID client.ProviderID
 		providerID.SetValue(deployment.GetProvider())
 		// avoid overwriting existing entries, deployments are already sorted by deployed_at desc
 		if _, exists := stackMap[stackName]; !exists {

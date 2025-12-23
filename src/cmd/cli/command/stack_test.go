@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -37,11 +37,11 @@ func TestStackListCmd(t *testing.T) {
 	}()
 
 	// Set up a mock client
-	mockClient := cliClient.GrpcClient{}
+	mockClient := client.GrpcClient{}
 	mockCtrl := &MockFabricControllerClient{
 		canIUseResponse: defangv1.CanIUseResponse{},
 	}
-	mockClient.SetClient(mockCtrl)
+	mockClient.SetFabricClient(mockCtrl)
 	global.Client = &mockClient
 
 	// Set up a fake RootCmd with required flags
@@ -72,19 +72,19 @@ func TestStackListCmd(t *testing.T) {
 			stacks: []stacks.StackParameters{
 				{
 					Name:     "teststack1",
-					Provider: cliClient.ProviderAWS,
-					Region:   "us-west-2",
+					Provider: client.ProviderAWS,
+					Region:   "us-test-2",
 					Mode:     modes.ModeAffordable,
 				},
 				{
 					Name:     "teststack2",
-					Provider: cliClient.ProviderGCP,
+					Provider: client.ProviderGCP,
 					Region:   "us-central1",
 					Mode:     modes.ModeBalanced,
 				},
 			},
 			expectOutput: "NAME        PROVIDER  REGION       MODE        DEPLOYEDAT\n" +
-				"teststack1  aws       us-west-2    AFFORDABLE  0001-01-01 00:00:00 +0000 UTC  \n" +
+				"teststack1  aws       us-test-2    AFFORDABLE  0001-01-01 00:00:00 +0000 UTC  \n" +
 				"teststack2  gcp       us-central1  BALANCED    0001-01-01 00:00:00 +0000 UTC  \n",
 		},
 	}
@@ -128,8 +128,8 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 			name: "valid parameters",
 			parameters: stacks.StackParameters{
 				Name:     "teststack",
-				Provider: cliClient.ProviderAWS,
-				Region:   "us-west-2",
+				Provider: client.ProviderAWS,
+				Region:   "us-test-2",
 				Mode:     modes.ModeAffordable,
 			},
 			expectErr: false,
@@ -138,8 +138,8 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 			name: "missing stack name",
 			parameters: stacks.StackParameters{
 				Name:     "",
-				Provider: cliClient.ProviderAWS,
-				Region:   "us-west-2",
+				Provider: client.ProviderAWS,
+				Region:   "us-test-2",
 				Mode:     modes.ModeAffordable,
 			},
 			expectErr: true,

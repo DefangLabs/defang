@@ -10,7 +10,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/modes"
@@ -22,7 +21,7 @@ type DeployParams struct {
 	common.LoaderParams
 }
 
-func HandleDeployTool(ctx context.Context, loader cliClient.Loader, params DeployParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
+func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
@@ -34,12 +33,18 @@ func HandleDeployTool(ctx context.Context, loader cliClient.Loader, params Deplo
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, config.Cluster)
 	if err != nil {
-		err = cli.InteractiveLoginMCP(ctx, client, config.Cluster, common.MCPDevelopmentClient)
+		err = cli.InteractiveLoginMCP(ctx, config.Cluster, common.MCPDevelopmentClient)
 		if err != nil {
 			var noBrowserErr auth.ErrNoBrowser
 			if errors.As(err, &noBrowserErr) {
 				return noBrowserErr.Error(), nil
 			}
+			return "", err
+		}
+
+		// Reconnect with the new token
+		client, err = cli.Connect(ctx, config.Cluster)
+		if err != nil {
 			return "", err
 		}
 	}

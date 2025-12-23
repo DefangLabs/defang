@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 )
 
 // mockElicitationsController is a mock implementation of elicitations.Controller
@@ -123,7 +123,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:   cliClient.ProviderAWS,
+				Provider:   client.ProviderAWS,
 				Region:     "us-east-1",
 				Name:       "awsuseast1",
 				AWSProfile: "test-profile",
@@ -149,7 +149,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:   cliClient.ProviderAWS,
+				Provider:   client.ProviderAWS,
 				Region:     "us-west-2",
 				Name:       "awsuswest2",
 				AWSProfile: "production",
@@ -177,7 +177,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:     cliClient.ProviderGCP,
+				Provider:     client.ProviderGCP,
 				Region:       "us-central1",
 				Name:         "gcpuscentral1",
 				GCPProjectID: "my-gcp-project",
@@ -203,7 +203,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:     cliClient.ProviderGCP,
+				Provider:     client.ProviderGCP,
 				Region:       "europe-west1",
 				Name:         "gcpeuropewest1",
 				GCPProjectID: "user-entered-project",
@@ -225,7 +225,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider: cliClient.ProviderDefang,
+				Provider: client.ProviderDefang,
 				Region:   "",
 				Name:     "defang",
 			},
@@ -245,7 +245,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider: cliClient.ProviderDO,
+				Provider: client.ProviderDO,
 				Region:   "nyc3",
 				Name:     "digitaloceeannyc3",
 			},
@@ -480,7 +480,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:   cliClient.ProviderAWS,
+				Provider:   client.ProviderAWS,
 				Region:     "us-east-1",
 				Name:       "my-stack",
 				AWSProfile: "default",
@@ -489,7 +489,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 		{
 			name: "Only region missing - AWS",
 			initialParams: &StackParameters{
-				Provider: cliClient.ProviderAWS,
+				Provider: client.ProviderAWS,
 				Name:     "my-stack",
 			},
 			setupMock: func(m *mockElicitationsController) {
@@ -501,7 +501,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:   cliClient.ProviderAWS,
+				Provider:   client.ProviderAWS,
 				Region:     "us-west-2",
 				Name:       "my-stack",
 				AWSProfile: "default",
@@ -510,7 +510,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 		{
 			name: "Only stack name missing - GCP",
 			initialParams: &StackParameters{
-				Provider: cliClient.ProviderGCP,
+				Provider: client.ProviderGCP,
 				Region:   "us-central1",
 			},
 			setupMock: func(m *mockElicitationsController) {
@@ -522,7 +522,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:     cliClient.ProviderGCP,
+				Provider:     client.ProviderGCP,
 				Region:       "us-central1",
 				Name:         "gcpuscentral1",
 				GCPProjectID: "my-project",
@@ -531,7 +531,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 		{
 			name: "Only AWS profile missing - with AWS_PROFILE env",
 			initialParams: &StackParameters{
-				Provider: cliClient.ProviderAWS,
+				Provider: client.ProviderAWS,
 				Region:   "eu-west-1",
 				Name:     "my-aws-stack",
 			},
@@ -546,7 +546,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:   cliClient.ProviderAWS,
+				Provider:   client.ProviderAWS,
 				Region:     "eu-west-1",
 				Name:       "my-aws-stack",
 				AWSProfile: "production",
@@ -555,7 +555,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 		{
 			name: "Only GCP project ID missing - with GCP_PROJECT_ID env",
 			initialParams: &StackParameters{
-				Provider: cliClient.ProviderGCP,
+				Provider: client.ProviderGCP,
 				Region:   "europe-west1",
 				Name:     "my-gcp-stack",
 			},
@@ -570,7 +570,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:     cliClient.ProviderGCP,
+				Provider:     client.ProviderGCP,
 				Region:       "europe-west1",
 				Name:         "my-gcp-stack",
 				GCPProjectID: "env-project-123",
@@ -589,7 +589,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider: cliClient.ProviderDO,
+				Provider: client.ProviderDO,
 				Region:   "sfo3",
 				Name:     "do-stack",
 			},
@@ -607,7 +607,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider: cliClient.ProviderDefang,
+				Provider: client.ProviderDefang,
 				Region:   "",
 				Name:     "defang-playground",
 			},
@@ -615,7 +615,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 		{
 			name: "Region and name missing - AWS",
 			initialParams: &StackParameters{
-				Provider: cliClient.ProviderAWS,
+				Provider: client.ProviderAWS,
 			},
 			setupMock: func(m *mockElicitationsController) {
 				m.defaultResponses["region"] = "ap-southeast-1"
@@ -627,7 +627,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:   cliClient.ProviderAWS,
+				Provider:   client.ProviderAWS,
 				Region:     "ap-southeast-1",
 				Name:       "awsapsoutheast1",
 				AWSProfile: "staging",
@@ -636,7 +636,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 		{
 			name: "All parameters provided - AWS complete",
 			initialParams: &StackParameters{
-				Provider:   cliClient.ProviderAWS,
+				Provider:   client.ProviderAWS,
 				Region:     "us-west-1",
 				Name:       "complete-stack",
 				AWSProfile: "prod",
@@ -646,7 +646,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:   cliClient.ProviderAWS,
+				Provider:   client.ProviderAWS,
 				Region:     "us-west-1",
 				Name:       "complete-stack",
 				AWSProfile: "prod",
@@ -655,7 +655,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 		{
 			name: "All parameters provided - GCP complete",
 			initialParams: &StackParameters{
-				Provider:     cliClient.ProviderGCP,
+				Provider:     client.ProviderGCP,
 				Region:       "asia-east1",
 				Name:         "gcp-complete",
 				GCPProjectID: "my-complete-project",
@@ -665,7 +665,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:     cliClient.ProviderGCP,
+				Provider:     client.ProviderGCP,
 				Region:       "asia-east1",
 				Name:         "gcp-complete",
 				GCPProjectID: "my-complete-project",
@@ -674,7 +674,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 		{
 			name: "Defang provider with name - no region needed",
 			initialParams: &StackParameters{
-				Provider: cliClient.ProviderDefang,
+				Provider: client.ProviderDefang,
 				Name:     "my-defang-stack",
 			},
 			setupMock:   func(m *mockElicitationsController) {},
@@ -682,7 +682,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider: cliClient.ProviderDefang,
+				Provider: client.ProviderDefang,
 				Region:   "",
 				Name:     "my-defang-stack",
 			},
@@ -701,7 +701,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:   cliClient.ProviderAWS,
+				Provider:   client.ProviderAWS,
 				Region:     "us-east-1",
 				Name:       "awsuseast1",
 				AWSProfile: "default",
@@ -721,7 +721,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:     cliClient.ProviderGCP,
+				Provider:     client.ProviderGCP,
 				Region:       "us-central1",
 				Name:         "gcpuscentral1",
 				GCPProjectID: "my-gcp-project",

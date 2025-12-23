@@ -111,7 +111,7 @@ type MockFabricClient struct {
 	DelegateDomain string
 }
 
-func (m MockFabricClient) GetController() defangv1connect.FabricControllerClient {
+func (m MockFabricClient) GetFabricClient() defangv1connect.FabricControllerClient {
 	return defangv1connect.NewFabricControllerClient(http.DefaultClient, "localhost")
 }
 

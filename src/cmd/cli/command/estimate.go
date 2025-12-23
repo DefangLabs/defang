@@ -5,7 +5,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -28,10 +28,10 @@ func makeEstimateCmd() *cobra.Command {
 				return err
 			}
 
-			if global.Stack.Provider == cliClient.ProviderAuto {
-				providerID, err := interactiveSelectProvider([]cliClient.ProviderID{
-					cliClient.ProviderAWS,
-					cliClient.ProviderGCP,
+			if global.Stack.Provider == client.ProviderAuto {
+				providerID, err := interactiveSelectProvider([]client.ProviderID{
+					client.ProviderAWS,
+					client.ProviderGCP,
 				})
 				if err != nil {
 					return fmt.Errorf("failed to select provider: %w", err)
@@ -39,14 +39,14 @@ func makeEstimateCmd() *cobra.Command {
 				global.Stack.Provider = providerID
 			}
 
-			var previewProvider cliClient.Provider = &cliClient.PlaygroundProvider{FabricClient: global.Client}
+			var previewProvider client.Provider = &client.PlaygroundProvider{FabricClient: global.Client}
 
 			// default to development mode if not specified; TODO: when mode is not specified, show an interactive prompt
 			if global.Stack.Mode == modes.ModeUnspecified {
 				global.Stack.Mode = modes.ModeAffordable
 			}
 			if region == "" {
-				region = cliClient.GetRegion(global.Stack.Provider) // This sets the default region based on the provider
+				region = client.GetRegion(global.Stack.Provider) // This sets the default region based on the provider
 			}
 
 			estimate, err := cli.RunEstimate(ctx, project, global.Client, previewProvider, global.Stack.Provider, region, global.Stack.Mode)
@@ -66,7 +66,7 @@ func makeEstimateCmd() *cobra.Command {
 	return estimateCmd
 }
 
-func interactiveSelectProvider(providers []cliClient.ProviderID) (cliClient.ProviderID, error) {
+func interactiveSelectProvider(providers []client.ProviderID) (client.ProviderID, error) {
 	if len(providers) < 2 {
 		panic("interactiveSelectProvider called with less than 2 providers")
 	}
@@ -78,9 +78,9 @@ func interactiveSelectProvider(providers []cliClient.ProviderID) (cliClient.Prov
 	// Default to the provider in the environment if available
 	var defaultOption any // not string!
 	if awsInEnv() {
-		defaultOption = cliClient.ProviderAWS.String()
+		defaultOption = client.ProviderAWS.String()
 	} else if gcpInEnv() {
-		defaultOption = cliClient.ProviderGCP.String()
+		defaultOption = client.ProviderGCP.String()
 	}
 	var optionValue string
 	if err := survey.AskOne(&survey.Select{
@@ -89,13 +89,13 @@ func interactiveSelectProvider(providers []cliClient.ProviderID) (cliClient.Prov
 		Options: options,
 		Help:    "The provider you choose will be used for deploying services.",
 		Description: func(value string, i int) string {
-			return providerDescription[cliClient.ProviderID(value)]
+			return providerDescription[client.ProviderID(value)]
 		},
 	}, &optionValue, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
 		return "", fmt.Errorf("failed to select provider: %w", err)
 	}
 	track.Evt("ProviderSelected", P("provider", optionValue))
-	var providerID cliClient.ProviderID
+	var providerID client.ProviderID
 	err := providerID.Set(optionValue)
 	if err != nil {
 		return "", err

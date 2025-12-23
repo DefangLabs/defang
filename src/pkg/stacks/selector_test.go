@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/stretchr/testify/assert"
@@ -104,7 +104,7 @@ func TestStackSelector_SelectStack_ExistingStack(t *testing.T) {
 	// Mock loading the selected stack
 	expectedParams := &StackParameters{
 		Name:       "production",
-		Provider:   cliClient.ProviderAWS,
+		Provider:   client.ProviderAWS,
 		Region:     "us-west-2",
 		AWSProfile: "default",
 		Mode:       modes.ModeBalanced,
@@ -223,7 +223,7 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 	// Mock wizard parameter collection
 	newStackParams := &StackParameters{
 		Name:       "staging",
-		Provider:   cliClient.ProviderAWS,
+		Provider:   client.ProviderAWS,
 		Region:     "us-east-1",
 		AWSProfile: "staging",
 		Mode:       modes.ModeAffordable,
@@ -268,7 +268,7 @@ func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
 	// Mock wizard parameter collection
 	newStackParams := &StackParameters{
 		Name:       "firststack",
-		Provider:   cliClient.ProviderAWS,
+		Provider:   client.ProviderAWS,
 		Region:     "us-west-2",
 		AWSProfile: "default",
 		Mode:       modes.ModeBalanced,
@@ -473,7 +473,7 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 	// Mock wizard parameter collection
 	newStackParams := &StackParameters{
 		Name:       "staging",
-		Provider:   cliClient.ProviderAWS,
+		Provider:   client.ProviderAWS,
 		Region:     "us-east-1",
 		AWSProfile: "staging",
 		Mode:       modes.ModeAffordable,

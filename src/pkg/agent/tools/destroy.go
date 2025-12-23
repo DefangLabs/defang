@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -17,7 +17,7 @@ type DestroyParams struct {
 	common.LoaderParams
 }
 
-func HandleDestroyTool(ctx context.Context, loader cliClient.Loader, params DestroyParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
+func HandleDestroyTool(ctx context.Context, loader client.Loader, params DestroyParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, config.Cluster)
 	if err != nil {
@@ -33,7 +33,7 @@ func HandleDestroyTool(ctx context.Context, loader cliClient.Loader, params Dest
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
-	term.Debug("Function invoked: cliClient.LoadProjectNameWithFallback")
+	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
 		return "", fmt.Errorf("failed to load project name: %w", err)

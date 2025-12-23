@@ -6,12 +6,12 @@ import (
 	"sort"
 	"strconv"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cluster"
+	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
-	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/joho/godotenv"
 	"github.com/spf13/pflag"
 )
@@ -68,7 +68,7 @@ Note: Ensure the flag name, environment variable name, and struct field name are
 and follow the established naming conventions.
 */
 type GlobalConfig struct {
-	Client         *cliClient.GrpcClient
+	Client         *client.GrpcClient
 	Cluster        string
 	ColorMode      ColorMode
 	Debug          bool
@@ -76,9 +76,9 @@ type GlobalConfig struct {
 	HideUpdate     bool
 	ModelID        string // only for debug/generate; Pro users
 	NonInteractive bool
-	Tenant         string
 	SourcePlatform migrate.SourcePlatform // only used for 'defang init' command
 	Stack          stacks.StackParameters
+	Tenant         types.TenantNameOrID // workspace
 	Verbose        bool
 }
 
@@ -90,13 +90,13 @@ variables, and command-line flags).
 */
 var global GlobalConfig = GlobalConfig{
 	ColorMode:      ColorAuto,
-	Cluster:        cluster.DefangFabric,
-	Debug:          false,
+	Cluster:        client.DefangFabric,
+	Debug:          pkg.GetenvBool("DEFANG_DEBUG"),
 	HasTty:         term.IsTerminal(),
 	HideUpdate:     false,
 	NonInteractive: !term.IsTerminal(),
-	Stack:          stacks.StackParameters{Name: "", Provider: cliClient.ProviderAuto, Mode: modes.ModeUnspecified},
 	SourcePlatform: migrate.SourcePlatformUnspecified, // default to auto-detecting the source platform
+	Stack:          stacks.StackParameters{Provider: client.ProviderAuto},
 	Verbose:        false,
 }
 
@@ -202,9 +202,9 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 
 	if !flags.Changed("workspace") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_WORKSPACE"); ok {
-			r.Tenant = fromEnv
+			r.Tenant = types.TenantNameOrID(fromEnv)
 		} else if fromEnv, ok := os.LookupEnv("DEFANG_ORG"); ok {
-			r.Tenant = fromEnv
+			r.Tenant = types.TenantNameOrID(fromEnv)
 			term.Warn("DEFANG_ORG is deprecated; use DEFANG_WORKSPACE instead")
 		}
 	}

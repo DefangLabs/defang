@@ -40,21 +40,15 @@ import (
 	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
-
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/proto"
 )
 
-type StsProviderAPI interface {
-	GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
-	AssumeRole(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error)
-}
-
-var StsClient StsProviderAPI
+type Config = awssdk.Config
 
 type ByocAws struct {
 	*byoc.ByocBaseClient
@@ -123,19 +117,12 @@ func AnnotateAwsError(err error) error {
 	return err
 }
 
-func NewByocProvider(ctx context.Context, tenantName types.TenantNameOrID, stack string) *ByocAws {
+func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string) *ByocAws {
 	b := &ByocAws{
 		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
-
 	return b
-}
-
-func initStsClient(cfg awssdk.Config) {
-	if StsClient == nil {
-		StsClient = sts.NewFromConfig(cfg)
-	}
 }
 
 func (b *ByocAws) makeContainers() []clouds.Container {
@@ -383,8 +370,8 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 	}
 
 	if roleARN != "" {
-		initStsClient(cfg)
-		creds := stscreds.NewAssumeRoleProvider(StsClient, roleARN)
+		stsClient := aws.NewStsFromConfig(cfg)
+		creds := stscreds.NewAssumeRoleProvider(stsClient, roleARN)
 		cfg.Credentials = awssdk.NewCredentialsCache(creds)
 	}
 
@@ -434,9 +421,9 @@ func (b *ByocAws) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
-	initStsClient(cfg)
 
-	identity, err := StsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	stsClient := aws.NewStsFromConfig(cfg)
+	identity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
@@ -477,7 +464,7 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_JSON":                os.Getenv("DEFANG_JSON"),
-		"DEFANG_ORG":                 b.TenantName, // Keep this as DEFANG_ORG for backward compatibility CD depends on this variable name
+		"DEFANG_ORG":                 string(b.TenantLabel), // Keep this as DEFANG_ORG for backward compatibility CD depends on this variable name
 		"DEFANG_PREFIX":              b.Prefix,
 		"DEFANG_PULUMI_DEBUG":        os.Getenv("DEFANG_PULUMI_DEBUG"),
 		"DEFANG_PULUMI_DIFF":         os.Getenv("DEFANG_PULUMI_DIFF"),
@@ -1018,8 +1005,4 @@ func (b *ByocAws) AddEcsEventHandler(handler ECSEventHandler) {
 	b.handlersLock.Lock()
 	defer b.handlersLock.Unlock()
 	b.ecsEventHandlers = append(b.ecsEventHandlers, handler)
-}
-
-func (b *ByocAws) ServicePublicDNS(name string, projectName string) string {
-	return dns.SafeLabel(name) + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(b.TenantName) + ".defang.app"
 }

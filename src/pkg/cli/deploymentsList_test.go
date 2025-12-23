@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	connect "github.com/bufbuild/connect-go"
@@ -57,11 +58,15 @@ func TestDeploymentsList(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	url := strings.TrimPrefix(server.URL, "http://")
-	grpcClient, _ := Connect(ctx, url)
+	grpcClient := Connect(url, types.TenantUnset)
 
 	t.Run("no deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
-		err := DeploymentsList(ctx, defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY, "empty", grpcClient, 10)
+		err := DeploymentsList(ctx, grpcClient, ListDeploymentsParams{
+			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY,
+			ProjectName: "empty",
+			Limit:       10,
+		})
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}
@@ -76,7 +81,11 @@ func TestDeploymentsList(t *testing.T) {
 
 	t.Run("some deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
-		err := DeploymentsList(ctx, defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY, "test", grpcClient, 10)
+		err := DeploymentsList(ctx, grpcClient, ListDeploymentsParams{
+			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY,
+			ProjectName: "test",
+			Limit:       10,
+		})
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}

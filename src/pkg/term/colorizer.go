@@ -198,14 +198,14 @@ func (t *Term) Debug(v ...any) (int, error) {
 	if !t.debug {
 		return 0, nil
 	}
-	return output(t.out, DebugColor, ensurePrefix(fmt.Sprintln(v...), " - "))
+	return output(t.err, DebugColor, ensurePrefix(fmt.Sprintln(v...), " - "))
 }
 
 func (t *Term) Debugf(format string, v ...any) (int, error) {
 	if !t.debug {
 		return 0, nil
 	}
-	return output(t.out, DebugColor, ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " - ")))
+	return output(t.err, DebugColor, ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " - ")))
 }
 
 func (t *Term) Info(v ...any) (int, error) {

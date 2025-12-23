@@ -36,7 +36,7 @@ func TestGetDelegationSet(t *testing.T) {
 	})
 
 	// First check that there isn't already a delegation set (it should be deleted by the cleanup function)
-	ds, err = GetDelegationSet(ctx, r53Client)
+	ds, err = GetDelegationSetByZone(ctx, nil, r53Client)
 	if !errors.Is(err, ErrNoDelegationSetFound) {
 		t.Fatalf("expected ErrNoDelegationSetFound, got: %v", err)
 	} else {
@@ -58,7 +58,7 @@ func TestGetDelegationSet(t *testing.T) {
 			t.Error("expected name servers")
 		}
 
-		dss, err := GetDelegationSet(ctx, r53Client)
+		dss, err := GetDelegationSetByZone(ctx, nil, r53Client)
 		if err != nil {
 			t.Fatal(err)
 		}

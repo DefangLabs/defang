@@ -6,12 +6,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cluster"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/spf13/pflag"
 )
 
@@ -51,7 +51,7 @@ func Test_configurationPrecedence(t *testing.T) {
 		NonInteractive: false, // set to false just for test instead of !term.IsTerminal() for consistency
 		SourcePlatform: migrate.SourcePlatformUnspecified,
 		Verbose:        false,
-		Stack:          stacks.StackParameters{Provider: cliClient.ProviderAuto, Mode: modes.ModeUnspecified},
+		Stack:          stacks.StackParameters{Provider: client.ProviderAuto, Mode: modes.ModeUnspecified},
 		Cluster:        "",
 		Tenant:         "",
 	}
@@ -116,7 +116,7 @@ func Test_configurationPrecedence(t *testing.T) {
 				Debug:   true,
 				Stack: stacks.StackParameters{
 					Name:     "from-flags",
-					Provider: cliClient.ProviderAWS,
+					Provider: client.ProviderAWS,
 					Mode:     modes.ModeHighAvailability,
 				},
 				Cluster:        "from-flags-cluster",
@@ -164,7 +164,7 @@ func Test_configurationPrecedence(t *testing.T) {
 				Debug:   false,
 				Stack: stacks.StackParameters{
 					Name:     "from-env",
-					Provider: cliClient.ProviderGCP,
+					Provider: client.ProviderGCP,
 					Mode:     modes.ModeBalanced,
 				},
 				Cluster:        "from-env-cluster",
@@ -200,7 +200,7 @@ func Test_configurationPrecedence(t *testing.T) {
 				Debug:   false,
 				Stack: stacks.StackParameters{
 					Name:     "from-env",
-					Provider: cliClient.ProviderDefang,
+					Provider: client.ProviderDefang,
 					Mode:     modes.ModeAffordable,
 				},
 				Cluster:        "from-env-cluster",
@@ -252,7 +252,7 @@ func Test_configurationPrecedence(t *testing.T) {
 			flags.StringVarP(&testConfig.Stack.Name, "stack", "s", testConfig.Stack.Name, "stack name (for BYOC providers)")
 			flags.Var(&testConfig.ColorMode, "color", "colorize output")
 			flags.StringVar(&testConfig.Cluster, "cluster", testConfig.Cluster, "Defang cluster to connect to")
-			flags.StringVar(&testConfig.Tenant, "workspace", testConfig.Tenant, "workspace name (tenant)")
+			flags.Var(&testConfig.Tenant, "workspace", "workspace name (tenant)")
 			flags.VarP(&testConfig.Stack.Provider, "provider", "P", "bring-your-own-cloud provider")
 			flags.BoolVarP(&testConfig.Verbose, "verbose", "v", testConfig.Verbose, "verbose logging")
 			flags.BoolVar(&testConfig.Debug, "debug", testConfig.Debug, "debug logging for troubleshooting the CLI")
@@ -368,10 +368,10 @@ func Test_configurationPrecedence(t *testing.T) {
 
 func TestTenantFlagWinsOverEnv(t *testing.T) {
 	cfg := GlobalConfig{
-		Cluster: cluster.DefangFabric,
+		Cluster: client.DefangFabric,
 	}
 	flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	flags.StringVar(&cfg.Tenant, "workspace", cfg.Tenant, "workspace name")
+	flags.Var(&cfg.Tenant, "workspace", "workspace name")
 	flags.StringVar(&cfg.Cluster, "cluster", cfg.Cluster, "cluster")
 
 	if err := flags.Set("workspace", "flag-workspace"); err != nil {
@@ -392,7 +392,7 @@ func TestTenantEnvSources(t *testing.T) {
 	tests := []struct {
 		name     string
 		envVars  map[string]string
-		expected string
+		expected types.TenantNameOrID
 	}{
 		{
 			name: "workspace env wins",
@@ -438,10 +438,10 @@ func TestTenantEnvSources(t *testing.T) {
 				t.Fatalf("failed to create .defang directory: %v", err)
 			}
 			cfg := GlobalConfig{
-				Cluster: cluster.DefangFabric,
+				Cluster: client.DefangFabric,
 			}
 			flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
-			flags.StringVar(&cfg.Tenant, "workspace", cfg.Tenant, "workspace name")
+			flags.Var(&cfg.Tenant, "workspace", "workspace name")
 			flags.StringVar(&cfg.Cluster, "cluster", cfg.Cluster, "cluster")
 
 			for key, value := range tt.envVars {

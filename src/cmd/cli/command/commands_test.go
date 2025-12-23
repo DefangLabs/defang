@@ -11,23 +11,21 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/auth"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
-	pkg "github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	awsdriver "github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type MockSsmClient struct {
-	pkg.SsmParametersAPI
+	awsdriver.SsmParametersAPI
 }
 
 func (m *MockSsmClient) PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
@@ -65,7 +63,7 @@ func (m *mockFabricService) WhoAmI(context.Context, *connect.Request[emptypb.Emp
 	return connect.NewResponse(&defangv1.WhoAmIResponse{
 		Tenant:            "default",
 		ProviderAccountId: "default",
-		Region:            "us-west-2",
+		Region:            "us-test-2",
 		Tier:              defangv1.SubscriptionTier_HOBBY,
 	}), nil
 }
@@ -92,23 +90,9 @@ func (m *mockFabricService) ListDeployments(context.Context, *connect.Request[de
 	}), nil
 }
 
-func init() {
-	SetupCommands(context.Background(), "0.0.0-test")
-}
-
-type mockStsProviderAPI struct{}
-
-func (s *mockStsProviderAPI) GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
-	callIdOutput := sts.GetCallerIdentityOutput{}
-	callIdOutput.Account = ptr.String("123456789012")
-	callIdOutput.Arn = ptr.String("arn:aws:iam::123456789012:user/test")
-
-	return &callIdOutput, nil
-}
-
-func (s *mockStsProviderAPI) AssumeRole(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
-	aro := sts.AssumeRoleOutput{}
-	return &aro, nil
+func TestMain(m *testing.M) {
+	SetupCommands("0.0.0-test")
+	os.Exit(m.Run())
 }
 
 func testCommand(args []string, cluster string) error {
@@ -204,10 +188,16 @@ func TestCommandGates(t *testing.T) {
 		},
 	}
 
+	prevSts, prevSsm := awsdriver.NewStsFromConfig, awsdriver.NewSsmFromConfig
+	t.Cleanup(func() {
+		awsdriver.NewStsFromConfig = prevSts
+		awsdriver.NewSsmFromConfig = prevSsm
+	})
+	awsdriver.NewStsFromConfig = func(aws.Config) awsdriver.StsClientAPI { return &awsdriver.MockStsClientAPI{} }
+	awsdriver.NewSsmFromConfig = func(aws.Config) awsdriver.SsmParametersAPI { return &MockSsmClient{} }
+
 	for _, tt := range testData {
 		t.Run(tt.name, func(t *testing.T) {
-			aws.StsClient = &mockStsProviderAPI{}
-			pkg.SsmClientOverride = &MockSsmClient{}
 			mockService.canIUseIsCalled = false
 
 			err := testCommand(tt.command, server.URL)
@@ -277,7 +267,7 @@ func (f *FakeStdout) Fd() uintptr {
 
 type mockStackManager struct {
 	t                *testing.T
-	expectedProvider cliClient.ProviderID
+	expectedProvider client.ProviderID
 	expectedRegion   string
 	listResult       []stacks.StackListItem
 	listError        error
@@ -288,7 +278,7 @@ type mockStackManager struct {
 	createResult     *stacks.StackParameters
 }
 
-func NewMockStackManager(t *testing.T, expectedProvider cliClient.ProviderID, expectedRegion string) *mockStackManager {
+func NewMockStackManager(t *testing.T, expectedProvider client.ProviderID, expectedRegion string) *mockStackManager {
 	return &mockStackManager{
 		t:                t,
 		expectedProvider: expectedProvider,
@@ -351,17 +341,18 @@ func (m *mockStackManager) LoadParameters(params map[string]string, overload boo
 }
 
 func TestNewProvider(t *testing.T) {
-	mockClient := cliClient.GrpcClient{}
+	mockClient := client.GrpcClient{}
 	mockCtrl := &MockFabricControllerClient{
 		canIUseResponse: defangv1.CanIUseResponse{},
 	}
-	mockClient.SetClient(mockCtrl)
-	global.Client = &mockClient
-	oldRootCmd := RootCmd
+	mockClient.SetFabricClient(mockCtrl)
+	oldRootCmd, oldClient := RootCmd, global.Client
 	t.Cleanup(func() {
 		RootCmd = oldRootCmd
+		global.Client = oldClient
 		global.Stack = stacks.StackParameters{}
 	})
+	global.Client = &mockClient
 	FakeRootWithProviderParam := func(provider string) *cobra.Command {
 		cmd := &cobra.Command{}
 		cmd.PersistentFlags().VarP(&global.Stack.Provider, "provider", "P", "fake provider flag")
@@ -380,13 +371,13 @@ func TestNewProvider(t *testing.T) {
 
 		// Create a mock stacks manager that returns empty stack list
 		mockEC := &mockElicitationsController{}
-		mockSM := NewMockStackManager(t, cliClient.ProviderAWS, "us-west-2")
+		mockSM := NewMockStackManager(t, client.ProviderAWS, "us-test-2")
 
 		p, err := newProvider(ctx, mockEC, mockSM)
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
-		if _, ok := p.(*cliClient.PlaygroundProvider); !ok {
+		if _, ok := p.(*client.PlaygroundProvider); !ok {
 			t.Errorf("Expected provider to be of type *cliClient.PlaygroundProvider, got %T", p)
 		}
 	})
@@ -405,18 +396,18 @@ func TestNewProvider(t *testing.T) {
 		// Parse the flags to initialize the flag system
 		RootCmd.ParseFlags([]string{})
 
-		sts := aws.StsClient
-		aws.StsClient = &mockStsProviderAPI{}
+		prevSts := awsdriver.NewStsFromConfig
+		awsdriver.NewStsFromConfig = func(cfg aws.Config) awsdriver.StsClientAPI { return &awsdriver.MockStsClientAPI{} }
 		const cdImageTag = "site/registry/repo:tag@sha256:digest"
 		mockCtrl.canIUseResponse.CdImage = cdImageTag
 		t.Cleanup(func() {
-			aws.StsClient = sts
+			awsdriver.NewStsFromConfig = prevSts
 			mockCtrl.canIUseResponse.CdImage = ""
 			global.Stack = stacks.StackParameters{}
 		})
 
 		mockEC := &mockElicitationsController{}
-		mockSM := NewMockStackManager(t, cliClient.ProviderAWS, "us-west-2")
+		mockSM := NewMockStackManager(t, client.ProviderAWS, "us-test-2")
 		p, err := newProvider(ctx, mockEC, mockSM)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
@@ -439,20 +430,20 @@ func TestNewProvider(t *testing.T) {
 	t.Run("Can override cd image from environment variable", func(t *testing.T) {
 		t.Chdir("../../../../src/testdata/sanity")
 		t.Setenv("DEFANG_STACK", "beta")
-		sts := aws.StsClient
-		aws.StsClient = &mockStsProviderAPI{}
+		prevSts := awsdriver.NewStsFromConfig
+		awsdriver.NewStsFromConfig = func(cfg aws.Config) awsdriver.StsClientAPI { return &awsdriver.MockStsClientAPI{} }
 		const cdImageTag = "site/registry/repo:tag@sha256:digest"
 		const overrideImageTag = "site/override/replaced:tag@sha256:otherdigest"
 		t.Setenv("DEFANG_CD_IMAGE", overrideImageTag)
 		mockCtrl.canIUseResponse.CdImage = cdImageTag
 		t.Cleanup(func() {
-			aws.StsClient = sts
+			awsdriver.NewStsFromConfig = prevSts
 			mockCtrl.canIUseResponse.CdImage = ""
 			global.Stack = stacks.StackParameters{}
 		})
 
 		mockEC := &mockElicitationsController{}
-		mockSM := NewMockStackManager(t, cliClient.ProviderAWS, "us-west-2")
+		mockSM := NewMockStackManager(t, client.ProviderAWS, "us-test-2")
 		p, err := newProvider(ctx, mockEC, mockSM)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
@@ -535,8 +526,8 @@ func TestGetStack(t *testing.T) {
 				sm := &mockStackManager{
 					loadResult: &stacks.StackParameters{
 						Name:     "test-stack",
-						Provider: cliClient.ProviderAWS,
-						Region:   "us-west-2",
+						Provider: client.ProviderAWS,
+						Region:   "us-test-2",
 					},
 				}
 				return ec, sm
@@ -544,8 +535,8 @@ func TestGetStack(t *testing.T) {
 			stackFlag: "test-stack",
 			expectedStack: &stacks.StackParameters{
 				Name:     "test-stack",
-				Provider: cliClient.ProviderAWS,
-				Region:   "us-west-2",
+				Provider: client.ProviderAWS,
+				Region:   "us-test-2",
 			},
 			expectedWhence: "stack file",
 		},
@@ -568,8 +559,8 @@ func TestGetStack(t *testing.T) {
 				sm := &mockStackManager{
 					loadResult: &stacks.StackParameters{
 						Name:     "auto-stack",
-						Provider: cliClient.ProviderAuto,
-						Region:   "us-west-2",
+						Provider: client.ProviderAuto,
+						Region:   "us-test-2",
 					},
 				}
 				return ec, sm
@@ -590,7 +581,7 @@ func TestGetStack(t *testing.T) {
 					},
 					loadResult: &stacks.StackParameters{
 						Name:     "existing-stack",
-						Provider: cliClient.ProviderAWS,
+						Provider: client.ProviderAWS,
 					},
 				}
 				return ec, sm
@@ -599,7 +590,7 @@ func TestGetStack(t *testing.T) {
 			expectWarning: true,
 			expectedStack: &stacks.StackParameters{
 				Name:     "existing-stack",
-				Provider: cliClient.ProviderAWS,
+				Provider: client.ProviderAWS,
 			},
 			expectedWhence: "only stack",
 		},
@@ -617,7 +608,7 @@ func TestGetStack(t *testing.T) {
 					},
 					loadResult: &stacks.StackParameters{
 						Name:     "existing-stack",
-						Provider: cliClient.ProviderAWS,
+						Provider: client.ProviderAWS,
 					},
 				}
 				return ec, sm
@@ -626,7 +617,7 @@ func TestGetStack(t *testing.T) {
 			expectWarning: true,
 			expectedStack: &stacks.StackParameters{
 				Name:     "existing-stack",
-				Provider: cliClient.ProviderAWS,
+				Provider: client.ProviderAWS,
 			},
 			expectedWhence: "interactive selection",
 		},
@@ -642,7 +633,7 @@ func TestGetStack(t *testing.T) {
 			nonInteractive: true,
 			expectedStack: &stacks.StackParameters{
 				Name:     "beta",
-				Provider: cliClient.ProviderDefang,
+				Provider: client.ProviderDefang,
 				Mode:     modes.ModeUnspecified,
 			},
 			expectedWhence: "non-interactive default",
@@ -660,7 +651,7 @@ func TestGetStack(t *testing.T) {
 			},
 			expectedStack: &stacks.StackParameters{
 				Name:     "only-stack",
-				Provider: cliClient.ProviderAWS,
+				Provider: client.ProviderAWS,
 				Mode:     modes.ModeAffordable,
 			},
 			expectedWhence: "only stack",
@@ -679,14 +670,14 @@ func TestGetStack(t *testing.T) {
 					},
 					loadResult: &stacks.StackParameters{
 						Name:     "stack1",
-						Provider: cliClient.ProviderAWS,
+						Provider: client.ProviderAWS,
 					},
 				}
 				return ec, sm
 			},
 			expectedStack: &stacks.StackParameters{
 				Name:     "stack1",
-				Provider: cliClient.ProviderAWS,
+				Provider: client.ProviderAWS,
 			},
 			expectedWhence: "interactive selection",
 		},
@@ -752,7 +743,7 @@ func TestGetStack(t *testing.T) {
 			global.NonInteractive = tc.nonInteractive
 
 			// Reset global stack state
-			global.Stack.Provider = cliClient.ProviderAuto
+			global.Stack.Provider = client.ProviderAuto
 
 			// Capture output to check for warnings
 			var output bytes.Buffer

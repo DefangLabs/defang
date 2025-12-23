@@ -461,6 +461,7 @@ message ListDeploymentsRequest {
   string project = 1;
   DeploymentType type = 2; // active or all
   uint32 limit = 3;        // number of deployments to return
+  string stack = 4;
 }
 
 message ListDeploymentsResponse { repeated Deployment deployments = 1; }

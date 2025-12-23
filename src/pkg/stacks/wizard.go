@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 )
 
@@ -36,9 +36,9 @@ func (w *Wizard) CollectParameters(ctx context.Context) (*StackParameters, error
 }
 
 func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *StackParameters) (*StackParameters, error) {
-	if params.Provider == cliClient.ProviderAuto || params.Provider == "" {
+	if params.Provider == client.ProviderAuto || params.Provider == "" {
 		var providerNames []string
-		for _, p := range cliClient.AllProviders() {
+		for _, p := range client.AllProviders() {
 			providerNames = append(providerNames, p.Name())
 		}
 		providerName, err := w.ec.RequestEnum(
@@ -51,7 +51,7 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *StackPa
 			return nil, fmt.Errorf("failed to elicit provider choice: %w", err)
 		}
 
-		var providerID cliClient.ProviderID
+		var providerID client.ProviderID
 		err = providerID.Set(providerName)
 		if err != nil {
 			return nil, err
@@ -59,10 +59,10 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *StackPa
 		params.Provider = providerID
 	}
 
-	if params.Provider == cliClient.ProviderDefang {
+	if params.Provider == client.ProviderDefang {
 		params.Region = ""
 	} else if params.Region == "" {
-		defaultRegion := cliClient.GetRegion(params.Provider)
+		defaultRegion := client.GetRegion(params.Provider)
 		region, err := w.ec.RequestStringWithDefault(ctx, "Which region do you want to deploy to?", "region", defaultRegion)
 		if err != nil {
 			return nil, fmt.Errorf("failed to elicit region choice: %w", err)
@@ -81,7 +81,7 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *StackPa
 	}
 
 	switch params.Provider {
-	case cliClient.ProviderAWS:
+	case client.ProviderAWS:
 		if params.AWSProfile == "" {
 			if os.Getenv("AWS_PROFILE") != "" {
 				profile, err := w.ec.RequestStringWithDefault(ctx, "Which AWS profile do you want to use?", "aws_profile", os.Getenv("AWS_PROFILE"))
@@ -106,7 +106,7 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *StackPa
 				params.AWSProfile = profile
 			}
 		}
-	case cliClient.ProviderGCP:
+	case client.ProviderGCP:
 		if params.GCPProjectID == "" {
 			if os.Getenv("GCP_PROJECT_ID") != "" {
 				projectID, err := w.ec.RequestStringWithDefault(ctx, "Enter your GCP Project ID:", "gcp_project_id", os.Getenv("GCP_PROJECT_ID"))

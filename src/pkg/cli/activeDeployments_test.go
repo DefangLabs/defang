@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	connect "github.com/bufbuild/connect-go"
@@ -47,13 +48,17 @@ func TestActiveDeployments(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	url := strings.TrimPrefix(server.URL, "http://")
-	grpcClient, _ := Connect(ctx, url)
+	grpcClient := Connect(url, types.TenantUnset)
 
 	t.Run("no active deployments", func(t *testing.T) {
 		fabricServer.testDeploymentsData = emptyDeployments
 		stdout, _ := term.SetupTestTerm(t)
 
-		err := DeploymentsList(ctx, defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, "", grpcClient, 10)
+		err := DeploymentsList(ctx, grpcClient, ListDeploymentsParams{
+			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
+			ProjectName: "",
+			Limit:       10,
+		})
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}
@@ -70,7 +75,11 @@ func TestActiveDeployments(t *testing.T) {
 		fabricServer.testDeploymentsData = activeDeployments
 
 		stdout, _ := term.SetupTestTerm(t)
-		err := DeploymentsList(ctx, defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, "", grpcClient, 10)
+		err := DeploymentsList(ctx, grpcClient, ListDeploymentsParams{
+			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
+			ProjectName: "",
+			Limit:       10,
+		})
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}

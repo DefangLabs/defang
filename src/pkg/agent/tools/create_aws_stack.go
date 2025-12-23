@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 )
@@ -33,7 +33,7 @@ func HandleCreateAWSStackTool(ctx context.Context, params CreateAWSStackParams, 
 	newStack := stacks.StackParameters{
 		Name:       params.Name,
 		AWSProfile: params.AWS_Profile,
-		Provider:   cliClient.ProviderAWS,
+		Provider:   client.ProviderAWS,
 		Region:     params.Region,
 		Mode:       mode,
 	}

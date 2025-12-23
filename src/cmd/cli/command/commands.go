@@ -18,12 +18,11 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/agent"
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
-	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
@@ -40,7 +39,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	"github.com/DefangLabs/defang/src/pkg/track"
-	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -53,21 +51,6 @@ var authNeededAnnotation = map[string]string{authNeeded: ""}
 
 var P = track.P
 
-// getTenantSelection resolves the tenant to use for this invocation (flag > env > token subject),
-// leaving it unset when we should rely on the personal tenant from the token subject.
-func getTenantSelection() types.TenantNameOrID {
-	if global.Tenant != "" {
-		return types.TenantNameOrID(global.Tenant)
-	}
-	if token := cluster.GetExistingToken(global.Cluster); token != "" {
-		if t := cli.TenantFromToken(token); t.IsSet() {
-			return t
-		}
-	}
-	// No explicit tenant: defer to token subject or server defaults.
-	return types.TenantUnset
-}
-
 func Execute(ctx context.Context) error {
 	if term.StdoutCanColor() {
 		restore := term.EnableANSI()
@@ -76,7 +59,7 @@ func Execute(ctx context.Context) error {
 
 	if err := RootCmd.ExecuteContext(ctx); err != nil {
 		if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
-			term.Error("Error:", cliClient.PrettyError(err))
+			term.Error("Error:", client.PrettyError(err))
 		}
 
 		if err == dryrun.ErrDryRun {
@@ -160,7 +143,7 @@ SetupCommands initializes and configures the entire Defang CLI command structure
 It registers all global flags that bind to GlobalConfig, sets up all subcommands with their
 specific flags, and establishes the command hierarchy.
 */
-func SetupCommands(ctx context.Context, version string) {
+func SetupCommands(version string) {
 	cobra.EnableTraverseRunHooks = true // we always need to run the RootCmd's pre-run hook
 
 	RootCmd.Version = version
@@ -186,11 +169,11 @@ func SetupCommands(ctx context.Context, version string) {
 	})
 	RootCmd.PersistentFlags().StringVar(&global.Cluster, "cluster", global.Cluster, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster") // only for Defang use
-	RootCmd.PersistentFlags().StringVar(&global.Tenant, "workspace", global.Tenant, "workspace to use (tenant name or ID)")
-	RootCmd.PersistentFlags().VarP(&global.Stack.Provider, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
+	RootCmd.PersistentFlags().Var(&global.Tenant, "workspace", "workspace to use")
+	RootCmd.PersistentFlags().VarP(&global.Stack.Provider, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, client.AllProviders()))
 	RootCmd.RegisterFlagCompletionFunc("provider", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var completions []cobra.Completion
-		for _, provider := range cliClient.AllProviders() {
+		for _, provider := range client.AllProviders() {
 			completions = append(completions, provider.String())
 		}
 		return completions, cobra.ShellCompDirectiveNoFileComp
@@ -206,10 +189,6 @@ func SetupCommands(ctx context.Context, version string) {
 	_ = RootCmd.MarkPersistentFlagDirname("cwd")
 	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, `compose file path(s)`)
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
-
-	// Create a temporary gRPC client for tracking events before login
-	// getTenantSelection defaults to types.TenantUnset when no tenant is specified
-	cli.ConnectWithTenant(ctx, global.Cluster, getTenantSelection())
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
@@ -343,6 +322,7 @@ func SetupCommands(ctx context.Context, version string) {
 	// Deployments Command
 	deploymentsCmd.AddCommand(deploymentsListCmd)
 	deploymentsCmd.PersistentFlags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
+	deploymentsCmd.PersistentFlags().Uint32P("limit", "l", 10, "maximum number of deployments to list")
 	RootCmd.AddCommand(deploymentsCmd)
 
 	// MCP Command
@@ -422,6 +402,9 @@ var RootCmd = &cobra.Command{
 			return nil
 		}
 
+		// Create a temporary gRPC client for tracking events before login
+		track.Tracker = cli.Connect(global.Cluster, global.Tenant)
+
 		ctx := cmd.Context()
 		term.SetDebug(global.Debug)
 
@@ -461,14 +444,15 @@ var RootCmd = &cobra.Command{
 			return err
 		}
 
-		global.Client, err = cli.ConnectWithTenant(ctx, global.Cluster, getTenantSelection())
-
+		global.Client, err = cli.ConnectWithTenant(ctx, global.Cluster, global.Tenant)
 		if err != nil {
 			if connect.CodeOf(err) != connect.CodeUnauthenticated {
 				return err
 			}
 			term.Debug("Using existing token failed; continuing to allow login/ToS flow:", err)
 		}
+
+		track.Tracker = global.Client // update tracker with the real client
 
 		if v, err := global.Client.GetVersions(ctx); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
@@ -524,7 +508,7 @@ var loginCmd = &cobra.Command{
 				return err
 			}
 		} else {
-			err := login.InteractiveLogin(cmd.Context(), global.Client, global.Cluster)
+			err := login.InteractiveLogin(cmd.Context(), global.Cluster)
 			if err != nil {
 				return err
 			}
@@ -574,7 +558,7 @@ var whoamiCmd = &cobra.Command{
 			term.Debug("unable to get provider:", err)
 		}
 
-		token := cluster.GetExistingToken(global.Cluster)
+		token := client.GetExistingToken(global.Cluster)
 
 		userInfo, err := auth.FetchUserInfo(cmd.Context(), token)
 		if err != nil {
@@ -584,8 +568,7 @@ var whoamiCmd = &cobra.Command{
 			}
 		}
 
-		tenantSelection := getTenantSelection()
-		data, err := cli.Whoami(cmd.Context(), global.Client, provider, userInfo, tenantSelection)
+		data, err := cli.Whoami(cmd.Context(), global.Client, provider, userInfo, global.Tenant)
 		if err != nil {
 			return err
 		}
@@ -814,7 +797,7 @@ var configSetCmd = &cobra.Command{
 			return err
 		}
 
-		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 		if err != nil {
 			return err
 		}
@@ -945,7 +928,7 @@ var configDeleteCmd = &cobra.Command{
 			return err
 		}
 
-		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 		if err != nil {
 			return err
 		}
@@ -953,7 +936,7 @@ var configDeleteCmd = &cobra.Command{
 		if err := cli.ConfigDelete(cmd.Context(), projectName, provider, names...); err != nil {
 			// Show a warning (not an error) if the config was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
-				term.Warn(cliClient.PrettyError(err))
+				term.Warn(client.PrettyError(err))
 				return nil
 			}
 			return err
@@ -978,7 +961,7 @@ var configListCmd = &cobra.Command{
 			return err
 		}
 
-		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 		if err != nil {
 			return err
 		}
@@ -1058,7 +1041,7 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
-		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 		if err != nil {
 			return err
 		}
@@ -1073,7 +1056,7 @@ var deleteCmd = &cobra.Command{
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
-				term.Warn(cliClient.PrettyError(err))
+				term.Warn(client.PrettyError(err))
 				return nil
 			}
 			return err
@@ -1105,27 +1088,10 @@ var deploymentsCmd = &cobra.Command{
 	Aliases:     []string{"deployment", "deploys", "deps", "dep"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "List active deployments across all projects",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		var projectName, _ = cmd.Flags().GetString("project-name")
-		var utc, _ = cmd.Flags().GetBool("utc")
-
-		if utc {
-			cli.EnableUTCMode()
-		}
-
-		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, projectName, global.Client, 0)
-	},
-}
-
-var deploymentsListCmd = &cobra.Command{
-	Use:         "history",
-	Aliases:     []string{"ls", "list"},
-	Annotations: authNeededAnnotation,
-	Args:        cobra.NoArgs,
-	Short:       "List deployment history for a project",
+	Short:       "List all active deployments",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var utc, _ = cmd.Flags().GetBool("utc")
+		var limit, _ = cmd.Flags().GetUint32("limit")
 
 		if utc {
 			cli.EnableUTCMode()
@@ -1137,7 +1103,41 @@ var deploymentsListCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY, projectName, global.Client, 10)
+		return cli.DeploymentsList(cmd.Context(), global.Client, cli.ListDeploymentsParams{
+			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
+			ProjectName: projectName,
+			StackName:   global.Stack.Name,
+			Limit:       limit,
+		})
+	},
+}
+
+var deploymentsListCmd = &cobra.Command{
+	Use:         "history",
+	Aliases:     []string{"ls", "list"},
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "List deployment history for a project",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		var utc, _ = cmd.Flags().GetBool("utc")
+		var limit, _ = cmd.Flags().GetUint32("limit")
+
+		if utc {
+			cli.EnableUTCMode()
+		}
+
+		loader := configureLoader(cmd)
+		projectName, err := loader.LoadProjectName(cmd.Context())
+		if err != nil {
+			return err
+		}
+
+		return cli.DeploymentsList(cmd.Context(), global.Client, cli.ListDeploymentsParams{
+			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY,
+			ProjectName: projectName,
+			StackName:   global.Stack.Name,
+			Limit:       limit,
+		})
 	},
 }
 
@@ -1168,7 +1168,7 @@ var tokenCmd = &cobra.Command{
 		var s, _ = cmd.Flags().GetString("scope")
 		var expires, _ = cmd.Flags().GetDuration("expires")
 
-		return cli.Token(cmd.Context(), global.Client, getTenantSelection(), expires, scope.Scope(s))
+		return cli.Token(cmd.Context(), global.Client, global.Tenant, expires, scope.Scope(s))
 	},
 }
 
@@ -1235,7 +1235,7 @@ func configureLoader(cmd *cobra.Command) *compose.Loader {
 	}
 
 	// Avoid common mistakes
-	var prov cliClient.ProviderID
+	var prov client.ProviderID
 	if prov.Set(projectName) == nil && !cmd.Flag("provider").Changed {
 		// using -p with a provider name instead of -P
 		term.Warnf("Project name %q looks like a provider name; did you mean to use -P=%s instead of -p?", projectName, projectName)
@@ -1291,11 +1291,11 @@ func isUpgradeCommand(cmd *cobra.Command) bool {
 	return cmd.Name() == "upgrade"
 }
 
-var providerDescription = map[cliClient.ProviderID]string{
-	cliClient.ProviderDefang: "The Defang Playground is a free platform intended for testing purposes only.",
-	cliClient.ProviderAWS:    "Deploy to AWS using the AWS_* environment variables or the AWS CLI configuration.",
-	cliClient.ProviderDO:     "Deploy to DigitalOcean using the DIGITALOCEAN_TOKEN, SPACES_ACCESS_KEY_ID, and SPACES_SECRET_ACCESS_KEY environment variables.",
-	cliClient.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
+var providerDescription = map[client.ProviderID]string{
+	client.ProviderDefang: "The Defang Playground is a free platform intended for testing purposes only.",
+	client.ProviderAWS:    "Deploy to AWS using the AWS_* environment variables or the AWS CLI configuration.",
+	client.ProviderDO:     "Deploy to DigitalOcean using the DIGITALOCEAN_TOKEN, SPACES_ACCESS_KEY_ID, and SPACES_SECRET_ACCESS_KEY environment variables.",
+	client.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
 }
 
 func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager) (*stacks.StackParameters, string, error) {
@@ -1304,7 +1304,7 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 	var whence string
 	stack := &stacks.StackParameters{
 		Name:     "",
-		Provider: cliClient.ProviderAuto,
+		Provider: client.ProviderAuto,
 		Mode:     modes.ModeUnspecified,
 	}
 
@@ -1323,7 +1323,7 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 		}
 		stack = stackParams
 
-		if stack.Provider == cliClient.ProviderAuto {
+		if stack.Provider == client.ProviderAuto {
 			return nil, "", fmt.Errorf("stack %q has an invalid provider %q", stack.Name, stack.Provider)
 		}
 		return stack, whence, nil
@@ -1352,15 +1352,15 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 			return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
 		}
 	}
-	if global.NonInteractive && stack.Provider == cliClient.ProviderAuto {
+	if global.NonInteractive && stack.Provider == client.ProviderAuto {
 		whence = "non-interactive default"
 		stack.Name = "beta"
-		stack.Provider = cliClient.ProviderDefang
+		stack.Provider = client.ProviderDefang
 		return stack, whence, nil
 	}
 
 	// if there is exactly one stack with that provider, use it
-	if len(knownStacks) == 1 && (stack.Provider == cliClient.ProviderAuto || knownStacks[0].Provider == stack.Provider.String()) {
+	if len(knownStacks) == 1 && (stack.Provider == client.ProviderAuto || knownStacks[0].Provider == stack.Provider.String()) {
 		knownStack := knownStacks[0]
 		// try to read the stackfile
 		stack, loadErr := sm.Load(knownStack.Name)
@@ -1399,7 +1399,7 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 }
 
 func importStack(sm stacks.Manager, stack stacks.StackListItem) (*stacks.StackParameters, error) {
-	var providerID cliClient.ProviderID
+	var providerID client.ProviderID
 	err := providerID.Set(stack.Provider)
 	if err != nil {
 		return nil, fmt.Errorf("invalid provider %q in stack %q: %w", stack.Provider, stack.Name, err)
@@ -1425,8 +1425,8 @@ func importStack(sm stacks.Manager, stack stacks.StackListItem) (*stacks.StackPa
 	return params, nil
 }
 
-func printProviderMismatchWarnings(ctx context.Context, provider cliClient.ProviderID) {
-	if provider == cliClient.ProviderDefang {
+func printProviderMismatchWarnings(ctx context.Context, provider client.ProviderID) {
+	if provider == client.ProviderDefang {
 		// Ignore any env vars when explicitly using the Defang playground provider
 		// Defaults to defang provider in non-interactive mode
 		if awsInEnv() {
@@ -1441,22 +1441,22 @@ func printProviderMismatchWarnings(ctx context.Context, provider cliClient.Provi
 	}
 
 	switch provider {
-	case cliClient.ProviderAWS:
+	case client.ProviderAWS:
 		if !awsInConfig(ctx) {
 			term.Warn("AWS provider was selected, but AWS environment is not set")
 		}
-	case cliClient.ProviderDO:
+	case client.ProviderDO:
 		if !doInEnv() {
 			term.Warn("DigitalOcean provider was selected, but DIGITALOCEAN_TOKEN environment variable is not set")
 		}
-	case cliClient.ProviderGCP:
+	case client.ProviderGCP:
 		if !gcpInEnv() {
 			term.Warn("GCP provider was selected, but GCP_PROJECT_ID environment variable is not set")
 		}
 	}
 }
 
-func newProvider(ctx context.Context, ec elicitations.Controller, sm stacks.Manager) (cliClient.Provider, error) {
+func newProvider(ctx context.Context, ec elicitations.Controller, sm stacks.Manager) (client.Provider, error) {
 	stack, whence, err := getStack(ctx, ec, sm)
 	if err != nil {
 		return nil, err
@@ -1466,7 +1466,7 @@ func newProvider(ctx context.Context, ec elicitations.Controller, sm stacks.Mana
 	global.Stack = *stack
 
 	extraMsg := ""
-	if stack.Provider == cliClient.ProviderDefang {
+	if stack.Provider == client.ProviderDefang {
 		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
 	}
 	term.Infof("Using the %q stack on %s from %s%s", stack.Name, stack.Provider, whence, extraMsg)
@@ -1476,7 +1476,7 @@ func newProvider(ctx context.Context, ec elicitations.Controller, sm stacks.Mana
 	return provider, nil
 }
 
-func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient.Provider, error) {
+func newProviderChecked(ctx context.Context, loader client.Loader) (client.Provider, error) {
 	var err error
 	projectName := ""
 	outside := true
@@ -1513,6 +1513,6 @@ func newProviderChecked(ctx context.Context, loader cliClient.Loader) (cliClient
 	return provider, err
 }
 
-func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string, serviceCount int) error {
-	return cliClient.CanIUseProvider(ctx, global.Client, provider, projectName, serviceCount)
+func canIUseProvider(ctx context.Context, provider client.Provider, projectName string, serviceCount int) error {
+	return client.CanIUseProvider(ctx, global.Client, provider, projectName, serviceCount)
 }

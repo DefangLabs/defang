@@ -14,7 +14,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/agent/plugins/fabric"
 	"github.com/DefangLabs/defang/src/pkg/agent/tools"
-	"github.com/DefangLabs/defang/src/pkg/cluster"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -34,10 +34,10 @@ type Agent struct {
 }
 
 func New(ctx context.Context, clusterAddr string, stack *stacks.StackParameters) (*Agent, error) {
-	accessToken := cluster.GetExistingToken(clusterAddr)
+	accessToken := client.GetExistingToken(clusterAddr)
 	aiProvider := "fabric"
 	var providerPlugin api.Plugin
-	addr := cluster.NormalizeHost(clusterAddr)
+	addr := client.NormalizeHost(clusterAddr)
 	// Generate a random session ID prepended with timestamp for easier sorting
 	sessionID := fmt.Sprintf("%s-%s", time.Now().Format("20060102T150405Z"), pkg.RandomID())
 	providerPlugin = &fabric.OpenAI{

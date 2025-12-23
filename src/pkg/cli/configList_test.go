@@ -6,8 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/bufbuild/connect-go"
@@ -47,11 +48,8 @@ func TestConfigList(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	url := strings.TrimPrefix(server.URL, "http://")
-	grpcClient, err := Connect(ctx, url)
-	if err != nil {
-		t.Fatal(err)
-	}
-	provider := cliClient.PlaygroundProvider{FabricClient: grpcClient}
+	grpcClient := Connect(url, types.TenantUnset)
+	provider := client.PlaygroundProvider{FabricClient: grpcClient}
 
 	t.Run("no configs", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
