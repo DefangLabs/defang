@@ -12,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/joho/godotenv"
 	"github.com/spf13/pflag"
 )
@@ -76,9 +77,9 @@ type GlobalConfig struct {
 	HideUpdate     bool
 	ModelID        string // only for debug/generate; Pro users
 	NonInteractive bool
-	Tenant         string
 	SourcePlatform migrate.SourcePlatform // only used for 'defang init' command
 	Stack          stacks.StackParameters
+	Tenant         types.TenantNameOrID // workspace
 	Verbose        bool
 }
 
@@ -202,9 +203,9 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 
 	if !flags.Changed("workspace") {
 		if fromEnv, ok := os.LookupEnv("DEFANG_WORKSPACE"); ok {
-			r.Tenant = fromEnv
+			r.Tenant = types.TenantNameOrID(fromEnv)
 		} else if fromEnv, ok := os.LookupEnv("DEFANG_ORG"); ok {
-			r.Tenant = fromEnv
+			r.Tenant = types.TenantNameOrID(fromEnv)
 			term.Warn("DEFANG_ORG is deprecated; use DEFANG_WORKSPACE instead")
 		}
 	}

@@ -23,7 +23,7 @@ func TestConnect(t *testing.T) {
 	t.Run("unreachable", func(t *testing.T) {
 		t.Parallel()
 		t.Skip("unreachable test only triggers when the wifi is off")
-		_, err := Connect(ctx, "1.2.3.4")
+		_, err := ConnectWithTenant(ctx, "1.2.3.4", types.TenantUnset)
 		if expected, actual := "unavailable: dial tcp 1.2.3.4:443: connect: network is unreachable", err.Error(); expected != actual {
 			t.Errorf("expected %v, got: %v", expected, actual)
 		}
@@ -38,7 +38,7 @@ func TestConnect(t *testing.T) {
 			t.Skip("skipping slow test in short mode")
 		}
 		// Use a non-routable IP address to trigger a timeout
-		_, err := Connect(ctx, "240.0.0.1")
+		_, err := ConnectWithTenant(ctx, "240.0.0.1", types.TenantUnset)
 		expected := []string{
 			`deadline_exceeded: Post "https://240.0.0.1:443/io.defang.v1.FabricController/WhoAmI": dial tcp 240.0.0.1:443: i/o timeout`,
 			`unavailable: dial tcp 240.0.0.1:443: connect: connection refused`,
@@ -53,7 +53,7 @@ func TestConnect(t *testing.T) {
 
 	t.Run("connection refused", func(t *testing.T) {
 		t.Parallel()
-		_, err := Connect(ctx, "127.0.0.1:1234")
+		_, err := ConnectWithTenant(ctx, "127.0.0.1:1234", types.TenantUnset)
 		if expected, actual := "unavailable: dial tcp 127.0.0.1:1234: connect: connection refused", err.Error(); expected != actual {
 			t.Errorf("expected %v, got: %v", expected, actual)
 		}
@@ -64,7 +64,7 @@ func TestConnect(t *testing.T) {
 
 	t.Run("no such host", func(t *testing.T) {
 		t.Parallel()
-		_, err := Connect(ctx, "blah.example.com")
+		_, err := ConnectWithTenant(ctx, "blah.example.com", types.TenantUnset)
 		suffixes := []string{": no such host", "device or resource busy"}
 		if actual := err.Error(); !slices.ContainsFunc(suffixes, func(suffix string) bool { return strings.HasSuffix(actual, suffix) }) {
 			t.Errorf("expected error to end with %q, got: %v", suffixes, actual)
@@ -79,7 +79,7 @@ func TestConnect(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 		t.Cleanup(server.Close)
 
-		_, err := Connect(ctx, strings.TrimPrefix(server.URL, "http://"))
+		_, err := ConnectWithTenant(ctx, strings.TrimPrefix(server.URL, "http://"), types.TenantUnset)
 		if expected, actual := "internal: protocol error: no Grpc-Status trailer: unexpected EOF", err.Error(); expected != actual {
 			t.Errorf("expected %v, got: %v", expected, actual)
 		}
@@ -95,7 +95,7 @@ func TestConnect(t *testing.T) {
 		server := httptest.NewServer(h)
 		t.Cleanup(server.Close)
 
-		g, err := Connect(ctx, strings.TrimPrefix(server.URL, "http://"))
+		g, err := ConnectWithTenant(ctx, strings.TrimPrefix(server.URL, "http://"), types.TenantUnset)
 		if err != nil {
 			t.Fatalf("expected %v, got: %v", nil, err)
 		}
@@ -106,17 +106,21 @@ func TestConnect(t *testing.T) {
 
 	t.Run("success ignores server tenant response", func(t *testing.T) {
 		t.Parallel()
-		handler := &mockWhoAmI{tenant: "server-tenant", tenantID: "server-id"}
+		const serverTenant = "server-tenant"
+		handler := &mockWhoAmI{tenant: serverTenant, tenantID: "server-id"}
 		_, h := defangv1connect.NewFabricControllerHandler(handler)
 		server := httptest.NewServer(h)
 		t.Cleanup(server.Close)
 
-		g, err := Connect(ctx, strings.TrimPrefix(server.URL, "http://"))
+		g, err := ConnectWithTenant(ctx, strings.TrimPrefix(server.URL, "http://"), types.TenantUnset)
 		if err != nil {
 			t.Fatalf("expected %v, got: %v", nil, err)
 		}
-		if g.GetTenantName() != types.TenantUnset {
-			t.Errorf("expected tenant to remain unset, got: %v", g.GetTenantName())
+		if g.GetRequestedTenant() != "" {
+			t.Errorf("expected requested tenant to be empty, got %q", g.GetRequestedTenant())
+		}
+		if g.GetTenantName() != serverTenant {
+			t.Errorf("expected tenant %q, got %q", serverTenant, g.GetTenantName())
 		}
 		if handler.seenTenant != "" {
 			t.Errorf("expected empty tenant header, got: %q", handler.seenTenant) // default connection should not force a tenant header
@@ -125,7 +129,8 @@ func TestConnect(t *testing.T) {
 
 	t.Run("explicit tenant header", func(t *testing.T) {
 		t.Parallel()
-		handler := &mockWhoAmI{tenant: "server-tenant", tenantID: "server-id"}
+		const serverTenant = "server-tenant"
+		handler := &mockWhoAmI{tenant: serverTenant, tenantID: "server-id"}
 		_, h := defangv1connect.NewFabricControllerHandler(handler)
 		server := httptest.NewServer(h)
 		t.Cleanup(server.Close)
@@ -141,8 +146,8 @@ func TestConnect(t *testing.T) {
 		if g.GetRequestedTenant() != requested {
 			t.Errorf("expected requested tenant %q, got %q", requested, g.GetRequestedTenant())
 		}
-		if g.GetTenantName() != requested {
-			t.Errorf("expected tenant %q, got %q", requested, g.GetTenantName())
+		if g.GetTenantName() != serverTenant {
+			t.Errorf("expected tenant %q, got %q", serverTenant, g.GetTenantName())
 		}
 	})
 
@@ -153,14 +158,11 @@ func TestConnect(t *testing.T) {
 		server := httptest.NewServer(h)
 		t.Cleanup(server.Close)
 
-		g, err := Connect(ctx, "ignored@"+strings.TrimPrefix(server.URL, "http://"))
-		if err != nil {
-			t.Fatalf("expected %v, got: %v", nil, err)
-		}
+		g := Connect("ignored@"+strings.TrimPrefix(server.URL, "http://"), types.TenantUnset)
 		if handler.seenTenant != "" {
 			t.Errorf("expected empty tenant header, got: %q", handler.seenTenant)
 		}
-		if g.GetTenantName() != types.TenantUnset {
+		if g.GetTenantName() != "" {
 			t.Errorf("expected tenant to remain unset, got: %v", g.GetTenantName())
 		}
 	})

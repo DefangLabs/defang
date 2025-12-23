@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	connect "github.com/bufbuild/connect-go"
@@ -57,7 +58,7 @@ func TestDeploymentsList(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	url := strings.TrimPrefix(server.URL, "http://")
-	grpcClient, _ := Connect(ctx, url)
+	grpcClient := Connect(url, types.TenantUnset)
 
 	t.Run("no deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)

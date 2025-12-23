@@ -22,7 +22,7 @@ func ListWorkspaces(cmd *cobra.Command, args []string) error {
 	}
 
 	// Determine current selection from flag/env/token, then reconcile with WhoAmI.
-	currentWorkspace := getTenantSelection()
+	currentWorkspace := global.Tenant
 
 	info, err := auth.FetchUserInfo(cmd.Context(), token)
 	if err != nil {

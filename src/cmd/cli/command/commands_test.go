@@ -82,7 +82,7 @@ func (m *mockFabricService) SetSelectedProvider(context.Context, *connect.Reques
 }
 
 func TestMain(m *testing.M) {
-	SetupCommands(context.Background(), "0.0.0-test")
+	SetupCommands("0.0.0-test")
 	os.Exit(m.Run())
 }
 
@@ -254,7 +254,7 @@ func TestGetProvider(t *testing.T) {
 	mockCtrl := &MockFabricControllerClient{
 		canIUseResponse: defangv1.CanIUseResponse{},
 	}
-	mockClient.SetClient(mockCtrl)
+	mockClient.SetFabricClient(mockCtrl)
 	oldRootCmd, oldClient, oldSts := RootCmd, global.Client, awsdriver.NewStsFromConfig
 	t.Cleanup(func() {
 		RootCmd = oldRootCmd

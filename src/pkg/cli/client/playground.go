@@ -26,7 +26,7 @@ func (g *PlaygroundProvider) Deploy(ctx context.Context, req *defangv1.DeployReq
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		return nil, errors.New("DEFANG_PULUMI_DIR is set, but not supported by the Playground provider")
 	}
-	return getMsg(g.GetController().Deploy(ctx, connect.NewRequest(req)))
+	return getMsg(g.GetFabricClient().Deploy(ctx, connect.NewRequest(req)))
 }
 
 func (g *PlaygroundProvider) GetDeploymentStatus(ctx context.Context) error {
@@ -39,7 +39,7 @@ func (g *PlaygroundProvider) Preview(ctx context.Context, req *defangv1.DeployRe
 }
 
 func (g *PlaygroundProvider) Estimate(ctx context.Context, req *defangv1.EstimateRequest) (*defangv1.EstimateResponse, error) {
-	return getMsg(g.GetController().Estimate(ctx, connect.NewRequest(req)))
+	return getMsg(g.GetFabricClient().Estimate(ctx, connect.NewRequest(req)))
 }
 
 func (g *PlaygroundProvider) GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error) {
@@ -47,48 +47,48 @@ func (g *PlaygroundProvider) GetProjectUpdate(context.Context, string) (*defangv
 }
 
 func (g *PlaygroundProvider) GetService(ctx context.Context, req *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
-	return getMsg(g.GetController().Get(ctx, connect.NewRequest(req)))
+	return getMsg(g.GetFabricClient().Get(ctx, connect.NewRequest(req)))
 }
 
 func (g *PlaygroundProvider) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	return getMsg(g.GetController().Delete(ctx, connect.NewRequest(req)))
+	return getMsg(g.GetFabricClient().Delete(ctx, connect.NewRequest(req)))
 }
 
 func (g *PlaygroundProvider) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
-	return getMsg(g.GetController().GetServices(ctx, connect.NewRequest(req)))
+	return getMsg(g.GetFabricClient().GetServices(ctx, connect.NewRequest(req)))
 }
 
 func (g *PlaygroundProvider) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
-	_, err := g.GetController().PutSecret(ctx, connect.NewRequest(req))
+	_, err := g.GetFabricClient().PutSecret(ctx, connect.NewRequest(req))
 	return err
 }
 
 func (g *PlaygroundProvider) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
-	_, err := g.GetController().DeleteSecrets(ctx, connect.NewRequest(req))
+	_, err := g.GetFabricClient().DeleteSecrets(ctx, connect.NewRequest(req))
 	return err
 }
 
 func (g *PlaygroundProvider) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
-	return getMsg(g.GetController().ListSecrets(ctx, connect.NewRequest(req)))
+	return getMsg(g.GetFabricClient().ListSecrets(ctx, connect.NewRequest(req)))
 }
 
 func (g *PlaygroundProvider) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	return getMsg(g.GetController().CreateUploadURL(ctx, connect.NewRequest(req)))
+	return getMsg(g.GetFabricClient().CreateUploadURL(ctx, connect.NewRequest(req)))
 }
 
 func (g *PlaygroundProvider) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error) {
-	return g.GetController().Subscribe(ctx, connect.NewRequest(req))
+	return g.GetFabricClient().Subscribe(ctx, connect.NewRequest(req))
 }
 
 func (g *PlaygroundProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
-	return g.GetController().Tail(ctx, connect.NewRequest(req))
+	return g.GetFabricClient().Tail(ctx, connect.NewRequest(req))
 }
 
 func (g *PlaygroundProvider) BootstrapCommand(ctx context.Context, req BootstrapCommandRequest) (types.ETag, error) {
 	return "", errors.New("the CD command is not valid for the Defang playground; did you forget --provider?")
 }
 func (g *PlaygroundProvider) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error) {
-	resp, err := getMsg(g.GetController().Destroy(ctx, connect.NewRequest(req)))
+	resp, err := getMsg(g.GetFabricClient().Destroy(ctx, connect.NewRequest(req)))
 	if err != nil {
 		return "", err
 	}
@@ -140,7 +140,7 @@ func (g PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, erro
 func (g *PlaygroundProvider) AccountInfo(ctx context.Context) (*AccountInfo, error) {
 	return &AccountInfo{
 		Provider:  ProviderDefang,
-		AccountID: g.GetTenantName().String(),
+		AccountID: string(g.GetTenantName()),
 		Region:    "us-west-2", // Hardcoded for now for prod1 TODO: Probably should be the current tenant shard?
 	}, nil
 }

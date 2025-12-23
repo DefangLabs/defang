@@ -32,7 +32,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 
 	slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
-	command.SetupCommands(ctx, version)
+	command.SetupCommands(version)
 	err := command.Execute(ctx)
 	if ctx.Err() != nil {
 		// The context was cancelled by the Interrupt signal handler

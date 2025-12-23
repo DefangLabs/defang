@@ -21,7 +21,7 @@ type CLIInterface interface {
 	CreatePlaygroundProvider(fabric *client.GrpcClient) client.Provider
 	GenerateAuthURL(authPort int) string
 	GetServices(ctx context.Context, projectName string, provider client.Provider) ([]*cli.Service, error)
-	InteractiveLoginMCP(ctx context.Context, fabric *client.GrpcClient, cluster string, mcpClient string) error
+	InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error
 	ListConfig(ctx context.Context, provider client.Provider, projectName string) (*defangv1.Secrets, error)
 	LoadProject(ctx context.Context, loader client.Loader) (*compose.Project, error)
 	LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error)
