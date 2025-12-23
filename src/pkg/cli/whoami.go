@@ -28,6 +28,11 @@ func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Pro
 		return ShowAccountData{}, err
 	}
 
+	if !tenantSelection.IsSet() {
+		// If no tenant was selected, pick the one from the server's WhoAmI response
+		tenantSelection = types.TenantNameOrID(resp.TenantId)
+	}
+
 	term.Debug("User ID: " + resp.UserId)
 	showData := ShowAccountData{
 		Region:         resp.Region,
