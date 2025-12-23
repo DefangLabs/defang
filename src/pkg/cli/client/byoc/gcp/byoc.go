@@ -359,8 +359,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"DEFANG_DEBUG": os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_JSON":  os.Getenv("DEFANG_JSON"),
 		"DEFANG_MODE":  strings.ToLower(cmd.mode.String()),
-		// TODO: Check with @lionello why this is hardcoded instead of using b.TenantLabel
-		"DEFANG_ORG":               "defang",
+		"DEFANG_ORG":               string(b.TenantLabel),
 		"DEFANG_PREFIX":            b.Prefix,
 		"DEFANG_PULUMI_DEBUG":      os.Getenv("DEFANG_PULUMI_DEBUG"),
 		"DEFANG_PULUMI_DIFF":       os.Getenv("DEFANG_PULUMI_DIFF"),
