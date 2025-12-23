@@ -1,0 +1,2 @@
+ ! service "service1": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+Error: missing configs ["API_TOKEN" "SECRET_KEY"] (https://docs.defang.io/docs/concepts/configuration)

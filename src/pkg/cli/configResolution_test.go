@@ -54,13 +54,12 @@ func testAllConfigResolutionFiles(t *testing.T, f func(t *testing.T, name, path 
 	t.Helper()
 
 	composeRegex := regexp.MustCompile(`^(?i)(docker-)?compose.ya?ml$`)
-	err := filepath.WalkDir("../../testdata/configresolution", func(path string, d os.DirEntry, err error) error {
+	err := filepath.WalkDir("testdata/configresolution", func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !composeRegex.MatchString(d.Name()) {
 			return err
 		}
 
 		t.Run(path, func(t *testing.T) {
-			t.Helper()
 			t.Log(path)
 			f(t, filepath.Base(filepath.Dir(path)), path)
 		})
