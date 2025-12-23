@@ -16,6 +16,8 @@ type configOutput struct {
 	Source  Source `json:"source,omitempty"`
 }
 
+const configMaskedValue = "*****"
+
 type Source int
 
 const (
@@ -41,7 +43,7 @@ func (s Source) String() string {
 
 // determineConfigSource determines the source of an environment variable
 // and returns the appropriate source type and value to display
-func determineConfigSource(envKey string, envValue *string, defangConfigs map[string]string) (Source, string) {
+func determineConfigSource(envKey string, envValue *string, defangConfigs map[string]struct{}) (Source, string) {
 	// If the key itself is a defang config, mask it
 	if _, isDefangConfig := defangConfigs[envKey]; isDefangConfig {
 		return SourceDefangConfig, configMaskedValue
@@ -66,12 +68,10 @@ func determineConfigSource(envKey string, envValue *string, defangConfigs map[st
 	return SourceComposeFile, *envValue
 }
 
-const configMaskedValue = "*****"
-
 func PrintConfigResolutionSummary(project *types.Project, defangConfig []string) error {
-	configset := make(map[string]string)
+	configset := make(map[string]struct{})
 	for _, name := range defangConfig {
-		configset[name] = ""
+		configset[name] = struct{}{}
 	}
 
 	projectEnvVars := []configOutput{}
