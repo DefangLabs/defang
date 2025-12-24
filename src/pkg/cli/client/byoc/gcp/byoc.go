@@ -356,9 +356,9 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		return "", err
 	}
 	env := map[string]string{
-		"DEFANG_DEBUG": os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
-		"DEFANG_JSON":  os.Getenv("DEFANG_JSON"),
-		"DEFANG_MODE":  strings.ToLower(cmd.mode.String()),
+		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
+		"DEFANG_JSON":              os.Getenv("DEFANG_JSON"),
+		"DEFANG_MODE":              strings.ToLower(cmd.mode.String()),
 		"DEFANG_ORG":               string(b.TenantLabel),
 		"DEFANG_PREFIX":            b.Prefix,
 		"DEFANG_PULUMI_DEBUG":      os.Getenv("DEFANG_PULUMI_DEBUG"),
