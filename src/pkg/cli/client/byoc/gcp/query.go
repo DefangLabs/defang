@@ -155,7 +155,7 @@ func (q *Query) AddCloudBuildLogQuery(stack, project, etag string, services []st
 	query := `resource.type="build"`
 
 	// FIXME: Support stack
-	servicesRegex := `[a-zA-Z0-9-]{1,63}`
+	servicesRegex := `[a-zA-Z0-9-_]{1,63}`
 	if len(services) > 0 {
 		servicesRegex = fmt.Sprintf("(%v)", strings.Join(services, "|")) // Cloud build labels allows upper case letters
 	}
