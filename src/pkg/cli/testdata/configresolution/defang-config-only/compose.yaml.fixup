@@ -1,0 +1,14 @@
+{
+  "service1": {
+    "command": null,
+    "entrypoint": null,
+    "environment": {
+      "API_TOKEN": "${API_TOKEN}",
+      "SECRET_KEY": "${SECRET_KEY}"
+    },
+    "image": "nginx",
+    "networks": {
+      "default": null
+    }
+  }
+}

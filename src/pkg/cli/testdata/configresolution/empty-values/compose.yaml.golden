@@ -1,0 +1,5 @@
+[1mENVIRONMENT VARIABLES RESOLUTION SUMMARY:[0m
+[1m
+SERVICE   NAME        VALUE       SOURCE[0m
+service1  EMPTY_VAR               compose_file  
+service1  WITH_VALUE  some_value  compose_file  

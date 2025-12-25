@@ -1,0 +1,7 @@
+services:
+  service1:
+    image: nginx
+    environment:
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASSWORD}@localhost/mydb
+      API_ENDPOINT: https://api.example.com
+      AUTH_HEADER: Bearer ${API_TOKEN}
