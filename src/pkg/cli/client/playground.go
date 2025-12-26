@@ -18,9 +18,17 @@ type PlaygroundProvider struct {
 	FabricClient
 	RetryDelayer
 	shardDomain string
+	PulumiStack string
 }
 
 var _ Provider = (*PlaygroundProvider)(nil)
+
+func (g *PlaygroundProvider) GetStackName() string {
+	if g.PulumiStack == "" {
+		return "beta"
+	}
+	return g.PulumiStack
+}
 
 func (g *PlaygroundProvider) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {

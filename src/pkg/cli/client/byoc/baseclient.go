@@ -71,6 +71,10 @@ func NewByocBaseClient(tenantName types.TenantLabel, backend ProjectBackend, sta
 	return b
 }
 
+func (b *ByocBaseClient) GetStackName() string {
+	return b.PulumiStack
+}
+
 func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
 	return nil, client.ErrNotImplemented("AI debugging is not yet supported for BYOC")
 }
@@ -114,9 +118,6 @@ func (b *ByocBaseClient) GetProjectDomain(projectName, zone string) string {
 		return "" // no project name => no custom domain
 	}
 	domain := dns.Normalize(zone)
-	if hasStack, ok := b.projectBackend.(HasStackSupport); ok {
-		domain = hasStack.GetStackName() + "." + domain
-	}
 	return domain
 }
 

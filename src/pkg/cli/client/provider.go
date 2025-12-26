@@ -66,11 +66,13 @@ type Provider interface {
 	SetUpCD(context.Context) error
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)
 	TearDownCD(context.Context) error
+	GetStackName() string
 }
 
 type Loader interface {
 	LoadProject(context.Context) (*composeTypes.Project, error)
 	LoadProjectName(context.Context) (string, error)
+	OutsideWorkingDirectory() bool
 }
 
 type RetryDelayer struct {

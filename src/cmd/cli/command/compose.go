@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
@@ -115,7 +117,7 @@ func makeComposeUpCmd() *cobra.Command {
 			} else if accountInfo, err := provider.AccountInfo(ctx); err != nil {
 				term.Debugf("AccountInfo failed: %v", err)
 			} else if len(resp.Deployments) > 0 {
-				handleExistingDeployments(resp.Deployments, accountInfo, project.Name)
+				handleExistingDeployments(resp.Deployments, accountInfo, project.Name, provider.GetStackName())
 			} else if global.Stack.Name == "" {
 				err = promptToCreateStack(ctx, stacks.StackParameters{
 					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
@@ -220,10 +222,13 @@ func makeComposeUpCmd() *cobra.Command {
 	return composeUpCmd
 }
 
-func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accountInfo *client.AccountInfo, projectName string) error {
+func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accountInfo *client.AccountInfo, projectName string, stackName string) error {
 	samePlace := slices.ContainsFunc(existingDeployments, func(dep *defangv1.Deployment) bool {
+		if dep.Provider != accountInfo.Provider.Value() {
+			return false
+		}
 		// Old deployments may not have a region or account ID, so we check for empty values too
-		return dep.Provider == global.Stack.Provider.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
+		return (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
 	})
 	if samePlace {
 		return nil
@@ -231,8 +236,8 @@ func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accou
 	if err := confirmDeploymentToNewLocation(projectName, existingDeployments); err != nil {
 		return err
 	}
-	if global.Stack.Name == "" {
-		stackName := "beta"
+	if stackName == "" {
+		stackName = "beta"
 		_, err := stacks.Create(stacks.StackParameters{
 			Name:     stackName,
 			Provider: accountInfo.Provider,
@@ -560,7 +565,18 @@ func makeComposeConfigCmd() *cobra.Command {
 				}, loadErr)
 			}
 
-			provider, err := newProvider(ctx, loader)
+			elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
+			ec := elicitations.NewController(elicitationsClient)
+			wd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get working directory: %w", err)
+			}
+			sm, err := stacks.NewManager(global.Client, wd, project.Name)
+			if err != nil {
+				return fmt.Errorf("failed to create stack manager: %w", err)
+			}
+
+			provider, err := newProvider(ctx, ec, sm)
 			if err != nil {
 				return err
 			}

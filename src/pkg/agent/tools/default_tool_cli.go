@@ -28,8 +28,8 @@ type StackConfig struct {
 
 type DefaultToolCLI struct{}
 
-func (DefaultToolCLI) CanIUseProvider(ctx context.Context, fabric *client.GrpcClient, projectName, stackName string, provider client.Provider, serviceCount int) error {
-	return client.CanIUseProvider(ctx, fabric, provider, projectName, stackName, serviceCount)
+func (DefaultToolCLI) CanIUseProvider(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, projectName string, serviceCount int) error {
+	return client.CanIUseProvider(ctx, fabric, provider, projectName, serviceCount)
 }
 
 func (DefaultToolCLI) ConfigSet(ctx context.Context, projectName string, provider client.Provider, name, value string) error {

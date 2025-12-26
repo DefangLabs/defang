@@ -1,0 +1,2 @@
+DEFANG_PROVIDER=aws
+AWS_REGION=us-west-2
