@@ -1234,6 +1234,14 @@ func configureLoader(cmd *cobra.Command) *compose.Loader {
 		panic(err)
 	}
 
+	if slash := strings.Index(projectName, "/"); slash != -1 {
+		// Compose project names cannot have slashes; use the part after the slash as the "stack" name
+		stackName := projectName[slash+1:]
+		term.Debugf("Setting DEFANG_SUFFIX=%q", stackName)
+		os.Setenv("DEFANG_SUFFIX", stackName)
+		projectName = projectName[:slash]
+	}
+
 	// Avoid common mistakes
 	var prov client.ProviderID
 	if prov.Set(projectName) == nil && !cmd.Flag("provider").Changed {

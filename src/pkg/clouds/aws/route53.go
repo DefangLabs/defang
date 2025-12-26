@@ -62,6 +62,47 @@ func GetDelegationSetByZone(ctx context.Context, zoneId *string, r53 Route53API)
 	return resp.DelegationSet, nil
 }
 
+func ListReusableDelegationSets(ctx context.Context, r53 Route53API) ([]types.DelegationSet, error) {
+	var delegationSets []types.DelegationSet
+	var nextMarker *string
+	for {
+		params := &route53.ListReusableDelegationSetsInput{
+			Marker: nextMarker,
+		}
+		resp, err := r53.ListReusableDelegationSets(ctx, params)
+		if err != nil {
+			return nil, err
+		}
+		delegationSets = append(delegationSets, resp.DelegationSets...)
+		if !resp.IsTruncated {
+			break
+		}
+		nextMarker = resp.NextMarker
+	}
+	return delegationSets, nil
+}
+
+func ListHostedZonesByDelegationSet(ctx context.Context, delegationSetId *string, r53 Route53API) ([]types.HostedZone, error) {
+	var hostedZones []types.HostedZone
+	var nextMarker *string
+	for {
+		params := &route53.ListHostedZonesInput{
+			DelegationSetId: delegationSetId,
+			Marker:          nextMarker,
+		}
+		resp, err := r53.ListHostedZones(ctx, params)
+		if err != nil {
+			return nil, err
+		}
+		hostedZones = append(hostedZones, resp.HostedZones...)
+		if !resp.IsTruncated {
+			break
+		}
+		nextMarker = resp.NextMarker
+	}
+	return hostedZones, nil
+}
+
 func GetHostedZonesByName(ctx context.Context, domain string, r53 Route53API) ([]*types.HostedZone, error) {
 	var nextHostedZoneId *string
 	var zones []*types.HostedZone
