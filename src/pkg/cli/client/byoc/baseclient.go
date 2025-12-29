@@ -295,7 +295,7 @@ func (b *ByocBaseClient) GetStackNameForDomain() string {
 	// excluded from the delegate subdomain. Now that stacks are explicit,
 	// and we want them to appear in the delegate, we need to preserve
 	// backwards compatibility with stacks named "beta". This backwards-
-	// compatibility is implemented here by retruning a Stack name of "" in
+	// compatibility is implemented here by returning a Stack name of "" in
 	// place of "beta", so that Fabric will treat these stacks as if there
 	// was no explicit stack.
 	if b.PulumiStack == stacks.DefaultBeta {
