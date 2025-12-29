@@ -6,7 +6,9 @@ logName="projects/test-project/logs/docker-logs"
 ) AND (
 (
   resource.type="cloud_run_revision"
+  labels."defang-stack" = "beta"
 ) OR (
   resource.type="gce_instance"
+  labels."defang-stack" = "beta"
 )
 )

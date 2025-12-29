@@ -14,6 +14,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/spinner"
@@ -207,7 +208,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 		Etag:     options.Deployment,
 		LogType:  uint32(options.LogType),
 		Pattern:  options.Filter,
-		Project:  projectName,
+		Project:  compose.NormalizeProjectName(projectName), // Matching the FixupServices behavior
 		Services: options.Services,
 		Since:    sinceTs, // this is also used to continue from the last timestamp
 		Until:    untilTs,
