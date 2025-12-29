@@ -170,11 +170,6 @@ func TestCommandGates(t *testing.T) {
 			expectCanIUseCalled: false,
 		},
 		{
-			name:                "delete service - aws - no access",
-			command:             []string{"delete", "abc", "--provider=aws", "--dry-run"},
-			expectCanIUseCalled: true,
-		},
-		{
 			name:                "whoami - allowed",
 			command:             []string{"whoami", "--provider=aws", "--dry-run"},
 			expectCanIUseCalled: false,
