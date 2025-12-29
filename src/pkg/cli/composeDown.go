@@ -18,54 +18,72 @@ import (
 func ComposeDown(ctx context.Context, projectName string, fabric client.FabricClient, provider client.Provider, names ...string) (types.ETag, error) {
 	term.Debugf("Destroying project %q %q", projectName, names)
 
-	if dryrun.DoDryRun {
-		return "", dryrun.ErrDryRun
-	}
-
-	if len(names) == 0 {
-		accountInfo, err := provider.AccountInfo(ctx)
-		if err != nil {
-			return "", err
-		}
-
-		// If no names are provided, destroy the entire project
-		etag, err := provider.Destroy(ctx, &defangv1.DestroyRequest{Project: projectName})
-		if err != nil {
-			return "", err
-		}
-
-		err = fabric.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
-			Deployment: &defangv1.Deployment{
-				Action:            defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN,
-				Id:                etag,
-				Project:           projectName,
-				Provider:          accountInfo.Provider.Value(),
-				ProviderAccountId: accountInfo.AccountID,
-				ProviderString:    string(accountInfo.Provider),
-				Region:            accountInfo.Region,
-				Timestamp:         timestamppb.New(time.Now()),
-			},
-		})
-
-		if err != nil {
-			term.Debug("PutDeployment failed:", err)
-		}
-
-		return etag, nil
-	}
-
-	delegateDomain, err := fabric.GetDelegateSubdomainZone(ctx, &defangv1.GetDelegateSubdomainZoneRequest{}) // TODO: pass projectName
-	if err != nil {
-		term.Debug("GetDelegateSubdomainZone failed:", err)
-		return "", errors.New("failed to get delegate domain")
-	}
-
-	resp, err := provider.Delete(ctx, &defangv1.DeleteRequest{Project: projectName, Names: names, DelegateDomain: delegateDomain.Zone})
+	accountInfo, err := provider.AccountInfo(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	return resp.Etag, nil
+	if dryrun.DoDryRun {
+		return "", dryrun.ErrDryRun
+	}
+
+	var etag types.ETag
+	var action defangv1.DeploymentAction
+	if len(names) == 0 {
+		// If no names are provided, destroy the entire project
+		action = defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN
+
+		etag, err = provider.Destroy(ctx, &defangv1.DestroyRequest{Project: projectName})
+		if err != nil {
+			return "", err
+		}
+
+		err = fabric.DeleteSubdomainZone(ctx, &defangv1.DeleteSubdomainZoneRequest{
+			Project: projectName,
+			Stack:   provider.GetStackNameForDomain(),
+		})
+		if err != nil {
+			term.Debug("DeleteSubdomainZone failed:", err)
+		}
+	} else {
+		// If names are provided, treat it as a delete = partial update
+		action = defangv1.DeploymentAction_DEPLOYMENT_ACTION_UP
+
+		delegateDomain, err := fabric.GetDelegateSubdomainZone(ctx, &defangv1.GetDelegateSubdomainZoneRequest{
+			Project: projectName,
+			Stack:   provider.GetStackNameForDomain(),
+		})
+		if err != nil {
+			term.Debug("GetDelegateSubdomainZone failed:", err)
+			return "", errors.New("failed to get delegate domain")
+		}
+
+		resp, err := provider.Delete(ctx, &defangv1.DeleteRequest{Project: projectName, Names: names, DelegateDomain: delegateDomain.Zone})
+		if err != nil {
+			return "", err
+		}
+		etag = resp.Etag
+	}
+
+	err = fabric.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
+		Deployment: &defangv1.Deployment{
+			Action:            action,
+			Id:                etag,
+			Project:           projectName,
+			Provider:          accountInfo.Provider.Value(),
+			ProviderAccountId: accountInfo.AccountID,
+			ProviderString:    string(accountInfo.Provider),
+			Region:            accountInfo.Region,
+			Stack:             provider.GetStackName(),
+			Timestamp:         timestamppb.New(time.Now()),
+		},
+	})
+	if err != nil {
+		term.Debug("PutDeployment failed:", err)
+		term.Warn("Unable to update deployment history, but deployment will proceed anyway.")
+	}
+
+	return etag, nil
 }
 
 var ErrDoNotComposeDown = errors.New("user did not want to compose down")

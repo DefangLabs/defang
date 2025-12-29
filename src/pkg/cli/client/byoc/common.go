@@ -107,5 +107,5 @@ func DebugPulumiGolang(ctx context.Context, env []string, cmd ...string) error {
 }
 
 func GetPrivateDomain(projectName string) string {
-	return dns.SafeLabel(projectName) + ".internal"
+	return dns.SafeLabel(projectName) + ".internal" // FIXME: should contain stack and/or tenant names
 }

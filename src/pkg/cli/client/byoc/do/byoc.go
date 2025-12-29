@@ -662,7 +662,7 @@ func (b *ByocDo) environment(projectName, delegateDomain string, mode defangv1.D
 		{Key: "DEFANG_PULUMI_DIFF", Value: os.Getenv("DEFANG_PULUMI_DIFF")},
 		{Key: "DEFANG_STATE_URL", Value: defangStateUrl},
 		{Key: "DIGITALOCEAN_TOKEN", Value: os.Getenv("DIGITALOCEAN_TOKEN"), Type: godo.AppVariableType_Secret},
-		{Key: "DOMAIN", Value: b.GetProjectDomain(projectName, delegateDomain)},
+		{Key: "DOMAIN", Value: delegateDomain},
 		{Key: "NODE_NO_WARNINGS", Value: "1"},
 		{Key: "NPM_CONFIG_UPDATE_NOTIFIER", Value: "false"},
 		{Key: "PRIVATE_DOMAIN", Value: byoc.GetPrivateDomain(projectName)},

@@ -55,6 +55,8 @@ type Provider interface {
 	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 	GetService(context.Context, *defangv1.GetRequest) (*defangv1.ServiceInfo, error)
 	GetServices(context.Context, *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error)
+	GetStackName() string
+	GetStackNameForDomain() string
 	ListConfig(context.Context, *defangv1.ListConfigsRequest) (*defangv1.Secrets, error)
 	PrepareDomainDelegation(context.Context, PrepareDomainDelegationRequest) (*PrepareDomainDelegationResponse, error)
 	Preview(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)

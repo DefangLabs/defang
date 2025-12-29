@@ -403,7 +403,7 @@ func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 	}
 	r53Client := route53.NewFromConfig(cfg)
 
-	projectDomain := b.GetProjectDomain(req.Project, req.DelegateDomain)
+	projectDomain := req.DelegateDomain
 	nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, req.Project, b.PulumiStack, r53Client, dns.ResolverAt)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
@@ -514,7 +514,7 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn,
 		env["DELEGATION_SET_ID"] = cmd.delegationSetId
 	}
 	if cmd.delegateDomain != "" {
-		env["DOMAIN"] = b.GetProjectDomain(cmd.project, cmd.delegateDomain)
+		env["DOMAIN"] = cmd.delegateDomain
 	} else {
 		env["DOMAIN"] = "dummy.domain"
 	}

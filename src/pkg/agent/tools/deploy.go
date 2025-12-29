@@ -70,7 +70,6 @@ func HandleDeployTool(ctx context.Context, loader client.ProjectLoader, params D
 		Project:    project,
 		UploadMode: compose.UploadModeDigest,
 		Mode:       modes.ModeAffordable,
-		Stack:      config.Stack.Name,
 	})
 	if err != nil {
 		err = fmt.Errorf("failed to compose up services: %w", err)

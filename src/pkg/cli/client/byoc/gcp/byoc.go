@@ -379,7 +379,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 	}
 
 	if cmd.delegateDomain != "" {
-		env["DOMAIN"] = b.GetProjectDomain(cmd.project, cmd.delegateDomain)
+		env["DOMAIN"] = cmd.delegateDomain
 	} else {
 		env["DOMAIN"] = "dummy.domain"
 	}
@@ -535,10 +535,6 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 		etag = execution // Only wait for the preview command cd job to finish
 	}
 	return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, nil
-}
-
-func (b *ByocGcp) GetStackName() string {
-	return b.PulumiStack
 }
 
 func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
@@ -731,7 +727,7 @@ func (b *ByocGcp) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 
 func (b *ByocGcp) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
 	for _, name := range req.Names {
-		secretId := b.StackName(req.Project, name)
+		secretId := b.resourceName(req.Project, name)
 		term.Debugf("Deleting secret %q", secretId)
 		if err := b.driver.DeleteSecret(ctx, secretId); err != nil {
 			return fmt.Errorf("failed to delete secret %q: %w", secretId, err)
@@ -741,7 +737,7 @@ func (b *ByocGcp) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error
 }
 
 func (b *ByocGcp) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
-	prefix := b.StackName(req.Project, "")
+	prefix := b.resourceName(req.Project, "")
 	secrets, err := b.driver.ListSecrets(ctx, prefix)
 	if err != nil {
 		if stat, ok := status.FromError(err); ok && stat.Code() == codes.PermissionDenied {
@@ -763,7 +759,7 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 	if !pkg.IsValidSecretName(req.Name) {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid config name; must be alphanumeric or _, cannot start with a number: %q", req.Name))
 	}
-	secretId := b.StackName(req.Project, req.Name)
+	secretId := b.resourceName(req.Project, req.Name)
 	term.Debugf("Creating secret %q", secretId)
 
 	if _, err := b.driver.CreateSecret(ctx, secretId); err != nil {
@@ -975,7 +971,7 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 	return &projUpdate, nil
 }
 
-func (b *ByocGcp) StackName(projectName, name string) string {
+func (b *ByocGcp) resourceName(projectName, name string) string {
 	pkg.Ensure(projectName != "", "ProjectName not set")
 	var parts []string
 	if b.Prefix != "" {

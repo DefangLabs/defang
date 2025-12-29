@@ -140,7 +140,6 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			deploy, project, err := cli.ComposeUp(ctx, global.Client, provider, cli.ComposeUpParams{
-				Stack:      global.Stack.Name,
 				Project:    project,
 				UploadMode: upload,
 				Mode:       global.Stack.Mode,
@@ -232,7 +231,7 @@ func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accou
 		return err
 	}
 	if global.Stack.Name == "" {
-		stackName := "beta"
+		const stackName = stacks.DefaultBeta
 		_, err := stacks.Create(stacks.StackParameters{
 			Name:     stackName,
 			Provider: accountInfo.Provider,
@@ -569,7 +568,6 @@ func makeComposeConfigCmd() *cobra.Command {
 				Project:    project,
 				UploadMode: compose.UploadModeIgnore,
 				Mode:       modes.ModeUnspecified,
-				Stack:      global.Stack.Name,
 			})
 			if !errors.Is(err, dryrun.ErrDryRun) {
 				return err
