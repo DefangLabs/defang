@@ -8,7 +8,7 @@ import (
 
 func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Tool {
 	return []ai.Tool{
-		ai.NewTool[ServicesParams, string](
+		ai.NewTool(
 			"services",
 			"List deployed services for the project in the current working directory",
 			func(ctx *ai.ToolContext, params ServicesParams) (string, error) {

@@ -170,7 +170,6 @@ var cdPreviewCmd = &cobra.Command{
 			Mode:       global.Stack.Mode,
 			Project:    project,
 			UploadMode: compose.UploadModePreview,
-			Stack:      global.Stack.Name,
 		})
 	},
 }

@@ -28,7 +28,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/github"
 	"github.com/DefangLabs/defang/src/pkg/login"
-	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
 	"github.com/DefangLabs/defang/src/pkg/modes"
@@ -312,12 +311,6 @@ func SetupCommands(version string) {
 	// Logs Command
 	logsCmd := makeLogsCmd()
 	RootCmd.AddCommand(logsCmd)
-
-	// Delete Command
-	deleteCmd.Flags().BoolP("name", "n", false, "name of the service(s) (backwards compat)")
-	_ = deleteCmd.Flags().MarkHidden("name")
-	deleteCmd.Flags().Bool("tail", false, "tail the service logs after deleting")
-	RootCmd.AddCommand(deleteCmd)
 
 	// Deployments Command
 	deploymentsCmd.AddCommand(deploymentsListCmd)
@@ -1021,64 +1014,6 @@ var debugCmd = &cobra.Command{
 			Until:          untilTs.UTC(),
 		}
 		return debugger.DebugDeployment(ctx, debugConfig)
-	},
-}
-
-var deleteCmd = &cobra.Command{
-	Use:         "delete SERVICE...",
-	Annotations: authNeededAnnotation,
-	Args:        cobra.MinimumNArgs(1),
-	Aliases:     []string{"del", "rm", "remove"},
-	Hidden:      true,
-	Short:       "Delete a service from the cluster",
-	Deprecated:  "use 'compose down' instead",
-	RunE: func(cmd *cobra.Command, names []string) error {
-		var tail, _ = cmd.Flags().GetBool("tail")
-
-		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
-		if err != nil {
-			return err
-		}
-
-		projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
-		if err != nil {
-			return err
-		}
-
-		err = canIUseProvider(cmd.Context(), provider, projectName, 0)
-		if err != nil {
-			return err
-		}
-
-		since := time.Now()
-		deployment, err := cli.Delete(cmd.Context(), projectName, global.Client, provider, names...)
-		if err != nil {
-			if connect.CodeOf(err) == connect.CodeNotFound {
-				// Show a warning (not an error) if the service was not found
-				term.Warn(client.PrettyError(err))
-				return nil
-			}
-			return err
-		}
-
-		term.Info("Deleted service", names, "with deployment ID", deployment)
-
-		if !tail {
-			printDefangHint("To track the update, do:", "tail --deployment "+deployment)
-			return nil
-		}
-
-		term.Info("Tailing logs for update; press Ctrl+C to detach:")
-
-		tailOptions := cli.TailOptions{
-			Deployment: deployment,
-			LogType:    logs.LogTypeAll,
-			Since:      since,
-			Verbose:    global.Verbose,
-		}
-		tailCtx := cmd.Context() // FIXME: stop Tail when the deployment is done
-		return cli.TailAndWaitForCD(tailCtx, provider, projectName, tailOptions)
 	},
 }
 

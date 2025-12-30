@@ -115,8 +115,8 @@ func (g *PlaygroundProvider) BootstrapList(context.Context, bool) (iter.Seq[stri
 	return nil, errors.New("this command is not valid for the Defang playground; did you forget --provider?")
 }
 
-func (g PlaygroundProvider) ServicePrivateDNS(name string) string {
-	return string(g.GetTenantName()) + "-" + name
+func (g *PlaygroundProvider) ServicePrivateDNS(name string) string {
+	return dns.SafeLabel(string(g.GetTenantName()) + "-" + name)
 }
 
 func (g *PlaygroundProvider) UpdateShardDomain(ctx context.Context) error {
@@ -124,15 +124,15 @@ func (g *PlaygroundProvider) UpdateShardDomain(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	g.shardDomain = resp.GetDomain()
+	g.shardDomain = resp.Domain
 	return nil
 }
 
-func (g PlaygroundProvider) ServicePublicDNS(name string, projectName string) string {
-	return dns.SafeLabel(string(g.GetTenantName())) + "-" + dns.SafeLabel(name) + "." + g.shardDomain
+func (g *PlaygroundProvider) ServicePublicDNS(name string, projectName string) string {
+	return g.ServicePrivateDNS(name) + "." + g.shardDomain
 }
 
-func (g PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, error) {
+func (g *PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, error) {
 	// Hack: Use GetServices to get the current project name
 	resp, err := g.GetServices(ctx, &defangv1.GetServicesRequest{})
 	if err != nil {
@@ -162,3 +162,11 @@ func (g *PlaygroundProvider) PrepareDomainDelegation(ctx context.Context, req Pr
 }
 
 func (g *PlaygroundProvider) SetCanIUseConfig(*defangv1.CanIUseResponse) {}
+
+func (PlaygroundProvider) GetStackNameForDomain() string {
+	return ""
+}
+
+func (PlaygroundProvider) GetStackName() string {
+	return ""
+}
