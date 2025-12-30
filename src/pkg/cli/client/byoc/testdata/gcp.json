@@ -1,0 +1,62 @@
+{
+  "version": 3,
+  "checkpoint": {
+    "stack": "organization/unit-test/gcp",
+    "latest": {
+      "manifest": {
+        "time": "2025-12-30T18:34:28.726005408Z",
+        "magic": "54dc5bb47acab16c24a18b0b5a24e17779a9b86d212894c66dc41705a478c7bf",
+        "version": "v3.185.0"
+      },
+      "secrets_providers": {
+        "type": "passphrase",
+        "state": {
+          "salt": "v1:0QtQv7VHs+g=:v1:nOpe530753APKzZm:MbzHpkxg4N/q6XcxtaDVNFjJxsZZLw=="
+        }
+      },
+      "resources": [
+        {
+          "urn": "urn:pulumi:gcp::unit-test::pulumi:pulumi:Stack::unit-test-gcp",
+          "custom": false,
+          "type": "pulumi:pulumi:Stack",
+          "outputs": {
+            "ALB public IP": "34.160.48.138",
+            "app domain": "app--8080.gcp.unit-test-gcp.t1234567.defang.app",
+            "app-cloudrun-uri": "https://defang-unit-test-gcp-app-f5fddb3-o67xwa3cfq-uc.a.run.app",
+            "lbCerts": {
+              "4dabf18193072939515e22adb298388d": "5cf8f73096256a8f31e491e813e4eb8e",
+              "id": "projects/edw-test-samples-3/locations/global/certificateMaps/defang-unit-test-gcp-lb-cert-map-fdcdd93",
+              "packageVersion": "",
+              "urn": "urn:pulumi:gcp::unit-test::gcp:certificatemanager/certificateMap:CertificateMap::defang-unit-test-gcp-lb-cert-map"
+            },
+            "wildcardCert": "projects/edw-test-samples-3/locations/global/certificates/defang-unit-test-gcp-gcp-unit-test-gcp-edward3lxjkb-309ddef"
+          },
+          "created": "2025-12-02T20:35:08.21402982Z",
+          "modified": "2025-12-02T20:35:08.21402982Z"
+        },
+        {
+          "urn": "urn:pulumi:gcp::unit-test::pulumi:providers:gcp::default_9_2_0",
+          "custom": true,
+          "id": "85b10337-7012-4a20-84b1-a507cdfecae5",
+          "type": "pulumi:providers:gcp",
+          "inputs": {
+            "__internal": {},
+            "defaultLabels": "{\"defang-org\":\"t1234567\",\"defang-project\":\"unit-test\",\"defang-stack\":\"gcp\",\"defang-version\":\"development\"}",
+            "project": "edw-test-samples-3",
+            "region": "us-central1",
+            "version": "9.2.0"
+          },
+          "outputs": {
+            "defaultLabels": "{\"defang-org\":\"t1234567\",\"defang-project\":\"unit-test\",\"defang-stack\":\"gcp\",\"defang-version\":\"development\"}",
+            "project": "edw-test-samples-3",
+            "region": "us-central1",
+            "version": "9.2.0"
+          },
+          "created": "2025-12-02T20:35:12.155982814Z",
+          "modified": "2025-12-29T21:35:51.5591769Z"
+        }
+      ],
+      "metadata": {}
+    }
+  }
+}
