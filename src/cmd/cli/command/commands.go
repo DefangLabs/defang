@@ -700,12 +700,15 @@ var initCmd = &cobra.Command{
 			Cluster:  global.Cluster,
 		}
 
+		var result setup.SetupResult
+		var err error
 		if len(args) > 0 {
-			_, err := setupClient.CloneSample(ctx, args[0])
-			return err
+			result, err = setupClient.CloneSample(ctx, args[0])
+		} else if from, ok := cmd.Flag("from").Value.(*migrate.SourcePlatform); ok && *from == migrate.SourcePlatformHeroku {
+			result, err = setupClient.MigrateFromHeroku(ctx)
+		} else {
+			result, err = setupClient.Start(ctx)
 		}
-
-		result, err := setupClient.Start(ctx)
 		if err != nil {
 			return err
 		}
