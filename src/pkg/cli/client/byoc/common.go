@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
@@ -104,8 +103,4 @@ func DebugPulumiGolang(ctx context.Context, env []string, cmd ...string) error {
 	}
 	// We always return an error to stop the CLI from "tailing" the cloud logs
 	return ErrLocalPulumiStopped
-}
-
-func GetPrivateDomain(projectName string) string {
-	return dns.SafeLabel(projectName) + ".internal" // FIXME: should contain stack and/or tenant names
 }

@@ -471,7 +471,7 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 		"DEFANG_STATE_URL":           defangStateUrl,
 		"NODE_NO_WARNINGS":           "1",
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
-		"PRIVATE_DOMAIN":             byoc.GetPrivateDomain(projectName),
+		"PRIVATE_DOMAIN":             b.GetPrivateDomain(projectName),
 		"PROJECT":                    projectName,        // may be empty
 		pulumiBackendKey:             pulumiBackendValue, // TODO: make secret
 		"PULUMI_AUTOMATION_API_SKIP_VERSION_CHECK":      "true",
@@ -1005,4 +1005,8 @@ func (b *ByocAws) AddEcsEventHandler(handler ECSEventHandler) {
 	b.handlersLock.Lock()
 	defer b.handlersLock.Unlock()
 	b.ecsEventHandlers = append(b.ecsEventHandlers, handler)
+}
+
+func (b *ByocAws) GetPrivateDomain(projectName string) string {
+	return b.GetProjectLabel(projectName) + ".internal"
 }

@@ -29,6 +29,7 @@ func (mp ErrMultipleProjects) Error() string {
 type ProjectBackend interface {
 	BootstrapList(context.Context, bool) (iter.Seq[string], error)
 	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
+	GetPrivateDomain(projectName string) string
 }
 
 type ServiceInfoUpdater interface {
@@ -77,8 +78,15 @@ func (b *ByocBaseClient) SetCanIUseConfig(quotas *defangv1.CanIUseResponse) {
 	b.CanIUseConfig.PulumiVersion = quotas.PulumiVersion
 }
 
-func (b *ByocBaseClient) ServicePrivateDNS(name string) string {
-	return dns.SafeLabel(name) // TODO: consider merging this with getPrivateFqdn
+// getServiceLabel returns a DNS-safe label for the given service
+func getServiceLabel(serviceName string) string {
+	// Technically DNS names can have underscores, but these are reserved for SRV records and some systems have issues with them.
+	return dns.SafeLabel(strings.ReplaceAll(serviceName, "_", "-"))
+}
+
+func (b *ByocBaseClient) ServicePrivateDNS(serviceName string) string {
+	// Private services can be accessed by just using the (sanitized) service name
+	return getServiceLabel(serviceName)
 }
 
 func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) {
@@ -197,23 +205,22 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 
 	hasHost := false
 	hasIngress := false
-	label := strings.ReplaceAll(service.Name, "_", "-")
 	if _, ok := service.Extensions["x-defang-static-files"]; !ok {
 		for _, port := range service.Ports {
 			hasIngress = hasIngress || port.Mode == compose.Mode_INGRESS
 			hasHost = hasHost || port.Mode == compose.Mode_HOST
-			si.Endpoints = append(si.Endpoints, b.GetEndpoint(label, projectName, delegateDomain, &port))
+			si.Endpoints = append(si.Endpoints, b.GetEndpoint(service.Name, projectName, delegateDomain, &port))
 		}
 	} else {
-		si.PublicFqdn = b.GetPublicFqdn(projectName, delegateDomain, label)
+		si.PublicFqdn = b.GetPublicFqdn(projectName, delegateDomain, service.Name)
 		si.Endpoints = append(si.Endpoints, si.PublicFqdn)
 	}
 	if hasIngress {
 		// si.LbIps = b.PrivateLbIps // only set LB IPs if there are ingress ports // FIXME: double check this is not being used at all
-		si.PublicFqdn = b.GetPublicFqdn(projectName, delegateDomain, label)
+		si.PublicFqdn = b.GetPublicFqdn(projectName, delegateDomain, service.Name)
 	}
 	if hasHost { // TODO: this should be network based instead of host vs ingress
-		si.PrivateFqdn = b.GetPrivateFqdn(projectName, label)
+		si.PrivateFqdn = b.GetPrivateFqdn(projectName, service.Name)
 	}
 
 	si.Status = "UPDATE_QUEUED"
@@ -243,17 +250,15 @@ func (b *ByocBaseClient) StackDir(projectName, name string) string {
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocBaseClient) GetEndpoint(label string, projectName, delegateDomain string, port *composeTypes.ServicePortConfig) string {
+func (b *ByocBaseClient) GetEndpoint(serviceName string, projectName, delegateDomain string, port *composeTypes.ServicePortConfig) string {
 	if port.Mode == compose.Mode_HOST {
-		privateFqdn := b.GetPrivateFqdn(projectName, label)
+		privateFqdn := b.GetPrivateFqdn(projectName, serviceName)
 		return fmt.Sprintf("%s:%d", privateFqdn, port.Target)
 	}
-	projectDomain := delegateDomain
-	if projectDomain == "" {
+	if projectName == "" {
 		return ":443" // placeholder for the public ALB/distribution
 	}
-	safeFqn := dns.SafeLabel(label)
-	return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, projectDomain)
+	return fmt.Sprintf("%s--%d.%s", getServiceLabel(serviceName), port.Target, delegateDomain) // delegateDomain already contains project/stack
 }
 
 func (*ByocBaseClient) UpdateShardDomain(ctx context.Context) error {
@@ -262,18 +267,16 @@ func (*ByocBaseClient) UpdateShardDomain(ctx context.Context) error {
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocBaseClient) GetPublicFqdn(projectName, delegateDomain, label string) string {
+func (b *ByocBaseClient) GetPublicFqdn(projectName, delegateDomain, serviceName string) string {
 	if projectName == "" {
-		return "" //b.fqdn
+		return ""
 	}
-	safeFqn := dns.SafeLabel(label)
-	return fmt.Sprintf("%s.%s", safeFqn, delegateDomain)
+	return fmt.Sprintf("%s.%s", getServiceLabel(serviceName), delegateDomain) // delegateDomain already contains project/stack
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocBaseClient) GetPrivateFqdn(projectName string, label string) string {
-	safeLabel := dns.SafeLabel(label)
-	return fmt.Sprintf("%s.%s", safeLabel, GetPrivateDomain(projectName)) // TODO: consider merging this with ServicePrivateDNS
+func (b *ByocBaseClient) GetPrivateFqdn(projectName string, serviceName string) string {
+	return fmt.Sprintf("%s.%s", b.ServicePrivateDNS(serviceName), b.projectBackend.GetPrivateDomain(projectName))
 }
 
 func (b *ByocBaseClient) GetProjectUpdatePath(projectName string) string {
@@ -282,16 +285,15 @@ func (b *ByocBaseClient) GetProjectUpdatePath(projectName string) string {
 	return fmt.Sprintf("projects/%s/%s/project.pb", projectName, b.PulumiStack)
 }
 
-func (b *ByocBaseClient) ServicePublicDNS(name string, projectName string) string {
-	if suffix := b.GetStackNameForDomain(); suffix != "" {
-		projectName = projectName + "-" + suffix
-	}
-	return dns.SafeLabel(name) + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(string(b.TenantLabel)) + ".defang.app"
+func (b *ByocBaseClient) ServicePublicDNS(serviceName string, projectName string) string {
+	tenantLabel := dns.SafeLabel(string(b.TenantLabel))
+	// TODO: this should use the delegate domain we got from Fabric
+	return fmt.Sprintf("%s.%s.%s.defang.app", getServiceLabel(serviceName), b.GetProjectLabel(projectName), tenantLabel)
 }
 
 func (b *ByocBaseClient) GetStackNameForDomain() string {
 	// Projects which were deployed before stacks were introduced, were
-	// deployed with the implicit stack name "beta", but this stack name was
+	// deployed with the implicit stack name "beta", but this stack name was``
 	// excluded from the delegate subdomain. Now that stacks are explicit,
 	// and we want them to appear in the delegate, we need to preserve
 	// backwards compatibility with stacks named "beta". This backwards-
@@ -306,4 +308,12 @@ func (b *ByocBaseClient) GetStackNameForDomain() string {
 
 func (b *ByocBaseClient) GetStackName() string {
 	return b.PulumiStack
+}
+
+// GetProjectLabel returns the DNS-safe project label, including stack (if applicable)
+func (b *ByocBaseClient) GetProjectLabel(projectName string) string {
+	if stack := b.GetStackNameForDomain(); stack != "" {
+		projectName = projectName + "-" + stack
+	}
+	return dns.SafeLabel(projectName)
 }

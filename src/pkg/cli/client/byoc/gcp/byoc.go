@@ -979,3 +979,8 @@ func (b *ByocGcp) resourceName(projectName, name string) string {
 	}
 	return strings.Join(append(parts, projectName, b.PulumiStack, name), "_") // same as fullDefangResourceName in gcpcd/up.go
 }
+
+func (*ByocGcp) GetPrivateDomain(projectName string) string {
+	// Apparently GCP does not support private DNS zones with arbitrary domain names
+	return "google.internal"
+}
