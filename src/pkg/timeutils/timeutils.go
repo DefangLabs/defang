@@ -1,6 +1,7 @@
 package timeutils
 
 import (
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,6 +32,17 @@ func ParseTimeOrDuration(str string, now time.Time) (time.Time, error) {
 	}
 	dur, err := time.ParseDuration(str)
 	if err != nil {
+		// try as unix millis or seconds
+		if unix, parseErr := strconv.ParseFloat(str, 64); parseErr == nil && unix < 1e13 {
+			// Float64 has 53 bits of precision, which means up to ~1e16 is lossless,
+			// but unix timestamps in nanoseconds is ~1e19 which exceeds that.
+			// This is why we stick to milliseconds precision in the float64,
+			// but convert to nanoseconds after conversion to int64.
+			if unix < 1e10 {
+				unix *= 1e3 // convert seconds to milliseconds
+			}
+			return time.Unix(0, int64(unix)*1e6), nil
+		}
 		return time.Time{}, err
 	}
 	return now.Add(-dur), nil // - because we want to go back in time
