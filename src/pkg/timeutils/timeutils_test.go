@@ -18,6 +18,9 @@ func TestParseTimeOrDuration(t *testing.T) {
 		{"2024-02-01T00:00:00.500Z", time.Date(2024, 2, 1, 0, 0, 0, 5e8, time.UTC)},
 		{"2024-03-01T00:00:00+07:00", time.Date(2024, 3, 1, 0, 0, 0, 0, time.FixedZone("", 7*60*60))},
 		{"00:01:02.040", time.Date(now.Year(), now.Month(), now.Day(), 0, 1, 2, 4e7, now.Location())}, // this test will fail if it's run at midnight UTC :(
+		{"1767075448030", time.UnixMilli(1767075448030)},
+		{"1767075448", time.Unix(1767075448, 0)},
+		{"1767075448.03", time.Unix(1767075448, 30000000)},
 	}
 	for _, tt := range tdt {
 		t.Run(tt.td, func(t *testing.T) {
