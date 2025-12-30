@@ -25,7 +25,10 @@ type StackParameters struct {
 
 var validStackName = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
 
-const Directory = ".defang"
+const (
+	DefaultBeta = "beta"
+	Directory   = ".defang"
+)
 
 func MakeDefaultName(providerId client.ProviderID, region string) string {
 	compressedRegion := strings.ReplaceAll(region, "-", "")

@@ -18,8 +18,8 @@ type FabricClient interface {
 	AgreeToS(context.Context) error
 	CanIUse(context.Context, *defangv1.CanIUseRequest) (*defangv1.CanIUseResponse, error)
 	CheckLoginAndToS(context.Context) error
+	CreateDelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
 	Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error)
-	DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
 	DeleteSubdomainZone(context.Context, *defangv1.DeleteSubdomainZoneRequest) error
 	Estimate(context.Context, *defangv1.EstimateRequest) (*defangv1.EstimateResponse, error)
 	GenerateCompose(context.Context, *defangv1.GenerateComposeRequest) (*defangv1.GenerateComposeResponse, error)

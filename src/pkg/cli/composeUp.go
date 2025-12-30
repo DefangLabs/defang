@@ -22,7 +22,6 @@ func (e ComposeError) Unwrap() error {
 }
 
 type ComposeUpParams struct {
-	Stack      string
 	Project    *compose.Project
 	UploadMode compose.UploadMode
 	Mode       modes.Mode
@@ -87,11 +86,10 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		return nil, project, dryrun.ErrDryRun
 	}
 
-	req := &defangv1.GetDelegateSubdomainZoneRequest{
+	delegateDomain, err := fabric.GetDelegateSubdomainZone(ctx, &defangv1.GetDelegateSubdomainZoneRequest{
 		Project: project.Name,
-		Stack:   params.Stack,
-	}
-	delegateDomain, err := fabric.GetDelegateSubdomainZone(ctx, req)
+		Stack:   provider.GetStackNameForDomain(),
+	})
 	if err != nil {
 		term.Debug("GetDelegateSubdomainZone failed:", err)
 		return nil, project, errors.New("failed to get delegate domain")
@@ -133,9 +131,9 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 			req := &defangv1.DelegateSubdomainZoneRequest{
 				NameServerRecords: delegation.NameServers,
 				Project:           project.Name,
-				Stack:             params.Stack,
+				Stack:             provider.GetStackNameForDomain(),
 			}
-			_, err = fabric.DelegateSubdomainZone(ctx, req)
+			_, err = fabric.CreateDelegateSubdomainZone(ctx, req)
 			if err != nil {
 				return nil, project, err
 			}
@@ -158,7 +156,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 			ProviderString:    string(accountInfo.Provider),
 			Region:            accountInfo.Region,
 			ServiceCount:      int32(len(fixedProject.Services)), // #nosec G115 - service count will not overflow int32
-			Stack:             params.Stack,
+			Stack:             provider.GetStackName(),
 			Timestamp:         timestamppb.Now(),
 			Mode:              mode.Value(),
 		},

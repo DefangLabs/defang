@@ -403,7 +403,7 @@ func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 	}
 	r53Client := route53.NewFromConfig(cfg)
 
-	projectDomain := b.GetProjectDomain(req.Project, req.DelegateDomain)
+	projectDomain := req.DelegateDomain
 	nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, req.Project, b.PulumiStack, r53Client, dns.ResolverAt)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
@@ -471,7 +471,7 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 		"DEFANG_STATE_URL":           defangStateUrl,
 		"NODE_NO_WARNINGS":           "1",
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
-		"PRIVATE_DOMAIN":             byoc.GetPrivateDomain(projectName),
+		"PRIVATE_DOMAIN":             b.GetPrivateDomain(projectName),
 		"PROJECT":                    projectName,        // may be empty
 		pulumiBackendKey:             pulumiBackendValue, // TODO: make secret
 		"PULUMI_AUTOMATION_API_SKIP_VERSION_CHECK":      "true",
@@ -514,7 +514,7 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn,
 		env["DELEGATION_SET_ID"] = cmd.delegationSetId
 	}
 	if cmd.delegateDomain != "" {
-		env["DOMAIN"] = b.GetProjectDomain(cmd.project, cmd.delegateDomain)
+		env["DOMAIN"] = cmd.delegateDomain
 	} else {
 		env["DOMAIN"] = "dummy.domain"
 	}
@@ -1005,4 +1005,8 @@ func (b *ByocAws) AddEcsEventHandler(handler ECSEventHandler) {
 	b.handlersLock.Lock()
 	defer b.handlersLock.Unlock()
 	b.ecsEventHandlers = append(b.ecsEventHandlers, handler)
+}
+
+func (b *ByocAws) GetPrivateDomain(projectName string) string {
+	return b.GetProjectLabel(projectName) + ".internal"
 }

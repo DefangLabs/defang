@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/route53/types"
 )
 
-func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, stack string, r53Client aws.Route53API, resolverAt func(string) dns.Resolver) (nsServers []string, delegationSetId string, err error) {
+func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, stackName string, r53Client aws.Route53API, resolverAt func(string) dns.Resolver) (nsServers []string, delegationSetId string, err error) {
 	// There's four cases to consider:
 	//  1. The subdomain zone does not exist: we create/get a delegation set and get its NS records and let CD/Pulumi create the hosted zone
 	//  2. The subdomain zone exists:
@@ -30,7 +30,7 @@ func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, st
 		term.Debugf("Zone %q not found, delegation set will be created", projectDomain)
 	} else {
 		// Case 2: Get the NS records for the existing subdomain zone
-		delegationSet, err = getOrCreateDelegationSetByZones(ctx, zones, projectName, stack, r53Client)
+		delegationSet, err = getOrCreateDelegationSetByZones(ctx, zones, projectName, stackName, r53Client)
 		if err != nil {
 			return nil, "", err
 		}
@@ -145,7 +145,7 @@ func nameServersHasConflict(ctx context.Context, nameServers []string, domains [
 	return false, nil
 }
 
-func getOrCreateDelegationSetByZones(ctx context.Context, zones []*types.HostedZone, projectName, stack string, r53Client aws.Route53API) (*types.DelegationSet, error) {
+func getOrCreateDelegationSetByZones(ctx context.Context, zones []*types.HostedZone, projectName, stackName string, r53Client aws.Route53API) (*types.DelegationSet, error) {
 	for _, zone := range zones {
 		projectDomain := dns.Normalize(*zone.Name)
 
@@ -154,7 +154,7 @@ func getOrCreateDelegationSetByZones(ctx context.Context, zones []*types.HostedZ
 			return nil, err // TODO: we should not fail deployment if GetHostedZoneTags fails
 		}
 		// Ignore zones that were created by an older CLI (2a), or another way (2c) or belong to a different project/stack (2d)
-		if tags["defang:project"] != projectName || tags["defang:stack"] != stack {
+		if tags["defang:project"] != projectName || tags["defang:stack"] != stackName {
 			term.Debugf("ignored zone %q as it belongs to a different project/stack (%q/%q), skipping", projectDomain, tags["defang:project"], tags["defang:stack"])
 			continue
 		}
