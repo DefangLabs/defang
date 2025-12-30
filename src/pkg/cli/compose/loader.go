@@ -92,7 +92,7 @@ func (l *Loader) LoadProject(ctx context.Context) (*Project, error) {
 }
 
 func (l *Loader) OutsideWorkingDirectory() bool {
-	// if --project-name is provider, we assume we are outside the project's working directory
+	// if --project-name is provided, we assume we are outside the project's working directory
 	return l.options.ProjectName != ""
 }
 
