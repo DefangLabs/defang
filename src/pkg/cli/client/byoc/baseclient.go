@@ -293,7 +293,7 @@ func (b *ByocBaseClient) ServicePublicDNS(serviceName string, projectName string
 
 func (b *ByocBaseClient) GetStackNameForDomain() string {
 	// Projects which were deployed before stacks were introduced, were
-	// deployed with the implicit stack name "beta", but this stack name was``
+	// deployed with the implicit stack name "beta", but this stack name was
 	// excluded from the delegate subdomain. Now that stacks are explicit,
 	// and we want them to appear in the delegate, we need to preserve
 	// backwards compatibility with stacks named "beta". This backwards-
