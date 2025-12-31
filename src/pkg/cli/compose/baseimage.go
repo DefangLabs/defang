@@ -6,6 +6,7 @@ import (
 	"os"
 	"slices"
 
+	"github.com/DefangLabs/defang/src/pkg/term"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
@@ -22,6 +23,10 @@ func FindAllBaseImages(project *composeTypes.Project) ([]string, error) {
 			dockerfileFullPath := service.Build.Context + string(os.PathSeparator) + dockerfilePath
 			images, err := extractDockerfileBaseImages(dockerfileFullPath)
 			if err != nil {
+				if os.IsNotExist(err) {
+					term.Errorf("dockerfile %s does not exist for service %s", dockerfileFullPath, service.Name)
+					continue
+				}
 				return nil, err
 			}
 			for _, img := range images {

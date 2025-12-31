@@ -7,5 +7,5 @@ services:
       dockerfile: Dockerfile
   mutiple-images:
     build:
-      context: multiple_images
+      context: mutiple_images
       dockerfile: Dockerfile

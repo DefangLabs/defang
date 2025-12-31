@@ -1,0 +1,23 @@
+name: base-image
+services:
+  mutiple-images:
+    build:
+      context: ./mutiple_images
+      dockerfile: Dockerfile
+    networks:
+      default: null
+  no-dockerfile:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      default: null
+  one-image:
+    build:
+      context: ./one_image
+      dockerfile: Dockerfile
+    networks:
+      default: null
+networks:
+  default:
+    name: base-image_default

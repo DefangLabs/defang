@@ -1,0 +1,35 @@
+{
+  "mutiple-images": {
+    "build": {
+      "context": "./mutiple_images",
+      "dockerfile": "Dockerfile"
+    },
+    "command": null,
+    "entrypoint": null,
+    "networks": {
+      "default": null
+    }
+  },
+  "no-dockerfile": {
+    "build": {
+      "context": ".",
+      "dockerfile": "*Railpack"
+    },
+    "command": null,
+    "entrypoint": null,
+    "networks": {
+      "default": null
+    }
+  },
+  "one-image": {
+    "build": {
+      "context": "./one_image",
+      "dockerfile": "Dockerfile"
+    },
+    "command": null,
+    "entrypoint": null,
+    "networks": {
+      "default": null
+    }
+  }
+}
