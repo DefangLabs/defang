@@ -2,7 +2,7 @@
   "bun": {
     "build": {
       "context": "./app",
-      "dockerfile": "*Railpack"
+      "dockerfile": "Dockerfile"
     },
     "command": null,
     "entrypoint": null,

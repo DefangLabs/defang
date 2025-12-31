@@ -1,2 +1,2 @@
 FROM alpine:latest
-RUN echo "some other line"
+RUN echo "alpine:latest, single image"
