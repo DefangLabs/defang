@@ -3,6 +3,7 @@ package compose
 import (
 	"fmt"
 	"maps"
+	"filepath"
 	"os"
 	"slices"
 
@@ -20,11 +21,11 @@ func FindAllBaseImages(project *composeTypes.Project) ([]string, error) {
 			if dockerfilePath == "" {
 				dockerfilePath = "Dockerfile"
 			}
-			dockerfileFullPath := service.Build.Context + string(os.PathSeparator) + dockerfilePath
+			dockerfileFullPath := filepath.Join(service.Build.Context, dockerfilePath)
 			images, err := extractDockerfileBaseImages(dockerfileFullPath)
 			if err != nil {
 				if os.IsNotExist(err) {
-					term.Debugf("dockerfile %s does not exist for service %s", dockerfileFullPath, service.Name)
+					term.Debugf("service %q: dockerfile %q does not exist; skipping", service.Name, dockerfileFullPath)
 					continue
 				}
 				return nil, err
