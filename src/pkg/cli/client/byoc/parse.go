@@ -25,7 +25,7 @@ type PulumiState struct {
 }
 
 func (ps PulumiState) String() string {
-	var pending string
+	var org, pending string
 	if len(ps.Pending) != 0 {
 		pending = " (pending"
 		for _, p := range ps.Pending {
@@ -33,7 +33,10 @@ func (ps PulumiState) String() string {
 		}
 		pending += ")"
 	}
-	return fmt.Sprintf("%s/%s {%s}%s", ps.Project, ps.Name, ps.DefangOrg, pending)
+	if ps.DefangOrg != "" {
+		org = " {" + string(ps.DefangOrg) + "}"
+	}
+	return fmt.Sprintf("%s/%s%s%s", ps.Project, ps.Name, org, pending)
 }
 
 func ParsePulumiStateFile(ctx context.Context, obj BucketObj, bucket string, objLoader func(ctx context.Context, bucket, object string) ([]byte, error)) (*PulumiState, error) {
