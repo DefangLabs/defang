@@ -1,11 +1,11 @@
 package compose
 
 import (
-	"fmt"
-	"maps"
-	"filepath"
-	"os"
-	"slices"
+"filepath"
+"fmt"
+"maps"
+"os"
+"slices"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
