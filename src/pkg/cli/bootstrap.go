@@ -11,9 +11,11 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func BootstrapCommand(ctx context.Context, projectName string, verbose bool, provider client.Provider, cmd string) error {
+func BootstrapCommand(ctx context.Context, projectName string, verbose bool, provider client.Provider, cmd string, fabric client.FabricClient) error {
 	if projectName == "" { // projectName is empty for "list --remote"
 		term.Infof("Running CD command %q", cmd)
 	} else {
@@ -27,6 +29,38 @@ func BootstrapCommand(ctx context.Context, projectName string, verbose bool, pro
 	etag, err := provider.BootstrapCommand(ctx, client.BootstrapCommandRequest{Project: projectName, Command: cmd})
 	if err != nil || etag == "" {
 		return err
+	}
+
+	if cmd == "down" || cmd == "destroy" {
+		err = fabric.DeleteSubdomainZone(ctx, &defangv1.DeleteSubdomainZoneRequest{
+			Project: projectName,
+			Stack:   provider.GetStackNameForDomain(),
+		})
+		if err != nil {
+			term.Warn("DeleteSubdomainZone failed:", err)
+		} else {
+			// If DeleteSubdomainZone succeeded, we're in the right workspace to mark the deployment as destroyed
+			accountInfo, err := provider.AccountInfo(ctx)
+			if err == nil {
+				err = fabric.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
+					Deployment: &defangv1.Deployment{
+						Action:            defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN,
+						Id:                etag,
+						Project:           projectName,
+						Provider:          accountInfo.Provider.Value(),
+						ProviderAccountId: accountInfo.AccountID,
+						ProviderString:    string(accountInfo.Provider),
+						Region:            accountInfo.Region,
+						Stack:             provider.GetStackName(),
+						Timestamp:         timestamppb.New(time.Now()),
+					},
+				})
+			}
+			if err != nil {
+				term.Debug("PutDeployment failed:", err)
+				term.Warn("Unable to update deployment history, but deployment will proceed anyway.")
+			}
+		}
 	}
 
 	options := TailOptions{
