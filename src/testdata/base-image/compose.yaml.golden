@@ -2,7 +2,7 @@ name: base-image
 services:
   mutiple-images:
     build:
-      context: ./mutiple_images
+      context: ./multiple-images
       dockerfile: Dockerfile
     networks:
       default: null
