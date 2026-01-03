@@ -33,7 +33,7 @@ var cdCmd = &cobra.Command{
 	},
 }
 
-func bootstrapCommand(cmd *cobra.Command, args []string, command string) error {
+func bootstrapCommand(cmd *cobra.Command, args []string, command string, fabric client.FabricClient) error {
 	ctx := cmd.Context()
 	loader := configureLoader(cmd)
 	provider, err := newProviderChecked(ctx, loader)
@@ -55,7 +55,7 @@ func bootstrapCommand(cmd *cobra.Command, args []string, command string) error {
 		if err != nil {
 			return err
 		}
-		errs = append(errs, cli.BootstrapCommand(ctx, projectName, global.Verbose, provider, command))
+		errs = append(errs, cli.BootstrapCommand(ctx, projectName, global.Verbose, provider, command, fabric))
 	}
 	return errors.Join(errs...)
 }
@@ -65,7 +65,7 @@ var cdDestroyCmd = &cobra.Command{
 	Annotations: authNeededAnnotation, // need subscription
 	Short:       "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return bootstrapCommand(cmd, args, "destroy")
+		return bootstrapCommand(cmd, args, "destroy", global.Client)
 	},
 }
 
@@ -74,7 +74,7 @@ var cdDownCmd = &cobra.Command{
 	Annotations: authNeededAnnotation, // need subscription
 	Short:       "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return bootstrapCommand(cmd, args, "down")
+		return bootstrapCommand(cmd, args, "down", global.Client)
 	},
 }
 
@@ -83,7 +83,7 @@ var cdRefreshCmd = &cobra.Command{
 	Annotations: authNeededAnnotation, // need subscription
 	Short:       "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return bootstrapCommand(cmd, args, "refresh")
+		return bootstrapCommand(cmd, args, "refresh", global.Client)
 	},
 }
 
@@ -92,7 +92,7 @@ var cdCancelCmd = &cobra.Command{
 	Annotations: authNeededAnnotation, // need subscription
 	Short:       "Cancel the current CD operation",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return bootstrapCommand(cmd, args, "cancel")
+		return bootstrapCommand(cmd, args, "cancel", global.Client)
 	},
 }
 
@@ -138,7 +138,7 @@ var cdListCmd = &cobra.Command{
 			}
 
 			// FIXME: this needs auth because it spawns the CD task
-			return cli.BootstrapCommand(cmd.Context(), "", global.Verbose, provider, "list")
+			return cli.BootstrapCommand(cmd.Context(), "", global.Verbose, provider, "list", global.Client)
 		}
 		return cli.BootstrapLocalList(cmd.Context(), provider, all)
 	},
