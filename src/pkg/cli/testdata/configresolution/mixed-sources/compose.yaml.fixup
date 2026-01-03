@@ -1,0 +1,15 @@
+{
+  "service1": {
+    "command": null,
+    "entrypoint": null,
+    "environment": {
+      "PLAIN_VAR": "plain_value",
+      "PUBLIC_URL": "https://example.com",
+      "SECRET_KEY": "${SECRET_KEY}"
+    },
+    "image": "nginx",
+    "networks": {
+      "default": null
+    }
+  }
+}

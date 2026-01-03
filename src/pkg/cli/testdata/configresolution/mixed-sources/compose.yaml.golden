@@ -1,0 +1,6 @@
+[1mENVIRONMENT VARIABLES RESOLUTION SUMMARY:[0m
+[1m
+SERVICE   NAME        VALUE                SOURCE[0m
+service1  PLAIN_VAR   plain_value          compose_file   
+service1  PUBLIC_URL  https://example.com  compose_file   
+service1  SECRET_KEY  *****                defang_config  
