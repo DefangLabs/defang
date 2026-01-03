@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
@@ -21,6 +22,61 @@ type StackParameters struct {
 	AWSProfile   string
 	GCPProjectID string
 	Mode         modes.Mode
+}
+
+func (params StackParameters) ToMap() map[string]string {
+	var properties map[string]string = make(map[string]string)
+	properties["DEFANG_PROVIDER"] = strings.ToLower(params.Provider.String())
+	if params.Region != "" {
+		var regionVarName string
+		switch params.Provider {
+		case client.ProviderAWS:
+			regionVarName = "AWS_REGION"
+		case client.ProviderGCP:
+			regionVarName = "GCP_LOCATION"
+		}
+		if regionVarName != "" {
+			properties[regionVarName] = strings.ToLower(params.Region)
+		}
+	}
+	if params.Mode != modes.ModeUnspecified {
+		properties["DEFANG_MODE"] = strings.ToLower(params.Mode.String())
+	}
+
+	if params.Provider == client.ProviderAWS && params.AWSProfile != "" {
+		properties["AWS_PROFILE"] = params.AWSProfile
+	}
+	if params.Provider == client.ProviderGCP && params.GCPProjectID != "" {
+		properties["GCP_PROJECT_ID"] = params.GCPProjectID
+	}
+	return properties
+}
+
+func ParamsFromMap(properties map[string]string) (StackParameters, error) {
+	var params StackParameters
+	for key, value := range properties {
+		switch key {
+		case "DEFANG_PROVIDER":
+			if err := params.Provider.Set(value); err != nil {
+				return params, err
+			}
+		case "AWS_REGION":
+			params.Region = value
+		case "GCP_LOCATION":
+			params.Region = value
+		case "AWS_PROFILE":
+			params.AWSProfile = value
+		case "GCP_PROJECT_ID":
+			params.GCPProjectID = value
+		case "DEFANG_MODE":
+			mode, err := modes.Parse(value)
+			if err != nil {
+				return params, err
+			}
+			params.Mode = mode
+		}
+	}
+	return params, nil
 }
 
 var validStackName = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
@@ -93,6 +149,7 @@ type StackListItem struct {
 	Provider     string
 	Region       string
 	Mode         string
+	DeployedAt   time.Time
 }
 
 func List() ([]StackListItem, error) {
@@ -140,58 +197,12 @@ func Parse(content string) (StackParameters, error) {
 	if err != nil {
 		return StackParameters{}, err
 	}
-	var params StackParameters
-	for key, value := range properties {
-		switch key {
-		case "DEFANG_PROVIDER":
-			if err := params.Provider.Set(value); err != nil {
-				return params, err
-			}
-		case "AWS_REGION":
-			params.Region = value
-		case "GCP_LOCATION":
-			params.Region = value
-		case "AWS_PROFILE":
-			params.AWSProfile = value
-		case "GCP_PROJECT_ID":
-			params.GCPProjectID = value
-		case "DEFANG_MODE":
-			mode, err := modes.Parse(value)
-			if err != nil {
-				return params, err
-			}
-			params.Mode = mode
-		}
-	}
-	return params, nil
+
+	return ParamsFromMap(properties)
 }
 
 func Marshal(params *StackParameters) (string, error) {
-	var properties map[string]string = make(map[string]string)
-	properties["DEFANG_PROVIDER"] = strings.ToLower(params.Provider.String())
-	if params.Region != "" {
-		var regionVarName string
-		switch params.Provider {
-		case client.ProviderAWS:
-			regionVarName = "AWS_REGION"
-		case client.ProviderGCP:
-			regionVarName = "GCP_LOCATION"
-		}
-		if regionVarName != "" {
-			properties[regionVarName] = strings.ToLower(params.Region)
-		}
-	}
-	if params.Mode != modes.ModeUnspecified {
-		properties["DEFANG_MODE"] = strings.ToLower(params.Mode.String())
-	}
-
-	if params.Provider == client.ProviderAWS && params.AWSProfile != "" {
-		properties["AWS_PROFILE"] = params.AWSProfile
-	}
-	if params.Provider == client.ProviderGCP && params.GCPProjectID != "" {
-		properties["GCP_PROJECT_ID"] = params.GCPProjectID
-	}
-	return godotenv.Marshal(properties)
+	return godotenv.Marshal(params.ToMap())
 }
 
 func Remove(name string) error {
@@ -250,6 +261,28 @@ func OverloadInDirectory(workingDirectory, name string) error {
 	}
 
 	term.Debugf("loaded globals from %s", path)
+	return nil
+}
+
+// This was basically ripped out of godotenv.Overload/Load. Unfortunately, they don't export
+// a function that loads a map[string]string, so we have to reimplement it here.
+func LoadParameters(params map[string]string, overload bool) error {
+	currentEnv := map[string]bool{}
+	rawEnv := os.Environ()
+	for _, rawEnvLine := range rawEnv {
+		key := strings.Split(rawEnvLine, "=")[0]
+		currentEnv[key] = true
+	}
+
+	for key, value := range params {
+		if !currentEnv[key] || overload {
+			err := os.Setenv(key, value)
+			if err != nil {
+				return fmt.Errorf("could not set env var %q: %w", key, err)
+			}
+		}
+	}
+
 	return nil
 }
 

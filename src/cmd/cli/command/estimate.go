@@ -3,10 +3,12 @@ package command
 import (
 	"fmt"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/spf13/cobra"
 )
 
@@ -27,13 +29,14 @@ func makeEstimateCmd() *cobra.Command {
 			}
 
 			if global.Stack.Provider == client.ProviderAuto {
-				_, err = interactiveSelectProvider([]client.ProviderID{
+				providerID, err := interactiveSelectProvider([]client.ProviderID{
 					client.ProviderAWS,
 					client.ProviderGCP,
 				})
 				if err != nil {
 					return fmt.Errorf("failed to select provider: %w", err)
 				}
+				global.Stack.Provider = providerID
 			}
 
 			var previewProvider client.Provider = &client.PlaygroundProvider{FabricClient: global.Client}
@@ -61,4 +64,41 @@ func makeEstimateCmd() *cobra.Command {
 	estimateCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	estimateCmd.Flags().StringVarP(&global.Stack.Region, "region", "r", "", "which cloud region to estimate")
 	return estimateCmd
+}
+
+func interactiveSelectProvider(providers []client.ProviderID) (client.ProviderID, error) {
+	if len(providers) < 2 {
+		panic("interactiveSelectProvider called with less than 2 providers")
+	}
+	// Prompt the user to choose a provider if in interactive mode
+	options := []string{}
+	for _, p := range providers {
+		options = append(options, p.String())
+	}
+	// Default to the provider in the environment if available
+	var defaultOption any // not string!
+	if awsInEnv() {
+		defaultOption = client.ProviderAWS.String()
+	} else if gcpInEnv() {
+		defaultOption = client.ProviderGCP.String()
+	}
+	var optionValue string
+	if err := survey.AskOne(&survey.Select{
+		Default: defaultOption,
+		Message: "Choose a cloud provider:",
+		Options: options,
+		Help:    "The provider you choose will be used for deploying services.",
+		Description: func(value string, i int) string {
+			return providerDescription[client.ProviderID(value)]
+		},
+	}, &optionValue, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
+		return "", fmt.Errorf("failed to select provider: %w", err)
+	}
+	track.Evt("ProviderSelected", P("provider", optionValue))
+	var providerID client.ProviderID
+	err := providerID.Set(optionValue)
+	if err != nil {
+		return "", err
+	}
+	return providerID, nil
 }

@@ -6,13 +6,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
-	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
-
-type ProjectLoader interface {
-	LoadProjectName(context.Context) (string, error)
-	LoadProject(context.Context) (*composeTypes.Project, error)
-}
 
 type FabricClient interface {
 	AgreeToS(context.Context) error
