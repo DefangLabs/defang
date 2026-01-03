@@ -31,8 +31,24 @@ pkgs/npm/README.md src/README.md: README.md
 .PHONY: test-nix
 test-nix:
 ifneq (,$(shell which nix))
-	nix run .#defang-cli --extra-experimental-features flakes --extra-experimental-features nix-command
+	+$(MAKE) nix-run; \
+	if [ $$? -ne 0 ]; then \
+		$(MAKE) update-nix-vendor-hash; \
+	fi
 endif
+
+.PHONY: update-nix-vendor-hash
+update-nix-vendor-hash:
+	sed -i.bak -E 's|(vendorHash = "sha256-)[A-Za-z0-9+/=]+(")|\10AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\2|' pkgs/defang/cli.nix
+	$(MAKE) nix-run 2>&1 | grep -o 'sha256-[A-Za-z0-9+/=]\+' | tail -n1 | xargs -I {} sed -i.bak -E 's|(vendorHash = ")[^"]+(")|vendorHash = "{}"|' pkgs/defang/cli.nix
+	rm pkgs/defang/cli.nix.bak
+	git add pkgs/defang/cli.nix
+	@echo cli.nix vendorHash has been updated; commit and push
+	@false
+
+.PHONY: nix-run
+nix-run:
+	nix run .#defang-cli --extra-experimental-features flakes --extra-experimental-features nix-command
 
 .PHONY: clean distclean
 clean distclean:
