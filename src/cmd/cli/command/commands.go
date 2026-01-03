@@ -245,8 +245,10 @@ func SetupCommands(version string) {
 	// Generate Command
 	generateCmd.Flags().StringVar(&global.ModelID, "model", global.ModelID, "LLM model to use for generating the code (Pro users only)")
 	RootCmd.AddCommand(generateCmd)
-	// new command
-	initCmd.PersistentFlags().Var(&global.SourcePlatform, "from", fmt.Sprintf(`the platform from which to migrate the project; one of %v`, migrate.AllSourcePlatforms))
+
+	// Init command
+	sourcePlatform := migrate.SourcePlatformUnspecified
+	initCmd.PersistentFlags().Var(&sourcePlatform, "from", fmt.Sprintf(`the platform from which to migrate the project; one of %v`, migrate.AllSourcePlatforms))
 	RootCmd.AddCommand(initCmd)
 
 	// Get Services Command
@@ -658,7 +660,6 @@ var generateCmd = &cobra.Command{
 
 		setupClient := setup.SetupClient{
 			Surveyor: surveyor.NewDefaultSurveyor(),
-			Heroku:   migrate.NewHerokuClient(),
 			ModelID:  global.ModelID,
 			Fabric:   global.Client,
 			Cluster:  global.Cluster,
@@ -694,18 +695,20 @@ var initCmd = &cobra.Command{
 
 		setupClient := setup.SetupClient{
 			Surveyor: surveyor.NewDefaultSurveyor(),
-			Heroku:   migrate.NewHerokuClient(),
 			ModelID:  global.ModelID,
 			Fabric:   global.Client,
 			Cluster:  global.Cluster,
 		}
 
+		var result setup.SetupResult
+		var err error
 		if len(args) > 0 {
-			_, err := setupClient.CloneSample(ctx, args[0])
-			return err
+			result, err = setupClient.CloneSample(ctx, args[0])
+		} else if from, ok := cmd.Flag("from").Value.(*migrate.SourcePlatform); ok && *from == migrate.SourcePlatformHeroku {
+			result, err = setupClient.MigrateFromHeroku(ctx)
+		} else {
+			result, err = setupClient.Start(ctx)
 		}
-
-		result, err := setupClient.Start(ctx)
 		if err != nil {
 			return err
 		}

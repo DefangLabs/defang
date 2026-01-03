@@ -23,7 +23,6 @@ var P = track.P
 
 type SetupClient struct {
 	Surveyor *surveyor.DefaultSurveyor
-	Heroku   *migrate.HerokuClient
 	ModelID  string
 	Fabric   *client.GrpcClient
 	Cluster  string
@@ -232,7 +231,8 @@ func (s *SetupClient) MigrateFromHeroku(ctx context.Context) (SetupResult, error
 	}
 
 	term.Info("Ok, let's create a compose file for your existing deployment.")
-	composeFileContents, err := migrate.InteractiveSetup(ctx, s.Fabric, s.Surveyor, s.Heroku, "heroku")
+	heroku := migrate.NewHerokuClient()
+	composeFileContents, err := migrate.InteractiveSetup(ctx, s.Fabric, s.Surveyor, heroku, migrate.SourcePlatformHeroku)
 	if err != nil {
 		return SetupResult{}, err
 	}
