@@ -1,0 +1,20 @@
+{
+  "version": 3,
+  "checkpoint": {
+    "stack": "organization/gcptest/beta",
+    "latest": {
+      "manifest": {
+        "time": "2025-02-14T15:21:40.22455072Z",
+        "magic": "0cfd49ecb2b79ab5c815533dd5e24026f83295ad05c68df3861ea07ea846919a",
+        "version": "v3.150.0"
+      },
+      "secrets_providers": {
+        "type": "passphrase",
+        "state": {
+          "salt": "v1:P4aDG/kd7mQ=:v1:iM3321D7KolXb2Vm:OcOBo3t0TOOV4+YGEoPzYQ0Z/WMrJg=="
+        }
+      },
+      "metadata": {}
+    }
+  }
+}

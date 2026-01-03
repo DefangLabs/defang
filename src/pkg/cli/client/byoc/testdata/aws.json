@@ -1,0 +1,100 @@
+{
+  "version": 3,
+  "checkpoint": {
+    "stack": "organization/unit-test/beta",
+    "latest": {
+      "manifest": {
+        "time": "2025-11-14T19:29:41.431348571Z",
+        "magic": "ebe3b71ffbd5a95eec1b5cb82516892f944b47f36c5b1ed4f716a76cb5fce31a",
+        "version": "v3.187.0"
+      },
+      "secrets_providers": {
+        "type": "passphrase",
+        "state": {
+          "salt": "v1:xnONJLrleCY=:v1:3hF0KWStpJ3Af3H1:RBxtQgxO8GY9vfTVyNc3+pjCadogEA=="
+        }
+      },
+      "resources": [
+        {
+          "urn": "urn:pulumi:beta::unit-test::pulumi:pulumi:Stack::unit-test-beta",
+          "custom": false,
+          "type": "pulumi:pulumi:Stack",
+          "outputs": {
+            "albArn": "arn:aws:elasticloadbalancing:us-east-1:407839483216:loadbalancer/app/defang-unit-test-beta-alb/5b7bab4afde72318",
+            "fqdn": "unit-test.defang.defang.app",
+            "kanikoLogGroupArn": "arn:aws:logs:us-east-1:407839483216:log-group:/Defang/unit-test/beta/builds",
+            "privateLbCIDRs": ["10.0.32.0/20", "10.0.160.0/20", "10.0.96.0/20"],
+            "publicNatIps": ["52.73.13.92"],
+            "serviceLogGroupArn": "arn:aws:logs:us-east-1:407839483216:log-group:/Defang/unit-test/beta/logs",
+            "state": "projects/unit-test/beta/project.pb",
+            "vpcId": "vpc-0ca6515692184669c"
+          },
+          "created": "2024-08-28T23:23:57.977166686Z",
+          "modified": "2024-08-28T23:23:57.977166686Z"
+        },
+        {
+          "urn": "urn:pulumi:beta::unit-test::pulumi:providers:aws::default_6_57_0",
+          "custom": true,
+          "id": "08e6a947-d40a-4bec-8f2a-c2f07f5de744",
+          "type": "pulumi:providers:aws",
+          "inputs": {
+            "__internal": {},
+            "defaultTags": "{\"tags\":{\"defang:org\":\"defang\",\"defang:project\":\"unit-test\",\"defang:stack\":\"beta\",\"defang:version\":\"0.6.0-1168-ga1fab310\"}}",
+            "region": "us-east-1",
+            "skipCredentialsValidation": "false",
+            "skipRegionValidation": "true",
+            "version": "6.57.0"
+          },
+          "outputs": {
+            "defaultTags": "{\"tags\":{\"defang:org\":\"defang\",\"defang:project\":\"unit-test\",\"defang:stack\":\"beta\",\"defang:version\":\"0.6.0-1168-ga1fab310\"}}",
+            "region": "us-east-1",
+            "skipCredentialsValidation": "false",
+            "skipRegionValidation": "true",
+            "version": "6.57.0"
+          },
+          "created": "2025-01-07T17:45:18.63300098Z",
+          "modified": "2025-11-14T19:21:02.933443892Z"
+        },
+        {
+          "urn": "urn:pulumi:beta::unit-test::pulumi:providers:pulumi-nodejs::default",
+          "custom": true,
+          "id": "42e741f3-8049-4bfc-bb13-60feffbc3a62",
+          "type": "pulumi:providers:pulumi-nodejs",
+          "inputs": {
+            "aws:defaultTags": "{\"tags\":{\"defang:org\":\"defang\",\"defang:project\":\"unit-test\",\"defang:stack\":\"beta\",\"defang:version\":\"0.6.0-1168-ga1fab310\"}}",
+            "aws:region": "us-east-1",
+            "unit-test:allowManaged": "true",
+            "unit-test:createApexDnsRecord": "true",
+            "unit-test:deploymentMode": "staging",
+            "unit-test:domain": "unit-test.defang.defang.app",
+            "unit-test:kanikoBuildRepo": "unit-test/kaniko-build",
+            "unit-test:org": "defang",
+            "unit-test:prefix": "Defang",
+            "unit-test:privateDomain": "unit-test.internal",
+            "unit-test:serviceDomain": "unit-test.defang.defang.app",
+            "unit-test:skipLoki": "true",
+            "unit-test:skipNetworkAcl": "true"
+          },
+          "outputs": {
+            "aws:defaultTags": "{\"tags\":{\"defang:org\":\"defang\",\"defang:project\":\"unit-test\",\"defang:stack\":\"beta\",\"defang:version\":\"0.6.0-1168-ga1fab310\"}}",
+            "aws:region": "us-east-1",
+            "unit-test:allowManaged": "true",
+            "unit-test:createApexDnsRecord": "true",
+            "unit-test:deploymentMode": "staging",
+            "unit-test:domain": "unit-test.defang.defang.app",
+            "unit-test:kanikoBuildRepo": "unit-test/kaniko-build",
+            "unit-test:org": "defang",
+            "unit-test:prefix": "Defang",
+            "unit-test:privateDomain": "unit-test.internal",
+            "unit-test:serviceDomain": "unit-test.defang.defang.app",
+            "unit-test:skipLoki": "true",
+            "unit-test:skipNetworkAcl": "true"
+          },
+          "created": "2024-08-28T23:26:38.477022211Z",
+          "modified": "2025-11-14T19:21:26.203903716Z"
+        }
+      ],
+      "metadata": {}
+    }
+  }
+}

@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"io"
+	"path"
 	"strings"
 	"testing"
 
@@ -15,11 +16,14 @@ type mockS3Client struct {
 	S3Client
 }
 
-func (mockS3Client) GetObject(context.Context, *s3.GetObjectInput, ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+func (mockS3Client) GetObject(ctx context.Context, oi *s3.GetObjectInput, opt ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+	dirs := strings.Split(*oi.Key, "/")
+	project, stack := dirs[len(dirs)-2], strings.TrimSuffix(dirs[len(dirs)-1], ".json")
 	return &s3.GetObjectOutput{
 		Body: io.NopCloser(strings.NewReader(`{
 	"version": 3,
 	"checkpoint": {
+		"stack": "` + path.Join("organization", project, stack) + `",
 		"latest": {
 			"resources": [{}]
 		}

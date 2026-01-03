@@ -286,13 +286,13 @@ func (b *ByocGcp) BootstrapList(ctx context.Context, _allRegions bool) (iter.Seq
 				term.Debugf("Error listing object in bucket %s: %v", bucketName, annotateGcpError(err))
 				continue
 			}
-			stack, err := byoc.ParsePulumiStackObject(ctx, gcpObj{obj}, bucketName, prefix, objLoader)
+			stack, err := byoc.ParsePulumiStateFile(ctx, gcpObj{obj}, bucketName, objLoader)
 			if err != nil {
 				term.Debugf("Skipping %q in bucket %s: %v", obj.Name, bucketName, annotateGcpError(err))
 				continue
 			}
-			if stack != "" {
-				if !yield(stack) {
+			if stack != nil {
+				if !yield(stack.String()) {
 					break
 				}
 			}
