@@ -166,7 +166,3 @@ func (g *PlaygroundProvider) SetCanIUseConfig(*defangv1.CanIUseResponse) {}
 func (PlaygroundProvider) GetStackNameForDomain() string {
 	return ""
 }
-
-func (PlaygroundProvider) GetStackName() string {
-	return ""
-}

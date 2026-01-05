@@ -310,10 +310,6 @@ func (b *ByocBaseClient) GetStackNameForDomain() string {
 	return b.PulumiStack
 }
 
-func (b *ByocBaseClient) GetStackName() string {
-	return b.PulumiStack
-}
-
 // GetProjectLabel returns the DNS-safe project label, including stack (if applicable)
 func (b *ByocBaseClient) GetProjectLabel(projectName string) string {
 	if stack := b.GetStackNameForDomain(); stack != "" {
