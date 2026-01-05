@@ -66,7 +66,7 @@ func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
 	}
 	localStacks, err := sm.ListLocal()
 	if err != nil {
-		var outsideErr *OutsideError
+		var outsideErr *ErrOutside
 		if !errors.As(err, &outsideErr) {
 			return nil, fmt.Errorf("failed to list local stacks: %w", err)
 		}
@@ -118,7 +118,7 @@ func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
 
 func (sm *manager) ListLocal() ([]StackListItem, error) {
 	if sm.outside {
-		return nil, &OutsideError{TargetDirectory: sm.targetDirectory}
+		return nil, &ErrOutside{TargetDirectory: sm.targetDirectory}
 	}
 	return ListInDirectory(sm.targetDirectory)
 }
@@ -168,18 +168,18 @@ func (sm *manager) ListRemote(ctx context.Context) ([]RemoteStack, error) {
 	return stackParams, nil
 }
 
-type OutsideError struct {
+type ErrOutside struct {
 	TargetDirectory string
 }
 
-func (e *OutsideError) Error() string {
+func (e *ErrOutside) Error() string {
 	cwd, _ := os.Getwd()
 	return fmt.Sprintf("operation not allowed: target directory (%s) is different from working directory (%s)", e.TargetDirectory, cwd)
 }
 
 func (sm *manager) Load(name string) (*StackParameters, error) {
 	if sm.outside {
-		return nil, &OutsideError{TargetDirectory: sm.targetDirectory}
+		return nil, &ErrOutside{TargetDirectory: sm.targetDirectory}
 	}
 	params, err := ReadInDirectory(sm.targetDirectory, name)
 	if err != nil {
@@ -198,7 +198,7 @@ func (sm *manager) LoadParameters(params map[string]string, overload bool) error
 
 func (sm *manager) Create(params StackParameters) (string, error) {
 	if sm.outside {
-		return "", &OutsideError{TargetDirectory: sm.targetDirectory}
+		return "", &ErrOutside{TargetDirectory: sm.targetDirectory}
 	}
 	return CreateInDirectory(sm.targetDirectory, params)
 }

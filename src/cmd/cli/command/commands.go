@@ -1308,7 +1308,7 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 		// try to read the stackfile
 		stack, loadErr := sm.Load(knownStack.Name)
 		if loadErr != nil {
-			var outsideErr *stacks.OutsideError
+			var outsideErr *stacks.ErrOutside
 			if errors.Is(loadErr, os.ErrNotExist) || errors.As(loadErr, &outsideErr) {
 				var importErr error
 				term.Warn("unable to load stack from file, attempting to import from previous deployments", loadErr)
