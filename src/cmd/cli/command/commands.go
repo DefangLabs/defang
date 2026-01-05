@@ -1252,7 +1252,7 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 	}
 
 	// This code unfortunately replicates the provider precedence rules in the
-	// RoomCmd's PersistentPreRunE func, I think we should avoid reading the
+	// RootCmd's PersistentPreRunE func, I think we should avoid reading the
 	// stack file during startup, and only read it here instead.
 	if os.Getenv("DEFANG_STACK") != "" || RootCmd.PersistentFlags().Changed("stack") {
 		whence = "stack file"
