@@ -26,11 +26,10 @@ type DeploymentLister interface {
 }
 
 type manager struct {
-	fabric           DeploymentLister
-	targetDirectory  string
-	projectName      string
-	outside          bool
-	workingDirectory string
+	fabric          DeploymentLister
+	targetDirectory string
+	projectName     string
+	outside         bool
 }
 
 func NewManager(fabric DeploymentLister, targetDirectory string, projectName string) (*manager, error) {
@@ -53,11 +52,10 @@ func NewManager(fabric DeploymentLister, targetDirectory string, projectName str
 		outside = workingDirectory != absTargetDirectory
 	}
 	return &manager{
-		fabric:           fabric,
-		targetDirectory:  absTargetDirectory,
-		projectName:      projectName,
-		outside:          outside,
-		workingDirectory: workingDirectory,
+		fabric:          fabric,
+		targetDirectory: absTargetDirectory,
+		projectName:     projectName,
+		outside:         outside,
 	}, nil
 }
 
@@ -120,7 +118,7 @@ func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
 
 func (sm *manager) ListLocal() ([]StackListItem, error) {
 	if sm.outside {
-		return nil, &OutsideError{TargetDirectory: sm.targetDirectory, WorkingDirectory: sm.workingDirectory}
+		return nil, &OutsideError{TargetDirectory: sm.targetDirectory}
 	}
 	return ListInDirectory(sm.targetDirectory)
 }
@@ -171,17 +169,17 @@ func (sm *manager) ListRemote(ctx context.Context) ([]RemoteStack, error) {
 }
 
 type OutsideError struct {
-	TargetDirectory  string
-	WorkingDirectory string
+	TargetDirectory string
 }
 
 func (e *OutsideError) Error() string {
-	return fmt.Sprintf("operation not allowed: target directory (%s) is different from working directory (%s)", e.TargetDirectory, e.WorkingDirectory)
+	cwd, _ := os.Getwd()
+	return fmt.Sprintf("operation not allowed: target directory (%s) is different from working directory (%s)", e.TargetDirectory, cwd)
 }
 
 func (sm *manager) Load(name string) (*StackParameters, error) {
 	if sm.outside {
-		return nil, &OutsideError{TargetDirectory: sm.targetDirectory, WorkingDirectory: sm.workingDirectory}
+		return nil, &OutsideError{TargetDirectory: sm.targetDirectory}
 	}
 	params, err := ReadInDirectory(sm.targetDirectory, name)
 	if err != nil {
@@ -200,7 +198,7 @@ func (sm *manager) LoadParameters(params map[string]string, overload bool) error
 
 func (sm *manager) Create(params StackParameters) (string, error) {
 	if sm.outside {
-		return "", &OutsideError{TargetDirectory: sm.targetDirectory, WorkingDirectory: sm.workingDirectory}
+		return "", &OutsideError{TargetDirectory: sm.targetDirectory}
 	}
 	return CreateInDirectory(sm.targetDirectory, params)
 }
