@@ -299,8 +299,8 @@ func SetupCommands(version string) {
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
 	debugCmd.Flags().MarkHidden("etag")
 	debugCmd.Flags().String("deployment", "", "deployment ID of the service")
-	debugCmd.Flags().String("since", "", "start time for logs (RFC3339 format)")
-	debugCmd.Flags().String("until", "", "end time for logs (RFC3339 format)")
+	debugCmd.Flags().String("since", "", "start time for logs; duration or timestamp (unix or RFC3339)")
+	debugCmd.Flags().String("until", "", "end time for logs; duration or timestamp (unix or RFC3339)")
 	debugCmd.Flags().StringVar(&global.ModelID, "model", global.ModelID, "LLM model to use for debugging (Pro users only)")
 	RootCmd.AddCommand(debugCmd)
 
