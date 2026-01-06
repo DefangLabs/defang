@@ -1254,7 +1254,7 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 		whence = "stack file"
 		stackName := os.Getenv("DEFANG_STACK")
 		if stackName == "" {
-			stackName = RootCmd.Flags().Lookup("stack").Value.String()
+			stackName, _ = RootCmd.Flags().GetString("stack")
 		}
 		stackParams, err := sm.Load(stackName)
 		if err != nil {
@@ -1278,7 +1278,7 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 	}
 	if RootCmd.PersistentFlags().Changed("provider") {
 		term.Warn("Warning: --provider flag is deprecated. Please use --stack instead. To learn about stacks, visit https://docs.defang.io/docs/concepts/stacks")
-		providerIDString := RootCmd.Flags().Lookup("provider").Value.String()
+		providerIDString := RootCmd.Flag("provider").Value.String()
 		err := stack.Provider.Set(providerIDString)
 		if err != nil {
 			return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
