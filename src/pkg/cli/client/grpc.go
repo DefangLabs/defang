@@ -194,3 +194,7 @@ func (g GrpcClient) Preview(ctx context.Context, req *defangv1.PreviewRequest) (
 func (g GrpcClient) GenerateCompose(ctx context.Context, req *defangv1.GenerateComposeRequest) (*defangv1.GenerateComposeResponse, error) {
 	return getMsg(g.client.GenerateCompose(ctx, connect.NewRequest(req)))
 }
+
+func (g GrpcClient) GetUploadURL(ctx context.Context, req *defangv1.GetUploadURLRequest) (*defangv1.GetUploadURLResponse, error) {
+	return getMsg(g.client.GetUploadURL(ctx, connect.NewRequest(req)))
+}
