@@ -3,6 +3,7 @@ package gcp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"path"
 	"regexp"
@@ -378,6 +379,7 @@ var cdExecutionNamePattern = regexp.MustCompile(`^defang-cd-[a-z0-9]{5}$`)
 
 func getLogEntryParser(ctx context.Context, gcpClient GcpLogsClient) func(entry *loggingpb.LogEntry) ([]*defangv1.TailResponse, error) {
 	envCache := make(map[string]map[string]string)
+	cdStarted := false
 	return func(entry *loggingpb.LogEntry) ([]*defangv1.TailResponse, error) {
 		if entry == nil {
 			return nil, nil
@@ -398,9 +400,12 @@ func getLogEntryParser(ctx context.Context, gcpClient GcpLogsClient) func(entry 
 		}
 
 		var serviceName, etag, host string
+		var buildTags []string
 		serviceName = entry.Labels["defang-service"]
 		executionName := entry.Labels["run.googleapis.com/execution_name"]
-		buildTags := entry.Labels["build_tags"]
+		if entry.Labels["build_tags"] != "" {
+			buildTags = strings.Split(entry.Labels["build_tags"], ",")
+		}
 		// Log from service
 		if serviceName != "" {
 			etag = entry.Labels["defang-etag"]
@@ -421,7 +426,7 @@ func getLogEntryParser(ctx context.Context, gcpClient GcpLogsClient) func(entry 
 				var err error
 				env, err = gcpClient.GetExecutionEnv(ctx, executionName)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to get execution environment variables: %w", err)
 				}
 				envCache[executionName] = env
 			}
@@ -435,7 +440,7 @@ func getLogEntryParser(ctx context.Context, gcpClient GcpLogsClient) func(entry 
 			// use kaniko build job environment to get etag
 			etag = env["DEFANG_ETAG"]
 			host = "pulumi" // Hardcoded to match end condition detector in cmd/cli/command/compose.go
-		} else if buildTags != "" {
+		} else if len(buildTags) > 0 {
 			var bt gcp.BuildTag
 			if err := bt.Parse(buildTags); err != nil {
 				return nil, err
@@ -443,6 +448,16 @@ func getLogEntryParser(ctx context.Context, gcpClient GcpLogsClient) func(entry 
 			serviceName = bt.Service
 			etag = bt.Etag
 			host = "cloudbuild"
+			if bt.IsDefangCD {
+				host = "pulumi"
+			}
+			// HACK: Detect cd start from cloudbuild logs to skip the cloud build image pulling logs
+			if strings.HasPrefix(msg, " ** Update started") {
+				cdStarted = true
+			}
+			if !cdStarted {
+				return nil, nil // Skip cloudbuild logs (like pulling cd image) before cd started
+			}
 		} else {
 			var err error
 			_, msg, err = LogEntryToString(entry)
@@ -477,6 +492,23 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 	readyServices := make(map[string]string)
 
 	computeEngineRootTriggers := make(map[string]string)
+
+	getReadyServicesCompletedResps := func(status string) []*defangv1.SubscribeResponse {
+		resps := make([]*defangv1.SubscribeResponse, 0, len(readyServices))
+		for serviceName, status := range readyServices {
+			resps = append(resps, &defangv1.SubscribeResponse{
+				Name:   serviceName,
+				State:  defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+				Status: status,
+			})
+		}
+		resps = append(resps, &defangv1.SubscribeResponse{
+			Name:   defangCD,
+			State:  defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+			Status: status,
+		})
+		return resps
+	}
 
 	return func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeResponse, error) {
 		if entry == nil {
@@ -575,20 +607,7 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 				}
 				cdSuccess = true
 				// Report all ready services when CD is successful, prevents cli deploy stop before cd is done
-				resps := make([]*defangv1.SubscribeResponse, 0, len(readyServices))
-				for serviceName, status := range readyServices {
-					resps = append(resps, &defangv1.SubscribeResponse{
-						Name:   serviceName,
-						State:  defangv1.ServiceState_DEPLOYMENT_COMPLETED,
-						Status: status,
-					})
-				}
-				resps = append(resps, &defangv1.SubscribeResponse{
-					Name:   defangCD,
-					State:  defangv1.ServiceState_DEPLOYMENT_COMPLETED,
-					Status: auditLog.GetStatus().GetMessage(),
-				})
-				return resps, nil // Ignore success cd status when we are waiting for service status
+				return getReadyServicesCompletedResps(auditLog.GetStatus().GetMessage()), nil // Ignore success cd status when we are waiting for service status
 			} else {
 				term.Warnf("unexpected execution name in audit log : %v", executionName)
 				return nil, nil
@@ -672,30 +691,43 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 				return nil, nil
 			}
 
-			var state defangv1.ServiceState
-			status := ""
-			if entry.Operation.First {
-				state = defangv1.ServiceState_BUILD_ACTIVATING
-			} else if entry.Operation.Last {
+			if bt.IsDefangCD {
+				if !entry.Operation.Last { // Ignore non-final cloud build event for CD
+					return nil, nil
+				}
+				// When cloud build fails, the last log message is an error message
 				if entry.Severity == logtype.LogSeverity_ERROR {
-					state = defangv1.ServiceState_BUILD_FAILED
-					if auditLog.GetStatus() != nil {
-						status = auditLog.GetStatus().String()
+					return nil, client.ErrDeploymentFailed{Message: auditLog.GetStatus().GetMessage()}
+				}
+
+				cdSuccess = true
+				return getReadyServicesCompletedResps(auditLog.GetStatus().String()), nil
+			} else {
+				var state defangv1.ServiceState
+				status := ""
+				if entry.Operation.First {
+					state = defangv1.ServiceState_BUILD_ACTIVATING
+				} else if entry.Operation.Last {
+					if entry.Severity == logtype.LogSeverity_ERROR {
+						state = defangv1.ServiceState_BUILD_FAILED
+						if auditLog.GetStatus() != nil {
+							status = auditLog.GetStatus().String()
+						}
+					} else {
+						state = defangv1.ServiceState_BUILD_STOPPING
 					}
 				} else {
-					state = defangv1.ServiceState_BUILD_STOPPING
+					state = defangv1.ServiceState_BUILD_RUNNING
 				}
-			} else {
-				state = defangv1.ServiceState_BUILD_RUNNING
+				if status == "" {
+					status = state.String()
+				}
+				return []*defangv1.SubscribeResponse{{
+					Name:   bt.Service,
+					State:  state,
+					Status: status,
+				}}, nil
 			}
-			if status == "" {
-				status = state.String()
-			}
-			return []*defangv1.SubscribeResponse{{
-				Name:   bt.Service,
-				State:  state,
-				Status: status,
-			}}, nil
 		default:
 			term.Warnf("unexpected resource type : %v", entry.Resource.Type)
 			return nil, nil
