@@ -27,7 +27,7 @@ func HandleServicesTool(ctx context.Context, loader client.Loader, params Servic
 		return "", fmt.Errorf("could not connect: %w", err)
 	}
 
-	sm, err := stacks.NewManager(client, params.WorkingDirectory, params.ProjectName)
+	sm, err := stacks.NewManager(client, loader.TargetDirectory(), params.ProjectName)
 	if err != nil {
 		return "", fmt.Errorf("failed to create stack manager: %w", err)
 	}

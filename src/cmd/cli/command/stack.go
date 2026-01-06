@@ -87,11 +87,6 @@ func makeStackListCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jsonMode, _ := cmd.Flags().GetBool("json")
 
-			wd, err := os.Getwd()
-			if err != nil {
-				return err
-			}
-
 			ctx := cmd.Context()
 			loader := configureLoader(cmd)
 			projectName, err := loader.LoadProjectName(ctx)
@@ -99,7 +94,7 @@ func makeStackListCmd() *cobra.Command {
 				return err
 			}
 
-			sm, err := stacks.NewManager(global.Client, wd, projectName)
+			sm, err := stacks.NewManager(global.Client, loader.TargetDirectory(), projectName)
 			if err != nil {
 				return err
 			}

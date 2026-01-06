@@ -538,11 +538,7 @@ var whoamiCmd = &cobra.Command{
 		}
 		elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
 		ec := elicitations.NewController(elicitationsClient)
-		wd, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("failed to get working directory: %w", err)
-		}
-		sm, err := stacks.NewManager(global.Client, wd, projectName)
+		sm, err := stacks.NewManager(global.Client, loader.TargetDirectory(), projectName)
 		if err != nil {
 			return fmt.Errorf("failed to create stack manager: %w", err)
 		}
@@ -1422,31 +1418,18 @@ func newProvider(ctx context.Context, ec elicitations.Controller, sm stacks.Mana
 func newProviderChecked(ctx context.Context, loader client.Loader) (client.Provider, error) {
 	var err error
 	projectName := ""
-	outside := true
 	if loader != nil {
 		projectName, err = loader.LoadProjectName(ctx)
 		if err != nil {
 			term.Warnf("Unable to load project: %v", err)
 		}
-		outside = loader.OutsideWorkingDirectory()
 	}
 	elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
 	ec := elicitations.NewController(elicitationsClient)
 	var sm stacks.Manager
-	if outside {
-		sm, err = stacks.NewManager(global.Client, "", projectName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create stack manager: %w", err)
-		}
-	} else {
-		wd, err := os.Getwd()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get working directory: %w", err)
-		}
-		sm, err = stacks.NewManager(global.Client, wd, projectName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create stack manager: %w", err)
-		}
+	sm, err = stacks.NewManager(global.Client, loader.TargetDirectory(), projectName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stack manager: %w", err)
 	}
 	provider, err := newProvider(ctx, ec, sm)
 	if err != nil {

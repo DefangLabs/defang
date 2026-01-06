@@ -33,23 +33,18 @@ type manager struct {
 }
 
 func NewManager(fabric DeploymentLister, targetDirectory string, projectName string) (*manager, error) {
-	workingDirectory, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get working directory: %w", err)
-	}
 	var outside bool
-	var absTargetDirectory string
+	absTargetDirectory := ""
 	if targetDirectory == "" {
 		outside = true
-		absTargetDirectory = ""
 	} else {
+		outside = false
 		// abs path for targetDirectory
 		var err error
 		absTargetDirectory, err = filepath.Abs(targetDirectory)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get absolute path for target directory: %w", err)
 		}
-		outside = workingDirectory != absTargetDirectory
 	}
 	return &manager{
 		fabric:          fabric,

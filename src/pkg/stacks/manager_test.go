@@ -637,10 +637,7 @@ func TestManager_WorkingDirectoryMatches(t *testing.T) {
 	}
 }
 
-func TestManager_WorkingDirectoryDifferent(t *testing.T) {
-	// Create a temporary directory for testing but don't change to it
-	tmpDir := t.TempDir()
-
+func TestManager_TargetDirectoryEmpty(t *testing.T) {
 	deployedAt := time.Now()
 	mockClient := &mockFabricClient{
 		deployments: []*defangv1.Deployment{
@@ -658,7 +655,7 @@ func TestManager_WorkingDirectoryDifferent(t *testing.T) {
 			},
 		},
 	}
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	manager, err := NewManager(mockClient, "", "test-project")
 	if err != nil {
 		t.Fatalf("NewManager failed: %v", err)
 	}
@@ -675,7 +672,7 @@ func TestManager_WorkingDirectoryDifferent(t *testing.T) {
 	// Create should fail
 	_, err = manager.Create(params)
 	if err == nil {
-		t.Error("Create() should fail when target directory differs from working directory")
+		t.Fatal("Create() should fail when target directory is empty")
 	}
 	if !strings.Contains(err.Error(), "operation not allowed: target directory") {
 		t.Errorf("Expected specific error message about operation not allowed, got: %v", err)
@@ -684,7 +681,7 @@ func TestManager_WorkingDirectoryDifferent(t *testing.T) {
 	// List should return only remote stacks (no error)
 	stacks, err := manager.List(context.Background())
 	if err != nil {
-		t.Fatalf("List() should not fail when target directory differs from working directory: %v", err)
+		t.Fatalf("List() should not fail when target directory is empty: %v", err)
 	}
 	if len(stacks) != 2 {
 		t.Errorf("Expected 2 remote stacks, got %d", len(stacks))
@@ -708,7 +705,7 @@ func TestManager_WorkingDirectoryDifferent(t *testing.T) {
 	// Load should fail
 	_, err = manager.Load("teststack")
 	if err == nil {
-		t.Error("Load() should fail when target directory differs from working directory")
+		t.Fatal("Load() should fail when target directory is empty")
 	}
 	if !strings.Contains(err.Error(), "operation not allowed: target directory") {
 		t.Errorf("Expected specific error message about operation not allowed, got: %v", err)

@@ -566,11 +566,7 @@ func makeComposeConfigCmd() *cobra.Command {
 
 			elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
 			ec := elicitations.NewController(elicitationsClient)
-			wd, err := os.Getwd()
-			if err != nil {
-				return fmt.Errorf("failed to get working directory: %w", err)
-			}
-			sm, err := stacks.NewManager(global.Client, wd, project.Name)
+			sm, err := stacks.NewManager(global.Client, loader.TargetDirectory(), project.Name)
 			if err != nil {
 				return fmt.Errorf("failed to create stack manager: %w", err)
 			}

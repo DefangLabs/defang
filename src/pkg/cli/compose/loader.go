@@ -91,9 +91,13 @@ func (l *Loader) LoadProject(ctx context.Context) (*Project, error) {
 	return l.loadProject(ctx, false)
 }
 
-func (l *Loader) OutsideWorkingDirectory() bool {
-	// if --project-name is provided, we assume we are outside the project's working directory
-	return l.options.ProjectName != ""
+func (l *Loader) TargetDirectory() string {
+	project, _ := l.loadProject(context.TODO(), true)
+	if project == nil {
+		return ""
+	}
+
+	return project.WorkingDir
 }
 
 func (l *Loader) loadProject(ctx context.Context, suppressWarn bool) (*Project, error) {
