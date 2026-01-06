@@ -375,7 +375,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			}
 
 			wizard := NewWizardWithProfileLister(mockController, profileLister)
-			ctx := context.Background()
+			ctx := t.Context()
 
 			// Execute
 			result, err := wizard.CollectParameters(ctx)
@@ -753,7 +753,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			tt.setupMock(mockController)
 
 			wizard := NewWizard(mockController)
-			ctx := context.Background()
+			ctx := t.Context()
 
 			// Execute
 			result, err := wizard.CollectRemainingParameters(ctx, tt.initialParams)

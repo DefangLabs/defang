@@ -82,7 +82,7 @@ func (m *MockStacksManager) Create(params StackParameters) (string, error) {
 }
 
 func TestStackSelector_SelectStack_ExistingStack(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockEC := &MockElicitationsController{}
 	mockSM := &MockStacksManager{}
@@ -201,7 +201,7 @@ func (tss *testableStackSelector) elicitStackSelection(ctx context.Context, ec e
 }
 
 func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockEC := &MockElicitationsController{}
 	mockSM := &MockStacksManager{}
@@ -253,7 +253,7 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 }
 
 func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockEC := &MockElicitationsController{}
 	mockSM := &MockStacksManager{}
@@ -298,7 +298,7 @@ func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
 }
 
 func TestStackSelector_SelectStack_ElicitationsNotSupported(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockEC := &MockElicitationsController{}
 	mockSM := &MockStacksManager{}
@@ -319,7 +319,7 @@ func TestStackSelector_SelectStack_ElicitationsNotSupported(t *testing.T) {
 }
 
 func TestStackSelector_SelectStack_ListStacksError(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockEC := &MockElicitationsController{}
 	mockSM := &MockStacksManager{}
@@ -344,7 +344,7 @@ func TestStackSelector_SelectStack_ListStacksError(t *testing.T) {
 }
 
 func TestStackSelector_SelectStack_ElicitationError(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockEC := &MockElicitationsController{}
 	mockSM := &MockStacksManager{}
@@ -376,7 +376,7 @@ func TestStackSelector_SelectStack_ElicitationError(t *testing.T) {
 }
 
 func TestStackSelector_SelectStack_LoadStackError(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockEC := &MockElicitationsController{}
 	mockSM := &MockStacksManager{}
@@ -410,7 +410,7 @@ func TestStackSelector_SelectStack_LoadStackError(t *testing.T) {
 }
 
 func TestStackSelector_SelectStack_WizardError(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockEC := &MockElicitationsController{}
 	mockSM := &MockStacksManager{}
@@ -451,7 +451,7 @@ func TestStackSelector_SelectStack_WizardError(t *testing.T) {
 }
 
 func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockEC := &MockElicitationsController{}
 	mockSM := &MockStacksManager{}
@@ -502,7 +502,7 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 }
 
 func TestStackSelector_ElicitStackSelection(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockEC := &MockElicitationsController{}
 	mockSM := &MockStacksManager{}

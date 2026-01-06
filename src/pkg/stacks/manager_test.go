@@ -57,7 +57,7 @@ func TestManager_CreateListLoad(t *testing.T) {
 	}
 
 	// Test that listing returns empty when no stacks exist
-	stacks, err := manager.List(context.Background())
+	stacks, err := manager.List(t.Context())
 	if err != nil {
 		t.Fatalf("List() should not error on empty directory: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestManager_CreateListLoad(t *testing.T) {
 	}
 
 	// Test listing after creating a stack
-	stacks, err = manager.List(context.Background())
+	stacks, err = manager.List(t.Context())
 	if err != nil {
 		t.Fatalf("List() failed: %v", err)
 	}
@@ -226,7 +226,7 @@ func TestManager_CreateMultipleStacks(t *testing.T) {
 	}
 
 	// List all stacks
-	listedStacks, err := manager.List(context.Background())
+	listedStacks, err := manager.List(t.Context())
 	if err != nil {
 		t.Fatalf("List() failed: %v", err)
 	}
@@ -363,7 +363,7 @@ func TestManager_ListRemote(t *testing.T) {
 		t.Fatalf("NewManager failed: %v", err)
 	}
 
-	remoteStacks, err := manager.ListRemote(context.Background())
+	remoteStacks, err := manager.ListRemote(t.Context())
 	if err != nil {
 		t.Fatalf("ListRemote() failed: %v", err)
 	}
@@ -402,7 +402,7 @@ func TestManager_ListRemoteError(t *testing.T) {
 		t.Fatalf("NewManager failed: %v", err)
 	}
 
-	_, err = manager.ListRemote(context.Background())
+	_, err = manager.ListRemote(t.Context())
 	if err == nil {
 		t.Error("ListRemote() should return error when fabric client fails")
 	}
@@ -464,7 +464,7 @@ func TestManager_ListMerged(t *testing.T) {
 	}
 
 	// List merged stacks
-	stacks, err := manager.List(context.Background())
+	stacks, err := manager.List(t.Context())
 	if err != nil {
 		t.Fatalf("List() failed: %v", err)
 	}
@@ -528,7 +528,7 @@ func TestManager_ListRemoteWithBetaStack(t *testing.T) {
 		t.Fatalf("NewManager failed: %v", err)
 	}
 
-	remoteStacks, err := manager.ListRemote(context.Background())
+	remoteStacks, err := manager.ListRemote(t.Context())
 	if err != nil {
 		t.Fatalf("ListRemote() failed: %v", err)
 	}
@@ -568,7 +568,7 @@ func TestManager_ListRemoteDuplicateDeployments(t *testing.T) {
 		t.Fatalf("NewManager failed: %v", err)
 	}
 
-	remoteStacks, err := manager.ListRemote(context.Background())
+	remoteStacks, err := manager.ListRemote(t.Context())
 	if err != nil {
 		t.Fatalf("ListRemote() failed: %v", err)
 	}
@@ -617,7 +617,7 @@ func TestManager_WorkingDirectoryMatches(t *testing.T) {
 	}
 
 	// List should work
-	stacks, err := manager.List(context.Background())
+	stacks, err := manager.List(t.Context())
 	if err != nil {
 		t.Fatalf("List() failed when directories match: %v", err)
 	}
@@ -679,7 +679,7 @@ func TestManager_TargetDirectoryEmpty(t *testing.T) {
 	}
 
 	// List should return only remote stacks (no error)
-	stacks, err := manager.List(context.Background())
+	stacks, err := manager.List(t.Context())
 	if err != nil {
 		t.Fatalf("List() should not fail when target directory is empty: %v", err)
 	}
@@ -734,7 +734,7 @@ func TestManager_RemoteOperationsWorkRegardlessOfDirectory(t *testing.T) {
 	}
 
 	// Remote operations should work even when directories don't match
-	remoteStacks, err := manager.ListRemote(context.Background())
+	remoteStacks, err := manager.ListRemote(t.Context())
 	if err != nil {
 		t.Fatalf("ListRemote() should work even when directories don't match: %v", err)
 	}
