@@ -76,6 +76,9 @@ func ParsePulumiStateFile(ctx context.Context, obj BucketObj, bucket string, obj
 	}
 
 	orgProjStack := strings.Split(state.Checkpoint.Stack, "/")
+	if len(orgProjStack) != 3 {
+		return nil, fmt.Errorf("invalid Pulumi stack name %q in state file %q", state.Checkpoint.Stack, obj.Name())
+	}
 	stack := PulumiState{
 		Project: orgProjStack[1],
 		Name:    path.Base(stackFile), // legacy logic to derive stack name from file name
@@ -85,6 +88,10 @@ func ParsePulumiStateFile(ctx context.Context, obj BucketObj, bucket string, obj
 	} else if len(state.Checkpoint.Latest.PendingOperations) > 0 {
 		for _, op := range state.Checkpoint.Latest.PendingOperations {
 			parts := strings.Split(op.Resource.Urn, "::") // prefix::project::type::resource => {urn:provider:stack}::{project}::{plugin:file:class}::{name}
+			if len(parts) < 4 {
+				term.Debug("Skipping pending operation with malformed URN:", op.Resource.Urn)
+				continue
+			}
 			stack.Pending = append(stack.Pending, parts[3])
 		}
 	} else if len(state.Checkpoint.Latest.Resources) == 0 {
