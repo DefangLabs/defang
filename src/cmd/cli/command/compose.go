@@ -117,7 +117,13 @@ func makeComposeUpCmd() *cobra.Command {
 			} else if accountInfo, err := provider.AccountInfo(ctx); err != nil {
 				term.Debugf("AccountInfo failed: %v", err)
 			} else if len(resp.Deployments) > 0 {
-				handleExistingDeployments(resp.Deployments, accountInfo, project.Name, provider.GetStackName())
+				confirmed, err := confirmDeployment(resp.Deployments, accountInfo, provider.GetStackName())
+				if err != nil {
+					return err
+				}
+				if !confirmed {
+					return fmt.Errorf("deployment of project %q was canceled", project.Name)
+				}
 			} else if global.Stack.Name == "" {
 				err = promptToCreateStack(ctx, stacks.StackParameters{
 					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
@@ -221,7 +227,7 @@ func makeComposeUpCmd() *cobra.Command {
 	return composeUpCmd
 }
 
-func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accountInfo *client.AccountInfo, projectName string, stackName string) error {
+func confirmDeployment(existingDeployments []*defangv1.Deployment, accountInfo *client.AccountInfo, stackName string) (bool, error) {
 	samePlace := slices.ContainsFunc(existingDeployments, func(dep *defangv1.Deployment) bool {
 		if dep.Provider != accountInfo.Provider.Value() {
 			return false
@@ -230,10 +236,14 @@ func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accou
 		return (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
 	})
 	if samePlace {
-		return nil
+		return true, nil
 	}
-	if err := confirmDeploymentToNewLocation(projectName, existingDeployments); err != nil {
-		return err
+	confirmed, err := confirmDeploymentToNewLocation(existingDeployments)
+	if err != nil {
+		return false, err
+	}
+	if !confirmed {
+		return false, nil
 	}
 	if stackName == "" {
 		stackName = stacks.DefaultBeta
@@ -249,7 +259,7 @@ func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accou
 			term.Info(stacks.PostCreateMessage(stackName))
 		}
 	}
-	return nil
+	return true, nil
 }
 
 func printExistingDeployments(existingDeployments []*defangv1.Deployment) {
@@ -266,18 +276,18 @@ func printExistingDeployments(existingDeployments []*defangv1.Deployment) {
 	term.Println(strings.Join(deploymentStrings, "\n"))
 }
 
-func confirmDeploymentToNewLocation(projectName string, existingDeployments []*defangv1.Deployment) error {
+func confirmDeploymentToNewLocation(existingDeployments []*defangv1.Deployment) (bool, error) {
 	printExistingDeployments(existingDeployments)
 	var confirm bool
 	if err := survey.AskOne(&survey.Confirm{
 		Message: "Are you sure you want to continue?",
 		Default: false,
 	}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
-		return err
+		return false, err
 	} else if !confirm {
-		return fmt.Errorf("deployment of project %q was canceled", projectName)
+		return false, nil
 	}
-	return nil
+	return true, nil
 }
 
 func promptToCreateStack(ctx context.Context, params stacks.StackParameters) error {
