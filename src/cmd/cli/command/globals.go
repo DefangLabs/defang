@@ -8,7 +8,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -94,7 +93,7 @@ var global = GlobalConfig{
 	HasTty:         term.IsTerminal(),
 	HideUpdate:     false,
 	NonInteractive: !term.IsTerminal(),
-	Stack:          stacks.StackParameters{Provider: client.ProviderAuto, Mode: modes.ModeUnspecified},
+	Stack:          stacks.StackParameters{Provider: client.ProviderAuto},
 	Verbose:        false,
 }
 

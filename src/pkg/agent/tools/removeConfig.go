@@ -18,14 +18,17 @@ type RemoveConfigParams struct {
 }
 
 // HandleRemoveConfigTool handles the remove config tool logic
-func HandleRemoveConfigTool(ctx context.Context, loader client.ProjectLoader, params RemoveConfigParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
+func HandleRemoveConfigTool(ctx context.Context, loader client.Loader, params RemoveConfigParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, sc.Cluster)
 	if err != nil {
 		return "", fmt.Errorf("Could not connect: %w", err)
 	}
 
-	sm := stacks.NewManager(params.WorkingDirectory)
+	sm, err := stacks.NewManager(client, loader.TargetDirectory(), params.ProjectName)
+	if err != nil {
+		return "", fmt.Errorf("failed to create stack manager: %w", err)
+	}
 	pp := NewProviderPreparer(cli, ec, client, sm)
 	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
 	if err != nil {

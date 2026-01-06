@@ -25,6 +25,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/github"
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
@@ -177,6 +178,7 @@ func SetupCommands(version string) {
 		return completions, cobra.ShellCompDirectiveNoFileComp
 	})
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
+	RootCmd.Flags().MarkDeprecated("provider", "please use --stack instead")
 	RootCmd.PersistentFlags().BoolVarP(&global.Verbose, "verbose", "v", global.Verbose, "verbose logging") // backwards compat: only used by tail
 	RootCmd.PersistentFlags().BoolVar(&global.Debug, "debug", global.Debug, "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&dryrun.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
@@ -531,7 +533,18 @@ var whoamiCmd = &cobra.Command{
 		loader := configureLoader(cmd)
 
 		global.NonInteractive = true // don't show provider prompt
-		provider, err := newProvider(cmd.Context(), loader)
+		ctx := cmd.Context()
+		projectName, err := loader.LoadProjectName(ctx)
+		if err != nil {
+			term.Warnf("Unable to load project: %v", err)
+		}
+		elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
+		ec := elicitations.NewController(elicitationsClient)
+		sm, err := stacks.NewManager(global.Client, loader.TargetDirectory(), projectName)
+		if err != nil {
+			return fmt.Errorf("failed to create stack manager: %w", err)
+		}
+		provider, err := newProvider(cmd.Context(), ec, sm)
 		if err != nil {
 			term.Debug("unable to get provider:", err)
 		}
@@ -1227,41 +1240,148 @@ var providerDescription = map[client.ProviderID]string{
 	client.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
 }
 
-func updateProviderID(ctx context.Context, loader client.Loader) error {
-	extraMsg := ""
-	whence := "default project"
+func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager) (*stacks.StackParameters, string, error) {
+	stackSelector := stacks.NewSelector(ec, sm)
 
-	// Command line flag takes precedence over environment variable
-	if RootCmd.PersistentFlags().Changed("provider") {
-		whence = "command line flag"
-	} else if val, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
-		// Sanitize the provider value from the environment variable
-		if err := global.Stack.Provider.Set(val); err != nil {
-			return fmt.Errorf("invalid provider '%v' in environment variable DEFANG_PROVIDER, supported providers are: %v", val, client.AllProviders())
-		}
-		whence = "environment variable"
+	var whence string
+	stack := &stacks.StackParameters{
+		Name:     "",
+		Provider: client.ProviderAuto,
+		Mode:     modes.ModeUnspecified,
 	}
 
-	switch global.Stack.Provider {
-	case client.ProviderAuto:
-		if global.NonInteractive {
-			// Defaults to defang provider in non-interactive mode
-			if awsInEnv() {
-				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")
-			}
-			if doInEnv() {
-				term.Warn("Using Defang playground, but DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
-			}
-			if gcpInEnv() {
-				term.Warn("Using Defang playground, but GCP_PROJECT_ID/CLOUDSDK_CORE_PROJECT environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
-			}
-			global.Stack.Provider = client.ProviderDefang
-		} else {
-			var err error
-			if whence, err = determineProviderID(ctx, loader); err != nil {
-				return err
+	// This code unfortunately replicates the provider precedence rules in the
+	// RootCmd's PersistentPreRunE func, I think we should avoid reading the
+	// stack file during startup, and only read it here instead.
+	if stackName := os.Getenv("DEFANG_STACK"); stackName != "" || RootCmd.PersistentFlags().Changed("stack") {
+		whence = "stack file"
+		if stackName == "" {
+			stackName, _ = RootCmd.Flags().GetString("stack")
+		}
+		stackParams, err := sm.Load(stackName)
+		if err != nil {
+			return nil, "", fmt.Errorf("unable to load stack %q: %w", stackName, err)
+		}
+		stack = stackParams
+
+		if stack.Provider == client.ProviderAuto {
+			return nil, "", fmt.Errorf("stack %q has an invalid provider %q", stack.Name, stack.Provider)
+		}
+		return stack, whence, nil
+	}
+
+	knownStacks, err := sm.List(ctx)
+	if err != nil {
+		return nil, "", fmt.Errorf("unable to list stacks: %w", err)
+	}
+	stackNames := make([]string, len(knownStacks))
+	for i, s := range knownStacks {
+		stackNames[i] = s.Name
+	}
+	if RootCmd.PersistentFlags().Changed("provider") {
+		term.Warn("Warning: --provider flag is deprecated. Please use --stack instead. To learn about stacks, visit https://docs.defang.io/docs/concepts/stacks")
+		providerIDString := RootCmd.Flag("provider").Value.String()
+		err := stack.Provider.Set(providerIDString)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
+		}
+	} else if _, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
+		term.Warn("Warning: DEFANG_PROVIDER environment variable is deprecated. Please use --stack instead. To learn about stacks, visit https://docs.defang.io/docs/concepts/stacks")
+		providerIDString := os.Getenv("DEFANG_PROVIDER")
+		err := stack.Provider.Set(providerIDString)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
+		}
+	}
+	if global.NonInteractive && stack.Provider == client.ProviderAuto {
+		whence = "non-interactive default"
+		stack.Name = stacks.DefaultBeta
+		stack.Provider = client.ProviderDefang
+		return stack, whence, nil
+	}
+
+	// if there is exactly one stack with that provider, use it
+	if len(knownStacks) == 1 && (stack.Provider == client.ProviderAuto || knownStacks[0].Provider == stack.Provider.String()) {
+		knownStack := knownStacks[0]
+		// try to read the stackfile
+		stack, loadErr := sm.Load(knownStack.Name)
+		if loadErr != nil {
+			var outsideErr *stacks.ErrOutside
+			if errors.Is(loadErr, os.ErrNotExist) || errors.As(loadErr, &outsideErr) {
+				var importErr error
+				term.Warn("unable to load stack from file, attempting to import from previous deployments", loadErr)
+				stack, importErr = importStack(sm, knownStack)
+				if importErr != nil {
+					return nil, "", fmt.Errorf("unable to load or import stack: %w", errors.Join(loadErr, importErr))
+				}
 			}
 		}
+
+		whence = "only stack"
+		return stack, whence, nil
+	}
+
+	// if there are zero known stacks or more than one known stack, prompt the user to create or select a stack
+	if global.NonInteractive {
+		if len(stackNames) > 0 {
+			return nil, "", fmt.Errorf("please specify a stack using --stack. The following stacks are available: %v", stackNames)
+		} else {
+			return nil, "", fmt.Errorf("no stacks are configured; please create a stack using 'defang stack create --provider=%s'", stack.Provider)
+		}
+	}
+
+	stackParameters, err := stackSelector.SelectStack(ctx)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to select stack: %w", err)
+	}
+	stack = stackParameters
+	whence = "interactive selection"
+	return stack, whence, nil
+}
+
+func importStack(sm stacks.Manager, stack stacks.StackListItem) (*stacks.StackParameters, error) {
+	var providerID client.ProviderID
+	err := providerID.Set(stack.Provider)
+	if err != nil {
+		return nil, fmt.Errorf("invalid provider %q in stack %q: %w", stack.Provider, stack.Name, err)
+	}
+	mode := modes.ModeUnspecified
+	if stack.Mode != "" {
+		err = mode.Set(stack.Mode)
+		if err != nil {
+			return nil, fmt.Errorf("invalid mode %q in stack %q: %w", stack.Mode, stack.Name, err)
+		}
+	}
+	params := &stacks.StackParameters{
+		Name:     stack.Name,
+		Provider: providerID,
+		Region:   stack.Region,
+		Mode:     mode,
+	}
+	err = sm.LoadParameters(params.ToMap(), false)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load parameters for stack %q: %w", stack.Name, err)
+	}
+
+	return params, nil
+}
+
+func printProviderMismatchWarnings(ctx context.Context, provider client.ProviderID) {
+	if provider == client.ProviderDefang {
+		// Ignore any env vars when explicitly using the Defang playground provider
+		// Defaults to defang provider in non-interactive mode
+		if awsInEnv() {
+			term.Warn("AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")
+		}
+		if doInEnv() {
+			term.Warn("DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
+		}
+		if gcpInEnv() {
+			term.Warn("GCP_PROJECT_ID/CLOUDSDK_CORE_PROJECT environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
+		}
+	}
+
+	switch provider {
 	case client.ProviderAWS:
 		if !awsInConfig(ctx) {
 			term.Warn("AWS provider was selected, but AWS environment is not set")
@@ -1274,26 +1394,48 @@ func updateProviderID(ctx context.Context, loader client.Loader) error {
 		if !gcpInEnv() {
 			term.Warn("GCP provider was selected, but GCP_PROJECT_ID environment variable is not set")
 		}
-	case client.ProviderDefang:
-		// Ignore any env vars when explicitly using the Defang playground provider
-		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
 	}
-
-	term.Infof("Using %s provider from %s%s", global.Stack.Provider.Name(), whence, extraMsg)
-	return nil
 }
 
-func newProvider(ctx context.Context, loader client.Loader) (client.Provider, error) {
-	if err := updateProviderID(ctx, loader); err != nil {
+func newProvider(ctx context.Context, ec elicitations.Controller, sm stacks.Manager) (client.Provider, error) {
+	stack, whence, err := getStack(ctx, ec, sm)
+	if err != nil {
 		return nil, err
 	}
 
-	provider := cli.NewProvider(ctx, global.Stack.Provider, global.Client, global.Stack.Name)
+	// TODO: avoid writing to this global variable once all readers are removed
+	global.Stack = *stack
+
+	extraMsg := ""
+	if stack.Provider == client.ProviderDefang {
+		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
+	}
+	term.Infof("Using the %q stack on %s from %s%s", stack.Name, stack.Provider, whence, extraMsg)
+
+	printProviderMismatchWarnings(ctx, stack.Provider)
+	provider := cli.NewProvider(ctx, stack.Provider, global.Client, stack.Name)
 	return provider, nil
 }
 
 func newProviderChecked(ctx context.Context, loader client.Loader) (client.Provider, error) {
-	provider, err := newProvider(ctx, loader)
+	var err error
+	projectName := ""
+	targetDirectory := ""
+	if loader != nil {
+		projectName, err = loader.LoadProjectName(ctx)
+		if err != nil {
+			term.Warnf("Unable to load project: %v", err)
+		}
+		targetDirectory = loader.TargetDirectory()
+	}
+	elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
+	ec := elicitations.NewController(elicitationsClient)
+	var sm stacks.Manager
+	sm, err = stacks.NewManager(global.Client, targetDirectory, projectName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stack manager: %w", err)
+	}
+	provider, err := newProvider(ctx, ec, sm)
 	if err != nil {
 		return nil, err
 	}
@@ -1302,77 +1444,5 @@ func newProviderChecked(ctx context.Context, loader client.Loader) (client.Provi
 }
 
 func canIUseProvider(ctx context.Context, provider client.Provider, projectName string, serviceCount int) error {
-	return client.CanIUseProvider(ctx, global.Client, provider, projectName, global.Stack.Name, serviceCount)
-}
-
-func determineProviderID(ctx context.Context, loader client.Loader) (string, error) {
-	var projectName string
-	if loader != nil {
-		var err error
-		projectName, err = loader.LoadProjectName(ctx)
-		if err != nil {
-			term.Warnf("Unable to load project: %v", err)
-		}
-
-		if projectName != "" && !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
-			resp, err := global.Client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projectName})
-			if err != nil {
-				term.Debugf("Unable to get selected provider: %v", err)
-			} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
-				global.Stack.Provider.SetValue(resp.Provider)
-				return "stored preference", nil
-			}
-		}
-	}
-
-	whence, err := interactiveSelectProvider(client.AllProviders())
-
-	// Save the selected provider to the fabric
-	if projectName != "" {
-		if err := global.Client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projectName, Provider: global.Stack.Provider.Value()}); err != nil {
-			term.Debugf("Unable to save selected provider to defang server: %v", err)
-		} else {
-			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", global.Stack.Provider, projectName)
-		}
-	}
-
-	return whence, err
-}
-
-func interactiveSelectProvider(providers []client.ProviderID) (string, error) {
-	if len(providers) < 2 {
-		panic("interactiveSelectProvider called with less than 2 providers")
-	}
-	// Prompt the user to choose a provider if in interactive mode
-	options := []string{}
-	for _, p := range providers {
-		options = append(options, p.String())
-	}
-	// Default to the provider in the environment if available
-	var defaultOption any // not string!
-	if awsInEnv() {
-		defaultOption = client.ProviderAWS.String()
-	} else if doInEnv() {
-		defaultOption = client.ProviderDO.String()
-	} else if gcpInEnv() {
-		defaultOption = client.ProviderGCP.String()
-	}
-	var optionValue string
-	if err := survey.AskOne(&survey.Select{
-		Default: defaultOption,
-		Message: "Choose a cloud provider:",
-		Options: options,
-		Help:    "The provider you choose will be used for deploying services.",
-		Description: func(value string, i int) string {
-			return providerDescription[client.ProviderID(value)]
-		},
-	}, &optionValue, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
-		return "", fmt.Errorf("failed to select provider: %w", err)
-	}
-	track.Evt("ProviderSelected", P("provider", optionValue))
-	if err := global.Stack.Provider.Set(optionValue); err != nil {
-		panic(err)
-	}
-
-	return "interactive prompt", nil
+	return client.CanIUseProvider(ctx, global.Client, provider, projectName, serviceCount)
 }

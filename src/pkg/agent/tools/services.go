@@ -20,14 +20,18 @@ type ServicesParams struct {
 	common.LoaderParams
 }
 
-func HandleServicesTool(ctx context.Context, loader client.ProjectLoader, params ServicesParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
+func HandleServicesTool(ctx context.Context, loader client.Loader, params ServicesParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, config.Cluster)
 	if err != nil {
 		return "", fmt.Errorf("could not connect: %w", err)
 	}
 
-	pp := NewProviderPreparer(cli, ec, client, stacks.NewManager(params.WorkingDirectory))
+	sm, err := stacks.NewManager(client, loader.TargetDirectory(), params.ProjectName)
+	if err != nil {
+		return "", fmt.Errorf("failed to create stack manager: %w", err)
+	}
+	pp := NewProviderPreparer(cli, ec, client, sm)
 	_, provider, err := pp.SetupProvider(ctx, config.Stack)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)

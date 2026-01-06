@@ -21,7 +21,7 @@ type DeployParams struct {
 	common.LoaderParams
 }
 
-func HandleDeployTool(ctx context.Context, loader client.ProjectLoader, params DeployParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
+func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
@@ -49,14 +49,17 @@ func HandleDeployTool(ctx context.Context, loader client.ProjectLoader, params D
 		}
 	}
 
-	sm := stacks.NewManager(params.WorkingDirectory)
+	sm, err := stacks.NewManager(client, loader.TargetDirectory(), params.ProjectName)
+	if err != nil {
+		return "", fmt.Errorf("failed to create stack manager: %w", err)
+	}
 	pp := NewProviderPreparer(cli, ec, client, sm)
 	_, provider, err := pp.SetupProvider(ctx, config.Stack)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
 
-	err = cli.CanIUseProvider(ctx, client, project.Name, config.Stack.Name, provider, len(project.Services))
+	err = cli.CanIUseProvider(ctx, client, provider, project.Name, len(project.Services))
 	if err != nil {
 		return "", fmt.Errorf("failed to use provider: %w", err)
 	}

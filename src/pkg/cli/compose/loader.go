@@ -91,6 +91,15 @@ func (l *Loader) LoadProject(ctx context.Context) (*Project, error) {
 	return l.loadProject(ctx, false)
 }
 
+func (l *Loader) TargetDirectory() string {
+	project, _ := l.loadProject(context.TODO(), true)
+	if project == nil {
+		return ""
+	}
+
+	return project.WorkingDir
+}
+
 func (l *Loader) loadProject(ctx context.Context, suppressWarn bool) (*Project, error) {
 	if l.cached != nil {
 		return l.cached, nil

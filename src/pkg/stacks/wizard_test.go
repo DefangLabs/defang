@@ -359,7 +359,7 @@ func TestWizardCollectParameters(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup
 			tt.setupEnv(t)
-			defer tt.cleanupEnv()
+			t.Cleanup(tt.cleanupEnv)
 
 			mockController := newMockElicitationsController()
 			tt.setupMock(mockController)
@@ -375,7 +375,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			}
 
 			wizard := NewWizardWithProfileLister(mockController, profileLister)
-			ctx := context.Background()
+			ctx := t.Context()
 
 			// Execute
 			result, err := wizard.CollectParameters(ctx)
@@ -747,13 +747,13 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup
 			tt.setupEnv(t)
-			defer tt.cleanupEnv()
+			t.Cleanup(tt.cleanupEnv)
 
 			mockController := newMockElicitationsController()
 			tt.setupMock(mockController)
 
 			wizard := NewWizard(mockController)
-			ctx := context.Background()
+			ctx := t.Context()
 
 			// Execute
 			result, err := wizard.CollectRemainingParameters(ctx, tt.initialParams)

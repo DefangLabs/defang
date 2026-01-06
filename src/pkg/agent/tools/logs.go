@@ -22,7 +22,7 @@ type LogsParams struct {
 	Until        string `json:"until,omitempty" jsonschema:"description=Optional: Retrieve logs written before this time. Format as RFC3339 or duration (e.g., '2023-10-01T15:04:05Z' or '1h')."`
 }
 
-func HandleLogsTool(ctx context.Context, loader client.ProjectLoader, params LogsParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
+func HandleLogsTool(ctx context.Context, loader client.Loader, params LogsParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
 	var sinceTime, untilTime time.Time
 	var err error
 	now := time.Now()
@@ -45,7 +45,10 @@ func HandleLogsTool(ctx context.Context, loader client.ProjectLoader, params Log
 		return "", fmt.Errorf("could not connect: %w", err)
 	}
 
-	sm := stacks.NewManager(params.WorkingDirectory)
+	sm, err := stacks.NewManager(client, loader.TargetDirectory(), params.ProjectName)
+	if err != nil {
+		return "", fmt.Errorf("failed to create stack manager: %w", err)
+	}
 	pp := NewProviderPreparer(cli, ec, client, sm)
 	_, provider, err := pp.SetupProvider(ctx, config.Stack)
 	if err != nil {
@@ -59,7 +62,7 @@ func HandleLogsTool(ctx context.Context, loader client.ProjectLoader, params Log
 	}
 	term.Debug("Project name loaded:", projectName)
 
-	err = cli.CanIUseProvider(ctx, client, projectName, config.Stack.Name, provider, 0)
+	err = cli.CanIUseProvider(ctx, client, provider, projectName, 0)
 	if err != nil {
 		return "", fmt.Errorf("failed to use provider: %w", err)
 	}

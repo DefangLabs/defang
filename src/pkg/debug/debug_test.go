@@ -38,7 +38,7 @@ func (s *mockSurveyor) AskOne(q survey.Prompt, response interface{}, opts ...sur
 }
 
 func TestDebugDeployment(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	mockAgent := &mockAgent{}
 
 	providerID := client.ProviderAWS
@@ -110,7 +110,7 @@ func TestDebugDeployment(t *testing.T) {
 }
 
 func TestDebugComposeLoadError(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	mockAgent := &mockAgent{}
 
 	tests := []struct {
