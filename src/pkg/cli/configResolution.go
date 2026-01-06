@@ -10,10 +10,10 @@ import (
 )
 
 type configOutput struct {
-	Service string `json:"service"`
-	Name    string `json:"name"`
-	Value   string `json:"value,omitempty"`
-	Source  Source `json:"source,omitempty"`
+	Service     string `json:"service"`
+	Environment string `json:"environment"`
+	Value       string `json:"value,omitempty"`
+	Source      Source `json:"source,omitempty"`
 }
 
 const configMaskedValue = "*****"
@@ -21,10 +21,9 @@ const configMaskedValue = "*****"
 type Source string
 
 const (
-	SourceUnknown       Source = "Unknown"
-	SourceComposeFile   Source = "Compose File"
-	SourceDefangConfig  Source = "Defang Config"
-	SourceInterpolation Source = "Interpolation"
+	SourceComposeFile   Source = "Compose"
+	SourceDefangConfig  Source = "Config"
+	SourceInterpolation Source = "Config (interpolated)"
 )
 
 func (s Source) String() string {
@@ -41,17 +40,13 @@ func determineConfigSource(envKey string, envValue *string, defangConfigs map[st
 
 	// If value is nil, it's from the compose file with empty value
 	if envValue == nil {
-		return SourceComposeFile, ""
+		return SourceDefangConfig, ""
 	}
 
 	// Check if the value contains references to defang configs
 	interpolatedVariables := compose.DetectInterpolationVariables(*envValue)
 	if len(interpolatedVariables) > 0 {
-		for _, varName := range interpolatedVariables {
-			if _, isDefangConfig := defangConfigs[varName]; isDefangConfig {
-				return SourceInterpolation, *envValue
-			}
-		}
+		return SourceInterpolation, *envValue
 	}
 
 	// Otherwise, it's from the compose file
@@ -70,10 +65,10 @@ func PrintConfigResolutionSummary(project *types.Project, defangConfig []string)
 		for envKey, envValue := range service.Environment {
 			source, value := determineConfigSource(envKey, envValue, configset)
 			projectEnvVars = append(projectEnvVars, configOutput{
-				Service: serviceName,
-				Name:    envKey,
-				Value:   value,
-				Source:  source,
+				Service:     serviceName,
+				Environment: envKey,
+				Value:       value,
+				Source:      source,
 			})
 		}
 	}
@@ -83,12 +78,12 @@ func PrintConfigResolutionSummary(project *types.Project, defangConfig []string)
 		if projectEnvVars[i].Service != projectEnvVars[j].Service {
 			return projectEnvVars[i].Service < projectEnvVars[j].Service
 		}
-		return projectEnvVars[i].Name < projectEnvVars[j].Name
+		return projectEnvVars[i].Environment < projectEnvVars[j].Environment
 	})
 
 	projectEnvVars = slices.Compact(projectEnvVars)
 
-	term.Println("\033[1mENVIRONMENT VARIABLES RESOLUTION SUMMARY:\033[0m")
+	// term.Println("\033[1mENVIRONMENT VARIABLES RESOLUTION SUMMARY:\033[0m")
 
-	return term.Table(projectEnvVars, "Service", "Name", "Value", "Source")
+	return term.Table(projectEnvVars, "Service", "Environment", "Value", "Source")
 }
