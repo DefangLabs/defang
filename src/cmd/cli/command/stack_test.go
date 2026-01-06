@@ -31,10 +31,10 @@ func TestStackListCmd(t *testing.T) {
 	// Save original RootCmd and restore after test
 	origRootCmd := RootCmd
 	origClient := global.Client
-	defer func() {
+	t.Cleanup(func() {
 		RootCmd = origRootCmd
 		global.Client = origClient
-	}()
+	})
 
 	// Set up a mock client
 	mockClient := client.GrpcClient{}
@@ -180,13 +180,13 @@ func TestLoadParameters(t *testing.T) {
 	os.Unsetenv("AWS_PROFILE")
 	os.Unsetenv("DEFANG_MODE")
 
-	defer func() {
+	t.Cleanup(func() {
 		// Clean up environment variables after test
 		os.Unsetenv("DEFANG_PROVIDER")
 		os.Unsetenv("AWS_REGION")
 		os.Unsetenv("AWS_PROFILE")
 		os.Unsetenv("DEFANG_MODE")
-	}()
+	})
 
 	err := stacks.LoadParameters(params, true)
 	if err != nil {

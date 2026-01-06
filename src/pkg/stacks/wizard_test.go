@@ -359,7 +359,7 @@ func TestWizardCollectParameters(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup
 			tt.setupEnv(t)
-			defer tt.cleanupEnv()
+			t.Cleanup(tt.cleanupEnv)
 
 			mockController := newMockElicitationsController()
 			tt.setupMock(mockController)
@@ -747,7 +747,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup
 			tt.setupEnv(t)
-			defer tt.cleanupEnv()
+			t.Cleanup(tt.cleanupEnv)
 
 			mockController := newMockElicitationsController()
 			tt.setupMock(mockController)
