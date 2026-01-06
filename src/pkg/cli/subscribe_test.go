@@ -223,7 +223,7 @@ func TestWaitServiceState(t *testing.T) {
 		t.Run("Expect Error", func(t *testing.T) {
 			ss, err := WaitServiceState(ctx, provider, tt.targetState, "testproject", tt.etag, tt.services)
 			if err == nil {
-				t.Fatalf("Unexpected error: %v", err)
+				t.Fatal("Expected error but got nil")
 			}
 			if !errors.As(err, &client.ErrDeploymentFailed{}) {
 				t.Errorf("Expected ErrDeploymentFailed but got: %v", err)

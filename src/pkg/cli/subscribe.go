@@ -68,7 +68,9 @@ func WatchServiceState(
 					}
 					continue
 				}
-				errChan <- serverStream.Err()
+				if err := serverStream.Err(); err != nil {
+					errChan <- err
+				}
 				return
 			}
 
