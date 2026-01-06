@@ -135,7 +135,7 @@ func (sm *manager) ListRemote(ctx context.Context) ([]RemoteStack, error) {
 	for _, deployment := range deployments {
 		stackName := deployment.GetStack()
 		if stackName == "" {
-			stackName = "beta"
+			stackName = DefaultBeta
 		}
 		var providerID client.ProviderID
 		providerID.SetValue(deployment.GetProvider())

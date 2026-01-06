@@ -1293,7 +1293,7 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 	}
 	if global.NonInteractive && stack.Provider == client.ProviderAuto {
 		whence = "non-interactive default"
-		stack.Name = "beta"
+		stack.Name = stacks.DefaultBeta
 		stack.Provider = client.ProviderDefang
 		return stack, whence, nil
 	}

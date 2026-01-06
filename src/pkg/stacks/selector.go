@@ -100,7 +100,7 @@ func (ss *stackSelector) elicitStackSelection(ctx context.Context, ec elicitatio
 
 func printStacksInfoMessage(stacks []string) {
 	// If there is a stack named "beta", print an informational message about it
-	betaExists := slices.Contains(stacks, "beta")
+	betaExists := slices.Contains(stacks, DefaultBeta)
 	if betaExists {
 		infoLine := "This project was deployed with an implicit Stack called 'beta' before Stacks were introduced."
 		if len(stacks) == 1 {
