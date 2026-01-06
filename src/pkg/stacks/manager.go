@@ -108,7 +108,7 @@ func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
 
 func (sm *manager) ListLocal() ([]StackListItem, error) {
 	if sm.outside {
-		return nil, &ErrOutside{TargetDirectory: sm.targetDirectory}
+		return nil, &ErrOutside{Operation: "ListLocal", TargetDirectory: sm.targetDirectory}
 	}
 	return ListInDirectory(sm.targetDirectory)
 }
@@ -125,9 +125,8 @@ func (sm *manager) ListRemote(ctx context.Context) ([]RemoteStack, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to list deployments: %w", err)
 	}
-	deployments := resp.GetDeployments()
 	stackMap := make(map[string]RemoteStack)
-	for _, deployment := range deployments {
+	for _, deployment := range resp.GetDeployments() {
 		stackName := deployment.GetStack()
 		if stackName == "" {
 			stackName = DefaultBeta
@@ -159,17 +158,18 @@ func (sm *manager) ListRemote(ctx context.Context) ([]RemoteStack, error) {
 }
 
 type ErrOutside struct {
+	Operation       string
 	TargetDirectory string
 }
 
 func (e *ErrOutside) Error() string {
 	cwd, _ := os.Getwd()
-	return fmt.Sprintf("operation not allowed: target directory (%s) is different from working directory (%s)", e.TargetDirectory, cwd)
+	return fmt.Sprintf("%s not allowed: target directory (%s) is different from working directory (%s)", e.Operation, e.TargetDirectory, cwd)
 }
 
 func (sm *manager) Load(name string) (*StackParameters, error) {
 	if sm.outside {
-		return nil, &ErrOutside{TargetDirectory: sm.targetDirectory}
+		return nil, &ErrOutside{Operation: "Load", TargetDirectory: sm.targetDirectory}
 	}
 	params, err := ReadInDirectory(sm.targetDirectory, name)
 	if err != nil {
@@ -188,7 +188,7 @@ func (sm *manager) LoadParameters(params map[string]string, overload bool) error
 
 func (sm *manager) Create(params StackParameters) (string, error) {
 	if sm.outside {
-		return "", &ErrOutside{TargetDirectory: sm.targetDirectory}
+		return "", &ErrOutside{Operation: "Create", TargetDirectory: sm.targetDirectory}
 	}
 	return CreateInDirectory(sm.targetDirectory, params)
 }
