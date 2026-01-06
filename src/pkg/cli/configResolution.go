@@ -18,27 +18,17 @@ type configOutput struct {
 
 const configMaskedValue = "*****"
 
-type Source int
+type Source string
 
 const (
-	SourceUnknown Source = iota
-	SourceComposeFile
-	SourceDefangConfig
-	SourceDefangAndComposeFile
+	SourceUnknown       Source = "Unknown"
+	SourceComposeFile   Source = "Compose File"
+	SourceDefangConfig  Source = "Defang Config"
+	SourceInterpolation Source = "Interpolation"
 )
 
-var sourceNames = map[Source]string{
-	SourceUnknown:              "unknown",
-	SourceComposeFile:          "compose_file",
-	SourceDefangConfig:         "defang_config",
-	SourceDefangAndComposeFile: "compose_file and defang_config",
-}
-
 func (s Source) String() string {
-	if name, ok := sourceNames[s]; ok {
-		return name
-	}
-	return sourceNames[SourceUnknown]
+	return string(s)
 }
 
 // determineConfigSource determines the source of an environment variable
@@ -59,7 +49,7 @@ func determineConfigSource(envKey string, envValue *string, defangConfigs map[st
 	if len(interpolatedVariables) > 0 {
 		for _, varName := range interpolatedVariables {
 			if _, isDefangConfig := defangConfigs[varName]; isDefangConfig {
-				return SourceDefangAndComposeFile, *envValue
+				return SourceInterpolation, *envValue
 			}
 		}
 	}
