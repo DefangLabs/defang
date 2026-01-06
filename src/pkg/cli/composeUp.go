@@ -55,14 +55,14 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 				return nil, project, err
 			}
 
-			if err := compose.ValidateProjectConfig(ctx, project, configs.Names); err != nil {
-				return nil, project, &ComposeError{err}
-			}
-
 			// Print config resolution summary
 			err = PrintConfigResolutionSummary(project, configs.Names)
 			if err != nil {
 				return nil, project, err
+			}
+
+			if err := compose.ValidateProjectConfig(ctx, project, configs.Names); err != nil {
+				return nil, project, &ComposeError{err}
 			}
 		}
 	}

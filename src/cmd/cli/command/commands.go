@@ -986,12 +986,12 @@ var configResolveCmd = &cobra.Command{
 			return err
 		}
 
-		err = compose.ValidateProjectConfig(cmd.Context(), project, config.Names)
+		err = cli.PrintConfigResolutionSummary(project, config.Names)
 		if err != nil {
 			return err
 		}
 
-		return cli.PrintConfigResolutionSummary(project, config.Names)
+		return compose.ValidateProjectConfig(cmd.Context(), project, config.Names)
 	},
 }
 
