@@ -53,10 +53,10 @@ func TestServiceNameRestorer(t *testing.T) {
 		})
 	}
 }
-func makeMockLogEntries(n int) []loggingpb.LogEntry {
-	logEntries := make([]loggingpb.LogEntry, n)
+func makeMockLogEntries(n int) []*loggingpb.LogEntry {
+	logEntries := make([]*loggingpb.LogEntry, n)
 	for i := range logEntries {
-		logEntries[i] = loggingpb.LogEntry{
+		logEntries[i] = &loggingpb.LogEntry{
 			Payload: &loggingpb.LogEntry_TextPayload{
 				TextPayload: "Log entry number " + strconv.Itoa(i),
 			},
