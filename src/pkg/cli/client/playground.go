@@ -22,6 +22,10 @@ type PlaygroundProvider struct {
 
 var _ Provider = (*PlaygroundProvider)(nil)
 
+func (g *PlaygroundProvider) GetStackName() string {
+	return "" // Playground does not use stacks
+}
+
 func (g *PlaygroundProvider) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		return nil, errors.New("DEFANG_PULUMI_DIR is set, but not supported by the Playground provider")
@@ -160,9 +164,5 @@ func (g *PlaygroundProvider) PrepareDomainDelegation(ctx context.Context, req Pr
 func (g *PlaygroundProvider) SetCanIUseConfig(*defangv1.CanIUseResponse) {}
 
 func (PlaygroundProvider) GetStackNameForDomain() string {
-	return ""
-}
-
-func (PlaygroundProvider) GetStackName() string {
 	return ""
 }

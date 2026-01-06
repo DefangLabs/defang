@@ -1,0 +1,256 @@
+{
+  "version": 3,
+  "checkpoint": {
+    "stack": "organization/unit-test/beta",
+    "latest": {
+      "manifest": {
+        "time": "2025-12-30T20:15:25.987193631Z",
+        "magic": "ebe3b71ffbd5a95eec1b5cb82516892f944b47f36c5b1ed4f716a76cb5fce31a",
+        "version": "v3.187.0"
+      },
+      "secrets_providers": {
+        "type": "passphrase",
+        "state": {
+          "salt": "v1:N/gsVh0hp2Y=:v1:vKFo17IX1lfReUhn:3YUDgAOnEAHur31kaALAfG+m9AWm9A=="
+        }
+      },
+      "resources": [
+        {
+          "urn": "urn:pulumi:beta::unit-test::pulumi:pulumi:Stack::unit-test-beta",
+          "custom": false,
+          "type": "pulumi:pulumi:Stack",
+          "outputs": {
+            "albArn": "arn:aws:elasticloadbalancing:us-west-2:381492210770:loadbalancer/app/defang-unit-test-beta-alb/89fe52819232fa0e",
+            "fqdn": "unit-test.defang.defang.app",
+            "kanikoLogGroupArn": "arn:aws:logs:us-west-2:381492210770:log-group:/Defang/unit-test/beta/builds",
+            "privateLbCIDRs": ["10.0.96.0/20", "10.0.32.0/20", "10.0.160.0/20"],
+            "publicNatIps": [],
+            "serviceLogGroupArn": "arn:aws:logs:us-west-2:381492210770:log-group:/Defang/unit-test/beta/logs",
+            "state": "projects/unit-test/beta/project.pb",
+            "vpcId": "vpc-093fdaf6489d40160"
+          },
+          "created": "2025-12-01T21:38:04.35961161Z",
+          "modified": "2025-12-01T21:38:04.35961161Z"
+        },
+        {
+          "urn": "urn:pulumi:beta::unit-test::defang-mvp:shared/ecs/defang:Defang::defang",
+          "custom": false,
+          "type": "defang-mvp:shared/ecs/defang:Defang",
+          "parent": "urn:pulumi:beta::unit-test::pulumi:pulumi:Stack::unit-test-beta",
+          "created": "2025-12-01T21:38:08.057478966Z",
+          "modified": "2025-12-01T21:38:08.057478966Z"
+        },
+        {
+          "urn": "urn:pulumi:beta::unit-test::pulumi:providers:aws::default_6_57_0",
+          "custom": true,
+          "id": "9fad7419-d372-490a-a19f-dc5d67256dd1",
+          "type": "pulumi:providers:aws",
+          "inputs": {
+            "__internal": {},
+            "defaultTags": "{\"tags\":{\"defang:org\":\"defang\",\"defang:project\":\"unit-test\",\"defang:stack\":\"beta\",\"defang:version\":\"0.6.0-1308-g9d86d1c4\"}}",
+            "region": "us-west-2",
+            "skipCredentialsValidation": "false",
+            "skipRegionValidation": "true",
+            "version": "6.57.0"
+          },
+          "outputs": {
+            "defaultTags": "{\"tags\":{\"defang:org\":\"defang\",\"defang:project\":\"unit-test\",\"defang:stack\":\"beta\",\"defang:version\":\"0.6.0-1308-g9d86d1c4\"}}",
+            "region": "us-west-2",
+            "skipCredentialsValidation": "false",
+            "skipRegionValidation": "true",
+            "version": "6.57.0"
+          },
+          "created": "2025-12-01T21:38:08.169707888Z",
+          "modified": "2025-12-30T19:52:44.895505106Z"
+        },
+        {
+          "urn": "urn:pulumi:beta::unit-test::defang-mvp:shared/ecs/defang:Defang$aws:ecs/cluster:Cluster::cluster",
+          "custom": true,
+          "id": "arn:aws:ecs:us-west-2:381492210770:cluster/Defang-unit-test-beta-cluster",
+          "type": "aws:ecs/cluster:Cluster",
+          "inputs": {
+            "__defaults": [],
+            "name": "Defang-unit-test-beta-cluster",
+            "tags": {
+              "defang:org": "defang",
+              "defang:project": "unit-test",
+              "defang:stack": "beta",
+              "defang:version": "0.6.0-1308-g9d86d1c4"
+            },
+            "tagsAll": {
+              "defang:org": "defang",
+              "defang:project": "unit-test",
+              "defang:stack": "beta",
+              "defang:version": "0.6.0-1308-g9d86d1c4"
+            }
+          },
+          "outputs": {
+            "arn": "arn:aws:ecs:us-west-2:381492210770:cluster/Defang-unit-test-beta-cluster",
+            "configuration": null,
+            "id": "arn:aws:ecs:us-west-2:381492210770:cluster/Defang-unit-test-beta-cluster",
+            "name": "Defang-unit-test-beta-cluster",
+            "serviceConnectDefaults": null,
+            "settings": [
+              {
+                "name": "containerInsights",
+                "value": "disabled"
+              }
+            ],
+            "tags": {
+              "defang:org": "defang",
+              "defang:project": "unit-test",
+              "defang:stack": "beta",
+              "defang:version": "0.6.0-1308-g9d86d1c4"
+            },
+            "tagsAll": {
+              "defang:org": "defang",
+              "defang:project": "unit-test",
+              "defang:stack": "beta",
+              "defang:version": "0.6.0-1308-g9d86d1c4"
+            }
+          },
+          "parent": "urn:pulumi:beta::unit-test::defang-mvp:shared/ecs/defang:Defang::defang",
+          "provider": "urn:pulumi:beta::unit-test::pulumi:providers:aws::default_6_57_0::9fad7419-d372-490a-a19f-dc5d67256dd1",
+          "created": "2025-12-01T21:38:20.898292203Z",
+          "modified": "2025-12-30T19:52:47.143024068Z"
+        },
+        {
+          "urn": "urn:pulumi:beta::unit-test::defang-mvp:shared/ecs/defang:Defang$aws:ecs/clusterCapacityProviders:ClusterCapacityProviders::cluster-capacity-providers",
+          "custom": true,
+          "id": "Defang-unit-test-beta-cluster",
+          "type": "aws:ecs/clusterCapacityProviders:ClusterCapacityProviders",
+          "inputs": {
+            "__defaults": [],
+            "capacityProviders": ["FARGATE", "FARGATE_SPOT"],
+            "clusterName": "Defang-unit-test-beta-cluster",
+            "defaultCapacityProviderStrategies": [
+              {
+                "__defaults": ["base"],
+                "base": 0,
+                "capacityProvider": "FARGATE_SPOT",
+                "weight": 100
+              }
+            ]
+          },
+          "outputs": {
+            "capacityProviders": ["FARGATE", "FARGATE_SPOT"],
+            "clusterName": "Defang-unit-test-beta-cluster",
+            "defaultCapacityProviderStrategies": [
+              {
+                "base": 0,
+                "capacityProvider": "FARGATE_SPOT",
+                "weight": 100
+              }
+            ],
+            "id": "Defang-unit-test-beta-cluster"
+          },
+          "parent": "urn:pulumi:beta::unit-test::defang-mvp:shared/ecs/defang:Defang::defang",
+          "dependencies": [
+            "urn:pulumi:beta::unit-test::defang-mvp:shared/ecs/defang:Defang$aws:ecs/cluster:Cluster::cluster"
+          ],
+          "provider": "urn:pulumi:beta::unit-test::pulumi:providers:aws::default_6_57_0::9fad7419-d372-490a-a19f-dc5d67256dd1",
+          "propertyDependencies": {
+            "clusterName": [
+              "urn:pulumi:beta::unit-test::defang-mvp:shared/ecs/defang:Defang$aws:ecs/cluster:Cluster::cluster"
+            ]
+          },
+          "created": "2025-12-01T21:38:31.508199395Z",
+          "modified": "2025-12-30T19:59:17.435050198Z"
+        }
+      ],
+      "pending_operations": [
+        {
+          "resource": {
+            "urn": "urn:pulumi:beta::unit-test::aws:acm/certificateValidation:CertificateValidation::*.unit-test.defang.defang.appValidation",
+            "custom": true,
+            "type": "aws:acm/certificateValidation:CertificateValidation",
+            "inputs": {
+              "__defaults": [],
+              "certificateArn": "arn:aws:acm:us-west-2:381492210770:certificate/5c9e495b-be16-451f-af9e-229748c4fd9a",
+              "validationRecordFqdns": [
+                "_3a0f96619707cf6fd9e0130eed627efa.unit-test.defang.defang.app"
+              ]
+            },
+            "parent": "urn:pulumi:beta::unit-test::pulumi:pulumi:Stack::unit-test-beta",
+            "dependencies": [
+              "urn:pulumi:beta::unit-test::aws:acm/certificate:Certificate::*.unit-test.defang.defang.app",
+              "urn:pulumi:beta::unit-test::aws:route53/record:Record::_3a0f96619707cf6fd9e0130eed627efa.unit-test.defang.defang.app_CNAME"
+            ],
+            "provider": "urn:pulumi:beta::unit-test::pulumi:providers:aws::default_6_57_0::9fad7419-d372-490a-a19f-dc5d67256dd1",
+            "propertyDependencies": {
+              "certificateArn": [
+                "urn:pulumi:beta::unit-test::aws:acm/certificate:Certificate::*.unit-test.defang.defang.app"
+              ],
+              "validationRecordFqdns": [
+                "urn:pulumi:beta::unit-test::aws:acm/certificate:Certificate::*.unit-test.defang.defang.app",
+                "urn:pulumi:beta::unit-test::aws:route53/record:Record::_3a0f96619707cf6fd9e0130eed627efa.unit-test.defang.defang.app_CNAME"
+              ]
+            }
+          },
+          "type": "creating"
+        },
+        {
+          "resource": {
+            "urn": "urn:pulumi:beta::unit-test::aws:acm/certificateValidation:CertificateValidation::*.unit-test.defang.defang.appValidation",
+            "custom": true,
+            "type": "aws:acm/certificateValidation:CertificateValidation",
+            "inputs": {
+              "__defaults": [],
+              "certificateArn": "arn:aws:acm:us-west-2:381492210770:certificate/178e1953-f430-40f5-9644-0821a53f86a3",
+              "validationRecordFqdns": [
+                "_3a0f96619707cf6fd9e0130eed627efa.unit-test.defang.defang.app"
+              ]
+            },
+            "parent": "urn:pulumi:beta::unit-test::pulumi:pulumi:Stack::unit-test-beta",
+            "dependencies": [
+              "urn:pulumi:beta::unit-test::aws:acm/certificate:Certificate::*.unit-test.defang.defang.app",
+              "urn:pulumi:beta::unit-test::aws:route53/record:Record::_3a0f96619707cf6fd9e0130eed627efa.unit-test.defang.defang.app_CNAME"
+            ],
+            "provider": "urn:pulumi:beta::unit-test::pulumi:providers:aws::default_6_57_0::9fad7419-d372-490a-a19f-dc5d67256dd1",
+            "propertyDependencies": {
+              "certificateArn": [
+                "urn:pulumi:beta::unit-test::aws:acm/certificate:Certificate::*.unit-test.defang.defang.app"
+              ],
+              "validationRecordFqdns": [
+                "urn:pulumi:beta::unit-test::aws:acm/certificate:Certificate::*.unit-test.defang.defang.app",
+                "urn:pulumi:beta::unit-test::aws:route53/record:Record::_3a0f96619707cf6fd9e0130eed627efa.unit-test.defang.defang.app_CNAME"
+              ]
+            }
+          },
+          "type": "creating"
+        },
+        {
+          "resource": {
+            "urn": "urn:pulumi:beta::unit-test::aws:acm/certificateValidation:CertificateValidation::*.unit-test.defang.defang.appValidation",
+            "custom": true,
+            "type": "aws:acm/certificateValidation:CertificateValidation",
+            "inputs": {
+              "__defaults": [],
+              "certificateArn": "arn:aws:acm:us-west-2:381492210770:certificate/178e1953-f430-40f5-9644-0821a53f86a3",
+              "validationRecordFqdns": [
+                "_3a0f96619707cf6fd9e0130eed627efa.unit-test.defang.defang.app"
+              ]
+            },
+            "parent": "urn:pulumi:beta::unit-test::pulumi:pulumi:Stack::unit-test-beta",
+            "dependencies": [
+              "urn:pulumi:beta::unit-test::aws:acm/certificate:Certificate::*.unit-test.defang.defang.app",
+              "urn:pulumi:beta::unit-test::aws:route53/record:Record::_3a0f96619707cf6fd9e0130eed627efa.unit-test.defang.defang.app_CNAME"
+            ],
+            "provider": "urn:pulumi:beta::unit-test::pulumi:providers:aws::default_6_57_0::9fad7419-d372-490a-a19f-dc5d67256dd1",
+            "propertyDependencies": {
+              "certificateArn": [
+                "urn:pulumi:beta::unit-test::aws:acm/certificate:Certificate::*.unit-test.defang.defang.app"
+              ],
+              "validationRecordFqdns": [
+                "urn:pulumi:beta::unit-test::aws:acm/certificate:Certificate::*.unit-test.defang.defang.app",
+                "urn:pulumi:beta::unit-test::aws:route53/record:Record::_3a0f96619707cf6fd9e0130eed627efa.unit-test.defang.defang.app_CNAME"
+              ]
+            }
+          },
+          "type": "creating"
+        }
+      ],
+      "metadata": {}
+    }
+  }
+}

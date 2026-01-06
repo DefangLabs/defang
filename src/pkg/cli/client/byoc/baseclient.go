@@ -68,6 +68,10 @@ func NewByocBaseClient(tenantLabel types.TenantLabel, backend ProjectBackend, st
 	}
 }
 
+func (b *ByocBaseClient) GetStackName() string {
+	return b.PulumiStack
+}
+
 func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
 	return nil, client.ErrNotImplemented("AI debugging is not yet supported for BYOC")
 }
@@ -304,10 +308,6 @@ func (b *ByocBaseClient) GetStackNameForDomain() string {
 	if b.PulumiStack == stacks.DefaultBeta {
 		return ""
 	}
-	return b.PulumiStack
-}
-
-func (b *ByocBaseClient) GetStackName() string {
 	return b.PulumiStack
 }
 

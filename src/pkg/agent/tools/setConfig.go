@@ -18,14 +18,17 @@ type SetConfigParams struct {
 	Value string `json:"value" jsonschema:"required"`
 }
 
-func HandleSetConfig(ctx context.Context, loader client.ProjectLoader, params SetConfigParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
+func HandleSetConfig(ctx context.Context, loader client.Loader, params SetConfigParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, sc.Cluster)
 	if err != nil {
 		return "", fmt.Errorf("Could not connect: %w", err)
 	}
 
-	sm := stacks.NewManager(params.WorkingDirectory)
+	sm, err := stacks.NewManager(client, loader.TargetDirectory(), params.ProjectName)
+	if err != nil {
+		return "", fmt.Errorf("failed to create stack manager: %w", err)
+	}
 	pp := NewProviderPreparer(cli, ec, client, sm)
 	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
 	if err != nil {

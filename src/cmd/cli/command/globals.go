@@ -8,8 +8,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/migrate"
-	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -77,7 +75,6 @@ type GlobalConfig struct {
 	HideUpdate     bool
 	ModelID        string // only for debug/generate; Pro users
 	NonInteractive bool
-	SourcePlatform migrate.SourcePlatform // only used for 'defang init' command
 	Stack          stacks.StackParameters
 	Tenant         types.TenantNameOrID // workspace
 	Verbose        bool
@@ -89,15 +86,14 @@ This instance is initialized with default values and is modified throughout
 the application lifecycle as configuration sources are processed (Stack files, environment
 variables, and command-line flags).
 */
-var global GlobalConfig = GlobalConfig{
+var global = GlobalConfig{
 	ColorMode:      ColorAuto,
 	Cluster:        client.DefangFabric,
 	Debug:          pkg.GetenvBool("DEFANG_DEBUG"),
 	HasTty:         term.IsTerminal(),
 	HideUpdate:     false,
 	NonInteractive: !term.IsTerminal(),
-	Stack:          stacks.StackParameters{Provider: client.ProviderAuto, Mode: modes.ModeUnspecified},
-	SourcePlatform: migrate.SourcePlatformUnspecified, // default to auto-detecting the source platform
+	Stack:          stacks.StackParameters{Provider: client.ProviderAuto},
 	Verbose:        false,
 }
 
@@ -207,15 +203,6 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 		} else if fromEnv, ok := os.LookupEnv("DEFANG_ORG"); ok {
 			r.Tenant = types.TenantNameOrID(fromEnv)
 			term.Warn("DEFANG_ORG is deprecated; use DEFANG_WORKSPACE instead")
-		}
-	}
-
-	if !flags.Changed("from") {
-		if fromEnv, ok := os.LookupEnv("DEFANG_SOURCE_PLATFORM"); ok {
-			err = r.SourcePlatform.Set(fromEnv)
-			if err != nil {
-				return err
-			}
 		}
 	}
 

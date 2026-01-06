@@ -286,13 +286,13 @@ func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[string
 				term.Debugf("Error listing object in bucket %s: %v", bucketName, annotateGcpError(err))
 				continue
 			}
-			stack, err := byoc.ParsePulumiStackObject(ctx, gcpObj{obj}, bucketName, prefix, objLoader)
+			stack, err := byoc.ParsePulumiStateFile(ctx, gcpObj{obj}, bucketName, objLoader)
 			if err != nil {
 				term.Debugf("Skipping %q in bucket %s: %v", obj.Name, bucketName, annotateGcpError(err))
 				continue
 			}
-			if stack != "" {
-				if !yield(stack) {
+			if stack != nil {
+				if !yield(stack.String()) {
 					break
 				}
 			}
@@ -303,7 +303,7 @@ func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[string
 func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
 	projectId := getGcpProjectID()
 	if projectId == "" {
-		return nil, errors.New("GCP_PROJECT_ID or CLOUDSDK_CORE_PROJECT must be set for GCP projects")
+		return nil, errors.New("GCP_PROJECT_ID or CLOUDSDK_CORE_PROJECT must be set for GCP projects; use 'gcloud projects list' to see available project ids")
 	}
 
 	// check whether the ADC is logged in by trying to get the current account email

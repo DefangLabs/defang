@@ -379,3 +379,113 @@ func TestLoad(t *testing.T) {
 		assert.Equal(t, os.Getenv("GCP_LOCATION"), stackParams.Region)
 	})
 }
+
+func TestParamsToMap(t *testing.T) {
+	tests := []struct {
+		name        string
+		params      StackParameters
+		expectedMap map[string]string
+	}{
+		{
+			name: "AWS params",
+			params: StackParameters{
+				Name:         "teststack",
+				Provider:     client.ProviderAWS,
+				Region:       "us-west-2",
+				AWSProfile:   "default",
+				GCPProjectID: "",
+				Mode:         modes.ModeAffordable,
+			},
+			expectedMap: map[string]string{
+				"DEFANG_PROVIDER": "aws",
+				"AWS_REGION":      "us-west-2",
+				"AWS_PROFILE":     "default",
+				"DEFANG_MODE":     "affordable",
+			},
+		},
+		{
+			name: "GCP params",
+			params: StackParameters{
+				Name:         "gcpstack",
+				Provider:     client.ProviderGCP,
+				Region:       "us-central1",
+				AWSProfile:   "",
+				GCPProjectID: "gcp-project-123",
+				Mode:         modes.ModeBalanced,
+			},
+			expectedMap: map[string]string{
+				"DEFANG_PROVIDER": "gcp",
+				"GCP_LOCATION":    "us-central1",
+				"GCP_PROJECT_ID":  "gcp-project-123",
+				"DEFANG_MODE":     "balanced",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resultMap := tt.params.ToMap()
+			if len(resultMap) != len(tt.expectedMap) {
+				t.Errorf("Params.ToMap() = %v, want %v", resultMap, tt.expectedMap)
+			}
+			for key, expectedValue := range tt.expectedMap {
+				if resultMap[key] != expectedValue {
+					t.Errorf("Params.ToMap()[%q] = %q, want %q", key, resultMap[key], expectedValue)
+				}
+			}
+		})
+	}
+}
+
+func TestParamsFromMap(t *testing.T) {
+	tests := []struct {
+		name           string
+		inputMap       map[string]string
+		expectedParams StackParameters
+	}{
+		{
+			name: "GCP params",
+			inputMap: map[string]string{
+				"DEFANG_PROVIDER": "gcp",
+				"GCP_LOCATION":    "us-central1",
+				"DEFANG_MODE":     "balanced",
+			},
+			expectedParams: StackParameters{
+				Provider: client.ProviderGCP,
+				Region:   "us-central1",
+				Mode:     modes.ModeBalanced,
+			},
+		},
+		{
+			name: "AWS params",
+			inputMap: map[string]string{
+				"DEFANG_PROVIDER": "aws",
+				"AWS_REGION":      "us-west-2",
+				"AWS_PROFILE":     "default",
+				"DEFANG_MODE":     "affordable",
+			},
+			expectedParams: StackParameters{
+				Provider:   client.ProviderAWS,
+				Region:     "us-west-2",
+				AWSProfile: "default",
+				Mode:       modes.ModeAffordable,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resultParams, err := ParamsFromMap(tt.inputMap)
+			if err != nil {
+				t.Errorf("ParamsFromMap() error = %v", err)
+			}
+
+			if resultParams.Provider != tt.expectedParams.Provider ||
+				resultParams.Region != tt.expectedParams.Region ||
+				resultParams.Mode != tt.expectedParams.Mode ||
+				resultParams.AWSProfile != tt.expectedParams.AWSProfile {
+				t.Errorf("ParamsFromMap() = %+v, want %+v", resultParams, tt.expectedParams)
+			}
+		})
+	}
+}
