@@ -73,8 +73,8 @@ func TestComposeDown(t *testing.T) {
 				t.Errorf("ComposeDown() failed: expected eTagSomething, got: %s", etag)
 			}
 			if req, ok := mockProvider.request["CdCommandRequest"]; ok {
-				req, err := req.(*client.CdCommandRequest)
-				if !err {
+				req, ok := req.(*client.CdCommandRequest)
+				if !ok {
 					t.Errorf("ComposeDown() failed: expected CdCommandRequest, got %v", req)
 				}
 				if req.Project != proj.Name {
@@ -98,8 +98,8 @@ func TestComposeDown(t *testing.T) {
 				t.Errorf("ComposeDown() failed: expected eTagSomething, got: %s", etag)
 			}
 			if req, ok := mockProvider.request["DeleteRequest"]; ok {
-				req, err := req.(*defangv1.DeleteRequest)
-				if !err {
+				req, ok := req.(*defangv1.DeleteRequest)
+				if !ok {
 					t.Errorf("ComposeDown() failed: expected DeleteRequest, got %v", req)
 				}
 				if req.Project != proj.Name || len(req.Names) != len(services) {

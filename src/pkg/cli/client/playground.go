@@ -85,7 +85,7 @@ func (g *PlaygroundProvider) QueryLogs(ctx context.Context, req *defangv1.TailRe
 }
 
 func (g *PlaygroundProvider) CdCommand(ctx context.Context, req CdCommandRequest) (types.ETag, error) {
-	if req.Command == "down" {
+	if req.Command == "destroy" {
 		return g.destroy(ctx, &defangv1.DestroyRequest{Project: req.Project})
 	}
 	return "", errors.New("the CD command is not valid for the Defang playground; did you forget --provider?")

@@ -18,7 +18,7 @@ func ComposeDown(ctx context.Context, projectName string, fabric client.FabricCl
 
 	if len(names) == 0 {
 		// If no names are provided, destroy the entire project
-		return CdCommand(ctx, projectName, provider, fabric, "down")
+		return CdCommand(ctx, projectName, provider, fabric, "destroy")
 	}
 
 	// If names are provided, treat it as a delete = partial update
