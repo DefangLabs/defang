@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -96,16 +97,10 @@ func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
 	for _, stack := range stackMap {
 		stackList = append(stackList, stack)
 	}
-	// sort stacks by name asc
+
 	// sort stacks by name asc
 	slices.SortFunc(stackList, func(a, b StackListItem) int {
-		if a.Name < b.Name {
-			return -1
-		}
-		if a.Name > b.Name {
-			return 1
-		}
-		return 0
+		return strings.Compare(a.Name, b.Name)
 	})
 
 	return stackList, nil
