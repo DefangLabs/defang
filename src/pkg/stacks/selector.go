@@ -108,8 +108,8 @@ func printStacksInfoMessage(stacks []string) {
 				"Creating a new Stack will result in a separate deployment instance."
 		}
 		infoLine += "\n   To learn more about Stacks, visit: https://docs.defang.io/docs/concepts/stacks"
-		term.Info(infoLine + "\n")
+		term.Println(infoLine)
 	}
 	executable, _ := os.Executable()
-	term.Infof("To skip this prompt, run %s up --stack=%s", filepath.Base(executable), "<stack_name>")
+	term.Printf("To skip this prompt, run %s up --stack=%s\n", filepath.Base(executable), "<stack_name>")
 }
