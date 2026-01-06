@@ -1272,9 +1272,9 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 	if err != nil {
 		return nil, "", fmt.Errorf("unable to list stacks: %w", err)
 	}
-	stackNames := make([]string, 0, len(knownStacks))
-	for _, s := range knownStacks {
-		stackNames = append(stackNames, s.Name)
+	stackNames := make([]string, len(knownStacks))
+	for i, s := range knownStacks {
+		stackNames[i] = s.Name
 	}
 	if RootCmd.PersistentFlags().Changed("provider") {
 		term.Warn("Warning: --provider flag is deprecated. Please use --stack instead. To learn about stacks, visit https://docs.defang.io/docs/concepts/stacks")
