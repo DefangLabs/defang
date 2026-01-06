@@ -1,11 +1,16 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"gopkg.in/yaml.v3"
 )
 
@@ -32,4 +37,35 @@ func PrintObject(root string, data proto.Message) error {
 	}
 	term.Println(string(bytes))
 	return nil
+}
+
+type putDeploymentParams struct {
+	Action       defangv1.DeploymentAction
+	ETag         types.ETag
+	Mode         defangv1.DeploymentMode
+	ProjectName  string
+	ServiceCount int
+}
+
+func putDeployment(ctx context.Context, provider client.Provider, fabric client.FabricClient, req putDeploymentParams) error {
+	accountInfo, err := provider.AccountInfo(ctx)
+	if err != nil {
+		return err // should not happen because we checked earlier
+	}
+
+	return fabric.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
+		Deployment: &defangv1.Deployment{
+			Action:            req.Action,
+			Id:                req.ETag,
+			Project:           req.ProjectName,
+			Provider:          accountInfo.Provider.Value(),
+			ProviderAccountId: accountInfo.AccountID,
+			ProviderString:    string(accountInfo.Provider),
+			Region:            accountInfo.Region,
+			ServiceCount:      int32(req.ServiceCount), // #nosec G115 - service count will not overflow int32
+			Stack:             provider.GetStackName(),
+			Timestamp:         timestamppb.Now(),
+			Mode:              req.Mode,
+		},
+	})
 }

@@ -27,9 +27,10 @@ func (mp ErrMultipleProjects) Error() string {
 }
 
 type ProjectBackend interface {
-	BootstrapList(context.Context, bool) (iter.Seq[string], error)
-	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
+	CdCommand(context.Context, client.CdCommandRequest) (types.ETag, error)
+	CdList(context.Context, bool) (iter.Seq[string], error)
 	GetPrivateDomain(projectName string) string
+	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 }
 
 type ServiceInfoUpdater interface {
@@ -91,7 +92,7 @@ func (b *ByocBaseClient) ServicePrivateDNS(serviceName string) string {
 
 func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) {
 	// Get the list of projects from remote
-	stacks, err := b.projectBackend.BootstrapList(ctx, false)
+	stacks, err := b.projectBackend.CdList(ctx, false)
 	if err != nil {
 		return "", fmt.Errorf("no cloud projects found: %w", err)
 	}

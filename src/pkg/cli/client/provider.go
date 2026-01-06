@@ -17,7 +17,7 @@ type DNSResolver interface {
 	UpdateShardDomain(ctx context.Context) error
 }
 
-type BootstrapCommandRequest struct {
+type CdCommandRequest struct {
 	Command string
 	Project string
 }
@@ -43,14 +43,13 @@ type ServerStream[Res any] interface {
 type Provider interface {
 	DNSResolver
 	AccountInfo(context.Context) (*AccountInfo, error)
-	BootstrapCommand(context.Context, BootstrapCommandRequest) (types.ETag, error)
-	BootstrapList(context.Context, bool) (iter.Seq[string], error)
+	CdCommand(context.Context, CdCommandRequest) (types.ETag, error)
+	CdList(context.Context, bool) (iter.Seq[string], error)
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
 	DelayBeforeRetry(context.Context) error
 	Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error)
 	DeleteConfig(context.Context, *defangv1.Secrets) error
 	Deploy(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
-	Destroy(context.Context, *defangv1.DestroyRequest) (types.ETag, error)
 	GetDeploymentStatus(context.Context) error // nil means deployment is pending/running; io.EOF means deployment is done
 	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 	GetService(context.Context, *defangv1.GetRequest) (*defangv1.ServiceInfo, error)

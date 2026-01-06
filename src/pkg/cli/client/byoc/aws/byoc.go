@@ -923,7 +923,7 @@ func (b *ByocAws) TearDownCD(ctx context.Context) error {
 	return b.driver.TearDown(ctx)
 }
 
-func (b *ByocAws) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (string, error) {
+func (b *ByocAws) CdCommand(ctx context.Context, req client.CdCommandRequest) (string, error) {
 	if err := b.SetUpCD(ctx); err != nil {
 		return "", err
 	}
@@ -942,10 +942,6 @@ func (b *ByocAws) BootstrapCommand(ctx context.Context, req client.BootstrapComm
 	return etag, nil
 }
 
-func (b *ByocAws) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (string, error) {
-	return b.BootstrapCommand(ctx, client.BootstrapCommandRequest{Project: req.Project, Command: "down"})
-}
-
 func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
 	ids := make([]string, len(secrets.Names))
 	for i, name := range secrets.Names {
@@ -958,7 +954,7 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	return nil
 }
 
-func (b *ByocAws) BootstrapList(ctx context.Context, allRegions bool) (iter.Seq[string], error) {
+func (b *ByocAws) CdList(ctx context.Context, allRegions bool) (iter.Seq[string], error) {
 	if allRegions {
 		s3Client, err := newS3Client(ctx, b.driver.Region)
 		if err != nil {

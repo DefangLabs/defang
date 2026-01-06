@@ -13,7 +13,7 @@ import (
 type mockComposeDown struct {
 	client.MockProvider
 	MockAccountInfo func(ctx context.Context) (*client.AccountInfo, error)
-	MockDestroy     func(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error)
+	MockCdCommand   func(ctx context.Context, req client.CdCommandRequest) (types.ETag, error)
 	MockDelete      func(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error)
 	request         map[string]any
 }
@@ -24,11 +24,11 @@ func (m mockComposeDown) AccountInfo(
 	return m.MockAccountInfo(ctx)
 }
 
-func (m mockComposeDown) Destroy(
+func (m mockComposeDown) CdCommand(
 	ctx context.Context,
-	req *defangv1.DestroyRequest,
+	req client.CdCommandRequest,
 ) (types.ETag, error) {
-	return m.MockDestroy(ctx, req)
+	return m.MockCdCommand(ctx, req)
 }
 
 func (m mockComposeDown) Delete(
@@ -52,8 +52,8 @@ func TestComposeDown(t *testing.T) {
 		MockAccountInfo: func(ctx context.Context) (*client.AccountInfo, error) {
 			return &client.AccountInfo{}, nil
 		},
-		MockDestroy: func(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error) {
-			mockProvider.request["DestroyRequest"] = req
+		MockCdCommand: func(ctx context.Context, req client.CdCommandRequest) (types.ETag, error) {
+			mockProvider.request["CdCommandRequest"] = &req
 			return "eTagDestroy", nil
 		},
 		MockDelete: func(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
@@ -72,10 +72,10 @@ func TestComposeDown(t *testing.T) {
 			if etag != "eTagDestroy" {
 				t.Errorf("ComposeDown() failed: expected eTagSomething, got: %s", etag)
 			}
-			if req, ok := mockProvider.request["DestroyRequest"]; ok {
-				req, err := req.(*defangv1.DestroyRequest)
+			if req, ok := mockProvider.request["CdCommandRequest"]; ok {
+				req, err := req.(*client.CdCommandRequest)
 				if !err {
-					t.Errorf("ComposeDown() failed: expected DestroyRequest, got %v", req)
+					t.Errorf("ComposeDown() failed: expected CdCommandRequest, got %v", req)
 				}
 				if req.Project != proj.Name {
 					t.Errorf("ComposeDown() failed: expected project %s, got: %s", proj.Name, req.Project)
@@ -100,7 +100,7 @@ func TestComposeDown(t *testing.T) {
 			if req, ok := mockProvider.request["DeleteRequest"]; ok {
 				req, err := req.(*defangv1.DeleteRequest)
 				if !err {
-					t.Errorf("ComposeDown() failed: expected DestroyRequest, got %v", req)
+					t.Errorf("ComposeDown() failed: expected DeleteRequest, got %v", req)
 				}
 				if req.Project != proj.Name || len(req.Names) != len(services) {
 					t.Errorf("ComposeDown() failed: expected project %s, got: %s", proj.Name, req.Project)

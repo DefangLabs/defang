@@ -221,7 +221,7 @@ func (b *ByocDo) GetDeploymentStatus(ctx context.Context) error {
 	}
 }
 
-func (b *ByocDo) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (string, error) {
+func (b *ByocDo) CdCommand(ctx context.Context, req client.CdCommandRequest) (string, error) {
 	if err := b.SetUpCD(ctx); err != nil {
 		return "", err
 	}
@@ -241,7 +241,7 @@ func (b *ByocDo) BootstrapCommand(ctx context.Context, req client.BootstrapComma
 	return etag, nil
 }
 
-func (b *ByocDo) BootstrapList(ctx context.Context, _allRegions bool) (iter.Seq[string], error) {
+func (b *ByocDo) CdList(ctx context.Context, _allRegions bool) (iter.Seq[string], error) {
 	s3client, err := b.driver.CreateS3Client()
 	if err != nil {
 		return nil, err
@@ -272,10 +272,6 @@ func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLReq
 
 func (b *ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
 	return nil, client.ErrNotImplemented("not implemented for DigitalOcean")
-}
-
-func (b *ByocDo) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (string, error) {
-	return b.BootstrapCommand(ctx, client.BootstrapCommandRequest{Project: req.Project, Command: "down"})
 }
 
 func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {

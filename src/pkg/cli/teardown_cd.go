@@ -15,7 +15,7 @@ func TearDownCD(ctx context.Context, provider client.Provider, force bool) error
 		return errors.New("dry run")
 	}
 	if !force {
-		if list, err := provider.BootstrapList(ctx, false); err != nil {
+		if list, err := provider.CdList(ctx, false); err != nil {
 			return fmt.Errorf("could not get list of services; use --force to tear down anyway: %w", err)
 		} else {
 			for range list {

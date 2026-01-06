@@ -84,10 +84,14 @@ func (g *PlaygroundProvider) QueryLogs(ctx context.Context, req *defangv1.TailRe
 	return g.GetFabricClient().Tail(ctx, connect.NewRequest(req))
 }
 
-func (g *PlaygroundProvider) BootstrapCommand(ctx context.Context, req BootstrapCommandRequest) (types.ETag, error) {
+func (g *PlaygroundProvider) CdCommand(ctx context.Context, req CdCommandRequest) (types.ETag, error) {
+	if req.Command == "down" {
+		return g.destroy(ctx, &defangv1.DestroyRequest{Project: req.Project})
+	}
 	return "", errors.New("the CD command is not valid for the Defang playground; did you forget --provider?")
 }
-func (g *PlaygroundProvider) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error) {
+
+func (g *PlaygroundProvider) destroy(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error) {
 	resp, err := getMsg(g.GetFabricClient().Destroy(ctx, connect.NewRequest(req)))
 	if err != nil {
 		return "", err
@@ -103,7 +107,7 @@ func (g *PlaygroundProvider) SetUpCD(ctx context.Context) error {
 	return errors.New("this command is not valid for the Defang playground; did you forget --provider?")
 }
 
-func (g *PlaygroundProvider) BootstrapList(context.Context, bool) (iter.Seq[string], error) {
+func (g *PlaygroundProvider) CdList(context.Context, bool) (iter.Seq[string], error) {
 	return nil, errors.New("this command is not valid for the Defang playground; did you forget --provider?")
 }
 

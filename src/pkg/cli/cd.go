@@ -11,62 +11,72 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func BootstrapCommand(ctx context.Context, projectName string, verbose bool, provider client.Provider, cmd string, fabric client.FabricClient) error {
+func CdCommand(ctx context.Context, projectName string, provider client.Provider, fabric client.FabricClient, cmd string) (types.ETag, error) {
 	if projectName == "" { // projectName is empty for "list --remote"
 		term.Infof("Running CD command %q", cmd)
 	} else {
 		term.Infof("Running CD command %q in project %q", cmd, projectName)
 	}
 	if dryrun.DoDryRun {
-		return dryrun.ErrDryRun
+		return "", dryrun.ErrDryRun
 	}
 
-	since := time.Now()
-	etag, err := provider.BootstrapCommand(ctx, client.BootstrapCommandRequest{Project: projectName, Command: cmd})
+	etag, err := provider.CdCommand(ctx, client.CdCommandRequest{Project: projectName, Command: cmd})
 	if err != nil || etag == "" {
-		return err
+		return "", err
 	}
 
 	if cmd == "down" || cmd == "destroy" {
-		err = fabric.DeleteSubdomainZone(ctx, &defangv1.DeleteSubdomainZoneRequest{
-			Project: projectName,
-			Stack:   provider.GetStackNameForDomain(),
-		})
+		err := postDown(ctx, projectName, provider, fabric, etag)
 		if err != nil {
-			term.Warn("DeleteSubdomainZone failed:", err)
-		} else {
-			// If DeleteSubdomainZone succeeded, we're in the right workspace to mark the deployment as destroyed
-			accountInfo, err := provider.AccountInfo(ctx)
-			if err == nil {
-				err = fabric.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
-					Deployment: &defangv1.Deployment{
-						Action:            defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN,
-						Id:                etag,
-						Project:           projectName,
-						Provider:          accountInfo.Provider.Value(),
-						ProviderAccountId: accountInfo.AccountID,
-						ProviderString:    string(accountInfo.Provider),
-						Region:            accountInfo.Region,
-						Stack:             provider.GetStackName(),
-						Timestamp:         timestamppb.New(time.Now()),
-					},
-				})
-			}
-			if err != nil {
-				term.Debug("PutDeployment failed:", err)
-				term.Warn("Unable to update deployment history, but deployment will proceed anyway.")
-			}
+			term.Debugf("postDown failed: %v", err)
+			term.Warn("Unable to update deployment history; deployment will proceed anyway.")
 		}
+	}
+	return etag, nil
+}
+
+func postDown(ctx context.Context, projectName string, provider client.Provider, fabric client.FabricClient, etag types.ETag) error {
+	// Special bookkeeping for "down" commands: delete the subdomain zone and mark deployment as destroyed
+	err := fabric.DeleteSubdomainZone(ctx, &defangv1.DeleteSubdomainZoneRequest{
+		Project: projectName,
+		Stack:   provider.GetStackNameForDomain(),
+	})
+	if err != nil {
+		// This can fail when the project was deployed from a different workspace than the current one
+		term.Debug("DeleteSubdomainZone failed:", err)
+		term.Warn("Unable to delete subdomain zone; are you in the right workspace?")
+		return err
+	}
+
+	// If DeleteSubdomainZone succeeded, we're in the right workspace to mark the deployment as destroyed
+	err = putDeployment(ctx, provider, fabric, putDeploymentParams{
+		Action:      defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN,
+		ETag:        etag,
+		ProjectName: projectName,
+	})
+	if err != nil {
+		term.Debug("Failed to record deployment:", err)
+		return err
+	}
+	return nil
+}
+
+func CdCommandAndTail(ctx context.Context, provider client.Provider, projectName string, verbose bool, cmd string, fabric client.FabricClient) error {
+	since := time.Now()
+	etag, err := CdCommand(ctx, projectName, provider, fabric, cmd)
+	if err != nil {
+		return err
 	}
 
 	options := TailOptions{
 		Deployment: etag,
-		Since:      since,
 		LogType:    logs.LogTypeBuild,
+		Since:      since,
 		Verbose:    verbose,
 	}
 	return TailAndWaitForCD(ctx, provider, projectName, options)
@@ -100,13 +110,13 @@ func SplitProjectStack(name string) (projectName string, stackName string) {
 	return parts[0], parts[1]
 }
 
-func BootstrapLocalList(ctx context.Context, provider client.Provider, allRegions bool) error {
+func CdListLocal(ctx context.Context, provider client.Provider, allRegions bool) error {
 	term.Debug("Running CD list")
 	if dryrun.DoDryRun {
 		return dryrun.ErrDryRun
 	}
 
-	stacks, err := provider.BootstrapList(ctx, allRegions)
+	stacks, err := provider.CdList(ctx, allRegions)
 	if err != nil {
 		return err
 	}

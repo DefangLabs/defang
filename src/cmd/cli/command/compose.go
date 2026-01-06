@@ -310,7 +310,7 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 	if strings.Contains(err.Error(), "maximum number of projects") {
 		if projectName, err2 := provider.RemoteProjectName(ctx); err2 == nil {
 			term.Error("Error:", client.PrettyError(err))
-			if _, err := cli.InteractiveComposeDown(ctx, provider, projectName); err != nil {
+			if _, err := cli.InteractiveComposeDown(ctx, projectName, global.Client, provider); err != nil {
 				term.Debug("ComposeDown failed:", err)
 				printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
 			} else {
