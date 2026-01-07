@@ -295,6 +295,8 @@ message GenerateStatusRequest { string uuid = 1; }
 message UploadURLRequest {
   string digest = 1;
   string project = 2;
+  string stack = 3;
+  string filename = 4;
 }
 
 message UploadURLResponse { string url = 1; }
