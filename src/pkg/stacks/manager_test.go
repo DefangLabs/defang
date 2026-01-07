@@ -674,7 +674,7 @@ func TestManager_TargetDirectoryEmpty(t *testing.T) {
 	if err == nil {
 		t.Fatal("Create() should fail when target directory is empty")
 	}
-	if !strings.Contains(err.Error(), "operation not allowed: target directory") {
+	if !strings.Contains(err.Error(), "Create not allowed: target directory") {
 		t.Errorf("Expected specific error message about operation not allowed, got: %v", err)
 	}
 
@@ -707,7 +707,7 @@ func TestManager_TargetDirectoryEmpty(t *testing.T) {
 	if err == nil {
 		t.Fatal("Load() should fail when target directory is empty")
 	}
-	if !strings.Contains(err.Error(), "operation not allowed: target directory") {
+	if !strings.Contains(err.Error(), "Load not allowed: target directory") {
 		t.Errorf("Expected specific error message about operation not allowed, got: %v", err)
 	}
 }

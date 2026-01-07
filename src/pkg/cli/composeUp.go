@@ -10,7 +10,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type ComposeError struct {
@@ -48,18 +47,20 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 	// Validate the project configuration against the provider's configuration, but only if we are going to deploy.
 	// FIXME: should not need to validate configs if we are doing preview, but preview will fail on missing configs.
 	if upload != compose.UploadModeIgnore {
-		listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
-			configs, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
-			if err != nil {
-				return nil, err
-			}
-
-			return configs.Names, nil
-		}
-
 		// Ignore missing configs in preview mode, because we don't want to fail the preview if some configs are missing.
 		if upload != compose.UploadModeEstimate {
-			if err := compose.ValidateProjectConfig(ctx, project, listConfigNamesFunc); err != nil {
+			configs, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
+			if err != nil {
+				return nil, project, err
+			}
+
+			// Print config resolution summary
+			err = PrintConfigResolutionSummary(project, configs.Names)
+			if err != nil {
+				return nil, project, err
+			}
+
+			if err := compose.ValidateProjectConfig(project, configs.Names); err != nil {
 				return nil, project, &ComposeError{err}
 			}
 		}
@@ -113,11 +114,6 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		deployRequest.DelegationSetId = delegation.DelegationSetId
 	}
 
-	accountInfo, err := provider.AccountInfo(ctx)
-	if err != nil {
-		return nil, project, err
-	}
-
 	var action defangv1.DeploymentAction
 	var resp *defangv1.DeployResponse
 	if upload == compose.UploadModePreview || upload == compose.UploadModeEstimate {
@@ -146,24 +142,16 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		action = defangv1.DeploymentAction_DEPLOYMENT_ACTION_UP
 	}
 
-	err = fabric.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
-		Deployment: &defangv1.Deployment{
-			Action:            action,
-			Id:                resp.Etag,
-			Project:           project.Name,
-			Provider:          accountInfo.Provider.Value(),
-			ProviderAccountId: accountInfo.AccountID,
-			ProviderString:    string(accountInfo.Provider),
-			Region:            accountInfo.Region,
-			ServiceCount:      int32(len(fixedProject.Services)), // #nosec G115 - service count will not overflow int32
-			Stack:             provider.GetStackName(),
-			Timestamp:         timestamppb.Now(),
-			Mode:              mode.Value(),
-		},
+	err = putDeployment(ctx, provider, fabric, putDeploymentParams{
+		Action:       action,
+		ETag:         resp.Etag,
+		Mode:         mode.Value(),
+		ProjectName:  project.Name,
+		ServiceCount: len(fixedProject.Services),
 	})
 	if err != nil {
-		term.Debugf("PutDeployment failed: %v", err)
-		term.Warn("Unable to update deployment history, but deployment will proceed anyway.")
+		term.Debug("Failed to record deployment:", err)
+		term.Warn("Unable to update deployment history; deployment will proceed anyway.")
 	}
 
 	if term.DoDebug() {

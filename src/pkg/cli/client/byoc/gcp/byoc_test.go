@@ -40,9 +40,9 @@ func TestSetUpCD(t *testing.T) {
 	}
 
 	if op, err := b.runCdCommand(ctx, cmd); err != nil {
-		t.Errorf("BootstrapCommand() error = %v, want nil", err)
+		t.Errorf("CdCommand() error = %v, want nil", err)
 	} else {
-		t.Logf("BootstrapCommand() = %v", op)
+		t.Logf("CdCommand() = %v", op)
 	}
 }
 

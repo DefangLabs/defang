@@ -98,22 +98,61 @@ func TestStackSelector_SelectStack_ExistingStack(t *testing.T) {
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock user selecting existing stack
-	expectedOptions := []string{"production", "development", CreateNewStack}
+	expectedOptions := []string{"production", "development"}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("production", nil)
 
-	// Mock loading the selected stack
+	// Expected params based on ToParameters() conversion
 	expectedParams := &StackParameters{
 		Name:       "production",
 		Provider:   client.ProviderAWS,
 		Region:     "us-west-2",
-		AWSProfile: "default",
-		Mode:       modes.ModeBalanced,
+		AWSProfile: "",
+		Mode:       modes.ModeUnspecified,
 	}
-	mockSM.On("Load", "production").Return(expectedParams, nil)
 
 	selector := NewSelector(mockEC, mockSM)
 
 	result, err := selector.SelectStack(ctx)
+
+	assert.NoError(t, err)
+	assert.Equal(t, expectedParams, result)
+
+	mockEC.AssertExpectations(t)
+	mockSM.AssertExpectations(t)
+}
+
+func TestStackSelector_SelectOrCreateStack_ExistingStack(t *testing.T) {
+	ctx := t.Context()
+
+	mockEC := &MockElicitationsController{}
+	mockSM := &MockStacksManager{}
+
+	// Mock that elicitations are supported
+	mockEC.On("IsSupported").Return(true)
+
+	// Mock existing stacks list
+	existingStacks := []StackListItem{
+		{Name: "production", Provider: "aws", Region: "us-west-2"},
+		{Name: "development", Provider: "aws", Region: "us-east-1"},
+	}
+	mockSM.On("List", ctx).Return(existingStacks, nil)
+
+	// Mock user selecting existing stack
+	expectedOptions := []string{"production", "development", CreateNewStack}
+	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("production", nil)
+
+	// Expected params based on ToParameters() conversion
+	expectedParams := &StackParameters{
+		Name:       "production",
+		Provider:   client.ProviderAWS,
+		Region:     "us-west-2",
+		AWSProfile: "",
+		Mode:       modes.ModeUnspecified,
+	}
+
+	selector := NewSelector(mockEC, mockSM)
+
+	result, err := selector.SelectOrCreateStack(ctx)
 
 	assert.NoError(t, err)
 	assert.Equal(t, expectedParams, result)
@@ -153,7 +192,7 @@ type testableStackSelector struct {
 
 func (tss *testableStackSelector) SelectStack(ctx context.Context) (*StackParameters, error) {
 	if !tss.ec.IsSupported() {
-		return nil, errors.New("your mcp client does not support elicitations, use the 'select_stack' tool to choose a stack")
+		return nil, errors.New("your MCP client does not support elicitations, use the 'select_stack' tool to choose a stack")
 	}
 	selectedStackName, err := tss.elicitStackSelection(ctx, tss.ec)
 	if err != nil {
@@ -312,7 +351,7 @@ func TestStackSelector_SelectStack_ElicitationsNotSupported(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "your mcp client does not support elicitations")
+	assert.Contains(t, err.Error(), "your MCP client does not support elicitations")
 
 	mockEC.AssertExpectations(t)
 	mockSM.AssertNotCalled(t, "List")
@@ -336,7 +375,6 @@ func TestStackSelector_SelectStack_ListStacksError(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "failed to select stack")
 	assert.Contains(t, err.Error(), "failed to list stacks")
 
 	mockEC.AssertExpectations(t)
@@ -359,7 +397,7 @@ func TestStackSelector_SelectStack_ElicitationError(t *testing.T) {
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock error during elicitation
-	expectedOptions := []string{"production", CreateNewStack}
+	expectedOptions := []string{"production"}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("", errors.New("user cancelled selection"))
 
 	selector := NewSelector(mockEC, mockSM)
@@ -368,42 +406,7 @@ func TestStackSelector_SelectStack_ElicitationError(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "failed to select stack")
 	assert.Contains(t, err.Error(), "failed to elicit stack choice")
-
-	mockEC.AssertExpectations(t)
-	mockSM.AssertExpectations(t)
-}
-
-func TestStackSelector_SelectStack_LoadStackError(t *testing.T) {
-	ctx := t.Context()
-
-	mockEC := &MockElicitationsController{}
-	mockSM := &MockStacksManager{}
-
-	// Mock that elicitations are supported
-	mockEC.On("IsSupported").Return(true)
-
-	// Mock existing stacks list
-	existingStacks := []StackListItem{
-		{Name: "production", Provider: "aws", Region: "us-west-2"},
-	}
-	mockSM.On("List", ctx).Return(existingStacks, nil)
-
-	// Mock user selecting existing stack
-	expectedOptions := []string{"production", CreateNewStack}
-	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("production", nil)
-
-	// Mock error when loading the selected stack
-	mockSM.On("Load", "production").Return((*StackParameters)(nil), errors.New("stack file corrupted"))
-
-	selector := NewSelector(mockEC, mockSM)
-
-	result, err := selector.SelectStack(ctx)
-
-	assert.Error(t, err)
-	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "stack file corrupted")
 
 	mockEC.AssertExpectations(t)
 	mockSM.AssertExpectations(t)
@@ -499,43 +502,4 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 	mockEC.AssertExpectations(t)
 	mockSM.AssertExpectations(t)
 	mockWizard.AssertExpectations(t)
-}
-
-func TestStackSelector_ElicitStackSelection(t *testing.T) {
-	ctx := t.Context()
-
-	mockEC := &MockElicitationsController{}
-	mockSM := &MockStacksManager{}
-
-	// Test case: multiple stacks available
-	t.Run("multiple stacks", func(t *testing.T) {
-		existingStacks := []StackListItem{
-			{Name: "prod", Provider: "aws", Region: "us-west-2"},
-			{Name: "dev", Provider: "gcp", Region: "us-central1"},
-		}
-		mockSM.On("List", ctx).Return(existingStacks, nil).Once()
-
-		expectedOptions := []string{"prod", "dev", CreateNewStack}
-		mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("dev", nil).Once()
-
-		selector := NewSelector(mockEC, mockSM)
-		result, err := selector.elicitStackSelection(ctx, mockEC)
-
-		assert.NoError(t, err)
-		assert.Equal(t, "dev", result)
-	})
-
-	// Test case: no stacks available
-	t.Run("no stacks", func(t *testing.T) {
-		mockSM.On("List", ctx).Return([]StackListItem{}, nil).Once()
-
-		selector := NewSelector(mockEC, mockSM)
-		result, err := selector.elicitStackSelection(ctx, mockEC)
-
-		assert.NoError(t, err)
-		assert.Equal(t, CreateNewStack, result)
-	})
-
-	mockEC.AssertExpectations(t)
-	mockSM.AssertExpectations(t)
 }

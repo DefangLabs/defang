@@ -96,7 +96,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}, loadErr)
 			}
 
-			provider, err := newProviderChecked(ctx, loader)
+			provider, err := newProviderChecked(ctx, loader, true)
 			if err != nil {
 				return err
 			}
@@ -325,7 +325,7 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 	if strings.Contains(err.Error(), "maximum number of projects") {
 		if projectName, err2 := provider.RemoteProjectName(ctx); err2 == nil {
 			term.Error("Error:", client.PrettyError(err))
-			if _, err := cli.InteractiveComposeDown(ctx, provider, projectName); err != nil {
+			if _, err := cli.InteractiveComposeDown(ctx, projectName, global.Client, provider); err != nil {
 				term.Debug("ComposeDown failed:", err)
 				printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
 			} else {
@@ -438,9 +438,10 @@ func makeComposeStopCmd() *cobra.Command {
 
 func makeComposeDownCmd() *cobra.Command {
 	composeDownCmd := &cobra.Command{
-		Use:         "down [SERVICE...]",
+		Use:         "down",
 		Aliases:     []string{"rm", "remove"}, // like docker stack
 		Annotations: authNeededAnnotation,
+		Args:        cobra.NoArgs, // TODO: optional list of service names to remove select services
 		Short:       "Reads a Compose file and deprovisions its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var detach, _ = cmd.Flags().GetBool("detach")
@@ -451,7 +452,7 @@ func makeComposeDownCmd() *cobra.Command {
 			}
 
 			loader := configureLoader(cmd)
-			provider, err := newProviderChecked(cmd.Context(), loader)
+			provider, err := newProviderChecked(cmd.Context(), loader, false)
 			if err != nil {
 				return err
 			}
@@ -467,7 +468,7 @@ func makeComposeDownCmd() *cobra.Command {
 			}
 
 			since := time.Now()
-			deployment, err := cli.ComposeDown(cmd.Context(), projectName, global.Client, provider, args...)
+			deployment, err := cli.ComposeDown(cmd.Context(), projectName, global.Client, provider)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
@@ -581,7 +582,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				return fmt.Errorf("failed to create stack manager: %w", err)
 			}
 
-			provider, err := newProvider(ctx, ec, sm)
+			provider, err := newProvider(ctx, ec, sm, false)
 			if err != nil {
 				return err
 			}
@@ -610,7 +611,7 @@ func makeComposePsCmd() *cobra.Command {
 			long, _ := cmd.Flags().GetBool("long")
 
 			loader := configureLoader(cmd)
-			provider, err := newProviderChecked(cmd.Context(), loader)
+			provider, err := newProviderChecked(cmd.Context(), loader, false)
 			if err != nil {
 				return err
 			}
@@ -735,7 +736,7 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	loader := configureLoader(cmd)
-	provider, err := newProviderChecked(cmd.Context(), loader)
+	provider, err := newProviderChecked(cmd.Context(), loader, false)
 	if err != nil {
 		return err
 	}

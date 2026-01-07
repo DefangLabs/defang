@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"slices"
 
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
@@ -26,40 +24,30 @@ func NewSelector(ec elicitations.Controller, sm Manager) *stackSelector {
 	}
 }
 
-func (ss *stackSelector) SelectStack(ctx context.Context) (*StackParameters, error) {
-	if !ss.ec.IsSupported() {
-		return nil, errors.New("your mcp client does not support elicitations, use the 'select_stack' tool to choose a stack")
-	}
-	selectedStackName, err := ss.elicitStackSelection(ctx, ss.ec)
-	if err != nil {
-		return nil, fmt.Errorf("failed to select stack: %w", err)
-	}
-
-	if selectedStackName == CreateNewStack {
-		wizard := NewWizard(ss.ec)
-		params, err := wizard.CollectParameters(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to collect stack parameters: %w", err)
-		}
-		_, err = ss.sm.Create(*params)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create stack: %w", err)
-		}
-
-		selectedStackName = params.Name
-	}
-
-	return ss.sm.Load(selectedStackName)
+func (ss *stackSelector) SelectOrCreateStack(ctx context.Context) (*StackParameters, error) {
+	return ss.selectStack(ctx, true)
 }
 
-func (ss *stackSelector) elicitStackSelection(ctx context.Context, ec elicitations.Controller) (string, error) {
+func (ss *stackSelector) SelectStack(ctx context.Context) (*StackParameters, error) {
+	return ss.selectStack(ctx, false)
+}
+
+func (ss *stackSelector) selectStack(ctx context.Context, allowCreate bool) (*StackParameters, error) {
+	if !ss.ec.IsSupported() {
+		return nil, errors.New("your MCP client does not support elicitations, use the 'select_stack' tool to choose a stack")
+	}
 	stackList, err := ss.sm.List(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to list stacks: %w", err)
+		return nil, fmt.Errorf("failed to list stacks: %w", err)
 	}
 
+	var selectedName string
 	if len(stackList) == 0 {
-		return CreateNewStack, nil
+		if allowCreate {
+			return ss.createStack(ctx)
+		} else {
+			return nil, errors.New("no stacks available to select")
+		}
 	}
 
 	stackLabels := make([]string, 0, len(stackList)+1)
@@ -76,26 +64,52 @@ func (ss *stackSelector) elicitStackSelection(ctx context.Context, ec elicitatio
 		stackNames = append(stackNames, s.Name)
 		labelMap[label] = s.Name
 	}
-	stackLabels = append(stackLabels, CreateNewStack)
+	if allowCreate {
+		stackLabels = append(stackLabels, CreateNewStack)
+	}
 
 	printStacksInfoMessage(stackNames)
-	selectedLabel, err := ec.RequestEnum(ctx, "Select a stack", "stack", stackLabels)
+	selectedLabel, err := ss.ec.RequestEnum(ctx, "Select a stack", "stack", stackLabels)
 	if err != nil {
-		return "", fmt.Errorf("failed to elicit stack choice: %w", err)
+		return nil, fmt.Errorf("failed to elicit stack choice: %w", err)
 	}
 
 	// If "Create new stack" was selected, return as-is
 	if selectedLabel == CreateNewStack {
-		return CreateNewStack, nil
+		return ss.createStack(ctx)
 	}
 
 	// Otherwise, map back to the actual stack name
 	selectedName, exists := labelMap[selectedLabel]
 	if !exists {
-		return "", fmt.Errorf("invalid stack selection: %s", selectedLabel)
+		return nil, fmt.Errorf("invalid stack selection: %s", selectedLabel)
 	}
 
-	return selectedName, nil
+	// find the stack with the selected name in the list of stacks
+	selectedStack := StackListItem{}
+	for _, stack := range stackList {
+		if stack.Name == selectedName {
+			selectedStack = stack
+			break
+		}
+	}
+
+	params := selectedStack.ToParameters()
+	return &params, nil
+}
+
+func (ss *stackSelector) createStack(ctx context.Context) (*StackParameters, error) {
+	wizard := NewWizard(ss.ec)
+	params, err := wizard.CollectParameters(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect stack parameters: %w", err)
+	}
+	_, err = ss.sm.Create(*params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stack: %w", err)
+	}
+
+	return params, nil
 }
 
 func printStacksInfoMessage(stacks []string) {
@@ -110,6 +124,5 @@ func printStacksInfoMessage(stacks []string) {
 		infoLine += "\n   To learn more about Stacks, visit: https://docs.defang.io/docs/concepts/stacks"
 		term.Println(infoLine)
 	}
-	executable, _ := os.Executable()
-	term.Printf("To skip this prompt, run %s up --stack=%s\n", filepath.Base(executable), "<stack_name>")
+	term.Printf("To skip this prompt, run this command with --stack=%s\n", "<stack_name>")
 }
