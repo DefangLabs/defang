@@ -227,7 +227,7 @@ func (b *ByocDo) CdCommand(ctx context.Context, req client.CdCommandRequest) (st
 	}
 
 	cmd := cdCommand{
-		command:        []string{req.Command},
+		command:        []string{string(req.Command)},
 		delegateDomain: "dummy.domain",
 		project:        req.Project,
 	}
@@ -268,10 +268,6 @@ func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLReq
 	return &defangv1.UploadURLResponse{
 		Url: url,
 	}, nil
-}
-
-func (b *ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	return nil, client.ErrNotImplemented("not implemented for DigitalOcean")
 }
 
 func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {

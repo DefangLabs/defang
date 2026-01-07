@@ -54,10 +54,6 @@ func (g *PlaygroundProvider) GetService(ctx context.Context, req *defangv1.GetRe
 	return getMsg(g.GetFabricClient().Get(ctx, connect.NewRequest(req)))
 }
 
-func (g *PlaygroundProvider) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	return getMsg(g.GetFabricClient().Delete(ctx, connect.NewRequest(req)))
-}
-
 func (g *PlaygroundProvider) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
 	return getMsg(g.GetFabricClient().GetServices(ctx, connect.NewRequest(req)))
 }
@@ -89,7 +85,7 @@ func (g *PlaygroundProvider) QueryLogs(ctx context.Context, req *defangv1.TailRe
 }
 
 func (g *PlaygroundProvider) CdCommand(ctx context.Context, req CdCommandRequest) (types.ETag, error) {
-	if req.Command == "destroy" {
+	if req.Command == CdCommandDestroy {
 		return g.destroy(ctx, &defangv1.DestroyRequest{Project: req.Project})
 	}
 	return "", errors.New("the CD command is not valid for the Defang playground; did you forget --provider?")

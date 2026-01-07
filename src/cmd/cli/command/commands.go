@@ -1430,8 +1430,7 @@ func newProviderChecked(ctx context.Context, loader client.Loader) (client.Provi
 	}
 	elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
 	ec := elicitations.NewController(elicitationsClient)
-	var sm stacks.Manager
-	sm, err = stacks.NewManager(global.Client, targetDirectory, projectName)
+	sm, err := stacks.NewManager(global.Client, targetDirectory, projectName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stack manager: %w", err)
 	}

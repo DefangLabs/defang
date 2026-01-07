@@ -17,8 +17,19 @@ type DNSResolver interface {
 	UpdateShardDomain(ctx context.Context) error
 }
 
+type CdCommand string
+
+const (
+	CdCommandCancel  CdCommand = "cancel"
+	CdCommandDestroy CdCommand = "destroy"
+	CdCommandDown    CdCommand = "down"
+	CdCommandList    CdCommand = "list"
+	CdCommandRefresh CdCommand = "refresh"
+	CdCommandUp      CdCommand = "up"
+)
+
 type CdCommandRequest struct {
-	Command string
+	Command CdCommand
 	Project string
 }
 
@@ -47,7 +58,6 @@ type Provider interface {
 	CdList(context.Context, bool) (iter.Seq[string], error)
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
 	DelayBeforeRetry(context.Context) error
-	Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error)
 	DeleteConfig(context.Context, *defangv1.Secrets) error
 	Deploy(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
 	GetDeploymentStatus(context.Context) error // nil means deployment is pending/running; io.EOF means deployment is done

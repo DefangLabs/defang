@@ -31,13 +31,6 @@ func (m mockComposeDown) CdCommand(
 	return m.MockCdCommand(ctx, req)
 }
 
-func (m mockComposeDown) Delete(
-	ctx context.Context,
-	req *defangv1.DeleteRequest,
-) (*defangv1.DeleteResponse, error) {
-	return m.MockDelete(ctx, req)
-}
-
 func TestComposeDown(t *testing.T) {
 	loader := compose.NewLoader(compose.WithPath("../../testdata/testproj/compose.yaml"))
 	proj, err := loader.LoadProject(t.Context())
@@ -78,31 +71,6 @@ func TestComposeDown(t *testing.T) {
 					t.Errorf("ComposeDown() failed: expected CdCommandRequest, got %v", req)
 				}
 				if req.Project != proj.Name {
-					t.Errorf("ComposeDown() failed: expected project %s, got: %s", proj.Name, req.Project)
-				}
-			}
-		})
-
-	t.Run("Expect `Provider.Delete` to be called when project and services are specified",
-		func(t *testing.T) {
-			services := make([]string, 0, len(proj.Services))
-			for _, service := range proj.Services {
-				services = append(services, service.Name)
-			}
-			etag, err := ComposeDown(t.Context(), proj.Name, mockClient, mockProvider, services...)
-
-			if err != nil {
-				t.Fatalf("ComposeDown() failed: %v", err)
-			}
-			if etag != "eTagDelete" {
-				t.Errorf("ComposeDown() failed: expected eTagSomething, got: %s", etag)
-			}
-			if req, ok := mockProvider.request["DeleteRequest"]; ok {
-				req, ok := req.(*defangv1.DeleteRequest)
-				if !ok {
-					t.Errorf("ComposeDown() failed: expected DeleteRequest, got %v", req)
-				}
-				if req.Project != proj.Name || len(req.Names) != len(services) {
 					t.Errorf("ComposeDown() failed: expected project %s, got: %s", proj.Name, req.Project)
 				}
 			}

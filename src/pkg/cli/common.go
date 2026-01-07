@@ -50,7 +50,7 @@ type putDeploymentParams struct {
 func putDeployment(ctx context.Context, provider client.Provider, fabric client.FabricClient, req putDeploymentParams) error {
 	accountInfo, err := provider.AccountInfo(ctx)
 	if err != nil {
-		return err // should not happen because we checked earlier
+		return err
 	}
 
 	return fabric.PutDeployment(ctx, &defangv1.PutDeploymentRequest{

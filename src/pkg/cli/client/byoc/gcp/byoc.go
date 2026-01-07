@@ -332,7 +332,7 @@ func (b *ByocGcp) CdCommand(ctx context.Context, req client.CdCommandRequest) (t
 	}
 	cmd := cdCommand{
 		project: req.Project,
-		command: []string{req.Command},
+		command: []string{string(req.Command)},
 	}
 	cdExecutionId, err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
 	if err != nil {
@@ -887,11 +887,6 @@ func (b *ByocGcp) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest)
 }
 
 // FUNCTIONS TO BE IMPLEMENTED BELOW ========================
-
-func (b *ByocGcp) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	// FIXME: implement
-	return nil, client.ErrNotImplemented("GCP Delete")
-}
 
 func (b *ByocGcp) TearDownCD(ctx context.Context) error {
 	// FIXME: implement

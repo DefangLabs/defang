@@ -13,24 +13,25 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/bufbuild/connect-go"
 )
 
-func CdCommand(ctx context.Context, projectName string, provider client.Provider, fabric client.FabricClient, cmd string) (types.ETag, error) {
+func CdCommand(ctx context.Context, projectName string, provider client.Provider, fabric client.FabricClient, command client.CdCommand) (types.ETag, error) {
 	if projectName == "" { // projectName is empty for "list --remote"
-		term.Infof("Running CD command %q", cmd)
+		term.Infof("Running CD command %q", command)
 	} else {
-		term.Infof("Running CD command %q in project %q", cmd, projectName)
+		term.Infof("Running CD command %q in project %q", command, projectName)
 	}
 	if dryrun.DoDryRun {
 		return "", dryrun.ErrDryRun
 	}
 
-	etag, err := provider.CdCommand(ctx, client.CdCommandRequest{Project: projectName, Command: cmd})
+	etag, err := provider.CdCommand(ctx, client.CdCommandRequest{Project: projectName, Command: command})
 	if err != nil || etag == "" {
 		return "", err
 	}
 
-	if cmd == "down" || cmd == "destroy" {
+	if command == client.CdCommandDestroy || command == client.CdCommandDown {
 		err := postDown(ctx, projectName, provider, fabric, etag)
 		if err != nil {
 			term.Debugf("postDown failed: %v", err)
@@ -49,11 +50,13 @@ func postDown(ctx context.Context, projectName string, provider client.Provider,
 	if err != nil {
 		// This can fail when the project was deployed from a different workspace than the current one
 		term.Debug("DeleteSubdomainZone failed:", err)
-		term.Warn("Unable to delete subdomain zone; are you in the right workspace?")
+		if connect.CodeOf(err) == connect.CodeNotFound {
+			term.Warn("Subdomain not found; did you mean to destroy a different project or stack?")
+		}
 		return err
 	}
 
-	// If DeleteSubdomainZone succeeded, we're in the right workspace to mark the deployment as destroyed
+	// Update deployment table to mark deployment as destroyed only after successful deletion of the subdomain
 	err = putDeployment(ctx, provider, fabric, putDeploymentParams{
 		Action:      defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN,
 		ETag:        etag,
@@ -66,9 +69,9 @@ func postDown(ctx context.Context, projectName string, provider client.Provider,
 	return nil
 }
 
-func CdCommandAndTail(ctx context.Context, provider client.Provider, projectName string, verbose bool, cmd string, fabric client.FabricClient) error {
+func CdCommandAndTail(ctx context.Context, provider client.Provider, projectName string, verbose bool, command client.CdCommand, fabric client.FabricClient) error {
 	since := time.Now()
-	etag, err := CdCommand(ctx, projectName, provider, fabric, cmd)
+	etag, err := CdCommand(ctx, projectName, provider, fabric, command)
 	if err != nil {
 		return err
 	}
