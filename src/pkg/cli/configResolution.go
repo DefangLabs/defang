@@ -83,6 +83,11 @@ func PrintConfigResolutionSummary(project *types.Project, defangConfig []string)
 
 	projectEnvVars = slices.Compact(projectEnvVars)
 
+	// Don't print table if there are no environment variables
+	if len(projectEnvVars) == 0 {
+		return nil
+	}
+
 	// term.Println("\033[1mENVIRONMENT VARIABLES RESOLUTION SUMMARY:\033[0m")
 
 	return term.Table(projectEnvVars, "Service", "Environment", "Value", "Source")
