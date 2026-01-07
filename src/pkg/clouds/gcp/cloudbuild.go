@@ -103,7 +103,9 @@ func (gcp Gcp) GetBuildInfo(ctx context.Context, buildId string) (*BuildTag, err
 		return nil, errors.New("build not found")
 	}
 	var bt BuildTag
-	bt.Parse(build.Tags)
+	if err := bt.Parse(build.Tags); err != nil {
+		return nil, fmt.Errorf("failed to parse build tags: %w", err)
+	}
 	if bt.Project != "" || bt.Service != "" || bt.Etag != "" {
 		return &bt, nil
 	}
