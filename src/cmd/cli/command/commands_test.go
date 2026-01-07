@@ -319,7 +319,7 @@ func (m *mockStackManager) Load(ctx context.Context, name string) (*stacks.Stack
 					Provider: provider,
 					Mode:     mode,
 				}
-				stacks.LoadParameters(params.ToMap(), true)
+				stacks.LoadParameters(params, true)
 				return &params, nil
 			}
 		}
@@ -333,7 +333,7 @@ func (m *mockStackManager) Load(ctx context.Context, name string) (*stacks.Stack
 			Region:   m.expectedRegion,
 			Mode:     modes.ModeAffordable,
 		}
-		stacks.LoadParameters(params.ToMap(), true)
+		stacks.LoadParameters(params, true)
 		return &params, nil
 	}
 
@@ -350,7 +350,7 @@ func (m *mockStackManager) Create(params stacks.StackParameters) (string, error)
 	return params.Name, nil
 }
 
-func (m *mockStackManager) LoadParameters(params map[string]string, overload bool) error {
+func (m *mockStackManager) LoadParameters(params stacks.StackParameters, overload bool) error {
 	return stacks.LoadParameters(params, overload)
 }
 

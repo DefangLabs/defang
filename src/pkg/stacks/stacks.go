@@ -275,7 +275,7 @@ func OverloadInDirectory(workingDirectory, name string) error {
 
 // This was basically ripped out of godotenv.Overload/Load. Unfortunately, they don't export
 // a function that loads a map[string]string, so we have to reimplement it here.
-func LoadParameters(params map[string]string, overload bool) error {
+func LoadParameters(params StackParameters, overload bool) error {
 	currentEnv := map[string]bool{}
 	rawEnv := os.Environ()
 	for _, rawEnvLine := range rawEnv {
@@ -283,7 +283,8 @@ func LoadParameters(params map[string]string, overload bool) error {
 		currentEnv[key] = true
 	}
 
-	for key, value := range params {
+	paramsMap := params.ToMap()
+	for key, value := range paramsMap {
 		if !currentEnv[key] || overload {
 			err := os.Setenv(key, value)
 			if err != nil {

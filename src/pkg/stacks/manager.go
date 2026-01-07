@@ -19,7 +19,7 @@ import (
 type Manager interface {
 	List(ctx context.Context) ([]StackListItem, error)
 	Load(ctx context.Context, name string) (*StackParameters, error)
-	LoadParameters(params map[string]string, overload bool) error
+	LoadParameters(params StackParameters, overload bool) error
 	Create(params StackParameters) (string, error)
 }
 
@@ -177,7 +177,7 @@ func (sm *manager) Load(ctx context.Context, name string) (*StackParameters, err
 		term.Infof("unable to load stack from file, attempting to import from previous deployments: %v", err)
 		return sm.LoadRemote(ctx, name)
 	}
-	err = sm.LoadParameters(params.ToMap(), false)
+	err = sm.LoadParameters(*params, false)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +199,7 @@ func (sm *manager) LoadRemote(ctx context.Context, name string) (*StackParameter
 	if remoteStack == nil {
 		return nil, fmt.Errorf("unable to find stack %q", name)
 	}
-	err = sm.LoadParameters(remoteStack.StackParameters.ToMap(), false)
+	err = sm.LoadParameters(remoteStack.StackParameters, false)
 	if err != nil {
 		return nil, fmt.Errorf("unable to import stack %q: %w", name, err)
 	}
@@ -207,7 +207,7 @@ func (sm *manager) LoadRemote(ctx context.Context, name string) (*StackParameter
 	return &remoteStack.StackParameters, nil
 }
 
-func (sm *manager) LoadParameters(params map[string]string, overload bool) error {
+func (sm *manager) LoadParameters(params StackParameters, overload bool) error {
 	return LoadParameters(params, overload)
 }
 

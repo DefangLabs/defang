@@ -71,7 +71,7 @@ func (m *MockStacksManager) Load(ctx context.Context, name string) (*StackParame
 	return result, args.Error(1)
 }
 
-func (m *MockStacksManager) LoadParameters(params map[string]string, overload bool) error {
+func (m *MockStacksManager) LoadParameters(params StackParameters, overload bool) error {
 	args := m.Called(params, overload)
 	return args.Error(0)
 }

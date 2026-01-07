@@ -1337,7 +1337,7 @@ func loadOrCreateStack(ctx context.Context, sm stacks.Manager, params *stacks.St
 		Mode:     params.Mode,
 		Region:   region,
 	}
-	err = sm.LoadParameters(loaded.ToMap(), false)
+	err = sm.LoadParameters(*loaded, false)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load stack %q and unable to create it: %w", params.Name, err)
 	}

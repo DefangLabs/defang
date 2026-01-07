@@ -167,11 +167,11 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 }
 
 func TestLoadParameters(t *testing.T) {
-	params := map[string]string{
-		"DEFANG_PROVIDER": "aws",
-		"AWS_REGION":      "us-west-2",
-		"AWS_PROFILE":     "default",
-		"DEFANG_MODE":     "AFFORDABLE",
+	params := stacks.StackParameters{
+		Provider:   client.ProviderAWS,
+		Region:     "us-west-2",
+		AWSProfile: "default",
+		Mode:       modes.ModeAffordable,
 	}
 
 	// Clear any existing env vars that might interfere with the test
@@ -196,5 +196,5 @@ func TestLoadParameters(t *testing.T) {
 	assert.Equal(t, "aws", os.Getenv("DEFANG_PROVIDER"))
 	assert.Equal(t, "us-west-2", os.Getenv("AWS_REGION"))
 	assert.Equal(t, "default", os.Getenv("AWS_PROFILE"))
-	assert.Equal(t, "AFFORDABLE", os.Getenv("DEFANG_MODE"))
+	assert.Equal(t, "affordable", os.Getenv("DEFANG_MODE"))
 }
