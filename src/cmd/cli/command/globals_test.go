@@ -1,16 +1,12 @@
 package command
 
 import (
-	"bytes"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
-	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/spf13/pflag"
 )
 
@@ -97,12 +93,6 @@ func Test_configurationPrecedence(t *testing.T) {
 
 			t.Chdir(tempDir)
 
-			// simulates the actual loading sequence
-			err := testConfig.syncFlagsWithEnv(flags)
-			if err != nil {
-				t.Fatalf("failed to sync flags with env vars: %v", err)
-			}
-
 			// verify the final configuration matches expectations
 			// if testConfig.Mode.String() != tt.expected.Mode.String() {
 			// 	t.Errorf("expected Mode to be '%s', got '%s'", tt.expected.Mode.String(), testConfig.Mode.String())
@@ -139,99 +129,6 @@ func Test_configurationPrecedence(t *testing.T) {
 			}
 			if testConfig.HideUpdate != tt.expected.HideUpdate {
 				t.Errorf("expected HideUpdate to be %v, got %v", tt.expected.HideUpdate, testConfig.HideUpdate)
-			}
-		})
-	}
-}
-
-func TestTenantFlagWinsOverEnv(t *testing.T) {
-	cfg := GlobalConfig{
-		Cluster: client.DefangFabric,
-	}
-	flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	flags.Var(&cfg.Tenant, "workspace", "workspace name")
-	flags.StringVar(&cfg.Cluster, "cluster", cfg.Cluster, "cluster")
-
-	if err := flags.Set("workspace", "flag-workspace"); err != nil {
-		t.Fatalf("failed to set workspace flag: %v", err)
-	}
-	t.Setenv("DEFANG_WORKSPACE", "env-workspace")
-
-	if err := cfg.syncFlagsWithEnv(flags); err != nil {
-		t.Fatalf("failed to sync flags with env vars: %v", err)
-	}
-
-	if cfg.Tenant != "flag-workspace" {
-		t.Fatalf("expected tenant from flag, got %q", cfg.Tenant)
-	}
-}
-
-func TestTenantEnvSources(t *testing.T) {
-	tests := []struct {
-		name     string
-		envVars  map[string]string
-		expected types.TenantNameOrID
-	}{
-		{
-			name: "workspace env wins",
-			envVars: map[string]string{
-				"DEFANG_WORKSPACE": "workspace-env",
-				"DEFANG_TENANT":    "tenant-env",
-				"DEFANG_ORG":       "org-env",
-			},
-			expected: "workspace-env",
-		},
-		{
-			name: "tenant env ignored",
-			envVars: map[string]string{
-				"DEFANG_TENANT": "tenant-env",
-			},
-			expected: "",
-		},
-		{
-			name: "org env fallback",
-			envVars: map[string]string{
-				"DEFANG_ORG": "org-env",
-			},
-			expected: "org-env",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			prevTerm := term.DefaultTerm
-			var stdout, stderr bytes.Buffer
-			term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
-			t.Cleanup(func() {
-				term.DefaultTerm = prevTerm
-			})
-
-			// Create a temporary directory and stack file
-			tempDir := t.TempDir()
-			t.Chdir(tempDir)
-
-			// Create the .defang subdirectory
-			err := os.MkdirAll(filepath.Join(tempDir, stacks.Directory), 0700)
-			if err != nil {
-				t.Fatalf("failed to create .defang directory: %v", err)
-			}
-			cfg := GlobalConfig{
-				Cluster: client.DefangFabric,
-			}
-			flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
-			flags.Var(&cfg.Tenant, "workspace", "workspace name")
-			flags.StringVar(&cfg.Cluster, "cluster", cfg.Cluster, "cluster")
-
-			for key, value := range tt.envVars {
-				t.Setenv(key, value)
-			}
-
-			if err := cfg.syncFlagsWithEnv(flags); err != nil {
-				t.Fatalf("failed to sync flags with env vars: %v", err)
-			}
-
-			if cfg.Tenant != tt.expected {
-				t.Fatalf("expected tenant %q, got %q", tt.expected, cfg.Tenant)
 			}
 		})
 	}

@@ -52,13 +52,13 @@ func TestWorkspaceListJSON(t *testing.T) {
 	term.DefaultTerm.ForceColor(false)
 
 	clusterURL := setupWorkspaceTestServers(t)
-	t.Setenv("DEFANG_WORKSPACE", "ws-2")
 
 	oldGlobal := global
 	t.Cleanup(func() { global = oldGlobal })
 
 	// Reset stack name to prevent loading stack files
 	global.Stack.Name = ""
+	global.Tenant = "ws-2"
 
 	if err := testCommand([]string{"workspace", "ls", "--json", "--non-interactive"}, clusterURL); err != nil {
 		t.Fatalf("workspace ls --json failed: %v", err)
@@ -87,11 +87,11 @@ func TestWorkspaceListVerboseTable(t *testing.T) {
 	term.DefaultTerm.ForceColor(false)
 
 	clusterURL := setupWorkspaceTestServers(t)
-	t.Setenv("DEFANG_WORKSPACE", "Workspace One")
 
 	oldGlobal := global
 	t.Cleanup(func() { global = oldGlobal })
 
+	global.Tenant = "Workspace One"
 	// Reset stack name to prevent loading stack files
 	global.Stack.Name = ""
 

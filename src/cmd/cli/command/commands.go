@@ -429,11 +429,6 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		err = global.syncFlagsWithEnv(cmd.Flags())
-		if err != nil {
-			return err
-		}
-
 		global.Client, err = cli.ConnectWithTenant(ctx, global.Cluster, global.Tenant)
 		if err != nil {
 			if connect.CodeOf(err) != connect.CodeUnauthenticated {
