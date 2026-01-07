@@ -1367,19 +1367,21 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 		}
 		stackParams, err := sm.Load(ctx, stackName)
 		if err != nil {
-			if global.NonInteractive && stack.Provider != client.ProviderAuto {
-				region := client.GetRegion(stack.Provider)
-				err = sm.LoadParameters(map[string]string{
-					"name":     stackName,
-					"provider": stack.Provider.String(),
-					"region":   region,
-					"mode":     stack.Mode.String(),
-				}, false)
-				if err != nil {
-					return nil, "", fmt.Errorf("unable to load stack %q and unable to create it: %w", stackName, err)
-				}
+			if !global.NonInteractive || stack.Provider == client.ProviderAuto {
+				return nil, "", fmt.Errorf("unable to load stack %q: %w", stackName, err)
 			}
-			return nil, "", fmt.Errorf("unable to load stack %q: %w", stackName, err)
+
+			// if we are in non-interactive mode, try to create a new stack with the given name, provider, region, and mode
+			region := client.GetRegion(stack.Provider)
+			err = sm.LoadParameters(map[string]string{
+				"name":     stackName,
+				"provider": stack.Provider.String(),
+				"region":   region,
+				"mode":     stack.Mode.String(),
+			}, false)
+			if err != nil {
+				return nil, "", fmt.Errorf("unable to load stack %q and unable to create it: %w", stackName, err)
+			}
 		}
 		stack = stackParams
 
