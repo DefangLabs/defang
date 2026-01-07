@@ -70,7 +70,7 @@ var mcpServerCmd = &cobra.Command{
 
 var mcpSetupCmd = &cobra.Command{
 	Use:   "setup",
-	Short: "Setup MCP client for defang mcp server",
+	Short: "Setup MCP client for defang MCP server",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		term.Debug("Setting up MCP client")

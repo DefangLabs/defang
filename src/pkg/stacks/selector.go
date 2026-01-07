@@ -28,7 +28,7 @@ func NewSelector(ec elicitations.Controller, sm Manager) *stackSelector {
 
 func (ss *stackSelector) SelectStack(ctx context.Context) (*StackParameters, error) {
 	if !ss.ec.IsSupported() {
-		return nil, errors.New("your mcp client does not support elicitations, use the 'select_stack' tool to choose a stack")
+		return nil, errors.New("your MCP client does not support elicitations, use the 'select_stack' tool to choose a stack")
 	}
 	selectedStackName, err := ss.elicitStackSelection(ctx, ss.ec)
 	if err != nil {

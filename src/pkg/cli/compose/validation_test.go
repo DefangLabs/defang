@@ -87,7 +87,6 @@ func TestValidationAndConvert(t *testing.T) {
 }
 
 func TestValidateConfig(t *testing.T) {
-
 	testProject := composeTypes.Project{
 		Services: composeTypes.Services{},
 	}

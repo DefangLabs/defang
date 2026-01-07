@@ -153,7 +153,7 @@ type testableStackSelector struct {
 
 func (tss *testableStackSelector) SelectStack(ctx context.Context) (*StackParameters, error) {
 	if !tss.ec.IsSupported() {
-		return nil, errors.New("your mcp client does not support elicitations, use the 'select_stack' tool to choose a stack")
+		return nil, errors.New("your MCP client does not support elicitations, use the 'select_stack' tool to choose a stack")
 	}
 	selectedStackName, err := tss.elicitStackSelection(ctx, tss.ec)
 	if err != nil {
@@ -312,7 +312,7 @@ func TestStackSelector_SelectStack_ElicitationsNotSupported(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "your mcp client does not support elicitations")
+	assert.Contains(t, err.Error(), "your MCP client does not support elicitations")
 
 	mockEC.AssertExpectations(t)
 	mockSM.AssertNotCalled(t, "List")
