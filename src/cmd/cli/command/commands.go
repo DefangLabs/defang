@@ -80,7 +80,7 @@ func Execute(ctx context.Context) error {
 
 		if strings.Contains(err.Error(), "maximum number of projects") {
 			projectName := "<name>"
-			provider, err := newProviderChecked(ctx, nil)
+			provider, err := newProviderChecked(ctx, nil, false)
 			if err != nil {
 				return err
 			}
@@ -546,7 +546,7 @@ var whoamiCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to create stack manager: %w", err)
 		}
-		provider, err := newProvider(cmd.Context(), ec, sm)
+		provider, err := newProvider(cmd.Context(), ec, sm, false)
 		if err != nil {
 			term.Debug("unable to get provider:", err)
 		}
@@ -613,7 +613,7 @@ var certGenerateCmd = &cobra.Command{
 			return err
 		}
 
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader, false)
 		if err != nil {
 			return err
 		}
@@ -784,7 +784,7 @@ var configSetCmd = &cobra.Command{
 
 		// Make sure we have a project to set config for before asking for a value
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader, false)
 		if err != nil {
 			return err
 		}
@@ -915,7 +915,7 @@ var configDeleteCmd = &cobra.Command{
 	Short:       "Removes one or more config values",
 	RunE: func(cmd *cobra.Command, names []string) error {
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader, false)
 		if err != nil {
 			return err
 		}
@@ -948,7 +948,7 @@ var configListCmd = &cobra.Command{
 	Short:       "List configs",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader, false)
 		if err != nil {
 			return err
 		}
@@ -971,7 +971,7 @@ var configResolveCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
 
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader, false)
 		if err != nil {
 			return err
 		}
@@ -1012,7 +1012,7 @@ var debugCmd = &cobra.Command{
 		}
 
 		loader := configureLoader(cmd)
-		_, err := newProviderChecked(ctx, loader)
+		_, err := newProviderChecked(ctx, loader, false)
 		if err != nil {
 			return err
 		}
@@ -1273,7 +1273,7 @@ var providerDescription = map[client.ProviderID]string{
 	client.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
 }
 
-func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager) (*stacks.StackParameters, string, error) {
+func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager, allowStackCreation bool) (*stacks.StackParameters, string, error) {
 	stackSelector := stacks.NewSelector(ec, sm)
 
 	var whence string
@@ -1363,7 +1363,12 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 		}
 	}
 
-	stackParameters, err := stackSelector.SelectStack(ctx)
+	var stackParameters *stacks.StackParameters
+	if allowStackCreation {
+		stackParameters, err = stackSelector.SelectOrCreateStack(ctx)
+	} else {
+		stackParameters, err = stackSelector.SelectStack(ctx)
+	}
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to select stack: %w", err)
 	}
@@ -1430,8 +1435,8 @@ func printProviderMismatchWarnings(ctx context.Context, provider client.Provider
 	}
 }
 
-func newProvider(ctx context.Context, ec elicitations.Controller, sm stacks.Manager) (client.Provider, error) {
-	stack, whence, err := getStack(ctx, ec, sm)
+func newProvider(ctx context.Context, ec elicitations.Controller, sm stacks.Manager, allowStackCreation bool) (client.Provider, error) {
+	stack, whence, err := getStack(ctx, ec, sm, allowStackCreation)
 	if err != nil {
 		return nil, err
 	}
@@ -1450,7 +1455,7 @@ func newProvider(ctx context.Context, ec elicitations.Controller, sm stacks.Mana
 	return provider, nil
 }
 
-func newProviderChecked(ctx context.Context, loader client.Loader) (client.Provider, error) {
+func newProviderChecked(ctx context.Context, loader client.Loader, allowStackCreation bool) (client.Provider, error) {
 	var err error
 	projectName := ""
 	targetDirectory := ""
@@ -1467,7 +1472,7 @@ func newProviderChecked(ctx context.Context, loader client.Loader) (client.Provi
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stack manager: %w", err)
 	}
-	provider, err := newProvider(ctx, ec, sm)
+	provider, err := newProvider(ctx, ec, sm, allowStackCreation)
 	if err != nil {
 		return nil, err
 	}

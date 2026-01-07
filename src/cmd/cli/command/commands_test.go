@@ -368,7 +368,7 @@ func TestNewProvider(t *testing.T) {
 		mockEC := &mockElicitationsController{}
 		mockSM := NewMockStackManager(t, client.ProviderAWS, "us-test-2")
 
-		p, err := newProvider(ctx, mockEC, mockSM)
+		p, err := newProvider(ctx, mockEC, mockSM, false)
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -403,7 +403,7 @@ func TestNewProvider(t *testing.T) {
 
 		mockEC := &mockElicitationsController{}
 		mockSM := NewMockStackManager(t, client.ProviderAWS, "us-test-2")
-		p, err := newProvider(ctx, mockEC, mockSM)
+		p, err := newProvider(ctx, mockEC, mockSM, false)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -439,7 +439,7 @@ func TestNewProvider(t *testing.T) {
 
 		mockEC := &mockElicitationsController{}
 		mockSM := NewMockStackManager(t, client.ProviderAWS, "us-test-2")
-		p, err := newProvider(ctx, mockEC, mockSM)
+		p, err := newProvider(ctx, mockEC, mockSM, false)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -744,7 +744,7 @@ func TestGetStack(t *testing.T) {
 			var output bytes.Buffer
 
 			// Call the function under test
-			stack, whence, err := getStack(ctx, ec, sm)
+			stack, whence, err := getStack(ctx, ec, sm, true)
 
 			// Check error expectations
 			if tc.expectedError != "" {

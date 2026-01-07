@@ -24,7 +24,15 @@ func NewSelector(ec elicitations.Controller, sm Manager) *stackSelector {
 	}
 }
 
+func (ss *stackSelector) SelectOrCreateStack(ctx context.Context) (*StackParameters, error) {
+	return ss.selectStack(ctx, true)
+}
+
 func (ss *stackSelector) SelectStack(ctx context.Context) (*StackParameters, error) {
+	return ss.selectStack(ctx, false)
+}
+
+func (ss *stackSelector) selectStack(ctx context.Context, allowCreate bool) (*StackParameters, error) {
 	if !ss.ec.IsSupported() {
 		return nil, errors.New("your MCP client does not support elicitations, use the 'select_stack' tool to choose a stack")
 	}
@@ -35,7 +43,11 @@ func (ss *stackSelector) SelectStack(ctx context.Context) (*StackParameters, err
 
 	var selectedName string
 	if len(stackList) == 0 {
-		return ss.createStack(ctx)
+		if allowCreate {
+			return ss.createStack(ctx)
+		} else {
+			return nil, errors.New("no stacks available to select")
+		}
 	}
 
 	stackLabels := make([]string, 0, len(stackList)+1)
@@ -52,7 +64,9 @@ func (ss *stackSelector) SelectStack(ctx context.Context) (*StackParameters, err
 		stackNames = append(stackNames, s.Name)
 		labelMap[label] = s.Name
 	}
-	stackLabels = append(stackLabels, CreateNewStack)
+	if allowCreate {
+		stackLabels = append(stackLabels, CreateNewStack)
+	}
 
 	printStacksInfoMessage(stackNames)
 	selectedLabel, err := ss.ec.RequestEnum(ctx, "Select a stack", "stack", stackLabels)

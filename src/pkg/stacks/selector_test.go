@@ -98,7 +98,7 @@ func TestStackSelector_SelectStack_ExistingStack(t *testing.T) {
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock user selecting existing stack
-	expectedOptions := []string{"production", "development", CreateNewStack}
+	expectedOptions := []string{"production", "development"}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("production", nil)
 
 	// Expected params based on ToParameters() conversion
@@ -113,6 +113,46 @@ func TestStackSelector_SelectStack_ExistingStack(t *testing.T) {
 	selector := NewSelector(mockEC, mockSM)
 
 	result, err := selector.SelectStack(ctx)
+
+	assert.NoError(t, err)
+	assert.Equal(t, expectedParams, result)
+
+	mockEC.AssertExpectations(t)
+	mockSM.AssertExpectations(t)
+}
+
+func TestStackSelector_SelectOrCreateStack_ExistingStack(t *testing.T) {
+	ctx := t.Context()
+
+	mockEC := &MockElicitationsController{}
+	mockSM := &MockStacksManager{}
+
+	// Mock that elicitations are supported
+	mockEC.On("IsSupported").Return(true)
+
+	// Mock existing stacks list
+	existingStacks := []StackListItem{
+		{Name: "production", Provider: "aws", Region: "us-west-2"},
+		{Name: "development", Provider: "aws", Region: "us-east-1"},
+	}
+	mockSM.On("List", ctx).Return(existingStacks, nil)
+
+	// Mock user selecting existing stack
+	expectedOptions := []string{"production", "development", CreateNewStack}
+	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("production", nil)
+
+	// Expected params based on ToParameters() conversion
+	expectedParams := &StackParameters{
+		Name:       "production",
+		Provider:   client.ProviderAWS,
+		Region:     "us-west-2",
+		AWSProfile: "",
+		Mode:       modes.ModeUnspecified,
+	}
+
+	selector := NewSelector(mockEC, mockSM)
+
+	result, err := selector.SelectOrCreateStack(ctx)
 
 	assert.NoError(t, err)
 	assert.Equal(t, expectedParams, result)
@@ -357,7 +397,7 @@ func TestStackSelector_SelectStack_ElicitationError(t *testing.T) {
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock error during elicitation
-	expectedOptions := []string{"production", CreateNewStack}
+	expectedOptions := []string{"production"}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("", errors.New("user cancelled selection"))
 
 	selector := NewSelector(mockEC, mockSM)
