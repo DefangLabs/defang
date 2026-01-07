@@ -325,7 +325,7 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 	if strings.Contains(err.Error(), "maximum number of projects") {
 		if projectName, err2 := provider.RemoteProjectName(ctx); err2 == nil {
 			term.Error("Error:", client.PrettyError(err))
-			if _, err := cli.InteractiveComposeDown(ctx, provider, projectName); err != nil {
+			if _, err := cli.InteractiveComposeDown(ctx, projectName, global.Client, provider); err != nil {
 				term.Debug("ComposeDown failed:", err)
 				printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
 			} else {
@@ -438,9 +438,10 @@ func makeComposeStopCmd() *cobra.Command {
 
 func makeComposeDownCmd() *cobra.Command {
 	composeDownCmd := &cobra.Command{
-		Use:         "down [SERVICE...]",
+		Use:         "down",
 		Aliases:     []string{"rm", "remove"}, // like docker stack
 		Annotations: authNeededAnnotation,
+		Args:        cobra.NoArgs, // TODO: optional list of service names to remove select services
 		Short:       "Reads a Compose file and deprovisions its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var detach, _ = cmd.Flags().GetBool("detach")
@@ -467,7 +468,7 @@ func makeComposeDownCmd() *cobra.Command {
 			}
 
 			since := time.Now()
-			deployment, err := cli.ComposeDown(cmd.Context(), projectName, global.Client, provider, args...)
+			deployment, err := cli.ComposeDown(cmd.Context(), projectName, global.Client, provider)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found

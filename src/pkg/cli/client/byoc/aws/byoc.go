@@ -545,30 +545,6 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn,
 	return b.driver.Run(ctx, env, cmd.command...)
 }
 
-func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	if len(req.Names) > 0 {
-		return nil, client.ErrNotImplemented("per-service deletion is not supported for BYOC")
-	}
-	if err := b.SetUpCD(ctx); err != nil {
-		return nil, err
-	}
-	// FIXME: this should only delete the services that are specified in the request, not all
-	cmd := cdCommand{
-		project:        req.Project,
-		delegateDomain: req.DelegateDomain,
-		command:        []string{"up", ""}, // 2nd empty string is a empty payload
-	}
-	cdTaskArn, err := b.runCdCommand(ctx, cmd)
-	if err != nil {
-		return nil, AnnotateAwsError(err)
-	}
-	etag := ecs.GetTaskID(cdTaskArn) // TODO: this is the CD task ID, not the etag
-	b.cdEtag = etag
-	b.cdStart = time.Now()
-	b.cdTaskArn = cdTaskArn
-	return &defangv1.DeleteResponse{Etag: etag}, nil
-}
-
 func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
 	if projectName == "" {
 		return nil, nil
@@ -923,13 +899,13 @@ func (b *ByocAws) TearDownCD(ctx context.Context) error {
 	return b.driver.TearDown(ctx)
 }
 
-func (b *ByocAws) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (string, error) {
+func (b *ByocAws) CdCommand(ctx context.Context, req client.CdCommandRequest) (string, error) {
 	if err := b.SetUpCD(ctx); err != nil {
 		return "", err
 	}
 	cmd := cdCommand{
 		project: req.Project,
-		command: []string{req.Command},
+		command: []string{string(req.Command)},
 	}
 	cdTaskArn, err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
 	if err != nil {
@@ -940,10 +916,6 @@ func (b *ByocAws) BootstrapCommand(ctx context.Context, req client.BootstrapComm
 	b.cdStart = time.Now()
 	b.cdTaskArn = cdTaskArn
 	return etag, nil
-}
-
-func (b *ByocAws) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (string, error) {
-	return b.BootstrapCommand(ctx, client.BootstrapCommandRequest{Project: req.Project, Command: "down"})
 }
 
 func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
@@ -958,7 +930,7 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	return nil
 }
 
-func (b *ByocAws) BootstrapList(ctx context.Context, allRegions bool) (iter.Seq[string], error) {
+func (b *ByocAws) CdList(ctx context.Context, allRegions bool) (iter.Seq[string], error) {
 	if allRegions {
 		s3Client, err := newS3Client(ctx, b.driver.Region)
 		if err != nil {

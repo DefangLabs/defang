@@ -260,7 +260,7 @@ func (o gcpObj) Size() int64 {
 	return o.obj.Size
 }
 
-func (b *ByocGcp) BootstrapList(ctx context.Context, _allRegions bool) (iter.Seq[string], error) {
+func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[string], error) {
 	bucketName, err := b.driver.GetBucketWithPrefix(ctx, "defang-cd")
 	if err != nil {
 		return nil, annotateGcpError(err)
@@ -326,13 +326,13 @@ func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 	}, nil
 }
 
-func (b *ByocGcp) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (types.ETag, error) {
+func (b *ByocGcp) CdCommand(ctx context.Context, req client.CdCommandRequest) (types.ETag, error) {
 	if err := b.SetUpCD(ctx); err != nil {
 		return "", err
 	}
 	cmd := cdCommand{
 		project: req.Project,
-		command: []string{req.Command},
+		command: []string{string(req.Command)},
 	}
 	cdExecutionId, err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
 	if err != nil {
@@ -560,7 +560,7 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 }
 
 func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	// BootstrapCommand returns the job execution ID as the eTag, which subsequently passed in as eTag in TailRequest,
+	// CdCommand returns the job execution ID as the eTag, which subsequently passed in as eTag in TailRequest,
 	// in those cases, we need a way to detect when the CD task has finished running and stop tailing thg logs by cancelling the logging context.
 	if b.cdExecution != "" && req.Etag == b.cdExecution {
 		var err error
@@ -680,10 +680,6 @@ func (b *ByocGcp) GetServices(ctx context.Context, req *defangv1.GetServicesRequ
 	}
 
 	return &listServiceResp, nil
-}
-
-func (b *ByocGcp) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error) {
-	return b.BootstrapCommand(ctx, client.BootstrapCommandRequest{Project: req.Project, Command: "down"})
 }
 
 type ConflictDelegateDomainError struct {
@@ -891,11 +887,6 @@ func (b *ByocGcp) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest)
 }
 
 // FUNCTIONS TO BE IMPLEMENTED BELOW ========================
-
-func (b *ByocGcp) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	// FIXME: implement
-	return nil, client.ErrNotImplemented("GCP Delete")
-}
 
 func (b *ByocGcp) TearDownCD(ctx context.Context) error {
 	// FIXME: implement
