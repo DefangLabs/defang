@@ -12,8 +12,8 @@ import (
 	cloudbuild "cloud.google.com/go/cloudbuild/apiv1/v2"
 	cloudbuildpb "cloud.google.com/go/cloudbuild/apiv1/v2/cloudbuildpb"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/goccy/go-yaml"
 	"google.golang.org/protobuf/types/known/durationpb"
-	"gopkg.in/yaml.v3"
 )
 
 type MachineType = cloudbuildpb.BuildOptions_MachineType
