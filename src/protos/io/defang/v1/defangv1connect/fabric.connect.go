@@ -157,9 +157,6 @@ const (
 	// FabricControllerGenerateComposeProcedure is the fully-qualified name of the FabricController's
 	// GenerateCompose RPC.
 	FabricControllerGenerateComposeProcedure = "/io.defang.v1.FabricController/GenerateCompose"
-	// FabricControllerGetUploadURLProcedure is the fully-qualified name of the FabricController's
-	// GetUploadURL RPC.
-	FabricControllerGetUploadURLProcedure = "/io.defang.v1.FabricController/GetUploadURL"
 )
 
 // FabricControllerClient is a client for the io.defang.v1.FabricController service.
@@ -217,7 +214,6 @@ type FabricControllerClient interface {
 	Estimate(context.Context, *connect_go.Request[v1.EstimateRequest]) (*connect_go.Response[v1.EstimateResponse], error)
 	Preview(context.Context, *connect_go.Request[v1.PreviewRequest]) (*connect_go.Response[v1.PreviewResponse], error)
 	GenerateCompose(context.Context, *connect_go.Request[v1.GenerateComposeRequest]) (*connect_go.Response[v1.GenerateComposeResponse], error)
-	GetUploadURL(context.Context, *connect_go.Request[v1.GetUploadURLRequest]) (*connect_go.Response[v1.GetUploadURLResponse], error)
 }
 
 // NewFabricControllerClient constructs a client for the io.defang.v1.FabricController service. By
@@ -474,12 +470,6 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
-		getUploadURL: connect_go.NewClient[v1.GetUploadURLRequest, v1.GetUploadURLResponse](
-			httpClient,
-			baseURL+FabricControllerGetUploadURLProcedure,
-			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
-			connect_go.WithClientOptions(opts...),
-		),
 	}
 }
 
@@ -528,7 +518,6 @@ type fabricControllerClient struct {
 	estimate                   *connect_go.Client[v1.EstimateRequest, v1.EstimateResponse]
 	preview                    *connect_go.Client[v1.PreviewRequest, v1.PreviewResponse]
 	generateCompose            *connect_go.Client[v1.GenerateComposeRequest, v1.GenerateComposeResponse]
-	getUploadURL               *connect_go.Client[v1.GetUploadURLRequest, v1.GetUploadURLResponse]
 }
 
 // GetStatus calls io.defang.v1.FabricController.GetStatus.
@@ -758,11 +747,6 @@ func (c *fabricControllerClient) GenerateCompose(ctx context.Context, req *conne
 	return c.generateCompose.CallUnary(ctx, req)
 }
 
-// GetUploadURL calls io.defang.v1.FabricController.GetUploadURL.
-func (c *fabricControllerClient) GetUploadURL(ctx context.Context, req *connect_go.Request[v1.GetUploadURLRequest]) (*connect_go.Response[v1.GetUploadURLResponse], error) {
-	return c.getUploadURL.CallUnary(ctx, req)
-}
-
 // FabricControllerHandler is an implementation of the io.defang.v1.FabricController service.
 type FabricControllerHandler interface {
 	GetStatus(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Status], error)
@@ -818,7 +802,6 @@ type FabricControllerHandler interface {
 	Estimate(context.Context, *connect_go.Request[v1.EstimateRequest]) (*connect_go.Response[v1.EstimateResponse], error)
 	Preview(context.Context, *connect_go.Request[v1.PreviewRequest]) (*connect_go.Response[v1.PreviewResponse], error)
 	GenerateCompose(context.Context, *connect_go.Request[v1.GenerateComposeRequest]) (*connect_go.Response[v1.GenerateComposeResponse], error)
-	GetUploadURL(context.Context, *connect_go.Request[v1.GetUploadURLRequest]) (*connect_go.Response[v1.GetUploadURLResponse], error)
 }
 
 // NewFabricControllerHandler builds an HTTP handler from the service implementation. It returns the
@@ -1071,12 +1054,6 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 		connect_go.WithHandlerOptions(opts...),
 	)
-	fabricControllerGetUploadURLHandler := connect_go.NewUnaryHandler(
-		FabricControllerGetUploadURLProcedure,
-		svc.GetUploadURL,
-		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
-		connect_go.WithHandlerOptions(opts...),
-	)
 	return "/io.defang.v1.FabricController/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case FabricControllerGetStatusProcedure:
@@ -1165,8 +1142,6 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerPreviewHandler.ServeHTTP(w, r)
 		case FabricControllerGenerateComposeProcedure:
 			fabricControllerGenerateComposeHandler.ServeHTTP(w, r)
-		case FabricControllerGetUploadURLProcedure:
-			fabricControllerGetUploadURLHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1346,8 +1321,4 @@ func (UnimplementedFabricControllerHandler) Preview(context.Context, *connect_go
 
 func (UnimplementedFabricControllerHandler) GenerateCompose(context.Context, *connect_go.Request[v1.GenerateComposeRequest]) (*connect_go.Response[v1.GenerateComposeResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GenerateCompose is not implemented"))
-}
-
-func (UnimplementedFabricControllerHandler) GetUploadURL(context.Context, *connect_go.Request[v1.GetUploadURLRequest]) (*connect_go.Response[v1.GetUploadURLResponse], error) {
-	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetUploadURL is not implemented"))
 }

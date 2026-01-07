@@ -23,7 +23,6 @@ type FabricClient interface {
 	GetPlaygroundProjectDomain(context.Context) (*defangv1.GetPlaygroundProjectDomainResponse, error)
 	GetSelectedProvider(context.Context, *defangv1.GetSelectedProviderRequest) (*defangv1.GetSelectedProviderResponse, error)
 	GetTenantName() types.TenantLabel
-	GetUploadURL(context.Context, *defangv1.GetUploadURLRequest) (*defangv1.GetUploadURLResponse, error)
 	GetVersions(context.Context) (*defangv1.Version, error)
 	ListDeployments(context.Context, *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error)
 	Preview(context.Context, *defangv1.PreviewRequest) (*defangv1.PreviewResponse, error)

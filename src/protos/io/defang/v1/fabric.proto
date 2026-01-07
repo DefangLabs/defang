@@ -150,10 +150,6 @@ service FabricController {
       returns (GenerateComposeResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   };
-
-  rpc GetUploadURL(GetUploadURLRequest) returns (GetUploadURLResponse) {
-    option idempotency_level = NO_SIDE_EFFECTS;
-  };
 }
 
 enum Provider {
@@ -262,8 +258,6 @@ message DeployRequest {
   string delegation_set_id = 6;
   bool preview = 7 [ deprecated = true ];
   Provider provider = 8;
-  string states_upload_url = 9;
-  string events_upload_url = 10;
 }
 
 message DeployResponse {
@@ -301,6 +295,8 @@ message GenerateStatusRequest { string uuid = 1; }
 message UploadURLRequest {
   string digest = 1;
   string project = 2;
+  string stack = 3;
+  string filename = 4;
 }
 
 message UploadURLResponse { string url = 1; }
@@ -645,14 +641,6 @@ message GetDelegateSubdomainZoneRequest {
   string project = 1;
   string stack = 2;
 }
-
-message GetUploadURLRequest {
-  string project = 1;
-  string stack = 2;
-  string name = 3;
-}
-
-message GetUploadURLResponse { string url = 1; }
 
 enum SubscriptionTier {
   SUBSCRIPTION_TIER_UNSPECIFIED = 0;
