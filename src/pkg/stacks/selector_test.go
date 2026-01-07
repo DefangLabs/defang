@@ -59,7 +59,7 @@ func (m *MockStacksManager) List(ctx context.Context) ([]StackListItem, error) {
 	return result, args.Error(1)
 }
 
-func (m *MockStacksManager) Load(name string) (*StackParameters, error) {
+func (m *MockStacksManager) Load(ctx context.Context, name string) (*StackParameters, error) {
 	args := m.Called(name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -212,7 +212,7 @@ func (tss *testableStackSelector) SelectStack(ctx context.Context) (*StackParame
 		selectedStackName = params.Name
 	}
 
-	return tss.sm.Load(selectedStackName)
+	return tss.sm.Load(ctx, selectedStackName)
 }
 
 func (tss *testableStackSelector) elicitStackSelection(ctx context.Context, ec elicitations.Controller) (string, error) {

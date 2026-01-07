@@ -1342,7 +1342,7 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 		if stackName == "" {
 			stackName, _ = RootCmd.Flags().GetString("stack")
 		}
-		stackParams, err := sm.Load(stackName)
+		stackParams, err := sm.Load(ctx, stackName)
 		if err != nil {
 			return nil, "", fmt.Errorf("unable to load stack %q: %w", stackName, err)
 		}
@@ -1388,17 +1388,9 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 	if len(knownStacks) == 1 && (stack.Provider == client.ProviderAuto || knownStacks[0].Provider == stack.Provider.String()) {
 		knownStack := knownStacks[0]
 		// try to read the stackfile
-		stack, loadErr := sm.Load(knownStack.Name)
+		stack, loadErr := sm.Load(ctx, knownStack.Name)
 		if loadErr != nil {
-			var outsideErr *stacks.ErrOutside
-			if errors.Is(loadErr, os.ErrNotExist) || errors.As(loadErr, &outsideErr) {
-				var importErr error
-				term.Warn("unable to load stack from file, attempting to import from previous deployments", loadErr)
-				stack, importErr = importStack(sm, knownStack)
-				if importErr != nil {
-					return nil, "", fmt.Errorf("unable to load or import stack: %w", errors.Join(loadErr, importErr))
-				}
-			}
+			return nil, "", fmt.Errorf("unable to load stack %q: %w", knownStack.Name, loadErr)
 		}
 
 		whence = "only stack"
@@ -1426,33 +1418,6 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 	stack = stackParameters
 	whence = "interactive selection"
 	return stack, whence, nil
-}
-
-func importStack(sm stacks.Manager, stack stacks.StackListItem) (*stacks.StackParameters, error) {
-	var providerID client.ProviderID
-	err := providerID.Set(stack.Provider)
-	if err != nil {
-		return nil, fmt.Errorf("invalid provider %q in stack %q: %w", stack.Provider, stack.Name, err)
-	}
-	mode := modes.ModeUnspecified
-	if stack.Mode != "" {
-		err = mode.Set(stack.Mode)
-		if err != nil {
-			return nil, fmt.Errorf("invalid mode %q in stack %q: %w", stack.Mode, stack.Name, err)
-		}
-	}
-	params := &stacks.StackParameters{
-		Name:     stack.Name,
-		Provider: providerID,
-		Region:   stack.Region,
-		Mode:     mode,
-	}
-	err = sm.LoadParameters(params.ToMap(), false)
-	if err != nil {
-		return nil, fmt.Errorf("unable to load parameters for stack %q: %w", stack.Name, err)
-	}
-
-	return params, nil
 }
 
 func printProviderMismatchWarnings(ctx context.Context, provider client.ProviderID) {

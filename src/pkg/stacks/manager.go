@@ -12,12 +12,13 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 type Manager interface {
 	List(ctx context.Context) ([]StackListItem, error)
-	Load(name string) (*StackParameters, error)
+	Load(ctx context.Context, name string) (*StackParameters, error)
 	LoadParameters(params map[string]string, overload bool) error
 	Create(params StackParameters) (string, error)
 }
@@ -167,19 +168,43 @@ func (e *ErrOutside) Error() string {
 	return fmt.Sprintf("%s not allowed: target directory (%s) is different from working directory (%s)", e.Operation, e.TargetDirectory, cwd)
 }
 
-func (sm *manager) Load(name string) (*StackParameters, error) {
+func (sm *manager) Load(ctx context.Context, name string) (*StackParameters, error) {
 	if sm.outside {
-		return nil, &ErrOutside{Operation: "Load", TargetDirectory: sm.targetDirectory}
+		return sm.LoadRemote(ctx, name)
 	}
 	params, err := ReadInDirectory(sm.targetDirectory, name)
 	if err != nil {
-		return nil, err
+		term.Infof("unable to load stack from file, attempting to import from previous deployments: %v", err)
+		return sm.LoadRemote(ctx, name)
 	}
 	err = sm.LoadParameters(params.ToMap(), false)
 	if err != nil {
 		return nil, err
 	}
 	return params, nil
+}
+
+func (sm *manager) LoadRemote(ctx context.Context, name string) (*StackParameters, error) {
+	remoteStacks, err := sm.ListRemote(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list remote stacks: %w", err)
+	}
+	var remoteStack *RemoteStack
+	for _, remote := range remoteStacks {
+		if remote.Name == name {
+			remoteStack = &remote
+			break
+		}
+	}
+	if remoteStack == nil {
+		return nil, fmt.Errorf("unable to find stack %q", name)
+	}
+	err = sm.LoadParameters(remoteStack.StackParameters.ToMap(), false)
+	if err != nil {
+		return nil, fmt.Errorf("unable to import stack %q: %w", name, err)
+	}
+
+	return &remoteStack.StackParameters, nil
 }
 
 func (sm *manager) LoadParameters(params map[string]string, overload bool) error {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -289,7 +290,7 @@ func (m *mockStackManager) List(ctx context.Context) ([]stacks.StackListItem, er
 	return m.listResult, nil
 }
 
-func (m *mockStackManager) Load(name string) (*stacks.StackParameters, error) {
+func (m *mockStackManager) Load(ctx context.Context, name string) (*stacks.StackParameters, error) {
 	if m.loadError != nil {
 		return nil, m.loadError
 	}
@@ -306,6 +307,24 @@ func (m *mockStackManager) Load(name string) (*stacks.StackParameters, error) {
 		return m.loadResult, nil
 	}
 
+	if m.listResult != nil {
+		for _, item := range m.listResult {
+			if item.Name == name {
+				var provider client.ProviderID
+				provider.Set(item.Provider)
+				var mode modes.Mode
+				mode.Set(item.Mode)
+				params := stacks.StackParameters{
+					Name:     name,
+					Provider: provider,
+					Mode:     mode,
+				}
+				stacks.LoadParameters(params.ToMap(), true)
+				return &params, nil
+			}
+		}
+	}
+
 	// If we have expected provider/region (from old NewMockStackManager usage), create default params
 	if m.expectedProvider != "" && m.expectedRegion != "" {
 		params := stacks.StackParameters{
@@ -318,7 +337,7 @@ func (m *mockStackManager) Load(name string) (*stacks.StackParameters, error) {
 		return &params, nil
 	}
 
-	return nil, os.ErrNotExist
+	return nil, fmt.Errorf("unable to find stack %q", name)
 }
 
 func (m *mockStackManager) Create(params stacks.StackParameters) (string, error) {

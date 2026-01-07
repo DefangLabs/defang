@@ -111,7 +111,7 @@ func TestManager_CreateListLoad(t *testing.T) {
 	}
 
 	// Test loading a stack
-	loadedParams, err := manager.Load("teststack")
+	loadedParams, err := manager.Load(t.Context(), "teststack")
 	if err != nil {
 		t.Fatalf("Load() failed: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestManager_CreateGCPStack(t *testing.T) {
 	}
 
 	// Test loading the GCP stack
-	loadedParams, err := manager.Load("gcpstack")
+	loadedParams, err := manager.Load(t.Context(), "gcpstack")
 	if err != nil {
 		t.Fatalf("Load() failed: %v", err)
 	}
@@ -237,7 +237,7 @@ func TestManager_CreateMultipleStacks(t *testing.T) {
 
 	// Verify each stack can be loaded
 	for _, params := range stacks {
-		loadedParams, err := manager.Load(params.Name)
+		loadedParams, err := manager.Load(t.Context(), params.Name)
 		if err != nil {
 			t.Fatalf("Load() failed for stack %s: %v", params.Name, err)
 		}
@@ -261,7 +261,7 @@ func TestManager_LoadNonexistentStack(t *testing.T) {
 	}
 
 	// Try to load a stack that doesn't exist
-	_, err = manager.Load("nonexistent")
+	_, err = manager.Load(t.Context(), "nonexistent")
 	if err == nil {
 		t.Error("Load() should return error for nonexistent stack")
 	}
@@ -627,7 +627,7 @@ func TestManager_WorkingDirectoryMatches(t *testing.T) {
 	}
 
 	// Load should work
-	loadedParams, err := manager.Load("teststack")
+	loadedParams, err := manager.Load(t.Context(), "teststack")
 	if err != nil {
 		t.Fatalf("Load() failed when directories match: %v", err)
 	}
@@ -703,11 +703,11 @@ func TestManager_TargetDirectoryEmpty(t *testing.T) {
 	}
 
 	// Load should fail
-	_, err = manager.Load("teststack")
+	_, err = manager.Load(t.Context(), "teststack")
 	if err == nil {
 		t.Fatal("Load() should fail when target directory is empty")
 	}
-	if !strings.Contains(err.Error(), "Load not allowed: target directory") {
+	if !strings.Contains(err.Error(), "unable to find stack \"teststack\"") {
 		t.Errorf("Expected specific error message about operation not allowed, got: %v", err)
 	}
 }
