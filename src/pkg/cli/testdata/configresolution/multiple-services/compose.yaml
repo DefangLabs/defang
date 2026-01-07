@@ -1,4 +1,6 @@
 services:
+  NoEnvVarService:
+    image: alpine
   service3:
     image: postgres
     environment:
