@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"slices"
 
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
@@ -110,6 +108,5 @@ func printStacksInfoMessage(stacks []string) {
 		infoLine += "\n   To learn more about Stacks, visit: https://docs.defang.io/docs/concepts/stacks"
 		term.Println(infoLine)
 	}
-	executable, _ := os.Executable()
-	term.Printf("To skip this prompt, run %s up --stack=%s\n", filepath.Base(executable), "<stack_name>")
+	term.Printf("To skip this prompt, run this command with --stack=%s\n", "<stack_name>")
 }
