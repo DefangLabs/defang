@@ -38,7 +38,8 @@ func determineConfigSource(envKey string, envValue *string, defangConfigs map[st
 		return SourceDefangConfig, configMaskedValue
 	}
 
-	// If value is nil, it's from the compose file with empty value
+	// If value is nil, it's from the compose file with empty value. This mean the user forgot to set with defang config.
+	// ValidateProjectConfig will catch this later and tell the user to set it.
 	if envValue == nil {
 		return SourceDefangConfig, ""
 	}
@@ -71,6 +72,11 @@ func PrintConfigResolutionSummary(project *types.Project, defangConfig []string)
 				Source:      source,
 			})
 		}
+	}
+
+	// Don't print table if there are no environment variables
+	if len(projectEnvVars) == 0 {
+		return nil
 	}
 
 	// Sort by Service, then by Name within each service
