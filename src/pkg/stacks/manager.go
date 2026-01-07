@@ -31,6 +31,7 @@ type manager struct {
 	targetDirectory string
 	projectName     string
 	outside         bool
+	stacks          []StackListItem
 }
 
 func NewManager(fabric DeploymentLister, targetDirectory string, projectName string) (*manager, error) {
@@ -52,10 +53,14 @@ func NewManager(fabric DeploymentLister, targetDirectory string, projectName str
 		targetDirectory: absTargetDirectory,
 		projectName:     projectName,
 		outside:         outside,
+		stacks:          make([]StackListItem, 0),
 	}, nil
 }
 
 func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
+	if len(sm.stacks) > 0 {
+		return sm.stacks, nil
+	}
 	remoteStacks, err := sm.ListRemote(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list remote stacks: %w", err)
@@ -102,6 +107,8 @@ func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
 	slices.SortFunc(stackList, func(a, b StackListItem) int {
 		return strings.Compare(a.Name, b.Name)
 	})
+
+	sm.stacks = stackList
 
 	return stackList, nil
 }
