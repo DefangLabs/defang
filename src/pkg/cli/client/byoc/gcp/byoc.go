@@ -842,15 +842,18 @@ func LogEntryToString(logEntry *loggingpb.LogEntry) (string, string, error) {
 }
 
 func LogEntriesToString(logEntries []*loggingpb.LogEntry) string {
-	result := ""
+	var sb strings.Builder
 	for _, logEntry := range logEntries {
 		logTimestamp, msg, err := LogEntryToString(logEntry)
 		if err != nil {
 			continue
 		}
-		result += logTimestamp + " " + msg + "\n"
+		sb.WriteString(logTimestamp)
+		sb.WriteString(" ")
+		sb.WriteString(msg)
+		sb.WriteString("\n")
 	}
-	return result
+	return sb.String()
 }
 
 func (b *ByocGcp) query(ctx context.Context, query string) ([]*loggingpb.LogEntry, error) {

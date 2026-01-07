@@ -27,11 +27,14 @@ type PulumiState struct {
 func (ps PulumiState) String() string {
 	var org, pending string
 	if len(ps.Pending) != 0 {
-		pending = " (pending"
+		var b strings.Builder
+		b.WriteString(" (pending")
 		for _, p := range ps.Pending {
-			pending += " " + strconv.Quote(p)
+			b.WriteString(" ")
+			b.WriteString(strconv.Quote(p))
 		}
-		pending += ")"
+		b.WriteString(")")
+		pending = b.String()
 	}
 	if ps.DefangOrg != "" {
 		org = " {" + string(ps.DefangOrg) + "}"

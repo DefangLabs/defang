@@ -244,11 +244,11 @@ func (g *ModelGenerator) Generate(ctx context.Context, req *ai.ModelRequest, han
 
 // concatenateContent concatenates text content into a single string
 func (g *ModelGenerator) concatenateContent(parts []*ai.Part) string {
-	content := ""
+	var b []byte
 	for _, part := range parts {
-		content += part.Text
+		b = append(b, part.Text...)
 	}
-	return content
+	return string(b)
 }
 
 // generateStream generates a streaming model response
