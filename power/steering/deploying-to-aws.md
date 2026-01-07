@@ -14,7 +14,7 @@ When the user's project has a compose.yaml file and would like to deploy to aws.
 
 ## Step 1: Select the stack to which the application will be deployed
 
-A stack is a single deployed instance of your project in a specific AWS account and region. You can deploy multiple stacks into the same account and region, for example: `staging` and `production`.
+A [stack](https://docs.defang.io/docs/concepts/stacks) is a single deployed instance of your project in a specific AWS account and region. You can deploy multiple stacks into the same account and region, for example: `staging` and `production`.
 
 Check if there are any stacks in the current project.
 
