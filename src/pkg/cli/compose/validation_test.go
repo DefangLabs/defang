@@ -60,7 +60,7 @@ func TestValidationAndConvert(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := ValidateProjectConfig(t.Context(), project, listConfigNames); err != nil {
+		if err := ValidateProjectConfig(project, listConfigNames); err != nil {
 			t.Logf("Project config validation failed: %v", err)
 			logs.WriteString("Error: " + err.Error() + "\n")
 		}
@@ -87,7 +87,6 @@ func TestValidationAndConvert(t *testing.T) {
 }
 
 func TestValidateConfig(t *testing.T) {
-	ctx := t.Context()
 
 	testProject := composeTypes.Project{
 		Services: composeTypes.Services{},
@@ -99,7 +98,7 @@ func TestValidateConfig(t *testing.T) {
 		}
 		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
 
-		if err := ValidateProjectConfig(ctx, &testProject, []string{}); err != nil {
+		if err := ValidateProjectConfig(&testProject, []string{}); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -114,7 +113,7 @@ func TestValidateConfig(t *testing.T) {
 		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
 
 		var missing ErrMissingConfig
-		if err := ValidateProjectConfig(ctx, &testProject, []string{}); !errors.As(err, &missing) {
+		if err := ValidateProjectConfig(&testProject, []string{}); !errors.As(err, &missing) {
 			t.Fatalf("expected ErrMissingConfig, got: %v", err)
 		} else {
 			if len(missing) != 3 {
@@ -137,7 +136,7 @@ func TestValidateConfig(t *testing.T) {
 		}
 		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
 
-		if err := ValidateProjectConfig(ctx, &testProject, []string{CONFIG_VAR}); err != nil {
+		if err := ValidateProjectConfig(&testProject, []string{CONFIG_VAR}); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -149,7 +148,7 @@ func TestValidateConfig(t *testing.T) {
 		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
 
 		var missing ErrMissingConfig
-		if err := ValidateProjectConfig(ctx, &testProject, []string{}); !errors.As(err, &missing) {
+		if err := ValidateProjectConfig(&testProject, []string{}); !errors.As(err, &missing) {
 			t.Fatalf("expected ErrMissingConfig, got: %v", err)
 		} else {
 			if len(missing) != 1 {

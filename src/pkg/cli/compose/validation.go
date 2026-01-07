@@ -449,7 +449,7 @@ func DetectInterpolationVariables(value string) []string {
 	return names
 }
 
-func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Project, listConfigNames []string) error {
+func ValidateProjectConfig(composeProject *composeTypes.Project, listConfigNames []string) error {
 	var names []string
 	// make list of secrets
 	for _, service := range composeProject.Services {

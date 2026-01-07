@@ -736,7 +736,7 @@ func collectUnsetEnvVars(project *composeTypes.Project) []string {
 	if project == nil {
 		return nil // in case loading failed
 	}
-	err := compose.ValidateProjectConfig(context.TODO(), project, []string{})
+	err := compose.ValidateProjectConfig(project, []string{})
 	var missingConfig compose.ErrMissingConfig
 	if errors.As(err, &missingConfig) {
 		return missingConfig
@@ -967,7 +967,7 @@ var configResolveCmd = &cobra.Command{
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"final"},
-	Short:       "Show the final resolve config(s) for the project",
+	Short:       "Show the final resolved environment for the project",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
 
@@ -991,7 +991,7 @@ var configResolveCmd = &cobra.Command{
 			return err
 		}
 
-		return compose.ValidateProjectConfig(cmd.Context(), project, config.Names)
+		return compose.ValidateProjectConfig(project, config.Names)
 	},
 }
 

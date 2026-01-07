@@ -61,7 +61,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 				return nil, project, err
 			}
 
-			if err := compose.ValidateProjectConfig(ctx, project, configs.Names); err != nil {
+			if err := compose.ValidateProjectConfig(project, configs.Names); err != nil {
 				return nil, project, &ComposeError{err}
 			}
 		}
