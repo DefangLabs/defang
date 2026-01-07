@@ -10,16 +10,16 @@ This guide describes how to deploy applications to GCP with Defang.
 
 ## Trigger
 
-When the user's project has a compose.yaml file and would like to deploy to aws.
+When the user's project has a compose.yaml file and would like to deploy to gcp.
 
 ## Step 1: Select the stack to which the application will be deployed
 
-A stack is a single deployed instance of your project in a specific AWS account and region. You can deploy multiple stacks into the same account and region, for example: `staging` and `production`.
+A stack is a single deployed instance of your project in a specific GCP account and region. You can deploy multiple stacks into the same account and region, for example: `staging` and `production`.
 
 Check if there are any stacks in the current project.
 
 - If a stack is already defined, ask the user if they would like to select one of the existing stacks, or if they would like to create a new one.
-- If there are no stacks, prompt user to create a new AWS stack.
+- If there are no stacks, prompt user to create a new GCP stack.
 
 The following information will be needed to create a stack:
 

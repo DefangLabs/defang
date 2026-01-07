@@ -32,9 +32,9 @@ Ensure that the step above ## Validate tools is completed before proceeding to t
 
 - Ask the user which cloud provider they want to use (AWS, GCP)
   - If AWS:
-    - Use the steering file `getting-started-aws`
+    - Use the steering file `deploying-to-aws`
   - If GCP:
-    - Use the steering file `getting-started-gcp`
+    - Use the steering file `deploying-to-gcp`
 
 # Available Steering Files
 
