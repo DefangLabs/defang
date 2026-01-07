@@ -848,7 +848,10 @@ func LogEntriesToString(logEntries []*loggingpb.LogEntry) string {
 		if err != nil {
 			continue
 		}
-		result.WriteString(logTimestamp + " " + msg + "\n")
+		result.WriteString(logTimestamp)
+		result.WriteByte(' ')
+		result.WriteString(msg)
+		result.WriteByte('\n')
 	}
 	return result.String()
 }

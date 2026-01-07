@@ -30,9 +30,10 @@ func (ps PulumiState) String() string {
 	if len(ps.Pending) != 0 {
 		pending.WriteString(" (pending")
 		for _, p := range ps.Pending {
-			pending.WriteString(" " + strconv.Quote(p))
+			pending.WriteByte(' ')
+			pending.WriteString(strconv.Quote(p))
 		}
-		pending.WriteString(")")
+		pending.WriteByte(')')
 	}
 	if ps.DefangOrg != "" {
 		org = " {" + string(ps.DefangOrg) + "}"
