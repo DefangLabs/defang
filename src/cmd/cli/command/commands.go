@@ -967,7 +967,7 @@ var configResolveCmd = &cobra.Command{
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"final"},
-	Short:       "Show the final resolved config for the project",
+	Short:       "Show the final resolve config(s) for the project",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
 
