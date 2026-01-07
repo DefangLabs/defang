@@ -280,6 +280,8 @@ func SetupCommands(version string) {
 
 	configCmd.AddCommand(configListCmd)
 
+	configCmd.AddCommand(configResolveCmd)
+
 	RootCmd.AddCommand(configCmd)
 
 	RootCmd.AddCommand(setupComposeCommand())
@@ -734,9 +736,7 @@ func collectUnsetEnvVars(project *composeTypes.Project) []string {
 	if project == nil {
 		return nil // in case loading failed
 	}
-	err := compose.ValidateProjectConfig(context.TODO(), project, func(ctx context.Context) ([]string, error) {
-		return nil, nil // assume no config
-	})
+	err := compose.ValidateProjectConfig(project, []string{})
 	var missingConfig compose.ErrMissingConfig
 	if errors.As(err, &missingConfig) {
 		return missingConfig
@@ -959,6 +959,39 @@ var configListCmd = &cobra.Command{
 		}
 
 		return cli.ConfigList(cmd.Context(), projectName, provider)
+	},
+}
+
+var configResolveCmd = &cobra.Command{
+	Use:         "resolve",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"final"},
+	Short:       "Show the final resolved environment for the project",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		loader := configureLoader(cmd)
+
+		provider, err := newProviderChecked(cmd.Context(), loader)
+		if err != nil {
+			return err
+		}
+
+		project, err := loader.LoadProject(cmd.Context())
+		if err != nil {
+			return err
+		}
+
+		config, err := provider.ListConfig(cmd.Context(), &defangv1.ListConfigsRequest{Project: project.Name})
+		if err != nil {
+			return err
+		}
+
+		err = cli.PrintConfigResolutionSummary(project, config.Names)
+		if err != nil {
+			return err
+		}
+
+		return compose.ValidateProjectConfig(project, config.Names)
 	},
 }
 

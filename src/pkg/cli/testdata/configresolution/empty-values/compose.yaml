@@ -1,0 +1,12 @@
+services:
+  service1:
+    image: nginx
+    environment:
+      EMPTY_VAR:
+      WITH_VALUE: some_value
+  service2:
+    image: nginx
+    environment:
+      - EMPTY_STRING=
+      - EMPTY_VAR
+      - WITH_VALUE=some_value
