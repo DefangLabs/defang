@@ -4,3 +4,4 @@ services:
     environment:
       SECRET_KEY: ${SECRET_KEY}
       API_TOKEN: ${API_TOKEN}
+      DB_USER:

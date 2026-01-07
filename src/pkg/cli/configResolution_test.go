@@ -25,7 +25,7 @@ func TestPrintConfigResolutionSummary(t *testing.T) {
 		var defangConfigs []string
 		switch name {
 		case "defang-config-only":
-			defangConfigs = []string{"SECRET_KEY", "API_TOKEN"}
+			defangConfigs = []string{"SECRET_KEY", "API_TOKEN", "DB_USER"}
 		case "mixed-sources":
 			defangConfigs = []string{"SECRET_KEY"}
 		case "interpolated-values":

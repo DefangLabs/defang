@@ -1,5 +1,6 @@
-[1mENVIRONMENT VARIABLES RESOLUTION SUMMARY:[0m
 [1m
-SERVICE   NAME      VALUE   SOURCE[0m
-service1  ENV_VAR1  value1  compose_file  
-service1  ENV_VAR2  value2  compose_file  
+SERVICE   ENVIRONMENT  VALUE   SOURCE[0m
+service1  ENV_VAR1     value1  Compose  
+service1  ENV_VAR2     value2  Compose  
+service2  ENV_VAR1     value1  Compose  
+service2  ENV_VAR2     value2  Compose  

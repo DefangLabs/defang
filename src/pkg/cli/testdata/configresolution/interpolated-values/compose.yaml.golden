@@ -1,6 +1,5 @@
-[1mENVIRONMENT VARIABLES RESOLUTION SUMMARY:[0m
 [1m
-SERVICE   NAME          VALUE                                                SOURCE[0m
-service1  API_ENDPOINT  https://api.example.com                              compose_file                    
-service1  AUTH_HEADER   Bearer ${API_TOKEN}                                  compose_file and defang_config  
-service1  DATABASE_URL  postgres://${DB_USER}:${DB_PASSWORD}@localhost/mydb  compose_file and defang_config  
+SERVICE   ENVIRONMENT   VALUE                                                SOURCE[0m
+service1  API_ENDPOINT  https://api.example.com                              Compose                
+service1  AUTH_HEADER   Bearer ${API_TOKEN}                                  Config (interpolated)  
+service1  DATABASE_URL  postgres://${DB_USER}:${DB_PASSWORD}@localhost/mydb  Config (interpolated)  

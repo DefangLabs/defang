@@ -1,4 +1,8 @@
 services:
+  service3:
+    image: postgres
+    environment:
+      DB_USER: "Defang"
   service2:
     image: redis
     environment:

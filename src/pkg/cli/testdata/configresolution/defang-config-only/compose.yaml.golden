@@ -1,5 +1,5 @@
-[1mENVIRONMENT VARIABLES RESOLUTION SUMMARY:[0m
 [1m
-SERVICE   NAME        VALUE  SOURCE[0m
-service1  API_TOKEN   *****  defang_config  
-service1  SECRET_KEY  *****  defang_config  
+SERVICE   ENVIRONMENT  VALUE  SOURCE[0m
+service1  API_TOKEN    *****  Config  
+service1  DB_USER      *****  Config  
+service1  SECRET_KEY   *****  Config  
