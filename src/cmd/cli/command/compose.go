@@ -96,7 +96,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}, loadErr)
 			}
 
-			provider, err := newProviderChecked(ctx, loader)
+			provider, err := newProviderChecked(ctx, loader, true)
 			if err != nil {
 				return err
 			}
@@ -452,7 +452,7 @@ func makeComposeDownCmd() *cobra.Command {
 			}
 
 			loader := configureLoader(cmd)
-			provider, err := newProviderChecked(cmd.Context(), loader)
+			provider, err := newProviderChecked(cmd.Context(), loader, false)
 			if err != nil {
 				return err
 			}
@@ -582,7 +582,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				return fmt.Errorf("failed to create stack manager: %w", err)
 			}
 
-			provider, err := newProvider(ctx, ec, sm)
+			provider, err := newProvider(ctx, ec, sm, false)
 			if err != nil {
 				return err
 			}
@@ -611,7 +611,7 @@ func makeComposePsCmd() *cobra.Command {
 			long, _ := cmd.Flags().GetBool("long")
 
 			loader := configureLoader(cmd)
-			provider, err := newProviderChecked(cmd.Context(), loader)
+			provider, err := newProviderChecked(cmd.Context(), loader, false)
 			if err != nil {
 				return err
 			}
@@ -736,7 +736,7 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	loader := configureLoader(cmd)
-	provider, err := newProviderChecked(cmd.Context(), loader)
+	provider, err := newProviderChecked(cmd.Context(), loader, false)
 	if err != nil {
 		return err
 	}
