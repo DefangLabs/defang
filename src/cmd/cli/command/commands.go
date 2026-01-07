@@ -981,17 +981,7 @@ var configResolveCmd = &cobra.Command{
 			return err
 		}
 
-		config, err := provider.ListConfig(cmd.Context(), &defangv1.ListConfigsRequest{Project: project.Name})
-		if err != nil {
-			return err
-		}
-
-		err = cli.PrintConfigResolutionSummary(project, config.Names)
-		if err != nil {
-			return err
-		}
-
-		return compose.ValidateProjectConfig(project, config.Names)
+		return cli.PrintConfigSummaryandValidate(cmd.Context(), provider, project)
 	},
 }
 
