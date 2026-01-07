@@ -575,14 +575,12 @@ func (b *ByocGcp) getLogStream(ctx context.Context, gcpLogsClient GcpLogsClient,
 		if execName == "." {
 			execName = ""
 		}
-		logStream.AddJobExecutionLog(execName) // CD log when there is an execution name
-		// TODO: update stack (1st param) to b.PulumiStack
-		logStream.AddJobLog("", req.Project, etag, req.Services)        // Kaniko or CD logs when there is no execution name
-		logStream.AddCloudBuildLog("", req.Project, etag, req.Services) // CloudBuild logs
+		logStream.AddJobExecutionLog(execName)                                     // CD log when there is an execution name
+		logStream.AddJobLog(b.PulumiStack, req.Project, etag, req.Services)        // Kaniko or CD logs when there is no execution name
+		logStream.AddCloudBuildLog(b.PulumiStack, req.Project, etag, req.Services) // CloudBuild logs
 	}
 	if logs.LogType(req.LogType).Has(logs.LogTypeRun) {
-		// TODO: update stack (1st param) to b.PulumiStack
-		logStream.AddServiceLog("", req.Project, etag, req.Services) // Service logs
+		logStream.AddServiceLog(b.PulumiStack, req.Project, etag, req.Services) // Service logs
 	}
 	logStream.AddFilter(req.Pattern)
 	if req.Follow {
@@ -778,18 +776,16 @@ func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
 		query.AddJobExecutionQuery(path.Base(b.cdExecution))
 	}
 
-	// Logs TODO: update stack (1st param) to b.PulumiStack
-	query.AddJobLogQuery("", req.Project, req.Etag, req.Services)        // Kaniko OR CD logs
-	query.AddServiceLogQuery("", req.Project, req.Etag, req.Services)    // Cloudrun service logs
-	query.AddCloudBuildLogQuery("", req.Project, req.Etag, req.Services) // CloudBuild logs
+	query.AddJobLogQuery(b.PulumiStack, req.Project, req.Etag, req.Services)        // Kaniko OR CD logs
+	query.AddServiceLogQuery(b.PulumiStack, req.Project, req.Etag, req.Services)    // Cloudrun service logs
+	query.AddCloudBuildLogQuery(b.PulumiStack, req.Project, req.Etag, req.Services) // CloudBuild logs
 	query.AddSince(since)
 	query.AddUntil(until)
 
-	// Service status updates TODO: update stack (1st param) to b.PulumiStack
-	query.AddJobStatusUpdateRequestQuery("", req.Project, req.Etag, req.Services)
-	query.AddJobStatusUpdateResponseQuery("", req.Project, req.Etag, req.Services)
-	query.AddServiceStatusRequestUpdate("", req.Project, req.Etag, req.Services)
-	query.AddServiceStatusReponseUpdate("", req.Project, req.Etag, req.Services)
+	query.AddJobStatusUpdateRequestQuery(b.PulumiStack, req.Project, req.Etag, req.Services)
+	query.AddJobStatusUpdateResponseQuery(b.PulumiStack, req.Project, req.Etag, req.Services)
+	query.AddServiceStatusRequestUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
+	query.AddServiceStatusReponseUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
 
 	return query.GetQuery()
 }
