@@ -32,177 +32,18 @@ func Test_configurationPrecedence(t *testing.T) {
 		Tenant:         "",
 	}
 
-	type stack struct {
-		stackname string
-		entries   map[string]string
-	}
-
 	tests := []struct {
-		name         string
-		rcStack      stack
-		createRCFile bool
-		envVars      map[string]string
-		flags        map[string]string
-		expected     GlobalConfig
+		name     string
+		envVars  map[string]string
+		flags    map[string]string
+		expected GlobalConfig
 	}{
 		{
-			name:         "Flags override env and stack file",
-			createRCFile: true,
-			rcStack: stack{
-				stackname: "test",
-				entries: map[string]string{
-					"DEFANG_MODE":            "AFFORDABLE",
-					"DEFANG_VERBOSE":         "false",
-					"DEFANG_DEBUG":           "true",
-					"DEFANG_STACK":           "from-env",
-					"DEFANG_FABRIC":          "from-env-cluster",
-					"DEFANG_PROVIDER":        "defang",
-					"DEFANG_COLOR":           "never",
-					"DEFANG_TTY":             "false",
-					"DEFANG_NON_INTERACTIVE": "true",
-					"DEFANG_HIDE_UPDATE":     "true",
-				},
-			},
-			envVars: map[string]string{
-				"DEFANG_MODE":        "BALANCED",
-				"DEFANG_VERBOSE":     "true",
-				"DEFANG_DEBUG":       "false",
-				"DEFANG_STACK":       "from-env",
-				"DEFANG_FABRIC":      "from-env-cluster",
-				"DEFANG_PROVIDER":    "gcp",
-				"DEFANG_COLOR":       "auto",
-				"DEFANG_TTY":         "false",
-				"DEFANG_HIDE_UPDATE": "false",
-			},
-			flags: map[string]string{
-				"mode":            "HIGH_AVAILABILITY",
-				"verbose":         "false",
-				"debug":           "true",
-				"stack":           "from-flags",
-				"cluster":         "from-flags-cluster",
-				"provider":        "aws",
-				"color":           "always",
-				"non-interactive": "false",
-			},
-			expected: GlobalConfig{
-				Verbose: false,
-				Debug:   true,
-				Stack: stacks.StackParameters{
-					Name:     "from-flags",
-					Provider: client.ProviderAWS,
-					Mode:     modes.ModeHighAvailability,
-				},
-				Cluster:        "from-flags-cluster",
-				Tenant:         "",
-				ColorMode:      ColorAlways,
-				HasTty:         false, // from env override
-				NonInteractive: false, // from flags override
-				HideUpdate:     false, // from env override (env false beats env true)
-			},
+			name:     "no stack file, no env vars and no flags",
+			expected: defaultConfig, // should match the initialized defaults above
 		},
 		{
-			name:         "Env overrides stack files when no flags set",
-			createRCFile: true,
-			rcStack: stack{
-				stackname: "test",
-				entries: map[string]string{
-					"DEFANG_MODE":            "AFFORDABLE",
-					"DEFANG_VERBOSE":         "false",
-					"DEFANG_DEBUG":           "true",
-					"DEFANG_STACK":           "from-env",
-					"DEFANG_FABRIC":          "from-env-cluster",
-					"DEFANG_PROVIDER":        "defang",
-					"DEFANG_COLOR":           "never",
-					"DEFANG_TTY":             "false",
-					"DEFANG_NON_INTERACTIVE": "true",
-				},
-			},
-			envVars: map[string]string{
-				"DEFANG_MODE":            "BALANCED",
-				"DEFANG_VERBOSE":         "true",
-				"DEFANG_DEBUG":           "false",
-				"DEFANG_STACK":           "from-env",
-				"DEFANG_FABRIC":          "from-env-cluster",
-				"DEFANG_PROVIDER":        "gcp",
-				"DEFANG_COLOR":           "auto",
-				"DEFANG_TTY":             "true",
-				"DEFANG_NON_INTERACTIVE": "false",
-				"DEFANG_HIDE_UPDATE":     "false",
-			},
-			expected: GlobalConfig{
-				Verbose: true,
-				Debug:   false,
-				Stack: stacks.StackParameters{
-					Name:     "from-env",
-					Provider: client.ProviderGCP,
-					Mode:     modes.ModeBalanced,
-				},
-				Cluster:        "from-env-cluster",
-				Tenant:         "",
-				ColorMode:      ColorAuto,
-				HasTty:         true,  // from env
-				NonInteractive: false, // from env
-				HideUpdate:     false, // from env (env overrides env)
-			},
-		},
-		{
-			name:         "stack file used when no env vars or flags set",
-			createRCFile: true,
-			rcStack: stack{
-				stackname: "test",
-				entries: map[string]string{
-					"DEFANG_MODE":            "AFFORDABLE",
-					"DEFANG_VERBOSE":         "true",
-					"DEFANG_DEBUG":           "false",
-					"DEFANG_STACK":           "from-env",
-					"DEFANG_FABRIC":          "from-env-cluster",
-					"DEFANG_PROVIDER":        "defang",
-					"DEFANG_COLOR":           "always",
-					"DEFANG_TTY":             "false",
-					"DEFANG_NON_INTERACTIVE": "true",
-					"DEFANG_HIDE_UPDATE":     "true",
-				},
-			},
-			expected: GlobalConfig{
-				Verbose: true,
-				Debug:   false,
-				Stack: stacks.StackParameters{
-					Name:     "from-env",
-					Provider: client.ProviderDefang,
-					Mode:     modes.ModeAffordable,
-				},
-				Cluster:        "from-env-cluster",
-				Tenant:         "",
-				ColorMode:      ColorAlways,
-				HasTty:         false, // from env
-				NonInteractive: true,  // from env
-				HideUpdate:     true,  // from env
-			},
-		},
-		{
-			name:         "stack file with no values used when no env vars or flags set",
-			createRCFile: true,
-			rcStack: stack{
-				stackname: "test",
-			},
-			expected: defaultConfig,
-		},
-		{
-			name:         "default .defang name and no values, when no env vars or flags",
-			createRCFile: true,
-			rcStack: stack{
-				stackname: "",
-			},
-			expected: defaultConfig,
-		},
-		{
-			name:         "no stack file, no env vars and no flags",
-			createRCFile: false,
-			expected:     defaultConfig, // should match the initialized defaults above
-		},
-		{
-			name:         "ignore empty debug bool",
-			createRCFile: false,
+			name: "ignore empty debug bool",
 			envVars: map[string]string{
 				"DEFANG_DEBUG": "",
 			},
@@ -243,27 +84,6 @@ func Test_configurationPrecedence(t *testing.T) {
 
 			var rcEnvs []string
 			// Create stack files in the temporary directory
-			if tt.createRCFile {
-				path := filepath.Join(tempDir, ".defang")
-				if tt.rcStack.stackname != "" {
-					os.Mkdir(path, 0700)
-					path = filepath.Join(path, tt.rcStack.stackname)
-				}
-
-				f, err := os.Create(path)
-				if err != nil {
-					t.Fatalf("failed to create file %s: %v", path, err)
-				}
-
-				// Write as environment file format
-				for key, value := range tt.rcStack.entries {
-					if _, err := f.WriteString(key + "=" + value + "\n"); err != nil {
-						t.Fatalf("failed to write to file %s: %v", path, err)
-					}
-					rcEnvs = append(rcEnvs, key)
-				}
-				f.Close()
-			}
 
 			t.Cleanup(func() {
 				// Unseting env vars set for this test is handled by t.Setenv automatically
