@@ -178,7 +178,6 @@ func SetupCommands(version string) {
 		return completions, cobra.ShellCompDirectiveNoFileComp
 	})
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
-	RootCmd.Flags().MarkDeprecated("provider", "please use --stack instead")
 	RootCmd.PersistentFlags().BoolVarP(&global.Verbose, "verbose", "v", global.Verbose, "verbose logging") // backwards compat: only used by tail
 	RootCmd.PersistentFlags().BoolVar(&global.Debug, "debug", global.Debug, "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&dryrun.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
@@ -1329,14 +1328,12 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 	}
 
 	if RootCmd.PersistentFlags().Changed("provider") {
-		term.Warn("Warning: --provider flag is deprecated. Please use --stack instead. To learn about stacks, visit https://docs.defang.io/docs/concepts/stacks")
 		providerIDString := RootCmd.Flag("provider").Value.String()
 		err := stack.Provider.Set(providerIDString)
 		if err != nil {
 			return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
 		}
 	} else if _, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
-		term.Warn("Warning: DEFANG_PROVIDER environment variable is deprecated. Please use --stack instead. To learn about stacks, visit https://docs.defang.io/docs/concepts/stacks")
 		providerIDString := os.Getenv("DEFANG_PROVIDER")
 		err := stack.Provider.Set(providerIDString)
 		if err != nil {
