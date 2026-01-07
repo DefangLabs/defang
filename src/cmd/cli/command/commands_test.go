@@ -361,6 +361,7 @@ func TestNewProvider(t *testing.T) {
 	}
 	mockClient.SetFabricClient(mockCtrl)
 	oldRootCmd, oldClient := RootCmd, global.Client
+	global.Stack = stacks.StackParameters{}
 	t.Cleanup(func() {
 		RootCmd = oldRootCmd
 		global.Client = oldClient
@@ -398,8 +399,10 @@ func TestNewProvider(t *testing.T) {
 
 	t.Run("Should set cd image from canIUse response", func(t *testing.T) {
 		t.Chdir("../../../../src/testdata/sanity")
-		t.Setenv("DEFANG_STACK", "beta")
 
+		global.Stack = stacks.StackParameters{
+			Name: "beta",
+		}
 		// Set up RootCmd with required flags for getStack function
 		RootCmd = &cobra.Command{Use: "defang"}
 		RootCmd.PersistentFlags().StringVarP(&global.Stack.Name, "stack", "s", global.Stack.Name, "stack name")
@@ -443,13 +446,15 @@ func TestNewProvider(t *testing.T) {
 
 	t.Run("Can override cd image from environment variable", func(t *testing.T) {
 		t.Chdir("../../../../src/testdata/sanity")
-		t.Setenv("DEFANG_STACK", "beta")
 		prevSts := awsdriver.NewStsFromConfig
 		awsdriver.NewStsFromConfig = func(cfg aws.Config) awsdriver.StsClientAPI { return &awsdriver.MockStsClientAPI{} }
 		const cdImageTag = "site/registry/repo:tag@sha256:digest"
 		const overrideImageTag = "site/override/replaced:tag@sha256:otherdigest"
 		t.Setenv("DEFANG_CD_IMAGE", overrideImageTag)
 		mockCtrl.canIUseResponse.CdImage = cdImageTag
+		global.Stack = stacks.StackParameters{
+			Name: "beta",
+		}
 		t.Cleanup(func() {
 			awsdriver.NewStsFromConfig = prevSts
 			mockCtrl.canIUseResponse.CdImage = ""
@@ -512,11 +517,10 @@ func (m *mockElicitationsController) IsSupported() bool {
 func TestGetStack(t *testing.T) {
 	ctx := context.Background()
 
+	global.Stack = stacks.StackParameters{}
 	// Save original state
-	origRootCmd := RootCmd
 	origGlobalNonInteractive := global.NonInteractive
 	defer func() {
-		RootCmd = origRootCmd
 		global.NonInteractive = origGlobalNonInteractive
 		global.Stack = stacks.StackParameters{}
 	}()
@@ -552,10 +556,10 @@ func TestGetStack(t *testing.T) {
 				Provider: client.ProviderAWS,
 				Region:   "us-test-2",
 			},
-			expectedWhence: "stack file",
+			expectedWhence: "stack",
 		},
 		{
-			name: "stack flag provided with invalid stack",
+			name: "stack flag provided with unknown stack but no provider",
 			setup: func(t *testing.T) (*mockElicitationsController, *mockStackManager) {
 				ec := &mockElicitationsController{}
 				sm := &mockStackManager{
@@ -564,7 +568,25 @@ func TestGetStack(t *testing.T) {
 				return ec, sm
 			},
 			stackFlag:     "nonexistent-stack",
-			expectedError: "unable to load stack \"nonexistent-stack\": stack not found",
+			expectedError: "Unable to load stack \"nonexistent-stack\" and unable to create it with provider \"auto\" in non-interactive mode",
+		},
+		{
+			name: "stack flag provided with unknown stack but valid provider",
+			setup: func(t *testing.T) (*mockElicitationsController, *mockStackManager) {
+				ec := &mockElicitationsController{}
+				sm := &mockStackManager{
+					loadError: errors.New("stack not found"),
+				}
+				return ec, sm
+			},
+			stackFlag:    "new-stack",
+			providerFlag: "gcp",
+			expectedStack: &stacks.StackParameters{
+				Name:     "new-stack",
+				Provider: client.ProviderGCP,
+				Region:   "us-central1",
+			},
+			expectedWhence: "stack",
 		},
 		{
 			name: "stack flag with auto provider should error",
@@ -727,37 +749,14 @@ func TestGetStack(t *testing.T) {
 			// Setup mocks
 			ec, sm := tc.setup(t)
 
-			// Create a new root command for this test
-			testRootCmd := &cobra.Command{Use: "defang"}
-			testRootCmd.PersistentFlags().String("stack", "", "stack name")
-			testRootCmd.PersistentFlags().VarP(&global.Stack.Provider, "provider", "P", "provider")
-
-			// Set flags if provided
-			var args []string
-			if tc.stackFlag != "" {
-				args = append(args, "--stack", tc.stackFlag)
-			}
-			if tc.providerFlag != "" {
-				args = append(args, "--provider", tc.providerFlag)
+			provider := client.ProviderAuto
+			provider.Set(tc.providerFlag)
+			global.Stack = stacks.StackParameters{
+				Name:     tc.stackFlag,
+				Provider: provider,
 			}
 
-			if len(args) > 0 {
-				testRootCmd.ParseFlags(args)
-			}
-
-			// Set environment variable if provided
-			if tc.envProvider != "" {
-				t.Setenv("DEFANG_PROVIDER", tc.envProvider)
-			} else {
-				os.Unsetenv("DEFANG_PROVIDER")
-			}
-
-			// Set global state
-			RootCmd = testRootCmd
 			global.NonInteractive = tc.nonInteractive
-
-			// Reset global stack state
-			global.Stack.Provider = client.ProviderAuto
 
 			// Capture output to check for warnings
 			var output bytes.Buffer
@@ -799,15 +798,6 @@ func TestGetStack(t *testing.T) {
 			// Check whence expectations
 			if tc.expectedWhence != "" && whence != tc.expectedWhence {
 				t.Errorf("expected whence %q, got %q", tc.expectedWhence, whence)
-			}
-
-			// Check warning expectations
-			if tc.expectWarning {
-				// Since we can't easily capture term.Warn output in tests, we just verify
-				// that the code path that would produce warnings was taken
-				if tc.providerFlag != "" && !testRootCmd.PersistentFlags().Changed("provider") {
-					t.Error("expected provider flag to be marked as changed for warning path")
-				}
 			}
 
 			_ = output // Suppress unused variable warning for now

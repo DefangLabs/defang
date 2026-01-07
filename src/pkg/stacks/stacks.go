@@ -28,16 +28,8 @@ func (params StackParameters) ToMap() map[string]string {
 	var properties map[string]string = make(map[string]string)
 	properties["DEFANG_PROVIDER"] = strings.ToLower(params.Provider.String())
 	if params.Region != "" {
-		var regionVarName string
-		switch params.Provider {
-		case client.ProviderAWS:
-			regionVarName = "AWS_REGION"
-		case client.ProviderGCP:
-			regionVarName = "GCP_LOCATION"
-		}
-		if regionVarName != "" {
-			properties[regionVarName] = strings.ToLower(params.Region)
-		}
+		regionVarName := client.GetRegionVarName(params.Provider)
+		properties[regionVarName] = strings.ToLower(params.Region)
 	}
 	if params.Mode != modes.ModeUnspecified {
 		properties["DEFANG_MODE"] = strings.ToLower(params.Mode.String())

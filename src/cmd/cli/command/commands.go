@@ -1312,78 +1312,60 @@ var providerDescription = map[client.ProviderID]string{
 	client.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
 }
 
+func loadOrCreateStack(ctx context.Context, sm stacks.Manager, params *stacks.StackParameters) (*stacks.StackParameters, error) {
+	loaded, err := sm.Load(ctx, params.Name)
+	if err == nil {
+		// allow mode to be overwritten by CLI flag or env var
+		if params.Mode != modes.ModeUnspecified {
+			loaded.Mode = params.Mode
+		}
+		return loaded, nil
+	}
+	if global.HasTty {
+		return nil, fmt.Errorf("unable to load stack %q: %w", params.Name, err)
+	}
+
+	if params.Provider == client.ProviderAuto {
+		return nil, fmt.Errorf("Unable to load stack %q and unable to create it with provider %q in non-interactive mode", params.Name, params.Provider)
+	}
+
+	// if we are in non-interactive mode, try to create a new stack with the given name, provider, region, and mode
+	region := client.GetRegion(params.Provider)
+	loaded = &stacks.StackParameters{
+		Name:     params.Name,
+		Provider: params.Provider,
+		Mode:     params.Mode,
+		Region:   region,
+	}
+	err = sm.LoadParameters(loaded.ToMap(), false)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load stack %q and unable to create it: %w", params.Name, err)
+	}
+	return loaded, nil
+}
+
 func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager, allowStackCreation bool) (*stacks.StackParameters, string, error) {
-	stackSelector := stacks.NewSelector(ec, sm)
-
 	var whence string
-	stack := &stacks.StackParameters{
-		Name:     "",
-		Provider: client.ProviderAuto,
-		Mode:     modes.ModeUnspecified,
+	stackParams := &global.Stack
+
+	if stackParams.Name != "" {
+		whence = "stack"
+		loaded, err := loadOrCreateStack(ctx, sm, stackParams)
+		if err != nil {
+			return nil, "", err
+		}
+
+		if loaded.Provider == client.ProviderAuto {
+			return nil, "", fmt.Errorf("stack %q has an invalid provider %q", loaded.Name, loaded.Provider)
+		}
+		return loaded, whence, nil
 	}
 
-	if RootCmd.PersistentFlags().Changed("provider") {
-		providerIDString := RootCmd.Flag("provider").Value.String()
-		err := stack.Provider.Set(providerIDString)
-		if err != nil {
-			return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
-		}
-	} else if _, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
-		providerIDString := os.Getenv("DEFANG_PROVIDER")
-		err := stack.Provider.Set(providerIDString)
-		if err != nil {
-			return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
-		}
-	}
-
-	if RootCmd.PersistentFlags().Changed("mode") {
-		modeString := RootCmd.Flag("mode").Value.String()
-		mode, err := modes.Parse(modeString)
-		if err != nil {
-			return nil, "", fmt.Errorf("invalid mode %q: %w", modeString, err)
-		}
-		stack.Mode = mode
-	} else if _, ok := os.LookupEnv("DEFANG_MODE"); ok {
-		modeString := os.Getenv("DEFANG_MODE")
-		mode, err := modes.Parse(modeString)
-		if err != nil {
-			return nil, "", fmt.Errorf("invalid mode %q: %w", modeString, err)
-		}
-		stack.Mode = mode
-	}
-
-	// This code unfortunately replicates the provider precedence rules in the
-	// RootCmd's PersistentPreRunE func, I think we should avoid reading the
-	// stack file during startup, and only read it here instead.
-	if stackName := os.Getenv("DEFANG_STACK"); stackName != "" || RootCmd.PersistentFlags().Changed("stack") {
-		whence = "stack file"
-		if stackName == "" {
-			stackName, _ = RootCmd.Flags().GetString("stack")
-		}
-		stackParams, err := sm.Load(ctx, stackName)
-		if err != nil {
-			if !global.NonInteractive || stack.Provider == client.ProviderAuto {
-				return nil, "", fmt.Errorf("unable to load stack %q: %w", stackName, err)
-			}
-
-			// if we are in non-interactive mode, try to create a new stack with the given name, provider, region, and mode
-			region := client.GetRegion(stack.Provider)
-			err = sm.LoadParameters(map[string]string{
-				"name":     stackName,
-				"provider": stack.Provider.String(),
-				"region":   region,
-				"mode":     stack.Mode.String(),
-			}, false)
-			if err != nil {
-				return nil, "", fmt.Errorf("unable to load stack %q and unable to create it: %w", stackName, err)
-			}
-		}
-		stack = stackParams
-
-		if stack.Provider == client.ProviderAuto {
-			return nil, "", fmt.Errorf("stack %q has an invalid provider %q", stack.Name, stack.Provider)
-		}
-		return stack, whence, nil
+	if global.NonInteractive && stackParams.Provider == client.ProviderAuto {
+		whence = "non-interactive default"
+		stackParams.Name = stacks.DefaultBeta
+		stackParams.Provider = client.ProviderDefang
+		return stackParams, whence, nil
 	}
 
 	knownStacks, err := sm.List(ctx)
@@ -1394,24 +1376,21 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 	for i, s := range knownStacks {
 		stackNames[i] = s.Name
 	}
-	if global.NonInteractive && stack.Provider == client.ProviderAuto {
-		whence = "non-interactive default"
-		stack.Name = stacks.DefaultBeta
-		stack.Provider = client.ProviderDefang
-		return stack, whence, nil
-	}
 
 	// if there is exactly one stack with that provider, use it
-	if len(knownStacks) == 1 && (stack.Provider == client.ProviderAuto || knownStacks[0].Provider == stack.Provider.String()) {
+	if len(knownStacks) == 1 && (stackParams.Provider == client.ProviderAuto || knownStacks[0].Provider == stackParams.Provider.String()) {
 		knownStack := knownStacks[0]
 		// try to read the stackfile
-		stack, loadErr := sm.Load(ctx, knownStack.Name)
+		loaded, loadErr := sm.Load(ctx, knownStack.Name)
 		if loadErr != nil {
 			return nil, "", fmt.Errorf("unable to load stack %q: %w", knownStack.Name, loadErr)
 		}
-
+		// allow mode to be overwritten by CLI flag or env var
+		if stackParams.Mode != modes.ModeUnspecified {
+			loaded.Mode = stackParams.Mode
+		}
 		whence = "only stack"
-		return stack, whence, nil
+		return loaded, whence, nil
 	}
 
 	// if there are zero known stacks or more than one known stack, prompt the user to create or select a stack
@@ -1419,22 +1398,23 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 		if len(stackNames) > 0 {
 			return nil, "", fmt.Errorf("please specify a stack using --stack. The following stacks are available: %v", stackNames)
 		} else {
-			return nil, "", fmt.Errorf("no stacks are configured; please create a stack using 'defang stack create --provider=%s'", stack.Provider)
+			return nil, "", fmt.Errorf("no stacks are configured; please create a stack using 'defang stack create --provider=%s'", stackParams.Provider)
 		}
 	}
 
-	var stackParameters *stacks.StackParameters
+	stackSelector := stacks.NewSelector(ec, sm)
+
+	var loaded *stacks.StackParameters
 	if allowStackCreation {
-		stackParameters, err = stackSelector.SelectOrCreateStack(ctx)
+		loaded, err = stackSelector.SelectOrCreateStack(ctx)
 	} else {
-		stackParameters, err = stackSelector.SelectStack(ctx)
+		loaded, err = stackSelector.SelectStack(ctx)
 	}
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to select stack: %w", err)
 	}
-	stack = stackParameters
 	whence = "interactive selection"
-	return stack, whence, nil
+	return loaded, whence, nil
 }
 
 func printProviderMismatchWarnings(ctx context.Context, provider client.ProviderID) {
