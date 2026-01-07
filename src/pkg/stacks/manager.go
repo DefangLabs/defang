@@ -175,7 +175,7 @@ func (sm *manager) Load(name string) (*StackParameters, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = LoadInDirectory(sm.targetDirectory, name)
+	err = sm.LoadParameters(params.ToMap(), false)
 	if err != nil {
 		return nil, err
 	}
