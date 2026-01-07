@@ -1328,6 +1328,38 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 		Mode:     modes.ModeUnspecified,
 	}
 
+	if RootCmd.PersistentFlags().Changed("provider") {
+		term.Warn("Warning: --provider flag is deprecated. Please use --stack instead. To learn about stacks, visit https://docs.defang.io/docs/concepts/stacks")
+		providerIDString := RootCmd.Flag("provider").Value.String()
+		err := stack.Provider.Set(providerIDString)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
+		}
+	} else if _, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
+		term.Warn("Warning: DEFANG_PROVIDER environment variable is deprecated. Please use --stack instead. To learn about stacks, visit https://docs.defang.io/docs/concepts/stacks")
+		providerIDString := os.Getenv("DEFANG_PROVIDER")
+		err := stack.Provider.Set(providerIDString)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
+		}
+	}
+
+	if RootCmd.PersistentFlags().Changed("mode") {
+		modeString := RootCmd.Flag("mode").Value.String()
+		mode, err := modes.Parse(modeString)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid mode %q: %w", modeString, err)
+		}
+		stack.Mode = mode
+	} else if _, ok := os.LookupEnv("DEFANG_MODE"); ok {
+		modeString := os.Getenv("DEFANG_MODE")
+		mode, err := modes.Parse(modeString)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid mode %q: %w", modeString, err)
+		}
+		stack.Mode = mode
+	}
+
 	// This code unfortunately replicates the provider precedence rules in the
 	// RootCmd's PersistentPreRunE func, I think we should avoid reading the
 	// stack file during startup, and only read it here instead.
@@ -1338,6 +1370,18 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 		}
 		stackParams, err := sm.Load(ctx, stackName)
 		if err != nil {
+			if global.NonInteractive && stack.Provider != client.ProviderAuto {
+				region := client.GetRegion(stack.Provider)
+				err = sm.LoadParameters(map[string]string{
+					"name":     stackName,
+					"provider": stack.Provider.String(),
+					"region":   region,
+					"mode":     stack.Mode.String(),
+				}, false)
+				if err != nil {
+					return nil, "", fmt.Errorf("unable to load stack %q and unable to create it: %w", stackName, err)
+				}
+			}
 			return nil, "", fmt.Errorf("unable to load stack %q: %w", stackName, err)
 		}
 		stack = stackParams
@@ -1355,21 +1399,6 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 	stackNames := make([]string, len(knownStacks))
 	for i, s := range knownStacks {
 		stackNames[i] = s.Name
-	}
-	if RootCmd.PersistentFlags().Changed("provider") {
-		term.Warn("Warning: --provider flag is deprecated. Please use --stack instead. To learn about stacks, visit https://docs.defang.io/docs/concepts/stacks")
-		providerIDString := RootCmd.Flag("provider").Value.String()
-		err := stack.Provider.Set(providerIDString)
-		if err != nil {
-			return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
-		}
-	} else if _, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
-		term.Warn("Warning: DEFANG_PROVIDER environment variable is deprecated. Please use --stack instead. To learn about stacks, visit https://docs.defang.io/docs/concepts/stacks")
-		providerIDString := os.Getenv("DEFANG_PROVIDER")
-		err := stack.Provider.Set(providerIDString)
-		if err != nil {
-			return nil, "", fmt.Errorf("invalid provider %q: %w", providerIDString, err)
-		}
 	}
 	if global.NonInteractive && stack.Provider == client.ProviderAuto {
 		whence = "non-interactive default"
