@@ -152,6 +152,23 @@ type StackListItem struct {
 	DeployedAt   time.Time
 }
 
+func (sli StackListItem) ToParameters() StackParameters {
+	var providerID client.ProviderID
+	providerID.Set(sli.Provider)
+	mode, err := modes.Parse(sli.Mode)
+	if err != nil {
+		mode = modes.ModeUnspecified
+	}
+	return StackParameters{
+		Name:         sli.Name,
+		Provider:     providerID,
+		Region:       sli.Region,
+		AWSProfile:   sli.AWSProfile,
+		GCPProjectID: sli.GCPProjectID,
+		Mode:         mode,
+	}
+}
+
 func List() ([]StackListItem, error) {
 	return ListInDirectory(".")
 }
