@@ -14,7 +14,7 @@ When the user's project has a compose.yaml file and would like to deploy to gcp.
 
 ## Step 1: Select the stack to which the application will be deployed
 
-A stack is a single deployed instance of your project in a specific GCP account and region. You can deploy multiple stacks into the same account and region, for example: `staging` and `production`.
+A stack is a single deployed instance of your project in a specific GCP project and region. You can deploy multiple stacks into the same project and region, for example: `staging` and `production`.
 
 Check if there are any stacks in the current project.
 
