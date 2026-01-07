@@ -2,8 +2,6 @@ package command
 
 import (
 	"os"
-	"path/filepath"
-	"sort"
 	"strconv"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -11,7 +9,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
-	"github.com/joho/godotenv"
 	"github.com/spf13/pflag"
 )
 
@@ -26,8 +23,7 @@ These options can be configured through multiple sources with the following prio
 Configuration Flow:
 
   - Default values are set when initializing the global variable
-  - Stack files are loaded to set environment variables (loadStackFile)
-  - Environment variables and Stack file values are synced to struct fields (syncFlagsWithEnv)
+  - Environment variables are synced to struct fields (syncFlagsWithEnv)
   - Command-line flags take precedence over all other sources
 
 Adding New Configuration Options:
@@ -151,7 +147,6 @@ Logic for each configuration option:
   - If the flag was explicitly set by the user (flags.Changed), use the flag value (already set by cobra)
   - If the flag was NOT set by the user, check for the corresponding DEFANG_* environment variable
   - If the environment variable exists, parse it and update the struct field
-  - Environment variables can come from the shell environment or stack files loaded by loadStackFile()
 
 This ensures the priority order: command-line flags > environment variables > stack file values > defaults
 */
@@ -229,71 +224,4 @@ func (r *GlobalConfig) syncFlagsWithEnv(flags *pflag.FlagSet) error {
 	}
 
 	return r.syncNonFlagEnvVars()
-}
-
-/*
-loadStackFile loads configuration values from stack files into environment variables.
-
-If stackName is provided, loads .defang.<stackName> (required - returns error if missing/invalid)
-
-Important: stack files have the lowest priority in the configuration hierarchy.
-They will NOT override environment variables that are already set, since
-godotenv.Load respects existing environment variables. Stack-specific stack files
-are considered required when specified.
-
-This function also checks for conflicts between environment variables in the stack file
-and existing shell environment variables, and warns the user if any are found.
-*/
-func loadStackFile(stackName string) error {
-	if stackName != "" {
-		// Check for conflicts before loading
-		err := checkEnvConflicts(stackName)
-		if err != nil {
-			return err
-		}
-
-		return stacks.Load(stackName) // ensure stack exists
-	}
-
-	return nil
-}
-
-/*
-checkEnvConflicts reads the stack file and checks if any environment variables
-in the file conflict with existing shell environment variables. If conflicts are
-found, it warns the user that the shell environment variable will take precedence.
-*/
-func checkEnvConflicts(stackName string) error {
-	path, err := filepath.Abs(filepath.Join(stacks.Directory, stackName))
-	if err != nil {
-		return err
-	}
-
-	// Read the stack file
-	stackEnv, err := godotenv.Read(path)
-	if err != nil {
-		// If we can't read the file, the subsequent stacks.Load which calls godotenv.Load will not work either
-		return err
-	}
-
-	// Check for conflicts with existing shell environment
-	var conflicts []string
-	for key, stackValue := range stackEnv {
-		if shellValue, ok := os.LookupEnv(key); ok && shellValue != stackValue {
-			conflicts = append(conflicts, key)
-		}
-	}
-
-	// Warn about conflicts
-	if len(conflicts) > 0 {
-		// Sort conflicts for deterministic output
-		sort.Strings(conflicts)
-
-		term.Warnf("Some variables from the stack file %q are overridden by your shell environment.", stackName)
-		for _, key := range conflicts {
-			term.Printf("  %s=%q\n", key, os.Getenv(key))
-		}
-		term.Println("Unset these variables in your shell to use stack values instead.")
-	}
-	return nil
 }

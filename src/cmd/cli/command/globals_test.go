@@ -14,28 +14,6 @@ import (
 	"github.com/spf13/pflag"
 )
 
-func Test_readGlobals(t *testing.T) {
-	t.Run("OS env beats any .defang file", func(t *testing.T) {
-		t.Chdir("testdata/with-stack")
-		t.Setenv("VALUE", "from OS env")
-		err := loadStackFile("test")
-		if err != nil {
-			t.Fatalf("%v", err)
-		}
-		if v := os.Getenv("VALUE"); v != "from OS env" {
-			t.Errorf("expected VALUE to be 'from OS env', got '%s'", v)
-		}
-		os.Unsetenv("VALUE")
-	})
-
-	t.Run("incorrect stackname used if no stack", func(t *testing.T) {
-		err := loadStackFile("non-existent-stack")
-		if err == nil {
-			t.Fatalf("this test should fail for non-existent stack: %v", err)
-		}
-	})
-}
-
 func Test_configurationPrecedence(t *testing.T) {
 	// Test various combinations of flags, environment variables, and .defang files
 	// no matter the order they are applied, or combination, the final configuration should be correct.
@@ -300,12 +278,7 @@ func Test_configurationPrecedence(t *testing.T) {
 			t.Chdir(tempDir)
 
 			// simulates the actual loading sequence
-			err := loadStackFile(tt.rcStack.stackname)
-			if err != nil {
-				t.Fatalf("failed to load env file: %v", err)
-			}
-
-			err = testConfig.syncFlagsWithEnv(flags)
+			err := testConfig.syncFlagsWithEnv(flags)
 			if err != nil {
 				t.Fatalf("failed to sync flags with env vars: %v", err)
 			}
