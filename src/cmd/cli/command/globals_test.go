@@ -46,7 +46,7 @@ func Test_configurationPrecedence(t *testing.T) {
 		expected     GlobalConfig
 	}{
 		{
-			name:         "Flags override env and env file",
+			name:         "Flags override env and stack file",
 			createRCFile: true,
 			rcStack: stack{
 				stackname: "test",
@@ -101,7 +101,7 @@ func Test_configurationPrecedence(t *testing.T) {
 			},
 		},
 		{
-			name:         "Env overrides env files when no flags set",
+			name:         "Env overrides stack files when no flags set",
 			createRCFile: true,
 			rcStack: stack{
 				stackname: "test",
@@ -146,7 +146,7 @@ func Test_configurationPrecedence(t *testing.T) {
 			},
 		},
 		{
-			name:         "env file used when no env vars or flags set",
+			name:         "stack file used when no env vars or flags set",
 			createRCFile: true,
 			rcStack: stack{
 				stackname: "test",
@@ -180,7 +180,7 @@ func Test_configurationPrecedence(t *testing.T) {
 			},
 		},
 		{
-			name:         "env file with no values used when no env vars or flags set",
+			name:         "stack file with no values used when no env vars or flags set",
 			createRCFile: true,
 			rcStack: stack{
 				stackname: "test",
@@ -196,7 +196,7 @@ func Test_configurationPrecedence(t *testing.T) {
 			expected: defaultConfig,
 		},
 		{
-			name:         "no env file, no env vars and no flags",
+			name:         "no stack file, no env vars and no flags",
 			createRCFile: false,
 			expected:     defaultConfig, // should match the initialized defaults above
 		},
@@ -226,23 +226,23 @@ func Test_configurationPrecedence(t *testing.T) {
 			flags.BoolVar(&testConfig.NonInteractive, "non-interactive", testConfig.NonInteractive, "disable interactive prompts / no TTY")
 			flags.VarP(&testConfig.Stack.Mode, "mode", "m", "deployment mode")
 
-			// Set flags based on user input (these override env and env file values)
+			// Set flags based on user input (these override env and stack file values)
 			for flagName, flagValue := range tt.flags {
 				if err := flags.Set(flagName, flagValue); err != nil {
 					t.Fatalf("failed to set flag %s=%s: %v", flagName, flagValue, err)
 				}
 			}
 
-			// Set environment variables (these override env file values)
+			// Set environment variables (these override stack file values)
 			for key, value := range tt.envVars {
 				t.Setenv(key, value)
 			}
 
-			// Make env files in a temporary directory
+			// Make stack files in a temporary directory
 			tempDir := t.TempDir()
 
 			var rcEnvs []string
-			// Create env files in the temporary directory
+			// Create stack files in the temporary directory
 			if tt.createRCFile {
 				path := filepath.Join(tempDir, ".defang")
 				if tt.rcStack.stackname != "" {
