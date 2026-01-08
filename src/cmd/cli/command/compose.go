@@ -55,9 +55,9 @@ type serviceUpdate struct {
 }
 
 var (
-	spinnerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("206"))
-	statusStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
-	nameStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("39"))
+	spinnerStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#bc9724", Dark: "#2ddedc"})
+	statusStyle  = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#a4729d", Dark: "#fae856"})
+	nameStyle    = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#305897", Dark: "#cdd2c9"})
 )
 
 func newDeploymentModel(serviceNames []string) *deploymentModel {
