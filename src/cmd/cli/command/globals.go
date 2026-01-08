@@ -75,6 +75,10 @@ type GlobalConfig struct {
 	Verbose        bool
 }
 
+func (global *GlobalConfig) Interactive() bool {
+	return !global.NonInteractive
+}
+
 /*
 global is the singleton instance of GlobalConfig that holds all CLI configuration.
 This instance is initialized with default values and is modified throughout

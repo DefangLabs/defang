@@ -1321,7 +1321,7 @@ func loadOrCreateStack(ctx context.Context, sm stacks.Manager, params *stacks.St
 		}
 		return loaded, nil
 	}
-	if global.HasTty {
+	if global.Interactive() {
 		return nil, fmt.Errorf("unable to load stack %q: %w", params.Name, err)
 	}
 
