@@ -452,7 +452,8 @@ func getLogEntryParser(ctx context.Context, gcpClient GcpLogsClient) func(entry 
 				host = "pulumi"
 			}
 			// HACK: Detect cd start from cloudbuild logs to skip the cloud build image pulling logs
-			if strings.HasPrefix(msg, " ** Update started") {
+			// " ** " or "Defang: " could come first in the log message when cd starts
+			if strings.HasPrefix(msg, " ** ") || strings.HasPrefix(msg, "Defang: ") {
 				cdStarted = true
 			}
 			if !cdStarted {

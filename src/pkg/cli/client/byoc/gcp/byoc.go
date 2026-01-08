@@ -406,6 +406,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 	if err != nil {
 		return "", err
 	}
+	term.Debugf("Starting CD in cloudbuild at: %v", time.Now().Format(time.RFC3339))
 	execution, err := b.driver.RunCloudBuild(ctx, gcp.CloudBuildArgs{
 		Steps:          string(steps),
 		ServiceAccount: &b.cdServiceAccount,
