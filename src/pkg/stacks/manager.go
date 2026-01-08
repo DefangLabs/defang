@@ -2,7 +2,6 @@ package stacks
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -57,10 +56,7 @@ func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
 	}
 	localStacks, err := sm.ListLocal()
 	if err != nil {
-		var outsideErr *ErrOutside
-		if !errors.As(err, &outsideErr) {
-			return nil, fmt.Errorf("failed to list local stacks: %w", err)
-		}
+		return nil, fmt.Errorf("failed to list local stacks: %w", err)
 	}
 	// Merge remote and local stacks into a single list of type StackOption,
 	// prefer remote if both exist, so we can show last deployed time
@@ -102,9 +98,6 @@ func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
 }
 
 func (sm *manager) ListLocal() ([]StackListItem, error) {
-	if sm.targetDirectory == "" {
-		return nil, &ErrOutside{Operation: "ListLocal", TargetDirectory: sm.targetDirectory}
-	}
 	return ListInDirectory(sm.targetDirectory)
 }
 
@@ -163,9 +156,6 @@ func (e *ErrOutside) Error() string {
 }
 
 func (sm *manager) Load(ctx context.Context, name string) (*StackParameters, error) {
-	if sm.targetDirectory == "" {
-		return sm.LoadRemote(ctx, name)
-	}
 	params, err := ReadInDirectory(sm.targetDirectory, name)
 	if err != nil {
 		term.Infof("unable to load stack from file, attempting to import from previous deployments: %v", err)
