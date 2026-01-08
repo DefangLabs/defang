@@ -16,7 +16,7 @@ import (
 type SetConfigParams struct {
 	common.LoaderParams
 	Name   string `json:"name" jsonschema:"required"`
-	Value  string `json:"value"`
+	Value  string `json:"value,omitempty"`
 	Random bool   `json:"random,omitempty" jsonschema:"description=Generate a secure randomly generated value for config (default: false)"`
 }
 
@@ -53,7 +53,7 @@ func HandleSetConfig(ctx context.Context, loader client.Loader, params SetConfig
 	value := params.Value
 	if params.Random {
 		if params.Value != "" {
-			term.Warn("Both 'random' and 'value' parameters provided; 'value' will be ignored")
+			return "", fmt.Errorf("Both 'random' and 'value' parameters provided; please provide only one")
 		}
 		value = cli.CreateRandomConfigValue()
 		term.Debug("Generated random value for config")
