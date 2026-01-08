@@ -20,7 +20,7 @@ func GetRegion(provider ProviderID) string {
 		panic("unsupported provider")
 	}
 
-	return pkg.Getenv(varName, defaultRegion) // Default region for AWS
+	return pkg.Getenv(varName, defaultRegion)
 }
 
 func GetRegionVarName(provider ProviderID) string {
