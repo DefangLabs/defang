@@ -795,3 +795,83 @@ func TestGetStack(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigSetMultiple(t *testing.T) {
+	mockService := &mockFabricService{}
+	_, handler := defangv1connect.NewFabricControllerHandler(mockService)
+	t.Chdir("../../../../src/testdata/sanity")
+
+	userinfoServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/userinfo" {
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"allTenants":[{"id":"default","name":"Default Workspace"}],
+			"userinfo":{"email":"cli@example.com","name":"CLI Tester"}
+		}`))
+	}))
+	t.Cleanup(userinfoServer.Close)
+
+	openAuthClient := auth.OpenAuthClient
+	t.Cleanup(func() {
+		auth.OpenAuthClient = openAuthClient
+	})
+	auth.OpenAuthClient = auth.NewClient("testclient", userinfoServer.URL)
+	t.Setenv("DEFANG_ACCESS_TOKEN", "token-123")
+
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+
+	prevSts, prevSsm := awsdriver.NewStsFromConfig, awsdriver.NewSsmFromConfig
+	t.Cleanup(func() {
+		awsdriver.NewStsFromConfig = prevSts
+		awsdriver.NewSsmFromConfig = prevSsm
+	})
+	awsdriver.NewStsFromConfig = func(aws.Config) awsdriver.StsClientAPI { return &awsdriver.MockStsClientAPI{} }
+	awsdriver.NewSsmFromConfig = func(aws.Config) awsdriver.SsmParametersAPI { return &MockSsmClient{} }
+
+	testCases := []struct {
+		name        string
+		args        []string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:        "multiple configs with one missing = should error",
+			args:        []string{"config", "set", "KEY1=value1", "KEY2", "--provider=aws", "--project-name=app"},
+			expectError: true,
+			errorMsg:    "when setting multiple configs, all must be in KEY=VALUE format",
+		},
+		{
+			name:        "multiple configs with --env should error",
+			args:        []string{"config", "set", "KEY1=value1", "KEY2=value2", "-e", "--provider=aws", "--project-name=app"},
+			expectError: true,
+			errorMsg:    "--env is only allowed when setting a single config",
+		},
+		{
+			name:        "multiple configs with --random should error",
+			args:        []string{"config", "set", "KEY1=value1", "KEY2=value2", "--random", "--provider=aws", "--project-name=app"},
+			expectError: true,
+			errorMsg:    "--random is only allowed when setting a single config",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := testCommand(tc.args, server.URL)
+
+			if tc.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if tc.errorMsg != "" && !strings.Contains(err.Error(), tc.errorMsg) {
+					t.Errorf("expected error message to contain %q, got %q", tc.errorMsg, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}

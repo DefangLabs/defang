@@ -772,9 +772,9 @@ var configCmd = &cobra.Command{
 }
 
 var configSetCmd = &cobra.Command{
-	Use:         "create CONFIG [file|-]", // like Docker
+	Use:         "create CONFIG... [file|-]", // like Docker
 	Annotations: authNeededAnnotation,
-	Args:        cobra.RangeArgs(0, 2), // Allow 0 args when using --env-file
+	Args:        cobra.MinimumNArgs(0), // Allow 0 args when using --env-file, or multiple configs
 	Aliases:     []string{"set", "add", "put"},
 	Short:       "Adds or updates a sensitive config value",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -838,11 +838,61 @@ var configSetCmd = &cobra.Command{
 			return nil
 		}
 
-		// Original single config logic
+		// Validate args
 		if len(args) == 0 {
 			return errors.New("CONFIG argument is required when not using --env-file")
 		}
 
+		// Handle multiple configs case
+		if len(args) > 1 {
+			// Validate: all args must be in KEY=VALUE format
+			for _, arg := range args {
+				if !strings.Contains(arg, "=") {
+					return errors.New("when setting multiple configs, all must be in KEY=VALUE format")
+				}
+			}
+
+			// Validate: --random is not allowed with multiple configs
+			if random {
+				return errors.New("--random is only allowed when setting a single config")
+			}
+
+			// Validate: --env is not allowed with multiple configs
+			if fromEnv {
+				return errors.New("--env is only allowed when setting a single config")
+			}
+
+			// Set each config from args
+			successCount := 0
+			for _, arg := range args {
+				parts := strings.SplitN(arg, "=", 2)
+				name := parts[0]
+				value := parts[1]
+
+				if !pkg.IsValidSecretName(name) {
+					term.Warnf("Skipping invalid config name: %q", name)
+					continue
+				}
+
+				if err := cli.ConfigSet(cmd.Context(), projectName, provider, name, value); err != nil {
+					term.Warnf("Failed to set %q: %v", name, err)
+				} else {
+					term.Info("Updated value for", name)
+					successCount++
+				}
+			}
+
+			if successCount == 0 {
+				return errors.New("failed to set any config values")
+			}
+
+			term.Infof("Successfully set %d config value(s)", successCount)
+
+			printDefangHint("To update the deployed values, do:", "compose up")
+			return nil
+		}
+
+		// Single config logic
 		parts := strings.SplitN(args[0], "=", 2)
 		name := parts[0]
 
@@ -852,8 +902,8 @@ var configSetCmd = &cobra.Command{
 
 		var value string
 		if fromEnv {
-			if len(args) == 2 || len(parts) == 2 {
-				return errors.New("cannot specify config value or input file when using --env")
+			if len(parts) == 2 {
+				return errors.New("cannot specify config value when using --env")
 			}
 			var ok bool
 			value, ok = os.LookupEnv(name)
@@ -861,20 +911,13 @@ var configSetCmd = &cobra.Command{
 				return fmt.Errorf("environment variable %q not found", name)
 			}
 		} else if len(parts) == 2 {
-			// Handle name=value; can't also specify a file in this case
-			if len(args) == 2 {
-				return errors.New("cannot specify both config value and input file")
-			}
+			// Handle name=value
 			value = parts[1]
-		} else if global.NonInteractive || len(args) == 2 {
-			// Read the value from a file or stdin
+		} else if global.NonInteractive {
+			// Read the value from stdin in non-interactive mode
 			var err error
 			var bytes []byte
-			if len(args) == 2 && args[1] != "-" {
-				bytes, err = os.ReadFile(args[1])
-			} else {
-				bytes, err = io.ReadAll(os.Stdin)
-			}
+			bytes, err = io.ReadAll(os.Stdin)
 			if err != nil && err != io.EOF {
 				return fmt.Errorf("failed reading the config value: %w", err)
 			}
