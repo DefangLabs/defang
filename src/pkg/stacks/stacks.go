@@ -22,6 +22,8 @@ type StackParameters struct {
 	AWSProfile   string
 	GCPProjectID string
 	Mode         modes.Mode
+	Prefix       string
+	Suffix       string
 }
 
 func (params StackParameters) ToMap() map[string]string {
@@ -40,6 +42,12 @@ func (params StackParameters) ToMap() map[string]string {
 	}
 	if params.Provider == client.ProviderGCP && params.GCPProjectID != "" {
 		properties["GCP_PROJECT_ID"] = params.GCPProjectID
+	}
+	if params.Prefix != "" {
+		properties["DEFANG_PREFIX"] = params.Prefix
+	}
+	if params.Suffix != "" {
+		properties["DEFANG_SUFFIX"] = params.Suffix
 	}
 	return properties
 }
@@ -66,6 +74,10 @@ func ParamsFromMap(properties map[string]string) (StackParameters, error) {
 				return params, err
 			}
 			params.Mode = mode
+		case "DEFANG_PREFIX":
+			params.Prefix = value
+		case "DEFANG_SUFFIX":
+			params.Suffix = value
 		}
 	}
 	return params, nil
