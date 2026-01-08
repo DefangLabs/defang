@@ -109,14 +109,6 @@ func NewGlobalConfig() *GlobalConfig {
 	}
 
 	hastty := term.IsTerminal() && !pkg.GetenvBool("CI")
-	nonInteractive := pkg.GetenvBool("DEFANG_NON_INTERACTIVE")
-	if nonInteractive {
-		hastty = false
-	}
-	defangtty := pkg.GetenvBool("DEFANG_TTY")
-	if defangtty {
-		hastty = true
-	}
 
 	tenant := types.TenantNameOrID("")
 	if fromEnv, ok := os.LookupEnv("DEFANG_WORKSPACE"); ok {
