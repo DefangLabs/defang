@@ -1,4 +1,5 @@
-[1m
+[95m * ENVIRONMENT VARIABLES RESOLUTION SUMMARY:
+[0m[1m
 SERVICE   ENVIRONMENT     VALUE       SOURCE[0m
 service1  APP_ENV         production  Compose  
 service1  DATABASE_URL    *****       Config   
