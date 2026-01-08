@@ -469,6 +469,8 @@ message Deployment {
   DeploymentMode mode = 11;
   google.protobuf.Timestamp completed = 12;
   DeploymentStatus status = 13;
+  string states_url = 14;
+  string events_url = 15;
 }
 
 enum DeploymentStatus {
