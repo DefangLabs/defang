@@ -782,6 +782,26 @@ var configSetCmd = &cobra.Command{
 		random, _ := cmd.Flags().GetBool("random")
 		envFile, _ := cmd.Flags().GetString("env-file")
 
+		// Early validation for multiple configs
+		if len(args) > 1 {
+			// Validate: all args must be in KEY=VALUE format
+			for _, arg := range args {
+				if !strings.Contains(arg, "=") {
+					return errors.New("when setting multiple configs, all must be in KEY=VALUE format")
+				}
+			}
+
+			// Validate: --random is not allowed with multiple configs
+			if random {
+				return errors.New("--random is only allowed when setting a single config")
+			}
+
+			// Validate: --env is not allowed with multiple configs
+			if fromEnv {
+				return errors.New("--env is only allowed when setting a single config")
+			}
+		}
+
 		// Make sure we have a project to set config for before asking for a value
 		loader := configureLoader(cmd)
 		provider, err := newProviderChecked(cmd.Context(), loader, false)
@@ -845,23 +865,6 @@ var configSetCmd = &cobra.Command{
 
 		// Handle multiple configs case
 		if len(args) > 1 {
-			// Validate: all args must be in KEY=VALUE format
-			for _, arg := range args {
-				if !strings.Contains(arg, "=") {
-					return errors.New("when setting multiple configs, all must be in KEY=VALUE format")
-				}
-			}
-
-			// Validate: --random is not allowed with multiple configs
-			if random {
-				return errors.New("--random is only allowed when setting a single config")
-			}
-
-			// Validate: --env is not allowed with multiple configs
-			if fromEnv {
-				return errors.New("--env is only allowed when setting a single config")
-			}
-
 			// Set each config from args
 			successCount := 0
 			for _, arg := range args {
