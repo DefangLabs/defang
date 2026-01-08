@@ -241,7 +241,6 @@ func makeComposeUpCmd() *cobra.Command {
 			var detach, _ = cmd.Flags().GetBool("detach")
 			var utc, _ = cmd.Flags().GetBool("utc")
 			var waitTimeout, _ = cmd.Flags().GetInt("wait-timeout")
-			var tail, _ = cmd.Flags().GetBool("tail")
 
 			if utc {
 				cli.EnableUTCMode()
@@ -368,7 +367,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			waitTimeoutDuration := time.Duration(waitTimeout) * time.Second
 			var serviceStates map[string]defangv1.ServiceState
-			if tail {
+			if global.Verbose || global.NonInteractive {
 				tailOptions.Follow = true
 				serviceStates, err = cli.TailAndMonitor(ctx, project, session.Provider, waitTimeoutDuration, tailOptions)
 				if err != nil {
@@ -433,7 +432,6 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
 	composeUpCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
-	composeUpCmd.Flags().Bool("tail", false, "tail the logs while deploying")
 	composeUpCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	composeUpCmd.Flags().Bool("build", true, "build the image before starting the service") // docker-compose compatibility
 	composeUpCmd.Flags().Bool("wait", true, "wait for services to be running|healthy")      // docker-compose compatibility
