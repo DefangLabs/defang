@@ -772,7 +772,7 @@ var configCmd = &cobra.Command{
 }
 
 var configSetCmd = &cobra.Command{
-	Use:         "create CONFIG... [file|-]", // like Docker
+	Use:         "create CONFIG... | CONFIG [file|-]", // like Docker
 	Annotations: authNeededAnnotation,
 	Args:        cobra.MinimumNArgs(0), // Allow 0 args when using --env-file, or multiple configs
 	Aliases:     []string{"set", "add", "put"},
@@ -905,8 +905,8 @@ var configSetCmd = &cobra.Command{
 
 		var value string
 		if fromEnv {
-			if len(parts) == 2 {
-				return errors.New("cannot specify config value when using --env")
+			if len(args) > 1 || len(parts) == 2 {
+				return errors.New("cannot specify config value or input file when using --env")
 			}
 			var ok bool
 			value, ok = os.LookupEnv(name)
@@ -914,13 +914,20 @@ var configSetCmd = &cobra.Command{
 				return fmt.Errorf("environment variable %q not found", name)
 			}
 		} else if len(parts) == 2 {
-			// Handle name=value
+			// Handle name=value; can't also specify a file in this case
+			if len(args) == 2 {
+				return errors.New("cannot specify both config value and input file")
+			}
 			value = parts[1]
-		} else if global.NonInteractive {
-			// Read the value from stdin in non-interactive mode
+		} else if global.NonInteractive || len(args) == 2 {
+			// Read the value from a file or stdin
 			var err error
 			var bytes []byte
-			bytes, err = io.ReadAll(os.Stdin)
+			if len(args) == 2 && args[1] != "-" {
+				bytes, err = os.ReadFile(args[1])
+			} else {
+				bytes, err = io.ReadAll(os.Stdin)
+			}
 			if err != nil && err != io.EOF {
 				return fmt.Errorf("failed reading the config value: %w", err)
 			}
