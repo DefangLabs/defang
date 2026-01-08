@@ -228,6 +228,18 @@ func TestHandleSetConfig(t *testing.T) {
 			expectedProjectNameCalls: true,
 			expectedConfigSetCalls:   true,
 		},
+		{
+			name:                     "successful config set with random flag ignores value",
+			cluster:                  testCluster,
+			providerId:               client.ProviderID(""),
+			requestArgs:              map[string]interface{}{"name": "valid_config_name", "value": "ignored-value", "random": true},
+			mockCLI:                  &MockSetConfigCLI{},
+			expectedError:            false,
+			expectedConnectCalls:     true,
+			expectedProviderCalls:    true,
+			expectedProjectNameCalls: true,
+			expectedConfigSetCalls:   true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -300,7 +312,12 @@ func TestHandleSetConfig(t *testing.T) {
 					assert.Equal(t, configName, tt.mockCLI.ConfigSetName)
 				}
 				if configValue, exists := tt.requestArgs["value"]; exists {
-					assert.Equal(t, configValue, tt.mockCLI.ConfigSetValue)
+					if random, rExists := tt.requestArgs["random"]; rExists && random.(bool) {
+						// When random is true, value should NOT be the provided value
+						assert.NotEqual(t, configValue, tt.mockCLI.ConfigSetValue, "Random flag should override provided value")
+					} else {
+						assert.Equal(t, configValue, tt.mockCLI.ConfigSetValue)
+					}
 				}
 				// If random flag is set, verify a value was generated
 				if random, exists := tt.requestArgs["random"]; exists && random.(bool) {

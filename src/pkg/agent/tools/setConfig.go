@@ -52,6 +52,9 @@ func HandleSetConfig(ctx context.Context, loader client.Loader, params SetConfig
 
 	value := params.Value
 	if params.Random {
+		if params.Value != "" {
+			term.Warn("Both 'random' and 'value' parameters provided; 'value' will be ignored")
+		}
 		value = cli.CreateRandomConfigValue()
 		term.Debug("Generated random value for config")
 	}
