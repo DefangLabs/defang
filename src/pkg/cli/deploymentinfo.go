@@ -58,7 +58,7 @@ func PrintServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) error 
 		return err
 	}
 
-	attrs := []string{"Service", "Deployment", "State", "Fqdn", "Endpoint", "Status"}
+	attrs := []string{"Service", "Deployment", "State", "Fqdn", "Endpoint"}
 	// if showDomainNameColumn {
 	// 	attrs = append(attrs, "DomainName")
 	// }

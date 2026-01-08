@@ -86,8 +86,8 @@ func TestPrintServices(t *testing.T) {
 		if err != nil {
 			t.Fatalf("PrintServices error = %v", err)
 		}
-		expectedOutput := "\x1b[95m * Checking service health...\n\x1b[0m\x1b[1m\nSERVICE  DEPLOYMENT  STATE          FQDN                       ENDPOINT                           STATUS\x1b[0m" + `
-foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.prod1.defang.dev  NOT_SPECIFIED
+		expectedOutput := "\x1b[95m * Checking service health...\n\x1b[0m\x1b[1m\nSERVICE  DEPLOYMENT  STATE          FQDN                       ENDPOINT\x1b[0m" + `
+foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.prod1.defang.dev
 `
 
 		receivedLines := strings.Split(stdout.String(), "\n")

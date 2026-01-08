@@ -37,8 +37,8 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 				},
 			},
 			expectedLines: []string{
-				"SERVICE   DEPLOYMENT  STATE          FQDN  ENDPOINT             STATUS",
-				"service1              NOT_SPECIFIED        https://example.com  UNKNOWN",
+				"SERVICE   DEPLOYMENT  STATE          FQDN  ENDPOINT",
+				"service1              NOT_SPECIFIED        https://example.com",
 				"",
 			},
 		},
@@ -58,8 +58,8 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 				},
 			},
 			expectedLines: []string{
-				"SERVICE   DEPLOYMENT  STATE          FQDN  ENDPOINT             STATUS",
-				"service1              NOT_SPECIFIED        https://example.com  UNKNOWN",
+				"SERVICE   DEPLOYMENT  STATE          FQDN  ENDPOINT",
+				"service1              NOT_SPECIFIED        https://example.com",
 				"",
 			},
 		},
@@ -77,8 +77,8 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 				},
 			},
 			expectedLines: []string{
-				"SERVICE   DEPLOYMENT  STATE          FQDN  ENDPOINT  STATUS",
-				"service1              NOT_SPECIFIED        N/A       UNKNOWN",
+				"SERVICE   DEPLOYMENT  STATE          FQDN  ENDPOINT",
+				"service1              NOT_SPECIFIED        N/A",
 				"",
 			},
 		},
