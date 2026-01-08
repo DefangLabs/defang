@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"path"
 
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -165,6 +166,20 @@ func (m MockFabricClient) ListDeployments(ctx context.Context, req *defangv1.Lis
 			},
 		},
 	}, nil
+}
+
+func (m MockFabricClient) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
+	name := req.Digest
+	if req.Filename != "" {
+		name = req.Filename
+	}
+	if req.Stack != "" {
+		name = path.Join(req.Stack, name)
+	}
+	if req.Project != "" {
+		name = path.Join(req.Project, name)
+	}
+	return &defangv1.UploadURLResponse{Url: "http://mock-upload-url/" + name}, nil
 }
 
 type MockLoader struct {

@@ -26,18 +26,18 @@ func (g *PlaygroundProvider) GetStackName() string {
 	return "" // Playground does not use stacks
 }
 
-func (g *PlaygroundProvider) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (g *PlaygroundProvider) Deploy(ctx context.Context, req *DeployRequest) (*defangv1.DeployResponse, error) {
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		return nil, errors.New("DEFANG_PULUMI_DIR is set, but not supported by the Playground provider")
 	}
-	return getMsg(g.GetFabricClient().Deploy(ctx, connect.NewRequest(req)))
+	return getMsg(g.GetFabricClient().Deploy(ctx, connect.NewRequest(&req.DeployRequest)))
 }
 
 func (g *PlaygroundProvider) GetDeploymentStatus(ctx context.Context) error {
 	return io.EOF // TODO: implement on fabric, for now assume service is deployed
 }
 
-func (g *PlaygroundProvider) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (g *PlaygroundProvider) Preview(ctx context.Context, req *DeployRequest) (*defangv1.DeployResponse, error) {
 	req.Preview = true
 	return g.Deploy(ctx, req)
 }

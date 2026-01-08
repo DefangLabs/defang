@@ -25,11 +25,11 @@ type mockDeployProvider struct {
 	tailStream       *client.MockWaitStream[defangv1.TailResponse]
 }
 
-func (d mockDeployProvider) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (d mockDeployProvider) Deploy(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
 	return d.Preview(ctx, req)
 }
 
-func (mockDeployProvider) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (mockDeployProvider) Preview(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
 	if len(req.Compose) == 0 {
 		return nil, errors.New("DeployRequest needs Compose")
 	}

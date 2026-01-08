@@ -172,15 +172,15 @@ func (b *ByocAws) GetDeploymentStatus(ctx context.Context) error {
 	return nil
 }
 
-func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocAws) Deploy(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
 	return b.deploy(ctx, req, "up")
 }
 
-func (b *ByocAws) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocAws) Preview(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
 	return b.deploy(ctx, req, "preview")
 }
 
-func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd string) (*defangv1.DeployResponse, error) {
+func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd string) (*defangv1.DeployResponse, error) {
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
@@ -246,6 +246,8 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		delegationSetId: req.DelegationSetId,
 		mode:            req.Mode,
 		project:         project.Name,
+		statesUrl:       req.StatesUrl,
+		eventsUrl:       req.EventsUrl,
 	}
 
 	if b.needDockerHubCreds {
@@ -502,6 +504,9 @@ type cdCommand struct {
 
 	dockerHubUsername    string
 	dockerHubAccessToken string
+
+	statesUrl string
+	eventsUrl string
 }
 
 func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn, error) {
@@ -542,6 +547,15 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn,
 			return nil, err
 		}
 	}
+
+	if statesUrl := pkg.Getenv("DEFANG_STATES_UPLOAD_URL", cmd.statesUrl); statesUrl != "" {
+		env["DEFANG_STATES_UPLOAD_URL"] = statesUrl
+	}
+
+	if eventsUrl := pkg.Getenv("DEFANG_EVENTS_UPLOAD_URL", cmd.eventsUrl); eventsUrl != "" {
+		env["DEFANG_EVENTS_UPLOAD_URL"] = eventsUrl
+	}
+
 	return b.driver.Run(ctx, env, cmd.command...)
 }
 
@@ -904,8 +918,10 @@ func (b *ByocAws) CdCommand(ctx context.Context, req client.CdCommandRequest) (s
 		return "", err
 	}
 	cmd := cdCommand{
-		project: req.Project,
-		command: []string{string(req.Command)},
+		project:   req.Project,
+		command:   []string{string(req.Command)},
+		statesUrl: req.StatesUrl,
+		eventsUrl: req.EventsUrl,
 	}
 	cdTaskArn, err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
 	if err != nil {

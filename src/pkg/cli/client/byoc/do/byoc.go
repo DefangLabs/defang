@@ -126,15 +126,15 @@ func (b *ByocDo) GetProjectUpdate(ctx context.Context, projectName string) (*def
 	return &projUpdate, nil
 }
 
-func (b *ByocDo) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocDo) Preview(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
 	return b.deploy(ctx, req, "preview")
 }
 
-func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocDo) Deploy(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
 	return b.deploy(ctx, req, "up")
 }
 
-func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd string) (*defangv1.DeployResponse, error) {
+func (b *ByocDo) deploy(ctx context.Context, req *client.DeployRequest, cmd string) (*defangv1.DeployResponse, error) {
 	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
 	project, err := compose.LoadFromContent(ctx, req.Compose, "")
 	if err != nil {
@@ -192,6 +192,8 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 		delegateDomain: req.DelegateDomain,
 		mode:           req.Mode,
 		project:        project.Name,
+		statesUrl:      req.StatesUrl,
+		eventsUrl:      req.EventsUrl,
 	}
 	_, err = b.runCdCommand(ctx, cdCmd)
 	if err != nil {
@@ -230,6 +232,8 @@ func (b *ByocDo) CdCommand(ctx context.Context, req client.CdCommandRequest) (st
 		command:        []string{string(req.Command)},
 		delegateDomain: "dummy.domain",
 		project:        req.Project,
+		statesUrl:      req.StatesUrl,
+		eventsUrl:      req.EventsUrl,
 	}
 	_, err := b.runCdCommand(ctx, cmd)
 	if err != nil {
@@ -605,6 +609,8 @@ type cdCommand struct {
 	project        string
 	delegateDomain string
 	mode           defangv1.DeploymentMode
+	statesUrl      string
+	eventsUrl      string
 }
 
 //nolint:unparam
@@ -613,6 +619,15 @@ func (b *ByocDo) runCdCommand(ctx context.Context, cmd cdCommand) (*godo.App, er
 	if err != nil {
 		return nil, err
 	}
+
+	if statesUrl := pkg.Getenv("DEFANG_STATES_UPLOAD_URL", cmd.statesUrl); statesUrl != "" {
+		env = append(env, &godo.AppVariableDefinition{Key: "DEFANG_STATES_UPLOAD_URL", Value: statesUrl})
+	}
+
+	if eventsUrl := pkg.Getenv("DEFANG_EVENTS_UPLOAD_URL", cmd.eventsUrl); eventsUrl != "" {
+		env = append(env, &godo.AppVariableDefinition{Key: "DEFANG_EVENTS_UPLOAD_URL", Value: eventsUrl})
+	}
+
 	if term.DoDebug() {
 		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging
 		debugEnv := make([]string, len(env))
