@@ -31,16 +31,11 @@ type manager struct {
 	fabric          DeploymentLister
 	targetDirectory string
 	projectName     string
-	outside         bool
 }
 
 func NewManager(fabric DeploymentLister, targetDirectory string, projectName string) (*manager, error) {
-	var outside bool
 	absTargetDirectory := ""
-	if targetDirectory == "" {
-		outside = true
-	} else {
-		outside = false
+	if targetDirectory != "" {
 		// abs path for targetDirectory
 		var err error
 		absTargetDirectory, err = filepath.Abs(targetDirectory)
@@ -52,7 +47,6 @@ func NewManager(fabric DeploymentLister, targetDirectory string, projectName str
 		fabric:          fabric,
 		targetDirectory: absTargetDirectory,
 		projectName:     projectName,
-		outside:         outside,
 	}, nil
 }
 
@@ -108,7 +102,7 @@ func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
 }
 
 func (sm *manager) ListLocal() ([]StackListItem, error) {
-	if sm.outside {
+	if sm.targetDirectory == "" {
 		return nil, &ErrOutside{Operation: "ListLocal", TargetDirectory: sm.targetDirectory}
 	}
 	return ListInDirectory(sm.targetDirectory)
@@ -169,7 +163,7 @@ func (e *ErrOutside) Error() string {
 }
 
 func (sm *manager) Load(ctx context.Context, name string) (*StackParameters, error) {
-	if sm.outside {
+	if sm.targetDirectory == "" {
 		return sm.LoadRemote(ctx, name)
 	}
 	params, err := ReadInDirectory(sm.targetDirectory, name)
@@ -212,7 +206,7 @@ func (sm *manager) LoadParameters(params StackParameters, overload bool) error {
 }
 
 func (sm *manager) Create(params StackParameters) (string, error) {
-	if sm.outside {
+	if sm.targetDirectory == "" {
 		return "", &ErrOutside{Operation: "Create", TargetDirectory: sm.targetDirectory}
 	}
 	return CreateInDirectory(sm.targetDirectory, params)
