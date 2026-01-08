@@ -307,21 +307,19 @@ func (m *mockStackManager) Load(ctx context.Context, name string) (*stacks.Stack
 		return m.loadResult, nil
 	}
 
-	if m.listResult != nil {
-		for _, item := range m.listResult {
-			if item.Name == name {
-				var provider client.ProviderID
-				provider.Set(item.Provider)
-				var mode modes.Mode
-				mode.Set(item.Mode)
-				params := stacks.StackParameters{
-					Name:     name,
-					Provider: provider,
-					Mode:     mode,
-				}
-				stacks.LoadParameters(params, true)
-				return &params, nil
+	for _, item := range m.listResult {
+		if item.Name == name {
+			var provider client.ProviderID
+			provider.Set(item.Provider)
+			var mode modes.Mode
+			mode.Set(item.Mode)
+			params := stacks.StackParameters{
+				Name:     name,
+				Provider: provider,
+				Mode:     mode,
 			}
+			stacks.LoadParameters(params, true)
+			return &params, nil
 		}
 	}
 
