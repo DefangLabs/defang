@@ -1,11 +1,14 @@
 package cli
 
 import (
+	"context"
 	"slices"
 	"sort"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/compose-spec/compose-go/v2/types"
 )
 
@@ -38,7 +41,8 @@ func determineConfigSource(envKey string, envValue *string, defangConfigs map[st
 		return SourceDefangConfig, configMaskedValue
 	}
 
-	// If value is nil, it's from the compose file with empty value
+	// If value is nil, it's from the compose file with empty value. This mean the user forgot to set with defang config.
+	// ValidateProjectConfig will catch this later and tell the user to set it.
 	if envValue == nil {
 		return SourceDefangConfig, ""
 	}
@@ -53,7 +57,7 @@ func determineConfigSource(envKey string, envValue *string, defangConfigs map[st
 	return SourceComposeFile, *envValue
 }
 
-func PrintConfigResolutionSummary(project *types.Project, defangConfig []string) error {
+func printConfigResolutionSummary(project *types.Project, defangConfig []string) error {
 	configset := make(map[string]struct{})
 	for _, name := range defangConfig {
 		configset[name] = struct{}{}
@@ -73,6 +77,11 @@ func PrintConfigResolutionSummary(project *types.Project, defangConfig []string)
 		}
 	}
 
+	// Don't print table if there are no environment variables
+	if len(projectEnvVars) == 0 {
+		return nil
+	}
+
 	// Sort by Service, then by Name within each service
 	sort.Slice(projectEnvVars, func(i, j int) bool {
 		if projectEnvVars[i].Service != projectEnvVars[j].Service {
@@ -83,7 +92,26 @@ func PrintConfigResolutionSummary(project *types.Project, defangConfig []string)
 
 	projectEnvVars = slices.Compact(projectEnvVars)
 
-	// term.Println("\033[1mENVIRONMENT VARIABLES RESOLUTION SUMMARY:\033[0m")
+	term.Info("ENVIRONMENT VARIABLES RESOLUTION SUMMARY:")
 
 	return term.Table(projectEnvVars, "Service", "Environment", "Value", "Source")
+}
+
+func PrintConfigSummaryAndValidate(ctx context.Context, provider client.Provider, project *compose.Project) error {
+	configs, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
+	if err != nil {
+		return err
+	}
+
+	err = printConfigResolutionSummary(project, configs.Names)
+	if err != nil {
+		return err
+	}
+
+	err = compose.ValidateProjectConfig(project, configs.Names)
+	if err != nil {
+		return &ComposeError{err}
+	}
+
+	return nil
 }

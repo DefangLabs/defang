@@ -36,7 +36,7 @@ func TestPrintConfigResolutionSummary(t *testing.T) {
 			defangConfigs = []string{}
 		}
 
-		err = PrintConfigResolutionSummary(proj, defangConfigs)
+		err = printConfigResolutionSummary(proj, defangConfigs)
 		if err != nil {
 			t.Fatalf("PrintConfigResolutionSummary() error = %v", err)
 		}
