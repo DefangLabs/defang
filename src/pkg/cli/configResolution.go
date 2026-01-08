@@ -97,7 +97,7 @@ func printConfigResolutionSummary(project *types.Project, defangConfig []string)
 	return term.Table(projectEnvVars, "Service", "Environment", "Value", "Source")
 }
 
-func PrintConfigSummaryandValidate(ctx context.Context, provider client.Provider, project *compose.Project) error {
+func PrintConfigSummaryAndValidate(ctx context.Context, provider client.Provider, project *compose.Project) error {
 	configs, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
 	if err != nil {
 		return err

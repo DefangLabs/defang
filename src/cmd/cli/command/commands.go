@@ -981,7 +981,7 @@ var configResolveCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.PrintConfigSummaryandValidate(cmd.Context(), provider, project)
+		return cli.PrintConfigSummaryAndValidate(cmd.Context(), provider, project)
 	},
 }
 

@@ -49,7 +49,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 	if upload != compose.UploadModeIgnore {
 		// Ignore missing configs in preview mode, because we don't want to fail the preview if some configs are missing.
 		if upload != compose.UploadModeEstimate {
-			if err := PrintConfigSummaryandValidate(ctx, provider, project); err != nil {
+			if err := PrintConfigSummaryAndValidate(ctx, provider, project); err != nil {
 				return nil, project, err
 			}
 		}
