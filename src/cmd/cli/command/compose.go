@@ -154,11 +154,13 @@ func (m *deploymentModel) View() string {
 }
 
 func monitorWithUI(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, deploymentID string) (map[string]defangv1.ServiceState, error) {
-	// Get compute services to determine what to monitor
-	_, computeServices := splitManagedAndUnmanagedServices(project.Services)
+	servicesNames := make([]string, 0, len(project.Services))
+	for _, svc := range project.Services {
+		servicesNames = append(servicesNames, svc.Name)
+	}
 
 	// Initialize the bubbletea model
-	model := newDeploymentModel(computeServices)
+	model := newDeploymentModel(servicesNames)
 
 	// Create the bubbletea program
 	p := tea.NewProgram(model)
@@ -198,20 +200,6 @@ func monitorWithUI(ctx context.Context, project *compose.Project, provider clien
 	wg.Wait()
 
 	return serviceStates, monitorErr
-}
-
-func splitManagedAndUnmanagedServices(serviceInfos compose.Services) ([]string, []string) {
-	var managedServices []string
-	var unmanagedServices []string
-	for _, service := range serviceInfos {
-		if cli.CanMonitorService(&service) {
-			unmanagedServices = append(unmanagedServices, service.Name)
-		} else {
-			managedServices = append(managedServices, service.Name)
-		}
-	}
-
-	return managedServices, unmanagedServices
 }
 
 func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
