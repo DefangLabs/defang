@@ -129,13 +129,14 @@ func (m *deploymentModel) View() string {
 		svc := m.services[name]
 
 		// Stop spinner for completed services
-		spinnerOrCheck := svc.spinner.View()
-		if svc.status == "DEPLOYMENT_COMPLETED" || svc.status == "DEPLOYMENT_FAILED" {
-			if svc.status == "DEPLOYMENT_COMPLETED" {
-				spinnerOrCheck = "✓"
-			} else {
-				spinnerOrCheck = "✗"
-			}
+		var spinnerOrCheck string
+		switch svc.status {
+		case "DEPLOYMENT_COMPLETED":
+			spinnerOrCheck = "✓"
+		case "DEPLOYMENT_FAILED":
+			spinnerOrCheck = "✗"
+		default:
+			spinnerOrCheck = svc.spinner.View()
 		}
 
 		line := lipgloss.JoinHorizontal(
