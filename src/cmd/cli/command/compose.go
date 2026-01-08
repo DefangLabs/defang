@@ -407,9 +407,8 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			// Print the current service states of the deployment
-			err = cli.PrintServiceStatesAndEndpoints(deploy.Services)
-			if err != nil {
-				return err
+			if err := cli.PrintServices(cmd.Context(), project.Name, provider, false); err != nil {
+				term.Warn(err)
 			}
 
 			term.Info("Done.")
