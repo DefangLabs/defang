@@ -101,7 +101,9 @@ func WatchServiceState(
 				continue
 			}
 
-			serviceStates[msg.Name] = msg.State
+			if msg.State != defangv1.ServiceState_NOT_SPECIFIED {
+				serviceStates[msg.Name] = msg.State
+			}
 			err := cb(msg, &serviceStates)
 			if err != nil {
 				if errors.Is(err, client.ErrDeploymentSucceeded) {
