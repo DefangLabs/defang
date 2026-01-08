@@ -216,6 +216,18 @@ func TestHandleSetConfig(t *testing.T) {
 			expectedProjectNameCalls: true,
 			expectedConfigSetCalls:   true,
 		},
+		{
+			name:                     "successful config set with random flag",
+			cluster:                  testCluster,
+			providerId:               client.ProviderID(""),
+			requestArgs:              map[string]interface{}{"name": "valid_config_name", "random": true},
+			mockCLI:                  &MockSetConfigCLI{},
+			expectedError:            false,
+			expectedConnectCalls:     true,
+			expectedProviderCalls:    true,
+			expectedProjectNameCalls: true,
+			expectedConfigSetCalls:   true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -236,10 +248,15 @@ func TestHandleSetConfig(t *testing.T) {
 			if v, ok := tt.requestArgs["value"].(string); ok {
 				value = v
 			}
+			random := false
+			if r, ok := tt.requestArgs["random"].(bool); ok {
+				random = r
+			}
 
 			params := SetConfigParams{
-				Name:  name,
-				Value: value,
+				Name:   name,
+				Value:  value,
+				Random: random,
 			}
 			ec := elicitations.NewController(&mockElicitationsClient{
 				responses: map[string]string{
@@ -284,6 +301,10 @@ func TestHandleSetConfig(t *testing.T) {
 				}
 				if configValue, exists := tt.requestArgs["value"]; exists {
 					assert.Equal(t, configValue, tt.mockCLI.ConfigSetValue)
+				}
+				// If random flag is set, verify a value was generated
+				if random, exists := tt.requestArgs["random"]; exists && random.(bool) {
+					assert.NotEmpty(t, tt.mockCLI.ConfigSetValue, "Random value should be generated")
 				}
 			}
 		})
