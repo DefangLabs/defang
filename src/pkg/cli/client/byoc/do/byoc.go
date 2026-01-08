@@ -620,12 +620,12 @@ func (b *ByocDo) runCdCommand(ctx context.Context, cmd cdCommand) (*godo.App, er
 		return nil, err
 	}
 
-	if statesUrl := pkg.Getenv("DEFANG_STATES_UPLOAD_URL", cmd.statesUrl); statesUrl != "" {
-		env = append(env, &godo.AppVariableDefinition{Key: "DEFANG_STATES_UPLOAD_URL", Value: statesUrl})
+	if cmd.statesUrl != "" {
+		env = append(env, &godo.AppVariableDefinition{Key: "DEFANG_STATES_UPLOAD_URL", Value: cmd.statesUrl})
 	}
 
-	if eventsUrl := pkg.Getenv("DEFANG_EVENTS_UPLOAD_URL", cmd.eventsUrl); eventsUrl != "" {
-		env = append(env, &godo.AppVariableDefinition{Key: "DEFANG_EVENTS_UPLOAD_URL", Value: eventsUrl})
+	if cmd.eventsUrl != "" {
+		env = append(env, &godo.AppVariableDefinition{Key: "DEFANG_EVENTS_UPLOAD_URL", Value: cmd.eventsUrl})
 	}
 
 	if term.DoDebug() {

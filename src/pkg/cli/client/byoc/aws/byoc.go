@@ -548,12 +548,12 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn,
 		}
 	}
 
-	if statesUrl := pkg.Getenv("DEFANG_STATES_UPLOAD_URL", cmd.statesUrl); statesUrl != "" {
-		env["DEFANG_STATES_UPLOAD_URL"] = statesUrl
+	if cmd.statesUrl != "" {
+		env["DEFANG_STATES_UPLOAD_URL"] = cmd.statesUrl
 	}
 
-	if eventsUrl := pkg.Getenv("DEFANG_EVENTS_UPLOAD_URL", cmd.eventsUrl); eventsUrl != "" {
-		env["DEFANG_EVENTS_UPLOAD_URL"] = eventsUrl
+	if cmd.eventsUrl != "" {
+		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
 	}
 
 	return b.driver.Run(ctx, env, cmd.command...)

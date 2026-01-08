@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -157,21 +158,30 @@ func CdListLocal(ctx context.Context, provider client.Provider, allRegions bool)
 }
 
 func GetStatesAndEventsUploadUrls(ctx context.Context, projectName string, provider client.Provider, fabric client.FabricClient) (statesUrl string, eventsUrl string, err error) {
-	statesResp, err := fabric.CreateUploadURL(ctx, &defangv1.UploadURLRequest{
-		Project:  projectName,
-		Stack:    provider.GetStackName(),
-		Filename: "states.json",
-	})
-	if err != nil {
-		return "", "", fmt.Errorf("failed to create states upload URL: %w", err)
+	// Allow overriding upload URLs via environment variables
+	statesUrl, eventsUrl = os.Getenv("DEFANG_STATES_UPLOAD_URL"), os.Getenv("DEFANG_EVENTS_UPLOAD_URL")
+
+	if statesUrl == "" {
+		statesResp, err := fabric.CreateUploadURL(ctx, &defangv1.UploadURLRequest{
+			Project:  projectName,
+			Stack:    provider.GetStackName(),
+			Filename: "states.json",
+		})
+		if err != nil {
+			return "", "", fmt.Errorf("failed to create states upload URL: %w", err)
+		}
+		statesUrl = statesResp.Url
 	}
-	eventsResp, err := fabric.CreateUploadURL(ctx, &defangv1.UploadURLRequest{
-		Project:  projectName,
-		Stack:    provider.GetStackName(),
-		Filename: "events.log",
-	})
-	if err != nil {
-		return "", "", fmt.Errorf("failed to create events upload URL: %w", err)
+	if eventsUrl == "" {
+		eventsResp, err := fabric.CreateUploadURL(ctx, &defangv1.UploadURLRequest{
+			Project:  projectName,
+			Stack:    provider.GetStackName(),
+			Filename: "events.log",
+		})
+		if err != nil {
+			return "", "", fmt.Errorf("failed to create events upload URL: %w", err)
+		}
+		eventsUrl = eventsResp.Url
 	}
-	return statesResp.Url, eventsResp.Url, nil
+	return statesUrl, eventsUrl, nil
 }

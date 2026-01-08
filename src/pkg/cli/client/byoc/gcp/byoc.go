@@ -388,12 +388,12 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		env["DOMAIN"] = "dummy.domain"
 	}
 
-	if statesUrl := pkg.Getenv("DEFANG_STATES_UPLOAD_URL", cmd.statesUrl); statesUrl != "" {
-		env["DEFANG_STATES_UPLOAD_URL"] = statesUrl
+	if cmd.statesUrl != "" {
+		env["DEFANG_STATES_UPLOAD_URL"] = cmd.statesUrl
 	}
 
-	if eventsUrl := pkg.Getenv("DEFANG_EVENTS_UPLOAD_URL", cmd.eventsUrl); eventsUrl != "" {
-		env["DEFANG_EVENTS_UPLOAD_URL"] = eventsUrl
+	if cmd.eventsUrl != "" {
+		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
 	}
 
 	for k, v := range cmd.envOverride {
