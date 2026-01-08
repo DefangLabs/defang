@@ -57,7 +57,7 @@ func determineConfigSource(envKey string, envValue *string, defangConfigs map[st
 	return SourceComposeFile, *envValue
 }
 
-func PrintConfigResolutionSummary(project *types.Project, defangConfig []string) error {
+func printConfigResolutionSummary(project *types.Project, defangConfig []string) error {
 	configset := make(map[string]struct{})
 	for _, name := range defangConfig {
 		configset[name] = struct{}{}
@@ -103,7 +103,7 @@ func PrintConfigSummaryandValidate(ctx context.Context, provider client.Provider
 		return err
 	}
 
-	err = PrintConfigResolutionSummary(project, configs.Names)
+	err = printConfigResolutionSummary(project, configs.Names)
 	if err != nil {
 		return err
 	}
