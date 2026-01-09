@@ -27,12 +27,12 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
-	"github.com/goccy/go-yaml"
 	"google.golang.org/api/googleapi"
 	auditpb "google.golang.org/genproto/googleapis/cloud/audit"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"gopkg.in/yaml.v3"
 )
 
 var _ client.Provider = (*ByocGcp)(nil)
