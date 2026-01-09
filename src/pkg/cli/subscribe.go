@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -29,7 +30,7 @@ func WaitServiceState(
 	}
 
 	// Assume "services" are normalized service names
-	subscribeRequest := defangv1.SubscribeRequest{Project: projectName, Etag: etag, Services: services}
+	subscribeRequest := defangv1.SubscribeRequest{Project: compose.NormalizeProjectName(projectName), Etag: etag, Services: services}
 	serverStream, err := provider.Subscribe(ctx, &subscribeRequest)
 	if err != nil {
 		return nil, err

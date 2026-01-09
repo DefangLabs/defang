@@ -9,7 +9,7 @@ logName="projects/test-project/logs/docker-logs"
   labels."defang-stack" = "beta"
 ) OR (
   resource.type="build"
-  labels.build_tags =~ "beta__[a-zA-Z0-9-]{1,63}_"
+  labels.build_tags =~ "beta__[a-zA-Z0-9-_]{1,63}_"
   -labels.build_step="MAIN"
 ) OR (
   resource.type="cloud_run_revision"

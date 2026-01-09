@@ -20,7 +20,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
-	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -536,8 +535,8 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 	}
 
 	// TODO: update stack (1st param) to b.PulumiStack
-	subscribeStream.AddJobStatusUpdate("", req.Project, req.Etag, req.Services)
-	subscribeStream.AddServiceStatusUpdate("", req.Project, req.Etag, req.Services)
+	subscribeStream.AddJobStatusUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
+	subscribeStream.AddServiceStatusUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
 	subscribeStream.StartFollow(time.Now())
 	return subscribeStream, nil
 }
@@ -676,7 +675,7 @@ func (e ConflictDelegateDomainError) Error() string {
 
 func (b *ByocGcp) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
 	term.Debugf("Preparing domain delegation for %s", req.DelegateDomain)
-	name := "defang-" + dns.SafeLabel(req.DelegateDomain)
+	name := "defang-" + gcp.SafeZoneName(req.DelegateDomain)
 	if zone, err := b.driver.EnsureDNSZoneExists(ctx, name, req.DelegateDomain, "defang delegate domain"); err != nil {
 		if apiErr := new(googleapi.Error); errors.As(err, &apiErr) {
 			if strings.Contains(apiErr.Message, "Please verify ownership of") ||
@@ -783,6 +782,7 @@ func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
 	query.AddSince(since)
 	query.AddUntil(until)
 
+	// Service status updates
 	query.AddJobStatusUpdateRequestQuery(b.PulumiStack, req.Project, req.Etag, req.Services)
 	query.AddJobStatusUpdateResponseQuery(b.PulumiStack, req.Project, req.Etag, req.Services)
 	query.AddServiceStatusRequestUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
