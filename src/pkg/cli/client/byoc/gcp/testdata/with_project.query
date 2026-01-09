@@ -6,15 +6,19 @@ logName="projects/test-project/logs/docker-logs"
 ) AND (
 (
   resource.type = "cloud_run_job"
+  labels."defang-stack" = "beta"
   labels."defang-project" = "test-project"
 ) OR (
   resource.type="build"
-  labels.build_tags =~ "_test-project_[a-zA-Z0-9-]{1,63}_"
+  labels.build_tags =~ "beta_test-project_[a-zA-Z0-9-]{1,63}_"
+  -labels.build_step="MAIN"
 ) OR (
   resource.type="cloud_run_revision"
+  labels."defang-stack" = "beta"
   labels."defang-project" = "test-project"
 ) OR (
   resource.type="gce_instance"
+  labels."defang-stack" = "beta"
   labels."defang-project" = "test-project"
 )
 )
