@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
+	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
@@ -17,11 +18,15 @@ type DestroyParams struct {
 	common.LoaderParams
 }
 
-func HandleDestroyTool(ctx context.Context, loader client.Loader, params DestroyParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
+func HandleDestroyTool(ctx context.Context, loader client.Loader, params DestroyParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
-	client, err := cli.Connect(ctx, config.Cluster)
+	client, err := GetClientWithRetry(ctx, cli, sc)
 	if err != nil {
-		return "", fmt.Errorf("could not connect: %w", err)
+		var noBrowserErr auth.ErrNoBrowser
+		if errors.As(err, &noBrowserErr) {
+			return noBrowserErr.Error(), nil
+		}
+		return "", err
 	}
 
 	sm, err := stacks.NewManager(client, loader.TargetDirectory(), params.ProjectName)
@@ -29,7 +34,7 @@ func HandleDestroyTool(ctx context.Context, loader client.Loader, params Destroy
 		return "", fmt.Errorf("failed to create stack manager: %w", err)
 	}
 	pp := NewProviderPreparer(cli, ec, client, sm)
-	_, provider, err := pp.SetupProvider(ctx, config.Stack)
+	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}

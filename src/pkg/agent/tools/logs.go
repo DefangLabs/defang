@@ -2,10 +2,12 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
+	"github.com/DefangLabs/defang/src/pkg/auth"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
@@ -22,7 +24,7 @@ type LogsParams struct {
 	Until        string `json:"until,omitempty" jsonschema:"description=Optional: Retrieve logs written before this time. Format as RFC3339 or duration (e.g., '2023-10-01T15:04:05Z' or '1h')."`
 }
 
-func HandleLogsTool(ctx context.Context, loader client.Loader, params LogsParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
+func HandleLogsTool(ctx context.Context, loader client.Loader, params LogsParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
 	var sinceTime, untilTime time.Time
 	var err error
 	now := time.Now()
@@ -40,9 +42,13 @@ func HandleLogsTool(ctx context.Context, loader client.Loader, params LogsParams
 	}
 
 	term.Debug("Function invoked: cli.Connect")
-	client, err := cli.Connect(ctx, config.Cluster)
+	client, err := GetClientWithRetry(ctx, cli, sc)
 	if err != nil {
-		return "", fmt.Errorf("could not connect: %w", err)
+		var noBrowserErr auth.ErrNoBrowser
+		if errors.As(err, &noBrowserErr) {
+			return noBrowserErr.Error(), nil
+		}
+		return "", err
 	}
 
 	sm, err := stacks.NewManager(client, loader.TargetDirectory(), params.ProjectName)
@@ -50,7 +56,7 @@ func HandleLogsTool(ctx context.Context, loader client.Loader, params LogsParams
 		return "", fmt.Errorf("failed to create stack manager: %w", err)
 	}
 	pp := NewProviderPreparer(cli, ec, client, sm)
-	_, provider, err := pp.SetupProvider(ctx, config.Stack)
+	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}

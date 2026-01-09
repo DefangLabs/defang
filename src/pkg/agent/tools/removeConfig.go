@@ -2,9 +2,11 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
+	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
@@ -20,9 +22,13 @@ type RemoveConfigParams struct {
 // HandleRemoveConfigTool handles the remove config tool logic
 func HandleRemoveConfigTool(ctx context.Context, loader client.Loader, params RemoveConfigParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
-	client, err := cli.Connect(ctx, sc.Cluster)
+	client, err := GetClientWithRetry(ctx, cli, sc)
 	if err != nil {
-		return "", fmt.Errorf("Could not connect: %w", err)
+		var noBrowserErr auth.ErrNoBrowser
+		if errors.As(err, &noBrowserErr) {
+			return noBrowserErr.Error(), nil
+		}
+		return "", err
 	}
 
 	sm, err := stacks.NewManager(client, loader.TargetDirectory(), params.ProjectName)
