@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/firebase/genkit/go/ai"
@@ -244,11 +245,11 @@ func (g *ModelGenerator) Generate(ctx context.Context, req *ai.ModelRequest, han
 
 // concatenateContent concatenates text content into a single string
 func (g *ModelGenerator) concatenateContent(parts []*ai.Part) string {
-	content := ""
+	var content strings.Builder
 	for _, part := range parts {
-		content += part.Text
+		content.WriteString(part.Text)
 	}
-	return content
+	return content.String()
 }
 
 // generateStream generates a streaming model response

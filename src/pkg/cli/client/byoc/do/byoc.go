@@ -23,14 +23,12 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	awsbyoc "github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/dns"
-	"github.com/DefangLabs/defang/src/pkg/logs"
-
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do/appPlatform"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do/region"
 	"github.com/DefangLabs/defang/src/pkg/http"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -64,7 +62,7 @@ type ByocDo struct {
 
 var _ client.Provider = (*ByocDo)(nil)
 
-func NewByocProvider(ctx context.Context, tenantName types.TenantNameOrID, stack string) *ByocDo {
+func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string) *ByocDo {
 	doRegion := do.Region(os.Getenv("REGION"))
 	if doRegion == "" {
 		doRegion = region.SFO3 // TODO: change default
@@ -223,13 +221,13 @@ func (b *ByocDo) GetDeploymentStatus(ctx context.Context) error {
 	}
 }
 
-func (b *ByocDo) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (string, error) {
+func (b *ByocDo) CdCommand(ctx context.Context, req client.CdCommandRequest) (string, error) {
 	if err := b.SetUpCD(ctx); err != nil {
 		return "", err
 	}
 
 	cmd := cdCommand{
-		command:        []string{req.Command},
+		command:        []string{string(req.Command)},
 		delegateDomain: "dummy.domain",
 		project:        req.Project,
 	}
@@ -243,7 +241,7 @@ func (b *ByocDo) BootstrapCommand(ctx context.Context, req client.BootstrapComma
 	return etag, nil
 }
 
-func (b *ByocDo) BootstrapList(ctx context.Context, _allRegions bool) (iter.Seq[string], error) {
+func (b *ByocDo) CdList(ctx context.Context, _allRegions bool) (iter.Seq[string], error) {
 	s3client, err := b.driver.CreateS3Client()
 	if err != nil {
 		return nil, err
@@ -270,14 +268,6 @@ func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLReq
 	return &defangv1.UploadURLResponse{
 		Url: url,
 	}, nil
-}
-
-func (b *ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	return nil, client.ErrNotImplemented("not implemented for DigitalOcean")
-}
-
-func (b *ByocDo) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (string, error) {
-	return b.BootstrapCommand(ctx, client.BootstrapCommandRequest{Project: req.Project, Command: "down"})
 }
 
 func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
@@ -658,16 +648,15 @@ func (b *ByocDo) environment(projectName, delegateDomain string, mode defangv1.D
 		{Key: "DEFANG_DEBUG", Value: os.Getenv("DEFANG_DEBUG")},
 		{Key: "DEFANG_JSON", Value: os.Getenv("DEFANG_JSON")},
 		{Key: "DEFANG_MODE", Value: strings.ToLower(mode.String())},
-		{Key: "DEFANG_ORG", Value: b.TenantName},
+		{Key: "DEFANG_ORG", Value: string(b.TenantLabel)},
 		{Key: "DEFANG_PREFIX", Value: b.Prefix},
 		{Key: "DEFANG_PULUMI_DEBUG", Value: os.Getenv("DEFANG_PULUMI_DEBUG")},
 		{Key: "DEFANG_PULUMI_DIFF", Value: os.Getenv("DEFANG_PULUMI_DIFF")},
 		{Key: "DEFANG_STATE_URL", Value: defangStateUrl},
 		{Key: "DIGITALOCEAN_TOKEN", Value: os.Getenv("DIGITALOCEAN_TOKEN"), Type: godo.AppVariableType_Secret},
-		{Key: "DOMAIN", Value: b.GetProjectDomain(projectName, delegateDomain)},
+		{Key: "DOMAIN", Value: delegateDomain},
 		{Key: "NODE_NO_WARNINGS", Value: "1"},
 		{Key: "NPM_CONFIG_UPDATE_NOTIFIER", Value: "false"},
-		{Key: "PRIVATE_DOMAIN", Value: byoc.GetPrivateDomain(projectName)},
 		{Key: "PROJECT", Value: projectName},
 		{Key: "PULUMI_CONFIG_PASSPHRASE", Value: byoc.PulumiConfigPassphrase, Type: godo.AppVariableType_Secret},
 		{Key: "PULUMI_COPILOT", Value: "false"},
@@ -736,10 +725,6 @@ func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, erro
 	}
 
 	return nil, fmt.Errorf("app not found: %s", appName)
-}
-
-func (b *ByocDo) ServicePublicDNS(name string, projectName string) string {
-	return dns.SafeLabel(name) + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(b.TenantName) + ".defang.app"
 }
 
 func processServiceInfo(service *godo.AppServiceSpec, projectName string) *defangv1.ServiceInfo {
@@ -885,4 +870,8 @@ func printlogs(msg *defangv1.LogEntry) {
 		io.WriteString(buf, line)
 	}
 	term.Println(buf.String())
+}
+
+func (*ByocDo) GetPrivateDomain(string) string {
+	return "" // DO does not support private DNS
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli"
-	"github.com/DefangLabs/defang/src/pkg/cluster"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/cobra"
 )
@@ -16,13 +16,13 @@ func ListWorkspaces(cmd *cobra.Command, args []string) error {
 	jsonMode, _ := cmd.Flags().GetBool("json")
 	verbose := global.Verbose
 
-	token := cluster.GetExistingToken(getCluster())
+	token := client.GetExistingToken(global.Cluster)
 	if token == "" {
 		return errors.New("no access token found; please log in with `defang login`")
 	}
 
 	// Determine current selection from flag/env/token, then reconcile with WhoAmI.
-	currentWorkspace := getTenantSelection()
+	currentWorkspace := global.Tenant
 
 	info, err := auth.FetchUserInfo(cmd.Context(), token)
 	if err != nil {

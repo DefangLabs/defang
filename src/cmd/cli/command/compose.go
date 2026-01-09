@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"time"
@@ -12,12 +13,12 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	pcluster "github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
@@ -35,7 +36,7 @@ const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
 
 func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
 	// We can only show services deployed to the prod1 defang SaaS environment.
-	if global.Stack.Provider == cliClient.ProviderDefang && global.Cluster == pcluster.DefaultCluster {
+	if global.Stack.Provider == client.ProviderDefang && global.Cluster == client.DefaultCluster {
 		term.Info("Monitor your services' status in the defang portal")
 		for _, serviceInfo := range serviceInfos {
 			term.Println("   -", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
@@ -53,6 +54,7 @@ func makeComposeUpCmd() *cobra.Command {
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and deploy a new project or update an existing project",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			var build, _ = cmd.Flags().GetBool("build")
 			var force, _ = cmd.Flags().GetBool("force")
 			var detach, _ = cmd.Flags().GetBool("detach")
 			var utc, _ = cmd.Flags().GetBool("utc")
@@ -62,9 +64,11 @@ func makeComposeUpCmd() *cobra.Command {
 				cli.EnableUTCMode()
 			}
 
-			upload := compose.UploadModeDigest
+			upload := compose.UploadModeDefault
 			if force {
 				upload = compose.UploadModeForce
+			} else if build {
+				upload = compose.UploadModeDigest
 			}
 
 			since := time.Now()
@@ -83,7 +87,7 @@ func makeComposeUpCmd() *cobra.Command {
 					return err
 				}
 
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.Stack)
+				debugger, err := debug.NewDebugger(ctx, global.Cluster, &global.Stack)
 				if err != nil {
 					return err
 				}
@@ -92,7 +96,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}, loadErr)
 			}
 
-			provider, err := newProviderChecked(ctx, loader)
+			provider, err := newProviderChecked(ctx, loader, true)
 			if err != nil {
 				return err
 			}
@@ -107,12 +111,19 @@ func makeComposeUpCmd() *cobra.Command {
 			if resp, err := global.Client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
 				Project: project.Name,
 				Type:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
+				Stack:   global.Stack.Name,
 			}); err != nil {
 				term.Debugf("ListDeployments failed: %v", err)
 			} else if accountInfo, err := provider.AccountInfo(ctx); err != nil {
 				term.Debugf("AccountInfo failed: %v", err)
 			} else if len(resp.Deployments) > 0 {
-				handleExistingDeployments(resp.Deployments, accountInfo, project.Name)
+				confirmed, err := confirmDeployment(resp.Deployments, accountInfo, provider.GetStackName())
+				if err != nil {
+					return err
+				}
+				if !confirmed {
+					return fmt.Errorf("deployment of project %q was canceled", project.Name)
+				}
 			} else if global.Stack.Name == "" {
 				err = promptToCreateStack(ctx, stacks.StackParameters{
 					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
@@ -137,14 +148,13 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			deploy, project, err := cli.ComposeUp(ctx, global.Client, provider, cli.ComposeUpParams{
-				Stack:      global.Stack.Name,
 				Project:    project,
 				UploadMode: upload,
 				Mode:       global.Stack.Mode,
 			})
 			if err != nil {
 				composeErr := err
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.Stack)
+				debugger, err := debug.NewDebugger(ctx, global.Cluster, &global.Stack)
 				if err != nil {
 					return err
 				}
@@ -173,7 +183,7 @@ func makeComposeUpCmd() *cobra.Command {
 			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
 				deploymentErr := err
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.Stack)
+				debugger, err := debug.NewDebugger(ctx, global.Cluster, &global.Stack)
 				if err != nil {
 					term.Warn("Failed to initialize debugger:", err)
 					return deploymentErr
@@ -211,26 +221,32 @@ func makeComposeUpCmd() *cobra.Command {
 	_ = composeUpCmd.Flags().MarkHidden("tail")
 	composeUpCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	composeUpCmd.Flags().Bool("build", true, "build the image before starting the service") // docker-compose compatibility
-	_ = composeUpCmd.Flags().MarkHidden("build")
-	composeUpCmd.Flags().Bool("wait", true, "wait for services to be running|healthy") // docker-compose compatibility
+	composeUpCmd.Flags().Bool("wait", true, "wait for services to be running|healthy")      // docker-compose compatibility
 	_ = composeUpCmd.Flags().MarkHidden("wait")
 	composeUpCmd.Flags().Int("wait-timeout", -1, "maximum duration to wait for the project to be running|healthy") // docker-compose compatibility
 	return composeUpCmd
 }
 
-func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accountInfo *cliClient.AccountInfo, projectName string) error {
+func confirmDeployment(existingDeployments []*defangv1.Deployment, accountInfo *client.AccountInfo, stackName string) (bool, error) {
 	samePlace := slices.ContainsFunc(existingDeployments, func(dep *defangv1.Deployment) bool {
+		if dep.Provider != accountInfo.Provider.Value() {
+			return false
+		}
 		// Old deployments may not have a region or account ID, so we check for empty values too
-		return dep.Provider == global.Stack.Provider.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
+		return (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
 	})
 	if samePlace {
-		return nil
+		return true, nil
 	}
-	if err := confirmDeploymentToNewLocation(projectName, existingDeployments); err != nil {
-		return err
+	confirmed, err := confirmDeploymentToNewLocation(existingDeployments)
+	if err != nil {
+		return false, err
 	}
-	if global.Stack.Name == "" {
-		stackName := "beta"
+	if !confirmed {
+		return false, nil
+	}
+	if stackName == "" {
+		stackName = stacks.DefaultBeta
 		_, err := stacks.Create(stacks.StackParameters{
 			Name:     stackName,
 			Provider: accountInfo.Provider,
@@ -243,16 +259,16 @@ func handleExistingDeployments(existingDeployments []*defangv1.Deployment, accou
 			term.Info(stacks.PostCreateMessage(stackName))
 		}
 	}
-	return nil
+	return true, nil
 }
 
 func printExistingDeployments(existingDeployments []*defangv1.Deployment) {
 	term.Info("This project was previously deployed to the following locations:")
 	deploymentStrings := make([]string, 0, len(existingDeployments))
 	for _, dep := range existingDeployments {
-		var providerId cliClient.ProviderID
+		var providerId client.ProviderID
 		providerId.SetValue(dep.Provider)
-		deploymentStrings = append(deploymentStrings, fmt.Sprintf(" - %v", cliClient.AccountInfo{Provider: providerId, AccountID: dep.ProviderAccountId, Region: dep.Region}))
+		deploymentStrings = append(deploymentStrings, fmt.Sprintf(" - %v", client.AccountInfo{Provider: providerId, AccountID: dep.ProviderAccountId, Region: dep.Region}))
 	}
 	// sort and remove duplicates
 	slices.Sort(deploymentStrings)
@@ -260,18 +276,18 @@ func printExistingDeployments(existingDeployments []*defangv1.Deployment) {
 	term.Println(strings.Join(deploymentStrings, "\n"))
 }
 
-func confirmDeploymentToNewLocation(projectName string, existingDeployments []*defangv1.Deployment) error {
+func confirmDeploymentToNewLocation(existingDeployments []*defangv1.Deployment) (bool, error) {
 	printExistingDeployments(existingDeployments)
 	var confirm bool
 	if err := survey.AskOne(&survey.Confirm{
 		Message: "Are you sure you want to continue?",
 		Default: false,
 	}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
-		return err
+		return false, err
 	} else if !confirm {
-		return fmt.Errorf("deployment of project %q was canceled", projectName)
+		return false, nil
 	}
-	return nil
+	return true, nil
 }
 
 func promptToCreateStack(ctx context.Context, params stacks.StackParameters) error {
@@ -296,7 +312,7 @@ func promptToCreateStack(ctx context.Context, params stacks.StackParameters) err
 	return nil
 }
 
-func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *compose.Project, provider cliClient.Provider, err error) error {
+func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *compose.Project, provider client.Provider, err error) error {
 	if errors.Is(err, types.ErrComposeFileNotFound) {
 		// TODO: generate a compose file based on the current project
 		printDefangHint("To start a new project, do:", "new")
@@ -308,8 +324,8 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 
 	if strings.Contains(err.Error(), "maximum number of projects") {
 		if projectName, err2 := provider.RemoteProjectName(ctx); err2 == nil {
-			term.Error("Error:", cliClient.PrettyError(err))
-			if _, err := cli.InteractiveComposeDown(ctx, provider, projectName); err != nil {
+			term.Error("Error:", client.PrettyError(err))
+			if _, err := cli.InteractiveComposeDown(ctx, projectName, global.Client, provider); err != nil {
 				term.Debug("ComposeDown failed:", err)
 				printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
 			} else {
@@ -321,14 +337,14 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 		return err
 	}
 
-	term.Error("Error:", cliClient.PrettyError(err))
+	term.Error("Error:", client.PrettyError(err))
 	return debugger.DebugDeploymentError(ctx, debug.DebugConfig{
 		Project: project,
 	}, err)
 }
 
 func handleTailAndMonitorErr(ctx context.Context, err error, debugger *debug.Debugger, debugConfig debug.DebugConfig) {
-	var errDeploymentFailed cliClient.ErrDeploymentFailed
+	var errDeploymentFailed client.ErrDeploymentFailed
 	if errors.As(err, &errDeploymentFailed) {
 		// Tail got canceled because of deployment failure: prompt to show the debugger
 		term.Warn(errDeploymentFailed)
@@ -422,9 +438,10 @@ func makeComposeStopCmd() *cobra.Command {
 
 func makeComposeDownCmd() *cobra.Command {
 	composeDownCmd := &cobra.Command{
-		Use:         "down [SERVICE...]",
+		Use:         "down",
 		Aliases:     []string{"rm", "remove"}, // like docker stack
 		Annotations: authNeededAnnotation,
+		Args:        cobra.NoArgs, // TODO: optional list of service names to remove select services
 		Short:       "Reads a Compose file and deprovisions its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var detach, _ = cmd.Flags().GetBool("detach")
@@ -435,12 +452,12 @@ func makeComposeDownCmd() *cobra.Command {
 			}
 
 			loader := configureLoader(cmd)
-			provider, err := newProviderChecked(cmd.Context(), loader)
+			provider, err := newProviderChecked(cmd.Context(), loader, false)
 			if err != nil {
 				return err
 			}
 
-			projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+			projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 			if err != nil {
 				return err
 			}
@@ -451,11 +468,11 @@ func makeComposeDownCmd() *cobra.Command {
 			}
 
 			since := time.Now()
-			deployment, err := cli.ComposeDown(cmd.Context(), projectName, global.Client, provider, args...)
+			deployment, err := cli.ComposeDown(cmd.Context(), projectName, global.Client, provider)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
-					term.Warn(cliClient.PrettyError(err))
+					term.Warn(client.PrettyError(err))
 					return nil
 				}
 				return err
@@ -548,7 +565,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				debugger, err := debug.NewDebugger(ctx, getCluster(), &global.Stack)
+				debugger, err := debug.NewDebugger(ctx, global.Cluster, &global.Stack)
 				if err != nil {
 					term.Warn("Failed to initialize debugger:", err)
 					return loadErr
@@ -558,7 +575,14 @@ func makeComposeConfigCmd() *cobra.Command {
 				}, loadErr)
 			}
 
-			provider, err := newProvider(ctx, loader)
+			elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
+			ec := elicitations.NewController(elicitationsClient)
+			sm, err := stacks.NewManager(global.Client, loader.TargetDirectory(), project.Name)
+			if err != nil {
+				return fmt.Errorf("failed to create stack manager: %w", err)
+			}
+
+			provider, err := newProvider(ctx, ec, sm, false)
 			if err != nil {
 				return err
 			}
@@ -567,7 +591,6 @@ func makeComposeConfigCmd() *cobra.Command {
 				Project:    project,
 				UploadMode: compose.UploadModeIgnore,
 				Mode:       modes.ModeUnspecified,
-				Stack:      global.Stack.Name,
 			})
 			if !errors.Is(err, dryrun.ErrDryRun) {
 				return err
@@ -588,12 +611,12 @@ func makeComposePsCmd() *cobra.Command {
 			long, _ := cmd.Flags().GetBool("long")
 
 			loader := configureLoader(cmd)
-			provider, err := newProviderChecked(cmd.Context(), loader)
+			provider, err := newProviderChecked(cmd.Context(), loader, false)
 			if err != nil {
 				return err
 			}
 
-			projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+			projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 			if err != nil {
 				return err
 			}
@@ -647,11 +670,11 @@ func setupLogsFlags(cmd *cobra.Command) {
 	cmd.Flags().MarkHidden("name")
 	cmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
 	cmd.Flags().MarkHidden("etag")
-	cmd.Flags().String("deployment", "", "deployment ID of the service")
+	cmd.Flags().String("deployment", "", "deployment ID of the service (use 'latest' for the most recent deployment)")
 	cmd.Flags().Bool("follow", false, "follow log output; incompatible with --until") // NOTE: -f is already used by --file
 	cmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
-	cmd.Flags().String("since", "", "show logs since duration/time")
-	cmd.Flags().String("until", "", "show logs until duration/time; incompatible with --follow")
+	cmd.Flags().String("since", "", "show logs since duration or timestamp (unix or RFC3339)")
+	cmd.Flags().String("until", "", "show logs until duration or timestamp (unix or RFC3339); incompatible with --follow")
 	cmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	cmd.Flags().Var(&logType, "type", fmt.Sprintf("show logs of type; one of %v", logs.AllLogTypes))
 	cmd.Flags().String("filter", "", "only show logs containing given text; case-insensitive")
@@ -713,14 +736,31 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	loader := configureLoader(cmd)
-	provider, err := newProviderChecked(cmd.Context(), loader)
+	provider, err := newProviderChecked(cmd.Context(), loader, false)
 	if err != nil {
 		return err
 	}
 
-	projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+	projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 	if err != nil {
 		return err
+	}
+
+	// Handle 'latest' deployment flag
+	if deployment == "latest" {
+		resp, err := global.Client.ListDeployments(cmd.Context(), &defangv1.ListDeploymentsRequest{
+			Project: projectName,
+			Stack:   global.Stack.Name,
+			Type:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
+			Limit:   1,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to fetch latest deployment: %w", err)
+		}
+		if len(resp.Deployments) == 0 {
+			return errors.New("no active deployments found")
+		}
+		deployment = resp.Deployments[0].Id
 	}
 
 	tailOptions := cli.TailOptions{

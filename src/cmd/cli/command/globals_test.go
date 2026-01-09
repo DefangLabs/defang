@@ -6,12 +6,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cluster"
-	"github.com/DefangLabs/defang/src/pkg/migrate"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/spf13/pflag"
 )
 
@@ -49,9 +48,8 @@ func Test_configurationPrecedence(t *testing.T) {
 		HasTty:         true, // set to true just for test instead of term.IsTerminal() for consistency
 		HideUpdate:     false,
 		NonInteractive: false, // set to false just for test instead of !term.IsTerminal() for consistency
-		SourcePlatform: migrate.SourcePlatformUnspecified,
 		Verbose:        false,
-		Stack:          stacks.StackParameters{Provider: cliClient.ProviderAuto, Mode: modes.ModeUnspecified},
+		Stack:          stacks.StackParameters{Provider: client.ProviderAuto, Mode: modes.ModeUnspecified},
 		Cluster:        "",
 		Tenant:         "",
 	}
@@ -81,7 +79,6 @@ func Test_configurationPrecedence(t *testing.T) {
 					"DEFANG_STACK":           "from-env",
 					"DEFANG_FABRIC":          "from-env-cluster",
 					"DEFANG_PROVIDER":        "defang",
-					"DEFANG_SOURCE_PLATFORM": "heroku",
 					"DEFANG_COLOR":           "never",
 					"DEFANG_TTY":             "false",
 					"DEFANG_NON_INTERACTIVE": "true",
@@ -89,16 +86,15 @@ func Test_configurationPrecedence(t *testing.T) {
 				},
 			},
 			envVars: map[string]string{
-				"DEFANG_MODE":            "BALANCED",
-				"DEFANG_VERBOSE":         "true",
-				"DEFANG_DEBUG":           "false",
-				"DEFANG_STACK":           "from-env",
-				"DEFANG_FABRIC":          "from-env-cluster",
-				"DEFANG_PROVIDER":        "gcp",
-				"DEFANG_SOURCE_PLATFORM": "heroku",
-				"DEFANG_COLOR":           "auto",
-				"DEFANG_TTY":             "false",
-				"DEFANG_HIDE_UPDATE":     "false",
+				"DEFANG_MODE":        "BALANCED",
+				"DEFANG_VERBOSE":     "true",
+				"DEFANG_DEBUG":       "false",
+				"DEFANG_STACK":       "from-env",
+				"DEFANG_FABRIC":      "from-env-cluster",
+				"DEFANG_PROVIDER":    "gcp",
+				"DEFANG_COLOR":       "auto",
+				"DEFANG_TTY":         "false",
+				"DEFANG_HIDE_UPDATE": "false",
 			},
 			flags: map[string]string{
 				"mode":            "HIGH_AVAILABILITY",
@@ -107,7 +103,6 @@ func Test_configurationPrecedence(t *testing.T) {
 				"stack":           "from-flags",
 				"cluster":         "from-flags-cluster",
 				"provider":        "aws",
-				"from":            "heroku",
 				"color":           "always",
 				"non-interactive": "false",
 			},
@@ -116,12 +111,11 @@ func Test_configurationPrecedence(t *testing.T) {
 				Debug:   true,
 				Stack: stacks.StackParameters{
 					Name:     "from-flags",
-					Provider: cliClient.ProviderAWS,
+					Provider: client.ProviderAWS,
 					Mode:     modes.ModeHighAvailability,
 				},
 				Cluster:        "from-flags-cluster",
 				Tenant:         "",
-				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAlways,
 				HasTty:         false, // from env override
 				NonInteractive: false, // from flags override
@@ -140,7 +134,6 @@ func Test_configurationPrecedence(t *testing.T) {
 					"DEFANG_STACK":           "from-env",
 					"DEFANG_FABRIC":          "from-env-cluster",
 					"DEFANG_PROVIDER":        "defang",
-					"DEFANG_SOURCE_PLATFORM": "heroku",
 					"DEFANG_COLOR":           "never",
 					"DEFANG_TTY":             "false",
 					"DEFANG_NON_INTERACTIVE": "true",
@@ -153,7 +146,6 @@ func Test_configurationPrecedence(t *testing.T) {
 				"DEFANG_STACK":           "from-env",
 				"DEFANG_FABRIC":          "from-env-cluster",
 				"DEFANG_PROVIDER":        "gcp",
-				"DEFANG_SOURCE_PLATFORM": "heroku",
 				"DEFANG_COLOR":           "auto",
 				"DEFANG_TTY":             "true",
 				"DEFANG_NON_INTERACTIVE": "false",
@@ -164,12 +156,11 @@ func Test_configurationPrecedence(t *testing.T) {
 				Debug:   false,
 				Stack: stacks.StackParameters{
 					Name:     "from-env",
-					Provider: cliClient.ProviderGCP,
+					Provider: client.ProviderGCP,
 					Mode:     modes.ModeBalanced,
 				},
 				Cluster:        "from-env-cluster",
 				Tenant:         "",
-				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAuto,
 				HasTty:         true,  // from env
 				NonInteractive: false, // from env
@@ -188,7 +179,6 @@ func Test_configurationPrecedence(t *testing.T) {
 					"DEFANG_STACK":           "from-env",
 					"DEFANG_FABRIC":          "from-env-cluster",
 					"DEFANG_PROVIDER":        "defang",
-					"DEFANG_SOURCE_PLATFORM": "heroku",
 					"DEFANG_COLOR":           "always",
 					"DEFANG_TTY":             "false",
 					"DEFANG_NON_INTERACTIVE": "true",
@@ -200,12 +190,11 @@ func Test_configurationPrecedence(t *testing.T) {
 				Debug:   false,
 				Stack: stacks.StackParameters{
 					Name:     "from-env",
-					Provider: cliClient.ProviderDefang,
+					Provider: client.ProviderDefang,
 					Mode:     modes.ModeAffordable,
 				},
 				Cluster:        "from-env-cluster",
 				Tenant:         "",
-				SourcePlatform: migrate.SourcePlatformHeroku,
 				ColorMode:      ColorAlways,
 				HasTty:         false, // from env
 				NonInteractive: true,  // from env
@@ -252,12 +241,11 @@ func Test_configurationPrecedence(t *testing.T) {
 			flags.StringVarP(&testConfig.Stack.Name, "stack", "s", testConfig.Stack.Name, "stack name (for BYOC providers)")
 			flags.Var(&testConfig.ColorMode, "color", "colorize output")
 			flags.StringVar(&testConfig.Cluster, "cluster", testConfig.Cluster, "Defang cluster to connect to")
-			flags.StringVar(&testConfig.Tenant, "workspace", testConfig.Tenant, "workspace name (tenant)")
+			flags.Var(&testConfig.Tenant, "workspace", "workspace name (tenant)")
 			flags.VarP(&testConfig.Stack.Provider, "provider", "P", "bring-your-own-cloud provider")
 			flags.BoolVarP(&testConfig.Verbose, "verbose", "v", testConfig.Verbose, "verbose logging")
 			flags.BoolVar(&testConfig.Debug, "debug", testConfig.Debug, "debug logging for troubleshooting the CLI")
 			flags.BoolVar(&testConfig.NonInteractive, "non-interactive", testConfig.NonInteractive, "disable interactive prompts / no TTY")
-			flags.Var(&testConfig.SourcePlatform, "from", "the platform from which to migrate the project")
 			flags.VarP(&testConfig.Stack.Mode, "mode", "m", "deployment mode")
 
 			// Set flags based on user input (these override env and env file values)
@@ -347,9 +335,6 @@ func Test_configurationPrecedence(t *testing.T) {
 			if testConfig.Tenant != tt.expected.Tenant {
 				t.Errorf("expected Tenant to be '%s', got '%s'", tt.expected.Tenant, testConfig.Tenant)
 			}
-			if testConfig.SourcePlatform != tt.expected.SourcePlatform {
-				t.Errorf("expected SourcePlatform to be '%s', got '%s'", tt.expected.SourcePlatform, testConfig.SourcePlatform)
-			}
 			if testConfig.ColorMode != tt.expected.ColorMode {
 				t.Errorf("expected ColorMode to be '%s', got '%s'", tt.expected.ColorMode, testConfig.ColorMode)
 			}
@@ -368,10 +353,10 @@ func Test_configurationPrecedence(t *testing.T) {
 
 func TestTenantFlagWinsOverEnv(t *testing.T) {
 	cfg := GlobalConfig{
-		Cluster: cluster.DefangFabric,
+		Cluster: client.DefangFabric,
 	}
 	flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	flags.StringVar(&cfg.Tenant, "workspace", cfg.Tenant, "workspace name")
+	flags.Var(&cfg.Tenant, "workspace", "workspace name")
 	flags.StringVar(&cfg.Cluster, "cluster", cfg.Cluster, "cluster")
 
 	if err := flags.Set("workspace", "flag-workspace"); err != nil {
@@ -392,7 +377,7 @@ func TestTenantEnvSources(t *testing.T) {
 	tests := []struct {
 		name     string
 		envVars  map[string]string
-		expected string
+		expected types.TenantNameOrID
 	}{
 		{
 			name: "workspace env wins",
@@ -438,10 +423,10 @@ func TestTenantEnvSources(t *testing.T) {
 				t.Fatalf("failed to create .defang directory: %v", err)
 			}
 			cfg := GlobalConfig{
-				Cluster: cluster.DefangFabric,
+				Cluster: client.DefangFabric,
 			}
 			flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
-			flags.StringVar(&cfg.Tenant, "workspace", cfg.Tenant, "workspace name")
+			flags.Var(&cfg.Tenant, "workspace", "workspace name")
 			flags.StringVar(&cfg.Cluster, "cluster", cfg.Cluster, "cluster")
 
 			for key, value := range tt.envVars {

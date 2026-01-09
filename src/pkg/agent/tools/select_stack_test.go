@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -104,7 +103,7 @@ func TestHandleSelectStackTool(t *testing.T) {
 			var result string
 			var err error
 
-			result, err = HandleSelectStackTool(context.Background(), tt.params, stackConfig)
+			result, err = HandleSelectStackTool(t.Context(), tt.params, stackConfig)
 
 			// Verify results
 			if tt.expectedError {

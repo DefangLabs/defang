@@ -33,7 +33,7 @@ func (a *Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
 	}
 	a.Region = Region(cfg.Region)
 	// Get caller identity to determine account ID
-	if output, err := sts.NewFromConfig(cfg).GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{}); err == nil {
+	if output, err := NewStsFromConfig(cfg).GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{}); err == nil {
 		a.AccountID = *output.Account
 	}
 	return cfg, err

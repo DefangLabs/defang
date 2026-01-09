@@ -354,10 +354,10 @@ func SetupClient(clientStr string) error {
 
 	err = configureDefangMCPServer(configPath, client)
 	if err != nil {
-		return fmt.Errorf("failed to update mcp config file for client %q: %w", client, err)
+		return fmt.Errorf("failed to update MCP config file for client %q: %w", client, err)
 	}
 
-	term.Infof("Ensure %s is upgraded to the latest version and restarted for mcp settings to take effect.\n", client)
+	term.Infof("Ensure %s is upgraded to the latest version and restarted for MCP settings to take effect.\n", client)
 
 	return nil
 }

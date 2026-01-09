@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/browser"
 )
 
-var openAuthClient = NewClient("defang-cli", pkg.Getenv("DEFANG_ISSUER", "https://auth.defang.io"))
+var OpenAuthClient = NewClient("defang-cli", pkg.Getenv("DEFANG_ISSUER", "https://auth.defang.io"))
 
 type ErrNoBrowser struct {
 	Err error
@@ -40,12 +40,12 @@ const (
 func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(string), mcpClient string) (AuthCodeFlow, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	redirectUri := openAuthClient.GetPollRedirectURI()
+	redirectUri := OpenAuthClient.GetPollRedirectURI()
 
 	opts := []AuthorizeOption{
 		WithPkce(),
 	}
-	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, opts...)
+	ar, err := OpenAuthClient.Authorize(redirectUri, CodeResponseType, opts...)
 	if err != nil {
 		return AuthCodeFlow{}, err
 	}
@@ -119,7 +119,7 @@ func pollForAuthCode(ctx context.Context, state string) (string, error) {
 	defer cancel()
 
 	for {
-		code, err := openAuthClient.Poll(ctx, state)
+		code, err := OpenAuthClient.Poll(ctx, state)
 		if err != nil {
 			if errors.Is(err, ErrPollTimeout) {
 				term.Debug("poll timed out, retrying...")
@@ -149,7 +149,7 @@ func ExchangeCodeForToken(ctx context.Context, code AuthCodeFlow, ss ...scope.Sc
 
 	term.Debugf("Generating access token with scopes %v", scopes)
 
-	token, err := openAuthClient.Exchange(code.code, code.redirectUri, code.verifier) // TODO: scope
+	token, err := OpenAuthClient.Exchange(code.code, code.redirectUri, code.verifier) // TODO: scope
 	if err != nil {
 		return "", err
 	}

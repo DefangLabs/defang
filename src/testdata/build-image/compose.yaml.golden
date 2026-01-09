@@ -1,0 +1,12 @@
+name: build-image
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: myapp:latest
+    networks:
+      default: null
+networks:
+  default:
+    name: build-image_default

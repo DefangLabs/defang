@@ -10,7 +10,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/modes"
@@ -22,7 +21,7 @@ type DeployParams struct {
 	common.LoaderParams
 }
 
-func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, params DeployParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
+func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
@@ -34,7 +33,7 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, param
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, config.Cluster)
 	if err != nil {
-		err = cli.InteractiveLoginMCP(ctx, client, config.Cluster, common.MCPDevelopmentClient)
+		err = cli.InteractiveLoginMCP(ctx, config.Cluster, common.MCPDevelopmentClient)
 		if err != nil {
 			var noBrowserErr auth.ErrNoBrowser
 			if errors.As(err, &noBrowserErr) {
@@ -42,16 +41,25 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, param
 			}
 			return "", err
 		}
+
+		// Reconnect with the new token
+		client, err = cli.Connect(ctx, config.Cluster)
+		if err != nil {
+			return "", err
+		}
 	}
 
-	sm := stacks.NewManager(params.WorkingDirectory)
+	sm, err := stacks.NewManager(client, loader.TargetDirectory(), params.ProjectName)
+	if err != nil {
+		return "", fmt.Errorf("failed to create stack manager: %w", err)
+	}
 	pp := NewProviderPreparer(cli, ec, client, sm)
 	_, provider, err := pp.SetupProvider(ctx, config.Stack)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
 
-	err = cli.CanIUseProvider(ctx, client, project.Name, config.Stack.Name, provider, len(project.Services))
+	err = cli.CanIUseProvider(ctx, client, provider, project.Name, len(project.Services))
 	if err != nil {
 		return "", fmt.Errorf("failed to use provider: %w", err)
 	}
@@ -65,7 +73,6 @@ func HandleDeployTool(ctx context.Context, loader cliClient.ProjectLoader, param
 		Project:    project,
 		UploadMode: compose.UploadModeDigest,
 		Mode:       modes.ModeAffordable,
-		Stack:      config.Stack.Name,
 	})
 	if err != nil {
 		err = fmt.Errorf("failed to compose up services: %w", err)

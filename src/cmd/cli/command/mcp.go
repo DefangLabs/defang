@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/tools"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/server"
@@ -37,7 +37,7 @@ var mcpServerCmd = &cobra.Command{
 		}
 
 		term.Debug("Creating log file")
-		logFile, err := os.OpenFile(filepath.Join(cliClient.StateDir, "defang-mcp.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+		logFile, err := os.OpenFile(filepath.Join(client.StateDir, "defang-mcp.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 		if err != nil {
 			term.Warnf("Failed to open log file: %v", err)
 		} else {
@@ -49,7 +49,7 @@ var mcpServerCmd = &cobra.Command{
 		// Create a new MCP server
 		term.Debug("Creating MCP server")
 		s, err := mcp.NewDefangMCPServer(RootCmd.Version, mcpClient, tools.DefaultToolCLI{}, mcp.StackConfig{
-			Cluster: getCluster(),
+			Cluster: global.Cluster,
 			Stack:   &global.Stack,
 		})
 		if err != nil {
@@ -70,7 +70,7 @@ var mcpServerCmd = &cobra.Command{
 
 var mcpSetupCmd = &cobra.Command{
 	Use:   "setup",
-	Short: "Setup MCP client for defang mcp server",
+	Short: "Setup MCP client for defang MCP server",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		term.Debug("Setting up MCP client")

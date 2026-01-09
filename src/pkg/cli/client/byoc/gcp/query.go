@@ -161,6 +161,8 @@ func (q *Query) AddCloudBuildLogQuery(stack, project, etag string, services []st
 	}
 	query += fmt.Sprintf(`
 labels.build_tags =~ "%v_%v_%v_%v"`, stack, project, servicesRegex, etag)
+	query += `
+-labels.build_step="MAIN"` // Exclude main build step logs (like "FETCHSOURCE"/"PUSH"/"DONE") to reduce noise
 
 	q.AddQuery(query)
 }

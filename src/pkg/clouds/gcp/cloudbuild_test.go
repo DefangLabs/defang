@@ -34,7 +34,7 @@ func TestBuildTagString(t *testing.T) {
 				t.Errorf("String() = %q, want %q", tagStr, tt.want)
 			}
 			var parsed BuildTag
-			err := parsed.Parse(tagStr)
+			err := parsed.Parse([]string{tagStr})
 			if err != nil {
 				t.Fatalf("Parse() returned error: %v", err)
 			}

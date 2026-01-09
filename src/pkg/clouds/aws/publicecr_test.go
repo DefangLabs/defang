@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	defanghttp "github.com/DefangLabs/defang/src/pkg/http"
-
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecrpublic"
 	"github.com/aws/aws-sdk-go-v2/service/ecrpublic/types"
 	"github.com/aws/smithy-go/ptr"
@@ -80,13 +80,16 @@ func TestCheckImageExistOnPublicECR(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			oldHttpClient := defanghttp.DefaultClient
-			oldPublicECRClient := PublicECRClientOverride
+			oldPublicECRClient := newPublicECRClientFromConfig
+			oldStsFromConfig := NewStsFromConfig
 			defer func() {
 				defanghttp.DefaultClient = oldHttpClient
-				PublicECRClientOverride = oldPublicECRClient
+				newPublicECRClientFromConfig = oldPublicECRClient
+				NewStsFromConfig = oldStsFromConfig
 			}()
+			NewStsFromConfig = func(cfg aws.Config) StsClientAPI { return &MockStsClientAPI{} }
 			defanghttp.DefaultClient = &http.Client{Transport: &MockHTTPRoundTripper{StatusCode: tt.mockStatusCode, Body: tt.mockBody}}
-			PublicECRClientOverride = MockPublicECRClient{}
+			newPublicECRClientFromConfig = func(cfg aws.Config) PublicECRAPI { return MockPublicECRClient{} }
 
 			awsInstance := &Aws{Region: "us-west-2"}
 			exists, err := awsInstance.CheckImageExistOnPublicECR(t.Context(), tt.repo, tt.tag)

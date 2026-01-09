@@ -435,7 +435,21 @@ func getResourceReservations(r composeTypes.Resources) *composeTypes.Resource {
 // Copied from shared/utils.ts but slightly modified to remove the negative-lookahead assertion
 var interpolationRegex = regexp.MustCompile(`(?i)\$(\$)|\$(?:{([^}]+)}|([_a-z][_a-z0-9]*))|([^$]+)`) // [1] escaped dollar, [2] curly braces, [3] variable name, [4] literal
 
-func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Project, listConfigNamesFunc ListConfigNamesFunc) error {
+func DetectInterpolationVariables(value string) []string {
+	var names []string
+	// check for variables used during interpolation
+	for _, match := range interpolationRegex.FindAllStringSubmatch(value, -1) {
+		if match[2] != "" {
+			names = append(names, match[2])
+		}
+		if match[3] != "" {
+			names = append(names, match[3])
+		}
+	}
+	return names
+}
+
+func ValidateProjectConfig(composeProject *composeTypes.Project, listConfigNames []string) error {
 	var names []string
 	// make list of secrets
 	for _, service := range composeProject.Services {
@@ -444,25 +458,13 @@ func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Pro
 				names = append(names, key)
 				continue
 			}
-			// check for variables used during interpolation
-			for _, match := range interpolationRegex.FindAllStringSubmatch(*value, -1) {
-				if match[2] != "" {
-					names = append(names, match[2])
-				}
-				if match[3] != "" {
-					names = append(names, match[3])
-				}
-			}
+			detectedNames := DetectInterpolationVariables(*value)
+			names = append(names, detectedNames...)
 		}
 	}
 
 	if len(names) == 0 {
 		return nil // no secrets to check
-	}
-
-	configs, err := listConfigNamesFunc(ctx)
-	if err != nil {
-		return err
 	}
 
 	// Deduplicate (sort + uniq)
@@ -471,7 +473,7 @@ func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Pro
 
 	errMissingConfig := ErrMissingConfig{}
 	for _, name := range names {
-		if !slices.Contains(configs, name) {
+		if !slices.Contains(listConfigNames, name) {
 			errMissingConfig = append(errMissingConfig, name)
 		}
 	}

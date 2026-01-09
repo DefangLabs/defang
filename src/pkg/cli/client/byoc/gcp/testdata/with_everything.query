@@ -15,6 +15,7 @@ logName="projects/test-project/logs/docker-logs"
 ) OR (
   resource.type="build"
   labels.build_tags =~ "beta_test-project_[a-zA-Z0-9-_]{1,63}_test-etag"
+  -labels.build_step="MAIN"
 ) OR (
   resource.type="cloud_run_revision"
   labels."defang-stack" = "beta"

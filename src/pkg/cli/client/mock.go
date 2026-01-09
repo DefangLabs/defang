@@ -34,8 +34,16 @@ func (m MockProvider) ServicePublicDNS(service string, projectName string) strin
 	return dns.SafeLabel(service) + "." + dns.SafeLabel(projectName) + ".tenant2.defang.app"
 }
 
-func (m MockProvider) UpdateShardDomain(ctx context.Context) error {
+func (MockProvider) UpdateShardDomain(ctx context.Context) error {
 	return nil
+}
+
+func (MockProvider) GetStackName() string {
+	return "test"
+}
+
+func (MockProvider) GetStackNameForDomain() string {
+	return ""
 }
 
 // MockServerStream mocks a ServerStream.
@@ -111,7 +119,7 @@ type MockFabricClient struct {
 	DelegateDomain string
 }
 
-func (m MockFabricClient) GetController() defangv1connect.FabricControllerClient {
+func (m MockFabricClient) GetFabricClient() defangv1connect.FabricControllerClient {
 	return defangv1connect.NewFabricControllerClient(http.DefaultClient, "localhost")
 }
 
@@ -135,7 +143,7 @@ func (m MockFabricClient) DeleteSubdomainZone(context.Context, *defangv1.DeleteS
 	return nil
 }
 
-func (m MockFabricClient) DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error) {
+func (m MockFabricClient) CreateDelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error) {
 	return &defangv1.DelegateSubdomainZoneResponse{Zone: "example.com"}, nil
 }
 
@@ -170,4 +178,8 @@ func (m MockLoader) LoadProject(ctx context.Context) (*composeTypes.Project, err
 
 func (m MockLoader) LoadProjectName(ctx context.Context) (string, error) {
 	return m.Project.Name, m.Error
+}
+
+func (m MockLoader) TargetDirectory() string {
+	return "."
 }

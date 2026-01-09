@@ -66,6 +66,10 @@ func (m mockGetServiceInfosProvider) GetProjectUpdate(context.Context, string) (
 	return nil, nil
 }
 
+func (mockGetServiceInfosProvider) GetPrivateDomain(projectName string) string {
+	return projectName + ".internal"
+}
+
 func NewMockGetServiceInfosProvider(stack string) *mockGetServiceInfosProvider {
 	p := &mockGetServiceInfosProvider{}
 	p.ByocBaseClient = NewByocBaseClient("test-tenant", p, stack)

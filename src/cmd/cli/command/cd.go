@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -33,16 +33,16 @@ var cdCmd = &cobra.Command{
 	},
 }
 
-func bootstrapCommand(cmd *cobra.Command, args []string, command string) error {
+func cdCommand(cmd *cobra.Command, args []string, command client.CdCommand, fabric client.FabricClient) error {
 	ctx := cmd.Context()
 	loader := configureLoader(cmd)
-	provider, err := newProviderChecked(ctx, loader)
+	provider, err := newProviderChecked(ctx, loader, false)
 	if err != nil {
 		return err
 	}
 
 	if len(args) == 0 {
-		projectName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
+		projectName, err := client.LoadProjectNameWithFallback(ctx, loader, provider)
 		if err != nil {
 			return err
 		}
@@ -55,7 +55,7 @@ func bootstrapCommand(cmd *cobra.Command, args []string, command string) error {
 		if err != nil {
 			return err
 		}
-		errs = append(errs, cli.BootstrapCommand(ctx, projectName, global.Verbose, provider, command))
+		errs = append(errs, cli.CdCommandAndTail(ctx, provider, projectName, global.Verbose, command, fabric))
 	}
 	return errors.Join(errs...)
 }
@@ -65,7 +65,7 @@ var cdDestroyCmd = &cobra.Command{
 	Annotations: authNeededAnnotation, // need subscription
 	Short:       "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return bootstrapCommand(cmd, args, "destroy")
+		return cdCommand(cmd, args, client.CdCommandDestroy, global.Client)
 	},
 }
 
@@ -74,7 +74,7 @@ var cdDownCmd = &cobra.Command{
 	Annotations: authNeededAnnotation, // need subscription
 	Short:       "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return bootstrapCommand(cmd, args, "down")
+		return cdCommand(cmd, args, client.CdCommandDown, global.Client)
 	},
 }
 
@@ -83,7 +83,7 @@ var cdRefreshCmd = &cobra.Command{
 	Annotations: authNeededAnnotation, // need subscription
 	Short:       "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return bootstrapCommand(cmd, args, "refresh")
+		return cdCommand(cmd, args, client.CdCommandRefresh, global.Client)
 	},
 }
 
@@ -92,7 +92,7 @@ var cdCancelCmd = &cobra.Command{
 	Annotations: authNeededAnnotation, // need subscription
 	Short:       "Cancel the current CD operation",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return bootstrapCommand(cmd, args, "cancel")
+		return cdCommand(cmd, args, client.CdCommandCancel, global.Client)
 	},
 }
 
@@ -104,7 +104,7 @@ var cdTearDownCmd = &cobra.Command{
 		force, _ := cmd.Flags().GetBool("force")
 
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader, false)
 		if err != nil {
 			return err
 		}
@@ -122,7 +122,7 @@ var cdListCmd = &cobra.Command{
 		remote, _ := cmd.Flags().GetBool("remote")
 		all, _ := cmd.Flags().GetBool("all")
 
-		provider, err := newProviderChecked(cmd.Context(), nil)
+		provider, err := newProviderChecked(cmd.Context(), nil, false)
 		if err != nil {
 			return err
 		}
@@ -138,9 +138,9 @@ var cdListCmd = &cobra.Command{
 			}
 
 			// FIXME: this needs auth because it spawns the CD task
-			return cli.BootstrapCommand(cmd.Context(), "", global.Verbose, provider, "list")
+			return cli.CdCommandAndTail(cmd.Context(), provider, "", global.Verbose, client.CdCommandList, global.Client)
 		}
-		return cli.BootstrapLocalList(cmd.Context(), provider, all)
+		return cli.CdListLocal(cmd.Context(), provider, all)
 	},
 }
 
@@ -156,7 +156,7 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader, false)
 		if err != nil {
 			return err
 		}
@@ -170,7 +170,6 @@ var cdPreviewCmd = &cobra.Command{
 			Mode:       global.Stack.Mode,
 			Project:    project,
 			UploadMode: compose.UploadModePreview,
-			Stack:      global.Stack.Name,
 		})
 	},
 }
@@ -184,7 +183,7 @@ var cdInstallCmd = &cobra.Command{
 	Hidden:      true, // users shouldn't have to run this manually, because it's done on deploy
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader)
+		provider, err := newProviderChecked(cmd.Context(), loader, false)
 		if err != nil {
 			return err
 		}

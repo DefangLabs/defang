@@ -28,7 +28,7 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 	hostModePort := &composeTypes.ServicePortConfig{Mode: "host", Target: 80}
 	tests := []struct {
 		ProjectName string
-		TenantName  types.TenantNameOrID
+		TenantLabel types.TenantLabel
 		Fqn         string
 		Port        *composeTypes.ServicePortConfig
 		EndPoint    string
@@ -50,16 +50,16 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.ProjectName+","+string(tt.TenantName), func(t *testing.T) {
+		t.Run(tt.ProjectName+","+string(tt.TenantLabel), func(t *testing.T) {
 			//like calling NewByocProvider(), but without needing real AccountInfo data
 			b := &ByocAws{
 				driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 			}
-			b.ByocBaseClient = byoc.NewByocBaseClient(tt.TenantName, b, "")
+			b.ByocBaseClient = byoc.NewByocBaseClient(tt.TenantLabel, b, "")
 
 			delegateDomain := "example.com"
 			projectLabel := dns.SafeLabel(tt.ProjectName)
-			tenantLabel := dns.SafeLabel(string(tt.TenantName))
+			tenantLabel := dns.SafeLabel(string(tt.TenantLabel))
 			if projectLabel != tenantLabel { // avoid stuttering
 				delegateDomain = projectLabel + "." + delegateDomain
 			}

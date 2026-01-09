@@ -20,26 +20,16 @@ type GrpcClient struct {
 	anonID string
 	client defangv1connect.FabricControllerClient
 
-	Tenant          types.TenantNameOrID // effective tenant sent to the server (requested or token-derived)
-	RequestedTenant types.TenantNameOrID // explicitly requested tenant (name or ID)
-	TokenTenant     types.TenantNameOrID // tenant derived from the access token subject, if any
+	requestedTenant types.TenantNameOrID
+	Tenant          types.TenantLabel
 }
 
-type TenantContext struct {
-	RequestedTenant types.TenantNameOrID // CLI-provided tenant (name or ID)
-	TokenTenant     types.TenantNameOrID // tenant derived from access token subject, if any
-}
-
-func NewGrpcClient(host, accessToken string, tenantCtx TenantContext) *GrpcClient {
+func NewGrpcClient(host, accessToken string, requestedTenant types.TenantNameOrID) *GrpcClient {
 	baseUrl := "http://"
 	if strings.HasSuffix(host, ":443") {
 		baseUrl = "https://"
 	}
 	baseUrl += host
-	effectiveTenant := tenantCtx.RequestedTenant
-	if !effectiveTenant.IsSet() {
-		effectiveTenant = tenantCtx.TokenTenant
-	}
 	// Debug(" - Connecting to", baseUrl)
 	fabricClient := defangv1connect.NewFabricControllerClient(
 		http.DefaultClient,
@@ -47,7 +37,7 @@ func NewGrpcClient(host, accessToken string, tenantCtx TenantContext) *GrpcClien
 		connect.WithGRPC(),
 		connect.WithInterceptors(
 			grpcLogger{"fabricClient"},
-			auth.NewAuthInterceptor(accessToken, string(effectiveTenant)),
+			auth.NewAuthInterceptor(accessToken, requestedTenant),
 			Retrier{},
 		),
 	)
@@ -55,9 +45,7 @@ func NewGrpcClient(host, accessToken string, tenantCtx TenantContext) *GrpcClien
 	return &GrpcClient{
 		client:          fabricClient,
 		anonID:          GetAnonID(),
-		Tenant:          effectiveTenant,
-		RequestedTenant: tenantCtx.RequestedTenant,
-		TokenTenant:     tenantCtx.TokenTenant,
+		requestedTenant: requestedTenant,
 	}
 }
 
@@ -68,28 +56,19 @@ func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
 	return resp.Msg, nil
 }
 
-func (g GrpcClient) GetController() defangv1connect.FabricControllerClient {
+func (g GrpcClient) GetFabricClient() defangv1connect.FabricControllerClient {
 	return g.client
 }
 
-func (g GrpcClient) GetTenantName() types.TenantNameOrID {
-	if g.Tenant.IsSet() {
-		return g.Tenant
-	}
-	if g.RequestedTenant.IsSet() {
-		return g.RequestedTenant
-	}
-	if g.TokenTenant.IsSet() {
-		return g.TokenTenant
-	}
-	return types.TenantUnset
-}
-
 func (g GrpcClient) GetRequestedTenant() types.TenantNameOrID {
-	return g.RequestedTenant
+	return g.requestedTenant
 }
 
-func (g *GrpcClient) SetClient(client defangv1connect.FabricControllerClient) {
+func (g GrpcClient) GetTenantName() types.TenantLabel {
+	return g.Tenant
+}
+
+func (g *GrpcClient) SetFabricClient(client defangv1connect.FabricControllerClient) {
 	g.client = client
 }
 
@@ -129,32 +108,16 @@ func (g GrpcClient) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error
 	return getMsg(g.client.WhoAmI(ctx, &connect.Request[emptypb.Empty]{}))
 }
 
-func (g GrpcClient) DelegateSubdomainZone(ctx context.Context, req *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error) {
+func (g GrpcClient) CreateDelegateSubdomainZone(ctx context.Context, req *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error) {
 	return getMsg(g.client.DelegateSubdomainZone(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) DeleteSubdomainZone(ctx context.Context, req *defangv1.DeleteSubdomainZoneRequest) error {
-	// Normalize "beta" to "" for backward compatibility with pre-stack projects.
-	// See the comment in GetDelegateSubdomainZone for explanation.
-	if req.Stack == "beta" {
-		req.Stack = ""
-	}
 	_, err := getMsg(g.client.DeleteSubdomainZone(ctx, connect.NewRequest(req)))
 	return err
 }
 
 func (g GrpcClient) GetDelegateSubdomainZone(ctx context.Context, req *defangv1.GetDelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error) {
-	// Projects which were deployed before stacks were introduced, were
-	// deployed with the implicit stack name "beta", but this stack name was
-	// excluded from the delegate subdomain. Now that stacks are explicit,
-	// and we want them to appear in the delegate, we need to preserve
-	// backwards compatibility with stacks named "beta". This backwards-
-	// compatibility is implemented here by sending a Stack name of "" in
-	// place of "beta", so that fabric will treat these stacks as if there
-	// was no explicit stack.
-	if req.Stack == "beta" {
-		req.Stack = ""
-	}
 	return getMsg(g.client.GetDelegateSubdomainZone(ctx, connect.NewRequest(req)))
 }
 

@@ -343,3 +343,26 @@ func (c client) Verify(token string, opts ...VerifyOption) (*VerifyResult, error
 	// The CLI doesn't have to verify the access token, because the server will.
 	return nil, errors.ErrUnsupported
 }
+
+func (c client) UserInfo(ctx context.Context, accessToken string) (*UserInfo, error) {
+	if accessToken == "" {
+		return nil, errors.New("access token is required to fetch user info")
+	}
+
+	// It is RECOMMENDED that the request use the HTTP GET method and the Access Token be sent using the Authorization header field.
+	resp, err := defangHttp.GetWithAuth(ctx, c.issuer+"/userinfo", "Bearer "+accessToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch userinfo: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("userinfo request failed with status %s", resp.Status)
+	}
+
+	var info UserInfo
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		return nil, fmt.Errorf("failed to decode userinfo: %w", err)
+	}
+	return &info, nil
+}

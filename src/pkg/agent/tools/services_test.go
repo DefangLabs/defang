@@ -66,11 +66,11 @@ func (m *MockCLI) GetServices(ctx context.Context, projectName string, provider 
 	return m.MockServices, nil
 }
 
-func (m *MockCLI) ComposeDown(ctx context.Context, projectName string, client *client.GrpcClient, provider client.Provider) (string, error) {
+func (m *MockCLI) ComposeDown(ctx context.Context, projectName string, fabric *client.GrpcClient, provider client.Provider) (string, error) {
 	return "", nil
 }
 
-func (m *MockCLI) ComposeUp(ctx context.Context, client *client.GrpcClient, provider client.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
+func (m *MockCLI) ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	return nil, nil, nil
 }
 
@@ -82,7 +82,7 @@ func (m *MockCLI) ConfigSet(ctx context.Context, projectName string, provider cl
 	return nil
 }
 
-func (m *MockCLI) CreatePlaygroundProvider(client *client.GrpcClient) client.Provider {
+func (m *MockCLI) CreatePlaygroundProvider(fabric *client.GrpcClient) client.Provider {
 	return m.MockProvider
 }
 
@@ -90,7 +90,7 @@ func (m *MockCLI) GenerateAuthURL(authPort int) string {
 	return ""
 }
 
-func (m *MockCLI) InteractiveLoginMCP(ctx context.Context, client *client.GrpcClient, cluster string, mcpClient string) error {
+func (m *MockCLI) InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
 	return nil
 }
 
@@ -106,7 +106,7 @@ func (m *MockCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResp
 	return ""
 }
 
-func (m *MockCLI) RunEstimate(ctx context.Context, project *compose.Project, client *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
+func (m *MockCLI) RunEstimate(ctx context.Context, project *compose.Project, fabric *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
 	return nil, nil
 }
 

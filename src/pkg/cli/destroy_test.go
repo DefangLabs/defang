@@ -6,7 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/bufbuild/connect-go"
@@ -53,10 +54,10 @@ func TestDestroy(t *testing.T) {
 
 	ctx := t.Context()
 	url := strings.TrimPrefix(server.URL, "http://")
-	grpcClient, _ := Connect(ctx, url)
-	client := cliClient.PlaygroundProvider{FabricClient: grpcClient}
+	grpcClient := Connect(url, types.TenantUnset)
+	fabric := client.PlaygroundProvider{FabricClient: grpcClient}
 
-	etag, err := client.Destroy(ctx, &defangv1.DestroyRequest{Project: "test-project"})
+	etag, err := fabric.CdCommand(ctx, client.CdCommandRequest{Command: "destroy", Project: "test-project"})
 	if err != nil {
 		t.Fatal(err)
 	}
