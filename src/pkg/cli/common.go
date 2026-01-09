@@ -45,6 +45,8 @@ type putDeploymentParams struct {
 	Mode         defangv1.DeploymentMode
 	ProjectName  string
 	ServiceCount int
+	StatesUrl    string
+	EventsUrl    string
 }
 
 func putDeployment(ctx context.Context, provider client.Provider, fabric client.FabricClient, req putDeploymentParams) error {
@@ -66,6 +68,8 @@ func putDeployment(ctx context.Context, provider client.Provider, fabric client.
 			Stack:             provider.GetStackName(),
 			Timestamp:         timestamppb.Now(),
 			Mode:              req.Mode,
+			StatesUrl:         req.StatesUrl,
+			EventsUrl:         req.EventsUrl,
 		},
 	})
 }

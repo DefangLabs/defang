@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
@@ -131,7 +132,7 @@ func TestDeployValidateGPUResources(t *testing.T) {
 	b.ByocBaseClient.SetupDone = true
 
 	t.Run("no errors", func(t *testing.T) {
-		testDeploy := defangv1.DeployRequest{
+		testDeploy := client.DeployRequest{DeployRequest: defangv1.DeployRequest{
 			Compose: []byte(
 				`name: project
 services:
@@ -144,7 +145,7 @@ services:
             - capabilities: [gpu]
               count: 1
 `),
-		}
+		}}
 
 		quotaClient = nil
 		_, err := b.Deploy(ctx, &testDeploy)
@@ -154,7 +155,7 @@ services:
 	})
 
 	t.Run("error on too many gpu", func(t *testing.T) {
-		testDeploy := defangv1.DeployRequest{
+		testDeploy := client.DeployRequest{DeployRequest: defangv1.DeployRequest{
 			Compose: []byte(
 				`name: project
 services:
@@ -167,7 +168,7 @@ services:
             - capabilities: [gpu]
               count: 24
 `),
-		}
+		}}
 
 		_, err := b.Deploy(ctx, &testDeploy)
 		if err != nil && !errors.Is(err, ErrGPUQuotaZero) && !errors.As(err, &errAWSOperation) {
@@ -176,7 +177,7 @@ services:
 	})
 
 	t.Run("no error on non-gpu resource", func(t *testing.T) {
-		testDeploy := defangv1.DeployRequest{
+		testDeploy := client.DeployRequest{DeployRequest: defangv1.DeployRequest{
 			Compose: []byte(
 				`name: project
 services:
@@ -189,7 +190,7 @@ services:
             - capabilities: [not-gpu]
               count: 24
 `),
-		}
+		}}
 
 		_, err := b.Deploy(ctx, &testDeploy)
 		if err != nil && errors.Is(err, ErrGPUQuotaZero) {

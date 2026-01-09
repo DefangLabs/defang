@@ -314,8 +314,10 @@ func (b *ByocGcp) CdCommand(ctx context.Context, req client.CdCommandRequest) (t
 		return "", err
 	}
 	cmd := cdCommand{
-		project: req.Project,
-		command: []string{string(req.Command)},
+		project:   req.Project,
+		command:   []string{string(req.Command)},
+		statesUrl: req.StatesUrl,
+		eventsUrl: req.EventsUrl,
 	}
 	cdExecutionId, err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
 	if err != nil {
@@ -330,6 +332,8 @@ type cdCommand struct {
 	etag           types.ETag
 	mode           defangv1.DeploymentMode
 	project        string
+	statesUrl      string
+	eventsUrl      string
 }
 
 type CloudBuildStep struct {
@@ -372,6 +376,14 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		env["DOMAIN"] = cmd.delegateDomain
 	} else {
 		env["DOMAIN"] = "dummy.domain"
+	}
+
+	if cmd.statesUrl != "" {
+		env["DEFANG_STATES_UPLOAD_URL"] = cmd.statesUrl
+	}
+
+	if cmd.eventsUrl != "" {
+		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
 	}
 
 	if cmd.etag != "" {
@@ -438,11 +450,11 @@ func (b *ByocGcp) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 	}
 	return &defangv1.UploadURLResponse{Url: url}, nil
 }
-func (b *ByocGcp) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocGcp) Deploy(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
 	return b.deploy(ctx, req, "up")
 }
 
-func (b *ByocGcp) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocGcp) Preview(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
 	return b.deploy(ctx, req, "preview")
 }
 
@@ -450,7 +462,7 @@ func (b *ByocGcp) GetDeploymentStatus(ctx context.Context) error {
 	return b.driver.GetBuildStatus(ctx, b.cdExecution)
 }
 
-func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, command string) (*defangv1.DeployResponse, error) {
+func (b *ByocGcp) deploy(ctx context.Context, req *client.DeployRequest, command string) (*defangv1.DeployResponse, error) {
 	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
 	project, err := compose.LoadFromContent(ctx, req.Compose, "")
 	if err != nil {
@@ -507,6 +519,8 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 		etag:           etag,
 		mode:           req.Mode,
 		project:        project.Name,
+		statesUrl:      req.StatesUrl,
+		eventsUrl:      req.EventsUrl,
 	}
 	execution, err := b.runCdCommand(ctx, cdCmd)
 	if err != nil {
