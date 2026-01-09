@@ -572,6 +572,7 @@ message ProjectUpdate {
   Provider provider = 7;
   uint32 project_outputs_version = 8;
   bytes project_outputs = 9; // JSON serialization of pulumi outputs. schema versioned using project_outputs_version
+  bytes stack_file = 10; // Defang stack file
 }
 
 message GetRequest { // was ServiceID
