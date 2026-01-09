@@ -74,12 +74,12 @@ func (m MockGcpLogsClient) GetBuildInfo(ctx context.Context, buildId string) (*g
 }
 
 type MockGcpLoggingLister struct {
-	logEntries []loggingpb.LogEntry
+	logEntries []*loggingpb.LogEntry
 }
 
 func (m *MockGcpLoggingLister) Next() (*loggingpb.LogEntry, error) {
 	if len(m.logEntries) > 0 {
-		entry := &m.logEntries[0]
+		entry := m.logEntries[0]
 		m.logEntries = m.logEntries[1:]
 		return entry, nil
 	}
