@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -53,7 +54,7 @@ func HandleSetConfig(ctx context.Context, loader client.Loader, params SetConfig
 	value := params.Value
 	if params.Random {
 		if params.Value != "" {
-			return "", fmt.Errorf("Both 'random' and 'value' parameters provided; please provide only one")
+			return "", errors.New("Both 'random' and 'value' parameters provided; please provide only one")
 		}
 		value = cli.CreateRandomConfigValue()
 		term.Debug("Generated random value for config")

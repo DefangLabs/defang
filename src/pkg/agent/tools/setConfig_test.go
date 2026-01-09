@@ -313,7 +313,7 @@ func TestHandleSetConfig(t *testing.T) {
 					assert.Equal(t, configName, tt.mockCLI.ConfigSetName)
 				}
 				if configValue, exists := tt.requestArgs["value"]; exists {
-					if random, rExists := tt.requestArgs["random"]; rExists && random.(bool) {
+					if random, rExists := tt.requestArgs["random"]; rExists && random.(bool) { // nolint:forcetypeassert
 						// When random is true, value should NOT be the provided value
 						assert.NotEqual(t, configValue, tt.mockCLI.ConfigSetValue, "Random flag should override provided value")
 					} else {
@@ -321,7 +321,7 @@ func TestHandleSetConfig(t *testing.T) {
 					}
 				}
 				// If random flag is set, verify a value was generated
-				if random, exists := tt.requestArgs["random"]; exists && random.(bool) {
+				if random, exists := tt.requestArgs["random"]; exists && random.(bool) { // nolint:forcetypeassert
 					assert.NotEmpty(t, tt.mockCLI.ConfigSetValue, "Random value should be generated")
 				}
 			}
