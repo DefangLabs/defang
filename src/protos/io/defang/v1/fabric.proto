@@ -140,6 +140,51 @@ service FabricController {
   rpc GenerateCompose(GenerateComposeRequest) returns (GenerateComposeResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
+
+  rpc PutStack(PutStackRequest) returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  rpc GetStack(GetStackRequest) returns (GetStackResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ListStacks(ListStacksRequest) returns (ListStacksResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc DeleteStack(DeleteStackRequest) returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+
+message Stack {
+  string name = 1;
+  string project = 2;
+  bytes stack_file = 3; // Defang stack file
+}
+
+message PutStackRequest {
+  Stack stack = 1;
+}
+
+message GetStackRequest {
+  string project = 1;
+  string stack = 2;
+}
+
+message GetStackResponse {
+  Stack stack = 1;
+}
+
+message ListStacksRequest {
+  string project = 1;
+}
+
+message ListStacksResponse {
+  repeated Stack stacks = 1;
+}
+
+message DeleteStackRequest {
+  string project = 1;
+  string stack = 2;
 }
 
 enum Provider {

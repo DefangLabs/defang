@@ -157,6 +157,18 @@ const (
 	// FabricControllerGenerateComposeProcedure is the fully-qualified name of the FabricController's
 	// GenerateCompose RPC.
 	FabricControllerGenerateComposeProcedure = "/io.defang.v1.FabricController/GenerateCompose"
+	// FabricControllerPutStackProcedure is the fully-qualified name of the FabricController's PutStack
+	// RPC.
+	FabricControllerPutStackProcedure = "/io.defang.v1.FabricController/PutStack"
+	// FabricControllerGetStackProcedure is the fully-qualified name of the FabricController's GetStack
+	// RPC.
+	FabricControllerGetStackProcedure = "/io.defang.v1.FabricController/GetStack"
+	// FabricControllerListStacksProcedure is the fully-qualified name of the FabricController's
+	// ListStacks RPC.
+	FabricControllerListStacksProcedure = "/io.defang.v1.FabricController/ListStacks"
+	// FabricControllerDeleteStackProcedure is the fully-qualified name of the FabricController's
+	// DeleteStack RPC.
+	FabricControllerDeleteStackProcedure = "/io.defang.v1.FabricController/DeleteStack"
 )
 
 // FabricControllerClient is a client for the io.defang.v1.FabricController service.
@@ -214,6 +226,10 @@ type FabricControllerClient interface {
 	Estimate(context.Context, *connect_go.Request[v1.EstimateRequest]) (*connect_go.Response[v1.EstimateResponse], error)
 	Preview(context.Context, *connect_go.Request[v1.PreviewRequest]) (*connect_go.Response[v1.PreviewResponse], error)
 	GenerateCompose(context.Context, *connect_go.Request[v1.GenerateComposeRequest]) (*connect_go.Response[v1.GenerateComposeResponse], error)
+	PutStack(context.Context, *connect_go.Request[v1.PutStackRequest]) (*connect_go.Response[emptypb.Empty], error)
+	GetStack(context.Context, *connect_go.Request[v1.GetStackRequest]) (*connect_go.Response[v1.GetStackResponse], error)
+	ListStacks(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListStacksResponse], error)
+	DeleteStack(context.Context, *connect_go.Request[v1.DeleteStackRequest]) (*connect_go.Response[emptypb.Empty], error)
 }
 
 // NewFabricControllerClient constructs a client for the io.defang.v1.FabricController service. By
@@ -470,6 +486,30 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
+		putStack: connect_go.NewClient[v1.PutStackRequest, emptypb.Empty](
+			httpClient,
+			baseURL+FabricControllerPutStackProcedure,
+			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+			connect_go.WithClientOptions(opts...),
+		),
+		getStack: connect_go.NewClient[v1.GetStackRequest, v1.GetStackResponse](
+			httpClient,
+			baseURL+FabricControllerGetStackProcedure,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
+		),
+		listStacks: connect_go.NewClient[emptypb.Empty, v1.ListStacksResponse](
+			httpClient,
+			baseURL+FabricControllerListStacksProcedure,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
+		),
+		deleteStack: connect_go.NewClient[v1.DeleteStackRequest, emptypb.Empty](
+			httpClient,
+			baseURL+FabricControllerDeleteStackProcedure,
+			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+			connect_go.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -518,6 +558,10 @@ type fabricControllerClient struct {
 	estimate                   *connect_go.Client[v1.EstimateRequest, v1.EstimateResponse]
 	preview                    *connect_go.Client[v1.PreviewRequest, v1.PreviewResponse]
 	generateCompose            *connect_go.Client[v1.GenerateComposeRequest, v1.GenerateComposeResponse]
+	putStack                   *connect_go.Client[v1.PutStackRequest, emptypb.Empty]
+	getStack                   *connect_go.Client[v1.GetStackRequest, v1.GetStackResponse]
+	listStacks                 *connect_go.Client[emptypb.Empty, v1.ListStacksResponse]
+	deleteStack                *connect_go.Client[v1.DeleteStackRequest, emptypb.Empty]
 }
 
 // GetStatus calls io.defang.v1.FabricController.GetStatus.
@@ -747,6 +791,26 @@ func (c *fabricControllerClient) GenerateCompose(ctx context.Context, req *conne
 	return c.generateCompose.CallUnary(ctx, req)
 }
 
+// PutStack calls io.defang.v1.FabricController.PutStack.
+func (c *fabricControllerClient) PutStack(ctx context.Context, req *connect_go.Request[v1.PutStackRequest]) (*connect_go.Response[emptypb.Empty], error) {
+	return c.putStack.CallUnary(ctx, req)
+}
+
+// GetStack calls io.defang.v1.FabricController.GetStack.
+func (c *fabricControllerClient) GetStack(ctx context.Context, req *connect_go.Request[v1.GetStackRequest]) (*connect_go.Response[v1.GetStackResponse], error) {
+	return c.getStack.CallUnary(ctx, req)
+}
+
+// ListStacks calls io.defang.v1.FabricController.ListStacks.
+func (c *fabricControllerClient) ListStacks(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListStacksResponse], error) {
+	return c.listStacks.CallUnary(ctx, req)
+}
+
+// DeleteStack calls io.defang.v1.FabricController.DeleteStack.
+func (c *fabricControllerClient) DeleteStack(ctx context.Context, req *connect_go.Request[v1.DeleteStackRequest]) (*connect_go.Response[emptypb.Empty], error) {
+	return c.deleteStack.CallUnary(ctx, req)
+}
+
 // FabricControllerHandler is an implementation of the io.defang.v1.FabricController service.
 type FabricControllerHandler interface {
 	GetStatus(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Status], error)
@@ -802,6 +866,10 @@ type FabricControllerHandler interface {
 	Estimate(context.Context, *connect_go.Request[v1.EstimateRequest]) (*connect_go.Response[v1.EstimateResponse], error)
 	Preview(context.Context, *connect_go.Request[v1.PreviewRequest]) (*connect_go.Response[v1.PreviewResponse], error)
 	GenerateCompose(context.Context, *connect_go.Request[v1.GenerateComposeRequest]) (*connect_go.Response[v1.GenerateComposeResponse], error)
+	PutStack(context.Context, *connect_go.Request[v1.PutStackRequest]) (*connect_go.Response[emptypb.Empty], error)
+	GetStack(context.Context, *connect_go.Request[v1.GetStackRequest]) (*connect_go.Response[v1.GetStackResponse], error)
+	ListStacks(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListStacksResponse], error)
+	DeleteStack(context.Context, *connect_go.Request[v1.DeleteStackRequest]) (*connect_go.Response[emptypb.Empty], error)
 }
 
 // NewFabricControllerHandler builds an HTTP handler from the service implementation. It returns the
@@ -1054,6 +1122,30 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 		connect_go.WithHandlerOptions(opts...),
 	)
+	fabricControllerPutStackHandler := connect_go.NewUnaryHandler(
+		FabricControllerPutStackProcedure,
+		svc.PutStack,
+		connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+		connect_go.WithHandlerOptions(opts...),
+	)
+	fabricControllerGetStackHandler := connect_go.NewUnaryHandler(
+		FabricControllerGetStackProcedure,
+		svc.GetStack,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
+	)
+	fabricControllerListStacksHandler := connect_go.NewUnaryHandler(
+		FabricControllerListStacksProcedure,
+		svc.ListStacks,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
+	)
+	fabricControllerDeleteStackHandler := connect_go.NewUnaryHandler(
+		FabricControllerDeleteStackProcedure,
+		svc.DeleteStack,
+		connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+		connect_go.WithHandlerOptions(opts...),
+	)
 	return "/io.defang.v1.FabricController/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case FabricControllerGetStatusProcedure:
@@ -1142,6 +1234,14 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerPreviewHandler.ServeHTTP(w, r)
 		case FabricControllerGenerateComposeProcedure:
 			fabricControllerGenerateComposeHandler.ServeHTTP(w, r)
+		case FabricControllerPutStackProcedure:
+			fabricControllerPutStackHandler.ServeHTTP(w, r)
+		case FabricControllerGetStackProcedure:
+			fabricControllerGetStackHandler.ServeHTTP(w, r)
+		case FabricControllerListStacksProcedure:
+			fabricControllerListStacksHandler.ServeHTTP(w, r)
+		case FabricControllerDeleteStackProcedure:
+			fabricControllerDeleteStackHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1321,4 +1421,20 @@ func (UnimplementedFabricControllerHandler) Preview(context.Context, *connect_go
 
 func (UnimplementedFabricControllerHandler) GenerateCompose(context.Context, *connect_go.Request[v1.GenerateComposeRequest]) (*connect_go.Response[v1.GenerateComposeResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GenerateCompose is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) PutStack(context.Context, *connect_go.Request[v1.PutStackRequest]) (*connect_go.Response[emptypb.Empty], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.PutStack is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) GetStack(context.Context, *connect_go.Request[v1.GetStackRequest]) (*connect_go.Response[v1.GetStackResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetStack is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) ListStacks(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListStacksResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.ListStacks is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) DeleteStack(context.Context, *connect_go.Request[v1.DeleteStackRequest]) (*connect_go.Response[emptypb.Empty], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.DeleteStack is not implemented"))
 }
