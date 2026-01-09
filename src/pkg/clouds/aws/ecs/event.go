@@ -151,13 +151,16 @@ func (e *TaskStateChangeEvent) Host() string {
 
 func (e *TaskStateChangeEvent) Status() string {
 	var buf strings.Builder
-	fmt.Fprintf(&buf, "TASK_%s", e.Detail.LastStatus)
+	buf.WriteString("TASK_")
+	buf.WriteString(e.Detail.LastStatus)
 	if e.Detail.StoppedReason != "" {
-		fmt.Fprintf(&buf, " %s", e.Detail.StoppedReason)
+		buf.WriteByte(' ')
+		buf.WriteString(e.Detail.StoppedReason)
 	}
-	fmt.Fprintf(&buf, " : %s", path.Base(e.Detail.TaskArn))
+	buf.WriteString(" : ")
+	buf.WriteString(path.Base(e.Detail.TaskArn))
 	if e.Detail.LastStatus == "DEPROVISIONING" {
-		exitCode := getTaskExitCode(e.Detail.Overrides.ContainerOverrides[0].Name, e.Detail.Containers)
+		exitCode := getTaskExitCode(e.Detail.Overrides.ContainerOverrides[0].Name, e.Detail.Containers) // TODO: check other containers
 		if exitCode != 0 {
 			fmt.Fprintf(&buf, " (exit code %v)", exitCode)
 		}
@@ -165,16 +168,24 @@ func (e *TaskStateChangeEvent) Status() string {
 	return buf.String()
 }
 
+const errSpotInterrupted = "Your Spot Task was interrupted."
+
 func (e *TaskStateChangeEvent) State() defangv1.ServiceState {
 	state := defangv1.ServiceState_NOT_SPECIFIED
-	if e.Detail.LastStatus == "DEACTIVATING" {
+	// When the task is being deactivated/stopped because of SPOT interruption,
+	// ignore the state event and wait for its replacement to come up. See https://github.com/DefangLabs/defang/issues/1581
+	if e.Detail.StoppedReason == errSpotInterrupted {
+		return state
+	}
+	switch e.Detail.LastStatus {
+	case "DEACTIVATING":
 		state = defangv1.ServiceState_DEPLOYMENT_FAILED // Fast deployment fail
-	} else if e.Detail.LastStatus == "DEPROVISIONING" {
+	case "DEPROVISIONING":
 		exitCode := getTaskExitCode(e.Detail.Overrides.ContainerOverrides[0].Name, e.Detail.Containers)
 		if exitCode != 0 {
 			state = defangv1.ServiceState_DEPLOYMENT_FAILED
 		}
-	} else {
+	default:
 		state = defangv1.ServiceState_DEPLOYMENT_PENDING // Treat all other task updates as deployment pending
 	}
 	return state
