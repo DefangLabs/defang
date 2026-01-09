@@ -29,8 +29,17 @@ const (
 )
 
 type CdCommandRequest struct {
-	Command CdCommand
-	Project string
+	Command   CdCommand
+	Project   string
+	StatesUrl string
+	EventsUrl string
+}
+
+type DeployRequest struct {
+	defangv1.DeployRequest
+
+	StatesUrl string
+	EventsUrl string
 }
 
 type PrepareDomainDelegationRequest struct {
@@ -59,7 +68,7 @@ type Provider interface {
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
 	DelayBeforeRetry(context.Context) error
 	DeleteConfig(context.Context, *defangv1.Secrets) error
-	Deploy(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
+	Deploy(context.Context, *DeployRequest) (*defangv1.DeployResponse, error)
 	GetDeploymentStatus(context.Context) error // nil means deployment is pending/running; io.EOF means deployment is done
 	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 	GetService(context.Context, *defangv1.GetRequest) (*defangv1.ServiceInfo, error)
@@ -68,7 +77,7 @@ type Provider interface {
 	GetStackNameForDomain() string
 	ListConfig(context.Context, *defangv1.ListConfigsRequest) (*defangv1.Secrets, error)
 	PrepareDomainDelegation(context.Context, PrepareDomainDelegationRequest) (*PrepareDomainDelegationResponse, error)
-	Preview(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
+	Preview(context.Context, *DeployRequest) (*defangv1.DeployResponse, error)
 	PutConfig(context.Context, *defangv1.PutConfigRequest) error
 	QueryForDebug(context.Context, *defangv1.DebugRequest) error
 	QueryLogs(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)

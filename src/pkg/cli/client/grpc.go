@@ -112,6 +112,10 @@ func (g GrpcClient) CreateDelegateSubdomainZone(ctx context.Context, req *defang
 	return getMsg(g.client.DelegateSubdomainZone(ctx, connect.NewRequest(req)))
 }
 
+func (g GrpcClient) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
+	return getMsg(g.client.CreateUploadURL(ctx, connect.NewRequest(req)))
+}
+
 func (g GrpcClient) DeleteSubdomainZone(ctx context.Context, req *defangv1.DeleteSubdomainZoneRequest) error {
 	_, err := getMsg(g.client.DeleteSubdomainZone(ctx, connect.NewRequest(req)))
 	return err

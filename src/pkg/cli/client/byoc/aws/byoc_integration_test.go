@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
@@ -21,9 +22,9 @@ func TestDeploy(t *testing.T) {
 	t.Run("multiple ingress without domain", func(t *testing.T) {
 		t.Skip("skipping test: delegation enabled")
 
-		_, err := b.Deploy(context.Background(), &defangv1.DeployRequest{
+		_, err := b.Deploy(context.Background(), &client.DeployRequest{DeployRequest: defangv1.DeployRequest{
 			Project: "byoc_integration_test",
-		})
+		}})
 		if err == nil || !strings.Contains(err.Error(), "duplicate endpoint:") {
 			t.Error("expected error")
 		}

@@ -8,10 +8,10 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"go.yaml.in/yaml/v3"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"gopkg.in/yaml.v3"
 )
 
 func MarshalPretty(root string, data proto.Message) ([]byte, error) {
@@ -45,6 +45,8 @@ type putDeploymentParams struct {
 	Mode         defangv1.DeploymentMode
 	ProjectName  string
 	ServiceCount int
+	StatesUrl    string
+	EventsUrl    string
 }
 
 func putDeployment(ctx context.Context, provider client.Provider, fabric client.FabricClient, req putDeploymentParams) error {
@@ -66,6 +68,8 @@ func putDeployment(ctx context.Context, provider client.Provider, fabric client.
 			Stack:             provider.GetStackName(),
 			Timestamp:         timestamppb.Now(),
 			Mode:              req.Mode,
+			StatesUrl:         req.StatesUrl,
+			EventsUrl:         req.EventsUrl,
 		},
 	})
 }

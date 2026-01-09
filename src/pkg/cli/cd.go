@@ -3,6 +3,8 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -26,13 +28,34 @@ func CdCommand(ctx context.Context, projectName string, provider client.Provider
 		return "", dryrun.ErrDryRun
 	}
 
-	etag, err := provider.CdCommand(ctx, client.CdCommandRequest{Project: projectName, Command: command})
+	var statesUrl, eventsUrl string
+	if _, ok := provider.(*client.PlaygroundProvider); !ok { // Do not need upload URLs for Playground
+		var err error
+		statesUrl, eventsUrl, err = GetStatesAndEventsUploadUrls(ctx, projectName, provider, fabric)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	etag, err := provider.CdCommand(ctx, client.CdCommandRequest{Project: projectName, Command: command, StatesUrl: statesUrl, EventsUrl: eventsUrl})
 	if err != nil || etag == "" {
 		return "", err
 	}
 
+	// Update deployment table to mark deployment as destroyed only after successful deletion of the subdomain
+	err = putDeployment(ctx, provider, fabric, putDeploymentParams{
+		Action:      defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN,
+		ETag:        etag,
+		ProjectName: projectName,
+		StatesUrl:   statesUrl,
+		EventsUrl:   eventsUrl,
+	})
+	if err != nil {
+		return "", err
+	}
+
 	if command == client.CdCommandDestroy || command == client.CdCommandDown {
-		err := postDown(ctx, projectName, provider, fabric, etag)
+		err := postDown(ctx, projectName, provider, fabric)
 		if err != nil {
 			term.Debugf("postDown failed: %v", err)
 			term.Warn("Unable to update deployment history; deployment will proceed anyway.")
@@ -41,7 +64,7 @@ func CdCommand(ctx context.Context, projectName string, provider client.Provider
 	return etag, nil
 }
 
-func postDown(ctx context.Context, projectName string, provider client.Provider, fabric client.FabricClient, etag types.ETag) error {
+func postDown(ctx context.Context, projectName string, provider client.Provider, fabric client.FabricClient) error {
 	// Special bookkeeping for "down" commands: delete the subdomain zone and mark deployment as destroyed
 	err := fabric.DeleteSubdomainZone(ctx, &defangv1.DeleteSubdomainZoneRequest{
 		Project: projectName,
@@ -53,17 +76,6 @@ func postDown(ctx context.Context, projectName string, provider client.Provider,
 		if connect.CodeOf(err) == connect.CodeNotFound {
 			term.Warn("Subdomain not found; did you mean to destroy a different project or stack?")
 		}
-		return err
-	}
-
-	// Update deployment table to mark deployment as destroyed only after successful deletion of the subdomain
-	err = putDeployment(ctx, provider, fabric, putDeploymentParams{
-		Action:      defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN,
-		ETag:        etag,
-		ProjectName: projectName,
-	})
-	if err != nil {
-		term.Debug("Failed to record deployment:", err)
 		return err
 	}
 	return nil
@@ -143,4 +155,33 @@ func CdListLocal(ctx context.Context, provider client.Provider, allRegions bool)
 		term.Printf("No projects found in %v\n", accountInfo)
 	}
 	return nil
+}
+
+func GetStatesAndEventsUploadUrls(ctx context.Context, projectName string, provider client.Provider, fabric client.FabricClient) (statesUrl string, eventsUrl string, err error) {
+	// Allow overriding upload URLs via environment variables
+	statesUrl, eventsUrl = os.Getenv("DEFANG_STATES_UPLOAD_URL"), os.Getenv("DEFANG_EVENTS_UPLOAD_URL")
+
+	if statesUrl == "" {
+		statesResp, err := fabric.CreateUploadURL(ctx, &defangv1.UploadURLRequest{
+			Project:  projectName,
+			Stack:    provider.GetStackName(),
+			Filename: "states.json",
+		})
+		if err != nil {
+			return "", "", fmt.Errorf("failed to create states upload URL: %w", err)
+		}
+		statesUrl = statesResp.Url
+	}
+	if eventsUrl == "" {
+		eventsResp, err := fabric.CreateUploadURL(ctx, &defangv1.UploadURLRequest{
+			Project:  projectName,
+			Stack:    provider.GetStackName(),
+			Filename: "events.log",
+		})
+		if err != nil {
+			return "", "", fmt.Errorf("failed to create events upload URL: %w", err)
+		}
+		eventsUrl = eventsResp.Url
+	}
+	return statesUrl, eventsUrl, nil
 }
