@@ -494,7 +494,7 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 
 	computeEngineRootTriggers := make(map[string]string)
 
-	getReadyServicesCompletedResps := func(status string) []*defangv1.SubscribeResponse {
+	getReadyServicesCompletedResps := func(cdStatus string) []*defangv1.SubscribeResponse {
 		resps := make([]*defangv1.SubscribeResponse, 0, len(readyServices))
 		for serviceName, status := range readyServices {
 			resps = append(resps, &defangv1.SubscribeResponse{
@@ -506,7 +506,7 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 		resps = append(resps, &defangv1.SubscribeResponse{
 			Name:   defangCD,
 			State:  defangv1.ServiceState_DEPLOYMENT_COMPLETED,
-			Status: status,
+			Status: cdStatus,
 		})
 		return resps
 	}
@@ -698,11 +698,19 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 				}
 				// When cloud build fails, the last log message is an error message
 				if entry.Severity == logtype.LogSeverity_ERROR {
-					return nil, client.ErrDeploymentFailed{Message: auditLog.GetStatus().GetMessage()}
+					msg := ""
+					if auditLog.GetStatus() != nil {
+						msg = auditLog.GetStatus().GetMessage()
+					}
+					return nil, client.ErrDeploymentFailed{Message: msg}
 				}
 
 				cdSuccess = true
-				return getReadyServicesCompletedResps(auditLog.GetStatus().String()), nil
+				status := ""
+				if auditLog.GetStatus() != nil {
+					status = auditLog.GetStatus().String()
+				}
+				return getReadyServicesCompletedResps(status), nil
 			} else {
 				var state defangv1.ServiceState
 				status := ""

@@ -31,10 +31,11 @@ const DefangCDBuildTag = "defang-cd"
 
 type CloudBuildArgs struct {
 	// Required fields
-	Source string
-	Steps  string
+	Steps string
 
-	// TODO: We should be able to use ETAG from object metadata as ditest in Diff func to determine a new build is necessary
+	// TODO: We should be able to use ETAG from object metadata as digest in Diff func to determine a new build is necessary
+	// Optional fields
+	Source         string
 	Images         []string          `pulumi:"images,optional" provider:"replaceOnChanges"`
 	ServiceAccount *string           `pulumi:"serviceAccount,optional" provider:"replaceOnChanges"`
 	Tags           []string          `pulumi:"tags,optional"`
@@ -230,9 +231,15 @@ func parseGCSURI(uri string) (bucket string, object string, err error) {
 	if len(parts) < 2 {
 		return "", "", errors.New("URI must contain a bucket and an object path")
 	}
-	obj, err := url.QueryUnescape(parts[1]) // Because the base 64 encoding may contain '='
+	if parts[0] == "" {
+		return "", "", errors.New("bucket name cannot be empty")
+	}
+	obj, err := url.PathUnescape(parts[1]) // Because the base 64 encoding may contain '='
 	if err != nil {
 		return "", "", fmt.Errorf("failed to unescape object path: %w", err)
+	}
+	if obj == "" {
+		return "", "", errors.New("object path cannot be empty")
 	}
 
 	return parts[0], obj, nil
