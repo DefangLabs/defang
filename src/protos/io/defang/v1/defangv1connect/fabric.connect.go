@@ -228,7 +228,7 @@ type FabricControllerClient interface {
 	GenerateCompose(context.Context, *connect_go.Request[v1.GenerateComposeRequest]) (*connect_go.Response[v1.GenerateComposeResponse], error)
 	PutStack(context.Context, *connect_go.Request[v1.PutStackRequest]) (*connect_go.Response[emptypb.Empty], error)
 	GetStack(context.Context, *connect_go.Request[v1.GetStackRequest]) (*connect_go.Response[v1.GetStackResponse], error)
-	ListStacks(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListStacksResponse], error)
+	ListStacks(context.Context, *connect_go.Request[v1.ListStacksRequest]) (*connect_go.Response[v1.ListStacksResponse], error)
 	DeleteStack(context.Context, *connect_go.Request[v1.DeleteStackRequest]) (*connect_go.Response[emptypb.Empty], error)
 }
 
@@ -498,7 +498,7 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
-		listStacks: connect_go.NewClient[emptypb.Empty, v1.ListStacksResponse](
+		listStacks: connect_go.NewClient[v1.ListStacksRequest, v1.ListStacksResponse](
 			httpClient,
 			baseURL+FabricControllerListStacksProcedure,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
@@ -560,7 +560,7 @@ type fabricControllerClient struct {
 	generateCompose            *connect_go.Client[v1.GenerateComposeRequest, v1.GenerateComposeResponse]
 	putStack                   *connect_go.Client[v1.PutStackRequest, emptypb.Empty]
 	getStack                   *connect_go.Client[v1.GetStackRequest, v1.GetStackResponse]
-	listStacks                 *connect_go.Client[emptypb.Empty, v1.ListStacksResponse]
+	listStacks                 *connect_go.Client[v1.ListStacksRequest, v1.ListStacksResponse]
 	deleteStack                *connect_go.Client[v1.DeleteStackRequest, emptypb.Empty]
 }
 
@@ -802,7 +802,7 @@ func (c *fabricControllerClient) GetStack(ctx context.Context, req *connect_go.R
 }
 
 // ListStacks calls io.defang.v1.FabricController.ListStacks.
-func (c *fabricControllerClient) ListStacks(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListStacksResponse], error) {
+func (c *fabricControllerClient) ListStacks(ctx context.Context, req *connect_go.Request[v1.ListStacksRequest]) (*connect_go.Response[v1.ListStacksResponse], error) {
 	return c.listStacks.CallUnary(ctx, req)
 }
 
@@ -868,7 +868,7 @@ type FabricControllerHandler interface {
 	GenerateCompose(context.Context, *connect_go.Request[v1.GenerateComposeRequest]) (*connect_go.Response[v1.GenerateComposeResponse], error)
 	PutStack(context.Context, *connect_go.Request[v1.PutStackRequest]) (*connect_go.Response[emptypb.Empty], error)
 	GetStack(context.Context, *connect_go.Request[v1.GetStackRequest]) (*connect_go.Response[v1.GetStackResponse], error)
-	ListStacks(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListStacksResponse], error)
+	ListStacks(context.Context, *connect_go.Request[v1.ListStacksRequest]) (*connect_go.Response[v1.ListStacksResponse], error)
 	DeleteStack(context.Context, *connect_go.Request[v1.DeleteStackRequest]) (*connect_go.Response[emptypb.Empty], error)
 }
 
@@ -1431,7 +1431,7 @@ func (UnimplementedFabricControllerHandler) GetStack(context.Context, *connect_g
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetStack is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) ListStacks(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListStacksResponse], error) {
+func (UnimplementedFabricControllerHandler) ListStacks(context.Context, *connect_go.Request[v1.ListStacksRequest]) (*connect_go.Response[v1.ListStacksResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.ListStacks is not implemented"))
 }
 
