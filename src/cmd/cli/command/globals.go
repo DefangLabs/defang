@@ -80,6 +80,10 @@ type GlobalConfig struct {
 	Verbose        bool
 }
 
+func hasTty() bool {
+	return term.IsTerminal() && !pkg.GetenvBool("CI")
+}
+
 /*
 global is the singleton instance of GlobalConfig that holds all CLI configuration.
 This instance is initialized with default values and is modified throughout
@@ -90,9 +94,9 @@ var global = GlobalConfig{
 	ColorMode:      ColorAuto,
 	Cluster:        client.DefangFabric,
 	Debug:          pkg.GetenvBool("DEFANG_DEBUG"),
-	HasTty:         term.IsTerminal(),
+	HasTty:         hasTty(),
 	HideUpdate:     false,
-	NonInteractive: !term.IsTerminal(),
+	NonInteractive: !hasTty(),
 	Stack:          stacks.StackParameters{Provider: client.ProviderAuto},
 	Verbose:        false,
 }
