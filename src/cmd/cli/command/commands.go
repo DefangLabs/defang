@@ -783,22 +783,30 @@ var configSetCmd = &cobra.Command{
 		envFile, _ := cmd.Flags().GetString("env-file")
 
 		// Early validation for multiple configs
+		// Distinguish between multiple configs (KEY1=value1 KEY2=value2) and single config with file (CONFIG file)
+		isMultipleConfigs := false
 		if len(args) > 1 {
-			// Validate: all args must be in KEY=VALUE format
-			for _, arg := range args {
-				if !strings.Contains(arg, "=") {
-					return errors.New("when setting multiple configs, all must be in KEY=VALUE format")
+			// If the first arg contains '=', it's multiple configs
+			// If the first arg doesn't contain '=', it's single config with file (CONFIG file)
+			if strings.Contains(args[0], "=") {
+				isMultipleConfigs = true
+				
+				// Validate: all args must be in KEY=VALUE format
+				for _, arg := range args {
+					if !strings.Contains(arg, "=") {
+						return errors.New("when setting multiple configs, all must be in KEY=VALUE format")
+					}
 				}
-			}
 
-			// Validate: --random is not allowed with multiple configs
-			if random {
-				return errors.New("--random is only allowed when setting a single config")
-			}
+				// Validate: --random is not allowed with multiple configs
+				if random {
+					return errors.New("--random is only allowed when setting a single config")
+				}
 
-			// Validate: --env is not allowed with multiple configs
-			if fromEnv {
-				return errors.New("--env is only allowed when setting a single config")
+				// Validate: --env is not allowed with multiple configs
+				if fromEnv {
+					return errors.New("--env is only allowed when setting a single config")
+				}
 			}
 		}
 
@@ -864,7 +872,7 @@ var configSetCmd = &cobra.Command{
 		}
 
 		// Handle multiple configs case
-		if len(args) > 1 {
+		if isMultipleConfigs {
 			// Set each config from args
 			successCount := 0
 			for _, arg := range args {
