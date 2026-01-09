@@ -229,16 +229,17 @@ func TestHandleSetConfig(t *testing.T) {
 			expectedConfigSetCalls:   true,
 		},
 		{
-			name:                     "successful config set with random flag ignores value",
+			name:                     "error when both random and value are provided",
 			cluster:                  testCluster,
 			providerId:               client.ProviderID(""),
 			requestArgs:              map[string]interface{}{"name": "valid_config_name", "value": "ignored-value", "random": true},
 			mockCLI:                  &MockSetConfigCLI{},
-			expectedError:            false,
+			expectedError:            true,
+			errorMessage:             "Both 'random' and 'value' parameters provided; please provide only one",
 			expectedConnectCalls:     true,
 			expectedProviderCalls:    true,
 			expectedProjectNameCalls: true,
-			expectedConfigSetCalls:   true,
+			expectedConfigSetCalls:   false,
 		},
 	}
 
