@@ -307,22 +307,6 @@ func (m *mockStackManager) Load(ctx context.Context, name string) (*stacks.Stack
 		return m.loadResult, nil
 	}
 
-	for _, item := range m.listResult {
-		if item.Name == name {
-			var provider client.ProviderID
-			provider.Set(item.Provider)
-			var mode modes.Mode
-			mode.Set(item.Mode)
-			params := stacks.StackParameters{
-				Name:     name,
-				Provider: provider,
-				Mode:     mode,
-			}
-			stacks.LoadParameters(params, true)
-			return &params, nil
-		}
-	}
-
 	// If we have expected provider/region (from old NewMockStackManager usage), create default params
 	if m.expectedProvider != "" && m.expectedRegion != "" {
 		params := stacks.StackParameters{
@@ -566,7 +550,7 @@ func TestGetStack(t *testing.T) {
 				return ec, sm
 			},
 			stackFlag:     "nonexistent-stack",
-			expectedError: "Unable to load stack \"nonexistent-stack\" and unable to create it with provider \"auto\" in non-interactive mode",
+			expectedError: "unable to find stack \"nonexistent-stack\": stack not found",
 		},
 		{
 			name: "stack flag provided with unknown stack but valid provider",
@@ -577,14 +561,9 @@ func TestGetStack(t *testing.T) {
 				}
 				return ec, sm
 			},
-			stackFlag:    "new-stack",
-			providerFlag: "gcp",
-			expectedStack: &stacks.StackParameters{
-				Name:     "new-stack",
-				Provider: client.ProviderGCP,
-				Region:   "us-central1",
-			},
-			expectedWhence: "stack",
+			stackFlag:     "nonexistent-stack",
+			providerFlag:  "gcp",
+			expectedError: "unable to find stack \"nonexistent-stack\": stack not found",
 		},
 		{
 			name: "stack flag with auto provider should error",
@@ -679,6 +658,11 @@ func TestGetStack(t *testing.T) {
 				sm := &mockStackManager{
 					listResult: []stacks.StackListItem{
 						{Name: "only-stack", Provider: "aws", Mode: "affordable"},
+					},
+					loadResult: &stacks.StackParameters{
+						Name:     "only-stack",
+						Provider: client.ProviderAWS,
+						Mode:     modes.ModeAffordable,
 					},
 				}
 				return ec, sm

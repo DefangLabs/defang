@@ -178,6 +178,7 @@ func SetupCommands(version string) {
 		return completions, cobra.ShellCompDirectiveNoFileComp
 	})
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
+	RootCmd.Flags().MarkDeprecated("provider", "use '--stack' to select a stack instead")
 	RootCmd.PersistentFlags().BoolVarP(&global.Verbose, "verbose", "v", global.Verbose, "verbose logging") // backwards compat: only used by tail
 	RootCmd.PersistentFlags().BoolVar(&global.Debug, "debug", global.Debug, "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&dryrun.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
@@ -1312,47 +1313,20 @@ var providerDescription = map[client.ProviderID]string{
 	client.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
 }
 
-func loadOrCreateStack(ctx context.Context, sm stacks.Manager, params *stacks.StackParameters) (*stacks.StackParameters, error) {
-	loaded, err := sm.Load(ctx, params.Name)
-	if err == nil {
-		// allow mode to be overwritten by CLI flag or env var
-		if params.Mode != modes.ModeUnspecified {
-			loaded.Mode = params.Mode
-		}
-		return loaded, nil
-	}
-	if global.Interactive() {
-		return nil, fmt.Errorf("unable to load stack %q: %w", params.Name, err)
-	}
-
-	if params.Provider == client.ProviderAuto {
-		return nil, fmt.Errorf("Unable to load stack %q and unable to create it with provider %q in non-interactive mode", params.Name, params.Provider)
-	}
-
-	// if we are in non-interactive mode, try to create a new stack with the given name, provider, region, and mode
-	region := client.GetRegion(params.Provider)
-	loaded = &stacks.StackParameters{
-		Name:     params.Name,
-		Provider: params.Provider,
-		Mode:     params.Mode,
-		Region:   region,
-	}
-	err = sm.LoadParameters(*loaded, false)
-	if err != nil {
-		return nil, fmt.Errorf("unable to load stack %q and unable to create it: %w", params.Name, err)
-	}
-	return loaded, nil
-}
-
 func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager, allowStackCreation bool) (*stacks.StackParameters, string, error) {
 	var whence string
 	stackParams := &global.Stack
 
 	if stackParams.Name != "" {
 		whence = "stack"
-		loaded, err := loadOrCreateStack(ctx, sm, stackParams)
+		loaded, err := sm.Load(ctx, stackParams.Name)
 		if err != nil {
-			return nil, "", err
+			term.Infof("Unable to find stack %q. Create it with `defang stack create %s`", stackParams.Name, stackParams.Name)
+			return nil, "", fmt.Errorf("unable to find stack %q: %w", stackParams.Name, err)
+		}
+		// allow mode to be overwritten by CLI flag or env var
+		if stackParams.Mode != modes.ModeUnspecified {
+			loaded.Mode = stackParams.Mode
 		}
 
 		if loaded.Provider == client.ProviderAuto {
