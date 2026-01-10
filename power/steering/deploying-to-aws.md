@@ -34,6 +34,10 @@ If a new stack is created, make sure to select it before it can be used.
 
 Now that a stack is selected, the project can be deployed.
 
+### Configs
+
+The deployment call will error back if any required configs are missing. Please refer to the steering file `managing-configs` for more information on how to manage configs.
+
 ## Step 3: Monitor the deployment
 
 Once the deployment has begun, progress can be monitored by tailing the logs or periodically checking service status.
