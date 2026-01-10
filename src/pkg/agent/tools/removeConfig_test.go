@@ -22,6 +22,7 @@ type MockRemoveConfigCLI struct {
 	ConnectError              error
 	LoadProjectNameError      error
 	ConfigDeleteError         error
+	InteractiveLoginMCPError  error
 	ConfigDeleteNotFoundError bool
 	ProjectName               string
 	CallLog                   []string
@@ -56,6 +57,14 @@ func (m *MockRemoveConfigCLI) ConfigDelete(ctx context.Context, projectName stri
 	return m.ConfigDeleteError
 }
 
+func (m *MockRemoveConfigCLI) InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
+	m.CallLog = append(m.CallLog, fmt.Sprintf("InteractiveLoginMCP(%s)", cluster))
+	if m.InteractiveLoginMCPError != nil {
+		return m.InteractiveLoginMCPError
+	}
+	return nil
+}
+
 func TestHandleRemoveConfigTool(t *testing.T) {
 	tests := []struct {
 		name                 string
@@ -71,9 +80,10 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			setupMock: func(m *MockRemoveConfigCLI) {
 				m.ProjectName = "test-project"
 				m.ConnectError = errors.New("connection failed")
+				m.InteractiveLoginMCPError = errors.New("connection failed")
 			},
 			expectError:   true,
-			expectedError: "Could not connect: connection failed",
+			expectedError: "connection failed",
 		},
 		{
 			name:       "load_project_name_error",

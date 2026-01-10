@@ -2,6 +2,9 @@
 
 Configs are key-value pairs that can be used to store sensitive information such as API keys, database credentials, or any other configuration data that should not be hardcoded into your application.
 
+**IMPORTANT**:
+Do not assume default values for configs; always prompt the user for input. For example, do not assume a default password for a database config is always randomly generated. Always present the user with the options to provide a value or choose to generate a random one before setting each config.
+
 ## Viewing Configs
 
 To view the current configs for your project, use the following MCP tool:
@@ -19,6 +22,8 @@ To set a config, use the following MCP tool:
 ```bash
 set_config
 ```
+
+When setting configs, make sure to ask the user for either a specific value or whether to generate a random value. Do not assume choices on behalf of the user.
 
 **IMPORTANT**:
 When using the `set_config` tool, ensure that only one of the following options is provided: either the `value` parameter or the `random` flag.

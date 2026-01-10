@@ -2,9 +2,11 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
+	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -26,9 +28,13 @@ func HandleEstimateTool(ctx context.Context, loader client.Loader, params Estima
 	}
 
 	term.Debug("Function invoked: cli.Connect")
-	fabric, err := cli.Connect(ctx, sc.Cluster)
+	fabric, err := GetClientWithRetry(ctx, cli, sc)
 	if err != nil {
-		return "", fmt.Errorf("could not connect: %w", err)
+		var noBrowserErr auth.ErrNoBrowser
+		if errors.As(err, &noBrowserErr) {
+			return noBrowserErr.Error(), nil
+		}
+		return "", err
 	}
 
 	defangProvider := cli.CreatePlaygroundProvider(fabric)
