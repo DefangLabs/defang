@@ -24,36 +24,33 @@ set_config
 When using the `set_config` tool, ensure that only one of the following options is provided: either the `value` parameter or the `random` flag.
 Providing both will result in an error.
 Example:
-`bash
-        {
+   ```json
+   {
         "name": "POSTGRES_PASSWORD",
         "value": "helloworld123",
         "random": true,
         "working_directory": "."
-        }
-        `
+   }
 
 Available parameters:
 
 - `name` (required): The key for the config you want to set.
 - `value` (optional): The value for the config. Do not provide this parameter if you are using the `random` parameter.
   Example:
-  ```bash
-  {
-  "name": "POSTGRES_PASSWORD",
-  "value": "helloworld123",
-  "working_directory": "."
-  }
-  ```
+   ```json
+   {
+     "name": "POSTGRES_PASSWORD",
+     "value": "helloworld123",
+     "working_directory": "."
+   }
 - `random` (optional): If this flag is provided, a random value will be generated for the config. Do not provide the `value` parameter if you are using this parameter.
   Example:
-  `bash
+   ```json
    {
-   "name": "POSTGRES_PASSWORD",
-   "random": true,
-   "working_directory": "."
+     "name": "POSTGRES_PASSWORD",
+     "random": true,
+     "working_directory": "."
    }
-   `
 
 ## Deleting Configs
 
