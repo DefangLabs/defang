@@ -3,7 +3,7 @@
 Configs are key-value pairs that can be used to store sensitive information such as API keys, database credentials, or any other configuration data that should not be hardcoded into your application.
 
 **IMPORTANT**:
-Do not assume default values for configs; always prompt the user for input. For example , do not assume a default password for a database config is always randomly generated. Always present the user with the options to provide a value or choose to generate a random one before setting each config.
+Do not assume default values for configs; always prompt the user for input. For example, do not assume a default password for a database config is always randomly generated. Always present the user with the options to provide a value or choose to generate a random one before setting each config.
 
 ## Viewing Configs
 
