@@ -20,7 +20,7 @@ To set a config, use the following MCP tool:
 set_config
 ```
 
-When setting configs, make sure to ask the user for either a specific value or to generate a random value. Do not assume choices on behalf of the user.
+When setting configs, make sure to ask the user for either a specific value or whether to generate a random value. Do not assume choices on behalf of the user.
 
 **IMPORTANT**:
 When using the `set_config` tool, ensure that only one of the following options is provided: either the `value` parameter or the `random` flag.
