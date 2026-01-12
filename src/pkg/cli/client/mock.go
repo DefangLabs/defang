@@ -198,3 +198,7 @@ func (m MockLoader) LoadProjectName(ctx context.Context) (string, error) {
 func (m MockLoader) TargetDirectory() string {
 	return "."
 }
+
+func (m MockLoader) CreateProjectForDebug() (*composeTypes.Project, error) {
+	return &m.Project, m.Error
+}
