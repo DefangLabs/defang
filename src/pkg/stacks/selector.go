@@ -85,16 +85,7 @@ func (ss *stackSelector) selectStack(ctx context.Context, allowCreate bool) (*St
 		return nil, fmt.Errorf("invalid stack selection: %s", selectedLabel)
 	}
 
-	// find the stack with the selected name in the list of stacks
-	selectedStack := StackListItem{}
-	for _, stack := range stackList {
-		if stack.Name == selectedName {
-			selectedStack = stack
-			break
-		}
-	}
-
-	return ss.sm.Load(selectedStack.Name)
+	return ss.sm.Load(selectedName)
 }
 
 func (ss *stackSelector) createStack(ctx context.Context) (*StackParameters, error) {
