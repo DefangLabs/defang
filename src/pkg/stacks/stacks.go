@@ -16,71 +16,56 @@ import (
 )
 
 type StackParameters struct {
-	Name         string
-	Provider     client.ProviderID
-	Region       string
-	AWSProfile   string
-	GCPProjectID string
-	Mode         modes.Mode
-	Prefix       string
-	Suffix       string
+	Name     string
+	Provider client.ProviderID
+	Mode     modes.Mode
+	Region   string
+	// replace properties with variable map, but keep getters and setters for common ones
+	Variables map[string]string
 }
 
-func (params StackParameters) ToMap() map[string]string {
-	var properties map[string]string = make(map[string]string)
-	properties["DEFANG_PROVIDER"] = strings.ToLower(params.Provider.String())
-	if params.Region != "" {
-		regionVarName := client.GetRegionVarName(params.Provider)
-		properties[regionVarName] = strings.ToLower(params.Region)
+func (sp StackParameters) ToMap() map[string]string {
+	vars := sp.Variables
+	if vars == nil {
+		vars = make(map[string]string)
 	}
-	if params.Mode != modes.ModeUnspecified {
-		properties["DEFANG_MODE"] = strings.ToLower(params.Mode.String())
+	vars["DEFANG_PROVIDER"] = sp.Provider.String()
+	regionVarName := client.GetRegionVarName(sp.Provider)
+	if regionVarName != "" && sp.Region != "" {
+		vars[regionVarName] = sp.Region
 	}
-
-	if params.Provider == client.ProviderAWS && params.AWSProfile != "" {
-		properties["AWS_PROFILE"] = params.AWSProfile
+	if sp.Mode != modes.ModeUnspecified {
+		vars["DEFANG_MODE"] = strings.ToLower(sp.Mode.String())
 	}
-	if params.Provider == client.ProviderGCP && params.GCPProjectID != "" {
-		properties["GCP_PROJECT_ID"] = params.GCPProjectID
-	}
-	if params.Prefix != "" {
-		properties["DEFANG_PREFIX"] = params.Prefix
-	}
-	if params.Suffix != "" {
-		properties["DEFANG_SUFFIX"] = params.Suffix
-	}
-	return properties
+	return vars
 }
 
 func ParamsFromMap(properties map[string]string) (StackParameters, error) {
-	var params StackParameters
-	for key, value := range properties {
-		switch key {
-		case "DEFANG_PROVIDER":
-			if err := params.Provider.Set(value); err != nil {
-				return params, err
-			}
-		case "AWS_REGION":
-			params.Region = value
-		case "GCP_LOCATION":
-			params.Region = value
-		case "AWS_PROFILE":
-			params.AWSProfile = value
-		case "GCP_PROJECT_ID":
-			params.GCPProjectID = value
-		case "DEFANG_MODE":
-			mode, err := modes.Parse(value)
-			if err != nil {
-				return params, err
-			}
-			params.Mode = mode
-		case "DEFANG_PREFIX":
-			params.Prefix = value
-		case "DEFANG_SUFFIX":
-			params.Suffix = value
+	if properties == nil {
+		return StackParameters{}, errors.New("properties map cannot be nil")
+	}
+	var provider client.ProviderID
+	if val, ok := properties["DEFANG_PROVIDER"]; ok {
+		err := provider.Set(val)
+		if err != nil {
+			return StackParameters{}, fmt.Errorf("invalid DEFANG_PROVIDER value %q: %w", val, err)
 		}
 	}
-	return params, nil
+	var mode modes.Mode
+	if val, ok := properties["DEFANG_MODE"]; ok {
+		err := mode.Set(val)
+		if err != nil {
+			return StackParameters{}, fmt.Errorf("invalid DEFANG_MODE value %q: %w", val, err)
+		}
+	}
+	regionVarName := client.GetRegionVarName(provider)
+	region := properties[regionVarName]
+	return StackParameters{
+		Variables: properties,
+		Provider:  provider,
+		Region:    region,
+		Mode:      mode,
+	}, nil
 }
 
 var validStackName = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
@@ -147,30 +132,8 @@ func CreateInDirectory(workingDirectory string, params StackParameters) (string,
 
 // for shell printing for converting to string format of StackParameters
 type StackListItem struct {
-	Name         string
-	AWSProfile   string
-	GCPProjectID string
-	Provider     string
-	Region       string
-	Mode         string
-	DeployedAt   time.Time
-}
-
-func (sli StackListItem) ToParameters() StackParameters {
-	var providerID client.ProviderID
-	providerID.Set(sli.Provider)
-	mode, err := modes.Parse(sli.Mode)
-	if err != nil {
-		mode = modes.ModeUnspecified
-	}
-	return StackParameters{
-		Name:         sli.Name,
-		Provider:     providerID,
-		Region:       sli.Region,
-		AWSProfile:   sli.AWSProfile,
-		GCPProjectID: sli.GCPProjectID,
-		Mode:         mode,
-	}
+	StackParameters
+	DeployedAt time.Time
 }
 
 func List() ([]StackListItem, error) {
@@ -195,31 +158,32 @@ func ListInDirectory(workingDirectory string) ([]StackListItem, error) {
 			term.Warnf("Skipping unreadable stack file %s: %v\n", filename, err)
 			continue
 		}
-		params, err := Parse(string(content))
+		variables, err := Parse(string(content))
+		if err != nil {
+			term.Warnf("Skipping invalid stack file %s: %v\n", filename, err)
+			continue
+		}
+		params, err := ParamsFromMap(variables)
 		if err != nil {
 			term.Warnf("Skipping invalid stack file %s: %v\n", filename, err)
 			continue
 		}
 		params.Name = file.Name()
-
 		stacks = append(stacks, StackListItem{
-			Name:     params.Name,
-			Provider: params.Provider.String(),
-			Region:   params.Region,
-			Mode:     params.Mode.String(),
+			StackParameters: params,
 		})
 	}
 
 	return stacks, nil
 }
 
-func Parse(content string) (StackParameters, error) {
+func Parse(content string) (map[string]string, error) {
 	properties, err := godotenv.Parse(strings.NewReader(content))
 	if err != nil {
-		return StackParameters{}, err
+		return nil, err
 	}
 
-	return ParamsFromMap(properties)
+	return properties, nil
 }
 
 func Marshal(params *StackParameters) (string, error) {
@@ -239,50 +203,22 @@ func RemoveInDirectory(workingDirectory, name string) error {
 	return os.Remove(path)
 }
 
-func Read(name string) (*StackParameters, error) {
-	return ReadInDirectory(".", name)
-}
-
 func ReadInDirectory(workingDirectory, name string) (*StackParameters, error) {
 	path := filename(workingDirectory, name)
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("could not read stack %q from %q: %w", name, path, err)
 	}
-	parsed, err := Parse(string(content))
+	variables, err := Parse(string(content))
 	if err != nil {
 		return nil, err
 	}
-	parsed.Name = name
-	return &parsed, nil
-}
-
-func Load(name string) error {
-	return LoadInDirectory(".", name)
-}
-
-func LoadInDirectory(workingDirectory, name string) error {
-	path := filename(workingDirectory, name)
-	if err := godotenv.Load(path); err != nil {
-		return fmt.Errorf("could not load stack %q from %q %w", name, path, err)
+	params, err := ParamsFromMap(variables)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse stack %q: %w", name, err)
 	}
-
-	term.Debugf("loaded globals from %s", path)
-	return nil
-}
-
-func Overload(name string) error {
-	return OverloadInDirectory(".", name)
-}
-
-func OverloadInDirectory(workingDirectory, name string) error {
-	path := filename(workingDirectory, name)
-	if err := godotenv.Overload(path); err != nil {
-		return fmt.Errorf("could not load stack %q from %q %w", name, path, err)
-	}
-
-	term.Debugf("loaded globals from %s", path)
-	return nil
+	params.Name = name
+	return &params, nil
 }
 
 // This was basically ripped out of godotenv.Overload/Load. Unfortunately, they don't export

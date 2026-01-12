@@ -75,7 +75,10 @@ func TestCreate(t *testing.T) {
 		{
 			name: "single letter ok",
 			parameters: StackParameters{
-				Name: "a",
+				Name:     "a",
+				Provider: client.ProviderAWS,
+				Region:   "us-west-2",
+				Mode:     modes.ModeAffordable,
 			},
 			expectErr:        false,
 			expectedFilename: ".defang/a",
@@ -83,7 +86,10 @@ func TestCreate(t *testing.T) {
 		{
 			name: "hyphen not ok",
 			parameters: StackParameters{
-				Name: "invalid-name",
+				Name:     "invalid-name",
+				Provider: client.ProviderAWS,
+				Region:   "us-west-2",
+				Mode:     modes.ModeAffordable,
 			},
 			expectErr: true,
 		},
@@ -149,10 +155,12 @@ func TestList(t *testing.T) {
 
 	t.Run("stacks present", func(t *testing.T) {
 		t.Chdir(t.TempDir())
-		// Create dummy stack files
+		// Create dummy stack files with valid content
 		os.Mkdir(Directory, 0700)
-		os.Create(filepath.Join(Directory, "stack1"))
-		os.Create(filepath.Join(Directory, "stack2"))
+		stack1Path := filepath.Join(Directory, "stack1")
+		stack2Path := filepath.Join(Directory, "stack2")
+		os.WriteFile(stack1Path, []byte("DEFANG_PROVIDER=aws\nAWS_REGION=us-west-2\nDEFANG_MODE=affordable\n"), 0600)
+		os.WriteFile(stack2Path, []byte("DEFANG_PROVIDER=gcp\nGCP_LOCATION=us-central1\nDEFANG_MODE=balanced\n"), 0600)
 
 		stacks, err := List()
 		if err != nil {
@@ -167,9 +175,15 @@ func TestList(t *testing.T) {
 func TestRemove(t *testing.T) {
 	t.Run("remove existing stack", func(t *testing.T) {
 		t.Chdir(t.TempDir())
-		// Create dummy stack file
+		// Create dummy stack file with valid provider and region
 		stackName := "stacktoremove"
-		stackFile, err := Create(StackParameters{Name: stackName})
+		params := StackParameters{
+			Name:     stackName,
+			Provider: client.ProviderAWS,
+			Region:   "us-west-2",
+			Mode:     modes.ModeAffordable,
+		}
+		stackFile, err := Create(params)
 		if err != nil {
 			t.Errorf("Setup Create() error = %v", err)
 		}
@@ -261,7 +275,7 @@ func TestParse(t *testing.T) {
 			name: "GCP provider",
 			content: `DEFANG_PROVIDER=gcp
 GCP_LOCATION=us-central1
-DEFANG_MODE=balanced
+DEFANG_MODE=BALANCED
 `,
 			expectedParams: StackParameters{
 				Provider: client.ProviderGCP,
@@ -273,7 +287,7 @@ DEFANG_MODE=balanced
 			name: "AWS provider",
 			content: `DEFANG_PROVIDER=aws
 AWS_REGION=us-east-1
-DEFANG_MODE=affordable
+DEFANG_MODE=AFFORDABLE
 `,
 			expectedParams: StackParameters{
 				Provider: client.ProviderAWS,
@@ -290,16 +304,15 @@ DEFANG_MODE=affordable
 				t.Errorf("Parse() error = %v", err)
 				return
 			}
-			if params.Provider != tt.expectedParams.Provider ||
-				params.Region != tt.expectedParams.Region ||
-				params.Mode != tt.expectedParams.Mode {
-				t.Errorf("Parse() = %v, want %v", params, tt.expectedParams)
-			}
+			regionEnvVarName := client.GetRegionVarName(tt.expectedParams.Provider)
+			assert.Equal(t, tt.expectedParams.Provider.String(), params["DEFANG_PROVIDER"])
+			assert.Equal(t, tt.expectedParams.Region, params[regionEnvVarName])
+			assert.Equal(t, tt.expectedParams.Mode.String(), params["DEFANG_MODE"])
 		})
 	}
 }
 
-func TestRead(t *testing.T) {
+func TestReadInDirectory(t *testing.T) {
 	t.Run("read existing stack", func(t *testing.T) {
 		t.Chdir(t.TempDir())
 		// Create dummy stack file
@@ -310,12 +323,12 @@ func TestRead(t *testing.T) {
 			Region:   "us-west-2",
 			Mode:     modes.ModeAffordable,
 		}
-		_, err := Create(expectedParams)
+		_, err := CreateInDirectory(".", expectedParams)
 		if err != nil {
 			t.Errorf("Setup Create() error = %v", err)
 		}
 
-		params, err := Read(stackName)
+		params, err := ReadInDirectory(".", stackName)
 		if err != nil {
 			t.Errorf("Read() error = %v", err)
 		}
@@ -324,59 +337,6 @@ func TestRead(t *testing.T) {
 			params.Mode != expectedParams.Mode {
 			t.Errorf("Read() = %v, want %v", params, expectedParams)
 		}
-	})
-}
-
-func TestLoad(t *testing.T) {
-	t.Run("load existing stack sets env vars", func(t *testing.T) {
-		os.Unsetenv("DEFANG_PROVIDER")
-		os.Unsetenv("GCP_LOCATION")
-
-		t.Chdir(t.TempDir())
-		// Create dummy stack file
-		stackName := "stacktoload"
-		expectedParams := StackParameters{
-			Name:     stackName,
-			Provider: client.ProviderGCP,
-			Region:   "us-central1",
-		}
-		_, err := Create(expectedParams)
-		if err != nil {
-			t.Errorf("Setup Create() error = %v", err)
-		}
-
-		err = Load(stackName)
-		if err != nil {
-			t.Errorf("Load() error = %v", err)
-		}
-		assert.Equal(t, os.Getenv("DEFANG_PROVIDER"), expectedParams.Provider.String())
-		assert.Equal(t, os.Getenv("GCP_LOCATION"), expectedParams.Region)
-	})
-
-	t.Run("load existing stack does not overwrite env vars", func(t *testing.T) {
-		t.Setenv("DEFANG_PROVIDER", "aws")
-		t.Setenv("AWS_REGION", "us-west-2")
-
-		t.Chdir(t.TempDir())
-		// Create dummy stack file
-		stackName := "stacktoload"
-		stackParams := StackParameters{
-			Name:     stackName,
-			Provider: client.ProviderGCP,
-			Region:   "us-central1",
-		}
-		_, err := Create(stackParams)
-		if err != nil {
-			t.Errorf("Setup Create() error = %v", err)
-		}
-
-		err = Load(stackName)
-		if err != nil {
-			t.Errorf("Load() error = %v", err)
-		}
-		assert.Equal(t, os.Getenv("DEFANG_PROVIDER"), "aws")
-		assert.Equal(t, os.Getenv("AWS_REGION"), "us-west-2")
-		assert.Equal(t, os.Getenv("GCP_LOCATION"), stackParams.Region)
 	})
 }
 
@@ -389,12 +349,13 @@ func TestParamsToMap(t *testing.T) {
 		{
 			name: "AWS params",
 			params: StackParameters{
-				Name:         "teststack",
-				Provider:     client.ProviderAWS,
-				Region:       "us-west-2",
-				AWSProfile:   "default",
-				GCPProjectID: "",
-				Mode:         modes.ModeAffordable,
+				Name:     "teststack",
+				Provider: client.ProviderAWS,
+				Region:   "us-west-2",
+				Variables: map[string]string{
+					"AWS_PROFILE": "default",
+				},
+				Mode: modes.ModeAffordable,
 			},
 			expectedMap: map[string]string{
 				"DEFANG_PROVIDER": "aws",
@@ -406,12 +367,13 @@ func TestParamsToMap(t *testing.T) {
 		{
 			name: "GCP params",
 			params: StackParameters{
-				Name:         "gcpstack",
-				Provider:     client.ProviderGCP,
-				Region:       "us-central1",
-				AWSProfile:   "",
-				GCPProjectID: "gcp-project-123",
-				Mode:         modes.ModeBalanced,
+				Name:     "gcpstack",
+				Provider: client.ProviderGCP,
+				Region:   "us-central1",
+				Variables: map[string]string{
+					"GCP_PROJECT_ID": "gcp-project-123",
+				},
+				Mode: modes.ModeBalanced,
 			},
 			expectedMap: map[string]string{
 				"DEFANG_PROVIDER": "gcp",
@@ -465,10 +427,12 @@ func TestParamsFromMap(t *testing.T) {
 				"DEFANG_MODE":     "affordable",
 			},
 			expectedParams: StackParameters{
-				Provider:   client.ProviderAWS,
-				Region:     "us-west-2",
-				AWSProfile: "default",
-				Mode:       modes.ModeAffordable,
+				Provider: client.ProviderAWS,
+				Region:   "us-west-2",
+				Variables: map[string]string{
+					"AWS_PROFILE": "default",
+				},
+				Mode: modes.ModeAffordable,
 			},
 		},
 	}
@@ -483,7 +447,7 @@ func TestParamsFromMap(t *testing.T) {
 			if resultParams.Provider != tt.expectedParams.Provider ||
 				resultParams.Region != tt.expectedParams.Region ||
 				resultParams.Mode != tt.expectedParams.Mode ||
-				resultParams.AWSProfile != tt.expectedParams.AWSProfile {
+				resultParams.Variables["AWS_PROFILE"] != tt.expectedParams.Variables["AWS_PROFILE"] {
 				t.Errorf("ParamsFromMap() = %+v, want %+v", resultParams, tt.expectedParams)
 			}
 		})

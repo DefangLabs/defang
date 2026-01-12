@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -18,8 +17,11 @@ import (
 type Manager interface {
 	List(ctx context.Context) ([]StackListItem, error)
 	Load(ctx context.Context, name string) (*StackParameters, error)
+	LoadLocal(name string) (*StackParameters, error)
+	LoadRemote(ctx context.Context, name string) (*StackParameters, error)
 	LoadParameters(params StackParameters, overload bool) error
 	Create(params StackParameters) (string, error)
+	TargetDirectory() string
 }
 
 type DeploymentLister interface {
@@ -49,6 +51,10 @@ func NewManager(fabric DeploymentLister, targetDirectory string, projectName str
 	}, nil
 }
 
+func (sm *manager) TargetDirectory() string {
+	return sm.targetDirectory
+}
+
 func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
 	remoteStacks, err := sm.ListRemote(ctx)
 	if err != nil {
@@ -59,28 +65,20 @@ func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
 		return nil, fmt.Errorf("failed to list local stacks: %w", err)
 	}
 	// Merge remote and local stacks into a single list of type StackOption,
-	// prefer remote if both exist, so we can show last deployed time
+	// prefer local if both exist, but keep remote deployed time if available
 	stackMap := make(map[string]StackListItem)
-	for _, local := range localStacks {
-		stackMap[local.Name] = StackListItem{
-			Name:         local.Name,
-			Provider:     local.Provider,
-			Region:       local.Region,
-			Mode:         local.Mode,
-			AWSProfile:   local.AWSProfile,
-			GCPProjectID: local.GCPProjectID,
-			DeployedAt:   time.Time{}, // No deployed time for local
-		}
-	}
 	for _, remote := range remoteStacks {
-		stackMap[remote.StackParameters.Name] = StackListItem{
-			Name:         remote.StackParameters.Name,
-			Provider:     remote.StackParameters.Provider.String(),
-			Region:       remote.StackParameters.Region,
-			Mode:         remote.StackParameters.Mode.String(),
-			AWSProfile:   remote.StackParameters.AWSProfile,
-			GCPProjectID: remote.StackParameters.GCPProjectID,
-			DeployedAt:   remote.DeployedAt.Local(),
+		stackMap[remote.Name] = remote
+	}
+	for _, local := range localStacks {
+		remote, exists := stackMap[local.StackParameters.Name]
+		if exists {
+			local.DeployedAt = remote.DeployedAt
+			stackMap[local.StackParameters.Name] = local
+		} else {
+			stackMap[local.StackParameters.Name] = StackListItem{
+				StackParameters: local.StackParameters,
+			}
 		}
 	}
 
@@ -101,19 +99,14 @@ func (sm *manager) ListLocal() ([]StackListItem, error) {
 	return ListInDirectory(sm.targetDirectory)
 }
 
-type RemoteStack struct {
-	StackParameters
-	DeployedAt time.Time
-}
-
-func (sm *manager) ListRemote(ctx context.Context) ([]RemoteStack, error) {
+func (sm *manager) ListRemote(ctx context.Context) ([]StackListItem, error) {
 	resp, err := sm.fabric.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
 		Project: sm.projectName,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list deployments: %w", err)
 	}
-	stackMap := make(map[string]RemoteStack)
+	stackMap := make(map[string]StackListItem)
 	for _, deployment := range resp.GetDeployments() {
 		stackName := deployment.GetStack()
 		if stackName == "" {
@@ -127,21 +120,33 @@ func (sm *manager) ListRemote(ctx context.Context) ([]RemoteStack, error) {
 			if ts := deployment.GetTimestamp(); ts != nil {
 				deployedAt = ts.AsTime()
 			}
-			stackMap[stackName] = RemoteStack{
-				StackParameters: StackParameters{
-					Name:     stackName,
-					Provider: providerID,
-					Region:   deployment.GetRegion(),
-					Mode:     modes.Mode(deployment.GetMode()),
-				},
-				DeployedAt: deployedAt,
+			variables := map[string]string{
+				"DEFANG_PROVIDER": providerID.String(),
+				"DEFANG_MODE":     deployment.GetMode().String(),
+			}
+			regionVarName := client.GetRegionVarName(providerID)
+			variables[regionVarName] = deployment.GetRegion()
+			params, err := ParamsFromMap(variables)
+			if err != nil {
+				term.Warnf("Skipping invalid remote deployment %s: %v\n", stackName, err)
+				continue
+			}
+			params.Name = stackName
+			stackMap[stackName] = StackListItem{
+				StackParameters: params,
+				DeployedAt:      deployedAt,
 			}
 		}
 	}
-	stackParams := make([]RemoteStack, 0, len(stackMap))
+	stackParams := make([]StackListItem, 0, len(stackMap))
 	for _, params := range stackMap {
 		stackParams = append(stackParams, params)
 	}
+
+	// sort by deployed at desc
+	slices.SortFunc(stackParams, func(a, b StackListItem) int {
+		return b.DeployedAt.Compare(a.DeployedAt)
+	})
 	return stackParams, nil
 }
 
@@ -156,10 +161,18 @@ func (e *ErrOutside) Error() string {
 }
 
 func (sm *manager) Load(ctx context.Context, name string) (*StackParameters, error) {
-	params, err := ReadInDirectory(sm.targetDirectory, name)
+	params, err := sm.LoadLocal(name)
 	if err != nil {
 		term.Infof("unable to load stack from file, attempting to import from previous deployments: %v", err)
 		return sm.LoadRemote(ctx, name)
+	}
+	return params, nil
+}
+
+func (sm *manager) LoadLocal(name string) (*StackParameters, error) {
+	params, err := ReadInDirectory(sm.targetDirectory, name)
+	if err != nil {
+		return nil, err
 	}
 	err = sm.LoadParameters(*params, false)
 	if err != nil {
@@ -173,7 +186,7 @@ func (sm *manager) LoadRemote(ctx context.Context, name string) (*StackParameter
 	if err != nil {
 		return nil, fmt.Errorf("failed to list remote stacks: %w", err)
 	}
-	var remoteStack *RemoteStack
+	var remoteStack *StackListItem
 	for _, remote := range remoteStacks {
 		if remote.Name == name {
 			remoteStack = &remote
