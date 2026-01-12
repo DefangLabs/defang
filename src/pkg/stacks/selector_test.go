@@ -60,6 +60,26 @@ func (m *MockStacksManager) List(ctx context.Context) ([]StackListItem, error) {
 }
 
 func (m *MockStacksManager) Load(ctx context.Context, name string) (*StackParameters, error) {
+	params, err := m.LoadLocal(name)
+	if err == nil {
+		return params, nil
+	}
+	return m.LoadRemote(ctx, name)
+}
+
+func (m *MockStacksManager) LoadLocal(name string) (*StackParameters, error) {
+	args := m.Called(name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	result, ok := args.Get(0).(*StackParameters)
+	if !ok {
+		return nil, args.Error(1)
+	}
+	return result, args.Error(1)
+}
+
+func (m *MockStacksManager) LoadRemote(ctx context.Context, name string) (*StackParameters, error) {
 	args := m.Called(name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -81,6 +101,11 @@ func (m *MockStacksManager) Create(params StackParameters) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
+func (m *MockStacksManager) TargetDirectory() string {
+	args := m.Called()
+	return args.String(0)
+}
+
 func TestStackSelector_SelectStack_ExistingStack(t *testing.T) {
 	ctx := t.Context()
 
@@ -92,8 +117,20 @@ func TestStackSelector_SelectStack_ExistingStack(t *testing.T) {
 
 	// Mock existing stacks list
 	existingStacks := []StackListItem{
-		{Name: "production", Provider: "aws", Region: "us-west-2"},
-		{Name: "development", Provider: "aws", Region: "us-east-1"},
+		{
+			StackParameters: StackParameters{
+				Name:     "production",
+				Provider: "aws",
+				Region:   "us-west-2",
+			},
+		},
+		{
+			StackParameters: StackParameters{
+				Name:     "development",
+				Provider: "aws",
+				Region:   "us-east-1",
+			},
+		},
 	}
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
@@ -103,11 +140,10 @@ func TestStackSelector_SelectStack_ExistingStack(t *testing.T) {
 
 	// Expected params based on ToParameters() conversion
 	expectedParams := &StackParameters{
-		Name:       "production",
-		Provider:   client.ProviderAWS,
-		Region:     "us-west-2",
-		AWSProfile: "",
-		Mode:       modes.ModeUnspecified,
+		Name:     "production",
+		Provider: client.ProviderAWS,
+		Region:   "us-west-2",
+		Mode:     modes.ModeUnspecified,
 	}
 
 	selector := NewSelector(mockEC, mockSM)
@@ -132,8 +168,8 @@ func TestStackSelector_SelectOrCreateStack_ExistingStack(t *testing.T) {
 
 	// Mock existing stacks list
 	existingStacks := []StackListItem{
-		{Name: "production", Provider: "aws", Region: "us-west-2"},
-		{Name: "development", Provider: "aws", Region: "us-east-1"},
+		{StackParameters: StackParameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
+		{StackParameters: StackParameters{Name: "development", Provider: "aws", Region: "us-east-1"}},
 	}
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
@@ -143,11 +179,10 @@ func TestStackSelector_SelectOrCreateStack_ExistingStack(t *testing.T) {
 
 	// Expected params based on ToParameters() conversion
 	expectedParams := &StackParameters{
-		Name:       "production",
-		Provider:   client.ProviderAWS,
-		Region:     "us-west-2",
-		AWSProfile: "",
-		Mode:       modes.ModeUnspecified,
+		Name:     "production",
+		Provider: client.ProviderAWS,
+		Region:   "us-west-2",
+		Mode:     modes.ModeUnspecified,
 	}
 
 	selector := NewSelector(mockEC, mockSM)
@@ -251,7 +286,7 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 
 	// Mock existing stacks list
 	existingStacks := []StackListItem{
-		{Name: "production", Provider: "aws", Region: "us-west-2"},
+		{StackParameters: StackParameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
 	}
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
@@ -261,19 +296,24 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 
 	// Mock wizard parameter collection
 	newStackParams := &StackParameters{
-		Name:       "staging",
-		Provider:   client.ProviderAWS,
-		Region:     "us-east-1",
-		AWSProfile: "staging",
-		Mode:       modes.ModeAffordable,
+		Name:     "staging",
+		Provider: client.ProviderAWS,
+		Region:   "us-east-1",
+		Variables: map[string]string{
+			"AWS_PROFILE": "staging",
+		},
+		Mode: modes.ModeAffordable,
 	}
 	mockWizard.On("CollectParameters", ctx).Return(newStackParams, nil)
 
 	// Mock stack creation
 	mockSM.On("Create", *newStackParams).Return("staging", nil)
 
-	// Mock loading the created stack
-	mockSM.On("Load", "staging").Return(newStackParams, nil)
+	// Mock LoadLocal to return error (simulate not found locally)
+	mockSM.On("LoadLocal", "staging").Return((*StackParameters)(nil), errors.New("not found"))
+
+	// Mock loading the created stack remotely
+	mockSM.On("LoadRemote", "staging").Return(newStackParams, nil)
 
 	selector := &testableStackSelector{
 		ec:     mockEC,
@@ -306,11 +346,13 @@ func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
 
 	// Mock wizard parameter collection
 	newStackParams := &StackParameters{
-		Name:       "firststack",
-		Provider:   client.ProviderAWS,
-		Region:     "us-west-2",
-		AWSProfile: "default",
-		Mode:       modes.ModeBalanced,
+		Name:     "firststack",
+		Provider: client.ProviderAWS,
+		Region:   "us-west-2",
+		Variables: map[string]string{
+			"AWS_PROFILE": "default",
+		},
+		Mode: modes.ModeBalanced,
 	}
 	mockWizard.On("CollectParameters", ctx).Return(newStackParams, nil)
 
@@ -318,7 +360,7 @@ func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
 	mockSM.On("Create", *newStackParams).Return("firststack", nil)
 
 	// Mock loading the created stack
-	mockSM.On("Load", "firststack").Return(newStackParams, nil)
+	mockSM.On("LoadLocal", "firststack").Return(newStackParams, nil)
 
 	selector := &testableStackSelector{
 		ec:     mockEC,
@@ -392,7 +434,7 @@ func TestStackSelector_SelectStack_ElicitationError(t *testing.T) {
 
 	// Mock existing stacks list
 	existingStacks := []StackListItem{
-		{Name: "production", Provider: "aws", Region: "us-west-2"},
+		{StackParameters: StackParameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
 	}
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
@@ -424,7 +466,7 @@ func TestStackSelector_SelectStack_WizardError(t *testing.T) {
 
 	// Mock existing stacks list
 	existingStacks := []StackListItem{
-		{Name: "production", Provider: "aws", Region: "us-west-2"},
+		{StackParameters: StackParameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
 	}
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
@@ -465,7 +507,7 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 
 	// Mock existing stacks list
 	existingStacks := []StackListItem{
-		{Name: "production", Provider: "aws", Region: "us-west-2"},
+		{StackParameters: StackParameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
 	}
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
@@ -475,11 +517,13 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 
 	// Mock wizard parameter collection
 	newStackParams := &StackParameters{
-		Name:       "staging",
-		Provider:   client.ProviderAWS,
-		Region:     "us-east-1",
-		AWSProfile: "staging",
-		Mode:       modes.ModeAffordable,
+		Name:     "staging",
+		Provider: client.ProviderAWS,
+		Region:   "us-east-1",
+		Variables: map[string]string{
+			"AWS_PROFILE": "staging",
+		},
+		Mode: modes.ModeAffordable,
 	}
 	mockWizard.On("CollectParameters", ctx).Return(newStackParams, nil)
 

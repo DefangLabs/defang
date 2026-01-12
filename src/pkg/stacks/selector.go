@@ -25,14 +25,26 @@ func NewSelector(ec elicitations.Controller, sm Manager) *stackSelector {
 }
 
 func (ss *stackSelector) SelectOrCreateStack(ctx context.Context) (*StackParameters, error) {
-	return ss.selectStack(ctx, true)
+	return ss.SelectStackWithOptions(ctx, SelectStackOptions{
+		AllowCreate: true,
+		AllowImport: false,
+	})
+}
+
+type SelectStackOptions struct {
+	AllowCreate bool
+	AllowImport bool
 }
 
 func (ss *stackSelector) SelectStack(ctx context.Context) (*StackParameters, error) {
-	return ss.selectStack(ctx, false)
+	return ss.SelectStackWithOptions(ctx, SelectStackOptions{
+		AllowCreate: false,
+		AllowImport: false,
+	})
 }
 
-func (ss *stackSelector) selectStack(ctx context.Context, allowCreate bool) (*StackParameters, error) {
+// TODO: rename this method SelectStack
+func (ss *stackSelector) SelectStackWithOptions(ctx context.Context, opts SelectStackOptions) (*StackParameters, error) {
 	if !ss.ec.IsSupported() {
 		return nil, errors.New("your MCP client does not support elicitations, use the 'select_stack' tool to choose a stack")
 	}
@@ -43,7 +55,7 @@ func (ss *stackSelector) selectStack(ctx context.Context, allowCreate bool) (*St
 
 	var selectedName string
 	if len(stackList) == 0 {
-		if allowCreate {
+		if opts.AllowCreate {
 			return ss.createStack(ctx)
 		} else {
 			return nil, errors.New("no stacks available to select")
@@ -64,7 +76,7 @@ func (ss *stackSelector) selectStack(ctx context.Context, allowCreate bool) (*St
 		stackNames = append(stackNames, s.Name)
 		labelMap[label] = s.Name
 	}
-	if allowCreate {
+	if opts.AllowCreate {
 		stackLabels = append(stackLabels, CreateNewStack)
 	}
 
@@ -86,16 +98,13 @@ func (ss *stackSelector) selectStack(ctx context.Context, allowCreate bool) (*St
 	}
 
 	// find the stack with the selected name in the list of stacks
-	selectedStack := StackListItem{}
 	for _, stack := range stackList {
 		if stack.Name == selectedName {
-			selectedStack = stack
-			break
+			return &stack.StackParameters, nil
 		}
 	}
 
-	params := selectedStack.ToParameters()
-	return &params, nil
+	return nil, fmt.Errorf("selected stack %q not found", selectedName)
 }
 
 func (ss *stackSelector) createStack(ctx context.Context) (*StackParameters, error) {
