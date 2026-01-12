@@ -69,7 +69,7 @@ func GetExistingToken(cluster string) string {
 }
 
 func GetWebIdentityTokenFile(cluster string) (string, error) {
-	jwtPath := GetTokenFile(cluster) + ".jwt"
+	jwtPath := GetTokenFile(cluster) + ".jwt" // TODO: store in TMPDIR instead?
 	_, err := os.Stat(jwtPath)
 	return jwtPath, err
 }
