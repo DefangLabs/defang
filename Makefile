@@ -31,7 +31,7 @@ pkgs/npm/README.md src/README.md: README.md
 .PHONY: test-nix
 test-nix:
 ifneq (,$(shell which nix))
-	+$(MAKE) nix-run; \
+	+@$(MAKE) nix-run; \
 	if [ $$? -ne 0 ]; then \
 		$(MAKE) update-nix-vendor-hash; \
 	fi
@@ -48,7 +48,7 @@ update-nix-vendor-hash:
 
 .PHONY: nix-run
 nix-run:
-	nix run .#defang-cli --extra-experimental-features flakes --extra-experimental-features nix-command
+	nix run .#defang-cli --extra-experimental-features flakes --extra-experimental-features nix-command -- help
 
 .PHONY: clean distclean
 clean distclean:
