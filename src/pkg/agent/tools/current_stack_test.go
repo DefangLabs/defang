@@ -20,11 +20,13 @@ func TestHandleCurrentStackTool(t *testing.T) {
 			name: "Stack is set",
 			stackConfig: StackConfig{
 				Stack: &stacks.StackParameters{
-					Name:       "test-stack",
-					Provider:   client.ProviderAWS,
-					Region:     "us-test-2",
-					Mode:       modes.ModeAffordable,
-					AWSProfile: "default",
+					Name:     "test-stack",
+					Provider: client.ProviderAWS,
+					Region:   "us-test-2",
+					Mode:     modes.ModeAffordable,
+					Variables: map[string]string{
+						"AWS_PROFILE": "default",
+					},
 				},
 			},
 			expected:      "This currently selected stack is \"test-stack\": AWS_PROFILE=\"default\"\nAWS_REGION=\"us-test-2\"\nDEFANG_MODE=\"affordable\"\nDEFANG_PROVIDER=\"aws\"",

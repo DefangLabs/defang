@@ -33,8 +33,6 @@ func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc clie
 }
 
 func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.StackParameters) (*client.ProviderID, client.Provider, error) {
-	var providerID client.ProviderID
-	var err error
 	if stack.Name == "" {
 		selector := stacks.NewSelector(pp.ec, pp.sm)
 		newStack, err := selector.SelectStack(ctx)
@@ -44,12 +42,8 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.Sta
 		*stack = *newStack
 	}
 
-	err = providerID.Set(stack.Provider.Name())
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to set provider ID: %w", err)
-	}
-
 	term.Debug("Function invoked: cli.NewProvider")
-	provider := pp.pc.NewProvider(ctx, providerID, pp.fc, stack.Name)
+	provider := pp.pc.NewProvider(ctx, stack.Provider, pp.fc, stack.Name)
+	providerID := stack.Provider
 	return &providerID, provider, nil
 }

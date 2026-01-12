@@ -46,11 +46,13 @@ func TestHandleSelectStackTool(t *testing.T) {
 				Stack: "test-stack",
 			},
 			initialStack: &stacks.StackParameters{
-				Name:         "old-stack",
-				Provider:     client.ProviderGCP,
-				Region:       "us-central1",
-				Mode:         modes.ModeAffordable,
-				GCPProjectID: "old-project",
+				Name:     "old-stack",
+				Provider: client.ProviderGCP,
+				Region:   "us-central1",
+				Mode:     modes.ModeAffordable,
+				Variables: map[string]string{
+					"GCP_PROJECT_ID": "old-project",
+				},
 			},
 			expectedResult: "Stack \"test-stack\" selected.",
 			expectedError:  false,

@@ -19,23 +19,21 @@ type CreateAWSStackParams struct {
 }
 
 func HandleCreateAWSStackTool(ctx context.Context, params CreateAWSStackParams, sc StackConfig) (string, error) {
-	var mode modes.Mode
-	var err error
 	if params.Mode == "" {
-		mode = modes.ModeAffordable
-	} else {
-		mode, err = modes.Parse(params.Mode)
-		if err != nil {
-			return "Invalid mode provided", err
-		}
+		params.Mode = modes.ModeAffordable.String()
 	}
-
+	mode, err := modes.Parse(params.Mode)
+	if err != nil {
+		return "Invalid mode provided", err
+	}
 	newStack := stacks.StackParameters{
-		Name:       params.Name,
-		AWSProfile: params.AWS_Profile,
-		Provider:   client.ProviderAWS,
-		Region:     params.Region,
-		Mode:       mode,
+		Name:     params.Name,
+		Region:   params.Region,
+		Provider: client.ProviderGCP,
+		Mode:     mode,
+		Variables: map[string]string{
+			"AWS_PROFILE": params.AWS_Profile,
+		},
 	}
 
 	_, err = stacks.CreateInDirectory(params.WorkingDirectory, newStack)
