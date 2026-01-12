@@ -17,9 +17,29 @@ type DNSResolver interface {
 	UpdateShardDomain(ctx context.Context) error
 }
 
-type BootstrapCommandRequest struct {
-	Command string
-	Project string
+type CdCommand string
+
+const (
+	CdCommandCancel  CdCommand = "cancel"
+	CdCommandDestroy CdCommand = "destroy"
+	CdCommandDown    CdCommand = "down"
+	CdCommandList    CdCommand = "list"
+	CdCommandRefresh CdCommand = "refresh"
+	CdCommandUp      CdCommand = "up"
+)
+
+type CdCommandRequest struct {
+	Command   CdCommand
+	Project   string
+	StatesUrl string
+	EventsUrl string
+}
+
+type DeployRequest struct {
+	defangv1.DeployRequest
+
+	StatesUrl string
+	EventsUrl string
 }
 
 type PrepareDomainDelegationRequest struct {
@@ -43,21 +63,21 @@ type ServerStream[Res any] interface {
 type Provider interface {
 	DNSResolver
 	AccountInfo(context.Context) (*AccountInfo, error)
-	BootstrapCommand(context.Context, BootstrapCommandRequest) (types.ETag, error)
-	BootstrapList(context.Context, bool) (iter.Seq[string], error)
+	CdCommand(context.Context, CdCommandRequest) (types.ETag, error)
+	CdList(context.Context, bool) (iter.Seq[string], error)
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
 	DelayBeforeRetry(context.Context) error
-	Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error)
 	DeleteConfig(context.Context, *defangv1.Secrets) error
-	Deploy(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
-	Destroy(context.Context, *defangv1.DestroyRequest) (types.ETag, error)
+	Deploy(context.Context, *DeployRequest) (*defangv1.DeployResponse, error)
 	GetDeploymentStatus(context.Context) error // nil means deployment is pending/running; io.EOF means deployment is done
 	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 	GetService(context.Context, *defangv1.GetRequest) (*defangv1.ServiceInfo, error)
 	GetServices(context.Context, *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error)
+	GetStackName() string
+	GetStackNameForDomain() string
 	ListConfig(context.Context, *defangv1.ListConfigsRequest) (*defangv1.Secrets, error)
 	PrepareDomainDelegation(context.Context, PrepareDomainDelegationRequest) (*PrepareDomainDelegationResponse, error)
-	Preview(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
+	Preview(context.Context, *DeployRequest) (*defangv1.DeployResponse, error)
 	PutConfig(context.Context, *defangv1.PutConfigRequest) error
 	QueryForDebug(context.Context, *defangv1.DebugRequest) error
 	QueryLogs(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
@@ -71,6 +91,7 @@ type Provider interface {
 type Loader interface {
 	LoadProject(context.Context) (*composeTypes.Project, error)
 	LoadProjectName(context.Context) (string, error)
+	TargetDirectory() string
 }
 
 type RetryDelayer struct {

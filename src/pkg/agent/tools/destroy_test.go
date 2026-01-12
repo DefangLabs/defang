@@ -7,8 +7,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,6 +23,7 @@ type MockDestroyCLI struct {
 	ComposeDownError                 error
 	LoadProjectNameWithFallbackError error
 	CanIUseProviderError             error
+	InteractiveLoginMCPError         error
 	ComposeDownResult                string
 	ProjectName                      string
 	CallLog                          []string
@@ -55,10 +58,18 @@ func (m *MockDestroyCLI) LoadProjectNameWithFallback(ctx context.Context, loader
 	return m.ProjectName, nil
 }
 
-func (m *MockDestroyCLI) CanIUseProvider(ctx context.Context, grpcClient *client.GrpcClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("CanIUseProvider(%s, %s)", providerId, projectName))
+func (m *MockDestroyCLI) CanIUseProvider(ctx context.Context, grpcClient *client.GrpcClient, provider client.Provider, projectName string, serviceCount int) error {
+	m.CallLog = append(m.CallLog, fmt.Sprintf("CanIUseProvider(%s)", projectName))
 	if m.CanIUseProviderError != nil {
 		return m.CanIUseProviderError
+	}
+	return nil
+}
+
+func (m *MockDestroyCLI) InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
+	m.CallLog = append(m.CallLog, fmt.Sprintf("InteractiveLoginMCP(%s)", cluster))
+	if m.InteractiveLoginMCPError != nil {
+		return m.InteractiveLoginMCPError
 	}
 	return nil
 }
@@ -76,8 +87,9 @@ func TestHandleDestroyTool(t *testing.T) {
 			providerID: client.ProviderAWS,
 			setupMock: func(m *MockDestroyCLI) {
 				m.ConnectError = errors.New("connection failed")
+				m.InteractiveLoginMCPError = errors.New("connection failed")
 			},
-			expectedError: "could not connect: connection failed",
+			expectedError: "connection failed",
 		},
 		{
 			name:       "load_project_name_error",
@@ -125,6 +137,12 @@ func TestHandleDestroyTool(t *testing.T) {
 		},
 	}
 
+	loader := &client.MockLoader{}
+	stack := stacks.StackParameters{
+		Name:     "test-stack",
+		Provider: client.ProviderAWS,
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Chdir("testdata")
@@ -137,19 +155,21 @@ func TestHandleDestroyTool(t *testing.T) {
 			}
 			tt.setupMock(mockCLI)
 
-			// Call the function
-			loader := &client.MockLoader{}
 			ec := elicitations.NewController(&mockElicitationsClient{
 				responses: map[string]string{
 					"strategy":     "profile",
 					"profile_name": "default",
 				},
 			})
-			stackName := "test-stack"
-			result, err := HandleDestroyTool(t.Context(), loader, mockCLI, ec, StackConfig{
-				Cluster:    "test-cluster",
-				ProviderID: &tt.providerID,
-				Stack:      &stackName,
+			// Call the function
+			params := DestroyParams{
+				LoaderParams: common.LoaderParams{
+					WorkingDirectory: ".",
+				},
+			}
+			result, err := HandleDestroyTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
+				Cluster: "test-cluster",
+				Stack:   &stack,
 			})
 
 			// Verify error expectations
@@ -168,7 +188,7 @@ func TestHandleDestroyTool(t *testing.T) {
 					"Connect(test-cluster)",
 					"NewProvider(aws)",
 					"LoadProjectNameWithFallback",
-					"CanIUseProvider(aws, test-project)",
+					"CanIUseProvider(test-project)",
 					"ComposeDown(test-project)",
 				}
 				assert.Equal(t, expectedCalls, mockCLI.CallLog)

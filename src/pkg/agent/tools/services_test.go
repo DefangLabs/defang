@@ -5,13 +5,14 @@ import (
 	"errors"
 	"os"
 	"testing"
-	"time"
 
-	"github.com/DefangLabs/defang/src/pkg/cli"
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
+	cli "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
@@ -65,11 +66,11 @@ func (m *MockCLI) GetServices(ctx context.Context, projectName string, provider 
 	return m.MockServices, nil
 }
 
-func (m *MockCLI) ComposeDown(ctx context.Context, projectName string, client *client.GrpcClient, provider client.Provider) (string, error) {
+func (m *MockCLI) ComposeDown(ctx context.Context, projectName string, fabric *client.GrpcClient, provider client.Provider) (string, error) {
 	return "", nil
 }
 
-func (m *MockCLI) ComposeUp(ctx context.Context, client *client.GrpcClient, provider client.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
+func (m *MockCLI) ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	return nil, nil, nil
 }
 
@@ -81,7 +82,7 @@ func (m *MockCLI) ConfigSet(ctx context.Context, projectName string, provider cl
 	return nil
 }
 
-func (m *MockCLI) CreatePlaygroundProvider(client *client.GrpcClient) client.Provider {
+func (m *MockCLI) CreatePlaygroundProvider(fabric *client.GrpcClient) client.Provider {
 	return m.MockProvider
 }
 
@@ -89,7 +90,7 @@ func (m *MockCLI) GenerateAuthURL(authPort int) string {
 	return ""
 }
 
-func (m *MockCLI) InteractiveLoginMCP(ctx context.Context, client *client.GrpcClient, cluster string, mcpClient string) error {
+func (m *MockCLI) InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
 	return nil
 }
 
@@ -105,16 +106,12 @@ func (m *MockCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResp
 	return ""
 }
 
-func (m *MockCLI) RunEstimate(ctx context.Context, project *compose.Project, client *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
+func (m *MockCLI) RunEstimate(ctx context.Context, project *compose.Project, fabric *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
 	return nil, nil
 }
 
 func (m *MockCLI) Tail(ctx context.Context, provider client.Provider, projectName string, options cli.TailOptions) error {
 	return nil
-}
-
-func (m *MockCLI) TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, options cli.TailOptions) (cli.ServiceStates, error) {
-	return nil, nil
 }
 
 // createConnectError creates a connect error with the specified code and message
@@ -151,7 +148,6 @@ func (m *mockElicitationsClient) Request(ctx context.Context, req elicitations.R
 func TestHandleServicesToolWithMockCLI(t *testing.T) {
 	tests := []struct {
 		name                string
-		providerId          client.ProviderID
 		requestArgs         map[string]interface{}
 		mockCLI             *MockCLI
 		expectedError       bool
@@ -162,8 +158,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 	}{
 		// Error cases
 		{
-			name:       "connect_error",
-			providerId: client.ProviderDefang,
+			name: "connect_error",
 			mockCLI: &MockCLI{
 				ConnectError: errors.New("connection failed"),
 			},
@@ -173,8 +168,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			expectedGetServices: false,
 		},
 		{
-			name:       "load_project_name_error",
-			providerId: client.ProviderDefang,
+			name: "load_project_name_error",
 			mockCLI: &MockCLI{
 				MockClient:                       &client.GrpcClient{},
 				MockProvider:                     &client.PlaygroundProvider{},
@@ -188,8 +182,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 
 		// GetServices error cases - these return different result types
 		{
-			name:       "get_services_no_services_error",
-			providerId: client.ProviderDefang,
+			name: "get_services_no_services_error",
 			mockCLI: &MockCLI{
 				MockClient:       &client.GrpcClient{},
 				MockProvider:     &client.PlaygroundProvider{},
@@ -202,8 +195,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			expectedProjectName: "test-project",
 		},
 		{
-			name:       "get_services_project_not_deployed",
-			providerId: client.ProviderDefang,
+			name: "get_services_project_not_deployed",
 			mockCLI: &MockCLI{
 				MockClient:       &client.GrpcClient{},
 				MockProvider:     &client.PlaygroundProvider{},
@@ -216,8 +208,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			expectedProjectName: "test-project",
 		},
 		{
-			name:       "get_services_generic_error",
-			providerId: client.ProviderDefang,
+			name: "get_services_generic_error",
 			mockCLI: &MockCLI{
 				MockClient:       &client.GrpcClient{},
 				MockProvider:     &client.PlaygroundProvider{},
@@ -231,8 +222,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 
 		// Success case
 		{
-			name:       "successful_cli_operations_until_get_services",
-			providerId: client.ProviderDefang,
+			name: "successful_cli_operations_until_get_services",
 			mockCLI: &MockCLI{
 				MockClient:      &client.GrpcClient{},
 				MockProvider:    &client.PlaygroundProvider{},
@@ -265,11 +255,18 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 					"profile_name": "default",
 				},
 			})
-			stackName := "test-stack"
-			result, err := HandleServicesTool(t.Context(), loader, tt.mockCLI, ec, StackConfig{
-				Cluster:    "test-cluster",
-				ProviderID: &tt.providerId,
-				Stack:      &stackName,
+			stack := stacks.StackParameters{
+				Name:     "test-stack",
+				Provider: client.ProviderAWS,
+			}
+			params := ServicesParams{
+				LoaderParams: common.LoaderParams{
+					WorkingDirectory: ".",
+				},
+			}
+			result, err := HandleServicesTool(t.Context(), loader, params, tt.mockCLI, ec, StackConfig{
+				Cluster: "test-cluster",
+				Stack:   &stack,
 			})
 
 			// Check Go error expectation

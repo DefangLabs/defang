@@ -2,22 +2,24 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/auth"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 type EstimateParams struct {
 	common.LoaderParams
-	DeploymentMode string `json:"deployment_mode,omit_empty" jsonschema:"default=affordable,enum=affordable,enum=balanced,enum=high_availability,description=The deployment mode for which to estimate costs (e.g., AFFORDABLE, BALANCED, HIGH_AVAILABILITY)."`
+	DeploymentMode string `json:"deployment_mode,omitempty" jsonschema:"default=affordable,enum=affordable,enum=balanced,enum=high_availability,description=The deployment mode for which to estimate costs (e.g., AFFORDABLE, BALANCED, HIGH_AVAILABILITY)."`
 	Provider       string `json:"provider" jsonschema:"required,enum=aws,enum=gcp description=The cloud provider for which to estimate costs."`
-	Region         string `json:"region,omit_empty" jsonschema:"description=The region in which to estimate costs."`
+	Region         string `json:"region,omitempty" jsonschema:"description=The region in which to estimate costs."`
 }
 
-func HandleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, params EstimateParams, cli CLIInterface, sc StackConfig) (string, error) {
+func HandleEstimateTool(ctx context.Context, loader client.Loader, params EstimateParams, cli CLIInterface, sc StackConfig) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
@@ -26,14 +28,18 @@ func HandleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, par
 	}
 
 	term.Debug("Function invoked: cli.Connect")
-	client, err := cli.Connect(ctx, sc.Cluster)
+	fabric, err := GetClientWithRetry(ctx, cli, sc)
 	if err != nil {
-		return "", fmt.Errorf("could not connect: %w", err)
+		var noBrowserErr auth.ErrNoBrowser
+		if errors.As(err, &noBrowserErr) {
+			return noBrowserErr.Error(), nil
+		}
+		return "", err
 	}
 
-	defangProvider := cli.CreatePlaygroundProvider(client)
+	defangProvider := cli.CreatePlaygroundProvider(fabric)
 
-	var providerID cliClient.ProviderID
+	var providerID client.ProviderID
 	err = providerID.Set(params.Provider)
 	if err != nil {
 		return "", err
@@ -46,7 +52,7 @@ func HandleEstimateTool(ctx context.Context, loader cliClient.ProjectLoader, par
 	}
 
 	term.Debug("Function invoked: cli.RunEstimate")
-	estimate, err := cli.RunEstimate(ctx, project, client, defangProvider, providerID, params.Region, deploymentMode)
+	estimate, err := cli.RunEstimate(ctx, project, fabric, defangProvider, providerID, params.Region, deploymentMode)
 	if err != nil {
 		return "", fmt.Errorf("failed to run estimate: %w", err)
 	}

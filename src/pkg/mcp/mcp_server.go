@@ -6,6 +6,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	agentTools "github.com/DefangLabs/defang/src/pkg/agent/tools"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
@@ -13,9 +14,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-
-	// NewDefangMCPServer returns a new MCPServer instance with all resources, tools registered.
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 )
 
 func prepareInstructions() string {
@@ -24,7 +22,7 @@ func prepareInstructions() string {
 }
 
 type ToolTracker struct {
-	providerId *cliClient.ProviderID
+	providerId *client.ProviderID
 	cluster    string
 	client     string
 }
@@ -47,18 +45,35 @@ func (t *ToolTracker) TrackTool(name string, handler server.ToolHandlerFunc) ser
 
 type StackConfig = tools.StackConfig
 
+// NewDefangMCPServer returns a new MCPServer instance with all resources, tools registered.
 func NewDefangMCPServer(version string, client MCPClient, cli agentTools.CLIInterface, config StackConfig) (*server.MCPServer, error) {
 	// Setup knowledge base
 	if err := SetupKnowledgeBase(); err != nil {
 		return nil, fmt.Errorf("failed to setup knowledge base: %w", err)
 	}
 
+	var elicitationsController *elicitations.Controller
+
 	s := server.NewMCPServer(
-		"Deploy with Defang",
+		"Defang Version",
 		version,
 		server.WithResourceCapabilities(true, true),
 		server.WithToolCapabilities(true),
+		server.WithElicitation(),
 		server.WithInstructions(prepareInstructions()),
+		server.WithHooks(&server.Hooks{
+			OnAfterInitialize: []server.OnAfterInitializeFunc{
+				func(ctx context.Context, id any, message *mcp.InitializeRequest, result *mcp.InitializeResult) {
+					if elicitationsController == nil {
+						return
+					}
+
+					if message.Params.Capabilities.Elicitation == nil {
+						(*elicitationsController).SetSupported(false)
+					}
+				},
+			},
+		}),
 	)
 
 	resources.SetupResources(s)
@@ -67,12 +82,13 @@ func NewDefangMCPServer(version string, client MCPClient, cli agentTools.CLIInte
 	common.MCPDevelopmentClient = string(client)
 
 	toolTracker := ToolTracker{
-		providerId: config.ProviderID,
+		providerId: &config.Stack.Provider,
 		cluster:    config.Cluster,
 		client:     common.MCPDevelopmentClient,
 	}
 	elicitationsClient := NewMCPElicitationsController(s)
 	ec := elicitations.NewController(elicitationsClient)
+	elicitationsController = &ec
 	defangTools := tools.CollectTools(ec, config)
 	for i := range defangTools {
 		defangTools[i].Handler = toolTracker.TrackTool(defangTools[i].Tool.Name, defangTools[i].Handler)

@@ -15,8 +15,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/agent/plugins/fabric"
 	"github.com/DefangLabs/defang/src/pkg/agent/tools"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/core/api"
@@ -33,18 +33,18 @@ type Agent struct {
 	system    string
 }
 
-func New(ctx context.Context, clusterAddr string, providerId *client.ProviderID, stack *string) (*Agent, error) {
-	accessToken := cluster.GetExistingToken(clusterAddr)
+func New(ctx context.Context, clusterAddr string, stack *stacks.StackParameters) (*Agent, error) {
+	accessToken := client.GetExistingToken(clusterAddr)
 	aiProvider := "fabric"
 	var providerPlugin api.Plugin
-	_, addr := cluster.SplitTenantHost(clusterAddr)
+	addr := client.NormalizeHost(clusterAddr)
 	// Generate a random session ID prepended with timestamp for easier sorting
 	sessionID := fmt.Sprintf("%s-%s", time.Now().Format("20060102T150405Z"), pkg.RandomID())
 	providerPlugin = &fabric.OpenAI{
 		APIKey: accessToken,
 		Opts: []option.RequestOption{
 			option.WithBaseURL(fmt.Sprintf("https://%s/api/v1", addr)),
-			option.WithHeader("X-Defang-Agent-Session-Id", sessionID),
+			option.WithHeader("x-defang-llm-session-id", sessionID),
 		},
 	}
 	defaultModel := "google/gemini-2.5-flash"
@@ -68,9 +68,8 @@ func New(ctx context.Context, clusterAddr string, providerId *client.ProviderID,
 	printer := printer{outStream: os.Stdout}
 	toolManager := NewToolManager(gk, printer)
 	defangTools := tools.CollectDefangTools(ec, tools.StackConfig{
-		Cluster:    clusterAddr,
-		ProviderID: providerId,
-		Stack:      stack,
+		Cluster: clusterAddr,
+		Stack:   stack,
 	})
 	toolManager.RegisterTools(defangTools...)
 	fsTools := CollectFsTools()

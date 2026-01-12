@@ -7,29 +7,30 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/do"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
-	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
-func Connect(ctx context.Context, addr string) (*client.GrpcClient, error) {
-	tenantName, host := cluster.SplitTenantHost(addr)
-	accessToken := cluster.GetExistingToken(addr)
-	term.Debug("Using tenant", tenantName, "for cluster", host)
-	grpcClient := client.NewGrpcClient(host, accessToken, tenantName)
-	track.Tracker = grpcClient // Update track client
+// Connect builds a client carrying the requested tenant (name or ID).
+func Connect(cluster string, requestedTenant types.TenantNameOrID) *client.GrpcClient {
+	host := client.NormalizeHost(cluster)
+	term.Debugf("Using tenant %q for cluster %q", requestedTenant, host)
+
+	accessToken := client.GetExistingToken(host)
+	return client.NewGrpcClient(host, accessToken, requestedTenant)
+}
+
+func ConnectWithTenant(ctx context.Context, addr string, requestedTenant types.TenantNameOrID) (*client.GrpcClient, error) {
+	grpcClient := Connect(addr, requestedTenant)
 
 	resp, err := grpcClient.WhoAmI(ctx)
 	if err != nil {
-		term.Debug("Unable to validate tenant ID with server:", err)
-	} else if string(tenantName) != resp.Tenant {
-		if tenantName != types.DEFAULT_TENANT {
-			term.Debugf("Overriding tenant %q with server provided value %q", tenantName, resp.Tenant)
-		}
-		grpcClient.TenantName = types.TenantName(resp.Tenant)
+		term.Debug("Unable to validate tenant with server:", err)
+		return grpcClient, err
 	}
-	return grpcClient, err
+
+	grpcClient.Tenant = types.TenantLabel(resp.Tenant)
+	return grpcClient, nil
 }
 
 func NewProvider(ctx context.Context, providerID client.ProviderID, fabricClient client.FabricClient, stack string) client.Provider {

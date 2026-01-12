@@ -7,8 +7,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,12 +19,13 @@ import (
 // MockListConfigCLI implements CLIInterface for testing
 type MockListConfigCLI struct {
 	CLIInterface
-	ConnectError         error
-	LoadProjectNameError error
-	ListConfigError      error
-	ConfigResponse       *defangv1.Secrets
-	ProjectName          string
-	CallLog              []string
+	ConnectError             error
+	LoadProjectNameError     error
+	ListConfigError          error
+	InteractiveLoginMCPError error
+	ConfigResponse           *defangv1.Secrets
+	ProjectName              string
+	CallLog                  []string
 }
 
 func (m *MockListConfigCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
@@ -54,6 +57,14 @@ func (m *MockListConfigCLI) ListConfig(ctx context.Context, provider client.Prov
 	return m.ConfigResponse, nil
 }
 
+func (m *MockListConfigCLI) InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
+	m.CallLog = append(m.CallLog, fmt.Sprintf("InteractiveLoginMCP(%s)", cluster))
+	if m.InteractiveLoginMCPError != nil {
+		return m.InteractiveLoginMCPError
+	}
+	return nil
+}
+
 func TestHandleListConfigTool(t *testing.T) {
 	tests := []struct {
 		name                 string
@@ -67,8 +78,9 @@ func TestHandleListConfigTool(t *testing.T) {
 			providerID: client.ProviderAWS,
 			setupMock: func(m *MockListConfigCLI) {
 				m.ConnectError = errors.New("connection failed")
+				m.InteractiveLoginMCPError = errors.New("connection failed")
 			},
-			expectedError: "Could not connect: connection failed",
+			expectedError: "connection failed",
 		},
 		{
 			name:       "load_project_name_error",
@@ -133,11 +145,18 @@ func TestHandleListConfigTool(t *testing.T) {
 				},
 			})
 
-			stackName := "test-stack"
-			result, err := HandleListConfigTool(t.Context(), loader, mockCLI, ec, StackConfig{
-				Cluster:    "test-cluster",
-				ProviderID: &tt.providerID,
-				Stack:      &stackName,
+			stack := stacks.StackParameters{
+				Name:     "test-stack",
+				Provider: client.ProviderAWS,
+			}
+			params := ListConfigParams{
+				LoaderParams: common.LoaderParams{
+					WorkingDirectory: ".",
+				},
+			}
+			result, err := HandleListConfigTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
+				Cluster: "test-cluster",
+				Stack:   &stack,
 			})
 
 			// Verify error expectations

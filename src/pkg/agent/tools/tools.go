@@ -6,9 +6,9 @@ import (
 	"github.com/firebase/genkit/go/ai"
 )
 
-func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Tool {
+func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 	return []ai.Tool{
-		ai.NewTool[ServicesParams, string](
+		ai.NewTool(
 			"services",
 			"List deployed services for the project in the current working directory",
 			func(ctx *ai.ToolContext, params ServicesParams) (string, error) {
@@ -17,7 +17,7 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 					return "Failed to configure loader", err
 				}
 				var cli CLIInterface = &DefaultToolCLI{}
-				return HandleServicesTool(ctx.Context, loader, cli, ec, config)
+				return HandleServicesTool(ctx.Context, loader, params, cli, ec, sc)
 			},
 		),
 		ai.NewTool("deploy",
@@ -28,7 +28,7 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 					return "Failed to configure loader", err
 				}
 				cli := &DefaultToolCLI{}
-				return HandleDeployTool(ctx.Context, loader, cli, ec, config)
+				return HandleDeployTool(ctx.Context, loader, params, cli, ec, sc)
 			},
 		),
 		ai.NewTool("destroy",
@@ -39,7 +39,7 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 					return "Failed to configure loader", err
 				}
 				cli := &DefaultToolCLI{}
-				return HandleDestroyTool(ctx.Context, loader, cli, ec, config)
+				return HandleDestroyTool(ctx.Context, loader, params, cli, ec, sc)
 			},
 		),
 		ai.NewTool("logs",
@@ -50,7 +50,7 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 					return "Failed to configure loader", err
 				}
 				cli := &DefaultToolCLI{}
-				return HandleLogsTool(ctx.Context, loader, params, cli, ec, config)
+				return HandleLogsTool(ctx.Context, loader, params, cli, ec, sc)
 			},
 		),
 		ai.NewTool("estimate",
@@ -61,7 +61,7 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 					return "Failed to configure loader", err
 				}
 				cli := &DefaultToolCLI{}
-				return HandleEstimateTool(ctx.Context, loader, params, cli, config)
+				return HandleEstimateTool(ctx.Context, loader, params, cli, sc)
 			},
 		),
 		ai.NewTool("set_config",
@@ -72,7 +72,37 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 					return "Failed to configure loader", err
 				}
 				cli := &DefaultToolCLI{}
-				return HandleSetConfig(ctx.Context, loader, params, cli, ec, config)
+				return HandleSetConfig(ctx.Context, loader, params, cli, ec, sc)
+			},
+		),
+		ai.NewTool("select_stack",
+			"Select the deployment stack for the defang project",
+			func(ctx *ai.ToolContext, params SelectStackParams) (string, error) {
+				return HandleSelectStackTool(ctx.Context, params, sc)
+			},
+		),
+		ai.NewTool("create_aws_stack",
+			"Create a defang stack file to deploy to AWS",
+			func(ctx *ai.ToolContext, params CreateAWSStackParams) (string, error) {
+				return HandleCreateAWSStackTool(ctx.Context, params, sc)
+			},
+		),
+		ai.NewTool("create_gcp_stack",
+			"Create a defang stack file to deploy to GCP",
+			func(ctx *ai.ToolContext, params CreateGCPStackParams) (string, error) {
+				return HandleCreateGCPStackTool(ctx.Context, params, sc)
+			},
+		),
+		ai.NewTool("list_stacks",
+			"List all the Defang stack(s) for the current project",
+			func(ctx *ai.ToolContext, params ListStacksParams) (string, error) {
+				return HandleListStacksTool(ctx.Context, params)
+			},
+		),
+		ai.NewTool("current_stack",
+			"Get the currently selected stack",
+			func(ctx *ai.ToolContext, params CurrentStackParams) (string, error) {
+				return HandleCurrentStackTool(ctx.Context, sc)
 			},
 		),
 		ai.NewTool("remove_config",
@@ -83,18 +113,18 @@ func CollectDefangTools(ec elicitations.Controller, config StackConfig) []ai.Too
 					return "Failed to configure loader", err
 				}
 				cli := &DefaultToolCLI{}
-				return HandleRemoveConfigTool(ctx.Context, loader, params, cli, ec, config)
+				return HandleRemoveConfigTool(ctx.Context, loader, params, cli, ec, sc)
 			},
 		),
 		ai.NewTool("list_configs",
 			"List config variables for the defang project",
-			func(ctx *ai.ToolContext, params ListConfigsParams) (string, error) {
+			func(ctx *ai.ToolContext, params ListConfigParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
 				cli := &DefaultToolCLI{}
-				return HandleListConfigTool(ctx.Context, loader, cli, ec, config)
+				return HandleListConfigTool(ctx.Context, loader, params, cli, ec, sc)
 			},
 		),
 	}

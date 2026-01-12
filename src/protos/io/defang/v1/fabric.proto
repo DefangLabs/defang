@@ -1,21 +1,21 @@
 // protos/io/defang/v1/fabric.proto
 syntax = "proto3";
 
-option go_package = "github.com/DefangLabs/defang/src/protos/io/defang/v1";
-
 package io.defang.v1;
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 import "google/type/money.proto";
 
+option go_package = "github.com/DefangLabs/defang/src/protos/io/defang/v1";
+
 service FabricController {
   rpc GetStatus(google.protobuf.Empty) returns (Status) {
     option idempotency_level = NO_SIDE_EFFECTS;
-  }; // public
+  }
   rpc GetVersion(google.protobuf.Empty) returns (Version) {
     option idempotency_level = NO_SIDE_EFFECTS;
-  }; // public
+  }
   rpc Token(TokenRequest) returns (TokenResponse); // public
 
   rpc RevokeToken(google.protobuf.Empty) returns (google.protobuf.Empty);
@@ -24,14 +24,13 @@ service FabricController {
   rpc Deploy(DeployRequest) returns (DeployResponse);
   rpc Get(GetRequest) returns (ServiceInfo) {
     option idempotency_level = NO_SIDE_EFFECTS;
-  }; // should be GetService
-  rpc GetPlaygroundProjectDomain(google.protobuf.Empty)
-      returns (GetPlaygroundProjectDomainResponse) {
+  }
+  rpc GetPlaygroundProjectDomain(google.protobuf.Empty) returns (GetPlaygroundProjectDomainResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
-  };
+  }
   rpc Delete(DeleteRequest) returns (DeleteResponse) {
     option deprecated = true;
-  }; // used by pulumi-defang provider; should use Deploy or Destroy
+  }
   rpc Destroy(DestroyRequest) returns (DestroyResponse) {
     option idempotency_level = IDEMPOTENT;
   }
@@ -42,10 +41,9 @@ service FabricController {
   // rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
   rpc GetServices(GetServicesRequest) returns (GetServicesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
-  }; // should be ListServices
+  }
 
-  rpc GenerateFiles(GenerateFilesRequest) returns (
-      GenerateFilesResponse); // deprecated; use StartGenerate/GenerateStatus
+  rpc GenerateFiles(GenerateFilesRequest) returns (GenerateFilesResponse);
   rpc StartGenerate(GenerateFilesRequest) returns (StartGenerateResponse);
   rpc GenerateStatus(GenerateStatusRequest) returns (GenerateFilesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -54,8 +52,7 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  rpc SignEULA(google.protobuf.Empty)
-      returns (google.protobuf.Empty); // AgreeToS
+  rpc SignEULA(google.protobuf.Empty) returns (google.protobuf.Empty); // AgreeToS
   rpc CheckToS(google.protobuf.Empty) returns (google.protobuf.Empty) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
@@ -64,11 +61,11 @@ service FabricController {
   rpc PutSecret(PutConfigRequest) returns (google.protobuf.Empty) {
     option deprecated = true;
     option idempotency_level = IDEMPOTENT;
-  };
+  }
   rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty) {
     option deprecated = true;
     option idempotency_level = IDEMPOTENT;
-  };
+  }
   rpc ListSecrets(ListConfigsRequest) returns (Secrets) {
     option idempotency_level = NO_SIDE_EFFECTS;
     option deprecated = true;
@@ -76,44 +73,40 @@ service FabricController {
 
   rpc GetConfigs(GetConfigsRequest) returns (GetConfigsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
-  }; // no values
+  }
   rpc PutConfig(PutConfigRequest) returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
-  };
+  }
   rpc DeleteConfigs(DeleteConfigsRequest) returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
   }
   rpc ListConfigs(ListConfigsRequest) returns (ListConfigsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
-  }; // no values
+  }
 
   rpc PutDeployment(PutDeploymentRequest) returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
-  };
+  }
 
-  rpc ListDeployments(ListDeploymentsRequest)
-      returns (ListDeploymentsResponse) {
+  rpc ListDeployments(ListDeploymentsRequest) returns (ListDeploymentsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
-  }; // no values
+  }
 
   rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
 
-  rpc DelegateSubdomainZone(DelegateSubdomainZoneRequest)
-      returns (DelegateSubdomainZoneResponse);
-  rpc DeleteSubdomainZone(DeleteSubdomainZoneRequest)
-      returns (google.protobuf.Empty) {
+  rpc DelegateSubdomainZone(DelegateSubdomainZoneRequest) returns (DelegateSubdomainZoneResponse);
+  rpc DeleteSubdomainZone(DeleteSubdomainZoneRequest) returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
-  };
-  rpc GetDelegateSubdomainZone(GetDelegateSubdomainZoneRequest)
-      returns (DelegateSubdomainZoneResponse) {
+  }
+  rpc GetDelegateSubdomainZone(GetDelegateSubdomainZoneRequest) returns (DelegateSubdomainZoneResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
-  };
+  }
   rpc SetOptions(SetOptionsRequest) returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
   }
   rpc WhoAmI(google.protobuf.Empty) returns (WhoAmIResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
-  };
+  }
   rpc Track(TrackRequest) returns (google.protobuf.Empty);
 
   // Endpoint for GDPR compliance
@@ -125,13 +118,11 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  rpc GetSelectedProvider(GetSelectedProviderRequest)
-      returns (GetSelectedProviderResponse) {
+  rpc GetSelectedProvider(GetSelectedProviderRequest) returns (GetSelectedProviderResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  rpc SetSelectedProvider(SetSelectedProviderRequest)
-      returns (google.protobuf.Empty) {
+  rpc SetSelectedProvider(SetSelectedProviderRequest) returns (google.protobuf.Empty) {
     option deprecated = true; // deprecated in favor of stacks
     option idempotency_level = IDEMPOTENT;
   }
@@ -146,10 +137,54 @@ service FabricController {
 
   rpc Preview(PreviewRequest) returns (PreviewResponse);
 
-  rpc GenerateCompose(GenerateComposeRequest)
-      returns (GenerateComposeResponse) {
+  rpc GenerateCompose(GenerateComposeRequest) returns (GenerateComposeResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
-  };
+  }
+
+  rpc PutStack(PutStackRequest) returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  rpc GetStack(GetStackRequest) returns (GetStackResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ListStacks(ListStacksRequest) returns (ListStacksResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc DeleteStack(DeleteStackRequest) returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+
+message Stack {
+  string name = 1;
+  string project = 2;
+  bytes stack_file = 3; // Defang stack file
+}
+
+message PutStackRequest {
+  Stack stack = 1;
+}
+
+message GetStackRequest {
+  string project = 1;
+  string stack = 2;
+}
+
+message GetStackResponse {
+  Stack stack = 1;
+}
+
+message ListStacksRequest {
+  string project = 1;
+}
+
+message ListStacksResponse {
+  repeated Stack stacks = 1;
+}
+
+message DeleteStackRequest {
+  string project = 1;
+  string stack = 2;
 }
 
 enum Provider {
@@ -160,7 +195,9 @@ enum Provider {
   GCP = 4;
 }
 
-message GetSelectedProviderRequest { string project = 1; }
+message GetSelectedProviderRequest {
+  string project = 1;
+}
 
 message GetSelectedProviderResponse {
   Provider provider = 1;
@@ -183,7 +220,9 @@ message DestroyRequest {
   string project = 1; // defaults to tenant ID
 }
 
-message DestroyResponse { string etag = 1; }
+message DestroyResponse {
+  string etag = 1;
+}
 
 message DebugRequest {
   repeated File files = 1;
@@ -250,13 +289,13 @@ message CanIUseResponse {
 }
 
 message DeployRequest {
-  reserved 1;                               // was: services
-  string project = 2 [ deprecated = true ]; // deprecated; use compose.name
+  reserved 1; // was: services
+  string project = 2 [deprecated = true]; // deprecated; use compose.name
   DeploymentMode mode = 3;
   bytes compose = 4; // yaml (or json)
   string delegate_domain = 5;
   string delegation_set_id = 6;
-  bool preview = 7 [ deprecated = true ];
+  bool preview = 7 [deprecated = true];
   Provider provider = 8;
 }
 
@@ -271,14 +310,16 @@ message DeleteRequest {
   string delegate_domain = 3;
 }
 
-message DeleteResponse { string etag = 1; }
+message DeleteResponse {
+  string etag = 1;
+}
 
 message GenerateFilesRequest {
   string prompt = 1;
   string language = 2;
   bool agree_tos = 3;
   bool training_opt_out = 4; // only valid for Pro users
-  string model_id = 5;       // only valid for Pro users
+  string model_id = 5; // only valid for Pro users
 }
 
 message File {
@@ -286,18 +327,28 @@ message File {
   string content = 2;
 }
 
-message GenerateFilesResponse { repeated File files = 1; }
+message GenerateFilesResponse {
+  repeated File files = 1;
+}
 
-message StartGenerateResponse { string uuid = 1; }
+message StartGenerateResponse {
+  string uuid = 1;
+}
 
-message GenerateStatusRequest { string uuid = 1; }
+message GenerateStatusRequest {
+  string uuid = 1;
+}
 
 message UploadURLRequest {
   string digest = 1;
   string project = 2;
+  string stack = 3;
+  string filename = 4;
 }
 
-message UploadURLResponse { string url = 1; }
+message UploadURLResponse {
+  string url = 1;
+}
 
 enum ServiceState {
   NOT_SPECIFIED = 0;
@@ -324,22 +375,20 @@ enum ServiceState {
 message ServiceInfo {
   Service service = 1;
   repeated string endpoints = 2; // list of endpoints, one for each port
-  string project = 3;            // was: tenant; defaults to tenant ID
+  string project = 3; // was: tenant; defaults to tenant ID
   string etag = 4;
   string status = 5;
   repeated string nat_ips = 6; // comma-separated list of NAT IPs
-  repeated string lb_ips =
-      7; // comma-separated list of internal CIDRs for the load-balancer
+  repeated string lb_ips = 7; // comma-separated list of internal CIDRs for the load-balancer
   string private_fqdn = 8; // fully qualified domain name (host)
-  string public_fqdn = 9;  // fully qualified domain name (ingress)
+  string public_fqdn = 9; // fully qualified domain name (ingress)
   google.protobuf.Timestamp created_at = 10;
   google.protobuf.Timestamp updated_at = 11;
   string zone_id = 12; // zone ID for byod domain
-  bool use_acme_cert =
-      13; // If we should setup the facilities to use ACME(let's encrypt) certs
-  reserved 14;             // was: string lb_dns
+  bool use_acme_cert = 13; // If we should setup the facilities to use ACME(let's encrypt) certs
+  reserved 14; // was: string lb_dns
   ServiceState state = 15; // enumerated status of the service
-  string domainname = 16;  // domain name for the service
+  string domainname = 16; // domain name for the service
   string lb_dns_name = 17; // fully qualified domain name for the load-balancer
   bool allow_scaling = 18; // true if service is allowed to autoscale
   string healthcheck_path = 19;
@@ -414,19 +463,29 @@ message PutConfigRequest {
   ConfigType type = 4;
 }
 
-message GetConfigsRequest { repeated ConfigKey configs = 1; }
+message GetConfigsRequest {
+  repeated ConfigKey configs = 1;
+}
 
-message GetConfigsResponse { repeated Config configs = 1; }
+message GetConfigsResponse {
+  repeated Config configs = 1;
+}
 
-message GetPlaygroundProjectDomainResponse { string domain = 1; }
+message GetPlaygroundProjectDomainResponse {
+  string domain = 1;
+}
 
-message DeleteConfigsRequest { repeated ConfigKey configs = 1; }
+message DeleteConfigsRequest {
+  repeated ConfigKey configs = 1;
+}
 
 message ListConfigsRequest {
   string project = 1; // defaults to tenant ID
 }
 
-message ListConfigsResponse { repeated ConfigKey configs = 1; }
+message ListConfigsResponse {
+  repeated ConfigKey configs = 1;
+}
 
 enum DeploymentType {
   DEPLOYMENT_TYPE_UNSPECIFIED = 0;
@@ -444,7 +503,7 @@ enum DeploymentAction {
 message Deployment {
   string id = 1; // aka etag
   string project = 2;
-  string provider_string = 3 [ deprecated = true ]; // was: provider
+  string provider_string = 3 [deprecated = true]; // was: provider
   string provider_account_id = 4;
   google.protobuf.Timestamp timestamp = 5;
   DeploymentAction action = 6;
@@ -452,24 +511,41 @@ message Deployment {
   Provider provider = 8;
   int32 service_count = 9;
   string stack = 10;
+  DeploymentMode mode = 11;
+  google.protobuf.Timestamp completed = 12;
+  DeploymentStatus status = 13;
+  string states_url = 14;
+  string events_url = 15;
 }
 
-message PutDeploymentRequest { Deployment deployment = 1; }
+enum DeploymentStatus {
+  DEPLOYMENT_STATUS_UNSPECIFIED = 0;
+  DEPLOYMENT_STATUS_IN_PROGRESS = 1;
+  DEPLOYMENT_STATUS_SUCCESS = 2;
+  DEPLOYMENT_STATUS_FAILED = 3;
+}
+
+message PutDeploymentRequest {
+  Deployment deployment = 1;
+}
 
 message ListDeploymentsRequest {
   string project = 1;
   DeploymentType type = 2; // active or all
-  uint32 limit = 3;        // number of deployments to return
+  uint32 limit = 3; // number of deployments to return
+  string stack = 4;
 }
 
-message ListDeploymentsResponse { repeated Deployment deployments = 1; }
+message ListDeploymentsResponse {
+  repeated Deployment deployments = 1;
+}
 
 message TokenRequest {
   string tenant = 1;
-  string auth_code = 2;      // from GitHub authorization code flow
+  string auth_code = 2; // from GitHub authorization code flow
   repeated string scope = 3; // "tail", "read", etc.
-  string assertion = 4;      // jwt-bearer
-  uint32 expires_in = 5;     // seconds
+  string assertion = 4; // jwt-bearer
+  uint32 expires_in = 5; // seconds
   string anon_id = 6;
   string refresh_token = 7;
 }
@@ -477,17 +553,16 @@ message TokenRequest {
 message TokenResponse {
   string access_token = 1; // short-lived token
   string refresh_token = 2;
-  // string token_type = 3; // "Bearer"
-  // uint32 expires_in = 4; // 3600
-  // string id_token = 5; // "eyJhbGciOiJSUzI…"
 }
 
-message Status { string version = 1; }
+message Status {
+  string version = 1;
+}
 
 message Version {
   string fabric = 1;
-  reserved 2;            // was "nats"
-  string cli_min = 3;    // minimum CLI version
+  reserved 2; // was "nats"
+  string cli_min = 3; // minimum CLI version
   string pulumi_min = 4; // minimum Pulumi provider version
 }
 
@@ -535,14 +610,14 @@ message GetServicesResponse {
 message ProjectUpdate {
   repeated ServiceInfo services = 1;
   string alb_arn = 2;
-  string project = 3 [ deprecated = true ]; // deprecated; use compose.name
+  string project = 3 [deprecated = true]; // deprecated; use compose.name
   bytes compose = 4;
   string cd_version = 5;
   DeploymentMode mode = 6;
   Provider provider = 7;
   uint32 project_outputs_version = 8;
-  bytes project_outputs = 9; // JSON serialization of pulumi outputs. schema
-                             // versioned using project_outputs_version
+  bytes project_outputs = 9; // JSON serialization of pulumi outputs. schema versioned using project_outputs_version
+  bytes stack_file = 10; // Defang stack file
 }
 
 message GetRequest { // was ServiceID
@@ -551,17 +626,16 @@ message GetRequest { // was ServiceID
 }
 
 message Service {
-  option deprecated =
-      true; // still used by pulumi-defang provider in state files
+  option deprecated = true; // still used by pulumi-defang provider in state files
   string name = 1;
-  reserved 2;  // was: string image
-  reserved 3;  // was: Platform platform
-  reserved 4;  // was: bool internal
-  reserved 5;  // was: Deploy deploy
-  reserved 6;  // was: repeated Port ports
-  reserved 7;  // was: map<string, string> environment
-  reserved 8;  // was: Build build
-  reserved 9;  // was: repeated Secret secrets
+  reserved 2; // was: string image
+  reserved 3; // was: Platform platform
+  reserved 4; // was: bool internal
+  reserved 5; // was: Deploy deploy
+  reserved 6; // was: repeated Port ports
+  reserved 7; // was: map<string, string> environment
+  reserved 8; // was: Build build
+  reserved 9; // was: repeated Secret secrets
   reserved 10; // was: HealthCheck healthcheck
   reserved 11; // was: repeated string command
   reserved 12; // was: string domainname
@@ -590,9 +664,9 @@ message DeployEvent {
 message Event {
   option deprecated = true;
   string specversion = 1; // required (but we don't care)
-  string type = 2;        // required
-  string source = 3;      // required
-  string id = 4;          // required
+  string type = 2; // required
+  string source = 3; // required
+  string id = 4; // required
   string datacontenttype = 5;
   string dataschema = 6;
   string subject = 7;
@@ -612,13 +686,15 @@ message SubscribeRequest {
 }
 
 message SubscribeResponse {
-  ServiceInfo service = 1 [ deprecated = true ];
+  ServiceInfo service = 1 [deprecated = true];
   string name = 2;
   string status = 3;
   ServiceState state = 4;
 }
 
-message GetServicesRequest { string project = 1; }
+message GetServicesRequest {
+  string project = 1;
+}
 
 message DelegateSubdomainZoneRequest {
   repeated string name_server_records = 1;
@@ -626,7 +702,9 @@ message DelegateSubdomainZoneRequest {
   string stack = 3;
 }
 
-message DelegateSubdomainZoneResponse { string zone = 1; }
+message DelegateSubdomainZoneResponse {
+  string zone = 1;
+}
 
 message DeleteSubdomainZoneRequest {
   string project = 1;
@@ -649,7 +727,7 @@ enum SubscriptionTier {
 
 message SetOptionsRequest {
   bool training_opt_out = 1; // only valid for Pro users
-  string model_id = 2;       // only valid for Pro users
+  string model_id = 2; // only valid for Pro users
 }
 
 message WhoAmIResponse {
@@ -692,7 +770,9 @@ message PreviewRequest {
   string project_name = 6;
 }
 
-message PreviewResponse { string etag = 1; }
+message PreviewResponse {
+  string etag = 1;
+}
 
 enum SourcePlatform {
   SOURCE_PLATFORM_UNSPECIFIED = 0;
@@ -702,8 +782,7 @@ enum SourcePlatform {
 message GenerateComposeRequest {
   SourcePlatform platform = 1;
   bytes data = 2; // platform-specific json
-  string previous_error =
-      3; // optional; if set, will retry while noting this error
+  string previous_error = 3; // optional; if set, will retry while noting this error
 }
 
 message GenerateComposeResponse {

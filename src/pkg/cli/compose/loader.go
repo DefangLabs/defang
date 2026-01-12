@@ -19,7 +19,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/template"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 type Project = composeTypes.Project
@@ -89,6 +89,15 @@ func (l *Loader) LoadProjectName(ctx context.Context) (string, error) {
 
 func (l *Loader) LoadProject(ctx context.Context) (*Project, error) {
 	return l.loadProject(ctx, false)
+}
+
+func (l *Loader) TargetDirectory() string {
+	project, _ := l.loadProject(context.TODO(), true)
+	if project == nil {
+		return ""
+	}
+
+	return project.WorkingDir
 }
 
 func (l *Loader) loadProject(ctx context.Context, suppressWarn bool) (*Project, error) {

@@ -1,0 +1,7 @@
+[95m * ENVIRONMENT VARIABLES RESOLUTION SUMMARY:
+[0m[1m
+SERVICE   ENVIRONMENT  VALUE   SOURCE[0m
+service1  ENV_VAR1     value1  Compose  
+service1  ENV_VAR2     value2  Compose  
+service2  ENV_VAR1     value1  Compose  
+service2  ENV_VAR2     value2  Compose  

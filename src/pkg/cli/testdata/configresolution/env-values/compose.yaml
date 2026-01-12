@@ -1,0 +1,7 @@
+services:
+  service1:
+    image: nginx
+    environment:
+      PLAIN_VAR: plain_value
+      SECRET_KEY: ${SECRET_KEY}
+      PUBLIC_URL: https://example-${HELLO_WORLD}.com

@@ -8,9 +8,11 @@ import (
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/auth"
+	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/bufbuild/connect-go"
 )
@@ -19,15 +21,23 @@ type ServicesParams struct {
 	common.LoaderParams
 }
 
-func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
+func HandleServicesTool(ctx context.Context, loader client.Loader, params ServicesParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
-	client, err := cli.Connect(ctx, config.Cluster)
+	client, err := GetClientWithRetry(ctx, cli, sc)
 	if err != nil {
-		return "", fmt.Errorf("could not connect: %w", err)
+		var noBrowserErr auth.ErrNoBrowser
+		if errors.As(err, &noBrowserErr) {
+			return noBrowserErr.Error(), nil
+		}
+		return "", err
 	}
 
-	pp := NewProviderPreparer(cli, ec, client)
-	_, provider, err := pp.SetupProvider(ctx, config.Stack)
+	sm, err := stacks.NewManager(client, loader.TargetDirectory(), params.ProjectName)
+	if err != nil {
+		return "", fmt.Errorf("failed to create stack manager: %w", err)
+	}
+	pp := NewProviderPreparer(cli, ec, client, sm)
+	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
@@ -43,7 +53,7 @@ func HandleServicesTool(ctx context.Context, loader cliClient.ProjectLoader, cli
 
 	serviceResponse, err := cli.GetServices(ctx, projectName, provider)
 	if err != nil {
-		var noServicesErr defangcli.ErrNoServices
+		var noServicesErr cliTypes.ErrNoServices
 		if errors.As(err, &noServicesErr) {
 			return noServicesErr.Error(), nil
 		}

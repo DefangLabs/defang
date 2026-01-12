@@ -139,7 +139,7 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 				case connect.CodeUnknown:
 					// Ignore unknown (nil) errors
 				default:
-					term.Warn(err) // TODO: use cliClient.PrettyError(…)
+					term.Warn(err) // TODO: use client.PrettyError(…)
 				}
 			}
 		}
@@ -485,7 +485,7 @@ func printLogEntry(e *defangv1.LogEntry, options *TailOptions, t *term.Term) {
 			line = term.StripAnsi(line)
 		}
 		buf.WriteString(line)
-		buf.WriteRune('\n')
+		buf.WriteByte('\n')
 	}
 
 	t.Print(buf.String())

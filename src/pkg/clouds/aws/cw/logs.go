@@ -246,10 +246,18 @@ func filterLogEvents(ctx context.Context, cw FilterLogEventsAPI, lgi LogGroupInp
 		if fleo.NextToken == nil {
 			return nil
 		}
-		if limit > 0 && len(events) >= int(limit) {
-			return nil
+		if limit > 0 {
+			if len(events) < int(limit) { // this handles len(events) == 0 as well
+				limit -= int32(len(events)) // #nosec G115 - always safe because len(events) < limit
+			} else if lastTS := events[len(events)-1].Timestamp; lastTS != nil && time.UnixMilli(*lastTS).Equal(start) {
+				// If the last event timestamp is equal to the start time, we risk getting stuck in a loop
+				// where the agent keeps asking for logs since the last timestamp, but ends up fetching the same logs
+				// over and over. To avoid this, we ignore the limit and keep going, until the timestamp changes.
+				limit = 10 // arbitrary small number to make some progress; could be smarter
+			} else {
+				return nil
+			}
 		}
-		limit -= int32(len(events)) // #nosec G115 - always safe because len(events) <= limit
 		params.NextToken = fleo.NextToken
 	}
 }

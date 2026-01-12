@@ -40,21 +40,15 @@ import (
 	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
-
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/proto"
 )
 
-type StsProviderAPI interface {
-	GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
-	AssumeRole(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error)
-}
-
-var StsClient StsProviderAPI
+type Config = awssdk.Config
 
 type ByocAws struct {
 	*byoc.ByocBaseClient
@@ -123,19 +117,12 @@ func AnnotateAwsError(err error) error {
 	return err
 }
 
-func NewByocProvider(ctx context.Context, tenantName types.TenantName, stack string) *ByocAws {
+func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string) *ByocAws {
 	b := &ByocAws{
 		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
-
 	return b
-}
-
-func initStsClient(cfg awssdk.Config) {
-	if StsClient == nil {
-		StsClient = sts.NewFromConfig(cfg)
-	}
 }
 
 func (b *ByocAws) makeContainers() []clouds.Container {
@@ -185,15 +172,15 @@ func (b *ByocAws) GetDeploymentStatus(ctx context.Context) error {
 	return nil
 }
 
-func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocAws) Deploy(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
 	return b.deploy(ctx, req, "up")
 }
 
-func (b *ByocAws) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocAws) Preview(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
 	return b.deploy(ctx, req, "preview")
 }
 
-func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd string) (*defangv1.DeployResponse, error) {
+func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd string) (*defangv1.DeployResponse, error) {
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
@@ -259,6 +246,8 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		delegationSetId: req.DelegationSetId,
 		mode:            req.Mode,
 		project:         project.Name,
+		statesUrl:       req.StatesUrl,
+		eventsUrl:       req.EventsUrl,
 	}
 
 	if b.needDockerHubCreds {
@@ -383,8 +372,8 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 	}
 
 	if roleARN != "" {
-		initStsClient(cfg)
-		creds := stscreds.NewAssumeRoleProvider(StsClient, roleARN)
+		stsClient := aws.NewStsFromConfig(cfg)
+		creds := stscreds.NewAssumeRoleProvider(stsClient, roleARN)
 		cfg.Credentials = awssdk.NewCredentialsCache(creds)
 	}
 
@@ -416,7 +405,7 @@ func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 	}
 	r53Client := route53.NewFromConfig(cfg)
 
-	projectDomain := b.GetProjectDomain(req.Project, req.DelegateDomain)
+	projectDomain := req.DelegateDomain
 	nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, req.Project, b.PulumiStack, r53Client, dns.ResolverAt)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
@@ -434,9 +423,9 @@ func (b *ByocAws) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
-	initStsClient(cfg)
 
-	identity, err := StsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	stsClient := aws.NewStsFromConfig(cfg)
+	identity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
@@ -477,14 +466,14 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_JSON":                os.Getenv("DEFANG_JSON"),
-		"DEFANG_ORG":                 b.TenantName,
+		"DEFANG_ORG":                 string(b.TenantLabel), // Keep this as DEFANG_ORG for backward compatibility CD depends on this variable name
 		"DEFANG_PREFIX":              b.Prefix,
 		"DEFANG_PULUMI_DEBUG":        os.Getenv("DEFANG_PULUMI_DEBUG"),
 		"DEFANG_PULUMI_DIFF":         os.Getenv("DEFANG_PULUMI_DIFF"),
 		"DEFANG_STATE_URL":           defangStateUrl,
 		"NODE_NO_WARNINGS":           "1",
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
-		"PRIVATE_DOMAIN":             byoc.GetPrivateDomain(projectName),
+		"PRIVATE_DOMAIN":             b.GetPrivateDomain(projectName),
 		"PROJECT":                    projectName,        // may be empty
 		pulumiBackendKey:             pulumiBackendValue, // TODO: make secret
 		"PULUMI_AUTOMATION_API_SKIP_VERSION_CHECK":      "true",
@@ -515,6 +504,9 @@ type cdCommand struct {
 
 	dockerHubUsername    string
 	dockerHubAccessToken string
+
+	statesUrl string
+	eventsUrl string
 }
 
 func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn, error) {
@@ -527,7 +519,7 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn,
 		env["DELEGATION_SET_ID"] = cmd.delegationSetId
 	}
 	if cmd.delegateDomain != "" {
-		env["DOMAIN"] = b.GetProjectDomain(cmd.project, cmd.delegateDomain)
+		env["DOMAIN"] = cmd.delegateDomain
 	} else {
 		env["DOMAIN"] = "dummy.domain"
 	}
@@ -555,31 +547,16 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn,
 			return nil, err
 		}
 	}
-	return b.driver.Run(ctx, env, cmd.command...)
-}
 
-func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	if len(req.Names) > 0 {
-		return nil, client.ErrNotImplemented("per-service deletion is not supported for BYOC")
+	if cmd.statesUrl != "" {
+		env["DEFANG_STATES_UPLOAD_URL"] = cmd.statesUrl
 	}
-	if err := b.SetUpCD(ctx); err != nil {
-		return nil, err
+
+	if cmd.eventsUrl != "" {
+		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
 	}
-	// FIXME: this should only delete the services that are specified in the request, not all
-	cmd := cdCommand{
-		project:        req.Project,
-		delegateDomain: req.DelegateDomain,
-		command:        []string{"up", ""}, // 2nd empty string is a empty payload
-	}
-	cdTaskArn, err := b.runCdCommand(ctx, cmd)
-	if err != nil {
-		return nil, AnnotateAwsError(err)
-	}
-	etag := ecs.GetTaskID(cdTaskArn) // TODO: this is the CD task ID, not the etag
-	b.cdEtag = etag
-	b.cdStart = time.Now()
-	b.cdTaskArn = cdTaskArn
-	return &defangv1.DeleteResponse{Etag: etag}, nil
+
+	return b.driver.Run(ctx, env, cmd.command...)
 }
 
 func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
@@ -936,13 +913,15 @@ func (b *ByocAws) TearDownCD(ctx context.Context) error {
 	return b.driver.TearDown(ctx)
 }
 
-func (b *ByocAws) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (string, error) {
+func (b *ByocAws) CdCommand(ctx context.Context, req client.CdCommandRequest) (string, error) {
 	if err := b.SetUpCD(ctx); err != nil {
 		return "", err
 	}
 	cmd := cdCommand{
-		project: req.Project,
-		command: []string{req.Command},
+		project:   req.Project,
+		command:   []string{string(req.Command)},
+		statesUrl: req.StatesUrl,
+		eventsUrl: req.EventsUrl,
 	}
 	cdTaskArn, err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
 	if err != nil {
@@ -953,10 +932,6 @@ func (b *ByocAws) BootstrapCommand(ctx context.Context, req client.BootstrapComm
 	b.cdStart = time.Now()
 	b.cdTaskArn = cdTaskArn
 	return etag, nil
-}
-
-func (b *ByocAws) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (string, error) {
-	return b.BootstrapCommand(ctx, client.BootstrapCommandRequest{Project: req.Project, Command: "down"})
 }
 
 func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
@@ -971,7 +946,7 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	return nil
 }
 
-func (b *ByocAws) BootstrapList(ctx context.Context, allRegions bool) (iter.Seq[string], error) {
+func (b *ByocAws) CdList(ctx context.Context, allRegions bool) (iter.Seq[string], error) {
 	if allRegions {
 		s3Client, err := newS3Client(ctx, b.driver.Region)
 		if err != nil {
@@ -1020,6 +995,6 @@ func (b *ByocAws) AddEcsEventHandler(handler ECSEventHandler) {
 	b.ecsEventHandlers = append(b.ecsEventHandlers, handler)
 }
 
-func (b *ByocAws) ServicePublicDNS(name string, projectName string) string {
-	return dns.SafeLabel(name) + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(b.TenantName) + ".defang.app"
+func (b *ByocAws) GetPrivateDomain(projectName string) string {
+	return b.GetProjectLabel(projectName) + ".internal"
 }

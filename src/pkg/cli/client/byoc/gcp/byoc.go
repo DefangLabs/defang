@@ -14,15 +14,11 @@ import (
 	"time"
 
 	"cloud.google.com/go/logging/apiv2/loggingpb"
-	run "cloud.google.com/go/run/apiv2"
-	"cloud.google.com/go/run/apiv2/runpb"
 	"cloud.google.com/go/storage"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/clouds"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/http"
@@ -30,8 +26,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
+	"go.yaml.in/yaml/v3"
 	"google.golang.org/api/googleapi"
 	auditpb "google.golang.org/genproto/googleapis/cloud/audit"
 	"google.golang.org/grpc/codes"
@@ -102,7 +98,7 @@ type ByocGcp struct {
 	cdEtag      string
 }
 
-func NewByocProvider(ctx context.Context, tenantName types.TenantName, stack string) *ByocGcp {
+func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string) *ByocGcp {
 	region := pkg.Getenv("GCP_LOCATION", "us-central1") // Defaults to us-central1 for lower price
 	projectId := getGcpProjectID()
 	b := &ByocGcp{driver: &gcp.Gcp{Region: region, ProjectId: projectId}}
@@ -122,7 +118,7 @@ func (b *ByocGcp) SetUpCD(ctx context.Context) error {
 	if b.setupDone {
 		return nil
 	}
-	// TODO: Handle organizations and Project Creation
+	// TODO: Handle project creation flow
 
 	term.Infof("Setting up defang CD in GCP project %s, this could take a few minutes", b.driver.ProjectId)
 	// 1. Enable required APIs
@@ -186,6 +182,7 @@ func (b *ByocGcp) SetUpCD(ctx context.Context) error {
 		"roles/certificatemanager.owner",        // For creating certificates
 		"roles/serviceusage.serviceUsageAdmin",  // For allowing cd to Enable APIs
 		"roles/datastore.owner",                 // For creating firestore database
+		"roles/logging.logWriter",               // For allowing cloudbuild to write logs
 	}); err != nil {
 		return err
 	}
@@ -232,20 +229,6 @@ func (b *ByocGcp) SetUpCD(ctx context.Context) error {
 	// 5. Setup Cloud Run Job
 	term.Debugf("Using CD image: %q", b.CDImage)
 
-	serviceAccount := path.Base(b.cdServiceAccount)
-	if err := b.driver.SetupJob(ctx, "defang-cd", serviceAccount, []clouds.Container{
-		{
-			Image:     b.CDImage,
-			Name:      ecs.CdContainerName,
-			Cpus:      2.0,
-			Memory:    2048_000_000, // 2G
-			Essential: ptr.Bool(true),
-			WorkDir:   "/app",
-		},
-	}); err != nil {
-		return err
-	}
-
 	b.setupDone = true
 	return nil
 }
@@ -260,7 +243,7 @@ func (o gcpObj) Size() int64 {
 	return o.obj.Size
 }
 
-func (b *ByocGcp) BootstrapList(ctx context.Context, _allRegions bool) (iter.Seq[string], error) {
+func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[string], error) {
 	bucketName, err := b.driver.GetBucketWithPrefix(ctx, "defang-cd")
 	if err != nil {
 		return nil, annotateGcpError(err)
@@ -286,13 +269,13 @@ func (b *ByocGcp) BootstrapList(ctx context.Context, _allRegions bool) (iter.Seq
 				term.Debugf("Error listing object in bucket %s: %v", bucketName, annotateGcpError(err))
 				continue
 			}
-			stack, err := byoc.ParsePulumiStackObject(ctx, gcpObj{obj}, bucketName, prefix, objLoader)
+			stack, err := byoc.ParsePulumiStateFile(ctx, gcpObj{obj}, bucketName, objLoader)
 			if err != nil {
 				term.Debugf("Skipping %q in bucket %s: %v", obj.Name, bucketName, annotateGcpError(err))
 				continue
 			}
-			if stack != "" {
-				if !yield(stack) {
+			if stack != nil {
+				if !yield(stack.String()) {
 					break
 				}
 			}
@@ -303,7 +286,7 @@ func (b *ByocGcp) BootstrapList(ctx context.Context, _allRegions bool) (iter.Seq
 func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
 	projectId := getGcpProjectID()
 	if projectId == "" {
-		return nil, errors.New("GCP_PROJECT_ID or CLOUDSDK_CORE_PROJECT must be set for GCP projects")
+		return nil, errors.New("GCP_PROJECT_ID or CLOUDSDK_CORE_PROJECT must be set for GCP projects; use 'gcloud projects list' to see available project ids")
 	}
 
 	// check whether the ADC is logged in by trying to get the current account email
@@ -326,13 +309,15 @@ func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 	}, nil
 }
 
-func (b *ByocGcp) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (types.ETag, error) {
+func (b *ByocGcp) CdCommand(ctx context.Context, req client.CdCommandRequest) (types.ETag, error) {
 	if err := b.SetUpCD(ctx); err != nil {
 		return "", err
 	}
 	cmd := cdCommand{
-		project: req.Project,
-		command: []string{req.Command},
+		project:   req.Project,
+		command:   []string{string(req.Command)},
+		statesUrl: req.StatesUrl,
+		eventsUrl: req.EventsUrl,
 	}
 	cdExecutionId, err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
 	if err != nil {
@@ -344,9 +329,18 @@ func (b *ByocGcp) BootstrapCommand(ctx context.Context, req client.BootstrapComm
 type cdCommand struct {
 	command        []string
 	delegateDomain string
-	envOverride    map[string]string
+	etag           types.ETag
 	mode           defangv1.DeploymentMode
 	project        string
+	statesUrl      string
+	eventsUrl      string
+}
+
+type CloudBuildStep struct {
+	Name       string   `yaml:"name,omitempty"`
+	Entrypoint string   `yaml:"entrypoint,omitempty"`
+	Args       []string `yaml:"args,omitempty"`
+	Env        []string `yaml:"env,omitempty"`
 }
 
 func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, error) {
@@ -359,7 +353,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_JSON":              os.Getenv("DEFANG_JSON"),
 		"DEFANG_MODE":              strings.ToLower(cmd.mode.String()),
-		"DEFANG_ORG":               "defang",
+		"DEFANG_ORG":               string(b.TenantLabel),
 		"DEFANG_PREFIX":            b.Prefix,
 		"DEFANG_PULUMI_DEBUG":      os.Getenv("DEFANG_PULUMI_DEBUG"),
 		"DEFANG_PULUMI_DIFF":       os.Getenv("DEFANG_PULUMI_DIFF"),
@@ -379,13 +373,21 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 	}
 
 	if cmd.delegateDomain != "" {
-		env["DOMAIN"] = b.GetProjectDomain(cmd.project, cmd.delegateDomain)
+		env["DOMAIN"] = cmd.delegateDomain
 	} else {
 		env["DOMAIN"] = "dummy.domain"
 	}
 
-	for k, v := range cmd.envOverride {
-		env[k] = v
+	if cmd.statesUrl != "" {
+		env["DEFANG_STATES_UPLOAD_URL"] = cmd.statesUrl
+	}
+
+	if cmd.eventsUrl != "" {
+		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
+	}
+
+	if cmd.etag != "" {
+		env["DEFANG_ETAG"] = cmd.etag
 	}
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
@@ -401,12 +403,36 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		}
 	}
 
-	execution, err := b.driver.Run(ctx, gcp.JobNameCD, env, cmd.command...)
+	var envs []string
+	for k, v := range env {
+		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	steps, err := yaml.Marshal([]CloudBuildStep{
+		{
+			Name: b.CDImage,
+			Args: cmd.command,
+			Env:  envs,
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	term.Debugf("Starting CD in cloudbuild at: %v", time.Now().Format(time.RFC3339))
+	execution, err := b.driver.RunCloudBuild(ctx, gcp.CloudBuildArgs{
+		Steps:          string(steps),
+		ServiceAccount: &b.cdServiceAccount,
+		Tags: []string{
+			fmt.Sprintf("%v_%v_%v_%v", b.PulumiStack, cmd.project, "cd", cmd.etag), // For cd logs, consistent with cloud build tagging
+			"defang-cd", // To indicate this is the actual cd service
+		},
+	})
 	if err != nil {
 		return "", err
 	}
 	b.cdExecution = execution
 	// term.Printf("CD Execution: %s\n", execution)
+
 	return execution, nil
 }
 
@@ -424,50 +450,19 @@ func (b *ByocGcp) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 	}
 	return &defangv1.UploadURLResponse{Url: url}, nil
 }
-func (b *ByocGcp) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocGcp) Deploy(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
 	return b.deploy(ctx, req, "up")
 }
 
-func (b *ByocGcp) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocGcp) Preview(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
 	return b.deploy(ctx, req, "preview")
 }
 
 func (b *ByocGcp) GetDeploymentStatus(ctx context.Context) error {
-	execClient, err := run.NewExecutionsClient(ctx)
-	if err != nil {
-		return err
-	}
-	defer execClient.Close()
-
-	execution, err := execClient.GetExecution(ctx, &runpb.GetExecutionRequest{Name: b.cdExecution})
-	if err != nil {
-		return err
-	}
-
-	var completionTime = execution.GetCompletionTime()
-	if completionTime != nil {
-		// cd is done
-		var failedTasks = execution.GetFailedCount()
-		if failedTasks > 0 {
-			var msgs []string
-			for _, condition := range execution.GetConditions() {
-				if condition.GetType() == "Completed" && condition.GetMessage() != "" {
-					msgs = append(msgs, condition.GetMessage())
-				}
-			}
-
-			return client.ErrDeploymentFailed{Message: strings.Join(msgs, ",")}
-		}
-
-		// completed successfully
-		return io.EOF
-	}
-
-	// still running
-	return nil
+	return b.driver.GetBuildStatus(ctx, b.cdExecution)
 }
 
-func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, command string) (*defangv1.DeployResponse, error) {
+func (b *ByocGcp) deploy(ctx context.Context, req *client.DeployRequest, command string) (*defangv1.DeployResponse, error) {
 	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
 	project, err := compose.LoadFromContent(ctx, req.Compose, "")
 	if err != nil {
@@ -521,9 +516,11 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 	cdCmd := cdCommand{
 		command:        []string{command, payload},
 		delegateDomain: req.DelegateDomain,
-		envOverride:    map[string]string{"DEFANG_ETAG": etag},
+		etag:           etag,
 		mode:           req.Mode,
 		project:        project.Name,
+		statesUrl:      req.StatesUrl,
+		eventsUrl:      req.EventsUrl,
 	}
 	execution, err := b.runCdCommand(ctx, cdCmd)
 	if err != nil {
@@ -535,10 +532,6 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 		etag = execution // Only wait for the preview command cd job to finish
 	}
 	return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, nil
-}
-
-func (b *ByocGcp) GetStackName() string {
-	return b.PulumiStack
 }
 
 func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
@@ -564,7 +557,7 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 }
 
 func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	// BootstrapCommand returns the job execution ID as the eTag, which subsequently passed in as eTag in TailRequest,
+	// CdCommand returns the job execution ID as the eTag, which subsequently passed in as eTag in TailRequest,
 	// in those cases, we need a way to detect when the CD task has finished running and stop tailing thg logs by cancelling the logging context.
 	if b.cdExecution != "" && req.Etag == b.cdExecution {
 		var err error
@@ -597,14 +590,12 @@ func (b *ByocGcp) getLogStream(ctx context.Context, gcpLogsClient GcpLogsClient,
 		if execName == "." {
 			execName = ""
 		}
-		logStream.AddJobExecutionLog(execName) // CD log when there is an execution name
-		// TODO: update stack (1st param) to b.PulumiStack
-		logStream.AddJobLog("", req.Project, etag, req.Services)        // Kaniko or CD logs when there is no execution name
-		logStream.AddCloudBuildLog("", req.Project, etag, req.Services) // CloudBuild logs
+		logStream.AddJobExecutionLog(execName)                                     // CD log when there is an execution name
+		logStream.AddJobLog(b.PulumiStack, req.Project, etag, req.Services)        // Kaniko or CD logs when there is no execution name
+		logStream.AddCloudBuildLog(b.PulumiStack, req.Project, etag, req.Services) // CloudBuild logs
 	}
 	if logs.LogType(req.LogType).Has(logs.LogTypeRun) {
-		// TODO: update stack (1st param) to b.PulumiStack
-		logStream.AddServiceLog("", req.Project, etag, req.Services) // Service logs
+		logStream.AddServiceLog(b.PulumiStack, req.Project, etag, req.Services) // Service logs
 	}
 	logStream.AddFilter(req.Pattern)
 	if req.Follow {
@@ -686,10 +677,6 @@ func (b *ByocGcp) GetServices(ctx context.Context, req *defangv1.GetServicesRequ
 	return &listServiceResp, nil
 }
 
-func (b *ByocGcp) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error) {
-	return b.BootstrapCommand(ctx, client.BootstrapCommandRequest{Project: req.Project, Command: "down"})
-}
-
 type ConflictDelegateDomainError struct {
 	NewDomain      string
 	ConflictDomain string
@@ -731,7 +718,7 @@ func (b *ByocGcp) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 
 func (b *ByocGcp) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
 	for _, name := range req.Names {
-		secretId := b.StackName(req.Project, name)
+		secretId := b.resourceName(req.Project, name)
 		term.Debugf("Deleting secret %q", secretId)
 		if err := b.driver.DeleteSecret(ctx, secretId); err != nil {
 			return fmt.Errorf("failed to delete secret %q: %w", secretId, err)
@@ -741,7 +728,7 @@ func (b *ByocGcp) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error
 }
 
 func (b *ByocGcp) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
-	prefix := b.StackName(req.Project, "")
+	prefix := b.resourceName(req.Project, "")
 	secrets, err := b.driver.ListSecrets(ctx, prefix)
 	if err != nil {
 		if stat, ok := status.FromError(err); ok && stat.Code() == codes.PermissionDenied {
@@ -763,7 +750,7 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 	if !pkg.IsValidSecretName(req.Name) {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid config name; must be alphanumeric or _, cannot start with a number: %q", req.Name))
 	}
-	secretId := b.StackName(req.Project, req.Name)
+	secretId := b.resourceName(req.Project, req.Name)
 	term.Debugf("Creating secret %q", secretId)
 
 	if _, err := b.driver.CreateSecret(ctx, secretId); err != nil {
@@ -804,18 +791,16 @@ func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
 		query.AddJobExecutionQuery(path.Base(b.cdExecution))
 	}
 
-	// Logs TODO: update stack (1st param) to b.PulumiStack
-	query.AddJobLogQuery("", req.Project, req.Etag, req.Services)        // Kaniko OR CD logs
-	query.AddServiceLogQuery("", req.Project, req.Etag, req.Services)    // Cloudrun service logs
-	query.AddCloudBuildLogQuery("", req.Project, req.Etag, req.Services) // CloudBuild logs
+	query.AddJobLogQuery(b.PulumiStack, req.Project, req.Etag, req.Services)        // Kaniko OR CD logs
+	query.AddServiceLogQuery(b.PulumiStack, req.Project, req.Etag, req.Services)    // Cloudrun service logs
+	query.AddCloudBuildLogQuery(b.PulumiStack, req.Project, req.Etag, req.Services) // CloudBuild logs
 	query.AddSince(since)
 	query.AddUntil(until)
 
-	// Service status updates TODO: update stack (1st param) to b.PulumiStack
-	query.AddJobStatusUpdateRequestQuery("", req.Project, req.Etag, req.Services)
-	query.AddJobStatusUpdateResponseQuery("", req.Project, req.Etag, req.Services)
-	query.AddServiceStatusRequestUpdate("", req.Project, req.Etag, req.Services)
-	query.AddServiceStatusReponseUpdate("", req.Project, req.Etag, req.Services)
+	query.AddJobStatusUpdateRequestQuery(b.PulumiStack, req.Project, req.Etag, req.Services)
+	query.AddJobStatusUpdateResponseQuery(b.PulumiStack, req.Project, req.Etag, req.Services)
+	query.AddServiceStatusRequestUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
+	query.AddServiceStatusReponseUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
 
 	return query.GetQuery()
 }
@@ -850,15 +835,18 @@ func LogEntryToString(logEntry *loggingpb.LogEntry) (string, string, error) {
 }
 
 func LogEntriesToString(logEntries []*loggingpb.LogEntry) string {
-	result := ""
+	var result strings.Builder
 	for _, logEntry := range logEntries {
 		logTimestamp, msg, err := LogEntryToString(logEntry)
 		if err != nil {
 			continue
 		}
-		result += logTimestamp + " " + msg + "\n"
+		result.WriteString(logTimestamp)
+		result.WriteByte(' ')
+		result.WriteString(msg)
+		result.WriteByte('\n')
 	}
-	return result
+	return result.String()
 }
 
 func (b *ByocGcp) query(ctx context.Context, query string) ([]*loggingpb.LogEntry, error) {
@@ -895,11 +883,6 @@ func (b *ByocGcp) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest)
 }
 
 // FUNCTIONS TO BE IMPLEMENTED BELOW ========================
-
-func (b *ByocGcp) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	// FIXME: implement
-	return nil, client.ErrNotImplemented("GCP Delete")
-}
 
 func (b *ByocGcp) TearDownCD(ctx context.Context) error {
 	// FIXME: implement
@@ -975,7 +958,7 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 	return &projUpdate, nil
 }
 
-func (b *ByocGcp) StackName(projectName, name string) string {
+func (b *ByocGcp) resourceName(projectName, name string) string {
 	pkg.Ensure(projectName != "", "ProjectName not set")
 	var parts []string
 	if b.Prefix != "" {
@@ -984,6 +967,7 @@ func (b *ByocGcp) StackName(projectName, name string) string {
 	return strings.Join(append(parts, projectName, b.PulumiStack, name), "_") // same as fullDefangResourceName in gcpcd/up.go
 }
 
-func (b *ByocGcp) ServicePublicDNS(name string, projectName string) string {
-	return dns.SafeLabel(name) + "." + b.PulumiStack + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(b.TenantName) + ".defang.app"
+func (*ByocGcp) GetPrivateDomain(projectName string) string {
+	// Apparently GCP does not support private DNS zones with arbitrary domain names
+	return "google.internal"
 }

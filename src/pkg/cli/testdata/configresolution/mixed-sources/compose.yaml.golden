@@ -1,0 +1,7 @@
+[95m * ENVIRONMENT VARIABLES RESOLUTION SUMMARY:
+[0m[1m
+SERVICE   ENVIRONMENT  VALUE                                       SOURCE[0m
+service1  FROM_ENV     from_ENV                                    Compose                
+service1  PLAIN_VAR    plain_value                                 Compose                
+service1  PUBLIC_URL   https://example-${SECRET_KEY}-from_ENV.com  Config (interpolated)  
+service1  SECRET_KEY   *****                                       Config                 

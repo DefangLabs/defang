@@ -17,6 +17,7 @@
           with pkgs;
           mkShell {
             buildInputs = [
+              bashInteractive # full bash with readline/completion so prompts render correctly
               buf
               crane
               git
@@ -24,6 +25,7 @@
               less
               gnused # force Linux `sed` everywhere
               go_1_24 # must match GO_VERSION in Dockerfile
+              gopls
               golangci-lint
               goreleaser
               nixfmt-rfc-style
@@ -34,6 +36,13 @@
               google-cloud-sdk
               vim
             ];
+            shellHook = ''
+              export SHELL=${bashInteractive}/bin/bash
+
+              if [ -t 1 ]; then
+                export PS1="[defang:nix] \w$ "
+              fi
+            '';
           };
         packages.defang-cli = pkgs.callPackage ./pkgs/defang/cli.nix { };
         packages.defang-bin = pkgs.callPackage ./pkgs/defang { };

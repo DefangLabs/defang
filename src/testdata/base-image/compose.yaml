@@ -1,0 +1,11 @@
+services:
+  no-dockerfile:
+    build: .
+  one-image:
+    build:
+      context: one_image
+      dockerfile: Dockerfile
+  mutiple-images:
+    build:
+      context: multiple-images
+      dockerfile: Dockerfile

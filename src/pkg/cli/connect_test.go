@@ -10,6 +10,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/bufbuild/connect-go"
@@ -22,7 +23,7 @@ func TestConnect(t *testing.T) {
 	t.Run("unreachable", func(t *testing.T) {
 		t.Parallel()
 		t.Skip("unreachable test only triggers when the wifi is off")
-		_, err := Connect(ctx, "1.2.3.4")
+		_, err := ConnectWithTenant(ctx, "1.2.3.4", types.TenantUnset)
 		if expected, actual := "unavailable: dial tcp 1.2.3.4:443: connect: network is unreachable", err.Error(); expected != actual {
 			t.Errorf("expected %v, got: %v", expected, actual)
 		}
@@ -37,9 +38,13 @@ func TestConnect(t *testing.T) {
 			t.Skip("skipping slow test in short mode")
 		}
 		// Use a non-routable IP address to trigger a timeout
-		_, err := Connect(ctx, "240.0.0.1")
-		if expected, actual := `deadline_exceeded: Post "https://240.0.0.1:443/io.defang.v1.FabricController/WhoAmI": dial tcp 240.0.0.1:443: i/o timeout`, err.Error(); expected != actual {
-			t.Errorf("expected %v, got: %v", expected, actual)
+		_, err := ConnectWithTenant(ctx, "240.0.0.1", types.TenantUnset)
+		expected := []string{
+			`deadline_exceeded: Post "https://240.0.0.1:443/io.defang.v1.FabricController/WhoAmI": dial tcp 240.0.0.1:443: i/o timeout`,
+			`unavailable: dial tcp 240.0.0.1:443: connect: connection refused`,
+		}
+		if actual := err.Error(); !slices.Contains(expected, actual) {
+			t.Errorf("expected one of %v, got: %v", expected, actual)
 		}
 		if !client.IsNetworkError(err) {
 			t.Errorf("expected network error, got: %v", err)
@@ -48,7 +53,7 @@ func TestConnect(t *testing.T) {
 
 	t.Run("connection refused", func(t *testing.T) {
 		t.Parallel()
-		_, err := Connect(ctx, "127.0.0.1:1234")
+		_, err := ConnectWithTenant(ctx, "127.0.0.1:1234", types.TenantUnset)
 		if expected, actual := "unavailable: dial tcp 127.0.0.1:1234: connect: connection refused", err.Error(); expected != actual {
 			t.Errorf("expected %v, got: %v", expected, actual)
 		}
@@ -59,7 +64,7 @@ func TestConnect(t *testing.T) {
 
 	t.Run("no such host", func(t *testing.T) {
 		t.Parallel()
-		_, err := Connect(ctx, "blah.example.com")
+		_, err := ConnectWithTenant(ctx, "blah.example.com", types.TenantUnset)
 		suffixes := []string{": no such host", "device or resource busy"}
 		if actual := err.Error(); !slices.ContainsFunc(suffixes, func(suffix string) bool { return strings.HasSuffix(actual, suffix) }) {
 			t.Errorf("expected error to end with %q, got: %v", suffixes, actual)
@@ -74,7 +79,7 @@ func TestConnect(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 		t.Cleanup(server.Close)
 
-		_, err := Connect(ctx, strings.TrimPrefix(server.URL, "http://"))
+		_, err := ConnectWithTenant(ctx, strings.TrimPrefix(server.URL, "http://"), types.TenantUnset)
 		if expected, actual := "internal: protocol error: no Grpc-Status trailer: unexpected EOF", err.Error(); expected != actual {
 			t.Errorf("expected %v, got: %v", expected, actual)
 		}
@@ -85,12 +90,12 @@ func TestConnect(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
-		handler := mockWhoAmI{}
+		handler := &mockWhoAmI{}
 		_, h := defangv1connect.NewFabricControllerHandler(handler)
 		server := httptest.NewServer(h)
 		t.Cleanup(server.Close)
 
-		g, err := Connect(ctx, strings.TrimPrefix(server.URL, "http://"))
+		g, err := ConnectWithTenant(ctx, strings.TrimPrefix(server.URL, "http://"), types.TenantUnset)
 		if err != nil {
 			t.Fatalf("expected %v, got: %v", nil, err)
 		}
@@ -99,52 +104,78 @@ func TestConnect(t *testing.T) {
 		}
 	})
 
-	t.Run("success ignore tenant", func(t *testing.T) {
+	t.Run("success ignores server tenant response", func(t *testing.T) {
 		t.Parallel()
-		const expected = "tenant1"
-		handler := mockWhoAmI{tenant: expected}
+		const serverTenant = "server-tenant"
+		handler := &mockWhoAmI{tenant: serverTenant, tenantID: "server-id"}
 		_, h := defangv1connect.NewFabricControllerHandler(handler)
 		server := httptest.NewServer(h)
 		t.Cleanup(server.Close)
 
-		// Try to override the tenant, but doesn't match the one from the "token"
-		g, err := Connect(ctx, "ignored@"+strings.TrimPrefix(server.URL, "http://"))
+		g, err := ConnectWithTenant(ctx, strings.TrimPrefix(server.URL, "http://"), types.TenantUnset)
 		if err != nil {
 			t.Fatalf("expected %v, got: %v", nil, err)
 		}
-		if g.TenantName != expected {
-			t.Errorf("expected %v, got: %v", expected, g.TenantName)
+		if g.GetRequestedTenant() != "" {
+			t.Errorf("expected requested tenant to be empty, got %q", g.GetRequestedTenant())
+		}
+		if g.GetTenantName() != serverTenant {
+			t.Errorf("expected tenant %q, got %q", serverTenant, g.GetTenantName())
+		}
+		if handler.seenTenant != "" {
+			t.Errorf("expected empty tenant header, got: %q", handler.seenTenant) // default connection should not force a tenant header
 		}
 	})
 
-	t.Run("success tenant from header", func(t *testing.T) {
+	t.Run("explicit tenant header", func(t *testing.T) {
 		t.Parallel()
-		handler := mockWhoAmI{}
+		const serverTenant = "server-tenant"
+		handler := &mockWhoAmI{tenant: serverTenant, tenantID: "server-id"}
 		_, h := defangv1connect.NewFabricControllerHandler(handler)
 		server := httptest.NewServer(h)
 		t.Cleanup(server.Close)
 
-		// Try to override the tenant
-		const expected = "tenant2"
-		g, err := Connect(ctx, expected+"@"+strings.TrimPrefix(server.URL, "http://"))
+		const requested = "tenant2"
+		g, err := ConnectWithTenant(ctx, strings.TrimPrefix(server.URL, "http://"), requested)
 		if err != nil {
 			t.Fatalf("expected %v, got: %v", nil, err)
 		}
-		if g.TenantName != expected {
-			t.Errorf("expected %v, got: %v", expected, g.TenantName)
+		if handler.seenTenant != requested {
+			t.Errorf("expected header %q, got: %q", requested, handler.seenTenant)
+		}
+		if g.GetRequestedTenant() != requested {
+			t.Errorf("expected requested tenant %q, got %q", requested, g.GetRequestedTenant())
+		}
+		if g.GetTenantName() != serverTenant {
+			t.Errorf("expected tenant %q, got %q", serverTenant, g.GetTenantName())
+		}
+	})
+
+	t.Run("legacy cluster prefix ignored", func(t *testing.T) {
+		t.Parallel()
+		handler := &mockWhoAmI{tenant: "server-tenant"}
+		_, h := defangv1connect.NewFabricControllerHandler(handler)
+		server := httptest.NewServer(h)
+		t.Cleanup(server.Close)
+
+		g := Connect("ignored@"+strings.TrimPrefix(server.URL, "http://"), types.TenantUnset)
+		if handler.seenTenant != "" {
+			t.Errorf("expected empty tenant header, got: %q", handler.seenTenant)
+		}
+		if g.GetTenantName() != "" {
+			t.Errorf("expected tenant to remain unset, got: %v", g.GetTenantName())
 		}
 	})
 }
 
 type mockWhoAmI struct {
-	tenant string
-	defangv1connect.FabricControllerHandler
+	tenant     string
+	tenantID   string
+	seenTenant string
+	defangv1connect.UnimplementedFabricControllerHandler
 }
 
-func (m mockWhoAmI) WhoAmI(ctx context.Context, req *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.WhoAmIResponse], error) {
-	tenant := m.tenant
-	if tenant == "" {
-		tenant = req.Header().Get(auth.XDefangOrgID)
-	}
-	return connect.NewResponse(&defangv1.WhoAmIResponse{Tenant: tenant}), nil
+func (m *mockWhoAmI) WhoAmI(ctx context.Context, req *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.WhoAmIResponse], error) {
+	m.seenTenant = req.Header().Get(auth.TenantHeader)
+	return connect.NewResponse(&defangv1.WhoAmIResponse{Tenant: m.tenant, TenantId: m.tenantID}), nil
 }

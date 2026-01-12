@@ -18,13 +18,22 @@ type PrintDeployment struct {
 	ProjectName string
 	Provider    string
 	Region      string
+	Mode        string
 }
 
-func DeploymentsList(ctx context.Context, listType defangv1.DeploymentType, projectName string, client client.FabricClient, limit uint32) error {
+type ListDeploymentsParams struct {
+	ListType    defangv1.DeploymentType
+	ProjectName string
+	StackName   string
+	Limit       uint32
+}
+
+func DeploymentsList(ctx context.Context, client client.FabricClient, params ListDeploymentsParams) error {
 	response, err := client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
-		Type:    listType,
-		Project: projectName,
-		Limit:   limit,
+		Type:    params.ListType,
+		Project: params.ProjectName,
+		Stack:   params.StackName,
+		Limit:   params.Limit,
 	})
 	if err != nil {
 		return err
@@ -33,10 +42,10 @@ func DeploymentsList(ctx context.Context, listType defangv1.DeploymentType, proj
 	numDeployments := len(response.Deployments)
 	if numDeployments == 0 {
 		var err error
-		if projectName == "" {
+		if params.ProjectName == "" {
 			_, err = term.Warn("No deployments found")
 		} else {
-			_, err = term.Warnf("No deployments found for project %q", projectName)
+			_, err = term.Warnf("No deployments found for project %q", params.ProjectName)
 		}
 		return err
 	}
@@ -51,6 +60,7 @@ func DeploymentsList(ctx context.Context, listType defangv1.DeploymentType, proj
 			ProjectName: d.Project,
 			Provider:    getProvider(d.Provider, d.ProviderString),
 			Region:      d.Region,
+			Mode:        d.Mode.String(),
 		}
 	}
 
@@ -64,7 +74,7 @@ func DeploymentsList(ctx context.Context, listType defangv1.DeploymentType, proj
 		return sortKeys[i] < sortKeys[j]
 	})
 
-	return term.Table(deployments, "ProjectName", "Provider", "AccountId", "Region", "Deployment", "DeployedAt")
+	return term.Table(deployments, "ProjectName", "Provider", "AccountId", "Region", "Deployment", "Mode", "DeployedAt")
 }
 
 func getProvider(provider defangv1.Provider, providerString string) string {

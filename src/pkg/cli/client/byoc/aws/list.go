@@ -67,7 +67,7 @@ func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string)
 			if obj.Key == nil || obj.Size == nil {
 				continue
 			}
-			stack, err := byoc.ParsePulumiStackObject(ctx, s3Obj{obj}, bucketName, prefix, func(ctx context.Context, bucket, path string) ([]byte, error) {
+			stack, err := byoc.ParsePulumiStateFile(ctx, s3Obj{obj}, bucketName, func(ctx context.Context, bucket, path string) ([]byte, error) {
 				getObjectOutput, err := s3client.GetObject(ctx, &s3.GetObjectInput{
 					Bucket: &bucket,
 					Key:    &path,
@@ -81,8 +81,8 @@ func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string)
 				term.Debugf("Skipping %q in bucket %s: %v", *obj.Key, bucketName, AnnotateAwsError(err))
 				continue
 			}
-			if stack != "" {
-				if !yield(stack) {
+			if stack != nil {
+				if !yield(stack.String()) {
 					break
 				}
 			}

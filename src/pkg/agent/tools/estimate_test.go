@@ -9,6 +9,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	_type "github.com/DefangLabs/defang/src/protos/google/type"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
@@ -18,14 +19,15 @@ import (
 // MockEstimateCLI implements CLIInterface for testing
 type MockEstimateCLI struct {
 	CLIInterface
-	ConnectError       error
-	LoadProjectError   error
-	RunEstimateError   error
-	EstimateResponse   *defangv1.EstimateResponse
-	Project            *compose.Project
-	CapturedOutput     string
-	CallLog            []string
-	ProviderIDAfterSet client.ProviderID // Track the providerID that gets set
+	ConnectError             error
+	LoadProjectError         error
+	RunEstimateError         error
+	InteractiveLoginMCPError error
+	EstimateResponse         *defangv1.EstimateResponse
+	Project                  *compose.Project
+	CapturedOutput           string
+	CallLog                  []string
+	ProviderIDAfterSet       client.ProviderID // Track the providerID that gets set
 }
 
 func (m *MockEstimateCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
@@ -64,6 +66,14 @@ func (m *MockEstimateCLI) CreatePlaygroundProvider(grpcClient *client.GrpcClient
 func (m *MockEstimateCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("PrintEstimate(%s)", mode.String()))
 	return m.CapturedOutput
+}
+
+func (m *MockEstimateCLI) InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
+	m.CallLog = append(m.CallLog, fmt.Sprintf("InteractiveLoginMCP(%s)", cluster))
+	if m.InteractiveLoginMCPError != nil {
+		return m.InteractiveLoginMCPError
+	}
+	return nil
 }
 
 func TestHandleEstimateTool(t *testing.T) {
@@ -110,8 +120,9 @@ func TestHandleEstimateTool(t *testing.T) {
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.ConnectError = errors.New("connection failed")
+				m.InteractiveLoginMCPError = errors.New("connection failed")
 			},
-			expectedError: "could not connect: connection failed",
+			expectedError: "connection failed",
 		},
 		{
 			name: "set_provider_id_error",
@@ -213,8 +224,8 @@ func TestHandleEstimateTool(t *testing.T) {
 			// Call the function
 			loader := &client.MockLoader{}
 			result, err := HandleEstimateTool(t.Context(), loader, params, mockCLI, StackConfig{
-				Cluster:    "test-cluster",
-				ProviderID: &providerID,
+				Cluster: "test-cluster",
+				Stack:   &stacks.StackParameters{Provider: providerID},
 			})
 
 			// Verify error expectations

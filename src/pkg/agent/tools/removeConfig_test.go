@@ -10,6 +10,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/bufbuild/connect-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,6 +22,7 @@ type MockRemoveConfigCLI struct {
 	ConnectError              error
 	LoadProjectNameError      error
 	ConfigDeleteError         error
+	InteractiveLoginMCPError  error
 	ConfigDeleteNotFoundError bool
 	ProjectName               string
 	CallLog                   []string
@@ -55,6 +57,14 @@ func (m *MockRemoveConfigCLI) ConfigDelete(ctx context.Context, projectName stri
 	return m.ConfigDeleteError
 }
 
+func (m *MockRemoveConfigCLI) InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
+	m.CallLog = append(m.CallLog, fmt.Sprintf("InteractiveLoginMCP(%s)", cluster))
+	if m.InteractiveLoginMCPError != nil {
+		return m.InteractiveLoginMCPError
+	}
+	return nil
+}
+
 func TestHandleRemoveConfigTool(t *testing.T) {
 	tests := []struct {
 		name                 string
@@ -70,9 +80,10 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			setupMock: func(m *MockRemoveConfigCLI) {
 				m.ProjectName = "test-project"
 				m.ConnectError = errors.New("connection failed")
+				m.InteractiveLoginMCPError = errors.New("connection failed")
 			},
 			expectError:   true,
-			expectedError: "Could not connect: connection failed",
+			expectedError: "connection failed",
 		},
 		{
 			name:       "load_project_name_error",
@@ -149,12 +160,14 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 					"profile_name": "default",
 				},
 			})
-			provider := client.ProviderAWS
-			stackName := "test-stack"
+
+			stack := stacks.StackParameters{
+				Name:     "test-stack",
+				Provider: client.ProviderAWS,
+			}
 			result, err := HandleRemoveConfigTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
-				Cluster:    "test-cluster",
-				ProviderID: &provider,
-				Stack:      &stackName,
+				Cluster: "test-cluster",
+				Stack:   &stack,
 			})
 
 			// Verify error expectations

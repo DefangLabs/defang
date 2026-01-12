@@ -15,10 +15,10 @@ var ErrTermsNotAgreed = errors.New("you must agree to the Defang terms of servic
 
 var P = track.P
 
-func InteractiveAgreeToS(ctx context.Context, c client.FabricClient) error {
+func InteractiveAgreeToS(ctx context.Context, fabric client.FabricClient) error {
 	if client.TermsAccepted() {
 		// The user has already agreed to the terms of service recently
-		if err := nonInteractiveAgreeToS(ctx, c); err != nil {
+		if err := nonInteractiveAgreeToS(ctx, fabric); err != nil {
 			term.Debug("unable to agree to terms:", err) // not fatal
 		}
 		return nil
@@ -40,10 +40,10 @@ func InteractiveAgreeToS(ctx context.Context, c client.FabricClient) error {
 		return ErrTermsNotAgreed
 	}
 
-	return NonInteractiveAgreeToS(ctx, c)
+	return NonInteractiveAgreeToS(ctx, fabric)
 }
 
-func NonInteractiveAgreeToS(ctx context.Context, c client.FabricClient) error {
+func NonInteractiveAgreeToS(ctx context.Context, fabric client.FabricClient) error {
 	if dryrun.DoDryRun {
 		return dryrun.ErrDryRun
 	}
@@ -53,11 +53,11 @@ func NonInteractiveAgreeToS(ctx context.Context, c client.FabricClient) error {
 		term.Debug("unable to persist terms agreement:", err) // not fatal
 	}
 
-	return nonInteractiveAgreeToS(ctx, c)
+	return nonInteractiveAgreeToS(ctx, fabric)
 }
 
-func nonInteractiveAgreeToS(ctx context.Context, c client.FabricClient) error {
-	if err := c.AgreeToS(ctx); err != nil {
+func nonInteractiveAgreeToS(ctx context.Context, fabric client.FabricClient) error {
+	if err := fabric.AgreeToS(ctx); err != nil {
 		return err
 	}
 	term.Info("You have agreed to the Defang terms of service")

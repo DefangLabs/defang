@@ -5,13 +5,11 @@ import (
 	"errors"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type ComposeError struct {
@@ -23,14 +21,13 @@ func (e ComposeError) Unwrap() error {
 }
 
 type ComposeUpParams struct {
-	Stack      string
 	Project    *compose.Project
 	UploadMode compose.UploadMode
 	Mode       modes.Mode
 }
 
 // ComposeUp validates a compose project and uploads the services using the client
-func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClient.Provider, params ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
+func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.Provider, params ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	upload := params.UploadMode
 	project := params.Project
 	mode := params.Mode
@@ -50,19 +47,10 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 	// Validate the project configuration against the provider's configuration, but only if we are going to deploy.
 	// FIXME: should not need to validate configs if we are doing preview, but preview will fail on missing configs.
 	if upload != compose.UploadModeIgnore {
-		listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
-			configs, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
-			if err != nil {
-				return nil, err
-			}
-
-			return configs.Names, nil
-		}
-
 		// Ignore missing configs in preview mode, because we don't want to fail the preview if some configs are missing.
 		if upload != compose.UploadModeEstimate {
-			if err := compose.ValidateProjectConfig(ctx, project, listConfigNamesFunc); err != nil {
-				return nil, project, &ComposeError{err}
+			if err := PrintConfigSummaryAndValidate(ctx, provider, project); err != nil {
+				return nil, project, err
 			}
 		}
 	}
@@ -88,21 +76,22 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 		return nil, project, dryrun.ErrDryRun
 	}
 
-	req := &defangv1.GetDelegateSubdomainZoneRequest{
+	delegateDomain, err := fabric.GetDelegateSubdomainZone(ctx, &defangv1.GetDelegateSubdomainZoneRequest{
 		Project: project.Name,
-		Stack:   params.Stack,
-	}
-	delegateDomain, err := fabric.GetDelegateSubdomainZone(ctx, req)
+		Stack:   provider.GetStackNameForDomain(),
+	})
 	if err != nil {
 		term.Debug("GetDelegateSubdomainZone failed:", err)
 		return nil, project, errors.New("failed to get delegate domain")
 	}
 
-	deployRequest := &defangv1.DeployRequest{
-		Mode:           mode.Value(),
-		Project:        project.Name,
-		Compose:        bytes,
-		DelegateDomain: delegateDomain.Zone,
+	deployRequest := &client.DeployRequest{
+		DeployRequest: defangv1.DeployRequest{
+			Mode:           mode.Value(),
+			Project:        project.Name,
+			Compose:        bytes,
+			DelegateDomain: delegateDomain.Zone,
+		},
 	}
 
 	delegation, err := provider.PrepareDomainDelegation(ctx, client.PrepareDomainDelegationRequest{
@@ -116,11 +105,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 		deployRequest.DelegationSetId = delegation.DelegationSetId
 	}
 
-	accountInfo, err := provider.AccountInfo(ctx)
-	if err != nil {
-		return nil, project, err
-	}
-
+	var statesUrl, eventsUrl string
 	var action defangv1.DeploymentAction
 	var resp *defangv1.DeployResponse
 	if upload == compose.UploadModePreview || upload == compose.UploadModeEstimate {
@@ -134,12 +119,21 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 			req := &defangv1.DelegateSubdomainZoneRequest{
 				NameServerRecords: delegation.NameServers,
 				Project:           project.Name,
-				Stack:             params.Stack,
+				Stack:             provider.GetStackNameForDomain(),
 			}
-			_, err = fabric.DelegateSubdomainZone(ctx, req)
+			_, err = fabric.CreateDelegateSubdomainZone(ctx, req)
 			if err != nil {
 				return nil, project, err
 			}
+		}
+
+		if _, ok := provider.(*client.PlaygroundProvider); !ok { // Do not need upload URLs for Playground
+			statesUrl, eventsUrl, err = GetStatesAndEventsUploadUrls(ctx, project.Name, provider, fabric)
+			if err != nil {
+				return nil, project, err
+			}
+			deployRequest.StatesUrl = statesUrl
+			deployRequest.EventsUrl = eventsUrl
 		}
 
 		resp, err = provider.Deploy(ctx, deployRequest)
@@ -149,23 +143,18 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider cliClie
 		action = defangv1.DeploymentAction_DEPLOYMENT_ACTION_UP
 	}
 
-	err = fabric.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
-		Deployment: &defangv1.Deployment{
-			Action:            action,
-			Id:                resp.Etag,
-			Project:           project.Name,
-			Provider:          accountInfo.Provider.Value(),
-			ProviderAccountId: accountInfo.AccountID,
-			ProviderString:    string(accountInfo.Provider),
-			Region:            accountInfo.Region,
-			ServiceCount:      int32(len(fixedProject.Services)), // #nosec G115 - service count will not overflow int32
-			Stack:             params.Stack,
-			Timestamp:         timestamppb.Now(),
-		},
+	err = putDeployment(ctx, provider, fabric, putDeploymentParams{
+		Action:       action,
+		ETag:         resp.Etag,
+		Mode:         mode.Value(),
+		ProjectName:  project.Name,
+		ServiceCount: len(fixedProject.Services),
+		StatesUrl:    statesUrl,
+		EventsUrl:    eventsUrl,
 	})
 	if err != nil {
-		term.Debugf("PutDeployment failed: %v", err)
-		term.Warn("Unable to update deployment history, but deployment will proceed anyway.")
+		term.Debug("Failed to record deployment:", err)
+		term.Warn("Unable to update deployment history; deployment will proceed anyway.")
 	}
 
 	if term.DoDebug() {
