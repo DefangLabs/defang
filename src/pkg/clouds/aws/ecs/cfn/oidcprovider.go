@@ -25,7 +25,7 @@ type OIDCProvider struct {
 	Tags []tags.Tag `json:"Tags,omitempty"`
 
 	// ThumbprintList AWS CloudFormation Property
-	// Required: true
+	// Required: false
 	// See: http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-oidcprovider.html#cfn-iam-oidcprovider-thumbprintlist
 	ThumbprintList interface{} `json:"ThumbprintList,omitempty"` // added "omitempty" to fix marshalling bug
 
