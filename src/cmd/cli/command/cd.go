@@ -121,7 +121,7 @@ var cdListCmd = &cobra.Command{
 		remote, _ := cmd.Flags().GetBool("remote")
 		all, _ := cmd.Flags().GetBool("all")
 
-		provider, err := newProviderChecked(cmd.Context(), nil, false)
+		session, err := NewCommandSession(cmd)
 		if err != nil {
 			return err
 		}
@@ -131,15 +131,15 @@ var cdListCmd = &cobra.Command{
 				return errors.New("--all cannot be used with --remote")
 			}
 
-			err = canIUseProvider(cmd.Context(), provider, "", 0)
+			err = canIUseProvider(cmd.Context(), session.Provider, "", 0)
 			if err != nil {
 				return err
 			}
 
 			// FIXME: this needs auth because it spawns the CD task
-			return cli.CdCommandAndTail(cmd.Context(), provider, "", global.Verbose, client.CdCommandList, global.Client)
+			return cli.CdCommandAndTail(cmd.Context(), session.Provider, "", global.Verbose, client.CdCommandList, global.Client)
 		}
-		return cli.CdListLocal(cmd.Context(), provider, all)
+		return cli.CdListLocal(cmd.Context(), session.Provider, all)
 	},
 }
 

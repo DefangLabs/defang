@@ -4,9 +4,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/session"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/spf13/cobra"
 )
 
@@ -55,5 +57,19 @@ func NewSessionLoaderOptionsForCommand(cmd *cobra.Command) session.SessionLoader
 		ComposeFilePaths: configPaths,
 		ProjectName:      projectName,
 		Interactive:      !global.NonInteractive,
+	}
+}
+
+func doubleCheckProjectName(projectName string) {
+	if global.NonInteractive {
+		return
+	}
+	var confirm bool
+	err := survey.AskOne(&survey.Confirm{
+		Message: "Continue with project: " + projectName + "?",
+	}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio()))
+	track.Evt("ProjectNameConfirm", P("project", projectName), P("confirm", confirm), P("err", err))
+	if err == nil && !confirm {
+		os.Exit(1)
 	}
 }

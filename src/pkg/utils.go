@@ -206,3 +206,15 @@ func ShellQuote(args ...string) string {
 	}
 	return strings.Join(quoted, " ")
 }
+
+func AwsInEnv() bool {
+	return os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
+}
+
+func DoInEnv() bool {
+	return os.Getenv("DIGITALOCEAN_ACCESS_TOKEN") != "" || os.Getenv("DIGITALOCEAN_TOKEN") != ""
+}
+
+func GcpInEnv() bool {
+	return os.Getenv("GCP_PROJECT_ID") != "" || os.Getenv("CLOUDSDK_CORE_PROJECT") != ""
+}

@@ -22,7 +22,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
@@ -80,18 +79,6 @@ func Execute(ctx context.Context) error {
 
 		if strings.Contains(err.Error(), "config") {
 			printDefangHint("To manage sensitive service config, use:", "config")
-		}
-
-		if strings.Contains(err.Error(), "maximum number of projects") {
-			projectName := "<name>"
-			provider, err := newProviderChecked(ctx, nil, false)
-			if err != nil {
-				return err
-			}
-			if resp, err := provider.RemoteProjectName(ctx); err == nil {
-				projectName = resp
-			}
-			printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
 		}
 
 		if cerr := new(cli.CancelError); errors.As(err, &cerr) {
@@ -1231,204 +1218,12 @@ func configureLoader(cmd *cobra.Command) *compose.Loader {
 	return compose.NewLoader(compose.WithProjectName(loaderFlags.ProjectName), compose.WithPath(loaderFlags.ComposeFilePaths...))
 }
 
-func doubleCheckProjectName(projectName string) {
-	if global.NonInteractive {
-		return
-	}
-	var confirm bool
-	err := survey.AskOne(&survey.Confirm{
-		Message: "Continue with project: " + projectName + "?",
-	}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio()))
-	track.Evt("ProjectNameConfirm", P("project", projectName), P("confirm", confirm), P("err", err))
-	if err == nil && !confirm {
-		os.Exit(1)
-	}
-}
-
-func awsInEnv() bool {
-	return os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
-}
-
-func doInEnv() bool {
-	return os.Getenv("DIGITALOCEAN_ACCESS_TOKEN") != "" || os.Getenv("DIGITALOCEAN_TOKEN") != ""
-}
-
-func gcpInEnv() bool {
-	return os.Getenv("GCP_PROJECT_ID") != "" || os.Getenv("CLOUDSDK_CORE_PROJECT") != ""
-}
-
-func awsInConfig(ctx context.Context) bool {
-	_, err := aws.LoadDefaultConfig(ctx, aws.Region(""))
-	return err == nil
-}
-
 func IsCompletionCommand(cmd *cobra.Command) bool {
 	return cmd.Name() == cobra.ShellCompRequestCmd || (cmd.Parent() != nil && cmd.Parent().Name() == "completion")
 }
 
 func isUpgradeCommand(cmd *cobra.Command) bool {
 	return cmd.Name() == "upgrade"
-}
-
-var providerDescription = map[client.ProviderID]string{
-	client.ProviderDefang: "The Defang Playground is a free platform intended for testing purposes only.",
-	client.ProviderAWS:    "Deploy to AWS using the AWS_* environment variables or the AWS CLI configuration.",
-	client.ProviderDO:     "Deploy to DigitalOcean using the DIGITALOCEAN_TOKEN, SPACES_ACCESS_KEY_ID, and SPACES_SECRET_ACCESS_KEY environment variables.",
-	client.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
-}
-
-func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager, allowStackCreation bool) (*stacks.StackParameters, string, error) {
-	var whence string
-	stackParams := &global.Stack
-
-	if stackParams.Name != "" {
-		whence = "stack"
-		loaded, err := sm.Load(ctx, stackParams.Name)
-		if err != nil {
-			term.Infof("Unable to find stack %q. Create it with `defang stack create %s`", stackParams.Name, stackParams.Name)
-			return nil, "", fmt.Errorf("unable to find stack %q: %w", stackParams.Name, err)
-		}
-		// allow mode to be overwritten by CLI flag or env var
-		if stackParams.Mode != modes.ModeUnspecified {
-			loaded.Mode = stackParams.Mode
-		}
-
-		if loaded.Provider == client.ProviderAuto {
-			return nil, "", fmt.Errorf("stack %q has an invalid provider %q", loaded.Name, loaded.Provider)
-		}
-		return loaded, whence, nil
-	}
-
-	if global.NonInteractive && stackParams.Provider == client.ProviderAuto {
-		whence = "non-interactive default"
-		stackParams.Name = stacks.DefaultBeta
-		stackParams.Provider = client.ProviderDefang
-		return stackParams, whence, nil
-	}
-
-	knownStacks, err := sm.List(ctx)
-	if err != nil {
-		return nil, "", fmt.Errorf("unable to list stacks: %w", err)
-	}
-	stackNames := make([]string, len(knownStacks))
-	for i, s := range knownStacks {
-		stackNames[i] = s.Name
-	}
-
-	// if there is exactly one stack with that provider, use it
-	if len(knownStacks) == 1 && (stackParams.Provider == client.ProviderAuto || knownStacks[0].Provider == stackParams.Provider) {
-		knownStack := knownStacks[0]
-		// try to read the stackfile
-		loaded, loadErr := sm.Load(ctx, knownStack.Name)
-		if loadErr != nil {
-			return nil, "", fmt.Errorf("unable to load stack %q: %w", knownStack.Name, loadErr)
-		}
-		// allow mode to be overwritten by CLI flag or env var
-		if stackParams.Mode != modes.ModeUnspecified {
-			loaded.Mode = stackParams.Mode
-		}
-		whence = "only stack"
-		return loaded, whence, nil
-	}
-
-	// if there are zero known stacks or more than one known stack, prompt the user to create or select a stack
-	if global.NonInteractive {
-		if len(stackNames) > 0 {
-			return nil, "", fmt.Errorf("please specify a stack using --stack. The following stacks are available: %v", stackNames)
-		} else {
-			return nil, "", fmt.Errorf("no stacks are configured; please create a stack using 'defang stack create --provider=%s'", stackParams.Provider)
-		}
-	}
-
-	stackSelector := stacks.NewSelector(ec, sm)
-
-	var loaded *stacks.StackParameters
-	if allowStackCreation {
-		loaded, err = stackSelector.SelectOrCreateStack(ctx)
-	} else {
-		loaded, err = stackSelector.SelectStack(ctx)
-	}
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to select stack: %w", err)
-	}
-	whence = "interactive selection"
-	return loaded, whence, nil
-}
-
-func printProviderMismatchWarnings(ctx context.Context, provider client.ProviderID) {
-	if provider == client.ProviderDefang {
-		// Ignore any env vars when explicitly using the Defang playground provider
-		// Defaults to defang provider in non-interactive mode
-		if awsInEnv() {
-			term.Warn("AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")
-		}
-		if doInEnv() {
-			term.Warn("DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
-		}
-		if gcpInEnv() {
-			term.Warn("GCP_PROJECT_ID/CLOUDSDK_CORE_PROJECT environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
-		}
-	}
-
-	switch provider {
-	case client.ProviderAWS:
-		if !awsInConfig(ctx) {
-			term.Warn("AWS provider was selected, but AWS environment is not set")
-		}
-	case client.ProviderDO:
-		if !doInEnv() {
-			term.Warn("DigitalOcean provider was selected, but DIGITALOCEAN_TOKEN environment variable is not set")
-		}
-	case client.ProviderGCP:
-		if !gcpInEnv() {
-			term.Warn("GCP provider was selected, but GCP_PROJECT_ID environment variable is not set")
-		}
-	}
-}
-
-func newProvider(ctx context.Context, ec elicitations.Controller, sm stacks.Manager, allowStackCreation bool) (client.Provider, error) {
-	stack, whence, err := getStack(ctx, ec, sm, allowStackCreation)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: avoid writing to this global variable once all readers are removed
-	global.Stack = *stack
-
-	extraMsg := ""
-	if stack.Provider == client.ProviderDefang {
-		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
-	}
-	term.Infof("Using the %q stack on %s from %s%s", stack.Name, stack.Provider, whence, extraMsg)
-
-	printProviderMismatchWarnings(ctx, stack.Provider)
-	provider := cli.NewProvider(ctx, stack.Provider, global.Client, stack.Name)
-	return provider, nil
-}
-
-func newProviderChecked(ctx context.Context, loader client.Loader, allowStackCreation bool) (client.Provider, error) {
-	var err error
-	projectName := ""
-	targetDirectory := ""
-	if loader != nil {
-		projectName, err = loader.LoadProjectName(ctx)
-		if err != nil {
-			term.Warnf("Unable to load project: %v", err)
-		}
-		targetDirectory = loader.TargetDirectory()
-	}
-	elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
-	ec := elicitations.NewController(elicitationsClient)
-	sm, err := stacks.NewManager(global.Client, targetDirectory, projectName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stack manager: %w", err)
-	}
-	provider, err := newProvider(ctx, ec, sm, allowStackCreation)
-	if err != nil {
-		return nil, err
-	}
-	_, err = provider.AccountInfo(ctx)
-	return provider, err
 }
 
 func canIUseProvider(ctx context.Context, provider client.Provider, projectName string, serviceCount int) error {

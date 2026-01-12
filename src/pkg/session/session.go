@@ -7,9 +7,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -57,7 +59,7 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 	}
 
 	// load stack
-	stack, err := sl.loadStack(ctx, targetDirectory)
+	stack, whence, err := sl.loadStack(ctx, targetDirectory)
 	if err != nil {
 		return nil, err
 	}
@@ -78,12 +80,19 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 		compose.WithPath(sl.opts.ComposeFilePaths...),
 	)
 	// load provider with selected stack
-	provider := sl.newProvider(ctx, stack.Name)
+	provider := cli.NewProvider(ctx, sl.opts.ProviderID, sl.client, stack.Name)
 	session := &Session{
 		Stack:    stack,
 		Loader:   loader,
 		Provider: provider,
 	}
+	extraMsg := ""
+	if stack.Provider == client.ProviderDefang {
+		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
+	}
+	term.Infof("Using the %q stack on %s from %s%s", stack.Name, stack.Provider, whence, extraMsg)
+
+	printProviderMismatchWarnings(ctx, stack.Provider)
 	_, err = provider.AccountInfo(ctx)
 	if err != nil {
 		// HACK: return the session even on error to allow `whoami` and `compose config` to return a result even on provider error
@@ -116,52 +125,67 @@ func (sl *SessionLoader) findTargetDirectory() (string, error) {
 	}
 }
 
-func (sl *SessionLoader) loadStack(ctx context.Context, targetDirectory string) (*stacks.StackParameters, error) {
+func (sl *SessionLoader) loadStack(ctx context.Context, targetDirectory string) (*stacks.StackParameters, string, error) {
 	sm, err := stacks.NewManager(sl.client, targetDirectory, sl.opts.ProjectName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create stack manager: %w", err)
+		return nil, "", fmt.Errorf("failed to create stack manager: %w", err)
 	}
 	if sl.opts.Stack != "" {
 		return sl.loadSpecifiedStack(ctx, sm, sl.opts.Stack)
 	}
 	if sl.opts.Interactive {
 		stackSelector := stacks.NewSelector(sl.ec, sm)
-		return stackSelector.SelectStackWithOptions(ctx, stacks.SelectStackOptions{
+		stack, err := stackSelector.SelectStackWithOptions(ctx, stacks.SelectStackOptions{
 			AllowCreate: sl.opts.AllowStackCreation,
 			AllowImport: sm.TargetDirectory() == "",
 		})
+
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to select stack: %w", err)
+		}
+		return stack, "interactive selection", nil
 	}
 
 	return sl.loadFallbackStack()
 }
 
-func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, sm stacks.Manager, name string) (*stacks.StackParameters, error) {
+func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, sm stacks.Manager, name string) (*stacks.StackParameters, string, error) {
+	whence := "--stack flag"
+	_, envSet := os.LookupEnv("DEFANG_STACK")
+	if envSet {
+		whence = "DEFANG_STACK environment variable"
+	}
 	stack, err := sm.LoadLocal(name)
 	if err == nil {
-		return stack, nil
+		return stack, whence + " and local stack file", nil
 	}
 	// the stack file does not exist locally
 	if !os.IsNotExist(err) {
-		return nil, err
+		return nil, "", err
 	}
 	stack, err = sm.LoadRemote(ctx, name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load stack %q remotely: %w", name, err)
+		return nil, "", fmt.Errorf("failed to load stack %q remotely: %w", name, err)
 	}
 	// persist the remote stack file to the local target directory
 	stackFilename, err := sm.Create(*stack)
 	if err != nil && !errors.Is(err, &stacks.ErrOutside{}) {
-		return nil, fmt.Errorf("failed to save imported stack %q to local directory: %w", name, err)
+		return nil, "", fmt.Errorf("failed to save imported stack %q to local directory: %w", name, err)
 	}
 	if stackFilename != "" {
 		term.Infof("Stack %q loaded and saved to %q. Add this file to source control", name, stackFilename)
 	}
-	return stack, nil
+	return stack, whence + " and previous deployment", nil
 }
 
-func (sl *SessionLoader) loadFallbackStack() (*stacks.StackParameters, error) {
+func (sl *SessionLoader) loadFallbackStack() (*stacks.StackParameters, string, error) {
+	whence := "--provider flag"
+	_, envSet := os.LookupEnv("DEFANG_PROVIDER")
+	if envSet {
+		whence = "DEFANG_PROVIDER environment variable and previous deployment"
+	}
 	if sl.opts.ProviderID == "" {
-		return nil, errors.New("--provider is required if --stack is not specified")
+		return nil, "", errors.New("--provider is required if --stack is not specified")
 	}
 	// TODO: list remote stacks, and if there is exactly one with the matched provider, load it
 	return &stacks.StackParameters{
@@ -169,9 +193,41 @@ func (sl *SessionLoader) loadFallbackStack() (*stacks.StackParameters, error) {
 		Variables: map[string]string{
 			"DEFANG_PROVIDER": sl.opts.ProviderID.String(),
 		},
-	}, nil
+	}, whence, nil
 }
 
-func (sl *SessionLoader) newProvider(ctx context.Context, stackName string) client.Provider {
-	return cli.NewProvider(ctx, sl.opts.ProviderID, sl.client, stackName)
+func printProviderMismatchWarnings(ctx context.Context, provider client.ProviderID) {
+	if provider == client.ProviderDefang {
+		// Ignore any env vars when explicitly using the Defang playground provider
+		// Defaults to defang provider in non-interactive mode
+		if pkg.AwsInEnv() {
+			term.Warn("AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")
+		}
+		if pkg.DoInEnv() {
+			term.Warn("DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
+		}
+		if pkg.GcpInEnv() {
+			term.Warn("GCP_PROJECT_ID/CLOUDSDK_CORE_PROJECT environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
+		}
+	}
+
+	switch provider {
+	case client.ProviderAWS:
+		if !awsInConfig(ctx) {
+			term.Warn("AWS provider was selected, but AWS environment is not set")
+		}
+	case client.ProviderDO:
+		if !pkg.DoInEnv() {
+			term.Warn("DigitalOcean provider was selected, but DIGITALOCEAN_TOKEN environment variable is not set")
+		}
+	case client.ProviderGCP:
+		if !pkg.GcpInEnv() {
+			term.Warn("GCP provider was selected, but GCP_PROJECT_ID environment variable is not set")
+		}
+	}
+}
+
+func awsInConfig(ctx context.Context) bool {
+	_, err := aws.LoadDefaultConfig(ctx, aws.Region(""))
+	return err == nil
 }

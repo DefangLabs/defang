@@ -314,35 +314,44 @@ func promptToCreateStack(ctx context.Context, params stacks.StackParameters) err
 	return nil
 }
 
-func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *compose.Project, provider client.Provider, err error) error {
-	if errors.Is(err, types.ErrComposeFileNotFound) {
+func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *compose.Project, provider client.Provider, originalErr error) error {
+	if errors.Is(originalErr, types.ErrComposeFileNotFound) {
 		// TODO: generate a compose file based on the current project
 		printDefangHint("To start a new project, do:", "new")
 	}
 
-	if global.NonInteractive || errors.Is(err, byoc.ErrLocalPulumiStopped) {
-		return err
-	}
-
-	if strings.Contains(err.Error(), "maximum number of projects") {
-		if projectName, err2 := provider.RemoteProjectName(ctx); err2 == nil {
-			term.Error("Error:", client.PrettyError(err))
-			if _, err := cli.InteractiveComposeDown(ctx, projectName, global.Client, provider); err != nil {
-				term.Debug("ComposeDown failed:", err)
-				printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
-			} else {
-				// TODO: actually do the "compose up" (because that's what the user intended in the first place)
-				printDefangHint("To try deployment again, do:", "compose up")
-			}
-			return nil
+	if strings.Contains(originalErr.Error(), "maximum number of projects") {
+		projectName, err := provider.RemoteProjectName(ctx)
+		if err != nil {
+			return originalErr
 		}
-		return err
+
+		// print the error before prompting for compose down
+		term.Error("Error:", client.PrettyError(originalErr))
+		if global.NonInteractive {
+			printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
+			return originalErr
+		}
+
+		_, err = cli.InteractiveComposeDown(ctx, projectName, global.Client, provider)
+		if err != nil {
+			term.Debug("ComposeDown failed:", err)
+			printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
+			return originalErr
+		} else {
+			// TODO: actually do the "compose up" (because that's what the user intended in the first place)
+			printDefangHint("To try deployment again, do:", "compose up")
+		}
 	}
 
-	term.Error("Error:", client.PrettyError(err))
+	if global.NonInteractive || errors.Is(originalErr, byoc.ErrLocalPulumiStopped) {
+		return originalErr
+	}
+
+	term.Error("Error:", client.PrettyError(originalErr))
 	return debugger.DebugDeploymentError(ctx, debug.DebugConfig{
 		Project: project,
-	}, err)
+	}, originalErr)
 }
 
 func handleTailAndMonitorErr(ctx context.Context, err error, debugger *debug.Debugger, debugConfig debug.DebugConfig) {
