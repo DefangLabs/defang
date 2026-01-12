@@ -94,8 +94,7 @@ func (ss *stackSelector) selectStack(ctx context.Context, allowCreate bool) (*St
 		}
 	}
 
-	params := selectedStack.ToParameters()
-	return &params, nil
+	return ss.sm.Load(selectedStack.Name)
 }
 
 func (ss *stackSelector) createStack(ctx context.Context) (*StackParameters, error) {

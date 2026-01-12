@@ -96,12 +96,17 @@ func TestStackSelector_SelectStack_ExistingStack(t *testing.T) {
 		{Name: "development", Provider: "aws", Region: "us-east-1"},
 	}
 	mockSM.On("List", ctx).Return(existingStacks, nil)
+	mockSM.On("Load", "production").Return(&StackParameters{
+		Name:     "production",
+		Provider: client.ProviderAWS,
+		Region:   "us-west-2",
+	}, nil)
 
 	// Mock user selecting existing stack
 	expectedOptions := []string{"production", "development"}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("production", nil)
 
-	// Expected params based on ToParameters() conversion
+	// Expected params being loaded from the selected stack
 	expectedParams := &StackParameters{
 		Name:       "production",
 		Provider:   client.ProviderAWS,
@@ -140,8 +145,13 @@ func TestStackSelector_SelectOrCreateStack_ExistingStack(t *testing.T) {
 	// Mock user selecting existing stack
 	expectedOptions := []string{"production", "development", CreateNewStack}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("production", nil)
+	mockSM.On("Load", "production").Return(&StackParameters{
+		Name:     "production",
+		Provider: client.ProviderAWS,
+		Region:   "us-west-2",
+	}, nil)
 
-	// Expected params based on ToParameters() conversion
+	// Expected params being loaded from the selected stack
 	expectedParams := &StackParameters{
 		Name:       "production",
 		Provider:   client.ProviderAWS,
