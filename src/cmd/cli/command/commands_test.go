@@ -268,7 +268,6 @@ type mockStackManager struct {
 	listResult       []stacks.StackListItem
 	listError        error
 	loadResults      map[string]*stacks.StackParameters
-	loadResult       *stacks.StackParameters
 	loadError        error
 	createError      error
 	createResult     *stacks.StackParameters
@@ -291,20 +290,14 @@ func (m *mockStackManager) List(ctx context.Context) ([]stacks.StackListItem, er
 }
 
 func (m *mockStackManager) Load(ctx context.Context, name string) (*stacks.StackParameters, error) {
+	params, err := m.LoadLocal(name)
+	if err == nil {
+		return params, nil
+	}
+
+	// If loadError was set, return it directly
 	if m.loadError != nil {
 		return nil, m.loadError
-	}
-
-	// Check for specific stack name first
-	if m.loadResults != nil {
-		if result, exists := m.loadResults[name]; exists {
-			return result, nil
-		}
-	}
-
-	// If we have an explicit loadResult, return it
-	if m.loadResult != nil {
-		return m.loadResult, nil
 	}
 
 	// If we have expected provider/region (from old NewMockStackManager usage), create default params
@@ -322,12 +315,45 @@ func (m *mockStackManager) Load(ctx context.Context, name string) (*stacks.Stack
 	return nil, fmt.Errorf("unable to find stack %q", name)
 }
 
+func (m *mockStackManager) LoadLocal(name string) (*stacks.StackParameters, error) {
+	if m.loadError != nil {
+		return nil, m.loadError
+	}
+
+	// Check for specific stack name first
+	if m.loadResults != nil {
+		if result, exists := m.loadResults[name]; exists {
+			return result, nil
+		}
+	}
+	return nil, fmt.Errorf("stack %q not found", name)
+}
+
+func (m *mockStackManager) LoadRemote(ctx context.Context, name string) (*stacks.StackParameters, error) {
+	// TODO: separate remote and local loadResults in the mock
+	if m.loadError != nil {
+		return nil, m.loadError
+	}
+
+	// Check for specific stack name first
+	if m.loadResults != nil {
+		if result, exists := m.loadResults[name]; exists {
+			return result, nil
+		}
+	}
+	return nil, fmt.Errorf("stack %q not found", name)
+}
+
+func (m *mockStackManager) TargetDirectory() string {
+	return "."
+}
+
 func (m *mockStackManager) Create(params stacks.StackParameters) (string, error) {
 	if m.createError != nil {
 		return "", m.createError
 	}
 	if m.createResult != nil {
-		m.loadResult = m.createResult
+		m.loadResults[params.Name] = m.createResult
 	}
 	return params.Name, nil
 }
@@ -524,10 +550,12 @@ func TestGetStack(t *testing.T) {
 			setup: func(t *testing.T) (*mockElicitationsController, *mockStackManager) {
 				ec := &mockElicitationsController{}
 				sm := &mockStackManager{
-					loadResult: &stacks.StackParameters{
-						Name:     "test-stack",
-						Provider: client.ProviderAWS,
-						Region:   "us-test-2",
+					loadResults: map[string]*stacks.StackParameters{
+						"test-stack": {
+							Name:     "test-stack",
+							Provider: client.ProviderAWS,
+							Region:   "us-test-2",
+						},
 					},
 				}
 				return ec, sm
@@ -570,10 +598,12 @@ func TestGetStack(t *testing.T) {
 			setup: func(t *testing.T) (*mockElicitationsController, *mockStackManager) {
 				ec := &mockElicitationsController{}
 				sm := &mockStackManager{
-					loadResult: &stacks.StackParameters{
-						Name:     "auto-stack",
-						Provider: client.ProviderAuto,
-						Region:   "us-test-2",
+					loadResults: map[string]*stacks.StackParameters{
+						"auto-stack": {
+							Name:     "auto-stack",
+							Provider: client.ProviderAuto,
+							Region:   "us-test-2",
+						},
 					},
 				}
 				return ec, sm
@@ -590,11 +620,18 @@ func TestGetStack(t *testing.T) {
 				}
 				sm := &mockStackManager{
 					listResult: []stacks.StackListItem{
-						{Name: "existing-stack", Provider: "aws"},
+						{
+							StackParameters: stacks.StackParameters{
+								Name:     "existing-stack",
+								Provider: "aws",
+							},
+						},
 					},
-					loadResult: &stacks.StackParameters{
-						Name:     "existing-stack",
-						Provider: client.ProviderAWS,
+					loadResults: map[string]*stacks.StackParameters{
+						"existing-stack": {
+							Name:     "existing-stack",
+							Provider: client.ProviderAWS,
+						},
 					},
 				}
 				return ec, sm
@@ -616,12 +653,14 @@ func TestGetStack(t *testing.T) {
 				}
 				sm := &mockStackManager{
 					listResult: []stacks.StackListItem{
-						{Name: "existing-stack", Provider: "aws"}, // Different provider to avoid "only stack" path
-						{Name: "other-stack", Provider: "gcp"},
+						{StackParameters: stacks.StackParameters{Name: "existing-stack", Provider: "aws"}}, // Different provider to avoid "only stack" path
+						{StackParameters: stacks.StackParameters{Name: "other-stack", Provider: "gcp"}},
 					},
-					loadResult: &stacks.StackParameters{
-						Name:     "existing-stack",
-						Provider: client.ProviderAWS,
+					loadResults: map[string]*stacks.StackParameters{
+						"existing-stack": {
+							Name:     "existing-stack",
+							Provider: client.ProviderAWS,
+						},
 					},
 				}
 				return ec, sm
@@ -657,12 +696,16 @@ func TestGetStack(t *testing.T) {
 				ec := &mockElicitationsController{}
 				sm := &mockStackManager{
 					listResult: []stacks.StackListItem{
-						{Name: "only-stack", Provider: "aws", Mode: "affordable"},
+						{StackParameters: stacks.StackParameters{
+							Name: "only-stack", Provider: "aws", Mode: modes.ModeAffordable},
+						},
 					},
-					loadResult: &stacks.StackParameters{
-						Name:     "only-stack",
-						Provider: client.ProviderAWS,
-						Mode:     modes.ModeAffordable,
+					loadResults: map[string]*stacks.StackParameters{
+						"only-stack": {
+							Name:     "only-stack",
+							Provider: client.ProviderAWS,
+							Mode:     modes.ModeAffordable,
+						},
 					},
 				}
 				return ec, sm
@@ -683,12 +726,14 @@ func TestGetStack(t *testing.T) {
 				}
 				sm := &mockStackManager{
 					listResult: []stacks.StackListItem{
-						{Name: "stack1", Provider: "aws"},
-						{Name: "stack2", Provider: "gcp"},
+						{StackParameters: stacks.StackParameters{Name: "stack1", Provider: "aws"}},
+						{StackParameters: stacks.StackParameters{Name: "stack2", Provider: "gcp"}},
 					},
-					loadResult: &stacks.StackParameters{
-						Name:     "stack1",
-						Provider: client.ProviderAWS,
+					loadResults: map[string]*stacks.StackParameters{
+						"stack1": {
+							Name:     "stack1",
+							Provider: client.ProviderAWS,
+						},
 					},
 				}
 				return ec, sm
@@ -716,8 +761,8 @@ func TestGetStack(t *testing.T) {
 				ec := &mockElicitationsController{isSupported: false} // Will cause SelectStack to fail
 				sm := &mockStackManager{
 					listResult: []stacks.StackListItem{
-						{Name: "stack1", Provider: "aws"},
-						{Name: "stack2", Provider: "aws"},
+						{StackParameters: stacks.StackParameters{Name: "stack1", Provider: "aws"}},
+						{StackParameters: stacks.StackParameters{Name: "stack2", Provider: "aws"}},
 					},
 				}
 				return ec, sm

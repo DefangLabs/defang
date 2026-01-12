@@ -175,10 +175,12 @@ func TestLoadParameters(t *testing.T) {
 		{
 			name: "AWS parameters",
 			parameters: stacks.StackParameters{
-				Provider:   client.ProviderAWS,
-				Region:     "us-west-2",
-				AWSProfile: "default",
-				Mode:       modes.ModeAffordable,
+				Provider: client.ProviderAWS,
+				Region:   "us-west-2",
+				Mode:     modes.ModeAffordable,
+				Variables: map[string]string{
+					"AWS_PROFILE": "default",
+				},
 			},
 			expectedEnv: map[string]string{
 				"DEFANG_PROVIDER": "aws",
@@ -190,10 +192,14 @@ func TestLoadParameters(t *testing.T) {
 		{
 			name: "GCP parameters",
 			parameters: stacks.StackParameters{
-				Provider:     client.ProviderGCP,
-				Region:       "us-central1",
-				GCPProjectID: "my-gcp-project",
-				Mode:         modes.ModeBalanced,
+				Provider: client.ProviderGCP,
+				Region:   "us-central1",
+				Mode:     modes.ModeBalanced,
+				Variables: map[string]string{
+					"GCP_PROJECT_ID": "my-gcp-project",
+					"DEFANG_PREFIX":  "test",
+					"DEFANG_SUFFIX":  "dev",
+				},
 			},
 			expectedEnv: map[string]string{
 				"DEFANG_PROVIDER": "gcp",
@@ -205,12 +211,14 @@ func TestLoadParameters(t *testing.T) {
 		{
 			name: "With prefix and suffix",
 			parameters: stacks.StackParameters{
-				Provider:   client.ProviderAWS,
-				Region:     "us-west-2",
-				AWSProfile: "default",
-				Mode:       modes.ModeAffordable,
-				Prefix:     "test",
-				Suffix:     "dev",
+				Provider: client.ProviderAWS,
+				Region:   "us-west-2",
+				Mode:     modes.ModeAffordable,
+				Variables: map[string]string{
+					"AWS_PROFILE":   "default",
+					"DEFANG_PREFIX": "test",
+					"DEFANG_SUFFIX": "dev",
+				},
 			},
 			expectedEnv: map[string]string{
 				"DEFANG_PROVIDER": "aws",
