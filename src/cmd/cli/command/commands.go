@@ -32,6 +32,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/migrate"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/scope"
+	"github.com/DefangLabs/defang/src/pkg/session"
 	"github.com/DefangLabs/defang/src/pkg/setup"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/surveyor"
@@ -49,6 +50,9 @@ const authNeeded = "auth-needed" // annotation to indicate that a command needs 
 var authNeededAnnotation = map[string]string{authNeeded: ""}
 
 var P = track.P
+
+var elicitationsClient = elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
+var ec = elicitations.NewController(elicitationsClient)
 
 func Execute(ctx context.Context) error {
 	if term.StdoutCanColor() {
@@ -521,23 +525,13 @@ var whoamiCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		jsonMode, _ := cmd.Flags().GetBool("json")
 
-		loader := configureLoader(cmd)
-
 		global.NonInteractive = true // don't show provider prompt
 		ctx := cmd.Context()
-		projectName, err := loader.LoadProjectName(ctx)
+		options := NewSessionLoaderOptionsForCommand(cmd)
+		sessionLoader := session.NewSessionLoader(global.Client, ec, options)
+		session, err := sessionLoader.LoadSession(ctx)
 		if err != nil {
-			term.Warnf("Unable to load project: %v", err)
-		}
-		elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
-		ec := elicitations.NewController(elicitationsClient)
-		sm, err := stacks.NewManager(global.Client, loader.TargetDirectory(), projectName)
-		if err != nil {
-			return fmt.Errorf("failed to create stack manager: %w", err)
-		}
-		provider, err := newProvider(cmd.Context(), ec, sm, false)
-		if err != nil {
-			term.Debug("unable to get provider:", err)
+			term.Warn("unable to load session:", err)
 		}
 
 		token := client.GetExistingToken(global.Cluster)
@@ -550,7 +544,7 @@ var whoamiCmd = &cobra.Command{
 			}
 		}
 
-		data, err := cli.Whoami(cmd.Context(), global.Client, provider, userInfo, global.Tenant)
+		data, err := cli.Whoami(cmd.Context(), global.Client, session.Provider, userInfo, global.Tenant)
 		if err != nil {
 			return err
 		}
@@ -596,18 +590,17 @@ var certGenerateCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	Short:   "Generate a TLS certificate",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-		project, err := loader.LoadProject(cmd.Context())
+		ctx := cmd.Context()
+		session, err := NewCommandSession(cmd)
+		if err != nil {
+			return err
+		}
+		project, err := session.Loader.LoadProject(ctx)
 		if err != nil {
 			return err
 		}
 
-		provider, err := newProviderChecked(cmd.Context(), loader, false)
-		if err != nil {
-			return err
-		}
-
-		if err := cli.GenerateLetsEncryptCert(cmd.Context(), project, global.Client, provider); err != nil {
+		if err := cli.GenerateLetsEncryptCert(ctx, project, global.Client, session.Provider); err != nil {
 			return err
 		}
 		return nil
@@ -779,7 +772,7 @@ var configSetCmd = &cobra.Command{
 			// If the first arg doesn't contain '=', it's single config with file (CONFIG file)
 			if strings.Contains(args[0], "=") {
 				isMultipleConfigs = true
-				
+
 				// Validate: all args must be in KEY=VALUE format
 				for _, arg := range args {
 					if !strings.Contains(arg, "=") {
@@ -800,13 +793,12 @@ var configSetCmd = &cobra.Command{
 		}
 
 		// Make sure we have a project to set config for before asking for a value
-		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader, false)
+		session, err := NewCommandSession(cmd)
 		if err != nil {
 			return err
 		}
 
-		projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), session.Loader, session.Provider)
 		if err != nil {
 			return err
 		}
@@ -837,7 +829,7 @@ var configSetCmd = &cobra.Command{
 					continue
 				}
 
-				if err := cli.ConfigSet(cmd.Context(), projectName, provider, name, value); err != nil {
+				if err := cli.ConfigSet(cmd.Context(), projectName, session.Provider, name, value); err != nil {
 					term.Warnf("Failed to set %q: %v", name, err)
 				} else {
 					term.Info("Updated value for", name)
@@ -874,7 +866,7 @@ var configSetCmd = &cobra.Command{
 					continue
 				}
 
-				if err := cli.ConfigSet(cmd.Context(), projectName, provider, name, value); err != nil {
+				if err := cli.ConfigSet(cmd.Context(), projectName, session.Provider, name, value); err != nil {
 					term.Warnf("Failed to set %q: %v", name, err)
 				} else {
 					term.Info("Updated value for", name)
@@ -947,7 +939,7 @@ var configSetCmd = &cobra.Command{
 			}
 		}
 
-		if err := cli.ConfigSet(cmd.Context(), projectName, provider, name, value); err != nil {
+		if err := cli.ConfigSet(cmd.Context(), projectName, session.Provider, name, value); err != nil {
 			return err
 		}
 		term.Info("Updated value for", name)
@@ -964,18 +956,17 @@ var configDeleteCmd = &cobra.Command{
 	Aliases:     []string{"del", "delete", "remove"},
 	Short:       "Removes one or more config values",
 	RunE: func(cmd *cobra.Command, names []string) error {
-		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader, false)
+		session, err := NewCommandSession(cmd)
 		if err != nil {
 			return err
 		}
 
-		projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), session.Loader, session.Provider)
 		if err != nil {
 			return err
 		}
 
-		if err := cli.ConfigDelete(cmd.Context(), projectName, provider, names...); err != nil {
+		if err := cli.ConfigDelete(cmd.Context(), projectName, session.Provider, names...); err != nil {
 			// Show a warning (not an error) if the config was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				term.Warn(client.PrettyError(err))
@@ -997,18 +988,17 @@ var configListCmd = &cobra.Command{
 	Aliases:     []string{"list"},
 	Short:       "List configs",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader, false)
+		ctx := cmd.Context()
+		session, err := NewCommandSession(cmd)
+		if err != nil {
+			return err
+		}
+		projectName, err := client.LoadProjectNameWithFallback(ctx, session.Loader, session.Provider)
 		if err != nil {
 			return err
 		}
 
-		projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
-		if err != nil {
-			return err
-		}
-
-		return cli.ConfigList(cmd.Context(), projectName, provider)
+		return cli.ConfigList(ctx, projectName, session.Provider)
 	},
 }
 
@@ -1019,19 +1009,18 @@ var configResolveCmd = &cobra.Command{
 	Aliases:     []string{"final"},
 	Short:       "Show the final resolved environment for the project",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-
-		provider, err := newProviderChecked(cmd.Context(), loader, false)
+		ctx := cmd.Context()
+		session, err := NewCommandSession(cmd)
 		if err != nil {
 			return err
 		}
 
-		project, err := loader.LoadProject(cmd.Context())
+		project, err := session.Loader.LoadProject(ctx)
 		if err != nil {
 			return err
 		}
 
-		return cli.PrintConfigSummaryAndValidate(cmd.Context(), provider, project)
+		return cli.PrintConfigSummaryAndValidate(ctx, session.Provider, project)
 	},
 }
 
@@ -1051,13 +1040,12 @@ var debugCmd = &cobra.Command{
 			deployment = etag
 		}
 
-		loader := configureLoader(cmd)
-		_, err := newProviderChecked(ctx, loader, false)
+		session, err := NewCommandSession(cmd)
 		if err != nil {
 			return err
 		}
 
-		project, err := loader.LoadProject(ctx)
+		project, err := session.Loader.LoadProject(ctx)
 		if err != nil {
 			return err
 		}
@@ -1081,7 +1069,7 @@ var debugCmd = &cobra.Command{
 			Deployment:     deployment,
 			FailedServices: args,
 			Project:        project,
-			ProviderID:     &global.Stack.Provider,
+			ProviderID:     &session.Stack.Provider,
 			Since:          sinceTs.UTC(),
 			Until:          untilTs.UTC(),
 		}
@@ -1097,6 +1085,7 @@ var deploymentsCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "List all active deployments",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
 		var utc, _ = cmd.Flags().GetBool("utc")
 		var limit, _ = cmd.Flags().GetUint32("limit")
 
@@ -1104,13 +1093,16 @@ var deploymentsCmd = &cobra.Command{
 			cli.EnableUTCMode()
 		}
 
-		loader := configureLoader(cmd)
-		projectName, err := loader.LoadProjectName(cmd.Context())
+		session, err := NewCommandSession(cmd)
+		if err != nil {
+			return err
+		}
+		projectName, err := session.Loader.LoadProjectName(ctx)
 		if err != nil {
 			return err
 		}
 
-		return cli.DeploymentsList(cmd.Context(), global.Client, cli.ListDeploymentsParams{
+		return cli.DeploymentsList(ctx, global.Client, cli.ListDeploymentsParams{
 			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
 			ProjectName: projectName,
 			StackName:   global.Stack.Name,
@@ -1133,8 +1125,12 @@ var deploymentsListCmd = &cobra.Command{
 			cli.EnableUTCMode()
 		}
 
-		loader := configureLoader(cmd)
-		projectName, err := loader.LoadProjectName(cmd.Context())
+		session, err := NewCommandSession(cmd)
+		if err != nil {
+			return err
+		}
+
+		projectName, err := session.Loader.LoadProjectName(cmd.Context())
 		if err != nil {
 			return err
 		}
@@ -1231,40 +1227,8 @@ var upgradeCmd = &cobra.Command{
 }
 
 func configureLoader(cmd *cobra.Command) *compose.Loader {
-	configPaths, err := cmd.Flags().GetStringArray("file")
-	if err != nil {
-		panic(err)
-	}
-
-	projectName, err := cmd.Flags().GetString("project-name")
-	if err != nil {
-		panic(err)
-	}
-
-	if slash := strings.Index(projectName, "/"); slash != -1 {
-		// Compose project names cannot have slashes; use the part after the slash as the "stack" name
-		stackName := projectName[slash+1:]
-		term.Debugf("Setting DEFANG_SUFFIX=%q", stackName)
-		os.Setenv("DEFANG_SUFFIX", stackName)
-		projectName = projectName[:slash]
-	}
-
-	// Avoid common mistakes
-	var prov client.ProviderID
-	if prov.Set(projectName) == nil && !cmd.Flag("provider").Changed {
-		// using -p with a provider name instead of -P
-		term.Warnf("Project name %q looks like a provider name; did you mean to use -P=%s instead of -p?", projectName, projectName)
-		doubleCheckProjectName(projectName)
-	} else if strings.HasPrefix(projectName, "roject-name") {
-		// -project-name= instead of --project-name
-		term.Warn("Did you mean to use --project-name instead of -project-name?")
-		doubleCheckProjectName(projectName)
-	} else if strings.HasPrefix(projectName, "rovider") {
-		// -provider= instead of --provider
-		term.Warn("Did you mean to use --provider instead of -provider?")
-		doubleCheckProjectName(projectName)
-	}
-	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(configPaths...))
+	loaderFlags := NewSessionLoaderOptionsForCommand(cmd)
+	return compose.NewLoader(compose.WithProjectName(loaderFlags.ProjectName), compose.WithPath(loaderFlags.ComposeFilePaths...))
 }
 
 func doubleCheckProjectName(projectName string) {
@@ -1352,7 +1316,7 @@ func getStack(ctx context.Context, ec elicitations.Controller, sm stacks.Manager
 	}
 
 	// if there is exactly one stack with that provider, use it
-	if len(knownStacks) == 1 && (stackParams.Provider == client.ProviderAuto || knownStacks[0].Provider == stackParams.Provider.String()) {
+	if len(knownStacks) == 1 && (stackParams.Provider == client.ProviderAuto || knownStacks[0].Provider == stackParams.Provider) {
 		knownStack := knownStacks[0]
 		// try to read the stackfile
 		loaded, loadErr := sm.Load(ctx, knownStack.Name)

@@ -35,14 +35,13 @@ var cdCmd = &cobra.Command{
 
 func cdCommand(cmd *cobra.Command, args []string, command client.CdCommand, fabric client.FabricClient) error {
 	ctx := cmd.Context()
-	loader := configureLoader(cmd)
-	provider, err := newProviderChecked(ctx, loader, false)
+	session, err := NewCommandSession(cmd)
 	if err != nil {
 		return err
 	}
 
 	if len(args) == 0 {
-		projectName, err := client.LoadProjectNameWithFallback(ctx, loader, provider)
+		projectName, err := client.LoadProjectNameWithFallback(ctx, session.Loader, session.Provider)
 		if err != nil {
 			return err
 		}
@@ -51,11 +50,11 @@ func cdCommand(cmd *cobra.Command, args []string, command client.CdCommand, fabr
 
 	var errs []error
 	for _, projectName := range args {
-		err := canIUseProvider(ctx, provider, projectName, 0)
+		err := canIUseProvider(ctx, session.Provider, projectName, 0)
 		if err != nil {
 			return err
 		}
-		errs = append(errs, cli.CdCommandAndTail(ctx, provider, projectName, global.Verbose, command, fabric))
+		errs = append(errs, cli.CdCommandAndTail(ctx, session.Provider, projectName, global.Verbose, command, fabric))
 	}
 	return errors.Join(errs...)
 }
@@ -101,15 +100,15 @@ var cdTearDownCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Destroy the CD cluster without destroying the services",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
 		force, _ := cmd.Flags().GetBool("force")
 
-		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader, false)
+		session, err := NewCommandSession(cmd)
 		if err != nil {
 			return err
 		}
 
-		return cli.TearDownCD(cmd.Context(), provider, force)
+		return cli.TearDownCD(ctx, session.Provider, force)
 	},
 }
 
@@ -150,23 +149,22 @@ var cdPreviewCmd = &cobra.Command{
 	Annotations: authNeededAnnotation, // FIXME: because it still needs a delegated domain
 	Short:       "Preview the changes that will be made by the CD task",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-		project, err := loader.LoadProject(cmd.Context())
+		ctx := cmd.Context()
+		session, err := NewCommandSession(cmd)
+		if err != nil {
+			return err
+		}
+		project, err := session.Loader.LoadProject(cmd.Context())
 		if err != nil {
 			return err
 		}
 
-		provider, err := newProviderChecked(cmd.Context(), loader, false)
+		err = canIUseProvider(ctx, session.Provider, project.Name, 1) // 1 SDU for BYOC preview
 		if err != nil {
 			return err
 		}
 
-		err = canIUseProvider(cmd.Context(), provider, project.Name, 1) // 1 SDU for BYOC preview
-		if err != nil {
-			return err
-		}
-
-		return cli.Preview(cmd.Context(), project, global.Client, provider, cli.ComposeUpParams{
+		return cli.Preview(ctx, project, global.Client, session.Provider, cli.ComposeUpParams{
 			Mode:       global.Stack.Mode,
 			Project:    project,
 			UploadMode: compose.UploadModePreview,
@@ -182,17 +180,17 @@ var cdInstallCmd = &cobra.Command{
 	Short:       "Install the CD resources into the cluster",
 	Hidden:      true, // users shouldn't have to run this manually, because it's done on deploy
 	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-		provider, err := newProviderChecked(cmd.Context(), loader, false)
+		ctx := cmd.Context()
+		session, err := NewCommandSession(cmd)
 		if err != nil {
 			return err
 		}
 
-		if err := canIUseProvider(cmd.Context(), provider, "", 0); err != nil {
+		if err := canIUseProvider(ctx, session.Provider, "", 0); err != nil {
 			return err
 		}
 
-		return cli.InstallCD(cmd.Context(), provider)
+		return cli.InstallCD(ctx, session.Provider)
 	},
 }
 

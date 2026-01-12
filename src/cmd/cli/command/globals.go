@@ -2,6 +2,7 @@ package command
 
 import (
 	"os"
+	"strconv"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -138,4 +139,24 @@ func NewGlobalConfig() *GlobalConfig {
 		Verbose: pkg.GetenvBool("DEFANG_VERBOSE"),
 		Tenant:  tenant,
 	}
+}
+
+func (global *GlobalConfig) ToMap() map[string]string {
+	m := make(map[string]string)
+	m["DEFANG_CLUSTER"] = global.Cluster
+	m["DEFANG_COLOR"] = global.ColorMode.String()
+	m["DEFANG_DEBUG"] = strconv.FormatBool(global.Debug)
+	m["DEFANG_NON_INTERACTIVE"] = strconv.FormatBool(global.NonInteractive)
+	if global.Stack.Provider != client.ProviderAuto {
+		m["DEFANG_PROVIDER"] = global.Stack.Provider.String()
+	}
+	if global.Stack.Region != "" {
+		regionVarName := client.GetRegionVarName(global.Stack.Provider)
+		m[regionVarName] = global.Stack.Region
+	}
+	if global.Stack.Mode != modes.ModeUnspecified {
+		m["DEFANG_MODE"] = global.Stack.Mode.String()
+	}
+	m["DEFANG_VERBOSE"] = strconv.FormatBool(global.Verbose)
+	return m
 }
