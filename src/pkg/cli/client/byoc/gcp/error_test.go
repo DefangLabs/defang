@@ -18,6 +18,12 @@ func TestIsValidGcpProjectID(t *testing.T) {
 		wantMsg   string
 	}{
 		{
+			name:      "empty string",
+			projectID: "",
+			wantValid: false,
+			wantMsg:   "must not be empty",
+		},
+		{
 			name:      "valid project ID",
 			projectID: "my-project-123",
 			wantValid: true,

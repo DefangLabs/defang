@@ -843,7 +843,7 @@ type ErrInvalidProjectID struct {
 }
 
 func (e ErrInvalidProjectID) Error() string {
-	return fmt.Sprintf("invalid GCP project ID %q: %s\n\nGCP project IDs must:\n  - Be 6 to 30 characters in length\n  - Contain only lowercase letters, numbers, and hyphens\n  - Start with a letter\n  - Not end with a hyphen\n\nPlease verify your GCP_PROJECT_ID or use 'gcloud projects list' to see available project IDs.", e.ProjectID, e.Message)
+	return fmt.Sprintf("invalid GCP project ID %q: %s\n\nGCP project IDs must:\n  - Be 6 to 30 characters in length\n  - Contain only lowercase letters, numbers, and hyphens\n  - Start with a lowercase letter\n  - Not end with a hyphen\n\nPlease verify your GCP_PROJECT_ID or use 'gcloud projects list' to see available project IDs.", e.ProjectID, e.Message)
 }
 
 // ErrProjectDeleted is returned when a project has been deleted
@@ -857,6 +857,9 @@ func (e ErrProjectDeleted) Error() string {
 
 // isValidGcpProjectID checks if a project ID follows GCP naming rules
 func isValidGcpProjectID(projectID string) (bool, string) {
+	if projectID == "" {
+		return false, "must not be empty"
+	}
 	if len(projectID) < 6 {
 		return false, "must be at least 6 characters"
 	}
