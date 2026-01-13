@@ -280,6 +280,11 @@ func TestIsADCRefreshNeeded(t *testing.T) {
 			want: false,
 		},
 		{
+			name: "should not match - words in wrong order",
+			err:  &googleapi.Error{Code: 403, Message: "This has been deleted from the project"},
+			want: false,
+		},
+		{
 			name: "USER_PROJECT_DENIED reason",
 			err: &googleapi.Error{
 				Code:    403,
