@@ -182,10 +182,6 @@ func Marshal(params *StackParameters) (string, error) {
 	return godotenv.Marshal(params.ToMap())
 }
 
-func Remove(name string) error {
-	return RemoveInDirectory(".", name)
-}
-
 func RemoveInDirectory(workingDirectory, name string) error {
 	if name == "" {
 		return errors.New("stack name cannot be empty")

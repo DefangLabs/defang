@@ -136,7 +136,7 @@ func makeStackRemoveCmd() *cobra.Command {
 		Short:   "Remove an existing Defang deployment stack",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			return stacks.Remove(name)
+			return stacks.RemoveInDirectory(".", name)
 		},
 	}
 	return stackRemoveCmd
