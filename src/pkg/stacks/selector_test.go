@@ -3,11 +3,10 @@ package stacks
 import (
 	"context"
 	"errors"
-	"fmt"
+	"os"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -42,7 +41,6 @@ func (m *MockElicitationsController) IsSupported() bool {
 	return args.Bool(0)
 }
 
-// MockStacksManager mocks the stacks.Manager interface
 type MockStacksManager struct {
 	mock.Mock
 }
@@ -59,51 +57,22 @@ func (m *MockStacksManager) List(ctx context.Context) ([]StackListItem, error) {
 	return result, args.Error(1)
 }
 
-func (m *MockStacksManager) Load(ctx context.Context, name string) (*StackParameters, error) {
-	params, err := m.LoadLocal(name)
-	if err == nil {
-		return params, nil
-	}
-	return m.LoadRemote(ctx, name)
-}
-
-func (m *MockStacksManager) LoadLocal(name string) (*StackParameters, error) {
-	args := m.Called(name)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	result, ok := args.Get(0).(*StackParameters)
-	if !ok {
-		return nil, args.Error(1)
-	}
-	return result, args.Error(1)
-}
-
-func (m *MockStacksManager) LoadRemote(ctx context.Context, name string) (*StackParameters, error) {
-	args := m.Called(name)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	result, ok := args.Get(0).(*StackParameters)
-	if !ok {
-		return nil, args.Error(1)
-	}
-	return result, args.Error(1)
-}
-
-func (m *MockStacksManager) LoadParameters(params StackParameters, overload bool) error {
-	args := m.Called(params, overload)
-	return args.Error(0)
-}
-
 func (m *MockStacksManager) Create(params StackParameters) (string, error) {
 	args := m.Called(params)
 	return args.String(0), args.Error(1)
 }
 
-func (m *MockStacksManager) TargetDirectory() string {
+type MockAWSProfileLister struct {
+	mock.Mock
+}
+
+func (m *MockAWSProfileLister) ListProfiles() ([]string, error) {
 	args := m.Called()
-	return args.String(0)
+	profiles, ok := args.Get(0).([]string)
+	if !ok {
+		return nil, args.Error(1)
+	}
+	return profiles, args.Error(1)
 }
 
 func TestStackSelector_SelectStack_ExistingStack(t *testing.T) {
@@ -148,7 +117,7 @@ func TestStackSelector_SelectStack_ExistingStack(t *testing.T) {
 
 	selector := NewSelector(mockEC, mockSM)
 
-	result, err := selector.SelectStack(ctx)
+	result, err := selector.SelectStack(ctx, SelectStackOptions{})
 
 	assert.NoError(t, err)
 	assert.Equal(t, expectedParams, result)
@@ -187,7 +156,7 @@ func TestStackSelector_SelectOrCreateStack_ExistingStack(t *testing.T) {
 
 	selector := NewSelector(mockEC, mockSM)
 
-	result, err := selector.SelectOrCreateStack(ctx)
+	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowCreate: true})
 
 	assert.NoError(t, err)
 	assert.Equal(t, expectedParams, result)
@@ -196,90 +165,13 @@ func TestStackSelector_SelectOrCreateStack_ExistingStack(t *testing.T) {
 	mockSM.AssertExpectations(t)
 }
 
-// WizardInterface defines the interface for collecting stack parameters
-type WizardInterface interface {
-	CollectParameters(ctx context.Context) (*StackParameters, error)
-}
-
-// MockWizardInterface mocks the WizardInterface
-type MockWizardInterface struct {
-	mock.Mock
-}
-
-func (m *MockWizardInterface) CollectParameters(ctx context.Context) (*StackParameters, error) {
-	args := m.Called(ctx)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	result, ok := args.Get(0).(*StackParameters)
-	if !ok {
-		return nil, args.Error(1)
-	}
-	return result, args.Error(1)
-}
-
-// testableStackSelector extends stackSelector to allow wizard injection for testing
-type testableStackSelector struct {
-	ec     elicitations.Controller
-	sm     Manager
-	wizard WizardInterface
-}
-
-func (tss *testableStackSelector) SelectStack(ctx context.Context) (*StackParameters, error) {
-	if !tss.ec.IsSupported() {
-		return nil, errors.New("your MCP client does not support elicitations, use the 'select_stack' tool to choose a stack")
-	}
-	selectedStackName, err := tss.elicitStackSelection(ctx, tss.ec)
-	if err != nil {
-		return nil, fmt.Errorf("failed to select stack: %w", err)
-	}
-
-	if selectedStackName == CreateNewStack {
-		params, err := tss.wizard.CollectParameters(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to collect stack parameters: %w", err)
-		}
-		_, err = tss.sm.Create(*params)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create stack: %w", err)
-		}
-
-		selectedStackName = params.Name
-	}
-
-	return tss.sm.Load(ctx, selectedStackName)
-}
-
-func (tss *testableStackSelector) elicitStackSelection(ctx context.Context, ec elicitations.Controller) (string, error) {
-	stackList, err := tss.sm.List(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to list stacks: %w", err)
-	}
-
-	if len(stackList) == 0 {
-		return CreateNewStack, nil
-	}
-
-	stackNames := make([]string, 0, len(stackList)+1)
-	for _, s := range stackList {
-		stackNames = append(stackNames, s.Name)
-	}
-	stackNames = append(stackNames, CreateNewStack)
-
-	selectedStackName, err := ec.RequestEnum(ctx, "Select a stack", "stack", stackNames)
-	if err != nil {
-		return "", fmt.Errorf("failed to elicit stack choice: %w", err)
-	}
-
-	return selectedStackName, nil
-}
-
 func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
+	os.Unsetenv("AWS_PROFILE")
+	os.Unsetenv("AWS_REGION")
 	ctx := t.Context()
 
 	mockEC := &MockElicitationsController{}
 	mockSM := &MockStacksManager{}
-	mockWizard := &MockWizardInterface{}
 
 	// Mock that elicitations are supported
 	mockEC.On("IsSupported").Return(true)
@@ -294,6 +186,23 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 	expectedOptions := []string{"production", CreateNewStack}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return(CreateNewStack, nil)
 
+	// Mock wizard parameter collection - provider selection
+	providerOptions := []string{"Defang Playground", "AWS", "DigitalOcean", "Google Cloud Platform"}
+	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("AWS", nil)
+
+	// Mock wizard parameter collection - region selection (default is us-west-2 for AWS)
+	mockEC.On("RequestStringWithDefault", ctx, "Which region do you want to deploy to?", "region", "us-west-2").Return("us-east-1", nil)
+
+	// Mock wizard parameter collection - stack name (default name based on provider and region)
+	mockEC.On("RequestStringWithDefault", ctx, "Enter a name for your stack:", "stack_name", "awsuseast1").Return("staging", nil)
+
+	// Mock wizard parameter collection - AWS profile selection (both scenarios)
+	// If profiles are found on filesystem, it will use RequestEnum
+	awsProfileOptions := []string{"default"}
+	mockEC.On("RequestEnum", ctx, "Which AWS profile do you want to use?", "aws_profile", awsProfileOptions).Return("staging", nil).Maybe()
+	// If no profiles are found, it will use RequestStringWithDefault
+	mockEC.On("RequestStringWithDefault", ctx, "Which AWS profile do you want to use?", "aws_profile", "default").Return("staging", nil).Maybe()
+
 	// Mock wizard parameter collection
 	newStackParams := &StackParameters{
 		Name:     "staging",
@@ -302,33 +211,25 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 		Variables: map[string]string{
 			"AWS_PROFILE": "staging",
 		},
-		Mode: modes.ModeAffordable,
 	}
-	mockWizard.On("CollectParameters", ctx).Return(newStackParams, nil)
 
 	// Mock stack creation
 	mockSM.On("Create", *newStackParams).Return("staging", nil)
 
-	// Mock LoadLocal to return error (simulate not found locally)
-	mockSM.On("LoadLocal", "staging").Return((*StackParameters)(nil), errors.New("not found"))
+	mockProfileLister := &MockAWSProfileLister{}
+	mockProfileLister.On("ListProfiles").Return([]string{"default"}, nil)
 
-	// Mock loading the created stack remotely
-	mockSM.On("LoadRemote", "staging").Return(newStackParams, nil)
+	selector := NewSelector(mockEC, mockSM)
+	selector.wizard = NewWizardWithProfileLister(mockEC, mockProfileLister)
 
-	selector := &testableStackSelector{
-		ec:     mockEC,
-		sm:     mockSM,
-		wizard: mockWizard,
-	}
-
-	result, err := selector.SelectStack(ctx)
+	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowCreate: true})
 
 	assert.NoError(t, err)
 	assert.Equal(t, newStackParams, result)
 
 	mockEC.AssertExpectations(t)
 	mockSM.AssertExpectations(t)
-	mockWizard.AssertExpectations(t)
+	mockProfileLister.AssertExpectations(t)
 }
 
 func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
@@ -336,13 +237,29 @@ func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
 
 	mockEC := &MockElicitationsController{}
 	mockSM := &MockStacksManager{}
-	mockWizard := &MockWizardInterface{}
 
 	// Mock that elicitations are supported
 	mockEC.On("IsSupported").Return(true)
 
 	// Mock empty stacks list - when no stacks exist, it should automatically proceed to create new
 	mockSM.On("List", ctx).Return([]StackListItem{}, nil)
+
+	// Mock wizard parameter collection - provider selection
+	providerOptions := []string{"Defang Playground", "AWS", "DigitalOcean", "Google Cloud Platform"}
+	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("AWS", nil)
+
+	// Mock wizard parameter collection - region selection
+	mockEC.On("RequestStringWithDefault", ctx, "Which region do you want to deploy to?", "region", "us-west-2").Return("us-west-2", nil)
+
+	// Mock wizard parameter collection - stack name (default name based on provider and region)
+	mockEC.On("RequestStringWithDefault", ctx, "Enter a name for your stack:", "stack_name", "awsuswest2").Return("firststack", nil)
+
+	// Mock wizard parameter collection - AWS profile selection (both scenarios)
+	// If profiles are found on filesystem, it will use RequestEnum
+	awsProfileOptions := []string{"default"}
+	mockEC.On("RequestEnum", ctx, "Which AWS profile do you want to use?", "aws_profile", awsProfileOptions).Return("default", nil).Maybe()
+	// If no profiles are found, it will use RequestStringWithDefault
+	mockEC.On("RequestStringWithDefault", ctx, "Which AWS profile do you want to use?", "aws_profile", "default").Return("default", nil).Maybe()
 
 	// Mock wizard parameter collection
 	newStackParams := &StackParameters{
@@ -352,30 +269,25 @@ func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
 		Variables: map[string]string{
 			"AWS_PROFILE": "default",
 		},
-		Mode: modes.ModeBalanced,
 	}
-	mockWizard.On("CollectParameters", ctx).Return(newStackParams, nil)
 
 	// Mock stack creation
 	mockSM.On("Create", *newStackParams).Return("firststack", nil)
 
-	// Mock loading the created stack
-	mockSM.On("LoadLocal", "firststack").Return(newStackParams, nil)
+	mockProfileLister := &MockAWSProfileLister{}
+	mockProfileLister.On("ListProfiles").Return([]string{"default"}, nil)
 
-	selector := &testableStackSelector{
-		ec:     mockEC,
-		sm:     mockSM,
-		wizard: mockWizard,
-	}
+	selector := NewSelector(mockEC, mockSM)
+	selector.wizard = NewWizardWithProfileLister(mockEC, mockProfileLister)
 
-	result, err := selector.SelectStack(ctx)
+	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowCreate: true})
 
 	assert.NoError(t, err)
 	assert.Equal(t, newStackParams, result)
 
 	mockEC.AssertExpectations(t)
 	mockSM.AssertExpectations(t)
-	mockWizard.AssertExpectations(t)
+	mockProfileLister.AssertExpectations(t)
 }
 
 func TestStackSelector_SelectStack_ElicitationsNotSupported(t *testing.T) {
@@ -389,7 +301,7 @@ func TestStackSelector_SelectStack_ElicitationsNotSupported(t *testing.T) {
 
 	selector := NewSelector(mockEC, mockSM)
 
-	result, err := selector.SelectStack(ctx)
+	result, err := selector.SelectStack(ctx, SelectStackOptions{})
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
@@ -413,7 +325,7 @@ func TestStackSelector_SelectStack_ListStacksError(t *testing.T) {
 
 	selector := NewSelector(mockEC, mockSM)
 
-	result, err := selector.SelectStack(ctx)
+	result, err := selector.SelectStack(ctx, SelectStackOptions{})
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
@@ -444,7 +356,7 @@ func TestStackSelector_SelectStack_ElicitationError(t *testing.T) {
 
 	selector := NewSelector(mockEC, mockSM)
 
-	result, err := selector.SelectStack(ctx)
+	result, err := selector.SelectStack(ctx, SelectStackOptions{})
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
@@ -459,7 +371,6 @@ func TestStackSelector_SelectStack_WizardError(t *testing.T) {
 
 	mockEC := &MockElicitationsController{}
 	mockSM := &MockStacksManager{}
-	mockWizard := &MockWizardInterface{}
 
 	// Mock that elicitations are supported
 	mockEC.On("IsSupported").Return(true)
@@ -474,16 +385,12 @@ func TestStackSelector_SelectStack_WizardError(t *testing.T) {
 	expectedOptions := []string{"production", CreateNewStack}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return(CreateNewStack, nil)
 
-	// Mock wizard parameter collection error
-	mockWizard.On("CollectParameters", ctx).Return((*StackParameters)(nil), errors.New("user cancelled wizard"))
+	// Mock wizard parameter collection - provider selection fails
+	providerOptions := []string{"Defang Playground", "AWS", "DigitalOcean", "Google Cloud Platform"}
+	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("", errors.New("user cancelled wizard"))
 
-	selector := &testableStackSelector{
-		ec:     mockEC,
-		sm:     mockSM,
-		wizard: mockWizard,
-	}
-
-	result, err := selector.SelectStack(ctx)
+	selector := NewSelector(mockEC, mockSM)
+	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowCreate: true})
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
@@ -492,15 +399,15 @@ func TestStackSelector_SelectStack_WizardError(t *testing.T) {
 
 	mockEC.AssertExpectations(t)
 	mockSM.AssertExpectations(t)
-	mockWizard.AssertExpectations(t)
 }
 
 func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
+	os.Unsetenv("AWS_PROFILE")
+	os.Unsetenv("AWS_REGION")
 	ctx := t.Context()
 
 	mockEC := &MockElicitationsController{}
 	mockSM := &MockStacksManager{}
-	mockWizard := &MockWizardInterface{}
 
 	// Mock that elicitations are supported
 	mockEC.On("IsSupported").Return(true)
@@ -514,6 +421,23 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 	// Mock user selecting to create new stack
 	expectedOptions := []string{"production", CreateNewStack}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return(CreateNewStack, nil)
+
+	// Mock wizard parameter collection - provider selection
+	providerOptions := []string{"Defang Playground", "AWS", "DigitalOcean", "Google Cloud Platform"}
+	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("AWS", nil)
+
+	// Mock wizard parameter collection - region selection
+	mockEC.On("RequestStringWithDefault", ctx, "Which region do you want to deploy to?", "region", "us-west-2").Return("us-east-1", nil)
+
+	// Mock wizard parameter collection - stack name (default name based on provider and region)
+	mockEC.On("RequestStringWithDefault", ctx, "Enter a name for your stack:", "stack_name", "awsuseast1").Return("staging", nil)
+
+	// Mock wizard parameter collection - AWS profile selection (both scenarios)
+	// If profiles are found on filesystem, it will use RequestEnum
+	awsProfileOptions := []string{"default"}
+	mockEC.On("RequestEnum", ctx, "Which AWS profile do you want to use?", "aws_profile", awsProfileOptions).Return("staging", nil).Maybe()
+	// If no profiles are found, it will use RequestStringWithDefault
+	mockEC.On("RequestStringWithDefault", ctx, "Which AWS profile do you want to use?", "aws_profile", "default").Return("staging", nil).Maybe()
 
 	// Mock wizard parameter collection
 	newStackParams := &StackParameters{
@@ -523,20 +447,17 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 		Variables: map[string]string{
 			"AWS_PROFILE": "staging",
 		},
-		Mode: modes.ModeAffordable,
 	}
-	mockWizard.On("CollectParameters", ctx).Return(newStackParams, nil)
 
 	// Mock stack creation error
 	mockSM.On("Create", *newStackParams).Return("", errors.New("invalid stack configuration"))
 
-	selector := &testableStackSelector{
-		ec:     mockEC,
-		sm:     mockSM,
-		wizard: mockWizard,
-	}
+	mockProfileLister := &MockAWSProfileLister{}
+	mockProfileLister.On("ListProfiles").Return([]string{"default"}, nil)
 
-	result, err := selector.SelectStack(ctx)
+	selector := NewSelector(mockEC, mockSM)
+	selector.wizard = NewWizardWithProfileLister(mockEC, mockProfileLister)
+	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowCreate: true})
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
@@ -545,5 +466,5 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 
 	mockEC.AssertExpectations(t)
 	mockSM.AssertExpectations(t)
-	mockWizard.AssertExpectations(t)
+	mockProfileLister.AssertExpectations(t)
 }

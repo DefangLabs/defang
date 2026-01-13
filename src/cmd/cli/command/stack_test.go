@@ -206,6 +206,8 @@ func TestLoadParameters(t *testing.T) {
 				"GCP_LOCATION":    "us-central1",
 				"GCP_PROJECT_ID":  "my-gcp-project",
 				"DEFANG_MODE":     "balanced",
+				"DEFANG_PREFIX":   "test",
+				"DEFANG_SUFFIX":   "dev",
 			},
 		},
 		{
