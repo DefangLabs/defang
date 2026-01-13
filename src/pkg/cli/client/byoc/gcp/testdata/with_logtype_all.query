@@ -5,9 +5,6 @@ logName="projects/test-project/logs/cos_containers" OR
 logName="projects/test-project/logs/docker-logs"
 ) AND ("error") AND (
 (
-  resource.type = "cloud_run_job"
-  labels."defang-stack" = "beta"
-) OR (
   resource.type="build"
   labels.build_tags =~ "beta__[a-zA-Z0-9-]{1,63}_"
   -labels.build_step="MAIN"
