@@ -326,9 +326,8 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 
 	if connect.CodeOf(originalErr) == connect.CodeResourceExhausted && strings.Contains(originalErr.Error(), "maximum number of projects") {
 		term.Error("Error:", client.PrettyError(originalErr))
-		err := handleTooManyProjects(ctx, provider)
+		err := handleTooManyProjectsError(ctx, provider, originalErr)
 		if err != nil {
-			term.Warn("Failed to interactively handle \"too many projects\" error", err)
 			return originalErr
 		}
 		return nil
@@ -344,23 +343,24 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 	}, originalErr)
 }
 
-func handleTooManyProjects(ctx context.Context, provider client.Provider) error {
+func handleTooManyProjectsError(ctx context.Context, provider client.Provider, originalErr error) error {
 	projectName, err := provider.RemoteProjectName(ctx)
 	if err != nil {
-		return err
+		term.Warn("failed to get remote project name:", err)
+		return originalErr
 	}
 
 	// print the error before prompting for compose down
 	if global.NonInteractive {
 		printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
-		return err
+		return originalErr
 	}
 
 	_, err = cli.InteractiveComposeDown(ctx, projectName, global.Client, provider)
 	if err != nil {
-		term.Debug("ComposeDown failed:", err)
+		term.Warn("ComposeDown failed:", err)
 		printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
-		return err
+		return originalErr
 	} else {
 		// TODO: actually do the "compose up" (because that's what the user intended in the first place)
 		printDefangHint("To try deployment again, do:", "compose up")
