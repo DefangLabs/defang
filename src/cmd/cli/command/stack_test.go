@@ -236,25 +236,15 @@ func TestLoadParameters(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clear any existing env vars that might interfere with the test
-			os.Unsetenv("DEFANG_PROVIDER")
-			os.Unsetenv("AWS_REGION")
-			os.Unsetenv("AWS_PROFILE")
-			os.Unsetenv("GCP_LOCATION")
-			os.Unsetenv("GCP_PROJECT_ID")
-			os.Unsetenv("DEFANG_MODE")
-			os.Unsetenv("DEFANG_PREFIX")
-			os.Unsetenv("DEFANG_SUFFIX")
+			for key := range tt.expectedEnv {
+				os.Unsetenv(key)
+			}
 
 			t.Cleanup(func() {
 				// Clean up environment variables after test
-				os.Unsetenv("DEFANG_PROVIDER")
-				os.Unsetenv("AWS_REGION")
-				os.Unsetenv("AWS_PROFILE")
-				os.Unsetenv("GCP_LOCATION")
-				os.Unsetenv("GCP_PROJECT_ID")
-				os.Unsetenv("DEFANG_MODE")
-				os.Unsetenv("DEFANG_PREFIX")
-				os.Unsetenv("DEFANG_SUFFIX")
+				for key := range tt.expectedEnv {
+					os.Unsetenv(key)
+				}
 			})
 
 			err := stacks.LoadParameters(tt.parameters, true)

@@ -294,6 +294,14 @@ func TestLoadSession(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			for key := range tt.expectedEnv {
+				os.Unsetenv(key)
+			}
+			t.Cleanup(func() {
+				for key := range tt.expectedEnv {
+					os.Unsetenv(key)
+				}
+			})
 			ctx := t.Context()
 			ec := &mockElicitationsController{isSupported: true}
 			sm := &mockStacksManager{}
@@ -347,7 +355,6 @@ func TestLoadSession(t *testing.T) {
 				actualValue, exists := session.Stack.Variables[key]
 				assert.True(t, exists, "expected env var %s to be set", key)
 				assert.Equal(t, expectedValue, actualValue, "env var %s has unexpected value", key)
-				os.Unsetenv(key)
 			}
 
 			// Verify all mock expectations were met
