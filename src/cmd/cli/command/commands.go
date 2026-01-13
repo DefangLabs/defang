@@ -515,10 +515,14 @@ var whoamiCmd = &cobra.Command{
 		global.NonInteractive = true // don't show provider prompt
 		ctx := cmd.Context()
 		options := NewSessionLoaderOptionsForCommand(cmd)
-		sessionLoader := session.NewSessionLoader(global.Client, ec, options)
+		sm, err := newStackManagerForCmd(cmd)
+		if err != nil {
+			return fmt.Errorf("failed to create stack manager: %w", err)
+		}
+		sessionLoader := session.NewSessionLoader(global.Client, ec, sm, options)
 		session, err := sessionLoader.LoadSession(ctx)
 		if err != nil {
-			term.Warn("unable to load session:", err)
+			return fmt.Errorf("loading session: %w", err)
 		}
 
 		token := client.GetExistingToken(global.Cluster)

@@ -76,7 +76,11 @@ func makeComposeUpCmd() *cobra.Command {
 
 			options := NewSessionLoaderOptionsForCommand(cmd)
 			options.AllowStackCreation = true
-			sessionLoader := session.NewSessionLoader(global.Client, ec, options)
+			sm, err := newStackManagerForCmd(cmd)
+			if err != nil {
+				return err
+			}
+			sessionLoader := session.NewSessionLoader(global.Client, ec, sm, options)
 			session, err := sessionLoader.LoadSession(ctx)
 			if err != nil {
 				return err
@@ -320,28 +324,14 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 		printDefangHint("To start a new project, do:", "new")
 	}
 
-	if strings.Contains(originalErr.Error(), "maximum number of projects") {
-		projectName, err := provider.RemoteProjectName(ctx)
-		if err != nil {
-			return originalErr
-		}
-
-		// print the error before prompting for compose down
+	if connect.CodeOf(originalErr) == connect.CodeResourceExhausted && strings.Contains(originalErr.Error(), "maximum number of projects") {
 		term.Error("Error:", client.PrettyError(originalErr))
-		if global.NonInteractive {
-			printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
-			return originalErr
-		}
-
-		_, err = cli.InteractiveComposeDown(ctx, projectName, global.Client, provider)
+		err := handleTooManyProjects(ctx, provider)
 		if err != nil {
-			term.Debug("ComposeDown failed:", err)
-			printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
+			term.Warn("Failed to interactively handle \"too many projects\" error", err)
 			return originalErr
-		} else {
-			// TODO: actually do the "compose up" (because that's what the user intended in the first place)
-			printDefangHint("To try deployment again, do:", "compose up")
 		}
+		return nil
 	}
 
 	if global.NonInteractive || errors.Is(originalErr, byoc.ErrLocalPulumiStopped) {
@@ -352,6 +342,31 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 	return debugger.DebugDeploymentError(ctx, debug.DebugConfig{
 		Project: project,
 	}, originalErr)
+}
+
+func handleTooManyProjects(ctx context.Context, provider client.Provider) error {
+	projectName, err := provider.RemoteProjectName(ctx)
+	if err != nil {
+		return err
+	}
+
+	// print the error before prompting for compose down
+	if global.NonInteractive {
+		printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
+		return err
+	}
+
+	_, err = cli.InteractiveComposeDown(ctx, projectName, global.Client, provider)
+	if err != nil {
+		term.Debug("ComposeDown failed:", err)
+		printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
+		return err
+	} else {
+		// TODO: actually do the "compose up" (because that's what the user intended in the first place)
+		printDefangHint("To try deployment again, do:", "compose up")
+	}
+
+	return nil
 }
 
 func handleTailAndMonitorErr(ctx context.Context, err error, debugger *debug.Debugger, debugConfig debug.DebugConfig) {
@@ -464,7 +479,7 @@ func makeComposeDownCmd() *cobra.Command {
 
 			session, err := NewCommandSession(cmd)
 			if err != nil {
-				term.Warn("Failed to initialize session:", err)
+				return err
 			}
 
 			projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), session.Loader, session.Provider)
@@ -560,9 +575,20 @@ func makeComposeConfigCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 
-			session, err := NewCommandSession(cmd)
+			options := NewSessionLoaderOptionsForCommand(cmd)
+			sm, err := newStackManagerForCmd(cmd)
 			if err != nil {
-				term.Warn("Failed to initialize session:", err)
+				return fmt.Errorf("failed to create stack manager: %w", err)
+			}
+			sessionLoader := session.NewSessionLoader(global.Client, ec, sm, options)
+			session, err := sessionLoader.LoadSession(ctx)
+			if err != nil {
+				return fmt.Errorf("loading session: %w", err)
+			}
+
+			_, err = session.Provider.AccountInfo(ctx)
+			if err != nil {
+				term.Warn("unable to load AccountInfo:", err)
 			}
 
 			project, loadErr := session.Loader.LoadProject(ctx)
@@ -614,7 +640,7 @@ func makeComposePsCmd() *cobra.Command {
 
 			session, err := NewCommandSession(cmd)
 			if err != nil {
-				term.Warn("Failed to initialize session:", err)
+				return err
 			}
 
 			projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), session.Loader, session.Provider)
