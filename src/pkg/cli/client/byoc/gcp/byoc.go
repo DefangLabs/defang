@@ -288,6 +288,11 @@ func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 		return nil, errors.New("GCP_PROJECT_ID or CLOUDSDK_CORE_PROJECT must be set for GCP projects; use 'gcloud projects list' to see available project ids")
 	}
 
+	// Validate project ID format early
+	if valid, validationMsg := isValidGcpProjectID(projectId); !valid {
+		return nil, ErrInvalidProjectID{ProjectID: projectId, Message: validationMsg}
+	}
+
 	// check whether the ADC is logged in by trying to get the current account email
 	email, err := b.driver.GetCurrentPrincipal(ctx)
 	if err != nil {
@@ -831,9 +836,120 @@ func (e briefGcpError) Error() string {
 	return e.err.Error()
 }
 
+// ErrInvalidProjectID is returned when the GCP_PROJECT_ID is invalid
+type ErrInvalidProjectID struct {
+	ProjectID string
+	Message   string
+}
+
+func (e ErrInvalidProjectID) Error() string {
+	return fmt.Sprintf("invalid GCP project ID %q: %s\n\nGCP project IDs must:\n  - Be 6 to 30 characters in length\n  - Contain only lowercase letters, numbers, and hyphens\n  - Start with a letter\n  - Not end with a hyphen\n\nPlease verify your GCP_PROJECT_ID or use 'gcloud projects list' to see available project IDs.", e.ProjectID, e.Message)
+}
+
+// ErrProjectDeleted is returned when a project has been deleted
+type ErrProjectDeleted struct {
+	ProjectID string
+}
+
+func (e ErrProjectDeleted) Error() string {
+	return fmt.Sprintf("project %q has been deleted or is no longer accessible\n\nIf you recently switched projects, your Application Default Credentials (ADC) may need to be refreshed.\nPlease run: gcloud auth application-default login", e.ProjectID)
+}
+
+// isValidGcpProjectID checks if a project ID follows GCP naming rules
+func isValidGcpProjectID(projectID string) (bool, string) {
+	if len(projectID) < 6 {
+		return false, "must be at least 6 characters"
+	}
+	if len(projectID) > 30 {
+		return false, "must be at most 30 characters"
+	}
+	if projectID[0] < 'a' || projectID[0] > 'z' {
+		return false, "must start with a lowercase letter"
+	}
+	if projectID[len(projectID)-1] == '-' {
+		return false, "cannot end with a hyphen"
+	}
+	// Check for invalid characters (must be lowercase letters, numbers, and hyphens only)
+	for _, c := range projectID {
+		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') {
+			return false, "can only contain lowercase letters, numbers, and hyphens"
+		}
+	}
+	return true, ""
+}
+
 func annotateGcpError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	term.Debug("GCP error:", err)
+
 	gerr := new(googleapi.Error)
 	if errors.As(err, &gerr) {
+		// Check for deleted project error (403 with specific message)
+		if gerr.Code == 403 && strings.Contains(gerr.Message, "has been deleted") {
+			// Try to extract project ID from the error message or details
+			projectID := ""
+			// Look for project ID in error details
+			for _, detail := range gerr.Details {
+				if metadata := GetGoogleAPIErrorDetail(detail, "metadata"); metadata != "" {
+					if consumer := GetGoogleAPIErrorDetail(detail, "metadata.consumer"); consumer != "" {
+						// consumer is often in format "projects/PROJECT_ID"
+						if strings.HasPrefix(consumer, "projects/") {
+							projectID = strings.TrimPrefix(consumer, "projects/")
+							break
+						}
+					}
+				}
+			}
+			if projectID == "" {
+				// Try to extract from the error message itself
+				// Message format: "Project PROJECT_ID has been deleted."
+				if idx := strings.Index(gerr.Message, "Project "); idx != -1 {
+					rest := gerr.Message[idx+8:]
+					if endIdx := strings.Index(rest, " "); endIdx != -1 {
+						projectID = rest[:endIdx]
+					}
+				}
+			}
+			if projectID != "" {
+				return ErrProjectDeleted{ProjectID: projectID}
+			}
+			// Fallback to generic message if we can't extract project ID
+			return fmt.Errorf("%s\n\nIf you recently switched projects, your Application Default Credentials (ADC) may need to be refreshed.\nPlease run: gcloud auth application-default login", gerr.Message)
+		}
+
+		// Check for invalid resource ID (400 with specific reason)
+		if gerr.Code == 400 {
+			// Look for RESOURCES_INVALID_RESOURCE_ID in error details
+			for _, detail := range gerr.Details {
+				if reason := GetGoogleAPIErrorDetail(detail, "reason"); reason == "RESOURCES_INVALID_RESOURCE_ID" {
+					// Try to get the resource_id from metadata
+					if resourceID := GetGoogleAPIErrorDetail(detail, "metadata.resource_id"); resourceID != "" {
+						// Check if this looks like an invalid project ID
+						if valid, validationMsg := isValidGcpProjectID(resourceID); !valid {
+							return ErrInvalidProjectID{ProjectID: resourceID, Message: validationMsg}
+						}
+					}
+				}
+			}
+			// Also check the error message for invalid resource id
+			if strings.Contains(gerr.Message, "resource id") && strings.Contains(gerr.Message, "is invalid") {
+				// Try to extract the resource ID from the message
+				// Format: "The resource id XXXX is invalid."
+				if idx := strings.Index(gerr.Message, "resource id "); idx != -1 {
+					rest := gerr.Message[idx+12:]
+					if endIdx := strings.Index(rest, " "); endIdx != -1 {
+						resourceID := rest[:endIdx]
+						if valid, validationMsg := isValidGcpProjectID(resourceID); !valid {
+							return ErrInvalidProjectID{ProjectID: resourceID, Message: validationMsg}
+						}
+					}
+				}
+			}
+		}
+
 		return briefGcpError{err: gerr}
 	}
 	return err
