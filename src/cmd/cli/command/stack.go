@@ -49,7 +49,7 @@ func makeStackNewCmd() *cobra.Command {
 			}
 
 			if global.NonInteractive {
-				_, err := stacks.Create(params)
+				_, err := stacks.CreateInDirectory(".", params)
 				return err
 			}
 
@@ -61,7 +61,7 @@ func makeStackNewCmd() *cobra.Command {
 
 			term.Debugf("Creating stack with parameters: %+v\n", params)
 
-			_, err = stacks.Create(params)
+			_, err = stacks.CreateInDirectory(".", params)
 			if err != nil {
 				return err
 			}

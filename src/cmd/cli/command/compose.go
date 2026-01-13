@@ -123,7 +123,7 @@ func makeComposeUpCmd() *cobra.Command {
 			} else if accountInfo, err := session.Provider.AccountInfo(ctx); err != nil {
 				term.Debugf("AccountInfo failed: %v", err)
 			} else if len(resp.Deployments) > 0 {
-				confirmed, err := confirmDeployment(resp.Deployments, accountInfo, session.Provider.GetStackName())
+				confirmed, err := confirmDeployment(session.Loader.TargetDirectory(), resp.Deployments, accountInfo, session.Provider.GetStackName())
 				if err != nil {
 					return err
 				}
@@ -131,7 +131,7 @@ func makeComposeUpCmd() *cobra.Command {
 					return fmt.Errorf("deployment of project %q was canceled", project.Name)
 				}
 			} else if global.Stack.Name == "" {
-				err = promptToCreateStack(ctx, stacks.StackParameters{
+				err = promptToCreateStack(ctx, session.Loader.TargetDirectory(), stacks.StackParameters{
 					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
 					Provider: accountInfo.Provider,
 					Region:   accountInfo.Region,
@@ -233,7 +233,7 @@ func makeComposeUpCmd() *cobra.Command {
 	return composeUpCmd
 }
 
-func confirmDeployment(existingDeployments []*defangv1.Deployment, accountInfo *client.AccountInfo, stackName string) (bool, error) {
+func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.Deployment, accountInfo *client.AccountInfo, stackName string) (bool, error) {
 	samePlace := slices.ContainsFunc(existingDeployments, func(dep *defangv1.Deployment) bool {
 		if dep.Provider != accountInfo.Provider.Value() {
 			return false
@@ -253,7 +253,7 @@ func confirmDeployment(existingDeployments []*defangv1.Deployment, accountInfo *
 	}
 	if stackName == "" {
 		stackName = stacks.DefaultBeta
-		_, err := stacks.Create(stacks.StackParameters{
+		_, err := stacks.CreateInDirectory(targetDirectory, stacks.StackParameters{
 			Name:     stackName,
 			Provider: accountInfo.Provider,
 			Region:   accountInfo.Region,
@@ -296,7 +296,7 @@ func confirmDeploymentToNewLocation(existingDeployments []*defangv1.Deployment) 
 	return true, nil
 }
 
-func promptToCreateStack(ctx context.Context, params stacks.StackParameters) error {
+func promptToCreateStack(ctx context.Context, targetDirectory string, params stacks.StackParameters) error {
 	if global.NonInteractive {
 		term.Info("Consider creating a stack to manage your deployments.")
 		printDefangHint("To create a stack, do:", "stack new --name="+params.Name)
@@ -308,7 +308,7 @@ func promptToCreateStack(ctx context.Context, params stacks.StackParameters) err
 		return err
 	}
 
-	_, err = stacks.Create(params)
+	_, err = stacks.CreateInDirectory(targetDirectory, params)
 	if err != nil {
 		return err
 	}

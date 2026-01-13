@@ -98,9 +98,9 @@ func TestCreate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			filename, err := Create(tt.parameters)
+			filename, err := CreateInDirectory(".", tt.parameters)
 			if (err != nil) != tt.expectErr {
-				t.Errorf("Create() error = %v, expectErr %v", err, tt.expectErr)
+				t.Errorf("CreateInDirectory() error = %v, expectErr %v", err, tt.expectErr)
 			}
 
 			// Cleanup created file if no error expected
@@ -111,7 +111,7 @@ func TestCreate(t *testing.T) {
 			}
 
 			if filename != tt.expectedFilename {
-				t.Errorf("Create() = %q, want %q", filename, tt.expectedFilename)
+				t.Errorf("CreateInDirectory() = %q, want %q", filename, tt.expectedFilename)
 			}
 		})
 	}
@@ -126,14 +126,14 @@ func TestRepeatCreate(t *testing.T) {
 		Mode:     modes.ModeBalanced,
 	}
 
-	_, err := Create(params)
+	_, err := CreateInDirectory(".", params)
 	if err != nil {
-		t.Errorf("First Create() error = %v", err)
+		t.Errorf("First CreateInDirectory() error = %v", err)
 	}
 
-	_, err = Create(params)
+	_, err = CreateInDirectory(".", params)
 	if err == nil {
-		t.Errorf("Expected error on duplicate Create(), got nil")
+		t.Errorf("Expected error on duplicate CreateInDirectory(), got nil")
 	} else {
 		assert.ErrorContains(t, err, "stack file already exists for \"repeattest\".")
 		assert.ErrorContains(t, err, "If you want to overwrite it, please spin down the stack and remove stackfile first.")
@@ -183,14 +183,14 @@ func TestRemove(t *testing.T) {
 			Region:   "us-west-2",
 			Mode:     modes.ModeAffordable,
 		}
-		stackFile, err := Create(params)
+		stackFile, err := CreateInDirectory(".", params)
 		if err != nil {
-			t.Errorf("Setup Create() error = %v", err)
+			t.Errorf("Setup CreateInDirectory() error = %v", err)
 		}
 
-		err = Remove(stackName)
+		err = RemoveInDirectory(".", stackName)
 		if err != nil {
-			t.Errorf("Remove() error = %v", err)
+			t.Errorf("RemoveInDirectory() error = %v", err)
 		}
 		if _, err := os.Stat(stackFile); !os.IsNotExist(err) {
 			t.Errorf("Expected stack file to be removed")
@@ -325,7 +325,7 @@ func TestReadInDirectory(t *testing.T) {
 		}
 		_, err := CreateInDirectory(".", expectedParams)
 		if err != nil {
-			t.Errorf("Setup Create() error = %v", err)
+			t.Errorf("Setup CreateInDirectory() error = %v", err)
 		}
 
 		params, err := ReadInDirectory(".", stackName)

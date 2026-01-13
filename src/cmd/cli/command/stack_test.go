@@ -101,7 +101,7 @@ func TestStackListCmd(t *testing.T) {
 				os.FileMode(0644),
 			)
 			for _, stack := range tt.stacks {
-				stacks.Create(stack)
+				stacks.CreateInDirectory(".", stack)
 			}
 
 			buffer := new(bytes.Buffer)

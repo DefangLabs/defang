@@ -81,10 +81,6 @@ func MakeDefaultName(providerId client.ProviderID, region string) string {
 	return strings.ToLower(providerId.String() + compressedRegion)
 }
 
-func Create(params StackParameters) (string, error) {
-	return CreateInDirectory(".", params)
-}
-
 func CreateInDirectory(workingDirectory string, params StackParameters) (string, error) {
 	if params.Name == "" {
 		return "", errors.New("stack name cannot be empty")
