@@ -3,6 +3,7 @@ package gcp
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -190,6 +192,118 @@ func TestGetLogStream(t *testing.T) {
 			query := logStream.GetQuery()
 			if err := pkg.Compare([]byte(query), "testdata/"+tt.name+".query"); err != nil {
 				t.Errorf("getLogStream() query mismatch: %v", err)
+			}
+		})
+	}
+}
+
+func TestAnnotateGcpError(t *testing.T) {
+	tests := []struct {
+		name              string
+		err               error
+		wantCredentialsErr bool
+	}{
+		{
+			name:              "deleted project error",
+			err:               &googleapi.Error{Code: 403, Message: "Project test-project has been deleted."},
+			wantCredentialsErr: true,
+		},
+		{
+			name: "USER_PROJECT_DENIED error",
+			err: &googleapi.Error{
+				Code:    403,
+				Message: "Project access denied",
+				Details: []interface{}{
+					map[string]interface{}{
+						"@type":  "type.googleapis.com/google.rpc.ErrorInfo",
+						"reason": "USER_PROJECT_DENIED",
+					},
+				},
+			},
+			wantCredentialsErr: true,
+		},
+		{
+			name:              "different 403 error",
+			err:               &googleapi.Error{Code: 403, Message: "Access denied for resource"},
+			wantCredentialsErr: false,
+		},
+		{
+			name:              "404 error",
+			err:               &googleapi.Error{Code: 404, Message: "Not found"},
+			wantCredentialsErr: false,
+		},
+		{
+			name:              "non-googleapi error",
+			err:               errors.New("some other error"),
+			wantCredentialsErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := annotateGcpError(tt.err)
+
+			var credErr *CredentialsError
+			gotCredentialsErr := errors.As(result, &credErr)
+
+			if gotCredentialsErr != tt.wantCredentialsErr {
+				t.Errorf("annotateGcpError() returned CredentialsError = %v, want %v", gotCredentialsErr, tt.wantCredentialsErr)
+			}
+		})
+	}
+}
+
+func TestIsADCRefreshNeeded(t *testing.T) {
+	tests := []struct {
+		name string
+		err  *googleapi.Error
+		want bool
+	}{
+		{
+			name: "deleted project message",
+			err:  &googleapi.Error{Code: 403, Message: "Project test-project has been deleted."},
+			want: true,
+		},
+		{
+			name: "project deleted in message",
+			err:  &googleapi.Error{Code: 403, Message: "The project 'test' was deleted"},
+			want: true,
+		},
+		{
+			name: "USER_PROJECT_DENIED reason",
+			err: &googleapi.Error{
+				Code:    403,
+				Message: "Access denied",
+				Details: []interface{}{
+					map[string]interface{}{
+						"reason": "USER_PROJECT_DENIED",
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "403 without project issue",
+			err:  &googleapi.Error{Code: 403, Message: "Access denied"},
+			want: false,
+		},
+		{
+			name: "404 error",
+			err:  &googleapi.Error{Code: 404, Message: "Not found"},
+			want: false,
+		},
+		{
+			name: "500 error",
+			err:  &googleapi.Error{Code: 500, Message: "Internal server error"},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isADCRefreshNeeded(tt.err)
+			if got != tt.want {
+				t.Errorf("isADCRefreshNeeded() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -834,9 +834,43 @@ func (e briefGcpError) Error() string {
 func annotateGcpError(err error) error {
 	gerr := new(googleapi.Error)
 	if errors.As(err, &gerr) {
+		// Check if this is a credential/ADC-related error
+		if isADCRefreshNeeded(gerr) {
+			return &CredentialsError{
+				error: briefGcpError{err: gerr},
+			}
+		}
 		return briefGcpError{err: gerr}
 	}
 	return err
+}
+
+// isADCRefreshNeeded checks if the error indicates that Application Default Credentials need to be refreshed
+func isADCRefreshNeeded(gerr *googleapi.Error) bool {
+	// Check for 403 Forbidden errors related to project access
+	if gerr.Code != 403 {
+		return false
+	}
+
+	// Check error message for common patterns
+	msg := strings.ToLower(gerr.Message)
+	if strings.Contains(msg, "has been deleted") ||
+		strings.Contains(msg, "project") && strings.Contains(msg, "deleted") {
+		return true
+	}
+
+	// Check error details for USER_PROJECT_DENIED or similar reasons
+	for _, detail := range gerr.Details {
+		if detailMap, ok := detail.(map[string]interface{}); ok {
+			if reason, ok := detailMap["reason"].(string); ok {
+				if reason == "USER_PROJECT_DENIED" {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 // Used to get nested values from the detail of a googleapi.Error
