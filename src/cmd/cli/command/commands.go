@@ -772,7 +772,7 @@ var configCmd = &cobra.Command{
 }
 
 var configSetCmd = &cobra.Command{
-	Use:         "create CONFIG... | CONFIG [file|-]", // like Docker
+	Use:         "create CONFIG [file|-] | CONFIG=VALUE...", // like Docker
 	Annotations: authNeededAnnotation,
 	Args:        cobra.MinimumNArgs(0), // Allow 0 args when using --env-file, or multiple configs
 	Aliases:     []string{"set", "add", "put"},
