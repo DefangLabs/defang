@@ -857,6 +857,7 @@ func (e ErrProjectDeleted) Error() string {
 
 // isValidGcpProjectID checks if a project ID follows GCP naming rules
 func isValidGcpProjectID(projectID string) (bool, string) {
+	// Early return for empty string to prevent index out of bounds
 	if projectID == "" {
 		return false, "must not be empty"
 	}
@@ -866,6 +867,7 @@ func isValidGcpProjectID(projectID string) (bool, string) {
 	if len(projectID) > 30 {
 		return false, "must be at most 30 characters"
 	}
+	// Safe to access indices now since we know length >= 6
 	if projectID[0] < 'a' || projectID[0] > 'z' {
 		return false, "must start with a lowercase letter"
 	}
@@ -909,8 +911,9 @@ func annotateGcpError(err error) error {
 			if projectID == "" {
 				// Try to extract from the error message itself
 				// Message format: "Project PROJECT_ID has been deleted."
-				if idx := strings.Index(gerr.Message, "Project "); idx != -1 {
-					rest := gerr.Message[idx+8:]
+				const projectPrefix = "Project "
+				if idx := strings.Index(gerr.Message, projectPrefix); idx != -1 {
+					rest := gerr.Message[idx+len(projectPrefix):]
 					if endIdx := strings.Index(rest, " "); endIdx != -1 {
 						projectID = rest[:endIdx]
 					}
@@ -941,8 +944,9 @@ func annotateGcpError(err error) error {
 			if strings.Contains(gerr.Message, "resource id") && strings.Contains(gerr.Message, "is invalid") {
 				// Try to extract the resource ID from the message
 				// Format: "The resource id XXXX is invalid."
-				if idx := strings.Index(gerr.Message, "resource id "); idx != -1 {
-					rest := gerr.Message[idx+12:]
+				const resourcePrefix = "resource id "
+				if idx := strings.Index(gerr.Message, resourcePrefix); idx != -1 {
+					rest := gerr.Message[idx+len(resourcePrefix):]
 					if endIdx := strings.Index(rest, " "); endIdx != -1 {
 						resourceID := rest[:endIdx]
 						if valid, validationMsg := isValidGcpProjectID(resourceID); !valid {
