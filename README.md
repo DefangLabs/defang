@@ -14,7 +14,7 @@ The Defang Command-Line Interface [(CLI)](https://docs.defang.io/docs/getting-st
 
 ### Deploying with Defang
 
-If you already have a Docker Compose file, create a new stack and then deploy it. For example:
+If you already have a Docker Compose file, create a new [stack](https://docs.defang.io/docs/concepts/stacks) and then deploy it. For example:
 
 ```shell
 $ defang stack new
