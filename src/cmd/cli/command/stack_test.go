@@ -166,7 +166,7 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 	}
 }
 
-func TestLoadParameters(t *testing.T) {
+func TestLoadStackEnv(t *testing.T) {
 	tests := []struct {
 		name        string
 		parameters  stacks.StackParameters
@@ -247,9 +247,9 @@ func TestLoadParameters(t *testing.T) {
 				}
 			})
 
-			err := stacks.LoadParameters(tt.parameters, true)
+			err := stacks.LoadStackEnv(tt.parameters, true)
 			if err != nil {
-				t.Fatalf("LoadParameters() error = %v", err)
+				t.Fatalf("LoadStackEnv() error = %v", err)
 			}
 
 			for key, expectedValue := range tt.expectedEnv {

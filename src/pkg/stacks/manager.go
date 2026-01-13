@@ -171,7 +171,7 @@ func (sm *manager) LoadLocal(name string) (*StackParameters, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = sm.LoadParameters(*params, false)
+	err = sm.LoadStackEnv(*params, false)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +193,7 @@ func (sm *manager) LoadRemote(ctx context.Context, name string) (*StackParameter
 	if remoteStack == nil {
 		return nil, fmt.Errorf("unable to find stack %q", name)
 	}
-	err = sm.LoadParameters(remoteStack.StackParameters, false)
+	err = sm.LoadStackEnv(remoteStack.StackParameters, false)
 	if err != nil {
 		return nil, fmt.Errorf("unable to import stack %q: %w", name, err)
 	}
@@ -201,8 +201,8 @@ func (sm *manager) LoadRemote(ctx context.Context, name string) (*StackParameter
 	return &remoteStack.StackParameters, nil
 }
 
-func (sm *manager) LoadParameters(params StackParameters, overload bool) error {
-	return LoadParameters(params, overload)
+func (sm *manager) LoadStackEnv(params StackParameters, overload bool) error {
+	return LoadStackEnv(params, overload)
 }
 
 func (sm *manager) Create(params StackParameters) (string, error) {

@@ -219,7 +219,7 @@ func ReadInDirectory(workingDirectory, name string) (*StackParameters, error) {
 
 // This was basically ripped out of godotenv.Overload/Load. Unfortunately, they don't export
 // a function that loads a map[string]string, so we have to reimplement it here.
-func LoadParameters(params StackParameters, overload bool) error {
+func LoadStackEnv(params StackParameters, overload bool) error {
 	currentEnv := map[string]bool{}
 	rawEnv := os.Environ()
 	for _, rawEnvLine := range rawEnv {

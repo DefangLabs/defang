@@ -21,7 +21,7 @@ type StacksManager interface {
 	Load(ctx context.Context, name string) (*stacks.StackParameters, error)
 	LoadLocal(name string) (*stacks.StackParameters, error)
 	LoadRemote(ctx context.Context, name string) (*stacks.StackParameters, error)
-	LoadParameters(params stacks.StackParameters, overload bool) error
+	LoadStackEnv(params stacks.StackParameters, overload bool) error
 	Create(params stacks.StackParameters) (string, error)
 	TargetDirectory() string
 }

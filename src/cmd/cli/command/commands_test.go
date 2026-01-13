@@ -350,8 +350,8 @@ func (m *mockStackManager) Create(params stacks.StackParameters) (string, error)
 	return params.Name, nil
 }
 
-func (m *mockStackManager) LoadParameters(params stacks.StackParameters, overload bool) error {
-	return stacks.LoadParameters(params, overload)
+func (m *mockStackManager) LoadStackEnv(params stacks.StackParameters, overload bool) error {
+	return stacks.LoadStackEnv(params, overload)
 }
 
 func TestNewProvider(t *testing.T) {
