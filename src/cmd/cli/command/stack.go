@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 
-	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -145,8 +143,6 @@ func makeStackRemoveCmd() *cobra.Command {
 }
 
 func PromptForStackParameters(ctx context.Context, params *stacks.StackParameters) error {
-	elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
-	ec := elicitations.NewController(elicitationsClient)
 	wizard := stacks.NewWizard(ec)
 	newParams, err := wizard.CollectRemainingParameters(ctx, params)
 	if err != nil {
