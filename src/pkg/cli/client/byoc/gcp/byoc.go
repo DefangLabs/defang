@@ -98,7 +98,12 @@ type ByocGcp struct {
 }
 
 func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string) *ByocGcp {
-	region := pkg.Getenv("GCP_LOCATION", "us-central1") // Defaults to us-central1 for lower price
+	// Try standard GCP environment variables in order of precedence
+	// Keeping GCP_LOCATION first for backward compatibility
+	region := pkg.GetFirstEnv("GCP_LOCATION", "GOOGLE_REGION", "GCLOUD_REGION", "CLOUDSDK_COMPUTE_REGION")
+	if region == "" {
+		region = "us-central1" // Defaults to us-central1 for lower price
+	}
 	projectId := getGcpProjectID()
 	b := &ByocGcp{driver: &gcp.Gcp{Region: region, ProjectId: projectId}}
 	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
@@ -106,11 +111,9 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 }
 
 func getGcpProjectID() string {
-	projectId, ok := os.LookupEnv("GCP_PROJECT_ID")
-	if !ok {
-		projectId = os.Getenv("CLOUDSDK_CORE_PROJECT")
-	}
-	return projectId
+	// Try standard GCP environment variables in order of precedence
+	// Keeping GCP_PROJECT_ID first for backward compatibility
+	return pkg.GetFirstEnv("GCP_PROJECT_ID", "GOOGLE_PROJECT", "GOOGLE_CLOUD_PROJECT", "GCLOUD_PROJECT", "CLOUDSDK_CORE_PROJECT")
 }
 
 func (b *ByocGcp) SetUpCD(ctx context.Context) error {
@@ -285,7 +288,7 @@ func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[string
 func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
 	projectId := getGcpProjectID()
 	if projectId == "" {
-		return nil, errors.New("GCP_PROJECT_ID or CLOUDSDK_CORE_PROJECT must be set for GCP projects; use 'gcloud projects list' to see available project ids")
+		return nil, errors.New("GCP project ID must be set via one of: GCP_PROJECT_ID, GOOGLE_PROJECT, GOOGLE_CLOUD_PROJECT, GCLOUD_PROJECT, or CLOUDSDK_CORE_PROJECT; use 'gcloud projects list' to see available project ids")
 	}
 
 	// check whether the ADC is logged in by trying to get the current account email

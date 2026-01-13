@@ -1240,7 +1240,8 @@ func doInEnv() bool {
 }
 
 func gcpInEnv() bool {
-	return os.Getenv("GCP_PROJECT_ID") != "" || os.Getenv("CLOUDSDK_CORE_PROJECT") != ""
+	// Check all supported GCP project environment variables
+	return pkg.GetFirstEnv("GCP_PROJECT_ID", "GOOGLE_PROJECT", "GOOGLE_CLOUD_PROJECT", "GCLOUD_PROJECT", "CLOUDSDK_CORE_PROJECT") != ""
 }
 
 func awsInConfig(ctx context.Context) bool {
@@ -1405,7 +1406,7 @@ func printProviderMismatchWarnings(ctx context.Context, provider client.Provider
 			term.Warn("DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
 		}
 		if gcpInEnv() {
-			term.Warn("GCP_PROJECT_ID/CLOUDSDK_CORE_PROJECT environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
+			term.Warn("GCP project environment variable was detected (GCP_PROJECT_ID, GOOGLE_PROJECT, GOOGLE_CLOUD_PROJECT, GCLOUD_PROJECT, or CLOUDSDK_CORE_PROJECT); did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
 		}
 	}
 
@@ -1420,7 +1421,7 @@ func printProviderMismatchWarnings(ctx context.Context, provider client.Provider
 		}
 	case client.ProviderGCP:
 		if !gcpInEnv() {
-			term.Warn("GCP provider was selected, but GCP_PROJECT_ID environment variable is not set")
+			term.Warn("GCP provider was selected, but no GCP project environment variable is set (GCP_PROJECT_ID, GOOGLE_PROJECT, GOOGLE_CLOUD_PROJECT, GCLOUD_PROJECT, or CLOUDSDK_CORE_PROJECT)")
 		}
 	}
 }
