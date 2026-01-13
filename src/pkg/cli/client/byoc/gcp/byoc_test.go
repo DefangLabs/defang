@@ -266,8 +266,13 @@ func TestIsADCRefreshNeeded(t *testing.T) {
 		},
 		{
 			name: "project deleted in message",
-			err:  &googleapi.Error{Code: 403, Message: "The project 'test' was deleted"},
+			err:  &googleapi.Error{Code: 403, Message: "The project 'test' has been deleted"},
 			want: true,
+		},
+		{
+			name: "should not match - unrelated message with project and deleted",
+			err:  &googleapi.Error{Code: 403, Message: "deleted user project access denied"},
+			want: false,
 		},
 		{
 			name: "USER_PROJECT_DENIED reason",
