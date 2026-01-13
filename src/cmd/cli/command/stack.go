@@ -44,11 +44,10 @@ func makeStackNewCmd() *cobra.Command {
 			var region, _ = cmd.Flags().GetString("region")
 
 			params := stacks.StackParameters{
-				Name:      stackName,
-				Provider:  global.Stack.Provider, // default provider
-				Region:    region,
-				Mode:      global.Stack.Mode,
-				Variables: map[string]string{},
+				Name:     stackName,
+				Provider: global.Stack.Provider, // default provider
+				Region:   region,
+				Mode:     global.Stack.Mode,
 			}
 
 			if global.NonInteractive {
