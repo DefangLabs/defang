@@ -234,8 +234,8 @@ func TestGetGcpProjectID(t *testing.T) {
 		{
 			name: "Multiple env vars set, GCP_PROJECT_ID takes precedence",
 			envVars: map[string]string{
-				"GCP_PROJECT_ID":         "gcp-project",
-				"GOOGLE_PROJECT":         "google-project",
+				"GCP_PROJECT_ID":        "gcp-project",
+				"GOOGLE_PROJECT":        "google-project",
 				"CLOUDSDK_CORE_PROJECT": "cloudsdk-project",
 			},
 			expected: "gcp-project",
@@ -243,7 +243,7 @@ func TestGetGcpProjectID(t *testing.T) {
 		{
 			name: "Multiple env vars set, GOOGLE_PROJECT takes precedence when GCP_PROJECT_ID is not set",
 			envVars: map[string]string{
-				"GOOGLE_PROJECT":         "google-project",
+				"GOOGLE_PROJECT":        "google-project",
 				"GOOGLE_CLOUD_PROJECT":  "google-cloud-project",
 				"CLOUDSDK_CORE_PROJECT": "cloudsdk-project",
 			},

@@ -239,7 +239,7 @@ func TestGetFirstEnv(t *testing.T) {
 			for k, v := range tt.envVars {
 				t.Setenv(k, v)
 			}
-			
+
 			got := GetFirstEnv(tt.keys...)
 			if got != tt.expected {
 				t.Errorf("GetFirstEnv(%v) = %v, want %v", tt.keys, got, tt.expected)

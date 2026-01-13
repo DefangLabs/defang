@@ -1,6 +1,8 @@
 package client
 
-import "github.com/DefangLabs/defang/src/pkg"
+import (
+	"github.com/DefangLabs/defang/src/pkg"
+)
 
 func GetRegion(provider ProviderID) string {
 	switch provider {
@@ -9,7 +11,7 @@ func GetRegion(provider ProviderID) string {
 	case ProviderGCP:
 		// Try standard GCP environment variables in order of precedence
 		// Keeping GCP_LOCATION first for backward compatibility
-		region := pkg.GetFirstEnv("GCP_LOCATION", "GOOGLE_REGION", "GCLOUD_REGION", "CLOUDSDK_COMPUTE_REGION")
+		region := pkg.GetFirstEnv(pkg.GCPRegionEnvVars...)
 		if region == "" {
 			return "us-central1" // Default region for GCP
 		}

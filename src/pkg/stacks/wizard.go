@@ -110,7 +110,7 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *StackPa
 	case client.ProviderGCP:
 		if params.GCPProjectID == "" {
 			// Check all supported GCP project environment variables
-			envProjectID := pkg.GetFirstEnv("GCP_PROJECT_ID", "GOOGLE_PROJECT", "GOOGLE_CLOUD_PROJECT", "GCLOUD_PROJECT", "CLOUDSDK_CORE_PROJECT")
+			envProjectID := pkg.GetFirstEnv(pkg.GCPProjectEnvVars...)
 			if envProjectID != "" {
 				projectID, err := w.ec.RequestStringWithDefault(ctx, "Enter your GCP Project ID:", "gcp_project_id", envProjectID)
 				if err != nil {

@@ -67,6 +67,10 @@ func GetFirstEnv(keys ...string) string {
 	return ""
 }
 
+// Standard GCP environment variables in order of precedence
+var GCPProjectEnvVars = []string{"GCP_PROJECT_ID", "GOOGLE_PROJECT", "GOOGLE_CLOUD_PROJECT", "GCLOUD_PROJECT", "CLOUDSDK_CORE_PROJECT"}
+var GCPRegionEnvVars = []string{"GCP_LOCATION", "GOOGLE_REGION", "GCLOUD_REGION", "CLOUDSDK_COMPUTE_REGION"}
+
 func SplitByComma(s string) []string {
 	if s == "" {
 		return nil

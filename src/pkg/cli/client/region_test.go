@@ -57,8 +57,8 @@ func TestGetRegion(t *testing.T) {
 			name:     "GCP with multiple env vars, GCP_LOCATION takes precedence",
 			provider: ProviderGCP,
 			envVars: map[string]string{
-				"GCP_LOCATION":             "us-west1",
-				"GOOGLE_REGION":            "europe-west1",
+				"GCP_LOCATION":            "us-west1",
+				"GOOGLE_REGION":           "europe-west1",
 				"CLOUDSDK_COMPUTE_REGION": "asia-east1",
 			},
 			expected: "us-west1",
@@ -67,8 +67,8 @@ func TestGetRegion(t *testing.T) {
 			name:     "GCP with multiple env vars, GOOGLE_REGION takes precedence when GCP_LOCATION is not set",
 			provider: ProviderGCP,
 			envVars: map[string]string{
-				"GOOGLE_REGION":            "europe-west1",
-				"GCLOUD_REGION":            "asia-east1",
+				"GOOGLE_REGION":           "europe-west1",
+				"GCLOUD_REGION":           "asia-east1",
 				"CLOUDSDK_COMPUTE_REGION": "us-east4",
 			},
 			expected: "europe-west1",
