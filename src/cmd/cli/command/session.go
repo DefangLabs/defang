@@ -40,13 +40,7 @@ func NewSessionLoaderOptionsForCommand(cmd *cobra.Command) session.SessionLoader
 	configPaths, _ := cmd.Flags().GetStringArray("file")
 	provider, _ := cmd.Flag("provider").Value.(*client.ProviderID)
 	projectName, _ := cmd.Flags().GetString("project-name")
-	if slash := strings.Index(projectName, "/"); slash != -1 {
-		// Compose project names cannot have slashes; use the part after the slash as the "stack" name
-		stackName := projectName[slash+1:]
-		term.Debugf("Setting DEFANG_SUFFIX=%q", stackName)
-		os.Setenv("DEFANG_SUFFIX", stackName)
-		projectName = projectName[:slash]
-	}
+
 	// Avoid common mistakes
 	if projectName != "" {
 		var maybeProvider client.ProviderID
