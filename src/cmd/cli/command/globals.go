@@ -150,8 +150,8 @@ func (global *GlobalConfig) ToMap() map[string]string {
 	if global.Stack.Provider != client.ProviderAuto {
 		m["DEFANG_PROVIDER"] = global.Stack.Provider.String()
 	}
-	if global.Stack.Region != "" {
-		regionVarName := client.GetRegionVarName(global.Stack.Provider)
+	regionVarName := client.GetRegionVarName(global.Stack.Provider)
+	if regionVarName != "" && global.Stack.Region != "" {
 		m[regionVarName] = global.Stack.Region
 	}
 	if global.Stack.Mode != modes.ModeUnspecified {
