@@ -19,7 +19,7 @@ func HandleSelectStackTool(ctx context.Context, params SelectStackParams, sc Sta
 		return "", fmt.Errorf("Unable to load stack %q, please use the tools create_aws_stack to create a stack for AWS deployment or create_gcp_stack to create a stack for GCP deployment: %w", params.Stack, err)
 	}
 
-	stacks.LoadParameters(*stack, true)
+	err = stacks.LoadParameters(*stack, true)
 	if err != nil {
 		return "", fmt.Errorf("Unable to load stack %q: %w", params.Stack, err)
 	}

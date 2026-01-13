@@ -29,7 +29,7 @@ func HandleCreateAWSStackTool(ctx context.Context, params CreateAWSStackParams, 
 	newStack := stacks.StackParameters{
 		Name:     params.Name,
 		Region:   params.Region,
-		Provider: client.ProviderGCP,
+		Provider: client.ProviderAWS,
 		Mode:     mode,
 		Variables: map[string]string{
 			"AWS_PROFILE": params.AWS_Profile,
