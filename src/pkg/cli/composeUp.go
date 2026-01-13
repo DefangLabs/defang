@@ -85,11 +85,13 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		return nil, project, errors.New("failed to get delegate domain")
 	}
 
-	deployRequest := &defangv1.DeployRequest{
-		Mode:           mode.Value(),
-		Project:        project.Name,
-		Compose:        bytes,
-		DelegateDomain: delegateDomain.Zone,
+	deployRequest := &client.DeployRequest{
+		DeployRequest: defangv1.DeployRequest{
+			Mode:           mode.Value(),
+			Project:        project.Name,
+			Compose:        bytes,
+			DelegateDomain: delegateDomain.Zone,
+		},
 	}
 
 	delegation, err := provider.PrepareDomainDelegation(ctx, client.PrepareDomainDelegationRequest{
@@ -103,6 +105,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		deployRequest.DelegationSetId = delegation.DelegationSetId
 	}
 
+	var statesUrl, eventsUrl string
 	var action defangv1.DeploymentAction
 	var resp *defangv1.DeployResponse
 	if upload == compose.UploadModePreview || upload == compose.UploadModeEstimate {
@@ -124,6 +127,15 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 			}
 		}
 
+		if _, ok := provider.(*client.PlaygroundProvider); !ok { // Do not need upload URLs for Playground
+			statesUrl, eventsUrl, err = GetStatesAndEventsUploadUrls(ctx, project.Name, provider, fabric)
+			if err != nil {
+				return nil, project, err
+			}
+			deployRequest.StatesUrl = statesUrl
+			deployRequest.EventsUrl = eventsUrl
+		}
+
 		resp, err = provider.Deploy(ctx, deployRequest)
 		if err != nil {
 			return nil, project, err
@@ -137,6 +149,8 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		Mode:         mode.Value(),
 		ProjectName:  project.Name,
 		ServiceCount: len(fixedProject.Services),
+		StatesUrl:    statesUrl,
+		EventsUrl:    eventsUrl,
 	})
 	if err != nil {
 		term.Debug("Failed to record deployment:", err)

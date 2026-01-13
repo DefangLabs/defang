@@ -21,7 +21,7 @@ type DeployParams struct {
 	common.LoaderParams
 }
 
-func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployParams, cli CLIInterface, ec elicitations.Controller, config StackConfig) (string, error) {
+func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
@@ -31,22 +31,13 @@ func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployPa
 	}
 
 	term.Debug("Function invoked: cli.Connect")
-	client, err := cli.Connect(ctx, config.Cluster)
+	client, err := GetClientWithRetry(ctx, cli, sc)
 	if err != nil {
-		err = cli.InteractiveLoginMCP(ctx, config.Cluster, common.MCPDevelopmentClient)
-		if err != nil {
-			var noBrowserErr auth.ErrNoBrowser
-			if errors.As(err, &noBrowserErr) {
-				return noBrowserErr.Error(), nil
-			}
-			return "", err
+		var noBrowserErr auth.ErrNoBrowser
+		if errors.As(err, &noBrowserErr) {
+			return noBrowserErr.Error(), nil
 		}
-
-		// Reconnect with the new token
-		client, err = cli.Connect(ctx, config.Cluster)
-		if err != nil {
-			return "", err
-		}
+		return "", err
 	}
 
 	sm, err := stacks.NewManager(client, loader.TargetDirectory(), params.ProjectName)
@@ -54,7 +45,7 @@ func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployPa
 		return "", fmt.Errorf("failed to create stack manager: %w", err)
 	}
 	pp := NewProviderPreparer(cli, ec, client, sm)
-	_, provider, err := pp.SetupProvider(ctx, config.Stack)
+	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
@@ -85,7 +76,7 @@ func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployPa
 			}
 
 			// try again
-			return HandleDeployTool(ctx, loader, params, cli, ec, config)
+			return HandleDeployTool(ctx, loader, params, cli, ec, sc)
 		}
 
 		return "", err

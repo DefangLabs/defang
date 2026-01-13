@@ -13,6 +13,7 @@ type FabricClient interface {
 	CanIUse(context.Context, *defangv1.CanIUseRequest) (*defangv1.CanIUseResponse, error)
 	CheckLoginAndToS(context.Context) error
 	CreateDelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
+	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
 	Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error)
 	DeleteSubdomainZone(context.Context, *defangv1.DeleteSubdomainZoneRequest) error
 	Estimate(context.Context, *defangv1.EstimateRequest) (*defangv1.EstimateResponse, error)

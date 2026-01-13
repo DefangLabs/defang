@@ -23,6 +23,7 @@ type MockDestroyCLI struct {
 	ComposeDownError                 error
 	LoadProjectNameWithFallbackError error
 	CanIUseProviderError             error
+	InteractiveLoginMCPError         error
 	ComposeDownResult                string
 	ProjectName                      string
 	CallLog                          []string
@@ -65,6 +66,14 @@ func (m *MockDestroyCLI) CanIUseProvider(ctx context.Context, grpcClient *client
 	return nil
 }
 
+func (m *MockDestroyCLI) InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
+	m.CallLog = append(m.CallLog, fmt.Sprintf("InteractiveLoginMCP(%s)", cluster))
+	if m.InteractiveLoginMCPError != nil {
+		return m.InteractiveLoginMCPError
+	}
+	return nil
+}
+
 func TestHandleDestroyTool(t *testing.T) {
 	tests := []struct {
 		name                 string
@@ -78,8 +87,9 @@ func TestHandleDestroyTool(t *testing.T) {
 			providerID: client.ProviderAWS,
 			setupMock: func(m *MockDestroyCLI) {
 				m.ConnectError = errors.New("connection failed")
+				m.InteractiveLoginMCPError = errors.New("connection failed")
 			},
-			expectedError: "could not connect: connection failed",
+			expectedError: "connection failed",
 		},
 		{
 			name:       "load_project_name_error",

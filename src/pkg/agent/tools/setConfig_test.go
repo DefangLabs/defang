@@ -16,20 +16,21 @@ import (
 // MockSetConfigCLI implements CLIInterface for testing
 type MockSetConfigCLI struct {
 	CLIInterface
-	ConnectError          error
-	LoadProjectNameError  error
-	ConfigSetError        error
-	ConnectCalled         bool
-	NewProviderCalled     bool
-	LoadProjectNameCalled bool
-	ConfigSetCalled       bool
-	ReturnedGrpcClient    *client.GrpcClient
-	ReturnedProvider      client.Provider
-	ReturnedProjectName   string
-	ConfigSetProjectName  string
-	ConfigSetProvider     client.Provider
-	ConfigSetName         string
-	ConfigSetValue        string
+	ConnectError             error
+	LoadProjectNameError     error
+	ConfigSetError           error
+	InteractiveLoginMCPError error
+	ConnectCalled            bool
+	NewProviderCalled        bool
+	LoadProjectNameCalled    bool
+	ConfigSetCalled          bool
+	ReturnedGrpcClient       *client.GrpcClient
+	ReturnedProvider         client.Provider
+	ReturnedProjectName      string
+	ConfigSetProjectName     string
+	ConfigSetProvider        client.Provider
+	ConfigSetName            string
+	ConfigSetValue           string
 }
 
 func (m *MockSetConfigCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
@@ -81,6 +82,13 @@ func (m *MockSetConfigCLI) ConfigSet(ctx context.Context, projectName string, pr
 	m.ConfigSetName = name
 	m.ConfigSetValue = value
 	return m.ConfigSetError
+}
+
+func (m *MockSetConfigCLI) InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
+	if m.InteractiveLoginMCPError != nil {
+		return m.InteractiveLoginMCPError
+	}
+	return nil
 }
 
 func TestHandleSetConfig(t *testing.T) {
@@ -160,9 +168,9 @@ func TestHandleSetConfig(t *testing.T) {
 			cluster:              testCluster,
 			providerId:           client.ProviderID(""),
 			requestArgs:          map[string]interface{}{"name": testConfigName, "value": testValue},
-			mockCLI:              &MockSetConfigCLI{ConnectError: errors.New("connection failed")},
+			mockCLI:              &MockSetConfigCLI{ConnectError: errors.New("connection failed"), InteractiveLoginMCPError: errors.New("connection failed")},
 			expectedError:        true,
-			errorMessage:         "Could not connect: connection failed",
+			errorMessage:         "connection failed",
 			expectedConnectCalls: true,
 		},
 		{
@@ -216,6 +224,31 @@ func TestHandleSetConfig(t *testing.T) {
 			expectedProjectNameCalls: true,
 			expectedConfigSetCalls:   true,
 		},
+		{
+			name:                     "successful config set with random flag",
+			cluster:                  testCluster,
+			providerId:               client.ProviderID(""),
+			requestArgs:              map[string]interface{}{"name": "valid_config_name", "random": true},
+			mockCLI:                  &MockSetConfigCLI{},
+			expectedError:            false,
+			expectedConnectCalls:     true,
+			expectedProviderCalls:    true,
+			expectedProjectNameCalls: true,
+			expectedConfigSetCalls:   true,
+		},
+		{
+			name:                     "error when both random and value are provided",
+			cluster:                  testCluster,
+			providerId:               client.ProviderID(""),
+			requestArgs:              map[string]interface{}{"name": "valid_config_name", "value": "ignored-value", "random": true},
+			mockCLI:                  &MockSetConfigCLI{},
+			expectedError:            true,
+			errorMessage:             "Both 'random' and 'value' parameters provided; please provide only one",
+			expectedConnectCalls:     true,
+			expectedProviderCalls:    true,
+			expectedProjectNameCalls: true,
+			expectedConfigSetCalls:   false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -236,10 +269,15 @@ func TestHandleSetConfig(t *testing.T) {
 			if v, ok := tt.requestArgs["value"].(string); ok {
 				value = v
 			}
+			random := false
+			if r, ok := tt.requestArgs["random"].(bool); ok {
+				random = r
+			}
 
 			params := SetConfigParams{
-				Name:  name,
-				Value: value,
+				Name:   name,
+				Value:  value,
+				Random: random,
 			}
 			ec := elicitations.NewController(&mockElicitationsClient{
 				responses: map[string]string{
@@ -283,7 +321,22 @@ func TestHandleSetConfig(t *testing.T) {
 					assert.Equal(t, configName, tt.mockCLI.ConfigSetName)
 				}
 				if configValue, exists := tt.requestArgs["value"]; exists {
-					assert.Equal(t, configValue, tt.mockCLI.ConfigSetValue)
+					if random, rExists := tt.requestArgs["random"]; rExists {
+						if randomBool, ok := random.(bool); ok && randomBool {
+							// When random is true, value should NOT be the provided value
+							assert.NotEqual(t, configValue, tt.mockCLI.ConfigSetValue, "Random flag should override provided value")
+						} else {
+							assert.Equal(t, configValue, tt.mockCLI.ConfigSetValue)
+						}
+					} else {
+						assert.Equal(t, configValue, tt.mockCLI.ConfigSetValue)
+					}
+				}
+				// If random flag is set, verify a value was generated
+				if random, exists := tt.requestArgs["random"]; exists {
+					if randomBool, ok := random.(bool); ok && randomBool {
+						assert.NotEmpty(t, tt.mockCLI.ConfigSetValue, "Random value should be generated")
+					}
 				}
 			}
 		})

@@ -39,10 +39,8 @@ func TestSetUpCD(t *testing.T) {
 		command: []string{"up", payload},
 	}
 
-	if op, err := b.runCdCommand(ctx, cmd); err != nil {
+	if err := b.runCdCommand(ctx, cmd); err != nil {
 		t.Errorf("CdCommand() error = %v, want nil", err)
-	} else {
-		t.Logf("CdCommand() = %v", op)
 	}
 }
 
@@ -74,12 +72,12 @@ func (m MockGcpLogsClient) GetBuildInfo(ctx context.Context, buildId string) (*g
 }
 
 type MockGcpLoggingLister struct {
-	logEntries []loggingpb.LogEntry
+	logEntries []*loggingpb.LogEntry
 }
 
 func (m *MockGcpLoggingLister) Next() (*loggingpb.LogEntry, error) {
 	if len(m.logEntries) > 0 {
-		entry := &m.logEntries[0]
+		entry := m.logEntries[0]
 		m.logEntries = m.logEntries[1:]
 		return entry, nil
 	}
@@ -100,64 +98,6 @@ func (m *MockGcpLoggingTailer) Start(ctx context.Context, query string) error {
 
 func (m *MockGcpLoggingTailer) Next(ctx context.Context) (*loggingpb.LogEntry, error) {
 	return m.MockGcpLoggingLister.Next()
-}
-
-func TestGetCDExecutionContext(t *testing.T) {
-	tests := []struct {
-		name        string
-		listEntries []loggingpb.LogEntry
-		tailEntries []loggingpb.LogEntry
-	}{
-		{name: "no entries"},
-		{name: "with only list entries",
-			listEntries: []loggingpb.LogEntry{
-				{Payload: &loggingpb.LogEntry_TextPayload{TextPayload: "log entry 1 from lister"}},
-				{Payload: &loggingpb.LogEntry_TextPayload{TextPayload: "log entry 2 from lister"}},
-			},
-		},
-		{name: "with only tail entries",
-			tailEntries: []loggingpb.LogEntry{
-				{Payload: &loggingpb.LogEntry_TextPayload{TextPayload: "log entry 1 from tailer"}},
-				{Payload: &loggingpb.LogEntry_TextPayload{TextPayload: "log entry 2 from tailer"}},
-			},
-		},
-		{name: "with both list and tail entries",
-			listEntries: []loggingpb.LogEntry{
-				{Payload: &loggingpb.LogEntry_TextPayload{TextPayload: "log entry 1 from lister"}},
-				{Payload: &loggingpb.LogEntry_TextPayload{TextPayload: "log entry 2 from lister"}},
-			},
-			tailEntries: []loggingpb.LogEntry{
-				{Payload: &loggingpb.LogEntry_TextPayload{TextPayload: "log entry 1 from tailer"}},
-				{Payload: &loggingpb.LogEntry_TextPayload{TextPayload: "log entry 2 from tailer"}},
-			},
-		},
-	}
-
-	ctx := t.Context()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			b := NewByocProvider(ctx, "testTenantID", "")
-
-			driver := &MockGcpLogsClient{
-				lister: &MockGcpLoggingLister{},
-				tailer: &MockGcpLoggingTailer{},
-			}
-			newCtx, err := b.getCDExecutionContext(ctx, driver, &defangv1.TailRequest{})
-			if err != nil {
-				t.Errorf("getCDExecutionContext() error = %v, want nil", err)
-			}
-			if newCtx == ctx {
-				t.Errorf("getCDExecutionContext() returned same context, want new context")
-			}
-			// Wait for subscription done
-			select {
-			case <-newCtx.Done():
-			case <-time.After(10 * time.Second):
-				t.Errorf("getCDExecutionContext() timeout waiting for done")
-			}
-		})
-	}
 }
 
 func TestGetLogStream(t *testing.T) {
@@ -201,11 +141,6 @@ func TestGetLogStream(t *testing.T) {
 			Pattern: "error",
 			LogType: uint32(logs.LogTypeAll),
 		}},
-		{name: "with_cd_exec", req: &defangv1.TailRequest{
-			LogType: uint32(logs.LogTypeAll),
-		},
-			cdExecution: "test-execution-id",
-		},
 		{name: "with_etag", req: &defangv1.TailRequest{
 			LogType: uint32(logs.LogTypeAll),
 			Etag:    "test-etag",
@@ -215,13 +150,6 @@ func TestGetLogStream(t *testing.T) {
 			LogType: uint32(logs.LogTypeAll),
 			Etag:    "test-etag",
 		}},
-		{name: "with_etag_equal_cd_exec", req: &defangv1.TailRequest{
-			Since:   timestamppb.New(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
-			LogType: uint32(logs.LogTypeAll),
-			Etag:    "test-execution-id",
-		},
-			cdExecution: "test-execution-id",
-		},
 		{name: "with_everything", req: &defangv1.TailRequest{
 			Project: "test-project",
 			Pattern: "error",

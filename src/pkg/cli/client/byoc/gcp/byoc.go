@@ -14,15 +14,11 @@ import (
 	"time"
 
 	"cloud.google.com/go/logging/apiv2/loggingpb"
-	run "cloud.google.com/go/run/apiv2"
-	"cloud.google.com/go/run/apiv2/runpb"
 	"cloud.google.com/go/storage"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/clouds"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/http"
@@ -30,8 +26,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
+	"go.yaml.in/yaml/v3"
 	"google.golang.org/api/googleapi"
 	auditpb "google.golang.org/genproto/googleapis/cloud/audit"
 	"google.golang.org/grpc/codes"
@@ -99,7 +95,6 @@ type ByocGcp struct {
 	delegateDomainZone   string
 
 	cdExecution string
-	cdEtag      string
 }
 
 func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string) *ByocGcp {
@@ -186,6 +181,7 @@ func (b *ByocGcp) SetUpCD(ctx context.Context) error {
 		"roles/certificatemanager.owner",        // For creating certificates
 		"roles/serviceusage.serviceUsageAdmin",  // For allowing cd to Enable APIs
 		"roles/datastore.owner",                 // For creating firestore database
+		"roles/logging.logWriter",               // For allowing cloudbuild to write logs
 	}); err != nil {
 		return err
 	}
@@ -231,20 +227,6 @@ func (b *ByocGcp) SetUpCD(ctx context.Context) error {
 
 	// 5. Setup Cloud Run Job
 	term.Debugf("Using CD image: %q", b.CDImage)
-
-	serviceAccount := path.Base(b.cdServiceAccount)
-	if err := b.driver.SetupJob(ctx, "defang-cd", serviceAccount, []clouds.Container{
-		{
-			Image:     b.CDImage,
-			Name:      ecs.CdContainerName,
-			Cpus:      2.0,
-			Memory:    2048_000_000, // 2G
-			Essential: ptr.Bool(true),
-			WorkDir:   "/app",
-		},
-	}); err != nil {
-		return err
-	}
 
 	b.setupDone = true
 	return nil
@@ -330,30 +312,43 @@ func (b *ByocGcp) CdCommand(ctx context.Context, req client.CdCommandRequest) (t
 	if err := b.SetUpCD(ctx); err != nil {
 		return "", err
 	}
+	etag := types.NewEtag()
 	cmd := cdCommand{
-		project: req.Project,
-		command: []string{string(req.Command)},
+		project:   req.Project,
+		command:   []string{string(req.Command)},
+		etag:      etag,
+		statesUrl: req.StatesUrl,
+		eventsUrl: req.EventsUrl,
 	}
-	cdExecutionId, err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
+	err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
 	if err != nil {
 		return "", err
 	}
-	return cdExecutionId, nil
+	return etag, nil
 }
 
 type cdCommand struct {
 	command        []string
 	delegateDomain string
-	envOverride    map[string]string
+	etag           types.ETag
 	mode           defangv1.DeploymentMode
 	project        string
+	statesUrl      string
+	eventsUrl      string
 }
 
-func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, error) {
+type CloudBuildStep struct {
+	Name       string   `yaml:"name,omitempty"`
+	Entrypoint string   `yaml:"entrypoint,omitempty"`
+	Args       []string `yaml:"args,omitempty"`
+	Env        []string `yaml:"env,omitempty"`
+}
+
+func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) error {
 	defangStateUrl := `gs://` + b.bucket
 	pulumiBackendKey, pulumiBackendValue, err := byoc.GetPulumiBackend(defangStateUrl)
 	if err != nil {
-		return "", err
+		return err
 	}
 	env := map[string]string{
 		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
@@ -384,8 +379,16 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		env["DOMAIN"] = "dummy.domain"
 	}
 
-	for k, v := range cmd.envOverride {
-		env[k] = v
+	if cmd.statesUrl != "" {
+		env["DEFANG_STATES_UPLOAD_URL"] = cmd.statesUrl
+	}
+
+	if cmd.eventsUrl != "" {
+		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
+	}
+
+	if cmd.etag != "" {
+		env["DEFANG_ETAG"] = cmd.etag
 	}
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
@@ -397,17 +400,40 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 			debugEnv = append(debugEnv, k+"="+v)
 		}
 		if err := byoc.DebugPulumiGolang(ctx, debugEnv, cmd.command...); err != nil {
-			return "", err
+			return err
 		}
 	}
 
-	execution, err := b.driver.Run(ctx, gcp.JobNameCD, env, cmd.command...)
+	var envs []string
+	for k, v := range env {
+		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	steps, err := yaml.Marshal([]CloudBuildStep{
+		{
+			Name: b.CDImage,
+			Args: cmd.command,
+			Env:  envs,
+		},
+	})
 	if err != nil {
-		return "", err
+		return err
+	}
+	term.Debugf("Starting CD in cloudbuild at: %v", time.Now().Format(time.RFC3339))
+	execution, err := b.driver.RunCloudBuild(ctx, gcp.CloudBuildArgs{
+		Steps:          string(steps),
+		ServiceAccount: &b.cdServiceAccount,
+		Tags: []string{
+			fmt.Sprintf("%v_%v_%v_%v", b.PulumiStack, cmd.project, "cd", cmd.etag), // For cd logs, consistent with cloud build tagging
+			"defang-cd", // To indicate this is the actual cd service
+		},
+	})
+	if err != nil {
+		return err
 	}
 	b.cdExecution = execution
-	// term.Printf("CD Execution: %s\n", execution)
-	return execution, nil
+
+	return nil
 }
 
 func (b *ByocGcp) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
@@ -424,50 +450,19 @@ func (b *ByocGcp) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 	}
 	return &defangv1.UploadURLResponse{Url: url}, nil
 }
-func (b *ByocGcp) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocGcp) Deploy(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
 	return b.deploy(ctx, req, "up")
 }
 
-func (b *ByocGcp) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocGcp) Preview(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
 	return b.deploy(ctx, req, "preview")
 }
 
 func (b *ByocGcp) GetDeploymentStatus(ctx context.Context) error {
-	execClient, err := run.NewExecutionsClient(ctx)
-	if err != nil {
-		return err
-	}
-	defer execClient.Close()
-
-	execution, err := execClient.GetExecution(ctx, &runpb.GetExecutionRequest{Name: b.cdExecution})
-	if err != nil {
-		return err
-	}
-
-	var completionTime = execution.GetCompletionTime()
-	if completionTime != nil {
-		// cd is done
-		var failedTasks = execution.GetFailedCount()
-		if failedTasks > 0 {
-			var msgs []string
-			for _, condition := range execution.GetConditions() {
-				if condition.GetType() == "Completed" && condition.GetMessage() != "" {
-					msgs = append(msgs, condition.GetMessage())
-				}
-			}
-
-			return client.ErrDeploymentFailed{Message: strings.Join(msgs, ",")}
-		}
-
-		// completed successfully
-		return io.EOF
-	}
-
-	// still running
-	return nil
+	return b.driver.GetBuildStatus(ctx, b.cdExecution)
 }
 
-func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, command string) (*defangv1.DeployResponse, error) {
+func (b *ByocGcp) deploy(ctx context.Context, req *client.DeployRequest, command string) (*defangv1.DeployResponse, error) {
 	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
 	project, err := compose.LoadFromContent(ctx, req.Compose, "")
 	if err != nil {
@@ -521,19 +516,16 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 	cdCmd := cdCommand{
 		command:        []string{command, payload},
 		delegateDomain: req.DelegateDomain,
-		envOverride:    map[string]string{"DEFANG_ETAG": etag},
+		etag:           etag,
 		mode:           req.Mode,
 		project:        project.Name,
+		statesUrl:      req.StatesUrl,
+		eventsUrl:      req.EventsUrl,
 	}
-	execution, err := b.runCdCommand(ctx, cdCmd)
-	if err != nil {
+	if err := b.runCdCommand(ctx, cdCmd); err != nil {
 		return nil, err
 	}
 
-	b.cdEtag = etag
-	if command == "preview" {
-		etag = execution // Only wait for the preview command cd job to finish
-	}
 	return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, nil
 }
 
@@ -548,27 +540,13 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 	if err != nil {
 		return nil, err
 	}
-	if req.Etag == b.cdEtag {
-		subscribeStream.AddJobExecutionUpdate(path.Base(b.cdExecution))
-	}
-
-	// TODO: update stack (1st param) to b.PulumiStack
-	subscribeStream.AddJobStatusUpdate("", req.Project, req.Etag, req.Services)
-	subscribeStream.AddServiceStatusUpdate("", req.Project, req.Etag, req.Services)
+	subscribeStream.AddJobStatusUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
+	subscribeStream.AddServiceStatusUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
 	subscribeStream.StartFollow(time.Now())
 	return subscribeStream, nil
 }
 
 func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	// CdCommand returns the job execution ID as the eTag, which subsequently passed in as eTag in TailRequest,
-	// in those cases, we need a way to detect when the CD task has finished running and stop tailing thg logs by cancelling the logging context.
-	if b.cdExecution != "" && req.Etag == b.cdExecution {
-		var err error
-		ctx, err = b.getCDExecutionContext(ctx, b.driver, req)
-		if err != nil {
-			return nil, err
-		}
-	}
 	return b.getLogStream(ctx, b.driver, req)
 }
 
@@ -585,22 +563,11 @@ func (b *ByocGcp) getLogStream(ctx context.Context, gcpLogsClient GcpLogsClient,
 		logStream.AddUntil(req.Until.AsTime())
 	}
 	etag := req.Etag
-	if etag == b.cdExecution { // Do not pass the cd execution name as etag
-		etag = ""
-	}
 	if logs.LogType(req.LogType).Has(logs.LogTypeBuild) {
-		execName := path.Base(b.cdExecution)
-		if execName == "." {
-			execName = ""
-		}
-		logStream.AddJobExecutionLog(execName) // CD log when there is an execution name
-		// TODO: update stack (1st param) to b.PulumiStack
-		logStream.AddJobLog("", req.Project, etag, req.Services)        // Kaniko or CD logs when there is no execution name
-		logStream.AddCloudBuildLog("", req.Project, etag, req.Services) // CloudBuild logs
+		logStream.AddCloudBuildLog(b.PulumiStack, req.Project, etag, req.Services) // CD logs and CloudBuild logs
 	}
 	if logs.LogType(req.LogType).Has(logs.LogTypeRun) {
-		// TODO: update stack (1st param) to b.PulumiStack
-		logStream.AddServiceLog("", req.Project, etag, req.Services) // Service logs
+		logStream.AddServiceLog(b.PulumiStack, req.Project, etag, req.Services) // Service logs
 	}
 	logStream.AddFilter(req.Pattern)
 	if req.Follow {
@@ -611,47 +578,6 @@ func (b *ByocGcp) getLogStream(ctx context.Context, gcpLogsClient GcpLogsClient,
 		logStream.StartTail(req.Limit)
 	}
 	return logStream, nil
-}
-
-func (b *ByocGcp) getCDExecutionContext(ctx context.Context, gcpLogsClient GcpLogsClient, req *defangv1.TailRequest) (context.Context, error) {
-	subscribeStream, err := NewSubscribeStream(ctx, gcpLogsClient, true, req.Etag, req.Services)
-	if err != nil {
-		return nil, err
-	}
-	subscribeStream.AddJobExecutionUpdate(path.Base(b.cdExecution))
-	var since time.Time
-	if req.Since.IsValid() {
-		since = req.Since.AsTime()
-	}
-	if req.Follow {
-		subscribeStream.StartFollow(since)
-	} else if req.Since.IsValid() {
-		subscribeStream.StartHead(req.Limit)
-	} else {
-		subscribeStream.StartTail(req.Limit)
-	}
-
-	var cancel context.CancelCauseFunc
-	ctx, cancel = context.WithCancelCause(ctx)
-	// Note: No defer cancel as cancel will always be called in the goroutine below
-	go func() {
-		defer subscribeStream.Close()
-		for subscribeStream.Receive() {
-			msg := subscribeStream.Msg()
-			if msg.State == defangv1.ServiceState_BUILD_FAILED || msg.State == defangv1.ServiceState_DEPLOYMENT_FAILED {
-				pkg.SleepWithContext(ctx, 3*time.Second) // Make sure the logs are flushed, gcp logs has a longer delay, thus 3s
-				cancel(fmt.Errorf("CD job failed %s", msg.Status))
-				return
-			}
-			if msg.State == defangv1.ServiceState_DEPLOYMENT_COMPLETED {
-				pkg.SleepWithContext(ctx, 3*time.Second) // Make sure the logs are flushed, gcp logs has a longer delay, thus 3s
-				cancel(io.EOF)
-				return
-			}
-		}
-		cancel(subscribeStream.Err())
-	}()
-	return ctx, nil
 }
 
 func (b *ByocGcp) GetService(ctx context.Context, req *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
@@ -792,22 +718,17 @@ func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
 		until = req.Until.AsTime()
 	}
 	query := NewLogQuery(b.driver.GetProjectID())
-	if b.cdExecution != "" {
-		query.AddJobExecutionQuery(path.Base(b.cdExecution))
-	}
-
-	// Logs TODO: update stack (1st param) to b.PulumiStack
-	query.AddJobLogQuery("", req.Project, req.Etag, req.Services)        // Kaniko OR CD logs
-	query.AddServiceLogQuery("", req.Project, req.Etag, req.Services)    // Cloudrun service logs
-	query.AddCloudBuildLogQuery("", req.Project, req.Etag, req.Services) // CloudBuild logs
 	query.AddSince(since)
 	query.AddUntil(until)
 
-	// Service status updates TODO: update stack (1st param) to b.PulumiStack
-	query.AddJobStatusUpdateRequestQuery("", req.Project, req.Etag, req.Services)
-	query.AddJobStatusUpdateResponseQuery("", req.Project, req.Etag, req.Services)
-	query.AddServiceStatusRequestUpdate("", req.Project, req.Etag, req.Services)
-	query.AddServiceStatusReponseUpdate("", req.Project, req.Etag, req.Services)
+	// Logs
+	query.AddCloudBuildLogQuery(b.PulumiStack, req.Project, req.Etag, req.Services)    // CloudBuild logs for CD and image builds
+	query.AddServiceLogQuery(b.PulumiStack, req.Project, req.Etag, req.Services)       // Cloudrun service logs
+	query.AddComputeEngineLogQuery(b.PulumiStack, req.Project, req.Etag, req.Services) // Compute Engine logs
+	// Status Updates
+	query.AddServiceStatusRequestUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
+	query.AddServiceStatusReponseUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
+	query.AddComputeEngineInstanceGroupInsertOrPatch(b.PulumiStack, req.Project, req.Etag, req.Services)
 
 	return query.GetQuery()
 }
