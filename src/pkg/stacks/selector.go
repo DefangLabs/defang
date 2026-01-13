@@ -12,39 +12,30 @@ import (
 
 const CreateNewStack = "Create new stack"
 
+type StacksManager interface {
+	List(ctx context.Context) ([]StackListItem, error)
+	Create(params StackParameters) (string, error)
+}
+
 type stackSelector struct {
-	ec elicitations.Controller
-	sm Manager
+	ec     elicitations.Controller
+	sm     StacksManager
+	wizard *Wizard
 }
 
-func NewSelector(ec elicitations.Controller, sm Manager) *stackSelector {
+func NewSelector(ec elicitations.Controller, sm StacksManager) *stackSelector {
 	return &stackSelector{
-		ec: ec,
-		sm: sm,
+		ec:     ec,
+		sm:     sm,
+		wizard: NewWizard(ec),
 	}
-}
-
-func (ss *stackSelector) SelectOrCreateStack(ctx context.Context) (*StackParameters, error) {
-	return ss.SelectStackWithOptions(ctx, SelectStackOptions{
-		AllowCreate: true,
-		AllowImport: false,
-	})
 }
 
 type SelectStackOptions struct {
 	AllowCreate bool
-	AllowImport bool
 }
 
-func (ss *stackSelector) SelectStack(ctx context.Context) (*StackParameters, error) {
-	return ss.SelectStackWithOptions(ctx, SelectStackOptions{
-		AllowCreate: false,
-		AllowImport: false,
-	})
-}
-
-// TODO: rename this method SelectStack
-func (ss *stackSelector) SelectStackWithOptions(ctx context.Context, opts SelectStackOptions) (*StackParameters, error) {
+func (ss *stackSelector) SelectStack(ctx context.Context, opts SelectStackOptions) (*StackParameters, error) {
 	if !ss.ec.IsSupported() {
 		return nil, errors.New("your MCP client does not support elicitations, use the 'select_stack' tool to choose a stack")
 	}
@@ -108,8 +99,7 @@ func (ss *stackSelector) SelectStackWithOptions(ctx context.Context, opts Select
 }
 
 func (ss *stackSelector) createStack(ctx context.Context) (*StackParameters, error) {
-	wizard := NewWizard(ss.ec)
-	params, err := wizard.CollectParameters(ctx)
+	params, err := ss.wizard.CollectParameters(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect stack parameters: %w", err)
 	}

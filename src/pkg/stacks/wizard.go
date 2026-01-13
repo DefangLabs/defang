@@ -99,7 +99,7 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *StackPa
 			}
 			profiles, err := w.profileLister.ListProfiles()
 			if err != nil || len(profiles) == 0 {
-				profile, err := w.ec.RequestStringWithDefault(ctx, "Enter the AWS profile you want to use:", "aws_profile", "default")
+				profile, err := w.ec.RequestStringWithDefault(ctx, "Which AWS profile do you want to use?", "aws_profile", "default")
 				if err != nil {
 					return nil, fmt.Errorf("failed to elicit AWS profile: %w", err)
 				}

@@ -2,6 +2,7 @@ package stacks
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,16 +14,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
-
-type Manager interface {
-	List(ctx context.Context) ([]StackListItem, error)
-	Load(ctx context.Context, name string) (*StackParameters, error)
-	LoadLocal(name string) (*StackParameters, error)
-	LoadRemote(ctx context.Context, name string) (*StackParameters, error)
-	LoadParameters(params StackParameters, overload bool) error
-	Create(params StackParameters) (string, error)
-	TargetDirectory() string
-}
 
 type DeploymentLister interface {
 	ListDeployments(ctx context.Context, req *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error)
@@ -125,7 +116,10 @@ func (sm *manager) ListRemote(ctx context.Context) ([]StackListItem, error) {
 				"DEFANG_MODE":     deployment.GetMode().String(),
 			}
 			regionVarName := client.GetRegionVarName(providerID)
-			variables[regionVarName] = deployment.GetRegion()
+			region := deployment.GetRegion()
+			if region != "" {
+				variables[regionVarName] = region
+			}
 			params, err := ParamsFromMap(variables)
 			if err != nil {
 				term.Warnf("Skipping invalid remote deployment %s: %v\n", stackName, err)
@@ -163,8 +157,11 @@ func (e *ErrOutside) Error() string {
 func (sm *manager) Load(ctx context.Context, name string) (*StackParameters, error) {
 	params, err := sm.LoadLocal(name)
 	if err != nil {
-		term.Infof("unable to load stack from file, attempting to import from previous deployments: %v", err)
-		return sm.LoadRemote(ctx, name)
+		if errors.Is(err, os.ErrNotExist) {
+			term.Infof("stack file not found, attempting to import from previous deployments: %v", err)
+			return sm.LoadRemote(ctx, name)
+		}
+		return nil, err
 	}
 	return params, nil
 }
@@ -187,9 +184,9 @@ func (sm *manager) LoadRemote(ctx context.Context, name string) (*StackParameter
 		return nil, fmt.Errorf("failed to list remote stacks: %w", err)
 	}
 	var remoteStack *StackListItem
-	for _, remote := range remoteStacks {
-		if remote.Name == name {
-			remoteStack = &remote
+	for i := range remoteStacks {
+		if remoteStacks[i].Name == name {
+			remoteStack = &remoteStacks[i]
 			break
 		}
 	}

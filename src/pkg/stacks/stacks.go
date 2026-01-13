@@ -25,9 +25,10 @@ type StackParameters struct {
 }
 
 func (sp StackParameters) ToMap() map[string]string {
-	vars := sp.Variables
-	if vars == nil {
-		vars = make(map[string]string)
+	// make a copy to avoid modifying the original
+	vars := make(map[string]string, len(sp.Variables))
+	for k, v := range sp.Variables {
+		vars[k] = v
 	}
 	vars["DEFANG_PROVIDER"] = sp.Provider.String()
 	regionVarName := client.GetRegionVarName(sp.Provider)
@@ -233,6 +234,9 @@ func LoadParameters(params StackParameters, overload bool) error {
 
 	paramsMap := params.ToMap()
 	for key, value := range paramsMap {
+		if currentEnv[key] && !overload {
+			fmt.Printf("The environment variable %q is set in both the stackfile and the environment. The value from the environment will be used.\n", key)
+		}
 		if !currentEnv[key] || overload {
 			err := os.Setenv(key, value)
 			if err != nil {
