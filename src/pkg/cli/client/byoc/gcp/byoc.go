@@ -854,7 +854,7 @@ func isADCRefreshNeeded(gerr *googleapi.Error) bool {
 
 	// Check error message for common patterns related to deleted projects
 	msg := strings.ToLower(gerr.Message)
-	if strings.Contains(msg, "has been deleted") {
+	if strings.Contains(msg, "project") && strings.Contains(msg, "has been deleted") {
 		return true
 	}
 

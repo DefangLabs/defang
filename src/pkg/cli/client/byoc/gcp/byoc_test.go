@@ -275,6 +275,11 @@ func TestIsADCRefreshNeeded(t *testing.T) {
 			want: false,
 		},
 		{
+			name: "should not match - has been deleted without project",
+			err:  &googleapi.Error{Code: 403, Message: "The resource has been deleted"},
+			want: false,
+		},
+		{
 			name: "USER_PROJECT_DENIED reason",
 			err: &googleapi.Error{
 				Code:    403,
