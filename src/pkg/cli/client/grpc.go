@@ -96,6 +96,10 @@ func (g GrpcClient) PutDeployment(ctx context.Context, req *defangv1.PutDeployme
 	return err
 }
 
+func (g GrpcClient) ListStacks(ctx context.Context, req *defangv1.ListStacksRequest) (*defangv1.ListStacksResponse, error) {
+	return getMsg(g.client.ListStacks(ctx, connect.NewRequest(req)))
+}
+
 func (g GrpcClient) ListDeployments(ctx context.Context, req *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error) {
 	return getMsg(g.client.ListDeployments(ctx, connect.NewRequest(req)))
 }
