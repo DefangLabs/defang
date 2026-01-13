@@ -230,7 +230,7 @@ func LoadStackEnv(params StackParameters, overload bool) error {
 	paramsMap := params.ToMap()
 	for key, value := range paramsMap {
 		if currentEnv[key] && !overload {
-			fmt.Printf("The environment variable %q is set in both the stackfile and the environment. The value from the environment will be used.\n", key)
+			term.Warnf("The environment variable %q is set in both the stackfile and the environment. The value from the environment will be used.\n", key)
 		}
 		if !currentEnv[key] || overload {
 			err := os.Setenv(key, value)
