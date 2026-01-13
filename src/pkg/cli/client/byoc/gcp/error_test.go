@@ -1,7 +1,9 @@
 package gcp
 
 import (
+	"context"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
@@ -227,5 +229,43 @@ func TestAnnotateGcpError_OtherErrors(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestAccountInfo_InvalidProjectID(t *testing.T) {
+	// Save and restore environment
+	oldProjectID := os.Getenv("GCP_PROJECT_ID")
+	defer func() {
+		if oldProjectID == "" {
+			os.Unsetenv("GCP_PROJECT_ID")
+		} else {
+			os.Setenv("GCP_PROJECT_ID", oldProjectID)
+		}
+	}()
+
+	// Set an invalid project ID
+	os.Setenv("GCP_PROJECT_ID", "2025-10-30T16:36:34.949-07:00")
+
+	ctx := context.Background()
+	b := NewByocProvider(ctx, "test-tenant", "")
+	
+	_, err := b.AccountInfo(ctx)
+	
+	if err == nil {
+		t.Fatal("AccountInfo() should return an error for invalid project ID")
+	}
+
+	var invalidErr ErrInvalidProjectID
+	if !errors.As(err, &invalidErr) {
+		t.Fatalf("AccountInfo() error = %T, want ErrInvalidProjectID, got: %v", err, err)
+	}
+
+	if invalidErr.ProjectID != "2025-10-30T16:36:34.949-07:00" {
+		t.Errorf("ErrInvalidProjectID.ProjectID = %q, want %q", invalidErr.ProjectID, "2025-10-30T16:36:34.949-07:00")
+	}
+
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "GCP project IDs must:") {
+		t.Errorf("error message should explain GCP project ID requirements, got: %s", errMsg)
 	}
 }
