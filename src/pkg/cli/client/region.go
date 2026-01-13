@@ -11,7 +11,7 @@ func GetRegion(provider ProviderID) string {
 	case ProviderGCP:
 		// Try standard GCP environment variables in order of precedence
 		// Keeping GCP_LOCATION first for backward compatibility
-		region := pkg.GetFirstEnv(pkg.GCPRegionEnvVars...)
+		_, region := pkg.GetFirstEnv(pkg.GCPRegionEnvVars...)
 		if region == "" {
 			return "us-central1" // Default region for GCP
 		}

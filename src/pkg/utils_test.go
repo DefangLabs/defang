@@ -196,40 +196,46 @@ func TestShellQuote(t *testing.T) {
 
 func TestGetFirstEnv(t *testing.T) {
 	tests := []struct {
-		name     string
-		keys     []string
-		envVars  map[string]string
-		expected string
+		name          string
+		keys          []string
+		envVars       map[string]string
+		expectedValue string
+		expectedKey   string
 	}{
 		{
-			name:     "No environment variables set",
-			keys:     []string{"VAR1", "VAR2", "VAR3"},
-			envVars:  map[string]string{},
-			expected: "",
+			name:          "No environment variables set",
+			keys:          []string{"VAR1", "VAR2", "VAR3"},
+			envVars:       map[string]string{},
+			expectedValue: "",
+			expectedKey:   "",
 		},
 		{
-			name:     "First variable is set",
-			keys:     []string{"VAR1", "VAR2", "VAR3"},
-			envVars:  map[string]string{"VAR1": "value1"},
-			expected: "value1",
+			name:          "First variable is set",
+			keys:          []string{"VAR1", "VAR2", "VAR3"},
+			envVars:       map[string]string{"VAR1": "value1"},
+			expectedValue: "value1",
+			expectedKey:   "VAR1",
 		},
 		{
-			name:     "Second variable is set",
-			keys:     []string{"VAR1", "VAR2", "VAR3"},
-			envVars:  map[string]string{"VAR2": "value2"},
-			expected: "value2",
+			name:          "Second variable is set",
+			keys:          []string{"VAR1", "VAR2", "VAR3"},
+			envVars:       map[string]string{"VAR2": "value2"},
+			expectedValue: "value2",
+			expectedKey:   "VAR2",
 		},
 		{
-			name:     "Multiple variables set, returns first",
-			keys:     []string{"VAR1", "VAR2", "VAR3"},
-			envVars:  map[string]string{"VAR2": "value2", "VAR3": "value3"},
-			expected: "value2",
+			name:          "Multiple variables set, returns first",
+			keys:          []string{"VAR1", "VAR2", "VAR3"},
+			envVars:       map[string]string{"VAR2": "value2", "VAR3": "value3"},
+			expectedValue: "value2",
+			expectedKey:   "VAR2",
 		},
 		{
-			name:     "All variables set, returns first",
-			keys:     []string{"VAR1", "VAR2", "VAR3"},
-			envVars:  map[string]string{"VAR1": "value1", "VAR2": "value2", "VAR3": "value3"},
-			expected: "value1",
+			name:          "All variables set, returns first",
+			keys:          []string{"VAR1", "VAR2", "VAR3"},
+			envVars:       map[string]string{"VAR1": "value1", "VAR2": "value2", "VAR3": "value3"},
+			expectedValue: "value1",
+			expectedKey:   "VAR1",
 		},
 	}
 
@@ -240,9 +246,12 @@ func TestGetFirstEnv(t *testing.T) {
 				t.Setenv(k, v)
 			}
 
-			got := GetFirstEnv(tt.keys...)
-			if got != tt.expected {
-				t.Errorf("GetFirstEnv(%v) = %v, want %v", tt.keys, got, tt.expected)
+			gotKey, gotValue := GetFirstEnv(tt.keys...)
+			if gotValue != tt.expectedValue {
+				t.Errorf("GetFirstEnv(%v) = %v, want %v", tt.keys, gotValue, tt.expectedValue)
+			}
+			if gotKey != tt.expectedKey {
+				t.Errorf("GetFirstEnv(%v) returned key %v, want %v", tt.keys, gotKey, tt.expectedKey)
 			}
 		})
 	}

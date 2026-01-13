@@ -58,16 +58,16 @@ func GetenvBool(key string) bool {
 	return val
 }
 
-func GetFirstEnv(keys ...string) string {
+func GetFirstEnv(keys ...string) (string, string) {
 	for _, key := range keys {
 		if value, ok := os.LookupEnv(key); ok {
-			return value
+			return key, value
 		}
 	}
-	return ""
+	return "", ""
 }
 
-// Standard GCP environment variables in order of precedence
+// Standard GCP environment variables in order of precedence; https://registry.terraform.io/providers/hashicorp/google/5.10.0/docs/guides/provider_reference#project-1
 var GCPProjectEnvVars = []string{"GCP_PROJECT_ID", "GOOGLE_PROJECT", "GOOGLE_CLOUD_PROJECT", "GCLOUD_PROJECT", "CLOUDSDK_CORE_PROJECT"}
 var GCPRegionEnvVars = []string{"GCP_LOCATION", "GOOGLE_REGION", "GCLOUD_REGION", "CLOUDSDK_COMPUTE_REGION"}
 

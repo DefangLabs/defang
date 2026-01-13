@@ -1231,17 +1231,19 @@ func doubleCheckProjectName(projectName string) {
 	}
 }
 
-func awsInEnv() bool {
-	return os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
+func awsInEnv() string {
+	env, _ := pkg.GetFirstEnv("AWS_PROFILE", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY")
+	return env
 }
 
-func doInEnv() bool {
-	return os.Getenv("DIGITALOCEAN_ACCESS_TOKEN") != "" || os.Getenv("DIGITALOCEAN_TOKEN") != ""
+func doInEnv() string {
+	env, _ := pkg.GetFirstEnv("DIGITALOCEAN_ACCESS_TOKEN", "DIGITALOCEAN_TOKEN")
+	return env
 }
 
-func gcpInEnv() bool {
-	// Check all supported GCP project environment variables
-	return pkg.GetFirstEnv(pkg.GCPProjectEnvVars...) != ""
+func gcpInEnv() string {
+	env, _ := pkg.GetFirstEnv(pkg.GCPProjectEnvVars...)
+	return env
 }
 
 func awsInConfig(ctx context.Context) bool {
@@ -1399,14 +1401,14 @@ func printProviderMismatchWarnings(ctx context.Context, provider client.Provider
 	if provider == client.ProviderDefang {
 		// Ignore any env vars when explicitly using the Defang playground provider
 		// Defaults to defang provider in non-interactive mode
-		if awsInEnv() {
-			term.Warn("AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")
+		if env := awsInEnv(); env != "" {
+			term.Warnf("AWS environment variables were detected (%v); did you forget --provider=aws or DEFANG_PROVIDER=aws?", env)
 		}
-		if doInEnv() {
-			term.Warn("DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
+		if env := doInEnv(); env != "" {
+			term.Warnf("DigitalOcean environment variable was detected (%v); did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?", env)
 		}
-		if gcpInEnv() {
-			term.Warnf("GCP project environment variable was detected (%v); did you forget --provider=gcp or DEFANG_PROVIDER=gcp?", pkg.GCPProjectEnvVars)
+		if env := gcpInEnv(); env != "" {
+			term.Warnf("GCP project environment variable was detected (%v); did you forget --provider=gcp or DEFANG_PROVIDER=gcp?", env)
 		}
 	}
 
@@ -1416,11 +1418,11 @@ func printProviderMismatchWarnings(ctx context.Context, provider client.Provider
 			term.Warn("AWS provider was selected, but AWS environment is not set")
 		}
 	case client.ProviderDO:
-		if !doInEnv() {
+		if env := doInEnv(); env == "" {
 			term.Warn("DigitalOcean provider was selected, but DIGITALOCEAN_TOKEN environment variable is not set")
 		}
 	case client.ProviderGCP:
-		if !gcpInEnv() {
+		if env := gcpInEnv(); env == "" {
 			term.Warnf("GCP provider was selected, but no GCP project environment variable is set (%v)", pkg.GCPProjectEnvVars)
 		}
 	}

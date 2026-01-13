@@ -100,7 +100,7 @@ type ByocGcp struct {
 func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string) *ByocGcp {
 	// Try standard GCP environment variables in order of precedence
 	// Keeping GCP_LOCATION first for backward compatibility
-	region := pkg.GetFirstEnv(pkg.GCPRegionEnvVars...)
+	_, region := pkg.GetFirstEnv(pkg.GCPRegionEnvVars...)
 	if region == "" {
 		region = "us-central1" // Defaults to us-central1 for lower price
 	}
@@ -113,7 +113,8 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 func getGcpProjectID() string {
 	// Try standard GCP environment variables in order of precedence
 	// Keeping GCP_PROJECT_ID first for backward compatibility
-	return pkg.GetFirstEnv(pkg.GCPProjectEnvVars...)
+	_, projectId := pkg.GetFirstEnv(pkg.GCPProjectEnvVars...)
+	return projectId
 }
 
 func (b *ByocGcp) SetUpCD(ctx context.Context) error {
@@ -288,7 +289,7 @@ func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[string
 func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
 	projectId := getGcpProjectID()
 	if projectId == "" {
-		return nil, errors.New("GCP project ID must be set via one of: " + strings.Join(pkg.GCPProjectEnvVars, ", ") + "; use 'gcloud projects list' to see available project ids")
+		return nil, fmt.Errorf("GCP project ID must be set via one of: %v; use 'gcloud projects list' to see available project ids", pkg.GCPProjectEnvVars)
 	}
 
 	// check whether the ADC is logged in by trying to get the current account email
