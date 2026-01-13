@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -18,9 +17,9 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
-	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/session"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
@@ -54,6 +53,8 @@ func makeComposeUpCmd() *cobra.Command {
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and deploy a new project or update an existing project",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+
 			var build, _ = cmd.Flags().GetBool("build")
 			var force, _ = cmd.Flags().GetBool("force")
 			var detach, _ = cmd.Flags().GetBool("detach")
@@ -72,17 +73,27 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			since := time.Now()
-			loader := configureLoader(cmd)
 
-			ctx := cmd.Context()
-			project, loadErr := loader.LoadProject(ctx)
+			options := NewSessionLoaderOptionsForCommand(cmd)
+			options.AllowStackCreation = true
+			sm, err := newStackManagerForCommand(cmd)
+			if err != nil {
+				return err
+			}
+			sessionLoader := session.NewSessionLoader(global.Client, ec, sm, options)
+			session, err := sessionLoader.LoadSession(ctx)
+			if err != nil {
+				return err
+			}
+
+			project, loadErr := session.Loader.LoadProject(ctx)
 			if loadErr != nil {
 				if global.NonInteractive {
 					return loadErr
 				}
 
 				term.Error("Cannot load project:", loadErr)
-				project, err := loader.CreateProjectForDebug()
+				project, err := session.Loader.CreateProjectForDebug()
 				if err != nil {
 					return err
 				}
@@ -96,13 +107,8 @@ func makeComposeUpCmd() *cobra.Command {
 				}, loadErr)
 			}
 
-			provider, err := newProviderChecked(ctx, loader, true)
-			if err != nil {
-				return err
-			}
-
 			// Check if the user has permission to use the provider
-			err = canIUseProvider(ctx, provider, project.Name, len(project.Services))
+			err = canIUseProvider(ctx, session.Provider, project.Name, len(project.Services))
 			if err != nil {
 				return err
 			}
@@ -114,10 +120,10 @@ func makeComposeUpCmd() *cobra.Command {
 				Stack:   global.Stack.Name,
 			}); err != nil {
 				term.Debugf("ListDeployments failed: %v", err)
-			} else if accountInfo, err := provider.AccountInfo(ctx); err != nil {
+			} else if accountInfo, err := session.Provider.AccountInfo(ctx); err != nil {
 				term.Debugf("AccountInfo failed: %v", err)
 			} else if len(resp.Deployments) > 0 {
-				confirmed, err := confirmDeployment(resp.Deployments, accountInfo, provider.GetStackName())
+				confirmed, err := confirmDeployment(session.Loader.TargetDirectory(), resp.Deployments, accountInfo, session.Provider.GetStackName())
 				if err != nil {
 					return err
 				}
@@ -125,7 +131,7 @@ func makeComposeUpCmd() *cobra.Command {
 					return fmt.Errorf("deployment of project %q was canceled", project.Name)
 				}
 			} else if global.Stack.Name == "" {
-				err = promptToCreateStack(ctx, stacks.StackParameters{
+				err = promptToCreateStack(ctx, session.Loader.TargetDirectory(), stacks.StackParameters{
 					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
 					Provider: accountInfo.Provider,
 					Region:   accountInfo.Region,
@@ -147,7 +153,7 @@ func makeComposeUpCmd() *cobra.Command {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
 			}
 
-			deploy, project, err := cli.ComposeUp(ctx, global.Client, provider, cli.ComposeUpParams{
+			deploy, project, err := cli.ComposeUp(ctx, global.Client, session.Provider, cli.ComposeUpParams{
 				Project:    project,
 				UploadMode: upload,
 				Mode:       global.Stack.Mode,
@@ -158,7 +164,7 @@ func makeComposeUpCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				return handleComposeUpErr(ctx, debugger, project, provider, composeErr)
+				return handleComposeUpErr(ctx, debugger, project, session.Provider, composeErr)
 			}
 
 			if len(deploy.Services) == 0 {
@@ -180,7 +186,7 @@ func makeComposeUpCmd() *cobra.Command {
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 
 			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, global.Verbose)
-			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
+			serviceStates, err := cli.TailAndMonitor(ctx, project, session.Provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
 				deploymentErr := err
 				debugger, err := debug.NewDebugger(ctx, global.Cluster, &global.Stack)
@@ -227,7 +233,7 @@ func makeComposeUpCmd() *cobra.Command {
 	return composeUpCmd
 }
 
-func confirmDeployment(existingDeployments []*defangv1.Deployment, accountInfo *client.AccountInfo, stackName string) (bool, error) {
+func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.Deployment, accountInfo *client.AccountInfo, stackName string) (bool, error) {
 	samePlace := slices.ContainsFunc(existingDeployments, func(dep *defangv1.Deployment) bool {
 		if dep.Provider != accountInfo.Provider.Value() {
 			return false
@@ -247,7 +253,7 @@ func confirmDeployment(existingDeployments []*defangv1.Deployment, accountInfo *
 	}
 	if stackName == "" {
 		stackName = stacks.DefaultBeta
-		_, err := stacks.Create(stacks.StackParameters{
+		_, err := stacks.CreateInDirectory(targetDirectory, stacks.StackParameters{
 			Name:     stackName,
 			Provider: accountInfo.Provider,
 			Region:   accountInfo.Region,
@@ -290,7 +296,7 @@ func confirmDeploymentToNewLocation(existingDeployments []*defangv1.Deployment) 
 	return true, nil
 }
 
-func promptToCreateStack(ctx context.Context, params stacks.StackParameters) error {
+func promptToCreateStack(ctx context.Context, targetDirectory string, params stacks.StackParameters) error {
 	if global.NonInteractive {
 		term.Info("Consider creating a stack to manage your deployments.")
 		printDefangHint("To create a stack, do:", "stack new --name="+params.Name)
@@ -302,7 +308,7 @@ func promptToCreateStack(ctx context.Context, params stacks.StackParameters) err
 		return err
 	}
 
-	_, err = stacks.Create(params)
+	_, err = stacks.CreateInDirectory(targetDirectory, params)
 	if err != nil {
 		return err
 	}
@@ -312,35 +318,55 @@ func promptToCreateStack(ctx context.Context, params stacks.StackParameters) err
 	return nil
 }
 
-func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *compose.Project, provider client.Provider, err error) error {
-	if errors.Is(err, types.ErrComposeFileNotFound) {
+func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *compose.Project, provider client.Provider, originalErr error) error {
+	if errors.Is(originalErr, types.ErrComposeFileNotFound) {
 		// TODO: generate a compose file based on the current project
 		printDefangHint("To start a new project, do:", "new")
 	}
 
-	if global.NonInteractive || errors.Is(err, byoc.ErrLocalPulumiStopped) {
-		return err
-	}
-
-	if strings.Contains(err.Error(), "maximum number of projects") {
-		if projectName, err2 := provider.RemoteProjectName(ctx); err2 == nil {
-			term.Error("Error:", client.PrettyError(err))
-			if _, err := cli.InteractiveComposeDown(ctx, projectName, global.Client, provider); err != nil {
-				term.Debug("ComposeDown failed:", err)
-				printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
-			} else {
-				// TODO: actually do the "compose up" (because that's what the user intended in the first place)
-				printDefangHint("To try deployment again, do:", "compose up")
-			}
-			return nil
+	if connect.CodeOf(originalErr) == connect.CodeResourceExhausted && strings.Contains(originalErr.Error(), "maximum number of projects") {
+		term.Error("Error:", client.PrettyError(originalErr))
+		err := handleTooManyProjectsError(ctx, provider, originalErr)
+		if err != nil {
+			return originalErr
 		}
-		return err
+		return nil
 	}
 
-	term.Error("Error:", client.PrettyError(err))
+	if global.NonInteractive || errors.Is(originalErr, byoc.ErrLocalPulumiStopped) {
+		return originalErr
+	}
+
+	term.Error("Error:", client.PrettyError(originalErr))
 	return debugger.DebugDeploymentError(ctx, debug.DebugConfig{
 		Project: project,
-	}, err)
+	}, originalErr)
+}
+
+func handleTooManyProjectsError(ctx context.Context, provider client.Provider, originalErr error) error {
+	projectName, err := provider.RemoteProjectName(ctx)
+	if err != nil {
+		term.Warn("failed to get remote project name:", err)
+		return originalErr
+	}
+
+	// print the error before prompting for compose down
+	if global.NonInteractive {
+		printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
+		return originalErr
+	}
+
+	_, err = cli.InteractiveComposeDown(ctx, projectName, global.Client, provider)
+	if err != nil {
+		term.Warn("ComposeDown failed:", err)
+		printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
+		return originalErr
+	} else {
+		// TODO: actually do the "compose up" (because that's what the user intended in the first place)
+		printDefangHint("To try deployment again, do:", "compose up")
+	}
+
+	return nil
 }
 
 func handleTailAndMonitorErr(ctx context.Context, err error, debugger *debug.Debugger, debugConfig debug.DebugConfig) {
@@ -451,24 +477,23 @@ func makeComposeDownCmd() *cobra.Command {
 				cli.EnableUTCMode()
 			}
 
-			loader := configureLoader(cmd)
-			provider, err := newProviderChecked(cmd.Context(), loader, false)
+			session, err := NewCommandSession(cmd)
 			if err != nil {
 				return err
 			}
 
-			projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+			projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), session.Loader, session.Provider)
 			if err != nil {
 				return err
 			}
 
-			err = canIUseProvider(cmd.Context(), provider, projectName, 0)
+			err = canIUseProvider(cmd.Context(), session.Provider, projectName, 0)
 			if err != nil {
 				return err
 			}
 
 			since := time.Now()
-			deployment, err := cli.ComposeDown(cmd.Context(), projectName, global.Client, provider)
+			deployment, err := cli.ComposeDown(cmd.Context(), projectName, global.Client, session.Provider)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
@@ -480,7 +505,7 @@ func makeComposeDownCmd() *cobra.Command {
 
 			term.Info("Deleted services, deployment ID", deployment)
 
-			listConfigs, err := provider.ListConfig(cmd.Context(), &defangv1.ListConfigsRequest{Project: projectName})
+			listConfigs, err := session.Provider.ListConfig(cmd.Context(), &defangv1.ListConfigsRequest{Project: projectName})
 			if err == nil {
 				if len(listConfigs.Names) > 0 {
 					term.Warn("Stored project configs are not deleted.")
@@ -496,7 +521,7 @@ func makeComposeDownCmd() *cobra.Command {
 
 			tailOptions := newTailOptionsForDown(deployment, since)
 			tailCtx := cmd.Context() // FIXME: stop Tail when the deployment task is done
-			err = cli.TailAndWaitForCD(tailCtx, provider, projectName, tailOptions)
+			err = cli.TailAndWaitForCD(tailCtx, session.Provider, projectName, tailOptions)
 			if err != nil && !errors.Is(err, io.EOF) {
 				if connect.CodeOf(err) == connect.CodePermissionDenied {
 					// If tail fails because of missing permission, we show a warning and detach. This is
@@ -548,17 +573,32 @@ func makeComposeConfigCmd() *cobra.Command {
 		Args:  cobra.NoArgs, // TODO: takes optional list of service names
 		Short: "Reads a Compose file and shows the generated config",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			loader := configureLoader(cmd)
-
 			ctx := cmd.Context()
-			project, loadErr := loader.LoadProject(ctx)
+
+			options := NewSessionLoaderOptionsForCommand(cmd)
+			sm, err := newStackManagerForCommand(cmd)
+			if err != nil {
+				return fmt.Errorf("failed to create stack manager: %w", err)
+			}
+			sessionLoader := session.NewSessionLoader(global.Client, ec, sm, options)
+			session, err := sessionLoader.LoadSession(ctx)
+			if err != nil {
+				return fmt.Errorf("loading session: %w", err)
+			}
+
+			_, err = session.Provider.AccountInfo(ctx)
+			if err != nil {
+				term.Warn("unable to load AccountInfo:", err)
+			}
+
+			project, loadErr := session.Loader.LoadProject(ctx)
 			if loadErr != nil {
 				if global.NonInteractive {
 					return loadErr
 				}
 
 				term.Error("Cannot load project:", loadErr)
-				project, err := loader.CreateProjectForDebug()
+				project, err := session.Loader.CreateProjectForDebug()
 				if err != nil {
 					term.Warn("Failed to create project for debug:", err)
 					return loadErr
@@ -575,19 +615,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}, loadErr)
 			}
 
-			elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
-			ec := elicitations.NewController(elicitationsClient)
-			sm, err := stacks.NewManager(global.Client, loader.TargetDirectory(), project.Name)
-			if err != nil {
-				return fmt.Errorf("failed to create stack manager: %w", err)
-			}
-
-			provider, err := newProvider(ctx, ec, sm, false)
-			if err != nil {
-				return err
-			}
-
-			_, _, err = cli.ComposeUp(ctx, global.Client, provider, cli.ComposeUpParams{
+			_, _, err = cli.ComposeUp(ctx, global.Client, session.Provider, cli.ComposeUpParams{
 				Project:    project,
 				UploadMode: compose.UploadModeIgnore,
 				Mode:       modes.ModeUnspecified,
@@ -610,18 +638,17 @@ func makeComposePsCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			long, _ := cmd.Flags().GetBool("long")
 
-			loader := configureLoader(cmd)
-			provider, err := newProviderChecked(cmd.Context(), loader, false)
+			session, err := NewCommandSession(cmd)
 			if err != nil {
 				return err
 			}
 
-			projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+			projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), session.Loader, session.Provider)
 			if err != nil {
 				return err
 			}
 
-			if err := cli.PrintServices(cmd.Context(), projectName, provider, long); err != nil {
+			if err := cli.PrintServices(cmd.Context(), projectName, session.Provider, long); err != nil {
 				if errNoServices := new(cli.ErrNoServices); !errors.As(err, errNoServices) {
 					return err
 				}
@@ -735,13 +762,12 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 		services = append(args, strings.Split(name, ",")...) // backwards compat
 	}
 
-	loader := configureLoader(cmd)
-	provider, err := newProviderChecked(cmd.Context(), loader, false)
+	session, err := NewCommandSession(cmd)
 	if err != nil {
 		return err
 	}
 
-	projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+	projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), session.Loader, session.Provider)
 	if err != nil {
 		return err
 	}
@@ -776,7 +802,7 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 		Limit:         limit,
 		PrintBookends: true,
 	}
-	return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
+	return cli.Tail(cmd.Context(), session.Provider, projectName, tailOptions)
 }
 
 func setupComposeCommand() *cobra.Command {

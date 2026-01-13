@@ -7,6 +7,7 @@ import (
 	"path"
 
 	"github.com/DefangLabs/defang/src/pkg/dns"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/bufbuild/connect-go"
@@ -182,6 +183,10 @@ func (m MockFabricClient) CreateUploadURL(ctx context.Context, req *defangv1.Upl
 	return &defangv1.UploadURLResponse{Url: "http://mock-upload-url/" + name}, nil
 }
 
+func (m MockFabricClient) GetTenantName() types.TenantLabel {
+	return "tenant-mock"
+}
+
 type MockLoader struct {
 	Project composeTypes.Project
 	Error   error
@@ -197,4 +202,8 @@ func (m MockLoader) LoadProjectName(ctx context.Context) (string, error) {
 
 func (m MockLoader) TargetDirectory() string {
 	return "."
+}
+
+func (m MockLoader) CreateProjectForDebug() (*composeTypes.Project, error) {
+	return &m.Project, m.Error
 }

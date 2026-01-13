@@ -3,14 +3,39 @@ package client
 import "github.com/DefangLabs/defang/src/pkg"
 
 func GetRegion(provider ProviderID) string {
+	varName := GetRegionVarName(provider)
+	var defaultRegion string
 	switch provider {
 	case ProviderAWS:
-		return pkg.Getenv("AWS_REGION", "us-west-2") // Default region for AWS
+		defaultRegion = "us-west-2"
 	case ProviderGCP:
-		return pkg.Getenv("GCP_LOCATION", "us-central1") // Default region for GCP
+		defaultRegion = "us-central1"
 	case ProviderDO:
-		return pkg.Getenv("REGION", "nyc3") // Default region for DigitalOcean
+		defaultRegion = "nyc3"
+	case ProviderDefang:
+		return ""
+	case ProviderAuto:
+		return ""
 	default:
-		return "" // No default region for unsupported providers or playground
+		panic("unsupported provider")
+	}
+
+	return pkg.Getenv(varName, defaultRegion)
+}
+
+func GetRegionVarName(provider ProviderID) string {
+	switch provider {
+	case ProviderAWS:
+		return "AWS_REGION"
+	case ProviderGCP:
+		return "GCP_LOCATION"
+	case ProviderDO:
+		return "REGION"
+	case ProviderDefang:
+		return ""
+	case ProviderAuto:
+		return ""
+	default:
+		panic("unsupported provider")
 	}
 }

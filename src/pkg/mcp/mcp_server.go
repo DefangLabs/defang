@@ -81,8 +81,9 @@ func NewDefangMCPServer(version string, client MCPClient, cli agentTools.CLIInte
 	// This is used to pass down information of what MCP client we are using
 	common.MCPDevelopmentClient = string(client)
 
+	providerID := config.Stack.Provider
 	toolTracker := ToolTracker{
-		providerId: &config.Stack.Provider,
+		providerId: &providerID,
 		cluster:    config.Cluster,
 		client:     common.MCPDevelopmentClient,
 	}

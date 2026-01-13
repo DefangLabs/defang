@@ -5,13 +5,14 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -34,13 +35,9 @@ func TestNewManager(t *testing.T) {
 	workingDir := "/tmp/test-dir"
 	mockClient := &mockFabricClient{}
 	manager, err := NewManager(mockClient, workingDir, "test-project")
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
+	require.NoError(t, err, "NewManager failed")
 
-	if manager == nil {
-		t.Error("NewManager should not return nil")
-	}
+	assert.NotNil(t, manager, "NewManager should not return nil")
 }
 
 func TestManager_CreateListLoad(t *testing.T) {
@@ -52,37 +49,29 @@ func TestManager_CreateListLoad(t *testing.T) {
 
 	mockClient := &mockFabricClient{}
 	manager, err := NewManager(mockClient, tmpDir, "test-project")
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
+	require.NoError(t, err, "NewManager failed")
 
 	// Test that listing returns empty when no stacks exist
 	stacks, err := manager.List(t.Context())
-	if err != nil {
-		t.Fatalf("List() should not error on empty directory: %v", err)
-	}
-	if len(stacks) != 0 {
-		t.Errorf("Expected empty stack list, got %d stacks", len(stacks))
-	}
+	require.NoError(t, err, "List() should not error on empty directory")
+	assert.Len(t, stacks, 0, "Expected empty stack list")
 
 	// Test creating a stack
 	params := StackParameters{
-		Name:       "teststack",
-		Provider:   client.ProviderAWS,
-		Region:     "us-east-1",
-		AWSProfile: "default",
-		Mode:       modes.ModeAffordable,
+		Name:     "teststack",
+		Provider: client.ProviderAWS,
+		Region:   "us-east-1",
+		Variables: map[string]string{
+			"AWS_PROFILE": "default",
+		},
+		Mode: modes.ModeAffordable,
 	}
 
 	filename, err := manager.Create(params)
-	if err != nil {
-		t.Fatalf("Create() failed: %v", err)
-	}
+	require.NoError(t, err, "Create() failed")
 
 	expectedPath := filepath.Join(tmpDir, Directory, "teststack")
-	if filename != expectedPath {
-		t.Errorf("Expected filename %s, got %s", expectedPath, filename)
-	}
+	assert.Equal(t, expectedPath, filename, "Expected filename mismatch")
 
 	// Verify the file was created
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
@@ -91,45 +80,22 @@ func TestManager_CreateListLoad(t *testing.T) {
 
 	// Test listing after creating a stack
 	stacks, err = manager.List(t.Context())
-	if err != nil {
-		t.Fatalf("List() failed: %v", err)
-	}
-	if len(stacks) != 1 {
-		t.Errorf("Expected 1 stack, got %d", len(stacks))
-	}
-	if stacks[0].Name != "teststack" {
-		t.Errorf("Expected stack name 'teststack', got '%s'", stacks[0].Name)
-	}
-	if stacks[0].Provider != "aws" {
-		t.Errorf("Expected provider 'aws', got '%s'", stacks[0].Provider)
-	}
-	if stacks[0].Region != "us-east-1" {
-		t.Errorf("Expected region 'us-east-1', got '%s'", stacks[0].Region)
-	}
-	if stacks[0].Mode != "AFFORDABLE" {
-		t.Errorf("Expected mode 'AFFORDABLE', got '%s'", stacks[0].Mode)
-	}
+
+	require.NoError(t, err, "List() failed")
+	assert.Len(t, stacks, 1, "Expected 1 stack")
+	assert.Equal(t, "teststack", stacks[0].Name, "Expected stack name 'teststack'")
+	assert.Equal(t, client.ProviderAWS, stacks[0].Provider, "Expected provider AWS")
+	assert.Equal(t, "us-east-1", stacks[0].Region, "Expected region 'us-east-1'")
+	assert.Equal(t, modes.ModeAffordable, stacks[0].Mode, "Expected mode 'AFFORDABLE'")
 
 	// Test loading a stack
-	loadedParams, err := manager.Load("teststack")
-	if err != nil {
-		t.Fatalf("Load() failed: %v", err)
-	}
-	if loadedParams.Name != "teststack" {
-		t.Errorf("Expected loaded stack name 'teststack', got '%s'", loadedParams.Name)
-	}
-	if loadedParams.Provider != client.ProviderAWS {
-		t.Errorf("Expected provider AWS, got %s", loadedParams.Provider)
-	}
-	if loadedParams.Region != "us-east-1" {
-		t.Errorf("Expected region 'us-east-1', got '%s'", loadedParams.Region)
-	}
-	if loadedParams.AWSProfile != "default" {
-		t.Errorf("Expected AWS profile 'default', got '%s'", loadedParams.AWSProfile)
-	}
-	if loadedParams.Mode != modes.ModeAffordable {
-		t.Errorf("Expected mode affordable, got %s", loadedParams.Mode)
-	}
+	loadedParams, err := manager.Load(t.Context(), "teststack")
+	require.NoError(t, err, "Load() failed")
+	assert.Equal(t, "teststack", loadedParams.Name, "Expected loaded stack name 'teststack'")
+	assert.Equal(t, client.ProviderAWS, loadedParams.Provider, "Expected provider AWS")
+	assert.Equal(t, "us-east-1", loadedParams.Region, "Expected region 'us-east-1'")
+	assert.Equal(t, "default", loadedParams.Variables["AWS_PROFILE"], "Expected AWS profile 'default'")
+	assert.Equal(t, modes.ModeAffordable, loadedParams.Mode, "Expected mode affordable")
 }
 
 func TestManager_CreateGCPStack(t *testing.T) {
@@ -141,43 +107,31 @@ func TestManager_CreateGCPStack(t *testing.T) {
 
 	mockClient := &mockFabricClient{}
 	manager, err := NewManager(mockClient, tmpDir, "test-project")
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
+	require.NoError(t, err, "NewManager failed")
 
 	// Test creating a GCP stack
 	params := StackParameters{
-		Name:         "gcpstack",
-		Provider:     client.ProviderGCP,
-		Region:       "us-central1",
-		GCPProjectID: "my-project",
-		Mode:         modes.ModeBalanced,
+		Name:     "gcpstack",
+		Provider: client.ProviderGCP,
+		Region:   "us-central1",
+		Variables: map[string]string{
+			"GCP_PROJECT_ID": "my-project",
+		},
+		Mode: modes.ModeBalanced,
 	}
 
 	filename, err := manager.Create(params)
-	if err != nil {
-		t.Fatalf("Create() failed: %v", err)
-	}
+	require.NoError(t, err, "Create() failed")
 
 	expectedPath := filepath.Join(tmpDir, Directory, "gcpstack")
-	if filename != expectedPath {
-		t.Errorf("Expected filename %s, got %s", expectedPath, filename)
-	}
+	assert.Equal(t, expectedPath, filename, "Expected filename mismatch")
 
 	// Test loading the GCP stack
-	loadedParams, err := manager.Load("gcpstack")
-	if err != nil {
-		t.Fatalf("Load() failed: %v", err)
-	}
-	if loadedParams.Provider != client.ProviderGCP {
-		t.Errorf("Expected provider GCP, got %s", loadedParams.Provider)
-	}
-	if loadedParams.GCPProjectID != "my-project" {
-		t.Errorf("Expected GCP project ID 'my-project', got '%s'", loadedParams.GCPProjectID)
-	}
-	if loadedParams.Mode != modes.ModeBalanced {
-		t.Errorf("Expected mode balanced, got %s", loadedParams.Mode)
-	}
+	loadedParams, err := manager.Load(t.Context(), "gcpstack")
+	require.NoError(t, err, "Load() failed")
+	assert.Equal(t, client.ProviderGCP, loadedParams.Provider, "Expected provider GCP")
+	assert.Equal(t, "my-project", loadedParams.Variables["GCP_PROJECT_ID"], "Expected GCP project ID 'my-project'")
+	assert.Equal(t, modes.ModeBalanced, loadedParams.Mode, "Expected mode balanced")
 }
 
 func TestManager_CreateMultipleStacks(t *testing.T) {
@@ -189,25 +143,27 @@ func TestManager_CreateMultipleStacks(t *testing.T) {
 
 	mockClient := &mockFabricClient{}
 	manager, err := NewManager(mockClient, tmpDir, "test-project")
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
+	require.NoError(t, err, "NewManager failed")
 
 	// Create multiple stacks
 	stacks := []StackParameters{
 		{
-			Name:       "stack1",
-			Provider:   client.ProviderAWS,
-			Region:     "us-east-1",
-			AWSProfile: "profile1",
-			Mode:       modes.ModeAffordable,
+			Name:     "stack1",
+			Provider: client.ProviderAWS,
+			Region:   "us-east-1",
+			Variables: map[string]string{
+				"AWS_PROFILE": "default",
+			},
+			Mode: modes.ModeAffordable,
 		},
 		{
-			Name:         "stack2",
-			Provider:     client.ProviderGCP,
-			Region:       "us-west1",
-			GCPProjectID: "project2",
-			Mode:         modes.ModeHighAvailability,
+			Name:     "stack2",
+			Provider: client.ProviderGCP,
+			Region:   "us-west1",
+			Variables: map[string]string{
+				"GCP_PROJECT_ID": "project2",
+			},
+			Mode: modes.ModeHighAvailability,
 		},
 		{
 			Name:     "stack3",
@@ -220,33 +176,21 @@ func TestManager_CreateMultipleStacks(t *testing.T) {
 	// Create all stacks
 	for _, params := range stacks {
 		_, err = manager.Create(params)
-		if err != nil {
-			t.Fatalf("Create() failed for stack %s: %v", params.Name, err)
-		}
+		require.NoError(t, err, "Create() failed for stack %s", params.Name)
 	}
 
 	// List all stacks
 	listedStacks, err := manager.List(t.Context())
-	if err != nil {
-		t.Fatalf("List() failed: %v", err)
-	}
+	require.NoError(t, err, "List() failed")
 
-	if len(listedStacks) != 3 {
-		t.Errorf("Expected 3 stacks, got %d", len(listedStacks))
-	}
+	assert.Len(t, listedStacks, 3, "Expected 3 stacks")
 
 	// Verify each stack can be loaded
 	for _, params := range stacks {
-		loadedParams, err := manager.Load(params.Name)
-		if err != nil {
-			t.Fatalf("Load() failed for stack %s: %v", params.Name, err)
-		}
-		if loadedParams.Name != params.Name {
-			t.Errorf("Expected name %s, got %s", params.Name, loadedParams.Name)
-		}
-		if loadedParams.Provider != params.Provider {
-			t.Errorf("Expected provider %s, got %s", params.Provider, loadedParams.Provider)
-		}
+		loadedParams, err := manager.Load(t.Context(), params.Name)
+		require.NoError(t, err, "Load() failed for stack %s", params.Name)
+		assert.Equal(t, params.Name, loadedParams.Name, "Expected name %s", params.Name)
+		assert.Equal(t, params.Provider, loadedParams.Provider, "Expected provider %s", params.Provider)
 	}
 }
 
@@ -256,15 +200,11 @@ func TestManager_LoadNonexistentStack(t *testing.T) {
 
 	mockClient := &mockFabricClient{}
 	manager, err := NewManager(mockClient, tmpDir, "test-project")
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
+	require.NoError(t, err, "NewManager failed")
 
 	// Try to load a stack that doesn't exist
-	_, err = manager.Load("nonexistent")
-	if err == nil {
-		t.Error("Load() should return error for nonexistent stack")
-	}
+	_, err = manager.Load(t.Context(), "nonexistent")
+	assert.Error(t, err, "Load() should return error for nonexistent stack")
 }
 
 func TestManager_CreateInvalidStackName(t *testing.T) {
@@ -273,9 +213,7 @@ func TestManager_CreateInvalidStackName(t *testing.T) {
 
 	mockClient := &mockFabricClient{}
 	manager, err := NewManager(mockClient, tmpDir, "test-project")
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
+	require.NoError(t, err, "NewManager failed")
 
 	// Test with empty name
 	params := StackParameters{
@@ -285,23 +223,17 @@ func TestManager_CreateInvalidStackName(t *testing.T) {
 	}
 
 	_, err = manager.Create(params)
-	if err == nil {
-		t.Error("Create() should return error for empty stack name")
-	}
+	assert.Error(t, err, "Create() should return error for empty stack name")
 
 	// Test with invalid characters
 	params.Name = "Invalid-Stack-Name"
 	_, err = manager.Create(params)
-	if err == nil {
-		t.Error("Create() should return error for invalid stack name with uppercase and hyphens")
-	}
+	assert.Error(t, err, "Create() should return error for invalid stack name with uppercase and hyphens")
 
 	// Test with name starting with number
 	params.Name = "1invalidname"
 	_, err = manager.Create(params)
-	if err == nil {
-		t.Error("Create() should return error for stack name starting with number")
-	}
+	assert.Error(t, err, "Create() should return error for stack name starting with number")
 }
 
 func TestManager_CreateDuplicateStack(t *testing.T) {
@@ -313,9 +245,7 @@ func TestManager_CreateDuplicateStack(t *testing.T) {
 
 	mockClient := &mockFabricClient{}
 	manager, err := NewManager(mockClient, tmpDir, "test-project")
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
+	require.NoError(t, err, "NewManager failed")
 
 	params := StackParameters{
 		Name:     "duplicatestack",
@@ -326,15 +256,11 @@ func TestManager_CreateDuplicateStack(t *testing.T) {
 
 	// Create the first stack
 	_, err = manager.Create(params)
-	if err != nil {
-		t.Fatalf("First Create() failed: %v", err)
-	}
+	require.NoError(t, err, "First Create() failed")
 
 	// Try to create the same stack again
 	_, err = manager.Create(params)
-	if err == nil {
-		t.Error("Create() should return error for duplicate stack name")
-	}
+	assert.Error(t, err, "Create() should return error for duplicate stack name")
 }
 
 func TestManager_ListRemote(t *testing.T) {
@@ -359,35 +285,22 @@ func TestManager_ListRemote(t *testing.T) {
 	}
 
 	manager, err := NewManager(mockClient, tmpDir, "test-project")
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
+	require.NoError(t, err, "NewManager failed")
 
 	remoteStacks, err := manager.ListRemote(t.Context())
-	if err != nil {
-		t.Fatalf("ListRemote() failed: %v", err)
-	}
+	require.NoError(t, err, "ListRemote() failed")
 
-	if len(remoteStacks) != 2 {
-		t.Errorf("Expected 2 remote stacks, got %d", len(remoteStacks))
-	}
+	assert.Len(t, remoteStacks, 2, "Expected 2 remote stacks")
 
-	// Check first remote stack
-	if remoteStacks[0].Name != "remotestack1" && remoteStacks[1].Name != "remotestack1" {
-		t.Error("Expected to find remotestack1")
-	}
+	assert.Equal(t, "remotestack1", remoteStacks[0].Name, "Expected stack name remotestack1")
+	assert.Equal(t, client.ProviderAWS, remoteStacks[0].Provider, "Expected provider aws for remotestack1")
+	assert.Equal(t, "us-east-1", remoteStacks[0].Region, "Expected region us-east-1 for remotestack1")
+	assert.NotZero(t, remoteStacks[0].DeployedAt, "Expected DeployedAt to be set for remotestack1")
 
-	// Check second remote stack
-	if remoteStacks[0].Name != "remotestack2" && remoteStacks[1].Name != "remotestack2" {
-		t.Error("Expected to find remotestack2")
-	}
-
-	// Verify deployed time is set
-	for _, stack := range remoteStacks {
-		if stack.DeployedAt.IsZero() {
-			t.Errorf("Expected DeployedAt to be set for stack %s", stack.Name)
-		}
-	}
+	assert.Equal(t, "remotestack2", remoteStacks[1].Name, "Expected stack name remotestack2")
+	assert.Equal(t, client.ProviderGCP, remoteStacks[1].Provider, "Expected provider gcp for remotestack2")
+	assert.Equal(t, "us-central1", remoteStacks[1].Region, "Expected region us-central1 for remotestack2")
+	assert.NotZero(t, remoteStacks[1].DeployedAt, "Expected DeployedAt to be set for remotestack2")
 }
 
 func TestManager_ListRemoteError(t *testing.T) {
@@ -398,14 +311,10 @@ func TestManager_ListRemoteError(t *testing.T) {
 	}
 
 	manager, err := NewManager(mockClient, tmpDir, "test-project")
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
+	require.NoError(t, err, "NewManager failed")
 
 	_, err = manager.ListRemote(t.Context())
-	if err == nil {
-		t.Error("ListRemote() should return error when fabric client fails")
-	}
+	assert.Error(t, err, "ListRemote() should return error when fabric client fails")
 }
 
 func TestManager_ListMerged(t *testing.T) {
@@ -433,63 +342,56 @@ func TestManager_ListMerged(t *testing.T) {
 	}
 
 	manager, err := NewManager(mockClient, tmpDir, "test-project")
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
+	require.NoError(t, err, "NewManager failed")
 
 	// Create a local stack that exists remotely too
 	localParams := StackParameters{
-		Name:       "sharedstack",
-		Provider:   client.ProviderAWS,
-		Region:     "us-west-2", // Different region locally
-		AWSProfile: "default",
-		Mode:       modes.ModeAffordable,
+		Name:     "sharedstack",
+		Provider: client.ProviderAWS,
+		Region:   "us-west-2", // Different region locally
+		Variables: map[string]string{
+			"AWS_PROFILE": "default",
+		},
+		Mode: modes.ModeAffordable,
 	}
 	_, err = manager.Create(localParams)
-	if err != nil {
-		t.Fatalf("Create() failed: %v", err)
-	}
+	require.NoError(t, err, "First Create() failed")
 
 	// Create a local-only stack
 	localOnlyParams := StackParameters{
-		Name:       "localonlystack",
-		Provider:   client.ProviderAWS,
-		Region:     "us-west-1",
-		AWSProfile: "default",
-		Mode:       modes.ModeAffordable,
+		Name:     "localonlystack",
+		Provider: client.ProviderAWS,
+		Region:   "us-west-1",
+		Variables: map[string]string{
+			"AWS_PROFILE": "default",
+		},
+		Mode: modes.ModeAffordable,
 	}
 	_, err = manager.Create(localOnlyParams)
-	if err != nil {
-		t.Fatalf("Create() failed: %v", err)
-	}
+	require.NoError(t, err, "Create() failed")
 
 	// List merged stacks
 	stacks, err := manager.List(t.Context())
-	if err != nil {
-		t.Fatalf("List() failed: %v", err)
-	}
+	require.NoError(t, err, "List() failed")
 
-	if len(stacks) != 3 {
-		t.Errorf("Expected 3 merged stacks, got %d", len(stacks))
-	}
+	assert.Len(t, stacks, 3, "Expected 3 merged stacks")
 
 	stackMap := make(map[string]StackListItem)
 	for _, stack := range stacks {
 		stackMap[stack.Name] = stack
 	}
+	assert.Len(t, stackMap, 3, "Expected 3 unique stack names")
 
-	// Check shared stack prefers remote (should have deployed time and remote region)
+	// Check shared stack prefers remote (should have deployed time and local region)
 	sharedStack, exists := stackMap["sharedstack"]
 	if !exists {
 		t.Error("Expected to find sharedstack")
-	} else {
-		if sharedStack.Region != "us-east-1" {
-			t.Errorf("Expected shared stack to use remote region us-east-1, got %s", sharedStack.Region)
-		}
-		if sharedStack.DeployedAt.IsZero() {
-			t.Error("Expected shared stack to have deployment time from remote")
-		}
 	}
+	assert.Equal(t, "us-west-2", sharedStack.Region, "Expected shared stack to use local region us-west-2")
+	assert.Equal(t, client.ProviderAWS, sharedStack.Provider, "Expected shared stack to use provider aws")
+	assert.Equal(t, modes.ModeAffordable, sharedStack.Mode, "Expected shared stack to use mode AFFORDABLE")
+	assert.Equal(t, "default", sharedStack.Variables["AWS_PROFILE"], "Expected shared stack to have AWS_PROFILE variable from local stack")
+	assert.Equal(t, deployedAt.Local().Format(time.RFC3339), sharedStack.DeployedAt.Local().Format(time.RFC3339), "Expected shared stack to have deployment time from remote")
 
 	// Check remote-only stack exists
 	_, exists = stackMap["remoteonlystack"]
@@ -501,11 +403,8 @@ func TestManager_ListMerged(t *testing.T) {
 	localOnlyStack, exists := stackMap["localonlystack"]
 	if !exists {
 		t.Error("Expected to find localonlystack")
-	} else {
-		if !localOnlyStack.DeployedAt.IsZero() {
-			t.Error("Expected local-only stack to have zero deployed time")
-		}
 	}
+	assert.Zero(t, localOnlyStack.DeployedAt, "Expected local-only stack to have zero deployed time")
 }
 
 func TestManager_ListRemoteWithBetaStack(t *testing.T) {
@@ -524,22 +423,13 @@ func TestManager_ListRemoteWithBetaStack(t *testing.T) {
 	}
 
 	manager, err := NewManager(mockClient, tmpDir, "test-project")
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
+	require.NoError(t, err, "NewManager() failed")
 
 	remoteStacks, err := manager.ListRemote(t.Context())
-	if err != nil {
-		t.Fatalf("ListRemote() failed: %v", err)
-	}
+	require.NoError(t, err, "ListRemote() failed")
 
-	if len(remoteStacks) != 1 {
-		t.Errorf("Expected 1 remote stack, got %d", len(remoteStacks))
-	}
-
-	if remoteStacks[0].Name != "beta" {
-		t.Errorf("Expected stack name to be 'beta', got '%s'", remoteStacks[0].Name)
-	}
+	assert.Len(t, remoteStacks, 1, "Expected 1 remote stack")
+	assert.Equal(t, "beta", remoteStacks[0].Name, "Expected stack name to default to 'beta'")
 }
 
 func TestManager_ListRemoteDuplicateDeployments(t *testing.T) {
@@ -564,23 +454,16 @@ func TestManager_ListRemoteDuplicateDeployments(t *testing.T) {
 	}
 
 	manager, err := NewManager(mockClient, tmpDir, "test-project")
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
+	require.NoError(t, err, "NewManager() failed")
 
 	remoteStacks, err := manager.ListRemote(t.Context())
-	if err != nil {
-		t.Fatalf("ListRemote() failed: %v", err)
-	}
+	require.NoError(t, err, "ListRemote() failed")
 
-	if len(remoteStacks) != 1 {
-		t.Errorf("Expected 1 remote stack (duplicates should be merged), got %d", len(remoteStacks))
-	}
-
-	// Should use the first deployment (most recent) since they're already sorted
-	if remoteStacks[0].Region != "us-east-1" {
-		t.Errorf("Expected region from first deployment (us-east-1), got %s", remoteStacks[0].Region)
-	}
+	assert.Len(t, remoteStacks, 1, "Expected 1 remote stack")
+	assert.Equal(t, "duplicatestack", remoteStacks[0].Name, "Expected stack name 'duplicatestack'")
+	assert.Equal(t, client.ProviderAWS, remoteStacks[0].Provider, "Expected provider from most recent deployment (aws)")
+	assert.Equal(t, "us-east-1", remoteStacks[0].Region, "Expected region from most recent deployment (us-east-1)")
+	assert.Equal(t, deployedAt.Local().Format(time.RFC3339), remoteStacks[0].DeployedAt.Local().Format(time.RFC3339), "Expected deployed time from most recent deployment")
 }
 
 func TestManager_WorkingDirectoryMatches(t *testing.T) {
@@ -592,49 +475,37 @@ func TestManager_WorkingDirectoryMatches(t *testing.T) {
 
 	mockClient := &mockFabricClient{}
 	manager, err := NewManager(mockClient, tmpDir, "test-project")
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
+	require.NoError(t, err, "NewManager() failed")
 
 	// Test that local operations work when working directory matches target directory
 	params := StackParameters{
-		Name:       "teststack",
-		Provider:   client.ProviderAWS,
-		Region:     "us-east-1",
-		AWSProfile: "default",
-		Mode:       modes.ModeAffordable,
+		Name:     "teststack",
+		Provider: client.ProviderAWS,
+		Region:   "us-east-1",
+		Variables: map[string]string{
+			"AWS_PROFILE": "default",
+		},
+		Mode: modes.ModeAffordable,
 	}
 
 	// Create should work
 	filename, err := manager.Create(params)
-	if err != nil {
-		t.Fatalf("Create() failed when directories match: %v", err)
-	}
+	require.NoError(t, err, "Create() failed when directories match")
 
 	expectedPath := filepath.Join(tmpDir, Directory, "teststack")
-	if filename != expectedPath {
-		t.Errorf("Expected filename %s, got %s", expectedPath, filename)
-	}
+	assert.Equal(t, expectedPath, filename, "Expected filename to match")
 
 	// List should work
 	stacks, err := manager.List(t.Context())
-	if err != nil {
-		t.Fatalf("List() failed when directories match: %v", err)
-	}
+	require.NoError(t, err, "List() failed when directories match")
 
-	if len(stacks) != 1 {
-		t.Errorf("Expected 1 stack, got %d", len(stacks))
-	}
+	assert.Len(t, stacks, 1, "Expected 1 stack when directories match")
 
 	// Load should work
-	loadedParams, err := manager.Load("teststack")
-	if err != nil {
-		t.Fatalf("Load() failed when directories match: %v", err)
-	}
+	loadedParams, err := manager.Load(t.Context(), "teststack")
+	require.NoError(t, err, "Load() failed when directories match")
 
-	if loadedParams.Name != "teststack" {
-		t.Errorf("Expected loaded stack name 'teststack', got '%s'", loadedParams.Name)
-	}
+	assert.Equal(t, loadedParams.Name, "teststack", "Expected loaded stack name 'teststack'")
 }
 
 func TestManager_TargetDirectoryEmpty(t *testing.T) {
@@ -656,60 +527,42 @@ func TestManager_TargetDirectoryEmpty(t *testing.T) {
 		},
 	}
 	manager, err := NewManager(mockClient, "", "test-project")
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
+	require.NoError(t, err, "NewManager() failed")
 
 	// Test that local operations are blocked when working directory differs from target directory
 	params := StackParameters{
-		Name:       "teststack",
-		Provider:   client.ProviderAWS,
-		Region:     "us-east-1",
-		AWSProfile: "default",
-		Mode:       modes.ModeAffordable,
+		Name:     "teststack",
+		Provider: client.ProviderAWS,
+		Region:   "us-east-1",
+		Variables: map[string]string{
+			"AWS_PROFILE": "default",
+		},
+		Mode: modes.ModeAffordable,
 	}
 
 	// Create should fail
 	_, err = manager.Create(params)
-	if err == nil {
-		t.Fatal("Create() should fail when target directory is empty")
-	}
-	if !strings.Contains(err.Error(), "Create not allowed: target directory") {
-		t.Errorf("Expected specific error message about operation not allowed, got: %v", err)
-	}
+	require.Error(t, err, "Create() should fail when target directory is empty")
+	require.Contains(t, err.Error(), "Create not allowed: target directory", "Expected specific error message about operation not allowed")
 
 	// List should return only remote stacks (no error)
 	stacks, err := manager.List(t.Context())
-	if err != nil {
-		t.Fatalf("List() should not fail when target directory is empty: %v", err)
-	}
-	if len(stacks) != 2 {
-		t.Errorf("Expected 2 remote stacks, got %d", len(stacks))
-	}
+	require.NoError(t, err, "List() should not fail when target directory is empty")
+	assert.Len(t, stacks, 2, "Expected 2 remote stacks when target directory is empty")
 
 	// Verify the returned stacks are remote stacks
 	stackNames := make(map[string]bool)
 	for _, stack := range stacks {
 		stackNames[stack.Name] = true
-		if stack.DeployedAt.IsZero() {
-			t.Errorf("Expected remote stack %s to have deployment time", stack.Name)
-		}
+		assert.NotZero(t, stack.DeployedAt, "Expected DeployedAt to be set for remote stacks")
 	}
-	if !stackNames["remotestack1"] {
-		t.Error("Expected to find remotestack1")
-	}
-	if !stackNames["remotestack2"] {
-		t.Error("Expected to find remotestack2")
-	}
+	require.True(t, stackNames["remotestack1"], "Expected to find remotestack1")
+	require.True(t, stackNames["remotestack2"], "Expected to find remotestack2")
 
 	// Load should fail
-	_, err = manager.Load("teststack")
-	if err == nil {
-		t.Fatal("Load() should fail when target directory is empty")
-	}
-	if !strings.Contains(err.Error(), "Load not allowed: target directory") {
-		t.Errorf("Expected specific error message about operation not allowed, got: %v", err)
-	}
+	_, err = manager.Load(t.Context(), "teststack")
+	require.Error(t, err, "Load() should fail when target directory is empty")
+	require.Contains(t, err.Error(), "unable to find stack \"teststack\"", "Expected specific error message about operation not allowed")
 }
 
 func TestManager_RemoteOperationsWorkRegardlessOfDirectory(t *testing.T) {
@@ -729,21 +582,12 @@ func TestManager_RemoteOperationsWorkRegardlessOfDirectory(t *testing.T) {
 	}
 
 	manager, err := NewManager(mockClient, tmpDir, "test-project")
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
+	require.NoError(t, err, "NewManager() failed")
 
 	// Remote operations should work even when directories don't match
 	remoteStacks, err := manager.ListRemote(t.Context())
-	if err != nil {
-		t.Fatalf("ListRemote() should work even when directories don't match: %v", err)
-	}
+	require.NoError(t, err, "ListRemote() should work even when directories don't match")
 
-	if len(remoteStacks) != 1 {
-		t.Errorf("Expected 1 remote stack, got %d", len(remoteStacks))
-	}
-
-	if remoteStacks[0].Name != "remotestack" {
-		t.Errorf("Expected stack name 'remotestack', got '%s'", remoteStacks[0].Name)
-	}
+	assert.Len(t, remoteStacks, 1, "Expected 1 remote stack when directories don't match")
+	assert.Equal(t, remoteStacks[0].Name, "remotestack", "Expected stack name 'remotestack'")
 }

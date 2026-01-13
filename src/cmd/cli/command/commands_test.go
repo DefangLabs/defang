@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,10 +12,10 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/auth"
+	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	awsdriver "github.com/DefangLabs/defang/src/pkg/clouds/aws"
-	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
@@ -152,6 +153,7 @@ func TestCommandGates(t *testing.T) {
 	})
 	auth.OpenAuthClient = auth.NewClient("testclient", userinfoServer.URL)
 	t.Setenv("DEFANG_ACCESS_TOKEN", "token-123")
+	t.Setenv("AWS_REGION", "us-test-1")
 
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
@@ -267,7 +269,6 @@ type mockStackManager struct {
 	listResult       []stacks.StackListItem
 	listError        error
 	loadResults      map[string]*stacks.StackParameters
-	loadResult       *stacks.StackParameters
 	loadError        error
 	createError      error
 	createResult     *stacks.StackParameters
@@ -289,7 +290,21 @@ func (m *mockStackManager) List(ctx context.Context) ([]stacks.StackListItem, er
 	return m.listResult, nil
 }
 
-func (m *mockStackManager) Load(name string) (*stacks.StackParameters, error) {
+func (m *mockStackManager) Load(ctx context.Context, name string) (*stacks.StackParameters, error) {
+	params, err := m.LoadLocal(name)
+	if err == nil {
+		return params, nil
+	}
+
+	// If loadError was set, return it directly
+	if m.loadError != nil {
+		return nil, m.loadError
+	}
+
+	return nil, fmt.Errorf("unable to find stack %q", name)
+}
+
+func (m *mockStackManager) LoadLocal(name string) (*stacks.StackParameters, error) {
 	if m.loadError != nil {
 		return nil, m.loadError
 	}
@@ -300,25 +315,26 @@ func (m *mockStackManager) Load(name string) (*stacks.StackParameters, error) {
 			return result, nil
 		}
 	}
+	return nil, fmt.Errorf("stack %q not found", name)
+}
 
-	// If we have an explicit loadResult, return it
-	if m.loadResult != nil {
-		return m.loadResult, nil
+func (m *mockStackManager) LoadRemote(ctx context.Context, name string) (*stacks.StackParameters, error) {
+	// TODO: separate remote and local loadResults in the mock
+	if m.loadError != nil {
+		return nil, m.loadError
 	}
 
-	// If we have expected provider/region (from old NewMockStackManager usage), create default params
-	if m.expectedProvider != "" && m.expectedRegion != "" {
-		params := stacks.StackParameters{
-			Name:     name,
-			Provider: m.expectedProvider,
-			Region:   m.expectedRegion,
-			Mode:     modes.ModeAffordable,
+	// Check for specific stack name first
+	if m.loadResults != nil {
+		if result, exists := m.loadResults[name]; exists {
+			return result, nil
 		}
-		stacks.LoadParameters(params.ToMap(), true)
-		return &params, nil
 	}
+	return nil, fmt.Errorf("stack %q not found", name)
+}
 
-	return nil, os.ErrNotExist
+func (m *mockStackManager) TargetDirectory() string {
+	return "."
 }
 
 func (m *mockStackManager) Create(params stacks.StackParameters) (string, error) {
@@ -326,52 +342,39 @@ func (m *mockStackManager) Create(params stacks.StackParameters) (string, error)
 		return "", m.createError
 	}
 	if m.createResult != nil {
-		m.loadResult = m.createResult
+		if m.loadResults == nil {
+			m.loadResults = make(map[string]*stacks.StackParameters)
+		}
+		m.loadResults[params.Name] = m.createResult
 	}
 	return params.Name, nil
 }
 
-func (m *mockStackManager) LoadParameters(params map[string]string, overload bool) error {
-	return stacks.LoadParameters(params, overload)
+func (m *mockStackManager) LoadStackEnv(params stacks.StackParameters, overload bool) error {
+	return stacks.LoadStackEnv(params, overload)
 }
 
 func TestNewProvider(t *testing.T) {
+	t.Setenv("AWS_REGION", "us-test-1")
+
 	mockClient := client.GrpcClient{}
 	mockCtrl := &MockFabricControllerClient{
 		canIUseResponse: defangv1.CanIUseResponse{},
 	}
 	mockClient.SetFabricClient(mockCtrl)
 	oldRootCmd, oldClient := RootCmd, global.Client
+	global.Stack = stacks.StackParameters{}
 	t.Cleanup(func() {
 		RootCmd = oldRootCmd
 		global.Client = oldClient
 		global.Stack = stacks.StackParameters{}
 	})
 	global.Client = &mockClient
-	FakeRootWithProviderParam := func(provider string) *cobra.Command {
-		cmd := &cobra.Command{}
-		cmd.PersistentFlags().VarP(&global.Stack.Provider, "provider", "P", "fake provider flag")
-		if provider != "" {
-			cmd.ParseFlags([]string{"--provider", provider})
-		}
-		return cmd
-	}
 
 	ctx := t.Context()
 
 	t.Run("Nil loader auto provider non-interactive should load playground provider", func(t *testing.T) {
-		global.Stack.Provider = "auto"
-		os.Unsetenv("DEFANG_PROVIDER")
-		RootCmd = FakeRootWithProviderParam("")
-
-		// Create a mock stacks manager that returns empty stack list
-		mockEC := &mockElicitationsController{}
-		mockSM := NewMockStackManager(t, client.ProviderAWS, "us-test-2")
-
-		p, err := newProvider(ctx, mockEC, mockSM, false)
-		if err != nil {
-			t.Fatalf("getProvider() failed: %v", err)
-		}
+		p := cli.NewProvider(ctx, client.ProviderAuto, client.MockFabricClient{}, "")
 		if _, ok := p.(*client.PlaygroundProvider); !ok {
 			t.Errorf("Expected provider to be of type *cliClient.PlaygroundProvider, got %T", p)
 		}
@@ -379,8 +382,10 @@ func TestNewProvider(t *testing.T) {
 
 	t.Run("Should set cd image from canIUse response", func(t *testing.T) {
 		t.Chdir("../../../../src/testdata/sanity")
-		t.Setenv("DEFANG_STACK", "beta")
 
+		global.Stack = stacks.StackParameters{
+			Name: "beta",
+		}
 		// Set up RootCmd with required flags for getStack function
 		RootCmd = &cobra.Command{Use: "defang"}
 		RootCmd.PersistentFlags().StringVarP(&global.Stack.Name, "stack", "s", global.Stack.Name, "stack name")
@@ -401,14 +406,8 @@ func TestNewProvider(t *testing.T) {
 			global.Stack = stacks.StackParameters{}
 		})
 
-		mockEC := &mockElicitationsController{}
-		mockSM := NewMockStackManager(t, client.ProviderAWS, "us-test-2")
-		p, err := newProvider(ctx, mockEC, mockSM, false)
-		if err != nil {
-			t.Errorf("getProvider() failed: %v", err)
-		}
-
-		err = canIUseProvider(ctx, p, "project", 0)
+		p := cli.NewProvider(ctx, client.ProviderAWS, client.MockFabricClient{}, "")
+		err := canIUseProvider(ctx, p, "project", 0)
 		if err != nil {
 			t.Errorf("CanIUseProvider() failed: %v", err)
 		}
@@ -424,27 +423,23 @@ func TestNewProvider(t *testing.T) {
 
 	t.Run("Can override cd image from environment variable", func(t *testing.T) {
 		t.Chdir("../../../../src/testdata/sanity")
-		t.Setenv("DEFANG_STACK", "beta")
 		prevSts := awsdriver.NewStsFromConfig
 		awsdriver.NewStsFromConfig = func(cfg aws.Config) awsdriver.StsClientAPI { return &awsdriver.MockStsClientAPI{} }
 		const cdImageTag = "site/registry/repo:tag@sha256:digest"
 		const overrideImageTag = "site/override/replaced:tag@sha256:otherdigest"
 		t.Setenv("DEFANG_CD_IMAGE", overrideImageTag)
 		mockCtrl.canIUseResponse.CdImage = cdImageTag
+		global.Stack = stacks.StackParameters{
+			Name: "beta",
+		}
 		t.Cleanup(func() {
 			awsdriver.NewStsFromConfig = prevSts
 			mockCtrl.canIUseResponse.CdImage = ""
 			global.Stack = stacks.StackParameters{}
 		})
 
-		mockEC := &mockElicitationsController{}
-		mockSM := NewMockStackManager(t, client.ProviderAWS, "us-test-2")
-		p, err := newProvider(ctx, mockEC, mockSM, false)
-		if err != nil {
-			t.Errorf("getProvider() failed: %v", err)
-		}
-
-		err = canIUseProvider(ctx, p, "project", 0)
+		p := cli.NewProvider(ctx, client.ProviderAWS, client.MockFabricClient{}, "")
+		err := canIUseProvider(ctx, p, "project", 0)
 		if err != nil {
 			t.Errorf("CanIUseProvider() failed: %v", err)
 		}
@@ -457,343 +452,6 @@ func TestNewProvider(t *testing.T) {
 			}
 		}
 	})
-}
-
-type mockElicitationsController struct {
-	isSupported bool
-	enumChoice  string
-}
-
-func (m *mockElicitationsController) RequestString(ctx context.Context, message, field string) (string, error) {
-	return "", nil
-}
-
-func (m *mockElicitationsController) RequestStringWithDefault(ctx context.Context, message, field, defaultValue string) (string, error) {
-	return defaultValue, nil
-}
-
-func (m *mockElicitationsController) RequestEnum(ctx context.Context, message, field string, options []string) (string, error) {
-	if m.enumChoice != "" {
-		return m.enumChoice, nil
-	}
-	if len(options) > 0 {
-		return options[0], nil
-	}
-	return "", nil
-}
-
-func (m *mockElicitationsController) SetSupported(supported bool) {
-	m.isSupported = supported
-}
-
-func (m *mockElicitationsController) IsSupported() bool {
-	return m.isSupported
-}
-
-func TestGetStack(t *testing.T) {
-	ctx := context.Background()
-
-	// Save original state
-	origRootCmd := RootCmd
-	origGlobalNonInteractive := global.NonInteractive
-	defer func() {
-		RootCmd = origRootCmd
-		global.NonInteractive = origGlobalNonInteractive
-		global.Stack = stacks.StackParameters{}
-	}()
-
-	testCases := []struct {
-		name           string
-		setup          func(t *testing.T) (*mockElicitationsController, *mockStackManager)
-		stackFlag      string
-		providerFlag   string
-		envProvider    string
-		nonInteractive bool
-		expectedStack  *stacks.StackParameters
-		expectedWhence string
-		expectedError  string
-		expectWarning  bool
-	}{
-		{
-			name: "stack flag provided with valid stack",
-			setup: func(t *testing.T) (*mockElicitationsController, *mockStackManager) {
-				ec := &mockElicitationsController{}
-				sm := &mockStackManager{
-					loadResult: &stacks.StackParameters{
-						Name:     "test-stack",
-						Provider: client.ProviderAWS,
-						Region:   "us-test-2",
-					},
-				}
-				return ec, sm
-			},
-			stackFlag: "test-stack",
-			expectedStack: &stacks.StackParameters{
-				Name:     "test-stack",
-				Provider: client.ProviderAWS,
-				Region:   "us-test-2",
-			},
-			expectedWhence: "stack file",
-		},
-		{
-			name: "stack flag provided with invalid stack",
-			setup: func(t *testing.T) (*mockElicitationsController, *mockStackManager) {
-				ec := &mockElicitationsController{}
-				sm := &mockStackManager{
-					loadError: errors.New("stack not found"),
-				}
-				return ec, sm
-			},
-			stackFlag:     "nonexistent-stack",
-			expectedError: "unable to load stack \"nonexistent-stack\": stack not found",
-		},
-		{
-			name: "stack flag with auto provider should error",
-			setup: func(t *testing.T) (*mockElicitationsController, *mockStackManager) {
-				ec := &mockElicitationsController{}
-				sm := &mockStackManager{
-					loadResult: &stacks.StackParameters{
-						Name:     "auto-stack",
-						Provider: client.ProviderAuto,
-						Region:   "us-test-2",
-					},
-				}
-				return ec, sm
-			},
-			stackFlag:     "auto-stack",
-			expectedError: "stack \"auto-stack\" has an invalid provider \"auto\"",
-		},
-		{
-			name: "provider flag provided with warning and existing stacks",
-			setup: func(t *testing.T) (*mockElicitationsController, *mockStackManager) {
-				ec := &mockElicitationsController{
-					isSupported: true,
-					enumChoice:  "existing-stack",
-				}
-				sm := &mockStackManager{
-					listResult: []stacks.StackListItem{
-						{Name: "existing-stack", Provider: "aws"},
-					},
-					loadResult: &stacks.StackParameters{
-						Name:     "existing-stack",
-						Provider: client.ProviderAWS,
-					},
-				}
-				return ec, sm
-			},
-			providerFlag:  "aws",
-			expectWarning: true,
-			expectedStack: &stacks.StackParameters{
-				Name:     "existing-stack",
-				Provider: client.ProviderAWS,
-			},
-			expectedWhence: "only stack",
-		},
-		{
-			name: "env provider with warning and existing stacks",
-			setup: func(t *testing.T) (*mockElicitationsController, *mockStackManager) {
-				ec := &mockElicitationsController{
-					isSupported: true,
-					enumChoice:  "existing-stack",
-				}
-				sm := &mockStackManager{
-					listResult: []stacks.StackListItem{
-						{Name: "existing-stack", Provider: "aws"}, // Different provider to avoid "only stack" path
-						{Name: "other-stack", Provider: "gcp"},
-					},
-					loadResult: &stacks.StackParameters{
-						Name:     "existing-stack",
-						Provider: client.ProviderAWS,
-					},
-				}
-				return ec, sm
-			},
-			envProvider:   "gcp",
-			expectWarning: true,
-			expectedStack: &stacks.StackParameters{
-				Name:     "existing-stack",
-				Provider: client.ProviderAWS,
-			},
-			expectedWhence: "interactive selection",
-		},
-		{
-			name: "non-interactive with auto provider returns default",
-			setup: func(t *testing.T) (*mockElicitationsController, *mockStackManager) {
-				ec := &mockElicitationsController{}
-				sm := &mockStackManager{
-					listResult: []stacks.StackListItem{},
-				}
-				return ec, sm
-			},
-			nonInteractive: true,
-			expectedStack: &stacks.StackParameters{
-				Name:     "beta",
-				Provider: client.ProviderDefang,
-				Mode:     modes.ModeUnspecified,
-			},
-			expectedWhence: "non-interactive default",
-		},
-		{
-			name: "single stack matches provider",
-			setup: func(t *testing.T) (*mockElicitationsController, *mockStackManager) {
-				ec := &mockElicitationsController{}
-				sm := &mockStackManager{
-					listResult: []stacks.StackListItem{
-						{Name: "only-stack", Provider: "aws", Mode: "affordable"},
-					},
-				}
-				return ec, sm
-			},
-			expectedStack: &stacks.StackParameters{
-				Name:     "only-stack",
-				Provider: client.ProviderAWS,
-				Mode:     modes.ModeAffordable,
-			},
-			expectedWhence: "only stack",
-		},
-		{
-			name: "interactive selection succeeds",
-			setup: func(t *testing.T) (*mockElicitationsController, *mockStackManager) {
-				ec := &mockElicitationsController{
-					isSupported: true,
-					enumChoice:  "stack1",
-				}
-				sm := &mockStackManager{
-					listResult: []stacks.StackListItem{
-						{Name: "stack1", Provider: "aws"},
-						{Name: "stack2", Provider: "gcp"},
-					},
-					loadResult: &stacks.StackParameters{
-						Name:     "stack1",
-						Provider: client.ProviderAWS,
-					},
-				}
-				return ec, sm
-			},
-			expectedStack: &stacks.StackParameters{
-				Name:     "stack1",
-				Provider: client.ProviderAWS,
-			},
-			expectedWhence: "interactive selection",
-		},
-		{
-			name: "sm.List error should propagate",
-			setup: func(t *testing.T) (*mockElicitationsController, *mockStackManager) {
-				ec := &mockElicitationsController{}
-				sm := &mockStackManager{
-					listError: errors.New("failed to list stacks"),
-				}
-				return ec, sm
-			},
-			expectedError: "unable to list stacks: failed to list stacks",
-		},
-		{
-			name: "stackSelector.SelectStack error should propagate",
-			setup: func(t *testing.T) (*mockElicitationsController, *mockStackManager) {
-				ec := &mockElicitationsController{isSupported: false} // Will cause SelectStack to fail
-				sm := &mockStackManager{
-					listResult: []stacks.StackListItem{
-						{Name: "stack1", Provider: "aws"},
-						{Name: "stack2", Provider: "aws"},
-					},
-				}
-				return ec, sm
-			},
-			expectedError: "failed to select stack:",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Setup mocks
-			ec, sm := tc.setup(t)
-
-			// Create a new root command for this test
-			testRootCmd := &cobra.Command{Use: "defang"}
-			testRootCmd.PersistentFlags().String("stack", "", "stack name")
-			testRootCmd.PersistentFlags().VarP(&global.Stack.Provider, "provider", "P", "provider")
-
-			// Set flags if provided
-			var args []string
-			if tc.stackFlag != "" {
-				args = append(args, "--stack", tc.stackFlag)
-			}
-			if tc.providerFlag != "" {
-				args = append(args, "--provider", tc.providerFlag)
-			}
-
-			if len(args) > 0 {
-				testRootCmd.ParseFlags(args)
-			}
-
-			// Set environment variable if provided
-			if tc.envProvider != "" {
-				t.Setenv("DEFANG_PROVIDER", tc.envProvider)
-			} else {
-				os.Unsetenv("DEFANG_PROVIDER")
-			}
-
-			// Set global state
-			RootCmd = testRootCmd
-			global.NonInteractive = tc.nonInteractive
-
-			// Reset global stack state
-			global.Stack.Provider = client.ProviderAuto
-
-			// Capture output to check for warnings
-			var output bytes.Buffer
-
-			// Call the function under test
-			stack, whence, err := getStack(ctx, ec, sm, true)
-
-			// Check error expectations
-			if tc.expectedError != "" {
-				if err == nil {
-					t.Fatalf("expected error %q, got nil", tc.expectedError)
-				}
-				if !strings.Contains(err.Error(), tc.expectedError) {
-					t.Fatalf("expected error to contain %q, got %q", tc.expectedError, err.Error())
-				}
-				return
-			}
-
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			// Check stack expectations
-			if tc.expectedStack != nil {
-				if stack == nil {
-					t.Fatal("expected stack to be non-nil")
-				}
-				if stack.Name != tc.expectedStack.Name {
-					t.Errorf("expected stack name %q, got %q", tc.expectedStack.Name, stack.Name)
-				}
-				if stack.Provider != tc.expectedStack.Provider {
-					t.Errorf("expected stack provider %q, got %q", tc.expectedStack.Provider, stack.Provider)
-				}
-				if tc.expectedStack.Region != "" && stack.Region != tc.expectedStack.Region {
-					t.Errorf("expected stack region %q, got %q", tc.expectedStack.Region, stack.Region)
-				}
-			}
-
-			// Check whence expectations
-			if tc.expectedWhence != "" && whence != tc.expectedWhence {
-				t.Errorf("expected whence %q, got %q", tc.expectedWhence, whence)
-			}
-
-			// Check warning expectations
-			if tc.expectWarning {
-				// Since we can't easily capture term.Warn output in tests, we just verify
-				// that the code path that would produce warnings was taken
-				if tc.providerFlag != "" && !testRootCmd.PersistentFlags().Changed("provider") {
-					t.Error("expected provider flag to be marked as changed for warning path")
-				}
-			}
-
-			_ = output // Suppress unused variable warning for now
-		})
-	}
 }
 
 func TestConfigSetMultiple(t *testing.T) {

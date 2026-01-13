@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
@@ -62,8 +63,15 @@ func makeEstimateCmd() *cobra.Command {
 	}
 
 	estimateCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
-	estimateCmd.Flags().StringVarP(&global.Stack.Region, "region", "r", "", "which cloud region to estimate")
+	estimateCmd.Flags().StringVarP(&global.Stack.Region, "region", "r", global.Stack.Region, "which cloud region to estimate")
 	return estimateCmd
+}
+
+var providerDescription = map[client.ProviderID]string{
+	client.ProviderDefang: "The Defang Playground is a free platform intended for testing purposes only.",
+	client.ProviderAWS:    "Deploy to AWS using the AWS_* environment variables or the AWS CLI configuration.",
+	client.ProviderDO:     "Deploy to DigitalOcean using the DIGITALOCEAN_TOKEN, SPACES_ACCESS_KEY_ID, and SPACES_SECRET_ACCESS_KEY environment variables.",
+	client.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
 }
 
 func interactiveSelectProvider(providers []client.ProviderID) (client.ProviderID, error) {
@@ -77,9 +85,9 @@ func interactiveSelectProvider(providers []client.ProviderID) (client.ProviderID
 	}
 	// Default to the provider in the environment if available
 	var defaultOption any // not string!
-	if awsInEnv() {
+	if pkg.AwsInEnv() {
 		defaultOption = client.ProviderAWS.String()
-	} else if gcpInEnv() {
+	} else if pkg.GcpInEnv() {
 		defaultOption = client.ProviderGCP.String()
 	}
 	var optionValue string

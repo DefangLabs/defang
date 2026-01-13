@@ -1,0 +1,364 @@
+package session
+
+import (
+	"context"
+	"errors"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+)
+
+type mockElicitationsController struct {
+	isSupported bool
+	enumChoice  string
+}
+
+func (m *mockElicitationsController) RequestString(ctx context.Context, message, field string) (string, error) {
+	return "", nil
+}
+
+func (m *mockElicitationsController) RequestStringWithDefault(ctx context.Context, message, field, defaultValue string) (string, error) {
+	return defaultValue, nil
+}
+
+func (m *mockElicitationsController) RequestEnum(ctx context.Context, message, field string, options []string) (string, error) {
+	if m.enumChoice != "" {
+		return m.enumChoice, nil
+	}
+	if len(options) > 0 {
+		return options[0], nil
+	}
+	return "", nil
+}
+
+func (m *mockElicitationsController) SetSupported(supported bool) {
+	m.isSupported = supported
+}
+
+func (m *mockElicitationsController) IsSupported() bool {
+	return m.isSupported
+}
+
+type mockStacksManager struct {
+	mock.Mock
+}
+
+func (m *mockStacksManager) List(ctx context.Context) ([]stacks.StackListItem, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	result, ok := args.Get(0).([]stacks.StackListItem)
+	if !ok {
+		return nil, args.Error(1)
+	}
+	return result, args.Error(1)
+}
+
+func (m *mockStacksManager) LoadLocal(name string) (*stacks.StackParameters, error) {
+	args := m.Called(name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	result, ok := args.Get(0).(*stacks.StackParameters)
+	if !ok {
+		return nil, args.Error(1)
+	}
+	return result, args.Error(1)
+}
+
+func (m *mockStacksManager) LoadRemote(ctx context.Context, name string) (*stacks.StackParameters, error) {
+	args := m.Called(ctx, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	result, ok := args.Get(0).(*stacks.StackParameters)
+	if !ok {
+		return nil, args.Error(1)
+	}
+	return result, args.Error(1)
+}
+
+func (m *mockStacksManager) Create(params stacks.StackParameters) (string, error) {
+	args := m.Called(params)
+	return args.String(0), args.Error(1)
+}
+
+func (m *mockStacksManager) TargetDirectory() string {
+	return ""
+}
+
+func TestLoadSession(t *testing.T) {
+	deployedAt := time.Date(2024, 6, 1, 12, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name          string
+		options       SessionLoaderOptions
+		localStack    *stacks.StackParameters
+		remoteStack   *stacks.StackParameters
+		stacksList    []stacks.StackListItem
+		expectedError string
+		expectedStack *stacks.StackParameters
+		expectedEnv   map[string]string
+	}{
+		{
+			name:          "empty options",
+			options:       SessionLoaderOptions{},
+			expectedError: "--provider must be specified if --stack is not specified",
+		},
+		{
+			name: "non-existent project specified",
+			options: SessionLoaderOptions{
+				ProjectName: "foo",
+			},
+			expectedError: "--provider must be specified if --stack is not specified",
+		},
+		{
+			name: "provider specified without stack assumes beta stack",
+			options: SessionLoaderOptions{
+				ProjectName: "foo",
+				ProviderID:  client.ProviderAWS,
+			},
+			expectedStack: &stacks.StackParameters{
+				Name:      "beta",
+				Provider:  client.ProviderAWS,
+				Variables: map[string]string{},
+			},
+			expectedError: "",
+		},
+		{
+			name: "stack specified but not found",
+			options: SessionLoaderOptions{
+				ProjectName: "foo",
+				Stack:       "missing-stack",
+			},
+			expectedError: "unable to find stack",
+			expectedEnv:   map[string]string{},
+		},
+		{
+			name: "local stack specified",
+			options: SessionLoaderOptions{
+				ProjectName: "foo",
+				Stack:       "local-stack",
+			},
+			localStack: &stacks.StackParameters{
+				Name:     "local-stack",
+				Provider: client.ProviderDefang,
+				Region:   "us-test-2",
+				Variables: map[string]string{
+					"AWS_PROFILE": "default",
+					"FOO":         "bar",
+				},
+			},
+			expectedStack: &stacks.StackParameters{
+				Name:      "local-stack",
+				Provider:  client.ProviderDefang,
+				Variables: map[string]string{},
+			},
+			expectedEnv: map[string]string{
+				"AWS_PROFILE": "default",
+				"FOO":         "bar",
+			},
+		},
+		{
+			name: "remote stack specified",
+			options: SessionLoaderOptions{
+				ProjectName: "foo",
+				Stack:       "remote-stack",
+			},
+			remoteStack: &stacks.StackParameters{
+				Name:     "remote-stack",
+				Provider: client.ProviderGCP,
+				Region:   "us-central1",
+				Variables: map[string]string{
+					"GCP_PROJECT_ID": "my-gcp-project",
+					"FOO":            "bar",
+				},
+			},
+			expectedStack: &stacks.StackParameters{
+				Name:      "remote-stack",
+				Provider:  client.ProviderGCP,
+				Variables: map[string]string{},
+			},
+			expectedEnv: map[string]string{
+				"GCP_PROJECT_ID": "my-gcp-project",
+				"FOO":            "bar",
+			},
+		},
+		{
+			name: "local and remote stack",
+			options: SessionLoaderOptions{
+				ProjectName: "foo",
+				Stack:       "both-stack",
+			},
+			localStack: &stacks.StackParameters{
+				Name:     "both-stack",
+				Provider: client.ProviderAWS,
+				Region:   "us-test-2",
+				Variables: map[string]string{
+					"AWS_PROFILE": "local-profile",
+					"FOO":         "local-bar",
+				},
+			},
+			remoteStack: &stacks.StackParameters{
+				Name:     "both-stack",
+				Provider: client.ProviderAWS,
+				Region:   "us-test-2",
+				Variables: map[string]string{
+					"AWS_PROFILE": "remote-profile",
+					"FOO":         "remote-bar",
+				},
+			},
+			expectedStack: &stacks.StackParameters{
+				Name:     "both-stack",
+				Provider: client.ProviderAWS,
+				Region:   "us-test-2",
+				Variables: map[string]string{
+					"AWS_PROFILE": "local-profile",
+					"FOO":         "local-bar",
+				},
+			},
+			expectedEnv: map[string]string{
+				"AWS_PROFILE": "local-profile",
+				"FOO":         "local-bar",
+			},
+		},
+		{
+			name: "interactive selection",
+			options: SessionLoaderOptions{
+				ProjectName:        "foo",
+				Interactive:        true,
+				AllowStackCreation: true,
+				ProviderID:         client.ProviderGCP,
+			},
+			stacksList: []stacks.StackListItem{
+				{
+					StackParameters: stacks.StackParameters{
+						Name:     "existing-stack",
+						Provider: client.ProviderGCP,
+						Region:   "us-central1",
+						Variables: map[string]string{
+							"GCP_PROJECT": "existing-gcp-project",
+							"FOO":         "existing-bar",
+						},
+					},
+					DeployedAt: deployedAt,
+				},
+			},
+			expectedStack: &stacks.StackParameters{
+				Name:      "existing-stack",
+				Provider:  client.ProviderGCP,
+				Variables: map[string]string{},
+			},
+			expectedEnv: map[string]string{
+				"GCP_PROJECT": "existing-gcp-project",
+				"FOO":         "existing-bar",
+			},
+		},
+		{
+			name: "stack with compose vars updates loader",
+			options: SessionLoaderOptions{
+				ProjectName: "foo",
+				Stack:       "compose-stack",
+			},
+			localStack: &stacks.StackParameters{
+				Name:     "compose-stack",
+				Provider: client.ProviderDefang,
+				Region:   "us-test-2",
+				Variables: map[string]string{
+					"COMPOSE_PROJECT_NAME": "myproject",
+					"COMPOSE_PATH":         "./docker-compose.yml:./docker-compose.override.yml",
+				},
+			},
+			expectedStack: &stacks.StackParameters{
+				Name:     "compose-stack",
+				Provider: client.ProviderDefang,
+				Variables: map[string]string{
+					"COMPOSE_PROJECT_NAME": "myproject",
+					"COMPOSE_PATH":         "./docker-compose.yml:./docker-compose.override.yml",
+				},
+			},
+			expectedEnv: map[string]string{
+				"COMPOSE_PROJECT_NAME": "myproject",
+				"COMPOSE_PATH":         "./docker-compose.yml:./docker-compose.override.yml",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for key := range tt.expectedEnv {
+				os.Unsetenv(key)
+			}
+			t.Cleanup(func() {
+				for key := range tt.expectedEnv {
+					os.Unsetenv(key)
+				}
+			})
+			ctx := t.Context()
+			ec := &mockElicitationsController{isSupported: true}
+			sm := &mockStacksManager{}
+
+			// Setup mock expectations based on test case
+			if tt.localStack != nil {
+				sm.On("LoadLocal", tt.localStack.Name).Return(tt.localStack, nil)
+			} else {
+				sm.On("LoadLocal", mock.Anything).Maybe().Return(nil, os.ErrNotExist)
+			}
+
+			if tt.remoteStack != nil {
+				sm.On("LoadRemote", ctx, tt.remoteStack.Name).Maybe().Return(tt.remoteStack, nil)
+				sm.On("Create", *tt.remoteStack).Maybe().Return("", nil)
+			} else {
+				sm.On("LoadRemote", ctx, mock.Anything).Maybe().Return(nil, errors.New("unable to find stack"))
+			}
+			if tt.stacksList != nil {
+				sm.On("List", ctx).Return(tt.stacksList, nil)
+			}
+
+			loader := NewSessionLoader(client.MockFabricClient{}, ec, sm, tt.options)
+			session, err := loader.LoadSession(ctx)
+			if tt.expectedError != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				return
+			}
+			require.NoError(t, err)
+			assert.NotNil(t, session)
+
+			// Verify session contents
+			assert.NotNil(t, session.Loader)
+
+			assert.NotNil(t, session.Provider)
+			if tt.options.ProviderID == client.ProviderAWS {
+				_, ok := session.Provider.(*aws.ByocAws)
+				assert.True(t, ok)
+			}
+			if tt.options.ProviderID == client.ProviderGCP {
+				_, ok := session.Provider.(*gcp.ByocGcp)
+				assert.True(t, ok)
+			}
+
+			assert.NotNil(t, session.Stack)
+			assert.Equal(t, tt.expectedStack.Name, session.Stack.Name)
+			assert.Equal(t, tt.expectedStack.Provider, session.Stack.Provider)
+
+			// Verify environment variables
+			for key, expectedValue := range tt.expectedEnv {
+				actualValue, exists := session.Stack.Variables[key]
+				assert.True(t, exists, "expected env var %s to be set", key)
+				assert.Equal(t, expectedValue, actualValue, "env var %s has unexpected value", key)
+			}
+
+			// Verify all mock expectations were met
+			sm.AssertExpectations(t)
+		})
+	}
+}
