@@ -772,15 +772,43 @@ var configCmd = &cobra.Command{
 }
 
 var configSetCmd = &cobra.Command{
-	Use:         "create CONFIG [file|-]", // like Docker
+	Use:         "create CONFIG [file|-] | CONFIG=VALUE...", // like Docker
 	Annotations: authNeededAnnotation,
-	Args:        cobra.RangeArgs(0, 2), // Allow 0 args when using --env-file
+	Args:        cobra.MinimumNArgs(0), // Allow 0 args when using --env-file, or multiple configs
 	Aliases:     []string{"set", "add", "put"},
 	Short:       "Adds or updates a sensitive config value",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fromEnv, _ := cmd.Flags().GetBool("env")
 		random, _ := cmd.Flags().GetBool("random")
 		envFile, _ := cmd.Flags().GetString("env-file")
+
+		// Early validation for multiple configs
+		// Distinguish between multiple configs (KEY1=value1 KEY2=value2) and single config with file (CONFIG file)
+		isMultipleConfigs := false
+		if len(args) > 1 {
+			// If the first arg contains '=', it's multiple configs
+			// If the first arg doesn't contain '=', it's single config with file (CONFIG file)
+			if strings.Contains(args[0], "=") {
+				isMultipleConfigs = true
+				
+				// Validate: all args must be in KEY=VALUE format
+				for _, arg := range args {
+					if !strings.Contains(arg, "=") {
+						return errors.New("when setting multiple configs, all must be in KEY=VALUE format")
+					}
+				}
+
+				// Validate: --random is not allowed with multiple configs
+				if random {
+					return errors.New("--random is only allowed when setting a single config")
+				}
+
+				// Validate: --env is not allowed with multiple configs
+				if fromEnv {
+					return errors.New("--env is only allowed when setting a single config")
+				}
+			}
+		}
 
 		// Make sure we have a project to set config for before asking for a value
 		loader := configureLoader(cmd)
@@ -838,11 +866,44 @@ var configSetCmd = &cobra.Command{
 			return nil
 		}
 
-		// Original single config logic
+		// Validate args
 		if len(args) == 0 {
 			return errors.New("CONFIG argument is required when not using --env-file")
 		}
 
+		// Handle multiple configs case
+		if isMultipleConfigs {
+			// Set each config from args
+			successCount := 0
+			for _, arg := range args {
+				parts := strings.SplitN(arg, "=", 2)
+				name := parts[0]
+				value := parts[1]
+
+				if !pkg.IsValidSecretName(name) {
+					term.Warnf("Skipping invalid config name: %q", name)
+					continue
+				}
+
+				if err := cli.ConfigSet(cmd.Context(), projectName, provider, name, value); err != nil {
+					term.Warnf("Failed to set %q: %v", name, err)
+				} else {
+					term.Info("Updated value for", name)
+					successCount++
+				}
+			}
+
+			if successCount == 0 {
+				return errors.New("failed to set any config values")
+			}
+
+			term.Infof("Successfully set %d config value(s)", successCount)
+
+			printDefangHint("To update the deployed values, do:", "compose up")
+			return nil
+		}
+
+		// Single config logic
 		parts := strings.SplitN(args[0], "=", 2)
 		name := parts[0]
 
@@ -852,7 +913,7 @@ var configSetCmd = &cobra.Command{
 
 		var value string
 		if fromEnv {
-			if len(args) == 2 || len(parts) == 2 {
+			if len(args) > 1 || len(parts) == 2 {
 				return errors.New("cannot specify config value or input file when using --env")
 			}
 			var ok bool
