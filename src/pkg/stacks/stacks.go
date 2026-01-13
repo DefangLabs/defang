@@ -41,28 +41,28 @@ func (sp StackParameters) ToMap() map[string]string {
 	return vars
 }
 
-func ParamsFromMap(properties map[string]string) (StackParameters, error) {
-	if properties == nil {
+func ParamsFromMap(variables map[string]string) (StackParameters, error) {
+	if variables == nil {
 		return StackParameters{}, errors.New("properties map cannot be nil")
 	}
 	var provider client.ProviderID
-	if val, ok := properties["DEFANG_PROVIDER"]; ok {
+	if val, ok := variables["DEFANG_PROVIDER"]; ok {
 		err := provider.Set(val)
 		if err != nil {
 			return StackParameters{}, fmt.Errorf("invalid DEFANG_PROVIDER value %q: %w", val, err)
 		}
 	}
 	var mode modes.Mode
-	if val, ok := properties["DEFANG_MODE"]; ok {
+	if val, ok := variables["DEFANG_MODE"]; ok {
 		err := mode.Set(val)
 		if err != nil {
 			return StackParameters{}, fmt.Errorf("invalid DEFANG_MODE value %q: %w", val, err)
 		}
 	}
 	regionVarName := client.GetRegionVarName(provider)
-	region := properties[regionVarName]
+	region := variables[regionVarName]
 	return StackParameters{
-		Variables: properties,
+		Variables: variables,
 		Provider:  provider,
 		Region:    region,
 		Mode:      mode,
@@ -179,12 +179,7 @@ func ListInDirectory(workingDirectory string) ([]StackListItem, error) {
 }
 
 func Parse(content string) (map[string]string, error) {
-	properties, err := godotenv.Parse(strings.NewReader(content))
-	if err != nil {
-		return nil, err
-	}
-
-	return properties, nil
+	return godotenv.Parse(strings.NewReader(content))
 }
 
 func Marshal(params *StackParameters) (string, error) {
