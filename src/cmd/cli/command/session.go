@@ -19,7 +19,7 @@ import (
 func NewCommandSession(cmd *cobra.Command) (*session.Session, error) {
 	ctx := cmd.Context()
 	options := NewSessionLoaderOptionsForCommand(cmd)
-	sm, err := newStackManagerForCmd(cmd)
+	sm, err := newStackManagerForCommand(cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func doubleCheckProjectName(projectName string) {
 	}
 }
 
-func newStackManagerForCmd(cmd *cobra.Command) (session.StacksManager, error) {
+func newStackManagerForCommand(cmd *cobra.Command) (session.StacksManager, error) {
 	projectName, _ := cmd.Flags().GetString("project-name")
 	targetDirectory, err := findTargetDirectory()
 	if err != nil {

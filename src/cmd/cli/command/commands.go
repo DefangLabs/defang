@@ -515,7 +515,7 @@ var whoamiCmd = &cobra.Command{
 		global.NonInteractive = true // don't show provider prompt
 		ctx := cmd.Context()
 		options := NewSessionLoaderOptionsForCommand(cmd)
-		sm, err := newStackManagerForCmd(cmd)
+		sm, err := newStackManagerForCommand(cmd)
 		if err != nil {
 			return fmt.Errorf("failed to create stack manager: %w", err)
 		}

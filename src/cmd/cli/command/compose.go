@@ -76,7 +76,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			options := NewSessionLoaderOptionsForCommand(cmd)
 			options.AllowStackCreation = true
-			sm, err := newStackManagerForCmd(cmd)
+			sm, err := newStackManagerForCommand(cmd)
 			if err != nil {
 				return err
 			}
@@ -576,7 +576,7 @@ func makeComposeConfigCmd() *cobra.Command {
 			ctx := cmd.Context()
 
 			options := NewSessionLoaderOptionsForCommand(cmd)
-			sm, err := newStackManagerForCmd(cmd)
+			sm, err := newStackManagerForCommand(cmd)
 			if err != nil {
 				return fmt.Errorf("failed to create stack manager: %w", err)
 			}
