@@ -21,6 +21,13 @@ Conditions:
         Fn::Equals:
             - Ref: EnablePullThroughCache
             - "true"
+    OidcClaims:
+        Fn::Not:
+            - Fn::Equals:
+                - Fn::Join:
+                    - ""
+                    - Ref: OidcProviderClaims
+                - ""
     OidcProvider:
         Fn::And:
             - Fn::Not:
@@ -33,12 +40,13 @@ Conditions:
                         - ""
                         - Ref: OidcProviderSubjects
                     - ""
-            - Fn::Not:
-                - Fn::Equals:
-                    - Fn::Join:
-                        - ""
-                        - Ref: OidcProviderThumbprints
+    OidcThumbprints:
+        Fn::Not:
+            - Fn::Equals:
+                - Fn::Join:
                     - ""
+                    - Ref: OidcProviderThumbprints
+                - ""
     OverrideCIRoleName:
         Fn::Not:
             - Fn::Equals:
@@ -48,12 +56,17 @@ Conditions:
         Fn::Equals:
             - Ref: RetainBucket
             - "true"
-Description: 'Defang AWS CloudFormation template for an ECS task. Don''t delete: use the CLI instead.'
+Description: 'Defang AWS CloudFormation template for the CD task. Do not delete this stack in the AWS console: use the Defang CLI instead. To create this stack, scroll down to acknowledge the risks and press ''Create stack''.'
 Outputs:
     bucketName:
         Description: Name of the S3 bucket
         Value:
             Ref: Bucket
+    ciRoleArn:
+        Condition: OidcProvider
+        Description: ARN of the CI role
+        Value:
+            Ref: CIRole
     clusterName:
         Description: Name of the ECS cluster
         Value:
@@ -110,11 +123,15 @@ Parameters:
         Type: String
     ExistingVpcId:
         Default: ""
-        Description: ID of existing VPC to use (leave empty to create new VPC)
+        Description: 'ID of existing VPC to use (optional: leave empty to create new VPC)'
         Type: String
     OidcProviderAudiences:
         Default: sts.amazonaws.com
-        Description: OIDC provider trusted audience (optional)
+        Description: OIDC provider trusted audience(s) (optional)
+        Type: CommaDelimitedList
+    OidcProviderClaims:
+        Default: ""
+        Description: Additional OIDC claim conditions as comma-separated JSON "key":"value" pairs (optional)
         Type: CommaDelimitedList
     OidcProviderIssuer:
         Default: ""
@@ -122,11 +139,11 @@ Parameters:
         Type: String
     OidcProviderSubjects:
         Default: ""
-        Description: OIDC provider trusted subject patterns (optional)
+        Description: OIDC provider trusted subject pattern(s) (optional)
         Type: CommaDelimitedList
     OidcProviderThumbprints:
         Default: ""
-        Description: OIDC provider thumbprints (optional)
+        Description: OIDC provider thumbprint(s) (optional)
         Type: CommaDelimitedList
     RetainBucket:
         AllowedValues:
@@ -144,8 +161,18 @@ Resources:
                 - Delete
         Properties:
             Tags:
-                - Key: CreatedBy
+                - Key: defang:CreatedBy
                   Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
             VersioningConfiguration:
                 Status: Enabled
         Type: AWS::S3::Bucket
@@ -165,7 +192,7 @@ Resources:
                               "Action": "sts:AssumeRoleWithWebIdentity",
                               "Condition": {
                                   "StringEquals": {
-                                      "${OidcProviderIssuer}:aud": [ "${Audiences}" ]
+                                      "${OidcProviderIssuer}:aud": [ "${Audiences}" ]${ExtraClaims}
                                   },
                                   "StringLike": {
                                       "${OidcProviderIssuer}:sub": [ "${Subjects}" ]
@@ -177,6 +204,16 @@ Resources:
                         Fn::Join:
                             - '","'
                             - Ref: OidcProviderAudiences
+                      ExtraClaims:
+                        Fn::If:
+                            - OidcClaims
+                            - Fn::Join:
+                                - ""
+                                - - ','
+                                  - Fn::Join:
+                                        - ','
+                                        - Ref: OidcProviderClaims
+                            - ""
                       Provider:
                         Ref: OIDCProvider
                       Subjects:
@@ -191,8 +228,18 @@ Resources:
                     - Ref: CIRoleName
                     - Ref: AWS::NoValue
             Tags:
-                - Key: CreatedBy
+                - Key: defang:CreatedBy
                   Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
         Type: AWS::IAM::Role
     CapacityProvider:
         Properties:
@@ -208,8 +255,18 @@ Resources:
     Cluster:
         Properties:
             Tags:
-                - Key: CreatedBy
+                - Key: defang:CreatedBy
                   Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
         Type: AWS::ECS::Cluster
     ExecutionRole:
         Properties:
@@ -245,8 +302,18 @@ Resources:
                     Version: "2012-10-17"
                   PolicyName: AllowECRPassThrough
             Tags:
-                - Key: CreatedBy
+                - Key: defang:CreatedBy
                   Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
         Type: AWS::IAM::Role
     InternetGateway:
         Condition: CreateVpcResources
@@ -254,8 +321,18 @@ Resources:
             Tags:
                 - Key: Name
                   Value: test-igw
-                - Key: CreatedBy
+                - Key: defang:CreatedBy
                   Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
         Type: AWS::EC2::InternetGateway
     InternetGatewayAttachment:
         Condition: CreateVpcResources
@@ -271,8 +348,18 @@ Resources:
         Properties:
             RetentionInDays: 1
             Tags:
-                - Key: CreatedBy
+                - Key: defang:CreatedBy
                   Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
         Type: AWS::Logs::LogGroup
     OIDCProvider:
         Condition: OidcProvider
@@ -280,10 +367,23 @@ Resources:
             ClientIdList:
                 Ref: OidcProviderAudiences
             Tags:
-                - Key: CreatedBy
+                - Key: defang:CreatedBy
                   Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
             ThumbprintList:
-                Ref: OidcProviderThumbprints
+                Fn::If:
+                    - OidcThumbprints
+                    - Ref: OidcProviderThumbprints
+                    - Ref: AWS::NoValue
             Url:
                 Fn::Sub: https://${OidcProviderIssuer}
         Type: AWS::IAM::OIDCProvider
@@ -295,8 +395,18 @@ Resources:
             SecretString:
                 Fn::Sub: '{"username":"${DockerHubUsername}","accessToken":"${DockerHubAccessToken}"}'
             Tags:
-                - Key: CreatedBy
+                - Key: defang:CreatedBy
                   Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
         Type: AWS::SecretsManager::Secret
     PullThroughCache:
         Condition: EnablePullThroughCache
@@ -327,8 +437,18 @@ Resources:
             Tags:
                 - Key: Name
                   Value: test-routetable
-                - Key: CreatedBy
+                - Key: defang:CreatedBy
                   Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
             VpcId:
                 Ref: VPC
         Type: AWS::EC2::RouteTable
@@ -345,8 +465,18 @@ Resources:
         Properties:
             GroupDescription: Security group for the ECS task that allows all outbound traffic
             Tags:
-                - Key: CreatedBy
+                - Key: defang:CreatedBy
                   Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
             VpcId:
                 Fn::If:
                     - CreateVpcResources
@@ -361,8 +491,18 @@ Resources:
             Tags:
                 - Key: Name
                   Value: test-subnet
-                - Key: CreatedBy
+                - Key: defang:CreatedBy
                   Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
             VpcId:
                 Ref: VPC
         Type: AWS::EC2::Subnet
@@ -429,8 +569,18 @@ Resources:
                 CpuArchitecture: X86_64
                 OperatingSystemFamily: LINUX
             Tags:
-                - Key: CreatedBy
+                - Key: defang:CreatedBy
                   Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
             TaskRoleArn:
                 Ref: TaskRole
         Type: AWS::ECS::TaskDefinition
@@ -476,8 +626,18 @@ Resources:
                     Version: "2012-10-17"
                   PolicyName: AllowAssumeRole
             Tags:
-                - Key: CreatedBy
+                - Key: defang:CreatedBy
                   Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
         Type: AWS::IAM::Role
     VPC:
         Condition: CreateVpcResources
@@ -486,6 +646,16 @@ Resources:
             Tags:
                 - Key: Name
                   Value: test-vpc
-                - Key: CreatedBy
+                - Key: defang:CreatedBy
                   Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
         Type: AWS::EC2::VPC
