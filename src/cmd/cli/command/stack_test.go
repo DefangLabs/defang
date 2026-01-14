@@ -203,7 +203,7 @@ func TestLoadStackEnv(t *testing.T) {
 			},
 			expectedEnv: map[string]string{
 				"DEFANG_PROVIDER": "gcp",
-				"GCP_LOCATION":    "us-central1",
+				"GOOGLE_REGION":   "us-central1",
 				"GCP_PROJECT_ID":  "my-gcp-project",
 				"DEFANG_MODE":     "balanced",
 				"DEFANG_PREFIX":   "test",

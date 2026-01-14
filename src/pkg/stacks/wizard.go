@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 )
@@ -114,8 +115,9 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *StackPa
 		}
 	case client.ProviderGCP:
 		if params.Variables["GCP_PROJECT_ID"] == "" {
-			if os.Getenv("GCP_PROJECT_ID") != "" {
-				projectID, err := w.ec.RequestStringWithDefault(ctx, "Enter your GCP Project ID:", "gcp_project_id", os.Getenv("GCP_PROJECT_ID"))
+			_, envProjectID := pkg.GetFirstEnv(pkg.GCPProjectEnvVars...)
+			if envProjectID != "" {
+				projectID, err := w.ec.RequestStringWithDefault(ctx, "Enter your GCP Project ID:", "gcp_project_id", envProjectID)
 				if err != nil {
 					return nil, fmt.Errorf("failed to elicit GCP Project ID: %w", err)
 				}

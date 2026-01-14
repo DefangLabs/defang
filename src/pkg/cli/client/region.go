@@ -1,6 +1,8 @@
 package client
 
-import "github.com/DefangLabs/defang/src/pkg"
+import (
+	"github.com/DefangLabs/defang/src/pkg"
+)
 
 func GetRegion(provider ProviderID) string {
 	varName := GetRegionVarName(provider)
@@ -28,7 +30,13 @@ func GetRegionVarName(provider ProviderID) string {
 	case ProviderAWS:
 		return "AWS_REGION"
 	case ProviderGCP:
-		return "GCP_LOCATION"
+		// Try standard GCP environment variables in order of precedence
+		// Keeping GCP_LOCATION first for backward compatibility
+		GCPRegionEnvVar, _ := pkg.GetFirstEnv(pkg.GCPRegionEnvVars...)
+		if GCPRegionEnvVar == "" {
+			return "GOOGLE_REGION"
+		}
+		return GCPRegionEnvVar
 	case ProviderDO:
 		return "REGION"
 	case ProviderDefang:

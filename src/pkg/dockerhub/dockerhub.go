@@ -28,7 +28,8 @@ func GetDockerHubCredentials(ctx context.Context) (string, string, error) {
 	//   Used by docker-login github action: https://github.com/marketplace/actions/docker-login
 	// Then check DOCKER_USERNAME and DOCKER_PASSWORD
 	//   Used by dockerhub github action guide: https://docs.docker.com/guides/gha/
-	user, pass := pkg.GetFirstEnv("DOCKERHUB_USERNAME", "DOCKER_USERNAME"), pkg.GetFirstEnv("DOCKERHUB_TOKEN", "DOCKER_PASSWORD")
+	_, user := pkg.GetFirstEnv("DOCKERHUB_USERNAME", "DOCKER_USERNAME")
+	_, pass := pkg.GetFirstEnv("DOCKERHUB_TOKEN", "DOCKER_PASSWORD")
 	if user != "" && pass != "" {
 		return user, pass, nil
 	}

@@ -194,3 +194,74 @@ func TestGetLogStream(t *testing.T) {
 		})
 	}
 }
+
+func TestGetGcpProjectID(t *testing.T) {
+	tests := []struct {
+		name     string
+		envVars  map[string]string
+		expected string
+	}{
+		{
+			name:     "No environment variables set",
+			envVars:  map[string]string{},
+			expected: "",
+		},
+		{
+			name:     "GCP_PROJECT_ID is set (backward compatibility)",
+			envVars:  map[string]string{"GCP_PROJECT_ID": "my-gcp-project"},
+			expected: "my-gcp-project",
+		},
+		{
+			name:     "GOOGLE_PROJECT is set",
+			envVars:  map[string]string{"GOOGLE_PROJECT": "google-project"},
+			expected: "google-project",
+		},
+		{
+			name:     "GOOGLE_CLOUD_PROJECT is set",
+			envVars:  map[string]string{"GOOGLE_CLOUD_PROJECT": "google-cloud-project"},
+			expected: "google-cloud-project",
+		},
+		{
+			name:     "GCLOUD_PROJECT is set",
+			envVars:  map[string]string{"GCLOUD_PROJECT": "gcloud-project"},
+			expected: "gcloud-project",
+		},
+		{
+			name:     "CLOUDSDK_CORE_PROJECT is set",
+			envVars:  map[string]string{"CLOUDSDK_CORE_PROJECT": "cloudsdk-project"},
+			expected: "cloudsdk-project",
+		},
+		{
+			name: "Multiple env vars set, GCP_PROJECT_ID takes precedence",
+			envVars: map[string]string{
+				"GCP_PROJECT_ID":        "gcp-project",
+				"GOOGLE_PROJECT":        "google-project",
+				"CLOUDSDK_CORE_PROJECT": "cloudsdk-project",
+			},
+			expected: "gcp-project",
+		},
+		{
+			name: "Multiple env vars set, GOOGLE_PROJECT takes precedence when GCP_PROJECT_ID is not set",
+			envVars: map[string]string{
+				"GOOGLE_PROJECT":        "google-project",
+				"GOOGLE_CLOUD_PROJECT":  "google-cloud-project",
+				"CLOUDSDK_CORE_PROJECT": "cloudsdk-project",
+			},
+			expected: "google-project",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set test environment variables
+			for k, v := range tt.envVars {
+				t.Setenv(k, v)
+			}
+
+			got := getGcpProjectID()
+			if got != tt.expected {
+				t.Errorf("getGcpProjectID() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}

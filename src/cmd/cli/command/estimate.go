@@ -85,9 +85,9 @@ func interactiveSelectProvider(providers []client.ProviderID) (client.ProviderID
 	}
 	// Default to the provider in the environment if available
 	var defaultOption any // not string!
-	if pkg.AwsInEnv() {
+	if pkg.AwsInEnv() != "" {
 		defaultOption = client.ProviderAWS.String()
-	} else if pkg.GcpInEnv() {
+	} else if pkg.GcpInEnv() != "" {
 		defaultOption = client.ProviderGCP.String()
 	}
 	var optionValue string

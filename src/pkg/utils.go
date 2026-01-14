@@ -20,6 +20,10 @@ import (
 var (
 	validServiceRegex = regexp.MustCompile(`^[A-Za-z0-9]+([-_][A-Za-z0-9]+)*$`) // alphanumeric+hyphens 1 ≤ len < 64
 	validSecretRegex  = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,63}$`)     // alphanumeric+underscore 1 ≤ len ≤ 64
+
+	// Standard GCP environment variables in order of precedence; https://registry.terraform.io/providers/hashicorp/google/5.10.0/docs/guides/provider_reference#project-1
+	GCPProjectEnvVars = []string{"GCP_PROJECT_ID", "GOOGLE_PROJECT", "GOOGLE_CLOUD_PROJECT", "GCLOUD_PROJECT", "CLOUDSDK_CORE_PROJECT"}
+	GCPRegionEnvVars  = []string{"GCP_LOCATION", "GOOGLE_REGION", "GCLOUD_REGION", "CLOUDSDK_COMPUTE_REGION"}
 )
 
 func GetCurrentUser() string {
@@ -58,13 +62,13 @@ func GetenvBool(key string) bool {
 	return val
 }
 
-func GetFirstEnv(keys ...string) string {
+func GetFirstEnv(keys ...string) (string, string) {
 	for _, key := range keys {
 		if value, ok := os.LookupEnv(key); ok {
-			return value
+			return key, value
 		}
 	}
-	return ""
+	return "", ""
 }
 
 func SplitByComma(s string) []string {
@@ -207,14 +211,17 @@ func ShellQuote(args ...string) string {
 	return strings.Join(quoted, " ")
 }
 
-func AwsInEnv() bool {
-	return os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
+func AwsInEnv() string {
+	env, _ := GetFirstEnv("AWS_PROFILE", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_ROLE_ARN")
+	return env
 }
 
-func DoInEnv() bool {
-	return os.Getenv("DIGITALOCEAN_ACCESS_TOKEN") != "" || os.Getenv("DIGITALOCEAN_TOKEN") != ""
+func DoInEnv() string {
+	env, _ := GetFirstEnv("DIGITALOCEAN_ACCESS_TOKEN", "DIGITALOCEAN_TOKEN")
+	return env
 }
 
-func GcpInEnv() bool {
-	return os.Getenv("GCP_PROJECT_ID") != "" || os.Getenv("CLOUDSDK_CORE_PROJECT") != ""
+func GcpInEnv() string {
+	env, _ := GetFirstEnv(GCPProjectEnvVars...)
+	return env
 }
