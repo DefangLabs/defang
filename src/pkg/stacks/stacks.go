@@ -180,7 +180,7 @@ func Parse(content string) (map[string]string, error) {
 
 func Marshal(params *StackParameters) (string, error) {
 	if params == nil {
-		return godotenv.Marshal(map[string]string{})
+		return "", nil
 	}
 	return godotenv.Marshal(params.ToMap())
 }
