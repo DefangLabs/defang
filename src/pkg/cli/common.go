@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -49,8 +50,26 @@ type putDeploymentParams struct {
 	EventsUrl    string
 }
 
-func putDeployment(ctx context.Context, provider client.Provider, fabric client.FabricClient, req putDeploymentParams) error {
+func putDeployment(ctx context.Context, provider client.Provider, fabric client.FabricClient, stack *stacks.StackParameters, req putDeploymentParams) error {
 	accountInfo, err := provider.AccountInfo(ctx)
+	if err != nil {
+		return err
+	}
+
+	stackFileContent, err := stacks.Marshal(stack)
+	if err != nil {
+		return err
+	}
+
+	err = fabric.PutStack(ctx, &defangv1.PutStackRequest{
+		Stack: &defangv1.Stack{
+			Name:           provider.GetStackName(),
+			Project:        req.ProjectName,
+			Provider:       accountInfo.Provider.Value(),
+			LastDeployedAt: timestamppb.Now(),
+			StackFile:      []byte(stackFileContent),
+		},
+	})
 	if err != nil {
 		return err
 	}

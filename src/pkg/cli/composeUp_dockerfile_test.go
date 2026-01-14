@@ -8,6 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 )
 
 func TestComposeUp_DockerfileValidation(t *testing.T) {
@@ -41,11 +42,15 @@ func TestComposeUp_DockerfileValidation(t *testing.T) {
 				t.Fatalf("Failed to load project: %v", err)
 			}
 
+			stack := &stacks.StackParameters{
+				Provider: client.ProviderDefang, // Use a valid provider to avoid panic
+			}
+
 			// Try to do a ComposeUp with the project
 			mockFabric := client.MockFabricClient{DelegateDomain: "example.com"}
 			mockProvider := &mockDeployProvider{MockProvider: client.MockProvider{}}
 
-			_, _, err = ComposeUp(ctx, mockFabric, mockProvider, ComposeUpParams{
+			_, _, err = ComposeUp(ctx, mockFabric, mockProvider, stack, ComposeUpParams{
 				Project:    project,
 				UploadMode: compose.UploadModeDigest, // This should trigger validation
 				Mode:       modes.ModeUnspecified,
@@ -80,11 +85,15 @@ func TestComposeUp_DockerfileValidationSkipped(t *testing.T) {
 		t.Fatalf("Failed to load project: %v", err)
 	}
 
+	stack := &stacks.StackParameters{
+		Provider: client.ProviderDefang, // Use a valid provider to avoid panic
+	}
+
 	mockFabric := client.MockFabricClient{DelegateDomain: "example.com"}
 	mockProvider := &mockDeployProvider{MockProvider: client.MockProvider{}}
 
 	// Test that validation is skipped for UploadModeIgnore (dry-run)
-	_, _, err = ComposeUp(ctx, mockFabric, mockProvider, ComposeUpParams{
+	_, _, err = ComposeUp(ctx, mockFabric, mockProvider, stack, ComposeUpParams{
 		Project:    project,
 		UploadMode: compose.UploadModeIgnore, // Should skip validation
 		Mode:       modes.ModeUnspecified,
@@ -96,7 +105,7 @@ func TestComposeUp_DockerfileValidationSkipped(t *testing.T) {
 	}
 
 	// Test that validation is skipped for UploadModeEstimate
-	_, _, err = ComposeUp(ctx, mockFabric, mockProvider, ComposeUpParams{
+	_, _, err = ComposeUp(ctx, mockFabric, mockProvider, stack, ComposeUpParams{
 		Project:    project,
 		UploadMode: compose.UploadModeEstimate, // Should skip validation
 		Mode:       modes.ModeUnspecified,

@@ -95,7 +95,7 @@ func (sm *manager) ListRemote(ctx context.Context) ([]StackListItem, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to list stacks: %w", err)
 	}
-	stackMap := make(map[string]StackListItem)
+	stackParams := make([]StackListItem, 0, len(resp.GetStacks()))
 	for _, stack := range resp.GetStacks() {
 		name := stack.GetName()
 		if name == "" {
@@ -113,14 +113,10 @@ func (sm *manager) ListRemote(ctx context.Context) ([]StackListItem, error) {
 			continue
 		}
 		params.Name = name
-		stackMap[name] = StackListItem{
+		stackParams = append(stackParams, StackListItem{
 			StackParameters: params,
 			DeployedAt:      stack.GetLastDeployedAt().AsTime(),
-		}
-	}
-	stackParams := make([]StackListItem, 0, len(stackMap))
-	for _, params := range stackMap {
-		stackParams = append(stackParams, params)
+		})
 	}
 
 	// sort by deployed at desc

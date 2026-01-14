@@ -149,6 +149,10 @@ func (m MockFabricClient) CreateDelegateSubdomainZone(context.Context, *defangv1
 	return &defangv1.DelegateSubdomainZoneResponse{Zone: "example.com"}, nil
 }
 
+func (m MockFabricClient) PutStack(ctx context.Context, req *defangv1.PutStackRequest) error {
+	return nil
+}
+
 func (m MockFabricClient) PutDeployment(ctx context.Context, req *defangv1.PutDeploymentRequest) error {
 	return nil
 }

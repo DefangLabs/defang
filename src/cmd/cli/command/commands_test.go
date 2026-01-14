@@ -246,6 +246,12 @@ func (m *MockFabricControllerClient) ListDeployments(ctx context.Context, req *c
 	}), nil
 }
 
+func (m *MockFabricControllerClient) ListStacks(ctx context.Context, req *connect.Request[defangv1.ListStacksRequest]) (*connect.Response[defangv1.ListStacksResponse], error) {
+	return connect.NewResponse(&defangv1.ListStacksResponse{
+		Stacks: []*defangv1.Stack{},
+	}), nil
+}
+
 type FakeStdin struct {
 	*bytes.Reader
 }

@@ -91,6 +91,11 @@ func (g GrpcClient) Publish(ctx context.Context, req *defangv1.PublishRequest) e
 	return err
 }
 
+func (g GrpcClient) PutStack(ctx context.Context, req *defangv1.PutStackRequest) error {
+	_, err := g.client.PutStack(ctx, connect.NewRequest(req))
+	return err
+}
+
 func (g GrpcClient) PutDeployment(ctx context.Context, req *defangv1.PutDeploymentRequest) error {
 	_, err := g.client.PutDeployment(ctx, connect.NewRequest(req))
 	return err

@@ -29,6 +29,7 @@ type FabricClient interface {
 	Preview(context.Context, *defangv1.PreviewRequest) (*defangv1.PreviewResponse, error)
 	Publish(context.Context, *defangv1.PublishRequest) error
 	PutDeployment(context.Context, *defangv1.PutDeploymentRequest) error
+	PutStack(context.Context, *defangv1.PutStackRequest) error
 	RevokeToken(context.Context) error
 	SetSelectedProvider(context.Context, *defangv1.SetSelectedProviderRequest) error
 	// Subscribe(context.Context, *v1.SubscribeRequest) (*v1.SubscribeResponse, error)

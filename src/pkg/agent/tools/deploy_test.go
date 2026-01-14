@@ -61,7 +61,7 @@ func (m *MockDeployCLI) InteractiveLoginMCP(ctx context.Context, cluster string,
 	return m.InteractiveLoginMCPError
 }
 
-func (m *MockDeployCLI) ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
+func (m *MockDeployCLI) ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, stack *stacks.StackParameters, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	m.CallLog = append(m.CallLog, "ComposeUp")
 	if m.ComposeUpError != nil {
 		return nil, nil, m.ComposeUpError

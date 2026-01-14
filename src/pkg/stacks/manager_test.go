@@ -273,7 +273,7 @@ func TestManager_ListRemote(t *testing.T) {
 				Name: "remotestack1",
 				StackFile: []byte(`
 DEFANG_PROVIDER=aws
-DEFANG_REGION=us-east-1
+AWS_REGION=us-east-1
 `),
 				LastDeployedAt: timestamppb.New(deployedAt),
 			},
@@ -281,7 +281,7 @@ DEFANG_REGION=us-east-1
 				Name: "remotestack2",
 				StackFile: []byte(`
 DEFANG_PROVIDER=gcp
-DEFANG_REGION=us-central1
+GCP_LOCATION=us-central1
 `),
 				LastDeployedAt: timestamppb.New(deployedAt),
 			},
@@ -334,15 +334,17 @@ func TestManager_ListMerged(t *testing.T) {
 				Name: "sharedstack",
 				StackFile: []byte(`
 DEFANG_PROVIDER=aws
-DEFANG_REGION=us-east-1
+AWS_REGION=us-east-1
 `),
+				LastDeployedAt: timestamppb.New(deployedAt),
 			},
 			{
 				Name: "remoteonlystack",
 				StackFile: []byte(`
 DEFANG_PROVIDER=gcp
-DEFANG_REGION=us-central1
+GCP_LOCATION=us-central1
 `),
+				LastDeployedAt: timestamppb.New(deployedAt),
 			},
 		},
 	}
@@ -423,7 +425,7 @@ func TestManager_ListRemoteWithBetaStack(t *testing.T) {
 				Name: "", // Empty stack name should default to "beta"
 				StackFile: []byte(`
 DEFANG_PROVIDER=aws
-DEFANG_REGION=us-east-1
+AWS_REGION=us-east-1
 `),
 				LastDeployedAt: timestamppb.New(deployedAt),
 			},
@@ -444,21 +446,24 @@ func TestManager_ListRemoteDuplicateDeployments(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	deployedAt := time.Now()
+	olderDeployedAt := deployedAt.Add(-time.Hour)
 	mockClient := &mockFabricClient{
 		stacks: []*defangv1.Stack{
 			{
 				Name: "duplicatestack",
 				StackFile: []byte(`
 DEFANG_PROVIDER=aws
-DEFANG_REGION=us-east-1
+AWS_REGION=us-east-1
 `),
+				LastDeployedAt: timestamppb.New(deployedAt),
 			},
 			{
 				Name: "duplicatestack",
 				StackFile: []byte(`
 DEFANG_PROVIDER=aws
-DEFANG_REGION=us-west-2
+AWS_REGION=us-west-2
 `),
+				LastDeployedAt: timestamppb.New(olderDeployedAt),
 			},
 		},
 	}
@@ -469,11 +474,19 @@ DEFANG_REGION=us-west-2
 	remoteStacks, err := manager.ListRemote(t.Context())
 	require.NoError(t, err, "ListRemote() failed")
 
-	assert.Len(t, remoteStacks, 1, "Expected 1 remote stack")
+	assert.Len(t, remoteStacks, 2, "Expected 2 remote stacks")
+
+	// Should be sorted by deployed time desc, so most recent (deployedAt) should be first
 	assert.Equal(t, "duplicatestack", remoteStacks[0].Name, "Expected stack name 'duplicatestack'")
 	assert.Equal(t, client.ProviderAWS, remoteStacks[0].Provider, "Expected provider from most recent deployment (aws)")
 	assert.Equal(t, "us-east-1", remoteStacks[0].Region, "Expected region from most recent deployment (us-east-1)")
 	assert.Equal(t, deployedAt.Local().Format(time.RFC3339), remoteStacks[0].DeployedAt.Local().Format(time.RFC3339), "Expected deployed time from most recent deployment")
+
+	// Second stack should be the older one
+	assert.Equal(t, "duplicatestack", remoteStacks[1].Name, "Expected stack name 'duplicatestack'")
+	assert.Equal(t, client.ProviderAWS, remoteStacks[1].Provider, "Expected provider from older deployment (aws)")
+	assert.Equal(t, "us-west-2", remoteStacks[1].Region, "Expected region from older deployment (us-west-2)")
+	assert.Equal(t, olderDeployedAt.Local().Format(time.RFC3339), remoteStacks[1].DeployedAt.Local().Format(time.RFC3339), "Expected deployed time from older deployment")
 }
 
 func TestManager_WorkingDirectoryMatches(t *testing.T) {
@@ -526,7 +539,7 @@ func TestManager_TargetDirectoryEmpty(t *testing.T) {
 				Name: "remotestack1",
 				StackFile: []byte(`
 DEFANG_PROVIDER=aws
-DEFANG_REGION=us-east-1
+AWS_REGION=us-east-1
 `),
 				LastDeployedAt: timestamppb.New(deployedAt),
 			},
@@ -534,7 +547,7 @@ DEFANG_REGION=us-east-1
 				Name: "remotestack2",
 				StackFile: []byte(`
 DEFANG_PROVIDER=gcp
-DEFANG_REGION=us-central1
+GCP_LOCATION=us-central1
 `),
 				LastDeployedAt: timestamppb.New(deployedAt),
 			},
@@ -590,7 +603,7 @@ func TestManager_RemoteOperationsWorkRegardlessOfDirectory(t *testing.T) {
 				Name: "remotestack",
 				StackFile: []byte(`
 DEFANG_PROVIDER=aws
-DEFANG_REGION=us-east-1
+AWS_REGION=us-east-1
 `),
 				LastDeployedAt: timestamppb.New(deployedAt),
 			},
