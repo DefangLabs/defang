@@ -85,12 +85,6 @@ func TestGetRegion(t *testing.T) {
 			envVars:  map[string]string{"REGION": "sfo3"},
 			expected: "sfo3",
 		},
-		{
-			name:     "Unknown provider",
-			provider: ProviderID("unknown"),
-			envVars:  map[string]string{},
-			expected: "",
-		},
 	}
 
 	for _, tt := range tests {

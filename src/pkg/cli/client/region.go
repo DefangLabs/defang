@@ -32,8 +32,11 @@ func GetRegionVarName(provider ProviderID) string {
 	case ProviderGCP:
 		// Try standard GCP environment variables in order of precedence
 		// Keeping GCP_LOCATION first for backward compatibility
-		_, GCPRegion := pkg.GetFirstEnv(pkg.GCPRegionEnvVars...)
-		return GCPRegion
+		GCPRegionEnvVar, _ := pkg.GetFirstEnv(pkg.GCPRegionEnvVars...)
+		if GCPRegionEnvVar == "" {
+			return pkg.GCPRegionEnvVars[0]
+		}
+		return GCPRegionEnvVar
 	case ProviderDO:
 		return "REGION"
 	case ProviderDefang:
