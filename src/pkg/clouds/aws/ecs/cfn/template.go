@@ -27,8 +27,11 @@ import (
 const (
 	maxCachePrefixLength = 20 // prefix must be 2-20 characters long; should be 30 https://github.com/hashicorp/terraform-provider-aws/pull/34716
 
-	CreatedByTagKey   = "CreatedBy"
-	CreatedByTagValue = awsecs.CrunProjectName
+	TagKeyCreatedBy   = "defang:CreatedBy"
+	TagKeyManagedBy   = "defang:ManagedBy"
+	TagKeyPrefix      = "defang:Prefix"
+	TagKeyStackName   = "defang:CloudFormationStackName"
+	TagKeyStackRegion = "defang:CloudFormationStackRegion"
 )
 
 func getCacheRepoPrefix(prefix, suffix string) string {
@@ -64,20 +67,36 @@ func CreateTemplate(stack string, containers []clouds.Container) (*cloudformatio
 
 	defaultTags := []tags.Tag{
 		{
-			Key:   CreatedByTagKey,
-			Value: CreatedByTagValue,
+			Key:   TagKeyCreatedBy,
+			Value: awsecs.CrunProjectName,
+		},
+		{
+			Key:   TagKeyPrefix,
+			Value: stack,
+		},
+		{
+			Key:   TagKeyManagedBy,
+			Value: "CloudFormation",
+		},
+		{
+			Key:   TagKeyStackName,
+			Value: cloudformation.Ref("AWS::StackName"),
+		},
+		{
+			Key:   TagKeyStackRegion,
+			Value: cloudformation.Ref("AWS::Region"),
 		},
 	}
 
 	template := cloudformation.NewTemplate()
-	template.Description = "Defang AWS CloudFormation template for an ECS task. Don't delete: use the CLI instead."
+	template.Description = "Defang AWS CloudFormation template for the CD task. Do not delete this stack in the AWS console: use the Defang CLI instead. To create this stack, scroll down to acknowledge the risks and press 'Create stack'."
 
 	// Parameters
 	// TODO: add an option to use the default VPC
 	template.Parameters[ParamsExistingVpcId] = cloudformation.Parameter{
 		Type:        "String", // TODO: use "AWS::EC2::VPC::Id" but seems it cannot be optional
 		Default:     ptr.String(""),
-		Description: ptr.String("ID of existing VPC to use (leave empty to create new VPC)"),
+		Description: ptr.String("ID of existing VPC to use (optional: leave empty to create new VPC)"),
 	}
 	template.Parameters[ParamsRetainBucket] = cloudformation.Parameter{
 		Type:          "String",
@@ -111,12 +130,12 @@ func CreateTemplate(stack string, containers []clouds.Container) (*cloudformatio
 	template.Parameters[ParamsOidcProviderSubjects] = cloudformation.Parameter{
 		Type:        "CommaDelimitedList",
 		Default:     ptr.String(""),
-		Description: ptr.String("OIDC provider trusted subject patterns (optional)"),
+		Description: ptr.String("OIDC provider trusted subject pattern(s) (optional)"),
 	}
 	template.Parameters[ParamsOidcProviderThumbprints] = cloudformation.Parameter{
 		Type:        "CommaDelimitedList",
 		Default:     ptr.String(""),
-		Description: ptr.String("OIDC provider thumbprints (optional)"),
+		Description: ptr.String("OIDC provider thumbprint(s) (optional)"),
 	}
 	template.Parameters[ParamsCIRoleName] = cloudformation.Parameter{
 		Type:        "String",
@@ -126,7 +145,12 @@ func CreateTemplate(stack string, containers []clouds.Container) (*cloudformatio
 	template.Parameters[ParamsOidcProviderAudiences] = cloudformation.Parameter{
 		Type:        "CommaDelimitedList",
 		Default:     ptr.String(oidcProviderDefaultAud),
-		Description: ptr.String("OIDC provider trusted audience (optional)"),
+		Description: ptr.String("OIDC provider trusted audience(s) (optional)"),
+	}
+	template.Parameters[ParamsOidcProviderClaims] = cloudformation.Parameter{
+		Type:        "CommaDelimitedList",
+		Default:     ptr.String(""),
+		Description: ptr.String(`Additional OIDC claim conditions as comma-separated JSON "key":"value" pairs (optional)`),
 	}
 
 	// Conditions
@@ -146,10 +170,14 @@ func CreateTemplate(stack string, containers []clouds.Container) (*cloudformatio
 	template.Conditions[_condOidcProvider] = cloudformation.And([]string{
 		cloudformation.Not([]string{cloudformation.Equals(cloudformation.Ref(ParamsOidcProviderIssuer), "")}),
 		cloudformation.Not([]string{cloudformation.Equals(cloudformation.Join("", cloudformation.Ref(ParamsOidcProviderSubjects)), "")}),
-		cloudformation.Not([]string{cloudformation.Equals(cloudformation.Join("", cloudformation.Ref(ParamsOidcProviderThumbprints)), "")}),
+		// cloudformation.Not([]string{cloudformation.Equals(cloudformation.Join("", cloudformation.Ref(ParamsOidcProviderThumbprints)), "")}), thumbprints are optional now
 	})
 	const _condOverrideCIRoleName = "OverrideCIRoleName"
 	template.Conditions[_condOverrideCIRoleName] = cloudformation.Not([]string{cloudformation.Equals(cloudformation.Ref(ParamsCIRoleName), "")})
+	const _condOidcClaims = "OidcClaims"
+	template.Conditions[_condOidcClaims] = cloudformation.Not([]string{cloudformation.Equals(cloudformation.Join("", cloudformation.Ref(ParamsOidcProviderClaims)), "")})
+	const _condOidcThumbprints = "OidcThumbprints"
+	template.Conditions[_condOidcThumbprints] = cloudformation.Not([]string{cloudformation.Equals(cloudformation.Join("", cloudformation.Ref(ParamsOidcProviderThumbprints)), "")})
 
 	// 1. bucket (for deployment state)
 	const _bucket = "Bucket"
@@ -222,7 +250,7 @@ func CreateTemplate(stack string, containers []clouds.Container) (*cloudformatio
 	const _pullThroughCache = "PullThroughCache"
 	template.Resources[_pullThroughCache] = &ecr.PullThroughCacheRule{
 		AWSCloudFormationCondition: _condEnablePullThroughCache,
-		EcrRepositoryPrefix:        ptr.String(ecrPublicPrefix),
+		EcrRepositoryPrefix:        ptr.String(ecrPublicPrefix), // FIXME: forcing this name causes conflicts if multiple stacks are created with same prefix
 		UpstreamRegistryUrl:        ptr.String(awsecs.EcrPublicRegistry),
 	}
 
@@ -243,7 +271,7 @@ func CreateTemplate(stack string, containers []clouds.Container) (*cloudformatio
 	const _pullThroughCacheDocker = "PullThroughCacheDocker"
 	template.Resources[_pullThroughCacheDocker] = &ecr.PullThroughCacheRule{
 		AWSCloudFormationCondition: _condEnableDockerPullThroughCache,
-		EcrRepositoryPrefix:        ptr.String(dockerPublicPrefix),
+		EcrRepositoryPrefix:        ptr.String(dockerPublicPrefix), // FIXME: forcing this name causes conflicts if multiple stacks are created with same prefix
 		UpstreamRegistryUrl:        ptr.String("registry-1.docker.io"),
 		CredentialArn:              cloudformation.RefPtr(_privateRepoSecret),
 	}
@@ -606,8 +634,11 @@ func CreateTemplate(stack string, containers []clouds.Container) (*cloudformatio
 		AWSCloudFormationCondition: _condOidcProvider,
 		Tags:                       defaultTags,
 		ClientIdList:               cloudformation.Ref(ParamsOidcProviderAudiences),
-		ThumbprintList:             cloudformation.Ref(ParamsOidcProviderThumbprints),
-		Url:                        cloudformation.SubPtr(`https://${` + ParamsOidcProviderIssuer + `}`),
+		ThumbprintList: cloudformation.If(_condOidcThumbprints,
+			cloudformation.Ref(ParamsOidcProviderThumbprints),
+			cloudformation.Ref("AWS::NoValue"),
+		),
+		Url: cloudformation.SubPtr(`https://${` + ParamsOidcProviderIssuer + `}`),
 	}
 
 	// 9b. CI role
@@ -629,7 +660,7 @@ func CreateTemplate(stack string, containers []clouds.Container) (*cloudformatio
         "Action": "sts:AssumeRoleWithWebIdentity",
         "Condition": {
             "StringEquals": {
-                "${`+ParamsOidcProviderIssuer+`}:aud": [ "${Audiences}" ]
+                "${`+ParamsOidcProviderIssuer+`}:aud": [ "${Audiences}" ]${ExtraClaims}
             },
             "StringLike": {
                 "${`+ParamsOidcProviderIssuer+`}:sub": [ "${Subjects}" ]
@@ -637,21 +668,22 @@ func CreateTemplate(stack string, containers []clouds.Container) (*cloudformatio
         }
     }]
 }`, map[string]any{
-			"Audiences": cloudformation.Join(`","`, cloudformation.Ref(ParamsOidcProviderAudiences)),
-			"Provider":  cloudformation.Ref(_oidcProvider),
-			"Subjects":  cloudformation.Join(`","`, cloudformation.Ref(ParamsOidcProviderSubjects)),
+			"Audiences":   cloudformation.Join(`","`, cloudformation.Ref(ParamsOidcProviderAudiences)),
+			"Provider":    cloudformation.Ref(_oidcProvider),
+			"Subjects":    cloudformation.Join(`","`, cloudformation.Ref(ParamsOidcProviderSubjects)),
+			"ExtraClaims": cloudformation.If(_condOidcClaims, cloudformation.Join("", []any{",", cloudformation.Join(",", cloudformation.Ref(ParamsOidcProviderClaims))}), ""),
 		}),
 		ManagedPolicyArns: []string{
 			"arn:aws:iam::aws:policy/AdministratorAccess",
 		},
 	}
 
-	// template.Outputs[OutputsCIRoleARN] = cloudformation.Output{
-	// 	Description: ptr.String("ARN of the CI role"),
-	// 	Value:       cloudformation.Ref(_CIRole),
-	// }
-
 	// Declare the remaining stack outputs
+	template.Outputs[OutputsCIRoleARN] = cloudformation.Output{
+		Condition:   ptr.String(_condOidcProvider),
+		Description: ptr.String("ARN of the CI role"),
+		Value:       cloudformation.Ref(_CIRole),
+	}
 	template.Outputs[OutputsTaskDefArn] = cloudformation.Output{
 		Description: ptr.String("ARN of the ECS task definition"),
 		Value:       cloudformation.Ref(_taskDefinition),
