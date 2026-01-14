@@ -281,7 +281,7 @@ AWS_REGION=us-east-1
 				Name: "remotestack2",
 				StackFile: []byte(`
 DEFANG_PROVIDER=gcp
-GCP_LOCATION=us-central1
+GOOGLE_REGION=us-central1
 `),
 				LastDeployedAt: timestamppb.New(deployedAt),
 			},
@@ -342,7 +342,7 @@ AWS_REGION=us-east-1
 				Name: "remoteonlystack",
 				StackFile: []byte(`
 DEFANG_PROVIDER=gcp
-GCP_LOCATION=us-central1
+GOOGLE_REGION=us-central1
 `),
 				LastDeployedAt: timestamppb.New(deployedAt),
 			},
@@ -547,7 +547,7 @@ AWS_REGION=us-east-1
 				Name: "remotestack2",
 				StackFile: []byte(`
 DEFANG_PROVIDER=gcp
-GCP_LOCATION=us-central1
+GOOGLE_REGION=us-central1
 `),
 				LastDeployedAt: timestamppb.New(deployedAt),
 			},
