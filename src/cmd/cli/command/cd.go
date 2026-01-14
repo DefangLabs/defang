@@ -95,6 +95,15 @@ var cdCancelCmd = &cobra.Command{
 	},
 }
 
+var cdOutputsCmd = &cobra.Command{
+	Use:         "outputs [PROJECT...]",
+	Annotations: authNeededAnnotation, // need subscription
+	Short:       "Get the outputs of the service stack",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return cdCommand(cmd, args, client.CdCommandOutputs, global.Client)
+	},
+}
+
 var cdTearDownCmd = &cobra.Command{
 	Use:   "teardown",
 	Args:  cobra.NoArgs,
