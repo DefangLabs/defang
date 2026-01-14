@@ -32,13 +32,17 @@ type StorageClient interface {
 	Close() error
 }
 
-func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string) (string, error) {
+func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string, versioning bool) (string, error) {
 	existing, err := gcp.GetBucketWithPrefix(ctx, prefix)
 	if err != nil {
 		return "", fmt.Errorf("failed to get bucket with prefix %q: %w", prefix, err)
 	}
 	if existing != "" {
 		term.Debugf("Bucket %q already exists\n", existing)
+		err := gcp.EnsureBucketVersioningEnabled(ctx, existing)
+		if err != nil {
+			return "", fmt.Errorf("failed to ensure versioning is enabled on existing bucket %q: %w", existing, err)
+		}
 		return existing, nil
 	}
 
@@ -59,6 +63,7 @@ func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string) (string, e
 		// We need Workload Identity Federation for githbub actions to be able access the build bucket
 		// https://docs.cloud.google.com/storage/docs/uniform-bucket-level-access#should-you-use
 		UniformBucketLevelAccess: storage.UniformBucketLevelAccess{Enabled: true},
+		VersioningEnabled:        versioning,
 	}); err != nil {
 		return "", fmt.Errorf("failed to create bucket %q: %w", newBucketName, err)
 	}
@@ -86,6 +91,24 @@ func (gcp Gcp) GetBucketWithPrefix(ctx context.Context, prefix string) (string, 
 		return "", fmt.Errorf("bucket iterator error: %w", err)
 	}
 	return attrs.Name, nil
+}
+
+func (gcp Gcp) EnsureBucketVersioningEnabled(ctx context.Context, bucketName string) error {
+	client, err := newStorageClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create storage client: %w", err)
+	}
+	defer client.Close()
+
+	bucket := client.Bucket(bucketName)
+	attrsToUpdate := storage.BucketAttrsToUpdate{
+		VersioningEnabled: true,
+	}
+	_, err = bucket.Update(ctx, attrsToUpdate)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (gcp Gcp) CreateUploadURL(ctx context.Context, bucketName, objectName, serviceAccount string) (string, error) {

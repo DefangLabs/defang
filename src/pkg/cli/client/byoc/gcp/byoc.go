@@ -147,7 +147,7 @@ func (b *ByocGcp) SetUpCD(ctx context.Context) error {
 	}
 
 	// 2. Setup cd bucket
-	if bucket, err := b.driver.EnsureBucketExists(ctx, "defang-cd"); err != nil {
+	if bucket, err := b.driver.EnsureBucketExists(ctx, "defang-cd", true); err != nil {
 		return err
 	} else {
 		b.bucket = bucket
