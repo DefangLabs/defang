@@ -25,7 +25,7 @@ The following information will be needed to create a stack:
 
 - Stack name: must be alphanumeric and must not start with a number
 - Region: for example: `us-west-2`
-- AWS Profile: the AWS profile with which the user should authenticate to AWS. First, verify the AWS CLI is installed and configured by running `aws`. You can list available profiles with `aws configure list-profiles`. If the AWS CLI is not installed or configured, direct the user to the [installation guide](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
+- AWS Profile: the AWS profile with which the user should authenticate to AWS. First, verify the AWS CLI is installed and configured by running `aws`. You can list available profiles with `aws configure list-profiles`, and once the profiles are retrieved; prompt the user to select one. If the AWS CLI is not installed or configured, direct the user to the [installation guide](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html). Once the AWS CLI has been successfully installed, guide the user to configure an AWS Profile by running `aws configure` and entering their credentials. Then restart the stack creation process.
 - Deployment Mode: The deployment mode is the primary parameter for managing the cost and resiliency of your application's deployment. The following deployment modes are available: `affordable`, `balanced`, and `high_availability`. The default is `affordable`. Learn more at https://docs.defang.io/docs/concepts/deployment-modes
 
 If a new stack is created, make sure to select it before it can be used.
