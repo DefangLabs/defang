@@ -39,7 +39,7 @@ func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string, versioning
 	}
 	if existing != "" {
 		term.Debugf("Bucket %q already exists\n", existing)
-		err := gcp.EnsureBucketVersioningEnabled(ctx, existing)
+		err := gcp.UpdateBucketVersioning(ctx, existing, versioning)
 		if err != nil {
 			return "", fmt.Errorf("failed to ensure versioning is enabled on existing bucket %q: %w", existing, err)
 		}
@@ -93,7 +93,7 @@ func (gcp Gcp) GetBucketWithPrefix(ctx context.Context, prefix string) (string, 
 	return attrs.Name, nil
 }
 
-func (gcp Gcp) EnsureBucketVersioningEnabled(ctx context.Context, bucketName string) error {
+func (gcp Gcp) UpdateBucketVersioning(ctx context.Context, bucketName string, enabled bool) error {
 	client, err := newStorageClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create storage client: %w", err)
@@ -102,7 +102,7 @@ func (gcp Gcp) EnsureBucketVersioningEnabled(ctx context.Context, bucketName str
 
 	bucket := client.Bucket(bucketName)
 	attrsToUpdate := storage.BucketAttrsToUpdate{
-		VersioningEnabled: true,
+		VersioningEnabled: enabled,
 	}
 	_, err = bucket.Update(ctx, attrsToUpdate)
 	if err != nil {
