@@ -144,7 +144,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		action = defangv1.DeploymentAction_DEPLOYMENT_ACTION_UP
 	}
 
-	err = putDeployment(ctx, provider, fabric, stack, putDeploymentParams{
+	err = putDeploymentAndStack(ctx, provider, fabric, stack, putDeploymentParams{
 		Action:       action,
 		ETag:         resp.Etag,
 		Mode:         mode.Value(),

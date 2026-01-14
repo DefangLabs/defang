@@ -50,7 +50,7 @@ type putDeploymentParams struct {
 	EventsUrl    string
 }
 
-func putDeployment(ctx context.Context, provider client.Provider, fabric client.FabricClient, stack *stacks.StackParameters, req putDeploymentParams) error {
+func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric client.FabricClient, stack *stacks.StackParameters, req putDeploymentParams) error {
 	accountInfo, err := provider.AccountInfo(ctx)
 	if err != nil {
 		return err
@@ -61,13 +61,18 @@ func putDeployment(ctx context.Context, provider client.Provider, fabric client.
 		return err
 	}
 
+	deployedAt := timestamppb.Now()
+
 	err = fabric.PutStack(ctx, &defangv1.PutStackRequest{
 		Stack: &defangv1.Stack{
-			Name:           provider.GetStackName(),
-			Project:        req.ProjectName,
-			Provider:       accountInfo.Provider.Value(),
-			LastDeployedAt: timestamppb.Now(),
-			StackFile:      []byte(stackFileContent),
+			Name:              provider.GetStackName(),
+			Project:           req.ProjectName,
+			Provider:          accountInfo.Provider.Value(),
+			Region:            accountInfo.Region,
+			Mode:              req.Mode,
+			ProviderAccountId: accountInfo.AccountID,
+			LastDeployedAt:    deployedAt,
+			StackFile:         []byte(stackFileContent),
 		},
 	})
 	if err != nil {
@@ -85,7 +90,7 @@ func putDeployment(ctx context.Context, provider client.Provider, fabric client.
 			Region:            accountInfo.Region,
 			ServiceCount:      int32(req.ServiceCount), // #nosec G115 - service count will not overflow int32
 			Stack:             provider.GetStackName(),
-			Timestamp:         timestamppb.Now(),
+			Timestamp:         deployedAt,
 			Mode:              req.Mode,
 			StatesUrl:         req.StatesUrl,
 			EventsUrl:         req.EventsUrl,
