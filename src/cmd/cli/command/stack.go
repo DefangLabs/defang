@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 
-	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -51,7 +49,7 @@ func makeStackNewCmd() *cobra.Command {
 			}
 
 			if global.NonInteractive {
-				_, err := stacks.Create(params)
+				_, err := stacks.CreateInDirectory(".", params)
 				return err
 			}
 
@@ -63,7 +61,7 @@ func makeStackNewCmd() *cobra.Command {
 
 			term.Debugf("Creating stack with parameters: %+v\n", params)
 
-			_, err = stacks.Create(params)
+			_, err = stacks.CreateInDirectory(".", params)
 			if err != nil {
 				return err
 			}
@@ -73,7 +71,7 @@ func makeStackNewCmd() *cobra.Command {
 		},
 	}
 	stackNewCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
-	stackNewCmd.Flags().StringVarP(&global.Stack.Region, "region", "r", "", "Cloud region for the stack deployment")
+	stackNewCmd.Flags().StringVarP(&global.Stack.Region, "region", "r", global.Stack.Region, "Cloud region for the stack deployment")
 
 	return stackNewCmd
 }
@@ -138,15 +136,13 @@ func makeStackRemoveCmd() *cobra.Command {
 		Short:   "Remove an existing Defang deployment stack",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			return stacks.Remove(name)
+			return stacks.RemoveInDirectory(".", name)
 		},
 	}
 	return stackRemoveCmd
 }
 
 func PromptForStackParameters(ctx context.Context, params *stacks.StackParameters) error {
-	elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
-	ec := elicitations.NewController(elicitationsClient)
 	wizard := stacks.NewWizard(ec)
 	newParams, err := wizard.CollectRemainingParameters(ctx, params)
 	if err != nil {

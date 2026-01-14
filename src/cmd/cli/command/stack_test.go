@@ -101,7 +101,7 @@ func TestStackListCmd(t *testing.T) {
 				os.FileMode(0644),
 			)
 			for _, stack := range tt.stacks {
-				stacks.Create(stack)
+				stacks.CreateInDirectory(".", stack)
 			}
 
 			buffer := new(bytes.Buffer)
@@ -166,35 +166,97 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 	}
 }
 
-func TestLoadParameters(t *testing.T) {
-	params := map[string]string{
-		"DEFANG_PROVIDER": "aws",
-		"AWS_REGION":      "us-west-2",
-		"AWS_PROFILE":     "default",
-		"DEFANG_MODE":     "AFFORDABLE",
+func TestLoadStackEnv(t *testing.T) {
+	tests := []struct {
+		name        string
+		parameters  stacks.StackParameters
+		expectedEnv map[string]string
+	}{
+		{
+			name: "AWS parameters",
+			parameters: stacks.StackParameters{
+				Provider: client.ProviderAWS,
+				Region:   "us-west-2",
+				Mode:     modes.ModeAffordable,
+				Variables: map[string]string{
+					"AWS_PROFILE": "default",
+				},
+			},
+			expectedEnv: map[string]string{
+				"DEFANG_PROVIDER": "aws",
+				"AWS_REGION":      "us-west-2",
+				"AWS_PROFILE":     "default",
+				"DEFANG_MODE":     "affordable",
+			},
+		},
+		{
+			name: "GCP parameters",
+			parameters: stacks.StackParameters{
+				Provider: client.ProviderGCP,
+				Region:   "us-central1",
+				Mode:     modes.ModeBalanced,
+				Variables: map[string]string{
+					"GCP_PROJECT_ID": "my-gcp-project",
+					"DEFANG_PREFIX":  "test",
+					"DEFANG_SUFFIX":  "dev",
+				},
+			},
+			expectedEnv: map[string]string{
+				"DEFANG_PROVIDER": "gcp",
+				"GCP_LOCATION":    "us-central1",
+				"GCP_PROJECT_ID":  "my-gcp-project",
+				"DEFANG_MODE":     "balanced",
+				"DEFANG_PREFIX":   "test",
+				"DEFANG_SUFFIX":   "dev",
+			},
+		},
+		{
+			name: "With prefix and suffix",
+			parameters: stacks.StackParameters{
+				Provider: client.ProviderAWS,
+				Region:   "us-west-2",
+				Mode:     modes.ModeAffordable,
+				Variables: map[string]string{
+					"AWS_PROFILE":   "default",
+					"DEFANG_PREFIX": "test",
+					"DEFANG_SUFFIX": "dev",
+				},
+			},
+			expectedEnv: map[string]string{
+				"DEFANG_PROVIDER": "aws",
+				"AWS_REGION":      "us-west-2",
+				"AWS_PROFILE":     "default",
+				"DEFANG_MODE":     "affordable",
+				"DEFANG_PREFIX":   "test",
+				"DEFANG_SUFFIX":   "dev",
+			},
+		},
 	}
 
-	// Clear any existing env vars that might interfere with the test
-	os.Unsetenv("DEFANG_PROVIDER")
-	os.Unsetenv("AWS_REGION")
-	os.Unsetenv("AWS_PROFILE")
-	os.Unsetenv("DEFANG_MODE")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Clear any existing env vars that might interfere with the test
+			for key := range tt.expectedEnv {
+				os.Unsetenv(key)
+			}
 
-	t.Cleanup(func() {
-		// Clean up environment variables after test
-		os.Unsetenv("DEFANG_PROVIDER")
-		os.Unsetenv("AWS_REGION")
-		os.Unsetenv("AWS_PROFILE")
-		os.Unsetenv("DEFANG_MODE")
-	})
+			t.Cleanup(func() {
+				// Clean up environment variables after test
+				for key := range tt.expectedEnv {
+					os.Unsetenv(key)
+				}
+			})
 
-	err := stacks.LoadParameters(params, true)
-	if err != nil {
-		t.Fatalf("LoadParameters() error = %v", err)
+			err := stacks.LoadStackEnv(tt.parameters, true)
+			if err != nil {
+				t.Fatalf("LoadStackEnv() error = %v", err)
+			}
+
+			for key, expectedValue := range tt.expectedEnv {
+				if value := os.Getenv(key); value != expectedValue {
+					t.Errorf("Environment variable %s = %s; want %s", key, value, expectedValue)
+				}
+			}
+		})
 	}
-
-	assert.Equal(t, "aws", os.Getenv("DEFANG_PROVIDER"))
-	assert.Equal(t, "us-west-2", os.Getenv("AWS_REGION"))
-	assert.Equal(t, "default", os.Getenv("AWS_PROFILE"))
-	assert.Equal(t, "AFFORDABLE", os.Getenv("DEFANG_MODE"))
 }

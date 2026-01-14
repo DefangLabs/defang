@@ -5,20 +5,42 @@ import (
 )
 
 func GetRegion(provider ProviderID) string {
+	varName := GetRegionVarName(provider)
+	var defaultRegion string
 	switch provider {
 	case ProviderAWS:
-		return pkg.Getenv("AWS_REGION", "us-west-2") // Default region for AWS
+		defaultRegion = "us-west-2"
+	case ProviderGCP:
+		defaultRegion = "us-central1"
+	case ProviderDO:
+		defaultRegion = "nyc3"
+	case ProviderDefang:
+		return ""
+	case ProviderAuto:
+		return ""
+	default:
+		panic("unsupported provider")
+	}
+
+	return pkg.Getenv(varName, defaultRegion)
+}
+
+func GetRegionVarName(provider ProviderID) string {
+	switch provider {
+	case ProviderAWS:
+		return "AWS_REGION"
 	case ProviderGCP:
 		// Try standard GCP environment variables in order of precedence
 		// Keeping GCP_LOCATION first for backward compatibility
-		_, region := pkg.GetFirstEnv(pkg.GCPRegionEnvVars...)
-		if region == "" {
-			return "us-central1" // Default region for GCP
-		}
-		return region
+		_, GCPRegion := pkg.GetFirstEnv(pkg.GCPRegionEnvVars...)
+		return GCPRegion
 	case ProviderDO:
-		return pkg.Getenv("REGION", "nyc3") // Default region for DigitalOcean
+		return "REGION"
+	case ProviderDefang:
+		return ""
+	case ProviderAuto:
+		return ""
 	default:
-		return "" // No default region for unsupported providers or playground
+		panic("unsupported provider")
 	}
 }

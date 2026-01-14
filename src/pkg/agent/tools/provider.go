@@ -16,14 +16,24 @@ type ProviderCreator interface {
 	NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient, stack string) client.Provider
 }
 
+type StacksManager interface {
+	List(ctx context.Context) ([]stacks.StackListItem, error)
+	Load(ctx context.Context, name string) (*stacks.StackParameters, error)
+	LoadLocal(name string) (*stacks.StackParameters, error)
+	LoadRemote(ctx context.Context, name string) (*stacks.StackParameters, error)
+	LoadStackEnv(params stacks.StackParameters, overload bool) error
+	Create(params stacks.StackParameters) (string, error)
+	TargetDirectory() string
+}
+
 type providerPreparer struct {
 	pc ProviderCreator
 	ec elicitations.Controller
 	fc client.FabricClient
-	sm stacks.Manager
+	sm StacksManager
 }
 
-func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc client.FabricClient, sm stacks.Manager) *providerPreparer {
+func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc client.FabricClient, sm StacksManager) *providerPreparer {
 	return &providerPreparer{
 		pc: pc,
 		ec: ec,
@@ -33,23 +43,19 @@ func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc clie
 }
 
 func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.StackParameters) (*client.ProviderID, client.Provider, error) {
-	var providerID client.ProviderID
-	var err error
-	if stack.Name == "" {
+	if stack.Name == "" && pp.ec.IsSupported() {
 		selector := stacks.NewSelector(pp.ec, pp.sm)
-		newStack, err := selector.SelectStack(ctx)
+		newStack, err := selector.SelectStack(ctx, stacks.SelectStackOptions{
+			AllowCreate: true,
+		})
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to setup stack: %w", err)
 		}
 		*stack = *newStack
 	}
 
-	err = providerID.Set(stack.Provider.Name())
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to set provider ID: %w", err)
-	}
-
 	term.Debug("Function invoked: cli.NewProvider")
-	provider := pp.pc.NewProvider(ctx, providerID, pp.fc, stack.Name)
+	provider := pp.pc.NewProvider(ctx, stack.Provider, pp.fc, stack.Name)
+	providerID := stack.Provider
 	return &providerID, provider, nil
 }

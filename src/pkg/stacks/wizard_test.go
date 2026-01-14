@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/stretchr/testify/assert"
 )
 
 // mockElicitationsController is a mock implementation of elicitations.Controller
@@ -123,10 +124,12 @@ func TestWizardCollectParameters(t *testing.T) {
 			},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:   client.ProviderAWS,
-				Region:     "us-east-1",
-				Name:       "awsuseast1",
-				AWSProfile: "test-profile",
+				Provider: client.ProviderAWS,
+				Region:   "us-east-1",
+				Name:     "awsuseast1",
+				Variables: map[string]string{
+					"AWS_PROFILE": "test-profile",
+				},
 			},
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
@@ -149,10 +152,12 @@ func TestWizardCollectParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:   client.ProviderAWS,
-				Region:     "us-west-2",
-				Name:       "awsuswest2",
-				AWSProfile: "production",
+				Provider: client.ProviderAWS,
+				Region:   "us-west-2",
+				Name:     "awsuswest2",
+				Variables: map[string]string{
+					"AWS_PROFILE": "production",
+				},
 			},
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
@@ -177,10 +182,12 @@ func TestWizardCollectParameters(t *testing.T) {
 			},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:     client.ProviderGCP,
-				Region:       "us-central1",
-				Name:         "gcpuscentral1",
-				GCPProjectID: "my-gcp-project",
+				Provider: client.ProviderGCP,
+				Region:   "us-central1",
+				Name:     "gcpuscentral1",
+				Variables: map[string]string{
+					"GCP_PROJECT_ID": "my-gcp-project",
+				},
 			},
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
@@ -203,10 +210,12 @@ func TestWizardCollectParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:     client.ProviderGCP,
-				Region:       "europe-west1",
-				Name:         "gcpeuropewest1",
-				GCPProjectID: "user-entered-project",
+				Provider: client.ProviderGCP,
+				Region:   "europe-west1",
+				Name:     "gcpeuropewest1",
+				Variables: map[string]string{
+					"GCP_PROJECT_ID": "user-entered-project",
+				},
 			},
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
@@ -389,28 +398,15 @@ func TestWizardCollectParameters(t *testing.T) {
 			}
 
 			// Verify result
-			if tt.expectedResult == nil && result != nil {
-				t.Errorf("expected nil result but got %+v", result)
-			}
-			if tt.expectedResult != nil && result == nil {
-				t.Errorf("expected result %+v but got nil", tt.expectedResult)
-			}
-			if tt.expectedResult != nil && result != nil {
-				if result.Provider != tt.expectedResult.Provider {
-					t.Errorf("expected Provider %v, got %v", tt.expectedResult.Provider, result.Provider)
-				}
-				if result.Region != tt.expectedResult.Region {
-					t.Errorf("expected Region %v, got %v", tt.expectedResult.Region, result.Region)
-				}
-				if result.Name != tt.expectedResult.Name {
-					t.Errorf("expected Name %v, got %v", tt.expectedResult.Name, result.Name)
-				}
-				if result.AWSProfile != tt.expectedResult.AWSProfile {
-					t.Errorf("expected AWSProfile %v, got %v", tt.expectedResult.AWSProfile, result.AWSProfile)
-				}
-				if result.GCPProjectID != tt.expectedResult.GCPProjectID {
-					t.Errorf("expected GCPProjectID %v, got %v", tt.expectedResult.GCPProjectID, result.GCPProjectID)
-				}
+			if tt.expectedResult == nil {
+				assert.Nil(t, result, "expected nil result")
+			} else {
+				assert.NotNil(t, result, "expected non-nil result")
+				assert.Equal(t, tt.expectedResult.Provider, result.Provider, "Provider mismatch")
+				assert.Equal(t, tt.expectedResult.Region, result.Region, "Region mismatch")
+				assert.Equal(t, tt.expectedResult.Name, result.Name, "Name mismatch")
+				assert.Equal(t, tt.expectedResult.Variables["AWS_PROFILE"], result.Variables["AWS_PROFILE"], "AWS_PROFILE mismatch")
+				assert.Equal(t, tt.expectedResult.Variables["GCP_PROJECT_ID"], result.Variables["GCP_PROJECT_ID"], "GCP_PROJECT_ID mismatch")
 			}
 
 			// Verify call order
@@ -480,10 +476,12 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:   client.ProviderAWS,
-				Region:     "us-east-1",
-				Name:       "my-stack",
-				AWSProfile: "default",
+				Provider: client.ProviderAWS,
+				Region:   "us-east-1",
+				Name:     "my-stack",
+				Variables: map[string]string{
+					"AWS_PROFILE": "default",
+				},
 			},
 		},
 		{
@@ -501,10 +499,12 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:   client.ProviderAWS,
-				Region:     "us-west-2",
-				Name:       "my-stack",
-				AWSProfile: "default",
+				Provider: client.ProviderAWS,
+				Region:   "us-west-2",
+				Name:     "my-stack",
+				Variables: map[string]string{
+					"AWS_PROFILE": "default",
+				},
 			},
 		},
 		{
@@ -522,10 +522,12 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:     client.ProviderGCP,
-				Region:       "us-central1",
-				Name:         "gcpuscentral1",
-				GCPProjectID: "my-project",
+				Provider: client.ProviderGCP,
+				Region:   "us-central1",
+				Name:     "gcpuscentral1",
+				Variables: map[string]string{
+					"GCP_PROJECT_ID": "my-project",
+				},
 			},
 		},
 		{
@@ -546,10 +548,12 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:   client.ProviderAWS,
-				Region:     "eu-west-1",
-				Name:       "my-aws-stack",
-				AWSProfile: "production",
+				Provider: client.ProviderAWS,
+				Region:   "eu-west-1",
+				Name:     "my-aws-stack",
+				Variables: map[string]string{
+					"AWS_PROFILE": "production",
+				},
 			},
 		},
 		{
@@ -570,10 +574,12 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:     client.ProviderGCP,
-				Region:       "europe-west1",
-				Name:         "my-gcp-stack",
-				GCPProjectID: "env-project-123",
+				Provider: client.ProviderGCP,
+				Region:   "europe-west1",
+				Name:     "my-gcp-stack",
+				Variables: map[string]string{
+					"GCP_PROJECT_ID": "env-project-123",
+				},
 			},
 		},
 		{
@@ -627,48 +633,58 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:   client.ProviderAWS,
-				Region:     "ap-southeast-1",
-				Name:       "awsapsoutheast1",
-				AWSProfile: "staging",
+				Provider: client.ProviderAWS,
+				Region:   "ap-southeast-1",
+				Name:     "awsapsoutheast1",
+				Variables: map[string]string{
+					"AWS_PROFILE": "staging",
+				},
 			},
 		},
 		{
 			name: "All parameters provided - AWS complete",
 			initialParams: &StackParameters{
-				Provider:   client.ProviderAWS,
-				Region:     "us-west-1",
-				Name:       "complete-stack",
-				AWSProfile: "prod",
+				Provider: client.ProviderAWS,
+				Region:   "us-west-1",
+				Name:     "complete-stack",
+				Variables: map[string]string{
+					"AWS_PROFILE": "prod",
+				},
 			},
 			setupMock:   func(m *mockElicitationsController) {},
 			setupEnv:    func(t *testing.T) {},
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:   client.ProviderAWS,
-				Region:     "us-west-1",
-				Name:       "complete-stack",
-				AWSProfile: "prod",
+				Provider: client.ProviderAWS,
+				Region:   "us-west-1",
+				Name:     "complete-stack",
+				Variables: map[string]string{
+					"AWS_PROFILE": "prod",
+				},
 			},
 		},
 		{
 			name: "All parameters provided - GCP complete",
 			initialParams: &StackParameters{
-				Provider:     client.ProviderGCP,
-				Region:       "asia-east1",
-				Name:         "gcp-complete",
-				GCPProjectID: "my-complete-project",
+				Provider: client.ProviderGCP,
+				Region:   "asia-east1",
+				Name:     "gcp-complete",
+				Variables: map[string]string{
+					"GCP_PROJECT_ID": "my-complete-project",
+				},
 			},
 			setupMock:   func(m *mockElicitationsController) {},
 			setupEnv:    func(t *testing.T) {},
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:     client.ProviderGCP,
-				Region:       "asia-east1",
-				Name:         "gcp-complete",
-				GCPProjectID: "my-complete-project",
+				Provider: client.ProviderGCP,
+				Region:   "asia-east1",
+				Name:     "gcp-complete",
+				Variables: map[string]string{
+					"GCP_PROJECT_ID": "my-complete-project",
+				},
 			},
 		},
 		{
@@ -701,10 +717,12 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:   client.ProviderAWS,
-				Region:     "us-east-1",
-				Name:       "awsuseast1",
-				AWSProfile: "default",
+				Provider: client.ProviderAWS,
+				Region:   "us-east-1",
+				Name:     "awsuseast1",
+				Variables: map[string]string{
+					"AWS_PROFILE": "default",
+				},
 			},
 		},
 		{
@@ -721,10 +739,12 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			cleanupEnv:  func() {},
 			expectError: false,
 			expectedResult: &StackParameters{
-				Provider:     client.ProviderGCP,
-				Region:       "us-central1",
-				Name:         "gcpuscentral1",
-				GCPProjectID: "my-gcp-project",
+				Provider: client.ProviderGCP,
+				Region:   "us-central1",
+				Name:     "gcpuscentral1",
+				Variables: map[string]string{
+					"GCP_PROJECT_ID": "my-gcp-project",
+				},
 			},
 		},
 		{
@@ -766,29 +786,16 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			// Verify result
-			if tt.expectedResult == nil && result != nil {
-				t.Errorf("expected nil result but got %+v", result)
-			}
-			if tt.expectedResult != nil && result == nil {
-				t.Errorf("expected result %+v but got nil", tt.expectedResult)
-			}
-			if tt.expectedResult != nil && result != nil {
-				if result.Provider != tt.expectedResult.Provider {
-					t.Errorf("expected Provider %v, got %v", tt.expectedResult.Provider, result.Provider)
-				}
-				if result.Region != tt.expectedResult.Region {
-					t.Errorf("expected Region %v, got %v", tt.expectedResult.Region, result.Region)
-				}
-				if result.Name != tt.expectedResult.Name {
-					t.Errorf("expected Name %v, got %v", tt.expectedResult.Name, result.Name)
-				}
-				if result.AWSProfile != tt.expectedResult.AWSProfile {
-					t.Errorf("expected AWSProfile %v, got %v", tt.expectedResult.AWSProfile, result.AWSProfile)
-				}
-				if result.GCPProjectID != tt.expectedResult.GCPProjectID {
-					t.Errorf("expected GCPProjectID %v, got %v", tt.expectedResult.GCPProjectID, result.GCPProjectID)
-				}
+			// Verify result using assert
+			if tt.expectedResult == nil {
+				assert.Nil(t, result, "expected nil result")
+			} else {
+				assert.NotNil(t, result, "expected non-nil result")
+				assert.Equal(t, tt.expectedResult.Provider, result.Provider, "Provider mismatch")
+				assert.Equal(t, tt.expectedResult.Region, result.Region, "Region mismatch")
+				assert.Equal(t, tt.expectedResult.Name, result.Name, "Name mismatch")
+				assert.Equal(t, tt.expectedResult.Variables["AWS_PROFILE"], result.Variables["AWS_PROFILE"], "AWS_PROFILE mismatch")
+				assert.Equal(t, tt.expectedResult.Variables["GCP_PROJECT_ID"], result.Variables["GCP_PROJECT_ID"], "GCP_PROJECT_ID mismatch")
 			}
 		})
 	}

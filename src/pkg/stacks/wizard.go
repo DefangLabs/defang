@@ -37,6 +37,11 @@ func (w *Wizard) CollectParameters(ctx context.Context) (*StackParameters, error
 }
 
 func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *StackParameters) (*StackParameters, error) {
+	// Initialize Variables map if nil
+	if params.Variables == nil {
+		params.Variables = make(map[string]string)
+	}
+
 	if params.Provider == client.ProviderAuto || params.Provider == "" {
 		var providerNames []string
 		for _, p := range client.AllProviders() {
@@ -60,6 +65,7 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *StackPa
 		params.Provider = providerID
 	}
 
+	// Clear region for Defang provider as it doesn't use regions
 	if params.Provider == client.ProviderDefang {
 		params.Region = ""
 	} else if params.Region == "" {
@@ -83,47 +89,46 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *StackPa
 
 	switch params.Provider {
 	case client.ProviderAWS:
-		if params.AWSProfile == "" {
+		if params.Variables["AWS_PROFILE"] == "" {
 			if os.Getenv("AWS_PROFILE") != "" {
 				profile, err := w.ec.RequestStringWithDefault(ctx, "Which AWS profile do you want to use?", "aws_profile", os.Getenv("AWS_PROFILE"))
 				if err != nil {
 					return nil, fmt.Errorf("failed to elicit AWS profile: %w", err)
 				}
-				params.AWSProfile = profile
+				params.Variables["AWS_PROFILE"] = profile
 				break
 			}
 			profiles, err := w.profileLister.ListProfiles()
 			if err != nil || len(profiles) == 0 {
-				profile, err := w.ec.RequestStringWithDefault(ctx, "Enter the AWS profile you want to use:", "aws_profile", "default")
+				profile, err := w.ec.RequestStringWithDefault(ctx, "Which AWS profile do you want to use?", "aws_profile", "default")
 				if err != nil {
 					return nil, fmt.Errorf("failed to elicit AWS profile: %w", err)
 				}
-				params.AWSProfile = profile
+				params.Variables["AWS_PROFILE"] = profile
 			} else {
 				profile, err := w.ec.RequestEnum(ctx, "Which AWS profile do you want to use?", "aws_profile", profiles)
 				if err != nil {
 					return nil, fmt.Errorf("failed to elicit AWS profile: %w", err)
 				}
-				params.AWSProfile = profile
+				params.Variables["AWS_PROFILE"] = profile
 			}
 		}
 	case client.ProviderGCP:
-		if params.GCPProjectID == "" {
-			// Check all supported GCP project environment variables
+		if params.Variables["GCP_PROJECT_ID"] == "" {
 			_, envProjectID := pkg.GetFirstEnv(pkg.GCPProjectEnvVars...)
 			if envProjectID != "" {
 				projectID, err := w.ec.RequestStringWithDefault(ctx, "Enter your GCP Project ID:", "gcp_project_id", envProjectID)
 				if err != nil {
 					return nil, fmt.Errorf("failed to elicit GCP Project ID: %w", err)
 				}
-				params.GCPProjectID = projectID
+				params.Variables["GCP_PROJECT_ID"] = projectID
 				break
 			}
 			projectID, err := w.ec.RequestString(ctx, "Enter your GCP Project ID:", "gcp_project_id")
 			if err != nil {
 				return nil, fmt.Errorf("failed to elicit GCP Project ID: %w", err)
 			}
-			params.GCPProjectID = projectID
+			params.Variables["GCP_PROJECT_ID"] = projectID
 		}
 	}
 

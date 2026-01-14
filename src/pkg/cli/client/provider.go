@@ -92,6 +92,7 @@ type Loader interface {
 	LoadProject(context.Context) (*composeTypes.Project, error)
 	LoadProjectName(context.Context) (string, error)
 	TargetDirectory() string
+	CreateProjectForDebug() (*composeTypes.Project, error)
 }
 
 type RetryDelayer struct {

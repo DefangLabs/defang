@@ -210,3 +210,18 @@ func ShellQuote(args ...string) string {
 	}
 	return strings.Join(quoted, " ")
 }
+
+func AwsInEnv() string {
+	env, _ := GetFirstEnv("AWS_PROFILE", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY")
+	return env
+}
+
+func DoInEnv() string {
+	env, _ := GetFirstEnv("DIGITALOCEAN_ACCESS_TOKEN", "DIGITALOCEAN_TOKEN")
+	return env
+}
+
+func GcpInEnv() string {
+	env, _ := GetFirstEnv(GCPProjectEnvVars...)
+	return env
+}
