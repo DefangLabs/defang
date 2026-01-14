@@ -212,7 +212,7 @@ func ShellQuote(args ...string) string {
 }
 
 func AwsInEnv() string {
-	env, _ := GetFirstEnv("AWS_PROFILE", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY")
+	env, _ := GetFirstEnv("AWS_PROFILE", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_ROLE_ARN")
 	return env
 }
 

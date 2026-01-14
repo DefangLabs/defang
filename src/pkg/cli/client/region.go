@@ -34,7 +34,7 @@ func GetRegionVarName(provider ProviderID) string {
 		// Keeping GCP_LOCATION first for backward compatibility
 		GCPRegionEnvVar, _ := pkg.GetFirstEnv(pkg.GCPRegionEnvVars...)
 		if GCPRegionEnvVar == "" {
-			return pkg.GCPRegionEnvVars[0]
+			return "GOOGLE_REGION"
 		}
 		return GCPRegionEnvVar
 	case ProviderDO:
