@@ -169,6 +169,9 @@ message Stack {
   bytes stack_file = 3; // Defang stack file
   Provider provider = 4;
   google.protobuf.Timestamp last_deployed_at = 5;
+  string provider_account_id = 6;
+  string region = 7;
+  DeploymentMode mode = 8;
 }
 
 message PutStackRequest {
