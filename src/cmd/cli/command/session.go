@@ -85,9 +85,10 @@ func newStackManagerForCommand(cmd *cobra.Command) (session.StacksManager, error
 	projectName, _ := cmd.Flags().GetString("project-name")
 	targetDirectory, err := findTargetDirectory()
 	if err != nil {
+		// No .defang folder in any parent directory, so we'd need a project-name to fetch stacks from Fabric
 		if projectName == "" {
 			if errors.Is(err, os.ErrNotExist) {
-				return nil, errors.New("--project-name must be specified when outside of a project directory")
+				return nil, errors.New("no local stack files found; create a new stack or use --project-name to load known stacks")
 			}
 			return nil, err
 		}

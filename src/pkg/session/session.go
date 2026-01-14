@@ -49,11 +49,11 @@ type SessionLoader struct {
 	opts   SessionLoaderOptions
 }
 
-func NewSessionLoader(client client.FabricClient, ec elicitations.Controller, sm StacksManager, opts SessionLoaderOptions) *SessionLoader {
+func NewSessionLoader(client client.FabricClient, ec elicitations.Controller, maybeSm StacksManager, opts SessionLoaderOptions) *SessionLoader {
 	return &SessionLoader{
 		client: client,
 		ec:     ec,
-		sm:     sm,
+		sm:     maybeSm,
 		opts:   opts,
 	}
 }
@@ -87,6 +87,10 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 }
 
 func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.StackParameters, string, error) {
+	if sl.sm == nil {
+		// Without stack manager, we can only load fallback stacks (from options)
+		return sl.loadFallbackStack()
+	}
 	if sl.opts.Stack != "" {
 		return sl.loadSpecifiedStack(ctx, sl.opts.Stack)
 	}
@@ -139,16 +143,15 @@ func (sl *SessionLoader) loadFallbackStack() (*stacks.StackParameters, string, e
 	whence := "--provider flag"
 	_, envSet := os.LookupEnv("DEFANG_PROVIDER")
 	if envSet {
-		whence = "DEFANG_PROVIDER environment variable and previous deployment"
+		whence = "DEFANG_PROVIDER"
 	}
-	if sl.opts.ProviderID == "" {
+	if sl.opts.ProviderID == "" || sl.opts.ProviderID == client.ProviderAuto {
 		return nil, "", errors.New("--provider must be specified if --stack is not specified")
 	}
 	// TODO: list remote stacks, and if there is exactly one with the matched provider, load it
 	return &stacks.StackParameters{
-		Name:      stacks.DefaultBeta,
-		Provider:  sl.opts.ProviderID,
-		Variables: map[string]string{},
+		Name:     stacks.DefaultBeta,
+		Provider: sl.opts.ProviderID,
 	}, whence, nil
 }
 

@@ -22,7 +22,7 @@ type ShowAccountData struct {
 	Name           string                    `json:"name"`
 }
 
-func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Provider, userInfo *auth.UserInfo, tenantSelection types.TenantNameOrID) (ShowAccountData, error) {
+func Whoami(ctx context.Context, fabric client.FabricClient, maybeProvider client.Provider, userInfo *auth.UserInfo, tenantSelection types.TenantNameOrID) (ShowAccountData, error) {
 	resp, err := fabric.WhoAmI(ctx)
 	if err != nil {
 		return ShowAccountData{}, err
@@ -42,9 +42,9 @@ func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Pro
 		Workspace:      ResolveWorkspaceName(userInfo, tenantSelection),
 	}
 
-	if provider != nil {
+	if maybeProvider != nil {
 		// Add provider account information
-		account, err := provider.AccountInfo(ctx)
+		account, err := maybeProvider.AccountInfo(ctx)
 		if err == nil {
 			showData.Provider = account.Provider
 			showData.Region = account.Region
