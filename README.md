@@ -8,6 +8,42 @@
 
 Take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.
 
+### How It Works
+
+```mermaid
+flowchart LR
+    subgraph local["Your Machine or CI/CD"]
+        compose["compose.yaml"]
+        cli["Defang CLI"]
+    end
+
+    subgraph defang["Defang Backend"]
+        fabric["Fabric gRPC API"]
+    end
+
+    subgraph cloud["Your Cloud Account"]
+        cd["Defang CD Task"]
+        subgraph infra["Infrastructure"]
+            containers["Containers"]
+            dns["DNS"]
+            lb["Load Balancer"]
+            secrets["Config & Secrets"]
+        end
+    end
+
+    compose --> cli
+    cli <--> fabric
+    cli --> cd
+    cd --> infra
+```
+
+1. **You write** a standard Docker Compose file
+2. **Defang CLI** validates your config and talks to the Fabric API
+3. **CD runs in your cloud** — a deployment task spins up in your AWS/GCP account
+4. **Infrastructure is created** — containers, DNS, load balancing, and secrets are provisioned
+
+Your code and secrets never leave your cloud account. Defang orchestrates the deployment, but everything runs in your infrastructure.
+
 ## Defang CLI
 
 The Defang Command-Line Interface [(CLI)](https://docs.defang.io/docs/getting-started) is designed for developers who prefer to manage their workflows directly from the terminal. It offers full access to Defang’s capabilities, allowing you to build, test, and deploy applications efficiently to the cloud.
