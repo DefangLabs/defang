@@ -172,17 +172,17 @@ jobs:
         working-directory: src
 
       - name: Add dummy config
-        run: echo blah | go run ./cmd/cli -C testdata/sanity config set -n dummy --debug
+        run: echo blah | go run ./cmd/cli -C testdata/sanity config set --provider=defang -n dummy --debug
         working-directory: src
 
       - name: Run sanity tests UP
         continue-on-error: true # until we have multi-project support in playground
-        run: go run ./cmd/cli -C testdata/sanity compose up --debug
+        run: go run ./cmd/cli -C testdata/sanity compose up --provider=defang --debug
         working-directory: src
 
       - name: Run sanity tests DOWN
         continue-on-error: true # until we have multi-project support in playground
-        run: go run ./cmd/cli -C testdata/sanity compose down --detach --debug
+        run: go run ./cmd/cli -C testdata/sanity compose down --provider=defang --detach --debug
         working-directory: src
 
   build-and-sign:
