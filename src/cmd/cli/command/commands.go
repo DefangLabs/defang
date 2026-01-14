@@ -510,14 +510,16 @@ var whoamiCmd = &cobra.Command{
 	Short:       "Show the current user",
 	Annotations: authNeededAnnotation,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
 		jsonMode, _ := cmd.Flags().GetBool("json")
 
 		global.NonInteractive = true // don't show provider prompt
-		ctx := cmd.Context()
+
 		options := NewSessionLoaderOptionsForCommand(cmd)
 		sm, err := newStackManagerForCommand(cmd)
 		if err != nil {
-			return fmt.Errorf("failed to create stack manager: %w", err)
+			// For WhoAmI it's OK to proceed without a stack manager
+			term.Debugf("failed to create stack manager: %v", err)
 		}
 		sessionLoader := session.NewSessionLoader(global.Client, ec, sm, options)
 		session, err := sessionLoader.LoadSession(ctx)
@@ -527,7 +529,7 @@ var whoamiCmd = &cobra.Command{
 
 		token := client.GetExistingToken(global.Cluster)
 
-		userInfo, err := auth.FetchUserInfo(cmd.Context(), token)
+		userInfo, err := auth.FetchUserInfo(ctx, token)
 		if err != nil {
 			// Either the auth service is down, or we're using a Fabric JWT: skip workspace information
 			if !jsonMode {
@@ -535,7 +537,7 @@ var whoamiCmd = &cobra.Command{
 			}
 		}
 
-		data, err := cli.Whoami(cmd.Context(), global.Client, session.Provider, userInfo, global.Tenant)
+		data, err := cli.Whoami(ctx, global.Client, session.Provider, userInfo, global.Tenant)
 		if err != nil {
 			return err
 		}

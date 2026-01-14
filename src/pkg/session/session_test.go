@@ -362,3 +362,17 @@ func TestLoadSession(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadSession_NoStackManager(t *testing.T) {
+	ctx := t.Context()
+	ec := &mockElicitationsController{isSupported: true}
+
+	options := SessionLoaderOptions{
+		ProviderID: client.ProviderDefang,
+	}
+
+	loader := NewSessionLoader(client.MockFabricClient{}, ec, nil, options)
+	session, err := loader.LoadSession(ctx)
+	require.NoError(t, err)
+	assert.NotNil(t, session)
+}

@@ -578,7 +578,8 @@ func makeComposeConfigCmd() *cobra.Command {
 			options := NewSessionLoaderOptionsForCommand(cmd)
 			sm, err := newStackManagerForCommand(cmd)
 			if err != nil {
-				return fmt.Errorf("failed to create stack manager: %w", err)
+				// For `compose config` it's OK to proceed without a stack manager
+				term.Debugf("failed to create stack manager: %v", err)
 			}
 			sessionLoader := session.NewSessionLoader(global.Client, ec, sm, options)
 			session, err := sessionLoader.LoadSession(ctx)
