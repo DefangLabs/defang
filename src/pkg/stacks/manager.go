@@ -8,8 +8,10 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
@@ -115,7 +117,7 @@ func (sm *manager) ListRemote(ctx context.Context) ([]StackListItem, error) {
 		params.Name = name
 		stackParams = append(stackParams, StackListItem{
 			StackParameters: params,
-			DeployedAt:      stack.GetLastDeployedAt().AsTime(),
+			DeployedAt:      timeutils.AsTime(stack.GetLastDeployedAt(), time.Time{}),
 		})
 	}
 
