@@ -20,6 +20,10 @@ import (
 var (
 	validServiceRegex = regexp.MustCompile(`^[A-Za-z0-9]+([-_][A-Za-z0-9]+)*$`) // alphanumeric+hyphens 1 ≤ len < 64
 	validSecretRegex  = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,63}$`)     // alphanumeric+underscore 1 ≤ len ≤ 64
+
+	// Standard GCP environment variables in order of precedence; https://registry.terraform.io/providers/hashicorp/google/5.10.0/docs/guides/provider_reference#project-1
+	GCPProjectEnvVars = []string{"GCP_PROJECT_ID", "GOOGLE_PROJECT", "GOOGLE_CLOUD_PROJECT", "GCLOUD_PROJECT", "CLOUDSDK_CORE_PROJECT"}
+	GCPRegionEnvVars  = []string{"GCP_LOCATION", "GOOGLE_REGION", "GCLOUD_REGION", "CLOUDSDK_COMPUTE_REGION"}
 )
 
 func GetCurrentUser() string {
@@ -66,10 +70,6 @@ func GetFirstEnv(keys ...string) (string, string) {
 	}
 	return "", ""
 }
-
-// Standard GCP environment variables in order of precedence; https://registry.terraform.io/providers/hashicorp/google/5.10.0/docs/guides/provider_reference#project-1
-var GCPProjectEnvVars = []string{"GCP_PROJECT_ID", "GOOGLE_PROJECT", "GOOGLE_CLOUD_PROJECT", "GCLOUD_PROJECT", "CLOUDSDK_CORE_PROJECT"}
-var GCPRegionEnvVars = []string{"GCP_LOCATION", "GOOGLE_REGION", "GCLOUD_REGION", "CLOUDSDK_COMPUTE_REGION"}
 
 func SplitByComma(s string) []string {
 	if s == "" {
