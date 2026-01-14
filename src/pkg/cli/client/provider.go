@@ -24,6 +24,7 @@ const (
 	CdCommandDestroy CdCommand = "destroy"
 	CdCommandDown    CdCommand = "down"
 	CdCommandList    CdCommand = "list"
+	CdCommandOutputs CdCommand = "outputs"
 	CdCommandRefresh CdCommand = "refresh"
 	CdCommandUp      CdCommand = "up"
 )
