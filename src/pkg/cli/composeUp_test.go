@@ -14,6 +14,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -100,7 +101,10 @@ func TestComposeUp(t *testing.T) {
 
 	mc := client.MockFabricClient{DelegateDomain: "example.com"}
 	mp := &mockDeployProvider{MockProvider: client.MockProvider{UploadUrl: server.URL + "/"}}
-	d, project, err := ComposeUp(t.Context(), mc, mp, ComposeUpParams{
+	stack := &stacks.StackParameters{
+		Provider: client.ProviderDefang,
+	}
+	d, project, err := ComposeUp(t.Context(), mc, mp, stack, ComposeUpParams{
 		Mode:       modes.ModeAffordable,
 		Project:    proj,
 		UploadMode: compose.UploadModeDigest,
@@ -288,7 +292,11 @@ func TestComposeUpStops(t *testing.T) {
 				deploymentStatus: tt.cdStatus,
 			}
 
-			resp, project, err := ComposeUp(ctx, fabric, provider, ComposeUpParams{
+			stack := &stacks.StackParameters{
+				Provider: client.ProviderDefang,
+			}
+
+			resp, project, err := ComposeUp(ctx, fabric, provider, stack, ComposeUpParams{
 				Mode:       modes.ModeUnspecified,
 				Project:    project,
 				UploadMode: compose.UploadModeDigest,
@@ -321,8 +329,9 @@ func TestComposeConfigWithoutLogin(t *testing.T) {
 	provider := &client.PlaygroundProvider{FabricClient: fabric}
 
 	project := &compose.Project{}
+	stack := &stacks.StackParameters{}
 
-	_, _, err := ComposeUp(t.Context(), fabric, provider, ComposeUpParams{
+	_, _, err := ComposeUp(t.Context(), fabric, provider, stack, ComposeUpParams{
 		Mode:       modes.ModeUnspecified,
 		Project:    project,
 		UploadMode: compose.UploadModeIgnore,

@@ -43,7 +43,7 @@ func CdCommand(ctx context.Context, projectName string, provider client.Provider
 	}
 
 	// Update deployment table to mark deployment as destroyed only after successful deletion of the subdomain
-	err = putDeployment(ctx, provider, fabric, putDeploymentParams{
+	err = putDeploymentAndStack(ctx, provider, fabric, nil, putDeploymentParams{
 		Action:      defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN,
 		ETag:        etag,
 		ProjectName: projectName,

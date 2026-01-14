@@ -50,8 +50,8 @@ func (DefaultToolCLI) Connect(ctx context.Context, cluster string) (*client.Grpc
 	return cli.ConnectWithTenant(ctx, cluster, types.TenantUnset)
 }
 
-func (DefaultToolCLI) ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
-	return cli.ComposeUp(ctx, fabric, provider, params)
+func (DefaultToolCLI) ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, stack *stacks.StackParameters, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
+	return cli.ComposeUp(ctx, fabric, provider, stack, params)
 }
 
 func (DefaultToolCLI) Tail(ctx context.Context, provider client.Provider, projectName string, options cli.TailOptions) error {

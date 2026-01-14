@@ -8,6 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -27,7 +28,7 @@ type ComposeUpParams struct {
 }
 
 // ComposeUp validates a compose project and uploads the services using the client
-func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.Provider, params ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
+func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.Provider, stack *stacks.StackParameters, params ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	upload := params.UploadMode
 	project := params.Project
 	mode := params.Mode
@@ -143,7 +144,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		action = defangv1.DeploymentAction_DEPLOYMENT_ACTION_UP
 	}
 
-	err = putDeployment(ctx, provider, fabric, putDeploymentParams{
+	err = putDeploymentAndStack(ctx, provider, fabric, stack, putDeploymentParams{
 		Action:       action,
 		ETag:         resp.Etag,
 		Mode:         mode.Value(),

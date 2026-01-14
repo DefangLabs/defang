@@ -160,7 +160,7 @@ func TestList(t *testing.T) {
 		stack1Path := filepath.Join(Directory, "stack1")
 		stack2Path := filepath.Join(Directory, "stack2")
 		os.WriteFile(stack1Path, []byte("DEFANG_PROVIDER=aws\nAWS_REGION=us-west-2\nDEFANG_MODE=affordable\n"), 0600)
-		os.WriteFile(stack2Path, []byte("DEFANG_PROVIDER=gcp\nGCP_LOCATION=us-central1\nDEFANG_MODE=balanced\n"), 0600)
+		os.WriteFile(stack2Path, []byte("DEFANG_PROVIDER=gcp\nGOOGLE_REGION=us-central1\nDEFANG_MODE=balanced\n"), 0600)
 
 		stacks, err := List()
 		if err != nil {

@@ -179,6 +179,9 @@ func Parse(content string) (map[string]string, error) {
 }
 
 func Marshal(params *StackParameters) (string, error) {
+	if params == nil {
+		return "", nil
+	}
 	return godotenv.Marshal(params.ToMap())
 }
 

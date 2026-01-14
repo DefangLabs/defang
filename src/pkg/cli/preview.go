@@ -9,7 +9,7 @@ import (
 )
 
 func Preview(ctx context.Context, project *compose.Project, fabric client.FabricClient, provider client.Provider, params ComposeUpParams) error {
-	resp, project, err := ComposeUp(ctx, fabric, provider, params)
+	resp, project, err := ComposeUp(ctx, fabric, provider, nil, params)
 	if err != nil {
 		return err
 	}

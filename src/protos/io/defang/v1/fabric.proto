@@ -155,10 +155,23 @@ service FabricController {
   }
 }
 
+enum Provider {
+  PROVIDER_UNSPECIFIED = 0;
+  DEFANG = 1;
+  AWS = 2;
+  DIGITALOCEAN = 3;
+  GCP = 4;
+}
+
 message Stack {
   string name = 1;
   string project = 2;
   bytes stack_file = 3; // Defang stack file
+  Provider provider = 4;
+  google.protobuf.Timestamp last_deployed_at = 5;
+  string provider_account_id = 6;
+  string region = 7;
+  DeploymentMode mode = 8;
 }
 
 message PutStackRequest {
@@ -185,14 +198,6 @@ message ListStacksResponse {
 message DeleteStackRequest {
   string project = 1;
   string stack = 2;
-}
-
-enum Provider {
-  PROVIDER_UNSPECIFIED = 0;
-  DEFANG = 1;
-  AWS = 2;
-  DIGITALOCEAN = 3;
-  GCP = 4;
 }
 
 message GetSelectedProviderRequest {
