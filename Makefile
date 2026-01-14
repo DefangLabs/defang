@@ -25,8 +25,14 @@ pkgs/npm/README.md src/README.md: README.md
 	@awk '/^## Environment Variables/{p=1} (/^## /||/^### /){if(p&&!/^## Environment Variables/){exit}} p' $< >> src/README.md
 	@cp src/README.md pkgs/npm/README.md
 	@git add $@
-	@echo 'README files synced successfully. Please add any changes to your commit.'
-	@false
+	@echo 'README files synced successfully.'
+	@if git diff --cached --quiet; then \
+		echo 'No changes have been staged.'; \
+		true; \
+	else \
+		echo 'The changes have been staged. Add them to a new commit and push again'; \
+		false; \
+	fi
 
 .PHONY: test-nix
 test-nix:
