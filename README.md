@@ -23,17 +23,18 @@ flowchart LR
 
     subgraph cloud["Your Cloud Account"]
         cd["Defang CD Task"]
+        secrets["Config & Secrets"]
         subgraph infra["Infrastructure"]
             containers["Containers"]
             dns["DNS"]
             lb["Load Balancer"]
-            secrets["Config & Secrets"]
         end
     end
 
     compose --> cli
     cli <--> fabric
     cli --> cd
+    cli --> secrets
     cd --> infra
 ```
 
