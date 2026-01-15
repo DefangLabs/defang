@@ -380,7 +380,7 @@ func makeComposeUpCmd() *cobra.Command {
 					tailOptions.LogType = logs.LogTypeBuild
 					tailOptions.Services = unbuiltServices
 				}
-				err := cli.Tail(ctx, provider, project.Name, tailOptions)
+				err := cli.Tail(ctx, session.Provider, project.Name, tailOptions)
 				if err != nil && !errors.Is(err, io.EOF) {
 					term.Warn("Failed to tail logs for deployment error", err)
 					return deploymentErr
@@ -394,8 +394,8 @@ func makeComposeUpCmd() *cobra.Command {
 				handleTailAndMonitorErr(ctx, deploymentErr, debugger, debug.DebugConfig{
 					Deployment: deploy.Etag,
 					Project:    project,
-					ProviderID: &global.Stack.Provider,
-					Stack:      &global.Stack.Name,
+					ProviderID: &session.Stack.Provider,
+					Stack:      &session.Stack.Name,
 					Since:      since,
 					Until:      time.Now(),
 				})
@@ -407,7 +407,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			// Print the current service states of the deployment
-			if err := cli.PrintServices(cmd.Context(), project.Name, provider, false); err != nil {
+			if err := cli.PrintServices(cmd.Context(), project.Name, session.Provider, false); err != nil {
 				term.Warn(err)
 			}
 
