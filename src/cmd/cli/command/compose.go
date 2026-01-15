@@ -394,8 +394,8 @@ func makeComposeUpCmd() *cobra.Command {
 				handleTailAndMonitorErr(ctx, deploymentErr, debugger, debug.DebugConfig{
 					Deployment: deploy.Etag,
 					Project:    project,
-					ProviderID: &global.Stack.Provider,
-					Stack:      &global.Stack.Name,
+					ProviderID: &session.Stack.Provider,
+					Stack:      &session.Stack.Name,
 					Since:      since,
 					Until:      time.Now(),
 				})
