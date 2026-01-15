@@ -47,7 +47,6 @@ func GetServices(ctx context.Context, projectName string, provider client.Provid
 		return nil, ErrNoServices{ProjectName: projectName}
 	}
 
-	term.Debug("Checking service health...")
 	UpdateServiceStates(ctx, servicesResponse.Services)
 
 	return servicesResponse, nil
@@ -63,7 +62,11 @@ func PrintServices(ctx context.Context, projectName string, provider client.Prov
 		return PrintObject("", servicesResponse)
 	}
 
-	return PrintServiceStatesAndEndpoints(servicesResponse.Services)
+	services, showCertGenerateHint, err := GetServiceStatesAndEndpoints(servicesResponse.Services)
+	if err != nil {
+		return err
+	}
+	return PrintServiceStatesAndEndpoints(services, showCertGenerateHint)
 }
 
 func UpdateServiceStates(ctx context.Context, serviceInfos []*defangv1.ServiceInfo) {
@@ -111,8 +114,8 @@ func UpdateServiceStates(ctx context.Context, serviceInfos []*defangv1.ServiceIn
 	wg.Wait()
 }
 
-func GetServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) ([]*Service, bool, error) {
-	var serviceTableItems []*Service
+func GetServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) ([]Service, bool, error) {
+	var serviceTableItems []Service
 
 	// showDomainNameColumn := false
 	showCertGenerateHint := false
@@ -135,7 +138,7 @@ func GetServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) ([]*Serv
 			domainname = serviceInfo.PrivateFqdn
 		}
 
-		ps := &Service{
+		ps := Service{
 			Deployment: serviceInfo.Etag,
 			Service:    serviceInfo.Service.Name,
 			State:      serviceInfo.State,
@@ -149,18 +152,13 @@ func GetServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) ([]*Serv
 	return serviceTableItems, showCertGenerateHint, nil
 }
 
-func PrintServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) error {
-	services, showCertGenerateHint, err := GetServiceStatesAndEndpoints(serviceInfos)
-	if err != nil {
-		return err
-	}
-
+func PrintServiceStatesAndEndpoints(services []Service, showCertGenerateHint bool) error {
 	attrs := []string{"Service", "Deployment", "State", "Fqdn", "Endpoint", "Status"}
 	// if showDomainNameColumn {
 	// 	attrs = append(attrs, "DomainName")
 	// }
 
-	err = term.Table(services, attrs...)
+	err := term.Table(services, attrs...)
 	if err != nil {
 		return err
 	}

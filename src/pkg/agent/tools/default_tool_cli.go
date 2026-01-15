@@ -70,7 +70,7 @@ func (DefaultToolCLI) ConfigDelete(ctx context.Context, projectName string, prov
 	return cli.ConfigDelete(ctx, projectName, provider, name)
 }
 
-func (DefaultToolCLI) GetServices(ctx context.Context, projectName string, provider client.Provider) ([]*cli.Service, error) {
+func (DefaultToolCLI) GetServices(ctx context.Context, projectName string, provider client.Provider) ([]cli.Service, error) {
 	servicesResponse, err := cli.GetServices(ctx, projectName, provider)
 	if err != nil {
 		return nil, err

@@ -16,6 +16,8 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/bufbuild/connect-go"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -88,7 +90,7 @@ func TestPrintServices(t *testing.T) {
 		if err != nil {
 			t.Fatalf("PrintServices error = %v", err)
 		}
-		expectedOutput := "\x1b[95m * Checking service health...\n\x1b[0m\x1b[1m\nSERVICE  DEPLOYMENT  STATE          FQDN                       ENDPOINT                           STATUS\x1b[0m" + `
+		expectedOutput := "\x1b[1m\nSERVICE  DEPLOYMENT  STATE          FQDN                       ENDPOINT                           STATUS\x1b[0m" + `
 foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.prod1.defang.dev  NOT_SPECIFIED
 `
 
@@ -122,7 +124,7 @@ foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.
 		if err != nil {
 			t.Fatalf("PrintServices error = %v", err)
 		}
-		expectedOutput := "\x1b[95m * Checking service health...\n\x1b[0mexpiresAt: \"2021-09-02T12:34:56Z\"\n" +
+		expectedOutput := "expiresAt: \"2021-09-02T12:34:56Z\"\n" +
 			"project: test\n" +
 			"services:\n" +
 			"    - createdAt: \"2021-09-01T12:34:56Z\"\n" +
@@ -144,19 +146,11 @@ foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.
 	})
 }
 
-func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
-	defaultTerm := term.DefaultTerm
-	t.Cleanup(func() {
-		term.DefaultTerm = defaultTerm
-	})
-
-	var stdout, stderr bytes.Buffer
-	term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
-
+func TestGetServiceStatesAndEndpoints(t *testing.T) {
 	tests := []struct {
-		name          string
-		serviceinfos  []*defangv1.ServiceInfo
-		expectedLines []string
+		name             string
+		serviceinfos     []*defangv1.ServiceInfo
+		expectedServices []Service
 	}{
 		{
 			name: "empty endpoint list",
@@ -170,10 +164,12 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 					Endpoints:  []string{},
 				},
 			},
-			expectedLines: []string{
-				"SERVICE   DEPLOYMENT  STATE          FQDN  ENDPOINT             STATUS",
-				"service1              NOT_SPECIFIED        https://example.com  UNKNOWN",
-				"",
+			expectedServices: []Service{
+				{
+					Service:  "service1",
+					Status:   "UNKNOWN",
+					Endpoint: "https://example.com",
+				},
 			},
 		},
 		{
@@ -191,10 +187,12 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 					},
 				},
 			},
-			expectedLines: []string{
-				"SERVICE   DEPLOYMENT  STATE          FQDN  ENDPOINT             STATUS",
-				"service1              NOT_SPECIFIED        https://example.com  UNKNOWN",
-				"",
+			expectedServices: []Service{
+				{
+					Service:  "service1",
+					Status:   "UNKNOWN",
+					Endpoint: "https://example.com",
+				},
 			},
 		},
 		{
@@ -210,9 +208,71 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 					},
 				},
 			},
+			expectedServices: []Service{
+				{
+					Service:  "service1",
+					Status:   "UNKNOWN",
+					Endpoint: "N/A",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			services, _, err := GetServiceStatesAndEndpoints(tt.serviceinfos)
+			require.NoError(t, err)
+
+			assert.Len(t, services, len(tt.expectedServices))
+			for i, svc := range services {
+				assert.Equal(t, tt.expectedServices[i].Service, svc.Service)
+				assert.Equal(t, tt.expectedServices[i].Status, svc.Status)
+				assert.Equal(t, tt.expectedServices[i].Endpoint, svc.Endpoint)
+			}
+		})
+	}
+}
+
+func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
+	defaultTerm := term.DefaultTerm
+	t.Cleanup(func() {
+		term.DefaultTerm = defaultTerm
+	})
+
+	var stdout, stderr bytes.Buffer
+	term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
+
+	tests := []struct {
+		name          string
+		services      []Service
+		expectedLines []string
+	}{
+		{
+			name: "empty endpoint list",
+			services: []Service{
+				{
+					Service:  "service1",
+					Status:   "UNKNOWN",
+					Endpoint: "https://example.com",
+				},
+			},
 			expectedLines: []string{
-				"SERVICE   DEPLOYMENT  STATE          FQDN  ENDPOINT  STATUS",
-				"service1              NOT_SPECIFIED        N/A       UNKNOWN",
+				"SERVICE   DEPLOYMENT  STATE          FQDN  ENDPOINT             STATUS",
+				"service1              NOT_SPECIFIED        https://example.com  UNKNOWN",
+				"",
+			},
+		},
+		{
+			name: "Service with Domainname",
+			services: []Service{
+				{
+					Service:  "service1",
+					Status:   "UNKNOWN",
+					Endpoint: "https://example.com",
+				},
+			},
+			expectedLines: []string{
+				"SERVICE   DEPLOYMENT  STATE          FQDN  ENDPOINT             STATUS",
+				"service1              NOT_SPECIFIED        https://example.com  UNKNOWN",
 				"",
 			},
 		},
@@ -222,7 +282,7 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 			// Reset stdout before each test
 			stdout.Reset()
 
-			_ = PrintServiceStatesAndEndpoints(tt.serviceinfos)
+			_ = PrintServiceStatesAndEndpoints(tt.services, false)
 			receivedLines := strings.Split(stdout.String(), "\n")
 
 			if len(receivedLines) != len(tt.expectedLines) {

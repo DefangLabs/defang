@@ -209,8 +209,13 @@ func makeComposeUpCmd() *cobra.Command {
 				service.State = serviceStates[service.Service.Name]
 			}
 
+			services, showCertGenerateHint, err := cli.GetServiceStatesAndEndpoints(deploy.Services)
+			if err != nil {
+				return err
+			}
+
 			// Print the current service states of the deployment
-			err = cli.PrintServiceStatesAndEndpoints(deploy.Services)
+			err = cli.PrintServiceStatesAndEndpoints(services, showCertGenerateHint)
 			if err != nil {
 				return err
 			}
