@@ -843,9 +843,9 @@ func (e briefGcpError) Error() string {
 	if e.err.Message != "" {
 		if e.err.Code == http.StatusForbidden {
 			if strings.Contains(e.err.Message, "not found or permission denied") {
-				projectname := extractProjectName(e.err.Message)
-				if projectname != "" {
-					return fmt.Sprintf("GCP project %q not found or permission denied, please ensure the project exists and your ADC credentials have access to it", projectname)
+				projectName := extractProjectName(e.err.Message)
+				if projectName != "" {
+					return fmt.Sprintf("GCP project %q not found or access denied. Verify that the project ID: %q is correct and that your Application Default Credentials have permission to access it.", projectName, projectName)
 				}
 			}
 		}
