@@ -61,10 +61,19 @@ func PrintServices(ctx context.Context, projectName string, provider client.Prov
 		return PrintObject("", servicesResponse)
 	}
 
-	results := GetHealthcheckResults(ctx, servicesResponse.Services)
-	services, err := NewServiceFromServiceInfo(servicesResponse.Services)
+	services, err := CollectServiceStatuses(ctx, servicesResponse.Services)
 	if err != nil {
 		return err
+	}
+
+	return PrintServiceStatesAndEndpoints(services)
+}
+
+func CollectServiceStatuses(ctx context.Context, serviceInfos []*defangv1.ServiceInfo) ([]Service, error) {
+	results := GetHealthcheckResults(ctx, serviceInfos)
+	services, err := NewServiceFromServiceInfo(serviceInfos)
+	if err != nil {
+		return nil, err
 	}
 	for i, svc := range services {
 		if status, ok := results[svc.Service]; ok {
@@ -73,8 +82,7 @@ func PrintServices(ctx context.Context, projectName string, provider client.Prov
 			services[i].HealthcheckStatus = "unknown"
 		}
 	}
-
-	return PrintServiceStatesAndEndpoints(services)
+	return services, nil
 }
 
 type HealthCheckResults map[string]string

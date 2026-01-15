@@ -76,14 +76,9 @@ func (DefaultToolCLI) GetServices(ctx context.Context, projectName string, provi
 		return nil, err
 	}
 
-	services, err := cli.NewServiceFromServiceInfo(servicesResponse.Services)
-	results := cli.GetHealthcheckResults(ctx, servicesResponse.Services)
-	for i, svc := range services {
-		if status, ok := results[svc.Service]; ok {
-			services[i].HealthcheckStatus = status
-		} else {
-			services[i].HealthcheckStatus = "unknown"
-		}
+	services, err := cli.CollectServiceStatuses(ctx, servicesResponse.Services)
+	if err != nil {
+		return nil, err
 	}
 
 	return services, err
