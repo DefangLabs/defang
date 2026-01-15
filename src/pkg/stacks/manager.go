@@ -15,17 +15,17 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-type StackLister interface {
+type Lister interface {
 	ListStacks(ctx context.Context, req *defangv1.ListStacksRequest) (*defangv1.ListStacksResponse, error)
 }
 
 type manager struct {
-	fabric          StackLister
+	fabric          Lister
 	targetDirectory string
 	projectName     string
 }
 
-func NewManager(fabric StackLister, targetDirectory string, projectName string) (*manager, error) {
+func NewManager(fabric Lister, targetDirectory string, projectName string) (*manager, error) {
 	absTargetDirectory := ""
 	if targetDirectory != "" {
 		// abs path for targetDirectory
@@ -46,7 +46,7 @@ func (sm *manager) TargetDirectory() string {
 	return sm.targetDirectory
 }
 
-func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
+func (sm *manager) List(ctx context.Context) ([]ListItem, error) {
 	remoteStacks, err := sm.ListRemote(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list remote stacks: %w", err)
@@ -57,7 +57,7 @@ func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
 	}
 	// Merge remote and local stacks into a single list of type StackOption,
 	// prefer local if both exist, but keep remote deployed time if available
-	stackMap := make(map[string]StackListItem)
+	stackMap := make(map[string]ListItem)
 	for _, remote := range remoteStacks {
 		stackMap[remote.Name] = remote
 	}
@@ -67,30 +67,30 @@ func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
 			local.DeployedAt = remote.DeployedAt
 			stackMap[local.Parameters.Name] = local
 		} else {
-			stackMap[local.Parameters.Name] = StackListItem{
+			stackMap[local.Parameters.Name] = ListItem{
 				Parameters: local.Parameters,
 			}
 		}
 	}
 
-	stackList := make([]StackListItem, 0, len(stackMap))
+	stackList := make([]ListItem, 0, len(stackMap))
 	for _, stack := range stackMap {
 		stackList = append(stackList, stack)
 	}
 
 	// sort stacks by name asc
-	slices.SortFunc(stackList, func(a, b StackListItem) int {
+	slices.SortFunc(stackList, func(a, b ListItem) int {
 		return strings.Compare(a.Name, b.Name)
 	})
 
 	return stackList, nil
 }
 
-func (sm *manager) ListLocal() ([]StackListItem, error) {
+func (sm *manager) ListLocal() ([]ListItem, error) {
 	return ListInDirectory(sm.targetDirectory)
 }
 
-func (sm *manager) ListRemote(ctx context.Context) ([]StackListItem, error) {
+func (sm *manager) ListRemote(ctx context.Context) ([]ListItem, error) {
 	if sm.projectName == "" {
 		return nil, errors.New("project name is required to list remote stacks")
 	}
@@ -100,7 +100,7 @@ func (sm *manager) ListRemote(ctx context.Context) ([]StackListItem, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to list stacks: %w", err)
 	}
-	stackParams := make([]StackListItem, 0, len(resp.GetStacks()))
+	stackParams := make([]ListItem, 0, len(resp.GetStacks()))
 	for _, stack := range resp.GetStacks() {
 		name := stack.GetName()
 		if name == "" {
@@ -112,14 +112,14 @@ func (sm *manager) ListRemote(ctx context.Context) ([]StackListItem, error) {
 			term.Warnf("Skipping invalid remote stack %s: %v\n", name, err)
 			continue
 		}
-		stackParams = append(stackParams, StackListItem{
+		stackParams = append(stackParams, ListItem{
 			Parameters: *params,
 			DeployedAt: timeutils.AsTime(stack.GetLastDeployedAt(), time.Time{}),
 		})
 	}
 
 	// sort by deployed at desc
-	slices.SortFunc(stackParams, func(a, b StackListItem) int {
+	slices.SortFunc(stackParams, func(a, b ListItem) int {
 		return b.DeployedAt.Compare(a.DeployedAt)
 	})
 	return stackParams, nil
@@ -164,7 +164,7 @@ func (sm *manager) LoadRemote(ctx context.Context, name string) (*Parameters, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to list remote stacks: %w", err)
 	}
-	var remoteStack *StackListItem
+	var remoteStack *ListItem
 	for i := range remoteStacks {
 		if remoteStacks[i].Name == name {
 			remoteStack = &remoteStacks[i]

@@ -141,16 +141,16 @@ func CreateInDirectory(workingDirectory string, params Parameters) (string, erro
 }
 
 // for shell printing for converting to string format of StackParameters
-type StackListItem struct {
+type ListItem struct {
 	Parameters
 	DeployedAt time.Time
 }
 
-func List() ([]StackListItem, error) {
+func List() ([]ListItem, error) {
 	return ListInDirectory(".")
 }
 
-func ListInDirectory(workingDirectory string) ([]StackListItem, error) {
+func ListInDirectory(workingDirectory string) ([]ListItem, error) {
 	defangDir := filepath.Join(workingDirectory, Directory)
 	files, err := os.ReadDir(defangDir)
 	if err != nil {
@@ -160,7 +160,7 @@ func ListInDirectory(workingDirectory string) ([]StackListItem, error) {
 		return nil, err
 	}
 
-	var stacks []StackListItem
+	var stacks []ListItem
 	for _, file := range files {
 		filename := filename(workingDirectory, file.Name())
 		content, err := os.ReadFile(filename)
@@ -174,7 +174,7 @@ func ListInDirectory(workingDirectory string) ([]StackListItem, error) {
 			term.Warnf("Skipping invalid stack file %s: %v\n", filename, err)
 			continue
 		}
-		stacks = append(stacks, StackListItem{
+		stacks = append(stacks, ListItem{
 			Parameters: *params,
 		})
 	}

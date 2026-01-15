@@ -18,7 +18,7 @@ import (
 )
 
 type StacksManager interface {
-	List(ctx context.Context) ([]stacks.StackListItem, error)
+	List(ctx context.Context) ([]stacks.ListItem, error)
 	LoadLocal(name string) (*stacks.Parameters, error)
 	LoadRemote(ctx context.Context, name string) (*stacks.Parameters, error)
 	Create(params stacks.Parameters) (string, error)

@@ -384,7 +384,7 @@ GOOGLE_REGION=us-central1
 
 	assert.Len(t, stacks, 3, "Expected 3 merged stacks")
 
-	stackMap := make(map[string]StackListItem)
+	stackMap := make(map[string]ListItem)
 	for _, stack := range stacks {
 		stackMap[stack.Name] = stack
 	}

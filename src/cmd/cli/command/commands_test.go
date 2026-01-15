@@ -272,7 +272,7 @@ type mockStackManager struct {
 	t                *testing.T
 	expectedProvider client.ProviderID
 	expectedRegion   string
-	listResult       []stacks.StackListItem
+	listResult       []stacks.ListItem
 	listError        error
 	loadResults      map[string]*stacks.Parameters
 	loadError        error
@@ -285,11 +285,11 @@ func NewMockStackManager(t *testing.T, expectedProvider client.ProviderID, expec
 		t:                t,
 		expectedProvider: expectedProvider,
 		expectedRegion:   expectedRegion,
-		listResult:       []stacks.StackListItem{},
+		listResult:       []stacks.ListItem{},
 	}
 }
 
-func (m *mockStackManager) List(ctx context.Context) ([]stacks.StackListItem, error) {
+func (m *mockStackManager) List(ctx context.Context) ([]stacks.ListItem, error) {
 	if m.listError != nil {
 		return nil, m.listError
 	}

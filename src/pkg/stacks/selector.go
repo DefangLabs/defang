@@ -12,18 +12,18 @@ import (
 
 const CreateNewStack = "Create new stack"
 
-type StacksManager interface {
-	List(ctx context.Context) ([]StackListItem, error)
+type Manager interface {
+	List(ctx context.Context) ([]ListItem, error)
 	Create(params Parameters) (string, error)
 }
 
 type stackSelector struct {
 	ec     elicitations.Controller
-	sm     StacksManager
+	sm     Manager
 	wizard *Wizard
 }
 
-func NewSelector(ec elicitations.Controller, sm StacksManager) *stackSelector {
+func NewSelector(ec elicitations.Controller, sm Manager) *stackSelector {
 	return &stackSelector{
 		ec:     ec,
 		sm:     sm,

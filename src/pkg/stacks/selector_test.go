@@ -45,12 +45,12 @@ type MockStacksManager struct {
 	mock.Mock
 }
 
-func (m *MockStacksManager) List(ctx context.Context) ([]StackListItem, error) {
+func (m *MockStacksManager) List(ctx context.Context) ([]ListItem, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	result, ok := args.Get(0).([]StackListItem)
+	result, ok := args.Get(0).([]ListItem)
 	if !ok {
 		return nil, args.Error(1)
 	}
@@ -85,7 +85,7 @@ func TestStackSelector_SelectStack_ExistingStack(t *testing.T) {
 	mockEC.On("IsSupported").Return(true)
 
 	// Mock existing stacks list
-	existingStacks := []StackListItem{
+	existingStacks := []ListItem{
 		{
 			Parameters: Parameters{
 				Name:     "production",
@@ -136,7 +136,7 @@ func TestStackSelector_SelectOrCreateStack_ExistingStack(t *testing.T) {
 	mockEC.On("IsSupported").Return(true)
 
 	// Mock existing stacks list
-	existingStacks := []StackListItem{
+	existingStacks := []ListItem{
 		{Parameters: Parameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
 		{Parameters: Parameters{Name: "development", Provider: "aws", Region: "us-east-1"}},
 	}
@@ -177,7 +177,7 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 	mockEC.On("IsSupported").Return(true)
 
 	// Mock existing stacks list
-	existingStacks := []StackListItem{
+	existingStacks := []ListItem{
 		{Parameters: Parameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
 	}
 	mockSM.On("List", ctx).Return(existingStacks, nil)
@@ -242,7 +242,7 @@ func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
 	mockEC.On("IsSupported").Return(true)
 
 	// Mock empty stacks list - when no stacks exist, it should automatically proceed to create new
-	mockSM.On("List", ctx).Return([]StackListItem{}, nil)
+	mockSM.On("List", ctx).Return([]ListItem{}, nil)
 
 	// Mock wizard parameter collection - provider selection
 	providerOptions := []string{"Defang Playground", "AWS", "DigitalOcean", "Google Cloud Platform"}
@@ -321,7 +321,7 @@ func TestStackSelector_SelectStack_ListStacksError(t *testing.T) {
 	mockEC.On("IsSupported").Return(true)
 
 	// Mock error when listing stacks
-	mockSM.On("List", ctx).Return([]StackListItem{}, errors.New("failed to access stack storage"))
+	mockSM.On("List", ctx).Return([]ListItem{}, errors.New("failed to access stack storage"))
 
 	selector := NewSelector(mockEC, mockSM)
 
@@ -345,7 +345,7 @@ func TestStackSelector_SelectStack_ElicitationError(t *testing.T) {
 	mockEC.On("IsSupported").Return(true)
 
 	// Mock existing stacks list
-	existingStacks := []StackListItem{
+	existingStacks := []ListItem{
 		{Parameters: Parameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
 	}
 	mockSM.On("List", ctx).Return(existingStacks, nil)
@@ -376,7 +376,7 @@ func TestStackSelector_SelectStack_WizardError(t *testing.T) {
 	mockEC.On("IsSupported").Return(true)
 
 	// Mock existing stacks list
-	existingStacks := []StackListItem{
+	existingStacks := []ListItem{
 		{Parameters: Parameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
 	}
 	mockSM.On("List", ctx).Return(existingStacks, nil)
@@ -413,7 +413,7 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 	mockEC.On("IsSupported").Return(true)
 
 	// Mock existing stacks list
-	existingStacks := []StackListItem{
+	existingStacks := []ListItem{
 		{Parameters: Parameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
 	}
 	mockSM.On("List", ctx).Return(existingStacks, nil)

@@ -51,12 +51,12 @@ type mockStacksManager struct {
 	mock.Mock
 }
 
-func (m *mockStacksManager) List(ctx context.Context) ([]stacks.StackListItem, error) {
+func (m *mockStacksManager) List(ctx context.Context) ([]stacks.ListItem, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	result, ok := args.Get(0).([]stacks.StackListItem)
+	result, ok := args.Get(0).([]stacks.ListItem)
 	if !ok {
 		return nil, args.Error(1)
 	}
@@ -103,7 +103,7 @@ func TestLoadSession(t *testing.T) {
 		options       SessionLoaderOptions
 		localStack    *stacks.Parameters
 		remoteStack   *stacks.Parameters
-		stacksList    []stacks.StackListItem
+		stacksList    []stacks.ListItem
 		expectedError string
 		expectedStack *stacks.Parameters
 		expectedEnv   map[string]string
@@ -238,7 +238,7 @@ func TestLoadSession(t *testing.T) {
 				AllowStackCreation: true,
 				ProviderID:         client.ProviderGCP,
 			},
-			stacksList: []stacks.StackListItem{
+			stacksList: []stacks.ListItem{
 				{
 					Parameters: stacks.Parameters{
 						Name:     "existing-stack",
