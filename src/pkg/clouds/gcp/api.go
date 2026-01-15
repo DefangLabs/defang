@@ -25,7 +25,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 			ServiceIds: apis,
 		}
 
-		operation, err := service.Services.BatchEnable(projectName, req).Do()
+		operation, err := service.Services.BatchEnable(projectName, req).Context(ctx).Do()
 		if err != nil {
 			if i < 2 {
 				term.Debugf("Failed to enable services, will retry in 5s: %v\n", err)
@@ -37,7 +37,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 
 		opService := serviceusage.NewOperationsService(service)
 		for {
-			op, err := opService.Get(operation.Name).Do()
+			op, err := opService.Get(operation.Name).Context(ctx).Do()
 			if err != nil {
 				term.Warnf("Failed to get operation status: %v\n", err)
 			} else if op.Done { // Check if the operation is done

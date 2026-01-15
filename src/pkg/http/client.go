@@ -12,7 +12,7 @@ var DefaultClient = newClient().StandardClient()
 
 type Header = http.Header
 
-// Not planning on repeating all http package constants here, but StatusOK is useful.
+// Not planning on repeating all http package constants here, but StatusOK and StatusForbidden are useful.
 const (
 	StatusOK        = http.StatusOK
 	StatusForbidden = http.StatusForbidden
