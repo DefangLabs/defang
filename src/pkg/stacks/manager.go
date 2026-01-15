@@ -107,19 +107,13 @@ func (sm *manager) ListRemote(ctx context.Context) ([]StackListItem, error) {
 			name = DefaultBeta
 		}
 		bytes := stack.GetStackFile()
-		variables, err := Parse(string(bytes))
+		params, err := NewParametersFromContent(name, bytes)
 		if err != nil {
 			term.Warnf("Skipping invalid remote stack %s: %v\n", name, err)
 			continue
 		}
-		params, err := ParamsFromMap(variables)
-		if err != nil {
-			term.Warnf("Skipping invalid remote stack %s: %v\n", name, err)
-			continue
-		}
-		params.Name = name
 		stackParams = append(stackParams, StackListItem{
-			Parameters: params,
+			Parameters: *params,
 			DeployedAt: timeutils.AsTime(stack.GetLastDeployedAt(), time.Time{}),
 		})
 	}

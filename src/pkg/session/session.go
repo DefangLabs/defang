@@ -14,6 +14,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 type StacksManager interface {
@@ -87,7 +88,7 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, string, error) {
 	if sl.sm == nil {
 		// Without stack manager, we can only load fallback stacks (from options)
-		return sl.loadFallbackStack()
+		return sl.loadFallbackStack(ctx)
 	}
 	if sl.opts.Stack != "" {
 		return sl.loadSpecifiedStack(ctx, sl.opts.Stack)
@@ -104,7 +105,7 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, str
 		return stack, "interactive selection", nil
 	}
 
-	return sl.loadFallbackStack()
+	return sl.loadFallbackStack(ctx)
 }
 
 func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, name string) (*stacks.Parameters, string, error) {
@@ -137,17 +138,25 @@ func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, name string) (*
 	return stack, whence + " and previous deployment", nil
 }
 
-func (sl *SessionLoader) loadFallbackStack() (*stacks.Parameters, string, error) {
-	whence := "--provider flag"
-	_, envSet := os.LookupEnv("DEFANG_PROVIDER")
-	if envSet {
-		whence = "DEFANG_PROVIDER"
+func (sl *SessionLoader) loadFallbackStack(ctx context.Context) (*stacks.Parameters, string, error) {
+	// Check Fabric for default stack (set by Portal or CLI)
+	res, err := sl.client.GetDefaultStack(ctx, &defangv1.GetDefaultStackRequest{
+		Project: sl.opts.ProjectName,
+	})
+	if err != nil {
+		term.Debugf("Could not get default stack from server: %v", err)
+		whence := "--provider flag"
+		_, envSet := os.LookupEnv("DEFANG_PROVIDER")
+		if envSet {
+			whence = "DEFANG_PROVIDER"
+		}
+		return &stacks.Parameters{
+			Name:     stacks.DefaultBeta,
+			Provider: sl.opts.ProviderID,
+		}, whence, nil
 	}
-	// TODO: list remote stacks, and if there is exactly one with the matched provider, load it
-	return &stacks.Parameters{
-		Name:     stacks.DefaultBeta,
-		Provider: sl.opts.ProviderID,
-	}, whence, nil
+	params, err := stacks.NewParametersFromContent(res.Stack.Name, res.Stack.StackFile)
+	return params, "default stack", err
 }
 
 func (sl *SessionLoader) newLoader() client.Loader {
