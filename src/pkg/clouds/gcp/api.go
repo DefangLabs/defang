@@ -43,7 +43,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 			} else if op.Done { // Check if the operation is done
 				if op.Error != nil {
 					if i < 2 {
-						term.Infof("Failed to enable services operation, will retry in 5s: %v\n", op.Error)
+						term.Debugf("Failed to enable services operation, will retry in 5s: %v\n", op.Error)
 						pkg.SleepWithContext(ctx, 5*time.Second)
 						break
 					}
