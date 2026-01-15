@@ -15,12 +15,13 @@ import (
 )
 
 type Service struct {
-	Deployment string
-	Endpoint   string
-	Service    string
-	State      defangv1.ServiceState
-	Status     string
-	Fqdn       string
+	Deployment   string
+	Endpoint     string
+	Service      string
+	State        defangv1.ServiceState
+	Status       string
+	Fqdn         string
+	AcmeCertUsed bool
 }
 
 type ErrNoServices struct {
@@ -57,16 +58,16 @@ func PrintServices(ctx context.Context, projectName string, provider client.Prov
 	if err != nil {
 		return err
 	}
-
 	if long {
 		return PrintObject("", servicesResponse)
 	}
 
-	services, showCertGenerateHint, err := GetServiceStatesAndEndpoints(servicesResponse.Services)
+	services, err := GetServiceStatesAndEndpoints(servicesResponse.Services)
 	if err != nil {
 		return err
 	}
-	return PrintServiceStatesAndEndpoints(services, showCertGenerateHint)
+
+	return PrintServiceStatesAndEndpoints(services)
 }
 
 func UpdateServiceStates(ctx context.Context, serviceInfos []*defangv1.ServiceInfo) {
@@ -114,11 +115,10 @@ func UpdateServiceStates(ctx context.Context, serviceInfos []*defangv1.ServiceIn
 	wg.Wait()
 }
 
-func GetServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) ([]Service, bool, error) {
+func GetServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) ([]Service, error) {
 	var serviceTableItems []Service
 
 	// showDomainNameColumn := false
-	showCertGenerateHint := false
 
 	for _, serviceInfo := range serviceInfos {
 		fqdn := serviceInfo.PublicFqdn
@@ -129,9 +129,6 @@ func GetServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) ([]Servi
 		if serviceInfo.Domainname != "" {
 			// showDomainNameColumn = true
 			domainname = "https://" + serviceInfo.Domainname
-			if serviceInfo.UseAcmeCert {
-				showCertGenerateHint = true
-			}
 		} else if serviceInfo.PublicFqdn != "" {
 			domainname = "https://" + serviceInfo.PublicFqdn
 		} else if serviceInfo.PrivateFqdn != "" {
@@ -139,20 +136,29 @@ func GetServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) ([]Servi
 		}
 
 		ps := Service{
-			Deployment: serviceInfo.Etag,
-			Service:    serviceInfo.Service.Name,
-			State:      serviceInfo.State,
-			Status:     serviceInfo.Status,
-			Endpoint:   domainname,
-			Fqdn:       fqdn,
+			Deployment:   serviceInfo.Etag,
+			Service:      serviceInfo.Service.Name,
+			State:        serviceInfo.State,
+			Status:       serviceInfo.Status,
+			Endpoint:     domainname,
+			Fqdn:         fqdn,
+			AcmeCertUsed: serviceInfo.UseAcmeCert,
 		}
 		serviceTableItems = append(serviceTableItems, ps)
 	}
 
-	return serviceTableItems, showCertGenerateHint, nil
+	return serviceTableItems, nil
 }
 
-func PrintServiceStatesAndEndpoints(services []Service, showCertGenerateHint bool) error {
+func PrintServiceStatesAndEndpoints(services []Service) error {
+	showCertGenerateHint := false
+	for _, svc := range services {
+		if svc.AcmeCertUsed {
+			showCertGenerateHint = true
+			break
+		}
+	}
+
 	attrs := []string{"Service", "Deployment", "State", "Fqdn", "Endpoint", "Status"}
 	// if showDomainNameColumn {
 	// 	attrs = append(attrs, "DomainName")

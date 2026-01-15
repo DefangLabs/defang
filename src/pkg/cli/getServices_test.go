@@ -216,10 +216,33 @@ func TestGetServiceStatesAndEndpoints(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "with acme cert",
+			serviceinfos: []*defangv1.ServiceInfo{
+				{
+					Service: &defangv1.Service{
+						Name: "service1",
+					},
+					Status:      "UNKNOWN",
+					UseAcmeCert: true,
+					Endpoints: []string{
+						"service1",
+					},
+				},
+			},
+			expectedServices: []Service{
+				{
+					Service:      "service1",
+					Status:       "UNKNOWN",
+					Endpoint:     "N/A",
+					AcmeCertUsed: true,
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			services, _, err := GetServiceStatesAndEndpoints(tt.serviceinfos)
+			services, err := GetServiceStatesAndEndpoints(tt.serviceinfos)
 			require.NoError(t, err)
 
 			assert.Len(t, services, len(tt.expectedServices))
@@ -227,6 +250,7 @@ func TestGetServiceStatesAndEndpoints(t *testing.T) {
 				assert.Equal(t, tt.expectedServices[i].Service, svc.Service)
 				assert.Equal(t, tt.expectedServices[i].Status, svc.Status)
 				assert.Equal(t, tt.expectedServices[i].Endpoint, svc.Endpoint)
+				assert.Equal(t, tt.expectedServices[i].AcmeCertUsed, svc.AcmeCertUsed)
 			}
 		})
 	}
@@ -276,13 +300,30 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 				"",
 			},
 		},
+		{
+			name: "with acme cert",
+			services: []Service{
+				{
+					Service:      "service1",
+					Status:       "UNKNOWN",
+					Endpoint:     "N/A",
+					AcmeCertUsed: true,
+				},
+			},
+			expectedLines: []string{
+				"SERVICE   DEPLOYMENT  STATE          FQDN  ENDPOINT  STATUS",
+				"service1              NOT_SPECIFIED        N/A       UNKNOWN",
+				" * Run `defang cert generate` to get a TLS certificate for your service(s)",
+				"",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Reset stdout before each test
 			stdout.Reset()
 
-			_ = PrintServiceStatesAndEndpoints(tt.services, false)
+			_ = PrintServiceStatesAndEndpoints(tt.services)
 			receivedLines := strings.Split(stdout.String(), "\n")
 
 			if len(receivedLines) != len(tt.expectedLines) {
