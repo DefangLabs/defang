@@ -61,7 +61,7 @@ func (ss *stackSelector) SelectStack(ctx context.Context, opts SelectStackOption
 		if s.DeployedAt.IsZero() {
 			label = s.Name
 		} else {
-			label = fmt.Sprintf("%s (deployed %s)", s.Name, s.DeployedAt.Format("Jan 2"))
+			label = fmt.Sprintf("%s (deployed %s)", s.Name, s.DeployedAt.Format("Jan 2 2006"))
 		}
 		stackLabels = append(stackLabels, label)
 		stackNames = append(stackNames, s.Name)
