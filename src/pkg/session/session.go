@@ -64,6 +64,10 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = stacks.LoadStackEnv(*stack, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load stack env: %w", err)
+	}
 	loader, err := sl.newLoader(stack)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create loader for stack %q: %w", stack.Name, err)
@@ -99,10 +103,10 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.StackParameters
 		stack, err := stackSelector.SelectStack(ctx, stacks.SelectStackOptions{
 			AllowCreate: sl.opts.AllowStackCreation,
 		})
-
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to select stack: %w", err)
 		}
+
 		return stack, "interactive selection", nil
 	}
 

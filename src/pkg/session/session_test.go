@@ -355,6 +355,7 @@ func TestLoadSession(t *testing.T) {
 				actualValue, exists := session.Stack.Variables[key]
 				assert.True(t, exists, "expected env var %s to be set", key)
 				assert.Equal(t, expectedValue, actualValue, "env var %s has unexpected value", key)
+				assert.Equal(t, expectedValue, os.Getenv(key))
 			}
 
 			// Verify all mock expectations were met
