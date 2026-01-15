@@ -847,7 +847,6 @@ func (e briefGcpError) Error() string {
 				if projectname != "" {
 					return fmt.Sprintf("GCP project %q not found or permission denied, please ensure the project exists and your ADC credentials have access to it", projectname)
 				}
-				return "GCP project not found or permission denied, please ensure the project exists and your ADC credentials have access to it"
 			}
 		}
 		return e.err.Message
