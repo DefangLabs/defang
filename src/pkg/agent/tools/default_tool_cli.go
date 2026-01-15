@@ -76,7 +76,7 @@ func (DefaultToolCLI) GetServices(ctx context.Context, projectName string, provi
 		return nil, err
 	}
 
-	si, err := cli.GetServiceStatesAndEndpoints(servicesResponse.Services)
+	si, err := cli.NewServiceFromServiceInfo(servicesResponse.Services)
 	return si, err
 }
 

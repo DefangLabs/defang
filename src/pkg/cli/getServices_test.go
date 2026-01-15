@@ -242,7 +242,7 @@ func TestGetServiceStatesAndEndpoints(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			services, err := GetServiceStatesAndEndpoints(tt.serviceinfos)
+			services, err := NewServiceFromServiceInfo(tt.serviceinfos)
 			require.NoError(t, err)
 
 			assert.Len(t, services, len(tt.expectedServices))

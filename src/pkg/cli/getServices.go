@@ -62,7 +62,7 @@ func PrintServices(ctx context.Context, projectName string, provider client.Prov
 		return PrintObject("", servicesResponse)
 	}
 
-	services, err := GetServiceStatesAndEndpoints(servicesResponse.Services)
+	services, err := NewServiceFromServiceInfo(servicesResponse.Services)
 	if err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func UpdateServiceStates(ctx context.Context, serviceInfos []*defangv1.ServiceIn
 	wg.Wait()
 }
 
-func GetServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) ([]Service, error) {
+func NewServiceFromServiceInfo(serviceInfos []*defangv1.ServiceInfo) ([]Service, error) {
 	var serviceTableItems []Service
 
 	// showDomainNameColumn := false
