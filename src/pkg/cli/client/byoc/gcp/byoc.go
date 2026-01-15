@@ -10,7 +10,6 @@ import (
 	"iter"
 	"os"
 	"path"
-	"regexp"
 	"strings"
 	"time"
 
@@ -820,63 +819,6 @@ func (b *ByocGcp) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest)
 func (b *ByocGcp) TearDownCD(ctx context.Context) error {
 	// FIXME: implement
 	return client.ErrNotImplemented("GCP TearDown")
-}
-
-// Utility functions
-
-// The default googleapi.Error is too verbose, only display the message if it exists
-type briefGcpError struct {
-	err *googleapi.Error
-}
-
-var projectNameRe = regexp.MustCompile(`Project '([^']+)'`)
-
-func extractProjectName(errMsg string) string {
-	matches := projectNameRe.FindStringSubmatch(errMsg)
-	if len(matches) >= 2 {
-		return matches[1]
-	}
-	return ""
-}
-
-func (e briefGcpError) Error() string {
-	if e.err.Message != "" {
-		if e.err.Code == http.StatusForbidden {
-			if strings.Contains(e.err.Message, "not found or permission denied") {
-				projectName := extractProjectName(e.err.Message)
-				if projectName != "" {
-					return fmt.Sprintf("GCP project %q not found or access denied. Verify that the project ID: %q is correct and that your Application Default Credentials have permission to access it.", projectName, projectName)
-				}
-			}
-		}
-		return e.err.Message
-	}
-	return e.err.Error()
-}
-
-func annotateGcpError(err error) error {
-	gerr := new(googleapi.Error)
-	if errors.As(err, &gerr) {
-		return briefGcpError{err: gerr}
-	}
-	return err
-}
-
-// Used to get nested values from the detail of a googleapi.Error
-func GetGoogleAPIErrorDetail(detail any, path string) string {
-	if path == "" {
-		value, ok := detail.(string)
-		if ok {
-			return value
-		}
-		return ""
-	}
-	dm, ok := detail.(map[string]any)
-	if !ok {
-		return ""
-	}
-	key, rest, _ := strings.Cut(path, ".")
-	return GetGoogleAPIErrorDetail(dm[key], rest)
 }
 
 func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
