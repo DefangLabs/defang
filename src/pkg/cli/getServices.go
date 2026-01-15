@@ -47,6 +47,9 @@ func GetServices(ctx context.Context, projectName string, provider client.Provid
 		return nil, ErrNoServices{ProjectName: projectName}
 	}
 
+	term.Debug("Checking service health...")
+	UpdateServiceStates(ctx, servicesResponse.Services)
+
 	return servicesResponse, nil
 }
 
@@ -55,9 +58,6 @@ func PrintServices(ctx context.Context, projectName string, provider client.Prov
 	if err != nil {
 		return err
 	}
-
-	term.Info("Checking service health...")
-	UpdateServiceStates(ctx, servicesResponse.Services)
 
 	if long {
 		return PrintObject("", servicesResponse)

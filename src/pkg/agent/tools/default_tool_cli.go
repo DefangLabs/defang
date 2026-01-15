@@ -76,9 +76,6 @@ func (DefaultToolCLI) GetServices(ctx context.Context, projectName string, provi
 		return nil, err
 	}
 
-	term.Debug("Checking service health...")
-	cli.UpdateServiceStates(ctx, servicesResponse.Services)
-
 	si, _, err := cli.GetServiceStatesAndEndpoints(servicesResponse.Services)
 	return si, err
 }
