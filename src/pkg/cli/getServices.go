@@ -15,13 +15,14 @@ import (
 )
 
 type Service struct {
-	Deployment   string
-	Endpoint     string
-	Service      string
-	State        defangv1.ServiceState
-	Status       string
-	Fqdn         string
-	AcmeCertUsed bool
+	Deployment        string
+	Endpoint          string
+	Service           string
+	State             defangv1.ServiceState
+	Status            string
+	Fqdn              string
+	AcmeCertUsed      bool
+	HealthcheckStatus string
 }
 
 type ErrNoServices struct {
@@ -48,8 +49,6 @@ func GetServices(ctx context.Context, projectName string, provider client.Provid
 		return nil, ErrNoServices{ProjectName: projectName}
 	}
 
-	UpdateServiceStates(ctx, servicesResponse.Services)
-
 	return servicesResponse, nil
 }
 
@@ -62,23 +61,35 @@ func PrintServices(ctx context.Context, projectName string, provider client.Prov
 		return PrintObject("", servicesResponse)
 	}
 
+	results := GetHealthcheckResults(ctx, servicesResponse.Services)
 	services, err := NewServiceFromServiceInfo(servicesResponse.Services)
 	if err != nil {
 		return err
+	}
+	for i, svc := range services {
+		if status, ok := results[svc.Service]; ok {
+			services[i].HealthcheckStatus = status
+		} else {
+			services[i].HealthcheckStatus = "unknown"
+		}
 	}
 
 	return PrintServiceStatesAndEndpoints(services)
 }
 
-func UpdateServiceStates(ctx context.Context, serviceInfos []*defangv1.ServiceInfo) {
+type HealthCheckResults map[string]string
+
+func GetHealthcheckResults(ctx context.Context, serviceInfos []*defangv1.ServiceInfo) HealthCheckResults {
 	// Create a context with a timeout for HTTP requests
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	var wg sync.WaitGroup
 
+	results := make(HealthCheckResults)
 	for _, serviceInfo := range serviceInfos {
 		for _, endpoint := range serviceInfo.Endpoints {
 			if strings.Contains(endpoint, ":") {
+				results[serviceInfo.Service.Name] = "skipped"
 				// Skip endpoints with ports because they likely non-HTTP services
 				continue
 			}
@@ -88,31 +99,38 @@ func UpdateServiceStates(ctx context.Context, serviceInfos []*defangv1.ServiceIn
 				url, err := url.JoinPath("https://"+endpoint, serviceInfo.HealthcheckPath)
 				if err != nil {
 					term.Errorf("failed to construct healthcheck URL for %q at endpoint %s: %s", serviceInfo.Service.Name, endpoint, err.Error())
+					results[serviceInfo.Service.Name] = "error"
 					return
 				}
 				// Use the regular net/http package to make the request without retries
 				req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 				if err != nil {
 					term.Errorf("failed to create healthcheck request for %q at %s: %s", serviceInfo.Service.Name, url, err.Error())
+					results[serviceInfo.Service.Name] = "error"
 					return
 				}
 				term.Debugf("[%s] checking health at %s", serviceInfo.Service.Name, url)
 				resp, err := http.DefaultClient.Do(req)
 				if err != nil {
 					term.Errorf("Healthcheck failed for %q at %s: %s", serviceInfo.Service.Name, url, err.Error())
+					results[serviceInfo.Service.Name] = "error"
 					return
 				}
 				defer resp.Body.Close()
 				if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 					serviceInfo.State = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 					term.Debugf("[%s] ✔ healthy", serviceInfo.Service.Name)
+					results[serviceInfo.Service.Name] = "healthy"
 				} else {
 					term.Debugf("[%s] ✘ unhealthy (%s)", serviceInfo.Service.Name, resp.Status)
+					results[serviceInfo.Service.Name] = "unhealthy"
 				}
 			}(serviceInfo)
 		}
 	}
 	wg.Wait()
+
+	return results
 }
 
 func NewServiceFromServiceInfo(serviceInfos []*defangv1.ServiceInfo) ([]Service, error) {

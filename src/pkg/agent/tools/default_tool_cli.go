@@ -76,8 +76,17 @@ func (DefaultToolCLI) GetServices(ctx context.Context, projectName string, provi
 		return nil, err
 	}
 
-	si, err := cli.NewServiceFromServiceInfo(servicesResponse.Services)
-	return si, err
+	services, err := cli.NewServiceFromServiceInfo(servicesResponse.Services)
+	results := cli.GetHealthcheckResults(ctx, servicesResponse.Services)
+	for i, svc := range services {
+		if status, ok := results[svc.Service]; ok {
+			services[i].HealthcheckStatus = status
+		} else {
+			services[i].HealthcheckStatus = "unknown"
+		}
+	}
+
+	return services, err
 }
 
 func (DefaultToolCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string {
