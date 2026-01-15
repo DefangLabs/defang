@@ -91,6 +91,9 @@ func (sm *manager) ListLocal() ([]StackListItem, error) {
 }
 
 func (sm *manager) ListRemote(ctx context.Context) ([]StackListItem, error) {
+	if sm.projectName == "" {
+		return nil, errors.New("project name is required to list remote stacks")
+	}
 	resp, err := sm.fabric.ListStacks(ctx, &defangv1.ListStacksRequest{
 		Project: sm.projectName,
 	})

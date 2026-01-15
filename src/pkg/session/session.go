@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -16,7 +14,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/compose-spec/compose-go/v2/consts"
 )
 
 type StacksManager interface {
@@ -40,6 +37,7 @@ type SessionLoaderOptions struct {
 	ComposeFilePaths   []string
 	AllowStackCreation bool
 	Interactive        bool
+	RequireStack       bool
 }
 
 type SessionLoader struct {
@@ -59,7 +57,6 @@ func NewSessionLoader(client client.FabricClient, ec elicitations.Controller, ma
 }
 
 func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
-	// load stack
 	stack, whence, err := sl.loadStack(ctx)
 	if err != nil {
 		return nil, err
@@ -68,10 +65,7 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load stack env: %w", err)
 	}
-	loader, err := sl.newLoader(stack)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create loader for stack %q: %w", stack.Name, err)
-	}
+	loader := sl.newLoader()
 	// load provider with selected stack
 	provider := cli.NewProvider(ctx, stack.Provider, sl.client, stack.Name)
 	session := &Session{
@@ -98,7 +92,7 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.StackParameters
 	if sl.opts.Stack != "" {
 		return sl.loadSpecifiedStack(ctx, sl.opts.Stack)
 	}
-	if sl.opts.Interactive {
+	if sl.opts.Interactive && sl.opts.RequireStack {
 		stackSelector := stacks.NewSelector(sl.ec, sl.sm)
 		stack, err := stackSelector.SelectStack(ctx, stacks.SelectStackOptions{
 			AllowCreate: sl.opts.AllowStackCreation,
@@ -149,9 +143,6 @@ func (sl *SessionLoader) loadFallbackStack() (*stacks.StackParameters, string, e
 	if envSet {
 		whence = "DEFANG_PROVIDER"
 	}
-	if sl.opts.ProviderID == "" || sl.opts.ProviderID == client.ProviderAuto {
-		return nil, "", errors.New("--provider must be specified if --stack is not specified")
-	}
 	// TODO: list remote stacks, and if there is exactly one with the matched provider, load it
 	return &stacks.StackParameters{
 		Name:     stacks.DefaultBeta,
@@ -159,40 +150,11 @@ func (sl *SessionLoader) loadFallbackStack() (*stacks.StackParameters, string, e
 	}, whence, nil
 }
 
-func (sl *SessionLoader) newLoader(stack *stacks.StackParameters) (client.Loader, error) {
-	// the stack may change the project name and compose file paths
-	if stack.Variables["COMPOSE_PROJECT_NAME"] != "" {
-		sl.opts.ProjectName = stack.Variables["COMPOSE_PROJECT_NAME"]
-	}
-	if len(stack.Variables["COMPOSE_PATH"]) > 0 {
-		paths, err := parseComposePaths(stack.Variables["COMPOSE_PATH"])
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse COMPOSE_PATH from stack variables: %w", err)
-		}
-		sl.opts.ComposeFilePaths = paths
-	}
-	// initialize loader
-	loader := compose.NewLoader(
+func (sl *SessionLoader) newLoader() client.Loader {
+	return compose.NewLoader(
 		compose.WithProjectName(sl.opts.ProjectName),
 		compose.WithPath(sl.opts.ComposeFilePaths...),
 	)
-	return loader, nil
-}
-
-func parseComposePaths(pathsStr string) ([]string, error) {
-	if len(pathsStr) <= 0 {
-		return []string{}, nil
-	}
-	paths := make([]string, 0)
-	sep := pkg.Getenv(consts.ComposePathSeparator, string(os.PathListSeparator))
-	for _, p := range strings.Split(pathsStr, sep) {
-		absPath, err := filepath.Abs(p)
-		if err != nil {
-			return nil, err
-		}
-		paths = append(paths, absPath)
-	}
-	return paths, nil
 }
 
 func printProviderMismatchWarnings(ctx context.Context, provider client.ProviderID) {

@@ -121,11 +121,12 @@ func TailAndWaitForCD(ctx context.Context, provider client.Provider, projectName
 }
 
 func SplitProjectStack(name string) (projectName string, stackName string) {
-	parts := strings.SplitN(name, "/", 2)
-	return parts[0], parts[1]
+	pulumiStack, _, _ := strings.Cut(name, " ") // in case name contains extra info like "proj/stack {workspace} [region]"
+	projectName, stackName, _ = strings.Cut(pulumiStack, "/")
+	return projectName, stackName
 }
 
-func CdListLocal(ctx context.Context, provider client.Provider, allRegions bool) error {
+func CdListFromStorage(ctx context.Context, provider client.Provider, allRegions bool) error {
 	term.Debug("Running CD list")
 	if dryrun.DoDryRun {
 		return dryrun.ErrDryRun
@@ -137,12 +138,12 @@ func CdListLocal(ctx context.Context, provider client.Provider, allRegions bool)
 	}
 
 	var count int
-	for stack := range stacks {
+	for stackInfo := range stacks {
 		count++
 		if !allRegions {
-			stack, _ = SplitProjectStack(stack)
+			stackInfo, _, _ = strings.Cut(stackInfo, " ") // remove extra info like "{workspace} [region]"
 		}
-		term.Println(" -", stack) // TODO: json output mode
+		term.Println(" -", stackInfo) // TODO: json output mode
 	}
 	if count == 0 {
 		accountInfo, err := provider.AccountInfo(ctx)

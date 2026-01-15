@@ -31,7 +31,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/migrate"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/scope"
-	"github.com/DefangLabs/defang/src/pkg/session"
 	"github.com/DefangLabs/defang/src/pkg/setup"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/surveyor"
@@ -516,14 +515,10 @@ var whoamiCmd = &cobra.Command{
 
 		global.NonInteractive = true // don't show provider prompt
 
-		options := NewSessionLoaderOptionsForCommand(cmd)
-		sm, err := newStackManagerForCommand(cmd)
-		if err != nil {
-			// For WhoAmI it's OK to proceed without a stack manager
-			term.Debugf("failed to create stack manager: %v", err)
-		}
-		sessionLoader := session.NewSessionLoader(global.Client, ec, sm, options)
-		session, err := sessionLoader.LoadSession(ctx)
+		session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
+			CheckAccountInfo: false,
+			RequireStack:     false, // for WhoAmI it's OK to proceed without a stack
+		})
 		if err != nil {
 			return fmt.Errorf("loading session: %w", err)
 		}
@@ -585,7 +580,7 @@ var certGenerateCmd = &cobra.Command{
 	Short:   "Generate a TLS certificate",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		session, err := NewCommandSession(cmd)
+		session, err := newCommandSession(cmd)
 		if err != nil {
 			return err
 		}
@@ -787,7 +782,7 @@ var configSetCmd = &cobra.Command{
 		}
 
 		// Make sure we have a project to set config for before asking for a value
-		session, err := NewCommandSession(cmd)
+		session, err := newCommandSession(cmd)
 		if err != nil {
 			return err
 		}
@@ -950,7 +945,7 @@ var configDeleteCmd = &cobra.Command{
 	Aliases:     []string{"del", "delete", "remove"},
 	Short:       "Removes one or more config values",
 	RunE: func(cmd *cobra.Command, names []string) error {
-		session, err := NewCommandSession(cmd)
+		session, err := newCommandSession(cmd)
 		if err != nil {
 			return err
 		}
@@ -983,7 +978,7 @@ var configListCmd = &cobra.Command{
 	Short:       "List configs",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		session, err := NewCommandSession(cmd)
+		session, err := newCommandSession(cmd)
 		if err != nil {
 			return err
 		}
@@ -1004,7 +999,7 @@ var configResolveCmd = &cobra.Command{
 	Short:       "Show the final resolved environment for the project",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		session, err := NewCommandSession(cmd)
+		session, err := newCommandSession(cmd)
 		if err != nil {
 			return err
 		}
@@ -1034,7 +1029,7 @@ var debugCmd = &cobra.Command{
 			deployment = etag
 		}
 
-		session, err := NewCommandSession(cmd)
+		session, err := newCommandSession(cmd)
 		if err != nil {
 			return err
 		}
@@ -1087,11 +1082,8 @@ var deploymentsCmd = &cobra.Command{
 			cli.EnableUTCMode()
 		}
 
-		session, err := NewCommandSession(cmd)
-		if err != nil {
-			return err
-		}
-		projectName, err := session.Loader.LoadProjectName(ctx)
+		loader := configureLoader(cmd)
+		projectName, err := loader.LoadProjectName(cmd.Context())
 		if err != nil {
 			return err
 		}
@@ -1119,7 +1111,7 @@ var deploymentsListCmd = &cobra.Command{
 			cli.EnableUTCMode()
 		}
 
-		session, err := NewCommandSession(cmd)
+		session, err := newCommandSession(cmd)
 		if err != nil {
 			return err
 		}
@@ -1221,7 +1213,7 @@ var upgradeCmd = &cobra.Command{
 }
 
 func configureLoader(cmd *cobra.Command) *compose.Loader {
-	loaderFlags := NewSessionLoaderOptionsForCommand(cmd)
+	loaderFlags := newSessionLoaderOptionsForCommand(cmd)
 	return compose.NewLoader(compose.WithProjectName(loaderFlags.ProjectName), compose.WithPath(loaderFlags.ComposeFilePaths...))
 }
 
