@@ -18,16 +18,16 @@ import (
 
 // mockFabricClient implements FabricClient interface for testing
 type mockFabricClient struct {
-	deployments []*defangv1.Deployment
-	listErr     error
+	stacks  []*defangv1.Stack
+	listErr error
 }
 
-func (m *mockFabricClient) ListDeployments(ctx context.Context, req *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error) {
+func (m *mockFabricClient) ListStacks(ctx context.Context, req *defangv1.ListStacksRequest) (*defangv1.ListStacksResponse, error) {
 	if m.listErr != nil {
 		return nil, m.listErr
 	}
-	return &defangv1.ListDeploymentsResponse{
-		Deployments: m.deployments,
+	return &defangv1.ListStacksResponse{
+		Stacks: m.stacks,
 	}, nil
 }
 
@@ -268,18 +268,22 @@ func TestManager_ListRemote(t *testing.T) {
 
 	deployedAt := time.Now()
 	mockClient := &mockFabricClient{
-		deployments: []*defangv1.Deployment{
+		stacks: []*defangv1.Stack{
 			{
-				Stack:     "remotestack1",
-				Provider:  defangv1.Provider_AWS,
-				Region:    "us-east-1",
-				Timestamp: timestamppb.New(deployedAt),
+				Name: "remotestack1",
+				StackFile: []byte(`
+DEFANG_PROVIDER=aws
+AWS_REGION=us-east-1
+`),
+				LastDeployedAt: timestamppb.New(deployedAt),
 			},
 			{
-				Stack:     "remotestack2",
-				Provider:  defangv1.Provider_GCP,
-				Region:    "us-central1",
-				Timestamp: timestamppb.New(deployedAt.Add(-time.Hour)),
+				Name: "remotestack2",
+				StackFile: []byte(`
+DEFANG_PROVIDER=gcp
+GOOGLE_REGION=us-central1
+`),
+				LastDeployedAt: timestamppb.New(deployedAt),
 			},
 		},
 	}
@@ -325,18 +329,22 @@ func TestManager_ListMerged(t *testing.T) {
 
 	deployedAt := time.Now()
 	mockClient := &mockFabricClient{
-		deployments: []*defangv1.Deployment{
+		stacks: []*defangv1.Stack{
 			{
-				Stack:     "sharedstack",
-				Provider:  defangv1.Provider_AWS,
-				Region:    "us-east-1",
-				Timestamp: timestamppb.New(deployedAt),
+				Name: "sharedstack",
+				StackFile: []byte(`
+DEFANG_PROVIDER=aws
+AWS_REGION=us-east-1
+`),
+				LastDeployedAt: timestamppb.New(deployedAt),
 			},
 			{
-				Stack:     "remoteonlystack",
-				Provider:  defangv1.Provider_GCP,
-				Region:    "us-central1",
-				Timestamp: timestamppb.New(deployedAt),
+				Name: "remoteonlystack",
+				StackFile: []byte(`
+DEFANG_PROVIDER=gcp
+GOOGLE_REGION=us-central1
+`),
+				LastDeployedAt: timestamppb.New(deployedAt),
 			},
 		},
 	}
@@ -412,12 +420,14 @@ func TestManager_ListRemoteWithBetaStack(t *testing.T) {
 
 	deployedAt := time.Now()
 	mockClient := &mockFabricClient{
-		deployments: []*defangv1.Deployment{
+		stacks: []*defangv1.Stack{
 			{
-				Stack:     "", // Empty stack name should default to "beta"
-				Provider:  defangv1.Provider_AWS,
-				Region:    "us-east-1",
-				Timestamp: timestamppb.New(deployedAt),
+				Name: "", // Empty stack name should default to "beta"
+				StackFile: []byte(`
+DEFANG_PROVIDER=aws
+AWS_REGION=us-east-1
+`),
+				LastDeployedAt: timestamppb.New(deployedAt),
 			},
 		},
 	}
@@ -436,19 +446,24 @@ func TestManager_ListRemoteDuplicateDeployments(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	deployedAt := time.Now()
+	olderDeployedAt := deployedAt.Add(-time.Hour)
 	mockClient := &mockFabricClient{
-		deployments: []*defangv1.Deployment{
+		stacks: []*defangv1.Stack{
 			{
-				Stack:     "duplicatestack",
-				Provider:  defangv1.Provider_AWS,
-				Region:    "us-east-1",
-				Timestamp: timestamppb.New(deployedAt), // Most recent
+				Name: "duplicatestack",
+				StackFile: []byte(`
+DEFANG_PROVIDER=aws
+AWS_REGION=us-east-1
+`),
+				LastDeployedAt: timestamppb.New(deployedAt),
 			},
 			{
-				Stack:     "duplicatestack",
-				Provider:  defangv1.Provider_AWS,
-				Region:    "us-west-2",
-				Timestamp: timestamppb.New(deployedAt.Add(-time.Hour)), // Older
+				Name: "duplicatestack",
+				StackFile: []byte(`
+DEFANG_PROVIDER=aws
+AWS_REGION=us-west-2
+`),
+				LastDeployedAt: timestamppb.New(olderDeployedAt),
 			},
 		},
 	}
@@ -459,11 +474,19 @@ func TestManager_ListRemoteDuplicateDeployments(t *testing.T) {
 	remoteStacks, err := manager.ListRemote(t.Context())
 	require.NoError(t, err, "ListRemote() failed")
 
-	assert.Len(t, remoteStacks, 1, "Expected 1 remote stack")
+	assert.Len(t, remoteStacks, 2, "Expected 2 remote stacks")
+
+	// Should be sorted by deployed time desc, so most recent (deployedAt) should be first
 	assert.Equal(t, "duplicatestack", remoteStacks[0].Name, "Expected stack name 'duplicatestack'")
 	assert.Equal(t, client.ProviderAWS, remoteStacks[0].Provider, "Expected provider from most recent deployment (aws)")
 	assert.Equal(t, "us-east-1", remoteStacks[0].Region, "Expected region from most recent deployment (us-east-1)")
 	assert.Equal(t, deployedAt.Local().Format(time.RFC3339), remoteStacks[0].DeployedAt.Local().Format(time.RFC3339), "Expected deployed time from most recent deployment")
+
+	// Second stack should be the older one
+	assert.Equal(t, "duplicatestack", remoteStacks[1].Name, "Expected stack name 'duplicatestack'")
+	assert.Equal(t, client.ProviderAWS, remoteStacks[1].Provider, "Expected provider from older deployment (aws)")
+	assert.Equal(t, "us-west-2", remoteStacks[1].Region, "Expected region from older deployment (us-west-2)")
+	assert.Equal(t, olderDeployedAt.Local().Format(time.RFC3339), remoteStacks[1].DeployedAt.Local().Format(time.RFC3339), "Expected deployed time from older deployment")
 }
 
 func TestManager_WorkingDirectoryMatches(t *testing.T) {
@@ -511,18 +534,22 @@ func TestManager_WorkingDirectoryMatches(t *testing.T) {
 func TestManager_TargetDirectoryEmpty(t *testing.T) {
 	deployedAt := time.Now()
 	mockClient := &mockFabricClient{
-		deployments: []*defangv1.Deployment{
+		stacks: []*defangv1.Stack{
 			{
-				Stack:     "remotestack1",
-				Provider:  defangv1.Provider_AWS,
-				Region:    "us-east-1",
-				Timestamp: timestamppb.New(deployedAt),
+				Name: "remotestack1",
+				StackFile: []byte(`
+DEFANG_PROVIDER=aws
+AWS_REGION=us-east-1
+`),
+				LastDeployedAt: timestamppb.New(deployedAt),
 			},
 			{
-				Stack:     "remotestack2",
-				Provider:  defangv1.Provider_GCP,
-				Region:    "us-central1",
-				Timestamp: timestamppb.New(deployedAt),
+				Name: "remotestack2",
+				StackFile: []byte(`
+DEFANG_PROVIDER=gcp
+GOOGLE_REGION=us-central1
+`),
+				LastDeployedAt: timestamppb.New(deployedAt),
 			},
 		},
 	}
@@ -571,12 +598,14 @@ func TestManager_RemoteOperationsWorkRegardlessOfDirectory(t *testing.T) {
 
 	deployedAt := time.Now()
 	mockClient := &mockFabricClient{
-		deployments: []*defangv1.Deployment{
+		stacks: []*defangv1.Stack{
 			{
-				Stack:     "remotestack",
-				Provider:  defangv1.Provider_AWS,
-				Region:    "us-east-1",
-				Timestamp: timestamppb.New(deployedAt),
+				Name: "remotestack",
+				StackFile: []byte(`
+DEFANG_PROVIDER=aws
+AWS_REGION=us-east-1
+`),
+				LastDeployedAt: timestamppb.New(deployedAt),
 			},
 		},
 	}

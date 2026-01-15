@@ -60,7 +60,7 @@ func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployPa
 
 	term.Debug("Function invoked: cli.ComposeUp")
 	// Use ComposeUp to deploy the services
-	deployResp, project, err := cli.ComposeUp(ctx, client, provider, cliTypes.ComposeUpParams{
+	deployResp, project, err := cli.ComposeUp(ctx, client, provider, sc.Stack, cliTypes.ComposeUpParams{
 		Project:    project,
 		UploadMode: compose.UploadModeDigest,
 		Mode:       modes.ModeAffordable,

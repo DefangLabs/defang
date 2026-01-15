@@ -15,14 +15,17 @@ flowchart LR
     subgraph local["Your Machine or CI/CD"]
         compose["compose.yaml"]
         cli["Defang CLI"]
-    end
+        style cli stroke-width:3px
+  end
 
     subgraph defang["Defang Backend"]
         fabric["Fabric gRPC API"]
+        style fabric stroke-width:3px
     end
 
     subgraph cloud["Your Cloud Account"]
         cd["Defang CD Task"]
+        style cd stroke-width:3px
         secrets["Config & Secrets"]
         subgraph infra["Infrastructure"]
             containers["Containers"]

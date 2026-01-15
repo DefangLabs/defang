@@ -37,7 +37,7 @@ require (
 	github.com/compose-spec/compose-go/v2 v2.7.2-0.20250715094302-8da9902241f9
 	github.com/digitalocean/godo v1.131.1
 	github.com/docker/cli v27.3.1+incompatible
-	github.com/docker/docker v27.3.1+incompatible
+	github.com/docker/docker v28.0.0+incompatible
 	github.com/firebase/genkit/go v1.2.0
 	github.com/goccy/go-yaml v1.17.1
 	github.com/golang-jwt/jwt/v5 v5.2.2

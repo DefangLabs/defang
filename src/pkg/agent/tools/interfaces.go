@@ -8,13 +8,14 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 type CLIInterface interface {
 	CanIUseProvider(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, projectName string, serviceCount int) error
 	ComposeDown(ctx context.Context, projectName string, fabric *client.GrpcClient, provider client.Provider) (string, error)
-	ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error)
+	ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, stack *stacks.StackParameters, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error)
 	ConfigDelete(ctx context.Context, projectName string, provider client.Provider, name string) error
 	ConfigSet(ctx context.Context, projectName string, provider client.Provider, name, value string) error
 	Connect(ctx context.Context, cluster string) (*client.GrpcClient, error)

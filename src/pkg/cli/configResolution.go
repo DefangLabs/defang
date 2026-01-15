@@ -92,7 +92,7 @@ func printConfigResolutionSummary(project *types.Project, defangConfig []string)
 
 	projectEnvVars = slices.Compact(projectEnvVars)
 
-	term.Info("ENVIRONMENT VARIABLES RESOLUTION SUMMARY:")
+	term.Info("Service environment variables resolution summary:")
 
 	return term.Table(projectEnvVars, "Service", "Environment", "Value", "Source")
 }

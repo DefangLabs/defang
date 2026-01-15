@@ -119,11 +119,11 @@ service FabricController {
   }
 
   rpc GetSelectedProvider(GetSelectedProviderRequest) returns (GetSelectedProviderResponse) {
+    option deprecated = true; // deprecated in favor of stacks; kept for old CLI clients
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-
   rpc SetSelectedProvider(SetSelectedProviderRequest) returns (google.protobuf.Empty) {
-    option deprecated = true; // deprecated in favor of stacks
+    option deprecated = true; // deprecated in favor of stacks; kept for old CLI clients
     option idempotency_level = IDEMPOTENT;
   }
 
@@ -153,12 +153,29 @@ service FabricController {
   rpc DeleteStack(DeleteStackRequest) returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
   }
+  rpc GetDefaultStack(GetDefaultStackRequest) returns (GetStackResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+enum Provider {
+  PROVIDER_UNSPECIFIED = 0;
+  DEFANG = 1;
+  AWS = 2;
+  DIGITALOCEAN = 3;
+  GCP = 4;
 }
 
 message Stack {
   string name = 1;
   string project = 2;
   bytes stack_file = 3; // Defang stack file
+  Provider provider = 4;
+  google.protobuf.Timestamp last_deployed_at = 5;
+  string provider_account_id = 6;
+  string region = 7;
+  DeploymentMode mode = 8;
+  bool is_default = 9;
 }
 
 message PutStackRequest {
@@ -168,6 +185,10 @@ message PutStackRequest {
 message GetStackRequest {
   string project = 1;
   string stack = 2;
+}
+
+message GetDefaultStackRequest {
+  string project = 1;
 }
 
 message GetStackResponse {
@@ -185,14 +206,6 @@ message ListStacksResponse {
 message DeleteStackRequest {
   string project = 1;
   string stack = 2;
-}
-
-enum Provider {
-  PROVIDER_UNSPECIFIED = 0;
-  DEFANG = 1;
-  AWS = 2;
-  DIGITALOCEAN = 3;
-  GCP = 4;
 }
 
 message GetSelectedProviderRequest {

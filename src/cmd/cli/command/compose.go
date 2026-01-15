@@ -153,7 +153,7 @@ func makeComposeUpCmd() *cobra.Command {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
 			}
 
-			deploy, project, err := cli.ComposeUp(ctx, global.Client, session.Provider, cli.ComposeUpParams{
+			deploy, project, err := cli.ComposeUp(ctx, global.Client, session.Provider, session.Stack, cli.ComposeUpParams{
 				Project:    project,
 				UploadMode: upload,
 				Mode:       global.Stack.Mode,
@@ -616,7 +616,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}, loadErr)
 			}
 
-			_, _, err = cli.ComposeUp(ctx, global.Client, session.Provider, cli.ComposeUpParams{
+			_, _, err = cli.ComposeUp(ctx, global.Client, session.Provider, session.Stack, cli.ComposeUpParams{
 				Project:    project,
 				UploadMode: compose.UploadModeIgnore,
 				Mode:       modes.ModeUnspecified,

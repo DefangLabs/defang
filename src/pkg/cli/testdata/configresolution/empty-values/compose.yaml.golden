@@ -1,4 +1,4 @@
-[95m * ENVIRONMENT VARIABLES RESOLUTION SUMMARY:
+[95m * Service environment variables resolution summary:
 [0m[1m
 SERVICE   ENVIRONMENT   VALUE       SOURCE[0m
 service1  EMPTY_VAR                 Config   

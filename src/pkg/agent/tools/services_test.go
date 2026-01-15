@@ -70,7 +70,7 @@ func (m *MockCLI) ComposeDown(ctx context.Context, projectName string, fabric *c
 	return "", nil
 }
 
-func (m *MockCLI) ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
+func (m *MockCLI) ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, stack *stacks.StackParameters, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	return nil, nil, nil
 }
 

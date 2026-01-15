@@ -10,22 +10,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-type DeploymentLister interface {
-	ListDeployments(ctx context.Context, req *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error)
+type StackLister interface {
+	ListStacks(ctx context.Context, req *defangv1.ListStacksRequest) (*defangv1.ListStacksResponse, error)
 }
 
 type manager struct {
-	fabric          DeploymentLister
+	fabric          StackLister
 	targetDirectory string
 	projectName     string
 }
 
-func NewManager(fabric DeploymentLister, targetDirectory string, projectName string) (*manager, error) {
+func NewManager(fabric StackLister, targetDirectory string, projectName string) (*manager, error) {
 	absTargetDirectory := ""
 	if targetDirectory != "" {
 		// abs path for targetDirectory
@@ -91,50 +91,34 @@ func (sm *manager) ListLocal() ([]StackListItem, error) {
 }
 
 func (sm *manager) ListRemote(ctx context.Context) ([]StackListItem, error) {
-	resp, err := sm.fabric.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
+	resp, err := sm.fabric.ListStacks(ctx, &defangv1.ListStacksRequest{
 		Project: sm.projectName,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list deployments: %w", err)
+		return nil, fmt.Errorf("failed to list stacks: %w", err)
 	}
-	stackMap := make(map[string]StackListItem)
-	for _, deployment := range resp.GetDeployments() {
-		stackName := deployment.GetStack()
-		if stackName == "" {
-			stackName = DefaultBeta
+	stackParams := make([]StackListItem, 0, len(resp.GetStacks()))
+	for _, stack := range resp.GetStacks() {
+		name := stack.GetName()
+		if name == "" {
+			name = DefaultBeta
 		}
-		var providerID client.ProviderID
-		providerID.SetValue(deployment.GetProvider())
-		// avoid overwriting existing entries, deployments are already sorted by deployed_at desc
-		if _, exists := stackMap[stackName]; !exists {
-			var deployedAt time.Time
-			if ts := deployment.GetTimestamp(); ts != nil {
-				deployedAt = ts.AsTime()
-			}
-			variables := map[string]string{
-				"DEFANG_PROVIDER": providerID.String(),
-				"DEFANG_MODE":     deployment.GetMode().String(),
-			}
-			regionVarName := client.GetRegionVarName(providerID)
-			region := deployment.GetRegion()
-			if region != "" {
-				variables[regionVarName] = region
-			}
-			params, err := ParamsFromMap(variables)
-			if err != nil {
-				term.Warnf("Skipping invalid remote deployment %s: %v\n", stackName, err)
-				continue
-			}
-			params.Name = stackName
-			stackMap[stackName] = StackListItem{
-				StackParameters: params,
-				DeployedAt:      deployedAt,
-			}
+		bytes := stack.GetStackFile()
+		variables, err := Parse(string(bytes))
+		if err != nil {
+			term.Warnf("Skipping invalid remote stack %s: %v\n", name, err)
+			continue
 		}
-	}
-	stackParams := make([]StackListItem, 0, len(stackMap))
-	for _, params := range stackMap {
-		stackParams = append(stackParams, params)
+		params, err := ParamsFromMap(variables)
+		if err != nil {
+			term.Warnf("Skipping invalid remote stack %s: %v\n", name, err)
+			continue
+		}
+		params.Name = name
+		stackParams = append(stackParams, StackListItem{
+			StackParameters: params,
+			DeployedAt:      timeutils.AsTime(stack.GetLastDeployedAt(), time.Time{}),
+		})
 	}
 
 	// sort by deployed at desc
