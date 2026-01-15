@@ -169,6 +169,9 @@ const (
 	// FabricControllerDeleteStackProcedure is the fully-qualified name of the FabricController's
 	// DeleteStack RPC.
 	FabricControllerDeleteStackProcedure = "/io.defang.v1.FabricController/DeleteStack"
+	// FabricControllerGetDefaultStackProcedure is the fully-qualified name of the FabricController's
+	// GetDefaultStack RPC.
+	FabricControllerGetDefaultStackProcedure = "/io.defang.v1.FabricController/GetDefaultStack"
 )
 
 // FabricControllerClient is a client for the io.defang.v1.FabricController service.
@@ -219,6 +222,7 @@ type FabricControllerClient interface {
 	// Endpoint for GDPR compliance
 	DeleteMe(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	VerifyDNSSetup(context.Context, *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[emptypb.Empty], error)
+	// Deprecated: do not use.
 	GetSelectedProvider(context.Context, *connect_go.Request[v1.GetSelectedProviderRequest]) (*connect_go.Response[v1.GetSelectedProviderResponse], error)
 	// Deprecated: do not use.
 	SetSelectedProvider(context.Context, *connect_go.Request[v1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error)
@@ -230,6 +234,7 @@ type FabricControllerClient interface {
 	GetStack(context.Context, *connect_go.Request[v1.GetStackRequest]) (*connect_go.Response[v1.GetStackResponse], error)
 	ListStacks(context.Context, *connect_go.Request[v1.ListStacksRequest]) (*connect_go.Response[v1.ListStacksResponse], error)
 	DeleteStack(context.Context, *connect_go.Request[v1.DeleteStackRequest]) (*connect_go.Response[emptypb.Empty], error)
+	GetDefaultStack(context.Context, *connect_go.Request[v1.GetDefaultStackRequest]) (*connect_go.Response[v1.GetStackResponse], error)
 }
 
 // NewFabricControllerClient constructs a client for the io.defang.v1.FabricController service. By
@@ -510,6 +515,12 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
 			connect_go.WithClientOptions(opts...),
 		),
+		getDefaultStack: connect_go.NewClient[v1.GetDefaultStackRequest, v1.GetStackResponse](
+			httpClient,
+			baseURL+FabricControllerGetDefaultStackProcedure,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -562,6 +573,7 @@ type fabricControllerClient struct {
 	getStack                   *connect_go.Client[v1.GetStackRequest, v1.GetStackResponse]
 	listStacks                 *connect_go.Client[v1.ListStacksRequest, v1.ListStacksResponse]
 	deleteStack                *connect_go.Client[v1.DeleteStackRequest, emptypb.Empty]
+	getDefaultStack            *connect_go.Client[v1.GetDefaultStackRequest, v1.GetStackResponse]
 }
 
 // GetStatus calls io.defang.v1.FabricController.GetStatus.
@@ -760,6 +772,8 @@ func (c *fabricControllerClient) VerifyDNSSetup(ctx context.Context, req *connec
 }
 
 // GetSelectedProvider calls io.defang.v1.FabricController.GetSelectedProvider.
+//
+// Deprecated: do not use.
 func (c *fabricControllerClient) GetSelectedProvider(ctx context.Context, req *connect_go.Request[v1.GetSelectedProviderRequest]) (*connect_go.Response[v1.GetSelectedProviderResponse], error) {
 	return c.getSelectedProvider.CallUnary(ctx, req)
 }
@@ -811,6 +825,11 @@ func (c *fabricControllerClient) DeleteStack(ctx context.Context, req *connect_g
 	return c.deleteStack.CallUnary(ctx, req)
 }
 
+// GetDefaultStack calls io.defang.v1.FabricController.GetDefaultStack.
+func (c *fabricControllerClient) GetDefaultStack(ctx context.Context, req *connect_go.Request[v1.GetDefaultStackRequest]) (*connect_go.Response[v1.GetStackResponse], error) {
+	return c.getDefaultStack.CallUnary(ctx, req)
+}
+
 // FabricControllerHandler is an implementation of the io.defang.v1.FabricController service.
 type FabricControllerHandler interface {
 	GetStatus(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Status], error)
@@ -859,6 +878,7 @@ type FabricControllerHandler interface {
 	// Endpoint for GDPR compliance
 	DeleteMe(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	VerifyDNSSetup(context.Context, *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[emptypb.Empty], error)
+	// Deprecated: do not use.
 	GetSelectedProvider(context.Context, *connect_go.Request[v1.GetSelectedProviderRequest]) (*connect_go.Response[v1.GetSelectedProviderResponse], error)
 	// Deprecated: do not use.
 	SetSelectedProvider(context.Context, *connect_go.Request[v1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error)
@@ -870,6 +890,7 @@ type FabricControllerHandler interface {
 	GetStack(context.Context, *connect_go.Request[v1.GetStackRequest]) (*connect_go.Response[v1.GetStackResponse], error)
 	ListStacks(context.Context, *connect_go.Request[v1.ListStacksRequest]) (*connect_go.Response[v1.ListStacksResponse], error)
 	DeleteStack(context.Context, *connect_go.Request[v1.DeleteStackRequest]) (*connect_go.Response[emptypb.Empty], error)
+	GetDefaultStack(context.Context, *connect_go.Request[v1.GetDefaultStackRequest]) (*connect_go.Response[v1.GetStackResponse], error)
 }
 
 // NewFabricControllerHandler builds an HTTP handler from the service implementation. It returns the
@@ -1146,6 +1167,12 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
 		connect_go.WithHandlerOptions(opts...),
 	)
+	fabricControllerGetDefaultStackHandler := connect_go.NewUnaryHandler(
+		FabricControllerGetDefaultStackProcedure,
+		svc.GetDefaultStack,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
+	)
 	return "/io.defang.v1.FabricController/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case FabricControllerGetStatusProcedure:
@@ -1242,6 +1269,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerListStacksHandler.ServeHTTP(w, r)
 		case FabricControllerDeleteStackProcedure:
 			fabricControllerDeleteStackHandler.ServeHTTP(w, r)
+		case FabricControllerGetDefaultStackProcedure:
+			fabricControllerGetDefaultStackHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1437,4 +1466,8 @@ func (UnimplementedFabricControllerHandler) ListStacks(context.Context, *connect
 
 func (UnimplementedFabricControllerHandler) DeleteStack(context.Context, *connect_go.Request[v1.DeleteStackRequest]) (*connect_go.Response[emptypb.Empty], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.DeleteStack is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) GetDefaultStack(context.Context, *connect_go.Request[v1.GetDefaultStackRequest]) (*connect_go.Response[v1.GetStackResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetDefaultStack is not implemented"))
 }
