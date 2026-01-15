@@ -101,7 +101,7 @@ func TestComposeUp(t *testing.T) {
 
 	mc := client.MockFabricClient{DelegateDomain: "example.com"}
 	mp := &mockDeployProvider{MockProvider: client.MockProvider{UploadUrl: server.URL + "/"}}
-	stack := &stacks.StackParameters{
+	stack := &stacks.Parameters{
 		Provider: client.ProviderDefang,
 	}
 	d, project, err := ComposeUp(t.Context(), mc, mp, stack, ComposeUpParams{
@@ -292,7 +292,7 @@ func TestComposeUpStops(t *testing.T) {
 				deploymentStatus: tt.cdStatus,
 			}
 
-			stack := &stacks.StackParameters{
+			stack := &stacks.Parameters{
 				Provider: client.ProviderDefang,
 			}
 
@@ -329,7 +329,7 @@ func TestComposeConfigWithoutLogin(t *testing.T) {
 	provider := &client.PlaygroundProvider{FabricClient: fabric}
 
 	project := &compose.Project{}
-	stack := &stacks.StackParameters{}
+	stack := &stacks.Parameters{}
 
 	_, _, err := ComposeUp(t.Context(), fabric, provider, stack, ComposeUpParams{
 		Mode:       modes.ModeUnspecified,

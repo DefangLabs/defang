@@ -14,7 +14,7 @@ const CreateNewStack = "Create new stack"
 
 type StacksManager interface {
 	List(ctx context.Context) ([]StackListItem, error)
-	Create(params StackParameters) (string, error)
+	Create(params Parameters) (string, error)
 }
 
 type stackSelector struct {
@@ -35,7 +35,7 @@ type SelectStackOptions struct {
 	AllowCreate bool
 }
 
-func (ss *stackSelector) SelectStack(ctx context.Context, opts SelectStackOptions) (*StackParameters, error) {
+func (ss *stackSelector) SelectStack(ctx context.Context, opts SelectStackOptions) (*Parameters, error) {
 	if !ss.ec.IsSupported() {
 		return nil, errors.New("your MCP client does not support elicitations, use the 'select_stack' tool to choose a stack")
 	}
@@ -91,14 +91,14 @@ func (ss *stackSelector) SelectStack(ctx context.Context, opts SelectStackOption
 	// find the stack with the selected name in the list of stacks
 	for _, stack := range stackList {
 		if stack.Name == selectedName {
-			return &stack.StackParameters, nil
+			return &stack.Parameters, nil
 		}
 	}
 
 	return nil, fmt.Errorf("selected stack %q not found", selectedName)
 }
 
-func (ss *stackSelector) createStack(ctx context.Context) (*StackParameters, error) {
+func (ss *stackSelector) createStack(ctx context.Context) (*Parameters, error) {
 	params, err := ss.wizard.CollectParameters(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect stack parameters: %w", err)

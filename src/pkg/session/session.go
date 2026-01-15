@@ -18,14 +18,14 @@ import (
 
 type StacksManager interface {
 	List(ctx context.Context) ([]stacks.StackListItem, error)
-	LoadLocal(name string) (*stacks.StackParameters, error)
-	LoadRemote(ctx context.Context, name string) (*stacks.StackParameters, error)
-	Create(params stacks.StackParameters) (string, error)
+	LoadLocal(name string) (*stacks.Parameters, error)
+	LoadRemote(ctx context.Context, name string) (*stacks.Parameters, error)
+	Create(params stacks.Parameters) (string, error)
 	TargetDirectory() string
 }
 
 type Session struct {
-	Stack    *stacks.StackParameters
+	Stack    *stacks.Parameters
 	Loader   client.Loader
 	Provider client.Provider
 }
@@ -84,7 +84,7 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 	return session, nil
 }
 
-func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.StackParameters, string, error) {
+func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, string, error) {
 	if sl.sm == nil {
 		// Without stack manager, we can only load fallback stacks (from options)
 		return sl.loadFallbackStack()
@@ -107,7 +107,7 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.StackParameters
 	return sl.loadFallbackStack()
 }
 
-func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, name string) (*stacks.StackParameters, string, error) {
+func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, name string) (*stacks.Parameters, string, error) {
 	whence := "--stack flag"
 	_, envSet := os.LookupEnv("DEFANG_STACK")
 	if envSet {
@@ -137,14 +137,14 @@ func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, name string) (*
 	return stack, whence + " and previous deployment", nil
 }
 
-func (sl *SessionLoader) loadFallbackStack() (*stacks.StackParameters, string, error) {
+func (sl *SessionLoader) loadFallbackStack() (*stacks.Parameters, string, error) {
 	whence := "--provider flag"
 	_, envSet := os.LookupEnv("DEFANG_PROVIDER")
 	if envSet {
 		whence = "DEFANG_PROVIDER"
 	}
 	// TODO: list remote stacks, and if there is exactly one with the matched provider, load it
-	return &stacks.StackParameters{
+	return &stacks.Parameters{
 		Name:     stacks.DefaultBeta,
 		Provider: sl.opts.ProviderID,
 	}, whence, nil

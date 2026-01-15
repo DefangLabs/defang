@@ -274,10 +274,10 @@ type mockStackManager struct {
 	expectedRegion   string
 	listResult       []stacks.StackListItem
 	listError        error
-	loadResults      map[string]*stacks.StackParameters
+	loadResults      map[string]*stacks.Parameters
 	loadError        error
 	createError      error
-	createResult     *stacks.StackParameters
+	createResult     *stacks.Parameters
 }
 
 func NewMockStackManager(t *testing.T, expectedProvider client.ProviderID, expectedRegion string) *mockStackManager {
@@ -296,7 +296,7 @@ func (m *mockStackManager) List(ctx context.Context) ([]stacks.StackListItem, er
 	return m.listResult, nil
 }
 
-func (m *mockStackManager) Load(ctx context.Context, name string) (*stacks.StackParameters, error) {
+func (m *mockStackManager) Load(ctx context.Context, name string) (*stacks.Parameters, error) {
 	params, err := m.LoadLocal(name)
 	if err == nil {
 		return params, nil
@@ -310,7 +310,7 @@ func (m *mockStackManager) Load(ctx context.Context, name string) (*stacks.Stack
 	return nil, fmt.Errorf("unable to find stack %q", name)
 }
 
-func (m *mockStackManager) LoadLocal(name string) (*stacks.StackParameters, error) {
+func (m *mockStackManager) LoadLocal(name string) (*stacks.Parameters, error) {
 	if m.loadError != nil {
 		return nil, m.loadError
 	}
@@ -324,7 +324,7 @@ func (m *mockStackManager) LoadLocal(name string) (*stacks.StackParameters, erro
 	return nil, fmt.Errorf("stack %q not found", name)
 }
 
-func (m *mockStackManager) LoadRemote(ctx context.Context, name string) (*stacks.StackParameters, error) {
+func (m *mockStackManager) LoadRemote(ctx context.Context, name string) (*stacks.Parameters, error) {
 	// TODO: separate remote and local loadResults in the mock
 	if m.loadError != nil {
 		return nil, m.loadError
@@ -343,20 +343,20 @@ func (m *mockStackManager) TargetDirectory() string {
 	return "."
 }
 
-func (m *mockStackManager) Create(params stacks.StackParameters) (string, error) {
+func (m *mockStackManager) Create(params stacks.Parameters) (string, error) {
 	if m.createError != nil {
 		return "", m.createError
 	}
 	if m.createResult != nil {
 		if m.loadResults == nil {
-			m.loadResults = make(map[string]*stacks.StackParameters)
+			m.loadResults = make(map[string]*stacks.Parameters)
 		}
 		m.loadResults[params.Name] = m.createResult
 	}
 	return params.Name, nil
 }
 
-func (m *mockStackManager) LoadStackEnv(params stacks.StackParameters, overload bool) error {
+func (m *mockStackManager) LoadStackEnv(params stacks.Parameters, overload bool) error {
 	return stacks.LoadStackEnv(params, overload)
 }
 
@@ -369,11 +369,11 @@ func TestNewProvider(t *testing.T) {
 	}
 	mockClient.SetFabricClient(mockCtrl)
 	oldRootCmd, oldClient := RootCmd, global.Client
-	global.Stack = stacks.StackParameters{}
+	global.Stack = stacks.Parameters{}
 	t.Cleanup(func() {
 		RootCmd = oldRootCmd
 		global.Client = oldClient
-		global.Stack = stacks.StackParameters{}
+		global.Stack = stacks.Parameters{}
 	})
 	global.Client = &mockClient
 
@@ -389,7 +389,7 @@ func TestNewProvider(t *testing.T) {
 	t.Run("Should set cd image from canIUse response", func(t *testing.T) {
 		t.Chdir("../../../../src/testdata/sanity")
 
-		global.Stack = stacks.StackParameters{
+		global.Stack = stacks.Parameters{
 			Name: "beta",
 		}
 		// Set up RootCmd with required flags for getStack function
@@ -409,7 +409,7 @@ func TestNewProvider(t *testing.T) {
 		t.Cleanup(func() {
 			awsdriver.NewStsFromConfig = prevSts
 			mockCtrl.canIUseResponse.CdImage = ""
-			global.Stack = stacks.StackParameters{}
+			global.Stack = stacks.Parameters{}
 		})
 
 		p := cli.NewProvider(ctx, client.ProviderAWS, client.MockFabricClient{}, "")
@@ -435,13 +435,13 @@ func TestNewProvider(t *testing.T) {
 		const overrideImageTag = "site/override/replaced:tag@sha256:otherdigest"
 		t.Setenv("DEFANG_CD_IMAGE", overrideImageTag)
 		mockCtrl.canIUseResponse.CdImage = cdImageTag
-		global.Stack = stacks.StackParameters{
+		global.Stack = stacks.Parameters{
 			Name: "beta",
 		}
 		t.Cleanup(func() {
 			awsdriver.NewStsFromConfig = prevSts
 			mockCtrl.canIUseResponse.CdImage = ""
-			global.Stack = stacks.StackParameters{}
+			global.Stack = stacks.Parameters{}
 		})
 
 		p := cli.NewProvider(ctx, client.ProviderAWS, client.MockFabricClient{}, "")

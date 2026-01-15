@@ -63,31 +63,31 @@ func (m *mockStacksManager) List(ctx context.Context) ([]stacks.StackListItem, e
 	return result, args.Error(1)
 }
 
-func (m *mockStacksManager) LoadLocal(name string) (*stacks.StackParameters, error) {
+func (m *mockStacksManager) LoadLocal(name string) (*stacks.Parameters, error) {
 	args := m.Called(name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	result, ok := args.Get(0).(*stacks.StackParameters)
+	result, ok := args.Get(0).(*stacks.Parameters)
 	if !ok {
 		return nil, args.Error(1)
 	}
 	return result, args.Error(1)
 }
 
-func (m *mockStacksManager) LoadRemote(ctx context.Context, name string) (*stacks.StackParameters, error) {
+func (m *mockStacksManager) LoadRemote(ctx context.Context, name string) (*stacks.Parameters, error) {
 	args := m.Called(ctx, name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	result, ok := args.Get(0).(*stacks.StackParameters)
+	result, ok := args.Get(0).(*stacks.Parameters)
 	if !ok {
 		return nil, args.Error(1)
 	}
 	return result, args.Error(1)
 }
 
-func (m *mockStacksManager) Create(params stacks.StackParameters) (string, error) {
+func (m *mockStacksManager) Create(params stacks.Parameters) (string, error) {
 	args := m.Called(params)
 	return args.String(0), args.Error(1)
 }
@@ -101,11 +101,11 @@ func TestLoadSession(t *testing.T) {
 	tests := []struct {
 		name          string
 		options       SessionLoaderOptions
-		localStack    *stacks.StackParameters
-		remoteStack   *stacks.StackParameters
+		localStack    *stacks.Parameters
+		remoteStack   *stacks.Parameters
 		stacksList    []stacks.StackListItem
 		expectedError string
-		expectedStack *stacks.StackParameters
+		expectedStack *stacks.Parameters
 		expectedEnv   map[string]string
 	}{
 		{
@@ -126,7 +126,7 @@ func TestLoadSession(t *testing.T) {
 				ProjectName: "foo",
 				ProviderID:  client.ProviderAWS,
 			},
-			expectedStack: &stacks.StackParameters{
+			expectedStack: &stacks.Parameters{
 				Name:      "beta",
 				Provider:  client.ProviderAWS,
 				Variables: map[string]string{},
@@ -148,7 +148,7 @@ func TestLoadSession(t *testing.T) {
 				ProjectName: "foo",
 				Stack:       "local-stack",
 			},
-			localStack: &stacks.StackParameters{
+			localStack: &stacks.Parameters{
 				Name:     "local-stack",
 				Provider: client.ProviderDefang,
 				Region:   "us-test-2",
@@ -157,7 +157,7 @@ func TestLoadSession(t *testing.T) {
 					"FOO":         "bar",
 				},
 			},
-			expectedStack: &stacks.StackParameters{
+			expectedStack: &stacks.Parameters{
 				Name:      "local-stack",
 				Provider:  client.ProviderDefang,
 				Variables: map[string]string{},
@@ -173,7 +173,7 @@ func TestLoadSession(t *testing.T) {
 				ProjectName: "foo",
 				Stack:       "remote-stack",
 			},
-			remoteStack: &stacks.StackParameters{
+			remoteStack: &stacks.Parameters{
 				Name:     "remote-stack",
 				Provider: client.ProviderGCP,
 				Region:   "us-central1",
@@ -182,7 +182,7 @@ func TestLoadSession(t *testing.T) {
 					"FOO":            "bar",
 				},
 			},
-			expectedStack: &stacks.StackParameters{
+			expectedStack: &stacks.Parameters{
 				Name:      "remote-stack",
 				Provider:  client.ProviderGCP,
 				Variables: map[string]string{},
@@ -198,7 +198,7 @@ func TestLoadSession(t *testing.T) {
 				ProjectName: "foo",
 				Stack:       "both-stack",
 			},
-			localStack: &stacks.StackParameters{
+			localStack: &stacks.Parameters{
 				Name:     "both-stack",
 				Provider: client.ProviderAWS,
 				Region:   "us-test-2",
@@ -207,7 +207,7 @@ func TestLoadSession(t *testing.T) {
 					"FOO":         "local-bar",
 				},
 			},
-			remoteStack: &stacks.StackParameters{
+			remoteStack: &stacks.Parameters{
 				Name:     "both-stack",
 				Provider: client.ProviderAWS,
 				Region:   "us-test-2",
@@ -216,7 +216,7 @@ func TestLoadSession(t *testing.T) {
 					"FOO":         "remote-bar",
 				},
 			},
-			expectedStack: &stacks.StackParameters{
+			expectedStack: &stacks.Parameters{
 				Name:     "both-stack",
 				Provider: client.ProviderAWS,
 				Region:   "us-test-2",
@@ -240,7 +240,7 @@ func TestLoadSession(t *testing.T) {
 			},
 			stacksList: []stacks.StackListItem{
 				{
-					StackParameters: stacks.StackParameters{
+					Parameters: stacks.Parameters{
 						Name:     "existing-stack",
 						Provider: client.ProviderGCP,
 						Region:   "us-central1",
@@ -252,7 +252,7 @@ func TestLoadSession(t *testing.T) {
 					DeployedAt: deployedAt,
 				},
 			},
-			expectedStack: &stacks.StackParameters{
+			expectedStack: &stacks.Parameters{
 				Name:      "existing-stack",
 				Provider:  client.ProviderGCP,
 				Variables: map[string]string{},
@@ -268,7 +268,7 @@ func TestLoadSession(t *testing.T) {
 				ProjectName: "foo",
 				Stack:       "compose-stack",
 			},
-			localStack: &stacks.StackParameters{
+			localStack: &stacks.Parameters{
 				Name:     "compose-stack",
 				Provider: client.ProviderDefang,
 				Region:   "us-test-2",
@@ -277,7 +277,7 @@ func TestLoadSession(t *testing.T) {
 					"COMPOSE_PATH":         "./docker-compose.yml:./docker-compose.override.yml",
 				},
 			},
-			expectedStack: &stacks.StackParameters{
+			expectedStack: &stacks.Parameters{
 				Name:     "compose-stack",
 				Provider: client.ProviderDefang,
 				Variables: map[string]string{

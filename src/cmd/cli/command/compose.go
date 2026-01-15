@@ -131,7 +131,7 @@ func makeComposeUpCmd() *cobra.Command {
 					return fmt.Errorf("deployment of project %q was canceled", project.Name)
 				}
 			} else if global.Stack.Name == "" {
-				err = promptToCreateStack(ctx, session.Loader.TargetDirectory(), stacks.StackParameters{
+				err = promptToCreateStack(ctx, session.Loader.TargetDirectory(), stacks.Parameters{
 					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
 					Provider: accountInfo.Provider,
 					Region:   accountInfo.Region,
@@ -253,7 +253,7 @@ func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.D
 	}
 	if stackName == "" {
 		stackName = stacks.DefaultBeta
-		_, err := stacks.CreateInDirectory(targetDirectory, stacks.StackParameters{
+		_, err := stacks.CreateInDirectory(targetDirectory, stacks.Parameters{
 			Name:     stackName,
 			Provider: accountInfo.Provider,
 			Region:   accountInfo.Region,
@@ -296,7 +296,7 @@ func confirmDeploymentToNewLocation(existingDeployments []*defangv1.Deployment) 
 	return true, nil
 }
 
-func promptToCreateStack(ctx context.Context, targetDirectory string, params stacks.StackParameters) error {
+func promptToCreateStack(ctx context.Context, targetDirectory string, params stacks.Parameters) error {
 	if global.NonInteractive {
 		term.Info("Consider creating a stack to manage your deployments.")
 		printDefangHint("To create a stack, do:", "stack new --name="+params.Name)

@@ -18,11 +18,11 @@ type ProviderCreator interface {
 
 type StacksManager interface {
 	List(ctx context.Context) ([]stacks.StackListItem, error)
-	Load(ctx context.Context, name string) (*stacks.StackParameters, error)
-	LoadLocal(name string) (*stacks.StackParameters, error)
-	LoadRemote(ctx context.Context, name string) (*stacks.StackParameters, error)
-	LoadStackEnv(params stacks.StackParameters, overload bool) error
-	Create(params stacks.StackParameters) (string, error)
+	Load(ctx context.Context, name string) (*stacks.Parameters, error)
+	LoadLocal(name string) (*stacks.Parameters, error)
+	LoadRemote(ctx context.Context, name string) (*stacks.Parameters, error)
+	LoadStackEnv(params stacks.Parameters, overload bool) error
+	Create(params stacks.Parameters) (string, error)
 	TargetDirectory() string
 }
 
@@ -42,7 +42,7 @@ func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc clie
 	}
 }
 
-func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.StackParameters) (*client.ProviderID, client.Provider, error) {
+func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.Parameters) (*client.ProviderID, client.Provider, error) {
 	if stack.Name == "" && pp.ec.IsSupported() {
 		selector := stacks.NewSelector(pp.ec, pp.sm)
 		newStack, err := selector.SelectStack(ctx, stacks.SelectStackOptions{

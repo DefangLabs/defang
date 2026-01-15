@@ -41,7 +41,7 @@ func makeStackNewCmd() *cobra.Command {
 
 			var region, _ = cmd.Flags().GetString("region")
 
-			params := stacks.StackParameters{
+			params := stacks.Parameters{
 				Name:     stackName,
 				Provider: global.Stack.Provider, // default provider
 				Region:   region,
@@ -142,7 +142,7 @@ func makeStackRemoveCmd() *cobra.Command {
 	return stackRemoveCmd
 }
 
-func PromptForStackParameters(ctx context.Context, params *stacks.StackParameters) error {
+func PromptForStackParameters(ctx context.Context, params *stacks.Parameters) error {
 	wizard := stacks.NewWizard(ec)
 	newParams, err := wizard.CollectRemainingParameters(ctx, params)
 	if err != nil {

@@ -62,13 +62,13 @@ func (sm *manager) List(ctx context.Context) ([]StackListItem, error) {
 		stackMap[remote.Name] = remote
 	}
 	for _, local := range localStacks {
-		remote, exists := stackMap[local.StackParameters.Name]
+		remote, exists := stackMap[local.Parameters.Name]
 		if exists {
 			local.DeployedAt = remote.DeployedAt
-			stackMap[local.StackParameters.Name] = local
+			stackMap[local.Parameters.Name] = local
 		} else {
-			stackMap[local.StackParameters.Name] = StackListItem{
-				StackParameters: local.StackParameters,
+			stackMap[local.Parameters.Name] = StackListItem{
+				Parameters: local.Parameters,
 			}
 		}
 	}
@@ -119,8 +119,8 @@ func (sm *manager) ListRemote(ctx context.Context) ([]StackListItem, error) {
 		}
 		params.Name = name
 		stackParams = append(stackParams, StackListItem{
-			StackParameters: params,
-			DeployedAt:      timeutils.AsTime(stack.GetLastDeployedAt(), time.Time{}),
+			Parameters: params,
+			DeployedAt: timeutils.AsTime(stack.GetLastDeployedAt(), time.Time{}),
 		})
 	}
 
@@ -141,7 +141,7 @@ func (e *ErrOutside) Error() string {
 	return fmt.Sprintf("%s not allowed: target directory (%s) is different from working directory (%s)", e.Operation, e.TargetDirectory, cwd)
 }
 
-func (sm *manager) Load(ctx context.Context, name string) (*StackParameters, error) {
+func (sm *manager) Load(ctx context.Context, name string) (*Parameters, error) {
 	params, err := sm.LoadLocal(name)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -153,7 +153,7 @@ func (sm *manager) Load(ctx context.Context, name string) (*StackParameters, err
 	return params, nil
 }
 
-func (sm *manager) LoadLocal(name string) (*StackParameters, error) {
+func (sm *manager) LoadLocal(name string) (*Parameters, error) {
 	params, err := ReadInDirectory(sm.targetDirectory, name)
 	if err != nil {
 		return nil, err
@@ -165,7 +165,7 @@ func (sm *manager) LoadLocal(name string) (*StackParameters, error) {
 	return params, nil
 }
 
-func (sm *manager) LoadRemote(ctx context.Context, name string) (*StackParameters, error) {
+func (sm *manager) LoadRemote(ctx context.Context, name string) (*Parameters, error) {
 	remoteStacks, err := sm.ListRemote(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list remote stacks: %w", err)
@@ -180,19 +180,19 @@ func (sm *manager) LoadRemote(ctx context.Context, name string) (*StackParameter
 	if remoteStack == nil {
 		return nil, fmt.Errorf("unable to find stack %q", name)
 	}
-	err = sm.LoadStackEnv(remoteStack.StackParameters, false)
+	err = sm.LoadStackEnv(remoteStack.Parameters, false)
 	if err != nil {
 		return nil, fmt.Errorf("unable to import stack %q: %w", name, err)
 	}
 
-	return &remoteStack.StackParameters, nil
+	return &remoteStack.Parameters, nil
 }
 
-func (sm *manager) LoadStackEnv(params StackParameters, overload bool) error {
+func (sm *manager) LoadStackEnv(params Parameters, overload bool) error {
 	return LoadStackEnv(params, overload)
 }
 
-func (sm *manager) Create(params StackParameters) (string, error) {
+func (sm *manager) Create(params Parameters) (string, error) {
 	if sm.targetDirectory == "" {
 		return "", &ErrOutside{Operation: "Create", TargetDirectory: sm.targetDirectory}
 	}

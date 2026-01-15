@@ -37,13 +37,13 @@ func TestMakeDefaultName(t *testing.T) {
 func TestCreate(t *testing.T) {
 	tests := []struct {
 		name             string
-		parameters       StackParameters
+		parameters       Parameters
 		expectErr        bool
 		expectedFilename string
 	}{
 		{
 			name: "valid parameters",
-			parameters: StackParameters{
+			parameters: Parameters{
 				Name:     "teststack",
 				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
@@ -54,7 +54,7 @@ func TestCreate(t *testing.T) {
 		},
 		{
 			name: "missing stack name",
-			parameters: StackParameters{
+			parameters: Parameters{
 				Name:     "",
 				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
@@ -64,7 +64,7 @@ func TestCreate(t *testing.T) {
 		},
 		{
 			name: "name with whitespaces",
-			parameters: StackParameters{
+			parameters: Parameters{
 				Name:     "invalid stack",
 				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
@@ -74,7 +74,7 @@ func TestCreate(t *testing.T) {
 		},
 		{
 			name: "single letter ok",
-			parameters: StackParameters{
+			parameters: Parameters{
 				Name:     "a",
 				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
@@ -85,7 +85,7 @@ func TestCreate(t *testing.T) {
 		},
 		{
 			name: "hyphen not ok",
-			parameters: StackParameters{
+			parameters: Parameters{
 				Name:     "invalid-name",
 				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
@@ -119,7 +119,7 @@ func TestCreate(t *testing.T) {
 
 func TestRepeatCreate(t *testing.T) {
 	t.Chdir(t.TempDir())
-	params := StackParameters{
+	params := Parameters{
 		Name:     "repeattest",
 		Provider: client.ProviderGCP,
 		Region:   "us-central1",
@@ -177,7 +177,7 @@ func TestRemove(t *testing.T) {
 		t.Chdir(t.TempDir())
 		// Create dummy stack file with valid provider and region
 		stackName := "stacktoremove"
-		params := StackParameters{
+		params := Parameters{
 			Name:     stackName,
 			Provider: client.ProviderAWS,
 			Region:   "us-west-2",
@@ -209,12 +209,12 @@ func TestRemove(t *testing.T) {
 func TestMarshal(t *testing.T) {
 	tests := []struct {
 		name            string
-		params          StackParameters
+		params          Parameters
 		expectedContent string
 	}{
 		{
 			name: "GCP provider",
-			params: StackParameters{
+			params: Parameters{
 				Name:     "teststack",
 				Provider: client.ProviderGCP,
 				Region:   "us-central1",
@@ -224,7 +224,7 @@ func TestMarshal(t *testing.T) {
 		},
 		{
 			name: "AWS provider",
-			params: StackParameters{
+			params: Parameters{
 				Name:     "awsstack",
 				Provider: client.ProviderAWS,
 				Region:   "us-east-1",
@@ -234,7 +234,7 @@ func TestMarshal(t *testing.T) {
 		},
 		{
 			name: "Unspecified mode",
-			params: StackParameters{
+			params: Parameters{
 				Name:     "nomodestack",
 				Provider: client.ProviderAWS,
 				Region:   "us-west-1",
@@ -244,7 +244,7 @@ func TestMarshal(t *testing.T) {
 		},
 		{
 			name: "Empty region",
-			params: StackParameters{
+			params: Parameters{
 				Name:     "noregionstack",
 				Provider: client.ProviderGCP,
 				Region:   "",
@@ -269,7 +269,7 @@ func TestParse(t *testing.T) {
 	tests := []struct {
 		name           string
 		content        string
-		expectedParams StackParameters
+		expectedParams Parameters
 	}{
 		{
 			name: "GCP provider",
@@ -277,7 +277,7 @@ func TestParse(t *testing.T) {
 GOOGLE_REGION=us-central1
 DEFANG_MODE=BALANCED
 `,
-			expectedParams: StackParameters{
+			expectedParams: Parameters{
 				Provider: client.ProviderGCP,
 				Region:   "us-central1",
 				Mode:     modes.ModeBalanced,
@@ -289,7 +289,7 @@ DEFANG_MODE=BALANCED
 AWS_REGION=us-east-1
 DEFANG_MODE=AFFORDABLE
 `,
-			expectedParams: StackParameters{
+			expectedParams: Parameters{
 				Provider: client.ProviderAWS,
 				Region:   "us-east-1",
 				Mode:     modes.ModeAffordable,
@@ -317,7 +317,7 @@ func TestReadInDirectory(t *testing.T) {
 		t.Chdir(t.TempDir())
 		// Create dummy stack file
 		stackName := "stacktoread"
-		expectedParams := StackParameters{
+		expectedParams := Parameters{
 			Name:     stackName,
 			Provider: client.ProviderAWS,
 			Region:   "us-west-2",
@@ -343,12 +343,12 @@ func TestReadInDirectory(t *testing.T) {
 func TestParamsToMap(t *testing.T) {
 	tests := []struct {
 		name        string
-		params      StackParameters
+		params      Parameters
 		expectedMap map[string]string
 	}{
 		{
 			name: "AWS params",
-			params: StackParameters{
+			params: Parameters{
 				Name:     "teststack",
 				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
@@ -366,7 +366,7 @@ func TestParamsToMap(t *testing.T) {
 		},
 		{
 			name: "GCP params",
-			params: StackParameters{
+			params: Parameters{
 				Name:     "gcpstack",
 				Provider: client.ProviderGCP,
 				Region:   "us-central1",
@@ -403,7 +403,7 @@ func TestParamsFromMap(t *testing.T) {
 	tests := []struct {
 		name           string
 		inputMap       map[string]string
-		expectedParams StackParameters
+		expectedParams Parameters
 	}{
 		{
 			name: "GCP params",
@@ -412,7 +412,7 @@ func TestParamsFromMap(t *testing.T) {
 				"GOOGLE_REGION":   "us-central1",
 				"DEFANG_MODE":     "balanced",
 			},
-			expectedParams: StackParameters{
+			expectedParams: Parameters{
 				Provider: client.ProviderGCP,
 				Region:   "us-central1",
 				Mode:     modes.ModeBalanced,
@@ -426,7 +426,7 @@ func TestParamsFromMap(t *testing.T) {
 				"AWS_PROFILE":     "default",
 				"DEFANG_MODE":     "affordable",
 			},
-			expectedParams: StackParameters{
+			expectedParams: Parameters{
 				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
 				Variables: map[string]string{

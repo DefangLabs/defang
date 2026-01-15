@@ -59,17 +59,17 @@ func TestStackListCmd(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		stacks       []stacks.StackParameters
+		stacks       []stacks.Parameters
 		expectOutput string
 	}{
 		{
 			name:         "no stacks present",
-			stacks:       []stacks.StackParameters{},
+			stacks:       []stacks.Parameters{},
 			expectOutput: " * No Defang stacks found in the current directory.\n",
 		},
 		{
 			name: "multiple stacks present",
-			stacks: []stacks.StackParameters{
+			stacks: []stacks.Parameters{
 				{
 					Name:     "teststack1",
 					Provider: client.ProviderAWS,
@@ -121,12 +121,12 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		parameters stacks.StackParameters
+		parameters stacks.Parameters
 		expectErr  bool
 	}{
 		{
 			name: "valid parameters",
-			parameters: stacks.StackParameters{
+			parameters: stacks.Parameters{
 				Name:     "teststack",
 				Provider: client.ProviderAWS,
 				Region:   "us-test-2",
@@ -136,7 +136,7 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 		},
 		{
 			name: "missing stack name",
-			parameters: stacks.StackParameters{
+			parameters: stacks.Parameters{
 				Name:     "",
 				Provider: client.ProviderAWS,
 				Region:   "us-test-2",
@@ -169,12 +169,12 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 func TestLoadStackEnv(t *testing.T) {
 	tests := []struct {
 		name        string
-		parameters  stacks.StackParameters
+		parameters  stacks.Parameters
 		expectedEnv map[string]string
 	}{
 		{
 			name: "AWS parameters",
-			parameters: stacks.StackParameters{
+			parameters: stacks.Parameters{
 				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
 				Mode:     modes.ModeAffordable,
@@ -191,7 +191,7 @@ func TestLoadStackEnv(t *testing.T) {
 		},
 		{
 			name: "GCP parameters",
-			parameters: stacks.StackParameters{
+			parameters: stacks.Parameters{
 				Provider: client.ProviderGCP,
 				Region:   "us-central1",
 				Mode:     modes.ModeBalanced,
@@ -212,7 +212,7 @@ func TestLoadStackEnv(t *testing.T) {
 		},
 		{
 			name: "With prefix and suffix",
-			parameters: stacks.StackParameters{
+			parameters: stacks.Parameters{
 				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
 				Mode:     modes.ModeAffordable,
