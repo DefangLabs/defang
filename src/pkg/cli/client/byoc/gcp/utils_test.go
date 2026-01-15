@@ -1,7 +1,6 @@
 package gcp
 
 import (
-	"strings"
 	"testing"
 
 	"google.golang.org/api/googleapi"
@@ -66,10 +65,5 @@ func Test_BadGCPprojectnameErrorWrap(t *testing.T) {
 
 	if errMsg != expectedMsg {
 		t.Errorf("Error() = %q, want %q", errMsg, expectedMsg)
-	}
-
-	// Verify the project name is in the error message
-	if !strings.Contains(errMsg, "badprojectname") {
-		t.Errorf("Error() message should contain project name 'badprojectname', got: %q", errMsg)
 	}
 }
