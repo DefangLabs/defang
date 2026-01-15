@@ -10,6 +10,7 @@ import (
 	"iter"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 
@@ -828,8 +829,27 @@ type briefGcpError struct {
 	err *googleapi.Error
 }
 
+var projectNameRe = regexp.MustCompile(`Project '([^']+)'`)
+
+func extractProjectName(errMsg string) string {
+	matches := projectNameRe.FindStringSubmatch(errMsg)
+	if len(matches) >= 2 {
+		return matches[1]
+	}
+	return ""
+}
+
 func (e briefGcpError) Error() string {
 	if e.err.Message != "" {
+		if e.err.Code == http.StatusForbidden {
+			if strings.Contains(e.err.Message, "not found or permission denied") {
+				projectname := extractProjectName(e.err.Message)
+				if projectname != "" {
+					return fmt.Sprintf("GCP project %q not found or permission denied, please ensure the project exists and your ADC credentials have access to it", projectname)
+				}
+				return "GCP project not found or permission denied, please ensure the project exists and your ADC credentials have access to it"
+			}
+		}
 		return e.err.Message
 	}
 	return e.err.Error()

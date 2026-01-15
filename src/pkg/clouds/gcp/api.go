@@ -28,7 +28,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 		operation, err := service.Services.BatchEnable(projectName, req).Do()
 		if err != nil {
 			if i < 2 {
-				term.Infof("Failed to enable services, will retry in 5s: %v\n", err)
+				term.Debugf("Failed to enable services, will retry in 5s: %v\n", err)
 				pkg.SleepWithContext(ctx, 5*time.Second)
 				continue
 			}

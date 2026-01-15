@@ -13,7 +13,10 @@ var DefaultClient = newClient().StandardClient()
 type Header = http.Header
 
 // Not planning on repeating all http package constants here, but StatusOK is useful.
-const StatusOK = http.StatusOK
+const (
+	StatusOK        = http.StatusOK
+	StatusForbidden = http.StatusForbidden
+)
 
 type slogLogger struct{}
 
