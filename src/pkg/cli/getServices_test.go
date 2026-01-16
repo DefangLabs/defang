@@ -386,7 +386,7 @@ func TestRunHealthcheck(t *testing.T) {
 			name:            "Invalid endpoint",
 			endpoint:        "http://invalid-endpoint-238hf83wfnrewanf.com",
 			healthcheckPath: "/",
-			expectedStatus:  "unhealthy (DNS error)",
+			expectedStatus:  "unknown (DNS error)",
 		},
 	}
 
