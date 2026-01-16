@@ -24,16 +24,31 @@ type Parameters struct {
 	Variables map[string]string
 }
 
+func NewParametersFromContent(name string, content []byte) (*Parameters, error) {
+	variables, err := parseContent(string(content))
+	if err != nil {
+		return nil, err
+	}
+	params, err := paramsFromMap(variables)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse stack %q: %w", name, err)
+	}
+	params.Name = name
+	return params, nil
+}
+
 func (sp Parameters) ToMap() map[string]string {
 	// make a copy to avoid modifying the original
 	vars := make(map[string]string, len(sp.Variables))
 	for k, v := range sp.Variables {
 		vars[k] = v
 	}
-	vars["DEFANG_PROVIDER"] = sp.Provider.String()
-	regionVarName := client.GetRegionVarName(sp.Provider)
-	if regionVarName != "" && sp.Region != "" {
-		vars[regionVarName] = sp.Region
+	if sp.Provider != "" {
+		vars["DEFANG_PROVIDER"] = sp.Provider.String()
+		regionVarName := client.GetRegionVarName(sp.Provider)
+		if regionVarName != "" && sp.Region != "" {
+			vars[regionVarName] = sp.Region
+		}
 	}
 	if sp.Mode != modes.ModeUnspecified {
 		vars["DEFANG_MODE"] = strings.ToLower(sp.Mode.String())
@@ -41,27 +56,27 @@ func (sp Parameters) ToMap() map[string]string {
 	return vars
 }
 
-func ParamsFromMap(variables map[string]string) (Parameters, error) {
+func paramsFromMap(variables map[string]string) (*Parameters, error) {
 	if variables == nil {
-		return Parameters{}, errors.New("properties map cannot be nil")
+		return nil, errors.New("properties map cannot be nil")
 	}
 	var provider client.ProviderID
 	if val, ok := variables["DEFANG_PROVIDER"]; ok {
 		err := provider.Set(val)
 		if err != nil {
-			return Parameters{}, fmt.Errorf("invalid DEFANG_PROVIDER value %q: %w", val, err)
+			return nil, fmt.Errorf("invalid DEFANG_PROVIDER value %q: %w", val, err)
 		}
 	}
 	var mode modes.Mode
 	if val, ok := variables["DEFANG_MODE"]; ok {
 		err := mode.Set(val)
 		if err != nil {
-			return Parameters{}, fmt.Errorf("invalid DEFANG_MODE value %q: %w", val, err)
+			return nil, fmt.Errorf("invalid DEFANG_MODE value %q: %w", val, err)
 		}
 	}
-	regionVarName := client.GetRegionVarName(provider)
+	regionVarName := client.GetRegionVarName(provider) // NOTE: GCP supports 5 different region vars
 	region := variables[regionVarName]
-	return Parameters{
+	return &Parameters{
 		Variables: variables,
 		Provider:  provider,
 		Region:    region,
@@ -103,7 +118,7 @@ func CreateInDirectory(workingDirectory string, params Parameters) (string, erro
 	if err != nil {
 		if errors.Is(err, os.ErrExist) {
 			instructions := fmt.Sprintf(
-				"If you want to overwrite it, please spin down the stack and remove stackfile first.\n"+
+				"If you want to overwrite it, please spin down the stack and remove stack file first.\n"+
 					"    defang down --stack %s && rm .defang/%s",
 				params.Name,
 				params.Name,
@@ -155,26 +170,21 @@ func ListInDirectory(workingDirectory string) ([]ListItem, error) {
 			term.Warnf("Skipping unreadable stack file %s: %v\n", filename, err)
 			continue
 		}
-		variables, err := Parse(string(content))
+
+		params, err := NewParametersFromContent(file.Name(), content)
 		if err != nil {
 			term.Warnf("Skipping invalid stack file %s: %v\n", filename, err)
 			continue
 		}
-		params, err := ParamsFromMap(variables)
-		if err != nil {
-			term.Warnf("Skipping invalid stack file %s: %v\n", filename, err)
-			continue
-		}
-		params.Name = file.Name()
 		stacks = append(stacks, ListItem{
-			Parameters: params,
+			Parameters: *params,
 		})
 	}
 
 	return stacks, nil
 }
 
-func Parse(content string) (map[string]string, error) {
+func parseContent(content string) (map[string]string, error) {
 	return godotenv.Parse(strings.NewReader(content))
 }
 
@@ -200,16 +210,7 @@ func ReadInDirectory(workingDirectory, name string) (*Parameters, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not read stack %q from %q: %w", name, path, err)
 	}
-	variables, err := Parse(string(content))
-	if err != nil {
-		return nil, err
-	}
-	params, err := ParamsFromMap(variables)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse stack %q: %w", name, err)
-	}
-	params.Name = name
-	return &params, nil
+	return NewParametersFromContent(name, content)
 }
 
 // This was basically ripped out of godotenv.Overload/Load. Unfortunately, they don't export
@@ -225,7 +226,7 @@ func LoadStackEnv(params Parameters, overload bool) error {
 	paramsMap := params.ToMap()
 	for key, value := range paramsMap {
 		if currentEnv[key] && !overload {
-			term.Warnf("The environment variable %q is set in both the stackfile and the environment. The value from the environment will be used.\n", key)
+			term.Warnf("The variable %q is set in both the stack file and the environment. The value from the environment will be used.\n", key)
 		}
 		if !currentEnv[key] || overload {
 			err := os.Setenv(key, value)
@@ -244,7 +245,7 @@ func filename(workingDirectory, stackname string) string {
 
 func PostCreateMessage(stackName string) string {
 	return fmt.Sprintf(
-		"A stackfile has been created at `.defang/%s`.\n"+
+		"A stack file has been created at `.defang/%s`.\n"+
 			"This file contains the configuration for this stack.\n"+
 			"We recommend you commit this file to source control, so it can be used by everyone on your team.\n"+
 			"You can now deploy using `defang up --stack=%s`.\n"+

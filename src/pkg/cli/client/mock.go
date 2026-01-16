@@ -191,6 +191,10 @@ func (m MockFabricClient) GetTenantName() types.TenantLabel {
 	return "tenant-mock"
 }
 
+func (m MockFabricClient) GetDefaultStack(context.Context, *defangv1.GetDefaultStackRequest) (*defangv1.GetStackResponse, error) {
+	return nil, errors.ErrUnsupported
+}
+
 type MockLoader struct {
 	Project composeTypes.Project
 	Error   error

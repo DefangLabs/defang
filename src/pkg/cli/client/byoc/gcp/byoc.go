@@ -102,7 +102,7 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 	// Keeping GCP_LOCATION first for backward compatibility
 	_, region := pkg.GetFirstEnv(pkg.GCPRegionEnvVars...)
 	if region == "" {
-		region = "us-central1" // Defaults to us-central1 for lower price
+		region = client.RegionDefaultGCP
 	}
 	projectId := getGcpProjectID()
 	b := &ByocGcp{driver: &gcp.Gcp{Region: region, ProjectId: projectId}}

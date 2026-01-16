@@ -23,7 +23,8 @@ var (
 
 	// Standard GCP environment variables in order of precedence; https://registry.terraform.io/providers/hashicorp/google/5.10.0/docs/guides/provider_reference#project-1
 	GCPProjectEnvVars = []string{"GCP_PROJECT_ID", "GOOGLE_PROJECT", "GOOGLE_CLOUD_PROJECT", "GCLOUD_PROJECT", "CLOUDSDK_CORE_PROJECT"}
-	GCPRegionEnvVars  = []string{"GCP_LOCATION", "GOOGLE_REGION", "GCLOUD_REGION", "CLOUDSDK_COMPUTE_REGION"}
+	// Keeping GCP_LOCATION first for backward compatibility
+	GCPRegionEnvVars = []string{"GCP_LOCATION", "GOOGLE_REGION", "GCLOUD_REGION", "CLOUDSDK_COMPUTE_REGION"}
 )
 
 func GetCurrentUser() string {
