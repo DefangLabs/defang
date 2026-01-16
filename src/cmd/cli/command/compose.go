@@ -209,8 +209,13 @@ func makeComposeUpCmd() *cobra.Command {
 				service.State = serviceStates[service.Service.Name]
 			}
 
+			services, err := cli.NewServiceFromServiceInfo(deploy.Services)
+			if err != nil {
+				return err
+			}
+
 			// Print the current service states of the deployment
-			err = cli.PrintServiceStatesAndEndpoints(deploy.Services)
+			err = cli.PrintServiceStatesAndEndpoints(services)
 			if err != nil {
 				return err
 			}
@@ -645,7 +650,11 @@ func makeComposePsCmd() *cobra.Command {
 				return err
 			}
 
-			if err := cli.PrintServices(cmd.Context(), projectName, session.Provider, long); err != nil {
+			if long {
+				return cli.PrintLongServices(cmd.Context(), projectName, session.Provider)
+			}
+
+			if err := cli.PrintServices(cmd.Context(), projectName, session.Provider); err != nil {
 				if errNoServices := new(cli.ErrNoServices); !errors.As(err, errNoServices) {
 					return err
 				}
