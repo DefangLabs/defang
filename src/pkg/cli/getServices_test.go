@@ -149,110 +149,89 @@ foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.
 
 func TestGetServiceStatesAndEndpoints(t *testing.T) {
 	tests := []struct {
-		name             string
-		serviceinfos     []*defangv1.ServiceInfo
-		expectedServices []ServiceLineItem
+		name            string
+		serviceinfo     *defangv1.ServiceInfo
+		expectedService ServiceLineItem
 	}{
 		{
 			name: "empty endpoint list",
-			serviceinfos: []*defangv1.ServiceInfo{
-				{
-					Service: &defangv1.Service{
-						Name: "service1",
-					},
-					Status:     "UNKNOWN",
-					Domainname: "example.com",
-					Endpoints:  []string{},
+			serviceinfo: &defangv1.ServiceInfo{
+				Service: &defangv1.Service{
+					Name: "service1",
 				},
+				Status:     "UNKNOWN",
+				Domainname: "example.com",
+				Endpoints:  []string{},
 			},
-			expectedServices: []ServiceLineItem{
-				{
-					Service:  "service1",
-					Status:   "UNKNOWN",
-					Endpoint: "https://example.com",
-				},
+			expectedService: ServiceLineItem{
+				Service:  "service1",
+				Status:   "UNKNOWN",
+				Endpoint: "https://example.com",
 			},
 		},
 		{
 			name: "Service with Domainname",
-			serviceinfos: []*defangv1.ServiceInfo{
-				{
-					Service: &defangv1.Service{
-						Name: "service1",
-					},
-					Status:     "UNKNOWN",
-					Domainname: "example.com",
-					Endpoints: []string{
-						"example.com",
-						"service1.internal:80",
-					},
+			serviceinfo: &defangv1.ServiceInfo{
+				Service: &defangv1.Service{
+					Name: "service1",
+				},
+				Status:     "UNKNOWN",
+				Domainname: "example.com",
+				Endpoints: []string{
+					"example.com",
+					"service1.internal:80",
 				},
 			},
-			expectedServices: []ServiceLineItem{
-				{
-					Service:  "service1",
-					Status:   "UNKNOWN",
-					Endpoint: "https://example.com",
-				},
+			expectedService: ServiceLineItem{
+				Service:  "service1",
+				Status:   "UNKNOWN",
+				Endpoint: "https://example.com",
 			},
 		},
 		{
 			name: "endpoint without port",
-			serviceinfos: []*defangv1.ServiceInfo{
-				{
-					Service: &defangv1.Service{
-						Name: "service1",
-					},
-					Status: "UNKNOWN",
-					Endpoints: []string{
-						"service1",
-					},
+			serviceinfo: &defangv1.ServiceInfo{
+				Service: &defangv1.Service{
+					Name: "service1",
+				},
+				Status: "UNKNOWN",
+				Endpoints: []string{
+					"service1",
 				},
 			},
-			expectedServices: []ServiceLineItem{
-				{
-					Service:  "service1",
-					Status:   "UNKNOWN",
-					Endpoint: "N/A",
-				},
+			expectedService: ServiceLineItem{
+				Service:  "service1",
+				Status:   "UNKNOWN",
+				Endpoint: "N/A",
 			},
 		},
 		{
 			name: "with acme cert",
-			serviceinfos: []*defangv1.ServiceInfo{
-				{
-					Service: &defangv1.Service{
-						Name: "service1",
-					},
-					Status:      "UNKNOWN",
-					UseAcmeCert: true,
-					Endpoints: []string{
-						"service1",
-					},
+			serviceinfo: &defangv1.ServiceInfo{
+				Service: &defangv1.Service{
+					Name: "service1",
+				},
+				Status:      "UNKNOWN",
+				UseAcmeCert: true,
+				Endpoints: []string{
+					"service1",
 				},
 			},
-			expectedServices: []ServiceLineItem{
-				{
-					Service:      "service1",
-					Status:       "UNKNOWN",
-					Endpoint:     "N/A",
-					AcmeCertUsed: true,
-				},
+			expectedService: ServiceLineItem{
+				Service:      "service1",
+				Status:       "UNKNOWN",
+				Endpoint:     "N/A",
+				AcmeCertUsed: true,
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			services, err := ServiceLineItemsFromServiceInfos(tt.serviceinfos)
-			require.NoError(t, err)
-
-			assert.Len(t, services, len(tt.expectedServices))
-			for i, svc := range services {
-				assert.Equal(t, tt.expectedServices[i].Service, svc.Service)
-				assert.Equal(t, tt.expectedServices[i].Status, svc.Status)
-				assert.Equal(t, tt.expectedServices[i].Endpoint, svc.Endpoint)
-				assert.Equal(t, tt.expectedServices[i].AcmeCertUsed, svc.AcmeCertUsed)
-			}
+			svc := ServiceLineItemFromServiceInfo(tt.serviceinfo)
+			assert.Equal(t, tt.expectedService.Service, svc.Service)
+			assert.Equal(t, tt.expectedService.Status, svc.Status)
+			assert.Equal(t, tt.expectedService.Endpoint, svc.Endpoint)
+			assert.Equal(t, tt.expectedService.AcmeCertUsed, svc.AcmeCertUsed)
 		})
 	}
 }
