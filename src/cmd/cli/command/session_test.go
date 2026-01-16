@@ -19,10 +19,9 @@ func TestNewStackManagerForCommand(t *testing.T) {
 		expectedError  string
 	}{
 		{
-			name:           "inside a directory without a project",
+			name:           "inside a directory without a project - defaults to defang provider",
 			directory:      "without-project",
 			expectedTarget: "",
-			expectedError:  "no local stack files found; create a new stack or use --project-name to load known stacks",
 		},
 		{
 			name:           "inside a project directory without a stack directory",
@@ -45,26 +44,21 @@ func TestNewStackManagerForCommand(t *testing.T) {
 			expectedTarget: "..",
 		},
 		{
-			name:          "outside a project directory",
-			directory:     ".",
-			projectName:   "myproject",
-			expectedError: "no local stack files found; create a new stack or use --project-name to load known stacks",
+			name:           "outside a project directory - default to defang provider",
+			directory:      ".",
+			projectName:    "myproject",
+			expectedTarget: "",
 		},
 	}
 
 	for _, tt := range tests {
+		tempDir := t.TempDir()
+		// copy testdata to tempDir
+		err := copyDir("testdata", tempDir)
+		if err != nil {
+			t.Fatalf("failed to copy testdata: %v", err)
+		}
 		t.Run(tt.name, func(t *testing.T) {
-			tempDir := t.TempDir()
-			var err error
-			if err != nil {
-				t.Fatalf("failed to create temp directory: %v", err)
-			}
-			// copy testdata to tempDir
-			err = copyDir("testdata", tempDir)
-			if err != nil {
-				t.Fatalf("failed to copy testdata: %v", err)
-			}
-			t.Cleanup(func() { os.RemoveAll(tempDir) })
 			testDir := filepath.Join(tempDir, tt.directory)
 			t.Chdir(testDir)
 
@@ -76,16 +70,16 @@ func TestNewStackManagerForCommand(t *testing.T) {
 			}
 			require.NoError(t, err, "expected no error but got one")
 
-			absTestDirectory, err := filepath.Abs(".")
-			if err != nil {
-				t.Fatalf("failed to get absolute path: %v", err)
+			if tt.expectedTarget == "" {
+				assert.Equal(t, "", sm.TargetDirectory())
+			} else {
+				actualTarget := sm.TargetDirectory()
+				expectedAbs, err := filepath.Abs(tt.expectedTarget)
+				if err != nil {
+					t.Fatalf("failed to get relative path: %v", err)
+				}
+				assert.Equal(t, expectedAbs, actualTarget)
 			}
-			actualTarget := sm.TargetDirectory()
-			relativeTarget, err := filepath.Rel(absTestDirectory, actualTarget)
-			if err != nil {
-				t.Fatalf("failed to get relative path: %v", err)
-			}
-			assert.Equal(t, tt.expectedTarget, relativeTarget)
 		})
 	}
 }
