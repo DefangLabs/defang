@@ -102,7 +102,7 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 	// Keeping GCP_LOCATION first for backward compatibility
 	_, region := pkg.GetFirstEnv(pkg.GCPRegionEnvVars...)
 	if region == "" {
-		region = "us-central1" // Defaults to us-central1 for lower price
+		region = client.RegionDefaultGCP
 	}
 	projectId := getGcpProjectID()
 	b := &ByocGcp{driver: &gcp.Gcp{Region: region, ProjectId: projectId}}
@@ -819,45 +819,6 @@ func (b *ByocGcp) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest)
 func (b *ByocGcp) TearDownCD(ctx context.Context) error {
 	// FIXME: implement
 	return client.ErrNotImplemented("GCP TearDown")
-}
-
-// Utility functions
-
-// The default googleapi.Error is too verbose, only display the message if it exists
-type briefGcpError struct {
-	err *googleapi.Error
-}
-
-func (e briefGcpError) Error() string {
-	if e.err.Message != "" {
-		return e.err.Message
-	}
-	return e.err.Error()
-}
-
-func annotateGcpError(err error) error {
-	gerr := new(googleapi.Error)
-	if errors.As(err, &gerr) {
-		return briefGcpError{err: gerr}
-	}
-	return err
-}
-
-// Used to get nested values from the detail of a googleapi.Error
-func GetGoogleAPIErrorDetail(detail any, path string) string {
-	if path == "" {
-		value, ok := detail.(string)
-		if ok {
-			return value
-		}
-		return ""
-	}
-	dm, ok := detail.(map[string]any)
-	if !ok {
-		return ""
-	}
-	key, rest, _ := strings.Cut(path, ".")
-	return GetGoogleAPIErrorDetail(dm[key], rest)
 }
 
 func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {

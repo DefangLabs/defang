@@ -285,7 +285,7 @@ func TestHandleSetConfig(t *testing.T) {
 					"profile_name": "default",
 				},
 			})
-			stack := stacks.StackParameters{
+			stack := stacks.Parameters{
 				Name:     "test-stack",
 				Provider: client.ProviderAWS,
 			}

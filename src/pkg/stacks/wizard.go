@@ -32,11 +32,11 @@ func NewWizardWithProfileLister(ec elicitations.Controller, profileLister AWSPro
 	}
 }
 
-func (w *Wizard) CollectParameters(ctx context.Context) (*StackParameters, error) {
-	return w.CollectRemainingParameters(ctx, &StackParameters{})
+func (w *Wizard) CollectParameters(ctx context.Context) (*Parameters, error) {
+	return w.CollectRemainingParameters(ctx, &Parameters{})
 }
 
-func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *StackParameters) (*StackParameters, error) {
+func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Parameters) (*Parameters, error) {
 	// Initialize Variables map if nil
 	if params.Variables == nil {
 		params.Variables = make(map[string]string)

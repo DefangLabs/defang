@@ -74,9 +74,9 @@ func makeComposeUpCmd() *cobra.Command {
 
 			since := time.Now()
 
-			options := NewSessionLoaderOptionsForCommand(cmd)
+			options := newSessionLoaderOptionsForCommand(cmd)
 			options.AllowStackCreation = true
-			sm, err := newStackManagerForCommand(cmd)
+			sm, err := newStackManagerForLoader(ctx, configureLoader(cmd))
 			if err != nil {
 				return err
 			}
@@ -131,7 +131,7 @@ func makeComposeUpCmd() *cobra.Command {
 					return fmt.Errorf("deployment of project %q was canceled", project.Name)
 				}
 			} else if global.Stack.Name == "" {
-				err = promptToCreateStack(ctx, session.Loader.TargetDirectory(), stacks.StackParameters{
+				err = promptToCreateStack(ctx, session.Loader.TargetDirectory(), stacks.Parameters{
 					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
 					Provider: accountInfo.Provider,
 					Region:   accountInfo.Region,
@@ -253,7 +253,7 @@ func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.D
 	}
 	if stackName == "" {
 		stackName = stacks.DefaultBeta
-		_, err := stacks.CreateInDirectory(targetDirectory, stacks.StackParameters{
+		_, err := stacks.CreateInDirectory(targetDirectory, stacks.Parameters{
 			Name:     stackName,
 			Provider: accountInfo.Provider,
 			Region:   accountInfo.Region,
@@ -296,7 +296,7 @@ func confirmDeploymentToNewLocation(existingDeployments []*defangv1.Deployment) 
 	return true, nil
 }
 
-func promptToCreateStack(ctx context.Context, targetDirectory string, params stacks.StackParameters) error {
+func promptToCreateStack(ctx context.Context, targetDirectory string, params stacks.Parameters) error {
 	if global.NonInteractive {
 		term.Info("Consider creating a stack to manage your deployments.")
 		printDefangHint("To create a stack, do:", "stack new --name="+params.Name)
@@ -477,7 +477,7 @@ func makeComposeDownCmd() *cobra.Command {
 				cli.EnableUTCMode()
 			}
 
-			session, err := NewCommandSession(cmd)
+			session, err := newCommandSession(cmd)
 			if err != nil {
 				return err
 			}
@@ -575,21 +575,17 @@ func makeComposeConfigCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 
-			options := NewSessionLoaderOptionsForCommand(cmd)
-			sm, err := newStackManagerForCommand(cmd)
-			if err != nil {
-				// For `compose config` it's OK to proceed without a stack manager
-				term.Debugf("failed to create stack manager: %v", err)
-			}
-			sessionLoader := session.NewSessionLoader(global.Client, ec, sm, options)
-			session, err := sessionLoader.LoadSession(ctx)
+			session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
+				CheckAccountInfo: false,
+				RequireStack:     false, // for `compose config` it's OK to proceed without a stack
+			})
 			if err != nil {
 				return fmt.Errorf("loading session: %w", err)
 			}
 
 			_, err = session.Provider.AccountInfo(ctx)
 			if err != nil {
-				term.Warn("unable to load AccountInfo:", err)
+				term.Warn("unable to connect to cloud provider:", err, "- some information may not be up-to-date")
 			}
 
 			project, loadErr := session.Loader.LoadProject(ctx)
@@ -639,7 +635,7 @@ func makeComposePsCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			long, _ := cmd.Flags().GetBool("long")
 
-			session, err := NewCommandSession(cmd)
+			session, err := newCommandSession(cmd)
 			if err != nil {
 				return err
 			}
@@ -763,7 +759,7 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 		services = append(args, strings.Split(name, ",")...) // backwards compat
 	}
 
-	session, err := NewCommandSession(cmd)
+	session, err := newCommandSession(cmd)
 	if err != nil {
 		return err
 	}

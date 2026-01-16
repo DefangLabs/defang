@@ -71,7 +71,7 @@ type GlobalConfig struct {
 	HideUpdate     bool
 	ModelID        string // only for debug/generate; Pro users
 	NonInteractive bool
-	Stack          stacks.StackParameters
+	Stack          stacks.Parameters
 	Tenant         types.TenantNameOrID // workspace
 	Verbose        bool
 }
@@ -130,7 +130,7 @@ func NewGlobalConfig() *GlobalConfig {
 		HasTty:         hastty,
 		HideUpdate:     pkg.GetenvBool("DEFANG_HIDE_UPDATE"),
 		NonInteractive: !hastty,
-		Stack: stacks.StackParameters{
+		Stack: stacks.Parameters{
 			Name:     pkg.Getenv("DEFANG_STACK", ""),
 			Provider: provider,
 			Mode:     mode,

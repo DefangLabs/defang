@@ -138,7 +138,7 @@ func TestHandleDestroyTool(t *testing.T) {
 	}
 
 	loader := &client.MockLoader{}
-	stack := stacks.StackParameters{
+	stack := stacks.Parameters{
 		Name:     "test-stack",
 		Provider: client.ProviderAWS,
 	}

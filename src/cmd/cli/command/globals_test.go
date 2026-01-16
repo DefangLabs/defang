@@ -23,7 +23,7 @@ func Test_configurationPrecedence(t *testing.T) {
 		HideUpdate:     false,
 		NonInteractive: false, // set to false just for test instead of !term.IsTerminal() for consistency
 		Verbose:        false,
-		Stack:          stacks.StackParameters{Provider: client.ProviderAuto, Mode: modes.ModeUnspecified},
+		Stack:          stacks.Parameters{Provider: client.ProviderAuto, Mode: modes.ModeUnspecified},
 		Cluster:        "",
 		Tenant:         "",
 	}

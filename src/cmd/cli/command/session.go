@@ -1,6 +1,7 @@
 package command
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/session"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -16,26 +18,45 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCommandSession(cmd *cobra.Command) (*session.Session, error) {
+type commandSessionOpts struct {
+	CheckAccountInfo bool
+	RequireStack     bool
+}
+
+func newCommandSession(cmd *cobra.Command) (*session.Session, error) {
+	return newCommandSessionWithOpts(cmd, commandSessionOpts{
+		CheckAccountInfo: true,
+		RequireStack:     true,
+	})
+}
+
+func newCommandSessionWithOpts(cmd *cobra.Command, opts commandSessionOpts) (*session.Session, error) {
 	ctx := cmd.Context()
-	options := NewSessionLoaderOptionsForCommand(cmd)
-	sm, err := newStackManagerForCommand(cmd)
+
+	options := newSessionLoaderOptionsForCommand(cmd)
+	options.RequireStack = opts.RequireStack
+	sm, err := newStackManagerForLoader(ctx, configureLoader(cmd))
 	if err != nil {
-		return nil, err
+		if opts.RequireStack {
+			return nil, err
+		}
+		term.Debugf("Could not create stack manager: %v", err)
 	}
 	sessionLoader := session.NewSessionLoader(global.Client, ec, sm, options)
 	session, err := sessionLoader.LoadSession(ctx)
 	if err != nil {
 		return nil, err
 	}
-	_, err = session.Provider.AccountInfo(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get account info from provider %q: %w", session.Stack.Provider, err)
+	if opts.CheckAccountInfo {
+		_, err = session.Provider.AccountInfo(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get account info from provider %q: %w", session.Stack.Provider, err)
+		}
 	}
 	return session, nil
 }
 
-func NewSessionLoaderOptionsForCommand(cmd *cobra.Command) session.SessionLoaderOptions {
+func newSessionLoaderOptionsForCommand(cmd *cobra.Command) session.SessionLoaderOptions {
 	stack, _ := cmd.Flags().GetString("stack")
 	configPaths, _ := cmd.Flags().GetStringArray("file")
 	provider, _ := cmd.Flag("provider").Value.(*client.ProviderID)
@@ -81,27 +102,15 @@ func doubleCheckProjectName(projectName string) {
 	}
 }
 
-func newStackManagerForCommand(cmd *cobra.Command) (session.StacksManager, error) {
-	loader := configureLoader(cmd)
-	projectName, _ := cmd.Flags().GetString("project-name")
-	if projectName == "" {
-		var err error
-		projectName, err = loader.LoadProjectName(cmd.Context())
-		if err != nil {
-			term.Debugf("Unable to load project name: %v", err)
-		}
-	}
+
+func newStackManagerForLoader(ctx context.Context, loader *compose.Loader) (session.StacksManager, error) {
 	targetDirectory, err := findTargetDirectory()
 	if err != nil {
-		// No .defang folder in any parent directory, so we'd need a project-name to fetch stacks from Fabric
-		if projectName == "" {
-			if errors.Is(err, os.ErrNotExist) {
-				return nil, errors.New("no local stack files found; create a new stack or use --project-name to load known stacks")
-			}
-			return nil, err
-		}
-		// Use empty string for targetDirectory when outside project but projectName is provided
 		targetDirectory = loader.TargetDirectory()
+	}
+	projectName, err := loader.LoadProjectName(ctx)
+	if err != nil {
+		term.Debugf("Could not determine project name: %v", err)
 	}
 	sm, err := stacks.NewManager(global.Client, targetDirectory, projectName)
 	if err != nil {

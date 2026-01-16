@@ -15,7 +15,7 @@ func TestHandleSelectStackTool(t *testing.T) {
 	tests := []struct {
 		name           string
 		params         SelectStackParams
-		initialStack   *stacks.StackParameters
+		initialStack   *stacks.Parameters
 		expectedResult string
 		expectedError  bool
 		errorContains  string
@@ -28,7 +28,7 @@ func TestHandleSelectStackTool(t *testing.T) {
 				},
 				Stack: "test-stack",
 			},
-			initialStack: &stacks.StackParameters{
+			initialStack: &stacks.Parameters{
 				Name:     "placeholder",
 				Provider: client.ProviderGCP,
 				Region:   "placeholder",
@@ -45,7 +45,7 @@ func TestHandleSelectStackTool(t *testing.T) {
 				},
 				Stack: "test-stack",
 			},
-			initialStack: &stacks.StackParameters{
+			initialStack: &stacks.Parameters{
 				Name:     "old-stack",
 				Provider: client.ProviderGCP,
 				Region:   "us-central1",
@@ -65,7 +65,7 @@ func TestHandleSelectStackTool(t *testing.T) {
 				},
 				Stack: "nonexistent-stack",
 			},
-			initialStack: &stacks.StackParameters{
+			initialStack: &stacks.Parameters{
 				Name: "placeholder",
 			},
 			expectedResult: "",
@@ -80,7 +80,7 @@ func TestHandleSelectStackTool(t *testing.T) {
 				},
 				Stack: "",
 			},
-			initialStack: &stacks.StackParameters{
+			initialStack: &stacks.Parameters{
 				Name: "placeholder",
 			},
 			expectedResult: "",

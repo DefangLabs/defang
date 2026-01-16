@@ -19,7 +19,7 @@ func TestHandleCurrentStackTool(t *testing.T) {
 		{
 			name: "Stack is set",
 			stackConfig: StackConfig{
-				Stack: &stacks.StackParameters{
+				Stack: &stacks.Parameters{
 					Name:     "test-stack",
 					Provider: client.ProviderAWS,
 					Region:   "us-test-2",

@@ -28,7 +28,7 @@ type ComposeUpParams struct {
 }
 
 // ComposeUp validates a compose project and uploads the services using the client
-func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.Provider, stack *stacks.StackParameters, params ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
+func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.Provider, stack *stacks.Parameters, params ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	upload := params.UploadMode
 	project := params.Project
 	mode := params.Mode

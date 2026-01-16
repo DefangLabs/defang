@@ -26,7 +26,7 @@ func HandleCreateGCPStackTool(ctx context.Context, params CreateGCPStackParams, 
 	if err != nil {
 		return "Invalid mode provided", err
 	}
-	newStack := stacks.StackParameters{
+	newStack := stacks.Parameters{
 		Name:     params.Name,
 		Region:   params.Region,
 		Provider: client.ProviderGCP,

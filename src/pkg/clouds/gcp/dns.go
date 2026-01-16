@@ -14,7 +14,7 @@ func (gcp Gcp) EnsureDNSZoneExists(ctx context.Context, name, domain, descriptio
 	}
 
 	zoneSvc := dns.NewManagedZonesService(dnsSvc)
-	zone, err := zoneSvc.Get(gcp.ProjectId, name).Do()
+	zone, err := zoneSvc.Get(gcp.ProjectId, name).Context(ctx).Do()
 	if err == nil {
 		return zone, nil
 	}
@@ -30,7 +30,7 @@ func (gcp Gcp) EnsureDNSZoneExists(ctx context.Context, name, domain, descriptio
 		Name:        name,
 		DnsName:     domain,
 		Description: description,
-	}).Do(); err != nil {
+	}).Context(ctx).Do(); err != nil {
 		return nil, fmt.Errorf("failed to create zone service: %w", err)
 	} else {
 		return zone, nil
@@ -44,7 +44,7 @@ func (gcp Gcp) GetDNSZone(ctx context.Context, name string) (*dns.ManagedZone, e
 	}
 
 	zoneSvc := dns.NewManagedZonesService(dnsSvc)
-	zone, err := zoneSvc.Get(gcp.ProjectId, name).Do()
+	zone, err := zoneSvc.Get(gcp.ProjectId, name).Context(ctx).Do()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get DNS zone service: %w", err)
 	}
@@ -59,7 +59,7 @@ func (gcp Gcp) DeleteDNSZone(ctx context.Context, name string) error {
 	}
 
 	zoneSvc := dns.NewManagedZonesService(dnsSvc)
-	zone, err := zoneSvc.Get(gcp.ProjectId, name).Do()
+	zone, err := zoneSvc.Get(gcp.ProjectId, name).Context(ctx).Do()
 	if err != nil {
 		return fmt.Errorf("failed to get DNS zone service: %w", err)
 	}
@@ -69,7 +69,7 @@ func (gcp Gcp) DeleteDNSZone(ctx context.Context, name string) error {
 			if (rrs.Type == "NS" || rrs.Type == "SOA") && rrs.Name == zone.DnsName {
 				continue // Skip NS and SOA records for the zone itself
 			}
-			_, err := dnsSvc.ResourceRecordSets.Delete(gcp.ProjectId, name, rrs.Name, rrs.Type).Do()
+			_, err := dnsSvc.ResourceRecordSets.Delete(gcp.ProjectId, name, rrs.Name, rrs.Type).Context(ctx).Do()
 			if err != nil {
 				return err
 			}
@@ -81,7 +81,7 @@ func (gcp Gcp) DeleteDNSZone(ctx context.Context, name string) error {
 		return fmt.Errorf("failed to delete DNS zone records: %w", err)
 	}
 
-	err = dnsSvc.ManagedZones.Delete(gcp.ProjectId, name).Do()
+	err = dnsSvc.ManagedZones.Delete(gcp.ProjectId, name).Context(ctx).Do()
 	if err != nil {
 		return fmt.Errorf("failed to delete DNS zone: %w", err)
 	}

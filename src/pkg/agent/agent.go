@@ -33,7 +33,7 @@ type Agent struct {
 	system    string
 }
 
-func New(ctx context.Context, clusterAddr string, stack *stacks.StackParameters) (*Agent, error) {
+func New(ctx context.Context, clusterAddr string, stack *stacks.Parameters) (*Agent, error) {
 	accessToken := client.GetExistingToken(clusterAddr)
 	aiProvider := "fabric"
 	var providerPlugin api.Plugin
