@@ -19,7 +19,7 @@ import (
 
 type StackConfig struct {
 	Cluster string
-	Stack   *stacks.StackParameters
+	Stack   *stacks.Parameters
 }
 
 // DefaultToolCLI implements all tool interfaces as passthroughs to the real CLI logic
@@ -50,7 +50,7 @@ func (DefaultToolCLI) Connect(ctx context.Context, cluster string) (*client.Grpc
 	return cli.ConnectWithTenant(ctx, cluster, types.TenantUnset)
 }
 
-func (DefaultToolCLI) ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, stack *stacks.StackParameters, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
+func (DefaultToolCLI) ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, stack *stacks.Parameters, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	return cli.ComposeUp(ctx, fabric, provider, stack, params)
 }
 

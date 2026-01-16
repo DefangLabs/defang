@@ -50,7 +50,7 @@ type putDeploymentParams struct {
 	EventsUrl    string
 }
 
-func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric client.FabricClient, stack *stacks.StackParameters, req putDeploymentParams) error {
+func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric client.FabricClient, stack *stacks.Parameters, req putDeploymentParams) error {
 	accountInfo, err := provider.AccountInfo(ctx)
 	if err != nil {
 		return err

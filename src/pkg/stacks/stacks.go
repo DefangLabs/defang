@@ -15,7 +15,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-type StackParameters struct {
+type Parameters struct {
 	Name     string
 	Provider client.ProviderID
 	Mode     modes.Mode
@@ -24,7 +24,7 @@ type StackParameters struct {
 	Variables map[string]string
 }
 
-func (sp StackParameters) ToMap() map[string]string {
+func (sp Parameters) ToMap() map[string]string {
 	// make a copy to avoid modifying the original
 	vars := make(map[string]string, len(sp.Variables))
 	for k, v := range sp.Variables {
@@ -41,27 +41,27 @@ func (sp StackParameters) ToMap() map[string]string {
 	return vars
 }
 
-func ParamsFromMap(variables map[string]string) (StackParameters, error) {
+func ParamsFromMap(variables map[string]string) (Parameters, error) {
 	if variables == nil {
-		return StackParameters{}, errors.New("properties map cannot be nil")
+		return Parameters{}, errors.New("properties map cannot be nil")
 	}
 	var provider client.ProviderID
 	if val, ok := variables["DEFANG_PROVIDER"]; ok {
 		err := provider.Set(val)
 		if err != nil {
-			return StackParameters{}, fmt.Errorf("invalid DEFANG_PROVIDER value %q: %w", val, err)
+			return Parameters{}, fmt.Errorf("invalid DEFANG_PROVIDER value %q: %w", val, err)
 		}
 	}
 	var mode modes.Mode
 	if val, ok := variables["DEFANG_MODE"]; ok {
 		err := mode.Set(val)
 		if err != nil {
-			return StackParameters{}, fmt.Errorf("invalid DEFANG_MODE value %q: %w", val, err)
+			return Parameters{}, fmt.Errorf("invalid DEFANG_MODE value %q: %w", val, err)
 		}
 	}
 	regionVarName := client.GetRegionVarName(provider)
 	region := variables[regionVarName]
-	return StackParameters{
+	return Parameters{
 		Variables: variables,
 		Provider:  provider,
 		Region:    region,
@@ -81,7 +81,7 @@ func MakeDefaultName(providerId client.ProviderID, region string) string {
 	return strings.ToLower(providerId.String() + compressedRegion)
 }
 
-func CreateInDirectory(workingDirectory string, params StackParameters) (string, error) {
+func CreateInDirectory(workingDirectory string, params Parameters) (string, error) {
 	if params.Name == "" {
 		return "", errors.New("stack name cannot be empty")
 	}
@@ -128,16 +128,16 @@ func CreateInDirectory(workingDirectory string, params StackParameters) (string,
 }
 
 // for shell printing for converting to string format of StackParameters
-type StackListItem struct {
-	StackParameters
+type ListItem struct {
+	Parameters
 	DeployedAt time.Time
 }
 
-func List() ([]StackListItem, error) {
+func List() ([]ListItem, error) {
 	return ListInDirectory(".")
 }
 
-func ListInDirectory(workingDirectory string) ([]StackListItem, error) {
+func ListInDirectory(workingDirectory string) ([]ListItem, error) {
 	defangDir := filepath.Join(workingDirectory, Directory)
 	files, err := os.ReadDir(defangDir)
 	if err != nil {
@@ -147,7 +147,7 @@ func ListInDirectory(workingDirectory string) ([]StackListItem, error) {
 		return nil, err
 	}
 
-	var stacks []StackListItem
+	var stacks []ListItem
 	for _, file := range files {
 		filename := filename(workingDirectory, file.Name())
 		content, err := os.ReadFile(filename)
@@ -166,8 +166,8 @@ func ListInDirectory(workingDirectory string) ([]StackListItem, error) {
 			continue
 		}
 		params.Name = file.Name()
-		stacks = append(stacks, StackListItem{
-			StackParameters: params,
+		stacks = append(stacks, ListItem{
+			Parameters: params,
 		})
 	}
 
@@ -178,7 +178,7 @@ func Parse(content string) (map[string]string, error) {
 	return godotenv.Parse(strings.NewReader(content))
 }
 
-func Marshal(params *StackParameters) (string, error) {
+func Marshal(params *Parameters) (string, error) {
 	if params == nil {
 		return "", nil
 	}
@@ -194,7 +194,7 @@ func RemoveInDirectory(workingDirectory, name string) error {
 	return os.Remove(path)
 }
 
-func ReadInDirectory(workingDirectory, name string) (*StackParameters, error) {
+func ReadInDirectory(workingDirectory, name string) (*Parameters, error) {
 	path := filename(workingDirectory, name)
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -214,7 +214,7 @@ func ReadInDirectory(workingDirectory, name string) (*StackParameters, error) {
 
 // This was basically ripped out of godotenv.Overload/Load. Unfortunately, they don't export
 // a function that loads a map[string]string, so we have to reimplement it here.
-func LoadStackEnv(params StackParameters, overload bool) error {
+func LoadStackEnv(params Parameters, overload bool) error {
 	currentEnv := map[string]bool{}
 	rawEnv := os.Environ()
 	for _, rawEnvLine := range rawEnv {

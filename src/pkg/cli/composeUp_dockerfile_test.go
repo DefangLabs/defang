@@ -42,7 +42,7 @@ func TestComposeUp_DockerfileValidation(t *testing.T) {
 				t.Fatalf("Failed to load project: %v", err)
 			}
 
-			stack := &stacks.StackParameters{
+			stack := &stacks.Parameters{
 				Provider: client.ProviderDefang, // Use a valid provider to avoid panic
 			}
 
@@ -85,7 +85,7 @@ func TestComposeUp_DockerfileValidationSkipped(t *testing.T) {
 		t.Fatalf("Failed to load project: %v", err)
 	}
 
-	stack := &stacks.StackParameters{
+	stack := &stacks.Parameters{
 		Provider: client.ProviderDefang, // Use a valid provider to avoid panic
 	}
 

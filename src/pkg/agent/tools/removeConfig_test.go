@@ -161,7 +161,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				},
 			})
 
-			stack := stacks.StackParameters{
+			stack := stacks.Parameters{
 				Name:     "test-stack",
 				Provider: client.ProviderAWS,
 			}

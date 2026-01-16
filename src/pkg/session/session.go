@@ -20,15 +20,15 @@ import (
 )
 
 type StacksManager interface {
-	List(ctx context.Context) ([]stacks.StackListItem, error)
-	LoadLocal(name string) (*stacks.StackParameters, error)
-	LoadRemote(ctx context.Context, name string) (*stacks.StackParameters, error)
-	Create(params stacks.StackParameters) (string, error)
+	List(ctx context.Context) ([]stacks.ListItem, error)
+	LoadLocal(name string) (*stacks.Parameters, error)
+	LoadRemote(ctx context.Context, name string) (*stacks.Parameters, error)
+	Create(params stacks.Parameters) (string, error)
 	TargetDirectory() string
 }
 
 type Session struct {
-	Stack    *stacks.StackParameters
+	Stack    *stacks.Parameters
 	Loader   client.Loader
 	Provider client.Provider
 }
@@ -90,7 +90,7 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 	return session, nil
 }
 
-func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.StackParameters, string, error) {
+func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, string, error) {
 	if sl.sm == nil {
 		// Without stack manager, we can only load fallback stacks (from options)
 		return sl.loadFallbackStack()
@@ -113,7 +113,7 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.StackParameters
 	return sl.loadFallbackStack()
 }
 
-func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, name string) (*stacks.StackParameters, string, error) {
+func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, name string) (*stacks.Parameters, string, error) {
 	whence := "--stack flag"
 	_, envSet := os.LookupEnv("DEFANG_STACK")
 	if envSet {
@@ -143,7 +143,7 @@ func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, name string) (*
 	return stack, whence + " and previous deployment", nil
 }
 
-func (sl *SessionLoader) loadFallbackStack() (*stacks.StackParameters, string, error) {
+func (sl *SessionLoader) loadFallbackStack() (*stacks.Parameters, string, error) {
 	whence := "--provider flag"
 	_, envSet := os.LookupEnv("DEFANG_PROVIDER")
 	if envSet {
@@ -153,13 +153,13 @@ func (sl *SessionLoader) loadFallbackStack() (*stacks.StackParameters, string, e
 		return nil, "", errors.New("--provider must be specified if --stack is not specified")
 	}
 	// TODO: list remote stacks, and if there is exactly one with the matched provider, load it
-	return &stacks.StackParameters{
+	return &stacks.Parameters{
 		Name:     stacks.DefaultBeta,
 		Provider: sl.opts.ProviderID,
 	}, whence, nil
 }
 
-func (sl *SessionLoader) newLoader(stack *stacks.StackParameters) (client.Loader, error) {
+func (sl *SessionLoader) newLoader(stack *stacks.Parameters) (client.Loader, error) {
 	// the stack may change the project name and compose file paths
 	if stack.Variables["COMPOSE_PROJECT_NAME"] != "" {
 		sl.opts.ProjectName = stack.Variables["COMPOSE_PROJECT_NAME"]

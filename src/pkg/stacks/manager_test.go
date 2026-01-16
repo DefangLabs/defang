@@ -57,7 +57,7 @@ func TestManager_CreateListLoad(t *testing.T) {
 	assert.Len(t, stacks, 0, "Expected empty stack list")
 
 	// Test creating a stack
-	params := StackParameters{
+	params := Parameters{
 		Name:     "teststack",
 		Provider: client.ProviderAWS,
 		Region:   "us-east-1",
@@ -110,7 +110,7 @@ func TestManager_CreateGCPStack(t *testing.T) {
 	require.NoError(t, err, "NewManager failed")
 
 	// Test creating a GCP stack
-	params := StackParameters{
+	params := Parameters{
 		Name:     "gcpstack",
 		Provider: client.ProviderGCP,
 		Region:   "us-central1",
@@ -146,7 +146,7 @@ func TestManager_CreateMultipleStacks(t *testing.T) {
 	require.NoError(t, err, "NewManager failed")
 
 	// Create multiple stacks
-	stacks := []StackParameters{
+	stacks := []Parameters{
 		{
 			Name:     "stack1",
 			Provider: client.ProviderAWS,
@@ -216,7 +216,7 @@ func TestManager_CreateInvalidStackName(t *testing.T) {
 	require.NoError(t, err, "NewManager failed")
 
 	// Test with empty name
-	params := StackParameters{
+	params := Parameters{
 		Name:     "",
 		Provider: client.ProviderAWS,
 		Region:   "us-east-1",
@@ -247,7 +247,7 @@ func TestManager_CreateDuplicateStack(t *testing.T) {
 	manager, err := NewManager(mockClient, tmpDir, "test-project")
 	require.NoError(t, err, "NewManager failed")
 
-	params := StackParameters{
+	params := Parameters{
 		Name:     "duplicatestack",
 		Provider: client.ProviderAWS,
 		Region:   "us-east-1",
@@ -353,7 +353,7 @@ GOOGLE_REGION=us-central1
 	require.NoError(t, err, "NewManager failed")
 
 	// Create a local stack that exists remotely too
-	localParams := StackParameters{
+	localParams := Parameters{
 		Name:     "sharedstack",
 		Provider: client.ProviderAWS,
 		Region:   "us-west-2", // Different region locally
@@ -366,7 +366,7 @@ GOOGLE_REGION=us-central1
 	require.NoError(t, err, "First Create() failed")
 
 	// Create a local-only stack
-	localOnlyParams := StackParameters{
+	localOnlyParams := Parameters{
 		Name:     "localonlystack",
 		Provider: client.ProviderAWS,
 		Region:   "us-west-1",
@@ -384,7 +384,7 @@ GOOGLE_REGION=us-central1
 
 	assert.Len(t, stacks, 3, "Expected 3 merged stacks")
 
-	stackMap := make(map[string]StackListItem)
+	stackMap := make(map[string]ListItem)
 	for _, stack := range stacks {
 		stackMap[stack.Name] = stack
 	}
@@ -501,7 +501,7 @@ func TestManager_WorkingDirectoryMatches(t *testing.T) {
 	require.NoError(t, err, "NewManager() failed")
 
 	// Test that local operations work when working directory matches target directory
-	params := StackParameters{
+	params := Parameters{
 		Name:     "teststack",
 		Provider: client.ProviderAWS,
 		Region:   "us-east-1",
@@ -557,7 +557,7 @@ GOOGLE_REGION=us-central1
 	require.NoError(t, err, "NewManager() failed")
 
 	// Test that local operations are blocked when working directory differs from target directory
-	params := StackParameters{
+	params := Parameters{
 		Name:     "teststack",
 		Provider: client.ProviderAWS,
 		Region:   "us-east-1",

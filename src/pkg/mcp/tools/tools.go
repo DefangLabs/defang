@@ -13,7 +13,7 @@ import (
 
 type StackConfig struct {
 	Cluster string
-	Stack   *stacks.StackParameters
+	Stack   *stacks.Parameters
 }
 
 func translateSchema(schema map[string]any) mcp.ToolInputSchema {
