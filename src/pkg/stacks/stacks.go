@@ -208,7 +208,7 @@ func ReadInDirectory(workingDirectory, name string) (*Parameters, error) {
 	path := filename(workingDirectory, name)
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("could not read stack %q from %q: %w", name, path, err)
+		return nil, err
 	}
 	return NewParametersFromContent(name, content)
 }
