@@ -16,24 +16,14 @@ type ProviderCreator interface {
 	NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient, stack string) client.Provider
 }
 
-type StacksManager interface {
-	List(ctx context.Context) ([]stacks.ListItem, error)
-	Load(ctx context.Context, name string) (*stacks.Parameters, error)
-	LoadLocal(name string) (*stacks.Parameters, error)
-	LoadRemote(ctx context.Context, name string) (*stacks.Parameters, error)
-	LoadStackEnv(params stacks.Parameters, overload bool) error
-	Create(params stacks.Parameters) (string, error)
-	TargetDirectory() string
-}
-
 type providerPreparer struct {
 	pc ProviderCreator
 	ec elicitations.Controller
 	fc client.FabricClient
-	sm StacksManager
+	sm stacks.Manager
 }
 
-func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc client.FabricClient, sm StacksManager) *providerPreparer {
+func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc client.FabricClient, sm stacks.Manager) *providerPreparer {
 	return &providerPreparer{
 		pc: pc,
 		ec: ec,
@@ -51,6 +41,11 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.Par
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to setup stack: %w", err)
 		}
+		err = stacks.LoadStackEnv(*stack, false)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to load stack env: %w", err)
+		}
+
 		*stack = *newStack
 	}
 

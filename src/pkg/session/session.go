@@ -101,6 +101,44 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, str
 	return sl.loadFallbackStack()
 }
 
+func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, name string) (*stacks.Parameters, string, error) {
+	whence := "--stack flag"
+	_, envSet := os.LookupEnv("DEFANG_STACK")
+	if envSet {
+		whence = "DEFANG_STACK environment variable"
+	}
+	stack, err := sl.sm.LoadLocal(name)
+	if err == nil {
+		err = stacks.LoadStackEnv(*stack, false)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to load stack env: %w", err)
+		}
+		return stack, whence + " and local stack file", nil
+	}
+	// the stack file does not exist locally
+	if !os.IsNotExist(err) {
+		return nil, "", err
+	}
+	stack, err = sl.sm.LoadRemote(ctx, name)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to load stack %q remotely: %w", name, err)
+	}
+	err = stacks.LoadStackEnv(*stack, false)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to load stack env: %w", err)
+	}
+	// persist the remote stack file to the local target directory
+	stackFilename, err := sl.sm.Create(*stack)
+	var errOutside *stacks.ErrOutside
+	if err != nil && !errors.As(err, &errOutside) {
+		return nil, "", fmt.Errorf("failed to save imported stack %q to local directory: %w", name, err)
+	}
+	if stackFilename != "" {
+		term.Infof("Stack %q loaded and saved to %q. Add this file to source control", name, stackFilename)
+	}
+	return stack, whence + " and previous deployment", nil
+}
+
 func (sl *SessionLoader) loadStackInteractively(ctx context.Context) (*stacks.Parameters, string, error) {
 	stackSelector := stacks.NewSelector(sl.ec, sl.sm)
 	stack, err := stackSelector.SelectStack(ctx, stacks.SelectStackOptions{
@@ -115,36 +153,6 @@ func (sl *SessionLoader) loadStackInteractively(ctx context.Context) (*stacks.Pa
 	}
 
 	return stack, "interactive selection", nil
-}
-
-func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, name string) (*stacks.Parameters, string, error) {
-	whence := "--stack flag"
-	_, envSet := os.LookupEnv("DEFANG_STACK")
-	if envSet {
-		whence = "DEFANG_STACK environment variable"
-	}
-	stack, err := sl.sm.LoadLocal(name)
-	if err == nil {
-		return stack, whence + " and local stack file", nil
-	}
-	// the stack file does not exist locally
-	if !os.IsNotExist(err) {
-		return nil, "", err
-	}
-	stack, err = sl.sm.LoadRemote(ctx, name)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to load stack %q remotely: %w", name, err)
-	}
-	// persist the remote stack file to the local target directory
-	stackFilename, err := sl.sm.Create(*stack)
-	var errOutside *stacks.ErrOutside
-	if err != nil && !errors.As(err, &errOutside) {
-		return nil, "", fmt.Errorf("failed to save imported stack %q to local directory: %w", name, err)
-	}
-	if stackFilename != "" {
-		term.Infof("Stack %q loaded and saved to %q. Add this file to source control", name, stackFilename)
-	}
-	return stack, whence + " and previous deployment", nil
 }
 
 func (sl *SessionLoader) loadFallbackStack() (*stacks.Parameters, string, error) {
