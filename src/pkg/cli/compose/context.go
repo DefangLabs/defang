@@ -223,6 +223,7 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 
 	var digest string
 	switch upload {
+	case UploadModeDefault:
 	case UploadModeDigest:
 		// Calculate the digest of the tarball and pass it to the fabric controller (to avoid building the same image twice)
 		sha := sha256.Sum256(buffer.Bytes())
