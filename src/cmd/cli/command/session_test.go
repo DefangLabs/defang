@@ -90,8 +90,8 @@ func copyDir(src string, dst string) error {
 		return err
 	}
 	for _, entry := range entries {
-		srcPath := src + string(os.PathSeparator) + entry.Name()
-		dstPath := dst + string(os.PathSeparator) + entry.Name()
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
 		if entry.IsDir() {
 			if err := os.Mkdir(dstPath, 0755); err != nil {
 				return err
