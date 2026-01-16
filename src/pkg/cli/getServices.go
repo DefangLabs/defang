@@ -178,14 +178,20 @@ func NewServiceFromServiceInfo(serviceInfos []*defangv1.ServiceInfo) ([]Service,
 
 func PrintServiceStatesAndEndpoints(services []Service) error {
 	showCertGenerateHint := false
+	printHealthcheckStatus := false
 	for _, svc := range services {
 		if svc.AcmeCertUsed {
 			showCertGenerateHint = true
-			break
+		}
+		if svc.HealthcheckStatus != "" {
+			printHealthcheckStatus = true
 		}
 	}
 
-	attrs := []string{"Service", "Deployment", "State", "Fqdn", "Endpoint", "Status"}
+	attrs := []string{"Service", "Deployment", "State", "Fqdn", "Endpoint"}
+	if printHealthcheckStatus {
+		attrs = append(attrs, "HealthcheckStatus")
+	}
 	// if showDomainNameColumn {
 	// 	attrs = append(attrs, "DomainName")
 	// }
