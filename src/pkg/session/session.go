@@ -146,6 +146,9 @@ func (sl *SessionLoader) loadFallbackStack(ctx context.Context) (*stacks.Paramet
 	if err != nil {
 		term.Debugf("Could not get default stack from server: %v", err)
 		whence := "--provider flag"
+		if sl.opts.ProviderID == "" {
+			whence = "default provider"
+		}
 		_, envSet := os.LookupEnv("DEFANG_PROVIDER")
 		if envSet {
 			whence = "DEFANG_PROVIDER"
