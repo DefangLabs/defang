@@ -1,8 +1,10 @@
 package gcp
 
 import (
+	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/googleapi"
 )
 
@@ -51,19 +53,16 @@ func Test_BadGCPprojectnameErrorWrap(t *testing.T) {
 
 	briefErr := briefGcpError{err: gcpErr}
 
-	// Test extractProjectName
-	projectName := briefErr.extractProjectName()
-	if projectName != "badprojectname" {
-		t.Errorf("extractProjectName() = %q, want %q", projectName, "badprojectname")
-	}
-
 	// Test Error() returns custom message with project name
 	errMsg := briefErr.Error()
-	expectedMsg := `GCP project "badprojectname" not found or permission denied. ` +
-		`Double check the project ID and make sure your Application Default Credentials ` +
-		`have permission to access the project.`
+	assert.Equal(t, errMsg, gcpErr.Message)
 
-	if errMsg != expectedMsg {
-		t.Errorf("Error() = %q, want %q", errMsg, expectedMsg)
-	}
+	// Test annotateGcpError wraps the error correctly
+	wrappedErr := annotateGcpError(gcpErr)
+	assert.Equal(t, `Double check the GCP project ID and make sure your Application Default Credentials have permission to access the project: `+gcpErr.Message, wrappedErr.Error())
+
+	// Test the error is wrapper correctly
+	var unwrappedErr *googleapi.Error
+	assert.True(t, errors.As(wrappedErr, &unwrappedErr))
+	assert.Equal(t, gcpErr, unwrappedErr)
 }
