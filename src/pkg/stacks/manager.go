@@ -91,6 +91,9 @@ func (sm *manager) ListLocal() ([]ListItem, error) {
 }
 
 func (sm *manager) ListRemote(ctx context.Context) ([]ListItem, error) {
+	if sm.projectName == "" {
+		return nil, errors.New("project name is required to list remote stacks")
+	}
 	resp, err := sm.fabric.ListStacks(ctx, &defangv1.ListStacksRequest{
 		Project: sm.projectName,
 	})
@@ -104,19 +107,13 @@ func (sm *manager) ListRemote(ctx context.Context) ([]ListItem, error) {
 			name = DefaultBeta
 		}
 		bytes := stack.GetStackFile()
-		variables, err := Parse(string(bytes))
+		params, err := NewParametersFromContent(name, bytes)
 		if err != nil {
 			term.Warnf("Skipping invalid remote stack %s: %v\n", name, err)
 			continue
 		}
-		params, err := ParamsFromMap(variables)
-		if err != nil {
-			term.Warnf("Skipping invalid remote stack %s: %v\n", name, err)
-			continue
-		}
-		params.Name = name
 		stackParams = append(stackParams, ListItem{
-			Parameters: params,
+			Parameters: *params,
 			DeployedAt: timeutils.AsTime(stack.GetLastDeployedAt(), time.Time{}),
 		})
 	}
@@ -155,10 +152,6 @@ func (sm *manager) LoadLocal(name string) (*Parameters, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = sm.LoadStackEnv(*params, false)
-	if err != nil {
-		return nil, err
-	}
 	return params, nil
 }
 
@@ -177,16 +170,8 @@ func (sm *manager) LoadRemote(ctx context.Context, name string) (*Parameters, er
 	if remoteStack == nil {
 		return nil, fmt.Errorf("unable to find stack %q", name)
 	}
-	err = sm.LoadStackEnv(remoteStack.Parameters, false)
-	if err != nil {
-		return nil, fmt.Errorf("unable to import stack %q: %w", name, err)
-	}
 
 	return &remoteStack.Parameters, nil
-}
-
-func (sm *manager) LoadStackEnv(params Parameters, overload bool) error {
-	return LoadStackEnv(params, overload)
 }
 
 func (sm *manager) Create(params Parameters) (string, error) {

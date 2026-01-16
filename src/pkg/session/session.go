@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -16,7 +14,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/compose-spec/compose-go/v2/consts"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 type StacksManager interface {
@@ -40,6 +38,7 @@ type SessionLoaderOptions struct {
 	ComposeFilePaths   []string
 	AllowStackCreation bool
 	Interactive        bool
+	RequireStack       bool
 }
 
 type SessionLoader struct {
@@ -59,24 +58,15 @@ func NewSessionLoader(client client.FabricClient, ec elicitations.Controller, ma
 }
 
 func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
-	// load stack
 	stack, whence, err := sl.loadStack(ctx)
 	if err != nil {
 		return nil, err
-	}
-	err = stacks.LoadStackEnv(*stack, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load stack env: %w", err)
-	}
-	loader, err := sl.newLoader(stack)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create loader for stack %q: %w", stack.Name, err)
 	}
 	// load provider with selected stack
 	provider := cli.NewProvider(ctx, stack.Provider, sl.client, stack.Name)
 	session := &Session{
 		Stack:    stack,
-		Loader:   loader,
+		Loader:   sl.newLoader(),
 		Provider: provider,
 	}
 
@@ -93,24 +83,16 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, string, error) {
 	if sl.sm == nil {
 		// Without stack manager, we can only load fallback stacks (from options)
-		return sl.loadFallbackStack()
+		return sl.loadFallbackStack(ctx)
 	}
 	if sl.opts.Stack != "" {
 		return sl.loadSpecifiedStack(ctx, sl.opts.Stack)
 	}
-	if sl.opts.Interactive {
-		stackSelector := stacks.NewSelector(sl.ec, sl.sm)
-		stack, err := stackSelector.SelectStack(ctx, stacks.SelectStackOptions{
-			AllowCreate: sl.opts.AllowStackCreation,
-		})
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to select stack: %w", err)
-		}
-
-		return stack, "interactive selection", nil
+	if sl.opts.Interactive && sl.opts.RequireStack {
+		return sl.loadStackInteractively(ctx)
 	}
 
-	return sl.loadFallbackStack()
+	return sl.loadFallbackStack(ctx)
 }
 
 func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, name string) (*stacks.Parameters, string, error) {
@@ -121,6 +103,10 @@ func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, name string) (*
 	}
 	stack, err := sl.sm.LoadLocal(name)
 	if err == nil {
+		err = stacks.LoadStackEnv(*stack, false)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to load stack env: %w", err)
+		}
 		return stack, whence + " and local stack file", nil
 	}
 	// the stack file does not exist locally
@@ -130,6 +116,10 @@ func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, name string) (*
 	stack, err = sl.sm.LoadRemote(ctx, name)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to load stack %q remotely: %w", name, err)
+	}
+	err = stacks.LoadStackEnv(*stack, false)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to load stack env: %w", err)
 	}
 	// persist the remote stack file to the local target directory
 	stackFilename, err := sl.sm.Create(*stack)
@@ -143,56 +133,60 @@ func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, name string) (*
 	return stack, whence + " and previous deployment", nil
 }
 
-func (sl *SessionLoader) loadFallbackStack() (*stacks.Parameters, string, error) {
-	whence := "--provider flag"
-	_, envSet := os.LookupEnv("DEFANG_PROVIDER")
-	if envSet {
-		whence = "DEFANG_PROVIDER"
+func (sl *SessionLoader) loadStackInteractively(ctx context.Context) (*stacks.Parameters, string, error) {
+	stackSelector := stacks.NewSelector(sl.ec, sl.sm)
+	stack, err := stackSelector.SelectStack(ctx, stacks.SelectStackOptions{
+		AllowCreate: sl.opts.AllowStackCreation,
+	})
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to select stack: %w", err)
 	}
-	if sl.opts.ProviderID == "" || sl.opts.ProviderID == client.ProviderAuto {
-		return nil, "", errors.New("--provider must be specified if --stack is not specified")
+	err = stacks.LoadStackEnv(*stack, false)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to load stack env: %w", err)
 	}
-	// TODO: list remote stacks, and if there is exactly one with the matched provider, load it
-	return &stacks.Parameters{
-		Name:     stacks.DefaultBeta,
-		Provider: sl.opts.ProviderID,
-	}, whence, nil
+
+	return stack, "interactive selection", nil
 }
 
-func (sl *SessionLoader) newLoader(stack *stacks.Parameters) (client.Loader, error) {
-	// the stack may change the project name and compose file paths
-	if stack.Variables["COMPOSE_PROJECT_NAME"] != "" {
-		sl.opts.ProjectName = stack.Variables["COMPOSE_PROJECT_NAME"]
-	}
-	if len(stack.Variables["COMPOSE_PATH"]) > 0 {
-		paths, err := parseComposePaths(stack.Variables["COMPOSE_PATH"])
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse COMPOSE_PATH from stack variables: %w", err)
+func (sl *SessionLoader) loadFallbackStack(ctx context.Context) (*stacks.Parameters, string, error) {
+	// Check Fabric for default stack (set by Portal or CLI)
+	res, err := sl.client.GetDefaultStack(ctx, &defangv1.GetDefaultStackRequest{
+		Project: sl.opts.ProjectName,
+	})
+	var params *stacks.Parameters
+	var whence = "default provider"
+	if err != nil {
+		term.Debugf("Could not get default stack from server: %v", err)
+		if sl.opts.ProviderID != "" {
+			whence = "--provider flag"
 		}
-		sl.opts.ComposeFilePaths = paths
+		_, envSet := os.LookupEnv("DEFANG_PROVIDER")
+		if envSet {
+			whence = "DEFANG_PROVIDER"
+		}
+		params = &stacks.Parameters{
+			Name:     stacks.DefaultBeta,
+			Provider: sl.opts.ProviderID,
+		}
+	} else {
+		params, err = stacks.NewParametersFromContent(res.Stack.Name, res.Stack.StackFile)
+		if err != nil {
+			return nil, "", err
+		}
 	}
-	// initialize loader
-	loader := compose.NewLoader(
+	err = stacks.LoadStackEnv(*params, false)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to load stack env: %w", err)
+	}
+	return params, whence, nil
+}
+
+func (sl *SessionLoader) newLoader() client.Loader {
+	return compose.NewLoader(
 		compose.WithProjectName(sl.opts.ProjectName),
 		compose.WithPath(sl.opts.ComposeFilePaths...),
 	)
-	return loader, nil
-}
-
-func parseComposePaths(pathsStr string) ([]string, error) {
-	if len(pathsStr) <= 0 {
-		return []string{}, nil
-	}
-	paths := make([]string, 0)
-	sep := pkg.Getenv(consts.ComposePathSeparator, string(os.PathListSeparator))
-	for _, p := range strings.Split(pathsStr, sep) {
-		absPath, err := filepath.Abs(p)
-		if err != nil {
-			return nil, err
-		}
-		paths = append(paths, absPath)
-	}
-	return paths, nil
 }
 
 func printProviderMismatchWarnings(ctx context.Context, provider client.ProviderID) {

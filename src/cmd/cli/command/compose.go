@@ -243,9 +243,9 @@ func makeComposeUpCmd() *cobra.Command {
 
 			since := time.Now()
 
-			options := NewSessionLoaderOptionsForCommand(cmd)
+			options := newSessionLoaderOptionsForCommand(cmd)
 			options.AllowStackCreation = true
-			sm, err := newStackManagerForCommand(cmd)
+			sm, err := newStackManagerForLoader(ctx, configureLoader(cmd))
 			if err != nil {
 				return err
 			}
@@ -407,7 +407,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			// Print the current service states of the deployment
-			if err := cli.PrintServices(cmd.Context(), project.Name, session.Provider, false); err != nil {
+			if err := cli.PrintServices(cmd.Context(), project.Name, session.Provider); err != nil {
 				term.Warn(err)
 			}
 
@@ -418,10 +418,13 @@ func makeComposeUpCmd() *cobra.Command {
 	}
 	composeUpCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
+	composeUpCmd.Flags().MarkDeprecated("force", "superseded by --build") // but keep for backwards compatibility
 	composeUpCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
+	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // no-op, but keep for backwards compatibility
+	_ = composeUpCmd.Flags().MarkHidden("tail")
 	composeUpCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
-	composeUpCmd.Flags().Bool("build", true, "build the image before starting the service") // docker-compose compatibility
-	composeUpCmd.Flags().Bool("wait", true, "wait for services to be running|healthy")      // docker-compose compatibility
+	composeUpCmd.Flags().Bool("build", false, "build images before starting services") // docker-compose compatibility
+	composeUpCmd.Flags().Bool("wait", true, "wait for services to be running|healthy") // docker-compose compatibility
 	_ = composeUpCmd.Flags().MarkHidden("wait")
 	composeUpCmd.Flags().Int("wait-timeout", -1, "maximum duration to wait for the project to be running|healthy") // docker-compose compatibility
 	return composeUpCmd
@@ -671,7 +674,7 @@ func makeComposeDownCmd() *cobra.Command {
 				cli.EnableUTCMode()
 			}
 
-			session, err := NewCommandSession(cmd)
+			session, err := newCommandSession(cmd)
 			if err != nil {
 				return err
 			}
@@ -736,7 +739,7 @@ func makeComposeDownCmd() *cobra.Command {
 	}
 	composeDownCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	composeDownCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
-	composeDownCmd.Flags().Bool("tail", false, "tail the service logs after deleting") // obsolete, but keep for backwards compatibility
+	composeDownCmd.Flags().Bool("tail", false, "tail the service logs after deleting") // no-op, but keep for backwards compatibility
 	_ = composeDownCmd.Flags().MarkHidden("tail")
 	return composeDownCmd
 }
@@ -769,21 +772,17 @@ func makeComposeConfigCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 
-			options := NewSessionLoaderOptionsForCommand(cmd)
-			sm, err := newStackManagerForCommand(cmd)
-			if err != nil {
-				// For `compose config` it's OK to proceed without a stack manager
-				term.Debugf("failed to create stack manager: %v", err)
-			}
-			sessionLoader := session.NewSessionLoader(global.Client, ec, sm, options)
-			session, err := sessionLoader.LoadSession(ctx)
+			session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
+				CheckAccountInfo: false,
+				RequireStack:     false, // for `compose config` it's OK to proceed without a stack
+			})
 			if err != nil {
 				return fmt.Errorf("loading session: %w", err)
 			}
 
 			_, err = session.Provider.AccountInfo(ctx)
 			if err != nil {
-				term.Warn("unable to load AccountInfo:", err)
+				term.Warn("unable to connect to cloud provider:", err, "- some information may not be up-to-date")
 			}
 
 			project, loadErr := session.Loader.LoadProject(ctx)
@@ -833,7 +832,7 @@ func makeComposePsCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			long, _ := cmd.Flags().GetBool("long")
 
-			session, err := NewCommandSession(cmd)
+			session, err := newCommandSession(cmd)
 			if err != nil {
 				return err
 			}
@@ -843,7 +842,11 @@ func makeComposePsCmd() *cobra.Command {
 				return err
 			}
 
-			if err := cli.PrintServices(cmd.Context(), projectName, session.Provider, long); err != nil {
+			if long {
+				return cli.PrintLongServices(cmd.Context(), projectName, session.Provider)
+			}
+
+			if err := cli.PrintServices(cmd.Context(), projectName, session.Provider); err != nil {
 				if errNoServices := new(cli.ErrNoServices); !errors.As(err, errNoServices) {
 					return err
 				}
@@ -891,7 +894,7 @@ func setupLogsFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("name", "n", "", "name of the service (backwards compat)")
 	cmd.Flags().MarkHidden("name")
 	cmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
-	cmd.Flags().MarkHidden("etag")
+	cmd.Flags().MarkDeprecated("etag", "superseded by --deployment") // but keep for backwards compatibility
 	cmd.Flags().String("deployment", "", "deployment ID of the service (use 'latest' for the most recent deployment)")
 	cmd.Flags().Bool("follow", false, "follow log output; incompatible with --until") // NOTE: -f is already used by --file
 	cmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
@@ -957,7 +960,7 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 		services = append(args, strings.Split(name, ",")...) // backwards compat
 	}
 
-	session, err := NewCommandSession(cmd)
+	session, err := newCommandSession(cmd)
 	if err != nil {
 		return err
 	}
