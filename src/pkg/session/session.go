@@ -64,10 +64,6 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = stacks.LoadStackEnv(*stack, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load stack env: %w", err)
-	}
 	loader, err := sl.newLoader(stack)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create loader for stack %q: %w", stack.Name, err)
@@ -99,18 +95,26 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, str
 		return sl.loadSpecifiedStack(ctx, sl.opts.Stack)
 	}
 	if sl.opts.Interactive {
-		stackSelector := stacks.NewSelector(sl.ec, sl.sm)
-		stack, err := stackSelector.SelectStack(ctx, stacks.SelectStackOptions{
-			AllowCreate: sl.opts.AllowStackCreation,
-		})
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to select stack: %w", err)
-		}
-
-		return stack, "interactive selection", nil
+		return sl.loadStackInteractively(ctx)
 	}
 
 	return sl.loadFallbackStack()
+}
+
+func (sl *SessionLoader) loadStackInteractively(ctx context.Context) (*stacks.Parameters, string, error) {
+	stackSelector := stacks.NewSelector(sl.ec, sl.sm)
+	stack, err := stackSelector.SelectStack(ctx, stacks.SelectStackOptions{
+		AllowCreate: sl.opts.AllowStackCreation,
+	})
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to select stack: %w", err)
+	}
+	err = stacks.LoadStackEnv(*stack, false)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to load stack env: %w", err)
+	}
+
+	return stack, "interactive selection", nil
 }
 
 func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, name string) (*stacks.Parameters, string, error) {
@@ -152,11 +156,15 @@ func (sl *SessionLoader) loadFallbackStack() (*stacks.Parameters, string, error)
 	if sl.opts.ProviderID == "" || sl.opts.ProviderID == client.ProviderAuto {
 		return nil, "", errors.New("--provider must be specified if --stack is not specified")
 	}
-	// TODO: list remote stacks, and if there is exactly one with the matched provider, load it
-	return &stacks.Parameters{
+	stack := &stacks.Parameters{
 		Name:     stacks.DefaultBeta,
 		Provider: sl.opts.ProviderID,
-	}, whence, nil
+	}
+	err := stacks.LoadStackEnv(*stack, false)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to load stack env: %w", err)
+	}
+	return stack, whence, nil
 }
 
 func (sl *SessionLoader) newLoader(stack *stacks.Parameters) (client.Loader, error) {
