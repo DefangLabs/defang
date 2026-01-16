@@ -140,6 +140,9 @@ func RunHealthcheck(ctx context.Context, name, endpoint, path string) (string, e
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		var dnsErr *net.DNSError
+		if errors.Is(err, context.DeadlineExceeded) {
+			return "unknown (timeout)", nil
+		}
 		if errors.As(err, &dnsErr) {
 			term.Warnf("service %q: Run `defang cert generate` to continue setup: %v", name, err)
 			return "unknown (DNS error)", nil
