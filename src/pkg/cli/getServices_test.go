@@ -76,7 +76,7 @@ func TestPrintServices(t *testing.T) {
 	provider := client.PlaygroundProvider{FabricClient: grpcClient}
 
 	t.Run("no services", func(t *testing.T) {
-		err := PrintServices(ctx, "empty", &provider, false)
+		err := PrintServices(ctx, "empty", &provider)
 		var expectedError ErrNoServices
 		if !errors.As(err, &expectedError) {
 			t.Fatalf("expected PrintServices error to be of type ErrNoServices, got: %v", err)
@@ -86,7 +86,7 @@ func TestPrintServices(t *testing.T) {
 	t.Run("some services", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
 
-		err := PrintServices(ctx, "test", &provider, false)
+		err := PrintServices(ctx, "test", &provider)
 		if err != nil {
 			t.Fatalf("PrintServices error = %v", err)
 		}
@@ -110,7 +110,7 @@ foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.
 	})
 
 	t.Run("no services long", func(t *testing.T) {
-		err := PrintServices(ctx, "empty", &provider, false)
+		err := PrintServices(ctx, "empty", &provider)
 		var expectedError ErrNoServices
 		if !errors.As(err, &expectedError) {
 			t.Fatalf("expected PrintServices error to be of type ErrNoServices, got: %v", err)
@@ -120,7 +120,7 @@ foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.
 	t.Run("some services long", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
 
-		err := PrintServices(ctx, "test", &provider, true)
+		err := PrintLongServices(ctx, "test", &provider)
 		if err != nil {
 			t.Fatalf("PrintServices error = %v", err)
 		}

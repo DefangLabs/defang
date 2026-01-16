@@ -36,7 +36,21 @@ func (e ErrNoServices) Error() string {
 	return fmt.Sprintf("no services found in project %q; check logs for deployment status", e.ProjectName)
 }
 
-func GetServices(ctx context.Context, projectName string, provider client.Provider) (*defangv1.GetServicesResponse, error) {
+// This was broken out to avoid breaking the printed output when the --long flag is used
+func PrintLongServices(ctx context.Context, projectName string, provider client.Provider) error {
+	servicesResponse, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: projectName})
+	if err != nil {
+		return err
+	}
+
+	numServices := len(servicesResponse.Services)
+	if numServices == 0 {
+		return nil
+	}
+	return PrintObject("", servicesResponse)
+}
+
+func GetServices(ctx context.Context, projectName string, provider client.Provider) ([]Service, error) {
 	term.Debugf("Listing services in project %q", projectName)
 
 	servicesResponse, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: projectName})
