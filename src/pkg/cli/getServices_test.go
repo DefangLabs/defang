@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
@@ -91,7 +92,7 @@ func TestPrintServices(t *testing.T) {
 			t.Fatalf("PrintServices error = %v", err)
 		}
 		expectedOutput := "\x1b[1m\nSERVICE  DEPLOYMENT  STATE          FQDN                       ENDPOINT                           HEALTHCHECKSTATUS\x1b[0m" + `
-foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.prod1.defang.dev  unhealthy
+foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.prod1.defang.dev  unhealthy (404 Not Found)
 `
 
 		receivedLines := strings.Split(stdout.String(), "\n")
@@ -336,6 +337,70 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 					t.Errorf("\n-%v\n+%v", tt.expectedLines[i], receivedLine)
 				}
 			}
+		})
+	}
+}
+
+func TestRunHealthcheck(t *testing.T) {
+	ctx := t.Context()
+
+	// Start a test HTTP server
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/healthy":
+			w.WriteHeader(http.StatusOK)
+		case "/unhealthy":
+			w.WriteHeader(http.StatusInternalServerError)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(testServer.Close)
+
+	tests := []struct {
+		name            string
+		endpoint        string
+		healthcheckPath string
+		expectedStatus  string
+		expectedErr     bool
+	}{
+		{
+			name:            "Healthy service",
+			endpoint:        testServer.URL,
+			healthcheckPath: "/healthy",
+			expectedStatus:  "healthy",
+		},
+		{
+			name:            "Unhealthy service",
+			endpoint:        testServer.URL,
+			healthcheckPath: "/unhealthy",
+			expectedStatus:  "unhealthy (500 Internal Server Error)",
+		},
+		{
+			name:            "Service not found",
+			endpoint:        testServer.URL,
+			healthcheckPath: "/notfound",
+			expectedStatus:  "unhealthy (404 Not Found)",
+		},
+		{
+			name:            "Invalid endpoint",
+			endpoint:        "http://invalid-endpoint",
+			healthcheckPath: "/healthy",
+			expectedStatus:  "",
+			expectedErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			status, err := RunHealthcheck(ctx, "test-service", tt.endpoint, tt.healthcheckPath)
+			if tt.expectedErr {
+				require.Error(t, err)
+				return
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.expectedStatus, status)
 		})
 	}
 }
