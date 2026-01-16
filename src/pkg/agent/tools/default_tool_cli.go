@@ -70,17 +70,8 @@ func (DefaultToolCLI) ConfigDelete(ctx context.Context, projectName string, prov
 	return cli.ConfigDelete(ctx, projectName, provider, name)
 }
 
-func (DefaultToolCLI) GetServices(ctx context.Context, projectName string, provider client.Provider) ([]*cli.Service, error) {
-	servicesResponse, err := cli.GetServices(ctx, projectName, provider)
-	if err != nil {
-		return nil, err
-	}
-
-	term.Debug("Checking service health...")
-	cli.UpdateServiceStates(ctx, servicesResponse.Services)
-
-	si, _, err := cli.GetServiceStatesAndEndpoints(servicesResponse.Services)
-	return si, err
+func (DefaultToolCLI) GetServices(ctx context.Context, projectName string, provider client.Provider) ([]cli.ServiceLineItem, error) {
+	return cli.GetServices(ctx, projectName, provider)
 }
 
 func (DefaultToolCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string {
