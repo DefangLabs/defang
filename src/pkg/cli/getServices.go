@@ -166,31 +166,31 @@ func RunHealthcheck(ctx context.Context, name, endpoint, path string) (string, e
 	}
 }
 
+func ServiceLineItemFromServiceInfo(serviceInfo *defangv1.ServiceInfo) ServiceLineItem {
+	domainname := "N/A"
+	if serviceInfo.Domainname != "" {
+		domainname = "https://" + serviceInfo.Domainname
+	} else if serviceInfo.PublicFqdn != "" {
+		domainname = "https://" + serviceInfo.PublicFqdn
+	} else if serviceInfo.PrivateFqdn != "" {
+		domainname = serviceInfo.PrivateFqdn
+	}
+
+	return ServiceLineItem{
+		Deployment:   serviceInfo.Etag,
+		Service:      serviceInfo.Service.Name,
+		State:        serviceInfo.State,
+		Status:       serviceInfo.Status,
+		Endpoint:     domainname,
+		AcmeCertUsed: serviceInfo.UseAcmeCert,
+	}
+}
+
 func ServiceLineItemsFromServiceInfos(serviceInfos []*defangv1.ServiceInfo) ([]ServiceLineItem, error) {
 	var serviceTableItems []ServiceLineItem
 
-	// showDomainNameColumn := false
-
 	for _, serviceInfo := range serviceInfos {
-		domainname := "N/A"
-		if serviceInfo.Domainname != "" {
-			// showDomainNameColumn = true
-			domainname = "https://" + serviceInfo.Domainname
-		} else if serviceInfo.PublicFqdn != "" {
-			domainname = "https://" + serviceInfo.PublicFqdn
-		} else if serviceInfo.PrivateFqdn != "" {
-			domainname = serviceInfo.PrivateFqdn
-		}
-
-		ps := ServiceLineItem{
-			Deployment:   serviceInfo.Etag,
-			Service:      serviceInfo.Service.Name,
-			State:        serviceInfo.State,
-			Status:       serviceInfo.Status,
-			Endpoint:     domainname,
-			AcmeCertUsed: serviceInfo.UseAcmeCert,
-		}
-		serviceTableItems = append(serviceTableItems, ps)
+		serviceTableItems = append(serviceTableItems, ServiceLineItemFromServiceInfo(serviceInfo))
 	}
 
 	return serviceTableItems, nil
@@ -212,10 +212,6 @@ func PrintServiceStatesAndEndpoints(services []ServiceLineItem) error {
 	if printHealthcheckStatus {
 		attrs = append(attrs, "HealthcheckStatus")
 	}
-	// if showDomainNameColumn {
-	// 	attrs = append(attrs, "DomainName")
-	// }
-
 	err := term.Table(services, attrs...)
 	if err != nil {
 		return err
