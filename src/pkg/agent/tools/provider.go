@@ -41,12 +41,11 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.Par
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to setup stack: %w", err)
 		}
+		*stack = *newStack
 		err = stacks.LoadStackEnv(*stack, false)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to load stack env: %w", err)
 		}
-
-		*stack = *newStack
 	}
 
 	term.Debug("Function invoked: cli.NewProvider")
