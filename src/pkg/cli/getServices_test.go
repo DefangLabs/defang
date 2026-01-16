@@ -151,7 +151,7 @@ func TestGetServiceStatesAndEndpoints(t *testing.T) {
 	tests := []struct {
 		name             string
 		serviceinfos     []*defangv1.ServiceInfo
-		expectedServices []Service
+		expectedServices []ServiceLineItem
 	}{
 		{
 			name: "empty endpoint list",
@@ -165,7 +165,7 @@ func TestGetServiceStatesAndEndpoints(t *testing.T) {
 					Endpoints:  []string{},
 				},
 			},
-			expectedServices: []Service{
+			expectedServices: []ServiceLineItem{
 				{
 					Service:  "service1",
 					Status:   "UNKNOWN",
@@ -188,7 +188,7 @@ func TestGetServiceStatesAndEndpoints(t *testing.T) {
 					},
 				},
 			},
-			expectedServices: []Service{
+			expectedServices: []ServiceLineItem{
 				{
 					Service:  "service1",
 					Status:   "UNKNOWN",
@@ -209,7 +209,7 @@ func TestGetServiceStatesAndEndpoints(t *testing.T) {
 					},
 				},
 			},
-			expectedServices: []Service{
+			expectedServices: []ServiceLineItem{
 				{
 					Service:  "service1",
 					Status:   "UNKNOWN",
@@ -231,7 +231,7 @@ func TestGetServiceStatesAndEndpoints(t *testing.T) {
 					},
 				},
 			},
-			expectedServices: []Service{
+			expectedServices: []ServiceLineItem{
 				{
 					Service:      "service1",
 					Status:       "UNKNOWN",
@@ -268,12 +268,12 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		services      []Service
+		services      []ServiceLineItem
 		expectedLines []string
 	}{
 		{
 			name: "empty endpoint list",
-			services: []Service{
+			services: []ServiceLineItem{
 				{
 					Service:  "service1",
 					Status:   "UNKNOWN",
@@ -288,7 +288,7 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 		},
 		{
 			name: "Service with Domainname",
-			services: []Service{
+			services: []ServiceLineItem{
 				{
 					Service:  "service1",
 					Status:   "UNKNOWN",
@@ -303,7 +303,7 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 		},
 		{
 			name: "with acme cert",
-			services: []Service{
+			services: []ServiceLineItem{
 				{
 					Service:      "service1",
 					Status:       "UNKNOWN",

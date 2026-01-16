@@ -14,7 +14,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-type Service struct {
+type ServiceLineItem struct {
 	Deployment        string
 	Endpoint          string
 	Service           string
@@ -50,7 +50,7 @@ func PrintLongServices(ctx context.Context, projectName string, provider client.
 	return PrintObject("", servicesResponse)
 }
 
-func GetServices(ctx context.Context, projectName string, provider client.Provider) ([]Service, error) {
+func GetServices(ctx context.Context, projectName string, provider client.Provider) ([]ServiceLineItem, error) {
 	term.Debugf("Listing services in project %q", projectName)
 
 	servicesResponse, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: projectName})
@@ -150,8 +150,8 @@ func RunHealthcheck(ctx context.Context, name, endpoint, path string) (string, e
 	}
 }
 
-func NewServiceFromServiceInfo(serviceInfos []*defangv1.ServiceInfo) ([]Service, error) {
-	var serviceTableItems []Service
+func NewServiceFromServiceInfo(serviceInfos []*defangv1.ServiceInfo) ([]ServiceLineItem, error) {
+	var serviceTableItems []ServiceLineItem
 
 	// showDomainNameColumn := false
 
@@ -170,7 +170,7 @@ func NewServiceFromServiceInfo(serviceInfos []*defangv1.ServiceInfo) ([]Service,
 			domainname = serviceInfo.PrivateFqdn
 		}
 
-		ps := Service{
+		ps := ServiceLineItem{
 			Deployment:   serviceInfo.Etag,
 			Service:      serviceInfo.Service.Name,
 			State:        serviceInfo.State,
@@ -185,7 +185,7 @@ func NewServiceFromServiceInfo(serviceInfos []*defangv1.ServiceInfo) ([]Service,
 	return serviceTableItems, nil
 }
 
-func PrintServiceStatesAndEndpoints(services []Service) error {
+func PrintServiceStatesAndEndpoints(services []ServiceLineItem) error {
 	showCertGenerateHint := false
 	printHealthcheckStatus := false
 	for _, svc := range services {
