@@ -82,7 +82,15 @@ func doubleCheckProjectName(projectName string) {
 }
 
 func newStackManagerForCommand(cmd *cobra.Command) (session.StacksManager, error) {
+	loader := configureLoader(cmd)
 	projectName, _ := cmd.Flags().GetString("project-name")
+	if projectName == "" {
+		var err error
+		projectName, err = loader.LoadProjectName(cmd.Context())
+		if err != nil {
+			term.Debugf("Unable to load project name: %v", err)
+		}
+	}
 	targetDirectory, err := findTargetDirectory()
 	if err != nil {
 		// No .defang folder in any parent directory, so we'd need a project-name to fetch stacks from Fabric
@@ -93,7 +101,7 @@ func newStackManagerForCommand(cmd *cobra.Command) (session.StacksManager, error
 			return nil, err
 		}
 		// Use empty string for targetDirectory when outside project but projectName is provided
-		targetDirectory = ""
+		targetDirectory = loader.TargetDirectory()
 	}
 	sm, err := stacks.NewManager(global.Client, targetDirectory, projectName)
 	if err != nil {
