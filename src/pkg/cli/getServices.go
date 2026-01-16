@@ -87,71 +87,60 @@ func PrintServices(ctx context.Context, projectName string, provider client.Prov
 	return PrintServiceStatesAndEndpoints(services)
 }
 
-func GetHealthcheckResults(ctx context.Context, serviceInfos []*defangv1.ServiceInfo) map[string]string {
+type HealthCheckResults map[string]string
+
+func GetHealthcheckResults(ctx context.Context, serviceInfos []*defangv1.ServiceInfo) HealthCheckResults {
 	// Create a context with a timeout for HTTP requests
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	var wg sync.WaitGroup
 
-	var results sync.Map
-	// initialize the map
-
+	results := make(HealthCheckResults)
 	for _, serviceInfo := range serviceInfos {
 		for _, endpoint := range serviceInfo.Endpoints {
 			if strings.Contains(endpoint, ":") {
-				results.Store(serviceInfo.Service.Name, "skipped")
+				results[serviceInfo.Service.Name] = "skipped"
 				// Skip endpoints with ports because they likely non-HTTP services
-				continue
-			}
-			url, err := url.JoinPath("https://"+endpoint, serviceInfo.HealthcheckPath)
-			if err != nil {
-				term.Debugf("failed to construct healthcheck URL for %q at endpoint %s: %s", serviceInfo.Service.Name, endpoint, err.Error())
-				results.Store(serviceInfo.Service.Name, "error")
-				continue
-			}
-			// Use the regular net/http package to make the request without retries
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-			if err != nil {
-				term.Debugf("failed to create healthcheck request for %q at %s: %s", serviceInfo.Service.Name, url, err.Error())
-				results.Store(serviceInfo.Service.Name, "error")
 				continue
 			}
 			wg.Add(1)
 			go func(serviceInfo *defangv1.ServiceInfo) {
 				defer wg.Done()
+				url, err := url.JoinPath("https://"+endpoint, serviceInfo.HealthcheckPath)
+				if err != nil {
+					term.Errorf("failed to construct healthcheck URL for %q at endpoint %s: %s", serviceInfo.Service.Name, endpoint, err.Error())
+					results[serviceInfo.Service.Name] = "error"
+					return
+				}
+				// Use the regular net/http package to make the request without retries
+				req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+				if err != nil {
+					term.Errorf("failed to create healthcheck request for %q at %s: %s", serviceInfo.Service.Name, url, err.Error())
+					results[serviceInfo.Service.Name] = "error"
+					return
+				}
 				term.Debugf("[%s] checking health at %s", serviceInfo.Service.Name, url)
 				resp, err := http.DefaultClient.Do(req)
 				if err != nil {
-					term.Debugf("Healthcheck failed for %q at %s: %s", serviceInfo.Service.Name, url, err.Error())
-					results.Store(serviceInfo.Service.Name, "error")
+					term.Errorf("Healthcheck failed for %q at %s: %s", serviceInfo.Service.Name, url, err.Error())
+					results[serviceInfo.Service.Name] = "error"
 					return
 				}
 				defer resp.Body.Close()
 				if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 					serviceInfo.State = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 					term.Debugf("[%s] ✔ healthy", serviceInfo.Service.Name)
-					results.Store(serviceInfo.Service.Name, "healthy")
+					results[serviceInfo.Service.Name] = "healthy"
 				} else {
 					term.Debugf("[%s] ✘ unhealthy (%s)", serviceInfo.Service.Name, resp.Status)
-					results.Store(serviceInfo.Service.Name, "unhealthy")
+					results[serviceInfo.Service.Name] = "unhealthy"
 				}
 			}(serviceInfo)
 		}
 	}
 	wg.Wait()
 
-	// Convert sync.Map to map[string]string
-	finalResults := make(map[string]string)
-	results.Range(func(key, value interface{}) bool {
-		k, ok1 := key.(string)
-		v, ok2 := value.(string)
-		if ok1 && ok2 {
-			finalResults[k] = v
-		}
-		return true
-	})
-
-	return finalResults
+	return results
 }
 
 func NewServiceFromServiceInfo(serviceInfos []*defangv1.ServiceInfo) ([]Service, error) {
