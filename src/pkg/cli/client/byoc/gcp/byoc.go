@@ -140,6 +140,7 @@ func (b *ByocGcp) SetUpCD(ctx context.Context) error {
 		"servicenetworking.googleapis.com",    // For VPC peering
 		"redis.googleapis.com",                // For Redis
 		"certificatemanager.googleapis.com",   // For SSL certs
+		"cloudscheduler.googleapis.com",       // For scheduling clean up job
 		// "config.googleapis.com", // Infrastructure Manager API, for future CD stack
 	}
 	if err := b.driver.EnsureAPIsEnabled(ctx, apis...); err != nil {
