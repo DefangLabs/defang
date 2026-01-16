@@ -178,15 +178,6 @@ func (g GrpcClient) VerifyDNSSetup(ctx context.Context, req *defangv1.VerifyDNSS
 	return err
 }
 
-func (g GrpcClient) GetSelectedProvider(ctx context.Context, req *defangv1.GetSelectedProviderRequest) (*defangv1.GetSelectedProviderResponse, error) {
-	return getMsg(g.client.GetSelectedProvider(ctx, connect.NewRequest(req)))
-}
-
-func (g GrpcClient) SetSelectedProvider(ctx context.Context, req *defangv1.SetSelectedProviderRequest) error {
-	_, err := g.client.SetSelectedProvider(ctx, connect.NewRequest(req))
-	return err
-}
-
 func (g GrpcClient) CanIUse(ctx context.Context, req *defangv1.CanIUseRequest) (*defangv1.CanIUseResponse, error) {
 	return getMsg(g.client.CanIUse(ctx, connect.NewRequest(req)))
 }
@@ -206,4 +197,8 @@ func (g GrpcClient) Preview(ctx context.Context, req *defangv1.PreviewRequest) (
 
 func (g GrpcClient) GenerateCompose(ctx context.Context, req *defangv1.GenerateComposeRequest) (*defangv1.GenerateComposeResponse, error) {
 	return getMsg(g.client.GenerateCompose(ctx, connect.NewRequest(req)))
+}
+
+func (g GrpcClient) GetDefaultStack(ctx context.Context, req *defangv1.GetDefaultStackRequest) (*defangv1.GetStackResponse, error) {
+	return getMsg(g.client.GetDefaultStack(ctx, connect.NewRequest(req)))
 }

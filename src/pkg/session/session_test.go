@@ -109,16 +109,20 @@ func TestLoadSession(t *testing.T) {
 		expectedEnv   map[string]string
 	}{
 		{
-			name:          "empty options",
-			options:       SessionLoaderOptions{},
-			expectedError: "--provider must be specified if --stack is not specified",
+			name:    "empty options - fallback stack",
+			options: SessionLoaderOptions{},
+			expectedStack: &stacks.Parameters{
+				Name: "beta",
+			},
 		},
 		{
-			name: "non-existent project specified",
+			name: "only project name specified",
 			options: SessionLoaderOptions{
 				ProjectName: "foo",
 			},
-			expectedError: "--provider must be specified if --stack is not specified",
+			expectedStack: &stacks.Parameters{
+				Name: "beta",
+			},
 		},
 		{
 			name: "provider specified without stack assumes beta stack",
@@ -231,12 +235,13 @@ func TestLoadSession(t *testing.T) {
 			},
 		},
 		{
-			name: "interactive selection",
+			name: "interactive selection - stack required",
 			options: SessionLoaderOptions{
 				ProjectName:        "foo",
 				Interactive:        true,
 				AllowStackCreation: true,
 				ProviderID:         client.ProviderGCP,
+				RequireStack:       true,
 			},
 			stacksList: []stacks.ListItem{
 				{
@@ -260,6 +265,32 @@ func TestLoadSession(t *testing.T) {
 			expectedEnv: map[string]string{
 				"GCP_PROJECT": "existing-gcp-project",
 				"FOO":         "existing-bar",
+			},
+		},
+		{
+			name: "interactive selection",
+			options: SessionLoaderOptions{
+				ProjectName:        "foo",
+				Interactive:        true,
+				AllowStackCreation: true,
+				ProviderID:         client.ProviderGCP,
+			},
+			stacksList: []stacks.ListItem{
+				{
+					Parameters: stacks.Parameters{
+						Name:     "existing-stack",
+						Provider: client.ProviderAWS,
+						Region:   "us-test-2",
+						Variables: map[string]string{
+							"FOO": "existing-bar",
+						},
+					},
+					DeployedAt: deployedAt,
+				},
+			},
+			expectedStack: &stacks.Parameters{
+				Name:     "beta",
+				Provider: client.ProviderGCP,
 			},
 		},
 		{
@@ -320,13 +351,13 @@ func TestLoadSession(t *testing.T) {
 				sm.On("LoadRemote", ctx, mock.Anything).Maybe().Return(nil, errors.New("unable to find stack"))
 			}
 			if tt.stacksList != nil {
-				sm.On("List", ctx).Return(tt.stacksList, nil)
+				sm.On("List", ctx).Maybe().Return(tt.stacksList, nil)
 			}
 
 			loader := NewSessionLoader(client.MockFabricClient{}, ec, sm, tt.options)
 			session, err := loader.LoadSession(ctx)
 			if tt.expectedError != "" {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedError)
 				return
 			}

@@ -136,7 +136,7 @@ func TestRepeatCreate(t *testing.T) {
 		t.Errorf("Expected error on duplicate CreateInDirectory(), got nil")
 	} else {
 		assert.ErrorContains(t, err, "stack file already exists for \"repeattest\".")
-		assert.ErrorContains(t, err, "If you want to overwrite it, please spin down the stack and remove stackfile first.")
+		assert.ErrorContains(t, err, "If you want to overwrite it, please spin down the stack and remove stack file first.")
 		assert.ErrorContains(t, err, "defang down --stack repeattest && rm .defang/repeattest")
 	}
 }
@@ -299,7 +299,7 @@ DEFANG_MODE=AFFORDABLE
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			params, err := Parse(tt.content)
+			params, err := parseContent(tt.content)
 			if err != nil {
 				t.Errorf("Parse() error = %v", err)
 				return
@@ -439,7 +439,7 @@ func TestParamsFromMap(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resultParams, err := ParamsFromMap(tt.inputMap)
+			resultParams, err := paramsFromMap(tt.inputMap)
 			if err != nil {
 				t.Errorf("ParamsFromMap() error = %v", err)
 			}
