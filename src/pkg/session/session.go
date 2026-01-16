@@ -154,32 +154,32 @@ func (sl *SessionLoader) loadFallbackStack(ctx context.Context) (*stacks.Paramet
 	res, err := sl.client.GetDefaultStack(ctx, &defangv1.GetDefaultStackRequest{
 		Project: sl.opts.ProjectName,
 	})
-  var params *stacks.Parameters
+	var params *stacks.Parameters
+	var whence = "default provider"
 	if err != nil {
 		term.Debugf("Could not get default stack from server: %v", err)
-		whence := "--provider flag"
-		if sl.opts.ProviderID == "" {
-			whence = "default provider"
+		if sl.opts.ProviderID != "" {
+			whence = "--provider flag"
 		}
 		_, envSet := os.LookupEnv("DEFANG_PROVIDER")
 		if envSet {
 			whence = "DEFANG_PROVIDER"
 		}
-    params = &stacks.Parameters{
+		params = &stacks.Parameters{
 			Name:     stacks.DefaultBeta,
 			Provider: sl.opts.ProviderID,
 		}
-  } else {
+	} else {
 		params, err = stacks.NewParametersFromContent(res.Stack.Name, res.Stack.StackFile)
-    if err != nil {
-      return nil, "", err
-    }
-  }
-  err := stacks.LoadStackEnv(*stack, false)
+		if err != nil {
+			return nil, "", err
+		}
+	}
+	err = stacks.LoadStackEnv(*params, false)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to load stack env: %w", err)
 	}
-	return params, "default stack", nil
+	return params, whence, nil
 }
 
 func (sl *SessionLoader) newLoader() client.Loader {
