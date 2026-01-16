@@ -35,7 +35,11 @@ var cdCmd = &cobra.Command{
 
 func cdCommand(cmd *cobra.Command, args []string, command client.CdCommand, fabric client.FabricClient) error {
 	ctx := cmd.Context()
-	session, err := NewCommandSession(cmd)
+
+	session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
+		CheckAccountInfo: true,
+		RequireStack:     false, // for `cd` it's OK to proceed without a stack
+	})
 	if err != nil {
 		return err
 	}
@@ -112,7 +116,10 @@ var cdTearDownCmd = &cobra.Command{
 		ctx := cmd.Context()
 		force, _ := cmd.Flags().GetBool("force")
 
-		session, err := NewCommandSession(cmd)
+		session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
+			CheckAccountInfo: true,
+			RequireStack:     false, // for `cd` it's OK to proceed without a stack
+		})
 		if err != nil {
 			return err
 		}
@@ -130,7 +137,10 @@ var cdListCmd = &cobra.Command{
 		remote, _ := cmd.Flags().GetBool("remote")
 		all, _ := cmd.Flags().GetBool("all")
 
-		session, err := NewCommandSession(cmd)
+		session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
+			CheckAccountInfo: true,
+			RequireStack:     false, // for `cd` it's OK to proceed without a stack
+		})
 		if err != nil {
 			return err
 		}
@@ -147,8 +157,9 @@ var cdListCmd = &cobra.Command{
 
 			// FIXME: this needs auth because it spawns the CD task
 			return cli.CdCommandAndTail(cmd.Context(), session.Provider, "", global.Verbose, client.CdCommandList, global.Client)
+		} else {
+			return cli.CdListFromStorage(cmd.Context(), session.Provider, all)
 		}
-		return cli.CdListLocal(cmd.Context(), session.Provider, all)
 	},
 }
 
@@ -159,7 +170,7 @@ var cdPreviewCmd = &cobra.Command{
 	Short:       "Preview the changes that will be made by the CD task",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		session, err := NewCommandSession(cmd)
+		session, err := newCommandSession(cmd)
 		if err != nil {
 			return err
 		}
@@ -190,7 +201,7 @@ var cdInstallCmd = &cobra.Command{
 	Hidden:      true, // users shouldn't have to run this manually, because it's done on deploy
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		session, err := NewCommandSession(cmd)
+		session, err := newCommandSession(cmd)
 		if err != nil {
 			return err
 		}

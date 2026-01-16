@@ -22,7 +22,7 @@ type FabricClient interface {
 	GetFabricClient() defangv1connect.FabricControllerClient
 	GetDelegateSubdomainZone(context.Context, *defangv1.GetDelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
 	GetPlaygroundProjectDomain(context.Context) (*defangv1.GetPlaygroundProjectDomainResponse, error)
-	GetSelectedProvider(context.Context, *defangv1.GetSelectedProviderRequest) (*defangv1.GetSelectedProviderResponse, error)
+	GetDefaultStack(context.Context, *defangv1.GetDefaultStackRequest) (*defangv1.GetStackResponse, error)
 	GetTenantName() types.TenantLabel
 	GetVersions(context.Context) (*defangv1.Version, error)
 	ListDeployments(context.Context, *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error)
@@ -31,8 +31,6 @@ type FabricClient interface {
 	PutDeployment(context.Context, *defangv1.PutDeploymentRequest) error
 	PutStack(context.Context, *defangv1.PutStackRequest) error
 	RevokeToken(context.Context) error
-	SetSelectedProvider(context.Context, *defangv1.SetSelectedProviderRequest) error
-	// Subscribe(context.Context, *v1.SubscribeRequest) (*v1.SubscribeResponse, error)
 	Token(context.Context, *defangv1.TokenRequest) (*defangv1.TokenResponse, error)
 	Track(string, ...Property) error
 	VerifyDNSSetup(context.Context, *defangv1.VerifyDNSSetupRequest) error

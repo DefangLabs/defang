@@ -91,6 +91,9 @@ func (sm *manager) ListLocal() ([]ListItem, error) {
 }
 
 func (sm *manager) ListRemote(ctx context.Context) ([]ListItem, error) {
+	if sm.projectName == "" {
+		return nil, errors.New("project name is required to list remote stacks")
+	}
 	resp, err := sm.fabric.ListStacks(ctx, &defangv1.ListStacksRequest{
 		Project: sm.projectName,
 	})
@@ -104,19 +107,13 @@ func (sm *manager) ListRemote(ctx context.Context) ([]ListItem, error) {
 			name = DefaultBeta
 		}
 		bytes := stack.GetStackFile()
-		variables, err := Parse(string(bytes))
+		params, err := NewParametersFromContent(name, bytes)
 		if err != nil {
 			term.Warnf("Skipping invalid remote stack %s: %v\n", name, err)
 			continue
 		}
-		params, err := ParamsFromMap(variables)
-		if err != nil {
-			term.Warnf("Skipping invalid remote stack %s: %v\n", name, err)
-			continue
-		}
-		params.Name = name
 		stackParams = append(stackParams, ListItem{
-			Parameters: params,
+			Parameters: *params,
 			DeployedAt: timeutils.AsTime(stack.GetLastDeployedAt(), time.Time{}),
 		})
 	}
