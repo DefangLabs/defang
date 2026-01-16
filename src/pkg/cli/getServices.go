@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -139,13 +140,18 @@ func RunHealthcheck(ctx context.Context, name, endpoint, path string) (string, e
 	term.Debugf("[%s] checking health at %s", name, url)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		var dnsErr *net.DNSError
 		if errors.Is(err, context.DeadlineExceeded) {
 			return "unknown (timeout)", nil
 		}
+		var dnsErr *net.DNSError
 		if errors.As(err, &dnsErr) {
 			term.Warnf("service %q: Run `defang cert generate` to continue setup: %v", name, err)
 			return "unknown (DNS error)", nil
+		}
+		var tlsErr *tls.CertificateVerificationError
+		if errors.As(err, &tlsErr) {
+			term.Warnf("service %q: Run `defang cert generate` to continue setup: %v", name, err)
+			return "unknown (TLS certificate error)", nil
 		}
 		return "", err
 	}
