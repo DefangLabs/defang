@@ -4,24 +4,28 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 )
 
+const (
+	RegionDefaultAWS = "us-west-2"
+	RegionDefaultDO  = "nyc3"
+	RegionDefaultGCP = "us-central1" // Defaults to us-central1 for lower price
+)
+
 func GetRegion(provider ProviderID) string {
-	varName := GetRegionVarName(provider)
 	var defaultRegion string
 	switch provider {
 	case ProviderAWS:
-		defaultRegion = "us-west-2"
+		defaultRegion = RegionDefaultAWS
 	case ProviderGCP:
-		defaultRegion = "us-central1"
+		defaultRegion = RegionDefaultGCP
 	case ProviderDO:
-		defaultRegion = "nyc3"
-	case ProviderDefang:
-		return ""
-	case ProviderAuto:
+		defaultRegion = RegionDefaultDO
+	case ProviderDefang, ProviderAuto:
 		return ""
 	default:
 		panic("unsupported provider")
 	}
 
+	varName := GetRegionVarName(provider)
 	return pkg.Getenv(varName, defaultRegion)
 }
 
@@ -31,7 +35,6 @@ func GetRegionVarName(provider ProviderID) string {
 		return "AWS_REGION"
 	case ProviderGCP:
 		// Try standard GCP environment variables in order of precedence
-		// Keeping GCP_LOCATION first for backward compatibility
 		GCPRegionEnvVar, _ := pkg.GetFirstEnv(pkg.GCPRegionEnvVars...)
 		if GCPRegionEnvVar == "" {
 			return "GOOGLE_REGION"
@@ -39,9 +42,7 @@ func GetRegionVarName(provider ProviderID) string {
 		return GCPRegionEnvVar
 	case ProviderDO:
 		return "REGION"
-	case ProviderDefang:
-		return ""
-	case ProviderAuto:
+	case ProviderDefang, ProviderAuto:
 		return ""
 	default:
 		panic("unsupported provider")

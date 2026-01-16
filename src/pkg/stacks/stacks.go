@@ -43,10 +43,12 @@ func (sp Parameters) ToMap() map[string]string {
 	for k, v := range sp.Variables {
 		vars[k] = v
 	}
-	vars["DEFANG_PROVIDER"] = sp.Provider.String()
-	regionVarName := client.GetRegionVarName(sp.Provider)
-	if regionVarName != "" && sp.Region != "" {
-		vars[regionVarName] = sp.Region
+	if sp.Provider != "" {
+		vars["DEFANG_PROVIDER"] = sp.Provider.String()
+		regionVarName := client.GetRegionVarName(sp.Provider)
+		if regionVarName != "" && sp.Region != "" {
+			vars[regionVarName] = sp.Region
+		}
 	}
 	if sp.Mode != modes.ModeUnspecified {
 		vars["DEFANG_MODE"] = strings.ToLower(sp.Mode.String())
@@ -116,7 +118,7 @@ func CreateInDirectory(workingDirectory string, params Parameters) (string, erro
 	if err != nil {
 		if errors.Is(err, os.ErrExist) {
 			instructions := fmt.Sprintf(
-				"If you want to overwrite it, please spin down the stack and remove stackfile first.\n"+
+				"If you want to overwrite it, please spin down the stack and remove stack file first.\n"+
 					"    defang down --stack %s && rm .defang/%s",
 				params.Name,
 				params.Name,
@@ -224,7 +226,7 @@ func LoadStackEnv(params Parameters, overload bool) error {
 	paramsMap := params.ToMap()
 	for key, value := range paramsMap {
 		if currentEnv[key] && !overload {
-			term.Warnf("The environment variable %q is set in both the stackfile and the environment. The value from the environment will be used.\n", key)
+			term.Warnf("The variable %q is set in both the stack file and the environment. The value from the environment will be used.\n", key)
 		}
 		if !currentEnv[key] || overload {
 			err := os.Setenv(key, value)
@@ -243,7 +245,7 @@ func filename(workingDirectory, stackname string) string {
 
 func PostCreateMessage(stackName string) string {
 	return fmt.Sprintf(
-		"A stackfile has been created at `.defang/%s`.\n"+
+		"A stack file has been created at `.defang/%s`.\n"+
 			"This file contains the configuration for this stack.\n"+
 			"We recommend you commit this file to source control, so it can be used by everyone on your team.\n"+
 			"You can now deploy using `defang up --stack=%s`.\n"+

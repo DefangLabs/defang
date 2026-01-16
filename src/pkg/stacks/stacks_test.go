@@ -136,7 +136,7 @@ func TestRepeatCreate(t *testing.T) {
 		t.Errorf("Expected error on duplicate CreateInDirectory(), got nil")
 	} else {
 		assert.ErrorContains(t, err, "stack file already exists for \"repeattest\".")
-		assert.ErrorContains(t, err, "If you want to overwrite it, please spin down the stack and remove stackfile first.")
+		assert.ErrorContains(t, err, "If you want to overwrite it, please spin down the stack and remove stack file first.")
 		assert.ErrorContains(t, err, "defang down --stack repeattest && rm .defang/repeattest")
 	}
 }
