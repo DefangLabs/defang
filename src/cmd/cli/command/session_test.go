@@ -76,7 +76,7 @@ func TestNewStackManagerForCommand(t *testing.T) {
 				actualTarget := sm.TargetDirectory()
 				expectedAbs, err := filepath.Abs(tt.expectedTarget)
 				if err != nil {
-					t.Fatalf("failed to get relative path: %v", err)
+					t.Fatalf("failed to get absolute path: %v", err)
 				}
 				assert.Equal(t, expectedAbs, actualTarget)
 			}
