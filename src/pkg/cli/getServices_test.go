@@ -363,7 +363,6 @@ func TestRunHealthcheck(t *testing.T) {
 		endpoint        string
 		healthcheckPath string
 		expectedStatus  string
-		expectedErr     bool
 	}{
 		{
 			name:            "Healthy service",
@@ -385,22 +384,16 @@ func TestRunHealthcheck(t *testing.T) {
 		},
 		{
 			name:            "Invalid endpoint",
-			endpoint:        "http://invalid-endpoint",
-			healthcheckPath: "/healthy",
-			expectedStatus:  "",
-			expectedErr:     true,
+			endpoint:        "http://invalid-endpoint-238hf83wfnrewanf.com",
+			healthcheckPath: "/",
+			expectedStatus:  "unhealthy (DNS error)",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			status, err := RunHealthcheck(ctx, "test-service", tt.endpoint, tt.healthcheckPath)
-			if tt.expectedErr {
-				require.Error(t, err)
-				return
-			} else {
-				require.NoError(t, err)
-			}
+			require.NoError(t, err)
 			assert.Equal(t, tt.expectedStatus, status)
 		})
 	}
