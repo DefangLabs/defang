@@ -187,6 +187,7 @@ func (b *ByocGcp) SetUpCD(ctx context.Context) error {
 		"roles/serviceusage.serviceUsageAdmin",  // For allowing cd to Enable APIs
 		"roles/datastore.owner",                 // For creating firestore database
 		"roles/logging.logWriter",               // For allowing cloudbuild to write logs
+		"roles/cloudscheduler.admin",            // For scheduling clean up jobs
 	}); err != nil {
 		return err
 	}
@@ -356,6 +357,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) error {
 		return err
 	}
 	env := map[string]string{
+		"DEFANG_CD_IMAGE":          b.CDImage,                 // used by down/destroy to schedule cleanup job with the same image
 		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_JSON":              os.Getenv("DEFANG_JSON"),
 		"DEFANG_MODE":              strings.ToLower(cmd.mode.String()),
