@@ -19,7 +19,7 @@ mcpServers: ["defang"]
 
 # Onboarding
 
-## Validate tools work
+## Validate tool
 
 Before using Defang, ensure the Defang CLI is installed and running.
 
@@ -28,7 +28,9 @@ The Defang CLI can be installed via npm, Homebrew, Winget, or `eval "$(curl -fsS
 ## First Steps:
 
 **IMPORTANT**:
-Ensure that the step above ## Validate tools is completed before proceeding to the steps below.
+Ensure that the step above ## Validate tool is completed before proceeding to the steps below.
+
+Once the Defang CLI is installed, the Kiro Power should refer to the using the Defang MCP tools instead of the Defang CLI if possible.
 
 - Ask the user which cloud provider they want to use (AWS, GCP)
   - If AWS:
