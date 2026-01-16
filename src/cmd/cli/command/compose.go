@@ -406,7 +406,7 @@ func makeComposeUpCmd() *cobra.Command {
 				service.State = serviceStates[service.Service.Name]
 			}
 
-			services, err := cli.NewServiceFromServiceInfo(deploy.Services)
+			services, err := cli.ServiceLineItemsFromServiceInfos(deploy.Services)
 			if err != nil {
 				return err
 			}

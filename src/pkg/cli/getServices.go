@@ -60,13 +60,14 @@ func GetServices(ctx context.Context, projectName string, provider client.Provid
 		return nil, err
 	}
 
-	numServices := len(servicesResponse.Services)
+	serviceInfos := servicesResponse.Services
+	numServices := len(serviceInfos)
 	if numServices == 0 {
 		return nil, ErrNoServices{ProjectName: projectName}
 	}
 
-	results := GetHealthcheckResults(ctx, servicesResponse.Services)
-	services, err := NewServiceFromServiceInfo(servicesResponse.Services)
+	endpointResults := GetHealthcheckResults(ctx, serviceInfos)
+	services, err := ServiceLineItemsFromServiceInfos(serviceInfos)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +166,7 @@ func RunHealthcheck(ctx context.Context, name, endpoint, path string) (string, e
 	}
 }
 
-func NewServiceFromServiceInfo(serviceInfos []*defangv1.ServiceInfo) ([]ServiceLineItem, error) {
+func ServiceLineItemsFromServiceInfos(serviceInfos []*defangv1.ServiceInfo) ([]ServiceLineItem, error) {
 	var serviceTableItems []ServiceLineItem
 
 	// showDomainNameColumn := false
