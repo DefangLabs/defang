@@ -1,11 +1,11 @@
 package command
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,45 +14,40 @@ func TestNewStackManagerForCommand(t *testing.T) {
 	tests := []struct {
 		name           string
 		directory      string
-		args           []string
+		projectName    string
 		expectedTarget string
 		expectedError  string
 	}{
 		{
 			name:           "inside a directory without a project",
 			directory:      "without-project",
-			args:           []string{""},
 			expectedTarget: "",
 			expectedError:  "no local stack files found; create a new stack or use --project-name to load known stacks",
 		},
 		{
 			name:           "inside a project directory without a stack directory",
 			directory:      "without-stack",
-			args:           []string{""},
 			expectedTarget: ".",
 		},
 		{
 			name:           "inside a nested directory within a project without a stack directory",
 			directory:      "without-stack/child",
-			args:           []string{""},
 			expectedTarget: "..",
 		},
 		{
 			name:           "inside a project directory with a stack directory",
 			directory:      "with-project-and-stack",
-			args:           []string{""},
 			expectedTarget: ".",
 		},
 		{
 			name:           "inside a nested directory within a project with a stack directory",
 			directory:      "with-project-and-stack/child",
-			args:           []string{""},
 			expectedTarget: "..",
 		},
 		{
 			name:          "outside a project directory",
 			directory:     ".",
-			args:          []string{"--project-name", "myproject"},
+			projectName:   "myproject",
 			expectedError: "no local stack files found; create a new stack or use --project-name to load known stacks",
 		},
 	}
@@ -72,12 +67,9 @@ func TestNewStackManagerForCommand(t *testing.T) {
 			t.Cleanup(func() { os.RemoveAll(tempDir) })
 			testDir := filepath.Join(tempDir, tt.directory)
 			t.Chdir(testDir)
-			cmd := makeComposeUpCmd()
-			RootCmd.AddCommand(cmd)
-			cmd.SetArgs(tt.args)
-			cmd.SetContext(context.Background())
 
-			sm, err := newStackManagerForCommand(cmd)
+			loader := compose.NewLoader(compose.WithProjectName(tt.projectName))
+			sm, err := newStackManagerForLoader(t.Context(), loader)
 			if tt.expectedError != "" {
 				assert.EqualError(t, err, tt.expectedError)
 				return
