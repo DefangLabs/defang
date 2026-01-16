@@ -141,7 +141,8 @@ func RunHealthcheck(ctx context.Context, name, endpoint, path string) (string, e
 	if err != nil {
 		var dnsErr *net.DNSError
 		if errors.As(err, &dnsErr) {
-			return "unhealthy (DNS error)", nil
+			term.Warnf("service %q: Run `defang cert generate` to continue setup: %v", name, err)
+			return "unknown (DNS error)", nil
 		}
 		return "", err
 	}
