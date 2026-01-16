@@ -398,3 +398,17 @@ func TestRunHealthcheck(t *testing.T) {
 		})
 	}
 }
+
+func TestRunHealthcheckTLSError(t *testing.T) {
+	ctx := t.Context()
+
+	// Start a test HTTPS server with a self-signed certificate
+	testServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(testServer.Close)
+
+	status, err := RunHealthcheck(ctx, "test-service", testServer.URL, "/healthy")
+	require.NoError(t, err)
+	assert.Equal(t, "unknown (TLS certificate error)", status)
+}
