@@ -22,7 +22,6 @@ type ServiceLineItem struct {
 	Service           string
 	State             defangv1.ServiceState
 	Status            string
-	Fqdn              string
 	AcmeCertUsed      bool
 	HealthcheckStatus string
 }
@@ -162,10 +161,6 @@ func NewServiceFromServiceInfo(serviceInfos []*defangv1.ServiceInfo) ([]ServiceL
 	// showDomainNameColumn := false
 
 	for _, serviceInfo := range serviceInfos {
-		fqdn := serviceInfo.PublicFqdn
-		if fqdn == "" {
-			fqdn = serviceInfo.PrivateFqdn
-		}
 		domainname := "N/A"
 		if serviceInfo.Domainname != "" {
 			// showDomainNameColumn = true
@@ -182,7 +177,6 @@ func NewServiceFromServiceInfo(serviceInfos []*defangv1.ServiceInfo) ([]ServiceL
 			State:        serviceInfo.State,
 			Status:       serviceInfo.Status,
 			Endpoint:     domainname,
-			Fqdn:         fqdn,
 			AcmeCertUsed: serviceInfo.UseAcmeCert,
 		}
 		serviceTableItems = append(serviceTableItems, ps)
@@ -203,7 +197,7 @@ func PrintServiceStatesAndEndpoints(services []ServiceLineItem) error {
 		}
 	}
 
-	attrs := []string{"Service", "Deployment", "State", "Fqdn", "Endpoint"}
+	attrs := []string{"Service", "Deployment", "State", "Endpoint"}
 	if printHealthcheckStatus {
 		attrs = append(attrs, "HealthcheckStatus")
 	}

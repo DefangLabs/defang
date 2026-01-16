@@ -231,7 +231,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 					{
 						Service:    "test-service",
 						Deployment: "test-deployment",
-						Fqdn:       "test.example.com",
 						Status:     "running",
 					},
 				},
