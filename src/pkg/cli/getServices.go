@@ -2,7 +2,9 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -138,6 +140,10 @@ func RunHealthcheck(ctx context.Context, name, endpoint, path string) (string, e
 	term.Debugf("[%s] checking health at %s", name, url)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		var dnsErr *net.DNSError
+		if errors.As(err, &dnsErr) {
+			return "unhealthy (DNS error)", nil
+		}
 		return "", err
 	}
 	defer resp.Body.Close()
