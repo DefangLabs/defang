@@ -402,17 +402,8 @@ func makeComposeUpCmd() *cobra.Command {
 				return deploymentErr
 			}
 
-			for _, service := range deploy.Services {
-				service.State = serviceStates[service.Service.Name]
-			}
-
-			services, err := cli.ServiceLineItemsFromServiceInfos(deploy.Services)
-			if err != nil {
-				return err
-			}
-
 			// Print the current service states of the deployment
-			err = cli.PrintServiceStatesAndEndpoints(services)
+			err = cli.PrintServices(ctx, project.Name, session.Provider)
 			if err != nil {
 				return err
 			}

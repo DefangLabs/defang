@@ -29,7 +29,7 @@ type MockCLI struct {
 	MockProjectName                  string
 
 	GetServicesError    error
-	MockServices        []cli.ServiceLineItem
+	MockServices        []cli.ServiceEndpoint
 	GetServicesCalled   bool
 	GetServicesProject  string
 	GetServicesProvider client.Provider
@@ -56,7 +56,7 @@ func (m *MockCLI) LoadProjectNameWithFallback(ctx context.Context, loader client
 	return "default-project", nil
 }
 
-func (m *MockCLI) GetServices(ctx context.Context, projectName string, provider client.Provider) ([]cli.ServiceLineItem, error) {
+func (m *MockCLI) GetServices(ctx context.Context, projectName string, provider client.Provider) ([]cli.ServiceEndpoint, error) {
 	m.GetServicesCalled = true
 	m.GetServicesProject = projectName
 	m.GetServicesProvider = provider
@@ -227,7 +227,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				MockClient:      &client.GrpcClient{},
 				MockProvider:    &client.PlaygroundProvider{},
 				MockProjectName: "test-project",
-				MockServices: []cli.ServiceLineItem{
+				MockServices: []cli.ServiceEndpoint{
 					{
 						Service:    "test-service",
 						Deployment: "test-deployment",
