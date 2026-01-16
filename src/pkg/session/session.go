@@ -62,16 +62,11 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = stacks.LoadStackEnv(*stack, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load stack env: %w", err)
-	}
-	loader := sl.newLoader()
 	// load provider with selected stack
 	provider := cli.NewProvider(ctx, stack.Provider, sl.client, stack.Name)
 	session := &Session{
 		Stack:    stack,
-		Loader:   loader,
+		Loader:   sl.newLoader(),
 		Provider: provider,
 	}
 
@@ -94,15 +89,7 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, str
 		return sl.loadSpecifiedStack(ctx, sl.opts.Stack)
 	}
 	if sl.opts.Interactive && sl.opts.RequireStack {
-		stackSelector := stacks.NewSelector(sl.ec, sl.sm)
-		stack, err := stackSelector.SelectStack(ctx, stacks.SelectStackOptions{
-			AllowCreate: sl.opts.AllowStackCreation,
-		})
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to select stack: %w", err)
-		}
-
-		return stack, "interactive selection", nil
+		return sl.loadStackInteractively(ctx)
 	}
 
 	return sl.loadFallbackStack(ctx)
@@ -116,6 +103,10 @@ func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, name string) (*
 	}
 	stack, err := sl.sm.LoadLocal(name)
 	if err == nil {
+		err = stacks.LoadStackEnv(*stack, false)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to load stack env: %w", err)
+		}
 		return stack, whence + " and local stack file", nil
 	}
 	// the stack file does not exist locally
@@ -125,6 +116,10 @@ func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, name string) (*
 	stack, err = sl.sm.LoadRemote(ctx, name)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to load stack %q remotely: %w", name, err)
+	}
+	err = stacks.LoadStackEnv(*stack, false)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to load stack env: %w", err)
 	}
 	// persist the remote stack file to the local target directory
 	stackFilename, err := sl.sm.Create(*stack)
@@ -138,28 +133,53 @@ func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, name string) (*
 	return stack, whence + " and previous deployment", nil
 }
 
+func (sl *SessionLoader) loadStackInteractively(ctx context.Context) (*stacks.Parameters, string, error) {
+	stackSelector := stacks.NewSelector(sl.ec, sl.sm)
+	stack, err := stackSelector.SelectStack(ctx, stacks.SelectStackOptions{
+		AllowCreate: sl.opts.AllowStackCreation,
+	})
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to select stack: %w", err)
+	}
+	err = stacks.LoadStackEnv(*stack, false)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to load stack env: %w", err)
+	}
+
+	return stack, "interactive selection", nil
+}
+
 func (sl *SessionLoader) loadFallbackStack(ctx context.Context) (*stacks.Parameters, string, error) {
 	// Check Fabric for default stack (set by Portal or CLI)
 	res, err := sl.client.GetDefaultStack(ctx, &defangv1.GetDefaultStackRequest{
 		Project: sl.opts.ProjectName,
 	})
+	var params *stacks.Parameters
+	var whence = "default provider"
 	if err != nil {
 		term.Debugf("Could not get default stack from server: %v", err)
-		whence := "--provider flag"
-		if sl.opts.ProviderID == "" {
-			whence = "default provider"
+		if sl.opts.ProviderID != "" {
+			whence = "--provider flag"
 		}
 		_, envSet := os.LookupEnv("DEFANG_PROVIDER")
 		if envSet {
 			whence = "DEFANG_PROVIDER"
 		}
-		return &stacks.Parameters{
+		params = &stacks.Parameters{
 			Name:     stacks.DefaultBeta,
 			Provider: sl.opts.ProviderID,
-		}, whence, nil
+		}
+	} else {
+		params, err = stacks.NewParametersFromContent(res.Stack.Name, res.Stack.StackFile)
+		if err != nil {
+			return nil, "", err
+		}
 	}
-	params, err := stacks.NewParametersFromContent(res.Stack.Name, res.Stack.StackFile)
-	return params, "default stack", err
+	err = stacks.LoadStackEnv(*params, false)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to load stack env: %w", err)
+	}
+	return params, whence, nil
 }
 
 func (sl *SessionLoader) newLoader() client.Loader {
