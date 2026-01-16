@@ -324,7 +324,8 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 			// Reset stdout before each test
 			stdout.Reset()
 
-			_ = PrintServiceStatesAndEndpoints(tt.services)
+			err := PrintServiceStatesAndEndpoints(tt.services)
+			require.NoError(t, err)
 			receivedLines := strings.Split(stdout.String(), "\n")
 
 			if len(receivedLines) != len(tt.expectedLines) {
