@@ -147,11 +147,11 @@ foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.
 	})
 }
 
-func TestGetServiceStatesAndEndpoints(t *testing.T) {
+func ServiceEndpointFromServiceInfo(t *testing.T) {
 	tests := []struct {
 		name            string
 		serviceinfo     *defangv1.ServiceInfo
-		expectedService ServiceLineItem
+		expectedService ServiceEndpoint
 	}{
 		{
 			name: "empty endpoint list",
@@ -163,7 +163,7 @@ func TestGetServiceStatesAndEndpoints(t *testing.T) {
 				Domainname: "example.com",
 				Endpoints:  []string{},
 			},
-			expectedService: ServiceLineItem{
+			expectedService: ServiceEndpoint{
 				Service:  "service1",
 				Status:   "UNKNOWN",
 				Endpoint: "https://example.com",
@@ -182,7 +182,7 @@ func TestGetServiceStatesAndEndpoints(t *testing.T) {
 					"service1.internal:80",
 				},
 			},
-			expectedService: ServiceLineItem{
+			expectedService: ServiceEndpoint{
 				Service:  "service1",
 				Status:   "UNKNOWN",
 				Endpoint: "https://example.com",
@@ -199,7 +199,7 @@ func TestGetServiceStatesAndEndpoints(t *testing.T) {
 					"service1",
 				},
 			},
-			expectedService: ServiceLineItem{
+			expectedService: ServiceEndpoint{
 				Service:  "service1",
 				Status:   "UNKNOWN",
 				Endpoint: "N/A",
@@ -217,7 +217,7 @@ func TestGetServiceStatesAndEndpoints(t *testing.T) {
 					"service1",
 				},
 			},
-			expectedService: ServiceLineItem{
+			expectedService: ServiceEndpoint{
 				Service:      "service1",
 				Status:       "UNKNOWN",
 				Endpoint:     "N/A",
@@ -227,7 +227,7 @@ func TestGetServiceStatesAndEndpoints(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := ServiceLineItemFromServiceInfo(tt.serviceinfo)
+			svc := ServiceEndpointsFromServiceInfo(tt.serviceinfo)
 			assert.Equal(t, tt.expectedService.Service, svc.Service)
 			assert.Equal(t, tt.expectedService.Status, svc.Status)
 			assert.Equal(t, tt.expectedService.Endpoint, svc.Endpoint)
@@ -247,12 +247,12 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		services      []ServiceLineItem
+		services      []ServiceEndpoint
 		expectedLines []string
 	}{
 		{
 			name: "empty endpoint list",
-			services: []ServiceLineItem{
+			services: []ServiceEndpoint{
 				{
 					Service:  "service1",
 					Status:   "UNKNOWN",
@@ -267,7 +267,7 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 		},
 		{
 			name: "Service with Domainname",
-			services: []ServiceLineItem{
+			services: []ServiceEndpoint{
 				{
 					Service:  "service1",
 					Status:   "UNKNOWN",
@@ -282,7 +282,7 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 		},
 		{
 			name: "with acme cert",
-			services: []ServiceLineItem{
+			services: []ServiceEndpoint{
 				{
 					Service:      "service1",
 					Status:       "UNKNOWN",

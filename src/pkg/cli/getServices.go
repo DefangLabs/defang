@@ -17,7 +17,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-type ServiceLineItem struct {
+type ServiceEndpoint struct {
 	Deployment        string
 	Endpoint          string
 	Service           string
@@ -52,7 +52,7 @@ func PrintLongServices(ctx context.Context, projectName string, provider client.
 	return PrintObject("", servicesResponse)
 }
 
-func GetServices(ctx context.Context, projectName string, provider client.Provider) ([]ServiceLineItem, error) {
+func GetServices(ctx context.Context, projectName string, provider client.Provider) ([]ServiceEndpoint, error) {
 	term.Debugf("Listing services in project %q", projectName)
 
 	servicesResponse, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: projectName})
@@ -67,7 +67,7 @@ func GetServices(ctx context.Context, projectName string, provider client.Provid
 	}
 
 	endpointResults := GetHealthcheckResults(ctx, serviceInfos)
-	services, err := ServiceLineItemsFromServiceInfos(serviceInfos)
+	services, err := ServiceEndpointsFromServiceInfos(serviceInfos)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func RunHealthcheck(ctx context.Context, name, endpoint, path string) (string, e
 	}
 }
 
-func ServiceLineItemFromServiceInfo(serviceInfo *defangv1.ServiceInfo) ServiceLineItem {
+func ServiceEndpointsFromServiceInfo(serviceInfo *defangv1.ServiceInfo) ServiceEndpoint {
 	domainname := "N/A"
 	if serviceInfo.Domainname != "" {
 		domainname = "https://" + serviceInfo.Domainname
@@ -176,7 +176,7 @@ func ServiceLineItemFromServiceInfo(serviceInfo *defangv1.ServiceInfo) ServiceLi
 		domainname = serviceInfo.PrivateFqdn
 	}
 
-	return ServiceLineItem{
+	return ServiceEndpoint{
 		Deployment:   serviceInfo.Etag,
 		Service:      serviceInfo.Service.Name,
 		State:        serviceInfo.State,
@@ -186,17 +186,17 @@ func ServiceLineItemFromServiceInfo(serviceInfo *defangv1.ServiceInfo) ServiceLi
 	}
 }
 
-func ServiceLineItemsFromServiceInfos(serviceInfos []*defangv1.ServiceInfo) ([]ServiceLineItem, error) {
-	var serviceTableItems []ServiceLineItem
+func ServiceEndpointsFromServiceInfos(serviceInfos []*defangv1.ServiceInfo) ([]ServiceEndpoint, error) {
+	var serviceTableItems []ServiceEndpoint
 
 	for _, serviceInfo := range serviceInfos {
-		serviceTableItems = append(serviceTableItems, ServiceLineItemFromServiceInfo(serviceInfo))
+		serviceTableItems = append(serviceTableItems, ServiceEndpointsFromServiceInfo(serviceInfo))
 	}
 
 	return serviceTableItems, nil
 }
 
-func PrintServiceStatesAndEndpoints(services []ServiceLineItem) error {
+func PrintServiceStatesAndEndpoints(services []ServiceEndpoint) error {
 	showCertGenerateHint := false
 	printHealthcheckStatus := false
 	for _, svc := range services {
