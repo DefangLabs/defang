@@ -71,17 +71,7 @@ func (DefaultToolCLI) ConfigDelete(ctx context.Context, projectName string, prov
 }
 
 func (DefaultToolCLI) GetServices(ctx context.Context, projectName string, provider client.Provider) ([]cli.Service, error) {
-	servicesResponse, err := cli.GetServices(ctx, projectName, provider)
-	if err != nil {
-		return nil, err
-	}
-
-	services, err := cli.CollectServiceStatuses(ctx, servicesResponse.Services)
-	if err != nil {
-		return nil, err
-	}
-
-	return services, err
+	return cli.GetServices(ctx, projectName, provider)
 }
 
 func (DefaultToolCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string {

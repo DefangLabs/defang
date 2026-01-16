@@ -63,29 +63,8 @@ func GetServices(ctx context.Context, projectName string, provider client.Provid
 		return nil, ErrNoServices{ProjectName: projectName}
 	}
 
-	return servicesResponse, nil
-}
-
-func PrintServices(ctx context.Context, projectName string, provider client.Provider, long bool) error {
-	servicesResponse, err := GetServices(ctx, projectName, provider)
-	if err != nil {
-		return err
-	}
-	if long {
-		return PrintObject("", servicesResponse)
-	}
-
-	services, err := CollectServiceStatuses(ctx, servicesResponse.Services)
-	if err != nil {
-		return err
-	}
-
-	return PrintServiceStatesAndEndpoints(services)
-}
-
-func CollectServiceStatuses(ctx context.Context, serviceInfos []*defangv1.ServiceInfo) ([]Service, error) {
-	results := GetHealthcheckResults(ctx, serviceInfos)
-	services, err := NewServiceFromServiceInfo(serviceInfos)
+	results := GetHealthcheckResults(ctx, servicesResponse.Services)
+	services, err := NewServiceFromServiceInfo(servicesResponse.Services)
 	if err != nil {
 		return nil, err
 	}
@@ -97,6 +76,15 @@ func CollectServiceStatuses(ctx context.Context, serviceInfos []*defangv1.Servic
 		}
 	}
 	return services, nil
+}
+
+func PrintServices(ctx context.Context, projectName string, provider client.Provider) error {
+	services, err := GetServices(ctx, projectName, provider)
+	if err != nil {
+		return err
+	}
+
+	return PrintServiceStatesAndEndpoints(services)
 }
 
 type HealthCheckResults map[string]string
