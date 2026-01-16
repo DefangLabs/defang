@@ -25,10 +25,10 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 			ServiceIds: apis,
 		}
 
-		operation, err := service.Services.BatchEnable(projectName, req).Do()
+		operation, err := service.Services.BatchEnable(projectName, req).Context(ctx).Do()
 		if err != nil {
 			if i < 2 {
-				term.Infof("Failed to enable services, will retry in 5s: %v\n", err)
+				term.Debugf("Failed to enable services, will retry in 5s: %v\n", err)
 				pkg.SleepWithContext(ctx, 5*time.Second)
 				continue
 			}
@@ -37,13 +37,13 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 
 		opService := serviceusage.NewOperationsService(service)
 		for {
-			op, err := opService.Get(operation.Name).Do()
+			op, err := opService.Get(operation.Name).Context(ctx).Do()
 			if err != nil {
 				term.Warnf("Failed to get operation status: %v\n", err)
 			} else if op.Done { // Check if the operation is done
 				if op.Error != nil {
 					if i < 2 {
-						term.Infof("Failed to enable services operation, will retry in 5s: %v\n", op.Error)
+						term.Debugf("Failed to enable services operation, will retry in 5s: %v\n", op.Error)
 						pkg.SleepWithContext(ctx, 5*time.Second)
 						break
 					}
