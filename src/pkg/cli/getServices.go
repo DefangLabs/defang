@@ -24,6 +24,7 @@ type ServiceEndpoint struct {
 	State             defangv1.ServiceState
 	Status            string
 	AcmeCertUsed      bool
+	HealthcheckPath   string
 	HealthcheckStatus string
 }
 
@@ -66,19 +67,12 @@ func GetServices(ctx context.Context, projectName string, provider client.Provid
 		return nil, ErrNoServices{ProjectName: projectName}
 	}
 
-	endpointResults := GetHealthcheckResults(ctx, serviceInfos)
-	services, err := ServiceEndpointsFromServiceInfos(serviceInfos)
+	serviceEndpoints, err := ServiceEndpointsFromServiceInfos(serviceInfos)
 	if err != nil {
 		return nil, err
 	}
-	for i, svc := range services {
-		if status, ok := results[svc.Service]; ok {
-			services[i].HealthcheckStatus = *status
-		} else {
-			services[i].HealthcheckStatus = "unknown"
-		}
-	}
-	return services, nil
+	UpdateHealthcheckResults(ctx, serviceEndpoints)
+	return serviceEndpoints, nil
 }
 
 func PrintServices(ctx context.Context, projectName string, provider client.Provider) error {
@@ -90,42 +84,30 @@ func PrintServices(ctx context.Context, projectName string, provider client.Prov
 	return PrintServiceStatesAndEndpoints(services)
 }
 
-type HealthCheckResults map[string]*string
-
-func GetHealthcheckResults(ctx context.Context, serviceInfos []*defangv1.ServiceInfo) HealthCheckResults {
+func UpdateHealthcheckResults(ctx context.Context, serviceEndpoints []ServiceEndpoint) {
 	// Create a context with a timeout for HTTP requests
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	var wg sync.WaitGroup
 
-	results := make(HealthCheckResults)
-	for _, serviceInfo := range serviceInfos {
-		results[serviceInfo.Service.Name] = (new(string))
-	}
-
-	for _, serviceInfo := range serviceInfos {
-		for _, endpoint := range serviceInfo.Endpoints {
-			if strings.Contains(endpoint, ":") {
-				*results[serviceInfo.Service.Name] = "skipped"
-				// Skip endpoints with ports because they likely non-HTTP services
-				continue
-			}
-			wg.Add(1)
-			go func(serviceInfo *defangv1.ServiceInfo) {
-				defer wg.Done()
-				result, err := RunHealthcheck(ctx, serviceInfo.Service.Name, "https://"+endpoint, serviceInfo.HealthcheckPath)
-				if err != nil {
-					term.Debugf("Healthcheck error for service %q at endpoint %q: %s", serviceInfo.Service.Name, endpoint, err.Error())
-					result = "error"
-				}
-				*results[serviceInfo.Service.Name] = result
-			}(serviceInfo)
+	for i, serviceEndpoint := range serviceEndpoints {
+		if strings.Contains(serviceEndpoint.Endpoint, ":") && !strings.HasPrefix(serviceEndpoint.Endpoint, "https://") {
+			serviceEndpoints[i].HealthcheckStatus = "-"
+			continue
 		}
+		wg.Add(1)
+		go func(serviceEndpoint *ServiceEndpoint) {
+			defer wg.Done()
+			result, err := RunHealthcheck(ctx, serviceEndpoint.Service, serviceEndpoint.Endpoint, serviceEndpoint.HealthcheckPath)
+			if err != nil {
+				term.Debugf("Healthcheck error for service %q at endpoint %q: %s", serviceEndpoint.Service, serviceEndpoint.Endpoint, err.Error())
+				result = "error"
+			}
+			serviceEndpoint.HealthcheckStatus = result
+		}(&serviceEndpoints[i])
 	}
 
 	wg.Wait()
-
-	return results
 }
 
 func RunHealthcheck(ctx context.Context, name, endpoint, path string) (string, error) {
@@ -166,40 +148,51 @@ func RunHealthcheck(ctx context.Context, name, endpoint, path string) (string, e
 	}
 }
 
-func ServiceEndpointsFromServiceInfo(serviceInfo *defangv1.ServiceInfo) ServiceEndpoint {
-	domainname := "N/A"
+func ServiceEndpointsFromServiceInfo(serviceInfo *defangv1.ServiceInfo) []ServiceEndpoint {
+	endpoints := make([]ServiceEndpoint, 0, len(serviceInfo.Endpoints)+1)
+	for _, endpoint := range serviceInfo.Endpoints {
+		_, port, _ := net.SplitHostPort(endpoint)
+		if port == "" {
+			endpoint = "https://" + strings.TrimPrefix(endpoint, "https://")
+		}
+		endpoints = append(endpoints, ServiceEndpoint{
+			Deployment:      serviceInfo.Etag,
+			Service:         serviceInfo.Service.Name,
+			State:           serviceInfo.State,
+			Status:          serviceInfo.Status,
+			Endpoint:        endpoint,
+			HealthcheckPath: serviceInfo.HealthcheckPath,
+			AcmeCertUsed:    serviceInfo.UseAcmeCert,
+		})
+	}
 	if serviceInfo.Domainname != "" {
-		domainname = "https://" + serviceInfo.Domainname
-	} else if serviceInfo.PublicFqdn != "" {
-		domainname = "https://" + serviceInfo.PublicFqdn
-	} else if serviceInfo.PrivateFqdn != "" {
-		domainname = serviceInfo.PrivateFqdn
+		endpoints = append(endpoints, ServiceEndpoint{
+			Deployment:      serviceInfo.Etag,
+			Service:         serviceInfo.Service.Name,
+			State:           serviceInfo.State,
+			Status:          serviceInfo.Status,
+			Endpoint:        "https://" + serviceInfo.Domainname,
+			HealthcheckPath: serviceInfo.HealthcheckPath,
+			AcmeCertUsed:    serviceInfo.UseAcmeCert,
+		})
 	}
-
-	return ServiceEndpoint{
-		Deployment:   serviceInfo.Etag,
-		Service:      serviceInfo.Service.Name,
-		State:        serviceInfo.State,
-		Status:       serviceInfo.Status,
-		Endpoint:     domainname,
-		AcmeCertUsed: serviceInfo.UseAcmeCert,
-	}
+	return endpoints
 }
 
 func ServiceEndpointsFromServiceInfos(serviceInfos []*defangv1.ServiceInfo) ([]ServiceEndpoint, error) {
 	var serviceTableItems []ServiceEndpoint
 
 	for _, serviceInfo := range serviceInfos {
-		serviceTableItems = append(serviceTableItems, ServiceEndpointsFromServiceInfo(serviceInfo))
+		serviceTableItems = append(serviceTableItems, ServiceEndpointsFromServiceInfo(serviceInfo)...)
 	}
 
 	return serviceTableItems, nil
 }
 
-func PrintServiceStatesAndEndpoints(services []ServiceEndpoint) error {
+func PrintServiceStatesAndEndpoints(serviceEndpoints []ServiceEndpoint) error {
 	showCertGenerateHint := false
 	printHealthcheckStatus := false
-	for _, svc := range services {
+	for _, svc := range serviceEndpoints {
 		if svc.AcmeCertUsed {
 			showCertGenerateHint = true
 		}
@@ -212,7 +205,7 @@ func PrintServiceStatesAndEndpoints(services []ServiceEndpoint) error {
 	if printHealthcheckStatus {
 		attrs = append(attrs, "HealthcheckStatus")
 	}
-	err := term.Table(services, attrs...)
+	err := term.Table(serviceEndpoints, attrs...)
 	if err != nil {
 		return err
 	}
