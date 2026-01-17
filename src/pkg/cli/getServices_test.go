@@ -91,8 +91,8 @@ func TestPrintServices(t *testing.T) {
 		if err != nil {
 			t.Fatalf("PrintServices error = %v", err)
 		}
-		expectedOutput := "\x1b[1m\nSERVICE  DEPLOYMENT  STATE          FQDN                       ENDPOINT                           HEALTHCHECKSTATUS\x1b[0m" + `
-foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.prod1.defang.dev  unhealthy (404 Not Found)
+		expectedOutput := "\x1b[1m\nSERVICE  DEPLOYMENT  STATE          ENDPOINT                                 HEALTHCHECKSTATUS\x1b[0m" + `
+foo      a1b2c3      NOT_SPECIFIED  https://test-foo--3000.prod1.defang.dev  unhealthy (404 Not Found)
 `
 
 		receivedLines := strings.Split(stdout.String(), "\n")
@@ -149,9 +149,9 @@ foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.
 
 func ServiceEndpointFromServiceInfo(t *testing.T) {
 	tests := []struct {
-		name            string
-		serviceinfo     *defangv1.ServiceInfo
-		expectedService ServiceEndpoint
+		name                     string
+		serviceinfo              *defangv1.ServiceInfo
+		expectedServiceEndpoints []ServiceEndpoint
 	}{
 		{
 			name: "empty endpoint list",
@@ -163,10 +163,12 @@ func ServiceEndpointFromServiceInfo(t *testing.T) {
 				Domainname: "example.com",
 				Endpoints:  []string{},
 			},
-			expectedService: ServiceEndpoint{
-				Service:  "service1",
-				Status:   "UNKNOWN",
-				Endpoint: "https://example.com",
+			expectedServiceEndpoints: []ServiceEndpoint{
+				{
+					Service:  "service1",
+					Status:   "UNKNOWN",
+					Endpoint: "https://example.com",
+				},
 			},
 		},
 		{
@@ -182,10 +184,12 @@ func ServiceEndpointFromServiceInfo(t *testing.T) {
 					"service1.internal:80",
 				},
 			},
-			expectedService: ServiceEndpoint{
-				Service:  "service1",
-				Status:   "UNKNOWN",
-				Endpoint: "https://example.com",
+			expectedServiceEndpoints: []ServiceEndpoint{
+				{
+					Service:  "service1",
+					Status:   "UNKNOWN",
+					Endpoint: "https://example.com",
+				},
 			},
 		},
 		{
@@ -199,10 +203,12 @@ func ServiceEndpointFromServiceInfo(t *testing.T) {
 					"service1",
 				},
 			},
-			expectedService: ServiceEndpoint{
-				Service:  "service1",
-				Status:   "UNKNOWN",
-				Endpoint: "N/A",
+			expectedServiceEndpoints: []ServiceEndpoint{
+				{
+					Service:  "service1",
+					Status:   "UNKNOWN",
+					Endpoint: "N/A",
+				},
 			},
 		},
 		{
@@ -217,21 +223,81 @@ func ServiceEndpointFromServiceInfo(t *testing.T) {
 					"service1",
 				},
 			},
-			expectedService: ServiceEndpoint{
-				Service:      "service1",
-				Status:       "UNKNOWN",
-				Endpoint:     "N/A",
-				AcmeCertUsed: true,
+			expectedServiceEndpoints: []ServiceEndpoint{
+				{
+					Service:      "service1",
+					Status:       "UNKNOWN",
+					Endpoint:     "N/A",
+					AcmeCertUsed: true,
+				},
+			},
+		},
+		{
+			name: "with multiple endpoints",
+			serviceinfo: &defangv1.ServiceInfo{
+				Service: &defangv1.Service{
+					Name: "service1",
+				},
+				Status: "UNKNOWN",
+				Endpoints: []string{
+					"service1:80",
+					"service1.internal:8080",
+				},
+			},
+			expectedServiceEndpoints: []ServiceEndpoint{
+				{
+					Service:  "service1",
+					Status:   "UNKNOWN",
+					Endpoint: "http://service1:80",
+				},
+				{
+					Service:  "service1",
+					Status:   "UNKNOWN",
+					Endpoint: "http://service1.internal:8080",
+				},
+			},
+		},
+		{
+			name: "with multiple endpoints and domainname",
+			serviceinfo: &defangv1.ServiceInfo{
+				Service: &defangv1.Service{
+					Name: "service1",
+				},
+				Status:     "UNKNOWN",
+				Domainname: "example.com",
+				Endpoints: []string{
+					"service1:80",
+					"service1.internal:8080",
+				},
+			},
+			expectedServiceEndpoints: []ServiceEndpoint{
+				{
+					Service:  "service1",
+					Status:   "UNKNOWN",
+					Endpoint: "http://service1:80",
+				},
+				{
+					Service:  "service1",
+					Status:   "UNKNOWN",
+					Endpoint: "http://service1.internal:8080",
+				},
+				{
+					Service:  "service1",
+					Status:   "UNKNOWN",
+					Endpoint: "https://example.com",
+				},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := ServiceEndpointsFromServiceInfo(tt.serviceinfo)
-			assert.Equal(t, tt.expectedService.Service, svc.Service)
-			assert.Equal(t, tt.expectedService.Status, svc.Status)
-			assert.Equal(t, tt.expectedService.Endpoint, svc.Endpoint)
-			assert.Equal(t, tt.expectedService.AcmeCertUsed, svc.AcmeCertUsed)
+			serviceEndpoints := ServiceEndpointsFromServiceInfo(tt.serviceinfo)
+			for i, endpoint := range serviceEndpoints {
+				assert.Equal(t, tt.expectedServiceEndpoints[i].Service, endpoint.Service)
+				assert.Equal(t, tt.expectedServiceEndpoints[i].Status, endpoint.Status)
+				assert.Equal(t, tt.expectedServiceEndpoints[i].Endpoint, endpoint.Endpoint)
+				assert.Equal(t, tt.expectedServiceEndpoints[i].AcmeCertUsed, endpoint.AcmeCertUsed)
+			}
 		})
 	}
 }
@@ -260,8 +326,8 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 				},
 			},
 			expectedLines: []string{
-				"SERVICE   DEPLOYMENT  STATE          FQDN  ENDPOINT",
-				"service1              NOT_SPECIFIED        https://example.com",
+				"SERVICE   DEPLOYMENT  STATE          ENDPOINT",
+				"service1              NOT_SPECIFIED  https://example.com",
 				"",
 			},
 		},
@@ -275,8 +341,8 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 				},
 			},
 			expectedLines: []string{
-				"SERVICE   DEPLOYMENT  STATE          FQDN  ENDPOINT",
-				"service1              NOT_SPECIFIED        https://example.com",
+				"SERVICE   DEPLOYMENT  STATE          ENDPOINT",
+				"service1              NOT_SPECIFIED  https://example.com",
 				"",
 			},
 		},
@@ -291,8 +357,8 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 				},
 			},
 			expectedLines: []string{
-				"SERVICE   DEPLOYMENT  STATE          FQDN  ENDPOINT",
-				"service1              NOT_SPECIFIED        N/A",
+				"SERVICE   DEPLOYMENT  STATE          ENDPOINT",
+				"service1              NOT_SPECIFIED  N/A",
 				" * Run `defang cert generate` to get a TLS certificate for your service(s)",
 				"",
 			},
