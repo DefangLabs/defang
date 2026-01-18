@@ -265,14 +265,12 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(setupComposeCommand())
 	// Add up/down commands to the root as well
 	down := makeComposeDownCmd()
-	down.Hidden = true // hidden from top-level menu
+	down.Aliases = []string{"dn", "destroy"} // like Pulumi
+	down.Hidden = true                       // hidden from top-level menu
 	RootCmd.AddCommand(down)
 	up := makeComposeUpCmd()
 	up.Hidden = true // hidden from top-level menu
 	RootCmd.AddCommand(up)
-	restart := makeComposeRestartCmd()
-	restart.Hidden = true // hidden from top-level menu
-	RootCmd.AddCommand(restart)
 
 	estimateCmd := makeEstimateCmd()
 	RootCmd.AddCommand(estimateCmd)
