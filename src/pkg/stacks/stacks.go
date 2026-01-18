@@ -16,11 +16,10 @@ import (
 )
 
 type Parameters struct {
-	Name     string
-	Provider client.ProviderID
-	Mode     modes.Mode
-	Region   string
-	// replace properties with variable map, but keep getters and setters for common ones
+	Name      string
+	Provider  client.ProviderID
+	Mode      modes.Mode
+	Region    string
 	Variables map[string]string
 }
 

@@ -55,16 +55,16 @@ func CdCommand(ctx context.Context, projectName string, provider client.Provider
 	}
 
 	if command == client.CdCommandDestroy || command == client.CdCommandDown {
-		err := postDown(ctx, projectName, provider, fabric)
+		err := afterDown(ctx, projectName, provider, fabric)
 		if err != nil {
-			term.Debugf("postDown failed: %v", err)
+			term.Debugf("afterDown failed: %v", err)
 			term.Warn("Unable to update deployment history; deployment will proceed anyway.")
 		}
 	}
 	return etag, nil
 }
 
-func postDown(ctx context.Context, projectName string, provider client.Provider, fabric client.FabricClient) error {
+func afterDown(ctx context.Context, projectName string, provider client.Provider, fabric client.FabricClient) error {
 	// Special bookkeeping for "down" commands: delete the subdomain zone and mark deployment as destroyed
 	err := fabric.DeleteSubdomainZone(ctx, &defangv1.DeleteSubdomainZoneRequest{
 		Project: projectName,

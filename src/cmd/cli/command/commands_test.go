@@ -356,10 +356,6 @@ func (m *mockStackManager) Create(params stacks.Parameters) (string, error) {
 	return params.Name, nil
 }
 
-func (m *mockStackManager) LoadStackEnv(params stacks.Parameters, overload bool) error {
-	return stacks.LoadStackEnv(params, overload)
-}
-
 func TestNewProvider(t *testing.T) {
 	t.Setenv("AWS_REGION", "us-test-1")
 
