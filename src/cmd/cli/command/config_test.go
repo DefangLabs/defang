@@ -16,6 +16,7 @@ func resetConfigSetFlags() {
 	configSetCmd.Flags().Set("env", "false")
 	configSetCmd.Flags().Set("random", "false")
 	configSetCmd.Flags().Set("env-file", "")
+	RootCmd.PersistentFlags().Set("dry-run", "false")
 }
 
 func TestConfigSetFlagConflicts(t *testing.T) {
