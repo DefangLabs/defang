@@ -21,6 +21,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
@@ -54,11 +55,12 @@ type ByocAws struct {
 
 	driver *cfn.AwsEcsCfn // TODO: ecs is stateful, contains the output of the cd cfn stack after SetUpCD
 
-	ecsEventHandlers []ECSEventHandler
-	handlersLock     sync.RWMutex
-	cdEtag           types.ETag
-	cdStart          time.Time
-	cdTaskArn        ecs.TaskArn
+	ecsEventHandlers       []ECSEventHandler
+	codebuildEventHandlers []CodebuildEventHandler
+	handlersLock           sync.RWMutex
+	cdEtag                 types.ETag
+	cdStart                time.Time
+	cdTaskArn              ecs.TaskArn
 
 	needDockerHubCreds bool
 }
@@ -709,7 +711,7 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
-	return newByocServerStream(tailStream, etag, req.Services, b), nil
+	return newByocServerStream(tailStream, etag, req.Services, b, b), nil
 }
 
 func (b *ByocAws) queryCdLogs(ctx context.Context, cwClient *cloudwatchlogs.Client, req *defangv1.TailRequest) (cw.LiveTailStream, error) {
@@ -890,6 +892,10 @@ type ECSEventHandler interface {
 	HandleECSEvent(evt ecs.Event)
 }
 
+type CodebuildEventHandler interface {
+	HandleCodebuildEvent(evt codebuild.Event)
+}
+
 func (b *ByocAws) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
 	s := &byocSubscribeServerStream{
 		services: req.Services,
@@ -910,10 +916,24 @@ func (b *ByocAws) HandleECSEvent(evt ecs.Event) {
 	}
 }
 
+func (b *ByocAws) HandleCodebuildEvent(evt codebuild.Event) {
+	b.handlersLock.RLock()
+	defer b.handlersLock.RUnlock()
+	for _, handler := range b.codebuildEventHandlers {
+		handler.HandleCodebuildEvent(evt)
+	}
+}
+
 func (b *ByocAws) AddEcsEventHandler(handler ECSEventHandler) {
 	b.handlersLock.Lock()
 	defer b.handlersLock.Unlock()
 	b.ecsEventHandlers = append(b.ecsEventHandlers, handler)
+}
+
+func (b *ByocAws) AddCodebuildEventHandler(handler CodebuildEventHandler) {
+	b.handlersLock.Lock()
+	defer b.handlersLock.Unlock()
+	b.codebuildEventHandlers = append(b.codebuildEventHandlers, handler)
 }
 
 func (b *ByocAws) GetPrivateDomain(projectName string) string {

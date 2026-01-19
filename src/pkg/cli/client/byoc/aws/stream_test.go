@@ -143,7 +143,7 @@ func TestStreamToLogEvent(t *testing.T) {
 		},
 	}
 
-	var byocServiceStream = newByocServerStream(nil, testEtag, []string{"cd", "app", "django", "django-image"}, nil)
+	var byocServiceStream = newByocServerStream(nil, testEtag, []string{"cd", "app", "django", "django-image"}, nil, nil)
 
 	for _, td := range testdata {
 		tailResp := byocServiceStream.parseEvents([]cw.LogEvent{*td.event})
