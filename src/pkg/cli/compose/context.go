@@ -195,7 +195,7 @@ var (
 	ContextSizeHardLimit = parseContextLimit(os.Getenv("DEFANG_BUILD_CONTEXT_LIMIT"), DefaultContextSizeHardLimit)
 )
 
-func getRemoteBuildContext(ctx context.Context, provider client.Provider, project, name string, build *types.BuildConfig, upload UploadMode) (string, error) {
+func getRemoteBuildContext(ctx context.Context, provider client.Provider, projectName, service string, build *types.BuildConfig, upload UploadMode) (string, error) {
 	root, err := filepath.Abs(build.Context)
 	if err != nil {
 		return "", fmt.Errorf("invalid build context: %w", err) // already checked in ValidateProject
@@ -216,10 +216,10 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 		return root, nil
 	case UploadModeEstimate:
 		// For estimation, we don't bother packaging the files, we just return a placeholder URL
-		return fmt.Sprintf("s3://cd-preview/%s%s", name, archiveType.Extension), nil
+		return fmt.Sprintf("s3://cd-preview/%s%s", service, archiveType.Extension), nil
 	}
 
-	term.Info("Packaging the project files for", name, "at", root)
+	term.Info("Packaging the project files for", service, "at", root)
 	buffer, err := createArchive(ctx, build.Context, build.Dockerfile, archiveType)
 	if err != nil {
 		return "", err
@@ -230,7 +230,7 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 	case UploadModeDefault, UploadModeDigest:
 		// Calculate the digest of the tarball and pass it to the fabric controller (to avoid building the same image twice)
 		digest = calcDigest(buffer.Bytes())
-		term.Debugf("Digest for %q: %s", name, digest)
+		term.Debugf("Digest for %q: %s", service, digest)
 	case UploadModePreview:
 		// For preview, we invoke the CD "preview" command, which will want a valid (S3) URL for diff, even though it won't be used
 		digest = calcDigest(buffer.Bytes())
@@ -241,8 +241,8 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 		panic("unexpected UploadMode value")
 	}
 
-	term.Info("Uploading the project files for", name)
-	return uploadArchive(ctx, provider, project, buffer, archiveType, digest)
+	term.Info("Uploading the project files for", service)
+	return uploadArchive(ctx, provider, projectName, buffer, archiveType, digest)
 }
 
 func calcDigest(data []byte) string {
@@ -250,9 +250,9 @@ func calcDigest(data []byte) string {
 	return "sha256-" + base64.StdEncoding.EncodeToString(sha[:]) // same as Nix
 }
 
-func uploadArchive(ctx context.Context, provider client.Provider, project string, body io.Reader, archiveType ArchiveType, digest string) (string, error) {
+func uploadArchive(ctx context.Context, provider client.Provider, projectName string, body io.Reader, archiveType ArchiveType, digest string) (string, error) {
 	// Upload the archive to the fabric controller storage; TODO: use a streaming API
-	ureq := &defangv1.UploadURLRequest{Digest: digest + archiveType.Extension, Project: project}
+	ureq := &defangv1.UploadURLRequest{Digest: digest + archiveType.Extension, Project: projectName}
 	res, err := provider.CreateUploadURL(ctx, ureq)
 	if err != nil {
 		return "", err
