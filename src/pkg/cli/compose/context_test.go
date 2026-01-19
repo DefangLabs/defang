@@ -15,7 +15,6 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/patternmatcher/ignorefile"
 )
@@ -242,7 +241,6 @@ func Test_getRemoteBuildContext(t *testing.T) {
 		w.WriteHeader(200)
 	}))
 	t.Cleanup(server.Close)
-	term.SetDebug(true)
 
 	src, err := filepath.Abs("../../..")
 	if err != nil {
