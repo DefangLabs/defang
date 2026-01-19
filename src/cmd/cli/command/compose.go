@@ -193,6 +193,13 @@ func monitorWithUI(ctx context.Context, project *compose.Project, provider clien
 			}
 			return nil
 		})
+		// empty out all of the service statuses before printing a final state
+		for _, name := range servicesNames {
+			p.Send(serviceUpdate{
+				name:   name,
+				status: "",
+			})
+		}
 		// Quit the UI when monitoring is done
 		p.Quit()
 	}()
