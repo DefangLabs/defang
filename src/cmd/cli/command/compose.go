@@ -132,9 +132,9 @@ func (m *deploymentModel) View() string {
 		var spinnerOrCheck string
 		switch svc.status {
 		case "DEPLOYMENT_COMPLETED":
-			spinnerOrCheck = "✓"
+			spinnerOrCheck = "✓ "
 		case "DEPLOYMENT_FAILED":
-			spinnerOrCheck = "✗"
+			spinnerOrCheck = "✗ "
 		default:
 			spinnerOrCheck = svc.spinner.View()
 		}
