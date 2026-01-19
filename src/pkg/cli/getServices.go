@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -18,14 +19,14 @@ import (
 )
 
 type ServiceEndpoint struct {
-	Deployment        string
-	Endpoint          string
-	Service           string
-	State             defangv1.ServiceState
-	Status            string
-	AcmeCertUsed      bool
-	HealthcheckPath   string
-	HealthcheckStatus string
+	Deployment      string
+	Endpoint        string
+	Service         string
+	State           string
+	Status          string
+	AcmeCertUsed    bool
+	HealthcheckPath string
+	Healthcheck     string // status
 }
 
 type ErrNoServices struct {
@@ -92,7 +93,7 @@ func UpdateHealthcheckResults(ctx context.Context, serviceEndpoints []ServiceEnd
 
 	for i, serviceEndpoint := range serviceEndpoints {
 		if strings.Contains(serviceEndpoint.Endpoint, ":") && !strings.HasPrefix(serviceEndpoint.Endpoint, "https://") {
-			serviceEndpoints[i].HealthcheckStatus = "-"
+			serviceEndpoints[i].Healthcheck = "-"
 			continue
 		}
 		wg.Add(1)
@@ -103,7 +104,7 @@ func UpdateHealthcheckResults(ctx context.Context, serviceEndpoints []ServiceEnd
 				term.Debugf("Healthcheck error for service %q at endpoint %q: %s", serviceEndpoint.Service, serviceEndpoint.Endpoint, err.Error())
 				result = "error"
 			}
-			serviceEndpoint.HealthcheckStatus = result
+			serviceEndpoint.Healthcheck = result
 		}(&serviceEndpoints[i])
 	}
 
@@ -158,7 +159,7 @@ func ServiceEndpointsFromServiceInfo(serviceInfo *defangv1.ServiceInfo) []Servic
 		endpoints = append(endpoints, ServiceEndpoint{
 			Deployment:      serviceInfo.Etag,
 			Service:         serviceInfo.Service.Name,
-			State:           serviceInfo.State,
+			State:           serviceInfo.State.String(),
 			Status:          serviceInfo.Status,
 			Endpoint:        endpoint,
 			HealthcheckPath: serviceInfo.HealthcheckPath,
@@ -169,7 +170,7 @@ func ServiceEndpointsFromServiceInfo(serviceInfo *defangv1.ServiceInfo) []Servic
 		endpoints = append(endpoints, ServiceEndpoint{
 			Deployment:      serviceInfo.Etag,
 			Service:         serviceInfo.Service.Name,
-			State:           serviceInfo.State,
+			State:           serviceInfo.State.String(),
 			Status:          serviceInfo.Status,
 			Endpoint:        "https://" + serviceInfo.Domainname,
 			HealthcheckPath: serviceInfo.HealthcheckPath,
@@ -196,14 +197,39 @@ func PrintServiceStatesAndEndpoints(serviceEndpoints []ServiceEndpoint) error {
 		if svc.AcmeCertUsed {
 			showCertGenerateHint = true
 		}
-		if svc.HealthcheckStatus != "" {
+		if svc.Healthcheck != "" {
 			printHealthcheckStatus = true
 		}
 	}
 
-	attrs := []string{"Service", "Deployment", "State", "Endpoint"}
+	attrs := []string{"Service", "Deployment", "State"}
 	if printHealthcheckStatus {
-		attrs = append(attrs, "HealthcheckStatus")
+		attrs = append(attrs, "Healthcheck", "Endpoint")
+	} else {
+		attrs = append(attrs, "Endpoint")
+	}
+
+	// sort serviceEndpoints by Service, Deployment, Endpoint
+	slices.SortStableFunc(serviceEndpoints, func(a, b ServiceEndpoint) int {
+		if a.Service != b.Service {
+			return strings.Compare(a.Service, b.Service)
+		}
+		if a.Deployment != b.Deployment {
+			return strings.Compare(a.Deployment, b.Deployment)
+		}
+		return strings.Compare(a.Endpoint, b.Endpoint)
+	})
+
+	// remove "Service", "Deployment", and "State" columns if they are the same as the previous row
+	lastService := ""
+	for i := range serviceEndpoints {
+		if serviceEndpoints[i].Service == lastService {
+			serviceEndpoints[i].Service = ""
+			serviceEndpoints[i].Deployment = ""
+			serviceEndpoints[i].State = ""
+		} else {
+			lastService = serviceEndpoints[i].Service
+		}
 	}
 	err := term.Table(serviceEndpoints, attrs...)
 	if err != nil {
