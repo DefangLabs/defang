@@ -80,6 +80,7 @@ func HandleLogsTool(ctx context.Context, loader client.Loader, params LogsParams
 		Limit:         100,
 		LogType:       logs.LogTypeAll,
 		PrintBookends: true,
+		Stack:         sc.Stack.Name,
 		Verbose:       true,
 	})
 
