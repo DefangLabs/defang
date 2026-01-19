@@ -227,7 +227,7 @@ func LoadStackEnv(params Parameters, overload bool) error {
 
 	paramsMap := params.ToMap()
 	for key, value := range paramsMap {
-		if currentEnv[key] != value && !overload {
+		if envValue, ok := currentEnv[key]; ok && envValue != value && !overload {
 			term.Warnf("The variable %q is set in both the stack and the environment. The value from the environment will be used.\n", key)
 		}
 		if _, ok := currentEnv[key]; !ok || overload {
