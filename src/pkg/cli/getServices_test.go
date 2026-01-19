@@ -91,8 +91,8 @@ func TestPrintServices(t *testing.T) {
 		if err != nil {
 			t.Fatalf("PrintServices error = %v", err)
 		}
-		expectedOutput := "\x1b[1m\nSERVICE  DEPLOYMENT  STATE          ENDPOINT                                 HEALTHCHECKSTATUS\x1b[0m" + `
-foo      a1b2c3      NOT_SPECIFIED  https://test-foo--3000.prod1.defang.dev  unhealthy (404 Not Found)
+		expectedOutput := "\x1b[1m\nSERVICE  DEPLOYMENT  STATE          HEALTHCHECK                ENDPOINT\x1b[0m" + `
+foo      a1b2c3      NOT_SPECIFIED  unhealthy (404 Not Found)  https://test-foo--3000.prod1.defang.dev
 `
 
 		receivedLines := strings.Split(stdout.String(), "\n")
@@ -320,14 +320,15 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 			name: "empty endpoint list",
 			services: []ServiceEndpoint{
 				{
-					Service:  "service1",
-					Status:   "UNKNOWN",
-					Endpoint: "https://example.com",
+					Service:    "service1",
+					State:      "DEPLOYMENT_COMPLETED",
+					Endpoint:   "https://example.com",
+					Deployment: "abcd1234",
 				},
 			},
 			expectedLines: []string{
-				"SERVICE   DEPLOYMENT  STATE          ENDPOINT",
-				"service1              NOT_SPECIFIED  https://example.com",
+				"SERVICE   DEPLOYMENT  STATE                 ENDPOINT",
+				"service1  abcd1234    DEPLOYMENT_COMPLETED  https://example.com",
 				"",
 			},
 		},
@@ -335,14 +336,15 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 			name: "Service with Domainname",
 			services: []ServiceEndpoint{
 				{
-					Service:  "service1",
-					Status:   "UNKNOWN",
-					Endpoint: "https://example.com",
+					Service:    "service1",
+					Endpoint:   "https://example.com",
+					Deployment: "abcd1234",
+					State:      "DEPLOYMENT_COMPLETED",
 				},
 			},
 			expectedLines: []string{
-				"SERVICE   DEPLOYMENT  STATE          ENDPOINT",
-				"service1              NOT_SPECIFIED  https://example.com",
+				"SERVICE   DEPLOYMENT  STATE                 ENDPOINT",
+				"service1  abcd1234    DEPLOYMENT_COMPLETED  https://example.com",
 				"",
 			},
 		},
@@ -351,15 +353,46 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 			services: []ServiceEndpoint{
 				{
 					Service:      "service1",
-					Status:       "UNKNOWN",
 					Endpoint:     "N/A",
 					AcmeCertUsed: true,
+					Deployment:   "abcd1234",
+					State:        "DEPLOYMENT_COMPLETED",
 				},
 			},
 			expectedLines: []string{
-				"SERVICE   DEPLOYMENT  STATE          ENDPOINT",
-				"service1              NOT_SPECIFIED  N/A",
+				"SERVICE   DEPLOYMENT  STATE                 ENDPOINT",
+				"service1  abcd1234    DEPLOYMENT_COMPLETED  N/A",
 				" * Run `defang cert generate` to get a TLS certificate for your service(s)",
+				"",
+			},
+		},
+		{
+			name: "with multiple endpoints and domainname",
+			services: []ServiceEndpoint{
+				{
+					Service:    "service1",
+					Endpoint:   "http://service1:80",
+					Deployment: "abcd1234",
+					State:      "DEPLOYMENT_COMPLETED",
+				},
+				{
+					Service:    "service1",
+					Endpoint:   "http://service1.internal:8080",
+					Deployment: "abcd1234",
+					State:      "DEPLOYMENT_COMPLETED",
+				},
+				{
+					Service:    "service1",
+					Endpoint:   "https://example.com",
+					Deployment: "abcd1234",
+					State:      "DEPLOYMENT_COMPLETED",
+				},
+			},
+			expectedLines: []string{
+				"SERVICE   DEPLOYMENT  STATE                 ENDPOINT",
+				"service1  abcd1234    DEPLOYMENT_COMPLETED  http://service1.internal:8080",
+				"                                            http://service1:80",
+				"                                            https://example.com",
 				"",
 			},
 		},
