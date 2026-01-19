@@ -8,13 +8,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/patternmatcher/ignorefile"
 )
@@ -40,6 +41,7 @@ func Test_parseContextLimit(t *testing.T) {
 }
 
 func TestUploadArchive(t *testing.T) {
+	const testproj = "testproj"
 	const path = "/upload/x/"
 	const digest = "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
 
@@ -47,8 +49,8 @@ func TestUploadArchive(t *testing.T) {
 		if r.Method != "PUT" {
 			t.Errorf("Expected PUT request, got %v", r.Method)
 		}
-		if !strings.HasPrefix(r.URL.Path, path) {
-			t.Errorf("Expected prefix %v, got %v", path, r.URL.Path)
+		if !strings.HasPrefix(r.URL.Path, path+testproj) {
+			t.Errorf("Expected prefix %v, got %v", path+testproj, r.URL.Path)
 		}
 		if !(r.Header.Get("Content-Type") == string(ArchiveTypeGzip.MimeType) || r.Header.Get("Content-Type") == string(ArchiveTypeZip.MimeType)) {
 			t.Errorf("Expected Content-Type: application/gzip or application/zip, got %v", r.Header.Get("Content-Type"))
@@ -57,65 +59,70 @@ func TestUploadArchive(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
+	uploadUrl := server.URL + path
 	t.Run("upload tar with digest", func(t *testing.T) {
-		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeGzip, digest)
+		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: uploadUrl}, testproj, &bytes.Buffer{}, ArchiveTypeGzip, digest)
 		if err != nil {
 			t.Fatalf("uploadArchive() failed: %v", err)
 		}
-		var expectedPath = path + digest + ArchiveTypeGzip.Extension
+		var expectedPath = path + testproj + "/" + digest + ArchiveTypeGzip.Extension
 		if url != server.URL+expectedPath {
 			t.Errorf("Expected %v, got %v", server.URL+expectedPath, url)
 		}
 	})
 
 	t.Run("upload zip with digest", func(t *testing.T) {
-		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeZip, digest)
+		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: uploadUrl}, testproj, &bytes.Buffer{}, ArchiveTypeZip, digest)
 		if err != nil {
 			t.Fatalf("uploadArchive() failed: %v", err)
 		}
-		var expectedPath = path + digest + ArchiveTypeZip.Extension
+		var expectedPath = path + testproj + "/" + digest + ArchiveTypeZip.Extension
 		if url != server.URL+expectedPath {
 			t.Errorf("Expected %v, got %v", server.URL+expectedPath, url)
 		}
 	})
 
 	t.Run("upload with zip", func(t *testing.T) {
-		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeZip, "")
+		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: uploadUrl}, testproj, &bytes.Buffer{}, ArchiveTypeZip, "")
 		if err != nil {
 			t.Fatalf("uploadContent() failed: %v", err)
 		}
-		if url != server.URL+path+ArchiveTypeZip.Extension {
+		var expectedPath = path + testproj + "/" + ArchiveTypeZip.Extension
+		if url != server.URL+expectedPath {
 			t.Errorf("Expected %v, got %v", server.URL+path+ArchiveTypeZip.Extension, url)
 		}
 	})
 
 	t.Run("upload with tar", func(t *testing.T) {
-		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeGzip, "")
+		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: uploadUrl}, testproj, &bytes.Buffer{}, ArchiveTypeGzip, "")
 		if err != nil {
 			t.Fatalf("uploadContent() failed: %v", err)
 		}
-		if url != server.URL+path+ArchiveTypeGzip.Extension {
-			t.Errorf("Expected %v, got %v", server.URL+path+ArchiveTypeGzip.Extension, url)
+		var expectedPath = path + testproj + "/" + ArchiveTypeGzip.Extension
+		if url != server.URL+expectedPath {
+			t.Errorf("Expected %v, got %v", server.URL+expectedPath, url)
 		}
 	})
 
 	t.Run("force upload tar without digest", func(t *testing.T) {
-		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeGzip, "")
+		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: uploadUrl}, testproj, &bytes.Buffer{}, ArchiveTypeGzip, "")
 		if err != nil {
 			t.Fatalf("uploadArchive() failed: %v", err)
 		}
-		if url != server.URL+path+ArchiveTypeGzip.Extension {
-			t.Errorf("Expected %v, got %v", server.URL+path+ArchiveTypeGzip.Extension, url)
+		var expectedPath = path + testproj + "/" + ArchiveTypeGzip.Extension
+		if url != server.URL+expectedPath {
+			t.Errorf("Expected %v, got %v", server.URL+expectedPath, url)
 		}
 	})
 
 	t.Run("force upload zip without digest", func(t *testing.T) {
-		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeZip, "")
+		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: uploadUrl}, testproj, &bytes.Buffer{}, ArchiveTypeZip, "")
 		if err != nil {
 			t.Fatalf("uploadArchive() failed: %v", err)
 		}
-		if url != server.URL+path+ArchiveTypeZip.Extension {
-			t.Errorf("Expected %v, got %v", server.URL+path+ArchiveTypeZip.Extension, url)
+		var expectedPath = path + testproj + "/" + ArchiveTypeZip.Extension
+		if url != server.URL+expectedPath {
+			t.Errorf("Expected %v, got %v", server.URL+expectedPath, url)
 		}
 	})
 }
@@ -179,31 +186,35 @@ func Test_getRemoteBuildContext(t *testing.T) {
 		name       string
 		uploadMode UploadMode
 		expectUrl  string
+		expectFile string
 	}{
 		{
 			name:       "Default UploadMode",
 			uploadMode: UploadModeDefault,
-			expectUrl:  "https://mock-bucket.s3.amazonaws.com/sha256-of7YhHrD80jN8sIbZ4FGehfjjhzCZqnlwddjEgvTIBM=.tar.gz", // same as Digest mode
+			expectUrl:  "https://mock-bucket.s3.amazonaws.com/project1/sha256-B+3Dq6U37SrlbnrfS4uIk3CDwrPJ+Q15TqUCPBEMQuA=.tar.gz", // same as Digest mode
+			expectFile: "sha256-B+3Dq6U37SrlbnrfS4uIk3CDwrPJ+Q15TqUCPBEMQuA=.tar.gz",
 		},
 		{
 			name:       "Force UploadMode",
 			uploadMode: UploadModeForce,
-			expectUrl:  "https://mock-bucket.s3.amazonaws.com/.tar.gz", // server decides name
+			expectUrl:  "https://mock-bucket.s3.amazonaws.com/project1/.tar.gz", // server decides name
+			expectFile: ".tar.gz",
 		},
 		{
 			name:       "Digest UploadMode",
 			uploadMode: UploadModeDigest,
-			expectUrl:  "https://mock-bucket.s3.amazonaws.com/sha256-of7YhHrD80jN8sIbZ4FGehfjjhzCZqnlwddjEgvTIBM=.tar.gz",
+			expectUrl:  "https://mock-bucket.s3.amazonaws.com/project1/sha256-B+3Dq6U37SrlbnrfS4uIk3CDwrPJ+Q15TqUCPBEMQuA=.tar.gz",
+			expectFile: "sha256-B+3Dq6U37SrlbnrfS4uIk3CDwrPJ+Q15TqUCPBEMQuA=.tar.gz",
 		},
 		{
 			name:       "Ignore UploadMode",
 			uploadMode: UploadModeIgnore,
-			expectUrl:  "/Users/$USER/dev/defang/src/testdata/testproj", // show local paths in "defang config"
+			expectUrl:  "$SRC/testdata/testproj", // show local paths in "defang config"
 		},
 		{
 			name:       "Preview UploadMode",
 			uploadMode: UploadModePreview,
-			expectUrl:  "s3://cd-preview/sha256-of7YhHrD80jN8sIbZ4FGehfjjhzCZqnlwddjEgvTIBM=.tar.gz", // like digest but fake bucket
+			expectUrl:  "s3://cd-preview/sha256-B+3Dq6U37SrlbnrfS4uIk3CDwrPJ+Q15TqUCPBEMQuA=.tar.gz", // like digest but fake bucket
 		},
 		{
 			name:       "Estimate UploadMode",
@@ -212,15 +223,33 @@ func Test_getRemoteBuildContext(t *testing.T) {
 		},
 	}
 
+	tmpDir := t.TempDir()
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "PUT" {
-			t.Errorf("Expected PUT request, got %v", r.Method)
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		defer r.Body.Close()
+		if dst, err := os.Create(filepath.Join(tmpDir, path.Base(r.URL.Path))); err != nil {
+			t.Errorf("Failed to create file: %v", err)
+		} else {
+			defer dst.Close()
+			if _, err := io.Copy(dst, r.Body); err != nil {
+				t.Errorf("Failed to write file: %v", err)
+			}
 		}
 		w.WriteHeader(200)
 	}))
 	t.Cleanup(server.Close)
+	term.SetDebug(true)
 
-	normalizer := strings.NewReplacer(pkg.GetCurrentUser(), "$USER", server.URL, "https://mock-bucket.s3.amazonaws.com")
+	src, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatalf("Failed to get working directory: %v", err)
+	}
+
+	normalizer := strings.NewReplacer(src, "$SRC", server.URL, "https://mock-bucket.s3.amazonaws.com")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			provider := client.MockProvider{UploadUrl: server.URL}
@@ -232,6 +261,17 @@ func Test_getRemoteBuildContext(t *testing.T) {
 			}
 			if got := normalizer.Replace(url); got != tt.expectUrl {
 				t.Errorf("Expected %v, got: %v", tt.expectUrl, got)
+			}
+			if tt.expectFile != "" {
+				// Check that the file was uploaded correctly
+				uploadedFile := filepath.Join(tmpDir, tt.expectFile)
+				all, err := os.ReadFile(uploadedFile)
+				if err != nil {
+					t.Fatalf("Failed to read uploaded file %v: %v", uploadedFile, err)
+				}
+				if calcDigest(all) != "sha256-B+3Dq6U37SrlbnrfS4uIk3CDwrPJ+Q15TqUCPBEMQuA=" {
+					t.Errorf("Uploaded file has unexpected digest: %v", calcDigest(all))
+				}
 			}
 		})
 	}

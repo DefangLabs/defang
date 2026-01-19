@@ -118,9 +118,13 @@ func (tw *tarFactory) CreateHeader(info fs.FileInfo, slashPath string) (io.Write
 	}
 
 	// Make reproducible; WalkDir walks files in lexical order.
+	header.AccessTime = time.Time{}
+	header.ChangeTime = time.Time{}
 	header.ModTime = time.Unix(sourceDateEpoch, 0)
 	header.Gid = 0
 	header.Uid = 0
+	header.Gname = ""
+	header.Uname = ""
 	header.Name = slashPath
 	err = tw.WriteHeader(header)
 	return tw.Writer, err
@@ -427,8 +431,8 @@ func walkContextFolder(root, dockerfile string, writeIgnore writeIgnoreFile, fn 
 
 func createArchive(ctx context.Context, root string, dockerfile string, contentType ArchiveType) (*bytes.Buffer, error) {
 	fileCount := 0
-	// TODO: use io.Pipe and do proper streaming (instead of buffering everything in memory)
 
+	// TODO: use io.Pipe and do proper streaming (instead of buffering everything in memory)
 	buf := &bytes.Buffer{}
 	var factory WriterFactory
 	if contentType == ArchiveTypeZip {

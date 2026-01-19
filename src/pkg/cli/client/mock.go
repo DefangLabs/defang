@@ -22,7 +22,7 @@ type MockProvider struct {
 }
 
 func (m MockProvider) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	url, err := url.JoinPath(m.UploadUrl, req.Digest)
+	url, err := url.JoinPath(m.UploadUrl, req.Project, req.Stack, req.Digest)
 	return &defangv1.UploadURLResponse{Url: url}, err
 }
 
