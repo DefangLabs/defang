@@ -106,7 +106,7 @@ func TestConfigSetFlagConflicts(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			resetConfigSetFlags()
+			t.Cleanup(resetConfigSetFlags)
 
 			err := testCommand(t, tc.args, server.URL)
 
