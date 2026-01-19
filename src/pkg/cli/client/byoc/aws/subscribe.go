@@ -18,6 +18,18 @@ type byocSubscribeServerStream struct {
 	done chan struct{}
 }
 
+func (s *byocSubscribeServerStream) HandleCodebuildEvent(evt ecs.Event) {
+	resp := defangv1.SubscribeResponse{
+		Name:   evt.Service(),
+		Status: evt.Status(),
+		State:  evt.State(),
+	}
+	select {
+	case s.ch <- &resp:
+	case <-s.done:
+	}
+}
+
 func (s *byocSubscribeServerStream) HandleECSEvent(evt ecs.Event) {
 	if etag := evt.Etag(); etag == "" || etag != s.etag {
 		return
