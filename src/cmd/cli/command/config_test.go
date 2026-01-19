@@ -3,6 +3,8 @@ package command
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -10,10 +12,27 @@ import (
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
-func TestConfigSetMultiple(t *testing.T) {
+func resetConfigSetFlags() {
+	configSetCmd.Flags().Set("env", "false")
+	configSetCmd.Flags().Set("random", "false")
+	configSetCmd.Flags().Set("env-file", "")
+}
+
+func TestConfigSetFlagConflicts(t *testing.T) {
 	mockService := &mockFabricService{}
 	_, handler := defangv1connect.NewFabricControllerHandler(mockService)
 	t.Chdir("../../../../src/testdata/sanity")
+
+	// Set up environment variables for --env tests
+	t.Setenv("KEY1", "value1")
+	t.Setenv("KEY2", "value2")
+
+	// Create a temp env file for --env-file tests
+	tempDir := t.TempDir()
+	envFilePath := filepath.Join(tempDir, "test.env")
+	if err := os.WriteFile(envFilePath, []byte("TEST_KEY=test_value\n"), 0644); err != nil {
+		t.Fatalf("failed to create test env file: %v", err)
+	}
 
 	userinfoServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/userinfo" {
@@ -32,18 +51,9 @@ func TestConfigSetMultiple(t *testing.T) {
 		auth.OpenAuthClient = openAuthClient
 	})
 	auth.OpenAuthClient = auth.NewClient("testclient", userinfoServer.URL)
-	// t.Setenv("DEFANG_ACCESS_TOKEN", "token-123")
 
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
-
-	// prevSts, prevSsm := awsdriver.NewStsFromConfig, awsdriver.NewSsmFromConfig
-	// t.Cleanup(func() {
-	// 	awsdriver.NewStsFromConfig = prevSts
-	// 	awsdriver.NewSsmFromConfig = prevSsm
-	// })
-	// awsdriver.NewStsFromConfig = func(aws.Config) awsdriver.StsClientAPI { return &awsdriver.MockStsClientAPI{} }
-	// awsdriver.NewSsmFromConfig = func(aws.Config) awsdriver.SsmParametersAPI { return &MockSsmClient{} }
 
 	testCases := []struct {
 		name        string
@@ -51,24 +61,52 @@ func TestConfigSetMultiple(t *testing.T) {
 		expectedErr string
 	}{
 		{
-			name:        "multiple configs with one missing = should error",
-			args:        []string{"config", "set", "KEY1=value1", "KEY2", "--provider=defang", "--project-name=app"},
-			expectedErr: "when setting multiple configs, all must be in KEY=VALUE format",
+			name:        "cannot use --random with --env",
+			args:        []string{"config", "set", "KEY1", "KEY2", "-e", "--random", "--provider=defang", "--project-name=app"},
+			expectedErr: "cannot use --random with --env",
 		},
 		{
-			name:        "multiple configs with --env should error",
-			args:        []string{"config", "set", "KEY1=value1", "KEY2=value2", "-e", "--provider=defang", "--project-name=app"},
-			expectedErr: "--env is only allowed when setting a single config",
+			name:        "cannot use --random with --env-file",
+			args:        []string{"config", "set", "KEY1", "--random", "--env-file=" + envFilePath, "--provider=defang", "--project-name=app"},
+			expectedErr: "cannot use --random with --env-file",
 		},
 		{
-			name:        "multiple configs with --random should error",
-			args:        []string{"config", "set", "KEY1=value1", "KEY2=value2", "--random", "--provider=defang", "--project-name=app"},
-			expectedErr: "--random is only allowed when setting a single config",
+			name:        "cannot use --env with --env-file",
+			args:        []string{"config", "set", "KEY1", "-e", "--env-file=" + envFilePath, "--provider=defang", "--project-name=app"},
+			expectedErr: "cannot use --env with --env-file",
+		},
+		{
+			name:        "no args with no flags",
+			args:        []string{"config", "set", "--provider=defang", "--project-name=app"},
+			expectedErr: "provide CONFIG argument or use --env-file to read from a file",
+		},
+		{
+			name:        "too many args with no flags",
+			args:        []string{"config", "set", "KEY1", "KEY2", "KEY3", "--provider=defang", "--project-name=app"},
+			expectedErr: "too many arguments; provide a single CONFIG or use --env, --random, or --env-file",
+		},
+		{
+			name: "valid use of --env",
+			args: []string{"config", "set", "KEY1", "KEY2", "--env", "--provider=defang", "--project-name=app"},
+		},
+		{
+			name: "valid use of --random",
+			args: []string{"config", "set", "KEY1", "KEY2", "--random", "--provider=defang", "--project-name=app"},
+		},
+		{
+			name: "valid use of --env-file",
+			args: []string{"config", "set", "--env-file=" + envFilePath, "--provider=defang", "--project-name=app"},
+		},
+		{
+			name: "valid use of KEY=VALUE format",
+			args: []string{"config", "set", "KEY1=somevalue", "--provider=defang", "--project-name=app"},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			resetConfigSetFlags()
+
 			err := testCommand(t, tc.args, server.URL)
 
 			if tc.expectedErr != "" {
