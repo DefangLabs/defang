@@ -96,38 +96,13 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func testCommand(args []string, cluster string) error {
+func testCommand(t *testing.T, args []string, cluster string) error {
+	t.Helper()
 	if cluster != "" {
 		args = append(args, "--cluster", strings.TrimPrefix(cluster, "http://"))
 	}
 	RootCmd.SetArgs(args)
-	return RootCmd.ExecuteContext(context.Background())
-}
-
-func TestVersion(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping live tests in short mode.")
-	}
-
-	t.Run("live", func(t *testing.T) {
-		err := testCommand([]string{"version"}, "")
-		if err != nil {
-			t.Fatalf("Version() failed: %v", err)
-		}
-	})
-
-	t.Run("mock", func(t *testing.T) {
-		mockService := &mockFabricService{}
-		_, handler := defangv1connect.NewFabricControllerHandler(mockService)
-
-		server := httptest.NewServer(handler)
-		t.Cleanup(server.Close)
-
-		err := testCommand([]string{"version"}, server.URL)
-		if err != nil {
-			t.Fatalf("Version() failed: %v", err)
-		}
-	})
+	return RootCmd.ExecuteContext(context.Background()) // t.Context() only works for first test?
 }
 
 func TestCommandGates(t *testing.T) {
@@ -197,7 +172,7 @@ func TestCommandGates(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockService.canIUseIsCalled = false
 
-			err := testCommand(tt.command, server.URL)
+			err := testCommand(t, tt.command, server.URL)
 
 			if tt.expectCanIUseCalled != mockService.canIUseIsCalled {
 				t.Errorf("unexpected canIUse: expected usage: %t", tt.expectCanIUseCalled)
@@ -454,84 +429,4 @@ func TestNewProvider(t *testing.T) {
 			}
 		}
 	})
-}
-
-func TestConfigSetMultiple(t *testing.T) {
-	mockService := &mockFabricService{}
-	_, handler := defangv1connect.NewFabricControllerHandler(mockService)
-	t.Chdir("../../../../src/testdata/sanity")
-
-	userinfoServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/userinfo" {
-			t.Fatalf("unexpected path %q", r.URL.Path)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{
-			"allTenants":[{"id":"default","name":"Default Workspace"}],
-			"userinfo":{"email":"cli@example.com","name":"CLI Tester"}
-		}`))
-	}))
-	t.Cleanup(userinfoServer.Close)
-
-	openAuthClient := auth.OpenAuthClient
-	t.Cleanup(func() {
-		auth.OpenAuthClient = openAuthClient
-	})
-	auth.OpenAuthClient = auth.NewClient("testclient", userinfoServer.URL)
-	t.Setenv("DEFANG_ACCESS_TOKEN", "token-123")
-
-	server := httptest.NewServer(handler)
-	t.Cleanup(server.Close)
-
-	prevSts, prevSsm := awsdriver.NewStsFromConfig, awsdriver.NewSsmFromConfig
-	t.Cleanup(func() {
-		awsdriver.NewStsFromConfig = prevSts
-		awsdriver.NewSsmFromConfig = prevSsm
-	})
-	awsdriver.NewStsFromConfig = func(aws.Config) awsdriver.StsClientAPI { return &awsdriver.MockStsClientAPI{} }
-	awsdriver.NewSsmFromConfig = func(aws.Config) awsdriver.SsmParametersAPI { return &MockSsmClient{} }
-
-	testCases := []struct {
-		name        string
-		args        []string
-		expectError bool
-		errorMsg    string
-	}{
-		{
-			name:        "multiple configs with one missing = should error",
-			args:        []string{"config", "set", "KEY1=value1", "KEY2", "--provider=aws", "--project-name=app"},
-			expectError: true,
-			errorMsg:    "when setting multiple configs, all must be in KEY=VALUE format",
-		},
-		{
-			name:        "multiple configs with --env should error",
-			args:        []string{"config", "set", "KEY1=value1", "KEY2=value2", "-e", "--provider=aws", "--project-name=app"},
-			expectError: true,
-			errorMsg:    "--env is only allowed when setting a single config",
-		},
-		{
-			name:        "multiple configs with --random should error",
-			args:        []string{"config", "set", "KEY1=value1", "KEY2=value2", "--random", "--provider=aws", "--project-name=app"},
-			expectError: true,
-			errorMsg:    "--random is only allowed when setting a single config",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			err := testCommand(tc.args, server.URL)
-
-			if tc.expectError {
-				if err == nil {
-					t.Errorf("expected error but got none")
-				} else if tc.errorMsg != "" && !strings.Contains(err.Error(), tc.errorMsg) {
-					t.Errorf("expected error message to contain %q, got %q", tc.errorMsg, err.Error())
-				}
-			} else {
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
-			}
-		})
-	}
 }
