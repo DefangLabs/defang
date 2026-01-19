@@ -89,7 +89,7 @@ func TestUploadArchive(t *testing.T) {
 		}
 		var expectedPath = path + testproj + "/" + ArchiveTypeZip.Extension
 		if url != server.URL+expectedPath {
-			t.Errorf("Expected %v, got %v", server.URL+path+ArchiveTypeZip.Extension, url)
+			t.Errorf("Expected %v, got %v", server.URL+expectedPath, url)
 		}
 	})
 
