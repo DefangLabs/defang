@@ -186,7 +186,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			waitTimeoutDuration := time.Duration(waitTimeout) * time.Second
 			var serviceStates map[string]defangv1.ServiceState
-			if global.Verbose || global.NonInteractive {
+			if global.Verbose || global.Debug || global.NonInteractive {
 				tailOptions.Follow = true
 				serviceStates, err = cli.TailAndMonitor(ctx, project, session.Provider, waitTimeoutDuration, tailOptions)
 				if err != nil {
