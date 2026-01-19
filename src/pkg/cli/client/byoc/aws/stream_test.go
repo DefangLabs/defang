@@ -77,8 +77,8 @@ func TestStreamToLogEvent(t *testing.T) {
 				Message:            ptrString("#12 [7/7] RUN python manage.py collectstatic --noinput\n"),
 			},
 			wantResp: &defangv1.TailResponse{
-				Service: "cd",
-				Host:    "codebuild",
+				Service: "django-image",
+				Host:    "fb1d2a8e-9553-497e-85e4-91a57f8b6ba6",
 				Entries: []*defangv1.LogEntry{
 					{
 						Timestamp: timestamppb.New(time.Unix(1761883446, int64(12000000))),
@@ -143,7 +143,7 @@ func TestStreamToLogEvent(t *testing.T) {
 		},
 	}
 
-	var byocServiceStream = newByocServerStream(nil, testEtag, []string{"cd", "app", "django"}, nil)
+	var byocServiceStream = newByocServerStream(nil, testEtag, []string{"cd", "app", "django", "django-image"}, nil)
 
 	for _, td := range testdata {
 		tailResp := byocServiceStream.parseEvents([]cw.LogEvent{*td.event})
