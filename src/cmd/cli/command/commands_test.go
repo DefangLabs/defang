@@ -79,6 +79,10 @@ func (m *mockFabricService) SetSelectedProvider(context.Context, *connect.Reques
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
+func (m *mockFabricService) PutSecret(context.Context, *connect.Request[defangv1.PutConfigRequest]) (*connect.Response[emptypb.Empty], error) {
+	return connect.NewResponse(&emptypb.Empty{}), nil
+}
+
 func (m *mockFabricService) ListDeployments(context.Context, *connect.Request[defangv1.ListDeploymentsRequest]) (*connect.Response[defangv1.ListDeploymentsResponse], error) {
 	return connect.NewResponse(&defangv1.ListDeploymentsResponse{
 		Deployments: []*defangv1.Deployment{
