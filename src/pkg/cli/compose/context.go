@@ -212,7 +212,7 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 		return root, nil
 	case UploadModeEstimate:
 		// For estimation, we don't bother packaging the files, we just return a placeholder URL
-		return fmt.Sprintf("s3://cd-preview/%v", time.Now().Unix()), nil
+		return fmt.Sprintf("s3://cd-preview/%s%s", name, archiveType.Extension), nil
 	}
 
 	term.Info("Packaging the project files for", name, "at", root)
@@ -223,17 +223,16 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 
 	var digest string
 	switch upload {
-	case UploadModeDefault:
-	case UploadModeDigest:
+	case UploadModeDefault, UploadModeDigest:
 		// Calculate the digest of the tarball and pass it to the fabric controller (to avoid building the same image twice)
-		sha := sha256.Sum256(buffer.Bytes())
-		digest = "sha256-" + base64.StdEncoding.EncodeToString(sha[:]) // same as Nix
-		term.Debug("Digest:", digest)
+		digest = calcDigest(buffer.Bytes())
+		term.Debugf("Digest for %q: %s", name, digest)
 	case UploadModePreview:
-		// For preview, we invoke the CD "preview" command, which will want a valid (S3) URL, even though it won't be used
-		return fmt.Sprintf("s3://cd-preview/%v", time.Now().Unix()), nil
+		// For preview, we invoke the CD "preview" command, which will want a valid (S3) URL for diff, even though it won't be used
+		digest = calcDigest(buffer.Bytes())
+		return fmt.Sprintf("s3://cd-preview/%s%s", digest, archiveType.Extension), nil
 	case UploadModeForce:
-		// Force: always upload the tarball (to a random URL), triggering a new build
+		// Force: empty digest = always upload the tarball (to a random URL), triggering a new build
 	default:
 		panic("unexpected UploadMode value")
 	}
@@ -242,21 +241,21 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 	return uploadArchive(ctx, provider, project, buffer, archiveType, digest)
 }
 
-func uploadArchive(ctx context.Context, provider client.Provider, project string, body io.Reader, contentType ArchiveType, digest string) (string, error) {
-	// Upload the archive to the fabric controller storage;; TODO: use a streaming API
-	if contentType.MimeType == ArchiveTypeZip.MimeType {
-		digest = digest + ArchiveTypeZip.Extension
-	} else {
-		digest = digest + ArchiveTypeGzip.Extension
-	}
-	ureq := &defangv1.UploadURLRequest{Digest: digest, Project: project}
+func calcDigest(data []byte) string {
+	sha := sha256.Sum256(data)
+	return "sha256-" + base64.StdEncoding.EncodeToString(sha[:]) // same as Nix
+}
+
+func uploadArchive(ctx context.Context, provider client.Provider, project string, body io.Reader, archiveType ArchiveType, digest string) (string, error) {
+	// Upload the archive to the fabric controller storage; TODO: use a streaming API
+	ureq := &defangv1.UploadURLRequest{Digest: digest + archiveType.Extension, Project: project}
 	res, err := provider.CreateUploadURL(ctx, ureq)
 	if err != nil {
 		return "", err
 	}
 
 	// Do an HTTP PUT to the generated URL
-	resp, err := http.Put(ctx, res.Url, string(contentType.MimeType), body)
+	resp, err := http.Put(ctx, res.Url, string(archiveType.MimeType), body)
 	if err != nil {
 		return "", err
 	}

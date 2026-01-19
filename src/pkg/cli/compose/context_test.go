@@ -13,7 +13,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/patternmatcher/ignorefile"
 )
 
@@ -53,7 +55,7 @@ func TestUploadArchive(t *testing.T) {
 		}
 		w.WriteHeader(200)
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
 
 	t.Run("upload tar with digest", func(t *testing.T) {
 		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeGzip, digest)
@@ -172,6 +174,69 @@ func TestWalkContextFolder(t *testing.T) {
 	})
 }
 
+func Test_getRemoteBuildContext(t *testing.T) {
+	tests := []struct {
+		name       string
+		uploadMode UploadMode
+		expectUrl  string
+	}{
+		{
+			name:       "Default UploadMode",
+			uploadMode: UploadModeDefault,
+			expectUrl:  "https://mock-bucket.s3.amazonaws.com/sha256-of7YhHrD80jN8sIbZ4FGehfjjhzCZqnlwddjEgvTIBM=.tar.gz", // same as Digest mode
+		},
+		{
+			name:       "Force UploadMode",
+			uploadMode: UploadModeForce,
+			expectUrl:  "https://mock-bucket.s3.amazonaws.com/.tar.gz", // server decides name
+		},
+		{
+			name:       "Digest UploadMode",
+			uploadMode: UploadModeDigest,
+			expectUrl:  "https://mock-bucket.s3.amazonaws.com/sha256-of7YhHrD80jN8sIbZ4FGehfjjhzCZqnlwddjEgvTIBM=.tar.gz",
+		},
+		{
+			name:       "Ignore UploadMode",
+			uploadMode: UploadModeIgnore,
+			expectUrl:  "/Users/$USER/dev/defang/src/testdata/testproj", // show local paths in "defang config"
+		},
+		{
+			name:       "Preview UploadMode",
+			uploadMode: UploadModePreview,
+			expectUrl:  "s3://cd-preview/sha256-of7YhHrD80jN8sIbZ4FGehfjjhzCZqnlwddjEgvTIBM=.tar.gz", // like digest but fake bucket
+		},
+		{
+			name:       "Estimate UploadMode",
+			uploadMode: UploadModeEstimate,
+			expectUrl:  "s3://cd-preview/service1.tar.gz", // like preview but skip digest calculation
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "PUT" {
+			t.Errorf("Expected PUT request, got %v", r.Method)
+		}
+		w.WriteHeader(200)
+	}))
+	t.Cleanup(server.Close)
+
+	normalizer := strings.NewReplacer(pkg.GetCurrentUser(), "$USER", server.URL, "https://mock-bucket.s3.amazonaws.com")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider := client.MockProvider{UploadUrl: server.URL}
+			url, err := getRemoteBuildContext(t.Context(), provider, "project1", "service1", &types.BuildConfig{
+				Context: "../../../testdata/testproj",
+			}, tt.uploadMode)
+			if err != nil {
+				t.Fatalf("getRemoteBuildContext() failed: %v", err)
+			}
+			if got := normalizer.Replace(url); got != tt.expectUrl {
+				t.Errorf("Expected %v, got: %v", tt.expectUrl, got)
+			}
+		})
+	}
+}
+
 func TestCreateTarballReader(t *testing.T) {
 	t.Run("Default Dockerfile", func(t *testing.T) {
 		buffer, err := createArchive(t.Context(), "../../../testdata/testproj", "", ArchiveTypeGzip)
@@ -183,7 +248,7 @@ func TestCreateTarballReader(t *testing.T) {
 		if err != nil {
 			t.Fatalf("gzip.NewReader() failed: %v", err)
 		}
-		defer g.Close()
+		t.Cleanup(func() { g.Close() })
 
 		expected := []string{".dockerignore", ".env", "Dockerfile", "fileName.env"}
 		var actual []string
