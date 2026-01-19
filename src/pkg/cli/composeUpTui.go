@@ -21,13 +21,12 @@ type deploymentModel struct {
 }
 
 type serviceState struct {
-	status  string
+	status  defangv1.ServiceState
 	spinner spinner.Model
 }
 
 type serviceUpdate struct {
-	name   string
-	status string
+	services map[string]defangv1.ServiceState
 }
 
 var (
@@ -45,7 +44,7 @@ func newDeploymentModel(serviceNames []string) *deploymentModel {
 		s.Style = spinnerStyle
 
 		services[name] = &serviceState{
-			status:  "DEPLOYMENT_QUEUED",
+			status:  defangv1.ServiceState_DEPLOYMENT_PENDING,
 			spinner: s,
 		}
 	}
@@ -72,8 +71,8 @@ func (m *deploymentModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 	case serviceUpdate:
-		if svc, exists := m.services[msg.name]; exists {
-			svc.status = msg.status
+		for name, status := range msg.services {
+			m.services[name].status = status
 		}
 		return m, nil
 	case spinner.TickMsg:
@@ -107,12 +106,20 @@ func (m *deploymentModel) View() string {
 		// Stop spinner for completed services
 		var spinnerOrCheck string
 		switch svc.status {
-		case "DEPLOYMENT_COMPLETED":
+		case defangv1.ServiceState_DEPLOYMENT_COMPLETED:
 			spinnerOrCheck = "✓ "
-		case "DEPLOYMENT_FAILED":
+		case defangv1.ServiceState_DEPLOYMENT_FAILED:
 			spinnerOrCheck = "✗ "
 		default:
 			spinnerOrCheck = svc.spinner.View()
+		}
+
+		statusText := svc.status.String()
+		switch svc.status {
+		case defangv1.ServiceState_NOT_SPECIFIED:
+			statusText = ""
+		case defangv1.ServiceState_DEPLOYMENT_PENDING:
+			statusText = "DEPLOYING"
 		}
 
 		line := lipgloss.JoinHorizontal(
@@ -121,7 +128,7 @@ func (m *deploymentModel) View() string {
 			" ",
 			nameStyle.Render("["+name+"]"),
 			" ",
-			statusStyle.Render(svc.status),
+			statusStyle.Render(statusText),
 		)
 		lines = append(lines, line)
 	}
@@ -161,21 +168,24 @@ func MonitorWithUI(ctx context.Context, project *compose.Project, provider clien
 		defer wg.Done()
 		serviceStates, monitorErr = Monitor(ctx, project, provider, waitTimeout, deploymentID, func(msg *defangv1.SubscribeResponse, states *ServiceStates) error {
 			// Send service status updates to the bubbletea model
-			for name, state := range *states {
-				p.Send(serviceUpdate{
-					name:   name,
-					status: state.String(),
-				})
+			services := make(map[string]defangv1.ServiceState)
+			for _, name := range servicesNames {
+				state, ok := (*states)[name]
+				if ok {
+					services[name] = state
+				} else {
+					services[name] = defangv1.ServiceState_DEPLOYMENT_PENDING
+				}
 			}
+			p.Send(serviceUpdate{
+				services: services,
+			})
 			return nil
 		})
 		// empty out all of the service statuses before printing a final state
-		for _, name := range servicesNames {
-			p.Send(serviceUpdate{
-				name:   name,
-				status: "",
-			})
-		}
+		p.Send(serviceUpdate{
+			services: make(map[string]defangv1.ServiceState),
+		})
 		// Quit the UI when monitoring is done
 		p.Quit()
 	}()
