@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"path"
 
 	"github.com/DefangLabs/defang/src/pkg/dns"
@@ -21,7 +22,8 @@ type MockProvider struct {
 }
 
 func (m MockProvider) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	return &defangv1.UploadURLResponse{Url: m.UploadUrl + req.Digest}, nil
+	url, err := url.JoinPath(m.UploadUrl, req.Project, req.Stack, req.Digest)
+	return &defangv1.UploadURLResponse{Url: url}, err
 }
 
 func (m MockProvider) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
