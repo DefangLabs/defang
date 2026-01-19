@@ -765,6 +765,7 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 		Follow:        follow,
 		Limit:         limit,
 		PrintBookends: true,
+		Stack:         session.Stack.Name,
 	}
 	return cli.Tail(cmd.Context(), session.Provider, projectName, tailOptions)
 }
