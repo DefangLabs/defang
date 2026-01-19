@@ -21,13 +21,13 @@ type deploymentModel struct {
 }
 
 type serviceState struct {
-	status  string
+	status  defangv1.ServiceState
 	spinner spinner.Model
 }
 
 type serviceUpdate struct {
 	name   string
-	status string
+	status defangv1.ServiceState
 }
 
 var (
@@ -45,7 +45,7 @@ func newDeploymentModel(serviceNames []string) *deploymentModel {
 		s.Style = spinnerStyle
 
 		services[name] = &serviceState{
-			status:  "DEPLOYMENT_QUEUED",
+			status:  defangv1.ServiceState_DEPLOYMENT_PENDING,
 			spinner: s,
 		}
 	}
@@ -107,12 +107,22 @@ func (m *deploymentModel) View() string {
 		// Stop spinner for completed services
 		var spinnerOrCheck string
 		switch svc.status {
-		case "DEPLOYMENT_COMPLETED":
+		case defangv1.ServiceState_DEPLOYMENT_COMPLETED:
 			spinnerOrCheck = "✓ "
-		case "DEPLOYMENT_FAILED":
+		case defangv1.ServiceState_DEPLOYMENT_FAILED:
 			spinnerOrCheck = "✗ "
 		default:
 			spinnerOrCheck = svc.spinner.View()
+		}
+
+		var statusText string
+		switch svc.status {
+		case defangv1.ServiceState_NOT_SPECIFIED:
+			statusText = ""
+		case defangv1.ServiceState_DEPLOYMENT_PENDING:
+			statusText = "DEPLOYING"
+		default:
+			statusText = svc.status.String()
 		}
 
 		line := lipgloss.JoinHorizontal(
@@ -121,7 +131,7 @@ func (m *deploymentModel) View() string {
 			" ",
 			nameStyle.Render("["+name+"]"),
 			" ",
-			statusStyle.Render(svc.status),
+			statusStyle.Render(statusText),
 		)
 		lines = append(lines, line)
 	}
@@ -164,7 +174,7 @@ func MonitorWithUI(ctx context.Context, project *compose.Project, provider clien
 			for name, state := range *states {
 				p.Send(serviceUpdate{
 					name:   name,
-					status: state.String(),
+					status: state,
 				})
 			}
 			return nil
@@ -173,7 +183,7 @@ func MonitorWithUI(ctx context.Context, project *compose.Project, provider clien
 		for _, name := range servicesNames {
 			p.Send(serviceUpdate{
 				name:   name,
-				status: "",
+				status: defangv1.ServiceState_NOT_SPECIFIED,
 			})
 		}
 		// Quit the UI when monitoring is done
