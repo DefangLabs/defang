@@ -25,8 +25,9 @@ const (
 	CdCommandDown    CdCommand = "down"
 	CdCommandList    CdCommand = "list"
 	CdCommandOutputs CdCommand = "outputs"
+	CdCommandPreview CdCommand = "preview" // needs Compose payload
 	CdCommandRefresh CdCommand = "refresh"
-	CdCommandUp      CdCommand = "up"
+	CdCommandUp      CdCommand = "up" // needs Compose payload
 )
 
 type CdCommandRequest struct {
