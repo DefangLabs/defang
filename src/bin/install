@@ -267,7 +267,7 @@ rm -r "$EXTRACT_DIR"
 rm "$FILENAME"
 
 echo "Installation completed. You can now use defang by typing '$BINARY_NAME' in the terminal."
-if [ -t 1 ]; then
+if [ -t 1 ] && [ "$CI" != "1" ] && [ "$CI" != "true" ]; then
     echo "Run '$BINARY_NAME mcp setup' to install the Defang MCP server."
 fi
 
