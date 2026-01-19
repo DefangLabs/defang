@@ -220,7 +220,8 @@ func PrintServiceStatesAndEndpoints(serviceEndpoints []ServiceEndpoint) error {
 		return strings.Compare(a.Endpoint, b.Endpoint)
 	})
 
-	// remove "Service", "Deployment", and "State" columns if they are the same as the previous row
+	// to reduce noise, print empty "Service", "Deployment", and "State" columns
+	// if they are for the same service as the previous row
 	lastService := ""
 	for i := range serviceEndpoints {
 		if serviceEndpoints[i].Service == lastService {
