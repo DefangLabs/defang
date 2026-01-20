@@ -60,7 +60,7 @@ func TestWorkspaceListJSON(t *testing.T) {
 	global.Stack.Name = ""
 	global.Tenant = "ws-2"
 
-	if err := testCommand([]string{"workspace", "ls", "--json", "--non-interactive"}, clusterURL); err != nil {
+	if err := testCommand(t, []string{"workspace", "ls", "--json", "--non-interactive"}, clusterURL); err != nil {
 		t.Fatalf("workspace ls --json failed: %v", err)
 	}
 
@@ -95,7 +95,7 @@ func TestWorkspaceListVerboseTable(t *testing.T) {
 	// Reset stack name to prevent loading stack files
 	global.Stack.Name = ""
 
-	if err := testCommand([]string{"workspace", "ls", "--verbose", "--json=false", "--non-interactive"}, clusterURL); err != nil {
+	if err := testCommand(t, []string{"workspace", "ls", "--verbose", "--json=false", "--non-interactive"}, clusterURL); err != nil {
 		t.Fatalf("workspace ls --verbose failed: %v", err)
 	}
 

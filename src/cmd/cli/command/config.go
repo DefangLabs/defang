@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -25,7 +24,7 @@ var configCmd = &cobra.Command{
 }
 
 var configSetCmd = &cobra.Command{
-	Use:         "create CONFIG [file|-] | CONFIG=VALUE...", // like Docker
+	Use:         "create CONFIG [file|-] | CONFIG...", // like Docker
 	Annotations: authNeededAnnotation,
 	Args:        cobra.MinimumNArgs(0), // Allow 0 args when using --env-file, or multiple configs
 	Aliases:     []string{"set", "add", "put"},
@@ -35,32 +34,32 @@ var configSetCmd = &cobra.Command{
 		random, _ := cmd.Flags().GetBool("random")
 		envFile, _ := cmd.Flags().GetString("env-file")
 
-		// Early validation for multiple configs
-		// Distinguish between multiple configs (KEY1=value1 KEY2=value2) and single config with file (CONFIG file)
-		isMultipleConfigs := false
-		if len(args) > 1 {
-			// If the first arg contains '=', it's multiple configs
-			// If the first arg doesn't contain '=', it's single config with file (CONFIG file)
-			if strings.Contains(args[0], "=") {
-				isMultipleConfigs = true
+		// This command has several modes of operation:
+		// 1. Set one or more config(s):
+		//  a. from command line args: defang config create CONFIG1=value1 [CONFIG2=value2...]
+		//  b. from env: defang config create --env CONFIG1 [CONFIG2...]
+		//  c. from random value(s): defang config create --random CONFIG1 [CONFIG2...]
+		//  d. from env-file: defang config create --env-file FILE
+		//  e. Set specified config(s) from env file: defang config create --env-file FILE CONFIG1 [CONFIG2...]
+		// 2. Set one config:
+		//  a. from file or stdin: defang config create CONFIG file|-
+		//  b. interactively: defang config create CONFIG
 
-				// Validate: all args must be in KEY=VALUE format
-				for _, arg := range args {
-					if !strings.Contains(arg, "=") {
-						return errors.New("when setting multiple configs, all must be in KEY=VALUE format")
-					}
-				}
-
-				// Validate: --random is not allowed with multiple configs
-				if random {
-					return errors.New("--random is only allowed when setting a single config")
-				}
-
-				// Validate: --env is not allowed with multiple configs
-				if fromEnv {
-					return errors.New("--env is only allowed when setting a single config")
-				}
-			}
+		if random && fromEnv {
+			return errors.New("cannot use --random with --env")
+		}
+		if random && envFile != "" {
+			return errors.New("cannot use --random with --env-file")
+		}
+		if fromEnv && envFile != "" {
+			return errors.New("cannot use --env with --env-file")
+		}
+		if len(args) == 0 && envFile == "" {
+			return errors.New("provide CONFIG argument or use --env-file to read from a file")
+		}
+		fromArgs := len(args) > 0 && strings.Contains(args[0], "=")
+		if !random && !fromEnv && envFile == "" && !fromArgs && len(args) > 2 {
+			return errors.New("too many arguments; provide a single CONFIG or use --env, --random, or --env-file")
 		}
 
 		// Make sure we have a project to set config for before asking for a value
@@ -74,113 +73,58 @@ var configSetCmd = &cobra.Command{
 			return err
 		}
 
-		// Handle --env-file flag
-		if envFile != "" {
-			if fromEnv || random {
-				return errors.New("cannot use --env-file with --env or --random")
+		var envMap map[string]string
+		if fromArgs {
+			// 1a. Handle CONFIG=VALUE args
+			envMap = make(map[string]string)
+			for _, pair := range args {
+				name, value, found := strings.Cut(pair, "=")
+				if !found {
+					return errors.New("when setting multiple configs, all must be in KEY=VALUE format")
+				}
+				envMap[name] = value
 			}
-			if len(args) > 0 {
-				return errors.New("cannot specify CONFIG arguments with --env-file")
+		} else if fromEnv {
+			// 1b. Handle --env flag: read specified configs from environment
+			envMap = make(map[string]string)
+			for _, name := range args {
+				if value, ok := os.LookupEnv(name); !ok {
+					return fmt.Errorf("environment variable %q not found", name)
+				} else {
+					envMap[name] = value
+				}
 			}
-
-			envMap, err := godotenv.Read(envFile)
+		} else if random {
+			// 1c. Handle --random flag: generate random values for specified configs
+			envMap = make(map[string]string)
+			for _, name := range args {
+				envMap[name] = cli.CreateRandomConfigValue()
+			}
+		} else if envFile != "" {
+			// 1d. Handle --env-file flag: read all or specified configs from the file
+			envMap, err = godotenv.Read(envFile)
 			if err != nil {
 				return fmt.Errorf("failed to read env file %q: %w", envFile, err)
 			}
 
 			if len(envMap) == 0 {
-				return errors.New("no config found in env file")
+				return errors.New("no config found in env file") // or warn?
 			}
 
-			// Set each config from the env file
-			successCount := 0
-			for name, value := range envMap {
-				if !pkg.IsValidSecretName(name) {
-					term.Warnf("Skipping invalid config name: %q", name)
-					continue
+			if len(args) > 0 {
+				// 1e. Set specified config(s) from env file: defang config create --env-file FILE CONFIG1 [CONFIG2...]
+				filteredEnvMap := make(map[string]string)
+				for _, name := range args {
+					if value, ok := envMap[name]; !ok {
+						return fmt.Errorf("config %q not found in env file", name)
+					} else {
+						filteredEnvMap[name] = value
+					}
 				}
-
-				if err := cli.ConfigSet(cmd.Context(), projectName, session.Provider, name, value); err != nil {
-					term.Warnf("Failed to set %q: %v", name, err)
-				} else {
-					term.Info("Updated value for", name)
-					successCount++
-				}
+				envMap = filteredEnvMap
 			}
-
-			if successCount == 0 {
-				return errors.New("failed to set any config values")
-			}
-
-			term.Infof("Successfully set %d config value(s)", successCount)
-
-			printDefangHint("To update the deployed values, do:", "compose up")
-			return nil
-		}
-
-		// Validate args
-		if len(args) == 0 {
-			return errors.New("CONFIG argument is required when not using --env-file")
-		}
-
-		// Handle multiple configs case
-		if isMultipleConfigs {
-			// Set each config from args
-			successCount := 0
-			for _, arg := range args {
-				parts := strings.SplitN(arg, "=", 2)
-				name := parts[0]
-				value := parts[1]
-
-				if !pkg.IsValidSecretName(name) {
-					term.Warnf("Skipping invalid config name: %q", name)
-					continue
-				}
-
-				if err := cli.ConfigSet(cmd.Context(), projectName, session.Provider, name, value); err != nil {
-					term.Warnf("Failed to set %q: %v", name, err)
-				} else {
-					term.Info("Updated value for", name)
-					successCount++
-				}
-			}
-
-			if successCount == 0 {
-				return errors.New("failed to set any config values")
-			}
-
-			term.Infof("Successfully set %d config value(s)", successCount)
-
-			printDefangHint("To update the deployed values, do:", "compose up")
-			return nil
-		}
-
-		// Single config logic
-		parts := strings.SplitN(args[0], "=", 2)
-		name := parts[0]
-
-		if !pkg.IsValidSecretName(name) {
-			return fmt.Errorf("invalid config name: %q", name)
-		}
-
-		var value string
-		if fromEnv {
-			if len(args) > 1 || len(parts) == 2 {
-				return errors.New("cannot specify config value or input file when using --env")
-			}
-			var ok bool
-			value, ok = os.LookupEnv(name)
-			if !ok {
-				return fmt.Errorf("environment variable %q not found", name)
-			}
-		} else if len(parts) == 2 {
-			// Handle name=value; can't also specify a file in this case
-			if len(args) == 2 {
-				return errors.New("cannot specify both config value and input file")
-			}
-			value = parts[1]
-		} else if global.NonInteractive || len(args) == 2 {
-			// Read the value from a file or stdin
+		} else if name := args[0]; global.NonInteractive || len(args) == 2 {
+			// 2a. Read the value from a file or stdin
 			var err error
 			var bytes []byte
 			if len(args) == 2 && args[1] != "-" {
@@ -191,32 +135,37 @@ var configSetCmd = &cobra.Command{
 			if err != nil && err != io.EOF {
 				return fmt.Errorf("failed reading the config value: %w", err)
 			}
-			// Trim the newline at the end because single line values are common
-			value = strings.TrimSuffix(string(bytes), "\n")
-		} else if random {
-			// Generate a random value for the config
-			value = cli.CreateRandomConfigValue()
-			term.Info("Generated random value: " + value)
+			// Trim the LF or CRLF at the end because single line values are common
+			value := strings.TrimRight(string(bytes), "\r\n")
+			envMap = map[string]string{name: value}
 		} else {
-			// Prompt for sensitive value
+			// 2b. Prompt for sensitive value
 			var sensitivePrompt = &survey.Password{
 				Message: fmt.Sprintf("Enter value for %q:", name),
 				Help:    "The value will be stored securely and cannot be retrieved later.",
 			}
 
+			var value string
 			err := survey.AskOne(sensitivePrompt, &value, survey.WithStdio(term.DefaultTerm.Stdio()))
 			if err != nil {
 				return err
 			}
+			envMap = map[string]string{name: value}
 		}
 
-		if err := cli.ConfigSet(cmd.Context(), projectName, session.Provider, name, value); err != nil {
-			return err
+		var errs []error
+		for name, value := range envMap {
+			if err := cli.ConfigSet(cmd.Context(), projectName, session.Provider, name, value); err != nil {
+				errs = append(errs, err)
+			} else {
+				term.Info("Updated value for", name)
+			}
 		}
-		term.Info("Updated value for", name)
+
+		term.Infof("Successfully set %d config value(s)", len(envMap)-len(errs))
 
 		printDefangHint("To update the deployed values, do:", "compose up")
-		return nil
+		return errors.Join(errs...)
 	},
 }
 

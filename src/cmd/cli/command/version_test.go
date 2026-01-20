@@ -2,7 +2,10 @@ package command
 
 import (
 	"fmt"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
 func TestIsNewer(t *testing.T) {
@@ -46,4 +49,30 @@ func TestGetCurrentVersion(t *testing.T) {
 	if ref != "1234567" {
 		t.Errorf("GetCurrentVersion() = %v; want 1234567", ref)
 	}
+}
+
+func TestVersion(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping live tests in short mode.")
+	}
+
+	t.Run("live", func(t *testing.T) {
+		err := testCommand(t, []string{"version"}, "")
+		if err != nil {
+			t.Fatalf("Version() failed: %v", err)
+		}
+	})
+
+	t.Run("mock", func(t *testing.T) {
+		mockService := &mockFabricService{}
+		_, handler := defangv1connect.NewFabricControllerHandler(mockService)
+
+		server := httptest.NewServer(handler)
+		t.Cleanup(server.Close)
+
+		err := testCommand(t, []string{"version"}, server.URL)
+		if err != nil {
+			t.Fatalf("Version() failed: %v", err)
+		}
+	})
 }
