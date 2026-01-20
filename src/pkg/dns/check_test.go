@@ -135,7 +135,6 @@ func TestGetIPInSync(t *testing.T) {
 }
 
 func TestCheckDomainDNSReady(t *testing.T) {
-	term.SetDebug(true)
 	emptyResolver := MockResolver{}
 	hasARecordResolver := MockResolver{Records: map[DNSRequest]DNSResponse{
 		{Type: "NS", Domain: "api.test.com"}:       {Records: []string{"ns1.example.com", "ns2.example.com"}, Error: nil},
@@ -154,9 +153,12 @@ func TestCheckDomainDNSReady(t *testing.T) {
 	}}
 	resolver = hasARecordResolver
 
+	oldResolver, oldDebug := ResolverAt, term.DoDebug()
 	t.Cleanup(func() {
-		ResolverAt = DirectResolverAt
+		ResolverAt = oldResolver
+		term.SetDebug(oldDebug)
 	})
+	term.SetDebug(true)
 
 	t.Run("CNAME and A records not found", func(t *testing.T) {
 		ResolverAt = func(_ string) Resolver { return emptyResolver }

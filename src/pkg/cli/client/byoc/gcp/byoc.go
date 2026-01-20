@@ -140,6 +140,7 @@ func (b *ByocGcp) SetUpCD(ctx context.Context) error {
 		"servicenetworking.googleapis.com",    // For VPC peering
 		"redis.googleapis.com",                // For Redis
 		"certificatemanager.googleapis.com",   // For SSL certs
+		"cloudscheduler.googleapis.com",       // For scheduling clean up job
 		// "config.googleapis.com", // Infrastructure Manager API, for future CD stack
 	}
 	if err := b.driver.EnsureAPIsEnabled(ctx, apis...); err != nil {
@@ -186,6 +187,7 @@ func (b *ByocGcp) SetUpCD(ctx context.Context) error {
 		"roles/serviceusage.serviceUsageAdmin",  // For allowing cd to Enable APIs
 		"roles/datastore.owner",                 // For creating firestore database
 		"roles/logging.logWriter",               // For allowing cloudbuild to write logs
+		"roles/cloudscheduler.admin",            // For scheduling clean up jobs
 	}); err != nil {
 		return err
 	}
@@ -355,6 +357,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) error {
 		return err
 	}
 	env := map[string]string{
+		"DEFANG_CD_IMAGE":          b.CDImage,                 // used by down/destroy to schedule cleanup job with the same image
 		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_JSON":              os.Getenv("DEFANG_JSON"),
 		"DEFANG_MODE":              strings.ToLower(cmd.mode.String()),
@@ -682,9 +685,6 @@ func (b *ByocGcp) ListConfig(ctx context.Context, req *defangv1.ListConfigsReque
 }
 
 func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
-	if !pkg.IsValidSecretName(req.Name) {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid config name; must be alphanumeric or _, cannot start with a number: %q", req.Name))
-	}
 	secretId := b.resourceName(req.Project, req.Name)
 	term.Debugf("Creating secret %q", secretId)
 

@@ -100,6 +100,14 @@ func (bs *byocServerStream) parseEvents(events []cw.LogEvent) *defangv1.TailResp
 		response.Host = "codebuild"
 		response.Service = "cd"
 		parseCodeBuildRecords = true
+		if parts := strings.Split(*first.LogStreamName, "/"); len(parts) == 3 {
+			// These events are from codebuild build: "<service>-image/<service>_<etag>/<build_id>" stream
+			// LogStreams: "worker-image/worker_iw7wua572g4j/db0fa3d3-0bbd-4770-8db4-f036a944af13"
+			response.Host = parts[2] // build id
+			underscore := strings.LastIndexByte(parts[1], '_')
+			response.Etag = parts[1][underscore+1:]
+			response.Service = parts[0] // Use <service>-image as service name for build logs
+		}
 	case strings.Contains(*first.LogStreamName, "-firelens-"):
 		// These events are from the Firelens sidecar "<service>/<kaniko>-firelens-<taskID>"; try to parse the JSON
 		// or ""
@@ -168,7 +176,7 @@ func (bs *byocServerStream) parseEvents(events []cw.LogEvent) *defangv1.TailResp
 				entry.Message = evt.Status()
 			}
 		} else if parseCodeBuildRecords {
-			entry.Service = "cd"
+			entry.Service = response.Service
 			entry.Etag = response.Etag
 			entry.Host = response.Host
 		} else if (response.Service == "cd") && (strings.HasPrefix(entry.Message, logs.ErrorPrefix) || strings.Contains(strings.ToLower(entry.Message), "error:")) {

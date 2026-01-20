@@ -48,7 +48,7 @@ var logType = logs.LogTypeAll
 func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd := &cobra.Command{
 		Use:         "up",
-		Aliases:     []string{"deploy"},
+		Aliases:     []string{"deploy"}, // Pulumi has "update" but it's ambiguous with "defang upgrade"
 		Annotations: authNeededAnnotation,
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and deploy a new project or update an existing project",
@@ -248,8 +248,7 @@ func makeComposeUpCmd() *cobra.Command {
 		},
 	}
 	composeUpCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
-	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
-	composeUpCmd.Flags().MarkDeprecated("force", "superseded by --build") // but keep for backwards compatibility
+	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed; implies --build")
 	composeUpCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // no-op, but keep for backwards compatibility
 	_ = composeUpCmd.Flags().MarkHidden("tail")
@@ -445,48 +444,6 @@ func flushWarnings() {
 	if global.HasTty && term.HadWarnings() {
 		term.Println("\n\u26A0\uFE0F Some warnings were seen during this command:")
 		term.FlushWarnings()
-	}
-}
-
-func makeComposeStartCmd() *cobra.Command {
-	composeStartCmd := &cobra.Command{
-		Use:         "start",
-		Aliases:     []string{"deploy"},
-		Annotations: authNeededAnnotation,
-		Args:        cobra.NoArgs, // TODO: takes optional list of service names
-		Hidden:      true,
-		Short:       "Reads a Compose file and deploys services to the cluster",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return errors.New("command 'start' is deprecated, use 'up' instead")
-		},
-	}
-	composeStartCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
-	return composeStartCmd
-}
-
-func makeComposeRestartCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:         "restart",
-		Annotations: authNeededAnnotation,
-		Args:        cobra.NoArgs, // TODO: takes optional list of service names
-		Hidden:      true,
-		Short:       "Reads a Compose file and restarts its services",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return errors.New("command 'restart' is deprecated, use 'up' instead")
-		},
-	}
-}
-
-func makeComposeStopCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:         "stop",
-		Annotations: authNeededAnnotation,
-		Args:        cobra.NoArgs, // TODO: takes optional list of service names
-		Hidden:      true,
-		Short:       "Reads a Compose file and stops its services",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return errors.New("command 'stop' is deprecated, use 'down' instead")
-		},
 	}
 }
 
@@ -790,6 +747,16 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 	if len(name) > 0 {
 		services = append(args, strings.Split(name, ",")...) // backwards compat
 	}
+	if logType.Has(logs.LogTypeBuild) {
+		servicesWithBuild := make([]string, 0, len(services)*2)
+		for _, service := range services {
+			servicesWithBuild = append(servicesWithBuild, service)
+			if !strings.HasSuffix(service, "-image") {
+				servicesWithBuild = append(servicesWithBuild, service+"-image")
+			}
+		}
+		services = servicesWithBuild
+	}
 
 	session, err := newCommandSession(cmd)
 	if err != nil {
@@ -830,6 +797,7 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 		Follow:        follow,
 		Limit:         limit,
 		PrintBookends: true,
+		Stack:         session.Stack.Name,
 	}
 	return cli.Tail(cmd.Context(), session.Provider, projectName, tailOptions)
 }
@@ -864,11 +832,5 @@ services:
 	composeTailCmd := makeTailCmd()
 	composeTailCmd.Hidden = true
 	composeCmd.AddCommand(composeTailCmd)
-
-	// deprecated, will be removed in future releases
-	composeCmd.AddCommand(makeComposeStartCmd())
-	composeCmd.AddCommand(makeComposeRestartCmd())
-	composeCmd.AddCommand(makeComposeStopCmd())
-
 	return composeCmd
 }

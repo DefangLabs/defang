@@ -16,11 +16,10 @@ import (
 )
 
 type Parameters struct {
-	Name     string
-	Provider client.ProviderID
-	Mode     modes.Mode
-	Region   string
-	// replace properties with variable map, but keep getters and setters for common ones
+	Name      string
+	Provider  client.ProviderID
+	Mode      modes.Mode
+	Region    string
 	Variables map[string]string
 }
 
@@ -216,19 +215,21 @@ func ReadInDirectory(workingDirectory, name string) (*Parameters, error) {
 // This was basically ripped out of godotenv.Overload/Load. Unfortunately, they don't export
 // a function that loads a map[string]string, so we have to reimplement it here.
 func LoadStackEnv(params Parameters, overload bool) error {
-	currentEnv := map[string]bool{}
+	currentEnv := map[string]string{}
 	rawEnv := os.Environ()
 	for _, rawEnvLine := range rawEnv {
-		key := strings.Split(rawEnvLine, "=")[0]
-		currentEnv[key] = true
+		key, value, found := strings.Cut(rawEnvLine, "=")
+		if found {
+			currentEnv[key] = value
+		}
 	}
 
 	paramsMap := params.ToMap()
 	for key, value := range paramsMap {
-		if currentEnv[key] && !overload {
-			term.Warnf("The variable %q is set in both the stack file and the environment. The value from the environment will be used.\n", key)
+		if envValue, ok := currentEnv[key]; ok && envValue != value && !overload {
+			term.Warnf("The variable %q is set in both the stack and the environment. The value from the environment will be used.\n", key)
 		}
-		if !currentEnv[key] || overload {
+		if _, ok := currentEnv[key]; !ok || overload {
 			err := os.Setenv(key, value)
 			if err != nil {
 				return fmt.Errorf("could not set env var %q: %w", key, err)

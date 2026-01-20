@@ -44,22 +44,12 @@ func getCacheRepoPrefix(prefix, suffix string) string {
 	return repo
 }
 
-const TemplateRevision = 2 // bump this when the template changes!
+const TemplateRevision = 3 // bump this when the template changes!
 
-// CreateStaticTemplate creates a parameterized CloudFormation template that can be statically served
+// CreateTemplate creates a parameterized CloudFormation template that can be statically served
 // All conditional logic is moved to CloudFormation parameters and conditions.
 // This allows the template to be generated once and reused across different deployments
 // by providing different parameter values during stack creation/update.
-//
-// Parameters supported:
-// - ExistingVpcId: VPC ID string or empty to create new VPC
-// - RetainBucket: "true"/"false" - Whether to retain S3 bucket on stack deletion
-// - EnablePullThroughCache: "true"/"false" - Whether to enable ECR pull-through cache
-// - DockerHubUsername: Username for Docker Hub authentication (optional)
-// - DockerHubAccessToken: Access token for Docker Hub authentication (optional)
-// - OidcProviderIssuer: OIDC provider trusted issuer (optional)
-// - OidcProviderSubjects: Comma-delimited list of OIDC provider trusted subject patterns (optional)
-// - OidcProviderThumbprints: Comma-delimited list of OIDC provider thumbprints (optional)
 func CreateTemplate(stack string, containers []clouds.Container) (*cloudformation.Template, error) {
 	const oidcProviderDefaultAud = "sts.amazonaws.com"
 

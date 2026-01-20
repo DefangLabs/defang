@@ -56,27 +56,29 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 		return err
 	}
 
-	stackFileContent, err := stacks.Marshal(stack)
-	if err != nil {
-		return err
-	}
+	now := timestamppb.Now()
 
-	deployedAt := timestamppb.Now()
+	if req.Action == defangv1.DeploymentAction_DEPLOYMENT_ACTION_UP {
+		stackFileContent, err := stacks.Marshal(stack)
+		if err != nil {
+			return err
+		}
 
-	err = fabric.PutStack(ctx, &defangv1.PutStackRequest{
-		Stack: &defangv1.Stack{
-			Name:              provider.GetStackName(),
-			Project:           req.ProjectName,
-			Provider:          accountInfo.Provider.Value(),
-			Region:            accountInfo.Region,
-			Mode:              req.Mode,
-			ProviderAccountId: accountInfo.AccountID,
-			LastDeployedAt:    deployedAt,
-			StackFile:         []byte(stackFileContent),
-		},
-	})
-	if err != nil {
-		return err
+		// TODO: should we always update the stack and upload the stack file?
+		if err := fabric.PutStack(ctx, &defangv1.PutStackRequest{
+			Stack: &defangv1.Stack{
+				Name:              provider.GetStackName(),
+				Project:           req.ProjectName,
+				Provider:          accountInfo.Provider.Value(),
+				Region:            accountInfo.Region,
+				Mode:              req.Mode,
+				ProviderAccountId: accountInfo.AccountID,
+				LastDeployedAt:    now,
+				StackFile:         []byte(stackFileContent),
+			},
+		}); err != nil {
+			return err
+		}
 	}
 
 	return fabric.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
@@ -90,7 +92,7 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 			Region:            accountInfo.Region,
 			ServiceCount:      int32(req.ServiceCount), // #nosec G115 - service count will not overflow int32
 			Stack:             provider.GetStackName(),
-			Timestamp:         deployedAt,
+			Timestamp:         now,
 			Mode:              req.Mode,
 			StatesUrl:         req.StatesUrl,
 			EventsUrl:         req.EventsUrl,

@@ -47,7 +47,7 @@ func (g *PlaygroundProvider) Estimate(ctx context.Context, req *defangv1.Estimat
 }
 
 func (g *PlaygroundProvider) GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error) {
-	return nil, errors.New("the project update command is not valid for the Defang playground; did you forget --provider?")
+	return nil, errors.New("the project update command is not valid for the Defang playground; did you forget --stack or --provider?")
 }
 
 func (g *PlaygroundProvider) GetService(ctx context.Context, req *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
@@ -88,7 +88,7 @@ func (g *PlaygroundProvider) CdCommand(ctx context.Context, req CdCommandRequest
 	if req.Command == CdCommandDestroy {
 		return g.destroy(ctx, &defangv1.DestroyRequest{Project: req.Project})
 	}
-	return "", errors.New("the CD command is not valid for the Defang playground; did you forget --provider?")
+	return "", errors.New("the CD command is not valid for the Defang playground; did you forget --stack or --provider?")
 }
 
 func (g *PlaygroundProvider) destroy(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error) {
@@ -100,15 +100,15 @@ func (g *PlaygroundProvider) destroy(ctx context.Context, req *defangv1.DestroyR
 }
 
 func (g *PlaygroundProvider) TearDownCD(ctx context.Context) error {
-	return errors.New("the teardown command is not valid for the Defang playground; did you forget --provider?")
+	return errors.New("the teardown command is not valid for the Defang playground; did you forget --stack or --provider?")
 }
 
 func (g *PlaygroundProvider) SetUpCD(ctx context.Context) error {
-	return errors.New("this command is not valid for the Defang playground; did you forget --provider?")
+	return errors.New("this command is not valid for the Defang playground; did you forget --stack or --provider?")
 }
 
 func (g *PlaygroundProvider) CdList(context.Context, bool) (iter.Seq[string], error) {
-	return nil, errors.New("this command is not valid for the Defang playground; did you forget --provider?")
+	return nil, errors.New("this command is not valid for the Defang playground; did you forget --stack or --provider?")
 }
 
 func (g *PlaygroundProvider) ServicePrivateDNS(name string) string {

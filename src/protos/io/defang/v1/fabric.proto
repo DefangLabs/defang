@@ -511,6 +511,7 @@ enum DeploymentAction {
   DEPLOYMENT_ACTION_UP = 1;
   DEPLOYMENT_ACTION_DOWN = 2;
   DEPLOYMENT_ACTION_PREVIEW = 3;
+  DEPLOYMENT_ACTION_REFRESH = 4;
 }
 
 message Deployment {

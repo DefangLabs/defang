@@ -244,11 +244,11 @@ func SetupCommands(version string) {
 
 	// Config Command (was: secrets)
 	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
+	_ = configSetCmd.Flags().MarkHidden("name")
 	configSetCmd.Flags().BoolP("env", "e", false, "set the config from an environment variable")
 	configSetCmd.Flags().Bool("random", false, "set a secure randomly generated value for config")
 	configSetCmd.Flags().String("env-file", "", "load config values from an .env file")
 	configSetCmd.MarkFlagFilename("env-file")
-	_ = configSetCmd.Flags().MarkHidden("name")
 
 	configCmd.AddCommand(configSetCmd)
 
@@ -265,14 +265,12 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(setupComposeCommand())
 	// Add up/down commands to the root as well
 	down := makeComposeDownCmd()
-	down.Hidden = true // hidden from top-level menu
+	down.Aliases = []string{"dn", "destroy"} // like Pulumi
+	down.Hidden = true                       // hidden from top-level menu
 	RootCmd.AddCommand(down)
 	up := makeComposeUpCmd()
 	up.Hidden = true // hidden from top-level menu
 	RootCmd.AddCommand(up)
-	restart := makeComposeRestartCmd()
-	restart.Hidden = true // hidden from top-level menu
-	RootCmd.AddCommand(restart)
 
 	estimateCmd := makeEstimateCmd()
 	RootCmd.AddCommand(estimateCmd)

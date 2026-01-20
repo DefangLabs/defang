@@ -69,9 +69,10 @@ $ defang up --stack=awsuswest2
 
 ## Defang MCP Server
 
-[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_defang-0098FF?style=flat&logo=visualstudiocode&logoColor=ffffff)](https://vscode.dev/redirect?url=vscode:mcp/install?%7B%22name%22%3A%22defang%22%2C%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22defang%22%2C%22mcp%22%2C%22serve%22%2C%22--client%22%2C%22vscode%22%5D%7D)
-[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_defang-24bfa5?style=flat&logo=visualstudiocode&logoColor=ffffff)](https://insiders.vscode.dev/redirect?url=vscode-insiders:mcp/install?%7B%22name%22%3A%22defang%22%2C%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22defang%22%2C%22mcp%22%2C%22serve%22%2C%22--client%22%2C%22vscode-insiders%22%5D%7D)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_defang-0098FF?style=flat&logo=visualstudiocode&logoColor=ffffff)](https://vscode.dev/redirect?url=vscode:mcp/install?%7B%22name%22%3A%22defang%22%2C%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22defang%40latest%22%2C%22mcp%22%2C%22serve%22%2C%22--client%3Dvscode%22%5D%7D)
+[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_defang-24bfa5?style=flat&logo=visualstudiocode&logoColor=ffffff)](https://insiders.vscode.dev/redirect?url=vscode-insiders:mcp/install?%7B%22name%22%3A%22defang%22%2C%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22defang%40latest%22%2C%22mcp%22%2C%22serve%22%2C%22--client%3Dvscode-insiders%22%5D%7D)
 [![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en-US/install-mcp?name=defang&config=eyJ0eXBlIjoic3RkaW8iLCJjb21tYW5kIjoibnB4IC15IGRlZmFuZyBtY3Agc2VydmUgLS1jbGllbnQgY3Vyc29yIn0%3D)
+[![Add to Kiro](https://kiro.dev/images/add-to-kiro.svg)](https://kiro.dev/launch/mcp/add?name=defang&config=%7B%22command%22%3A%20%22npx%22%2C%20%22args%22%3A%20%5B%22-y%22%2C%20%22defang%40latest%22%2C%20%22mcp%22%2C%20%22serve%22%2C%20%22--client%3Dkiro%22%5D%2C%20%22disabled%22%3A%20false%2C%20%22autoApprove%22%3A%20%5B%5D%7D)
 
 The Defang Model Context Protocol [(MCP)](https://docs.defang.io/docs/concepts/mcp) Server is tailored for developers who work primarily within integrated development environments (IDEs). It enables seamless cloud deployment from supported editors such as Cursor, Windsurf, VS Code, VS Code Insiders and Claude delivering a fully integrated experience without leaving your development environment.
 
@@ -113,7 +114,6 @@ Install the Defang CLI from one of the following sources:
   ```
 
 - Using the [Nix package manager](https://nixos.org):
-
   - with Nix-Env:
     ```
     nix-env -if https://github.com/DefangLabs/defang/archive/main.tar.gz

@@ -631,9 +631,6 @@ func (b *ByocAws) getSecretID(projectName, name string) string {
 }
 
 func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.PutConfigRequest) error {
-	if !pkg.IsValidSecretName(secret.Name) {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid config name; must be alphanumeric or _, cannot start with a number: %q", secret.Name))
-	}
 	fqn := b.getSecretID(secret.Project, secret.Name)
 	term.Debugf("Putting parameter %q", fqn)
 	err := b.driver.PutSecret(ctx, fqn, secret.Value)

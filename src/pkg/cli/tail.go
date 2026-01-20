@@ -52,6 +52,7 @@ type TailOptions struct {
 	Raw                bool
 	Services           []string
 	Since              time.Time
+	Stack              string // only used for display purposes
 	Until              time.Time
 	Verbose            bool
 	PrintBookends      bool
@@ -83,6 +84,9 @@ func (to TailOptions) String() string {
 	}
 	if to.Filter != "" {
 		cmd += fmt.Sprintf(" --filter=%q", to.Filter)
+	}
+	if to.Stack != "" {
+		cmd += " --stack=" + to.Stack
 	}
 	if len(to.Services) > 0 {
 		cmd += " " + strings.Join(to.Services, " ")

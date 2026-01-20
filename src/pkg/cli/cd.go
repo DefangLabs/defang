@@ -42,29 +42,34 @@ func CdCommand(ctx context.Context, projectName string, provider client.Provider
 		return "", err
 	}
 
-	// Update deployment table to mark deployment as destroyed only after successful deletion of the subdomain
-	err = putDeploymentAndStack(ctx, provider, fabric, nil, putDeploymentParams{
-		Action:      defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN,
-		ETag:        etag,
-		ProjectName: projectName,
-		StatesUrl:   statesUrl,
-		EventsUrl:   eventsUrl,
-	})
-	if err != nil {
-		return "", err
-	}
-
-	if command == client.CdCommandDestroy || command == client.CdCommandDown {
-		err := postDown(ctx, projectName, provider, fabric)
+	action := defangv1.DeploymentAction_DEPLOYMENT_ACTION_REFRESH
+	switch command {
+	case client.CdCommandDown, client.CdCommandDestroy:
+		err := deleteSubdomain(ctx, projectName, provider, fabric)
 		if err != nil {
-			term.Debugf("postDown failed: %v", err)
+			term.Warn("Unable to update deployment history; deployment will proceed anyway.")
+			break
+		}
+		// Update deployment table to mark deployment as destroyed only after successful deletion of the subdomain
+		action = defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN
+		fallthrough
+	case client.CdCommandRefresh:
+		err := putDeploymentAndStack(ctx, provider, fabric, nil, putDeploymentParams{
+			Action:      action,
+			ETag:        etag,
+			ProjectName: projectName,
+			StatesUrl:   statesUrl,
+			EventsUrl:   eventsUrl,
+		})
+		if err != nil {
+			term.Debug("Failed to record deployment:", err)
 			term.Warn("Unable to update deployment history; deployment will proceed anyway.")
 		}
 	}
 	return etag, nil
 }
 
-func postDown(ctx context.Context, projectName string, provider client.Provider, fabric client.FabricClient) error {
+func deleteSubdomain(ctx context.Context, projectName string, provider client.Provider, fabric client.FabricClient) error {
 	// Special bookkeeping for "down" commands: delete the subdomain zone and mark deployment as destroyed
 	err := fabric.DeleteSubdomainZone(ctx, &defangv1.DeleteSubdomainZoneRequest{
 		Project: projectName,
