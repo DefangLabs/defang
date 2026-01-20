@@ -244,7 +244,7 @@ func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.D
 			return false
 		}
 		// Old deployments may not have a region or account ID, so we check for empty values too
-		return (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "") // TODO: compare stackName
+		return (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "") // already filtered by stack
 	})
 	if samePlace {
 		return true, nil
