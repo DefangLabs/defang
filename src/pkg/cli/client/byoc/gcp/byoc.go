@@ -830,7 +830,7 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 		return nil, annotateGcpError(err)
 	}
 	if bucketName == "" {
-		return nil, errors.New("no defang cd bucket found")
+		return nil, nil // no bucket = no services yet
 	}
 
 	path := b.GetProjectUpdatePath(projectName)
@@ -840,7 +840,11 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 	term.Debug("Getting services from bucket:", bucketName, path, uploadSA)
 	pbBytes, err := b.driver.GetBucketObjectWithServiceAccount(ctx, bucketName, path, uploadSA)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get project bucket object, try bootstrap the project with a deployment: %w", err)
+		term.Debugf("Failed to get project bucket object from bucket %q at path %q with service account %q: %v", bucketName, path, uploadSA, err)
+		if errors.Is(err, gcp.ErrObjectNotExist) {
+			return nil, nil // no services yet
+		}
+		return nil, err
 	}
 
 	projUpdate := defangv1.ProjectUpdate{}

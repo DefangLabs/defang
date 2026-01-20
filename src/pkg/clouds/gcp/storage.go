@@ -188,6 +188,8 @@ func (gcp Gcp) GetBucketObjectWithServiceAccount(ctx context.Context, bucketName
 	return gcp.getBucketObject(ctx, bucketName, objectName, client)
 }
 
+var ErrObjectNotExist = storage.ErrObjectNotExist
+
 func (gcp Gcp) getBucketObject(ctx context.Context, bucketName, objectName string, client StorageClient) ([]byte, error) {
 	bucket := client.Bucket(bucketName)
 	r, err := bucket.Object(objectName).NewReader(ctx)
