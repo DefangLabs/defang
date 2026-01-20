@@ -268,7 +268,9 @@ rm "$FILENAME"
 
 echo "Installation completed. You can now use defang by typing '$BINARY_NAME' in the terminal."
 if [ -t 1 ] && [ "$CI" != "1" ] && [ "$CI" != "true" ]; then
+    echo "The Defang MCP server can be used with the coding agent of your choice."
     echo "Run '$BINARY_NAME mcp setup' to install the Defang MCP server."
+    echo "Alternatively, you can use Defang's built-in agent by running '$BINARY_NAME'."
 fi
 
 # Unset the variables and functions to avoid polluting the user's environment
