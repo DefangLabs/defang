@@ -2,9 +2,13 @@ package cli
 
 import (
 	"context"
+	"crypto/tls"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -14,15 +18,15 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-type ServiceLineItem struct {
-	Deployment        string
-	Endpoint          string
-	Service           string
-	State             defangv1.ServiceState
-	Status            string
-	Fqdn              string
-	AcmeCertUsed      bool
-	HealthcheckStatus string
+type ServiceEndpoint struct {
+	Deployment      string
+	Endpoint        string
+	Service         string
+	State           string
+	Status          string
+	AcmeCertUsed    bool
+	HealthcheckPath string
+	Healthcheck     string // status
 }
 
 type ErrNoServices struct {
@@ -50,7 +54,7 @@ func PrintLongServices(ctx context.Context, projectName string, provider client.
 	return PrintObject("", servicesResponse)
 }
 
-func GetServices(ctx context.Context, projectName string, provider client.Provider) ([]ServiceLineItem, error) {
+func GetServices(ctx context.Context, projectName string, provider client.Provider) ([]ServiceEndpoint, error) {
 	term.Debugf("Listing services in project %q", projectName)
 
 	servicesResponse, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: projectName})
@@ -58,24 +62,18 @@ func GetServices(ctx context.Context, projectName string, provider client.Provid
 		return nil, err
 	}
 
-	numServices := len(servicesResponse.Services)
+	serviceInfos := servicesResponse.Services
+	numServices := len(serviceInfos)
 	if numServices == 0 {
 		return nil, ErrNoServices{ProjectName: projectName}
 	}
 
-	results := GetHealthcheckResults(ctx, servicesResponse.Services)
-	services, err := NewServiceFromServiceInfo(servicesResponse.Services)
+	serviceEndpoints, err := ServiceEndpointsFromServiceInfos(serviceInfos)
 	if err != nil {
 		return nil, err
 	}
-	for i, svc := range services {
-		if status, ok := results[svc.Service]; ok {
-			services[i].HealthcheckStatus = *status
-		} else {
-			services[i].HealthcheckStatus = "unknown"
-		}
-	}
-	return services, nil
+	UpdateHealthcheckResults(ctx, serviceEndpoints)
+	return serviceEndpoints, nil
 }
 
 func PrintServices(ctx context.Context, projectName string, provider client.Provider) error {
@@ -87,42 +85,30 @@ func PrintServices(ctx context.Context, projectName string, provider client.Prov
 	return PrintServiceStatesAndEndpoints(services)
 }
 
-type HealthCheckResults map[string]*string
-
-func GetHealthcheckResults(ctx context.Context, serviceInfos []*defangv1.ServiceInfo) HealthCheckResults {
+func UpdateHealthcheckResults(ctx context.Context, serviceEndpoints []ServiceEndpoint) {
 	// Create a context with a timeout for HTTP requests
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	var wg sync.WaitGroup
 
-	results := make(HealthCheckResults)
-	for _, serviceInfo := range serviceInfos {
-		results[serviceInfo.Service.Name] = (new(string))
-	}
-
-	for _, serviceInfo := range serviceInfos {
-		for _, endpoint := range serviceInfo.Endpoints {
-			if strings.Contains(endpoint, ":") {
-				*results[serviceInfo.Service.Name] = "skipped"
-				// Skip endpoints with ports because they likely non-HTTP services
-				continue
-			}
-			wg.Add(1)
-			go func(serviceInfo *defangv1.ServiceInfo) {
-				defer wg.Done()
-				result, err := RunHealthcheck(ctx, serviceInfo.Service.Name, "https://"+endpoint, serviceInfo.HealthcheckPath)
-				if err != nil {
-					term.Debugf("Healthcheck error for service %q at endpoint %q: %s", serviceInfo.Service.Name, endpoint, err.Error())
-					result = "error"
-				}
-				*results[serviceInfo.Service.Name] = result
-			}(serviceInfo)
+	for i, serviceEndpoint := range serviceEndpoints {
+		if strings.Contains(serviceEndpoint.Endpoint, ":") && !strings.HasPrefix(serviceEndpoint.Endpoint, "https://") {
+			serviceEndpoints[i].Healthcheck = "-"
+			continue
 		}
+		wg.Add(1)
+		go func(serviceEndpoint *ServiceEndpoint) {
+			defer wg.Done()
+			result, err := RunHealthcheck(ctx, serviceEndpoint.Service, serviceEndpoint.Endpoint, serviceEndpoint.HealthcheckPath)
+			if err != nil {
+				term.Debugf("Healthcheck error for service %q at endpoint %q: %s", serviceEndpoint.Service, serviceEndpoint.Endpoint, err.Error())
+				result = "error"
+			}
+			serviceEndpoint.Healthcheck = result
+		}(&serviceEndpoints[i])
 	}
 
 	wg.Wait()
-
-	return results
 }
 
 func RunHealthcheck(ctx context.Context, name, endpoint, path string) (string, error) {
@@ -138,6 +124,19 @@ func RunHealthcheck(ctx context.Context, name, endpoint, path string) (string, e
 	term.Debugf("[%s] checking health at %s", name, url)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return "unknown (timeout)", nil
+		}
+		var dnsErr *net.DNSError
+		if errors.As(err, &dnsErr) {
+			term.Warnf("service %q: Run `defang cert generate` to continue setup: %v", name, err)
+			return "unknown (DNS error)", nil
+		}
+		var tlsErr *tls.CertificateVerificationError
+		if errors.As(err, &tlsErr) {
+			term.Warnf("service %q: Run `defang cert generate` to continue setup: %v", name, err)
+			return "unknown (TLS certificate error)", nil
+		}
 		return "", err
 	}
 	defer resp.Body.Close()
@@ -150,62 +149,90 @@ func RunHealthcheck(ctx context.Context, name, endpoint, path string) (string, e
 	}
 }
 
-func NewServiceFromServiceInfo(serviceInfos []*defangv1.ServiceInfo) ([]ServiceLineItem, error) {
-	var serviceTableItems []ServiceLineItem
+func ServiceEndpointsFromServiceInfo(serviceInfo *defangv1.ServiceInfo) []ServiceEndpoint {
+	endpoints := make([]ServiceEndpoint, 0, len(serviceInfo.Endpoints)+1)
+	for _, endpoint := range serviceInfo.Endpoints {
+		_, port, _ := net.SplitHostPort(endpoint)
+		if port == "" {
+			endpoint = "https://" + strings.TrimPrefix(endpoint, "https://")
+		}
+		endpoints = append(endpoints, ServiceEndpoint{
+			Deployment:      serviceInfo.Etag,
+			Service:         serviceInfo.Service.Name,
+			State:           serviceInfo.State.String(),
+			Status:          serviceInfo.Status,
+			Endpoint:        endpoint,
+			HealthcheckPath: serviceInfo.HealthcheckPath,
+			AcmeCertUsed:    serviceInfo.UseAcmeCert,
+		})
+	}
+	if serviceInfo.Domainname != "" {
+		endpoints = append(endpoints, ServiceEndpoint{
+			Deployment:      serviceInfo.Etag,
+			Service:         serviceInfo.Service.Name,
+			State:           serviceInfo.State.String(),
+			Status:          serviceInfo.Status,
+			Endpoint:        "https://" + serviceInfo.Domainname,
+			HealthcheckPath: serviceInfo.HealthcheckPath,
+			AcmeCertUsed:    serviceInfo.UseAcmeCert,
+		})
+	}
+	return endpoints
+}
 
-	// showDomainNameColumn := false
+func ServiceEndpointsFromServiceInfos(serviceInfos []*defangv1.ServiceInfo) ([]ServiceEndpoint, error) {
+	var serviceTableItems []ServiceEndpoint
 
 	for _, serviceInfo := range serviceInfos {
-		fqdn := serviceInfo.PublicFqdn
-		if fqdn == "" {
-			fqdn = serviceInfo.PrivateFqdn
-		}
-		domainname := "N/A"
-		if serviceInfo.Domainname != "" {
-			// showDomainNameColumn = true
-			domainname = "https://" + serviceInfo.Domainname
-		} else if serviceInfo.PublicFqdn != "" {
-			domainname = "https://" + serviceInfo.PublicFqdn
-		} else if serviceInfo.PrivateFqdn != "" {
-			domainname = serviceInfo.PrivateFqdn
-		}
-
-		ps := ServiceLineItem{
-			Deployment:   serviceInfo.Etag,
-			Service:      serviceInfo.Service.Name,
-			State:        serviceInfo.State,
-			Status:       serviceInfo.Status,
-			Endpoint:     domainname,
-			Fqdn:         fqdn,
-			AcmeCertUsed: serviceInfo.UseAcmeCert,
-		}
-		serviceTableItems = append(serviceTableItems, ps)
+		serviceTableItems = append(serviceTableItems, ServiceEndpointsFromServiceInfo(serviceInfo)...)
 	}
 
 	return serviceTableItems, nil
 }
 
-func PrintServiceStatesAndEndpoints(services []ServiceLineItem) error {
+func PrintServiceStatesAndEndpoints(serviceEndpoints []ServiceEndpoint) error {
 	showCertGenerateHint := false
 	printHealthcheckStatus := false
-	for _, svc := range services {
+	for _, svc := range serviceEndpoints {
 		if svc.AcmeCertUsed {
 			showCertGenerateHint = true
 		}
-		if svc.HealthcheckStatus != "" {
+		if svc.Healthcheck != "" {
 			printHealthcheckStatus = true
 		}
 	}
 
-	attrs := []string{"Service", "Deployment", "State", "Fqdn", "Endpoint"}
+	attrs := []string{"Service", "Deployment", "State"}
 	if printHealthcheckStatus {
-		attrs = append(attrs, "HealthcheckStatus")
+		attrs = append(attrs, "Healthcheck", "Endpoint")
+	} else {
+		attrs = append(attrs, "Endpoint")
 	}
-	// if showDomainNameColumn {
-	// 	attrs = append(attrs, "DomainName")
-	// }
 
-	err := term.Table(services, attrs...)
+	// sort serviceEndpoints by Service, Deployment, Endpoint
+	slices.SortStableFunc(serviceEndpoints, func(a, b ServiceEndpoint) int {
+		if a.Service != b.Service {
+			return strings.Compare(a.Service, b.Service)
+		}
+		if a.Deployment != b.Deployment {
+			return strings.Compare(a.Deployment, b.Deployment)
+		}
+		return strings.Compare(a.Endpoint, b.Endpoint)
+	})
+
+	// to reduce noise, print empty "Service", "Deployment", and "State" columns
+	// if they are for the same service as the previous row
+	lastService := ""
+	for i := range serviceEndpoints {
+		if serviceEndpoints[i].Service == lastService {
+			serviceEndpoints[i].Service = ""
+			serviceEndpoints[i].Deployment = ""
+			serviceEndpoints[i].State = ""
+		} else {
+			lastService = serviceEndpoints[i].Service
+		}
+	}
+	err := term.Table(serviceEndpoints, attrs...)
 	if err != nil {
 		return err
 	}

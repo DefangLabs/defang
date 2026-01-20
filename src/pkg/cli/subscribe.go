@@ -14,16 +14,14 @@ var ErrNothingToMonitor = errors.New("no services to monitor")
 
 type ServiceStates = map[string]defangv1.ServiceState
 
-func WaitServiceState(
+func WatchServiceState(
 	ctx context.Context,
 	provider client.Provider,
-	targetState defangv1.ServiceState,
 	projectName string,
 	etag types.ETag,
 	services []string,
+	cb func(*defangv1.SubscribeResponse, *ServiceStates) error,
 ) (ServiceStates, error) {
-	term.Debugf("waiting for services %v to reach state %s\n", services, targetState) // TODO: don't print in Go-routine
-
 	if len(services) == 0 {
 		return nil, ErrNothingToMonitor
 	}
@@ -50,46 +48,96 @@ func WaitServiceState(
 	}
 
 	// Monitor for when all services are completed to end this command
-	for {
-		if !serverStream.Receive() {
-			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
-			if isTransientError(serverStream.Err()) {
-				if err := provider.DelayBeforeRetry(ctx); err != nil {
-					return serviceStates, err
+	msgChan := make(chan *defangv1.SubscribeResponse, 1)
+	errChan := make(chan error, 1)
+
+	// Run stream receiving in a separate goroutine
+	go func() {
+		for {
+			if !serverStream.Receive() {
+				// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
+				if isTransientError(serverStream.Err()) {
+					if err := provider.DelayBeforeRetry(ctx); err != nil {
+						errChan <- err
+						return
+					}
+					serverStream, err = provider.Subscribe(ctx, &subscribeRequest)
+					if err != nil {
+						errChan <- err
+						return
+					}
+					continue
 				}
-				serverStream, err = provider.Subscribe(ctx, &subscribeRequest)
-				if err != nil {
-					return serviceStates, err
+				if err := serverStream.Err(); err != nil {
+					errChan <- err
 				}
+				return
+			}
+
+			msg := serverStream.Msg()
+			if msg == nil {
 				continue
 			}
-			return serviceStates, serverStream.Err()
+
+			select {
+			case msgChan <- msg:
+			case <-ctx.Done():
+				return
+			}
 		}
+	}()
 
-		msg := serverStream.Msg()
-		if msg == nil {
-			continue
+	for {
+		select {
+		case <-ctx.Done():
+			return serviceStates, ctx.Err()
+		case err := <-errChan:
+			return serviceStates, err
+		case msg := <-msgChan:
+			term.Debugf("service %s with state ( %s ) and status: %s\n", msg.Name, msg.State, msg.Status) // TODO: don't print in Go-routine
+
+			if _, ok := serviceStates[msg.Name]; !ok {
+				term.Debugf("unexpected service %s update", msg.Name) // TODO: don't print in Go-routine
+				continue
+			}
+
+			if msg.State != defangv1.ServiceState_NOT_SPECIFIED {
+				serviceStates[msg.Name] = msg.State
+			}
+			err := cb(msg, &serviceStates)
+			if err != nil {
+				if errors.Is(err, client.ErrDeploymentSucceeded) {
+					return serviceStates, nil
+				}
+				return serviceStates, err
+			}
 		}
+	}
+}
 
-		term.Debugf("service %s with state ( %s ) and status: %s\n", msg.Name, msg.State, msg.Status) // TODO: don't print in Go-routine
+func WaitServiceState(
+	ctx context.Context,
+	provider client.Provider,
+	targetState defangv1.ServiceState,
+	projectName string,
+	etag types.ETag,
+	services []string,
+) (ServiceStates, error) {
+	term.Debugf("waiting for services %v to reach state %s\n", services, targetState) // TODO: don't print in Go-routine
 
-		if _, ok := serviceStates[msg.Name]; !ok {
-			term.Debugf("unexpected service %s update", msg.Name) // TODO: don't print in Go-routine
-			continue
-		}
-
-		serviceStates[msg.Name] = msg.State
-
+	return WatchServiceState(ctx, provider, projectName, etag, services, func(msg *defangv1.SubscribeResponse, serviceStates *ServiceStates) error {
 		// exit early on detecting a FAILED state
 		switch msg.State {
 		case defangv1.ServiceState_BUILD_FAILED, defangv1.ServiceState_DEPLOYMENT_FAILED:
-			return serviceStates, client.ErrDeploymentFailed{Service: msg.Name, Message: msg.Status}
+			return client.ErrDeploymentFailed{Service: msg.Name, Message: msg.Status}
 		}
 
-		if allInState(targetState, serviceStates) {
-			return serviceStates, nil // all services are in the target state
+		if allInState(targetState, *serviceStates) {
+			return client.ErrDeploymentSucceeded // signal successful completion
 		}
-	}
+
+		return nil
+	})
 }
 
 func allInState(targetState defangv1.ServiceState, serviceStates ServiceStates) bool {

@@ -177,18 +177,46 @@ func makeComposeUpCmd() *cobra.Command {
 				term.Info("Detached.")
 				return nil
 			}
-
-			// show users the current streaming logs
-			tailSource := "all services"
-			if deploy.Etag != "" {
-				tailSource = "deployment ID " + deploy.Etag
+			tailOptions := cli.TailOptions{
+				Deployment: deploy.Etag,
+				LogType:    logs.LogTypeAll,
+				Since:      since,
+				Verbose:    true,
 			}
-			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 
-			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, global.Verbose)
-			serviceStates, err := cli.TailAndMonitor(ctx, project, session.Provider, time.Duration(waitTimeout)*time.Second, tailOptions)
-			if err != nil {
+			waitTimeoutDuration := time.Duration(waitTimeout) * time.Second
+			var serviceStates map[string]defangv1.ServiceState
+			if global.Verbose || global.NonInteractive {
+				tailOptions.Follow = true
+				serviceStates, err = cli.TailAndMonitor(ctx, project, session.Provider, waitTimeoutDuration, tailOptions)
+				if err != nil {
+					return err
+				}
+			} else {
+				term.Info("Live tail logs with `defang tail --deployment=" + deploy.Etag + "`")
+				serviceStates, err = cli.MonitorWithUI(ctx, project, session.Provider, waitTimeoutDuration, deploy.Etag)
+			}
+			if err != nil && !errors.Is(err, context.Canceled) {
 				deploymentErr := err
+
+				// if any services failed to build, only show build logs for those
+				// services
+				var unbuiltServices = make([]string, 0, len(project.Services))
+				for service, state := range serviceStates {
+					if state <= defangv1.ServiceState_BUILD_STOPPING {
+						unbuiltServices = append(unbuiltServices, service)
+					}
+				}
+				if len(unbuiltServices) > 0 {
+					tailOptions.LogType = logs.LogTypeBuild
+					tailOptions.Services = unbuiltServices
+				}
+				err := cli.Tail(ctx, session.Provider, project.Name, tailOptions)
+				if err != nil && !errors.Is(err, io.EOF) {
+					term.Warn("Failed to tail logs for deployment error", err)
+					return deploymentErr
+				}
+
 				debugger, err := debug.NewDebugger(ctx, global.Cluster, &global.Stack)
 				if err != nil {
 					term.Warn("Failed to initialize debugger:", err)
@@ -197,8 +225,8 @@ func makeComposeUpCmd() *cobra.Command {
 				handleTailAndMonitorErr(ctx, deploymentErr, debugger, debug.DebugConfig{
 					Deployment: deploy.Etag,
 					Project:    project,
-					ProviderID: &global.Stack.Provider,
-					Stack:      &global.Stack.Name,
+					ProviderID: &session.Stack.Provider,
+					Stack:      &session.Stack.Name,
 					Since:      since,
 					Until:      time.Now(),
 				})
@@ -209,15 +237,9 @@ func makeComposeUpCmd() *cobra.Command {
 				service.State = serviceStates[service.Service.Name]
 			}
 
-			services, err := cli.NewServiceFromServiceInfo(deploy.Services)
-			if err != nil {
-				return err
-			}
-
 			// Print the current service states of the deployment
-			err = cli.PrintServiceStatesAndEndpoints(services)
-			if err != nil {
-				return err
+			if err := cli.PrintServices(cmd.Context(), project.Name, session.Provider); err != nil {
+				term.Warn(err)
 			}
 
 			term.Info("Done.")
@@ -278,7 +300,7 @@ func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.D
 }
 
 func printExistingDeployments(existingDeployments []*defangv1.Deployment) {
-	term.Info("This project was previously deployed to the following locations:")
+	term.Info("This project has already deployed to the following locations:")
 	deploymentStrings := make([]string, 0, len(existingDeployments))
 	for _, dep := range existingDeployments {
 		var providerId client.ProviderID

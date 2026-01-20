@@ -91,8 +91,8 @@ func TestPrintServices(t *testing.T) {
 		if err != nil {
 			t.Fatalf("PrintServices error = %v", err)
 		}
-		expectedOutput := "\x1b[1m\nSERVICE  DEPLOYMENT  STATE          FQDN                       ENDPOINT                           HEALTHCHECKSTATUS\x1b[0m" + `
-foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.prod1.defang.dev  unhealthy (404 Not Found)
+		expectedOutput := "\x1b[1m\nSERVICE  DEPLOYMENT  STATE          HEALTHCHECK                ENDPOINT\x1b[0m" + `
+foo      a1b2c3      NOT_SPECIFIED  unhealthy (404 Not Found)  https://test-foo--3000.prod1.defang.dev
 `
 
 		receivedLines := strings.Split(stdout.String(), "\n")
@@ -147,25 +147,23 @@ foo      a1b2c3      NOT_SPECIFIED  test-foo.prod1.defang.dev  https://test-foo.
 	})
 }
 
-func TestGetServiceStatesAndEndpoints(t *testing.T) {
+func TestServiceEndpointFromServiceInfo(t *testing.T) {
 	tests := []struct {
-		name             string
-		serviceinfos     []*defangv1.ServiceInfo
-		expectedServices []ServiceLineItem
+		name                     string
+		serviceinfo              *defangv1.ServiceInfo
+		expectedServiceEndpoints []ServiceEndpoint
 	}{
 		{
 			name: "empty endpoint list",
-			serviceinfos: []*defangv1.ServiceInfo{
-				{
-					Service: &defangv1.Service{
-						Name: "service1",
-					},
-					Status:     "UNKNOWN",
-					Domainname: "example.com",
-					Endpoints:  []string{},
+			serviceinfo: &defangv1.ServiceInfo{
+				Service: &defangv1.Service{
+					Name: "service1",
 				},
+				Status:     "UNKNOWN",
+				Domainname: "example.com",
+				Endpoints:  []string{},
 			},
-			expectedServices: []ServiceLineItem{
+			expectedServiceEndpoints: []ServiceEndpoint{
 				{
 					Service:  "service1",
 					Status:   "UNKNOWN",
@@ -175,20 +173,18 @@ func TestGetServiceStatesAndEndpoints(t *testing.T) {
 		},
 		{
 			name: "Service with Domainname",
-			serviceinfos: []*defangv1.ServiceInfo{
-				{
-					Service: &defangv1.Service{
-						Name: "service1",
-					},
-					Status:     "UNKNOWN",
-					Domainname: "example.com",
-					Endpoints: []string{
-						"example.com",
-						"service1.internal:80",
-					},
+			serviceinfo: &defangv1.ServiceInfo{
+				Service: &defangv1.Service{
+					Name: "service1",
+				},
+				Status:     "UNKNOWN",
+				Domainname: "example.com",
+				Endpoints: []string{
+					"example.com",
+					"service1.internal:80",
 				},
 			},
-			expectedServices: []ServiceLineItem{
+			expectedServiceEndpoints: []ServiceEndpoint{
 				{
 					Service:  "service1",
 					Status:   "UNKNOWN",
@@ -198,18 +194,16 @@ func TestGetServiceStatesAndEndpoints(t *testing.T) {
 		},
 		{
 			name: "endpoint without port",
-			serviceinfos: []*defangv1.ServiceInfo{
-				{
-					Service: &defangv1.Service{
-						Name: "service1",
-					},
-					Status: "UNKNOWN",
-					Endpoints: []string{
-						"service1",
-					},
+			serviceinfo: &defangv1.ServiceInfo{
+				Service: &defangv1.Service{
+					Name: "service1",
+				},
+				Status: "UNKNOWN",
+				Endpoints: []string{
+					"service1",
 				},
 			},
-			expectedServices: []ServiceLineItem{
+			expectedServiceEndpoints: []ServiceEndpoint{
 				{
 					Service:  "service1",
 					Status:   "UNKNOWN",
@@ -219,19 +213,17 @@ func TestGetServiceStatesAndEndpoints(t *testing.T) {
 		},
 		{
 			name: "with acme cert",
-			serviceinfos: []*defangv1.ServiceInfo{
-				{
-					Service: &defangv1.Service{
-						Name: "service1",
-					},
-					Status:      "UNKNOWN",
-					UseAcmeCert: true,
-					Endpoints: []string{
-						"service1",
-					},
+			serviceinfo: &defangv1.ServiceInfo{
+				Service: &defangv1.Service{
+					Name: "service1",
+				},
+				Status:      "UNKNOWN",
+				UseAcmeCert: true,
+				Endpoints: []string{
+					"service1",
 				},
 			},
-			expectedServices: []ServiceLineItem{
+			expectedServiceEndpoints: []ServiceEndpoint{
 				{
 					Service:      "service1",
 					Status:       "UNKNOWN",
@@ -240,18 +232,71 @@ func TestGetServiceStatesAndEndpoints(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "with multiple endpoints",
+			serviceinfo: &defangv1.ServiceInfo{
+				Service: &defangv1.Service{
+					Name: "service1",
+				},
+				Status: "UNKNOWN",
+				Endpoints: []string{
+					"service1:80",
+					"service1.internal:8080",
+				},
+			},
+			expectedServiceEndpoints: []ServiceEndpoint{
+				{
+					Service:  "service1",
+					Status:   "UNKNOWN",
+					Endpoint: "http://service1:80",
+				},
+				{
+					Service:  "service1",
+					Status:   "UNKNOWN",
+					Endpoint: "http://service1.internal:8080",
+				},
+			},
+		},
+		{
+			name: "with multiple endpoints and domainname",
+			serviceinfo: &defangv1.ServiceInfo{
+				Service: &defangv1.Service{
+					Name: "service1",
+				},
+				Status:     "UNKNOWN",
+				Domainname: "example.com",
+				Endpoints: []string{
+					"service1:80",
+					"service1.internal:8080",
+				},
+			},
+			expectedServiceEndpoints: []ServiceEndpoint{
+				{
+					Service:  "service1",
+					Status:   "UNKNOWN",
+					Endpoint: "http://service1:80",
+				},
+				{
+					Service:  "service1",
+					Status:   "UNKNOWN",
+					Endpoint: "http://service1.internal:8080",
+				},
+				{
+					Service:  "service1",
+					Status:   "UNKNOWN",
+					Endpoint: "https://example.com",
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			services, err := NewServiceFromServiceInfo(tt.serviceinfos)
-			require.NoError(t, err)
-
-			assert.Len(t, services, len(tt.expectedServices))
-			for i, svc := range services {
-				assert.Equal(t, tt.expectedServices[i].Service, svc.Service)
-				assert.Equal(t, tt.expectedServices[i].Status, svc.Status)
-				assert.Equal(t, tt.expectedServices[i].Endpoint, svc.Endpoint)
-				assert.Equal(t, tt.expectedServices[i].AcmeCertUsed, svc.AcmeCertUsed)
+			serviceEndpoints := ServiceEndpointsFromServiceInfo(tt.serviceinfo)
+			for i, endpoint := range serviceEndpoints {
+				assert.Equal(t, tt.expectedServiceEndpoints[i].Service, endpoint.Service)
+				assert.Equal(t, tt.expectedServiceEndpoints[i].Status, endpoint.Status)
+				assert.Equal(t, tt.expectedServiceEndpoints[i].Endpoint, endpoint.Endpoint)
+				assert.Equal(t, tt.expectedServiceEndpoints[i].AcmeCertUsed, endpoint.AcmeCertUsed)
 			}
 		})
 	}
@@ -268,53 +313,86 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		services      []ServiceLineItem
+		services      []ServiceEndpoint
 		expectedLines []string
 	}{
 		{
 			name: "empty endpoint list",
-			services: []ServiceLineItem{
+			services: []ServiceEndpoint{
 				{
-					Service:  "service1",
-					Status:   "UNKNOWN",
-					Endpoint: "https://example.com",
+					Service:    "service1",
+					State:      "DEPLOYMENT_COMPLETED",
+					Endpoint:   "https://example.com",
+					Deployment: "abcd1234",
 				},
 			},
 			expectedLines: []string{
-				"SERVICE   DEPLOYMENT  STATE          FQDN  ENDPOINT",
-				"service1              NOT_SPECIFIED        https://example.com",
+				"SERVICE   DEPLOYMENT  STATE                 ENDPOINT",
+				"service1  abcd1234    DEPLOYMENT_COMPLETED  https://example.com",
 				"",
 			},
 		},
 		{
 			name: "Service with Domainname",
-			services: []ServiceLineItem{
+			services: []ServiceEndpoint{
 				{
-					Service:  "service1",
-					Status:   "UNKNOWN",
-					Endpoint: "https://example.com",
+					Service:    "service1",
+					Endpoint:   "https://example.com",
+					Deployment: "abcd1234",
+					State:      "DEPLOYMENT_COMPLETED",
 				},
 			},
 			expectedLines: []string{
-				"SERVICE   DEPLOYMENT  STATE          FQDN  ENDPOINT",
-				"service1              NOT_SPECIFIED        https://example.com",
+				"SERVICE   DEPLOYMENT  STATE                 ENDPOINT",
+				"service1  abcd1234    DEPLOYMENT_COMPLETED  https://example.com",
 				"",
 			},
 		},
 		{
 			name: "with acme cert",
-			services: []ServiceLineItem{
+			services: []ServiceEndpoint{
 				{
 					Service:      "service1",
-					Status:       "UNKNOWN",
 					Endpoint:     "N/A",
 					AcmeCertUsed: true,
+					Deployment:   "abcd1234",
+					State:        "DEPLOYMENT_COMPLETED",
 				},
 			},
 			expectedLines: []string{
-				"SERVICE   DEPLOYMENT  STATE          FQDN  ENDPOINT",
-				"service1              NOT_SPECIFIED        N/A",
+				"SERVICE   DEPLOYMENT  STATE                 ENDPOINT",
+				"service1  abcd1234    DEPLOYMENT_COMPLETED  N/A",
 				" * Run `defang cert generate` to get a TLS certificate for your service(s)",
+				"",
+			},
+		},
+		{
+			name: "with multiple endpoints and domainname",
+			services: []ServiceEndpoint{
+				{
+					Service:    "service1",
+					Endpoint:   "http://service1:80",
+					Deployment: "abcd1234",
+					State:      "DEPLOYMENT_COMPLETED",
+				},
+				{
+					Service:    "service1",
+					Endpoint:   "http://service1.internal:8080",
+					Deployment: "abcd1234",
+					State:      "DEPLOYMENT_COMPLETED",
+				},
+				{
+					Service:    "service1",
+					Endpoint:   "https://example.com",
+					Deployment: "abcd1234",
+					State:      "DEPLOYMENT_COMPLETED",
+				},
+			},
+			expectedLines: []string{
+				"SERVICE   DEPLOYMENT  STATE                 ENDPOINT",
+				"service1  abcd1234    DEPLOYMENT_COMPLETED  http://service1.internal:8080",
+				"                                            http://service1:80",
+				"                                            https://example.com",
 				"",
 			},
 		},
@@ -363,7 +441,6 @@ func TestRunHealthcheck(t *testing.T) {
 		endpoint        string
 		healthcheckPath string
 		expectedStatus  string
-		expectedErr     bool
 	}{
 		{
 			name:            "Healthy service",
@@ -385,23 +462,31 @@ func TestRunHealthcheck(t *testing.T) {
 		},
 		{
 			name:            "Invalid endpoint",
-			endpoint:        "http://invalid-endpoint",
-			healthcheckPath: "/healthy",
-			expectedStatus:  "",
-			expectedErr:     true,
+			endpoint:        "http://invalid-endpoint-238hf83wfnrewanf.com",
+			healthcheckPath: "/",
+			expectedStatus:  "unknown (DNS error)",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			status, err := RunHealthcheck(ctx, "test-service", tt.endpoint, tt.healthcheckPath)
-			if tt.expectedErr {
-				require.Error(t, err)
-				return
-			} else {
-				require.NoError(t, err)
-			}
+			require.NoError(t, err)
 			assert.Equal(t, tt.expectedStatus, status)
 		})
 	}
+}
+
+func TestRunHealthcheckTLSError(t *testing.T) {
+	ctx := t.Context()
+
+	// Start a test HTTPS server with a self-signed certificate
+	testServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(testServer.Close)
+
+	status, err := RunHealthcheck(ctx, "test-service", testServer.URL, "/healthy")
+	require.NoError(t, err)
+	assert.Equal(t, "unknown (TLS certificate error)", status)
 }

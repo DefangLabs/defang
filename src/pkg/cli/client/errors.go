@@ -1,6 +1,11 @@
 package client
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrDeploymentSucceeded = errors.New("deployment succeeded")
 
 type ErrDeploymentFailed struct {
 	Message string
