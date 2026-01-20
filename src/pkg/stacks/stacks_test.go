@@ -478,7 +478,7 @@ func TestLoadStackEnv_ConflictingAWSCredentials(t *testing.T) {
 			warningContain: "AWS_ACCESS_KEY_ID takes precedence",
 		},
 		{
-			name: "AWS_PROFILE in stack and AWS_SECRET_ACCESS_KEY in env",
+			name: "AWS_PROFILE in stack and AWS_SECRET_ACCESS_KEY only in env - no conflict",
 			params: Parameters{
 				Variables: map[string]string{
 					"AWS_PROFILE": "default",
@@ -487,8 +487,7 @@ func TestLoadStackEnv_ConflictingAWSCredentials(t *testing.T) {
 			envVars: map[string]string{
 				"AWS_SECRET_ACCESS_KEY": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
 			},
-			expectWarning:  true,
-			warningContain: "AWS_ACCESS_KEY_ID takes precedence",
+			expectWarning: false, // AWS_SECRET_ACCESS_KEY alone is not a valid credential
 		},
 		{
 			name: "AWS_PROFILE in stack and both keys in env",
@@ -529,11 +528,6 @@ func TestLoadStackEnv_ConflictingAWSCredentials(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stdout, _ := term.SetupTestTerm(t)
-
-			// Clear relevant env vars first
-			os.Unsetenv("AWS_ACCESS_KEY_ID")
-			os.Unsetenv("AWS_SECRET_ACCESS_KEY")
-			os.Unsetenv("AWS_PROFILE")
 
 			// Set test env vars
 			for k, v := range tt.envVars {
