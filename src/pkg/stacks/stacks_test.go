@@ -3,10 +3,12 @@ package stacks
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -449,6 +451,105 @@ func TestParamsFromMap(t *testing.T) {
 				resultParams.Mode != tt.expectedParams.Mode ||
 				resultParams.Variables["AWS_PROFILE"] != tt.expectedParams.Variables["AWS_PROFILE"] {
 				t.Errorf("ParamsFromMap() = %+v, want %+v", resultParams, tt.expectedParams)
+			}
+		})
+	}
+}
+
+func TestLoadStackEnv_ConflictingAWSCredentials(t *testing.T) {
+	tests := []struct {
+		name           string
+		params         Parameters
+		envVars        map[string]string
+		expectWarning  bool
+		warningContain string
+	}{
+		{
+			name: "AWS_PROFILE in stack and AWS_ACCESS_KEY_ID in env",
+			params: Parameters{
+				Variables: map[string]string{
+					"AWS_PROFILE": "default",
+				},
+			},
+			envVars: map[string]string{
+				"AWS_ACCESS_KEY_ID": "AKIAIOSFODNN7EXAMPLE",
+			},
+			expectWarning:  true,
+			warningContain: "AWS_ACCESS_KEY_ID takes precedence",
+		},
+		{
+			name: "AWS_PROFILE in stack and AWS_SECRET_ACCESS_KEY in env",
+			params: Parameters{
+				Variables: map[string]string{
+					"AWS_PROFILE": "default",
+				},
+			},
+			envVars: map[string]string{
+				"AWS_SECRET_ACCESS_KEY": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+			},
+			expectWarning:  true,
+			warningContain: "AWS_ACCESS_KEY_ID takes precedence",
+		},
+		{
+			name: "AWS_PROFILE in stack and both keys in env",
+			params: Parameters{
+				Variables: map[string]string{
+					"AWS_PROFILE": "default",
+				},
+			},
+			envVars: map[string]string{
+				"AWS_ACCESS_KEY_ID":     "AKIAIOSFODNN7EXAMPLE",
+				"AWS_SECRET_ACCESS_KEY": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+			},
+			expectWarning:  true,
+			warningContain: "AWS_ACCESS_KEY_ID takes precedence",
+		},
+		{
+			name: "AWS_PROFILE in stack only - no conflict",
+			params: Parameters{
+				Variables: map[string]string{
+					"AWS_PROFILE": "default",
+				},
+			},
+			envVars:       map[string]string{},
+			expectWarning: false,
+		},
+		{
+			name: "no AWS_PROFILE in stack - no conflict",
+			params: Parameters{
+				Variables: map[string]string{},
+			},
+			envVars: map[string]string{
+				"AWS_ACCESS_KEY_ID": "AKIAIOSFODNN7EXAMPLE",
+			},
+			expectWarning: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stdout, _ := term.SetupTestTerm(t)
+
+			// Clear relevant env vars first
+			os.Unsetenv("AWS_ACCESS_KEY_ID")
+			os.Unsetenv("AWS_SECRET_ACCESS_KEY")
+			os.Unsetenv("AWS_PROFILE")
+
+			// Set test env vars
+			for k, v := range tt.envVars {
+				t.Setenv(k, v)
+			}
+
+			err := LoadStackEnv(tt.params, false)
+			assert.NoError(t, err)
+
+			output := stdout.String()
+			if tt.expectWarning {
+				assert.True(t, strings.Contains(output, tt.warningContain),
+					"expected warning containing %s, got %s", tt.warningContain, output)
+			} else {
+				assert.False(t, strings.Contains(output, "AWS_ACCESS_KEY_ID takes precedence"),
+					"expected no warning, got %s", output)
 			}
 		})
 	}

@@ -225,6 +225,15 @@ func LoadStackEnv(params Parameters, overload bool) error {
 	}
 
 	paramsMap := params.ToMap()
+
+	// Warn about conflicting AWS credential sources: AWS SDK prioritizes explicit keys over profile
+	if awsProfileName, hasStackProfile := paramsMap["AWS_PROFILE"]; hasStackProfile {
+		envAccessKeyID, hasEnvAccessKey := currentEnv["AWS_ACCESS_KEY_ID"]
+		if hasEnvAccessKey {
+			term.Warnf("Both AWS_ACCESS_KEY_ID: %q and AWS_PROFILE: %q are set; AWS_ACCESS_KEY_ID takes precedence and AWS_PROFILE will be ignored", envAccessKeyID, awsProfileName)
+		}
+	}
+
 	for key, value := range paramsMap {
 		if envValue, ok := currentEnv[key]; ok && envValue != value && !overload {
 			term.Warnf("The variable %q is set in both the stack and the environment. The value from the environment will be used.\n", key)
