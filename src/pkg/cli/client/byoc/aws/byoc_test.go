@@ -90,8 +90,8 @@ func (f FakeLoader) LoadProject(ctx context.Context) (*composeTypes.Project, err
 	return &composeTypes.Project{Name: f.ProjectName}, nil
 }
 
-func (f FakeLoader) LoadProjectName(ctx context.Context) (string, error) {
-	return f.ProjectName, nil
+func (f FakeLoader) LoadProjectName(ctx context.Context) (string, bool, error) {
+	return f.ProjectName, false, nil
 }
 
 //go:embed testdata/*.json

@@ -92,7 +92,7 @@ type Provider interface {
 
 type Loader interface {
 	LoadProject(context.Context) (*composeTypes.Project, error)
-	LoadProjectName(context.Context) (string, error)
+	LoadProjectName(context.Context) (string, bool, error)
 	TargetDirectory() string
 	CreateProjectForDebug() (*composeTypes.Project, error)
 }

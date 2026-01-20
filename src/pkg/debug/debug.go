@@ -22,7 +22,7 @@ var P = track.P
 
 type DebugConfig struct {
 	ProviderID     *client.ProviderID
-	Stack          *string
+	Stack          string
 	Deployment     types.ETag
 	FailedServices []string
 	Project        *compose.Project
@@ -46,6 +46,9 @@ func (dc DebugConfig) String() string {
 		if dc.Project.WorkingDir != "" {
 			cmd += " --cwd=" + dc.Project.WorkingDir
 		}
+	}
+	if dc.Stack != "" {
+		cmd += " --stack=" + dc.Stack
 	}
 	if len(dc.FailedServices) > 0 {
 		cmd += " " + strings.Join(dc.FailedServices, " ")

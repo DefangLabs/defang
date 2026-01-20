@@ -140,7 +140,7 @@ func (sm *manager) Load(ctx context.Context, name string) (*Parameters, error) {
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			term.Infof("stack file not found, attempting to import from previous deployments: %v", err)
-			return sm.LoadRemote(ctx, name)
+			return sm.GetRemote(ctx, name)
 		}
 		return nil, err
 	}
@@ -155,7 +155,7 @@ func (sm *manager) LoadLocal(name string) (*Parameters, error) {
 	return params, nil
 }
 
-func (sm *manager) LoadRemote(ctx context.Context, name string) (*Parameters, error) {
+func (sm *manager) GetRemote(ctx context.Context, name string) (*Parameters, error) {
 	remoteStacks, err := sm.ListRemote(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list remote stacks: %w", err)

@@ -75,7 +75,7 @@ func (m *mockStacksManager) LoadLocal(name string) (*stacks.Parameters, error) {
 	return result, args.Error(1)
 }
 
-func (m *mockStacksManager) LoadRemote(ctx context.Context, name string) (*stacks.Parameters, error) {
+func (m *mockStacksManager) GetRemote(ctx context.Context, name string) (*stacks.Parameters, error) {
 	args := m.Called(ctx, name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -345,10 +345,10 @@ func TestLoadSession(t *testing.T) {
 			}
 
 			if tt.remoteStack != nil {
-				sm.On("LoadRemote", ctx, tt.remoteStack.Name).Maybe().Return(tt.remoteStack, nil)
+				sm.On("GetRemote", ctx, tt.remoteStack.Name).Maybe().Return(tt.remoteStack, nil)
 				sm.On("Create", *tt.remoteStack).Maybe().Return("", nil)
 			} else {
-				sm.On("LoadRemote", ctx, mock.Anything).Maybe().Return(nil, errors.New("unable to find stack"))
+				sm.On("GetRemote", ctx, mock.Anything).Maybe().Return(nil, errors.New("unable to find stack"))
 			}
 			if tt.stacksList != nil {
 				sm.On("List", ctx).Maybe().Return(tt.stacksList, nil)

@@ -37,7 +37,7 @@ func deploymentsList(cmd *cobra.Command, listType defangv1.DeploymentType) error
 	}
 
 	loader := configureLoader(cmd)
-	projectName, err := loader.LoadProjectName(cmd.Context())
+	projectName, _, err := loader.LoadProjectName(cmd.Context())
 	if err != nil {
 		return err
 	}

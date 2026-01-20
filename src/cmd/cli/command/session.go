@@ -107,7 +107,7 @@ func newStackManagerForLoader(ctx context.Context, loader *compose.Loader) (sess
 	if err != nil {
 		targetDirectory = loader.TargetDirectory()
 	}
-	projectName, err := loader.LoadProjectName(ctx)
+	projectName, _, err := loader.LoadProjectName(ctx)
 	if err != nil {
 		term.Debugf("Could not determine project name: %v", err)
 	}

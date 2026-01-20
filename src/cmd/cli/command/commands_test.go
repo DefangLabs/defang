@@ -303,7 +303,7 @@ func (m *mockStackManager) LoadLocal(name string) (*stacks.Parameters, error) {
 	return nil, fmt.Errorf("stack %q not found", name)
 }
 
-func (m *mockStackManager) LoadRemote(ctx context.Context, name string) (*stacks.Parameters, error) {
+func (m *mockStackManager) GetRemote(ctx context.Context, name string) (*stacks.Parameters, error) {
 	// TODO: separate remote and local loadResults in the mock
 	if m.loadError != nil {
 		return nil, m.loadError
