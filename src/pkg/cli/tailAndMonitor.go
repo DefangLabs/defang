@@ -10,6 +10,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
@@ -31,15 +32,49 @@ func Monitor(ctx context.Context, project *compose.Project, provider client.Prov
 	_, computeServices := splitManagedAndUnmanagedServices(project.Services)
 
 	var (
-		serviceStates ServiceStates
-		cdErr, svcErr error
+		serviceStates          ServiceStates
+		tailErr, svcErr, cdErr error
 	)
 	wg := &sync.WaitGroup{}
-	wg.Add(2)
+	wg.Add(3)
+
+	go func() {
+		defer wg.Done()
+		tailRequest := &defangv1.TailRequest{
+			Follow:  true,
+			Project: project.Name,
+			Etag:    deploymentID,
+			LogType: uint32(logs.LogTypeBuild),
+		}
+		var stream client.ServerStream[defangv1.TailResponse]
+		stream, tailErr = provider.QueryLogs(ctx, tailRequest)
+		if tailErr != nil {
+			cancelSvcStatus(svcErr)
+			return
+		}
+
+		for {
+			select {
+			case <-ctx.Done():
+				tailErr = ctx.Err()
+				return
+			default:
+				if !stream.Receive() {
+					if err := stream.Err(); err != nil {
+						tailErr = err
+					}
+					return
+				}
+			}
+		}
+	}()
 
 	go func() {
 		defer wg.Done()
 		serviceStates, svcErr = WatchServiceState(svcStatusCtx, provider, project.Name, deploymentID, computeServices, watchCallback)
+		if svcErr != nil {
+			cancelSvcStatus(svcErr)
+		}
 	}()
 
 	go func() {
@@ -53,7 +88,7 @@ func Monitor(ctx context.Context, project *compose.Project, provider client.Prov
 	wg.Wait()
 	pkg.SleepWithContext(ctx, 2*time.Second)
 
-	return serviceStates, errors.Join(cdErr, svcErr)
+	return serviceStates, errors.Join(tailErr, svcErr, cdErr)
 }
 
 func TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, tailOptions TailOptions) (ServiceStates, error) {
