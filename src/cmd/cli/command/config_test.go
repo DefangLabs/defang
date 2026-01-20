@@ -102,6 +102,11 @@ func TestConfigSetFlagConflicts(t *testing.T) {
 			expectedErr: "failed to read env file \"--provider=defang\": open --provider=defang: no such file or directory",
 		},
 		{
+			name:        "some KEY=VALUE and some keys without =",
+			args:        []string{"config", "set", "KEY1=somevalue", "KEY2", "--provider=defang", "--project-name=app"},
+			expectedErr: "when setting multiple configs, all must be in KEY=VALUE format",
+		},
+		{
 			name: "valid use of --env",
 			args: []string{"config", "set", "KEY1", "KEY2", "--env", "--provider=defang", "--project-name=app"},
 		},
@@ -112,6 +117,10 @@ func TestConfigSetFlagConflicts(t *testing.T) {
 		{
 			name: "valid use of --env-file",
 			args: []string{"config", "set", "--env-file=" + envFilePath, "--provider=defang", "--project-name=app"},
+		},
+		{
+			name: "no = in KEY=VALUE format; interactive mode",
+			args: []string{"config", "set", "KEY1", "--provider=defang", "--project-name=app"},
 		},
 		{
 			name: "valid use of KEY=VALUE format",

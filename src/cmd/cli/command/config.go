@@ -78,7 +78,10 @@ var configSetCmd = &cobra.Command{
 			// 1a. Handle CONFIG=VALUE args
 			envMap = make(map[string]string)
 			for _, pair := range args {
-				name, value, _ := strings.Cut(pair, "=")
+				name, value, found := strings.Cut(pair, "=")
+				if !found {
+					return errors.New("when setting multiple configs, all must be in KEY=VALUE format")
+				}
 				envMap[name] = value
 			}
 		} else if fromEnv {
