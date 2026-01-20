@@ -244,12 +244,16 @@ func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.D
 			return false
 		}
 		// Old deployments may not have a region or account ID, so we check for empty values too
-		return (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
+		return (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "") // TODO: compare stackName
 	})
 	if samePlace {
 		return true, nil
 	}
-	confirmed, err := confirmDeploymentToNewLocation(existingDeployments)
+	printExistingDeployments(existingDeployments)
+	if global.NonInteractive {
+		return true, nil
+	}
+	confirmed, err := confirmDeploymentToNewLocation()
 	if err != nil {
 		return false, err
 	}
@@ -287,8 +291,7 @@ func printExistingDeployments(existingDeployments []*defangv1.Deployment) {
 	term.Println(strings.Join(deploymentStrings, "\n"))
 }
 
-func confirmDeploymentToNewLocation(existingDeployments []*defangv1.Deployment) (bool, error) {
-	printExistingDeployments(existingDeployments)
+func confirmDeploymentToNewLocation() (bool, error) {
 	var confirm bool
 	if err := survey.AskOne(&survey.Confirm{
 		Message: "Are you sure you want to continue?",
