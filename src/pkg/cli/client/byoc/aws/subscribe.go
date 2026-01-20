@@ -3,6 +3,7 @@ package aws
 import (
 	"slices"
 
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -18,7 +19,7 @@ type byocSubscribeServerStream struct {
 	done chan struct{}
 }
 
-func (s *byocSubscribeServerStream) HandleCodebuildEvent(evt ecs.Event) {
+func (s *byocSubscribeServerStream) HandleCodebuildEvent(evt codebuild.Event) {
 	resp := defangv1.SubscribeResponse{
 		Name:   evt.Service(),
 		Status: evt.Status(),
