@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -69,9 +70,28 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 }
 
 func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, string, error) {
+	if sl.sm == nil {
+		return &stacks.Parameters{
+			Name:     stacks.DefaultBeta,
+			Provider: sl.opts.ProviderID,
+		}, "no stack manager available", nil
+	}
 	stack, whence, err := sl.sm.GetStack(ctx, sl.opts.GetStackOpts)
 	if err != nil {
-		return nil, whence, err
+		if sl.opts.ProviderID != "" {
+			whence = "--provider flag"
+		}
+		_, envSet := os.LookupEnv("DEFANG_PROVIDER")
+		if envSet {
+			whence = "DEFANG_PROVIDER"
+		}
+		if whence == "" {
+			whence = "fallback stack"
+		}
+		return &stacks.Parameters{
+			Name:     stacks.DefaultBeta,
+			Provider: sl.opts.ProviderID,
+		}, whence, nil
 	}
 	if err := stacks.LoadStackEnv(*stack, true); err != nil {
 		return nil, whence, fmt.Errorf("failed to load stack env: %w", err)

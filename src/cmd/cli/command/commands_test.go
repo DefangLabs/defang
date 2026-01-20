@@ -95,6 +95,16 @@ func (m *mockFabricService) ListDeployments(context.Context, *connect.Request[de
 	}), nil
 }
 
+func (m *mockFabricService) GetDefaultStack(context.Context, *connect.Request[defangv1.GetDefaultStackRequest]) (*connect.Response[defangv1.GetStackResponse], error) {
+	return connect.NewResponse(&defangv1.GetStackResponse{
+		Stack: &defangv1.Stack{
+			Name:      "default",
+			Project:   "default-project",
+			StackFile: []byte("DEFANG_PROVIDER=aws\nAWS_REGION=us-west-2\n"),
+		},
+	}), nil
+}
+
 func TestMain(m *testing.M) {
 	SetupCommands("0.0.0-test")
 	os.Exit(m.Run())

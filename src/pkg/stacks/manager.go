@@ -219,7 +219,7 @@ func (sm *manager) getSpecifiedStack(ctx context.Context, name string) (*Paramet
 	// the stack file does not exist locally; try loading remotely
 	stack, err = sm.GetRemote(ctx, name)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to load stack %q remotely: %w", name, err)
+		return nil, "", fmt.Errorf("failed to find stack file or previously deployed stack: %w", err)
 	}
 	// persist the remote stack file to the local target directory
 	stackFilename, err := sm.Create(*stack)
