@@ -31,10 +31,15 @@ func (m *mockFabricClient) ListStacks(ctx context.Context, req *defangv1.ListSta
 	}, nil
 }
 
+func (m *mockFabricClient) GetDefaultStack(ctx context.Context, req *defangv1.GetDefaultStackRequest) (*defangv1.GetStackResponse, error) {
+	return nil, errors.New("not implemented")
+}
+
 func TestNewManager(t *testing.T) {
 	workingDir := "/tmp/test-dir"
 	mockClient := &mockFabricClient{}
-	manager, err := NewManager(mockClient, workingDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, workingDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	assert.NotNil(t, manager, "NewManager should not return nil")
@@ -48,7 +53,8 @@ func TestManager_CreateListLoad(t *testing.T) {
 	t.Chdir(tmpDir)
 
 	mockClient := &mockFabricClient{}
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	// Test that listing returns empty when no stacks exist
@@ -106,7 +112,8 @@ func TestManager_CreateGCPStack(t *testing.T) {
 	t.Chdir(tmpDir)
 
 	mockClient := &mockFabricClient{}
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	// Test creating a GCP stack
@@ -142,7 +149,8 @@ func TestManager_CreateMultipleStacks(t *testing.T) {
 	t.Chdir(tmpDir)
 
 	mockClient := &mockFabricClient{}
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	// Create multiple stacks
@@ -199,7 +207,8 @@ func TestManager_LoadNonexistentStack(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	mockClient := &mockFabricClient{}
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	// Try to load a stack that doesn't exist
@@ -212,7 +221,8 @@ func TestManager_CreateInvalidStackName(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	mockClient := &mockFabricClient{}
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	// Test with empty name
@@ -244,7 +254,8 @@ func TestManager_CreateDuplicateStack(t *testing.T) {
 	t.Chdir(tmpDir)
 
 	mockClient := &mockFabricClient{}
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	params := Parameters{
@@ -288,7 +299,8 @@ GOOGLE_REGION=us-central1
 		},
 	}
 
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	remoteStacks, err := manager.ListRemote(t.Context())
@@ -314,7 +326,8 @@ func TestManager_ListRemoteError(t *testing.T) {
 		listErr: errors.New("network error"),
 	}
 
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	_, err = manager.ListRemote(t.Context())
@@ -349,7 +362,8 @@ GOOGLE_REGION=us-central1
 		},
 	}
 
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	// Create a local stack that exists remotely too
@@ -432,7 +446,8 @@ AWS_REGION=us-east-1
 		},
 	}
 
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager() failed")
 
 	remoteStacks, err := manager.ListRemote(t.Context())
@@ -468,7 +483,8 @@ AWS_REGION=us-west-2
 		},
 	}
 
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager() failed")
 
 	remoteStacks, err := manager.ListRemote(t.Context())
@@ -497,7 +513,8 @@ func TestManager_WorkingDirectoryMatches(t *testing.T) {
 	t.Chdir(tmpDir)
 
 	mockClient := &mockFabricClient{}
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager() failed")
 
 	// Test that local operations work when working directory matches target directory
@@ -553,7 +570,8 @@ GOOGLE_REGION=us-central1
 			},
 		},
 	}
-	manager, err := NewManager(mockClient, "", "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, "", "test-project", ec)
 	require.NoError(t, err, "NewManager() failed")
 
 	// Test that local operations are blocked when working directory differs from target directory
@@ -610,7 +628,8 @@ AWS_REGION=us-east-1
 		},
 	}
 
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager() failed")
 
 	// Remote operations should work even when directories don't match

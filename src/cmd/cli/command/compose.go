@@ -80,7 +80,7 @@ func makeComposeUpCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			sessionLoader := session.NewSessionLoader(global.Client, ec, sm, options)
+			sessionLoader := session.NewSessionLoader(global.Client, sm, options)
 			session, err := sessionLoader.LoadSession(ctx)
 			if err != nil {
 				return err

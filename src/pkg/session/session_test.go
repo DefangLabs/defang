@@ -92,6 +92,19 @@ func (m *mockStacksManager) Create(params stacks.Parameters) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
+func (m *mockStacksManager) GetStack(ctx context.Context, opts stacks.GetStackOpts) (*stacks.Parameters, string, error) {
+	args := m.Called(ctx, opts)
+	if args.Get(0) == nil {
+		return nil, "", args.Error(2)
+	}
+	result, ok := args.Get(0).(*stacks.Parameters)
+	if !ok {
+		return nil, "", args.Error(2)
+	}
+	whence, _ := args.Get(1).(string)
+	return result, whence, args.Error(2)
+}
+
 func (m *mockStacksManager) TargetDirectory() string {
 	return ""
 }
@@ -141,7 +154,9 @@ func TestLoadSession(t *testing.T) {
 			name: "stack specified but not found",
 			options: SessionLoaderOptions{
 				ProjectName: "foo",
-				Stack:       "missing-stack",
+				GetStackOpts: stacks.GetStackOpts{
+					Stack: "missing-stack",
+				},
 			},
 			expectedError: "unable to find stack",
 			expectedEnv:   map[string]string{},
@@ -150,7 +165,9 @@ func TestLoadSession(t *testing.T) {
 			name: "local stack specified",
 			options: SessionLoaderOptions{
 				ProjectName: "foo",
-				Stack:       "local-stack",
+				GetStackOpts: stacks.GetStackOpts{
+					Stack: "local-stack",
+				},
 			},
 			localStack: &stacks.Parameters{
 				Name:     "local-stack",
@@ -175,7 +192,9 @@ func TestLoadSession(t *testing.T) {
 			name: "remote stack specified",
 			options: SessionLoaderOptions{
 				ProjectName: "foo",
-				Stack:       "remote-stack",
+				GetStackOpts: stacks.GetStackOpts{
+					Stack: "remote-stack",
+				},
 			},
 			remoteStack: &stacks.Parameters{
 				Name:     "remote-stack",
@@ -200,7 +219,9 @@ func TestLoadSession(t *testing.T) {
 			name: "local and remote stack",
 			options: SessionLoaderOptions{
 				ProjectName: "foo",
-				Stack:       "both-stack",
+				GetStackOpts: stacks.GetStackOpts{
+					Stack: "both-stack",
+				},
 			},
 			localStack: &stacks.Parameters{
 				Name:     "both-stack",
@@ -237,11 +258,13 @@ func TestLoadSession(t *testing.T) {
 		{
 			name: "interactive selection - stack required",
 			options: SessionLoaderOptions{
-				ProjectName:        "foo",
-				Interactive:        true,
-				AllowStackCreation: true,
-				ProviderID:         client.ProviderGCP,
-				RequireStack:       true,
+				ProjectName: "foo",
+				ProviderID:  client.ProviderGCP,
+				GetStackOpts: stacks.GetStackOpts{
+					Interactive:        true,
+					AllowStackCreation: true,
+					RequireStack:       true,
+				},
 			},
 			stacksList: []stacks.ListItem{
 				{
@@ -270,10 +293,12 @@ func TestLoadSession(t *testing.T) {
 		{
 			name: "interactive selection",
 			options: SessionLoaderOptions{
-				ProjectName:        "foo",
-				Interactive:        true,
-				AllowStackCreation: true,
-				ProviderID:         client.ProviderGCP,
+				ProjectName: "foo",
+				ProviderID:  client.ProviderGCP,
+				GetStackOpts: stacks.GetStackOpts{
+					Interactive:        true,
+					AllowStackCreation: true,
+				},
 			},
 			stacksList: []stacks.ListItem{
 				{
@@ -297,7 +322,9 @@ func TestLoadSession(t *testing.T) {
 			name: "stack with compose vars updates loader",
 			options: SessionLoaderOptions{
 				ProjectName: "foo",
-				Stack:       "compose-stack",
+				GetStackOpts: stacks.GetStackOpts{
+					Stack: "compose-stack",
+				},
 			},
 			localStack: &stacks.Parameters{
 				Name:     "compose-stack",
@@ -334,7 +361,6 @@ func TestLoadSession(t *testing.T) {
 				}
 			})
 			ctx := t.Context()
-			ec := &mockElicitationsController{isSupported: true}
 			sm := &mockStacksManager{}
 
 			// Setup mock expectations based on test case
@@ -354,7 +380,7 @@ func TestLoadSession(t *testing.T) {
 				sm.On("List", ctx).Maybe().Return(tt.stacksList, nil)
 			}
 
-			loader := NewSessionLoader(client.MockFabricClient{}, ec, sm, tt.options)
+			loader := NewSessionLoader(client.MockFabricClient{}, sm, tt.options)
 			session, err := loader.LoadSession(ctx)
 			if tt.expectedError != "" {
 				require.Error(t, err)
@@ -397,13 +423,12 @@ func TestLoadSession(t *testing.T) {
 
 func TestLoadSession_NoStackManager(t *testing.T) {
 	ctx := t.Context()
-	ec := &mockElicitationsController{isSupported: true}
 
 	options := SessionLoaderOptions{
 		ProviderID: client.ProviderDefang,
 	}
 
-	loader := NewSessionLoader(client.MockFabricClient{}, ec, nil, options)
+	loader := NewSessionLoader(client.MockFabricClient{}, nil, options)
 	session, err := loader.LoadSession(ctx)
 	require.NoError(t, err)
 	assert.NotNil(t, session)
