@@ -100,7 +100,7 @@ func (m *mockFabricService) GetDefaultStack(context.Context, *connect.Request[de
 		Stack: &defangv1.Stack{
 			Name:      "default",
 			Project:   "default-project",
-			StackFile: []byte("DEFANG_PROVIDER=aws\nAWS_REGION=us-west-2\n"),
+			StackFile: []byte("DEFANG_PROVIDER=defang\n"),
 		},
 	}), nil
 }
