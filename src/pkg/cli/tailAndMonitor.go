@@ -56,7 +56,7 @@ func Monitor(ctx context.Context, project *compose.Project, provider client.Prov
 	return serviceStates, errors.Join(cdErr, svcErr)
 }
 
-func TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, tailOptions TailOptions) (ServiceStates, error) {
+func TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, tailOptions TailOptions, cb func(*defangv1.SubscribeResponse, *ServiceStates) error) (ServiceStates, error) {
 	tailOptions.Follow = true
 	if tailOptions.Deployment == "" {
 		panic("tailOptions.Deployment must be a valid deployment ID")
@@ -73,9 +73,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 	// Run Monitor in a goroutine
 	go func() {
 		// Pass a NOOP function for the callback since TailAndMonitor doesn't use UI
-		serviceStates, monitorErr = Monitor(ctx, project, provider, waitTimeout, tailOptions.Deployment, func(*defangv1.SubscribeResponse, *ServiceStates) error {
-			return nil // NOOP - no UI updates needed when tailing
-		})
+		serviceStates, monitorErr = Monitor(ctx, project, provider, waitTimeout, tailOptions.Deployment, cb)
 		pkg.SleepWithContext(ctx, 2*time.Second) // a delay before cancelling tail to make sure we get last status messages
 		cancelTail(errMonitoringDone)            // cancel the tail when monitoring is done
 	}()

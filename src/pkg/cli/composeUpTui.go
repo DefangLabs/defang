@@ -8,6 +8,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -166,10 +167,16 @@ func MonitorWithUI(ctx context.Context, project *compose.Project, provider clien
 		}
 	}()
 
+	tailOptions := TailOptions{
+		Deployment: deploymentID,
+		Follow:     true,
+		LogType:    logs.LogTypeBuild,
+	}
+
 	// Start monitoring in a goroutine
 	go func() {
 		defer wg.Done()
-		serviceStates, monitorErr = Monitor(ctx, project, provider, waitTimeout, deploymentID, func(msg *defangv1.SubscribeResponse, states *ServiceStates) error {
+		serviceStates, monitorErr = TailAndMonitor(ctx, project, provider, waitTimeout, tailOptions, func(msg *defangv1.SubscribeResponse, states *ServiceStates) error {
 			// Send service status updates to the bubbletea model
 			for name, state := range *states {
 				p.Send(serviceUpdate{

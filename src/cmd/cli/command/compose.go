@@ -188,7 +188,9 @@ func makeComposeUpCmd() *cobra.Command {
 			var serviceStates map[string]defangv1.ServiceState
 			if global.Verbose || global.Debug || global.NonInteractive {
 				tailOptions.Follow = true
-				serviceStates, err = cli.TailAndMonitor(ctx, project, session.Provider, waitTimeoutDuration, tailOptions)
+				serviceStates, err = cli.TailAndMonitor(ctx, project, session.Provider, waitTimeoutDuration, tailOptions, func(*defangv1.SubscribeResponse, *cli.ServiceStates) error {
+					return nil // NOOP - no UI updates needed when tailing
+				})
 				if err != nil {
 					return err
 				}
