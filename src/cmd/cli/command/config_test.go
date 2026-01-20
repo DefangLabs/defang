@@ -87,6 +87,21 @@ func TestConfigSetFlagConflicts(t *testing.T) {
 			expectedErr: "too many arguments; provide a single CONFIG or use --env, --random, or --env-file",
 		},
 		{
+			name:        "no args with --random",
+			args:        []string{"config", "set", "--random", "--provider=defang", "--project-name=app"},
+			expectedErr: "provide CONFIG argument or use --env-file to read from a file",
+		},
+		{
+			name:        "no args with --env",
+			args:        []string{"config", "set", "--env", "--provider=defang", "--project-name=app"},
+			expectedErr: "provide CONFIG argument or use --env-file to read from a file",
+		},
+		{
+			name:        "no args with --env-file",
+			args:        []string{"config", "set", "--env-file", "--provider=defang", "--project-name=app"},
+			expectedErr: "failed to read env file \"--provider=defang\": open --provider=defang: no such file or directory",
+		},
+		{
 			name: "valid use of --env",
 			args: []string{"config", "set", "KEY1", "KEY2", "--env", "--provider=defang", "--project-name=app"},
 		},
@@ -101,6 +116,10 @@ func TestConfigSetFlagConflicts(t *testing.T) {
 		{
 			name: "valid use of KEY=VALUE format",
 			args: []string{"config", "set", "KEY1=somevalue", "--provider=defang", "--project-name=app"},
+		},
+		{
+			name: "valid use of KEY=VALUE format with multiple args",
+			args: []string{"config", "set", "KEY1=somevalue", "KEY2=anothervalue", "--provider=defang", "--project-name=app"},
 		},
 	}
 
