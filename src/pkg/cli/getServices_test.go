@@ -147,7 +147,7 @@ foo      a1b2c3      NOT_SPECIFIED  unhealthy (404 Not Found)  https://test-foo-
 	})
 }
 
-func ServiceEndpointFromServiceInfo(t *testing.T) {
+func TestServiceEndpointFromServiceInfo(t *testing.T) {
 	tests := []struct {
 		name                     string
 		serviceinfo              *defangv1.ServiceInfo
