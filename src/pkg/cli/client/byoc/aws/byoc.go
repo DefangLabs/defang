@@ -905,6 +905,7 @@ func (b *ByocAws) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 		done: make(chan struct{}),
 	}
 	b.AddEcsEventHandler(s)
+	b.AddCodebuildEventHandler(s)
 	return s, nil
 }
 

@@ -172,18 +172,22 @@ func (bs *byocServerStream) parseEvents(events []cw.LogEvent) *defangv1.TailResp
 			if err != nil {
 				term.Debugf("error parsing ECS event, output raw event log: %v", err)
 			} else {
-				bs.ecsEventsHandler.HandleECSEvent(evt)
+				if bs.ecsEventsHandler != nil {
+					bs.ecsEventsHandler.HandleECSEvent(evt)
+				}
 				entry.Service = evt.Service()
 				entry.Etag = evt.Etag()
 				entry.Host = evt.Host()
 				entry.Message = evt.Status()
 			}
 		} else if parseCodeBuildRecords {
-			entry.Service = response.Service
+			entry.Service = strings.TrimSuffix(response.Service, "-image")
 			entry.Etag = response.Etag
 			entry.Host = response.Host
 			evt := codebuild.ParseCodebuildEvent(entry)
-			bs.codebuildEventHandler.HandleCodebuildEvent(evt)
+			if bs.codebuildEventHandler != nil {
+				bs.codebuildEventHandler.HandleCodebuildEvent(evt)
+			}
 		} else if (response.Service == "cd") && (strings.HasPrefix(entry.Message, logs.ErrorPrefix) || strings.Contains(strings.ToLower(entry.Message), "error:")) {
 			entry.Stderr = true
 		}
