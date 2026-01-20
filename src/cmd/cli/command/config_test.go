@@ -31,7 +31,7 @@ func TestConfigSetFlagConflicts(t *testing.T) {
 	// Create a temp env file for --env-file tests
 	tempDir := t.TempDir()
 	envFilePath := filepath.Join(tempDir, "test.env")
-	if err := os.WriteFile(envFilePath, []byte("TEST_KEY=test_value\n"), 0644); err != nil {
+	if err := os.WriteFile(envFilePath, []byte("TEST_KEY=test_value\nANOTHER_KEY=another_value\nTHIRD_KEY=third_value\n"), 0644); err != nil {
 		t.Fatalf("failed to create test env file: %v", err)
 	}
 
@@ -107,6 +107,16 @@ func TestConfigSetFlagConflicts(t *testing.T) {
 			expectedErr: "when setting multiple configs, all must be in KEY=VALUE format",
 		},
 		{
+			name:        "--env-file with config not in file",
+			args:        []string{"config", "set", "--env-file=" + envFilePath, "NONEXISTENT_KEY", "--provider=defang", "--project-name=app"},
+			expectedErr: "config \"NONEXISTENT_KEY\" not found in env file",
+		},
+		{
+			name:        "--env with config not in environment",
+			args:        []string{"config", "set", "--env", "NONEXISTENT_KEY", "--provider=defang", "--project-name=app"},
+			expectedErr: "environment variable \"NONEXISTENT_KEY\" not found",
+		},
+		{
 			name: "valid use of --env",
 			args: []string{"config", "set", "KEY1", "KEY2", "--env", "--provider=defang", "--project-name=app"},
 		},
@@ -117,6 +127,10 @@ func TestConfigSetFlagConflicts(t *testing.T) {
 		{
 			name: "valid use of --env-file",
 			args: []string{"config", "set", "--env-file=" + envFilePath, "--provider=defang", "--project-name=app"},
+		},
+		{
+			name: "valid use of --env-file with specific configs",
+			args: []string{"config", "set", "--env-file=" + envFilePath, "TEST_KEY", "ANOTHER_KEY", "--provider=defang", "--project-name=app"},
 		},
 		{
 			name: "no = in KEY=VALUE format; interactive mode",
