@@ -227,7 +227,11 @@ func LoadStackEnv(params Parameters, overload bool) error {
 	paramsMap := params.ToMap()
 	for key, value := range paramsMap {
 		if envValue, ok := currentEnv[key]; ok && envValue != value && !overload {
-			term.Warnf("The variable %q is set in both the stack and the environment. The value from the environment will be used.\n", key)
+			if key == "DEFANG_PROVIDER" {
+				term.Warnf("The variable DEFANG_PROVIDER is set to %q in the environment, but the stack specifies %q. The value from the stack will be used.\n", envValue, value)
+			} else {
+				term.Warnf("The variable %q is set to %q in the environment, but the stack specifies %q. The value from the environment will be used.\n", key, envValue, value)
+			}
 		}
 		if _, ok := currentEnv[key]; !ok || overload {
 			err := os.Setenv(key, value)
