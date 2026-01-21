@@ -666,7 +666,7 @@ func TestGetStack(t *testing.T) {
 			options: GetStackOpts{
 				Stack: "missingstack",
 			},
-			expectedError: "unable to find stack",
+			expectedError: "stack \"missingstack\" does not exist",
 			expectedEnv:   map[string]string{},
 		},
 		{

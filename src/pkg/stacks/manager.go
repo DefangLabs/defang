@@ -203,6 +203,14 @@ func (sl *manager) GetStack(ctx context.Context, opts GetStackOpts) (*Parameters
 	return sl.getDefaultStack(ctx)
 }
 
+type ErrNotExist struct {
+	StackName string
+}
+
+func (e *ErrNotExist) Error() string {
+	return fmt.Sprintf("stack %q does not exist", e.StackName)
+}
+
 func (sm *manager) getSpecifiedStack(ctx context.Context, name string) (*Parameters, string, error) {
 	whence := "--stack flag"
 	_, envSet := os.LookupEnv("DEFANG_STACK")
@@ -219,7 +227,7 @@ func (sm *manager) getSpecifiedStack(ctx context.Context, name string) (*Paramet
 	// the stack file does not exist locally; try loading remotely
 	stack, err = sm.GetRemote(ctx, name)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to find stack file or previously deployed stack: %w", err)
+		return nil, "", &ErrNotExist{StackName: name}
 	}
 	// persist the remote stack file to the local target directory
 	stackFilename, err := sm.Create(*stack)
