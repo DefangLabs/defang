@@ -71,20 +71,20 @@ func NewLoader(opts ...LoaderOption) *Loader {
 	return &Loader{options: options}
 }
 
-func (l *Loader) LoadProjectName(ctx context.Context) (string, error) {
+func (l *Loader) LoadProjectName(ctx context.Context) (string, bool, error) {
 	if l.options.ProjectName != "" {
-		return l.options.ProjectName, nil
+		return l.options.ProjectName, false, nil
 	}
 
 	project, err := l.loadProject(ctx, true)
 	if err != nil {
 		if errors.Is(err, types.ErrComposeFileNotFound) {
-			return "", fmt.Errorf("no --project-name specified and %w", err)
+			return "", false, fmt.Errorf("no --project-name specified and %w", err)
 		}
-		return "", err
+		return "", false, err
 	}
 
-	return project.Name, nil
+	return project.Name, true, nil
 }
 
 func (l *Loader) LoadProject(ctx context.Context) (*Project, error) {

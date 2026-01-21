@@ -98,6 +98,7 @@ func CdCommandAndTail(ctx context.Context, provider client.Provider, projectName
 		LogType:    logs.LogTypeBuild,
 		Since:      since,
 		Verbose:    verbose,
+		Stack:      provider.GetStackName(),
 	}
 	return TailAndWaitForCD(ctx, provider, projectName, options)
 }

@@ -21,7 +21,7 @@ func TestLoadProjectName(t *testing.T) {
 		t.Run("Load project name from compose file or directory:"+expectedName, func(t *testing.T) {
 			t.Setenv("POSTGRES_PASSWORD", "example") // used in interpolate/compose.yaml for warning test
 			loader := NewLoader(WithPath(path))
-			name, err := loader.LoadProjectName(t.Context())
+			name, _, err := loader.LoadProjectName(t.Context())
 			if err != nil {
 				t.Fatalf("LoadProjectName() failed: %v", err)
 			}
@@ -37,7 +37,7 @@ func TestLoadProjectName(t *testing.T) {
 	t.Run("COMPOSE_PROJECT_NAME env var should override project name", func(t *testing.T) {
 		t.Setenv("COMPOSE_PROJECT_NAME", "overridename")
 		loader := NewLoader(WithPath("../../../testdata/testproj/compose.yaml"))
-		name, err := loader.LoadProjectName(t.Context())
+		name, _, err := loader.LoadProjectName(t.Context())
 		if err != nil {
 			t.Fatalf("LoadProjectName() failed: %v", err)
 		}
@@ -50,7 +50,7 @@ func TestLoadProjectName(t *testing.T) {
 	t.Run("--project-name has precedence over COMPOSE_PROJECT_NAME env var", func(t *testing.T) {
 		t.Setenv("COMPOSE_PROJECT_NAME", "ignoreme")
 		loader := NewLoader(WithProjectName("expectedname"))
-		name, err := loader.LoadProjectName(t.Context())
+		name, _, err := loader.LoadProjectName(t.Context())
 		if err != nil {
 			t.Fatalf("LoadProjectName() failed: %v", err)
 		}
@@ -63,7 +63,7 @@ func TestLoadProjectName(t *testing.T) {
 
 func TestLoadProjectNameWithoutComposeFile(t *testing.T) {
 	loader := NewLoader(WithProjectName("testproj"))
-	name, err := loader.LoadProjectName(t.Context())
+	name, _, err := loader.LoadProjectName(t.Context())
 	if err != nil {
 		t.Fatalf("LoadProjectName() failed: %v", err)
 	}
