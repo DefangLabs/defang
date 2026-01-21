@@ -137,9 +137,10 @@ func (gcp Gcp) RunCloudBuild(ctx context.Context, args CloudBuildArgs) (string, 
 		// TODO: Support NPM or Python packages using Artifacts field
 		// AvailableSecrets: secrets,
 		Options: &cloudbuildpb.BuildOptions{
-			MachineType: GetMachineType(args.MachineType),
-			DiskSizeGb:  GetDiskSize(args.DiskSizeGb),
-			Logging:     cloudbuildpb.BuildOptions_CLOUD_LOGGING_ONLY,
+			MachineType:             GetMachineType(args.MachineType),
+			DiskSizeGb:              GetDiskSize(args.DiskSizeGb),
+			Logging:                 cloudbuildpb.BuildOptions_CLOUD_LOGGING_ONLY,
+			EnableStructuredLogging: true,
 		},
 		Timeout: durationpb.New(time.Hour),
 		Tags:    args.Tags,
