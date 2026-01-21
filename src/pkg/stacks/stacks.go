@@ -144,6 +144,7 @@ func CreateInDirectory(workingDirectory string, params Parameters) (string, erro
 // for shell printing for converting to string format of StackParameters
 type ListItem struct {
 	Parameters
+	Default    bool
 	DeployedAt time.Time
 }
 

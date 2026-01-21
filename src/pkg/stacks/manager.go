@@ -70,6 +70,7 @@ func (sm *manager) List(ctx context.Context) ([]ListItem, error) {
 		remote, exists := stackMap[local.Parameters.Name]
 		if exists {
 			local.DeployedAt = remote.DeployedAt
+			local.Default = remote.Default
 			stackMap[local.Parameters.Name] = local
 		} else {
 			stackMap[local.Parameters.Name] = ListItem{
@@ -120,6 +121,7 @@ func (sm *manager) ListRemote(ctx context.Context) ([]ListItem, error) {
 		stackParams = append(stackParams, ListItem{
 			Parameters: *params,
 			DeployedAt: timeutils.AsTime(stack.GetLastDeployedAt(), time.Time{}),
+			Default:    stack.GetIsDefault(),
 		})
 	}
 
