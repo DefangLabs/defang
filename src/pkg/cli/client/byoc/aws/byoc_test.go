@@ -386,7 +386,7 @@ aws_secret_access_key = wJalrXUtnFEMI/KDEFANG/bPxRfiCYEXAMPLEKEY
 			if tt.expectWarning {
 				assert.Contains(t, output, tt.warningContain, "expected warning in output")
 			} else {
-				t.Errorf("unexpected warning output: %s", output)
+				assert.NotContains(t, output, "AWS_ACCESS_KEY_ID takes precedence", "unexpected warning in output")
 			}
 		})
 	}
