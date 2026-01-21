@@ -39,7 +39,9 @@ func deploymentsList(cmd *cobra.Command, listType defangv1.DeploymentType) error
 	loader := configureLoader(cmd)
 	projectName, _, err := loader.LoadProjectName(cmd.Context())
 	if err != nil {
-		return err
+		if listType == defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY {
+			return err
+		}
 	}
 
 	return cli.DeploymentsList(cmd.Context(), global.Client, cli.ListDeploymentsParams{
