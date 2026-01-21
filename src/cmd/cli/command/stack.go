@@ -8,6 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
 )
 
@@ -21,6 +22,7 @@ func makeStackCmd() *cobra.Command {
 	stackCmd.AddCommand(stackNewCmd)
 	stackListCmd := makeStackListCmd()
 	stackCmd.AddCommand(stackListCmd)
+	stackCmd.AddCommand(makeStackDefaultCmd())
 	stackRemoveCmd := makeStackRemoveCmd()
 	stackRemoveCmd.Hidden = true
 	stackCmd.AddCommand(stackRemoveCmd)
@@ -126,6 +128,53 @@ func makeStackListCmd() *cobra.Command {
 	}
 	stackListCmd.Flags().Bool("json", false, "Output in JSON format")
 	return stackListCmd
+}
+
+func makeStackDefaultCmd() *cobra.Command {
+	var stackDefaultCmd = &cobra.Command{
+		Use:     "default STACK_NAME",
+		Aliases: []string{"set-default"},
+		Args:    cobra.ExactArgs(1),
+		Short:   "Set the default Defang deployment stack for the current directory",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			name := args[0]
+			loader := configureLoader(cmd)
+			projectName, _, err := loader.LoadProjectName(ctx)
+			if err != nil {
+				return err
+			}
+
+			sm, err := stacks.NewManager(global.Client, loader.TargetDirectory(), projectName, ec)
+			if err != nil {
+				return err
+			}
+
+			stack, err := sm.Load(ctx, name) // verify stack exists
+			if err != nil {
+				return err
+			}
+
+			stackfile, err := stacks.Marshal(stack)
+			if err != nil {
+				return err
+			}
+
+			err = global.Client.PutStack(ctx, &defangv1.PutStackRequest{
+				Stack: &defangv1.Stack{
+					Name:      stack.Name,
+					Project:   projectName,
+					Provider:  stack.Provider.Value(),
+					Region:    stack.Region,
+					Mode:      stack.Mode.Value(),
+					IsDefault: true,
+					StackFile: []byte(stackfile),
+				},
+			})
+			return err
+		},
+	}
+	return stackDefaultCmd
 }
 
 func makeStackRemoveCmd() *cobra.Command {
