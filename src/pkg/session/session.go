@@ -96,7 +96,7 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, str
 	envProvider := os.Getenv("DEFANG_PROVIDER")
 	if envProvider != "" && client.ProviderID(envProvider) != stack.Provider {
 		os.Unsetenv("DEFANG_PROVIDER")
-		term.Warnf("The variable DEFANG_PROVIDER is set to %q in the environment, but the selected stack %q uses provider %q. So the environment variable will be ignored.\n", envProvider, stack.Name, stack.Provider)
+		term.Warnf("The variable DEFANG_PROVIDER is set to %q in the environment, but the selected stack %q uses provider %q. So the environment variable will be ignored.", envProvider, stack.Name, stack.Provider)
 	}
 	if err := stacks.LoadStackEnv(*stack, true); err != nil {
 		return nil, whence, fmt.Errorf("failed to load stack env: %w", err)

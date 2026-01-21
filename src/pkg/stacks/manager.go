@@ -263,6 +263,9 @@ func (sm *manager) getDefaultStack(ctx context.Context) (*Parameters, string, er
 
 	whence := "default stack from server"
 	params, err := NewParametersFromContent(res.Stack.Name, res.Stack.StackFile)
+	if err != nil {
+		return nil, whence, err
+	}
 	// A default stack may not change the Compose project name or file paths, because we got those from the Compose file
 	if pn, ok := params.Variables["COMPOSE_PROJECT_NAME"]; ok && pn != sm.projectName {
 		return nil, whence, fmt.Errorf("using default stack %q for project %q, but the stack specifies COMPOSE_PROJECT_NAME=%q", res.Stack.Name, sm.projectName, pn)
@@ -270,5 +273,5 @@ func (sm *manager) getDefaultStack(ctx context.Context) (*Parameters, string, er
 	if cf, ok := params.Variables["COMPOSE_FILE"]; ok {
 		term.Warnf("Using default stack %q for project %q, but the stack specifies COMPOSE_FILE=%q", res.Stack.Name, sm.projectName, cf)
 	}
-	return params, whence, err
+	return params, whence, nil
 }
