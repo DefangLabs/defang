@@ -188,6 +188,15 @@ func TestAWSEnv_ConflictingAWSCredentials(t *testing.T) {
 		aws.NewStsFromConfig = originalStsFromConfig
 	})
 
+	envVars := []string{
+		"AWS_PROFILE",
+		"AWS_ACCESS_KEY_ID",
+		"AWS_SECRET_ACCESS_KEY"}
+
+	for _, envVar := range envVars {
+		t.Setenv(envVar, "")
+	}
+
 	// Create a temporary AWS config directory with fake credentials
 	tmpDir := t.TempDir()
 	configContent := `[profile my-aws-profile]
@@ -257,7 +266,7 @@ aws_secret_access_key = wJalrXUtnFEMI/KDEFANG/bPxRfiCYEXAMPLEKEY
 			configFiles:    false,
 			expectedError:  true,
 			expectWarning:  true,
-			warningContain: "AWS_ACCESS_KEY_ID takes precedence",
+			warningContain: "Both AWS_PROFILE and AWS_ACCESS_KEY_ID set but AWS_SECRET_ACCESS_KEY is invalid",
 		},
 		// With config files
 		{
@@ -290,7 +299,7 @@ aws_secret_access_key = wJalrXUtnFEMI/KDEFANG/bPxRfiCYEXAMPLEKEY
 			},
 			configFiles:    true,
 			expectWarning:  true,
-			warningContain: "AWS_ACCESS_KEY_ID takes precedence",
+			warningContain: "Both AWS_PROFILE and AWS_ACCESS_KEY_ID set but AWS_SECRET_ACCESS_KEY is invalid",
 		},
 		{
 			name: "AWS_PROFILE with both AWS keys, with config files",
@@ -349,7 +358,7 @@ aws_secret_access_key = wJalrXUtnFEMI/KDEFANG/bPxRfiCYEXAMPLEKEY
 			configFiles:    true,
 			expectedError:  true,
 			expectWarning:  true,
-			warningContain: "AWS_ACCESS_KEY_ID takes precedence",
+			warningContain: "Both AWS_PROFILE and AWS_ACCESS_KEY_ID set but AWS_SECRET_ACCESS_KEY is invalid",
 		},
 	}
 
