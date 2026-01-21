@@ -93,6 +93,9 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, str
 		if whence == "" {
 			whence = "fallback stack"
 		}
+		if sl.opts.ProviderID == client.ProviderAuto {
+			sl.opts.ProviderID = client.ProviderDefang
+		}
 		return &stacks.Parameters{
 			Name:     stacks.DefaultBeta,
 			Provider: sl.opts.ProviderID,
