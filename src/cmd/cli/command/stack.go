@@ -150,7 +150,13 @@ func makeStackDefaultCmd() *cobra.Command {
 				return err
 			}
 
-			return cli.SetDefaultStack(ctx, global.Client, sm, projectName, name)
+			err = cli.SetDefaultStack(ctx, global.Client, sm, projectName, name)
+			if err != nil {
+				return err
+			}
+
+			term.Info(fmt.Sprintf("Stack %q is now the default stack for project %q\n", name, projectName))
+			return nil
 		},
 	}
 	return stackDefaultCmd
