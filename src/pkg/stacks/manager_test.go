@@ -614,7 +614,7 @@ GOOGLE_REGION=us-central1
 	// Load should fail
 	_, err = manager.Load(t.Context(), "teststack")
 	require.Error(t, err, "Load() should fail when target directory is empty")
-	require.Contains(t, err.Error(), "unable to find stack \"teststack\"", "Expected specific error message about operation not allowed")
+	require.Contains(t, err.Error(), "stack \"teststack\" does not exist", "Expected specific error message about operation not allowed")
 }
 
 func TestManager_RemoteOperationsWorkRegardlessOfDirectory(t *testing.T) {
