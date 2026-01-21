@@ -118,6 +118,13 @@ func AnnotateAwsError(err error) error {
 }
 
 func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string) *ByocAws {
+	if awsProfileName := os.Getenv("AWS_PROFILE"); awsProfileName != "" {
+		envAccessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
+		if envAccessKeyID != "" {
+			term.Warnf("Both AWS_ACCESS_KEY_ID: %q and AWS_PROFILE: %q are set; AWS_ACCESS_KEY_ID takes precedence and AWS_PROFILE will be ignored", envAccessKeyID, awsProfileName)
+		}
+	}
+
 	b := &ByocAws{
 		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
