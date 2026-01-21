@@ -3,15 +3,20 @@ package gcp
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"io"
 	"testing"
 	"time"
 
 	"cloud.google.com/go/logging/apiv2/loggingpb"
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -264,4 +269,104 @@ func TestGetGcpProjectID(t *testing.T) {
 			}
 		})
 	}
+}
+
+type mockGcpDriver struct {
+	gcpDriver
+	bucketName                             string
+	getBucketWithPrefixError               error
+	getBucketObjectWithServiceAccountError error
+}
+
+func (m mockGcpDriver) GetBucketWithPrefix(ctx context.Context, prefix string) (string, error) {
+	return m.bucketName, m.getBucketWithPrefixError
+}
+
+func (m mockGcpDriver) GetBucketObjectWithServiceAccount(ctx context.Context, bucketName, objectName, serviceAccount string) ([]byte, error) {
+	if bucketName != m.bucketName || objectName != "projects/project1/stack1/project.pb" {
+		return nil, gcp.ErrObjectNotExist
+	}
+	projectUpdate := defangv1.ProjectUpdate{
+		Services: []*defangv1.ServiceInfo{{Service: &defangv1.Service{Name: "service1"}}},
+	}
+	projectUpdateBytes, _ := proto.Marshal(&projectUpdate)
+	return projectUpdateBytes, m.getBucketObjectWithServiceAccountError
+}
+
+func (mockGcpDriver) GetServiceAccountEmail(name string) string {
+	return "mock-sa"
+}
+
+func TestGetServices(t *testing.T) {
+	b := &ByocGcp{driver: mockGcpDriver{}}
+	b.ByocBaseClient = byoc.NewByocBaseClient("tenant1", b, "stack1")
+
+	t.Run("no bucket = no services", func(t *testing.T) {
+		res, err := b.GetServices(t.Context(), &defangv1.GetServicesRequest{
+			Project: "project1",
+		})
+		require.NoError(t, err)
+		assert.Empty(t, res.Services)
+	})
+
+	t.Run("bucket error = error", func(t *testing.T) {
+		storageErr := errors.New("storage: error")
+		b.driver = &mockGcpDriver{
+			getBucketWithPrefixError: storageErr,
+		}
+		res, err := b.GetServices(t.Context(), &defangv1.GetServicesRequest{
+			Project: "project1",
+		})
+		require.ErrorIs(t, err, storageErr)
+		assert.Nil(t, res)
+	})
+
+	t.Run("no object = no services", func(t *testing.T) {
+		b.driver = &mockGcpDriver{
+			bucketName:                             "bucket-a",
+			getBucketObjectWithServiceAccountError: gcp.ErrObjectNotExist,
+		}
+		res, err := b.GetServices(t.Context(), &defangv1.GetServicesRequest{
+			Project: "project1",
+		})
+		require.NoError(t, err)
+		assert.Empty(t, res.Services)
+	})
+
+	t.Run("storage error = error", func(t *testing.T) {
+		storageErr := errors.New("storage: error")
+		b.driver = &mockGcpDriver{
+			bucketName:                             "bucket-a",
+			getBucketObjectWithServiceAccountError: storageErr,
+		}
+		res, err := b.GetServices(t.Context(), &defangv1.GetServicesRequest{
+			Project: "project1",
+		})
+		require.ErrorIs(t, err, storageErr)
+		assert.Nil(t, res)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		b.driver = &mockGcpDriver{
+			bucketName:                             "bucket-a",
+			getBucketObjectWithServiceAccountError: nil,
+		}
+		res, err := b.GetServices(t.Context(), &defangv1.GetServicesRequest{
+			Project: "project1",
+		})
+		require.NoError(t, err)
+		assert.Len(t, res.Services, 1)
+	})
+
+	t.Run("wrong project = no services", func(t *testing.T) {
+		b.driver = &mockGcpDriver{
+			bucketName:                             "bucket-a",
+			getBucketObjectWithServiceAccountError: nil,
+		}
+		res, err := b.GetServices(t.Context(), &defangv1.GetServicesRequest{
+			Project: "project2",
+		})
+		require.NoError(t, err)
+		assert.Empty(t, res.Services)
+	})
 }

@@ -104,6 +104,10 @@ func (gcp Gcp) GetProjectID() ProjectId {
 	return ProjectId(gcp.ProjectId)
 }
 
+func (gcp Gcp) GetRegion() string {
+	return gcp.Region
+}
+
 func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*resourcemanagerpb.Project, error) {
 	client, err := resourcemanager.NewProjectsClient(ctx)
 	if err != nil {

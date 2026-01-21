@@ -74,7 +74,7 @@ func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string, versioning
 func (gcp Gcp) GetBucketWithPrefix(ctx context.Context, prefix string) (string, error) {
 	client, err := newStorageClient(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to get stoage bucket with prefix %q: %w", prefix, err)
+		return "", fmt.Errorf("failed to get storage bucket with prefix %q: %w", prefix, err)
 	}
 	defer client.Close()
 
@@ -84,10 +84,10 @@ func (gcp Gcp) GetBucketWithPrefix(ctx context.Context, prefix string) (string, 
 
 	// Return the first matching bucket
 	attrs, err := it.Next()
-	if err == iterator.Done {
-		return "", nil
-	}
 	if err != nil {
+		if err == iterator.Done {
+			return "", nil
+		}
 		return "", fmt.Errorf("bucket iterator error: %w", err)
 	}
 	return attrs.Name, nil
@@ -187,6 +187,8 @@ func (gcp Gcp) GetBucketObjectWithServiceAccount(ctx context.Context, bucketName
 	defer client.Close()
 	return gcp.getBucketObject(ctx, bucketName, objectName, client)
 }
+
+var ErrObjectNotExist = storage.ErrObjectNotExist
 
 func (gcp Gcp) getBucketObject(ctx context.Context, bucketName, objectName string, client StorageClient) ([]byte, error) {
 	bucket := client.Bucket(bucketName)
