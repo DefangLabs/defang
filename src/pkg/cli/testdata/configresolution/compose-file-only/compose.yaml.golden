@@ -1,7 +1,7 @@
 [95m * Service environment variables resolution summary:
 [0m[1m
-SERVICE   ENVIRONMENT  VALUE   SOURCE[0m
-service1  ENV_VAR1     value1  Compose  
-service1  ENV_VAR2     value2  Compose  
-service2  ENV_VAR1     value1  Compose  
-service2  ENV_VAR2     value2  Compose  
+SERVICE   ENVIRONMENT  SOURCE   VALUE[0m
+service1  ENV_VAR1     Compose  value1  
+service1  ENV_VAR2     Compose  value2  
+service2  ENV_VAR1     Compose  value1  
+service2  ENV_VAR2     Compose  value2  

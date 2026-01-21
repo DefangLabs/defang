@@ -1,6 +1,6 @@
 [95m * Service environment variables resolution summary:
 [0m[1m
-SERVICE   ENVIRONMENT  VALUE  SOURCE[0m
-service1  API_TOKEN    *****  Config  
-service1  DB_USER      *****  Config  
-service1  SECRET_KEY   *****  Config  
+SERVICE   ENVIRONMENT  SOURCE  VALUE[0m
+service1  API_TOKEN    Config  *****  
+service1  DB_USER      Config  *****  
+service1  SECRET_KEY   Config  *****  

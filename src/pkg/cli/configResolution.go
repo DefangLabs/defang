@@ -94,7 +94,7 @@ func printConfigResolutionSummary(project *types.Project, defangConfig []string)
 
 	term.Info("Service environment variables resolution summary:")
 
-	return term.Table(projectEnvVars, "Service", "Environment", "Value", "Source")
+	return term.Table(projectEnvVars, "Service", "Environment", "Source", "Value")
 }
 
 func PrintConfigSummaryAndValidate(ctx context.Context, provider client.Provider, project *compose.Project) error {
