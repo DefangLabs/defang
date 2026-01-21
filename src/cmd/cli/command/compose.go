@@ -80,7 +80,7 @@ func makeComposeUpCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			sessionLoader := session.NewSessionLoader(global.Client, ec, sm, options)
+			sessionLoader := session.NewSessionLoader(global.Client, sm, options)
 			session, err := sessionLoader.LoadSession(ctx)
 			if err != nil {
 				return err
@@ -117,7 +117,7 @@ func makeComposeUpCmd() *cobra.Command {
 			if resp, err := global.Client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
 				Project: project.Name,
 				Type:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
-				Stack:   global.Stack.Name,
+				Stack:   session.Stack.Name,
 			}); err != nil {
 				term.Debugf("ListDeployments failed: %v", err)
 			} else if accountInfo, err := session.Provider.AccountInfo(ctx); err != nil {
@@ -135,7 +135,7 @@ func makeComposeUpCmd() *cobra.Command {
 					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
 					Provider: accountInfo.Provider,
 					Region:   accountInfo.Region,
-					Mode:     global.Stack.Mode,
+					Mode:     session.Stack.Mode,
 				})
 				if err != nil {
 					term.Debug("Failed to create stack:", err)
@@ -185,7 +185,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 
-			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, global.Verbose)
+			tailOptions := newTailOptionsForDeploy(session.Stack.Name, deploy.Etag, since, global.Verbose)
 			serviceStates, err := cli.TailAndMonitor(ctx, project, session.Provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
 				deploymentErr := err
@@ -197,8 +197,8 @@ func makeComposeUpCmd() *cobra.Command {
 				handleTailAndMonitorErr(ctx, deploymentErr, debugger, debug.DebugConfig{
 					Deployment: deploy.Etag,
 					Project:    project,
-					ProviderID: &global.Stack.Provider,
-					Stack:      &global.Stack.Name,
+					ProviderID: &session.Stack.Provider,
+					Stack:      session.Stack.Name,
 					Since:      since,
 					Until:      time.Now(),
 				})
@@ -394,14 +394,15 @@ func handleTailAndMonitorErr(ctx context.Context, err error, debugger *debug.Deb
 		// Call the AI debug endpoint using the original command context (not the tail ctx which is canceled)
 		if nil != debugger.DebugDeploymentError(ctx, debugConfig, errDeploymentFailed) {
 			// don't show this defang hint if debugging was successful
-			tailOptions := newTailOptionsForDeploy(debugConfig.Deployment, debugConfig.Since, true)
+			tailOptions := newTailOptionsForDeploy(debugConfig.Stack, debugConfig.Deployment, debugConfig.Since, true)
 			printDefangHint("To see the logs of the failed service, run:", "logs "+tailOptions.String())
 		}
 	}
 }
 
-func newTailOptionsForDeploy(deployment string, since time.Time, verbose bool) cli.TailOptions {
+func newTailOptionsForDeploy(stack, deployment string, since time.Time, verbose bool) cli.TailOptions {
 	return cli.TailOptions{
+		Stack:      stack,
 		Deployment: deployment,
 		LogType:    logs.LogTypeAll,
 		// TODO: Move this to playground provider GetDeploymentStatus
@@ -485,7 +486,7 @@ func makeComposeDownCmd() *cobra.Command {
 				return nil
 			}
 
-			tailOptions := newTailOptionsForDown(deployment, since)
+			tailOptions := newTailOptionsForDown(session.Stack.Name, deployment, since)
 			tailCtx := cmd.Context() // FIXME: stop Tail when the deployment task is done
 			err = cli.TailAndWaitForCD(tailCtx, session.Provider, projectName, tailOptions)
 			if err != nil && !errors.Is(err, io.EOF) {
@@ -513,8 +514,9 @@ func makeComposeDownCmd() *cobra.Command {
 	return composeDownCmd
 }
 
-func newTailOptionsForDown(deployment string, since time.Time) cli.TailOptions {
+func newTailOptionsForDown(stack, deployment string, since time.Time) cli.TailOptions {
 	return cli.TailOptions{
+		Stack:      stack,
 		Deployment: deployment,
 		Since:      since,
 		// TODO: Move this to playground provider GetDeploymentStatus
@@ -753,7 +755,7 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 	if deployment == "latest" {
 		resp, err := global.Client.ListDeployments(cmd.Context(), &defangv1.ListDeploymentsRequest{
 			Project: projectName,
-			Stack:   global.Stack.Name,
+			Stack:   session.Stack.Name,
 			Type:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
 			Limit:   1,
 		})

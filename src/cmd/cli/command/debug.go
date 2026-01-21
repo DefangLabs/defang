@@ -35,7 +35,7 @@ var debugCmd = &cobra.Command{
 			return err
 		}
 
-		debugger, err := debug.NewDebugger(ctx, global.Cluster, &global.Stack)
+		debugger, err := debug.NewDebugger(ctx, global.Cluster, session.Stack)
 		if err != nil {
 			return err
 		}
@@ -55,6 +55,7 @@ var debugCmd = &cobra.Command{
 			FailedServices: args,
 			Project:        project,
 			ProviderID:     &session.Stack.Provider,
+			Stack:          session.Stack.Name,
 			Since:          sinceTs.UTC(),
 			Until:          untilTs.UTC(),
 		}

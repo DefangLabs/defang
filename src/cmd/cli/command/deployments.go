@@ -8,44 +8,39 @@ import (
 
 var deploymentsCmd = &cobra.Command{
 	Use:         "deployments",
-	Aliases:     []string{"deployment", "deploys", "deps", "dep"},
+	Aliases:     []string{"deployment", "deploys", "deps", "dep", "ls", "list"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "List all active deployments",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return deploymentsList(cmd, defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE)
+		var utc, _ = cmd.Flags().GetBool("utc")
+		var limit, _ = cmd.Flags().GetUint32("limit")
+		var all, _ = cmd.Flags().GetBool("all")
+		var listType defangv1.DeploymentType
+		if all {
+			listType = defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY
+		} else {
+			listType = defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE
+		}
+
+		if utc {
+			cli.EnableUTCMode()
+		}
+
+		loader := configureLoader(cmd)
+		projectName, _, err := loader.LoadProjectName(cmd.Context())
+		if err != nil {
+			if listType == defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY {
+				return err
+			}
+		}
+
+		return cli.DeploymentsList(cmd.Context(), global.Client, cli.ListDeploymentsParams{
+			ListType:    listType,
+			ProjectName: projectName,
+			StackName:   global.Stack.Name,
+			Limit:       limit,
+		})
+
 	},
-}
-
-var deploymentsListCmd = &cobra.Command{
-	Use:         "history",
-	Aliases:     []string{"ls", "list"},
-	Annotations: authNeededAnnotation,
-	Args:        cobra.NoArgs,
-	Short:       "List deployment history for a project",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return deploymentsList(cmd, defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY)
-	},
-}
-
-func deploymentsList(cmd *cobra.Command, listType defangv1.DeploymentType) error {
-	var utc, _ = cmd.Flags().GetBool("utc")
-	var limit, _ = cmd.Flags().GetUint32("limit")
-
-	if utc {
-		cli.EnableUTCMode()
-	}
-
-	loader := configureLoader(cmd)
-	projectName, err := loader.LoadProjectName(cmd.Context())
-	if err != nil {
-		return err
-	}
-
-	return cli.DeploymentsList(cmd.Context(), global.Client, cli.ListDeploymentsParams{
-		ListType:    listType,
-		ProjectName: projectName,
-		StackName:   global.Stack.Name,
-		Limit:       limit,
-	})
 }

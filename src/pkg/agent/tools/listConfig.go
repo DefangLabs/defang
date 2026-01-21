@@ -30,7 +30,7 @@ func HandleListConfigTool(ctx context.Context, loader client.Loader, params List
 		return "", err
 	}
 
-	sm, err := stacks.NewManager(client, loader.TargetDirectory(), params.ProjectName)
+	sm, err := stacks.NewManager(client, loader.TargetDirectory(), params.ProjectName, ec)
 	if err != nil {
 		return "", fmt.Errorf("failed to create stack manager: %w", err)
 	}

@@ -577,7 +577,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 			var cfnErr *cfn.ErrStackNotFoundException
 			if errors.As(err, &cfnErr) {
 				term.Debugf("FillOutputs: %v", err)
-				return nil, nil // no services yet
+				return nil, nil // no bucket = no services yet
 			}
 			return nil, AnnotateAwsError(err)
 		}
@@ -597,7 +597,6 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 		Bucket: &bucketName,
 		Key:    &path,
 	})
-
 	if err != nil {
 		if aws.IsS3NoSuchKeyError(err) {
 			term.Debug("s3.GetObject:", err)

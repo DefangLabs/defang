@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,8 +19,9 @@ import (
 
 // mockFabricClient implements FabricClient interface for testing
 type mockFabricClient struct {
-	stacks  []*defangv1.Stack
-	listErr error
+	defaultStack *defangv1.Stack
+	stacks       []*defangv1.Stack
+	listErr      error
 }
 
 func (m *mockFabricClient) ListStacks(ctx context.Context, req *defangv1.ListStacksRequest) (*defangv1.ListStacksResponse, error) {
@@ -31,10 +33,20 @@ func (m *mockFabricClient) ListStacks(ctx context.Context, req *defangv1.ListSta
 	}, nil
 }
 
+func (m *mockFabricClient) GetDefaultStack(ctx context.Context, req *defangv1.GetDefaultStackRequest) (*defangv1.GetStackResponse, error) {
+	if m.defaultStack == nil {
+		return nil, errors.New("no default stack set")
+	}
+	return &defangv1.GetStackResponse{
+		Stack: m.defaultStack,
+	}, nil
+}
+
 func TestNewManager(t *testing.T) {
 	workingDir := "/tmp/test-dir"
 	mockClient := &mockFabricClient{}
-	manager, err := NewManager(mockClient, workingDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, workingDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	assert.NotNil(t, manager, "NewManager should not return nil")
@@ -48,7 +60,8 @@ func TestManager_CreateListLoad(t *testing.T) {
 	t.Chdir(tmpDir)
 
 	mockClient := &mockFabricClient{}
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	// Test that listing returns empty when no stacks exist
@@ -106,7 +119,8 @@ func TestManager_CreateGCPStack(t *testing.T) {
 	t.Chdir(tmpDir)
 
 	mockClient := &mockFabricClient{}
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	// Test creating a GCP stack
@@ -142,7 +156,8 @@ func TestManager_CreateMultipleStacks(t *testing.T) {
 	t.Chdir(tmpDir)
 
 	mockClient := &mockFabricClient{}
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	// Create multiple stacks
@@ -199,7 +214,8 @@ func TestManager_LoadNonexistentStack(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	mockClient := &mockFabricClient{}
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	// Try to load a stack that doesn't exist
@@ -212,7 +228,8 @@ func TestManager_CreateInvalidStackName(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	mockClient := &mockFabricClient{}
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	// Test with empty name
@@ -244,7 +261,8 @@ func TestManager_CreateDuplicateStack(t *testing.T) {
 	t.Chdir(tmpDir)
 
 	mockClient := &mockFabricClient{}
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	params := Parameters{
@@ -288,7 +306,8 @@ GOOGLE_REGION=us-central1
 		},
 	}
 
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	remoteStacks, err := manager.ListRemote(t.Context())
@@ -314,7 +333,8 @@ func TestManager_ListRemoteError(t *testing.T) {
 		listErr: errors.New("network error"),
 	}
 
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	_, err = manager.ListRemote(t.Context())
@@ -349,7 +369,8 @@ GOOGLE_REGION=us-central1
 		},
 	}
 
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager failed")
 
 	// Create a local stack that exists remotely too
@@ -432,7 +453,8 @@ AWS_REGION=us-east-1
 		},
 	}
 
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager() failed")
 
 	remoteStacks, err := manager.ListRemote(t.Context())
@@ -468,7 +490,8 @@ AWS_REGION=us-west-2
 		},
 	}
 
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager() failed")
 
 	remoteStacks, err := manager.ListRemote(t.Context())
@@ -497,7 +520,8 @@ func TestManager_WorkingDirectoryMatches(t *testing.T) {
 	t.Chdir(tmpDir)
 
 	mockClient := &mockFabricClient{}
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager() failed")
 
 	// Test that local operations work when working directory matches target directory
@@ -553,7 +577,8 @@ GOOGLE_REGION=us-central1
 			},
 		},
 	}
-	manager, err := NewManager(mockClient, "", "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, "", "test-project", ec)
 	require.NoError(t, err, "NewManager() failed")
 
 	// Test that local operations are blocked when working directory differs from target directory
@@ -610,7 +635,8 @@ AWS_REGION=us-east-1
 		},
 	}
 
-	manager, err := NewManager(mockClient, tmpDir, "test-project")
+	ec := &mockElicitationsController{supported: true}
+	manager, err := NewManager(mockClient, tmpDir, "test-project", ec)
 	require.NoError(t, err, "NewManager() failed")
 
 	// Remote operations should work even when directories don't match
@@ -619,4 +645,281 @@ AWS_REGION=us-east-1
 
 	assert.Len(t, remoteStacks, 1, "Expected 1 remote stack when directories don't match")
 	assert.Equal(t, remoteStacks[0].Name, "remotestack", "Expected stack name 'remotestack'")
+}
+
+func TestGetStack(t *testing.T) {
+	tests := []struct {
+		name                 string
+		projectName          string
+		options              GetStackOpts
+		defaultStack         *defangv1.Stack
+		localStack           *Parameters
+		remoteStack          *Parameters
+		expectedError        string
+		expectedStack        *Parameters
+		expectedEnv          map[string]string
+		interactiveResponses map[string]string
+	}{
+		{
+			name:        "stack specified but not found",
+			projectName: "foo",
+			options: GetStackOpts{
+				Stack: "missingstack",
+			},
+			expectedError: "unable to find stack",
+			expectedEnv:   map[string]string{},
+		},
+		{
+			name:        "local stack specified",
+			projectName: "foo",
+			options: GetStackOpts{
+				Stack: "localstack",
+			},
+			localStack: &Parameters{
+				Name:     "localstack",
+				Provider: client.ProviderDefang,
+				Region:   "us-test-2",
+				Variables: map[string]string{
+					"DEFANG_PROVIDER": "defang",
+					"FOO":             "bar",
+				},
+			},
+			expectedStack: &Parameters{
+				Name:      "localstack",
+				Provider:  client.ProviderDefang,
+				Variables: map[string]string{},
+			},
+			expectedEnv: map[string]string{
+				"DEFANG_PROVIDER": "defang",
+				"FOO":             "bar",
+			},
+		},
+		{
+			name:        "remote stack specified",
+			projectName: "foo",
+			options: GetStackOpts{
+				Stack: "remotestack",
+			},
+			remoteStack: &Parameters{
+				Name:     "remotestack",
+				Provider: client.ProviderGCP,
+				Region:   "us-central1",
+				Variables: map[string]string{
+					"DEFANG_PROVIDER": "gcp",
+					"GCP_PROJECT_ID":  "my-gcp-project",
+					"FOO":             "bar",
+				},
+			},
+			expectedStack: &Parameters{
+				Name:      "remotestack",
+				Provider:  client.ProviderGCP,
+				Variables: map[string]string{},
+			},
+			expectedEnv: map[string]string{
+				"DEFANG_PROVIDER": "gcp",
+				"GCP_PROJECT_ID":  "my-gcp-project",
+				"FOO":             "bar",
+			},
+		},
+		{
+			name:        "local and remote stack",
+			projectName: "foo",
+			options: GetStackOpts{
+				Stack: "bothstack",
+			},
+			localStack: &Parameters{
+				Name:     "bothstack",
+				Provider: client.ProviderAWS,
+				Region:   "us-test-2",
+				Variables: map[string]string{
+					"DEFANG_PROVIDER": "aws",
+					"AWS_PROFILE":     "local-profile",
+					"FOO":             "local-bar",
+				},
+			},
+			remoteStack: &Parameters{
+				Name:     "bothstack",
+				Provider: client.ProviderAWS,
+				Region:   "us-test-2",
+				Variables: map[string]string{
+					"DEFANG_PROVIDER": "aws",
+					"AWS_PROFILE":     "remote-profile",
+					"FOO":             "remote-bar",
+				},
+			},
+			expectedStack: &Parameters{
+				Name:     "bothstack",
+				Provider: client.ProviderAWS,
+				Region:   "us-test-2",
+				Variables: map[string]string{
+					"DEFANG_PROVIDER": "aws",
+					"AWS_PROFILE":     "local-profile",
+					"FOO":             "local-bar",
+				},
+			},
+			expectedEnv: map[string]string{
+				"DEFANG_PROVIDER": "aws",
+				"AWS_PROFILE":     "local-profile",
+				"FOO":             "local-bar",
+			},
+		},
+		{
+			name:        "interactive selection - stack required",
+			projectName: "foo",
+			options: GetStackOpts{
+				Interactive:        true,
+				AllowStackCreation: true,
+				RequireStack:       true,
+			},
+			remoteStack: &Parameters{
+				Name:     "existingstack",
+				Provider: client.ProviderGCP,
+				Region:   "us-central1",
+				Variables: map[string]string{
+					"DEFANG_PROVIDER": "gcp",
+					"GCP_PROJECT":     "existing-gcp-project",
+					"FOO":             "existing-bar",
+				},
+			},
+			interactiveResponses: map[string]string{
+				"stack": "existingstack",
+			},
+			expectedStack: &Parameters{
+				Name:      "existingstack",
+				Provider:  client.ProviderGCP,
+				Variables: map[string]string{},
+			},
+			expectedEnv: map[string]string{
+				"DEFANG_PROVIDER": "gcp",
+				"GCP_PROJECT":     "existing-gcp-project",
+				"FOO":             "existing-bar",
+			},
+		},
+		{
+			name:        "interactive selection - stack not required, fallback to default",
+			projectName: "foo",
+			options: GetStackOpts{
+				Interactive:        true,
+				AllowStackCreation: true,
+			},
+			defaultStack: &defangv1.Stack{
+				Name:     "mydefault",
+				Provider: defangv1.Provider_GCP,
+				StackFile: []byte(`
+DEFANG_PROVIDER=gcp
+`),
+			},
+			remoteStack: &Parameters{
+				Name:     "existingstack",
+				Provider: client.ProviderAWS,
+				Region:   "us-test-2",
+				Variables: map[string]string{
+					"DEFANG_PROVIDER": "aws",
+					"FOO":             "existing-bar",
+				},
+			},
+			expectedStack: &Parameters{
+				Name:     "mydefault",
+				Provider: client.ProviderGCP,
+			},
+		},
+		{
+			name:        "stack with compose vars updates loader",
+			projectName: "foo",
+			options: GetStackOpts{
+				Stack: "composestack",
+			},
+			localStack: &Parameters{
+				Name:     "composestack",
+				Provider: client.ProviderDefang,
+				Region:   "us-test-2",
+				Variables: map[string]string{
+					"COMPOSE_PROJECT_NAME": "myproject",
+					"COMPOSE_PATH":         "./docker-compose.yml:./docker-compose.override.yml",
+				},
+			},
+			expectedStack: &Parameters{
+				Name:     "composestack",
+				Provider: client.ProviderDefang,
+				Variables: map[string]string{
+					"COMPOSE_PROJECT_NAME": "myproject",
+					"COMPOSE_PATH":         "./docker-compose.yml:./docker-compose.override.yml",
+				},
+			},
+			expectedEnv: map[string]string{
+				"COMPOSE_PROJECT_NAME": "myproject",
+				"COMPOSE_PATH":         "./docker-compose.yml:./docker-compose.override.yml",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a temporary directory for testing
+			tmpDir := t.TempDir()
+
+			// Change to temp directory so working directory matches target directory
+			t.Chdir(tmpDir)
+			ctx := t.Context()
+
+			ec := &mockElicitationsController{
+				supported:     true,
+				enumResponses: tt.interactiveResponses,
+			}
+
+			if tt.localStack != nil {
+				_, err := CreateInDirectory(tmpDir, *tt.localStack)
+				require.NoError(t, err, "Failed to create local stack")
+			}
+
+			remoteStacks := []*defangv1.Stack{}
+			if tt.remoteStack != nil {
+				var stackFileBuilder strings.Builder
+				for key, value := range tt.remoteStack.Variables {
+					stackFileBuilder.WriteString(key)
+					stackFileBuilder.WriteString("=")
+					stackFileBuilder.WriteString(value)
+					stackFileBuilder.WriteString("\n")
+				}
+				stackFileContent := stackFileBuilder.String()
+				remoteStacks = append(remoteStacks, &defangv1.Stack{
+					Name:      tt.remoteStack.Name,
+					StackFile: []byte(stackFileContent),
+				})
+			}
+
+			var mockFabric *mockFabricClient
+			if tt.defaultStack == nil {
+				mockFabric = &mockFabricClient{
+					stacks: remoteStacks,
+				}
+			} else {
+				mockFabric = &mockFabricClient{
+					stacks:       remoteStacks,
+					defaultStack: tt.defaultStack,
+				}
+			}
+
+			targetDirectory := "."
+			manager, err := NewManager(mockFabric, targetDirectory, tt.projectName, ec)
+			require.NoError(t, err, "Failed to create Manager")
+			stack, _, err := manager.GetStack(ctx, tt.options)
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				return
+			}
+			require.NoError(t, err)
+			assert.NotNil(t, stack)
+			assert.Equal(t, tt.expectedStack.Name, stack.Name)
+			assert.Equal(t, tt.expectedStack.Provider, stack.Provider)
+
+			// Verify environment variables
+			for key, expectedValue := range tt.expectedEnv {
+				actualValue, exists := stack.Variables[key]
+				assert.True(t, exists, "expected env var %s to be set", key)
+				assert.Equal(t, expectedValue, actualValue, "env var %s has unexpected value", key)
+			}
+		})
+	}
 }

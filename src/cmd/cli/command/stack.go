@@ -87,12 +87,12 @@ func makeStackListCmd() *cobra.Command {
 
 			ctx := cmd.Context()
 			loader := configureLoader(cmd)
-			projectName, err := loader.LoadProjectName(ctx)
+			projectName, _, err := loader.LoadProjectName(ctx)
 			if err != nil {
 				return err
 			}
 
-			sm, err := stacks.NewManager(global.Client, loader.TargetDirectory(), projectName)
+			sm, err := stacks.NewManager(global.Client, loader.TargetDirectory(), projectName, ec)
 			if err != nil {
 				return err
 			}

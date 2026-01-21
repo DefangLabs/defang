@@ -42,7 +42,7 @@ func newCommandSessionWithOpts(cmd *cobra.Command, opts commandSessionOpts) (*se
 		}
 		term.Debugf("Could not create stack manager: %v", err)
 	}
-	sessionLoader := session.NewSessionLoader(global.Client, ec, sm, options)
+	sessionLoader := session.NewSessionLoader(global.Client, sm, options)
 	session, err := sessionLoader.LoadSession(ctx)
 	if err != nil {
 		return nil, err
@@ -80,11 +80,13 @@ func newSessionLoaderOptionsForCommand(cmd *cobra.Command) session.SessionLoader
 		}
 	}
 	return session.SessionLoaderOptions{
-		Stack:            stack,
 		ProviderID:       *provider,
 		ComposeFilePaths: configPaths,
 		ProjectName:      projectName,
-		Interactive:      !global.NonInteractive,
+		GetStackOpts: stacks.GetStackOpts{
+			Interactive: !global.NonInteractive,
+			Stack:       stack,
+		},
 	}
 }
 
@@ -107,11 +109,11 @@ func newStackManagerForLoader(ctx context.Context, loader *compose.Loader) (sess
 	if err != nil {
 		targetDirectory = loader.TargetDirectory()
 	}
-	projectName, err := loader.LoadProjectName(ctx)
+	projectName, _, err := loader.LoadProjectName(ctx)
 	if err != nil {
 		term.Debugf("Could not determine project name: %v", err)
 	}
-	sm, err := stacks.NewManager(global.Client, targetDirectory, projectName)
+	sm, err := stacks.NewManager(global.Client, targetDirectory, projectName, ec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stack manager: %w", err)
 	}

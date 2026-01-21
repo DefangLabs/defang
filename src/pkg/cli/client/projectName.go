@@ -10,7 +10,7 @@ import (
 func LoadProjectNameWithFallback(ctx context.Context, loader Loader, provider Provider) (string, error) {
 	var loadErr error
 	if loader != nil {
-		projectName, err := loader.LoadProjectName(ctx)
+		projectName, _, err := loader.LoadProjectName(ctx)
 		if err == nil {
 			return projectName, nil
 		}

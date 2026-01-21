@@ -1,7 +1,7 @@
 [95m * Service environment variables resolution summary:
 [0m[1m
-SERVICE   ENVIRONMENT  VALUE                                       SOURCE[0m
-service1  FROM_ENV     from_ENV                                    Compose                
-service1  PLAIN_VAR    plain_value                                 Compose                
-service1  PUBLIC_URL   https://example-${SECRET_KEY}-from_ENV.com  Config (interpolated)  
-service1  SECRET_KEY   *****                                       Config                 
+SERVICE   ENVIRONMENT  SOURCE                 VALUE[0m
+service1  FROM_ENV     Compose                from_ENV                                    
+service1  PLAIN_VAR    Compose                plain_value                                 
+service1  PUBLIC_URL   Config (interpolated)  https://example-${SECRET_KEY}-from_ENV.com  
+service1  SECRET_KEY   Config                 *****                                       

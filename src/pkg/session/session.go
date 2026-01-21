@@ -2,7 +2,6 @@ package session
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
@@ -11,18 +10,13 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
-	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 type StacksManager interface {
-	List(ctx context.Context) ([]stacks.ListItem, error)
-	LoadLocal(name string) (*stacks.Parameters, error)
-	LoadRemote(ctx context.Context, name string) (*stacks.Parameters, error)
-	Create(params stacks.Parameters) (string, error)
 	TargetDirectory() string
+	GetStack(ctx context.Context, opts stacks.GetStackOpts) (*stacks.Parameters, string, error)
 }
 
 type Session struct {
@@ -32,26 +26,21 @@ type Session struct {
 }
 
 type SessionLoaderOptions struct {
-	Stack              string
-	ProviderID         client.ProviderID
-	ProjectName        string
-	ComposeFilePaths   []string
-	AllowStackCreation bool
-	Interactive        bool
-	RequireStack       bool
+	ProviderID       client.ProviderID
+	ProjectName      string
+	ComposeFilePaths []string
+	stacks.GetStackOpts
 }
 
 type SessionLoader struct {
 	client client.FabricClient
-	ec     elicitations.Controller
 	sm     StacksManager
 	opts   SessionLoaderOptions
 }
 
-func NewSessionLoader(client client.FabricClient, ec elicitations.Controller, maybeSm StacksManager, opts SessionLoaderOptions) *SessionLoader {
+func NewSessionLoader(client client.FabricClient, maybeSm StacksManager, opts SessionLoaderOptions) *SessionLoader {
 	return &SessionLoader{
 		client: client,
-		ec:     ec,
 		sm:     maybeSm,
 		opts:   opts,
 	}
@@ -82,82 +71,13 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 
 func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, string, error) {
 	if sl.sm == nil {
-		// Without stack manager, we can only load fallback stacks (from options)
-		return sl.loadFallbackStack(ctx)
+		return &stacks.Parameters{
+			Name:     stacks.DefaultBeta,
+			Provider: sl.opts.ProviderID,
+		}, "no stack manager available", nil
 	}
-	if sl.opts.Stack != "" {
-		return sl.loadSpecifiedStack(ctx, sl.opts.Stack)
-	}
-	if sl.opts.Interactive && sl.opts.RequireStack {
-		return sl.loadStackInteractively(ctx)
-	}
-
-	return sl.loadFallbackStack(ctx)
-}
-
-func (sl *SessionLoader) loadSpecifiedStack(ctx context.Context, name string) (*stacks.Parameters, string, error) {
-	whence := "--stack flag"
-	_, envSet := os.LookupEnv("DEFANG_STACK")
-	if envSet {
-		whence = "DEFANG_STACK environment variable"
-	}
-	stack, err := sl.sm.LoadLocal(name)
-	if err == nil {
-		err = stacks.LoadStackEnv(*stack, false)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to load stack env: %w", err)
-		}
-		return stack, whence + " and local stack file", nil
-	}
-	// the stack file does not exist locally
-	if !os.IsNotExist(err) {
-		return nil, "", err
-	}
-	stack, err = sl.sm.LoadRemote(ctx, name)
+	stack, whence, err := sl.sm.GetStack(ctx, sl.opts.GetStackOpts)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to load stack %q remotely: %w", name, err)
-	}
-	err = stacks.LoadStackEnv(*stack, false)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to load stack env: %w", err)
-	}
-	// persist the remote stack file to the local target directory
-	stackFilename, err := sl.sm.Create(*stack)
-	var errOutside *stacks.ErrOutside
-	if err != nil && !errors.As(err, &errOutside) {
-		return nil, "", fmt.Errorf("failed to save imported stack %q to local directory: %w", name, err)
-	}
-	if stackFilename != "" {
-		term.Infof("Stack %q loaded and saved to %q. Add this file to source control", name, stackFilename)
-	}
-	return stack, whence + " and previous deployment", nil
-}
-
-func (sl *SessionLoader) loadStackInteractively(ctx context.Context) (*stacks.Parameters, string, error) {
-	stackSelector := stacks.NewSelector(sl.ec, sl.sm)
-	stack, err := stackSelector.SelectStack(ctx, stacks.SelectStackOptions{
-		AllowCreate: sl.opts.AllowStackCreation,
-	})
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to select stack: %w", err)
-	}
-	err = stacks.LoadStackEnv(*stack, false)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to load stack env: %w", err)
-	}
-
-	return stack, "interactive selection", nil
-}
-
-func (sl *SessionLoader) loadFallbackStack(ctx context.Context) (*stacks.Parameters, string, error) {
-	// Check Fabric for default stack (set by Portal or CLI)
-	res, err := sl.client.GetDefaultStack(ctx, &defangv1.GetDefaultStackRequest{
-		Project: sl.opts.ProjectName,
-	})
-	var params *stacks.Parameters
-	var whence = "default provider"
-	if err != nil {
-		term.Debugf("Could not get default stack from server: %v", err)
 		if sl.opts.ProviderID != "" {
 			whence = "--provider flag"
 		}
@@ -165,21 +85,23 @@ func (sl *SessionLoader) loadFallbackStack(ctx context.Context) (*stacks.Paramet
 		if envSet {
 			whence = "DEFANG_PROVIDER"
 		}
-		params = &stacks.Parameters{
+		if whence == "" {
+			whence = "fallback stack"
+		}
+		return &stacks.Parameters{
 			Name:     stacks.DefaultBeta,
 			Provider: sl.opts.ProviderID,
-		}
-	} else {
-		params, err = stacks.NewParametersFromContent(res.Stack.Name, res.Stack.StackFile)
-		if err != nil {
-			return nil, "", err
-		}
+		}, whence, nil
 	}
-	err = stacks.LoadStackEnv(*params, false)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to load stack env: %w", err)
+	envProvider := os.Getenv("DEFANG_PROVIDER")
+	if envProvider != "" && client.ProviderID(envProvider) != stack.Provider {
+		os.Unsetenv("DEFANG_PROVIDER")
+		term.Warnf("The variable DEFANG_PROVIDER is set to %q in the environment, but the selected stack %q uses provider %q. So the environment variable will be ignored.", envProvider, stack.Name, stack.Provider)
 	}
-	return params, whence, nil
+	if err := stacks.LoadStackEnv(*stack, true); err != nil {
+		return nil, whence, fmt.Errorf("failed to load stack env: %w", err)
+	}
+	return stack, whence, nil
 }
 
 func (sl *SessionLoader) newLoader() client.Loader {

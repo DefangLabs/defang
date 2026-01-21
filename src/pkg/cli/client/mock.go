@@ -194,7 +194,12 @@ func (m MockFabricClient) GetTenantName() types.TenantLabel {
 }
 
 func (m MockFabricClient) GetDefaultStack(context.Context, *defangv1.GetDefaultStackRequest) (*defangv1.GetStackResponse, error) {
-	return nil, errors.ErrUnsupported
+	return &defangv1.GetStackResponse{
+		Stack: &defangv1.Stack{
+			Name:    "default",
+			Project: "default-project",
+		},
+	}, nil
 }
 
 type MockLoader struct {
@@ -206,8 +211,8 @@ func (m MockLoader) LoadProject(ctx context.Context) (*composeTypes.Project, err
 	return &m.Project, m.Error
 }
 
-func (m MockLoader) LoadProjectName(ctx context.Context) (string, error) {
-	return m.Project.Name, m.Error
+func (m MockLoader) LoadProjectName(ctx context.Context) (string, bool, error) {
+	return m.Project.Name, false, m.Error
 }
 
 func (m MockLoader) TargetDirectory() string {

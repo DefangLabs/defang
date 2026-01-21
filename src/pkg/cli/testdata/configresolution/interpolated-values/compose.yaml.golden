@@ -1,6 +1,6 @@
 [95m * Service environment variables resolution summary:
 [0m[1m
-SERVICE   ENVIRONMENT   VALUE                                                SOURCE[0m
-service1  API_ENDPOINT  https://api.example.com                              Compose                
-service1  AUTH_HEADER   Bearer ${API_TOKEN}                                  Config (interpolated)  
-service1  DATABASE_URL  postgres://${DB_USER}:${DB_PASSWORD}@localhost/mydb  Config (interpolated)  
+SERVICE   ENVIRONMENT   SOURCE                 VALUE[0m
+service1  API_ENDPOINT  Compose                https://api.example.com                              
+service1  AUTH_HEADER   Config (interpolated)  Bearer ${API_TOKEN}                                  
+service1  DATABASE_URL  Config (interpolated)  postgres://${DB_USER}:${DB_PASSWORD}@localhost/mydb  

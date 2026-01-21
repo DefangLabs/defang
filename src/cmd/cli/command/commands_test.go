@@ -95,6 +95,16 @@ func (m *mockFabricService) ListDeployments(context.Context, *connect.Request[de
 	}), nil
 }
 
+func (m *mockFabricService) GetDefaultStack(context.Context, *connect.Request[defangv1.GetDefaultStackRequest]) (*connect.Response[defangv1.GetStackResponse], error) {
+	return connect.NewResponse(&defangv1.GetStackResponse{
+		Stack: &defangv1.Stack{
+			Name:      "default",
+			Project:   "default-project",
+			StackFile: []byte("DEFANG_PROVIDER=defang\n"),
+		},
+	}), nil
+}
+
 func TestMain(m *testing.M) {
 	SetupCommands("0.0.0-test")
 	os.Exit(m.Run())
@@ -303,7 +313,7 @@ func (m *mockStackManager) LoadLocal(name string) (*stacks.Parameters, error) {
 	return nil, fmt.Errorf("stack %q not found", name)
 }
 
-func (m *mockStackManager) LoadRemote(ctx context.Context, name string) (*stacks.Parameters, error) {
+func (m *mockStackManager) GetRemote(ctx context.Context, name string) (*stacks.Parameters, error) {
 	// TODO: separate remote and local loadResults in the mock
 	if m.loadError != nil {
 		return nil, m.loadError

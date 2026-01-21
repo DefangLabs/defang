@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
@@ -15,37 +14,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
-
-type mockElicitationsController struct {
-	isSupported bool
-	enumChoice  string
-}
-
-func (m *mockElicitationsController) RequestString(ctx context.Context, message, field string) (string, error) {
-	return "", nil
-}
-
-func (m *mockElicitationsController) RequestStringWithDefault(ctx context.Context, message, field, defaultValue string) (string, error) {
-	return defaultValue, nil
-}
-
-func (m *mockElicitationsController) RequestEnum(ctx context.Context, message, field string, options []string) (string, error) {
-	if m.enumChoice != "" {
-		return m.enumChoice, nil
-	}
-	if len(options) > 0 {
-		return options[0], nil
-	}
-	return "", nil
-}
-
-func (m *mockElicitationsController) SetSupported(supported bool) {
-	m.isSupported = supported
-}
-
-func (m *mockElicitationsController) IsSupported() bool {
-	return m.isSupported
-}
 
 type mockStacksManager struct {
 	mock.Mock
@@ -75,7 +43,7 @@ func (m *mockStacksManager) LoadLocal(name string) (*stacks.Parameters, error) {
 	return result, args.Error(1)
 }
 
-func (m *mockStacksManager) LoadRemote(ctx context.Context, name string) (*stacks.Parameters, error) {
+func (m *mockStacksManager) GetRemote(ctx context.Context, name string) (*stacks.Parameters, error) {
 	args := m.Called(ctx, name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -92,17 +60,28 @@ func (m *mockStacksManager) Create(params stacks.Parameters) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
+func (m *mockStacksManager) GetStack(ctx context.Context, opts stacks.GetStackOpts) (*stacks.Parameters, string, error) {
+	args := m.Called(ctx, opts)
+	if args.Get(0) == nil {
+		return nil, "", args.Error(2)
+	}
+	result, ok := args.Get(0).(*stacks.Parameters)
+	if !ok {
+		return nil, "", args.Error(2)
+	}
+	whence, _ := args.Get(1).(string)
+	return result, whence, args.Error(2)
+}
+
 func (m *mockStacksManager) TargetDirectory() string {
 	return ""
 }
 
 func TestLoadSession(t *testing.T) {
-	deployedAt := time.Date(2024, 6, 1, 12, 0, 0, 0, time.UTC)
 	tests := []struct {
 		name          string
 		options       SessionLoaderOptions
-		localStack    *stacks.Parameters
-		remoteStack   *stacks.Parameters
+		existingStack *stacks.Parameters
 		stacksList    []stacks.ListItem
 		expectedError string
 		expectedStack *stacks.Parameters
@@ -113,6 +92,25 @@ func TestLoadSession(t *testing.T) {
 			options: SessionLoaderOptions{},
 			expectedStack: &stacks.Parameters{
 				Name: "beta",
+			},
+		},
+		{
+			name: "specified existing stack",
+			options: SessionLoaderOptions{
+				GetStackOpts: stacks.GetStackOpts{
+					Stack: "existingstack",
+				},
+			},
+			existingStack: &stacks.Parameters{
+				Name:     "existingstack",
+				Provider: client.ProviderDefang,
+			},
+			expectedStack: &stacks.Parameters{
+				Name:     "existingstack",
+				Provider: client.ProviderDefang,
+				Variables: map[string]string{
+					"DEFANG_PROVIDER": "defang",
+				},
 			},
 		},
 		{
@@ -137,190 +135,6 @@ func TestLoadSession(t *testing.T) {
 			},
 			expectedError: "",
 		},
-		{
-			name: "stack specified but not found",
-			options: SessionLoaderOptions{
-				ProjectName: "foo",
-				Stack:       "missing-stack",
-			},
-			expectedError: "unable to find stack",
-			expectedEnv:   map[string]string{},
-		},
-		{
-			name: "local stack specified",
-			options: SessionLoaderOptions{
-				ProjectName: "foo",
-				Stack:       "local-stack",
-			},
-			localStack: &stacks.Parameters{
-				Name:     "local-stack",
-				Provider: client.ProviderDefang,
-				Region:   "us-test-2",
-				Variables: map[string]string{
-					"AWS_PROFILE": "default",
-					"FOO":         "bar",
-				},
-			},
-			expectedStack: &stacks.Parameters{
-				Name:      "local-stack",
-				Provider:  client.ProviderDefang,
-				Variables: map[string]string{},
-			},
-			expectedEnv: map[string]string{
-				"AWS_PROFILE": "default",
-				"FOO":         "bar",
-			},
-		},
-		{
-			name: "remote stack specified",
-			options: SessionLoaderOptions{
-				ProjectName: "foo",
-				Stack:       "remote-stack",
-			},
-			remoteStack: &stacks.Parameters{
-				Name:     "remote-stack",
-				Provider: client.ProviderGCP,
-				Region:   "us-central1",
-				Variables: map[string]string{
-					"GCP_PROJECT_ID": "my-gcp-project",
-					"FOO":            "bar",
-				},
-			},
-			expectedStack: &stacks.Parameters{
-				Name:      "remote-stack",
-				Provider:  client.ProviderGCP,
-				Variables: map[string]string{},
-			},
-			expectedEnv: map[string]string{
-				"GCP_PROJECT_ID": "my-gcp-project",
-				"FOO":            "bar",
-			},
-		},
-		{
-			name: "local and remote stack",
-			options: SessionLoaderOptions{
-				ProjectName: "foo",
-				Stack:       "both-stack",
-			},
-			localStack: &stacks.Parameters{
-				Name:     "both-stack",
-				Provider: client.ProviderAWS,
-				Region:   "us-test-2",
-				Variables: map[string]string{
-					"AWS_PROFILE": "local-profile",
-					"FOO":         "local-bar",
-				},
-			},
-			remoteStack: &stacks.Parameters{
-				Name:     "both-stack",
-				Provider: client.ProviderAWS,
-				Region:   "us-test-2",
-				Variables: map[string]string{
-					"AWS_PROFILE": "remote-profile",
-					"FOO":         "remote-bar",
-				},
-			},
-			expectedStack: &stacks.Parameters{
-				Name:     "both-stack",
-				Provider: client.ProviderAWS,
-				Region:   "us-test-2",
-				Variables: map[string]string{
-					"AWS_PROFILE": "local-profile",
-					"FOO":         "local-bar",
-				},
-			},
-			expectedEnv: map[string]string{
-				"AWS_PROFILE": "local-profile",
-				"FOO":         "local-bar",
-			},
-		},
-		{
-			name: "interactive selection - stack required",
-			options: SessionLoaderOptions{
-				ProjectName:        "foo",
-				Interactive:        true,
-				AllowStackCreation: true,
-				ProviderID:         client.ProviderGCP,
-				RequireStack:       true,
-			},
-			stacksList: []stacks.ListItem{
-				{
-					Parameters: stacks.Parameters{
-						Name:     "existing-stack",
-						Provider: client.ProviderGCP,
-						Region:   "us-central1",
-						Variables: map[string]string{
-							"GCP_PROJECT": "existing-gcp-project",
-							"FOO":         "existing-bar",
-						},
-					},
-					DeployedAt: deployedAt,
-				},
-			},
-			expectedStack: &stacks.Parameters{
-				Name:      "existing-stack",
-				Provider:  client.ProviderGCP,
-				Variables: map[string]string{},
-			},
-			expectedEnv: map[string]string{
-				"GCP_PROJECT": "existing-gcp-project",
-				"FOO":         "existing-bar",
-			},
-		},
-		{
-			name: "interactive selection",
-			options: SessionLoaderOptions{
-				ProjectName:        "foo",
-				Interactive:        true,
-				AllowStackCreation: true,
-				ProviderID:         client.ProviderGCP,
-			},
-			stacksList: []stacks.ListItem{
-				{
-					Parameters: stacks.Parameters{
-						Name:     "existing-stack",
-						Provider: client.ProviderAWS,
-						Region:   "us-test-2",
-						Variables: map[string]string{
-							"FOO": "existing-bar",
-						},
-					},
-					DeployedAt: deployedAt,
-				},
-			},
-			expectedStack: &stacks.Parameters{
-				Name:     "beta",
-				Provider: client.ProviderGCP,
-			},
-		},
-		{
-			name: "stack with compose vars updates loader",
-			options: SessionLoaderOptions{
-				ProjectName: "foo",
-				Stack:       "compose-stack",
-			},
-			localStack: &stacks.Parameters{
-				Name:     "compose-stack",
-				Provider: client.ProviderDefang,
-				Region:   "us-test-2",
-				Variables: map[string]string{
-					"COMPOSE_PROJECT_NAME": "myproject",
-					"COMPOSE_PATH":         "./docker-compose.yml:./docker-compose.override.yml",
-				},
-			},
-			expectedStack: &stacks.Parameters{
-				Name:     "compose-stack",
-				Provider: client.ProviderDefang,
-				Variables: map[string]string{
-					"COMPOSE_PROJECT_NAME": "myproject",
-					"COMPOSE_PATH":         "./docker-compose.yml:./docker-compose.override.yml",
-				},
-			},
-			expectedEnv: map[string]string{
-				"COMPOSE_PROJECT_NAME": "myproject",
-				"COMPOSE_PATH":         "./docker-compose.yml:./docker-compose.override.yml",
-			},
-		},
 	}
 
 	for _, tt := range tests {
@@ -334,27 +148,18 @@ func TestLoadSession(t *testing.T) {
 				}
 			})
 			ctx := t.Context()
-			ec := &mockElicitationsController{isSupported: true}
 			sm := &mockStacksManager{}
 
-			// Setup mock expectations based on test case
-			if tt.localStack != nil {
-				sm.On("LoadLocal", tt.localStack.Name).Return(tt.localStack, nil)
+			if tt.existingStack == nil {
+				sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", errors.New("stack not found"))
 			} else {
-				sm.On("LoadLocal", mock.Anything).Maybe().Return(nil, os.ErrNotExist)
-			}
-
-			if tt.remoteStack != nil {
-				sm.On("LoadRemote", ctx, tt.remoteStack.Name).Maybe().Return(tt.remoteStack, nil)
-				sm.On("Create", *tt.remoteStack).Maybe().Return("", nil)
-			} else {
-				sm.On("LoadRemote", ctx, mock.Anything).Maybe().Return(nil, errors.New("unable to find stack"))
+				sm.On("GetStack", ctx, mock.Anything).Maybe().Return(tt.existingStack, "local", nil)
 			}
 			if tt.stacksList != nil {
 				sm.On("List", ctx).Maybe().Return(tt.stacksList, nil)
 			}
 
-			loader := NewSessionLoader(client.MockFabricClient{}, ec, sm, tt.options)
+			loader := NewSessionLoader(client.MockFabricClient{}, sm, tt.options)
 			session, err := loader.LoadSession(ctx)
 			if tt.expectedError != "" {
 				require.Error(t, err)
@@ -397,13 +202,12 @@ func TestLoadSession(t *testing.T) {
 
 func TestLoadSession_NoStackManager(t *testing.T) {
 	ctx := t.Context()
-	ec := &mockElicitationsController{isSupported: true}
 
 	options := SessionLoaderOptions{
 		ProviderID: client.ProviderDefang,
 	}
 
-	loader := NewSessionLoader(client.MockFabricClient{}, ec, nil, options)
+	loader := NewSessionLoader(client.MockFabricClient{}, nil, options)
 	session, err := loader.LoadSession(ctx)
 	require.NoError(t, err)
 	assert.NotNil(t, session)
