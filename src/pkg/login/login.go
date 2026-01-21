@@ -94,21 +94,19 @@ func NonInteractiveGitHubLogin(ctx context.Context, fabric client.FabricClient, 
 
 	err = client.SaveAccessToken(cluster, resp.AccessToken) // creates the state folder too
 
-	if roleArn := os.Getenv("AWS_ROLE_ARN"); roleArn != "" {
-		// If AWS_ROLE_ARN is set, we're doing "Assume Role with Web Identity"
-		if os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") == "" {
-			// AWS_ROLE_ARN is set, but AWS_WEB_IDENTITY_TOKEN_FILE is empty: write the token to a new file
-			jwtPath, _ := client.GetWebIdentityTokenFile(cluster)
-			term.Debugf("writing web identity token to %s for role %s", jwtPath, roleArn)
-			if err := os.WriteFile(jwtPath, []byte(idToken), 0600); err != nil {
-				return fmt.Errorf("failed to save web identity token: %w", err)
-			}
-			// Set AWS env vars for this CLI invocation
-			os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath)
-			os.Setenv("AWS_ROLE_SESSION_NAME", "testyml") // TODO: from WhoAmI
-		} else {
-			term.Debugf("AWS_WEB_IDENTITY_TOKEN_FILE is already set; not writing token to a new file")
+	// If AWS_ROLE_ARN is set, we're doing "Assume Role with Web Identity"
+	if os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") == "" {
+		// AWS_ROLE_ARN is set, but AWS_WEB_IDENTITY_TOKEN_FILE is empty: write the token to a new file
+		jwtPath, _ := client.GetWebIdentityTokenFile(cluster)
+		term.Debugf("writing web identity token to %s", jwtPath)
+		if err := os.WriteFile(jwtPath, []byte(idToken), 0600); err != nil {
+			return fmt.Errorf("failed to save web identity token: %w", err)
 		}
+		// Set AWS env vars for this CLI invocation
+		os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath)
+		os.Setenv("AWS_ROLE_SESSION_NAME", "testyml") // TODO: from WhoAmI
+	} else {
+		term.Debugf("AWS_WEB_IDENTITY_TOKEN_FILE is already set; not writing token to a new file")
 	}
 
 	return err
