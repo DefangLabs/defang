@@ -11,11 +11,12 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-type PrintDeployment struct {
+type DeploymentLineItem struct {
 	AccountId   string
 	Deployment  string
 	DeployedAt  string
 	ProjectName string
+	Stack       string
 	Provider    string
 	Region      string
 	Mode        string
@@ -51,13 +52,14 @@ func DeploymentsList(ctx context.Context, client client.FabricClient, params Lis
 	}
 
 	// map to Deployment struct
-	deployments := make([]PrintDeployment, numDeployments)
+	deployments := make([]DeploymentLineItem, numDeployments)
 	for i, d := range response.Deployments {
-		deployments[i] = PrintDeployment{
+		deployments[i] = DeploymentLineItem{
 			AccountId:   d.ProviderAccountId,
 			DeployedAt:  d.Timestamp.AsTime().Local().Format(time.RFC3339),
 			Deployment:  d.Id,
 			ProjectName: d.Project,
+			Stack:       d.Stack,
 			Provider:    getProvider(d.Provider, d.ProviderString),
 			Region:      d.Region,
 			Mode:        d.Mode.String(),
@@ -68,13 +70,13 @@ func DeploymentsList(ctx context.Context, client client.FabricClient, params Lis
 	sortKeys := make([]string, numDeployments)
 	for i, d := range deployments {
 		// TODO: allow user to specify sort order
-		sortKeys[i] = strings.Join([]string{d.ProjectName, d.Provider, d.AccountId, d.Region}, "|")
+		sortKeys[i] = strings.Join([]string{d.ProjectName, d.Stack, d.Provider, d.AccountId, d.Region}, "|")
 	}
 	sort.SliceStable(sortKeys, func(i, j int) bool {
 		return sortKeys[i] < sortKeys[j]
 	})
 
-	return term.Table(deployments, "ProjectName", "Provider", "AccountId", "Region", "Deployment", "Mode", "DeployedAt")
+	return term.Table(deployments, "ProjectName", "Stack", "Provider", "AccountId", "Region", "Deployment", "Mode", "DeployedAt")
 }
 
 func getProvider(provider defangv1.Provider, providerString string) string {
