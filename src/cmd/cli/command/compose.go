@@ -394,7 +394,7 @@ func handleTailAndMonitorErr(ctx context.Context, err error, debugger *debug.Deb
 		// Call the AI debug endpoint using the original command context (not the tail ctx which is canceled)
 		if nil != debugger.DebugDeploymentError(ctx, debugConfig, errDeploymentFailed) {
 			// don't show this defang hint if debugging was successful
-			tailOptions := newTailOptionsForDeploy("", debugConfig.Deployment, debugConfig.Since, true)
+			tailOptions := newTailOptionsForDeploy(debugConfig.Stack, debugConfig.Deployment, debugConfig.Since, true)
 			printDefangHint("To see the logs of the failed service, run:", "logs "+tailOptions.String())
 		}
 	}
