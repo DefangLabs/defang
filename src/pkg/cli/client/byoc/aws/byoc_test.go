@@ -23,6 +23,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDomainMultipleProjectSupport(t *testing.T) {
@@ -372,27 +373,20 @@ aws_secret_access_key = wJalrXUtnFEMI/KDEFANG/bPxRfiCYEXAMPLEKEY
 			// Create ByocAws instance - warning is printed here in NewByocProvider
 			b := NewByocProvider(ctx, "tenant1", "exampleStack")
 			_, err := b.AccountInfo(ctx)
-			if err != nil {
-				if !tt.expectedError {
-					t.Fatalf("GetAccountInfo() failed: %v", err)
-				}
+
+			if tt.expectedError {
+				assert.Error(t, err, "expected AccountInfo() to fail")
 			} else {
-				if tt.expectedError {
-					t.Fatalf("expected error but got none")
-				}
+				assert.NoError(t, err, "AccountInfo() should succeed")
 			}
 
 			// Check if warning was printed to stdout
 			output := stdout.String()
 
 			if tt.expectWarning {
-				if !strings.Contains(output, tt.warningContain) {
-					t.Errorf("expected warning containing %q, but got output: %q", tt.warningContain, output)
-				}
+				assert.Contains(t, output, tt.warningContain, "expected warning in output")
 			} else {
-				if strings.Contains(output, "AWS_ACCESS_KEY_ID takes precedence") {
-					t.Errorf("unexpected warning in output: %q", output)
-				}
+				t.Errorf("unexpected warning output: %s", output)
 			}
 		})
 	}
