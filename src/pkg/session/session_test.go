@@ -95,6 +95,17 @@ func TestLoadSession(t *testing.T) {
 			},
 		},
 		{
+			name: "specified non-existing stack",
+			options: SessionLoaderOptions{
+				GetStackOpts: stacks.GetStackOpts{
+					Stack: "missingstack",
+				},
+			},
+
+			expectedError: "stack \"missingstack\" does not exist",
+			expectedEnv:   map[string]string{},
+		},
+		{
 			name: "specified existing stack",
 			options: SessionLoaderOptions{
 				GetStackOpts: stacks.GetStackOpts{
@@ -151,7 +162,13 @@ func TestLoadSession(t *testing.T) {
 			sm := &mockStacksManager{}
 
 			if tt.existingStack == nil {
-				sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", errors.New("stack not found"))
+				if tt.options.GetStackOpts.Stack != "" {
+					// For specified non-existing stack, return ErrNotExist
+					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", &stacks.ErrNotExist{StackName: tt.options.GetStackOpts.Stack})
+				} else {
+					// For empty stack (should fall back to beta), return a general error that's not ErrNotExist
+					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", errors.New("no default stack set for project"))
+				}
 			} else {
 				sm.On("GetStack", ctx, mock.Anything).Maybe().Return(tt.existingStack, "local", nil)
 			}

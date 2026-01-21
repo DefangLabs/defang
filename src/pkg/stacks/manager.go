@@ -175,7 +175,7 @@ func (sm *manager) GetRemote(ctx context.Context, name string) (*Parameters, err
 		}
 	}
 	if remoteStack == nil {
-		return nil, fmt.Errorf("unable to find stack %q", name)
+		return nil, &ErrNotExist{StackName: name}
 	}
 
 	return &remoteStack.Parameters, nil
@@ -205,6 +205,14 @@ func (sl *manager) GetStack(ctx context.Context, opts GetStackOpts) (*Parameters
 	return sl.getDefaultStack(ctx)
 }
 
+type ErrNotExist struct {
+	StackName string
+}
+
+func (e *ErrNotExist) Error() string {
+	return fmt.Sprintf("stack %q does not exist", e.StackName)
+}
+
 func (sm *manager) getSpecifiedStack(ctx context.Context, name string) (*Parameters, string, error) {
 	whence := "--stack flag"
 	_, envSet := os.LookupEnv("DEFANG_STACK")
@@ -221,7 +229,7 @@ func (sm *manager) getSpecifiedStack(ctx context.Context, name string) (*Paramet
 	// the stack file does not exist locally; try loading remotely
 	stack, err = sm.GetRemote(ctx, name)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to find stack file or previously deployed stack: %w", err)
+		return nil, "", err
 	}
 	// persist the remote stack file to the local target directory
 	stackFilename, err := sm.Create(*stack)
@@ -259,7 +267,7 @@ func (sm *manager) getDefaultStack(ctx context.Context) (*Parameters, string, er
 		if connect.CodeOf(err) != connect.CodeNotFound {
 			return nil, "", err
 		}
-		term.Debugf("No default stack set for project %q; using default", sm.projectName)
+		term.Debugf("No default stack set for project %q; using fallback", sm.projectName)
 		return nil, "", errors.New("no default stack set for project")
 	}
 
