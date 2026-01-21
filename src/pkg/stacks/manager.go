@@ -265,7 +265,7 @@ func (sm *manager) getDefaultStack(ctx context.Context) (*Parameters, string, er
 		if connect.CodeOf(err) != connect.CodeNotFound {
 			return nil, "", err
 		}
-		term.Debugf("No default stack set for project %q; using default", sm.projectName)
+		term.Debugf("No default stack set for project %q; using fallback", sm.projectName)
 		return nil, "", errors.New("no default stack set for project")
 	}
 
