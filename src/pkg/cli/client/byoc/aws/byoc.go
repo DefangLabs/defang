@@ -121,7 +121,7 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 	if awsProfileName := os.Getenv("AWS_PROFILE"); awsProfileName != "" {
 		envAccessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
 		if envAccessKeyID != "" {
-			term.Warnf("Both AWS_ACCESS_KEY_ID: %q and AWS_PROFILE: %q are set; AWS_ACCESS_KEY_ID takes precedence and AWS_PROFILE will be ignored", envAccessKeyID, awsProfileName)
+			term.Warnf("Both AWS_ACCESS_KEY_ID and AWS_PROFILE (%q) are set; AWS_ACCESS_KEY_ID takes precedence and AWS_PROFILE will be ignored", awsProfileName)
 		}
 	}
 
