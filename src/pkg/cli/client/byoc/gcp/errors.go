@@ -31,7 +31,7 @@ func annotateGcpError(err error) error {
 		briefErr := briefGcpError{err: gerr}
 		// Check for forbidden errors to provide more context for ADC errors #1519
 		if gerr.Code == http.StatusForbidden {
-			return fmt.Errorf("Double check the GCP project ID and make sure your Application Default Credentials have permission to access the project: %w", briefErr)
+			return fmt.Errorf("double check the GCP project ID and make sure your Application Default Credentials have permission to access the project: %w", briefErr)
 		}
 		return briefErr
 	}

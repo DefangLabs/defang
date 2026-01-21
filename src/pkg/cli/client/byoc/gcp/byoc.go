@@ -28,6 +28,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 	"go.yaml.in/yaml/v3"
+	gcpdns "google.golang.org/api/dns/v1"
 	"google.golang.org/api/googleapi"
 	auditpb "google.golang.org/genproto/googleapis/cloud/audit"
 	"google.golang.org/grpc/codes"
@@ -83,10 +84,38 @@ func (e CredentialsError) Unwrap() error {
 	return e.error
 }
 
+type gcpDriver interface {
+	AddSecretVersion(ctx context.Context, secretName string, payload []byte) (string, error)
+	CleanupOldVersionsExcept(ctx context.Context, secretName string, keep int) error
+	CreateSecret(ctx context.Context, secretID string) (string, error)
+	CreateUploadURL(ctx context.Context, bucketName, objectName, serviceAccount string) (string, error)
+	DeleteSecret(ctx context.Context, secretName string) error
+	EnsureAPIsEnabled(ctx context.Context, apis ...string) error
+	EnsureBucketExists(ctx context.Context, prefix string, versioning bool) (string, error)
+	EnsureDNSZoneExists(ctx context.Context, name, domain, description string) (*gcpdns.ManagedZone, error)
+	EnsurePrincipalHasBucketRoles(ctx context.Context, bucketName, principal string, roles []string) error
+	EnsurePrincipalHasRoles(ctx context.Context, serviceAccount string, roles []string) error
+	EnsurePrincipalHasServiceAccountRoles(ctx context.Context, principal, serviceAccount string, roles []string) error
+	EnsureRoleExists(ctx context.Context, roleId, title, description string, permissions []string) (string, error)
+	EnsureServiceAccountExists(ctx context.Context, serviceAccountId, displayName, description string) (string, error)
+	GetBucketObjectWithServiceAccount(ctx context.Context, bucketName, objectName, serviceAccount string) ([]byte, error)
+	GetBucketWithPrefix(ctx context.Context, prefix string) (string, error)
+	GetBuildStatus(ctx context.Context, startBuildOpName string) error
+	GetCurrentPrincipal(ctx context.Context) (string, error)
+	GetDNSZone(ctx context.Context, name string) (*gcpdns.ManagedZone, error)
+	GetRegion() string
+	GetServiceAccountEmail(name string) string
+	IterateBucketObjects(ctx context.Context, bucketName, prefix string) (iter.Seq2[*storage.ObjectAttrs, error], error)
+	ListSecrets(ctx context.Context, prefix string) ([]string, error)
+	RunCloudBuild(ctx context.Context, args gcp.CloudBuildArgs) (string, error)
+	SignBytes(ctx context.Context, b []byte, name string) ([]byte, error)
+	GcpLogsClient
+}
+
 type ByocGcp struct {
 	*byoc.ByocBaseClient
 
-	driver *gcp.Gcp
+	driver gcpDriver
 
 	bucket               string
 	cdServiceAccount     string
@@ -123,7 +152,7 @@ func (b *ByocGcp) SetUpCD(ctx context.Context) error {
 	}
 	// TODO: Handle project creation flow
 
-	term.Infof("Setting up defang CD in GCP project %s, this could take a few minutes", b.driver.ProjectId)
+	term.Infof("Setting up defang CD in GCP project %s, this could take a few minutes", b.driver.GetProjectID())
 	// 1. Enable required APIs
 	// TODO: enable minimum APIs needed for bootstrap the cd image, let CD enable the rest of the APIs
 	apis := []string{
@@ -148,7 +177,7 @@ func (b *ByocGcp) SetUpCD(ctx context.Context) error {
 	}
 
 	// 2. Setup cd bucket
-	if bucket, err := b.driver.EnsureBucketExists(ctx, "defang-cd", true); err != nil {
+	if bucket, err := b.driver.EnsureBucketExists(ctx, DefangCDProjectName, true); err != nil {
 		return err
 	} else {
 		b.bucket = bucket
@@ -249,7 +278,7 @@ func (o gcpObj) Size() int64 {
 }
 
 func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[string], error) {
-	bucketName, err := b.driver.GetBucketWithPrefix(ctx, "defang-cd")
+	bucketName, err := b.driver.GetBucketWithPrefix(ctx, DefangCDProjectName)
 	if err != nil {
 		return nil, annotateGcpError(err)
 	}
@@ -308,7 +337,7 @@ func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 	}
 	return &client.AccountInfo{
 		AccountID: projectId,
-		Region:    b.driver.Region,
+		Region:    b.driver.GetRegion(),
 		Details:   email,
 		Provider:  client.ProviderGCP,
 	}, nil
@@ -366,12 +395,12 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) error {
 		"DEFANG_PULUMI_DEBUG":      os.Getenv("DEFANG_PULUMI_DEBUG"),
 		"DEFANG_PULUMI_DIFF":       os.Getenv("DEFANG_PULUMI_DIFF"),
 		"DEFANG_STATE_URL":         defangStateUrl,
-		"GCP_PROJECT":              b.driver.ProjectId,
+		"GCP_PROJECT":              string(b.driver.GetProjectID()),
 		"PROJECT":                  cmd.project,
 		"PULUMI_CONFIG_PASSPHRASE": byoc.PulumiConfigPassphrase, // TODO: make secret
 		"PULUMI_COPILOT":           "false",
 		"PULUMI_SKIP_UPDATE_CHECK": "true",
-		"REGION":                   b.driver.Region,
+		"REGION":                   b.driver.GetRegion(),
 		"STACK":                    b.PulumiStack,
 		pulumiBackendKey:           pulumiBackendValue, // TODO: make secret
 	}
@@ -399,7 +428,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) error {
 	}
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
-		debugEnv := []string{"REGION=" + b.driver.Region}
+		debugEnv := []string{"REGION=" + b.driver.GetRegion()}
 		if gcpProject := os.Getenv("GCP_PROJECT_ID"); gcpProject != "" {
 			debugEnv = append(debugEnv, "GCP_PROJECT_ID="+gcpProject)
 		}
@@ -432,7 +461,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) error {
 		ServiceAccount: &b.cdServiceAccount,
 		Tags: []string{
 			fmt.Sprintf("%v_%v_%v_%v", b.PulumiStack, cmd.project, "cd", cmd.etag), // For cd logs, consistent with cloud build tagging
-			"defang-cd", // To indicate this is the actual cd service
+			DefangCDProjectName, // To indicate this is the actual cd service
 		},
 	})
 	if err != nil {
@@ -814,8 +843,6 @@ func (b *ByocGcp) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest)
 	return nil
 }
 
-// FUNCTIONS TO BE IMPLEMENTED BELOW ========================
-
 func (b *ByocGcp) TearDownCD(ctx context.Context) error {
 	// FIXME: implement
 	return client.ErrNotImplemented("GCP TearDown")
@@ -825,7 +852,7 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 	if projectName == "" {
 		return nil, nil
 	}
-	bucketName, err := b.driver.GetBucketWithPrefix(ctx, "defang-cd")
+	bucketName, err := b.driver.GetBucketWithPrefix(ctx, DefangCDProjectName)
 	if err != nil {
 		return nil, annotateGcpError(err)
 	}
