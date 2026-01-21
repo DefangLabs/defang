@@ -8,7 +8,7 @@ import (
 
 var deploymentsCmd = &cobra.Command{
 	Use:         "deployments",
-	Aliases:     []string{"deployment", "deploys", "deps", "dep"},
+	Aliases:     []string{"deployment", "deploys", "deps", "dep", "ls", "list"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "List all active deployments",
@@ -17,9 +17,8 @@ var deploymentsCmd = &cobra.Command{
 	},
 }
 
-var deploymentsListCmd = &cobra.Command{
+var deploymentsHistoryCmd = &cobra.Command{
 	Use:         "history",
-	Aliases:     []string{"ls", "list"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "List deployment history for a project",

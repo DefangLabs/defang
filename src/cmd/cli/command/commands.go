@@ -232,12 +232,10 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(initCmd)
 
 	// Get Services Command
-	lsCommand := makeComposePsCmd()
-	lsCommand.Use = "services"
-	// TODO: when we add multi-project support to the playground, differentiate
-	// between ls and ps
-	lsCommand.Aliases = []string{"getServices", "ps", "ls", "list"}
-	RootCmd.AddCommand(lsCommand)
+	psCommand := makeComposePsCmd()
+	psCommand.Use = "services"
+	psCommand.Aliases = []string{"getServices", "ps"}
+	RootCmd.AddCommand(psCommand)
 
 	// Version Command
 	RootCmd.AddCommand(versionCmd)
@@ -293,7 +291,7 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(logsCmd)
 
 	// Deployments Command
-	deploymentsCmd.AddCommand(deploymentsListCmd)
+	deploymentsCmd.AddCommand(deploymentsHistoryCmd)
 	deploymentsCmd.PersistentFlags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	deploymentsCmd.PersistentFlags().Uint32P("limit", "l", 10, "maximum number of deployments to list")
 	RootCmd.AddCommand(deploymentsCmd)
