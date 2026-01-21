@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
 )
 
@@ -150,28 +150,7 @@ func makeStackDefaultCmd() *cobra.Command {
 				return err
 			}
 
-			stack, err := sm.Load(ctx, name) // verify stack exists
-			if err != nil {
-				return err
-			}
-
-			stackfile, err := stacks.Marshal(stack)
-			if err != nil {
-				return err
-			}
-
-			err = global.Client.PutStack(ctx, &defangv1.PutStackRequest{
-				Stack: &defangv1.Stack{
-					Name:      stack.Name,
-					Project:   projectName,
-					Provider:  stack.Provider.Value(),
-					Region:    stack.Region,
-					Mode:      stack.Mode.Value(),
-					IsDefault: true,
-					StackFile: []byte(stackfile),
-				},
-			})
-			return err
+			return cli.SetDefaultStack(ctx, global.Client, sm, projectName, name)
 		},
 	}
 	return stackDefaultCmd
