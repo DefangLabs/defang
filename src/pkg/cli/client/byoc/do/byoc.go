@@ -596,10 +596,6 @@ func (s *subscribeStream) Close() error {
 	return nil
 }
 
-func (b *ByocDo) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest) error {
-	return client.ErrNotImplemented("AI debugging is not yet supported for DO BYOC")
-}
-
 func (b *ByocDo) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
 	return nil, nil // TODO: implement domain delegation for DO
 }

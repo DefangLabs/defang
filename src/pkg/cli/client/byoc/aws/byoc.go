@@ -10,7 +10,6 @@ import (
 	"io"
 	"iter"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -675,93 +674,6 @@ func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 	return &defangv1.UploadURLResponse{
 		Url: url,
 	}, nil
-}
-
-func (b *ByocAws) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest) error {
-	// tailRequest := &defangv1.TailRequest{
-	// 	Etag:     req.Etag,
-	// 	Project:  req.Project,
-	// 	Services: req.Services,
-	// 	Since:    req.Since,
-	// 	Until:    req.Until,
-	// }
-
-	// The LogStreamNamePrefix filter can only be used with one service name
-	var service string
-	if len(req.Services) == 1 {
-		service = req.Services[0]
-	}
-
-	start := b.cdStart // TODO: get start time from req.Etag
-	if req.Since.IsValid() {
-		start = req.Since.AsTime()
-	} else if start.IsZero() {
-		start = time.Now().Add(-time.Hour)
-	}
-
-	end := time.Now()
-	if req.Until.IsValid() {
-		end = req.Until.AsTime()
-	}
-
-	// get stack information (for CD log group ARN)
-	err := b.driver.FillOutputs(ctx)
-	if err != nil {
-		return AnnotateAwsError(err)
-	}
-
-	cwClient, err := cw.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region
-	if err != nil {
-		return err
-	}
-
-	// Gather logs from the CD task, builds, ECS events, and all services
-	evtsChan, errsChan := cw.QueryLogGroups(ctx, cwClient, start, end, 0, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
-	if evtsChan == nil {
-		return <-errsChan // TODO: there could be multiple errors
-	}
-
-	const maxQuerySizePerLogGroup = 128 * 1024 // 128KB per LogGroup (to stay well below the 1MB gRPC payload limit)
-
-	sb := strings.Builder{}
-loop:
-	for {
-		select {
-		case event, ok := <-evtsChan:
-			if !ok {
-				break loop
-			}
-			parseECSEventRecords := strings.HasSuffix(*event.LogGroupIdentifier, "/ecs")
-			if parseECSEventRecords {
-				if event, err := ecs.ParseECSEvent([]byte(*event.Message)); err == nil {
-					// TODO: once we know the AWS deploymentId from TaskStateChangeEvent detail.startedBy, we can do a 2nd query to filter by deploymentId
-					if event.Etag() != "" && req.Etag != "" && event.Etag() != req.Etag {
-						continue
-					}
-					if event.Service() != "" && len(req.Services) > 0 && !slices.Contains(req.Services, event.Service()) {
-						continue
-					}
-					// This matches the status messages in the Defang Playground Loki logs
-					sb.WriteString("status=")
-					sb.WriteString(event.Status())
-					sb.WriteByte('\n')
-					continue
-				}
-			}
-			msg := term.StripAnsi(*event.Message)
-			sb.WriteString(msg)
-			sb.WriteByte('\n')
-			if sb.Len() > maxQuerySizePerLogGroup { // FIXME: this limit was supposed to be per LogGroup
-				term.Warn("Query result was truncated")
-				break loop
-			}
-		case err := <-errsChan:
-			term.Warn("CloudWatch query error:", AnnotateAwsError(err))
-			// continue reading other log groups
-		}
-	}
-	req.Logs = sb.String()
-	return nil
 }
 
 func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {

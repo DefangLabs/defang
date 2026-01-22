@@ -81,7 +81,6 @@ type Provider interface {
 	PrepareDomainDelegation(context.Context, PrepareDomainDelegationRequest) (*PrepareDomainDelegationResponse, error)
 	Preview(context.Context, *DeployRequest) (*defangv1.DeployResponse, error)
 	PutConfig(context.Context, *defangv1.PutConfigRequest) error
-	QueryForDebug(context.Context, *defangv1.DebugRequest) error
 	QueryLogs(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	RemoteProjectName(context.Context) (string, error)
 	SetCanIUseConfig(*defangv1.CanIUseResponse)
