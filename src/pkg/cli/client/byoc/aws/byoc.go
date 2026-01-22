@@ -119,9 +119,15 @@ func AnnotateAwsError(err error) error {
 
 func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string) *ByocAws {
 	if awsProfileName := os.Getenv("AWS_PROFILE"); awsProfileName != "" {
-		envAccessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
-		if envAccessKeyID != "" {
-			term.Warnf("Both AWS_ACCESS_KEY_ID and AWS_PROFILE (%q) are set; AWS_ACCESS_KEY_ID takes precedence and AWS_PROFILE will be ignored", awsProfileName)
+		AWSAccessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
+		AWSSecretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
+		switch {
+		case AWSAccessKeyID != "" && AWSSecretAccessKey != "":
+			term.Warnf("Both AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY and AWS_PROFILE (%q) are set; access keys take precedence and AWS_PROFILE will be ignored", awsProfileName)
+		case AWSAccessKeyID != "" && AWSSecretAccessKey == "":
+			term.Warnf("Partial credentials found in env, missing: AWS_SECRET_ACCESS_KEY; using AWS_PROFILE (%q) instead", awsProfileName)
+		case AWSAccessKeyID == "" && AWSSecretAccessKey != "":
+			term.Warnf("Partial credentials found in env, missing: AWS_ACCESS_KEY_ID; using AWS_PROFILE (%q) instead", awsProfileName)
 		}
 	}
 
