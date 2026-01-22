@@ -209,6 +209,7 @@ func (gcp Gcp) EnsurePrincipalHasBucketRoles(ctx context.Context, bucketName, pr
 		}
 	}
 
+checkPolicy:
 	for start := time.Now(); time.Since(start) < 5*time.Minute; {
 		vp, err := bucket.IAM().Policy(ctx)
 		if err != nil {
@@ -222,7 +223,7 @@ func (gcp Gcp) EnsurePrincipalHasBucketRoles(ctx context.Context, bucketName, pr
 				if err := pkg.SleepWithContext(ctx, 3*time.Second); err != nil {
 					return err
 				}
-				continue
+				continue checkPolicy
 			}
 		}
 		return nil
@@ -359,6 +360,8 @@ func ensurePrincipalHasRolesWithResource(ctx context.Context, client resourceWit
 				continue
 			}
 			return fmt.Errorf("failed to set IAM policy for resource %s: %w", resource, err)
+		} else {
+			break
 		}
 	}
 
