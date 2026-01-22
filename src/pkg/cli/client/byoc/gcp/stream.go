@@ -392,8 +392,14 @@ func getLogEntryParser(ctx context.Context, gcpClient GcpLogsClient) func(entry 
 		var stderr bool
 		if entry.LogName != "" {
 			stderr = strings.HasSuffix(entry.LogName, "run.googleapis.com%2Fstderr")
-		} else if entry.GetJsonPayload() != nil && entry.GetJsonPayload().GetFields()["cos.googleapis.com/stream"] != nil {
-			stderr = entry.GetJsonPayload().GetFields()["cos.googleapis.com/stream"].GetStringValue() == "stderr"
+		}
+		if entry.GetJsonPayload() != nil {
+			if stream := entry.GetJsonPayload().GetFields()["cos.googleapis.com/stream"]; stream != nil {
+				stderr = stream.GetStringValue() == "stderr"
+			}
+		}
+		if entry.GetSeverity() > logtype.LogSeverity_WARNING {
+			stderr = true
 		}
 		if strings.Contains(strings.ToLower(msg), "error:") {
 			stderr = true
@@ -450,14 +456,14 @@ func getLogEntryParser(ctx context.Context, gcpClient GcpLogsClient) func(entry 
 			host = "cloudbuild"
 			if bt.IsDefangCD {
 				host = "pulumi"
-			}
-			// HACK: Detect cd start from cloudbuild logs to skip the cloud build image pulling logs
-			// " ** " or "Defang: " could come first in the log message when cd starts
-			if strings.HasPrefix(msg, " ** ") || strings.HasPrefix(msg, "Defang: ") {
-				cdStarted = true
-			}
-			if !cdStarted {
-				return nil, nil // Skip cloudbuild logs (like pulling cd image) before cd started
+				// HACK: Detect cd start from cloudbuild logs to skip the cloud build image pulling logs
+				// " ** " or "Defang: " could come first in the log message when cd starts
+				if strings.HasPrefix(msg, " ** ") || strings.HasPrefix(msg, "Defang: ") {
+					cdStarted = true
+				}
+				if !cdStarted {
+					return nil, nil // Skip cloudbuild logs (like pulling cd image) before cd started
+				}
 			}
 		} else {
 			var err error
