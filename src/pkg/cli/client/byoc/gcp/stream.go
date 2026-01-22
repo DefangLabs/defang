@@ -398,7 +398,7 @@ func getLogEntryParser(ctx context.Context, gcpClient GcpLogsClient) func(entry 
 				stderr = stream.GetStringValue() == "stderr"
 			}
 		}
-		if entry.GetSeverity() >= logtype.LogSeverity_WARNING {
+		if entry.GetSeverity() > logtype.LogSeverity_WARNING {
 			stderr = true
 		}
 		if strings.Contains(strings.ToLower(msg), "error:") {
