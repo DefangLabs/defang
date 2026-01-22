@@ -149,10 +149,6 @@ func (g *PlaygroundProvider) AccountInfo(ctx context.Context) (*AccountInfo, err
 	}, nil
 }
 
-func (g *PlaygroundProvider) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest) error {
-	return nil
-}
-
 func (g *PlaygroundProvider) PrepareDomainDelegation(ctx context.Context, req PrepareDomainDelegationRequest) (*PrepareDomainDelegationResponse, error) {
 	return nil, nil // Playground does not support delegate domains
 }
