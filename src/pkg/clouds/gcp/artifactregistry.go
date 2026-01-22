@@ -3,12 +3,9 @@ package gcp
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	artifactregistry "cloud.google.com/go/artifactregistry/apiv1"
 	"cloud.google.com/go/artifactregistry/apiv1/artifactregistrypb"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func (gcp Gcp) EnsureArtifactRegistryExists(ctx context.Context, repoName string) (string, error) {
@@ -46,16 +43,4 @@ func (gcp Gcp) EnsureArtifactRegistryExists(ctx context.Context, repoName string
 	}
 
 	return resp.Name, nil
-}
-
-func IsNotFound(err error) bool {
-	if grpcErr, ok := status.FromError(err); ok {
-		if grpcErr.Code() == codes.NotFound {
-			return true
-		}
-		if grpcErr.Code() == codes.Unknown && strings.HasSuffix(grpcErr.Message(), "notFound") {
-			return true
-		}
-	}
-	return false
 }

@@ -697,7 +697,7 @@ func (b *ByocGcp) ListConfig(ctx context.Context, req *defangv1.ListConfigsReque
 	prefix := b.resourceName(req.Project, "")
 	secrets, err := b.driver.ListSecrets(ctx, prefix)
 	if err != nil {
-		if stat, ok := status.FromError(err); ok && stat.Code() == codes.PermissionDenied {
+		if gcp.IsAccessNotEnabled(err) {
 			if err := b.driver.EnsureAPIsEnabled(ctx, "secretmanager.googleapis.com"); err != nil {
 				return nil, annotateGcpError(err)
 			}
@@ -717,7 +717,7 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 	term.Debugf("Creating secret %q", secretId)
 
 	if _, err := b.driver.CreateSecret(ctx, secretId); err != nil {
-		if stat, ok := status.FromError(err); ok && stat.Code() == codes.PermissionDenied {
+		if gcp.IsAccessNotEnabled(err) {
 			if err := b.driver.EnsureAPIsEnabled(ctx, "secretmanager.googleapis.com"); err != nil {
 				return annotateGcpError(err)
 			}

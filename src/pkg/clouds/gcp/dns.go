@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"google.golang.org/api/dns/v1"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func (gcp Gcp) getDNSZone(ctx context.Context, name string) (*dns.ManagedZone, *dns.Service, error) {
@@ -19,7 +17,7 @@ func (gcp Gcp) getDNSZone(ctx context.Context, name string) (*dns.ManagedZone, *
 	// This requires dns.googleapis.com service to be enabled in the GCP project
 	zone, err := zoneSvc.Get(gcp.ProjectId, name).Context(ctx).Do()
 	if err != nil {
-		if stat, ok := status.FromError(err); ok && stat.Code() == codes.PermissionDenied {
+		if IsAccessNotEnabled(err) {
 			if err := gcp.EnsureAPIsEnabled(ctx, "dns.googleapis.com"); err != nil {
 				return nil, nil, err
 			}
