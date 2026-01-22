@@ -289,6 +289,7 @@ func (gcp Gcp) EnsurePrincipalHasServiceAccountRoles(ctx context.Context, princi
 		}
 	}
 
+checkPolicy:
 	for start := time.Now(); time.Since(start) < 5*time.Minute; {
 		vp, err := client.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{Resource: resource})
 		if err != nil {
@@ -301,7 +302,7 @@ func (gcp Gcp) EnsurePrincipalHasServiceAccountRoles(ctx context.Context, princi
 				if err := pkg.SleepWithContext(ctx, 3*time.Second); err != nil {
 					return err
 				}
-				continue
+				continue checkPolicy
 			}
 		}
 		return nil
