@@ -49,6 +49,10 @@ func Test_BadGCPprojectnameErrorWrap(t *testing.T) {
 		Code:    403,
 		Message: "Project 'badprojectname' not found or permission denied.\nHelp Token: AcxmRmLSl-kWjuntWxEi67mxGpzJGGd2wYETCeD62ggFgHBNMRS8zqDD7iOMq9vTMPRs1XyX8q0G4JfCDJfKvTaPSV40gsoBHUJrq_eVdmFXUpNT",
 		Body:    rawBody,
+		Errors: []googleapi.ErrorItem{{
+			Message: "Project 'badprojectname' not found or permission denied.\nHelp Token: AcxmRmLSl-kWjuntWxEi67mxGpzJGGd2wYETCeD62ggFgHBNMRS8zqDD7iOMq9vTMPRs1XyX8q0G4JfCDJfKvTaPSV40gsoBHUJrq_eVdmFXUpNT",
+			Reason:  "forbidden",
+		}},
 	}
 
 	briefErr := briefGcpError{err: gcpErr}
