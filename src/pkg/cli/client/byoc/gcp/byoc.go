@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
 	"iter"
 	"os"
 	"path"
@@ -742,30 +741,6 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 	return nil
 }
 
-func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
-	var since, until time.Time
-	if req.Since.IsValid() {
-		since = req.Since.AsTime()
-	}
-	if req.Until.IsValid() {
-		until = req.Until.AsTime()
-	}
-	query := NewLogQuery(b.driver.GetProjectID())
-	query.AddSince(since)
-	query.AddUntil(until)
-
-	// Logs
-	query.AddCloudBuildLogQuery(b.PulumiStack, req.Project, req.Etag, req.Services)    // CloudBuild logs for CD and image builds
-	query.AddServiceLogQuery(b.PulumiStack, req.Project, req.Etag, req.Services)       // Cloudrun service logs
-	query.AddComputeEngineLogQuery(b.PulumiStack, req.Project, req.Etag, req.Services) // Compute Engine logs
-	// Status Updates
-	query.AddServiceStatusRequestUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
-	query.AddServiceStatusReponseUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
-	query.AddComputeEngineInstanceGroupInsertOrPatch(b.PulumiStack, req.Project, req.Etag, req.Services)
-
-	return query.GetQuery()
-}
-
 func LogEntryToString(logEntry *loggingpb.LogEntry) (string, string, error) {
 	result := ""
 	emptySpace := strings.Repeat(" ", len(time.RFC3339)+1) // length of what a time stampe would be
@@ -808,39 +783,6 @@ func LogEntriesToString(logEntries []*loggingpb.LogEntry) string {
 		result.WriteByte('\n')
 	}
 	return result.String()
-}
-
-func (b *ByocGcp) query(ctx context.Context, query string) ([]*loggingpb.LogEntry, error) {
-	term.Debugf("Querying logs with filter: \n %s", query)
-	var entries []*loggingpb.LogEntry
-	lister, err := b.driver.ListLogEntries(ctx, query, gcp.OrderAscending)
-	if err != nil {
-		return nil, err
-	}
-
-	for {
-		entry, err := lister.Next()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-		entries = append(entries, entry)
-	}
-
-	return entries, nil
-}
-
-func (b *ByocGcp) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest) error {
-	logEntries, err := b.query(ctx, b.createDeploymentLogQuery(req))
-	if err != nil {
-		return annotateGcpError(err)
-	}
-	req.Logs = LogEntriesToString(logEntries)
-	term.Debug(req.Logs)
-
-	return nil
 }
 
 func (b *ByocGcp) TearDownCD(ctx context.Context) error {
