@@ -123,9 +123,11 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 		AWSSecretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
 		switch {
 		case AWSAccessKeyID != "" && AWSSecretAccessKey != "":
-			term.Warnf("Both AWS_ACCESS_KEY_ID and AWS_PROFILE (%q) are set; AWS_ACCESS_KEY_ID takes precedence and AWS_PROFILE will be ignored", awsProfileName)
+			term.Warnf("Both AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY and AWS_PROFILE (%q) are set; access keys take precedence and AWS_PROFILE will be ignored", awsProfileName)
 		case AWSAccessKeyID != "" && AWSSecretAccessKey == "":
-			term.Warnf("Both AWS_PROFILE and AWS_ACCESS_KEY_ID set but AWS_SECRET_ACCESS_KEY is invalid; using AWS_PROFILE (%q) instead", awsProfileName)
+			term.Warnf("Partial credentials found in env, missing: AWS_SECRET_ACCESS_KEY; using AWS_PROFILE (%q) instead", awsProfileName)
+		case AWSAccessKeyID == "" && AWSSecretAccessKey != "":
+			term.Warnf("Partial credentials found in env, missing: AWS_ACCESS_KEY_ID; using AWS_PROFILE (%q) instead", awsProfileName)
 		}
 	}
 

@@ -191,7 +191,10 @@ func TestAWSEnv_ConflictingAWSCredentials(t *testing.T) {
 	envVars := []string{
 		"AWS_PROFILE",
 		"AWS_ACCESS_KEY_ID",
-		"AWS_SECRET_ACCESS_KEY"}
+		"AWS_SECRET_ACCESS_KEY",
+		"AWS_CONFIG_FILE",
+		"AWS_SHARED_CREDENTIALS_FILE",
+	}
 
 	for _, envVar := range envVars {
 		t.Setenv(envVar, "")
@@ -266,7 +269,7 @@ aws_secret_access_key = wJalrXUtnFEMI/KDEFANG/bPxRfiCYEXAMPLEKEY
 			configFiles:    false,
 			expectedError:  true,
 			expectWarning:  true,
-			warningContain: "Both AWS_PROFILE and AWS_ACCESS_KEY_ID set but AWS_SECRET_ACCESS_KEY is invalid",
+			warningContain: "Partial credentials found in env, missing: AWS_SECRET_ACCESS_KEY",
 		},
 		// With config files
 		{
@@ -299,7 +302,7 @@ aws_secret_access_key = wJalrXUtnFEMI/KDEFANG/bPxRfiCYEXAMPLEKEY
 			},
 			configFiles:    true,
 			expectWarning:  true,
-			warningContain: "Both AWS_PROFILE and AWS_ACCESS_KEY_ID set but AWS_SECRET_ACCESS_KEY is invalid",
+			warningContain: "Partial credentials found in env, missing: AWS_SECRET_ACCESS_KEY",
 		},
 		{
 			name: "AWS_PROFILE with both AWS keys, with config files",
@@ -310,7 +313,7 @@ aws_secret_access_key = wJalrXUtnFEMI/KDEFANG/bPxRfiCYEXAMPLEKEY
 			},
 			configFiles:    true,
 			expectWarning:  true,
-			warningContain: "AWS_ACCESS_KEY_ID takes precedence",
+			warningContain: "access keys take precedence",
 		},
 		// Edge cases
 		{
@@ -358,7 +361,7 @@ aws_secret_access_key = wJalrXUtnFEMI/KDEFANG/bPxRfiCYEXAMPLEKEY
 			configFiles:    true,
 			expectedError:  true,
 			expectWarning:  true,
-			warningContain: "Both AWS_PROFILE and AWS_ACCESS_KEY_ID set but AWS_SECRET_ACCESS_KEY is invalid",
+			warningContain: "Partial credentials found in env, missing: AWS_SECRET_ACCESS_KEY",
 		},
 	}
 
@@ -370,6 +373,10 @@ aws_secret_access_key = wJalrXUtnFEMI/KDEFANG/bPxRfiCYEXAMPLEKEY
 				// Point AWS SDK to our fake config files
 				t.Setenv("AWS_CONFIG_FILE", configPath)
 				t.Setenv("AWS_SHARED_CREDENTIALS_FILE", credentialsPath)
+			} else {
+				// Point AWS SDK to non-existent files to prevent finding real credentials
+				t.Setenv("AWS_CONFIG_FILE", filepath.Join(tmpDir, "nonexistent_config"))
+				t.Setenv("AWS_SHARED_CREDENTIALS_FILE", filepath.Join(tmpDir, "nonexistent_credentials"))
 			}
 
 			// Set test env vars
