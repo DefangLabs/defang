@@ -29,7 +29,9 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 		if err != nil {
 			if i < 2 {
 				term.Debugf("Failed to enable services, will retry in 5s: %v\n", err)
-				pkg.SleepWithContext(ctx, 5*time.Second)
+				if err := pkg.SleepWithContext(ctx, 5*time.Second); err != nil {
+					return err
+				}
 				continue
 			}
 			return fmt.Errorf("failed to batch enable services: %w", err)
@@ -44,14 +46,18 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 				if op.Error != nil {
 					if i < 2 {
 						term.Debugf("Failed to enable services operation, will retry in 5s: %v\n", op.Error)
-						pkg.SleepWithContext(ctx, 5*time.Second)
+						if err := pkg.SleepWithContext(ctx, 5*time.Second); err != nil {
+							return err
+						}
 						break
 					}
 					return fmt.Errorf("error in operation: %v", op.Error)
 				}
 				return nil
 			}
-			pkg.SleepWithContext(ctx, 3*time.Second)
+			if err := pkg.SleepWithContext(ctx, 3*time.Second); err != nil {
+				return err
+			}
 		}
 	}
 	return errors.New("failed to enable services after 3 attempts") // This should never be reached

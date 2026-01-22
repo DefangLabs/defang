@@ -673,7 +673,7 @@ func (b *ByocGcp) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 				return nil, cde
 			}
 		}
-		return nil, err
+		return nil, annotateGcpError(err)
 	} else {
 		b.delegateDomainZone = zone.Name
 		term.Debugf("Zone %s created with nameservers %v", zone.Name, zone.NameServers)

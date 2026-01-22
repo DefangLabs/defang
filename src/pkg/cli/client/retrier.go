@@ -15,7 +15,9 @@ func (Retrier) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		res, err := next(ctx, req)
 		if connect.CodeOf(err) == connect.CodeUnavailable {
 			// Retry once after a 1 second sleep
-			pkg.SleepWithContext(ctx, 1*time.Second)
+			if err := pkg.SleepWithContext(ctx, 1*time.Second); err != nil {
+				return nil, err
+			}
 			res, err = next(ctx, req)
 		}
 		return res, err
