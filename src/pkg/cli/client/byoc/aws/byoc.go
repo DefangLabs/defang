@@ -762,6 +762,13 @@ func (b *ByocAws) queryLogs(ctx context.Context, cwClient *cloudwatchlogs.Client
 			}
 			return nil, errors.Join(errs...)
 		}
+		if len(req.Services) == 0 {
+			albCh, err := b.fetchAndStreamAlbLogs(ctx, req.Project, start, end)
+			if err == nil {
+				evtsChan = cw.MergeLogEventChan(evtsChan, albCh)
+			}
+		}
+
 		// TODO: any errors from errsChan should be reported but get dropped
 		return cw.NewStaticLogStream(evtsChan, func() {}), nil
 	}

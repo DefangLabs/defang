@@ -91,6 +91,9 @@ func (bs *byocServerStream) parseEvents(events []cw.LogEvent) *defangv1.TailResp
 	// Get the Etag/Host/Service from the first entry (should be the same for all events in this batch)
 	first := events[0]
 	switch {
+	case first.LogGroupIdentifier == nil || first.LogStreamName == nil:
+		response.Service = "alb"
+		// response.Host = TODO: we can get the ALB IP from the bucket object name
 	case strings.HasSuffix(*first.LogGroupIdentifier, "/ecs"):
 		// ECS lifecycle events. LogStreams: "f0b805a8-fa74-3212-b6ce-a981c011d337"
 		parseECSEventRecords = true

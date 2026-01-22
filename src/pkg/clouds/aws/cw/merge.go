@@ -1,7 +1,7 @@
 package cw
 
 // Inspired by https://dev.to/vinaygo/concurrency-merge-sort-using-channels-and-goroutines-in-golang-35f7
-func Mergech[T any](left chan T, right chan T, c chan T, less func(T, T) bool) {
+func Mergech[T any](left <-chan T, right <-chan T, c chan<- T, less func(T, T) bool) {
 	defer close(c)
 	val, ok := <-left
 	val2, ok2 := <-right
@@ -24,7 +24,7 @@ func Mergech[T any](left chan T, right chan T, c chan T, less func(T, T) bool) {
 	}
 }
 
-func mergeLogEventChan(left, right chan LogEvent) chan LogEvent {
+func MergeLogEventChan(left, right <-chan LogEvent) <-chan LogEvent {
 	if left == nil {
 		return right
 	}
