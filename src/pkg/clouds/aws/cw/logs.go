@@ -115,7 +115,7 @@ type FilterLogEventsAPI interface {
 }
 
 func QueryLogGroups(ctx context.Context, cwClient FilterLogEventsAPI, start, end time.Time, limit int32, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
-	var evtsChan chan LogEvent
+	var evtsChan <-chan LogEvent
 	errChan := make(chan error, len(logGroups))
 	var wg sync.WaitGroup
 	for _, lgi := range logGroups {
@@ -143,9 +143,9 @@ func QueryLogGroups(ctx context.Context, cwClient FilterLogEventsAPI, start, end
 				errChan <- fmt.Errorf("error querying log group %q: %w", lgi.LogGroupARN, err)
 			}
 		}(lgi)
-		evtsChan = mergeLogEventChan(evtsChan, lgEvtChan) // Merge sort the log events based on timestamp
-		// take the last n events only
+		evtsChan = MergeLogEventChan(evtsChan, lgEvtChan) // Merge sort the log events based on timestamp
 		if limit > 0 {
+			// take the first/last n events only
 			if start.IsZero() {
 				evtsChan = takeLastN(evtsChan, int(limit))
 			} else {
@@ -297,7 +297,7 @@ func GetLogEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {
 	}
 }
 
-func takeLastN[T any](input chan T, n int) chan T {
+func takeLastN[T any](input <-chan T, n int) <-chan T {
 	if n <= 0 {
 		return input
 	}
@@ -318,7 +318,7 @@ func takeLastN[T any](input chan T, n int) chan T {
 	return out
 }
 
-func takeFirstN[T any](input chan T, n int) chan T {
+func takeFirstN[T any](input <-chan T, n int) <-chan T {
 	if n <= 0 {
 		return input
 	}
