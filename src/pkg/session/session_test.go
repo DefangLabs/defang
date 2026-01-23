@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 
@@ -82,13 +83,15 @@ func TestLoadSession(t *testing.T) {
 		options       SessionLoaderOptions
 		existingStack *stacks.Parameters
 		stacksList    []stacks.ListItem
+		getStackError error
 		expectedError string
 		expectedStack *stacks.Parameters
 		expectedEnv   map[string]string
 	}{
 		{
-			name:    "empty options - fallback stack",
-			options: SessionLoaderOptions{},
+			name:          "empty options - fallback stack",
+			options:       SessionLoaderOptions{},
+			getStackError: errors.New("no default stack set for project"),
 			expectedStack: &stacks.Parameters{
 				Name: "beta",
 			},
@@ -128,6 +131,7 @@ func TestLoadSession(t *testing.T) {
 			options: SessionLoaderOptions{
 				ProjectName: "foo",
 			},
+			getStackError: errors.New("no default stack set for project"),
 			expectedStack: &stacks.Parameters{
 				Name: "beta",
 			},
@@ -143,7 +147,20 @@ func TestLoadSession(t *testing.T) {
 				Provider:  client.ProviderAWS,
 				Variables: map[string]string{},
 			},
+			getStackError: errors.New("no default stack set for project"),
 			expectedError: "",
+		},
+		{
+			name: "no stack - RequireStack true",
+			options: SessionLoaderOptions{
+				ProjectName: "foo",
+				ProviderID:  client.ProviderGCP,
+				GetStackOpts: stacks.GetStackOpts{
+					RequireStack: true,
+				},
+			},
+			getStackError: errors.New("no default stack set for project"),
+			expectedError: "no default stack set for project",
 		},
 	}
 
@@ -164,9 +181,8 @@ func TestLoadSession(t *testing.T) {
 				if tt.options.GetStackOpts.Stack != "" {
 					// For specified non-existing stack, return ErrNotExist
 					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", &stacks.ErrNotExist{StackName: tt.options.GetStackOpts.Stack})
-				} else {
-					// For empty stack (should fall back to beta), return ErrDefaultStackNotSet
-					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", stacks.ErrDefaultStackNotSet)
+				} else if tt.getStackError != nil {
+					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", tt.getStackError)
 				}
 			} else {
 				sm.On("GetStack", ctx, mock.Anything).Maybe().Return(tt.existingStack, "local", nil)
