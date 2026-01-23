@@ -76,6 +76,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			options := newSessionLoaderOptionsForCommand(cmd)
 			options.AllowStackCreation = true
+			options.RequireStack = true
 			sm, err := newStackManagerForLoader(ctx, configureLoader(cmd))
 			if err != nil {
 				return err
