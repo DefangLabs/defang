@@ -34,7 +34,7 @@ func newCommandSessionWithOpts(cmd *cobra.Command, opts commandSessionOpts) (*se
 	ctx := cmd.Context()
 
 	options := newSessionLoaderOptionsForCommand(cmd)
-	options.RequireStack = opts.RequireStack
+	options.DisallowFallbackStack = opts.RequireStack
 	sm, err := newStackManagerForLoader(ctx, configureLoader(cmd))
 	if err != nil {
 		if opts.RequireStack {

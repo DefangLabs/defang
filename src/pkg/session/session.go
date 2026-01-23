@@ -78,7 +78,7 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, str
 	}
 	stack, whence, err := sl.sm.GetStack(ctx, sl.opts.GetStackOpts)
 	if err != nil {
-		if sl.opts.RequireStack || sl.opts.GetStackOpts.Stack != "" {
+		if sl.opts.DisallowFallbackStack || sl.opts.GetStackOpts.Stack != "" {
 			return nil, "", err
 		}
 		if sl.opts.ProviderID != "" {

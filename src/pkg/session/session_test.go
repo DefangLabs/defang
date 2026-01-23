@@ -156,7 +156,7 @@ func TestLoadSession(t *testing.T) {
 				ProjectName: "foo",
 				ProviderID:  client.ProviderGCP,
 				GetStackOpts: stacks.GetStackOpts{
-					RequireStack: true,
+					DisallowFallbackStack: true,
 				},
 			},
 			getStackError: errors.New("no default stack set for project"),

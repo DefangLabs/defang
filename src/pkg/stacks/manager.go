@@ -200,17 +200,17 @@ func (sm *manager) Create(params Parameters) (string, error) {
 }
 
 type GetStackOpts struct {
-	Stack              string
-	Interactive        bool
-	RequireStack       bool
-	AllowStackCreation bool
+	Stack                 string
+	Interactive           bool
+	DisallowFallbackStack bool
+	AllowStackCreation    bool
 }
 
 func (sl *manager) GetStack(ctx context.Context, opts GetStackOpts) (*Parameters, string, error) {
 	if opts.Stack != "" {
 		return sl.getSpecifiedStack(ctx, opts.Stack)
 	}
-	if opts.Interactive && opts.RequireStack {
+	if opts.Interactive && opts.DisallowFallbackStack {
 		return sl.getStackInteractively(ctx, opts)
 	}
 	return sl.getDefaultStack(ctx)

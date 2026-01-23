@@ -767,9 +767,9 @@ func TestGetStack(t *testing.T) {
 			name:        "interactive selection - stack required",
 			projectName: "foo",
 			options: GetStackOpts{
-				Interactive:        true,
-				AllowStackCreation: true,
-				RequireStack:       true,
+				Interactive:           true,
+				AllowStackCreation:    true,
+				DisallowFallbackStack: true,
 			},
 			remoteStack: &Parameters{
 				Name:     "existingstack",
