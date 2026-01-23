@@ -70,7 +70,7 @@ type ErrMissingAwsCreds struct {
 }
 
 func (e ErrMissingAwsCreds) Error() string {
-	return "Could not authenticate to the AWS service. Please check your AWS credentials and try again. (https://docs.defang.io/docs/providers/aws/#getting-started)"
+	return "Could not authenticate to the AWS service. Please check your AWS credentials and try again. (https://s.defang.io/aws-setup)"
 }
 
 func (e ErrMissingAwsCreds) Unwrap() error {
@@ -82,7 +82,7 @@ type ErrMissingAwsRegion struct {
 }
 
 func (e ErrMissingAwsRegion) Error() string {
-	return e.err.Error() + " (https://docs.defang.io/docs/providers/aws#region)"
+	return e.err.Error() + " (https://s.defang.io/aws#region)"
 }
 
 func (e ErrMissingAwsRegion) Unwrap() error {

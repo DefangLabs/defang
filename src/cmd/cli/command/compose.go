@@ -271,7 +271,7 @@ func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.D
 		if err != nil {
 			term.Debugf("Failed to create stack %v", err)
 		} else {
-			term.Info(stacks.PostCreateMessage(stackName))
+			stacks.PrintCreateMessage(stackName)
 		}
 	}
 	return true, nil
@@ -321,7 +321,7 @@ func promptToCreateStack(ctx context.Context, targetDirectory string, params sta
 		return err
 	}
 
-	term.Info(stacks.PostCreateMessage(params.Name))
+	stacks.PrintCreateMessage(params.Name)
 
 	return nil
 }

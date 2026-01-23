@@ -245,13 +245,13 @@ func filename(workingDirectory, stackname string) string {
 	return filepath.Join(workingDirectory, Directory, stackname)
 }
 
-func PostCreateMessage(stackName string) string {
-	return fmt.Sprintf(
-		"A stack file has been created at `.defang/%s`.\n"+
-			"This file contains the configuration for this stack.\n"+
+func PrintCreateMessage(stackName string) {
+	term.Infof("A stack file has been created at `.defang/%s`.", stackName)
+	term.Printf(
+		"This file contains the configuration for this stack.\n"+
 			"We recommend you commit this file to source control, so it can be used by everyone on your team.\n"+
 			"You can now deploy using `defang up --stack=%s`.\n"+
-			"To learn more about stacks, visit https://docs.defang.io/docs/concepts/stacks",
-		stackName, stackName,
+			"To learn more about stacks, visit https://s.defang.io/stacks\n",
+		stackName,
 	)
 }

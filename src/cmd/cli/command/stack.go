@@ -68,7 +68,7 @@ func makeStackNewCmd() *cobra.Command {
 				return err
 			}
 
-			term.Info(stacks.PostCreateMessage(params.Name))
+			stacks.PrintCreateMessage(params.Name)
 			return nil
 		},
 	}
