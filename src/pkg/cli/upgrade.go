@@ -26,12 +26,6 @@ func Upgrade(ctx context.Context) error {
 	}
 	term.Debugf(" - Evaluated: %s\n", ex)
 
-	prefix, err := homebrewPrefix(ctx)
-	if err == nil && strings.HasPrefix(ex, prefix) {
-		printInstructions("brew upgrade -g defang")
-		return nil
-	}
-
 	if strings.HasPrefix(ex, "/nix/store/") {
 		// Detect whether the user has used Flakes or nix-env
 		if strings.Contains(ex, "-defang-cli-") {
@@ -64,6 +58,12 @@ func Upgrade(ctx context.Context) error {
 		}
 	}
 
+	prefix, err := homebrewPrefix(ctx)
+	if err == nil && strings.HasPrefix(ex, prefix) {
+		printInstructions("brew upgrade -g defang")
+		return nil
+	}
+
 	// Default to the shell script
 	printInstructions(`eval "$(curl -fsSL s.defang.io/install)"`)
 
@@ -71,19 +71,25 @@ func Upgrade(ctx context.Context) error {
 }
 
 func homebrewPrefix(ctx context.Context) (string, error) {
+	const HOMEBREW_PREFIX = "HOMEBREW_PREFIX"
+
+	if homebrewPrefix := os.Getenv(HOMEBREW_PREFIX); homebrewPrefix != "" {
+		return homebrewPrefix, nil
+	}
+
+	// Run `brew config` to find the prefix (this is slow)
 	output, err := exec.CommandContext(ctx, "brew", "config").Output()
 	if err != nil {
 		return "", err
 	}
 	// filter out the line which includes HOMEBREW_PREFIX
-	const HOMEBREW_PREFIX = "HOMEBREW_PREFIX: "
 	for _, line := range strings.Split(string(output), "\n") {
 		// remove the prefix from the line
-		if homebrewPrefix, ok := strings.CutPrefix(line, HOMEBREW_PREFIX); ok {
+		if homebrewPrefix, ok := strings.CutPrefix(line, HOMEBREW_PREFIX+": "); ok {
 			return homebrewPrefix, nil
 		}
 	}
-	return "", errors.New("HOMEBREW_PREFIX not found in brew config")
+	return "", errors.New(HOMEBREW_PREFIX + " not found")
 }
 
 func printInstructions(cmd string) {
