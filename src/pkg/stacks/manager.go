@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -117,6 +118,15 @@ func (sm *manager) ListRemote(ctx context.Context) ([]ListItem, error) {
 		if err != nil {
 			term.Warnf("Skipping invalid remote stack %s: %v\n", name, err)
 			continue
+		}
+		if params.Mode == modes.ModeUnspecified {
+			params.Mode = modes.Mode(stack.GetMode())
+		}
+		if params.Region == "" {
+			params.Region = stack.GetRegion()
+		}
+		if params.Provider == "" {
+			params.Provider.SetValue(stack.GetProvider())
 		}
 		stackParams = append(stackParams, ListItem{
 			Parameters: *params,
