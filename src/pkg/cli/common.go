@@ -59,7 +59,7 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 	now := timestamppb.Now()
 
 	if req.Action == defangv1.DeploymentAction_DEPLOYMENT_ACTION_UP {
-		stackFileContent, err := stacks.Marshal(stack)
+		stackFile, err := stacks.Marshal(stack)
 		if err != nil {
 			return err
 		}
@@ -74,7 +74,7 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 				Mode:              req.Mode,
 				ProviderAccountId: accountInfo.AccountID,
 				LastDeployedAt:    now,
-				StackFile:         []byte(stackFileContent),
+				StackFile:         []byte(stackFile),
 			},
 		}); err != nil {
 			return err

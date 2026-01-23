@@ -32,7 +32,7 @@ func NewSelector(ec elicitations.Controller, sm Manager) *stackSelector {
 }
 
 type SelectStackOptions struct {
-	AllowCreate bool
+	AllowStackCreation bool
 }
 
 func (ss *stackSelector) SelectStack(ctx context.Context, opts SelectStackOptions) (*Parameters, error) {
@@ -46,7 +46,7 @@ func (ss *stackSelector) SelectStack(ctx context.Context, opts SelectStackOption
 
 	var selectedName string
 	if len(stackList) == 0 {
-		if opts.AllowCreate {
+		if opts.AllowStackCreation {
 			return ss.createStack(ctx)
 		} else {
 			return nil, errors.New("no stacks available to select")
@@ -67,7 +67,7 @@ func (ss *stackSelector) SelectStack(ctx context.Context, opts SelectStackOption
 		stackNames = append(stackNames, s.Name)
 		labelMap[label] = s.Name
 	}
-	if opts.AllowCreate {
+	if opts.AllowStackCreation {
 		stackLabels = append(stackLabels, CreateNewStack)
 	}
 

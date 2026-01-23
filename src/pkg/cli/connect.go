@@ -44,7 +44,7 @@ func NewProvider(ctx context.Context, providerID client.ProviderID, fabricClient
 	case client.ProviderGCP:
 		provider = gcp.NewByocProvider(ctx, fabricClient.GetTenantName(), stack)
 	default:
-		provider = &client.PlaygroundProvider{FabricClient: fabricClient}
+		provider = client.NewPlaygroundProvider(fabricClient, stack)
 	}
 	return provider
 }

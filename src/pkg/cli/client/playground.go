@@ -18,12 +18,20 @@ type PlaygroundProvider struct {
 	FabricClient
 	RetryDelayer
 	shardDomain string
+	Stack       string
 }
 
 var _ Provider = (*PlaygroundProvider)(nil)
 
+func NewPlaygroundProvider(fabricClient FabricClient, stack string) *PlaygroundProvider {
+	return &PlaygroundProvider{
+		FabricClient: fabricClient,
+		Stack:        stack,
+	}
+}
+
 func (g *PlaygroundProvider) GetStackName() string {
-	return "" // Playground does not use stacks
+	return g.Stack
 }
 
 func (g *PlaygroundProvider) Deploy(ctx context.Context, req *DeployRequest) (*defangv1.DeployResponse, error) {

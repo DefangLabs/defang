@@ -44,8 +44,8 @@ func (b *Mode) Set(s string) error {
 	return nil
 }
 
-func Parse(s string) (Mode, error) {
-	upper := strings.ToUpper(s)
+func Parse(str string) (Mode, error) {
+	upper := strings.ToUpper(str)
 	mode, ok := defangv1.DeploymentMode_value[upper]
 	if !ok {
 		switch upper {
@@ -56,7 +56,7 @@ func Parse(s string) (Mode, error) {
 		case "HA", "HIGH_AVAILABILITY", "HIGH-AVAILABILITY":
 			mode = int32(defangv1.DeploymentMode_PRODUCTION)
 		default:
-			return 0, fmt.Errorf("invalid mode: %s, not one of %v", s, AllDeploymentModes())
+			return 0, fmt.Errorf("invalid mode: %q, not one of %v", str, AllDeploymentModes())
 		}
 	}
 	return Mode(mode), nil
