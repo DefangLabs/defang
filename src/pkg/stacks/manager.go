@@ -224,6 +224,8 @@ func (e *ErrNotExist) Error() string {
 	return fmt.Sprintf("stack %q does not exist", e.StackName)
 }
 
+var ErrDefaultStackNotSet = errors.New("no default stack set for project")
+
 func (sm *manager) getSpecifiedStack(ctx context.Context, name string) (*Parameters, string, error) {
 	whence := "--stack flag"
 	_, envSet := os.LookupEnv("DEFANG_STACK")
@@ -278,9 +280,7 @@ func (sm *manager) getDefaultStack(ctx context.Context) (*Parameters, string, er
 		if connect.CodeOf(err) != connect.CodeNotFound {
 			return nil, "", err
 		}
-		term.Debugf("No default stack set for project %q; using fallback", sm.projectName)
-
-		return nil, "", errors.New("no default stack set for project")
+		return nil, "", ErrDefaultStackNotSet
 	}
 
 	whence := "default stack from server"

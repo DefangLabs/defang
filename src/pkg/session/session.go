@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -80,6 +81,9 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, str
 	if err != nil {
 		if sl.opts.DisallowFallbackStack || sl.opts.GetStackOpts.Stack != "" {
 			return nil, "", err
+		}
+		if errors.Is(err, stacks.ErrDefaultStackNotSet) {
+			term.Debugf("No default stack set for project %q; using fallback", sl.opts.ProjectName)
 		}
 		if sl.opts.ProviderID != "" {
 			whence = "--provider flag"
