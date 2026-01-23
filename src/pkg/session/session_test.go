@@ -2,7 +2,6 @@ package session
 
 import (
 	"context"
-	"errors"
 	"os"
 	"testing"
 
@@ -166,8 +165,8 @@ func TestLoadSession(t *testing.T) {
 					// For specified non-existing stack, return ErrNotExist
 					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", &stacks.ErrNotExist{StackName: tt.options.GetStackOpts.Stack})
 				} else {
-					// For empty stack (should fall back to beta), return a general error that's not ErrNotExist
-					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", errors.New("no default stack set for project"))
+					// For empty stack (should fall back to beta), return ErrDefaultStackNotSet
+					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", stacks.ErrDefaultStackNotSet)
 				}
 			} else {
 				sm.On("GetStack", ctx, mock.Anything).Maybe().Return(tt.existingStack, "local", nil)

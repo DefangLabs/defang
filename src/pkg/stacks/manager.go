@@ -119,6 +119,7 @@ func (sm *manager) ListRemote(ctx context.Context) ([]ListItem, error) {
 			term.Warnf("Skipping invalid remote stack %s: %v\n", name, err)
 			continue
 		}
+		// fill in missing fields from remote stack info
 		if params.Mode == modes.ModeUnspecified {
 			params.Mode = modes.Mode(stack.GetMode())
 		}
@@ -223,6 +224,8 @@ func (e *ErrNotExist) Error() string {
 	return fmt.Sprintf("stack %q does not exist", e.StackName)
 }
 
+var ErrDefaultStackNotSet = errors.New("no default stack set for project")
+
 func (sm *manager) getSpecifiedStack(ctx context.Context, name string) (*Parameters, string, error) {
 	whence := "--stack flag"
 	_, envSet := os.LookupEnv("DEFANG_STACK")
@@ -256,7 +259,7 @@ func (sm *manager) getSpecifiedStack(ctx context.Context, name string) (*Paramet
 func (sm *manager) getStackInteractively(ctx context.Context, opts GetStackOpts) (*Parameters, string, error) {
 	stackSelector := NewSelector(sm.ec, sm)
 	stack, err := stackSelector.SelectStack(ctx, SelectStackOptions{
-		AllowCreate: opts.AllowStackCreation,
+		AllowStackCreation: opts.AllowStackCreation,
 	})
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to select stack: %w", err)
@@ -278,7 +281,7 @@ func (sm *manager) getDefaultStack(ctx context.Context) (*Parameters, string, er
 			return nil, "", err
 		}
 		term.Debugf("No default stack set for project %q; using fallback", sm.projectName)
-		return nil, "", errors.New("no default stack set for project")
+		return nil, "", ErrDefaultStackNotSet
 	}
 
 	whence := "default stack from server"

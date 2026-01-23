@@ -21,7 +21,7 @@ func SetDefaultStack(ctx context.Context, stacksPutter StacksPutter, stacksLoade
 		return err
 	}
 
-	stackfile, err := stacks.Marshal(stack)
+	stackFile, err := stacks.Marshal(stack)
 	if err != nil {
 		return err
 	}
@@ -34,7 +34,7 @@ func SetDefaultStack(ctx context.Context, stacksPutter StacksPutter, stacksLoade
 			Region:    stack.Region,
 			Mode:      stack.Mode.Value(),
 			IsDefault: true,
-			StackFile: []byte(stackfile),
+			StackFile: []byte(stackFile),
 		},
 	})
 	return err

@@ -42,11 +42,15 @@ func DeploymentsList(ctx context.Context, client client.FabricClient, params Lis
 
 	numDeployments := len(response.Deployments)
 	if numDeployments == 0 {
+		var active string
+		if params.ListType == defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE {
+			active = " active"
+		}
 		var err error
 		if params.ProjectName == "" {
-			_, err = term.Warn("No deployments found")
+			_, err = term.Warnf("No%s deployments found; use --workspace to specify a different workspace", active)
 		} else {
-			_, err = term.Warnf("No deployments found for project %q", params.ProjectName)
+			_, err = term.Warnf("No%s deployments found for project %q", active, params.ProjectName)
 		}
 		return err
 	}

@@ -79,8 +79,7 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, str
 	}
 	stack, whence, err := sl.sm.GetStack(ctx, sl.opts.GetStackOpts)
 	if err != nil {
-		var notExistErr *stacks.ErrNotExist
-		if errors.As(err, &notExistErr) {
+		if !errors.Is(err, stacks.ErrDefaultStackNotSet) {
 			return nil, "", err
 		}
 		if sl.opts.ProviderID != "" {
