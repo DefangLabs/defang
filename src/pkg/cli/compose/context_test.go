@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -251,8 +252,12 @@ func Test_getRemoteBuildContext(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			provider := client.MockProvider{UploadUrl: server.URL}
+			context := "../../../testdata/testproj"
+			if err := standardizeDirMode(context); err != nil {
+				t.Fatalf("Failed to standardize directory modes: %v", err)
+			}
 			url, err := getRemoteBuildContext(t.Context(), provider, "project1", "service1", &types.BuildConfig{
-				Context: "../../../testdata/testproj",
+				Context: context,
 			}, tt.uploadMode)
 			if err != nil {
 				t.Fatalf("getRemoteBuildContext() failed: %v", err)
@@ -273,6 +278,25 @@ func Test_getRemoteBuildContext(t *testing.T) {
 			}
 		})
 	}
+}
+
+func standardizeDirMode(dir string) error {
+	// Ensure root directory itself is 0755
+	if err := os.Chmod(dir, 0755); err != nil {
+		return fmt.Errorf("chmod root: %w", err)
+	}
+
+	return filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() {
+			return os.Chmod(path, 0755)
+		}
+
+		return os.Chmod(path, 0644)
+	})
 }
 
 func TestCreateTarballReader(t *testing.T) {
