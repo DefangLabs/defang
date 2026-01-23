@@ -545,8 +545,8 @@ func makeComposeConfigCmd() *cobra.Command {
 			ctx := cmd.Context()
 
 			session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
-				CheckAccountInfo: false,
-				RequireStack:     false, // for `compose config` it's OK to proceed without a stack
+				CheckAccountInfo:      false,
+				DisallowFallbackStack: false, // for `compose config` it's OK to proceed without a stack
 			})
 			if err != nil {
 				return fmt.Errorf("loading session: %w", err)

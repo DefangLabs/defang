@@ -23,8 +23,8 @@ var whoamiCmd = &cobra.Command{
 		global.NonInteractive = true // don't show provider prompt
 
 		session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
-			CheckAccountInfo: false,
-			RequireStack:     false, // for WhoAmI it's OK to proceed without a stack
+			CheckAccountInfo:      false,
+			DisallowFallbackStack: false, // for WhoAmI it's OK to proceed without a stack
 		})
 		if err != nil {
 			return fmt.Errorf("loading session: %w", err)

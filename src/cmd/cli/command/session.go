@@ -19,14 +19,14 @@ import (
 )
 
 type commandSessionOpts struct {
-	CheckAccountInfo bool
-	RequireStack     bool
+	CheckAccountInfo      bool
+	DisallowFallbackStack bool
 }
 
 func newCommandSession(cmd *cobra.Command) (*session.Session, error) {
 	return newCommandSessionWithOpts(cmd, commandSessionOpts{
-		CheckAccountInfo: true,
-		RequireStack:     true,
+		CheckAccountInfo:      true,
+		DisallowFallbackStack: true,
 	})
 }
 
@@ -34,10 +34,10 @@ func newCommandSessionWithOpts(cmd *cobra.Command, opts commandSessionOpts) (*se
 	ctx := cmd.Context()
 
 	options := newSessionLoaderOptionsForCommand(cmd)
-	options.DisallowFallbackStack = opts.RequireStack
+	options.DisallowFallbackStack = opts.DisallowFallbackStack
 	sm, err := newStackManagerForLoader(ctx, configureLoader(cmd))
 	if err != nil {
-		if opts.RequireStack {
+		if opts.DisallowFallbackStack {
 			return nil, err
 		}
 		term.Debugf("Could not create stack manager: %v", err)
