@@ -183,7 +183,6 @@ func TestWalkContextFolder(t *testing.T) {
 }
 
 func Test_getRemoteBuildContext(t *testing.T) {
-	term.SetDebug(testing.Verbose())
 	tests := []struct {
 		name       string
 		uploadMode UploadMode
