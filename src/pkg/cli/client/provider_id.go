@@ -75,7 +75,7 @@ func (p *ProviderID) Set(str string) error {
 		}
 	}
 
-	return fmt.Errorf("provider not one of %v", allProviders)
+	return fmt.Errorf("invalid provider: %q, not one of %v", str, allProviders)
 }
 
 func (p *ProviderID) SetValue(val defangv1.Provider) {

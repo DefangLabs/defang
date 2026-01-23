@@ -59,22 +59,23 @@ func paramsFromMap(variables map[string]string) (*Parameters, error) {
 	if variables == nil {
 		return nil, errors.New("properties map cannot be nil")
 	}
+	var region string
 	var provider client.ProviderID
 	if val, ok := variables["DEFANG_PROVIDER"]; ok {
 		err := provider.Set(val)
 		if err != nil {
-			return nil, fmt.Errorf("invalid DEFANG_PROVIDER value %q: %w", val, err)
+			return nil, fmt.Errorf("invalid DEFANG_PROVIDER value: %w", err)
 		}
+		regionVarName := client.GetRegionVarName(provider) // FIXME: GCP supports 5 different region vars
+		region = variables[regionVarName]
 	}
 	var mode modes.Mode
 	if val, ok := variables["DEFANG_MODE"]; ok {
 		err := mode.Set(val)
 		if err != nil {
-			return nil, fmt.Errorf("invalid DEFANG_MODE value %q: %w", val, err)
+			return nil, fmt.Errorf("invalid DEFANG_MODE value: %w", err)
 		}
 	}
-	regionVarName := client.GetRegionVarName(provider) // NOTE: GCP supports 5 different region vars
-	region := variables[regionVarName]
 	return &Parameters{
 		Variables: variables,
 		Provider:  provider,
