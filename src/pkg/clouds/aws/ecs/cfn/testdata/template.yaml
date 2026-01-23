@@ -66,7 +66,9 @@ Outputs:
         Condition: OidcProvider
         Description: ARN of the CI role
         Value:
-            Ref: CIRole
+            Fn::GetAtt:
+                - CIRole
+                - Arn
     clusterName:
         Description: Name of the ECS cluster
         Value:

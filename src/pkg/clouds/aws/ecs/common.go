@@ -19,6 +19,7 @@ type TaskArn = clouds.TaskID
 type AwsEcs struct {
 	aws.Aws
 	BucketName             string
+	CIRoleARN              string
 	ClusterName            string
 	DefaultSecurityGroupID string
 	LogGroupARN            string

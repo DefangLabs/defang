@@ -222,7 +222,7 @@ func Test_getRemoteBuildContext(t *testing.T) {
 		},
 	}
 
-	tmpDir := t.TempDir()
+	tmpDir := t.TempDir() // change this to "/tmp" or so to inspect the files
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "PUT" {

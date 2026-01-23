@@ -8,6 +8,6 @@ const (
 	OutputsLogGroupARN            = "logGroupArn"
 	OutputsSecurityGroupID        = "securityGroupId"
 	OutputsSubnetID               = "subnetId"
-	OutputsTaskDefArn             = "taskDefArn"
+	OutputsTaskDefARN             = "taskDefArn"
 	OutputsTemplateVersion        = "templateVersion"
 )

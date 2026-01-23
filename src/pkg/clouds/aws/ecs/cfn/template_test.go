@@ -43,31 +43,33 @@ func TestGetCacheRepoPrefix(t *testing.T) {
 	}
 }
 
+var testContainers = []clouds.Container{
+	{
+		Image: "alpine:latest",
+	},
+	{
+		Image: "docker.io/library/alpine:latest",
+		Name:  "main2",
+	},
+	{
+		Name:     "main3",
+		Image:    "public.ecr.aws/docker/library/alpine:latest",
+		Memory:   512_000_000,
+		Platform: "linux/amd64",
+	},
+}
+
 func createTestTemplate(t *testing.T) []byte {
 	t.Helper()
-	template, err := CreateTemplate("test", []clouds.Container{
-		{
-			Image: "alpine:latest",
-		},
-		{
-			Image: "docker.io/library/alpine:latest",
-			Name:  "main2",
-		},
-		{
-			Name:     "main3",
-			Image:    "public.ecr.aws/docker/library/alpine:latest",
-			Memory:   512_000_000,
-			Platform: "linux/amd64",
-		},
-	})
+	template, err := CreateTemplate("test", testContainers)
 	if err != nil {
 		t.Fatalf("Error creating template: %v", err)
 	}
-	actual, err := template.YAML()
+	templateBody, err := template.YAML()
 	if err != nil {
 		t.Fatalf("Error generating template YAML: %v", err)
 	}
-	return actual
+	return templateBody
 }
 
 func TestCreateTemplate(t *testing.T) {

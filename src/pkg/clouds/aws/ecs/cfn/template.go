@@ -672,9 +672,9 @@ func CreateTemplate(stack string, containers []clouds.Container) (*cloudformatio
 	template.Outputs[OutputsCIRoleARN] = cloudformation.Output{
 		Condition:   ptr.String(_condOidcProvider),
 		Description: ptr.String("ARN of the CI role"),
-		Value:       cloudformation.Ref(_CIRole),
+		Value:       cloudformation.GetAtt(_CIRole, "Arn"),
 	}
-	template.Outputs[OutputsTaskDefArn] = cloudformation.Output{
+	template.Outputs[OutputsTaskDefARN] = cloudformation.Output{
 		Description: ptr.String("ARN of the ECS task definition"),
 		Value:       cloudformation.Ref(_taskDefinition),
 	}
