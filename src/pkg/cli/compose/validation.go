@@ -25,7 +25,7 @@ type ListConfigNamesFunc func(context.Context) ([]string, error)
 type ErrMissingConfig []string
 
 func (e ErrMissingConfig) Error() string {
-	return fmt.Sprintf("missing configs %q (https://docs.defang.io/docs/concepts/configuration)", ([]string)(e))
+	return fmt.Sprintf("missing configs %q (https://s.defang.io/config)", ([]string)(e))
 }
 
 var ErrDockerfileNotFound = errors.New("dockerfile not found")

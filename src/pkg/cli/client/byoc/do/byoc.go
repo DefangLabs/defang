@@ -487,7 +487,7 @@ func (b *ByocDo) TearDownCD(ctx context.Context) error {
 func (b *ByocDo) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
 	accessToken := os.Getenv("DIGITALOCEAN_TOKEN")
 	if accessToken == "" {
-		return nil, errors.New("DIGITALOCEAN_TOKEN must be set (https://docs.defang.io/docs/providers/digitalocean#getting-started)")
+		return nil, errors.New("DIGITALOCEAN_TOKEN must be set (https://s.defang.io/digitalocean#getting-started)")
 	}
 	account, _, err := b.client.Account.Get(ctx)
 	if err != nil {

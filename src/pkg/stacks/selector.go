@@ -120,7 +120,7 @@ func printStacksInfoMessage(stacks []string) {
 			infoLine += "\n   To update your existing deployment, select the 'beta' Stack.\n" +
 				"Creating a new Stack will result in a separate deployment instance."
 		}
-		infoLine += "\n   To learn more about Stacks, visit: https://docs.defang.io/docs/concepts/stacks"
+		infoLine += "\n   To learn more about Stacks, visit: https://s.defang.io/stacks"
 		term.Println(infoLine)
 	}
 	term.Printf("To skip this prompt, run this command with --stack=%s\n", "<stack_name>")
