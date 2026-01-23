@@ -103,7 +103,7 @@ func TestHandleEstimateTool(t *testing.T) {
 				}
 				m.CapturedOutput = "Estimated cost: $15.00/month"
 			},
-			expectedError: "invalid mode: unknown-mode, not one of [AFFORDABLE BALANCED HIGH_AVAILABILITY]",
+			expectedError: "invalid mode: \"unknown-mode\", not one of [AFFORDABLE BALANCED HIGH_AVAILABILITY]",
 		},
 		{
 			name: "load_project_error",
@@ -132,7 +132,7 @@ func TestHandleEstimateTool(t *testing.T) {
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
 			},
-			expectedError: "provider not one of [auto defang aws digitalocean gcp]",
+			expectedError: "invalid provider: \"invalid-provider\", not one of [auto defang aws digitalocean gcp]",
 		},
 		{
 			name: "run_estimate_error",
