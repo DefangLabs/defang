@@ -76,6 +76,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			options := newSessionLoaderOptionsForCommand(cmd)
 			options.AllowStackCreation = true
+			options.RequireStack = true
 			sm, err := newStackManagerForLoader(ctx, configureLoader(cmd))
 			if err != nil {
 				return err
@@ -98,7 +99,7 @@ func makeComposeUpCmd() *cobra.Command {
 					return err
 				}
 
-				debugger, err := debug.NewDebugger(ctx, global.Cluster, &global.Stack)
+				debugger, err := debug.NewDebugger(ctx, global.Cluster, session.Stack)
 				if err != nil {
 					return err
 				}
@@ -130,7 +131,7 @@ func makeComposeUpCmd() *cobra.Command {
 				if !confirmed {
 					return fmt.Errorf("deployment of project %q was canceled", project.Name)
 				}
-			} else if global.Stack.Name == "" {
+			} else if session.Stack.Name == "" {
 				err = promptToCreateStack(ctx, session.Loader.TargetDirectory(), stacks.Parameters{
 					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
 					Provider: accountInfo.Provider,
@@ -156,11 +157,11 @@ func makeComposeUpCmd() *cobra.Command {
 			deploy, project, err := cli.ComposeUp(ctx, global.Client, session.Provider, session.Stack, cli.ComposeUpParams{
 				Project:    project,
 				UploadMode: upload,
-				Mode:       global.Stack.Mode,
+				Mode:       session.Stack.Mode,
 			})
 			if err != nil {
 				composeErr := err
-				debugger, err := debug.NewDebugger(ctx, global.Cluster, &global.Stack)
+				debugger, err := debug.NewDebugger(ctx, global.Cluster, session.Stack)
 				if err != nil {
 					return err
 				}
@@ -189,7 +190,7 @@ func makeComposeUpCmd() *cobra.Command {
 			serviceStates, err := cli.TailAndMonitor(ctx, project, session.Provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
 				deploymentErr := err
-				debugger, err := debug.NewDebugger(ctx, global.Cluster, &global.Stack)
+				debugger, err := debug.NewDebugger(ctx, global.Cluster, session.Stack)
 				if err != nil {
 					term.Warn("Failed to initialize debugger:", err)
 					return deploymentErr
