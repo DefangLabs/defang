@@ -10,7 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -118,6 +120,16 @@ func (sm *manager) ListRemote(ctx context.Context) ([]ListItem, error) {
 			term.Warnf("Skipping invalid remote stack %s: %v\n", name, err)
 			continue
 		}
+		// fill in missing fields from remote stack info
+		if params.Mode == modes.ModeUnspecified {
+			params.Mode = modes.Mode(stack.GetMode())
+		}
+		if params.Region == "" {
+			params.Region = stack.GetRegion()
+		}
+		if params.Provider == "" {
+			params.Provider.SetValue(stack.GetProvider())
+		}
 		stackParams = append(stackParams, ListItem{
 			Parameters: *params,
 			DeployedAt: timeutils.AsTime(stack.GetLastDeployedAt(), time.Time{}),
@@ -189,20 +201,50 @@ func (sm *manager) Create(params Parameters) (string, error) {
 }
 
 type GetStackOpts struct {
+	ProviderID         client.ProviderID
 	Stack              string
 	Interactive        bool
-	RequireStack       bool
 	AllowStackCreation bool
 }
 
 func (sl *manager) GetStack(ctx context.Context, opts GetStackOpts) (*Parameters, string, error) {
+	// use --stack if available
 	if opts.Stack != "" {
 		return sl.getSpecifiedStack(ctx, opts.Stack)
 	}
-	if opts.Interactive && opts.RequireStack {
+	// use --provider if available
+	if opts.ProviderID != client.ProviderAuto && opts.ProviderID != "" {
+		whence := "DEFANG_PROVIDER"
+		envProvider := os.Getenv("DEFANG_PROVIDER")
+		if envProvider != opts.ProviderID.String() {
+			whence = "--provider flag"
+		}
+		return &Parameters{
+			Name:     DefaultBeta,
+			Provider: opts.ProviderID,
+		}, whence, nil
+	}
+	// fallback to interactive
+	if opts.Interactive {
 		return sl.getStackInteractively(ctx, opts)
 	}
-	return sl.getDefaultStack(ctx)
+	// fallback to default stack
+	stack, whence, err := sl.getDefaultStack(ctx)
+	if err != nil {
+		if !errors.Is(err, ErrDefaultStackNotSet) {
+			return nil, "", err
+		}
+		whence := "fallback stack"
+
+		// fallback to fallback
+		stack = &Parameters{
+			Name:     DefaultBeta,
+			Provider: client.ProviderDefang,
+		}
+		return stack, whence, nil
+	}
+
+	return stack, whence, nil
 }
 
 type ErrNotExist struct {
@@ -212,6 +254,8 @@ type ErrNotExist struct {
 func (e *ErrNotExist) Error() string {
 	return fmt.Sprintf("stack %q does not exist", e.StackName)
 }
+
+var ErrDefaultStackNotSet = errors.New("no default stack set for project")
 
 func (sm *manager) getSpecifiedStack(ctx context.Context, name string) (*Parameters, string, error) {
 	whence := "--stack flag"
@@ -246,7 +290,7 @@ func (sm *manager) getSpecifiedStack(ctx context.Context, name string) (*Paramet
 func (sm *manager) getStackInteractively(ctx context.Context, opts GetStackOpts) (*Parameters, string, error) {
 	stackSelector := NewSelector(sm.ec, sm)
 	stack, err := stackSelector.SelectStack(ctx, SelectStackOptions{
-		AllowCreate: opts.AllowStackCreation,
+		AllowStackCreation: opts.AllowStackCreation,
 	})
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to select stack: %w", err)
@@ -267,8 +311,7 @@ func (sm *manager) getDefaultStack(ctx context.Context) (*Parameters, string, er
 		if connect.CodeOf(err) != connect.CodeNotFound {
 			return nil, "", err
 		}
-		term.Debugf("No default stack set for project %q; using fallback", sm.projectName)
-		return nil, "", errors.New("no default stack set for project")
+		return nil, "", ErrDefaultStackNotSet
 	}
 
 	whence := "default stack from server"

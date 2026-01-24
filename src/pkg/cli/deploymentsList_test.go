@@ -144,7 +144,7 @@ func TestActiveDeployments(t *testing.T) {
 		}
 
 		receivedOutput := stdout.String()
-		expectedOutput := "No deployments found"
+		expectedOutput := "No active deployments found; use --workspace to specify a different workspace"
 
 		if !strings.Contains(receivedOutput, expectedOutput) {
 			t.Errorf("Expected %s to contain %s", receivedOutput, expectedOutput)

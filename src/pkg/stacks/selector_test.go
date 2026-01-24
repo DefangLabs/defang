@@ -156,7 +156,7 @@ func TestStackSelector_SelectOrCreateStack_ExistingStack(t *testing.T) {
 
 	selector := NewSelector(mockEC, mockSM)
 
-	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowCreate: true})
+	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowStackCreation: true})
 
 	assert.NoError(t, err)
 	assert.Equal(t, expectedParams, result)
@@ -222,7 +222,7 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 	selector := NewSelector(mockEC, mockSM)
 	selector.wizard = NewWizardWithProfileLister(mockEC, mockProfileLister)
 
-	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowCreate: true})
+	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowStackCreation: true})
 
 	assert.NoError(t, err)
 	assert.Equal(t, newStackParams, result)
@@ -280,7 +280,7 @@ func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
 	selector := NewSelector(mockEC, mockSM)
 	selector.wizard = NewWizardWithProfileLister(mockEC, mockProfileLister)
 
-	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowCreate: true})
+	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowStackCreation: true})
 
 	assert.NoError(t, err)
 	assert.Equal(t, newStackParams, result)
@@ -390,7 +390,7 @@ func TestStackSelector_SelectStack_WizardError(t *testing.T) {
 	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("", errors.New("user cancelled wizard"))
 
 	selector := NewSelector(mockEC, mockSM)
-	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowCreate: true})
+	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowStackCreation: true})
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
@@ -457,7 +457,7 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 
 	selector := NewSelector(mockEC, mockSM)
 	selector.wizard = NewWizardWithProfileLister(mockEC, mockProfileLister)
-	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowCreate: true})
+	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowStackCreation: true})
 
 	assert.Error(t, err)
 	assert.Nil(t, result)

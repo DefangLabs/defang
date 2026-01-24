@@ -2,7 +2,6 @@ package session
 
 import (
 	"context"
-	"errors"
 	"os"
 	"testing"
 
@@ -83,30 +82,13 @@ func TestLoadSession(t *testing.T) {
 		options       SessionLoaderOptions
 		existingStack *stacks.Parameters
 		stacksList    []stacks.ListItem
+		getStackError error
 		expectedError string
 		expectedStack *stacks.Parameters
 		expectedEnv   map[string]string
 	}{
 		{
-			name:    "empty options - fallback stack",
-			options: SessionLoaderOptions{},
-			expectedStack: &stacks.Parameters{
-				Name: "beta",
-			},
-		},
-		{
-			name: "specified non-existing stack",
-			options: SessionLoaderOptions{
-				GetStackOpts: stacks.GetStackOpts{
-					Stack: "missingstack",
-				},
-			},
-
-			expectedError: "stack \"missingstack\" does not exist",
-			expectedEnv:   map[string]string{},
-		},
-		{
-			name: "specified existing stack",
+			name: "specified stack",
 			options: SessionLoaderOptions{
 				GetStackOpts: stacks.GetStackOpts{
 					Stack: "existingstack",
@@ -123,28 +105,6 @@ func TestLoadSession(t *testing.T) {
 					"DEFANG_PROVIDER": "defang",
 				},
 			},
-		},
-		{
-			name: "only project name specified",
-			options: SessionLoaderOptions{
-				ProjectName: "foo",
-			},
-			expectedStack: &stacks.Parameters{
-				Name: "beta",
-			},
-		},
-		{
-			name: "provider specified without stack assumes beta stack",
-			options: SessionLoaderOptions{
-				ProjectName: "foo",
-				ProviderID:  client.ProviderAWS,
-			},
-			expectedStack: &stacks.Parameters{
-				Name:      "beta",
-				Provider:  client.ProviderAWS,
-				Variables: map[string]string{},
-			},
-			expectedError: "",
 		},
 	}
 
@@ -165,9 +125,8 @@ func TestLoadSession(t *testing.T) {
 				if tt.options.GetStackOpts.Stack != "" {
 					// For specified non-existing stack, return ErrNotExist
 					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", &stacks.ErrNotExist{StackName: tt.options.GetStackOpts.Stack})
-				} else {
-					// For empty stack (should fall back to beta), return a general error that's not ErrNotExist
-					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", errors.New("no default stack set for project"))
+				} else if tt.getStackError != nil {
+					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", tt.getStackError)
 				}
 			} else {
 				sm.On("GetStack", ctx, mock.Anything).Maybe().Return(tt.existingStack, "local", nil)
@@ -221,7 +180,9 @@ func TestLoadSession_NoStackManager(t *testing.T) {
 	ctx := t.Context()
 
 	options := SessionLoaderOptions{
-		ProviderID: client.ProviderDefang,
+		GetStackOpts: stacks.GetStackOpts{
+			ProviderID: client.ProviderDefang,
+		},
 	}
 
 	loader := NewSessionLoader(client.MockFabricClient{}, nil, options)

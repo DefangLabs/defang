@@ -59,22 +59,23 @@ func paramsFromMap(variables map[string]string) (*Parameters, error) {
 	if variables == nil {
 		return nil, errors.New("properties map cannot be nil")
 	}
+	var region string
 	var provider client.ProviderID
 	if val, ok := variables["DEFANG_PROVIDER"]; ok {
 		err := provider.Set(val)
 		if err != nil {
-			return nil, fmt.Errorf("invalid DEFANG_PROVIDER value %q: %w", val, err)
+			return nil, fmt.Errorf("invalid DEFANG_PROVIDER value: %w", err)
 		}
+		regionVarName := client.GetRegionVarName(provider) // FIXME: GCP supports 5 different region vars
+		region = variables[regionVarName]
 	}
 	var mode modes.Mode
 	if val, ok := variables["DEFANG_MODE"]; ok {
 		err := mode.Set(val)
 		if err != nil {
-			return nil, fmt.Errorf("invalid DEFANG_MODE value %q: %w", val, err)
+			return nil, fmt.Errorf("invalid DEFANG_MODE value: %w", err)
 		}
 	}
-	regionVarName := client.GetRegionVarName(provider) // NOTE: GCP supports 5 different region vars
-	region := variables[regionVarName]
 	return &Parameters{
 		Variables: variables,
 		Provider:  provider,
@@ -245,13 +246,13 @@ func filename(workingDirectory, stackname string) string {
 	return filepath.Join(workingDirectory, Directory, stackname)
 }
 
-func PostCreateMessage(stackName string) string {
-	return fmt.Sprintf(
-		"A stack file has been created at `.defang/%s`.\n"+
-			"This file contains the configuration for this stack.\n"+
+func PrintCreateMessage(stackName string) {
+	term.Infof("A stack file has been created at `.defang/%s`.", stackName)
+	term.Printf(
+		"This file contains the configuration for this stack.\n"+
 			"We recommend you commit this file to source control, so it can be used by everyone on your team.\n"+
 			"You can now deploy using `defang up --stack=%s`.\n"+
-			"To learn more about stacks, visit https://docs.defang.io/docs/concepts/stacks",
-		stackName, stackName,
+			"To learn more about stacks, visit https://s.defang.io/stacks\n",
+		stackName,
 	)
 }

@@ -36,7 +36,7 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.Par
 	if stack.Name == "" && pp.ec.IsSupported() {
 		selector := stacks.NewSelector(pp.ec, pp.sm)
 		newStack, err := selector.SelectStack(ctx, stacks.SelectStackOptions{
-			AllowCreate: true,
+			AllowStackCreation: true,
 		})
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to setup stack: %w", err)

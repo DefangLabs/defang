@@ -20,13 +20,11 @@ import (
 
 type commandSessionOpts struct {
 	CheckAccountInfo bool
-	RequireStack     bool
 }
 
 func newCommandSession(cmd *cobra.Command) (*session.Session, error) {
 	return newCommandSessionWithOpts(cmd, commandSessionOpts{
 		CheckAccountInfo: true,
-		RequireStack:     true,
 	})
 }
 
@@ -34,12 +32,8 @@ func newCommandSessionWithOpts(cmd *cobra.Command, opts commandSessionOpts) (*se
 	ctx := cmd.Context()
 
 	options := newSessionLoaderOptionsForCommand(cmd)
-	options.RequireStack = opts.RequireStack
 	sm, err := newStackManagerForLoader(ctx, configureLoader(cmd))
 	if err != nil {
-		if opts.RequireStack {
-			return nil, err
-		}
 		term.Debugf("Could not create stack manager: %v", err)
 	}
 	sessionLoader := session.NewSessionLoader(global.Client, sm, options)
@@ -80,10 +74,10 @@ func newSessionLoaderOptionsForCommand(cmd *cobra.Command) session.SessionLoader
 		}
 	}
 	return session.SessionLoaderOptions{
-		ProviderID:       *provider,
 		ComposeFilePaths: configPaths,
 		ProjectName:      projectName,
 		GetStackOpts: stacks.GetStackOpts{
+			ProviderID:  *provider,
 			Interactive: !global.NonInteractive,
 			Stack:       stack,
 		},

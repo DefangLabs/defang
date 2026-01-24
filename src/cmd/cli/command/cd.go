@@ -38,7 +38,6 @@ func cdCommand(cmd *cobra.Command, args []string, command client.CdCommand, fabr
 
 	session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
 		CheckAccountInfo: true,
-		RequireStack:     false, // for `cd` it's OK to proceed without a stack
 	})
 	if err != nil {
 		return err
@@ -118,7 +117,6 @@ var cdTearDownCmd = &cobra.Command{
 
 		session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
 			CheckAccountInfo: true,
-			RequireStack:     false, // for `cd` it's OK to proceed without a stack
 		})
 		if err != nil {
 			return err
@@ -139,7 +137,6 @@ var cdListCmd = &cobra.Command{
 
 		session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
 			CheckAccountInfo: true,
-			RequireStack:     false, // for `cd` it's OK to proceed without a stack
 		})
 		if err != nil {
 			return err
@@ -185,7 +182,7 @@ var cdPreviewCmd = &cobra.Command{
 		}
 
 		return cli.Preview(ctx, project, global.Client, session.Provider, cli.ComposeUpParams{
-			Mode:       global.Stack.Mode,
+			Mode:       session.Stack.Mode,
 			Project:    project,
 			UploadMode: compose.UploadModePreview,
 		})

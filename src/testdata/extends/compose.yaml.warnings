@@ -6,4 +6,4 @@
  ! service "map-reset": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "map-set": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "map-unset": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
-Error: missing configs ["EMPTY_VALUE" "NEW_VALUE" "NO_VALUE" "WITH_VALUE"] (https://docs.defang.io/docs/concepts/configuration)
+Error: missing configs ["EMPTY_VALUE" "NEW_VALUE" "NO_VALUE" "WITH_VALUE"] (https://s.defang.io/config)
