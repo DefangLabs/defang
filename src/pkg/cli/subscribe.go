@@ -77,6 +77,10 @@ func WaitServiceState(
 			term.Debugf("unexpected service %s update", msg.Name) // TODO: don't print in Go-routine
 			continue
 		}
+		if msg.State == defangv1.ServiceState_NOT_SPECIFIED {
+			// We might get task/service states that do not map to a ServiceState; ignore those
+			continue
+		}
 
 		serviceStates[msg.Name] = msg.State
 
