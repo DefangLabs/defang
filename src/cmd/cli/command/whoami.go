@@ -2,7 +2,6 @@ package command
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -22,12 +21,16 @@ var whoamiCmd = &cobra.Command{
 
 		global.NonInteractive = true // don't show provider prompt
 
+		var provider client.Provider
 		session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
-			CheckAccountInfo: false,
-			RequireStack:     false, // for WhoAmI it's OK to proceed without a stack
+			CheckAccountInfo: false, // because we do it inside cli.Whoami
 		})
 		if err != nil {
-			return fmt.Errorf("loading session: %w", err)
+			if !jsonMode {
+				term.Warnf("Provider account information not available: %v", err)
+			}
+		} else {
+			provider = session.Provider
 		}
 
 		token := client.GetExistingToken(global.Cluster)
@@ -35,12 +38,12 @@ var whoamiCmd = &cobra.Command{
 		userInfo, err := auth.FetchUserInfo(ctx, token)
 		if err != nil {
 			// Either the auth service is down, or we're using a Fabric JWT: skip workspace information
-			if !jsonMode {
+			if !jsonMode && global.HasTty {
 				term.Warn("Workspace information unavailable:", err)
 			}
 		}
 
-		data, err := cli.Whoami(ctx, global.Client, session.Provider, userInfo, global.Tenant)
+		data, err := cli.Whoami(ctx, global.Client, provider, userInfo, global.Tenant)
 		if err != nil {
 			return err
 		}
