@@ -57,6 +57,55 @@ Conditions:
             - Ref: RetainBucket
             - "true"
 Description: 'Defang AWS CloudFormation template for the CD task. Do not delete this stack in the AWS console: use the Defang CLI instead. To create this stack, scroll down to acknowledge the risks and press ''Create stack''.'
+Metadata:
+    AWS::CloudFormation::Interface:
+        ParameterGroups:
+            - Label:
+                default: CI/CD Integration (OIDC)
+              Parameters:
+                - OidcProviderIssuer
+                - OidcProviderSubjects
+                - OidcProviderAudiences
+                - CIRoleName
+                - OidcProviderThumbprints
+                - OidcProviderClaims
+            - Label:
+                default: Network Configuration
+              Parameters:
+                - ExistingVpcId
+            - Label:
+                default: Container Registry (ECR Pull-Through Cache)
+              Parameters:
+                - EnablePullThroughCache
+                - DockerHubUsername
+                - DockerHubAccessToken
+            - Label:
+                default: Storage Configuration
+              Parameters:
+                - RetainBucket
+        ParameterLabels:
+            CIRoleName:
+                default: CI Role Name
+            DockerHubAccessToken:
+                default: Docker Hub Access Token
+            DockerHubUsername:
+                default: Docker Hub Username
+            EnablePullThroughCache:
+                default: Enable ECR Pull-Through Cache
+            ExistingVpcId:
+                default: Existing VPC ID
+            OidcProviderAudiences:
+                default: OIDC Trusted Audiences
+            OidcProviderClaims:
+                default: Additional OIDC Claim Conditions
+            OidcProviderIssuer:
+                default: OIDC Provider Issuer URL
+            OidcProviderSubjects:
+                default: OIDC Trusted Subject Patterns
+            OidcProviderThumbprints:
+                default: OIDC Provider Thumbprints
+            RetainBucket:
+                default: Retain S3 Bucket on Delete
 Outputs:
     bucketName:
         Description: Name of the S3 bucket

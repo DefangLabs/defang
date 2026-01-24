@@ -143,6 +143,43 @@ func CreateTemplate(stack string, containers []clouds.Container) (*cloudformatio
 		Description: ptr.String(`Additional OIDC claim conditions as comma-separated JSON "key":"value" pairs (optional)`),
 	}
 
+	// Metadata - AWS::CloudFormation::Interface for parameter grouping and labels
+	template.Metadata = map[string]interface{}{
+		"AWS::CloudFormation::Interface": map[string]interface{}{
+			"ParameterGroups": []map[string]interface{}{
+				{
+					"Label":      map[string]string{"default": "CI/CD Integration (OIDC)"},
+					"Parameters": []string{ParamsOidcProviderIssuer, ParamsOidcProviderSubjects, ParamsOidcProviderAudiences, ParamsCIRoleName, ParamsOidcProviderThumbprints, ParamsOidcProviderClaims},
+				},
+				{
+					"Label":      map[string]string{"default": "Network Configuration"},
+					"Parameters": []string{ParamsExistingVpcId},
+				},
+				{
+					"Label":      map[string]string{"default": "Container Registry (ECR Pull-Through Cache)"},
+					"Parameters": []string{ParamsEnablePullThroughCache, ParamsDockerHubUsername, ParamsDockerHubAccessToken},
+				},
+				{
+					"Label":      map[string]string{"default": "Storage Configuration"},
+					"Parameters": []string{ParamsRetainBucket},
+				},
+			},
+			"ParameterLabels": map[string]interface{}{
+				ParamsExistingVpcId:           map[string]string{"default": "Existing VPC ID"},
+				ParamsRetainBucket:            map[string]string{"default": "Retain S3 Bucket on Delete"},
+				ParamsEnablePullThroughCache:  map[string]string{"default": "Enable ECR Pull-Through Cache"},
+				ParamsDockerHubUsername:       map[string]string{"default": "Docker Hub Username"},
+				ParamsDockerHubAccessToken:    map[string]string{"default": "Docker Hub Access Token"},
+				ParamsOidcProviderIssuer:      map[string]string{"default": "OIDC Provider Issuer URL"},
+				ParamsOidcProviderSubjects:    map[string]string{"default": "OIDC Trusted Subject Patterns"},
+				ParamsOidcProviderAudiences:   map[string]string{"default": "OIDC Trusted Audiences"},
+				ParamsOidcProviderThumbprints: map[string]string{"default": "OIDC Provider Thumbprints"},
+				ParamsOidcProviderClaims:      map[string]string{"default": "Additional OIDC Claim Conditions"},
+				ParamsCIRoleName:              map[string]string{"default": "CI Role Name"},
+			},
+		},
+	}
+
 	// Conditions
 	const _condCreateVpcResources = "CreateVpcResources"
 	template.Conditions[_condCreateVpcResources] = cloudformation.Equals(cloudformation.Ref(ParamsExistingVpcId), "")
