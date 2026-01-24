@@ -79,9 +79,6 @@ var configSetCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to get account info from provider %q: %w", session.Stack.Provider, err)
 		}
-		if err != nil {
-			return err
-		}
 
 		projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), session.Loader, session.Provider)
 		if err != nil {

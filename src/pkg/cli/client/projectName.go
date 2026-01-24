@@ -7,6 +7,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
+// Deprecated: should use stacks instead of ProjectName fallback.
 func LoadProjectNameWithFallback(ctx context.Context, loader Loader, provider Provider) (string, error) {
 	var loadErr error
 	if loader != nil {
