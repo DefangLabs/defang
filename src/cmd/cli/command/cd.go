@@ -37,8 +37,7 @@ func cdCommand(cmd *cobra.Command, args []string, command client.CdCommand, fabr
 	ctx := cmd.Context()
 
 	session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
-		CheckAccountInfo:      true,
-		DisallowFallbackStack: false, // for `cd` it's OK to proceed without a stack
+		CheckAccountInfo: true,
 	})
 	if err != nil {
 		return err
@@ -117,8 +116,7 @@ var cdTearDownCmd = &cobra.Command{
 		force, _ := cmd.Flags().GetBool("force")
 
 		session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
-			CheckAccountInfo:      true,
-			DisallowFallbackStack: false, // for `cd` it's OK to proceed without a stack
+			CheckAccountInfo: true,
 		})
 		if err != nil {
 			return err
@@ -138,8 +136,7 @@ var cdListCmd = &cobra.Command{
 		all, _ := cmd.Flags().GetBool("all")
 
 		session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
-			CheckAccountInfo:      true,
-			DisallowFallbackStack: false, // for `cd` it's OK to proceed without a stack
+			CheckAccountInfo: true,
 		})
 		if err != nil {
 			return err

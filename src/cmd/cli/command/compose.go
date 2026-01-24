@@ -76,7 +76,6 @@ func makeComposeUpCmd() *cobra.Command {
 
 			options := newSessionLoaderOptionsForCommand(cmd)
 			options.AllowStackCreation = true
-			options.DisallowFallbackStack = true
 			sm, err := newStackManagerForLoader(ctx, configureLoader(cmd))
 			if err != nil {
 				return err
@@ -545,11 +544,10 @@ func makeComposeConfigCmd() *cobra.Command {
 			ctx := cmd.Context()
 
 			session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
-				CheckAccountInfo:      false,
-				DisallowFallbackStack: false, // for `compose config` it's OK to proceed without a stack
+				CheckAccountInfo: false,
 			})
 			if err != nil {
-				return fmt.Errorf("loading session: %w", err)
+				return err
 			}
 
 			_, err = session.Provider.AccountInfo(ctx)

@@ -2,9 +2,7 @@ package session
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"os"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -27,7 +25,6 @@ type Session struct {
 }
 
 type SessionLoaderOptions struct {
-	ProviderID       client.ProviderID
 	ProjectName      string
 	ComposeFilePaths []string
 	stacks.GetStackOpts
@@ -77,37 +74,12 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, str
 			Provider: sl.opts.ProviderID,
 		}, "no stack manager available", nil
 	}
+
 	stack, whence, err := sl.sm.GetStack(ctx, sl.opts.GetStackOpts)
 	if err != nil {
-		if sl.opts.DisallowFallbackStack || sl.opts.GetStackOpts.Stack != "" {
-			return nil, "", err
-		}
-		if errors.Is(err, stacks.ErrDefaultStackNotSet) {
-			term.Debugf("No default stack set for project %q; using fallback", sl.opts.ProjectName)
-		}
-		if sl.opts.ProviderID != "" {
-			whence = "--provider flag"
-		}
-		_, envSet := os.LookupEnv("DEFANG_PROVIDER")
-		if envSet {
-			whence = "DEFANG_PROVIDER"
-		}
-		if whence == "" {
-			whence = "fallback stack"
-		}
-		if sl.opts.ProviderID == client.ProviderAuto {
-			sl.opts.ProviderID = client.ProviderDefang
-		}
-		return &stacks.Parameters{
-			Name:     stacks.DefaultBeta,
-			Provider: sl.opts.ProviderID,
-		}, whence, nil
+		return nil, whence, err
 	}
-	envProvider := os.Getenv("DEFANG_PROVIDER")
-	if envProvider != "" && client.ProviderID(envProvider) != stack.Provider {
-		os.Unsetenv("DEFANG_PROVIDER")
-		term.Warnf("The variable DEFANG_PROVIDER is set to %q in the environment, but the selected stack %q uses provider %q. So the environment variable will be ignored.", envProvider, stack.Name, stack.Provider)
-	}
+
 	if err := stacks.LoadStackEnv(*stack, true); err != nil {
 		return nil, whence, fmt.Errorf("failed to load stack env: %w", err)
 	}

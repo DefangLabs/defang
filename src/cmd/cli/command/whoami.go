@@ -2,11 +2,12 @@ package command
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/cobra"
 )
@@ -22,12 +23,16 @@ var whoamiCmd = &cobra.Command{
 
 		global.NonInteractive = true // don't show provider prompt
 
+		var provider client.Provider
 		session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
-			CheckAccountInfo:      false,
-			DisallowFallbackStack: false, // for WhoAmI it's OK to proceed without a stack
+			CheckAccountInfo: false,
 		})
 		if err != nil {
-			return fmt.Errorf("loading session: %w", err)
+			if !errors.Is(err, stacks.ErrDefaultStackNotSet) {
+				return err
+			}
+		} else {
+			provider = session.Provider
 		}
 
 		token := client.GetExistingToken(global.Cluster)
@@ -40,7 +45,7 @@ var whoamiCmd = &cobra.Command{
 			}
 		}
 
-		data, err := cli.Whoami(ctx, global.Client, session.Provider, userInfo, global.Tenant)
+		data, err := cli.Whoami(ctx, global.Client, provider, userInfo, global.Tenant)
 		if err != nil {
 			return err
 		}

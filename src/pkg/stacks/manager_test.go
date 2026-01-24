@@ -764,12 +764,11 @@ func TestGetStack(t *testing.T) {
 			},
 		},
 		{
-			name:        "interactive selection - stack required",
+			name:        "interactive selection",
 			projectName: "foo",
 			options: GetStackOpts{
-				Interactive:           true,
-				AllowStackCreation:    true,
-				DisallowFallbackStack: true,
+				Interactive:        true,
+				AllowStackCreation: true,
 			},
 			remoteStack: &Parameters{
 				Name:     "existingstack",
@@ -793,34 +792,6 @@ func TestGetStack(t *testing.T) {
 				"DEFANG_PROVIDER": "gcp",
 				"GCP_PROJECT":     "existing-gcp-project",
 				"FOO":             "existing-bar",
-			},
-		},
-		{
-			name:        "interactive selection - stack not required, fallback to default",
-			projectName: "foo",
-			options: GetStackOpts{
-				Interactive:        true,
-				AllowStackCreation: true,
-			},
-			defaultStack: &defangv1.Stack{
-				Name:     "mydefault",
-				Provider: defangv1.Provider_GCP,
-				StackFile: []byte(`
-DEFANG_PROVIDER=gcp
-`),
-			},
-			remoteStack: &Parameters{
-				Name:     "existingstack",
-				Provider: client.ProviderAWS,
-				Region:   "us-test-2",
-				Variables: map[string]string{
-					"DEFANG_PROVIDER": "aws",
-					"FOO":             "existing-bar",
-				},
-			},
-			expectedStack: &Parameters{
-				Name:     "mydefault",
-				Provider: client.ProviderGCP,
 			},
 		},
 		{

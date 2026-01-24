@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -200,20 +201,50 @@ func (sm *manager) Create(params Parameters) (string, error) {
 }
 
 type GetStackOpts struct {
-	Stack                 string
-	Interactive           bool
-	DisallowFallbackStack bool
-	AllowStackCreation    bool
+	ProviderID         client.ProviderID
+	Stack              string
+	Interactive        bool
+	AllowStackCreation bool
 }
 
 func (sl *manager) GetStack(ctx context.Context, opts GetStackOpts) (*Parameters, string, error) {
+	// use --stack if available
 	if opts.Stack != "" {
 		return sl.getSpecifiedStack(ctx, opts.Stack)
 	}
-	if opts.Interactive && opts.DisallowFallbackStack {
+	// use --provider if available
+	if opts.ProviderID != client.ProviderAuto && opts.ProviderID != "" {
+		whence := "DEFANG_PROVIDER"
+		envProvider := os.Getenv("DEFANG_PROVIDER")
+		if envProvider != opts.ProviderID.String() {
+			whence = "--provider flag"
+		}
+		return &Parameters{
+			Name:     DefaultBeta,
+			Provider: opts.ProviderID,
+		}, whence, nil
+	}
+	// fallback to interactive
+	if opts.Interactive {
 		return sl.getStackInteractively(ctx, opts)
 	}
-	return sl.getDefaultStack(ctx)
+	// fallback to default stack
+	stack, whence, err := sl.getDefaultStack(ctx)
+	if err != nil {
+		if !errors.Is(err, ErrDefaultStackNotSet) {
+			return nil, "", err
+		}
+		whence := "fallback stack"
+
+		// fallback to fallback
+		stack = &Parameters{
+			Name:     DefaultBeta,
+			Provider: client.ProviderDefang,
+		}
+		return stack, whence, nil
+	}
+
+	return stack, whence, nil
 }
 
 type ErrNotExist struct {

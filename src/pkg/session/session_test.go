@@ -2,7 +2,6 @@ package session
 
 import (
 	"context"
-	"errors"
 	"os"
 	"testing"
 
@@ -89,26 +88,7 @@ func TestLoadSession(t *testing.T) {
 		expectedEnv   map[string]string
 	}{
 		{
-			name:          "empty options - fallback stack",
-			options:       SessionLoaderOptions{},
-			getStackError: errors.New("no default stack set for project"),
-			expectedStack: &stacks.Parameters{
-				Name: "beta",
-			},
-		},
-		{
-			name: "specified non-existing stack",
-			options: SessionLoaderOptions{
-				GetStackOpts: stacks.GetStackOpts{
-					Stack: "missingstack",
-				},
-			},
-
-			expectedError: "stack \"missingstack\" does not exist",
-			expectedEnv:   map[string]string{},
-		},
-		{
-			name: "specified existing stack",
+			name: "specified stack",
 			options: SessionLoaderOptions{
 				GetStackOpts: stacks.GetStackOpts{
 					Stack: "existingstack",
@@ -125,42 +105,6 @@ func TestLoadSession(t *testing.T) {
 					"DEFANG_PROVIDER": "defang",
 				},
 			},
-		},
-		{
-			name: "only project name specified",
-			options: SessionLoaderOptions{
-				ProjectName: "foo",
-			},
-			getStackError: errors.New("no default stack set for project"),
-			expectedStack: &stacks.Parameters{
-				Name: "beta",
-			},
-		},
-		{
-			name: "provider specified without stack assumes beta stack",
-			options: SessionLoaderOptions{
-				ProjectName: "foo",
-				ProviderID:  client.ProviderAWS,
-			},
-			expectedStack: &stacks.Parameters{
-				Name:      "beta",
-				Provider:  client.ProviderAWS,
-				Variables: map[string]string{},
-			},
-			getStackError: errors.New("no default stack set for project"),
-			expectedError: "",
-		},
-		{
-			name: "no stack - RequireStack true",
-			options: SessionLoaderOptions{
-				ProjectName: "foo",
-				ProviderID:  client.ProviderGCP,
-				GetStackOpts: stacks.GetStackOpts{
-					DisallowFallbackStack: true,
-				},
-			},
-			getStackError: errors.New("no default stack set for project"),
-			expectedError: "no default stack set for project",
 		},
 	}
 
@@ -236,7 +180,9 @@ func TestLoadSession_NoStackManager(t *testing.T) {
 	ctx := t.Context()
 
 	options := SessionLoaderOptions{
-		ProviderID: client.ProviderDefang,
+		GetStackOpts: stacks.GetStackOpts{
+			ProviderID: client.ProviderDefang,
+		},
 	}
 
 	loader := NewSessionLoader(client.MockFabricClient{}, nil, options)
