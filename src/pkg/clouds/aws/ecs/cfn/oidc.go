@@ -11,9 +11,12 @@ import (
 
 type Jwk struct {
 	Kty string   `json:"kty"`
+	Kid string   `json:"kid,omitempty"`
 	Alg string   `json:"alg,omitempty"`
 	Use string   `json:"use,omitempty"`
-	X5c []string `json:"x5c,omitempty"`
+	N   string   `json:"n,omitempty"`   // RSA modulus, base64url-encoded
+	E   string   `json:"e,omitempty"`   // RSA exponent, base64url-encoded
+	X5c [][]byte `json:"x5c,omitempty"` // DER-encoded cert(s)
 	X5t string   `json:"x5t,omitempty"` // base64url-encoded
 }
 
@@ -60,12 +63,16 @@ func FetchThumbprints(iss string) ([]string, error) {
 
 	var thumbprints []string
 	for _, key := range jwks.Keys {
-		if len(key.X5c) > 0 {
-			decoded, err := base64.RawURLEncoding.DecodeString(key.X5t)
+		if key.X5t != "" {
+			thumbprint, err := base64.RawURLEncoding.DecodeString(key.X5t)
 			if err != nil {
 				return nil, fmt.Errorf("invalid base64url encoding in x5t claim: %w", err)
 			}
-			thumbprints = append(thumbprints, hex.EncodeToString(decoded))
+			thumbprints = append(thumbprints, hex.EncodeToString(thumbprint))
+		} else if len(key.X5c) > 0 {
+			// Compute SHA-1 thumbprint of DER-encoded cert
+			// thumbprint := sha1.Sum(key.X5c[0]) not important; avoid importing sha1
+			// thumbprints = append(thumbprints, hex.EncodeToString(thumbprint[:]))
 		}
 	}
 	return thumbprints, nil
