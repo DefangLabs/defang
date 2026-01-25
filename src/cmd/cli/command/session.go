@@ -51,9 +51,7 @@ func newCommandSessionWithOpts(cmd *cobra.Command, opts commandSessionOpts) (*se
 }
 
 func newSessionLoaderOptionsForCommand(cmd *cobra.Command) session.SessionLoaderOptions {
-	stack, _ := cmd.Flags().GetString("stack")
 	configPaths, _ := cmd.Flags().GetStringArray("file")
-	provider, _ := cmd.Flag("provider").Value.(*client.ProviderID)
 	projectName, _ := cmd.Flags().GetString("project-name")
 
 	// Avoid common mistakes
@@ -77,9 +75,8 @@ func newSessionLoaderOptionsForCommand(cmd *cobra.Command) session.SessionLoader
 		ComposeFilePaths: configPaths,
 		ProjectName:      projectName,
 		GetStackOpts: stacks.GetStackOpts{
-			ProviderID:  *provider,
 			Interactive: !global.NonInteractive,
-			Stack:       stack,
+			Default:     global.Stack,
 		},
 	}
 }

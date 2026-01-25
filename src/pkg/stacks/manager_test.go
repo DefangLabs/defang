@@ -664,7 +664,7 @@ func TestGetStack(t *testing.T) {
 			name:        "stack specified but not found",
 			projectName: "foo",
 			options: GetStackOpts{
-				Stack: "missingstack",
+				Default: Parameters{Name: "missingstack"},
 			},
 			expectedError: "stack \"missingstack\" does not exist",
 			expectedEnv:   map[string]string{},
@@ -673,7 +673,7 @@ func TestGetStack(t *testing.T) {
 			name:        "local stack specified",
 			projectName: "foo",
 			options: GetStackOpts{
-				Stack: "localstack",
+				Default: Parameters{Name: "localstack"},
 			},
 			localStack: &Parameters{
 				Name:     "localstack",
@@ -698,7 +698,7 @@ func TestGetStack(t *testing.T) {
 			name:        "remote stack specified",
 			projectName: "foo",
 			options: GetStackOpts{
-				Stack: "remotestack",
+				Default: Parameters{Name: "remotestack"},
 			},
 			remoteStack: &Parameters{
 				Name:     "remotestack",
@@ -725,7 +725,7 @@ func TestGetStack(t *testing.T) {
 			name:        "local and remote stack",
 			projectName: "foo",
 			options: GetStackOpts{
-				Stack: "bothstack",
+				Default: Parameters{Name: "bothstack"},
 			},
 			localStack: &Parameters{
 				Name:     "bothstack",
@@ -767,8 +767,10 @@ func TestGetStack(t *testing.T) {
 			name:        "interactive selection",
 			projectName: "foo",
 			options: GetStackOpts{
-				Interactive:        true,
-				AllowStackCreation: true,
+				Interactive: true,
+				SelectStackOptions: SelectStackOptions{
+					AllowStackCreation: true,
+				},
 			},
 			remoteStack: &Parameters{
 				Name:     "existingstack",
@@ -784,9 +786,14 @@ func TestGetStack(t *testing.T) {
 				"stack": "existingstack",
 			},
 			expectedStack: &Parameters{
-				Name:      "existingstack",
-				Provider:  client.ProviderGCP,
-				Variables: map[string]string{},
+				Name:     "existingstack",
+				Provider: client.ProviderGCP,
+				Region:   "us-central1",
+				Variables: map[string]string{
+					"DEFANG_PROVIDER": "gcp",
+					"GCP_PROJECT":     "existing-gcp-project",
+					"FOO":             "existing-bar",
+				},
 			},
 			expectedEnv: map[string]string{
 				"DEFANG_PROVIDER": "gcp",
@@ -798,7 +805,7 @@ func TestGetStack(t *testing.T) {
 			name:        "stack with compose vars updates loader",
 			projectName: "foo",
 			options: GetStackOpts{
-				Stack: "composestack",
+				Default: Parameters{Name: "composestack"},
 			},
 			localStack: &Parameters{
 				Name:     "composestack",
