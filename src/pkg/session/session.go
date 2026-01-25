@@ -68,13 +68,6 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 }
 
 func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, string, error) {
-	if sl.sm == nil {
-		return &stacks.Parameters{
-			Name:     stacks.DefaultBeta,
-			Provider: sl.opts.ProviderID,
-		}, "no stack manager available", nil
-	}
-
 	stack, whence, err := sl.sm.GetStack(ctx, sl.opts.GetStackOpts)
 	if err != nil {
 		return nil, whence, err

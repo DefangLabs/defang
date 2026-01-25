@@ -201,47 +201,43 @@ func (sm *manager) Create(params Parameters) (string, error) {
 }
 
 type GetStackOpts struct {
-	ProviderID         client.ProviderID
-	Stack              string
-	Interactive        bool
-	AllowStackCreation bool
+	Default     Parameters
+	Interactive bool
+	SelectStackOptions
 }
 
-func (sl *manager) GetStack(ctx context.Context, opts GetStackOpts) (*Parameters, string, error) {
+func (sm *manager) GetStack(ctx context.Context, opts GetStackOpts) (*Parameters, string, error) {
 	// use --stack if available
-	if opts.Stack != "" {
-		return sl.getSpecifiedStack(ctx, opts.Stack)
+	if opts.Default.Name != "" {
+		return sm.getSpecifiedStack(ctx, opts.Default.Name) // TODO: merge with opts.Default?
 	}
 	// use --provider if available
-	if opts.ProviderID != client.ProviderAuto && opts.ProviderID != "" {
+	if opts.Default.Provider != client.ProviderAuto && opts.Default.Provider != "" {
 		whence := "DEFANG_PROVIDER"
-		envProvider := os.Getenv("DEFANG_PROVIDER")
-		if envProvider != opts.ProviderID.String() {
+		var fromEnv client.ProviderID
+		if err := fromEnv.Set(os.Getenv("DEFANG_PROVIDER")); err == nil && fromEnv != opts.Default.Provider {
 			whence = "--provider flag"
 		}
-		return &Parameters{
-			Name:     DefaultBeta,
-			Provider: opts.ProviderID,
-		}, whence, nil
+		fallback := opts.Default
+		fallback.Name = DefaultBeta
+		return &fallback, whence, nil
 	}
 	// fallback to interactive
 	if opts.Interactive {
-		return sl.getStackInteractively(ctx, opts)
+		return sm.getStackInteractively(ctx, opts) // TODO: merge with opts.Default?
 	}
-	// fallback to default stack
-	stack, whence, err := sl.getDefaultStack(ctx)
+	// fallback to default stack for project
+	stack, whence, err := sm.getDefaultStack(ctx)
 	if err != nil {
 		if !errors.Is(err, ErrDefaultStackNotSet) {
 			return nil, "", err
 		}
-		whence := "fallback stack"
 
-		// fallback to fallback
-		stack = &Parameters{
-			Name:     DefaultBeta,
-			Provider: client.ProviderDefang,
-		}
-		return stack, whence, nil
+		// no default stack for project; use fallback
+		whence := "fallback stack"
+		fallback := opts.Default
+		fallback.Name = DefaultBeta
+		return &fallback, whence, nil
 	}
 
 	return stack, whence, nil
@@ -289,9 +285,8 @@ func (sm *manager) getSpecifiedStack(ctx context.Context, name string) (*Paramet
 
 func (sm *manager) getStackInteractively(ctx context.Context, opts GetStackOpts) (*Parameters, string, error) {
 	stackSelector := NewSelector(sm.ec, sm)
-	stack, err := stackSelector.SelectStack(ctx, SelectStackOptions{
-		AllowStackCreation: opts.AllowStackCreation,
-	})
+	// TODO: pass fallback stack to selector wizard for pre-filling
+	stack, err := stackSelector.SelectStack(ctx, opts.SelectStackOptions)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to select stack: %w", err)
 	}

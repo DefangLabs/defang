@@ -91,7 +91,9 @@ func TestLoadSession(t *testing.T) {
 			name: "specified stack",
 			options: SessionLoaderOptions{
 				GetStackOpts: stacks.GetStackOpts{
-					Stack: "existingstack",
+					Default: stacks.Parameters{
+						Name: "existingstack",
+					},
 				},
 			},
 			existingStack: &stacks.Parameters{
@@ -122,9 +124,9 @@ func TestLoadSession(t *testing.T) {
 			sm := &mockStacksManager{}
 
 			if tt.existingStack == nil {
-				if tt.options.GetStackOpts.Stack != "" {
+				if tt.options.Default.Name != "" {
 					// For specified non-existing stack, return ErrNotExist
-					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", &stacks.ErrNotExist{StackName: tt.options.GetStackOpts.Stack})
+					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", &stacks.ErrNotExist{StackName: tt.options.Default.Name})
 				} else if tt.getStackError != nil {
 					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", tt.getStackError)
 				}
@@ -149,11 +151,11 @@ func TestLoadSession(t *testing.T) {
 			assert.NotNil(t, session.Loader)
 
 			assert.NotNil(t, session.Provider)
-			if tt.options.ProviderID == client.ProviderAWS {
+			if tt.options.Default.Provider == client.ProviderAWS {
 				_, ok := session.Provider.(*aws.ByocAws)
 				assert.True(t, ok)
 			}
-			if tt.options.ProviderID == client.ProviderGCP {
+			if tt.options.Default.Provider == client.ProviderGCP {
 				_, ok := session.Provider.(*gcp.ByocGcp)
 				assert.True(t, ok)
 			}
@@ -174,19 +176,4 @@ func TestLoadSession(t *testing.T) {
 			sm.AssertExpectations(t)
 		})
 	}
-}
-
-func TestLoadSession_NoStackManager(t *testing.T) {
-	ctx := t.Context()
-
-	options := SessionLoaderOptions{
-		GetStackOpts: stacks.GetStackOpts{
-			ProviderID: client.ProviderDefang,
-		},
-	}
-
-	loader := NewSessionLoader(client.MockFabricClient{}, nil, options)
-	session, err := loader.LoadSession(ctx)
-	require.NoError(t, err)
-	assert.NotNil(t, session)
 }
