@@ -14,7 +14,7 @@ var whoamiCmd = &cobra.Command{
 	Use:         "whoami",
 	Args:        cobra.NoArgs,
 	Short:       "Show the current user",
-	Annotations: authNeededAnnotation,
+	Annotations: authNeededAlways,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 		jsonMode, _ := cmd.Flags().GetBool("json")

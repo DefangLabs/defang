@@ -26,7 +26,7 @@ var configCmd = &cobra.Command{
 
 var configSetCmd = &cobra.Command{
 	Use:         "create CONFIG [file|-] | CONFIG...", // like Docker
-	Annotations: authNeededAnnotation,
+	Annotations: authNeededForPlayground,
 	Args:        cobra.MinimumNArgs(0), // Allow 0 args when using --env-file, or multiple configs
 	Aliases:     []string{"set", "add", "put"},
 	Short:       "Adds or updates a sensitive config value",
@@ -183,7 +183,7 @@ var configSetCmd = &cobra.Command{
 
 var configDeleteCmd = &cobra.Command{
 	Use:         "rm CONFIG...", // like Docker
-	Annotations: authNeededAnnotation,
+	Annotations: authNeededForPlayground,
 	Args:        cobra.MinimumNArgs(1),
 	Aliases:     []string{"del", "delete", "remove"},
 	Short:       "Removes one or more config values",
@@ -215,7 +215,7 @@ var configDeleteCmd = &cobra.Command{
 
 var configListCmd = &cobra.Command{
 	Use:         "ls", // like Docker
-	Annotations: authNeededAnnotation,
+	Annotations: authNeededForPlayground,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"list"},
 	Short:       "List configs",
@@ -236,7 +236,7 @@ var configListCmd = &cobra.Command{
 
 var configResolveCmd = &cobra.Command{
 	Use:         "resolve",
-	Annotations: authNeededAnnotation,
+	Annotations: authNeededForPlayground,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"final"},
 	Short:       "Show the final resolved environment for the project",

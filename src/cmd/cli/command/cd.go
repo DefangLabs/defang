@@ -64,7 +64,7 @@ func cdCommand(cmd *cobra.Command, args []string, command client.CdCommand, fabr
 
 var cdDestroyCmd = &cobra.Command{
 	Use:         "destroy [PROJECT...]",
-	Annotations: authNeededAnnotation, // need subscription
+	Annotations: authNeededAlways, // need subscription
 	Short:       "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cdCommand(cmd, args, client.CdCommandDestroy, global.Client)
@@ -73,7 +73,7 @@ var cdDestroyCmd = &cobra.Command{
 
 var cdDownCmd = &cobra.Command{
 	Use:         "down [PROJECT...]",
-	Annotations: authNeededAnnotation, // need subscription
+	Annotations: authNeededAlways, // need subscription
 	Short:       "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cdCommand(cmd, args, client.CdCommandDown, global.Client)
@@ -82,7 +82,7 @@ var cdDownCmd = &cobra.Command{
 
 var cdRefreshCmd = &cobra.Command{
 	Use:         "refresh [PROJECT...]",
-	Annotations: authNeededAnnotation, // need subscription
+	Annotations: authNeededAlways, // need subscription
 	Short:       "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cdCommand(cmd, args, client.CdCommandRefresh, global.Client)
@@ -91,7 +91,7 @@ var cdRefreshCmd = &cobra.Command{
 
 var cdCancelCmd = &cobra.Command{
 	Use:         "cancel [PROJECT...]",
-	Annotations: authNeededAnnotation, // need subscription
+	Annotations: authNeededAlways, // need subscription
 	Short:       "Cancel the current CD operation",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cdCommand(cmd, args, client.CdCommandCancel, global.Client)
@@ -100,7 +100,7 @@ var cdCancelCmd = &cobra.Command{
 
 var cdOutputsCmd = &cobra.Command{
 	Use:         "outputs [PROJECT...]",
-	Annotations: authNeededAnnotation, // need subscription
+	Annotations: authNeededAlways, // need subscription
 	Short:       "Get the outputs of the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cdCommand(cmd, args, client.CdCommandOutputs, global.Client)
@@ -163,7 +163,7 @@ var cdListCmd = &cobra.Command{
 var cdPreviewCmd = &cobra.Command{
 	Use:         "preview",
 	Args:        cobra.NoArgs,
-	Annotations: authNeededAnnotation, // FIXME: because it still needs a delegated domain
+	Annotations: authNeededAlways, // FIXME: because it still needs a delegated domain
 	Short:       "Preview the changes that will be made by the CD task",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
@@ -193,7 +193,7 @@ var cdInstallCmd = &cobra.Command{
 	Use:         "install",
 	Aliases:     []string{"setup"},
 	Args:        cobra.NoArgs,
-	Annotations: authNeededAnnotation,
+	Annotations: authNeededAlways,
 	Short:       "Install the CD resources into the cluster",
 	Hidden:      true, // users shouldn't have to run this manually, because it's done on deploy
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -214,7 +214,7 @@ var cdInstallCmd = &cobra.Command{
 var cdCloudformationCmd = &cobra.Command{
 	Use:         "cloudformation",
 	Short:       "CloudFormation template related commands",
-	Annotations: authNeededAnnotation,
+	Annotations: authNeededAlways,
 	Args:        cobra.NoArgs,
 	Hidden:      true,
 	RunE: func(cmd *cobra.Command, args []string) error {

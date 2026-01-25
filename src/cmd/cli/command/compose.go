@@ -49,7 +49,7 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd := &cobra.Command{
 		Use:         "up",
 		Aliases:     []string{"deploy"}, // Pulumi has "update" but it's ambiguous with "defang upgrade"
-		Annotations: authNeededAnnotation,
+		Annotations: authNeededAlways,
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and deploy a new project or update an existing project",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -433,7 +433,7 @@ func makeComposeDownCmd() *cobra.Command {
 	composeDownCmd := &cobra.Command{
 		Use:         "down",
 		Aliases:     []string{"rm", "remove"}, // like docker stack
-		Annotations: authNeededAnnotation,
+		Annotations: authNeededAlways,
 		Args:        cobra.NoArgs, // TODO: optional list of service names to remove select services
 		Short:       "Reads a Compose file and deprovisions its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -595,7 +595,7 @@ func makeComposeConfigCmd() *cobra.Command {
 func makeComposePsCmd() *cobra.Command {
 	getServicesCmd := &cobra.Command{
 		Use:         "ps",
-		Annotations: authNeededAnnotation,
+		Annotations: authNeededAlways,
 		Args:        cobra.NoArgs,
 		Aliases:     []string{"getServices", "services"},
 		Short:       "Get list of services in the project",
@@ -639,7 +639,7 @@ func makeComposePsCmd() *cobra.Command {
 func makeLogsCmd() *cobra.Command {
 	var logsCmd = &cobra.Command{
 		Use:         "logs [SERVICE...]",
-		Annotations: authNeededAnnotation,
+		Annotations: authNeededForPlayground,
 		Short:       "Show logs from one or more services",
 		RunE:        handleLogsCmd,
 	}
@@ -651,7 +651,7 @@ func makeLogsCmd() *cobra.Command {
 func makeTailCmd() *cobra.Command {
 	var tailCmd = &cobra.Command{
 		Use:         "tail [SERVICE...]",
-		Annotations: authNeededAnnotation,
+		Annotations: authNeededForPlayground,
 		Short:       "Show logs from one or more services",
 		RunE:        handleLogsCmd,
 	}

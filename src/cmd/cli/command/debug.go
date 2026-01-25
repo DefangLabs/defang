@@ -11,7 +11,7 @@ import (
 
 var debugCmd = &cobra.Command{
 	Use:         "debug [SERVICE...]",
-	Annotations: authNeededAnnotation,
+	Annotations: authNeededAlways,
 	Hidden:      true,
 	Short:       "Debug a build, deployment, or service failure",
 	RunE: func(cmd *cobra.Command, args []string) error {
