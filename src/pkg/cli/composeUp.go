@@ -44,7 +44,7 @@ func checkDeploymentMode(prevMode, newMode modes.Mode) (modes.Mode, error) {
 	switch newMode {
 	case modes.ModeUnspecified:
 		if prevMode != modes.ModeUnspecified {
-			term.Warn("No deployment mode specified; using previous deployment mode:", prevMode)
+			term.Debug("No deployment mode specified; using previous deployment mode:", prevMode)
 			newMode = prevMode
 		}
 	case modes.ModeAffordable:
