@@ -133,7 +133,7 @@ func makeStackListCmd() *cobra.Command {
 func makeStackDefaultCmd() *cobra.Command {
 	var stackDefaultCmd = &cobra.Command{
 		Use:     "default STACK_NAME",
-		Aliases: []string{"set-default"},
+		Aliases: []string{"set-default", "select", "use"},
 		Args:    cobra.ExactArgs(1),
 		Short:   "Set the default Defang deployment stack for the current directory",
 		RunE: func(cmd *cobra.Command, args []string) error {
