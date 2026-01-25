@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
@@ -25,6 +26,42 @@ type ComposeUpParams struct {
 	Project    *compose.Project
 	UploadMode compose.UploadMode
 	Mode       modes.Mode
+}
+
+func checkDeploymentMode(prevMode, newMode modes.Mode) (modes.Mode, error) {
+	// previous deployment mode | new mode          | behavior:
+	// -------------------------|-------------------|-----------------------
+	// any                      | unspecified       | previous mode
+	// affordable               | affordable        | nop, use affordable
+	// affordable               | balanced          | new mode: balanced
+	// affordable               | high-availability | new mode: high-availability
+	// balanced                 | affordable        | warn, use new mode: affordable
+	// balanced                 | balanced          | nop, use balanced
+	// balanced                 | high-availability | new mode: high-availability
+	// high-availability        | affordable        | error
+	// high-availability        | balanced          | warn, use balanced
+	// high-availability        | high-availability | nop, use high-availability
+	switch newMode {
+	case modes.ModeUnspecified:
+		if prevMode != modes.ModeUnspecified {
+			term.Warn("No deployment mode specified; using previous deployment mode:", prevMode)
+			newMode = prevMode
+		}
+	case modes.ModeAffordable:
+		switch prevMode {
+		case modes.ModeHighAvailability:
+			return newMode, fmt.Errorf("will not downgrade deployment mode from %s to %s; use %s", prevMode, newMode, modes.ModeBalanced)
+		case modes.ModeBalanced:
+			term.Warnf("Downgrading deployment mode from %s to %s", prevMode, newMode)
+		}
+	case modes.ModeBalanced:
+		if prevMode == modes.ModeHighAvailability {
+			term.Warnf("Downgrading deployment mode from %s to %s", prevMode, newMode)
+		}
+	case modes.ModeHighAvailability:
+		// from anything to high-availability is allowed
+	}
+	return newMode, nil
 }
 
 // ComposeUp validates a compose project and uploads the services using the client
@@ -86,11 +123,11 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		return nil, project, errors.New("failed to get delegate domain")
 	}
 
-	if mode == modes.ModeUnspecified {
-		// If no mode is specified, check the mode of the previous deployment
-		if prevUp, err := provider.GetProjectUpdate(ctx, project.Name); err == nil && prevUp.Mode != defangv1.DeploymentMode_MODE_UNSPECIFIED {
-			mode = modes.Mode(prevUp.Mode)
-			term.Warn("No deployment mode specified; using previous deployment mode:", mode)
+	if prevUpdate, err := provider.GetProjectUpdate(ctx, project.Name); err == nil {
+		prevMode := modes.Mode(prevUpdate.Mode)
+		mode, err = checkDeploymentMode(prevMode, mode)
+		if err != nil {
+			return nil, project, err
 		}
 	}
 
