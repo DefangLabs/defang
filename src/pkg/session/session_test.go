@@ -8,6 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -108,6 +109,31 @@ func TestLoadSession(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "override mode",
+			options: SessionLoaderOptions{
+				GetStackOpts: stacks.GetStackOpts{
+					Default: stacks.Parameters{
+						Name: "existingstack",
+						Mode: modes.ModeAffordable,
+					},
+				},
+			},
+			existingStack: &stacks.Parameters{
+				Name:     "existingstack",
+				Provider: client.ProviderAWS,
+				Mode:     modes.ModeBalanced,
+			},
+			expectedStack: &stacks.Parameters{
+				Name:     "existingstack",
+				Provider: client.ProviderAWS,
+				Mode:     modes.ModeAffordable,
+				Variables: map[string]string{
+					"DEFANG_PROVIDER": "aws",
+					"DEFANG_MODE":     "affordable",
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -145,12 +171,12 @@ func TestLoadSession(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.NotNil(t, session)
+			require.NotNil(t, session)
 
 			// Verify session contents
-			assert.NotNil(t, session.Loader)
+			require.NotNil(t, session.Loader)
 
-			assert.NotNil(t, session.Provider)
+			require.NotNil(t, session.Provider)
 			if tt.options.Default.Provider == client.ProviderAWS {
 				_, ok := session.Provider.(*aws.ByocAws)
 				assert.True(t, ok)
@@ -160,9 +186,10 @@ func TestLoadSession(t *testing.T) {
 				assert.True(t, ok)
 			}
 
-			assert.NotNil(t, session.Stack)
+			require.NotNil(t, session.Stack)
 			assert.Equal(t, tt.expectedStack.Name, session.Stack.Name)
 			assert.Equal(t, tt.expectedStack.Provider, session.Stack.Provider)
+			assert.Equal(t, tt.expectedStack.Mode, session.Stack.Mode)
 
 			// Verify environment variables
 			for key, expectedValue := range tt.expectedEnv {

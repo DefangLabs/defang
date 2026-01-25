@@ -9,6 +9,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
@@ -71,6 +72,11 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, str
 	stack, whence, err := sl.sm.GetStack(ctx, sl.opts.GetStackOpts)
 	if err != nil {
 		return nil, whence, err
+	}
+
+	// The only stack property that can be overridden via env/flag is Mode
+	if newMode := sl.opts.Default.Mode; newMode != modes.ModeUnspecified {
+		stack.Mode = newMode
 	}
 
 	if err := stacks.LoadStackEnv(*stack, true); err != nil {
