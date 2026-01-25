@@ -39,6 +39,9 @@ func (mockDeployProvider) Preview(ctx context.Context, req *client.DeployRequest
 	if err != nil {
 		return nil, err
 	}
+	if project.Name == "" {
+		return nil, errors.New("project name is required")
+	}
 
 	etag := types.NewEtag()
 	var services []*defangv1.ServiceInfo
@@ -60,6 +63,12 @@ func (m *mockDeployProvider) Subscribe(ctx context.Context, req *defangv1.Subscr
 func (m *mockDeployProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	m.tailStream = client.NewMockWaitStream[defangv1.TailResponse]()
 	return m.tailStream, ctx.Err()
+}
+
+func (m mockDeployProvider) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
+	return &defangv1.ProjectUpdate{
+		Mode: defangv1.DeploymentMode_STAGING,
+	}, ctx.Err()
 }
 
 func (m mockDeployProvider) GetDeploymentStatus(ctx context.Context) error {
@@ -338,5 +347,55 @@ func TestComposeConfigWithoutLogin(t *testing.T) {
 	})
 	if !errors.Is(err, dryrun.ErrDryRun) {
 		t.Fatalf("ComposeUp() failed: %v", err)
+	}
+}
+
+func Test_checkDeploymentMode(t *testing.T) {
+	// previous deployment mode | new mode          | behavior:
+	// -------------------------|-------------------|-----------------------
+	// any                      | unspecified       | previous mode
+	// affordable               | affordable        | nop, use affordable
+	// affordable               | balanced          | new mode: balanced
+	// affordable               | high-availability | new mode: high-availability
+	// balanced                 | affordable        | warn, use new mode: affordable
+	// balanced                 | balanced          | nop, use balanced
+	// balanced                 | high-availability | new mode: high-availability
+	// high-availability        | affordable        | error
+	// high-availability        | balanced          | warn, use balanced
+	// high-availability        | high-availability | nop, use high-availability
+	tests := []struct {
+		prevMode modes.Mode
+		newMode  modes.Mode
+		wantMode modes.Mode
+		wantErr  bool
+	}{
+		{modes.ModeUnspecified, modes.ModeUnspecified, modes.ModeUnspecified, false},
+		{modes.ModeUnspecified, modes.ModeAffordable, modes.ModeAffordable, false},
+		{modes.ModeUnspecified, modes.ModeBalanced, modes.ModeBalanced, false},
+		{modes.ModeUnspecified, modes.ModeHighAvailability, modes.ModeHighAvailability, false},
+		{modes.ModeAffordable, modes.ModeUnspecified, modes.ModeAffordable, false},
+		{modes.ModeAffordable, modes.ModeAffordable, modes.ModeAffordable, false},
+		{modes.ModeAffordable, modes.ModeBalanced, modes.ModeBalanced, false},
+		{modes.ModeAffordable, modes.ModeHighAvailability, modes.ModeHighAvailability, false},
+		{modes.ModeBalanced, modes.ModeUnspecified, modes.ModeBalanced, false},
+		{modes.ModeBalanced, modes.ModeAffordable, modes.ModeAffordable, false},
+		{modes.ModeBalanced, modes.ModeBalanced, modes.ModeBalanced, false},
+		{modes.ModeBalanced, modes.ModeHighAvailability, modes.ModeHighAvailability, false},
+		{modes.ModeHighAvailability, modes.ModeUnspecified, modes.ModeHighAvailability, false},
+		{modes.ModeHighAvailability, modes.ModeAffordable, modes.ModeAffordable, true},
+		{modes.ModeHighAvailability, modes.ModeBalanced, modes.ModeBalanced, false},
+		{modes.ModeHighAvailability, modes.ModeHighAvailability, modes.ModeHighAvailability, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.prevMode.String()+"->"+tt.newMode.String(), func(t *testing.T) {
+			gotMode, err := checkDeploymentMode(tt.prevMode, tt.newMode)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("checkDeploymentMode() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if gotMode != tt.wantMode {
+				t.Errorf("checkDeploymentMode() gotMode = %v, want %v", gotMode, tt.wantMode)
+			}
+		})
 	}
 }
