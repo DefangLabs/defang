@@ -2,11 +2,15 @@ package command
 
 import (
 	"fmt"
+	"os"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
+	"google.golang.org/protobuf/proto"
 )
 
 var debugCmd = &cobra.Command{
@@ -20,6 +24,13 @@ var debugCmd = &cobra.Command{
 		deployment, _ := cmd.Flags().GetString("deployment")
 		since, _ := cmd.Flags().GetString("since")
 		until, _ := cmd.Flags().GetString("until")
+
+		var projupdate defangv1.ProjectUpdate
+		if b, err := os.ReadFile("/Users/llunesu/Downloads/zdqxyk3xati8"); err == nil {
+			if err := proto.Unmarshal(b, &projupdate); err == nil {
+				cli.PrintObject("", &projupdate)
+			}
+		}
 
 		if etag != "" && deployment == "" {
 			deployment = etag
