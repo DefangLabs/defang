@@ -86,6 +86,14 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		return nil, project, errors.New("failed to get delegate domain")
 	}
 
+	if mode == modes.ModeUnspecified {
+		// If no mode is specified, check the mode of the previous deployment
+		if prevUp, err := provider.GetProjectUpdate(ctx, project.Name); err == nil && prevUp.Mode != defangv1.DeploymentMode_MODE_UNSPECIFIED {
+			mode = modes.Mode(prevUp.Mode)
+			term.Warn("No deployment mode specified; using previous deployment mode:", mode)
+		}
+	}
+
 	deployRequest := &client.DeployRequest{
 		DeployRequest: defangv1.DeployRequest{
 			Mode:           mode.Value(),
