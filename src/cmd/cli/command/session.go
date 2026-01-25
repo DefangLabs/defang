@@ -51,9 +51,9 @@ func newCommandSessionWithOpts(cmd *cobra.Command, opts commandSessionOpts) (*se
 }
 
 func newSessionLoaderOptionsForCommand(cmd *cobra.Command) session.SessionLoaderOptions {
-	stack, _ := cmd.Flags().GetString("stack")
+	stackName, _ := cmd.Flags().GetString("stack")
 	configPaths, _ := cmd.Flags().GetStringArray("file")
-	provider, _ := cmd.Flag("provider").Value.(*client.ProviderID)
+	providerId, _ := cmd.Flag("provider").Value.(*client.ProviderID)
 	projectName, _ := cmd.Flags().GetString("project-name")
 
 	// Avoid common mistakes
@@ -77,9 +77,9 @@ func newSessionLoaderOptionsForCommand(cmd *cobra.Command) session.SessionLoader
 		ComposeFilePaths: configPaths,
 		ProjectName:      projectName,
 		GetStackOpts: stacks.GetStackOpts{
-			ProviderID:  *provider,
+			ProviderID:  *providerId,
 			Interactive: !global.NonInteractive,
-			Stack:       stack,
+			Stack:       stackName,
 		},
 	}
 }
@@ -101,7 +101,7 @@ func doubleCheckProjectName(projectName string) {
 func newStackManagerForLoader(ctx context.Context, loader *compose.Loader) (session.StacksManager, error) {
 	targetDirectory, err := findTargetDirectory()
 	if err != nil {
-		targetDirectory = loader.TargetDirectory()
+		targetDirectory = loader.TargetDirectory(ctx)
 	}
 	projectName, _, err := loader.LoadProjectName(ctx)
 	if err != nil {

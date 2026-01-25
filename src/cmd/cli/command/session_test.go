@@ -71,9 +71,9 @@ func TestNewStackManagerForCommand(t *testing.T) {
 			require.NoError(t, err, "expected no error but got one")
 
 			if tt.expectedTarget == "" {
-				assert.Equal(t, "", sm.TargetDirectory())
+				assert.Equal(t, "", sm.TargetDirectory(t.Context()))
 			} else {
-				actualTarget := sm.TargetDirectory()
+				actualTarget := sm.TargetDirectory(t.Context())
 				expectedAbs, err := filepath.Abs(tt.expectedTarget)
 				if err != nil {
 					t.Fatalf("failed to get absolute path: %v", err)

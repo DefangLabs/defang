@@ -328,7 +328,7 @@ func (m *mockStackManager) GetRemote(ctx context.Context, name string) (*stacks.
 	return nil, fmt.Errorf("stack %q not found", name)
 }
 
-func (m *mockStackManager) TargetDirectory() string {
+func (m *mockStackManager) TargetDirectory(context.Context) string {
 	return "."
 }
 
