@@ -32,7 +32,7 @@ func (c *ColorMode) Set(value string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("color mode not one of %v", allColorModes)
+	return fmt.Errorf("invalid color: %q, not one of %v", value, allColorModes)
 }
 
 func (c ColorMode) Type() string {

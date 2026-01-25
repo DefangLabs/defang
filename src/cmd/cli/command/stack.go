@@ -94,7 +94,7 @@ func makeStackListCmd() *cobra.Command {
 				return err
 			}
 
-			sm, err := stacks.NewManager(global.Client, loader.TargetDirectory(), projectName, ec)
+			sm, err := stacks.NewManager(global.Client, loader.TargetDirectory(ctx), projectName, ec)
 			if err != nil {
 				return err
 			}
@@ -145,7 +145,7 @@ func makeStackDefaultCmd() *cobra.Command {
 				return err
 			}
 
-			sm, err := stacks.NewManager(global.Client, loader.TargetDirectory(), projectName, ec)
+			sm, err := stacks.NewManager(global.Client, loader.TargetDirectory(ctx), projectName, ec)
 			if err != nil {
 				return err
 			}

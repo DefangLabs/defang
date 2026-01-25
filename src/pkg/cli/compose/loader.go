@@ -91,8 +91,8 @@ func (l *Loader) LoadProject(ctx context.Context) (*Project, error) {
 	return l.loadProject(ctx, false)
 }
 
-func (l *Loader) TargetDirectory() string {
-	project, _ := l.loadProject(context.TODO(), true)
+func (l *Loader) TargetDirectory(ctx context.Context) string {
+	project, _ := l.loadProject(ctx, true)
 	if project == nil {
 		return ""
 	}
