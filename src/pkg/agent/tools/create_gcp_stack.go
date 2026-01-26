@@ -2,12 +2,9 @@ package tools
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/modes"
-	"github.com/DefangLabs/defang/src/pkg/stacks"
 )
 
 type CreateGCPStackParams struct {
@@ -19,27 +16,12 @@ type CreateGCPStackParams struct {
 }
 
 func HandleCreateGCPStackTool(ctx context.Context, params CreateGCPStackParams, sc StackConfig) (string, error) {
-	if params.Mode == "" {
-		params.Mode = modes.ModeAffordable.String()
-	}
-	mode, err := modes.Parse(params.Mode)
-	if err != nil {
-		return "Invalid mode provided", err
-	}
-	newStack := stacks.Parameters{
-		Name:     params.Name,
-		Region:   params.Region,
-		Provider: client.ProviderGCP,
-		Mode:     mode,
-		Variables: map[string]string{
-			"GCP_PROJECT_ID": params.GCPProjectID,
-		},
-	}
-
-	_, err = stacks.CreateInDirectory(params.WorkingDirectory, newStack)
-	if err != nil {
-		return "Failed to create stack", err
-	}
-
-	return fmt.Sprintf("Successfully created stack %q. Use the 'select_stack' tool to activate it for use.", params.Name), nil
+	return createStack(createStackParams{
+		WorkingDirectory: params.WorkingDirectory,
+		Name:             params.Name,
+		Region:           params.Region,
+		Provider:         client.ProviderGCP,
+		Mode:             params.Mode,
+		Variables:        map[string]string{"GCP_PROJECT_ID": params.GCPProjectID},
+	}, sc)
 }
