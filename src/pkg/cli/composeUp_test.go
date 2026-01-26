@@ -17,13 +17,15 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/stretchr/testify/require"
 )
 
 type mockDeployProvider struct {
 	client.MockProvider
-	deploymentStatus error
-	subscribeStream  *client.MockWaitStream[defangv1.SubscribeResponse]
-	tailStream       *client.MockWaitStream[defangv1.TailResponse]
+	deploymentStatus  error
+	subscribeStream   *client.MockWaitStream[defangv1.SubscribeResponse]
+	tailStream        *client.MockWaitStream[defangv1.TailResponse]
+	prevProjectUpdate *defangv1.ProjectUpdate
 }
 
 func (d mockDeployProvider) Deploy(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
@@ -66,9 +68,7 @@ func (m *mockDeployProvider) QueryLogs(ctx context.Context, req *defangv1.TailRe
 }
 
 func (m mockDeployProvider) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
-	return &defangv1.ProjectUpdate{
-		Mode: defangv1.DeploymentMode_STAGING,
-	}, ctx.Err()
+	return m.prevProjectUpdate, ctx.Err()
 }
 
 func (m mockDeployProvider) GetDeploymentStatus(ctx context.Context) error {
@@ -113,28 +113,43 @@ func TestComposeUp(t *testing.T) {
 	stack := &stacks.Parameters{
 		Provider: client.ProviderDefang,
 	}
-	d, project, err := ComposeUp(t.Context(), mc, mp, stack, ComposeUpParams{
-		Mode:       modes.ModeAffordable,
-		Project:    proj,
-		UploadMode: compose.UploadModeDigest,
-	})
-	if err != nil {
-		t.Fatalf("ComposeUp() failed: %v", err)
-	}
-	if project == nil {
-		t.Fatalf("ComposeUp() failed: project is nil")
-	}
-	if !gotContext.Load() {
-		t.Errorf("ComposeStart() failed: did not get context")
-	}
-	if len(d.Services) != len(proj.Services) {
-		t.Errorf("ComposeUp() failed: expected %d services, got %d", len(proj.Services), len(d.Services))
-	}
-	for _, service := range d.Services {
-		if _, ok := proj.Services[service.Service.Name]; !ok {
-			t.Errorf("ComposeUp() failed: service %s not found", service.Service.Name)
+
+	t.Run("happy path", func(t *testing.T) {
+		d, project, err := ComposeUp(t.Context(), mc, mp, stack, ComposeUpParams{
+			Mode:       modes.ModeAffordable,
+			Project:    proj,
+			UploadMode: compose.UploadModeDigest,
+		})
+		if err != nil {
+			t.Fatalf("ComposeUp() failed: %v", err)
 		}
-	}
+		if project == nil {
+			t.Fatalf("ComposeUp() failed: project is nil")
+		}
+		if !gotContext.Load() {
+			t.Errorf("ComposeStart() failed: did not get context")
+		}
+		if len(d.Services) != len(proj.Services) {
+			t.Errorf("ComposeUp() failed: expected %d services, got %d", len(proj.Services), len(d.Services))
+		}
+		for _, service := range d.Services {
+			if _, ok := proj.Services[service.Service.Name]; !ok {
+				t.Errorf("ComposeUp() failed: service %s not found", service.Service.Name)
+			}
+		}
+	})
+
+	t.Run("no downgrade from HA to affordable", func(t *testing.T) {
+		mp.prevProjectUpdate = &defangv1.ProjectUpdate{
+			Mode: defangv1.DeploymentMode_PRODUCTION,
+		}
+		_, _, err = ComposeUp(t.Context(), mc, mp, stack, ComposeUpParams{
+			Mode:       modes.ModeAffordable,
+			Project:    proj,
+			UploadMode: compose.UploadModeDigest,
+		})
+		require.ErrorContains(t, err, "downgrade deployment mode from HIGH_AVAILABILITY to AFFORDABLE")
+	})
 }
 
 func TestSplitManagedAndUnmanagedServices(t *testing.T) {
