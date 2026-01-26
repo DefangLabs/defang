@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"os"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -78,26 +77,24 @@ func TestCreateStack(t *testing.T) {
 			errorContains:  "stack name must start with a letter",
 		},
 	}
-	// unset before running tests
-	envVars := []string{
-		"DEFANG_PROVIDER",
-		"AWS_PROFILE",
-		"AWS_REGION",
-		"GCP_PROJECT_ID",
-		"CLOUDSDK_COMPUTE_REGION",
-		"DEFANG_MODE",
-		"DEFANG_STACK",
-	}
-	for _, ev := range envVars {
-		// if it was set, restore it after the test
-		if val, exists := os.LookupEnv(ev); exists {
-			defer t.Setenv(ev, val)
-		}
-		os.Unsetenv(ev)
-	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// unset before running tests
+			envVars := []string{
+				"DEFANG_PROVIDER",
+				"AWS_PROFILE",
+				"AWS_REGION",
+				"GCP_PROJECT_ID",
+				"CLOUDSDK_COMPUTE_REGION",
+				"DEFANG_MODE",
+				"DEFANG_STACK",
+			}
+			for _, ev := range envVars {
+				// if it was set, restore it after the test
+				t.Setenv(ev, "")
+			}
+
 			tmpDir := t.TempDir()
 
 			tt.params.WorkingDirectory = tmpDir
