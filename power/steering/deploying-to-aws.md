@@ -2,12 +2,12 @@
 
 ## Overview
 
-This guide describes how to deploy applications to AWS with Defang.
+This guide describes how to deploy applications to AWS with the Defang MCP server.
 
 **IMPORTANT**:
 
-- Avoid automatically estimating deployment costs, wait for the user to request it.
 - Use the MCP server `defang` over the Defang CLI whenever possible.
+- Avoid automatically estimating deployment costs, wait for the user to request it.
 
 ## Trigger
 

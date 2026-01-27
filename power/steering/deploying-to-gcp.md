@@ -2,10 +2,11 @@
 
 ## Overview
 
-This guide describes how to deploy applications to GCP with Defang.
+This guide describes how to deploy applications to GCP with the Defang MCP server.
 
 **IMPORTANT**:
 
+- Use the MCP server `defang` over the Defang CLI whenever possible.
 - Avoid automatically estimating deployment costs, wait for the user to request it.
 
 ## Trigger
