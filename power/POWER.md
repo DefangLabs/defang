@@ -14,7 +14,7 @@ keywords:
     "digitalocean",
     "estimate",
   ]
-mcpServers: ["defang"]
+mcpServers: ["power-defang-defang"]
 ---
 
 # Onboarding
@@ -22,18 +22,24 @@ mcpServers: ["defang"]
 ## Validate tool
 
 Before using Defang, ensure the Defang CLI is installed and running.
+Run `defang --version` to check if the Defang CLI is installed, if not installed, follow the instructions below to install it.
 
 The Defang CLI can be installed in order of priority:
 
-1.  `eval "$(curl -fsSL s.defang.io/install)"`
-2.  npm
-3.  Homebrew
-4.  Winget
+1.  curl: `eval "$(curl -fsSL s.defang.io/install)"`
+2.  npm: `npm i defang`
+3.  Homebrew: `brew install DefangLabs/defang/defang`
+4.  Winget for windows installtion: `winget install defang`
+5.  Nix: `nix profile install github:DefangLabs/defang#defang-bin --refresh`
+
+Once installed, run `defang --version` to verify the installation was successful, then ask the user to restart the Kiro IDE before proceeding to ## First Steps.
 
 ## First Steps:
 
 **IMPORTANT**:
-Ensure that the step above ## Validate tool is completed before proceeding to the steps below.
+
+- Avoid automatically estimating deployment costs, unless user specifically requests it.
+- Ensure that the step above ## Validate tool is completed before proceeding to the steps below.
 
 Once the Defang CLI is installed, the Kiro Power should use the Defang MCP tools instead of the Defang CLI whenever possible.
 
