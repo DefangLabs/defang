@@ -301,6 +301,13 @@ message CanIUseResponse {
   bytes signature = 6;
 }
 
+enum DeploymentOrigin {
+  NOT_SPECIFIED = 0;
+  CI = 1;
+  GITHUB = 2;
+  GITLAB = 3;
+}
+
 message DeployRequest {
   reserved 1; // was: services
   string project = 2 [deprecated = true]; // deprecated; use compose.name
@@ -310,6 +317,7 @@ message DeployRequest {
   string delegation_set_id = 6;
   bool preview = 7 [deprecated = true];
   Provider provider = 8;
+  DeploymentOrigin origin = 9;
 }
 
 message DeployResponse {
