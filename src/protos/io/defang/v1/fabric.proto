@@ -301,13 +301,6 @@ message CanIUseResponse {
   bytes signature = 6;
 }
 
-enum DeploymentOrigin {
-  NOT_SPECIFIED = 0;
-  CI = 1;
-  GITHUB = 2;
-  GITLAB = 3;
-}
-
 message DeployRequest {
   reserved 1; // was: services
   string project = 2 [deprecated = true]; // deprecated; use compose.name
@@ -317,7 +310,6 @@ message DeployRequest {
   string delegation_set_id = 6;
   bool preview = 7 [deprecated = true];
   Provider provider = 8;
-  DeploymentOrigin origin = 9;
 }
 
 message DeployResponse {
@@ -522,6 +514,13 @@ enum DeploymentAction {
   DEPLOYMENT_ACTION_REFRESH = 4;
 }
 
+enum DeploymentOrigin {
+  DEPLOYMENT_ORIGIN_NOT_SPECIFIED = 0;
+  DEPLOYMENT_ORIGIN_CI = 1;
+  DEPLOYMENT_ORIGIN_GITHUB = 2;
+  DEPLOYMENT_ORIGIN_GITLAB = 3;
+}
+
 message Deployment {
   string id = 1; // aka etag
   string project = 2;
@@ -538,6 +537,7 @@ message Deployment {
   DeploymentStatus status = 13;
   string states_url = 14;
   string events_url = 15;
+  DeploymentOrigin origin = 16;
 }
 
 enum DeploymentStatus {
