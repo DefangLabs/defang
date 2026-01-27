@@ -23,7 +23,12 @@ mcpServers: ["defang"]
 
 Before using Defang, ensure the Defang CLI is installed and running.
 
-The Defang CLI can be installed via npm, Homebrew, Winget, or `eval "$(curl -fsSL s.defang.io/install)"`
+The Defang CLI can be installed in order of priority:
+
+1.  `eval "$(curl -fsSL s.defang.io/install)"`
+2.  npm
+3.  Homebrew
+4.  Winget
 
 ## First Steps:
 
@@ -31,6 +36,7 @@ The Defang CLI can be installed via npm, Homebrew, Winget, or `eval "$(curl -fsS
 Ensure that the step above ## Validate tool is completed before proceeding to the steps below.
 
 Once the Defang CLI is installed, the Kiro Power should use the Defang MCP tools instead of the Defang CLI whenever possible.
+
 - If the Defang MCP server is not working, use the Defang CLI instead.
 - For help with the Defang CLI, run `defang --help` to view the CLI help documentation.
 
