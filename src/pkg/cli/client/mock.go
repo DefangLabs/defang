@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"sync/atomic"
 
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -52,21 +53,25 @@ func (MockProvider) GetStackNameForDomain() string {
 
 // MockServerStream mocks a ServerStream.
 type MockServerStream[Msg any] struct {
-	index int
-	Resps []*Msg
-	Error error
+	index  int
+	Resps  []*Msg
+	Error  error
+	closed atomic.Bool
 }
 
-func (*MockServerStream[T]) Close() error {
+func (m *MockServerStream[T]) Close() error {
+	if m.closed.Swap(true) {
+		panic("MockServerStream already closed")
+	}
 	return nil
 }
 
 func (m *MockServerStream[T]) Receive() bool {
-	if m.index >= len(m.Resps) {
+	if m.index >= len(m.Resps) || m.closed.Load() {
 		return false
 	}
 	m.index++
-	return true
+	return m.Resps[m.index-1] != nil
 }
 
 func (m *MockServerStream[T]) Msg() *T {
