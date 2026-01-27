@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
@@ -81,6 +82,8 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 		}
 	}
 
+	origin := getDeploymentOriginFromEnvironment()
+
 	return fabric.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
 		Deployment: &defangv1.Deployment{
 			Action:            req.Action,
@@ -96,6 +99,20 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 			Mode:              req.Mode,
 			StatesUrl:         req.StatesUrl,
 			EventsUrl:         req.EventsUrl,
+			Origin:            origin,
 		},
 	})
+}
+
+func getDeploymentOriginFromEnvironment() defangv1.DeploymentOrigin {
+	if os.Getenv("GITHUB_ACTION") != "" {
+		return defangv1.DeploymentOrigin_DEPLOYMENT_ORIGIN_GITHUB
+	}
+	if os.Getenv("GITLAB_CI") != "" {
+		return defangv1.DeploymentOrigin_DEPLOYMENT_ORIGIN_GITLAB
+	}
+	if os.Getenv("CI") != "" {
+		return defangv1.DeploymentOrigin_DEPLOYMENT_ORIGIN_CI
+	}
+	return defangv1.DeploymentOrigin_DEPLOYMENT_ORIGIN_NOT_SPECIFIED
 }
