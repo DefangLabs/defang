@@ -25,13 +25,6 @@ var debugCmd = &cobra.Command{
 		since, _ := cmd.Flags().GetString("since")
 		until, _ := cmd.Flags().GetString("until")
 
-		var projupdate defangv1.ProjectUpdate
-		if b, err := os.ReadFile("/Users/llunesu/Downloads/zdqxyk3xati8"); err == nil {
-			if err := proto.Unmarshal(b, &projupdate); err == nil {
-				cli.PrintObject("", &projupdate)
-			}
-		}
-
 		if etag != "" && deployment == "" {
 			deployment = etag
 		}
