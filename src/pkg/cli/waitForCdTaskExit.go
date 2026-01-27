@@ -25,12 +25,10 @@ func WaitForCdTaskExit(ctx context.Context, provider client.Provider) error {
 			}
 			// Retry on transient errors
 			if isTransientError(err) {
-				// If it's a transient error, we can retry
-				if err := provider.DelayBeforeRetry(ctx); err != nil {
-					return err
-				}
+				// If it's a transient error, we can retry at the next tick
 				continue
 			}
+			// nil means the task is still running and we continue polling
 			if err != nil {
 				return err
 			}

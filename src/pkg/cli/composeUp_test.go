@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -26,13 +27,14 @@ type mockDeployProvider struct {
 	subscribeStream   *client.MockWaitStream[defangv1.SubscribeResponse]
 	tailStream        *client.MockWaitStream[defangv1.TailResponse]
 	prevProjectUpdate *defangv1.ProjectUpdate
+	lock              sync.Mutex
 }
 
-func (d mockDeployProvider) Deploy(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
+func (d *mockDeployProvider) Deploy(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
 	return d.Preview(ctx, req)
 }
 
-func (mockDeployProvider) Preview(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
+func (*mockDeployProvider) Preview(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
 	if len(req.Compose) == 0 {
 		return nil, errors.New("DeployRequest needs Compose")
 	}
@@ -58,20 +60,24 @@ func (mockDeployProvider) Preview(ctx context.Context, req *client.DeployRequest
 }
 
 func (m *mockDeployProvider) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.subscribeStream = client.NewMockWaitStream[defangv1.SubscribeResponse]()
 	return m.subscribeStream, ctx.Err()
 }
 
 func (m *mockDeployProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.tailStream = client.NewMockWaitStream[defangv1.TailResponse]()
 	return m.tailStream, ctx.Err()
 }
 
-func (m mockDeployProvider) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
+func (m *mockDeployProvider) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
 	return m.prevProjectUpdate, ctx.Err()
 }
 
-func (m mockDeployProvider) GetDeploymentStatus(ctx context.Context) error {
+func (m *mockDeployProvider) GetDeploymentStatus(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return context.Cause(ctx)
@@ -80,11 +86,11 @@ func (m mockDeployProvider) GetDeploymentStatus(ctx context.Context) error {
 	}
 }
 
-func (mockDeployProvider) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
+func (*mockDeployProvider) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
 	return &client.AccountInfo{}, ctx.Err()
 }
 
-func (mockDeployProvider) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
+func (*mockDeployProvider) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
 	return &client.PrepareDomainDelegationResponse{
 		NameServers:     []string{"ns1.example.com", "ns2.example.com"},
 		DelegationSetId: "test-delegation-set-id",
