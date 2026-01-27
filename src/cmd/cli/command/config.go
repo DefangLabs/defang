@@ -173,10 +173,10 @@ var configSetCmd = &cobra.Command{
 			})
 			if err != nil {
 				errs = append(errs, err)
-			} else if didSet {
-				term.Info("Updated value for", name)
-			} else if ifNotSet {
+			} else if ifNotSet && !didSet {
 				term.Info("Config", name, "is already set; skipping due to --if-not-set flag")
+			} else {
+				term.Info("Updated value for", name)
 			}
 		}
 
