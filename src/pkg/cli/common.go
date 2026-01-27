@@ -83,6 +83,14 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 	}
 
 	origin := getDeploymentOriginFromEnvironment()
+	originMetadata := getDeploymentOriginMetadataFromEnvironment()
+	if len(originMetadata) > 0 {
+		originMetadataBytes, err := json.Marshal(originMetadata)
+		if err != nil {
+			return err
+		}
+		term.Debugf("Deployment origin metadata: %s", string(originMetadataBytes))
+	}
 
 	return fabric.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
 		Deployment: &defangv1.Deployment{
@@ -100,6 +108,7 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 			StatesUrl:         req.StatesUrl,
 			EventsUrl:         req.EventsUrl,
 			Origin:            origin,
+			OriginMetadata:    originMetadata,
 		},
 	})
 }
@@ -115,4 +124,22 @@ func getDeploymentOriginFromEnvironment() defangv1.DeploymentOrigin {
 		return defangv1.DeploymentOrigin_DEPLOYMENT_ORIGIN_CI
 	}
 	return defangv1.DeploymentOrigin_DEPLOYMENT_ORIGIN_NOT_SPECIFIED
+}
+
+func getDeploymentOriginMetadataFromEnvironment() map[string]string {
+	metadata := make(map[string]string)
+
+	// https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+	if os.Getenv("GITHUB_ACTION") != "" {
+		metadata["GITHUB_REPOSITORY"] = os.Getenv("GITHUB_REPOSITORY")
+		metadata["GITHUB_RUN_ID"] = os.Getenv("GITHUB_RUN_ID")
+	}
+
+	// https://gitlab.com/$CI_PROJECT_PATH/-/jobs/$CI_JOB_ID
+	if os.Getenv("GITLAB_CI") != "" {
+		metadata["CI_PROJECT_PATH"] = os.Getenv("CI_PROJECT_PATH")
+		metadata["CI_JOB_ID"] = os.Getenv("CI_JOB_ID")
+	}
+
+	return metadata
 }
