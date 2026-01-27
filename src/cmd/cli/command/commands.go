@@ -245,6 +245,7 @@ func SetupCommands(version string) {
 	_ = configSetCmd.Flags().MarkHidden("name")
 	configSetCmd.Flags().BoolP("env", "e", false, "set the config from an environment variable")
 	configSetCmd.Flags().Bool("random", false, "set a secure randomly generated value for config")
+	configSetCmd.Flags().Bool("if-not-set", false, "set the config if it is not already set")
 	configSetCmd.Flags().String("env-file", "", "load config values from an .env file")
 	configSetCmd.MarkFlagFilename("env-file")
 

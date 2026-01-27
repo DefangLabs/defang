@@ -34,6 +34,7 @@ var configSetCmd = &cobra.Command{
 		ctx := cmd.Context()
 		fromEnv, _ := cmd.Flags().GetBool("env")
 		random, _ := cmd.Flags().GetBool("random")
+		ifNotSet, _ := cmd.Flags().GetBool("if-not-set")
 		envFile, _ := cmd.Flags().GetString("env-file")
 
 		// This command has several modes of operation:
@@ -167,10 +168,15 @@ var configSetCmd = &cobra.Command{
 
 		var errs []error
 		for name, value := range envMap {
-			if err := cli.ConfigSet(cmd.Context(), projectName, session.Provider, name, value); err != nil {
+			didSet, err := cli.ConfigSet(cmd.Context(), projectName, session.Provider, name, value, cli.ConfigSetOptions{
+				IfNotSet: ifNotSet,
+			})
+			if err != nil {
 				errs = append(errs, err)
-			} else {
+			} else if didSet {
 				term.Info("Updated value for", name)
+			} else if ifNotSet {
+				term.Info("Config", name, "is already set; skipping due to --if-not-set flag")
 			}
 		}
 
