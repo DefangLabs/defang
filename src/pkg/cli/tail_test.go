@@ -350,6 +350,8 @@ func TestTailContext(t *testing.T) {
 			t.Cleanup(cancel)
 
 			time.AfterFunc(10*time.Millisecond, func() {
+				mock.lock.Lock()
+				defer mock.lock.Unlock()
 				mock.tailStream.Send(nil, tt.cause)
 			})
 			err := Tail(ctx, mock, "project", tailOptions)

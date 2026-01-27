@@ -229,11 +229,6 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel() // to ensure we close the stream and clean-up this context
 
-	go func() {
-		<-ctx.Done()
-		serverStream.Close() // this works because it takes a pointer receiver
-	}()
-
 	spin := spinner.New()
 	doSpinner := !options.Raw && term.StdoutCanColor() && term.IsTerminal()
 
@@ -325,6 +320,12 @@ func printTailBookend(options *TailOptions, lastLogTime time.Time) {
 }
 
 func receiveLogs(ctx context.Context, provider client.Provider, projectName string, tailRequest *defangv1.TailRequest, serverStream client.ServerStream[defangv1.TailResponse], options *TailOptions, doSpinner bool, handler LogEntryHandler) error {
+	safeCloser := NewSafeCloser(serverStream)
+	go func() {
+		<-ctx.Done()
+		safeCloser.Close()
+	}()
+
 	headBookendPrinted := false
 	lastLogTime := time.Time{}
 	skipDuplicate := false
@@ -354,6 +355,7 @@ func receiveLogs(ctx context.Context, provider client.Provider, projectName stri
 					term.Debug("Reconnect failed:", err)
 					return err
 				}
+				safeCloser.Swap(serverStream) // closes the old stream
 				if !options.Raw {
 					term.Printf("%*s", spaces, "\r") // clear the "reconnecting" message
 				}

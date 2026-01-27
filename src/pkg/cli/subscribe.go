@@ -38,9 +38,10 @@ func WaitServiceState(
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel() // to ensure we close the stream and clean-up this context
 
+	safeCloser := NewSafeCloser(serverStream)
 	go func() {
 		<-ctx.Done()
-		serverStream.Close()
+		safeCloser.Close()
 	}()
 
 	serviceStates := make(ServiceStates, len(services))
@@ -61,6 +62,7 @@ func WaitServiceState(
 				if err != nil {
 					return serviceStates, err
 				}
+				safeCloser.Swap(serverStream) // closes the old stream
 				continue
 			}
 			return serviceStates, serverStream.Err()
