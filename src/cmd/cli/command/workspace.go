@@ -62,7 +62,7 @@ var workspaceCmd = &cobra.Command{
 	Use:         "workspace",
 	Aliases:     []string{"workspaces", "ws"},
 	Args:        cobra.NoArgs,
-	Annotations: authNeededAnnotation,
+	Annotations: authNeededAlways,
 	Short:       "Manage workspaces",
 	RunE:        ListWorkspaces,
 }
@@ -71,7 +71,7 @@ var workspaceListCmd = &cobra.Command{
 	Use:         "ls",
 	Aliases:     []string{"list"},
 	Args:        cobra.NoArgs,
-	Annotations: authNeededAnnotation,
+	Annotations: authNeededAlways,
 	Short:       "List available workspaces",
 	RunE:        ListWorkspaces,
 }

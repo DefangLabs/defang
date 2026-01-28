@@ -9,7 +9,7 @@ import (
 var deploymentsCmd = &cobra.Command{
 	Use:         "deployments",
 	Aliases:     []string{"deployment", "deploys", "deps", "dep", "ls", "list"},
-	Annotations: authNeededAnnotation,
+	Annotations: authNeededAlways,
 	Args:        cobra.NoArgs,
 	Short:       "List all active deployments",
 	RunE: func(cmd *cobra.Command, args []string) error {
