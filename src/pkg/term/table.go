@@ -62,7 +62,13 @@ func (t *Term) Table(slice any, attributes ...string) error {
 				}
 				continue
 			}
-			_, err = fmt.Fprintf(w, "%v\t", field.Interface())
+			val := field.Interface()
+			zero := reflect.Zero(field.Type()).Interface()
+			if reflect.DeepEqual(val, zero) {
+				_, err = fmt.Fprint(w, "\t")
+			} else {
+				_, err = fmt.Fprintf(w, "%v\t", val)
+			}
 			if err != nil {
 				return err
 			}
