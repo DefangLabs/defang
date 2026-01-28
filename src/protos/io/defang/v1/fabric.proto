@@ -539,6 +539,7 @@ message Deployment {
   string events_url = 15;
   DeploymentOrigin origin = 16;
   map<string, string> origin_metadata = 17;
+  repeated ServiceInfo services = 18;
 }
 
 enum DeploymentStatus {

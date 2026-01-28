@@ -46,9 +46,9 @@ type putDeploymentParams struct {
 	ETag         types.ETag
 	Mode         defangv1.DeploymentMode
 	ProjectName  string
-	ServiceCount int
 	StatesUrl    string
 	EventsUrl    string
+	ServiceInfos []*defangv1.ServiceInfo
 }
 
 func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric client.FabricClient, stack *stacks.Parameters, req putDeploymentParams) error {
@@ -101,7 +101,7 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 			ProviderAccountId: accountInfo.AccountID,
 			ProviderString:    string(accountInfo.Provider),
 			Region:            accountInfo.Region,
-			ServiceCount:      int32(req.ServiceCount), // #nosec G115 - service count will not overflow int32
+			ServiceCount:      int32(len(req.ServiceInfos)), // #nosec G115 - service count will not overflow int32
 			Stack:             provider.GetStackName(),
 			Timestamp:         now,
 			Mode:              req.Mode,
@@ -109,6 +109,7 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 			EventsUrl:         req.EventsUrl,
 			Origin:            origin,
 			OriginMetadata:    originMetadata,
+			Services:          req.ServiceInfos,
 		},
 	})
 }

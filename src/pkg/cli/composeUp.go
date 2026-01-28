@@ -194,9 +194,9 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		ETag:         resp.Etag,
 		Mode:         mode.Value(),
 		ProjectName:  project.Name,
-		ServiceCount: len(fixedProject.Services),
 		StatesUrl:    statesUrl,
 		EventsUrl:    eventsUrl,
+		ServiceInfos: resp.Services,
 	})
 	if err != nil {
 		term.Debug("Failed to record deployment:", err)
