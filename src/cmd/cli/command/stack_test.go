@@ -84,8 +84,8 @@ func TestStackListCmd(t *testing.T) {
 				},
 			},
 			expectOutput: "NAME        DEFAULT  PROVIDER  REGION       MODE        DEPLOYEDAT\n" +
-				"teststack1  false    aws       us-test-2    AFFORDABLE  0001-01-01 00:00:00 +0000 UTC  \n" +
-				"teststack2  false    gcp       us-central1  BALANCED    0001-01-01 00:00:00 +0000 UTC  \n",
+				"teststack1           aws       us-test-2    AFFORDABLE    \n" +
+				"teststack2           gcp       us-central1  BALANCED      \n",
 		},
 	}
 	for _, tt := range tests {
