@@ -129,16 +129,21 @@ func getDeploymentOriginFromEnvironment() defangv1.DeploymentOrigin {
 func getDeploymentOriginMetadataFromEnvironment() map[string]string {
 	metadata := make(map[string]string)
 
-	// https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+	// https://docs.github.com/en/actions/reference/workflows-and-actions/variables
 	if os.Getenv("GITHUB_ACTION") != "" {
 		metadata["GITHUB_REPOSITORY"] = os.Getenv("GITHUB_REPOSITORY")
 		metadata["GITHUB_RUN_ID"] = os.Getenv("GITHUB_RUN_ID")
+		metadata["GITHUB_WORKFLOW_REF"] = os.Getenv("GITHUB_WORKFLOW_REF")
+		metadata["GITHUB_JOB"] = os.Getenv("GITHUB_JOB")
+		metadata["GITHUB_ACTOR"] = os.Getenv("GITHUB_ACTOR")
 	}
 
-	// https://gitlab.com/$CI_PROJECT_PATH/-/jobs/$CI_JOB_ID
+	// https://docs.gitlab.com/ci/variables/predefined_variables/
 	if os.Getenv("GITLAB_CI") != "" {
 		metadata["CI_PROJECT_PATH"] = os.Getenv("CI_PROJECT_PATH")
 		metadata["CI_JOB_ID"] = os.Getenv("CI_JOB_ID")
+		metadata["CI_CONFIG_PATH"] = os.Getenv("CI_CONFIG_PATH")
+		metadata["GITLAB_USER_LOGIN"] = os.Getenv("GITLAB_USER_LOGIN")
 	}
 
 	return metadata
