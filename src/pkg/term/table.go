@@ -1,8 +1,10 @@
 package term
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"text/tabwriter"
@@ -13,6 +15,15 @@ func Table(slice any, attributes ...string) error {
 }
 
 func (t *Term) Table(slice any, attributes ...string) error {
+	if os.Getenv("DEFANG_JSON") == "1" {
+		// In JSON mode, we don't print tables, let's marshal the slice as JSON instead
+		bytes, err := json.MarshalIndent(slice, "", "\t")
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintln(t.out, string(bytes))
+		return err
+	}
 	// Ensure slice is a slice
 	val := reflect.ValueOf(slice)
 	if val.Kind() != reflect.Slice {

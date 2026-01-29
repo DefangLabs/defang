@@ -165,11 +165,11 @@ func SetupCommands(version string) {
 	_ = RootCmd.MarkPersistentFlagDirname("cwd")
 	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, `compose file path(s)`)
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
+	RootCmd.PersistentFlags().BoolVarP(&global.Json, "json", "", false, "show output in JSON format")
+	RootCmd.PersistentFlags().BoolVarP(&global.Utc, "utc", "", false, "show timestamps in UTC timezone")
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
-	cdCmd.PersistentFlags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
-	cdCmd.PersistentFlags().Bool("json", pkg.GetenvBool("DEFANG_JSON"), "show logs in JSON format")
 	cdCmd.PersistentFlags().StringVar(&byoc.DefangPulumiBackend, "pulumi-backend", "", `specify an alternate Pulumi backend URL or "pulumi-cloud"`)
 	cdCmd.AddCommand(cdDestroyCmd)
 	cdCmd.AddCommand(cdDownCmd)
@@ -292,7 +292,6 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(logsCmd)
 
 	// Deployments Command
-	deploymentsCmd.PersistentFlags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	deploymentsCmd.PersistentFlags().Uint32P("limit", "l", 10, "maximum number of deployments to list")
 	deploymentsCmd.PersistentFlags().BoolP("all", "a", false, "show all deployments, including stopped")
 	RootCmd.AddCommand(deploymentsCmd)
@@ -362,6 +361,16 @@ var RootCmd = &cobra.Command{
 				return os.Chdir(cwd)
 			}
 			return nil
+		}
+		var utc, _ = cmd.Flags().GetBool("utc")
+		var json, _ = cmd.Flags().GetBool("json")
+
+		if utc {
+			cli.EnableUTCMode()
+		}
+		if json {
+			cli.EnableJSONMode()
+			global.Verbose = true
 		}
 
 		// Create a temporary gRPC client for tracking events before login

@@ -101,6 +101,10 @@ func EnableUTCMode() {
 	time.Local = time.UTC
 }
 
+func EnableJSONMode() {
+	os.Setenv("DEFANG_JSON", "1")
+}
+
 type CancelError struct {
 	TailOptions
 	ProjectName string
