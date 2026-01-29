@@ -1,7 +1,6 @@
 package command
 
 import (
-	"encoding/json"
 	"errors"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -30,20 +29,6 @@ func ListWorkspaces(cmd *cobra.Command, args []string) error {
 	}
 
 	rows := cli.WorkspaceRows(info, currentWorkspace)
-	if !verbose {
-		for i := range rows {
-			rows[i].ID = ""
-		}
-	}
-
-	if jsonMode {
-		out, err := json.MarshalIndent(rows, "", "  ")
-		if err != nil {
-			return err
-		}
-		_, err = term.Println(string(out))
-		return err
-	}
 
 	if len(rows) == 0 {
 		term.Info("No workspaces found for this account.")
@@ -51,7 +36,7 @@ func ListWorkspaces(cmd *cobra.Command, args []string) error {
 	}
 
 	headers := []string{"Name", "Current"}
-	if verbose {
+	if verbose && !jsonMode {
 		headers = []string{"Name", "ID", "Current"}
 	}
 

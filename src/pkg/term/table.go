@@ -17,7 +17,28 @@ func Table(slice any, attributes ...string) error {
 func (t *Term) Table(slice any, attributes ...string) error {
 	if os.Getenv("DEFANG_JSON") == "1" {
 		// In JSON mode, we don't print tables, let's marshal the slice as JSON instead
-		bytes, err := json.MarshalIndent(slice, "", "\t")
+		val := reflect.ValueOf(slice)
+		if val.Kind() != reflect.Slice {
+			return errors.New("Table: input is not a slice")
+		}
+
+		filtered := make([]map[string]any, val.Len())
+		for i := range val.Len() {
+			item := val.Index(i)
+			if item.Kind() == reflect.Ptr {
+				item = item.Elem()
+			}
+
+			filtered[i] = make(map[string]any)
+			for _, attr := range attributes {
+				field := item.FieldByName(attr)
+				if field.IsValid() {
+					filtered[i][attr] = field.Interface()
+				}
+			}
+		}
+
+		bytes, err := json.MarshalIndent(filtered, "", "\t")
 		if err != nil {
 			return err
 		}
