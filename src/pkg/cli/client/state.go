@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/google/uuid"
 )
 
@@ -20,6 +21,7 @@ var (
 type State struct {
 	AnonID          string
 	TermsAcceptedAt time.Time
+	Tenant          types.TenantNameOrID
 }
 
 func initState(path string) State {
@@ -62,4 +64,14 @@ func AcceptTerms() error {
 
 func TermsAccepted() bool {
 	return state.termsAccepted()
+}
+
+func SetCurrentTenant(tenant types.TenantNameOrID) error {
+	state.Tenant = tenant
+	return state.write(statePath)
+}
+
+func GetCurrentTenant() types.TenantNameOrID {
+	state = initState(statePath)
+	return state.Tenant
 }
