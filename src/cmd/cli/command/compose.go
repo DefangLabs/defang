@@ -547,7 +547,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				CheckAccountInfo: false,
 			})
 			if err != nil {
-				term.Warn("Failed to load stack", err)
+				term.Warn("unable to load stack:", err, "- some information may not be up-to-date")
 			}
 
 			_, err = session.Provider.AccountInfo(ctx)
