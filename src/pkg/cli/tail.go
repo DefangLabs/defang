@@ -95,14 +95,23 @@ func (to TailOptions) String() string {
 }
 
 var P = track.P
+var originalLocal = time.Local
 
-// EnableUTCMode sets the local time zone to UTC.
-func EnableUTCMode() {
-	time.Local = time.UTC
+// SetUTCMode sets the local time zone to UTC.
+func SetUTCMode(enable bool) {
+	if enable {
+		time.Local = time.UTC
+	} else {
+		time.Local = originalLocal
+	}
 }
 
-func EnableJSONMode() {
-	os.Setenv("DEFANG_JSON", "1")
+func SetJSONMode(enable bool) {
+	if enable {
+		os.Setenv("DEFANG_JSON", "1")
+	} else {
+		os.Unsetenv("DEFANG_JSON")
+	}
 }
 
 type CancelError struct {

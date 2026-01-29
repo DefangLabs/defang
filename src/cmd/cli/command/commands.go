@@ -365,11 +365,9 @@ var RootCmd = &cobra.Command{
 		var utc, _ = cmd.Flags().GetBool("utc")
 		var json, _ = cmd.Flags().GetBool("json")
 
-		if utc {
-			cli.EnableUTCMode()
-		}
+		cli.SetUTCMode(utc)
+		cli.SetJSONMode(json)
 		if json {
-			cli.EnableJSONMode()
 			global.Verbose = true
 		}
 
