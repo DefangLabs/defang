@@ -69,10 +69,12 @@ type GlobalConfig struct {
 	Debug          bool
 	HasTty         bool
 	HideUpdate     bool
+	Json           bool
 	ModelID        string // only for debug/generate; Pro users
 	NonInteractive bool
 	Stack          stacks.Parameters
 	Tenant         types.TenantNameOrID // workspace
+	Utc            bool
 	Verbose        bool
 }
 

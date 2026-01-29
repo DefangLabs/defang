@@ -2,7 +2,6 @@ package command
 
 import (
 	"errors"
-	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -18,19 +17,6 @@ var cdCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	Short:   "Manually run a command with the CD task (for BYOC only)",
 	Hidden:  true,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		var utc, _ = cmd.Flags().GetBool("utc")
-		var json, _ = cmd.Flags().GetBool("json")
-
-		if utc {
-			cli.EnableUTCMode()
-		}
-
-		if json {
-			os.Setenv("DEFANG_JSON", "1") // FIXME: ugly way to set this globally
-			global.Verbose = true
-		}
-	},
 }
 
 func cdCommand(cmd *cobra.Command, args []string, command client.CdCommand, fabric client.FabricClient) error {

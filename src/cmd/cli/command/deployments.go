@@ -13,7 +13,6 @@ var deploymentsCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "List all active deployments",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var utc, _ = cmd.Flags().GetBool("utc")
 		var limit, _ = cmd.Flags().GetUint32("limit")
 		var all, _ = cmd.Flags().GetBool("all")
 		var listType defangv1.DeploymentType
@@ -21,10 +20,6 @@ var deploymentsCmd = &cobra.Command{
 			listType = defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY
 		} else {
 			listType = defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE
-		}
-
-		if utc {
-			cli.EnableUTCMode()
 		}
 
 		loader := configureLoader(cmd)

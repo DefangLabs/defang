@@ -58,9 +58,10 @@ func DeploymentsList(ctx context.Context, client client.FabricClient, params Lis
 	// map to Deployment struct
 	deployments := make([]DeploymentLineItem, numDeployments)
 	for i, d := range response.Deployments {
+		deployedAt := d.Timestamp.AsTime().Local().Format(time.RFC3339)
 		deployments[i] = DeploymentLineItem{
 			AccountId:   d.ProviderAccountId,
-			DeployedAt:  d.Timestamp.AsTime().Local().Format(time.RFC3339),
+			DeployedAt:  deployedAt,
 			Deployment:  d.Id,
 			ProjectName: d.Project,
 			Stack:       d.Stack,
