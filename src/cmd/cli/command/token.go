@@ -8,7 +8,7 @@ import (
 
 var tokenCmd = &cobra.Command{
 	Use:         "token",
-	Annotations: authNeededAnnotation,
+	Annotations: authNeededAlways,
 	Args:        cobra.NoArgs,
 	Short:       "Manage personal access tokens",
 	RunE: func(cmd *cobra.Command, args []string) error {
