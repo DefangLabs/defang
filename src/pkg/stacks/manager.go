@@ -63,22 +63,13 @@ func (sm *manager) List(ctx context.Context) ([]ListItem, error) {
 		return nil, fmt.Errorf("failed to list local stacks: %w", err)
 	}
 	// Merge remote and local stacks into a single list of type StackOption,
-	// prefer local if both exist, but keep remote deployed time if available
+	// prefer remote if both exist
 	stackMap := make(map[string]ListItem)
+	for _, local := range localStacks {
+		stackMap[local.Name] = local
+	}
 	for _, remote := range remoteStacks {
 		stackMap[remote.Name] = remote
-	}
-	for _, local := range localStacks {
-		remote, exists := stackMap[local.Parameters.Name]
-		if exists {
-			local.DeployedAt = remote.DeployedAt
-			local.Default = remote.Default
-			stackMap[local.Parameters.Name] = local
-		} else {
-			stackMap[local.Parameters.Name] = ListItem{
-				Parameters: local.Parameters,
-			}
-		}
 	}
 
 	stackList := make([]ListItem, 0, len(stackMap))
