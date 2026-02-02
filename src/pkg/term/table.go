@@ -22,11 +22,13 @@ func (t *Term) Table(slice any, attributes ...string) error {
 }
 
 func (t *Term) json(slice any, attributes ...string) error {
-	// In JSON mode, we don't print tables, let's marshal the slice as JSON instead
 	val := reflect.ValueOf(slice)
 	if val.Kind() != reflect.Slice {
 		return errors.New("Table: input is not a slice")
 	}
+
+	encoder := json.NewEncoder(t.out)
+	encoder.SetIndent("", "\t")
 
 	filtered := make([]map[string]any, val.Len())
 	for i := range val.Len() {
@@ -53,12 +55,7 @@ func (t *Term) json(slice any, attributes ...string) error {
 		}
 	}
 
-	bytes, err := json.MarshalIndent(filtered, "", "\t")
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintln(t.out, string(bytes))
-	return err
+	return encoder.Encode(filtered)
 }
 
 func (t *Term) table(slice any, attributes ...string) error {
