@@ -128,7 +128,7 @@ brews:
       # Generate and install shell completions
       bash_completion.install Utils.safe_popen_read(bin/"defang", "completion", "bash") => "defang"
       zsh_completion.install Utils.safe_popen_read(bin/"defang", "completion", "zsh") => "_defang"
-      fish_completion.install Utils.safe_popen_read(bin/"defang", "completion", "fish")
+      fish_completion.install Utils.safe_popen_read(bin/"defang", "completion", "fish") => "defang.fish"
     test: |
       system "#{bin}/defang", "--version"
 

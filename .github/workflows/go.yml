@@ -416,8 +416,9 @@ jobs:
           event-type: cli-autodoc
           client-payload: '{"version": "${{ github.ref_name }}"}'
 
-      # NOTE: Homebrew formula updates are now handled automatically by GoReleaser with bottles
-      # The manual trigger below is kept for backwards compatibility but may be removed in the future
+      # NOTE: Homebrew formula updates are now handled automatically by GoReleaser with bottles.
+      # The manual trigger below is preserved as documentation of the old approach but is no longer needed.
+      # It can be safely removed in a future cleanup.
       # - name: Trigger Homebrew Formula Update
       #   uses: peter-evans/repository-dispatch@v3
       #   with:
