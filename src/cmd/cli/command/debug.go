@@ -2,15 +2,11 @@ package command
 
 import (
 	"fmt"
-	"os"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
-	"google.golang.org/protobuf/proto"
 )
 
 var debugCmd = &cobra.Command{
@@ -60,8 +56,8 @@ var debugCmd = &cobra.Command{
 			Project:        project,
 			ProviderID:     &session.Stack.Provider,
 			Stack:          session.Stack.Name,
-			Since:          sinceTs.UTC(),
-			Until:          untilTs.UTC(),
+			Since:          sinceTs,
+			Until:          untilTs,
 		}
 		return debugger.DebugDeployment(ctx, debugConfig)
 	},
