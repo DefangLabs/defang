@@ -811,6 +811,8 @@ services:
 	composeCmd.AddCommand(makeComposeDownCmd())
 	composeCmd.AddCommand(makeComposePsCmd())
 	composeCmd.AddCommand(makeLogsCmd())
+	deploymentsCmd := makeDeploymentsCmd()
+	composeCmd.AddCommand(deploymentsCmd)
 	composeTailCmd := makeTailCmd()
 	composeTailCmd.Hidden = true
 	composeCmd.AddCommand(composeTailCmd)
