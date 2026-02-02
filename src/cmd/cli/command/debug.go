@@ -56,8 +56,8 @@ var debugCmd = &cobra.Command{
 			Project:        project,
 			ProviderID:     &session.Stack.Provider,
 			Stack:          session.Stack.Name,
-			Since:          sinceTs.UTC(),
-			Until:          untilTs.UTC(),
+			Since:          sinceTs,
+			Until:          untilTs,
 		}
 		return debugger.DebugDeployment(ctx, debugConfig)
 	},
