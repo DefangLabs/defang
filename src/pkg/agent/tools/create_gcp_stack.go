@@ -46,6 +46,9 @@ func HandleCreateGCPStackTool(ctx context.Context, params CreateGCPStackParams, 
 		return "", fmt.Errorf("Unable to load stack %q: %w", params.Name, err)
 	}
 
+	if sc.Stack == nil {
+		return "", fmt.Errorf("stack config not initialized")
+	}
 	*sc.Stack = newStack
 
 	return fmt.Sprintf("Successfully created stack %q and loaded its environment.", params.Name), nil
