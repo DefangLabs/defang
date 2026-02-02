@@ -37,6 +37,7 @@
               vim
             ];
             shellHook = ''
+              unset DEVELOPER_DIR # to avoid suprious warning: unhandled Platform key FamilyDisplayName
               export SHELL=${bashInteractive}/bin/bash
 
               if [ -t 1 ]; then
