@@ -375,7 +375,6 @@ var RootCmd = &cobra.Command{
 
 		ctx := cmd.Context()
 		term.SetDebug(global.Debug)
-		term.SetJSON(json)
 
 		// Use "defer" to track any errors that occur during the command
 		defer func() {
@@ -394,6 +393,8 @@ var RootCmd = &cobra.Command{
 		case ColorAlways:
 			term.ForceColor(true)
 		}
+
+		term.SetJSON(json)
 
 		if cwd, _ := cmd.Flags().GetString("cwd"); cwd != "" {
 			// Change directory before running the command
