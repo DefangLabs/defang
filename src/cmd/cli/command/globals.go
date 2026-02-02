@@ -115,6 +115,7 @@ func NewGlobalConfig() *GlobalConfig {
 		}
 	}
 
+	json := pkg.GetenvBool("DEFANG_JSON")
 	hastty := term.IsTerminal() && !pkg.GetenvBool("CI")
 
 	tenant := types.TenantNameOrID("")
@@ -131,6 +132,7 @@ func NewGlobalConfig() *GlobalConfig {
 		Debug:          pkg.GetenvBool("DEFANG_DEBUG"),
 		HasTty:         hastty,
 		HideUpdate:     pkg.GetenvBool("DEFANG_HIDE_UPDATE"),
+		Json:           json,
 		NonInteractive: !hastty,
 		Stack: stacks.Parameters{
 			Name:     pkg.Getenv("DEFANG_STACK", ""),

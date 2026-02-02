@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
 	"text/tabwriter"
@@ -15,13 +14,13 @@ func Table(slice any, attributes ...string) error {
 }
 
 func (t *Term) Table(slice any, attributes ...string) error {
-	if os.Getenv("DEFANG_JSON") == "1" {
-		return t.json(slice, attributes...)
+	if t.json {
+		return t.jsonTable(slice, attributes...)
 	}
 	return t.table(slice, attributes...)
 }
 
-func (t *Term) json(slice any, attributes ...string) error {
+func (t *Term) jsonTable(slice any, attributes ...string) error {
 	val := reflect.ValueOf(slice)
 	if val.Kind() != reflect.Slice {
 		return errors.New("Table: input is not a slice")

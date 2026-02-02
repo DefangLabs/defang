@@ -375,6 +375,7 @@ var RootCmd = &cobra.Command{
 
 		ctx := cmd.Context()
 		term.SetDebug(global.Debug)
+		term.SetJSON(json)
 
 		// Use "defer" to track any errors that occur during the command
 		defer func() {
