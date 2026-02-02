@@ -165,8 +165,8 @@ func SetupCommands(version string) {
 	_ = RootCmd.MarkPersistentFlagDirname("cwd")
 	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, `compose file path(s)`)
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
-	RootCmd.PersistentFlags().BoolVarP(&global.Json, "json", "", false, "show output in JSON format")
-	RootCmd.PersistentFlags().BoolVarP(&global.Utc, "utc", "", false, "show timestamps in UTC timezone")
+	RootCmd.PersistentFlags().BoolVarP(&global.Json, "json", "", global.Json, "show output in JSON format")
+	RootCmd.PersistentFlags().BoolVarP(&global.Utc, "utc", "", global.Utc, "show timestamps in UTC timezone")
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
