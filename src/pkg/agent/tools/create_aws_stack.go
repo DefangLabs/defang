@@ -45,6 +45,9 @@ func HandleCreateAWSStackTool(ctx context.Context, params CreateAWSStackParams, 
 	if err != nil {
 		return "", fmt.Errorf("Unable to load stack %q: %w", params.Name, err)
 	}
+	if sc.Stack == nil {
+		return "", fmt.Errorf("stack config not initialized")
+	}
 
 	*sc.Stack = newStack
 
