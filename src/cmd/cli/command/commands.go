@@ -213,7 +213,6 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(loginCmd)
 
 	// Whoami Command
-	whoamiCmd.PersistentFlags().Bool("json", pkg.GetenvBool("DEFANG_JSON"), "print output in JSON format")
 	RootCmd.AddCommand(whoamiCmd)
 
 	// Workspace Command
