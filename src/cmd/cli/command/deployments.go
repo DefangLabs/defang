@@ -12,7 +12,7 @@ func makeDeploymentsCmd(use string) *cobra.Command {
 	deploymentsCmd := &cobra.Command{
 		Use:         use,
 		Aliases:     slices.Compact([]string{"deployments", use, "ls", "deployment", "deploys", "deps", "dep", "ls", "list"}),
-		Annotations: authNeededAnnotation,
+		Annotations: authNeededAlways,
 		Args:        cobra.NoArgs,
 		Short:       "List all deployments",
 		RunE: func(cmd *cobra.Command, args []string) error {

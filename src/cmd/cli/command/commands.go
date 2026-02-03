@@ -32,7 +32,8 @@ import (
 )
 
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
-var authNeededAnnotation = map[string]string{authNeeded: ""}
+var authNeededAlways = map[string]string{authNeeded: ""}
+var authNeededForPlayground = map[string]string{authNeeded: "playground"} // request login only if invoked for Playground
 
 var P = track.P
 
@@ -422,8 +423,13 @@ var RootCmd = &cobra.Command{
 		}
 
 		// Check if we are correctly logged in, but only if the command needs authorization
-		if _, ok := cmd.Annotations[authNeeded]; !ok {
+		if when, ok := cmd.Annotations[authNeeded]; !ok {
 			return nil
+		} else if when == "playground" {
+			// Only need to be logged in for Playground, ie. no explicit BYOC provider (note that stack file hasn't been loaded yet)
+			if global.Stack.Provider != client.ProviderAuto && global.Stack.Provider != client.ProviderDefang {
+				return nil
+			}
 		}
 
 		if global.NonInteractive {
