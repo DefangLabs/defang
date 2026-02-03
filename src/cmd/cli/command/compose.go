@@ -123,7 +123,7 @@ func makeComposeUpCmd() *cobra.Command {
 			} else if accountInfo, err := session.Provider.AccountInfo(ctx); err != nil {
 				term.Debugf("AccountInfo failed: %v", err)
 			} else if len(resp.Deployments) > 0 {
-				confirmed, err := confirmDeployment(session.Loader.TargetDirectory(), resp.Deployments, accountInfo, session.Provider.GetStackName())
+				confirmed, err := confirmDeployment(session.Loader.TargetDirectory(ctx), resp.Deployments, accountInfo, session.Provider.GetStackName())
 				if err != nil {
 					return err
 				}
@@ -131,7 +131,7 @@ func makeComposeUpCmd() *cobra.Command {
 					return fmt.Errorf("deployment of project %q was canceled", project.Name)
 				}
 			} else if session.Stack.Name == "" {
-				err = promptToCreateStack(ctx, session.Loader.TargetDirectory(), stacks.Parameters{
+				err = promptToCreateStack(ctx, session.Loader.TargetDirectory(ctx), stacks.Parameters{
 					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
 					Provider: accountInfo.Provider,
 					Region:   accountInfo.Region,

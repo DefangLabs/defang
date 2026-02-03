@@ -49,7 +49,7 @@ func NewManager(fabric Lister, targetDirectory string, projectName string, ec el
 	}, nil
 }
 
-func (sm *manager) TargetDirectory() string {
+func (sm *manager) TargetDirectory(context.Context) string {
 	return sm.targetDirectory
 }
 

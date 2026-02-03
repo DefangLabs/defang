@@ -212,15 +212,15 @@ type MockLoader struct {
 	Error   error
 }
 
-func (m MockLoader) LoadProject(ctx context.Context) (*composeTypes.Project, error) {
+func (m MockLoader) LoadProject(context.Context) (*composeTypes.Project, error) {
 	return &m.Project, m.Error
 }
 
-func (m MockLoader) LoadProjectName(ctx context.Context) (string, bool, error) {
+func (m MockLoader) LoadProjectName(context.Context) (string, bool, error) {
 	return m.Project.Name, false, m.Error
 }
 
-func (m MockLoader) TargetDirectory() string {
+func (m MockLoader) TargetDirectory(context.Context) string {
 	return "."
 }
 

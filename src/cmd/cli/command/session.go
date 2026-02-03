@@ -98,7 +98,7 @@ func doubleCheckProjectName(projectName string) {
 func newStackManagerForLoader(ctx context.Context, loader *compose.Loader) (session.StacksManager, error) {
 	targetDirectory, err := findTargetDirectory()
 	if err != nil {
-		targetDirectory = loader.TargetDirectory()
+		targetDirectory = loader.TargetDirectory(ctx)
 	}
 	projectName, _, err := loader.LoadProjectName(ctx)
 	if err != nil {
