@@ -15,46 +15,15 @@ func Table(slice any, attributes ...string) error {
 
 func (t *Term) Table(slice any, attributes ...string) error {
 	if t.json {
-		return t.jsonTable(slice, attributes...)
+		return t.jsonTable(slice)
 	}
 	return t.table(slice, attributes...)
 }
 
-func (t *Term) jsonTable(slice any, attributes ...string) error {
-	val := reflect.ValueOf(slice)
-	if val.Kind() != reflect.Slice {
-		return errors.New("Table: input is not a slice")
-	}
-
+func (t *Term) jsonTable(slice any) error {
 	encoder := json.NewEncoder(t.out)
 	encoder.SetIndent("", "\t")
-
-	filtered := make([]map[string]any, val.Len())
-	for i := range val.Len() {
-		item := val.Index(i)
-		if item.Kind() == reflect.Ptr {
-			item = item.Elem()
-		}
-
-		filtered[i] = make(map[string]any)
-		for _, attr := range attributes {
-			field := item.FieldByName(attr)
-			if !field.IsValid() {
-				continue
-			}
-
-			// Use json tag if available, otherwise use field name
-			jsonKey := attr
-			if structField, ok := item.Type().FieldByName(attr); ok {
-				if tag := structField.Tag.Get("json"); tag != "" && tag != "-" {
-					jsonKey = strings.Split(tag, ",")[0]
-				}
-			}
-			filtered[i][jsonKey] = field.Interface()
-		}
-	}
-
-	return encoder.Encode(filtered)
+	return encoder.Encode(slice)
 }
 
 func (t *Term) table(slice any, attributes ...string) error {
