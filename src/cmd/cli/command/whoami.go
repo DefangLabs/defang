@@ -16,7 +16,6 @@ var whoamiCmd = &cobra.Command{
 	Annotations: authNeededAlways,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		jsonMode, _ := cmd.Flags().GetBool("json")
 
 		global.NonInteractive = true // don't show provider prompt
 
@@ -25,9 +24,7 @@ var whoamiCmd = &cobra.Command{
 			CheckAccountInfo: false, // because we do it inside cli.Whoami
 		})
 		if err != nil {
-			if !jsonMode {
-				term.Warnf("Provider account information not available: %v", err)
-			}
+			term.Warnf("Provider account information not available: %v", err)
 		} else {
 			provider = session.Provider
 		}
@@ -37,7 +34,7 @@ var whoamiCmd = &cobra.Command{
 		userInfo, err := auth.FetchUserInfo(ctx, token)
 		if err != nil {
 			// Either the auth service is down, or we're using a Fabric JWT: skip workspace information
-			if !jsonMode && global.HasTty {
+			if global.HasTty {
 				term.Warn("Workspace information unavailable:", err)
 			}
 		}

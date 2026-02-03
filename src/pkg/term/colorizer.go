@@ -216,24 +216,31 @@ func (t *Term) Debugf(format string, v ...any) (int, error) {
 	return output(t.err, DebugColor, ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " - ")))
 }
 
+func (t *Term) outOrErr() *termenv.Output {
+	if t.json {
+		return t.err
+	}
+	return t.out
+}
+
 func (t *Term) Info(v ...any) (int, error) {
-	return output(t.out, InfoColor, ensurePrefix(fmt.Sprintln(v...), " * "))
+	return output(t.outOrErr(), InfoColor, ensurePrefix(fmt.Sprintln(v...), " * "))
 }
 
 func (t *Term) Infof(format string, v ...any) (int, error) {
-	return output(t.out, InfoColor, ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " * ")))
+	return output(t.outOrErr(), InfoColor, ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " * ")))
 }
 
 func (t *Term) Warn(v ...any) (int, error) {
 	msg := ensurePrefix(fmt.Sprintln(v...), " ! ")
 	t.warnings = append(t.warnings, msg)
-	return output(t.out, WarnColor, msg)
+	return output(t.outOrErr(), WarnColor, msg)
 }
 
 func (t *Term) Warnf(format string, v ...any) (int, error) {
 	msg := ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " ! "))
 	t.warnings = append(t.warnings, msg)
-	return output(t.out, WarnColor, msg)
+	return output(t.outOrErr(), WarnColor, msg)
 }
 
 func (t *Term) Error(v ...any) (int, error) {
