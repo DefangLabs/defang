@@ -120,7 +120,7 @@ Install the Defang CLI from one of the following sources:
     ```
   - or with Flakes:
     ```
-    nix profile install github:DefangLabs/defang#defang-bin --refresh
+    nix profile install github:DefangLabs/defang#defang-cli --refresh
     ```
 
 - Using [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/):
