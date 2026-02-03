@@ -32,7 +32,8 @@ import (
 )
 
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
-var authNeededAnnotation = map[string]string{authNeeded: ""}
+var authNeededAlways = map[string]string{authNeeded: ""}
+var authNeededForPlayground = map[string]string{authNeeded: "playground"} // request login only if invoked for Playground
 
 var P = track.P
 
@@ -165,11 +166,11 @@ func SetupCommands(version string) {
 	_ = RootCmd.MarkPersistentFlagDirname("cwd")
 	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, `compose file path(s)`)
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
+	RootCmd.PersistentFlags().BoolVarP(&global.Json, "json", "", global.Json, "show output in JSON format")
+	RootCmd.PersistentFlags().BoolVarP(&global.Utc, "utc", "", global.Utc, "show timestamps in UTC timezone")
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
-	cdCmd.PersistentFlags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
-	cdCmd.PersistentFlags().Bool("json", pkg.GetenvBool("DEFANG_JSON"), "show logs in JSON format")
 	cdCmd.PersistentFlags().StringVar(&byoc.DefangPulumiBackend, "pulumi-backend", "", `specify an alternate Pulumi backend URL or "pulumi-cloud"`)
 	cdCmd.AddCommand(cdDestroyCmd)
 	cdCmd.AddCommand(cdDownCmd)
@@ -213,7 +214,6 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(loginCmd)
 
 	// Whoami Command
-	whoamiCmd.PersistentFlags().Bool("json", pkg.GetenvBool("DEFANG_JSON"), "print output in JSON format")
 	RootCmd.AddCommand(whoamiCmd)
 
 	// Workspace Command
@@ -292,9 +292,7 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(logsCmd)
 
 	// Deployments Command
-	deploymentsCmd.PersistentFlags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
-	deploymentsCmd.PersistentFlags().Uint32P("limit", "l", 10, "maximum number of deployments to list")
-	deploymentsCmd.PersistentFlags().BoolP("all", "a", false, "show all deployments, including stopped")
+	var deploymentsCmd = makeDeploymentsCmd("deployments")
 	RootCmd.AddCommand(deploymentsCmd)
 
 	// MCP Command
@@ -363,6 +361,14 @@ var RootCmd = &cobra.Command{
 			}
 			return nil
 		}
+		var utc, _ = cmd.Flags().GetBool("utc")
+		var json, _ = cmd.Flags().GetBool("json")
+
+		cli.SetUTCMode(utc)
+		cli.SetJSONMode(json)
+		if json {
+			global.Verbose = true
+		}
 
 		// Create a temporary gRPC client for tracking events before login
 		track.Tracker = cli.Connect(global.Cluster, global.Tenant)
@@ -387,6 +393,8 @@ var RootCmd = &cobra.Command{
 		case ColorAlways:
 			term.ForceColor(true)
 		}
+
+		term.SetJSON(json)
 
 		if cwd, _ := cmd.Flags().GetString("cwd"); cwd != "" {
 			// Change directory before running the command
@@ -415,8 +423,13 @@ var RootCmd = &cobra.Command{
 		}
 
 		// Check if we are correctly logged in, but only if the command needs authorization
-		if _, ok := cmd.Annotations[authNeeded]; !ok {
+		if when, ok := cmd.Annotations[authNeeded]; !ok {
 			return nil
+		} else if when == "playground" {
+			// Only need to be logged in for Playground, ie. no explicit BYOC provider (note that stack file hasn't been loaded yet)
+			if global.Stack.Provider != client.ProviderAuto && global.Stack.Provider != client.ProviderDefang {
+				return nil
+			}
 		}
 
 		if global.NonInteractive {

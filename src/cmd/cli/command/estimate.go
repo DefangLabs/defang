@@ -17,7 +17,7 @@ func makeEstimateCmd() *cobra.Command {
 	var estimateCmd = &cobra.Command{
 		Use:         "estimate",
 		Args:        cobra.NoArgs,
-		Annotations: authNeededAnnotation,
+		Annotations: authNeededAlways,
 		Short:       "Estimate the cost of deploying the current project",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()

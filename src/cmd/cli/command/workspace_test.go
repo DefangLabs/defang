@@ -73,10 +73,6 @@ func TestWorkspaceListJSON(t *testing.T) {
 		t.Fatalf("expected 2 workspaces, got %d", len(rows))
 	}
 
-	if rows[0].ID != "" || rows[1].ID != "" {
-		t.Fatalf("expected IDs to be omitted in non-verbose JSON output, got %+v", rows)
-	}
-
 	if !rows[1].Current || rows[0].Current {
 		t.Fatalf("expected ws-2 to be current; rows=%+v", rows)
 	}

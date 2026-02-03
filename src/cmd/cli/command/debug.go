@@ -11,7 +11,7 @@ import (
 
 var debugCmd = &cobra.Command{
 	Use:         "debug [SERVICE...]",
-	Annotations: authNeededAnnotation,
+	Annotations: authNeededAlways,
 	Hidden:      true,
 	Short:       "Debug a build, deployment, or service failure",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -56,8 +56,8 @@ var debugCmd = &cobra.Command{
 			Project:        project,
 			ProviderID:     &session.Stack.Provider,
 			Stack:          session.Stack.Name,
-			Since:          sinceTs.UTC(),
-			Until:          untilTs.UTC(),
+			Since:          sinceTs,
+			Until:          untilTs,
 		}
 		return debugger.DebugDeployment(ctx, debugConfig)
 	},

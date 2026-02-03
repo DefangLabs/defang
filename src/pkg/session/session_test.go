@@ -73,7 +73,7 @@ func (m *mockStacksManager) GetStack(ctx context.Context, opts stacks.GetStackOp
 	return result, whence, args.Error(2)
 }
 
-func (m *mockStacksManager) TargetDirectory() string {
+func (m *mockStacksManager) TargetDirectory(context.Context) string {
 	return ""
 }
 
