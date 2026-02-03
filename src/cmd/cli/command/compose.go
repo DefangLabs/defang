@@ -417,7 +417,7 @@ func newTailOptionsForDeploy(stack, deployment string, since time.Time, verbose 
 }
 
 func flushWarnings() {
-	if global.HasTty && term.HadWarnings() {
+	if global.HasTty && term.HadWarnings() && !global.Json {
 		term.Println("\n\u26A0\uFE0F Some warnings were seen during this command:")
 		term.FlushWarnings()
 	}
