@@ -16,7 +16,7 @@ func Logout(ctx context.Context, fabricClient client.FabricClient, cluster strin
 	if err != nil && connect.CodeOf(err) != connect.CodeUnauthenticated {
 		return err
 	}
-	
+
 	// Remove the cached token file
 	tokenFile := client.GetTokenFile(cluster)
 	if err := os.Remove(tokenFile); err != nil && !os.IsNotExist(err) {
@@ -25,7 +25,7 @@ func Logout(ctx context.Context, fabricClient client.FabricClient, cluster strin
 	} else if err == nil {
 		term.Debug("Removed token file:", tokenFile)
 	}
-	
+
 	// Also remove the JWT web identity token file if it exists
 	jwtFile, err := client.GetWebIdentityTokenFile(cluster)
 	if err == nil {
@@ -35,6 +35,6 @@ func Logout(ctx context.Context, fabricClient client.FabricClient, cluster strin
 			term.Debug("Removed JWT token file:", jwtFile)
 		}
 	}
-	
+
 	return nil
 }
