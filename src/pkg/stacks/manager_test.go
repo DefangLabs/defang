@@ -416,7 +416,7 @@ GOOGLE_REGION=us-central1
 	if !exists {
 		t.Error("Expected to find sharedstack")
 	}
-	assert.Equal(t, "us-east-1", sharedStack.Region, "Expected shared stack to use local region us-east-1")
+	assert.Equal(t, "us-east-1", sharedStack.Region, "Expected shared stack to use remote region us-east-1")
 	assert.Equal(t, client.ProviderAWS, sharedStack.Provider, "Expected shared stack to use provider aws")
 	assert.Equal(t, modes.ModeUnspecified, sharedStack.Mode, "Expected shared stack to use mode UNSPECIFIED")
 	assert.Equal(t, "", sharedStack.Variables["AWS_PROFILE"], "Expected shared stack to have empty AWS_PROFILE variable")
