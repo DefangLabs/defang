@@ -291,8 +291,7 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(logsCmd)
 
 	// Deployments Command
-	deploymentsCmd.PersistentFlags().Uint32P("limit", "l", 10, "maximum number of deployments to list")
-	deploymentsCmd.PersistentFlags().BoolP("all", "a", false, "show all deployments, including stopped")
+	var deploymentsCmd = makeDeploymentsCmd("deployments")
 	RootCmd.AddCommand(deploymentsCmd)
 
 	// MCP Command
