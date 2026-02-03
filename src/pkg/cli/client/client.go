@@ -19,18 +19,21 @@ type FabricClient interface {
 	Estimate(context.Context, *defangv1.EstimateRequest) (*defangv1.EstimateResponse, error)
 	GenerateCompose(context.Context, *defangv1.GenerateComposeRequest) (*defangv1.GenerateComposeResponse, error)
 	GenerateFiles(context.Context, *defangv1.GenerateFilesRequest) (*defangv1.GenerateFilesResponse, error)
-	GetFabricClient() defangv1connect.FabricControllerClient
-	GetDelegateSubdomainZone(context.Context, *defangv1.GetDelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
-	GetPlaygroundProjectDomain(context.Context) (*defangv1.GetPlaygroundProjectDomainResponse, error)
 	GetDefaultStack(context.Context, *defangv1.GetDefaultStackRequest) (*defangv1.GetStackResponse, error)
+	GetDelegateSubdomainZone(context.Context, *defangv1.GetDelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
+	GetFabricClient() defangv1connect.FabricControllerClient
+	GetPlaygroundProjectDomain(context.Context) (*defangv1.GetPlaygroundProjectDomainResponse, error)
+	GetRequestedTenant() types.TenantNameOrID
 	GetTenantName() types.TenantLabel
 	GetVersions(context.Context) (*defangv1.Version, error)
 	ListDeployments(context.Context, *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error)
+	ListStacks(context.Context, *defangv1.ListStacksRequest) (*defangv1.ListStacksResponse, error)
 	Preview(context.Context, *defangv1.PreviewRequest) (*defangv1.PreviewResponse, error)
 	Publish(context.Context, *defangv1.PublishRequest) error
 	PutDeployment(context.Context, *defangv1.PutDeploymentRequest) error
 	PutStack(context.Context, *defangv1.PutStackRequest) error
 	RevokeToken(context.Context) error
+	SetOptions(context.Context, *defangv1.SetOptionsRequest) error
 	Token(context.Context, *defangv1.TokenRequest) (*defangv1.TokenResponse, error)
 	Track(string, ...Property) error
 	VerifyDNSSetup(context.Context, *defangv1.VerifyDNSSetupRequest) error
