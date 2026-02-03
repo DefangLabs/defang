@@ -115,7 +115,7 @@ func NewGlobalConfig() *GlobalConfig {
 
 	hastty := term.IsTerminal() && !pkg.GetenvBool("CI")
 
-	tenant := types.TenantNameOrID("")
+	tenant := client.GetCurrentTenant()
 	if fromEnv, ok := os.LookupEnv("DEFANG_WORKSPACE"); ok {
 		tenant = types.TenantNameOrID(fromEnv)
 	} else if fromEnv, ok := os.LookupEnv("DEFANG_ORG"); ok {
