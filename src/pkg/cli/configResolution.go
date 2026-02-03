@@ -3,7 +3,7 @@ package cli
 import (
 	"context"
 	"slices"
-	"sort"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
@@ -82,12 +82,12 @@ func printConfigResolutionSummary(project *types.Project, defangConfig []string)
 		return nil
 	}
 
-	// Sort by Service, then by Name within each service
-	sort.Slice(projectEnvVars, func(i, j int) bool {
-		if projectEnvVars[i].Service != projectEnvVars[j].Service {
-			return projectEnvVars[i].Service < projectEnvVars[j].Service
+	// Sort by Service, then by Environment within each service
+	slices.SortFunc(projectEnvVars, func(a, b configOutput) int {
+		if cmp := strings.Compare(a.Service, b.Service); cmp != 0 {
+			return cmp
 		}
-		return projectEnvVars[i].Environment < projectEnvVars[j].Environment
+		return strings.Compare(a.Environment, b.Environment)
 	})
 
 	projectEnvVars = slices.Compact(projectEnvVars)
