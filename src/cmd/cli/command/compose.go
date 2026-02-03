@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"slices"
 	"strings"
 	"time"
@@ -32,6 +33,119 @@ import (
 
 const DEFANG_PORTAL_HOST = "portal.defang.io"
 const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
+
+// localOnlyProvider is a minimal provider for local-only operations like compose config
+// that don't require authentication to the Fabric server.
+type localOnlyProvider struct {
+	stack string
+}
+
+// DNSResolver interface
+func (p *localOnlyProvider) ServicePrivateDNS(name string) string {
+	return name // Return service name as placeholder
+}
+
+func (p *localOnlyProvider) ServicePublicDNS(name string, projectName string) string {
+	return name + "." + projectName + ".example.com" // Placeholder domain
+}
+
+func (p *localOnlyProvider) UpdateShardDomain(ctx context.Context) error {
+	return nil
+}
+
+// Provider interface - methods used by compose config
+func (p *localOnlyProvider) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
+	return &defangv1.Secrets{}, nil // Return empty config list
+}
+
+func (p *localOnlyProvider) GetStackName() string {
+	return p.stack
+}
+
+func (p *localOnlyProvider) GetStackNameForDomain() string {
+	return p.stack
+}
+
+// Provider interface - stub methods not used by compose config
+func (p *localOnlyProvider) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
+	return nil, errors.New("not authenticated - local only mode")
+}
+
+func (p *localOnlyProvider) CdCommand(ctx context.Context, req client.CdCommandRequest) (types.ETag, error) {
+	return "", errors.New("not supported in local only mode")
+}
+
+func (p *localOnlyProvider) CdList(ctx context.Context, all bool) (iter.Seq[string], error) {
+	return nil, errors.New("not supported in local only mode")
+}
+
+func (p *localOnlyProvider) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
+	return nil, errors.New("not supported in local only mode")
+}
+
+func (p *localOnlyProvider) DelayBeforeRetry(ctx context.Context) error {
+	return nil
+}
+
+func (p *localOnlyProvider) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
+	return errors.New("not supported in local only mode")
+}
+
+func (p *localOnlyProvider) Deploy(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
+	return nil, errors.New("not supported in local only mode")
+}
+
+func (p *localOnlyProvider) GetDeploymentStatus(ctx context.Context) error {
+	return io.EOF
+}
+
+func (p *localOnlyProvider) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
+	return nil, errors.New("not supported in local only mode")
+}
+
+func (p *localOnlyProvider) GetService(ctx context.Context, req *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
+	return nil, errors.New("not supported in local only mode")
+}
+
+func (p *localOnlyProvider) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
+	return nil, errors.New("not supported in local only mode")
+}
+
+func (p *localOnlyProvider) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
+	return nil, errors.New("not supported in local only mode")
+}
+
+func (p *localOnlyProvider) Preview(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
+	return nil, errors.New("not supported in local only mode")
+}
+
+func (p *localOnlyProvider) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
+	return errors.New("not supported in local only mode")
+}
+
+func (p *localOnlyProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+	return nil, errors.New("not supported in local only mode")
+}
+
+func (p *localOnlyProvider) RemoteProjectName(ctx context.Context) (string, error) {
+	return "", errors.New("not supported in local only mode")
+}
+
+func (p *localOnlyProvider) SetCanIUseConfig(resp *defangv1.CanIUseResponse) {
+	// No-op in local only mode
+}
+
+func (p *localOnlyProvider) SetUpCD(ctx context.Context) error {
+	return errors.New("not supported in local only mode")
+}
+
+func (p *localOnlyProvider) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
+	return nil, errors.New("not supported in local only mode")
+}
+
+func (p *localOnlyProvider) TearDownCD(ctx context.Context) error {
+	return errors.New("not supported in local only mode")
+}
 
 func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
 	// We can only show services deployed to the prod1 defang SaaS environment.
@@ -531,26 +645,49 @@ func makeComposeConfigCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 
-			session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
+			// Try to load full session, but fall back to local-only mode if authentication fails
+			sess, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
 				CheckAccountInfo: false,
 			})
+
+			var provider client.Provider
+			var stack *stacks.Parameters
+			var loader client.Loader
+
 			if err != nil {
-				term.Warn("unable to load stack:", err, "- some information may not be up-to-date")
+				// Fall back to local-only mode without authentication
+				term.Warn("unable to load stack:", err, "- using local-only mode")
+
+				// Create a minimal loader from command flags
+				configPaths, _ := cmd.Flags().GetStringArray("file")
+				projectName, _ := cmd.Flags().GetString("project-name")
+				loader = compose.NewLoader(
+					compose.WithProjectName(projectName),
+					compose.WithPath(configPaths...),
+				)
+
+				// Use a local-only provider that doesn't require authentication
+				provider = &localOnlyProvider{stack: stacks.DefaultBeta}
+				stack = &stacks.Parameters{Name: stacks.DefaultBeta}
+			} else {
+				loader = sess.Loader
+				provider = sess.Provider
+				stack = sess.Stack
+
+				_, err = sess.Provider.AccountInfo(ctx)
+				if err != nil {
+					term.Warn("unable to connect to cloud provider:", err, "- some information may not be up-to-date")
+				}
 			}
 
-			_, err = session.Provider.AccountInfo(ctx)
-			if err != nil {
-				term.Warn("unable to connect to cloud provider:", err, "- some information may not be up-to-date")
-			}
-
-			project, loadErr := session.Loader.LoadProject(ctx)
+			project, loadErr := loader.LoadProject(ctx)
 			if loadErr != nil {
 				if global.NonInteractive {
 					return loadErr
 				}
 
 				term.Error("Cannot load project:", loadErr)
-				project, err := session.Loader.CreateProjectForDebug()
+				project, err := loader.CreateProjectForDebug()
 				if err != nil {
 					term.Warn("Failed to create project for debug:", err)
 					return loadErr
@@ -567,7 +704,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}, loadErr)
 			}
 
-			_, _, err = cli.ComposeUp(ctx, global.Client, session.Provider, session.Stack, cli.ComposeUpParams{
+			_, _, err = cli.ComposeUp(ctx, global.Client, provider, stack, cli.ComposeUpParams{
 				Project:    project,
 				UploadMode: compose.UploadModeIgnore,
 				Mode:       modes.ModeUnspecified,
