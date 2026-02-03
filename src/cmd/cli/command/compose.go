@@ -58,12 +58,7 @@ func makeComposeUpCmd() *cobra.Command {
 			var build, _ = cmd.Flags().GetBool("build")
 			var force, _ = cmd.Flags().GetBool("force")
 			var detach, _ = cmd.Flags().GetBool("detach")
-			var utc, _ = cmd.Flags().GetBool("utc")
 			var waitTimeout, _ = cmd.Flags().GetInt("wait-timeout")
-
-			if utc {
-				cli.EnableUTCMode()
-			}
 
 			upload := compose.UploadModeDefault
 			if force {
@@ -123,7 +118,7 @@ func makeComposeUpCmd() *cobra.Command {
 			} else if accountInfo, err := session.Provider.AccountInfo(ctx); err != nil {
 				term.Debugf("AccountInfo failed: %v", err)
 			} else if len(resp.Deployments) > 0 {
-				confirmed, err := confirmDeployment(session.Loader.TargetDirectory(), resp.Deployments, accountInfo, session.Provider.GetStackName())
+				confirmed, err := confirmDeployment(session.Loader.TargetDirectory(ctx), resp.Deployments, accountInfo, session.Provider.GetStackName())
 				if err != nil {
 					return err
 				}
@@ -131,7 +126,7 @@ func makeComposeUpCmd() *cobra.Command {
 					return fmt.Errorf("deployment of project %q was canceled", project.Name)
 				}
 			} else if session.Stack.Name == "" {
-				err = promptToCreateStack(ctx, session.Loader.TargetDirectory(), stacks.Parameters{
+				err = promptToCreateStack(ctx, session.Loader.TargetDirectory(ctx), stacks.Parameters{
 					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
 					Provider: accountInfo.Provider,
 					Region:   accountInfo.Region,
@@ -227,7 +222,6 @@ func makeComposeUpCmd() *cobra.Command {
 	}
 	composeUpCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed; implies --build")
-	composeUpCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // no-op, but keep for backwards compatibility
 	_ = composeUpCmd.Flags().MarkHidden("tail")
 	composeUpCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
@@ -438,11 +432,6 @@ func makeComposeDownCmd() *cobra.Command {
 		Short:       "Reads a Compose file and deprovisions its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var detach, _ = cmd.Flags().GetBool("detach")
-			var utc, _ = cmd.Flags().GetBool("utc")
-
-			if utc {
-				cli.EnableUTCMode()
-			}
 
 			session, err := newCommandSession(cmd)
 			if err != nil {
@@ -508,7 +497,6 @@ func makeComposeDownCmd() *cobra.Command {
 		},
 	}
 	composeDownCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
-	composeDownCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	composeDownCmd.Flags().Bool("tail", false, "tail the service logs after deleting") // no-op, but keep for backwards compatibility
 	_ = composeDownCmd.Flags().MarkHidden("tail")
 	return composeDownCmd
@@ -547,7 +535,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				CheckAccountInfo: false,
 			})
 			if err != nil {
-				return err
+				term.Warn("unable to load stack:", err, "- some information may not be up-to-date")
 			}
 
 			_, err = session.Provider.AccountInfo(ctx)
@@ -670,7 +658,6 @@ func setupLogsFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
 	cmd.Flags().String("since", "", "show logs since duration or timestamp (unix or RFC3339)")
 	cmd.Flags().String("until", "", "show logs until duration or timestamp (unix or RFC3339); incompatible with --follow")
-	cmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	cmd.Flags().Var(&logType, "type", fmt.Sprintf("show logs of type; one of %v", logs.AllLogTypes))
 	cmd.Flags().String("filter", "", "only show logs containing given text; case-insensitive")
 }
@@ -681,7 +668,6 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 	var deployment, _ = cmd.Flags().GetString("deployment")
 	var raw, _ = cmd.Flags().GetBool("raw")
 	var since, _ = cmd.Flags().GetString("since")
-	var utc, _ = cmd.Flags().GetBool("utc")
 	var verbose, _ = cmd.Flags().GetBool("verbose")
 	var filter, _ = cmd.Flags().GetString("filter")
 	var until, _ = cmd.Flags().GetString("until")
@@ -694,10 +680,6 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 
 	if etag != "" && deployment == "" {
 		deployment = etag
-	}
-
-	if utc {
-		cli.EnableUTCMode()
 	}
 
 	if !cmd.Flags().Changed("verbose") {
@@ -811,6 +793,8 @@ services:
 	composeCmd.AddCommand(makeComposeDownCmd())
 	composeCmd.AddCommand(makeComposePsCmd())
 	composeCmd.AddCommand(makeLogsCmd())
+	composeLsCmd := makeDeploymentsCmd("ls")
+	composeCmd.AddCommand(composeLsCmd)
 	composeTailCmd := makeTailCmd()
 	composeTailCmd.Hidden = true
 	composeCmd.AddCommand(composeTailCmd)

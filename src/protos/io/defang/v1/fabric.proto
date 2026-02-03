@@ -514,6 +514,13 @@ enum DeploymentAction {
   DEPLOYMENT_ACTION_REFRESH = 4;
 }
 
+enum DeploymentOrigin {
+  DEPLOYMENT_ORIGIN_NOT_SPECIFIED = 0;
+  DEPLOYMENT_ORIGIN_CI = 1;
+  DEPLOYMENT_ORIGIN_GITHUB = 2;
+  DEPLOYMENT_ORIGIN_GITLAB = 3;
+}
+
 message Deployment {
   string id = 1; // aka etag
   string project = 2;
@@ -530,6 +537,9 @@ message Deployment {
   DeploymentStatus status = 13;
   string states_url = 14;
   string events_url = 15;
+  DeploymentOrigin origin = 16;
+  map<string, string> origin_metadata = 17;
+  repeated ServiceInfo services = 18;
 }
 
 enum DeploymentStatus {

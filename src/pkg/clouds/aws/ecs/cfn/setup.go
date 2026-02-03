@@ -161,10 +161,6 @@ func (a *AwsEcsCfn) SetUp(ctx context.Context, containers []clouds.Container) er
 		return err
 	}
 
-	return a.upsertStackAndWait(ctx, templateBody)
-}
-
-func (a *AwsEcsCfn) upsertStackAndWait(ctx context.Context, templateBody []byte) error {
 	// Set parameter values based on current configuration
 	parameters := []cfnTypes.Parameter{
 		// {
@@ -200,6 +196,10 @@ func (a *AwsEcsCfn) upsertStackAndWait(ctx context.Context, templateBody []byte)
 	}
 	// TODO: support DOCKER_AUTH_CONFIG
 
+	return a.upsertStackAndWait(ctx, templateBody, parameters...)
+}
+
+func (a *AwsEcsCfn) upsertStackAndWait(ctx context.Context, templateBody []byte, parameters ...cfnTypes.Parameter) error {
 	// Upsert with parameters
 	if err := a.updateStackAndWait(ctx, string(templateBody), parameters); err != nil {
 		// Check if the stack doesn't exist; if so, create it, otherwise return the error
@@ -249,7 +249,7 @@ func (a *AwsEcsCfn) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) er
 			}
 		case OutputsDefaultSecurityGroupID:
 			a.DefaultSecurityGroupID = *output.OutputValue
-		case OutputsTaskDefArn:
+		case OutputsTaskDefARN:
 			a.TaskDefARN = *output.OutputValue
 		case OutputsClusterName:
 			a.ClusterName = *output.OutputValue
@@ -259,6 +259,8 @@ func (a *AwsEcsCfn) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) er
 			a.SecurityGroupID = *output.OutputValue
 		case OutputsBucketName:
 			a.BucketName = *output.OutputValue
+		case OutputsCIRoleARN:
+			a.CIRoleARN = *output.OutputValue
 		}
 	}
 

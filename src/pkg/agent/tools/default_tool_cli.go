@@ -33,7 +33,8 @@ func (DefaultToolCLI) CanIUseProvider(ctx context.Context, fabric *client.GrpcCl
 }
 
 func (DefaultToolCLI) ConfigSet(ctx context.Context, projectName string, provider client.Provider, name, value string) error {
-	return cli.ConfigSet(ctx, projectName, provider, name, value)
+	_, err := cli.ConfigSet(ctx, projectName, provider, name, value, cli.ConfigSetOptions{})
+	return err
 }
 
 func (DefaultToolCLI) RunEstimate(ctx context.Context, project *compose.Project, fabric *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {

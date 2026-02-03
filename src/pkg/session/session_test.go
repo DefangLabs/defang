@@ -8,6 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -72,7 +73,7 @@ func (m *mockStacksManager) GetStack(ctx context.Context, opts stacks.GetStackOp
 	return result, whence, args.Error(2)
 }
 
-func (m *mockStacksManager) TargetDirectory() string {
+func (m *mockStacksManager) TargetDirectory(context.Context) string {
 	return ""
 }
 
@@ -91,7 +92,9 @@ func TestLoadSession(t *testing.T) {
 			name: "specified stack",
 			options: SessionLoaderOptions{
 				GetStackOpts: stacks.GetStackOpts{
-					Stack: "existingstack",
+					Default: stacks.Parameters{
+						Name: "existingstack",
+					},
 				},
 			},
 			existingStack: &stacks.Parameters{
@@ -103,6 +106,31 @@ func TestLoadSession(t *testing.T) {
 				Provider: client.ProviderDefang,
 				Variables: map[string]string{
 					"DEFANG_PROVIDER": "defang",
+				},
+			},
+		},
+		{
+			name: "override mode",
+			options: SessionLoaderOptions{
+				GetStackOpts: stacks.GetStackOpts{
+					Default: stacks.Parameters{
+						Name: "existingstack",
+						Mode: modes.ModeAffordable,
+					},
+				},
+			},
+			existingStack: &stacks.Parameters{
+				Name:     "existingstack",
+				Provider: client.ProviderAWS,
+				Mode:     modes.ModeBalanced,
+			},
+			expectedStack: &stacks.Parameters{
+				Name:     "existingstack",
+				Provider: client.ProviderAWS,
+				Mode:     modes.ModeAffordable,
+				Variables: map[string]string{
+					"DEFANG_PROVIDER": "aws",
+					"DEFANG_MODE":     "affordable",
 				},
 			},
 		},
@@ -122,9 +150,9 @@ func TestLoadSession(t *testing.T) {
 			sm := &mockStacksManager{}
 
 			if tt.existingStack == nil {
-				if tt.options.GetStackOpts.Stack != "" {
+				if tt.options.Default.Name != "" {
 					// For specified non-existing stack, return ErrNotExist
-					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", &stacks.ErrNotExist{StackName: tt.options.GetStackOpts.Stack})
+					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", &stacks.ErrNotExist{StackName: tt.options.Default.Name})
 				} else if tt.getStackError != nil {
 					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", tt.getStackError)
 				}
@@ -143,24 +171,25 @@ func TestLoadSession(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.NotNil(t, session)
+			require.NotNil(t, session)
 
 			// Verify session contents
-			assert.NotNil(t, session.Loader)
+			require.NotNil(t, session.Loader)
 
-			assert.NotNil(t, session.Provider)
-			if tt.options.ProviderID == client.ProviderAWS {
+			require.NotNil(t, session.Provider)
+			if tt.options.Default.Provider == client.ProviderAWS {
 				_, ok := session.Provider.(*aws.ByocAws)
 				assert.True(t, ok)
 			}
-			if tt.options.ProviderID == client.ProviderGCP {
+			if tt.options.Default.Provider == client.ProviderGCP {
 				_, ok := session.Provider.(*gcp.ByocGcp)
 				assert.True(t, ok)
 			}
 
-			assert.NotNil(t, session.Stack)
+			require.NotNil(t, session.Stack)
 			assert.Equal(t, tt.expectedStack.Name, session.Stack.Name)
 			assert.Equal(t, tt.expectedStack.Provider, session.Stack.Provider)
+			assert.Equal(t, tt.expectedStack.Mode, session.Stack.Mode)
 
 			// Verify environment variables
 			for key, expectedValue := range tt.expectedEnv {
@@ -174,19 +203,4 @@ func TestLoadSession(t *testing.T) {
 			sm.AssertExpectations(t)
 		})
 	}
-}
-
-func TestLoadSession_NoStackManager(t *testing.T) {
-	ctx := t.Context()
-
-	options := SessionLoaderOptions{
-		GetStackOpts: stacks.GetStackOpts{
-			ProviderID: client.ProviderDefang,
-		},
-	}
-
-	loader := NewSessionLoader(client.MockFabricClient{}, nil, options)
-	session, err := loader.LoadSession(ctx)
-	require.NoError(t, err)
-	assert.NotNil(t, session)
 }

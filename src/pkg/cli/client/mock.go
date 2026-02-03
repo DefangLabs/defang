@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"sync/atomic"
 
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -52,21 +53,25 @@ func (MockProvider) GetStackNameForDomain() string {
 
 // MockServerStream mocks a ServerStream.
 type MockServerStream[Msg any] struct {
-	index int
-	Resps []*Msg
-	Error error
+	index  int
+	Resps  []*Msg
+	Error  error
+	closed atomic.Bool
 }
 
-func (*MockServerStream[T]) Close() error {
+func (m *MockServerStream[T]) Close() error {
+	if m.closed.Swap(true) {
+		panic("MockServerStream already closed")
+	}
 	return nil
 }
 
 func (m *MockServerStream[T]) Receive() bool {
-	if m.index >= len(m.Resps) {
+	if m.index >= len(m.Resps) || m.closed.Load() {
 		return false
 	}
 	m.index++
-	return true
+	return m.Resps[m.index-1] != nil
 }
 
 func (m *MockServerStream[T]) Msg() *T {
@@ -207,15 +212,15 @@ type MockLoader struct {
 	Error   error
 }
 
-func (m MockLoader) LoadProject(ctx context.Context) (*composeTypes.Project, error) {
+func (m MockLoader) LoadProject(context.Context) (*composeTypes.Project, error) {
 	return &m.Project, m.Error
 }
 
-func (m MockLoader) LoadProjectName(ctx context.Context) (string, bool, error) {
+func (m MockLoader) LoadProjectName(context.Context) (string, bool, error) {
 	return m.Project.Name, false, m.Error
 }
 
-func (m MockLoader) TargetDirectory() string {
+func (m MockLoader) TargetDirectory(context.Context) string {
 	return "."
 }
 

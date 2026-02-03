@@ -26,15 +26,15 @@ func TestCloudFormation(t *testing.T) {
 	aws.RetainBucket = false // delete bucket after test
 	aws.Spot = true
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("SetUp", func(t *testing.T) {
-		template := createTestTemplate(t)
 		// Enable fancy features so we can test all conditional resources
 		t.Setenv("DEFANG_NO_CACHE", "0") // force cache usage
 		t.Setenv("DOCKERHUB_USERNAME", "defanglabs2")
 		t.Setenv("DOCKERHUB_ACCESS_TOKEN", "defanglabs")
-		err := aws.upsertStackAndWait(ctx, template)
+
+		err := aws.SetUp(ctx, testContainers)
 		if err != nil {
 			t.Fatal(err)
 		}

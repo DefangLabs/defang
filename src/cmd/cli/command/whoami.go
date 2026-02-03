@@ -1,12 +1,11 @@
 package command
 
 import (
-	"encoding/json"
-
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
 )
 
@@ -51,28 +50,22 @@ var whoamiCmd = &cobra.Command{
 		if !global.Verbose {
 			data.Tenant = ""
 			data.TenantID = ""
+			if data.SubscriberTier == defangv1.SubscriptionTier_SUBSCRIPTION_TIER_UNSPECIFIED {
+				data.SubscriberTier = defangv1.SubscriptionTier_HOBBY // don't show "SUBSCRIPTION_TIER_UNSPECIFIED"
+			}
 		}
 
-		if jsonMode {
-			bytes, err := json.Marshal(data)
-			if err != nil {
-				return err
-			}
-			_, err = term.Println(string(bytes))
-			return err
-		} else {
-			cols := []string{
-				"Workspace",
-				"SubscriberTier",
-				"Name",
-				"Email",
-				"Provider",
-				"Region",
-			}
-			if global.Verbose {
-				cols = append(cols, "Tenant", "TenantID")
-			}
-			return term.Table([]cli.ShowAccountData{data}, cols...)
+		cols := []string{
+			"Workspace",
+			"SubscriberTier",
+			"Name",
+			"Email",
+			"Provider",
+			"Region",
 		}
+		if global.Verbose {
+			cols = append(cols, "Tenant", "TenantID")
+		}
+		return term.Table([]cli.ShowAccountData{data}, cols...)
 	},
 }

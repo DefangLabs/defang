@@ -166,11 +166,11 @@ func SetupCommands(version string) {
 	_ = RootCmd.MarkPersistentFlagDirname("cwd")
 	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, `compose file path(s)`)
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
+	RootCmd.PersistentFlags().BoolVarP(&global.Json, "json", "", global.Json, "show output in JSON format")
+	RootCmd.PersistentFlags().BoolVarP(&global.Utc, "utc", "", global.Utc, "show timestamps in UTC timezone")
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
-	cdCmd.PersistentFlags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
-	cdCmd.PersistentFlags().Bool("json", pkg.GetenvBool("DEFANG_JSON"), "show logs in JSON format")
 	cdCmd.PersistentFlags().StringVar(&byoc.DefangPulumiBackend, "pulumi-backend", "", `specify an alternate Pulumi backend URL or "pulumi-cloud"`)
 	cdCmd.AddCommand(cdDestroyCmd)
 	cdCmd.AddCommand(cdDownCmd)
@@ -214,7 +214,6 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(loginCmd)
 
 	// Whoami Command
-	whoamiCmd.PersistentFlags().Bool("json", pkg.GetenvBool("DEFANG_JSON"), "print output in JSON format")
 	RootCmd.AddCommand(whoamiCmd)
 
 	// Workspace Command
@@ -246,6 +245,7 @@ func SetupCommands(version string) {
 	_ = configSetCmd.Flags().MarkHidden("name")
 	configSetCmd.Flags().BoolP("env", "e", false, "set the config from an environment variable")
 	configSetCmd.Flags().Bool("random", false, "set a secure randomly generated value for config")
+	configSetCmd.Flags().Bool("if-not-set", false, "set the config if it is not already set")
 	configSetCmd.Flags().String("env-file", "", "load config values from an .env file")
 	configSetCmd.MarkFlagFilename("env-file")
 
@@ -292,9 +292,7 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(logsCmd)
 
 	// Deployments Command
-	deploymentsCmd.PersistentFlags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
-	deploymentsCmd.PersistentFlags().Uint32P("limit", "l", 10, "maximum number of deployments to list")
-	deploymentsCmd.PersistentFlags().BoolP("all", "a", false, "show all deployments, including stopped")
+	var deploymentsCmd = makeDeploymentsCmd("deployments")
 	RootCmd.AddCommand(deploymentsCmd)
 
 	// MCP Command
@@ -363,6 +361,14 @@ var RootCmd = &cobra.Command{
 			}
 			return nil
 		}
+		var utc, _ = cmd.Flags().GetBool("utc")
+		var json, _ = cmd.Flags().GetBool("json")
+
+		cli.SetUTCMode(utc)
+		cli.SetJSONMode(json)
+		if json {
+			global.Verbose = true
+		}
 
 		// Create a temporary gRPC client for tracking events before login
 		track.Tracker = cli.Connect(global.Cluster, global.Tenant)
@@ -387,6 +393,8 @@ var RootCmd = &cobra.Command{
 		case ColorAlways:
 			term.ForceColor(true)
 		}
+
+		term.SetJSON(json)
 
 		if cwd, _ := cmd.Flags().GetString("cwd"); cwd != "" {
 			// Change directory before running the command

@@ -1,6 +1,7 @@
 package term
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -13,6 +14,19 @@ func Table(slice any, attributes ...string) error {
 }
 
 func (t *Term) Table(slice any, attributes ...string) error {
+	if t.json {
+		return t.jsonTable(slice)
+	}
+	return t.table(slice, attributes...)
+}
+
+func (t *Term) jsonTable(slice any) error {
+	encoder := json.NewEncoder(t.out)
+	encoder.SetIndent("", "\t")
+	return encoder.Encode(slice)
+}
+
+func (t *Term) table(slice any, attributes ...string) error {
 	// Ensure slice is a slice
 	val := reflect.ValueOf(slice)
 	if val.Kind() != reflect.Slice {
@@ -62,7 +76,13 @@ func (t *Term) Table(slice any, attributes ...string) error {
 				}
 				continue
 			}
-			_, err = fmt.Fprintf(w, "%v\t", field.Interface())
+			val := field.Interface()
+			zero := reflect.Zero(field.Type()).Interface()
+			if reflect.DeepEqual(val, zero) {
+				_, err = fmt.Fprint(w, "\t")
+			} else {
+				_, err = fmt.Fprintf(w, "%v\t", val)
+			}
 			if err != nil {
 				return err
 			}

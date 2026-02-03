@@ -10,7 +10,10 @@ pre-commit:
 	@if git diff --cached --name-only | grep -q '^src/'; then $(MAKE) -C src lint; fi
 
 .PHONY: pre-push
-pre-push: pkgs/npm/README.md src/README.md test-nix
+pre-push: pkgs/npm/README.md src/README.md test test-nix
+
+.PHONY: test
+test:
 	@$(MAKE) -C src test
 
 .PHONY: setup
