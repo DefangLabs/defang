@@ -531,26 +531,31 @@ func makeComposeConfigCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 
-			session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
+			sessionx, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
 				CheckAccountInfo: false,
 			})
 			if err != nil {
 				term.Warn("unable to load stack:", err, "- some information may not be up-to-date")
+				sessionx = &session.Session{
+					Loader:   configureLoader(cmd),
+					Provider: client.NewPlaygroundProvider(global.Client, stacks.DefaultBeta),
+					Stack:    &stacks.Parameters{Name: stacks.DefaultBeta, Provider: client.ProviderDefang},
+				}
 			}
 
-			_, err = session.Provider.AccountInfo(ctx)
+			_, err = sessionx.Provider.AccountInfo(ctx)
 			if err != nil {
 				term.Warn("unable to connect to cloud provider:", err, "- some information may not be up-to-date")
 			}
 
-			project, loadErr := session.Loader.LoadProject(ctx)
+			project, loadErr := sessionx.Loader.LoadProject(ctx)
 			if loadErr != nil {
 				if global.NonInteractive {
 					return loadErr
 				}
 
 				term.Error("Cannot load project:", loadErr)
-				project, err := session.Loader.CreateProjectForDebug()
+				project, err := sessionx.Loader.CreateProjectForDebug()
 				if err != nil {
 					term.Warn("Failed to create project for debug:", err)
 					return loadErr
@@ -567,7 +572,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}, loadErr)
 			}
 
-			_, _, err = cli.ComposeUp(ctx, global.Client, session.Provider, session.Stack, cli.ComposeUpParams{
+			_, _, err = cli.ComposeUp(ctx, global.Client, sessionx.Provider, sessionx.Stack, cli.ComposeUpParams{
 				Project:    project,
 				UploadMode: compose.UploadModeIgnore,
 				Mode:       modes.ModeUnspecified,
