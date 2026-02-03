@@ -33,7 +33,7 @@ import (
 
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
 var authNeededAlways = map[string]string{authNeeded: ""}
-var authNeededForPlayground = map[string]string{authNeeded: "playground"}
+var authNeededForPlayground = map[string]string{authNeeded: "playground"} // request login only if invoked for Playground
 
 var P = track.P
 
