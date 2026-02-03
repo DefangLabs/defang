@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -40,6 +41,7 @@ type ToolManager struct {
 	printer                  Printer
 	prevTurnToolRequestsJSON map[string]bool
 	tools                    []ai.ToolRef
+	timeout                  time.Duration
 }
 
 func NewToolManager(genkit *genkit.Genkit, printer Printer) *ToolManager {
@@ -48,6 +50,7 @@ func NewToolManager(genkit *genkit.Genkit, printer Printer) *ToolManager {
 		printer:                  printer,
 		prevTurnToolRequestsJSON: make(map[string]bool),
 		tools:                    make([]ai.ToolRef, 0),
+		timeout:                  30 * time.Second,
 	}
 }
 
@@ -99,7 +102,9 @@ func (t *ToolManager) handleToolRequest(ctx context.Context, req *ai.ToolRequest
 	}
 
 	output, err := TeeTerm(func() (any, error) {
-		return tool.RunRaw(ctx, req.Input)
+		timeoutCtx, cancel := context.WithTimeout(ctx, t.timeout)
+		defer cancel()
+		return tool.RunRaw(timeoutCtx, req.Input)
 	})
 	if err != nil {
 		if errors.Is(err, common.ErrNoProviderSet) {
