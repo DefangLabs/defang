@@ -17,6 +17,7 @@ type Term struct {
 	stdout, stderr io.Writer
 	out, err       *termenv.Output
 	debug          bool
+	json           bool
 
 	isTerminal bool
 	hasDarkBg  bool
@@ -82,6 +83,13 @@ func (t *Term) ForceColor(color bool) {
 
 func (t *Term) SetDebug(debug bool) {
 	t.debug = debug
+}
+
+func (t *Term) SetJSON(json bool) {
+	if json {
+		t.ForceColor(false)
+	}
+	t.json = json
 }
 
 func (t *Term) DoDebug() bool {
@@ -347,6 +355,10 @@ func ForceColor(color bool) {
 
 func SetDebug(debug bool) {
 	DefaultTerm.SetDebug(debug)
+}
+
+func SetJSON(json bool) {
+	DefaultTerm.SetJSON(json)
 }
 
 func DoDebug() bool {

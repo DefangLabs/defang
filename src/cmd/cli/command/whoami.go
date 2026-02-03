@@ -1,8 +1,6 @@
 package command
 
 import (
-	"encoding/json"
-
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -57,26 +55,17 @@ var whoamiCmd = &cobra.Command{
 			}
 		}
 
-		if jsonMode {
-			bytes, err := json.Marshal(data)
-			if err != nil {
-				return err
-			}
-			_, err = term.Println(string(bytes))
-			return err
-		} else {
-			cols := []string{
-				"Workspace",
-				"SubscriberTier",
-				"Name",
-				"Email",
-				"Provider",
-				"Region",
-			}
-			if global.Verbose {
-				cols = append(cols, "Tenant", "TenantID")
-			}
-			return term.Table([]cli.ShowAccountData{data}, cols...)
+		cols := []string{
+			"Workspace",
+			"SubscriberTier",
+			"Name",
+			"Email",
+			"Provider",
+			"Region",
 		}
+		if global.Verbose {
+			cols = append(cols, "Tenant", "TenantID")
+		}
+		return term.Table([]cli.ShowAccountData{data}, cols...)
 	},
 }

@@ -14,9 +14,8 @@ func makeDeploymentsCmd(use string) *cobra.Command {
 		Aliases:     slices.Compact([]string{"deployments", use, "ls", "deployment", "deploys", "deps", "dep", "ls", "list"}),
 		Annotations: authNeededAnnotation,
 		Args:        cobra.NoArgs,
-		Short:       "List all active deployments",
+		Short:       "List all deployments",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var utc, _ = cmd.Flags().GetBool("utc")
 			var limit, _ = cmd.Flags().GetUint32("limit")
 			var all, _ = cmd.Flags().GetBool("all")
 			var listType defangv1.DeploymentType
@@ -24,10 +23,6 @@ func makeDeploymentsCmd(use string) *cobra.Command {
 				listType = defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY
 			} else {
 				listType = defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE
-			}
-
-			if utc {
-				cli.EnableUTCMode()
 			}
 
 			loader := configureLoader(cmd)
@@ -46,7 +41,6 @@ func makeDeploymentsCmd(use string) *cobra.Command {
 			})
 		},
 	}
-	deploymentsCmd.PersistentFlags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	deploymentsCmd.PersistentFlags().Uint32P("limit", "l", 10, "maximum number of deployments to list")
 	deploymentsCmd.PersistentFlags().BoolP("all", "a", false, "show all deployments, including stopped")
 	return deploymentsCmd
