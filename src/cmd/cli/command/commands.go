@@ -292,7 +292,7 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(logsCmd)
 
 	// Deployments Command
-	var deploymentsCmd = makeDeploymentsCmd()
+	var deploymentsCmd = makeDeploymentsCmd("deployments")
 	RootCmd.AddCommand(deploymentsCmd)
 
 	// MCP Command

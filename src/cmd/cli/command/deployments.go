@@ -1,15 +1,17 @@
 package command
 
 import (
+	"slices"
+
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
 )
 
-func makeDeploymentsCmd() *cobra.Command {
+func makeDeploymentsCmd(use string) *cobra.Command {
 	deploymentsCmd := &cobra.Command{
-		Use:         "deployments",
-		Aliases:     []string{"deployment", "deploys", "deps", "dep", "ls", "list"},
+		Use:         use,
+		Aliases:     slices.Compact([]string{"deployments", use, "ls", "deployment", "deploys", "deps", "dep", "ls", "list"}),
 		Annotations: authNeededAnnotation,
 		Args:        cobra.NoArgs,
 		Short:       "List all active deployments",
