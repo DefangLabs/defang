@@ -2,35 +2,35 @@ package term
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 	"text/tabwriter"
 )
 
-func Table(slice any, attributes ...string) error {
-	return DefaultTerm.Table(slice, attributes...)
+func Table(data any, attributes ...string) error {
+	return DefaultTerm.Table(data, attributes...)
 }
 
-func (t *Term) Table(slice any, attributes ...string) error {
+func (t *Term) Table(data any, attributes ...string) error {
 	if t.json {
-		return t.jsonTable(slice)
+		return t.jsonTable(data)
 	}
-	return t.table(slice, attributes...)
+	return t.table(data, attributes...)
 }
 
-func (t *Term) jsonTable(slice any) error {
+func (t *Term) jsonTable(data any) error {
 	encoder := json.NewEncoder(t.out)
 	encoder.SetIndent("", "\t")
-	return encoder.Encode(slice)
+	return encoder.Encode(data)
 }
 
-func (t *Term) table(slice any, attributes ...string) error {
-	// Ensure slice is a slice
-	val := reflect.ValueOf(slice)
+func (t *Term) table(data any, attributes ...string) error {
+	// Ensure data is a slice
+	val := reflect.ValueOf(data)
 	if val.Kind() != reflect.Slice {
-		return errors.New("Table: input is not a slice")
+		val = reflect.MakeSlice(reflect.SliceOf(val.Type()), 1, 1)
+		val.Index(0).Set(reflect.ValueOf(data))
 	}
 
 	// Create a tabwriter
