@@ -1,6 +1,7 @@
 import AdmZip from "adm-zip";
 import axios from "axios";
 import * as child_process from "child_process";
+import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import * as tar from "tar";
@@ -114,7 +115,6 @@ async function verifyChecksum(
     }
     
     // Calculate the actual checksum
-    const crypto = await import('crypto');
     const fileBuffer = await fs.promises.readFile(archiveFilePath);
     const hash = crypto.createHash('sha256');
     hash.update(fileBuffer);

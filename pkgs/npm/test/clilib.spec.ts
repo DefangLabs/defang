@@ -1,6 +1,7 @@
 import axios, {type AxiosResponse } from "axios";
 import * as chai from "chai";
 import chaiAsPromised from "chai-as-promised";
+import * as crypto from "crypto";
 import fs from "fs";
 import "mocha";
 import * as sinon from "sinon";
@@ -241,8 +242,7 @@ describe("Testing verifyChecksum()", () => {
     const archiveBuffer = Buffer.from("test data");
     readFileStub.withArgs(archivePath).resolves(archiveBuffer);
     
-    // Since we can't easily mock crypto, we need to calculate the actual hash
-    const crypto = await import('crypto');
+    // Calculate the actual hash using the statically imported crypto
     const hash = crypto.createHash('sha256');
     hash.update(archiveBuffer);
     const actualHash = hash.digest('hex');
@@ -313,8 +313,6 @@ describe("Testing downloadChecksumFile()", () => {
     const expectedUrl = `https://s.defang.io/${expectedFilename}?x-defang-source=npm`;
     const expectedPath = `/tmp/${expectedFilename}`;
     
-    // We need to stub downloadFile on the clilib object
-    const crypto = await import('crypto');
     const axiosStub = sandbox.stub(axios, "get");
     axiosStub.resolves({
       status: 200,
