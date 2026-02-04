@@ -73,6 +73,69 @@ async function downloadFile(
   }
 }
 
+async function downloadChecksumFile(
+  version: string,
+  outputPath: string
+): Promise<string | null> {
+  const checksumFilename = `defang_v${version}_checksums.txt`;
+  const downloadUrl = `https://s.defang.io/${checksumFilename}?x-defang-source=npm`;
+  const downloadTargetFile = path.join(outputPath, checksumFilename);
+
+  return await downloadFile(downloadUrl, downloadTargetFile);
+}
+
+async function verifyChecksum(
+  archiveFilePath: string,
+  checksumFilePath: string
+): Promise<boolean> {
+  try {
+    // Read the checksum file
+    const checksumContent = await fs.promises.readFile(checksumFilePath, "utf8");
+    
+    // Get the archive filename (without path)
+    const archiveFilename = path.basename(archiveFilePath);
+    
+    // Find the line with the checksum for our archive
+    const lines = checksumContent.split('\n');
+    let expectedChecksum: string | null = null;
+    
+    for (const line of lines) {
+      // Format: <checksum>  <filename>
+      const parts = line.trim().split(/\s+/);
+      if (parts.length >= 2 && parts[parts.length - 1] === archiveFilename) {
+        expectedChecksum = parts[0];
+        break;
+      }
+    }
+    
+    if (!expectedChecksum) {
+      console.warn(`Checksum for ${archiveFilename} not found in checksum file.`);
+      return false;
+    }
+    
+    // Calculate the actual checksum
+    const crypto = await import('crypto');
+    const fileBuffer = await fs.promises.readFile(archiveFilePath);
+    const hash = crypto.createHash('sha256');
+    hash.update(fileBuffer);
+    const actualChecksum = hash.digest('hex');
+    
+    // Compare checksums
+    if (actualChecksum !== expectedChecksum) {
+      console.error('Checksum verification failed!');
+      console.error(`Expected: ${expectedChecksum}`);
+      console.error(`Got:      ${actualChecksum}`);
+      return false;
+    }
+    
+    console.log('Checksum verification passed.');
+    return true;
+  } catch (error) {
+    console.error(`Error verifying checksum: ${error}`);
+    return false;
+  }
+}
+
 async function extractArchive(
   archiveFilePath: string,
   outputPath: string
@@ -312,6 +375,26 @@ export async function install(
       throw new Error(`Failed to download ${filename}`);
     }
 
+    // Download and verify checksum
+    console.log('Downloading checksum file...');
+    const checksumFile = await downloadChecksumFile(version, saveDirectory);
+    
+    if (checksumFile) {
+      console.log('Verifying checksum...');
+      const isValid = await verifyChecksum(archiveFile, checksumFile);
+      
+      // Clean up checksum file
+      await deleteArchive(checksumFile);
+      
+      if (!isValid) {
+        // Clean up archive file if checksum verification failed
+        await deleteArchive(archiveFile);
+        throw new Error('Checksum verification failed! The downloaded file may be corrupted or tampered with.');
+      }
+    } else {
+      console.warn('Warning: Could not download checksum file. Skipping checksum verification.');
+    }
+
     // Because the releases are compressed tar.gz or .zip we need to
     // uncompress them to the ./bin directory in the package in node_modules.
     const result = await extractArchive(archiveFile, saveDirectory);
@@ -381,6 +464,7 @@ export async function run(): Promise<void> {
 const clilib = {
   deleteArchive,
   downloadAppArchive,
+  downloadChecksumFile,
   downloadFile,
   extractArchive,
   extractCLIVersions,
@@ -390,6 +474,7 @@ const clilib = {
   getLatestVersion,
   getVersionInfo,
   getPathToExecutable,
+  verifyChecksum,
 };
 
 export default clilib;
