@@ -435,7 +435,7 @@ var RootCmd = &cobra.Command{
 		if global.NonInteractive {
 			err = global.Client.CheckLoginAndToS(ctx)
 		} else {
-			err = login.InteractiveRequireLoginAndToS(ctx, global.Client, global.Cluster)
+			global.Client, err = login.InteractiveRequireLoginAndToS(ctx, global.Client, global.Cluster)
 		}
 
 		return err
@@ -446,7 +446,8 @@ var RootCmd = &cobra.Command{
 		}
 
 		ctx := cmd.Context()
-		err := login.InteractiveRequireLoginAndToS(ctx, global.Client, global.Cluster)
+		var err error
+		global.Client, err = login.InteractiveRequireLoginAndToS(ctx, global.Client, global.Cluster)
 		if err != nil {
 			return err
 		}

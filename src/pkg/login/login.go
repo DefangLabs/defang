@@ -112,7 +112,9 @@ func NonInteractiveGitHubLogin(ctx context.Context, fabric client.FabricClient, 
 	return err
 }
 
-func InteractiveRequireLoginAndToS(ctx context.Context, fabric *client.GrpcClient, addr string) error {
+// InteractiveRequireLoginAndToS ensures the user is logged in and has agreed to the terms of service.
+// If necessary, it will reconnect to the server as the right tenant, returning the updated Fabric client.
+func InteractiveRequireLoginAndToS(ctx context.Context, fabric client.FabricClient, addr string) (client.FabricClient, error) {
 	var err error
 	if err = fabric.CheckLoginAndToS(ctx); err != nil {
 		// Login interactively now; only do this for authorization-related errors
@@ -123,19 +125,19 @@ func InteractiveRequireLoginAndToS(ctx context.Context, fabric *client.GrpcClien
 
 			defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
 			if err = InteractiveLogin(ctx, addr); err != nil {
-				return err
+				return fabric, err
 			}
 
 			// Reconnect with the new token
 			if newFabric, err := cli.ConnectWithTenant(ctx, addr, fabric.GetRequestedTenant()); err != nil {
-				return err
+				return fabric, err
 			} else {
-				*fabric = *newFabric
+				fabric = newFabric
 				track.Tracker = fabric // update global tracker
 			}
 
 			if err = fabric.CheckLoginAndToS(ctx); err == nil { // recheck (new token = new user)
-				return nil // success
+				return fabric, nil // success
 			}
 		}
 
@@ -145,10 +147,9 @@ func InteractiveRequireLoginAndToS(ctx context.Context, fabric *client.GrpcClien
 
 			defer func() { track.Cmd(nil, "Terms", P("reason", err)) }()
 			if err = InteractiveAgreeToS(ctx, fabric); err != nil {
-				return err // fatal
+				return fabric, err // fatal
 			}
 		}
 	}
-
-	return err
+	return fabric, err
 }

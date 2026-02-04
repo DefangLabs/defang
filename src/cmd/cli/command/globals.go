@@ -63,7 +63,7 @@ Note: Ensure the flag name, environment variable name, and struct field name are
 and follow the established naming conventions.
 */
 type GlobalConfig struct {
-	Client         *client.GrpcClient
+	Client         client.FabricClient
 	Cluster        string
 	ColorMode      ColorMode
 	Debug          bool

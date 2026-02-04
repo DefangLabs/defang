@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
+	"os"
 	"testing"
 	"time"
 
@@ -258,6 +259,11 @@ func TestGetGcpProjectID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			for _, envVar := range pkg.GCPProjectEnvVars {
+				t.Setenv(envVar, "") // this ensures env var is restored after the test
+				os.Unsetenv(envVar)  // after t.Setenv, to really unset it
+			}
+
 			// Set test environment variables
 			for k, v := range tt.envVars {
 				t.Setenv(k, v)
