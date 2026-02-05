@@ -65,6 +65,10 @@ func (t *Term) table(data any, attributes ...string) error {
 		if item.Kind() == reflect.Ptr || item.Kind() == reflect.Interface {
 			item = item.Elem()
 		}
+		// Ignore nil items
+		if !item.IsValid() {
+			continue
+		}
 
 		for _, attr := range attributes {
 			field := item.FieldByName(attr)
