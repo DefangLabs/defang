@@ -52,21 +52,14 @@ func (ss *stackSelector) SelectStack(ctx context.Context, opts SelectStackOption
 			return nil, errors.New("no stacks available to select")
 		}
 	}
-
+	labelMap := makeStackLabels(stackList)
 	stackLabels := make([]string, 0, len(stackList)+1)
 	stackNames := make([]string, 0, len(stackList))
-	labelMap := make(map[string]string)
-	for _, s := range stackList {
-		var label string
-		if s.DeployedAt.IsZero() {
-			label = s.Name
-		} else {
-			label = fmt.Sprintf("%s (deployed %s)", s.Name, s.DeployedAt.Format("Jan 2 2006"))
-		}
+	for label, name := range labelMap {
 		stackLabels = append(stackLabels, label)
-		stackNames = append(stackNames, s.Name)
-		labelMap[label] = s.Name
+		stackNames = append(stackNames, name)
 	}
+
 	if opts.AllowStackCreation {
 		stackLabels = append(stackLabels, CreateNewStack)
 	}
@@ -96,6 +89,20 @@ func (ss *stackSelector) SelectStack(ctx context.Context, opts SelectStackOption
 	}
 
 	return nil, fmt.Errorf("selected stack %q not found", selectedName)
+}
+
+func makeStackLabels(stacks []ListItem) map[string]string {
+	labelMap := make(map[string]string)
+	for _, s := range stacks {
+		var label string
+		if s.DeployedAt.IsZero() {
+			label = s.Name
+		} else {
+			label = fmt.Sprintf("%s (deployed %s)", s.Name, s.DeployedAt.Format("Jan 2 2006"))
+		}
+		labelMap[label] = s.Name
+	}
+	return labelMap
 }
 
 func (ss *stackSelector) createStack(ctx context.Context) (*Parameters, error) {
