@@ -185,7 +185,7 @@ func (bs *byocServerStream) parseEvents(events []cw.LogEvent) *defangv1.TailResp
 			entry.Etag = response.Etag
 			entry.Host = response.Host
 			evt := codebuild.ParseCodebuildEvent(entry)
-			if bs.codebuildEventHandler != nil {
+			if bs.codebuildEventHandler != nil && evt.State() != defangv1.ServiceState_NOT_SPECIFIED {
 				bs.codebuildEventHandler.HandleCodebuildEvent(evt)
 			}
 		} else if (response.Service == "cd") && (strings.HasPrefix(entry.Message, logs.ErrorPrefix) || strings.Contains(strings.ToLower(entry.Message), "error:")) {
