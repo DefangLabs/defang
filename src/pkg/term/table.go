@@ -29,8 +29,7 @@ func (t *Term) table(data any, attributes ...string) error {
 	// Ensure data is a slice
 	val := reflect.ValueOf(data)
 	if val.Kind() != reflect.Slice {
-		val = reflect.MakeSlice(reflect.SliceOf(val.Type()), 1, 1)
-		val.Index(0).Set(reflect.ValueOf(data))
+		val = reflect.ValueOf([]any{data})
 	}
 
 	// Create a tabwriter
@@ -63,7 +62,7 @@ func (t *Term) table(data any, attributes ...string) error {
 	// Print rows
 	for i := range val.Len() {
 		item := val.Index(i)
-		if item.Kind() == reflect.Ptr {
+		if item.Kind() == reflect.Ptr || item.Kind() == reflect.Interface {
 			item = item.Elem()
 		}
 
