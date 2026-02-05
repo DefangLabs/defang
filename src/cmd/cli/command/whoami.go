@@ -63,6 +63,6 @@ var whoamiCmd = &cobra.Command{
 		if global.Verbose {
 			cols = append(cols, "Tenant", "TenantID")
 		}
-		return term.Table([]cli.ShowAccountData{data}, cols...)
+		return term.Table(data, cols...)
 	},
 }
