@@ -40,7 +40,7 @@ flowchart LR
     cli --> cd
     cli --> secrets
     cd --> infra
-    containers->db
+    containers --> db
 ```
 
 1. **You write** a standard Docker Compose file
