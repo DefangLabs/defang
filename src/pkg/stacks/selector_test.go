@@ -104,8 +104,8 @@ func TestStackSelector_SelectStack_ExistingStack(t *testing.T) {
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock user selecting existing stack
-	expectedOptions := []string{"production", "development"}
-	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("production", nil)
+	expectedOptions := []string{"production (us-west-2)", "development (us-east-1)"}
+	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("production (us-west-2)", nil)
 
 	// Expected params based on ToParameters() conversion
 	expectedParams := &Parameters{
@@ -143,8 +143,8 @@ func TestStackSelector_SelectOrCreateStack_ExistingStack(t *testing.T) {
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock user selecting existing stack
-	expectedOptions := []string{"production", "development", CreateNewStack}
-	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("production", nil)
+	expectedOptions := []string{"production (us-west-2)", "development (us-east-1)", CreateNewStack}
+	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("production (us-west-2)", nil)
 
 	// Expected params based on ToParameters() conversion
 	expectedParams := &Parameters{
@@ -183,7 +183,7 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock user selecting to create new stack
-	expectedOptions := []string{"production", CreateNewStack}
+	expectedOptions := []string{"production (aws, us-west-2)", CreateNewStack}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return(CreateNewStack, nil)
 
 	// Mock wizard parameter collection - provider selection
@@ -351,7 +351,7 @@ func TestStackSelector_SelectStack_ElicitationError(t *testing.T) {
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock error during elicitation
-	expectedOptions := []string{"production"}
+	expectedOptions := []string{"production (aws, us-west-2)"}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("", errors.New("user cancelled selection"))
 
 	selector := NewSelector(mockEC, mockSM)
@@ -382,7 +382,7 @@ func TestStackSelector_SelectStack_WizardError(t *testing.T) {
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock user selecting to create new stack
-	expectedOptions := []string{"production", CreateNewStack}
+	expectedOptions := []string{"production (aws, us-west-2)", CreateNewStack}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return(CreateNewStack, nil)
 
 	// Mock wizard parameter collection - provider selection fails
@@ -419,7 +419,7 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock user selecting to create new stack
-	expectedOptions := []string{"production", CreateNewStack}
+	expectedOptions := []string{"production (aws, us-west-2)", CreateNewStack}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return(CreateNewStack, nil)
 
 	// Mock wizard parameter collection - provider selection
@@ -467,4 +467,73 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 	mockEC.AssertExpectations(t)
 	mockSM.AssertExpectations(t)
 	mockProfileLister.AssertExpectations(t)
+}
+
+func TestMakeStackSelectorLabels(t *testing.T) {
+	tests := []struct {
+		name       string
+		stacks     []ListItem
+		wantLabels []string
+	}{
+		{
+			name:       "no stacks",
+			stacks:     []ListItem{},
+			wantLabels: []string{},
+		},
+		{
+			name: "one stack - present all fields",
+			stacks: []ListItem{
+				{Parameters: Parameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
+			},
+			wantLabels: []string{"production (aws, us-west-2)"},
+		},
+		{
+			name: "hide redundant provider",
+			stacks: []ListItem{
+				{Parameters: Parameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
+				{Parameters: Parameters{Name: "development", Provider: "aws", Region: "us-east-1"}},
+			},
+			wantLabels: []string{
+				"production (us-west-2)",
+				"development (us-east-1)",
+			},
+		},
+		{
+			name: "hide redundant provider and region",
+			stacks: []ListItem{
+				{Parameters: Parameters{Name: "prod-us-west-2", Provider: "aws", Region: "us-west-2"}},
+				{Parameters: Parameters{Name: "dev-us-west-2", Provider: "aws", Region: "us-west-2"}},
+			},
+			wantLabels: []string{
+				"prod-us-west-2",
+				"dev-us-west-2",
+			},
+		},
+		{
+			name: "mixed redundancy",
+			stacks: []ListItem{
+				{Parameters: Parameters{Name: "prod-us-west-2", Provider: "aws", Region: "us-west-2"}},
+				{Parameters: Parameters{Name: "dev-us-east-1", Provider: "aws", Region: "us-east-1"}},
+				{Parameters: Parameters{Name: "gcp-stack", Provider: "gcp", Region: "us-central1"}},
+			},
+			wantLabels: []string{
+				"prod-us-west-2 (aws, us-west-2)",
+				"dev-us-east-1 (aws, us-east-1)",
+				"gcp-stack (gcp, us-central1)",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			labels := MakeStackSelectorLabels(tt.stacks)
+
+			// Extract labels into a slice for easier comparison
+			var gotLabels []string
+			for label := range labels {
+				gotLabels = append(gotLabels, label)
+			}
+
+			assert.ElementsMatch(t, tt.wantLabels, gotLabels)
+		})
+	}
 }

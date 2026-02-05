@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -52,12 +53,17 @@ func (ss *stackSelector) SelectStack(ctx context.Context, opts SelectStackOption
 			return nil, errors.New("no stacks available to select")
 		}
 	}
-	labelMap := makeStackLabels(stackList)
+	labelMap := MakeStackSelectorLabels(stackList)
 	stackLabels := make([]string, 0, len(stackList)+1)
 	stackNames := make([]string, 0, len(stackList))
-	for label, name := range labelMap {
-		stackLabels = append(stackLabels, label)
-		stackNames = append(stackNames, name)
+	for _, stack := range stackList {
+		for label, name := range labelMap {
+			if name == stack.Name {
+				stackLabels = append(stackLabels, label)
+				stackNames = append(stackNames, name)
+				break
+			}
+		}
 	}
 
 	if opts.AllowStackCreation {
@@ -91,20 +97,6 @@ func (ss *stackSelector) SelectStack(ctx context.Context, opts SelectStackOption
 	return nil, fmt.Errorf("selected stack %q not found", selectedName)
 }
 
-func makeStackLabels(stacks []ListItem) map[string]string {
-	labelMap := make(map[string]string)
-	for _, s := range stacks {
-		var label string
-		if s.DeployedAt.IsZero() {
-			label = s.Name
-		} else {
-			label = fmt.Sprintf("%s (deployed %s)", s.Name, s.DeployedAt.Format("Jan 2 2006"))
-		}
-		labelMap[label] = s.Name
-	}
-	return labelMap
-}
-
 func (ss *stackSelector) createStack(ctx context.Context) (*Parameters, error) {
 	params, err := ss.wizard.CollectParameters(ctx)
 	if err != nil {
@@ -131,4 +123,77 @@ func printStacksInfoMessage(stacks []string) {
 		term.Println(infoLine)
 	}
 	term.Printf("To skip this prompt, run this command with --stack=%s\n", "<stack_name>")
+}
+
+func MakeStackSelectorLabels(stacks []ListItem) map[string]string {
+	partsList := stackLabelParts(stacks)
+	partsList = reduceStackLabelParts(partsList)
+
+	labelMap := make(map[string]string)
+	for i, parts := range partsList {
+		label := formatStackLabelParts(parts)
+		labelMap[label] = stacks[i].Name
+	}
+	return labelMap
+}
+
+func stackLabelParts(stacks []ListItem) [][]string {
+	partsList := make([][]string, 0, len(stacks))
+	for _, s := range stacks {
+		var deployedAt string
+		if !s.DeployedAt.IsZero() {
+			deployedAt = "last deployed " + s.DeployedAt.Format("Jan 2 2006")
+		}
+		parts := []string{
+			s.Name,
+			s.Provider.String(),
+			s.Region,
+			deployedAt,
+		}
+		partsList = append(partsList, parts)
+	}
+	return partsList
+}
+
+func reduceStackLabelParts(partsList [][]string) [][]string {
+	if len(partsList) <= 1 {
+		return partsList
+	}
+	// iterate over the partsList,
+	// if all stacks have the same value for a given part index, remove that part from all labels
+	for i := 0; i < len(partsList[0]); i++ {
+		same := true
+		value := partsList[0][i]
+		for _, part := range partsList {
+			if part[i] != value {
+				same = false
+				break
+			}
+		}
+		if same {
+			for j := 0; j < len(partsList); j++ {
+				partsList[j] = append(partsList[j][:i], partsList[j][i+1:]...)
+			}
+			i-- // adjust index since we removed a part
+		}
+	}
+
+	return partsList
+}
+
+func formatStackLabelParts(parts []string) string {
+	// remove any empty parts
+	nonEmptyParts := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part != "" {
+			nonEmptyParts = append(nonEmptyParts, part)
+		}
+	}
+	if len(nonEmptyParts) == 0 {
+		return ""
+	}
+	if len(nonEmptyParts) == 1 {
+		return nonEmptyParts[0]
+	}
+	return fmt.Sprintf("%s (%s)", nonEmptyParts[0], strings.Join(nonEmptyParts[1:], ", "))
 }
