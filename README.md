@@ -28,9 +28,10 @@ flowchart LR
         style cd stroke-width:3px
         secrets["Config & Secrets"]
         subgraph infra["Infrastructure"]
-            containers["Containers"]
-            dns["DNS"]
             lb["Load Balancer"]
+            containers["Containers"]
+            db["DB"]
+            dns["DNS"]
         end
     end
 
@@ -39,6 +40,7 @@ flowchart LR
     cli --> cd
     cli --> secrets
     cd --> infra
+    containers->db
 ```
 
 1. **You write** a standard Docker Compose file
@@ -80,14 +82,13 @@ The Defang Model Context Protocol [(MCP)](https://docs.defang.io/docs/concepts/m
 
 - Public releases of the Defang CLI; [click here](https://github.com/DefangLabs/defang/releases/latest/) for the latest version
 - Built-in support for MCP Server — the Defang MCP Server makes cloud deployment as easy as a single prompt. [Learn more](https://docs.defang.io/docs/concepts/mcp)
-- [Samples](https://github.com/DefangLabs/samples) in Golang, Python, and Node.js that show how to accomplish various tasks and deploy them to the DOP using a Docker Compose file using the Defang CLI.
 - Samples that show how to deploy an app using the [Defang Pulumi Provider](https://github.com/DefangLabs/pulumi-defang).
 
 ## Getting started
 
 - Read our [Getting Started](https://docs.defang.io/docs/getting-started) page
 - Follow the installation instructions from the [Installing](https://docs.defang.io/docs/getting-started/installing) page
-- Take a look at our [Samples folder](https://github.com/DefangLabs/defang/tree/main/samples) for example projects in various programming languages.
+- Take a look at our [Samples](https://github.com/DefangLabs/samples) in Golang, Python, and Node.js that show how to accomplish various tasks and deploy them
 - Try the AI integration by running `defang generate`
 - Start your new service with `defang compose up`
 
