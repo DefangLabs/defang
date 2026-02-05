@@ -558,6 +558,7 @@ message ListDeploymentsRequest {
   DeploymentType type = 2; // active or all
   uint32 limit = 3; // number of deployments to return
   string stack = 4;
+  google.protobuf.Timestamp until = 5;
 }
 
 message ListDeploymentsResponse {
