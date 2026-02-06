@@ -20,6 +20,12 @@ type byocSubscribeServerStream struct {
 }
 
 func (s *byocSubscribeServerStream) HandleCodebuildEvent(evt codebuild.Event) {
+	if etag := evt.Etag(); etag == "" || etag != s.etag {
+		return
+	}
+	if service := evt.Service(); len(s.services) > 0 && !slices.Contains(s.services, service) {
+		return
+	}
 	resp := defangv1.SubscribeResponse{
 		Name:   evt.Service(),
 		Status: evt.Status(),
