@@ -10,7 +10,7 @@ The Defang Command-Line Interface [(CLI)](https://docs.defang.io/docs/getting-st
 
 - Read our [Getting Started](https://docs.defang.io/docs/getting-started) page
 - Follow the installation instructions from the [Installing](https://docs.defang.io/docs/getting-started/installing) page
-- Take a look at our [Samples folder](https://github.com/DefangLabs/defang/tree/main/samples) for example projects in various programming languages.
+- Take a look at our [Samples](https://github.com/DefangLabs/samples) in Golang, Python, and Node.js that show how to accomplish various tasks and deploy them
 - Try the AI integration by running `defang generate`
 - Start your new service with `defang compose up`
 
