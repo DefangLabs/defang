@@ -181,7 +181,7 @@ func (bs *byocServerStream) parseEvents(events []cw.LogEvent) *defangv1.TailResp
 				entry.Message = evt.Status()
 			}
 		} else if parseCodeBuildRecords {
-			entry.Service = strings.TrimSuffix(response.Service, "-image")
+			entry.Service = response.Service
 			entry.Etag = response.Etag
 			entry.Host = response.Host
 			evt := codebuild.ParseCodebuildEvent(entry)

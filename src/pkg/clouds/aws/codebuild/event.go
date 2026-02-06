@@ -69,35 +69,24 @@ func (e *CodebuildEvent) Status() string {
 }
 
 func parseCodebuildMessage(message string) defangv1.ServiceState {
-	if strings.Contains(message, "Phase complete: ") && strings.Contains(message, "State: FAILED") {
+	switch {
+	case strings.Contains(message, "Phase complete: ") && strings.Contains(message, "State: FAILED"):
 		return defangv1.ServiceState_BUILD_FAILED
-	}
-	if strings.Contains(message, "Running on CodeBuild") {
+	case strings.Contains(message, "Running on CodeBuild"):
 		return defangv1.ServiceState_BUILD_ACTIVATING
-	}
-	if strings.Contains(message, "Phase is DOWNLOAD_SOURCE") {
+	case strings.Contains(message, "Phase is DOWNLOAD_SOURCE"):
 		return defangv1.ServiceState_BUILD_RUNNING
-	}
-
-	if strings.Contains(message, "Entering phase INSTALL") {
+	case strings.Contains(message, "Entering phase INSTALL"):
 		return defangv1.ServiceState_BUILD_RUNNING
-	}
-
-	if strings.Contains(message, "Entering phase PRE_BUILD") {
+	case strings.Contains(message, "Entering phase PRE_BUILD"):
 		return defangv1.ServiceState_BUILD_RUNNING
-	}
-
-	if strings.Contains(message, "Entering phase BUILD") {
+	case strings.Contains(message, "Entering phase BUILD"):
 		return defangv1.ServiceState_BUILD_RUNNING
-	}
-
-	if strings.Contains(message, "Entering phase POST_BUILD") {
+	case strings.Contains(message, "Entering phase POST_BUILD"):
 		return defangv1.ServiceState_BUILD_STOPPING
-	}
-
-	if strings.Contains(message, "Phase complete: UPLOAD_ARTIFACTS State: SUCCEEDED") {
+	case strings.Contains(message, "Phase complete: UPLOAD_ARTIFACTS State: SUCCEEDED"):
 		return defangv1.ServiceState_DEPLOYMENT_PENDING
+	default:
+		return defangv1.ServiceState_NOT_SPECIFIED
 	}
-
-	return defangv1.ServiceState_NOT_SPECIFIED
 }

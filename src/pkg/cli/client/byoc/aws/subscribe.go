@@ -2,6 +2,7 @@ package aws
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
@@ -23,7 +24,8 @@ func (s *byocSubscribeServerStream) HandleCodebuildEvent(evt codebuild.Event) {
 	if etag := evt.Etag(); etag == "" || etag != s.etag {
 		return
 	}
-	if service := evt.Service(); len(s.services) > 0 && !slices.Contains(s.services, service) {
+	service := strings.TrimSuffix(evt.Service(), "-image")
+	if len(s.services) > 0 && !slices.Contains(s.services, service) {
 		return
 	}
 	resp := defangv1.SubscribeResponse{
