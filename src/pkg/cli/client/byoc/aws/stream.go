@@ -10,6 +10,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -29,16 +30,18 @@ type byocServerStream struct {
 	services []string
 	stream   cw.LiveTailStream
 
-	ecsEventsHandler ECSEventHandler
+	ecsEventsHandler      ECSEventHandler
+	codebuildEventHandler CodebuildEventHandler
 }
 
-func newByocServerStream(stream cw.LiveTailStream, etag string, services []string, ecsEventHandler ECSEventHandler) *byocServerStream {
+func newByocServerStream(stream cw.LiveTailStream, etag string, services []string, ecsEventHandler ECSEventHandler, codebuildEventHandler CodebuildEventHandler) *byocServerStream {
 	return &byocServerStream{
 		etag:     etag,
 		stream:   stream,
 		services: services,
 
-		ecsEventsHandler: ecsEventHandler,
+		ecsEventsHandler:      ecsEventHandler,
+		codebuildEventHandler: codebuildEventHandler,
 	}
 }
 
@@ -169,7 +172,9 @@ func (bs *byocServerStream) parseEvents(events []cw.LogEvent) *defangv1.TailResp
 			if err != nil {
 				term.Debugf("error parsing ECS event, output raw event log: %v", err)
 			} else {
-				bs.ecsEventsHandler.HandleECSEvent(evt)
+				if bs.ecsEventsHandler != nil {
+					bs.ecsEventsHandler.HandleECSEvent(evt)
+				}
 				entry.Service = evt.Service()
 				entry.Etag = evt.Etag()
 				entry.Host = evt.Host()
@@ -179,6 +184,10 @@ func (bs *byocServerStream) parseEvents(events []cw.LogEvent) *defangv1.TailResp
 			entry.Service = response.Service
 			entry.Etag = response.Etag
 			entry.Host = response.Host
+			evt := codebuild.ParseCodebuildEvent(entry)
+			if bs.codebuildEventHandler != nil && evt.State() != defangv1.ServiceState_NOT_SPECIFIED {
+				bs.codebuildEventHandler.HandleCodebuildEvent(evt)
+			}
 		} else if (response.Service == "cd") && (strings.HasPrefix(entry.Message, logs.ErrorPrefix) || strings.Contains(strings.ToLower(entry.Message), "error:")) {
 			entry.Stderr = true
 		}

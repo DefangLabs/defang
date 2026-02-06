@@ -2,7 +2,9 @@ package aws
 
 import (
 	"slices"
+	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -16,6 +18,25 @@ type byocSubscribeServerStream struct {
 	resp *defangv1.SubscribeResponse
 	err  error
 	done chan struct{}
+}
+
+func (s *byocSubscribeServerStream) HandleCodebuildEvent(evt codebuild.Event) {
+	if etag := evt.Etag(); etag == "" || etag != s.etag {
+		return
+	}
+	service := strings.TrimSuffix(evt.Service(), "-image")
+	if len(s.services) > 0 && !slices.Contains(s.services, service) {
+		return
+	}
+	resp := defangv1.SubscribeResponse{
+		Name:   evt.Service(),
+		Status: evt.Status(),
+		State:  evt.State(),
+	}
+	select {
+	case s.ch <- &resp:
+	case <-s.done:
+	}
 }
 
 func (s *byocSubscribeServerStream) HandleECSEvent(evt ecs.Event) {
