@@ -3606,7 +3606,7 @@ type ListDeploymentsRequest struct {
 	Type          DeploymentType         `protobuf:"varint,2,opt,name=type,proto3,enum=io.defang.v1.DeploymentType" json:"type,omitempty"` // active or all
 	Limit         uint32                 `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`                                // number of deployments to return
 	Stack         string                 `protobuf:"bytes,4,opt,name=stack,proto3" json:"stack,omitempty"`
-	Until         *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=until,proto3" json:"until,omitempty"`
+	Until         *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=until,proto3" json:"until,omitempty"` // return deployments before this time (exclusive)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
