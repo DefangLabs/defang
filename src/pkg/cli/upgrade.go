@@ -53,7 +53,7 @@ func Upgrade(ctx context.Context) error {
 		_, hasPrompt := os.LookupEnv("PROMPT")             // CMD
 		_, hasPSModulePath := os.LookupEnv("PSModulePath") // CMD and Powershell
 		if !hasMSYSTEM && !hasPrompt && hasPSModulePath {
-			printInstructions(`iwr https://s.defang.io/defang_win_amd64.zip -OutFile defang.zip; Expand-Archive defang.zip . -Force`)
+			printInstructions(`iwr https://s.defang.io/defang_windows_` + runtime.GOARCH + `.zip -OutFile defang.zip; Expand-Archive defang.zip . -Force`)
 			return nil
 		}
 	}
