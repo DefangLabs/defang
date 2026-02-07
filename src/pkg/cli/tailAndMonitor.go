@@ -4,66 +4,43 @@ import (
 	"context"
 	"errors"
 	"io"
-	"sync"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 )
 
-const targetServiceState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
-
-func TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, tailOptions TailOptions) (ServiceStates, error) {
+func TailAndMonitor(
+	ctx context.Context,
+	project *compose.Project,
+	provider client.Provider,
+	waitTimeout time.Duration,
+	tailOptions TailOptions,
+) (ServiceStates, error) {
 	tailOptions.Follow = true
 	if tailOptions.Deployment == "" {
-		panic("tailOptions.Deployment must be a valid deployment ID")
-	}
-	if waitTimeout > 0 {
-		var cancelTimeout context.CancelFunc
-		ctx, cancelTimeout = context.WithTimeout(ctx, waitTimeout)
-		defer cancelTimeout()
+		panic("deploymentID must be provided to tail logs")
 	}
 
 	tailCtx, cancelTail := context.WithCancelCause(context.Background())
 	defer cancelTail(nil) // to cancel tail and clean-up context
 
-	svcStatusCtx, cancelSvcStatus := context.WithCancelCause(ctx)
-	defer cancelSvcStatus(nil) // to cancel WaitServiceState and clean-up context
-
-	_, computeServices := splitManagedAndUnmanagedServices(project.Services)
-
-	var serviceStates ServiceStates
-	var cdErr, svcErr error
-
-	wg := &sync.WaitGroup{}
-	wg.Add(2)
-
-	go func() {
-		defer wg.Done()
-		// block on waiting for services to reach target state
-		serviceStates, svcErr = WaitServiceState(svcStatusCtx, provider, targetServiceState, project.Name, tailOptions.Deployment, computeServices)
-	}()
-
-	go func() {
-		defer wg.Done()
-		// block on waiting for cdTask to complete
-		if err := WaitForCdTaskExit(ctx, provider); err != nil {
-			cdErr = err
-			// When CD fails, stop WaitServiceState
-			cancelSvcStatus(cdErr)
-		}
-	}()
-
 	errMonitoringDone := errors.New("monitoring done") // pseudo error to signal that monitoring is done
 
+	var serviceStates ServiceStates
+	var monitorErr error
+
+	// Run Monitor in a separate goroutine
 	go func() {
-		wg.Wait()
+		// Pass a NOOP function for the callback since TailAndMonitor doesn't use UI
+		serviceStates, monitorErr = Monitor(ctx, project, provider, waitTimeout, tailOptions.Deployment, func(ServiceStates) (bool, error) {
+			return false, nil // NOOP - no UI updates needed when tailing
+		})
 		pkg.SleepWithContext(ctx, 2*time.Second) // a delay before cancelling tail to make sure we get last status messages
-		cancelTail(errMonitoringDone)            // cancel the tail when both goroutines are done
+		cancelTail(errMonitoringDone)            // cancel the tail when monitoring is done
 	}()
 
 	tailOptions.PrintBookends = false
@@ -82,13 +59,13 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 
 		switch {
 		case errors.Is(err, io.EOF):
-			break // an end condition was detected; cdErr and/or svcErr might be nil
+			break // an end condition was detected; monitorErr might be nil
 
 		case errors.Is(context.Cause(ctx), context.Canceled):
 			term.Warn("Deployment is not finished. Service(s) might not be running.")
 
 		case errors.Is(context.Cause(tailCtx), errMonitoringDone):
-			break // the monitoring stopped the tail; cdErr and/or svcErr will have been set
+			break // the monitoring stopped the tail; monitorErr will have been set
 
 		case errors.Is(context.Cause(ctx), context.DeadlineExceeded):
 			// Tail was canceled when wait-timeout is reached; show a warning and exit with an error
@@ -96,11 +73,11 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 			fallthrough
 
 		default:
-			tailErr = err // report the error, in addition to the cdErr and svcErr
+			tailErr = err // report the error, in addition to the monitorErr
 		}
 	}
 
-	return serviceStates, errors.Join(cdErr, svcErr, tailErr)
+	return serviceStates, errors.Join(monitorErr, tailErr)
 }
 
 func CanMonitorService(service *compose.ServiceConfig) bool {
