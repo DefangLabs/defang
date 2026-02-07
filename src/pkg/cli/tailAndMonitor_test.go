@@ -8,6 +8,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/require"
@@ -114,9 +115,15 @@ func TestTailAndMonitor(t *testing.T) {
 			"api":    compose.ServiceConfig{Name: "api"},
 		},
 	}
+	logEntryHandler := func(*defangv1.LogEntry, *TailOptions, *term.Term) error {
+		return nil
+	}
+	watchCallback := func(states ServiceStates) (bool, error) {
+		return false, nil
+	}
 	states, err := TailAndMonitor(t.Context(), project, mockProvider, time.Minute, TailOptions{
 		Deployment: "deployment12",
-	})
+	}, logEntryHandler, watchCallback)
 	require.NoError(t, err)
 	require.Equal(t, ServiceStates{
 		"web":    defangv1.ServiceState_DEPLOYMENT_COMPLETED,

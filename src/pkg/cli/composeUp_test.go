@@ -16,6 +16,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/require"
@@ -338,7 +339,13 @@ func TestComposeUpStops(t *testing.T) {
 				timer := time.AfterFunc(time.Second, func() { provider.subscribeStream.Send(tt.svcFailed, tt.subscribeErr) })
 				t.Cleanup(func() { timer.Stop() })
 			}
-			_, err = TailAndMonitor(ctx, project, provider, -1, TailOptions{Deployment: resp.Etag})
+			logEntryHandler := func(*defangv1.LogEntry, *TailOptions, *term.Term) error {
+				return nil
+			}
+			watchCallback := func(serviceStates ServiceStates) (bool, error) {
+				return false, nil
+			}
+			_, err = TailAndMonitor(ctx, project, provider, -1, TailOptions{Deployment: resp.Etag}, logEntryHandler, watchCallback)
 			if err != nil {
 				if err.Error() != tt.wantError {
 					t.Errorf("expected error: %v, got: %v", tt.wantError, err)

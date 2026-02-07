@@ -8,6 +8,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -156,7 +157,7 @@ func MonitorWithUI(ctx context.Context, project *compose.Project, provider clien
 	// Start monitoring in a goroutine
 	go func() {
 		defer wg.Done()
-		serviceStates, monitorErr = Monitor(ctx, project, provider, waitTimeout, deploymentID, func(states ServiceStates) (bool, error) {
+		watchCallback := func(states map[string]defangv1.ServiceState) (bool, error) {
 			// Send service status updates to the bubbletea model
 			for name, state := range states {
 				p.Send(serviceUpdate{
@@ -164,8 +165,14 @@ func MonitorWithUI(ctx context.Context, project *compose.Project, provider clien
 					status: state.String(),
 				})
 			}
+			// Continue watching until all services are in a terminal state
 			return false, nil
-		})
+		}
+		logEntryHandler := func(*defangv1.LogEntry, *TailOptions, *term.Term) error {
+			// No-op since we're only updating the UI based on service states
+			return nil
+		}
+		serviceStates, monitorErr = TailAndMonitor(ctx, project, provider, waitTimeout, TailOptions{Deployment: deploymentID}, logEntryHandler, watchCallback)
 		// Quit the UI when monitoring is done
 		p.Quit()
 	}()

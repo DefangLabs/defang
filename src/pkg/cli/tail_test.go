@@ -393,7 +393,7 @@ func TestPrintHandler(t *testing.T) {
 		mockTerm := term.NewTerm(os.Stdin, &stdout, &stderr)
 
 		for _, entry := range logEntries {
-			logEntryPrintHandler(entry, &TailOptions{
+			LogEntryPrintHandler(entry, &TailOptions{
 				Deployment: entry.Etag,
 				Services:   []string{},
 				Verbose:    false,

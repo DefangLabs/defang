@@ -17,7 +17,7 @@ import (
 
 const targetServiceState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 
-func TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, tailOptions TailOptions) (ServiceStates, error) {
+func TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, tailOptions TailOptions, handler LogEntryHandler, cb WatchCallback) (ServiceStates, error) {
 	tailOptions.Follow = true
 	if tailOptions.Deployment == "" {
 		panic("tailOptions.Deployment must be a valid deployment ID")
@@ -45,7 +45,11 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 	go func() {
 		defer wg.Done()
 		// block on waiting for services to reach target state
-		serviceStates, svcErr = WaitServiceState(svcStatusCtx, provider, targetServiceState, project.Name, tailOptions.Deployment, computeServices)
+		term.Debugf("waiting for services %v to reach state %s\n", computeServices, targetServiceState) // TODO: don't print in Go-routine
+		serviceStates, svcErr = WatchServiceState(svcStatusCtx, provider, targetServiceState, project.Name, tailOptions.Deployment, computeServices, func(serviceStates ServiceStates) (bool, error) {
+			cb(serviceStates) // send updates to UI regardless of error or completion
+			return allInState(targetServiceState, serviceStates), nil
+		})
 	}()
 
 	go func() {
@@ -69,7 +73,8 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 	tailOptions.PrintBookends = false
 	// blocking call to tail
 	var tailErr error
-	if err := Tail(tailCtx, provider, project.Name, tailOptions); err != nil {
+	err := streamLogs(ctx, provider, project.Name, tailOptions, handler)
+	if err != nil {
 		term.Debug("Tail stopped with", err, errors.Unwrap(err))
 
 		if connect.CodeOf(err) == connect.CodePermissionDenied {

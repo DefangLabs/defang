@@ -133,7 +133,7 @@ func (cerr CancelError) Unwrap() error {
 }
 
 func Tail(ctx context.Context, provider client.Provider, projectName string, options TailOptions) error {
-	return streamLogs(ctx, provider, projectName, options, logEntryPrintHandler)
+	return streamLogs(ctx, provider, projectName, options, LogEntryPrintHandler)
 }
 
 func isTransientError(err error) bool {
@@ -441,7 +441,7 @@ func handleLogEntryMsgs(msg *defangv1.TailResponse, doSpinner bool, skipDuplicat
 	return nil
 }
 
-func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions, t *term.Term) error {
+func LogEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions, t *term.Term) error {
 	// HACK: skip noisy CI/CD logs (except errors)
 	var internalServices = []string{"cd", "kaniko", "fabric", "ecs", "codebuild", "cloudbuild", "pulumi"}
 	var internalHosts = []string{"kaniko", "fabric", "ecs", "codebuild", "cloudbuild", "pulumi"}
