@@ -133,39 +133,6 @@ func (cerr CancelError) Unwrap() error {
 }
 
 func Tail(ctx context.Context, provider client.Provider, projectName string, options TailOptions) error {
-	if options.LogType == logs.LogTypeUnspecified {
-		options.LogType = logs.LogTypeAll
-	}
-
-	term.Debugf("Tailing %s logs in project %q", options.LogType, projectName)
-
-	if options.Deployment != "" {
-		_, err := types.ParseEtag(options.Deployment)
-		if err != nil {
-			return err
-		}
-	}
-
-	if len(options.Services) > 0 {
-		for _, service := range options.Services {
-			// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
-			if _, err := provider.GetService(ctx, &defangv1.GetRequest{Project: projectName, Name: service}); err != nil {
-				switch connect.CodeOf(err) {
-				case connect.CodeNotFound:
-					term.Warnf("Service does not exist (yet): %q", service)
-				case connect.CodeUnknown:
-					// Ignore unknown (nil) errors
-				default:
-					term.Warn(err) // TODO: use client.PrettyError(…)
-				}
-			}
-		}
-	}
-
-	if dryrun.DoDryRun {
-		return dryrun.ErrDryRun
-	}
-
 	return streamLogs(ctx, provider, projectName, options, logEntryPrintHandler)
 }
 
@@ -203,6 +170,35 @@ func isTransientError(err error) bool {
 type LogEntryHandler func(*defangv1.LogEntry, *TailOptions, *term.Term) error
 
 func streamLogs(ctx context.Context, provider client.Provider, projectName string, options TailOptions, handler LogEntryHandler) error {
+	if options.LogType == logs.LogTypeUnspecified {
+		options.LogType = logs.LogTypeAll
+	}
+
+	term.Debugf("Tailing %s logs in project %q", options.LogType, projectName)
+
+	if options.Deployment != "" {
+		_, err := types.ParseEtag(options.Deployment)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(options.Services) > 0 {
+		for _, service := range options.Services {
+			// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
+			if _, err := provider.GetService(ctx, &defangv1.GetRequest{Project: projectName, Name: service}); err != nil {
+				switch connect.CodeOf(err) {
+				case connect.CodeNotFound:
+					term.Warnf("Service does not exist (yet): %q", service)
+				case connect.CodeUnknown:
+					// Ignore unknown (nil) errors
+				default:
+					term.Warn(err) // TODO: use client.PrettyError(…)
+				}
+			}
+		}
+	}
+
 	var sinceTs, untilTs *timestamppb.Timestamp
 	if pkg.IsValidTime(options.Since) {
 		sinceTs = timestamppb.New(options.Since)
@@ -233,6 +229,10 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 	}
 
 	term.Debug("Tail request:", tailRequest)
+
+	if dryrun.DoDryRun {
+		return dryrun.ErrDryRun
+	}
 
 	serverStream, err := provider.QueryLogs(ctx, tailRequest)
 	if err != nil {
