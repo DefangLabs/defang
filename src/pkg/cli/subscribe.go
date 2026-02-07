@@ -13,14 +13,16 @@ import (
 var ErrNothingToMonitor = errors.New("no services to monitor")
 
 type ServiceStates = map[string]defangv1.ServiceState
+type WatchCallback func(ServiceStates) (bool, error)
 
-func WaitServiceState(
+func WatchServiceState(
 	ctx context.Context,
 	provider client.Provider,
 	targetState defangv1.ServiceState,
 	projectName string,
 	etag types.ETag,
 	services []string,
+	cb WatchCallback,
 ) (ServiceStates, error) {
 	term.Debugf("waiting for services %v to reach state %s\n", services, targetState) // TODO: don't print in Go-routine
 
@@ -85,6 +87,13 @@ func WaitServiceState(
 		}
 
 		serviceStates[msg.Name] = msg.State
+		finished, err := cb(serviceStates)
+		if err != nil {
+			return nil, err
+		}
+		if finished {
+			return serviceStates, nil
+		}
 
 		// exit early on detecting a FAILED state
 		switch msg.State {
@@ -96,6 +105,20 @@ func WaitServiceState(
 			return serviceStates, nil // all services are in the target state
 		}
 	}
+}
+
+func WaitServiceState(
+	ctx context.Context,
+	provider client.Provider,
+	targetState defangv1.ServiceState,
+	projectName string,
+	etag types.ETag,
+	services []string,
+) (ServiceStates, error) {
+	term.Debugf("waiting for services %v to reach state %s\n", services, targetState) // TODO: don't print in Go-routine
+	return WatchServiceState(ctx, provider, targetState, projectName, etag, services, func(serviceStates ServiceStates) (bool, error) {
+		return allInState(targetState, serviceStates), nil
+	})
 }
 
 func allInState(targetState defangv1.ServiceState, serviceStates ServiceStates) bool {
