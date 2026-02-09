@@ -141,7 +141,7 @@ var cdListCmd = &cobra.Command{
 			// FIXME: this needs auth because it spawns the CD task
 			return cli.CdCommandAndTail(cmd.Context(), session.Provider, "", global.Verbose, client.CdCommandList, global.Client)
 		} else {
-			return cli.CdListFromStorage(cmd.Context(), session.Provider, all)
+			return cli.CdListFromStorage(cmd.Context(), session.Provider, all || global.Verbose)
 		}
 	},
 }
