@@ -10,7 +10,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -133,6 +132,13 @@ func SplitProjectStack(name string) (projectName string, stackName string) {
 	return projectName, stackName
 }
 
+type StackLineItem struct {
+	Project   string
+	Stack     string
+	Workspace string
+	Region    string
+}
+
 func CdListFromStorage(ctx context.Context, provider client.Provider, allRegions bool) error {
 	term.Debug("Running CD list")
 	if dryrun.DoDryRun {
@@ -144,9 +150,14 @@ func CdListFromStorage(ctx context.Context, provider client.Provider, allRegions
 		return err
 	}
 
-	var stacks []state.StackInfo
+	var stacks []StackLineItem
 	for stackInfo := range stacksIter {
-		stacks = append(stacks, *stackInfo)
+		stacks = append(stacks, StackLineItem{
+			Project:   stackInfo.Project,
+			Stack:     stackInfo.Name,
+			Workspace: stackInfo.Workspace,
+			Region:    stackInfo.Region,
+		})
 	}
 
 	if len(stacks) == 0 {
