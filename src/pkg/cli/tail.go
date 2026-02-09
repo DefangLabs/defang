@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"net"
 	"os"
 	"regexp"
@@ -234,13 +235,13 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 
 	term.Debug("Tail request:", tailRequest)
 
-	serverStream, err := provider.QueryLogs(ctx, tailRequest)
+	logs, err := provider.QueryLogs(ctx, tailRequest)
 	if err != nil {
 		return err
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel() // to ensure we close the stream and clean-up this context
+	defer cancel() // to ensure we clean-up this context
 
 	spin := spinner.New()
 	doSpinner := !options.Raw && term.StdoutCanColor() && term.IsTerminal()
@@ -293,7 +294,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 		}
 	}
 
-	return receiveLogs(ctx, provider, projectName, tailRequest, serverStream, &options, doSpinner, handler)
+	return receiveLogs(ctx, provider, projectName, tailRequest, logs, &options, doSpinner, handler)
 }
 
 func makeHeadBookendOptions(options *TailOptions, firstLogTime time.Time) *TailOptions {
@@ -332,29 +333,33 @@ func printTailBookend(options *TailOptions, lastLogTime time.Time) {
 	}
 }
 
-func receiveLogs(ctx context.Context, provider client.Provider, projectName string, tailRequest *defangv1.TailRequest, serverStream client.ServerStream[defangv1.TailResponse], options *TailOptions, doSpinner bool, handler LogEntryHandler) error {
-	safeCloser := NewSafeCloser(serverStream)
-	go func() {
-		<-ctx.Done()
-		safeCloser.Close()
-	}()
+func receiveLogs(ctx context.Context, provider client.Provider, projectName string, tailRequest *defangv1.TailRequest, logs iter.Seq2[*defangv1.TailResponse, error], options *TailOptions, doSpinner bool, handler LogEntryHandler) error {
+	next, stop := iter.Pull2(logs)
+	defer stop()
 
 	headBookendPrinted := false
 	lastLogTime := time.Time{}
 	skipDuplicate := false
-	var err error
 	for {
-		if !serverStream.Receive() {
-			if errors.Is(serverStream.Err(), context.Canceled) || errors.Is(serverStream.Err(), context.DeadlineExceeded) {
-				return &CancelError{TailOptions: *options, error: serverStream.Err(), ProjectName: projectName}
+		msg, err, ok := next()
+		if !ok {
+			// Iterator finished normally
+			if options.PrintBookends {
+				printTailBookend(options, lastLogTime)
 			}
-			if errors.Is(serverStream.Err(), io.EOF) {
-				return serverStream.Err()
+			return nil
+		}
+		if err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return &CancelError{TailOptions: *options, error: err, ProjectName: projectName}
+			}
+			if errors.Is(err, io.EOF) {
+				return err
 			}
 
-			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
-			if isTransientError(serverStream.Err()) {
-				term.Debug("Disconnected:", serverStream.Err())
+			// Reconnect on transient errors
+			if isTransientError(err) {
+				term.Debug("Disconnected:", err)
 				var spaces int
 				if !options.Raw {
 					spaces, _ = term.Warnf("Reconnecting...\r") // overwritten below
@@ -363,12 +368,13 @@ func receiveLogs(ctx context.Context, provider client.Provider, projectName stri
 					return err
 				}
 				tailRequest.Since = timestamppb.New(options.Since)
-				serverStream, err = provider.QueryLogs(ctx, tailRequest)
+				stop() // stop the old iterator
+				newLogs, err := provider.QueryLogs(ctx, tailRequest)
 				if err != nil {
 					term.Debug("Reconnect failed:", err)
 					return err
 				}
-				safeCloser.Swap(serverStream) // closes the old stream
+				next, stop = iter.Pull2(newLogs)
 				if !options.Raw {
 					term.Printf("%*s", spaces, "\r") // clear the "reconnecting" message
 				}
@@ -376,15 +382,8 @@ func receiveLogs(ctx context.Context, provider client.Provider, projectName stri
 				continue
 			}
 
-			if serverStream.Err() == nil { // returns nil on EOF
-				if options.PrintBookends {
-					printTailBookend(options, lastLogTime)
-				}
-				return nil
-			}
-			return serverStream.Err()
+			return err
 		}
-		msg := serverStream.Msg()
 
 		if msg == nil {
 			continue

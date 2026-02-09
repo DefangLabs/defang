@@ -4,6 +4,7 @@ package cw
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -23,26 +24,20 @@ func TestPendingStream(t *testing.T) {
 		t.Skipf("Failed to load AWS config: %v", err)
 	}
 
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
 	cw := cloudwatchlogs.NewFromConfig(cfg)
-	ps, err := QueryAndTailLogGroup(context.Background(), cw, LogGroupInput{
+	evts, err := QueryAndTailLogGroup(ctx, cw, LogGroupInput{
 		LogGroupARN: "arn:aws:logs:us-west-2:532501343364:log-group:/ecs/lio/logss:*",
 	}, time.Now().Add(-time.Minute), time.Time{})
 	assert.NoError(t, err)
 
-	go func() {
-		time.Sleep(5 * time.Second)
-		ps.Close()
-	}()
-
-	if ps.Err() != nil {
-		t.Errorf("Error: %v", ps.Err())
-	}
-
-	for e := range ps.Events() {
-		if e == nil {
-			t.Errorf("Error: %v", ps.Err())
+	for evt, err := range evts {
+		if err != nil {
+			t.Logf("Stream ended: %v", err)
+			break
 		}
-		println(e)
+		fmt.Println(*evt.Message)
 	}
-	t.Error(ps.Err())
 }

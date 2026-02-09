@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"io"
+	"iter"
 	"testing"
 	"time"
 
@@ -18,15 +19,15 @@ type mockTailAndMonitorProvider struct {
 	getDeploymentStatusErr error
 }
 
-func (m *mockTailAndMonitorProvider) GetDeploymentStatus(ctx context.Context) error {
+func (m *mockTailAndMonitorProvider) GetDeploymentStatus(ctx context.Context) (bool, error) {
 	if err := ctx.Err(); err != nil {
-		return err
+		return false, err
 	}
-	return m.getDeploymentStatusErr
+	return false, m.getDeploymentStatusErr
 }
 
-func (m *mockTailAndMonitorProvider) QueryLogs(ctx context.Context, r *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	return client.NewMockWaitStream[defangv1.TailResponse](), ctx.Err()
+func (m *mockTailAndMonitorProvider) QueryLogs(ctx context.Context, r *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
+	return client.ServerStreamIterCtx[defangv1.TailResponse](ctx, client.NewMockWaitStream[defangv1.TailResponse]()), ctx.Err()
 }
 
 func (m *mockTailAndMonitorProvider) DelayBeforeRetry(ctx context.Context) error {

@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"iter"
 	"reflect"
 	"sync/atomic"
 	"testing"
@@ -43,7 +44,7 @@ func (m *mockSubscribeServerStream) Receive() bool {
 func (m *mockSubscribeProvider) Subscribe(
 	_ context.Context,
 	req *defangv1.SubscribeRequest,
-) (client.ServerStream[defangv1.SubscribeResponse], error) {
+) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {
 	m.reqs = append(m.reqs, req)
 
 	resps, ok := m.resps[req.Etag]
@@ -51,7 +52,7 @@ func (m *mockSubscribeProvider) Subscribe(
 		panic("unexpected etag; not in resps map")
 	}
 
-	return &mockSubscribeServerStream{MockSubscribeServerStream: resps}, nil
+	return client.ServerStreamIter[defangv1.SubscribeResponse](&mockSubscribeServerStream{MockSubscribeServerStream: resps}), nil
 }
 
 func TestWaitServiceState(t *testing.T) {
@@ -302,8 +303,8 @@ type mockSubscribeProviderForReconnectTest struct {
 func (m *mockSubscribeProviderForReconnectTest) Subscribe(
 	_ context.Context,
 	_ *defangv1.SubscribeRequest,
-) (client.ServerStream[defangv1.SubscribeResponse], error) {
-	return m.stream, nil
+) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {
+	return client.ServerStreamIter[defangv1.SubscribeResponse](m.stream), nil
 }
 
 func TestWaitServiceStateStreamReceive(t *testing.T) {

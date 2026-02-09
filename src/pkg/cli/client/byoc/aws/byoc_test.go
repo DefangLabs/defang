@@ -10,12 +10,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -105,12 +104,15 @@ var testDir embed.FS
 var expectedDir embed.FS
 
 func TestSubscribe(t *testing.T) {
-	t.Skip("Pending test")
+	t.Skip("Pending test") // TODO: requires CW mock or real AWS credentials
 	tests, err := testDir.ReadDir("testdata")
 	if err != nil {
 		t.Fatalf("failed to load ecs events test files: %v", err)
 	}
 	for _, tt := range tests {
+		if !strings.HasSuffix(tt.Name(), ".json") {
+			continue
+		}
 		t.Run(tt.Name(), func(t *testing.T) {
 			start := strings.LastIndex(tt.Name(), "-")
 			end := strings.LastIndex(tt.Name(), ".")
@@ -120,60 +122,53 @@ func TestSubscribe(t *testing.T) {
 			name := tt.Name()[:start]
 			etag := tt.Name()[start+1 : end]
 
-			byoc := &ByocAws{}
-
-			resp, err := byoc.Subscribe(t.Context(), &defangv1.SubscribeRequest{
-				Etag:     etag,
-				Services: []string{"api", "web"},
-			})
-			if err != nil {
-				t.Fatalf("Subscribe() failed: %v", err)
-			}
-
-			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-
-				filename := filepath.Join("testdata", name+".events")
-				ef, _ := expectedDir.ReadFile(filename)
-				dec := json.NewDecoder(bytes.NewReader(ef))
-
-				for {
-					if !resp.Receive() {
-						if resp.Err() != nil {
-							t.Errorf("Receive() failed: %v", resp.Err())
-						}
-						break
-					}
-					msg := resp.Msg()
-					var expected defangv1.SubscribeResponse
-					if err := dec.Decode(&expected); err == io.EOF {
-						t.Errorf("unexpected message: %v", msg)
-					} else if err != nil {
-						t.Errorf("error unmarshaling expected ECS event: %v", err)
-					} else if msg.Name != expected.Name || msg.Status != expected.Status || msg.State != expected.State {
-						t.Errorf("expected message-, got+\n-%v\n+%v", &expected, msg)
-					}
-				}
-			}()
-
 			data, err := testDir.ReadFile(filepath.Join("testdata", tt.Name()))
 			if err != nil {
 				t.Fatalf("failed to read test file: %v", err)
 			}
+
+			// Build CW log events from the ECS event JSON lines
+			ecsLogGroup := "arn:aws:logs:us-west-2:123:log-group:/ecs"
 			lines := bufio.NewScanner(bytes.NewReader(data))
+			var cwEvents []cw.LogEvent
+			var ts int64
 			for lines.Scan() {
-				ecsEvt, err := ecs.ParseECSEvent([]byte(lines.Text()))
-				if err != nil {
-					t.Fatalf("error parsing ECS event: %v", err)
-				}
-
-				byoc.HandleECSEvent(ecsEvt)
+				line := lines.Text()
+				cwEvents = append(cwEvents, cw.LogEvent{
+					LogGroupIdentifier: &ecsLogGroup,
+					LogStreamName:      awssdk.String("some-stream"),
+					Message:            awssdk.String(line),
+					Timestamp:          &ts,
+				})
 			}
-			resp.Close()
 
-			wg.Wait()
+			// Feed through parseSubscribeEvents
+			evtIter := func(yield func(cw.LogEvent, error) bool) {
+				for _, evt := range cwEvents {
+					if !yield(evt, nil) {
+						return
+					}
+				}
+			}
+
+			filename := filepath.Join("testdata", name+".events")
+			ef, _ := expectedDir.ReadFile(filename)
+			dec := json.NewDecoder(bytes.NewReader(ef))
+
+			for msg, err := range parseSubscribeEvents(evtIter, etag, []string{"api", "web"}) {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+					break
+				}
+				var expected defangv1.SubscribeResponse
+				if err := dec.Decode(&expected); err == io.EOF {
+					t.Errorf("unexpected message: %v", msg)
+				} else if err != nil {
+					t.Errorf("error unmarshaling expected event: %v", err)
+				} else if msg.Name != expected.Name || msg.Status != expected.Status || msg.State != expected.State {
+					t.Errorf("expected message-, got+\n-%v\n+%v", &expected, msg)
+				}
+			}
 		})
 	}
 }

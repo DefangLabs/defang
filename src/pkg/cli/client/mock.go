@@ -3,9 +3,11 @@ package client
 import (
 	"context"
 	"errors"
+	"iter"
 	"net/http"
 	"net/url"
 	"path"
+	"sync"
 	"sync/atomic"
 
 	"github.com/DefangLabs/defang/src/pkg/dns"
@@ -16,6 +18,12 @@ import (
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+// MockIter creates an iter.Seq2 from a pre-populated list of responses and a final error.
+// A nil response in the list acts as a stream-end marker.
+func MockIter[T any](resps []*T, finalErr error) iter.Seq2[*T, error] {
+	return ServerStreamIter[T](&MockServerStream[T]{Resps: resps, Error: finalErr})
+}
 
 type MockProvider struct {
 	Provider
@@ -89,14 +97,16 @@ func (m *MockServerStream[T]) Err() error {
 // returns messages and errors from channels. It blocks until the channels are
 // closed or an error is received. It is used for testing purposes.
 type MockWaitStream[T any] struct {
-	msg   *T
-	err   error
-	msgCh chan *T
+	msg       *T
+	err       error
+	msgCh     chan *T
+	done      chan struct{}
+	closeOnce sync.Once
 }
 
 // NewMockWaitStream returns a ServerStream that will block until closed.
 func NewMockWaitStream[T any]() *MockWaitStream[T] {
-	return &MockWaitStream[T]{msgCh: make(chan *T)}
+	return &MockWaitStream[T]{msgCh: make(chan *T), done: make(chan struct{})}
 }
 
 func (m *MockWaitStream[T]) Send(msg *T, err error) {
@@ -105,9 +115,13 @@ func (m *MockWaitStream[T]) Send(msg *T, err error) {
 }
 
 func (m *MockWaitStream[T]) Receive() bool {
-	msg, ok := <-m.msgCh
-	m.msg = msg
-	return ok && msg != nil
+	select {
+	case msg, ok := <-m.msgCh:
+		m.msg = msg
+		return ok && msg != nil
+	case <-m.done:
+		return false
+	}
 }
 
 func (m *MockWaitStream[T]) Msg() *T {
@@ -119,7 +133,7 @@ func (m *MockWaitStream[T]) Err() error {
 }
 
 func (m *MockWaitStream[T]) Close() error {
-	close(m.msgCh)
+	m.closeOnce.Do(func() { close(m.done) })
 	return nil
 }
 

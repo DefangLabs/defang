@@ -18,9 +18,9 @@ func WaitForCdTaskExit(ctx context.Context, provider client.Provider) error {
 	for {
 		select {
 		case <-ticker.C:
-			err := provider.GetDeploymentStatus(ctx)
+			done, err := provider.GetDeploymentStatus(ctx)
 			// End condition: EOF indicates that the task has completed successfully
-			if errors.Is(err, io.EOF) {
+			if done || errors.Is(err, io.EOF) {
 				return nil
 			}
 			// Retry on transient errors
@@ -28,10 +28,10 @@ func WaitForCdTaskExit(ctx context.Context, provider client.Provider) error {
 				// If it's a transient error, we can retry at the next tick
 				continue
 			}
-			// nil means the task is still running and we continue polling
 			if err != nil {
 				return err
 			}
+			// nil means the task is still running and we continue polling
 		case <-ctx.Done(): // Stop the loop when the context is cancelled
 			return ctx.Err()
 		}

@@ -207,19 +207,19 @@ func (b *ByocDo) deploy(ctx context.Context, req *client.DeployRequest, cmd stri
 	}, nil
 }
 
-func (b *ByocDo) GetDeploymentStatus(ctx context.Context) error {
+func (b *ByocDo) GetDeploymentStatus(ctx context.Context) (bool, error) {
 	deploymentInfo, _, err := b.client.Apps.GetDeployment(ctx, b.cdAppID, b.cdDeploymentID)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	switch deploymentInfo.GetPhase() {
 	default:
-		return nil // pending
+		return false, nil // pending
 	case godo.DeploymentPhase_Active:
-		return io.EOF
+		return true, io.EOF // success; EOF returned for backward compatibility
 	case godo.DeploymentPhase_Error, godo.DeploymentPhase_Canceled:
-		return client.ErrDeploymentFailed{Message: deploymentInfo.Cause}
+		return true, client.ErrDeploymentFailed{Message: deploymentInfo.Cause}
 	}
 }
 
@@ -380,7 +380,7 @@ func (b *ByocDo) PutConfig(ctx context.Context, config *defangv1.PutConfigReques
 	return err
 }
 
-func (b *ByocDo) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+func (b *ByocDo) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
 	var appID, deploymentID string
 
 	if req.Etag != "" && req.Etag == b.cdEtag {
@@ -450,7 +450,11 @@ func (b *ByocDo) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (clie
 				return nil, err
 			}
 
-			return newByocServerStream(ctx, appLiveURL, req.Etag)
+			stream, err := newByocServerStream(ctx, appLiveURL, req.Etag)
+			if err != nil {
+				return nil, err
+			}
+			return client.ServerStreamIter[defangv1.TailResponse](stream), nil
 		}
 
 		// Sleep for 10 seconds so we dont spam the DO API
@@ -500,19 +504,20 @@ func (b *ByocDo) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
 	}, nil
 }
 
-func (b *ByocDo) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
+func (b *ByocDo) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {
 	if req.Etag != b.cdEtag || b.cdAppID == "" {
 		return nil, errors.ErrUnsupported // TODO: fetch the deployment ID for the given etag
 	}
 	ctx, cancel := context.WithCancel(ctx) // canceled by subscribeStream.Close()
-	return &subscribeStream{
+	s := &subscribeStream{
 		appID:        b.cdAppID,
 		b:            b,
 		deploymentID: b.cdDeploymentID,
 		ctx:          ctx,
 		cancel:       cancel,
 		queue:        make(chan *defangv1.SubscribeResponse, 10),
-	}, nil
+	}
+	return client.ServerStreamIter[defangv1.SubscribeResponse](s), nil
 }
 
 type subscribeStream struct {

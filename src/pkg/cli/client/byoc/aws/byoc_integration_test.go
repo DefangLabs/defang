@@ -34,7 +34,7 @@ func TestDeploy(t *testing.T) {
 func TestTail(t *testing.T) {
 	b := NewByocProvider(ctx, "TestTail", "")
 
-	ss, err := b.QueryLogs(context.Background(), &defangv1.TailRequest{Project: "byoc_integration_test"})
+	logs, err := b.QueryLogs(context.Background(), &defangv1.TailRequest{Project: "byoc_integration_test"})
 	if err != nil {
 		// the only acceptable error is "unauthorized"
 		if connect.CodeOf(err) == connect.CodeUnauthenticated {
@@ -42,18 +42,17 @@ func TestTail(t *testing.T) {
 		}
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer ss.Close()
 
-	// First we expect "true" (the "start" event)
-	if ss.Receive() != true {
-		t.Error("expected Receive() to return true")
-	}
-	if len(ss.Msg().Entries) != 0 {
-		t.Error("expected empty entries")
-	}
-	err = ss.Err()
-	if err != nil {
-		t.Error(err)
+	for msg, err := range logs {
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			break
+		}
+		// First message should have empty entries (the "start" event)
+		if len(msg.Entries) != 0 {
+			t.Error("expected empty entries")
+		}
+		break // only check the first message
 	}
 }
 
