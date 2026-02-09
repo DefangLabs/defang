@@ -9,6 +9,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
@@ -28,7 +29,7 @@ func (mp ErrMultipleProjects) Error() string {
 
 type ProjectBackend interface {
 	CdCommand(context.Context, client.CdCommandRequest) (types.ETag, error)
-	CdList(context.Context, bool) (iter.Seq[string], error)
+	CdList(context.Context, bool) (iter.Seq[*state.StackInfo], error)
 	GetPrivateDomain(projectName string) string
 	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 }
@@ -101,9 +102,8 @@ func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) 
 		return "", fmt.Errorf("no cloud projects found: %w", err)
 	}
 	var projectNames []string
-	for name := range stacks {
-		projectName := strings.Split(name, "/")[0] // Remove the stack name
-		projectNames = append(projectNames, projectName)
+	for stack := range stacks {
+		projectNames = append(projectNames, stack.Project)
 	}
 
 	if len(projectNames) == 0 {

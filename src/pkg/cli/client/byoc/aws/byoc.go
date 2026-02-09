@@ -18,6 +18,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
@@ -869,7 +870,7 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	return nil
 }
 
-func (b *ByocAws) CdList(ctx context.Context, allRegions bool) (iter.Seq[string], error) {
+func (b *ByocAws) CdList(ctx context.Context, allRegions bool) (iter.Seq[*state.StackInfo], error) {
 	if allRegions {
 		s3Client, err := newS3Client(ctx, b.driver.Region)
 		if err != nil {

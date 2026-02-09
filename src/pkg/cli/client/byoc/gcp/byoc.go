@@ -277,7 +277,7 @@ func (o gcpObj) Size() int64 {
 	return o.obj.Size
 }
 
-func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[string], error) {
+func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[*state.StackInfo], error) {
 	bucketName, err := b.driver.GetBucketWithPrefix(ctx, DefangCDProjectName)
 	if err != nil {
 		return nil, annotateGcpError(err)
@@ -297,21 +297,28 @@ func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[string
 	if err != nil {
 		return nil, annotateGcpError(err)
 	}
-	return func(yield func(string) bool) {
+	return func(yield func(*state.StackInfo) bool) {
 		for obj, err := range seq {
 			if err != nil {
 				term.Debugf("Error listing object in bucket %s: %v", bucketName, annotateGcpError(err))
 				continue
 			}
-			stack, err := state.ParsePulumiStateFile(ctx, gcpObj{obj}, bucketName, objLoader)
+			st, err := state.ParsePulumiStateFile(ctx, gcpObj{obj}, bucketName, objLoader)
 			if err != nil {
 				term.Debugf("Skipping %q in bucket %s: %v", obj.Name, bucketName, annotateGcpError(err))
 				continue
 			}
-			if stack != nil {
-				if !yield(stack.String()) {
-					break
-				}
+			if st == nil {
+				continue
+			}
+			stack := &state.StackInfo{
+				Name:      st.Name,
+				Project:   st.Project,
+				Workspace: string(st.DefangOrg),
+				Region:    b.driver.GetRegion(),
+			}
+			if !yield(stack) {
+				break
 			}
 		}
 	}, nil

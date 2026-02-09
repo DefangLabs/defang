@@ -22,6 +22,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	awsbyoc "github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
@@ -245,7 +246,7 @@ func (b *ByocDo) CdCommand(ctx context.Context, req client.CdCommandRequest) (st
 	return etag, nil
 }
 
-func (b *ByocDo) CdList(ctx context.Context, _allRegions bool) (iter.Seq[string], error) {
+func (b *ByocDo) CdList(ctx context.Context, _allRegions bool) (iter.Seq[*state.StackInfo], error) {
 	s3client, err := b.driver.CreateS3Client()
 	if err != nil {
 		return nil, err
@@ -256,7 +257,26 @@ func (b *ByocDo) CdList(ctx context.Context, _allRegions bool) (iter.Seq[string]
 		return nil, err
 	}
 
-	return awsbyoc.ListPulumiStacks(ctx, s3client, bucketName)
+	stacks, err := awsbyoc.ListPulumiStacks(ctx, s3client, bucketName)
+	if err != nil {
+		return nil, err
+	}
+	return func(yield func(*state.StackInfo) bool) {
+		for st := range stacks {
+			if st == nil {
+				continue
+			}
+			info := &state.StackInfo{
+				Project:   st.Project,
+				Name:      st.Name,
+				Workspace: string(st.DefangOrg),
+				Region:    string(b.driver.Region),
+			}
+			if !yield(info) {
+				break
+			}
+		}
+	}, nil
 }
 
 func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {

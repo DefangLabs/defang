@@ -10,6 +10,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -138,20 +139,17 @@ func CdListFromStorage(ctx context.Context, provider client.Provider, allRegions
 		return dryrun.ErrDryRun
 	}
 
-	stacks, err := provider.CdList(ctx, allRegions)
+	stacksIter, err := provider.CdList(ctx, allRegions)
 	if err != nil {
 		return err
 	}
 
-	var count int
-	for stackInfo := range stacks {
-		count++
-		if !allRegions {
-			stackInfo, _, _ = strings.Cut(stackInfo, " ") // remove extra info like "{workspace} [region]"
-		}
-		term.Println(" -", stackInfo) // TODO: json output mode
+	var stacks []state.StackInfo
+	for stackInfo := range stacksIter {
+		stacks = append(stacks, *stackInfo)
 	}
-	if count == 0 {
+
+	if len(stacks) == 0 {
 		accountInfo, err := provider.AccountInfo(ctx)
 		if err != nil {
 			return err
@@ -161,7 +159,8 @@ func CdListFromStorage(ctx context.Context, provider client.Provider, allRegions
 		}
 		term.Printf("No projects found in %v\n", accountInfo)
 	}
-	return nil
+
+	return term.Table(stacks, "Project", "Stack", "Workspace", "Region")
 }
 
 func GetStatesAndEventsUploadUrls(ctx context.Context, projectName string, provider client.Provider, fabric client.FabricClient) (statesUrl string, eventsUrl string, err error) {

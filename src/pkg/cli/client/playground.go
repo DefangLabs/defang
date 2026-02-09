@@ -7,6 +7,7 @@ import (
 	"iter"
 	"os"
 
+	byocState "github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -115,7 +116,7 @@ func (g *PlaygroundProvider) SetUpCD(ctx context.Context) error {
 	return errors.New("this command is not valid for the Defang playground; did you forget --stack or --provider?")
 }
 
-func (g *PlaygroundProvider) CdList(context.Context, bool) (iter.Seq[string], error) {
+func (g *PlaygroundProvider) CdList(context.Context, bool) (iter.Seq[*byocState.StackInfo], error) {
 	return nil, errors.New("this command is not valid for the Defang playground; did you forget --stack or --provider?")
 }
 
