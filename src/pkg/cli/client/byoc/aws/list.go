@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -67,7 +68,7 @@ func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string)
 			if obj.Key == nil || obj.Size == nil {
 				continue
 			}
-			stack, err := byoc.ParsePulumiStateFile(ctx, s3Obj{obj}, bucketName, func(ctx context.Context, bucket, path string) ([]byte, error) {
+			stack, err := state.ParsePulumiStateFile(ctx, s3Obj{obj}, bucketName, func(ctx context.Context, bucket, path string) ([]byte, error) {
 				getObjectOutput, err := s3client.GetObject(ctx, &s3.GetObjectInput{
 					Bucket: &bucket,
 					Key:    &path,
