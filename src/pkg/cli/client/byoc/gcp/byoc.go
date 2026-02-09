@@ -794,6 +794,7 @@ func LogEntriesToString(logEntries []*loggingpb.LogEntry) string {
 }
 
 func (b *ByocGcp) TearDownCD(ctx context.Context) error {
+	// term.Warn("Deleting Defang CD; currently existing stacks or configs will not be deleted, but they will be orphaned and they will need to be cleaned up manually")
 	// FIXME: implement
 	return client.ErrNotImplemented("GCP TearDown")
 }

@@ -834,6 +834,7 @@ func (b *ByocAws) UpdateServiceInfo(ctx context.Context, si *defangv1.ServiceInf
 }
 
 func (b *ByocAws) TearDownCD(ctx context.Context) error {
+	term.Warn("Deleting the Defang CD cluster; currently existing stacks or configs will not be deleted, but they will be orphaned and they will need to be cleaned up manually")
 	return b.driver.TearDown(ctx)
 }
 
