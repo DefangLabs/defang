@@ -64,7 +64,8 @@ func (DefaultToolCLI) ComposeDown(ctx context.Context, projectName string, fabri
 }
 
 func (DefaultToolCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
-	return client.LoadProjectNameWithFallback(ctx, loader, provider)
+	projectName, _, err := loader.LoadProjectName(ctx)
+	return projectName, err
 }
 
 func (DefaultToolCLI) ConfigDelete(ctx context.Context, projectName string, provider client.Provider, name string) error {
