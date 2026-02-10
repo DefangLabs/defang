@@ -49,3 +49,8 @@ func FromArn(arn string) Region {
 	}
 	return Region(parts[3])
 }
+
+func Values() []Region {
+	var zero Region
+	return zero.Values()
+}

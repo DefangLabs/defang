@@ -25,10 +25,6 @@ var ErrAWSNoConnection = errors.New("no connect to AWS service quotas")
 var ErrGPUQuotaZero = errors.New("no GPUs enabled. To resolve see https://s.defang.io/deploy-gpu")
 var ErrNoQuotasReceived = errors.New("no service quotas received")
 
-func NewServiceQuotasClient(cfg aws.Config) *servicequotas.Client {
-	return servicequotas.NewFromConfig(cfg)
-}
-
 func hasGPUQuota(ctx context.Context) (bool, error) {
 	if quotaClient == nil {
 		return false, ErrAWSNoConnection

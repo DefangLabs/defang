@@ -36,11 +36,11 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/servicequotas"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
@@ -166,7 +166,7 @@ func (b *ByocAws) SetUpCD(ctx context.Context) error {
 	// Delete default SecurityGroup rules to comply with stricter AWS account security policies
 	if sgId := b.driver.DefaultSecurityGroupID; sgId != "" {
 		term.Debugf("Cleaning up default Security Group rules (%s)", sgId)
-		if err := b.driver.RevokeDefaultSecurityGroupRules(ctx, sgId); err != nil {
+		if err := aws.RevokeDefaultSecurityGroupRules(ctx, sgId, b.driver.CDRegion); err != nil {
 			term.Warnf("Could not clean up default Security Group rules: %v", err)
 		}
 	}
@@ -195,7 +195,7 @@ func (b *ByocAws) Preview(ctx context.Context, req *client.DeployRequest) (*defa
 }
 
 func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd string) (*defangv1.DeployResponse, error) {
-	cfg, err := b.driver.LoadConfig(ctx)
+	appCfg, err := b.driver.LoadConfigForApp(ctx)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
@@ -210,7 +210,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		return nil, err
 	}
 
-	quotaClient = NewServiceQuotasClient(cfg)
+	quotaClient = servicequotas.NewFromConfig(appCfg)
 	if err = validateGPUResources(ctx, project); err != nil {
 		return nil, err
 	}
@@ -309,7 +309,7 @@ func (b *ByocAws) putDockerHubSecret(ctx context.Context, projectName string, us
 		return "", err
 	}
 
-	cfg, err := b.driver.LoadConfig(ctx)
+	cfg, err := b.driver.LoadConfigForCD(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -357,7 +357,7 @@ func (b *ByocAws) checkRequiresDockerHubToken(ctx context.Context, project *comp
 			tag = "latest"
 		}
 
-		found, err := b.driver.CheckImageExistOnPublicECR(ctx, ecrRepo, tag)
+		found, err := aws.CheckImageExistOnPublicECR(ctx, ecrRepo, tag)
 		if err != nil {
 			term.Debugf("Error checking image %q on Public ECR: %v, assuming credentials needed", image, err)
 			found = false
@@ -380,7 +380,7 @@ func (b *ByocAws) checkRequiresDockerHubToken(ctx context.Context, project *comp
 }
 
 func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string, error) {
-	cfg, err := b.driver.LoadConfig(ctx)
+	cfg, err := b.driver.LoadConfigForApp(ctx)
 	if err != nil {
 		return "", AnnotateAwsError(err)
 	}
@@ -413,7 +413,7 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 }
 
 func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
-	cfg, err := b.driver.LoadConfig(ctx)
+	cfg, err := b.driver.LoadConfigForApp(ctx)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
@@ -433,7 +433,7 @@ func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 
 func (b *ByocAws) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
 	// Use STS to get the account ID
-	cfg, err := b.driver.LoadConfig(ctx)
+	cfg, err := b.driver.LoadConfigForApp(ctx)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
@@ -470,14 +470,13 @@ func (b *ByocAws) bucketName() string {
 }
 
 func (b *ByocAws) environment(projectName string) (map[string]string, error) {
-	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
-	defangStateUrl := fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.bucketName(), region)
+	defangStateUrl := fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.bucketName(), b.driver.CDRegion)
 	pulumiBackendKey, pulumiBackendValue, err := byoc.GetPulumiBackend(defangStateUrl)
 	if err != nil {
 		return nil, err
 	}
 	env := map[string]string{
-		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
+		"AWS_REGION":                 string(b.driver.Region),
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_JSON":                os.Getenv("DEFANG_JSON"),
 		"DEFANG_ORG":                 string(b.TenantLabel), // Keep this as DEFANG_ORG for backward compatibility CD depends on this variable name
@@ -550,7 +549,7 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn,
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging
-		debugEnv := []string{"AWS_REGION=" + b.driver.Region.String()}
+		debugEnv := []string{"AWS_REGION=" + string(b.driver.Region)}
 		if awsProfile := os.Getenv("AWS_PROFILE"); awsProfile != "" {
 			debugEnv = append(debugEnv, "AWS_PROFILE="+awsProfile)
 		}
@@ -581,7 +580,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 	if bucketName == "" {
 		if err := b.driver.FillOutputs(ctx); err != nil {
 			// FillOutputs might fail if the stack is not created yet; return empty update in that case
-			var cfnErr *cfn.ErrStackNotFoundException
+			var cfnErr *cfn.ErrStackNotFound
 			if errors.As(err, &cfnErr) {
 				term.Debugf("FillOutputs: %v", err)
 				return nil, nil // no bucket = no services yet
@@ -591,7 +590,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 		bucketName = b.bucketName()
 	}
 
-	cfg, err := b.driver.LoadConfig(ctx)
+	cfg, err := b.driver.LoadConfigForCD(ctx)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
@@ -686,12 +685,6 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		term.Warnf("Unable to show CD logs: %v", err) // TODO: could skip this warning if the user wasn't asking for CD logs
 	}
 
-	var err error
-	cwClient, err := cw.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region
-	if err != nil {
-		return nil, AnnotateAwsError(err)
-	}
-
 	// How to tail multiple tasks/services at once?
 	//  * Etag is invalid:		treat Etag as CD task ID and tail only that task's logs
 	//  * No Etag, no services:	tail all tasks/services
@@ -702,10 +695,10 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	etag, err := types.ParseEtag(req.Etag)
 	if err != nil && req.Etag != "" {
 		// Assume invalid "etag" is the task ID of the CD task
-		tailStream, err = b.queryCdLogs(ctx, cwClient, req)
+		tailStream, err = b.queryCdLogs(ctx, req)
 		// no need to filter events by etag because we only show logs from the specified task ID
 	} else {
-		tailStream, err = b.queryLogs(ctx, cwClient, req)
+		tailStream, err = b.queryLogs(ctx, req)
 	}
 
 	if err != nil {
@@ -714,12 +707,16 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	return newByocServerStream(tailStream, etag, req.Services, b, b), nil
 }
 
-func (b *ByocAws) queryCdLogs(ctx context.Context, cwClient *cloudwatchlogs.Client, req *defangv1.TailRequest) (cw.LiveTailStream, error) {
-	var err error
+func (b *ByocAws) queryCdLogs(ctx context.Context, req *defangv1.TailRequest) (cw.LiveTailStream, error) {
+	cwClient, err := cw.NewCloudWatchLogsClient(ctx, b.driver.CDRegion)
+	if err != nil {
+		return nil, AnnotateAwsError(err)
+	}
 	b.cdTaskArn, err = b.driver.GetTaskArn(req.Etag) // only fails on missing task ID
 	if err != nil {
 		return nil, err
 	}
+
 	if req.Follow {
 		return b.driver.TailTaskID(ctx, cwClient, req.Etag)
 	} else {
@@ -729,7 +726,7 @@ func (b *ByocAws) queryCdLogs(ctx context.Context, cwClient *cloudwatchlogs.Clie
 	}
 }
 
-func (b *ByocAws) queryLogs(ctx context.Context, cwClient *cloudwatchlogs.Client, req *defangv1.TailRequest) (cw.LiveTailStream, error) {
+func (b *ByocAws) queryLogs(ctx context.Context, req *defangv1.TailRequest) (cw.LiveTailStream, error) {
 	start := timeutils.AsTime(req.Since, time.Time{})
 	end := timeutils.AsTime(req.Until, time.Time{})
 
@@ -737,72 +734,96 @@ func (b *ByocAws) queryLogs(ctx context.Context, cwClient *cloudwatchlogs.Client
 	if len(req.Services) == 1 {
 		service = req.Services[0]
 	}
-	lgis := b.getLogGroupInputs(req.Etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))
-	if req.Follow {
-		return cw.QueryAndTailLogGroups(
-			ctx,
-			cwClient,
-			start,
-			end,
-			lgis...,
-		)
-	} else {
-		evtsChan, errsChan := cw.QueryLogGroups(
-			ctx,
-			cwClient,
-			start,
-			end,
-			req.Limit,
-			lgis...,
-		)
-		if evtsChan == nil {
-			var errs []error
-			for err := range errsChan {
-				errs = append(errs, err)
-			}
-			return nil, errors.Join(errs...)
-		}
-		// TODO: any errors from errsChan should be reported but get dropped
-		return cw.NewStaticLogStream(evtsChan, func() {}), nil
-	}
-}
-
-func (b *ByocAws) makeLogGroupARN(name string) string {
-	return b.driver.MakeARN("logs", "log-group:"+name)
-}
-
-func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filter string, logType logs.LogType) []cw.LogGroupInput {
 	// Escape the filter pattern to avoid problems with the CloudWatch Logs pattern syntax
 	// See https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
 	var pattern string // TODO: add etag to filter
-	if filter != "" {
-		pattern = strconv.Quote(filter)
+	if req.Pattern != "" {
+		pattern = strconv.Quote(req.Pattern)
 	}
 
+	// Split log groups by region: CD logs are in CDRegion, app logs are in app Region
+	cdLgis := b.getCdLogGroupInputs(req.Etag, pattern, logs.LogType(req.LogType))
+	appLgis := b.getAppLogGroupInputs(req.Etag, req.Project, service, pattern, logs.LogType(req.LogType))
+
+	var streams []cw.LiveTailStream
+	if len(cdLgis) > 0 {
+		s, err := b.queryLogGroupsInRegion(ctx, b.driver.CDRegion, start, end, req.Follow, req.Limit, cdLgis)
+		if err != nil {
+			term.Warnf("Unable to query CD logs: %v", err)
+		} else {
+			streams = append(streams, s)
+		}
+	}
+	if len(appLgis) > 0 {
+		s, err := b.queryLogGroupsInRegion(ctx, b.driver.Region, start, end, req.Follow, req.Limit, appLgis)
+		if err != nil {
+			return nil, AnnotateAwsError(err)
+		}
+		streams = append(streams, s)
+	}
+	if len(streams) == 0 {
+		return nil, errors.New("no log groups to query")
+	}
+	return cw.MergeLiveTailStreams(streams...), nil
+}
+
+func (b *ByocAws) queryLogGroupsInRegion(ctx context.Context, region aws.Region, start, end time.Time, follow bool, limit int32, lgis []cw.LogGroupInput) (cw.LiveTailStream, error) {
+	cwClient, err := cw.NewCloudWatchLogsClient(ctx, region)
+	if err != nil {
+		return nil, err
+	}
+	if follow {
+		return cw.QueryAndTailLogGroups(ctx, cwClient, start, end, lgis...)
+	}
+	evtsChan, errsChan := cw.QueryLogGroups(ctx, cwClient, start, end, limit, lgis...)
+	if evtsChan == nil {
+		var errs []error
+		for err := range errsChan {
+			errs = append(errs, err)
+		}
+		return nil, errors.Join(errs...)
+	}
+	// TODO: any errors from errsChan should be reported but get dropped
+	return cw.NewStaticLogStream(evtsChan, func() {}), nil
+}
+
+func (b *ByocAws) makeAppLogGroupARN(name string) string {
+	return b.driver.MakeARN("logs", "log-group:"+name) // app region
+}
+
+func (b *ByocAws) getCdLogGroupInputs(etag types.ETag, pattern string, logType logs.LogType) []cw.LogGroupInput {
 	var groups []cw.LogGroupInput
-	// Tail CD and builds
-	if logType.Has(logs.LogTypeBuild) {
+	if logType.Has(logs.LogTypeBuild) || logType.Has(logs.LogTypeCD) {
 		if b.driver.LogGroupARN == "" {
 			term.Debug("CD stack LogGroupARN is not set; skipping CD logs")
 		} else {
+			// FIXME: filter on etag and/or projectName
 			cdTail := cw.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern}
 			// If we know the CD task ARN, only tail the logstream for that CD task; FIXME: store the task ID in the project's ProjectUpdate in S3 and use that
 			if b.cdTaskArn != nil && b.cdEtag == etag {
 				cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.cdTaskArn))}
 			}
+			term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames, pattern)
 			groups = append(groups, cdTail)
-			term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames, filter)
 		}
-		buildsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "builds")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service
-		term.Debug("Query builds logs", buildsTail.LogGroupARN, filter)
+	}
+	return groups
+}
+
+func (b *ByocAws) getAppLogGroupInputs(etag types.ETag, projectName, service, pattern string, logType logs.LogType) []cw.LogGroupInput {
+	var groups []cw.LogGroupInput
+	// Tail build logs
+	if logType.Has(logs.LogTypeBuild) {
+		buildsTail := cw.LogGroupInput{LogGroupARN: b.makeAppLogGroupARN(b.StackDir(projectName, "builds")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service
+		term.Debug("Query builds logs", buildsTail.LogGroupARN, pattern)
 		groups = append(groups, buildsTail)
-		ecsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "ecs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
-		term.Debug("Query ecs events logs", ecsTail.LogGroupARN, filter)
+		ecsTail := cw.LogGroupInput{LogGroupARN: b.makeAppLogGroupARN(b.StackDir(projectName, "ecs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
+		term.Debug("Query ecs events logs", ecsTail.LogGroupARN, pattern)
 		groups = append(groups, ecsTail)
 	}
 	// Tail services
 	if logType.Has(logs.LogTypeRun) {
-		servicesTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "logs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts
+		servicesTail := cw.LogGroupInput{LogGroupARN: b.makeAppLogGroupARN(b.StackDir(projectName, "logs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts
 		if service != "" && etag != "" {
 			servicesTail.LogStreamNamePrefix = service + "/" + service + "_" + etag
 		}

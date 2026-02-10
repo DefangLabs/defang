@@ -202,7 +202,7 @@ func (sm *manager) GetStack(ctx context.Context, opts GetStackOpts) (*Parameters
 	if opts.Default.Name != "" {
 		return sm.getSpecifiedStack(ctx, opts.Default.Name) // TODO: merge with opts.Default?
 	}
-	// use --provider if available
+	// use --provider if available (legacy mode)
 	if opts.Default.Provider != client.ProviderAuto && opts.Default.Provider != "" {
 		whence := "DEFANG_PROVIDER"
 		var fromEnv client.ProviderID

@@ -3,6 +3,7 @@ package cw
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
@@ -141,6 +142,33 @@ func newEventStream(cancel func()) *eventStream {
 		cancel: cancel,
 		ch:     make(chan types.StartLiveTailResponseStream),
 	}
+}
+
+// MergeLiveTailStreams merges multiple LiveTailStreams into one.
+func MergeLiveTailStreams(streams ...LiveTailStream) LiveTailStream {
+	if len(streams) == 1 {
+		return streams[0]
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	es := newEventStream(func() {
+		cancel()
+		for _, s := range streams {
+			s.Close()
+		}
+	})
+	var wg sync.WaitGroup
+	for _, s := range streams {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			es.err = es.pipeEvents(ctx, s)
+		}()
+	}
+	go func() {
+		wg.Wait()
+		close(es.ch)
+	}()
+	return es
 }
 
 func NewStaticLogStream(ch <-chan LogEvent, cancel func()) EventStream[types.StartLiveTailResponseStream] {

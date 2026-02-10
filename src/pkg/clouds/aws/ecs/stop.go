@@ -9,7 +9,7 @@ import (
 )
 
 func (a AwsEcs) Stop(ctx context.Context, id clouds.TaskID) error {
-	cfg, err := a.LoadConfig(ctx)
+	cfg, err := a.LoadConfigForCD(ctx)
 	if err != nil {
 		return err
 	}

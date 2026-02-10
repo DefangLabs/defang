@@ -11,12 +11,12 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/clouds"
-	common "github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	awsecs "github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfnTypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/ptr"
 )
@@ -37,38 +37,84 @@ func OptionVPCAndSubnetID(ctx context.Context, vpcID, subnetID string) func(clou
 	}
 }
 
-func New(stack string, region region.Region) *AwsEcsCfn {
+func New(stack string, region aws.Region) *AwsEcsCfn {
 	if stack == "" {
 		panic("stack must be set")
 	}
 	return &AwsEcsCfn{
 		stackName: stack,
 		AwsEcs: awsecs.AwsEcs{
-			Aws:          common.Aws{Region: region},
+			Aws:          aws.Aws{Region: region},
+			CDRegion:     region, // assume CD runs in the same region as the app
 			RetainBucket: true,
 			// Spot: true,
 		},
 	}
 }
 
-func (a *AwsEcsCfn) newClient(ctx context.Context) (*cloudformation.Client, error) {
-	cfg, err := a.LoadConfig(ctx)
+func (a *AwsEcsCfn) newCloudFormationClient(ctx context.Context) (*cloudformation.Client, error) {
+	cfg, err := a.LoadConfigForCD(ctx)
 	if err != nil {
 		return nil, err
 	}
-
 	return cloudformation.NewFromConfig(cfg), nil
 }
 
+func withRegion(region aws.Region) func(*cloudformation.Options) {
+	return func(opts *cloudformation.Options) {
+		if region != "" {
+			opts.Region = string(region)
+		}
+	}
+}
+
+func (a *AwsEcsCfn) describeStacksAllRegions(ctx context.Context, cfn *cloudformation.Client) (*cloudformation.DescribeStacksOutput, error) {
+	input := &cloudformation.DescribeStacksInput{StackName: &a.stackName}
+
+	// First, try the current region of the CloudFormation client
+	var noStackErr error
+	if dso, err := cfn.DescribeStacks(ctx, input); err != nil {
+		err = annotateCfnError(err)
+		if snf := new(ErrStackNotFound); !errors.As(err, &snf) {
+			return nil, err
+		}
+		// CD stack not found in this region; try other regions before returning not found error
+		noStackErr = err
+	} else {
+		return dso, nil
+	}
+
+	// Use a single S3 query to list all buckets with the defang-cd- prefix
+	// This is faster than calling CloudFormation DescribeStacks in each region
+	cfg, err := a.LoadConfigForCD(ctx)
+	if err != nil {
+		return nil, err
+	}
+	buckets, err := aws.ListBucketsByPrefix(ctx, s3.NewFromConfig(cfg), a.stackName+"-")
+	if err != nil {
+		return nil, err
+	}
+	for _, bucketRegion := range buckets {
+		if bucketRegion == a.CDRegion {
+			continue // skip, already done above
+		}
+		if dso, err := cfn.DescribeStacks(ctx, input, withRegion(bucketRegion)); err == nil {
+			a.CDRegion = bucketRegion
+			term.Debug("Reusing CloudFormation stack in region", bucketRegion)
+			return dso, nil
+		}
+	}
+	return nil, noStackErr
+}
+
 func (a *AwsEcsCfn) updateStackAndWait(ctx context.Context, templateBody string, parameters []cfnTypes.Parameter) error {
-	cfn, err := a.newClient(ctx)
+	cfn, err := a.newCloudFormationClient(ctx)
 	if err != nil {
 		return err
 	}
 
 	// Check the template version first, to avoid updating to an outdated template; TODO: can we use StackPolicy/Conditions instead?
-	// TODO: should check all regions
-	if dso, err := cfn.DescribeStacks(ctx, &cloudformation.DescribeStacksInput{StackName: &a.stackName}); err == nil && len(dso.Stacks) == 1 {
+	if dso, err := a.describeStacksAllRegions(ctx, cfn); err == nil && len(dso.Stacks) == 1 {
 		for _, output := range dso.Stacks[0].Outputs {
 			if *output.OutputKey == OutputsTemplateVersion {
 				deployedRev, _ := strconv.Atoi(*output.OutputValue)
@@ -108,7 +154,7 @@ func (a *AwsEcsCfn) updateStackAndWait(ctx context.Context, templateBody string,
 		return err // might call createStackAndWait depending on the error
 	}
 
-	term.Info("Waiting for CloudFormation stack", a.stackName, "to be updated...") // TODO: verbose only
+	term.Infof("Waiting for CloudFormation stack %s to be updated in %s...", a.stackName, a.CDRegion)
 	dso, err := cloudformation.NewStackUpdateCompleteWaiter(cfn, update1s).WaitForOutput(ctx, &cloudformation.DescribeStacksInput{
 		StackName: uso.StackId,
 	}, stackTimeout)
@@ -119,7 +165,7 @@ func (a *AwsEcsCfn) updateStackAndWait(ctx context.Context, templateBody string,
 }
 
 func (a *AwsEcsCfn) createStackAndWait(ctx context.Context, templateBody string, parameters []cfnTypes.Parameter) error {
-	cfn, err := a.newClient(ctx)
+	cfn, err := a.newCloudFormationClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -140,7 +186,7 @@ func (a *AwsEcsCfn) createStackAndWait(ctx context.Context, templateBody string,
 		}
 	}
 
-	term.Info("Waiting for CloudFormation stack", a.stackName, "to be created...") // TODO: verbose only
+	term.Infof("Waiting for CloudFormation stack %s to be created in %s...", a.stackName, a.CDRegion)
 	dso, err := cloudformation.NewStackCreateCompleteWaiter(cfn, create1s).WaitForOutput(ctx, &cloudformation.DescribeStacksInput{
 		StackName: ptr.String(a.stackName),
 	}, stackTimeout)
@@ -203,8 +249,8 @@ func (a *AwsEcsCfn) upsertStackAndWait(ctx context.Context, templateBody []byte,
 	// Upsert with parameters
 	if err := a.updateStackAndWait(ctx, string(templateBody), parameters); err != nil {
 		// Check if the stack doesn't exist; if so, create it, otherwise return the error
-		var apiError smithy.APIError
-		if ok := errors.As(err, &apiError); !ok || (apiError.ErrorCode() != "ValidationError") || !strings.HasSuffix(apiError.ErrorMessage(), "does not exist") {
+		err = annotateCfnError(err)
+		if snf := new(ErrStackNotFound); !errors.As(err, &snf) {
 			return err
 		}
 		return a.createStackAndWait(ctx, string(templateBody), parameters)
@@ -212,10 +258,19 @@ func (a *AwsEcsCfn) upsertStackAndWait(ctx context.Context, templateBody []byte,
 	return nil
 }
 
-type ErrStackNotFoundException = cfnTypes.StackNotFoundException
+type ErrStackNotFound = cfnTypes.StackNotFoundException
+
+func annotateCfnError(err error) error {
+	// Check if the stack doesn't exist (ValidationError); if so, return a nice error; workaround for https://github.com/aws/aws-sdk-go-v2/issues/2296
+	var ae smithy.APIError
+	if errors.As(err, &ae) && ae.ErrorCode() == "ValidationError" && strings.HasSuffix(ae.ErrorMessage(), " does not exist") {
+		err = &ErrStackNotFound{Message: ptr.String(ae.ErrorMessage())}
+	}
+	return err
+}
 
 func (a *AwsEcsCfn) FillOutputs(ctx context.Context) error {
-	cfn, err := a.newClient(ctx)
+	cfn, err := a.newCloudFormationClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -225,12 +280,7 @@ func (a *AwsEcsCfn) FillOutputs(ctx context.Context) error {
 		StackName: ptr.String(a.stackName),
 	})
 	if err != nil {
-		// Check if the stack doesn't exist (ValidationError); if so, return a nice error; https://github.com/aws/aws-sdk-go-v2/issues/2296
-		var ae smithy.APIError
-		if errors.As(err, &ae) && ae.ErrorCode() == "ValidationError" {
-			return &ErrStackNotFoundException{Message: ptr.String(ae.ErrorMessage())}
-		}
-		return err
+		return annotateCfnError(err)
 	}
 
 	return a.fillWithOutputs(dso)
@@ -265,7 +315,7 @@ func (a *AwsEcsCfn) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) er
 	}
 
 	if a.AccountID == "" && a.LogGroupARN != "" {
-		a.AccountID = common.GetAccountID(a.LogGroupARN)
+		a.AccountID = aws.GetAccountID(a.LogGroupARN)
 	}
 	return nil
 }
@@ -300,7 +350,7 @@ func (a *AwsEcsCfn) GetInfo(ctx context.Context, taskArn awsecs.TaskArn) (*cloud
 }
 
 func (a *AwsEcsCfn) TearDown(ctx context.Context) error {
-	cfn, err := a.newClient(ctx)
+	cfn, err := a.newCloudFormationClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -320,7 +370,7 @@ func (a *AwsEcsCfn) TearDown(ctx context.Context) error {
 		return err
 	}
 
-	term.Info("Waiting for CloudFormation stack", a.stackName, "to be deleted...") // TODO: verbose only
+	term.Infof("Waiting for CloudFormation stack %s to be deleted in %s...", a.stackName, a.CDRegion)
 	return cloudformation.NewStackDeleteCompleteWaiter(cfn, delete1s).Wait(ctx, &cloudformation.DescribeStacksInput{
 		StackName: ptr.String(a.stackName),
 	}, stackTimeout)

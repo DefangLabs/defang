@@ -9,21 +9,33 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/processcreds"
+	"github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
-type Region string
+type Region = types.VPCRegion
 
 type Aws struct {
 	AccountID string
 	Region    Region
 }
 
-func (r Region) String() string {
-	return string(r)
+func MakeARN(service string, region Region, accountID, resource string) string {
+	return strings.Join([]string{
+		"arn",
+		"aws",
+		service,
+		string(region),
+		accountID,
+		resource,
+	}, ":")
 }
 
-func (a *Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
+func (a *Aws) MakeARN(service, resource string) string {
+	return MakeARN(service, a.Region, a.AccountID, resource)
+}
+
+func (a *Aws) LoadConfigForApp(ctx context.Context) (aws.Config, error) {
 	cfg, err := LoadDefaultConfig(ctx, a.Region)
 	if err != nil {
 		return cfg, err

@@ -10,8 +10,8 @@ import (
 	"github.com/aws/smithy-go/ptr"
 )
 
-func (a *Aws) RevokeDefaultSecurityGroupRules(ctx context.Context, sgId string) error {
-	cfg, err := a.LoadConfig(ctx)
+func RevokeDefaultSecurityGroupRules(ctx context.Context, sgId string, region Region) error {
+	cfg, err := LoadDefaultConfig(ctx, region)
 	if err != nil {
 		return err
 	}

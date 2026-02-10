@@ -61,7 +61,7 @@ func (a *AwsEcs) GetTaskArn(taskID string) (TaskArn, error) {
 	if a.ClusterName == "" {
 		return nil, errors.New("ClusterName is required")
 	}
-	taskArn := a.MakeARN("ecs", "task/"+a.ClusterName+"/"+taskID)
+	taskArn := a.MakeCdARN("ecs", "task/"+a.ClusterName+"/"+taskID)
 	return &taskArn, nil
 }
 

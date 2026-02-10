@@ -18,7 +18,7 @@ import (
 const taskCount = 1
 
 func (a *AwsEcs) PopulateVPCandSubnetID(ctx context.Context, vpcID, subnetID string) error {
-	cfg, err := a.LoadConfig(ctx)
+	cfg, err := a.LoadConfigForCD(ctx)
 	if err != nil {
 		return err
 	}
@@ -39,7 +39,7 @@ var sanitizeStartedBy = regexp.MustCompile(`[^a-zA-Z0-9_-]+`) // letters (upperc
 func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) (TaskArn, error) {
 	// a.Refresh(ctx)
 
-	cfg, err := a.LoadConfig(ctx)
+	cfg, err := a.LoadConfigForCD(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -16,7 +16,7 @@ var s3InvalidCharsRegexp = regexp.MustCompile(`[^a-zA-Z0-9!_.*'()-]`)
 const prefix = "uploads/"
 
 func (a *AwsEcs) CreateUploadURL(ctx context.Context, name string) (string, error) {
-	cfg, err := a.LoadConfig(ctx)
+	cfg, err := a.LoadConfigForCD(ctx)
 	if err != nil {
 		return "", err
 	}

@@ -37,7 +37,7 @@ func IsParameterNotFoundError(err error) bool {
 }
 
 func (a *Aws) DeleteSecrets(ctx context.Context, names ...string) error {
-	cfg, err := a.LoadConfig(ctx)
+	cfg, err := a.LoadConfigForApp(ctx)
 	if err != nil {
 		return err
 	}
@@ -57,7 +57,7 @@ func (a *Aws) DeleteSecrets(ctx context.Context, names ...string) error {
 }
 
 func (a *Aws) IsValidSecret(ctx context.Context, name string) (bool, error) {
-	cfg, err := a.LoadConfig(ctx)
+	cfg, err := a.LoadConfigForApp(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -83,7 +83,7 @@ func (a *Aws) IsValidSecret(ctx context.Context, name string) (bool, error) {
 }
 
 func (a *Aws) PutSecret(ctx context.Context, name, value string) error {
-	cfg, err := a.LoadConfig(ctx)
+	cfg, err := a.LoadConfigForApp(ctx)
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,7 @@ func (a *Aws) ListSecrets(ctx context.Context) ([]string, error) {
 }
 
 func (a *Aws) ListSecretsByPrefix(ctx context.Context, prefix string) ([]string, error) {
-	cfg, err := a.LoadConfig(ctx)
+	cfg, err := a.LoadConfigForApp(ctx)
 	if err != nil {
 		return nil, err
 	}
