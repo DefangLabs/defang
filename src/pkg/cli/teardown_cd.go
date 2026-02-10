@@ -23,11 +23,13 @@ func TearDownCD(ctx context.Context, provider client.Provider, force bool) error
 	if err != nil {
 		return fmt.Errorf("could not get list of deployed stacks: %w", err)
 	}
-
-	var stacks []state.StackInfo
-	for stackInfo := range list {
-		stacks = append(stacks, *stackInfo)
-	}
+	stacks := slices.Collect(func(yield func(state.Info) bool) {
+		for stackInfo := range list {
+			if !yield(*stackInfo) {
+				return
+			}
+		}
+	})
 
 	// sort stacks by workspace, project, stack for easier readability
 	slices.SortFunc(stacks, func(a, b state.StackInfo) int {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -150,15 +151,16 @@ func CdListFromStorage(ctx context.Context, provider client.Provider, allRegions
 		return err
 	}
 
-	var stacks []StackLineItem
-	for stackInfo := range stacksIter {
-		stacks = append(stacks, StackLineItem{
-			Project:   stackInfo.Project,
-			Stack:     stackInfo.Name,
-			Workspace: stackInfo.Workspace,
-			Region:    stackInfo.Region,
-		})
-	}
+	stacks := slices.Collect(func(yield func(*state.Info) bool) {
+		for stackInfo := range stacksIter {
+			if stackInfo == nil {
+				continue
+			}
+			if !yield(stackInfo) {
+				return
+			}
+		}
+	})
 
 	if len(stacks) == 0 {
 		accountInfo, err := provider.AccountInfo(ctx)
