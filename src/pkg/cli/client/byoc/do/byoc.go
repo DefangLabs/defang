@@ -22,6 +22,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	awsbyoc "github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
@@ -245,7 +246,7 @@ func (b *ByocDo) CdCommand(ctx context.Context, req client.CdCommandRequest) (st
 	return etag, nil
 }
 
-func (b *ByocDo) CdList(ctx context.Context, _allRegions bool) (iter.Seq[string], error) {
+func (b *ByocDo) CdList(ctx context.Context, _allRegions bool) (iter.Seq[state.Info], error) {
 	s3client, err := b.driver.CreateS3Client()
 	if err != nil {
 		return nil, err
@@ -256,7 +257,23 @@ func (b *ByocDo) CdList(ctx context.Context, _allRegions bool) (iter.Seq[string]
 		return nil, err
 	}
 
-	return awsbyoc.ListPulumiStacks(ctx, s3client, bucketName)
+	stacks, err := awsbyoc.ListPulumiStacks(ctx, s3client, bucketName)
+	if err != nil {
+		return nil, err
+	}
+	return func(yield func(state.Info) bool) {
+		for st := range stacks {
+			info := state.Info{
+				Project:   st.Project,
+				Stack:     st.Name,
+				Workspace: string(st.Workspace),
+				Region:    string(b.driver.Region),
+			}
+			if !yield(info) {
+				break
+			}
+		}
+	}, nil
 }
 
 func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
@@ -461,6 +478,7 @@ func (b *ByocDo) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (clie
 }
 
 func (b *ByocDo) TearDownCD(ctx context.Context) error {
+	term.Warn("Deleting the Defang CD app; currently existing stacks or configs will not be deleted, but they will be orphaned and they will need to be cleaned up manually")
 	app, err := b.getAppByName(ctx, appPlatform.CdName)
 	if err != nil {
 		return err

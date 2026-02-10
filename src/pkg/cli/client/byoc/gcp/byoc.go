@@ -17,6 +17,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/dns"
@@ -276,7 +277,7 @@ func (o gcpObj) Size() int64 {
 	return o.obj.Size
 }
 
-func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[string], error) {
+func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[state.Info], error) {
 	bucketName, err := b.driver.GetBucketWithPrefix(ctx, DefangCDProjectName)
 	if err != nil {
 		return nil, annotateGcpError(err)
@@ -296,21 +297,28 @@ func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[string
 	if err != nil {
 		return nil, annotateGcpError(err)
 	}
-	return func(yield func(string) bool) {
+	return func(yield func(state.Info) bool) {
 		for obj, err := range seq {
 			if err != nil {
 				term.Debugf("Error listing object in bucket %s: %v", bucketName, annotateGcpError(err))
 				continue
 			}
-			stack, err := byoc.ParsePulumiStateFile(ctx, gcpObj{obj}, bucketName, objLoader)
+			st, err := state.ParsePulumiStateFile(ctx, gcpObj{obj}, bucketName, objLoader)
 			if err != nil {
 				term.Debugf("Skipping %q in bucket %s: %v", obj.Name, bucketName, annotateGcpError(err))
 				continue
 			}
-			if stack != nil {
-				if !yield(stack.String()) {
-					break
-				}
+			if st == nil {
+				continue
+			}
+			stack := state.Info{
+				Stack:     st.Name,
+				Project:   st.Project,
+				Workspace: string(st.Workspace),
+				Region:    b.driver.GetRegion(),
+			}
+			if !yield(stack) {
+				break
 			}
 		}
 	}, nil
@@ -786,6 +794,7 @@ func LogEntriesToString(logEntries []*loggingpb.LogEntry) string {
 }
 
 func (b *ByocGcp) TearDownCD(ctx context.Context) error {
+	// term.Warn("Deleting Defang CD; currently existing stacks or configs will not be deleted, but they will be orphaned and they will need to be cleaned up manually")
 	// FIXME: implement
 	return client.ErrNotImplemented("GCP TearDown")
 }

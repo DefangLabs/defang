@@ -108,7 +108,11 @@ var cdTearDownCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.TearDownCD(ctx, session.Provider, force)
+		err = cli.TearDownCD(ctx, session.Provider, force)
+		if errors.Is(err, cli.ErrExistingStacks) {
+			printDefangHint("Use `defang cd destroy --force` to force teardown the CD cluster, leaving existing projects orphaned")
+		}
+		return err
 	},
 }
 

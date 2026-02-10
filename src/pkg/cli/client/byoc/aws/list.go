@@ -2,13 +2,13 @@ package aws
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"iter"
 	"strings"
 	"sync"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -26,12 +26,28 @@ func newS3Client(ctx context.Context, region aws.Region) (*s3.Client, error) {
 	return s3client, nil
 }
 
-func listPulumiStacksInBucket(ctx context.Context, region aws.Region, bucketName string) (iter.Seq[string], error) {
+func listPulumiStacksInBucket(ctx context.Context, region aws.Region, bucketName string) (iter.Seq[state.Info], error) {
 	s3client, err := newS3Client(ctx, region)
 	if err != nil {
 		return nil, err
 	}
-	return ListPulumiStacks(ctx, s3client, bucketName)
+	stacks, err := ListPulumiStacks(ctx, s3client, bucketName)
+	if err != nil {
+		return nil, err
+	}
+	return func(yield func(state.Info) bool) {
+		for st := range stacks {
+			info := state.Info{
+				Project:   st.Project,
+				Stack:     st.Name,
+				Workspace: string(st.Workspace),
+				Region:    string(region),
+			}
+			if !yield(info) {
+				break
+			}
+		}
+	}, nil
 }
 
 type s3Obj struct{ obj s3types.Object }
@@ -51,7 +67,7 @@ type S3Client interface {
 	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
 }
 
-func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string) (iter.Seq[string], error) {
+func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string) (iter.Seq[state.PulumiState], error) {
 	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
 
 	term.Debug("Listing stacks in bucket:", bucketName)
@@ -62,12 +78,12 @@ func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
-	return func(yield func(string) bool) {
+	return func(yield func(state.PulumiState) bool) {
 		for _, obj := range out.Contents {
 			if obj.Key == nil || obj.Size == nil {
 				continue
 			}
-			stack, err := byoc.ParsePulumiStateFile(ctx, s3Obj{obj}, bucketName, func(ctx context.Context, bucket, path string) ([]byte, error) {
+			state, err := state.ParsePulumiStateFile(ctx, s3Obj{obj}, bucketName, func(ctx context.Context, bucket, path string) ([]byte, error) {
 				getObjectOutput, err := s3client.GetObject(ctx, &s3.GetObjectInput{
 					Bucket: &bucket,
 					Key:    &path,
@@ -81,8 +97,8 @@ func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string)
 				term.Debugf("Skipping %q in bucket %s: %v", *obj.Key, bucketName, AnnotateAwsError(err))
 				continue
 			}
-			if stack != nil {
-				if !yield(stack.String()) {
+			if state != nil {
+				if !yield(*state) {
 					break
 				}
 			}
@@ -91,7 +107,7 @@ func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string)
 	}, nil
 }
 
-func listPulumiStacksAllRegions(ctx context.Context, s3client S3Client) (iter.Seq[string], error) {
+func listPulumiStacksAllRegions(ctx context.Context, s3client S3Client) (iter.Seq[state.Info], error) {
 	// Use a single S3 query to list all buckets with the defang-cd- prefix
 	// This is faster than calling CloudFormation DescribeStacks in each region
 	listBucketsOutput, err := s3client.ListBuckets(ctx, &s3.ListBucketsInput{})
@@ -99,10 +115,10 @@ func listPulumiStacksAllRegions(ctx context.Context, s3client S3Client) (iter.Se
 		return nil, AnnotateAwsError(err)
 	}
 
-	return func(yield func(string) bool) {
+	return func(yield func(state.Info) bool) {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		stackCh := make(chan string)
+		stackCh := make(chan state.Info)
 
 		// Filter buckets by prefix and get their locations
 		var wg sync.WaitGroup
@@ -141,7 +157,7 @@ func listPulumiStacksAllRegions(ctx context.Context, s3client S3Client) (iter.Se
 					select {
 					case <-ctx.Done():
 						return
-					case stackCh <- fmt.Sprintf("%s [%s]", stack, region):
+					case stackCh <- stack:
 					}
 				}
 			}(bucketRegion)
