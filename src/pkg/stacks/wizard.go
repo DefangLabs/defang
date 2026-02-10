@@ -79,7 +79,7 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 
 	if params.Name == "" {
 		defaultName := MakeDefaultName(params.Provider, params.Region)
-		name, err := w.ec.RequestStringWithDefault(ctx, "Enter a name for your stack:", "stack_name", defaultName)
+		name, err := w.ec.RequestStringWithDefault(ctx, "What do you want to call this stack?:", "stack_name", defaultName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to elicit stack name: %w", err)
 		}
@@ -117,14 +117,14 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 		if params.Variables["GCP_PROJECT_ID"] == "" {
 			_, envProjectID := pkg.GetFirstEnv(pkg.GCPProjectEnvVars...)
 			if envProjectID != "" {
-				projectID, err := w.ec.RequestStringWithDefault(ctx, "Enter your GCP Project ID:", "gcp_project_id", envProjectID)
+				projectID, err := w.ec.RequestStringWithDefault(ctx, "What is your GCP Project ID?:", "gcp_project_id", envProjectID)
 				if err != nil {
 					return nil, fmt.Errorf("failed to elicit GCP Project ID: %w", err)
 				}
 				params.Variables["GCP_PROJECT_ID"] = projectID
 				break
 			}
-			projectID, err := w.ec.RequestString(ctx, "Enter your GCP Project ID:", "gcp_project_id")
+			projectID, err := w.ec.RequestString(ctx, "What is your GCP Project ID?:", "gcp_project_id")
 			if err != nil {
 				return nil, fmt.Errorf("failed to elicit GCP Project ID: %w", err)
 			}
