@@ -50,8 +50,8 @@ func (m *MockDestroyCLI) ComposeDown(ctx context.Context, projectName string, gr
 	return m.ComposeDownResult, nil
 }
 
-func (m *MockDestroyCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
-	m.CallLog = append(m.CallLog, "LoadProjectNameWithFallback")
+func (m *MockDestroyCLI) LoadProjectName(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
+	m.CallLog = append(m.CallLog, "LoadProjectName")
 	if m.LoadProjectNameWithFallbackError != nil {
 		return "", m.LoadProjectNameWithFallbackError
 	}
@@ -187,7 +187,7 @@ func TestHandleDestroyTool(t *testing.T) {
 				expectedCalls := []string{
 					"Connect(test-cluster)",
 					"NewProvider(aws)",
-					"LoadProjectNameWithFallback",
+					"LoadProjectName",
 					"CanIUseProvider(test-project)",
 					"ComposeDown(test-project)",
 				}

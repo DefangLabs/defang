@@ -25,7 +25,7 @@ type CLIInterface interface {
 	InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error
 	ListConfig(ctx context.Context, provider client.Provider, projectName string) (*defangv1.Secrets, error)
 	LoadProject(ctx context.Context, loader client.Loader) (*compose.Project, error)
-	LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error)
+	LoadProjectName(ctx context.Context, loader client.Loader, provider client.Provider) (string, error)
 	NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient, stack string) client.Provider
 	PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string
 	RunEstimate(ctx context.Context, project *compose.Project, fabric *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error)

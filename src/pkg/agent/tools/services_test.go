@@ -46,7 +46,7 @@ func (m *MockCLI) NewProvider(ctx context.Context, providerId client.ProviderID,
 	return m.MockProvider
 }
 
-func (m *MockCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
+func (m *MockCLI) LoadProjectName(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
 	if m.LoadProjectNameWithFallbackError != nil {
 		return "", m.LoadProjectNameWithFallbackError
 	}
