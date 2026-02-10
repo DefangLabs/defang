@@ -871,7 +871,7 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	return nil
 }
 
-func (b *ByocAws) CdList(ctx context.Context, allRegions bool) (iter.Seq[*state.StackInfo], error) {
+func (b *ByocAws) CdList(ctx context.Context, allRegions bool) (iter.Seq[*state.Info], error) {
 	if allRegions {
 		s3Client, err := newS3Client(ctx, b.driver.Region)
 		if err != nil {

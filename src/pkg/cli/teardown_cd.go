@@ -32,20 +32,20 @@ func TearDownCD(ctx context.Context, provider client.Provider, force bool) error
 	})
 
 	// sort stacks by workspace, project, stack for easier readability
-	slices.SortFunc(stacks, func(a, b state.StackInfo) int {
+	slices.SortFunc(stacks, func(a, b state.Info) int {
 		if a.Workspace != b.Workspace {
 			return cmp.Compare(a.Workspace, b.Workspace)
 		}
 		if a.Project != b.Project {
 			return cmp.Compare(a.Project, b.Project)
 		}
-		return cmp.Compare(a.Name, b.Name)
+		return cmp.Compare(a.Stack, b.Stack)
 	})
 
 	if len(stacks) > 0 {
 		term.Info("Some stacks are currently deployed. Run the following commands to tear them down:")
 		for _, stack := range stacks {
-			term.Infof("  `defang down --workspace %s --project-name %s --stack %s`\n", stack.Workspace, stack.Project, stack.Name)
+			term.Infof("  `defang down --workspace %s --project-name %s --stack %s`\n", stack.Workspace, stack.Project, stack.Stack)
 		}
 		if !force {
 			return ErrExistingStacks

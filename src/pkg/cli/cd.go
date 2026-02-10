@@ -11,6 +11,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -131,13 +132,6 @@ func SplitProjectStack(name string) (projectName string, stackName string) {
 	pulumiStack, _, _ := strings.Cut(name, " ") // in case name contains extra info like "proj/stack {workspace} [region]"
 	projectName, stackName, _ = strings.Cut(pulumiStack, "/")
 	return projectName, stackName
-}
-
-type StackLineItem struct {
-	Project   string
-	Stack     string
-	Workspace string
-	Region    string
 }
 
 func CdListFromStorage(ctx context.Context, provider client.Provider, allRegions bool) error {

@@ -29,7 +29,7 @@ func (mp ErrMultipleProjects) Error() string {
 
 type ProjectBackend interface {
 	CdCommand(context.Context, client.CdCommandRequest) (types.ETag, error)
-	CdList(context.Context, bool) (iter.Seq[*state.StackInfo], error)
+	CdList(context.Context, bool) (iter.Seq[*state.Info], error)
 	GetPrivateDomain(projectName string) string
 	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 }

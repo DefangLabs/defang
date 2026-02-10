@@ -277,7 +277,7 @@ func (o gcpObj) Size() int64 {
 	return o.obj.Size
 }
 
-func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[*state.StackInfo], error) {
+func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[*state.Info], error) {
 	bucketName, err := b.driver.GetBucketWithPrefix(ctx, DefangCDProjectName)
 	if err != nil {
 		return nil, annotateGcpError(err)
@@ -297,7 +297,7 @@ func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[*state
 	if err != nil {
 		return nil, annotateGcpError(err)
 	}
-	return func(yield func(*state.StackInfo) bool) {
+	return func(yield func(*state.Info) bool) {
 		for obj, err := range seq {
 			if err != nil {
 				term.Debugf("Error listing object in bucket %s: %v", bucketName, annotateGcpError(err))
@@ -311,8 +311,8 @@ func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[*state
 			if st == nil {
 				continue
 			}
-			stack := &state.StackInfo{
-				Name:      st.Name,
+			stack := &state.Info{
+				Stack:     st.Name,
 				Project:   st.Project,
 				Workspace: string(st.Workspace),
 				Region:    b.driver.GetRegion(),

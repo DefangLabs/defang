@@ -1,8 +1,8 @@
 package state
 
-type StackInfo struct {
+type Info struct {
 	Project   string
-	Name      string
+	Stack     string
 	Workspace string
 	Region    string
 }
