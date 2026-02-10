@@ -326,9 +326,11 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 		printDefangHint("To start a new project, do:", "new")
 	}
 
-	if connect.CodeOf(originalErr) == connect.CodeResourceExhausted && strings.Contains(originalErr.Error(), "maximum number of projects") {
+	playgroundProvider, isPlayground := provider.(*client.PlaygroundProvider)
+
+	if isPlayground && connect.CodeOf(originalErr) == connect.CodeResourceExhausted && strings.Contains(originalErr.Error(), "maximum number of projects") {
 		term.Error("Error:", client.PrettyError(originalErr))
-		err := handleTooManyProjectsError(ctx, provider, originalErr)
+		err := handleTooManyProjectsError(ctx, playgroundProvider, originalErr)
 		if err != nil {
 			return originalErr
 		}
@@ -345,7 +347,7 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 	}, originalErr)
 }
 
-func handleTooManyProjectsError(ctx context.Context, provider client.Provider, originalErr error) error {
+func handleTooManyProjectsError(ctx context.Context, provider *client.PlaygroundProvider, originalErr error) error {
 	projectName, err := provider.RemoteProjectName(ctx)
 	if err != nil {
 		term.Warn("failed to get remote project name:", err)
