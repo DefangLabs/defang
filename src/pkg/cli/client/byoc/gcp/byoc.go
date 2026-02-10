@@ -314,7 +314,7 @@ func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[*state
 			stack := &state.StackInfo{
 				Name:      st.Name,
 				Project:   st.Project,
-				Workspace: string(st.DefangOrg),
+				Workspace: string(st.Workspace),
 				Region:    b.driver.GetRegion(),
 			}
 			if !yield(stack) {

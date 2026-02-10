@@ -20,7 +20,7 @@ type BucketObj interface {
 type PulumiState struct {
 	Project   string
 	Name      string
-	DefangOrg types.TenantLabel
+	Workspace types.TenantLabel
 	Pending   []string
 }
 
@@ -35,8 +35,8 @@ func (ps PulumiState) String() string {
 		}
 		pending.WriteByte(')')
 	}
-	if ps.DefangOrg != "" {
-		org = " {" + string(ps.DefangOrg) + "}"
+	if ps.Workspace != "" {
+		org = " {" + string(ps.Workspace) + "}"
 	}
 	return fmt.Sprintf("%s/%s%s%s", ps.Project, ps.Name, org, pending.String())
 }
@@ -107,7 +107,7 @@ func ParsePulumiStateFile(ctx context.Context, obj BucketObj, bucket string, obj
 				DefangOrg string `json:"defang-org,omitempty"`
 			}
 			if err := json.Unmarshal([]byte(res.Inputs.DefaultLabels), &labels); err == nil && labels.DefangOrg != "" {
-				stack.DefangOrg = types.TenantLabel(labels.DefangOrg)
+				stack.Workspace = types.TenantLabel(labels.DefangOrg)
 				break
 			}
 		} else if res.Inputs.DefaultTags != "" {
@@ -117,7 +117,7 @@ func ParsePulumiStateFile(ctx context.Context, obj BucketObj, bucket string, obj
 				}
 			}
 			if err := json.Unmarshal([]byte(res.Inputs.DefaultTags), &tags); err == nil && tags.Tags.DefangOrg != "" {
-				stack.DefangOrg = types.TenantLabel(tags.Tags.DefangOrg)
+				stack.Workspace = types.TenantLabel(tags.Tags.DefangOrg)
 				break
 			}
 		}

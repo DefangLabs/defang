@@ -43,7 +43,7 @@ func listPulumiStacksInBucket(ctx context.Context, region aws.Region, bucketName
 			info := &state.StackInfo{
 				Project:   st.Project,
 				Name:      st.Name,
-				Workspace: string(st.DefangOrg),
+				Workspace: string(st.Workspace),
 				Region:    string(region),
 			}
 			if !yield(info) {
