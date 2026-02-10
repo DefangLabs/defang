@@ -3,8 +3,10 @@ package stacks
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -70,7 +72,9 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 		params.Region = ""
 	} else if params.Region == "" {
 		defaultRegion := client.GetRegion(params.Provider)
-		region, err := w.ec.RequestStringWithDefault(ctx, "Which region do you want to deploy to?", "region", defaultRegion)
+		region, err := w.ec.RequestStringWithOptions(ctx, "Which region do you want to deploy to?", "region", elicitations.Options{
+			DefaultValue: defaultRegion,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to elicit region choice: %w", err)
 		}
@@ -79,7 +83,10 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 
 	if params.Name == "" {
 		defaultName := MakeDefaultName(params.Provider, params.Region)
-		name, err := w.ec.RequestStringWithDefault(ctx, "What do you want to call this stack?:", "stack_name", defaultName)
+		name, err := w.ec.RequestStringWithOptions(ctx, "What do you want to call this stack?:", "stack_name", elicitations.Options{
+			DefaultValue: defaultName,
+			Validator:    ValidStackName,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to elicit stack name: %w", err)
 		}
@@ -91,7 +98,9 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 	case client.ProviderAWS:
 		if params.Variables["AWS_PROFILE"] == "" {
 			if os.Getenv("AWS_PROFILE") != "" {
-				profile, err := w.ec.RequestStringWithDefault(ctx, "Which AWS profile do you want to use?", "aws_profile", os.Getenv("AWS_PROFILE"))
+				profile, err := w.ec.RequestStringWithOptions(ctx, "Which AWS profile do you want to use?", "aws_profile", elicitations.Options{
+					DefaultValue: os.Getenv("AWS_PROFILE"),
+				})
 				if err != nil {
 					return nil, fmt.Errorf("failed to elicit AWS profile: %w", err)
 				}
@@ -100,7 +109,9 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 			}
 			profiles, err := w.profileLister.ListProfiles()
 			if err != nil || len(profiles) == 0 {
-				profile, err := w.ec.RequestStringWithDefault(ctx, "Which AWS profile do you want to use?", "aws_profile", "default")
+				profile, err := w.ec.RequestStringWithOptions(ctx, "Which AWS profile do you want to use?", "aws_profile", elicitations.Options{
+					DefaultValue: "default",
+				})
 				if err != nil {
 					return nil, fmt.Errorf("failed to elicit AWS profile: %w", err)
 				}
@@ -117,7 +128,9 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 		if params.Variables["GCP_PROJECT_ID"] == "" {
 			_, envProjectID := pkg.GetFirstEnv(pkg.GCPProjectEnvVars...)
 			if envProjectID != "" {
-				projectID, err := w.ec.RequestStringWithDefault(ctx, "What is your GCP Project ID?:", "gcp_project_id", envProjectID)
+				projectID, err := w.ec.RequestStringWithOptions(ctx, "What is your GCP Project ID?:", "gcp_project_id", elicitations.Options{
+					DefaultValue: envProjectID,
+				})
 				if err != nil {
 					return nil, fmt.Errorf("failed to elicit GCP Project ID: %w", err)
 				}
@@ -180,4 +193,31 @@ func (f *FileSystemAWSProfileLister) ListProfiles() ([]string, error) {
 	}
 	sort.Strings(result)
 	return result, nil
+}
+
+func ValidStackName(val any) error {
+	// the reflect value of the result
+	value := reflect.ValueOf(val)
+	str, ok := value.Interface().(string)
+	if !ok {
+		return errors.New("Value is required")
+	}
+	if len(str) == 0 {
+		return errors.New("Value cannot be empty")
+	}
+
+	// if the value starts with a number, return an error
+	firstChar := str[0]
+	if firstChar >= '0' && firstChar <= '9' {
+		return errors.New("Value must not start with a number")
+	}
+
+	// if the value is not alphanumeric return an error
+	for _, r := range str {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')) {
+			return errors.New("Value must be alphanumeric")
+		}
+	}
+
+	return nil
 }

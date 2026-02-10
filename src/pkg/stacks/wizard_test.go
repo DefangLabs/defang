@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -45,15 +46,15 @@ func (m *mockElicitationsController) RequestString(ctx context.Context, message,
 	return "", errors.New("mock: no response configured for field " + field)
 }
 
-func (m *mockElicitationsController) RequestStringWithDefault(ctx context.Context, message, field, defaultValue string) (string, error) {
-	m.callOrder = append(m.callOrder, "RequestStringWithDefault:"+field)
+func (m *mockElicitationsController) RequestStringWithOptions(ctx context.Context, message, field string, options elicitations.Options) (string, error) {
+	m.callOrder = append(m.callOrder, "RequestStringWithOptions:"+field)
 	if err, exists := m.defaultErrors[field]; exists {
 		return "", err
 	}
 	if response, exists := m.defaultResponses[field]; exists {
 		return response, nil
 	}
-	return defaultValue, nil
+	return options.DefaultValue, nil
 }
 
 func (m *mockElicitationsController) RequestEnum(ctx context.Context, message, field string, options []string) (string, error) {
@@ -133,9 +134,9 @@ func TestWizardCollectParameters(t *testing.T) {
 			},
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithDefault:region",
-				"RequestStringWithDefault:stack_name",
-				"RequestStringWithDefault:aws_profile",
+				"RequestStringWithOptions:region",
+				"RequestStringWithOptions:stack_name",
+				"RequestStringWithOptions:aws_profile",
 			},
 		},
 		{
@@ -161,8 +162,8 @@ func TestWizardCollectParameters(t *testing.T) {
 			},
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithDefault:region",
-				"RequestStringWithDefault:stack_name",
+				"RequestStringWithOptions:region",
+				"RequestStringWithOptions:stack_name",
 				"RequestEnum:aws_profile",
 			},
 		},
@@ -191,9 +192,9 @@ func TestWizardCollectParameters(t *testing.T) {
 			},
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithDefault:region",
-				"RequestStringWithDefault:stack_name",
-				"RequestStringWithDefault:gcp_project_id",
+				"RequestStringWithOptions:region",
+				"RequestStringWithOptions:stack_name",
+				"RequestStringWithOptions:gcp_project_id",
 			},
 		},
 		{
@@ -219,8 +220,8 @@ func TestWizardCollectParameters(t *testing.T) {
 			},
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithDefault:region",
-				"RequestStringWithDefault:stack_name",
+				"RequestStringWithOptions:region",
+				"RequestStringWithOptions:stack_name",
 				"RequestString:gcp_project_id",
 			},
 		},
@@ -240,7 +241,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			},
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithDefault:stack_name",
+				"RequestStringWithOptions:stack_name",
 			},
 		},
 		{
@@ -260,8 +261,8 @@ func TestWizardCollectParameters(t *testing.T) {
 			},
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithDefault:region",
-				"RequestStringWithDefault:stack_name",
+				"RequestStringWithOptions:region",
+				"RequestStringWithOptions:stack_name",
 			},
 		},
 		{
@@ -298,7 +299,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedResult: nil,
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithDefault:region",
+				"RequestStringWithOptions:region",
 			},
 		},
 		{
@@ -314,8 +315,8 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedResult: nil,
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithDefault:region",
-				"RequestStringWithDefault:stack_name",
+				"RequestStringWithOptions:region",
+				"RequestStringWithOptions:stack_name",
 			},
 		},
 		{
@@ -336,8 +337,8 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedResult: nil,
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithDefault:region",
-				"RequestStringWithDefault:stack_name",
+				"RequestStringWithOptions:region",
+				"RequestStringWithOptions:stack_name",
 				"RequestEnum:aws_profile",
 			},
 		},
@@ -357,8 +358,8 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedResult: nil,
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithDefault:region",
-				"RequestStringWithDefault:stack_name",
+				"RequestStringWithOptions:region",
+				"RequestStringWithOptions:stack_name",
 				"RequestString:gcp_project_id",
 			},
 		},
