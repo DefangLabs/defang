@@ -116,7 +116,7 @@ func (g *PlaygroundProvider) SetUpCD(ctx context.Context) error {
 	return errors.New("this command is not valid for the Defang playground; did you forget --stack or --provider?")
 }
 
-func (g *PlaygroundProvider) CdList(context.Context, bool) (iter.Seq[*byocState.Info], error) {
+func (g *PlaygroundProvider) CdList(context.Context, bool) (iter.Seq[byocState.Info], error) {
 	return nil, errors.New("this command is not valid for the Defang playground; did you forget --stack or --provider?")
 }
 

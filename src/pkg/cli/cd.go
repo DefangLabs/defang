@@ -145,11 +145,8 @@ func CdListFromStorage(ctx context.Context, provider client.Provider, allRegions
 		return err
 	}
 
-	stacks := slices.Collect(func(yield func(*state.Info) bool) {
+	stacks := slices.Collect(func(yield func(state.Info) bool) {
 		for stackInfo := range stacksIter {
-			if stackInfo == nil {
-				continue
-			}
 			if !yield(stackInfo) {
 				return
 			}

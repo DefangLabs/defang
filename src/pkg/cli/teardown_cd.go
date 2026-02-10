@@ -23,7 +23,7 @@ func TearDownCD(ctx context.Context, provider client.Provider, force bool) error
 	if err != nil {
 		return fmt.Errorf("could not get list of deployed stacks: %w", err)
 	}
-	stacks := slices.SortedFunc(list, func(a, b *state.Info) int {
+	stacks := slices.SortedFunc(list, func(a, b state.Info) int {
 		if a.Workspace != b.Workspace {
 			return cmp.Compare(a.Workspace, b.Workspace)
 		}

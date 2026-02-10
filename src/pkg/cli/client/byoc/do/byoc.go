@@ -246,7 +246,7 @@ func (b *ByocDo) CdCommand(ctx context.Context, req client.CdCommandRequest) (st
 	return etag, nil
 }
 
-func (b *ByocDo) CdList(ctx context.Context, _allRegions bool) (iter.Seq[*state.Info], error) {
+func (b *ByocDo) CdList(ctx context.Context, _allRegions bool) (iter.Seq[state.Info], error) {
 	s3client, err := b.driver.CreateS3Client()
 	if err != nil {
 		return nil, err
@@ -261,12 +261,9 @@ func (b *ByocDo) CdList(ctx context.Context, _allRegions bool) (iter.Seq[*state.
 	if err != nil {
 		return nil, err
 	}
-	return func(yield func(*state.Info) bool) {
+	return func(yield func(state.Info) bool) {
 		for st := range stacks {
-			if st == nil {
-				continue
-			}
-			info := &state.Info{
+			info := state.Info{
 				Project:   st.Project,
 				Stack:     st.Name,
 				Workspace: string(st.Workspace),
