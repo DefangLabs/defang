@@ -17,7 +17,7 @@ func TestPutSecret(t *testing.T) {
 	a := Aws{Region: Region(pkg.Getenv("AWS_REGION", "us-west-2"))}
 
 	ctx := context.Background()
-	cfg, err := a.LoadConfig(ctx)
+	cfg, err := a.LoadConfigForApp(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

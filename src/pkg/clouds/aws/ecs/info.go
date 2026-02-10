@@ -11,7 +11,7 @@ import (
 )
 
 func (a AwsEcs) Info(ctx context.Context, id TaskArn) (*clouds.TaskInfo, error) {
-	cfg, err := a.LoadConfig(ctx)
+	cfg, err := a.LoadConfigForCD(ctx)
 	if err != nil {
 		return nil, err
 	}

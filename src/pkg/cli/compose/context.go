@@ -265,14 +265,12 @@ func uploadArchive(ctx context.Context, provider client.Provider, projectName st
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("HTTP PUT failed with status code %v", resp.Status)
+		return "", fmt.Errorf("Upload failed: HTTP PUT status %v", resp.Status)
 	}
 
 	url := http.RemoveQueryParam(res.Url)
-	const gcpPrefix = "https://storage.googleapis.com/"
-	if strings.HasPrefix(url, gcpPrefix) {
-		url = "gs://" + url[len(gcpPrefix):]
-	}
+	// Only gs:// is supported in the URL as http get in gcpcd does not handle auth yet
+	url = strings.Replace(url, "https://storage.googleapis.com/", "gs://", 1)
 	return url, nil
 }
 

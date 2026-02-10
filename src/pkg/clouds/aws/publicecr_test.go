@@ -91,8 +91,7 @@ func TestCheckImageExistOnPublicECR(t *testing.T) {
 			defanghttp.DefaultClient = &http.Client{Transport: &MockHTTPRoundTripper{StatusCode: tt.mockStatusCode, Body: tt.mockBody}}
 			newPublicECRClientFromConfig = func(cfg aws.Config) PublicECRAPI { return MockPublicECRClient{} }
 
-			awsInstance := &Aws{Region: "us-west-2"}
-			exists, err := awsInstance.CheckImageExistOnPublicECR(t.Context(), tt.repo, tt.tag)
+			exists, err := CheckImageExistOnPublicECR(t.Context(), tt.repo, tt.tag)
 			if err != nil {
 				if tt.expectedError == "" {
 					t.Fatalf("unexpected error: %v", err)

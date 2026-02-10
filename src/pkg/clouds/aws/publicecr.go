@@ -19,12 +19,11 @@ type PublicECRAPI interface {
 var ecrPublicAuthToken string
 
 var newPublicECRClientFromConfig = func(cfg aws.Config) PublicECRAPI {
-	cfg.Region = "us-east-1" // ECR Public is only in us-east-1
 	return ecrpublic.NewFromConfig(cfg)
 }
 
-func (a *Aws) CheckImageExistOnPublicECR(ctx context.Context, repo, tag string) (bool, error) {
-	cfg, err := a.LoadConfig(ctx)
+func CheckImageExistOnPublicECR(ctx context.Context, repo, tag string) (bool, error) {
+	cfg, err := LoadDefaultConfig(ctx, "us-east-1") // ECR Public is only in us-east-1
 	if err != nil {
 		return false, err
 	}

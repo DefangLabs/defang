@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"io"
 	"iter"
-	"strings"
 	"sync"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -45,9 +43,8 @@ func (a s3Obj) Size() int64 {
 }
 
 type S3Client interface {
-	GetBucketLocation(ctx context.Context, params *s3.GetBucketLocationInput, optFns ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error)
+	aws.S3Lister
 	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
-	ListBuckets(ctx context.Context, params *s3.ListBucketsInput, optFns ...func(*s3.Options)) (*s3.ListBucketsOutput, error)
 	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
 }
 
@@ -91,10 +88,11 @@ func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string)
 	}, nil
 }
 
-func listPulumiStacksAllRegions(ctx context.Context, s3client S3Client) (iter.Seq[string], error) {
+func listPulumiStacksAllRegions(ctx context.Context, s3client aws.S3Lister) (iter.Seq[string], error) {
 	// Use a single S3 query to list all buckets with the defang-cd- prefix
 	// This is faster than calling CloudFormation DescribeStacks in each region
-	listBucketsOutput, err := s3client.ListBuckets(ctx, &s3.ListBucketsInput{})
+	// Filter by prefix: defang-cd-
+	buckets, err := aws.ListBucketsByPrefix(ctx, s3client, byoc.CdTaskPrefix+"-")
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
@@ -106,34 +104,11 @@ func listPulumiStacksAllRegions(ctx context.Context, s3client S3Client) (iter.Se
 
 		// Filter buckets by prefix and get their locations
 		var wg sync.WaitGroup
-		for _, bucket := range listBucketsOutput.Buckets {
-			if bucket.Name == nil {
-				continue
-			}
-			// Filter by prefix: defang-cd-
-			if !strings.HasPrefix(*bucket.Name, byoc.CdTaskPrefix+"-") {
-				continue
-			}
-
-			// Get bucket location
-			locationOutput, err := s3client.GetBucketLocation(ctx, &s3.GetBucketLocationInput{
-				Bucket: bucket.Name,
-			})
-			if err != nil {
-				term.Debugf("Skipping bucket %s: failed to get location: %v", *bucket.Name, AnnotateAwsError(err))
-				continue
-			}
-
-			// GetBucketLocation returns empty string for us-east-1 buckets
-			bucketRegion := aws.Region(locationOutput.LocationConstraint)
-			if bucketRegion == "" {
-				bucketRegion = region.USEast1
-			}
-
+		for bucket, bucketRegion := range buckets {
 			wg.Add(1)
 			go func(region aws.Region) {
 				defer wg.Done()
-				stacks, err := listPulumiStacksInBucket(ctx, region, *bucket.Name)
+				stacks, err := listPulumiStacksInBucket(ctx, region, bucket)
 				if err != nil {
 					return
 				}

@@ -1,10 +1,12 @@
 package ecs
 
 import (
+	"context"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	awsx "github.com/aws/aws-sdk-go-v2/aws"
 )
 
 const (
@@ -18,6 +20,7 @@ type TaskArn = clouds.TaskID
 
 type AwsEcs struct {
 	aws.Aws
+	CDRegion               aws.Region
 	BucketName             string
 	CIRoleARN              string
 	ClusterName            string
@@ -29,6 +32,15 @@ type AwsEcs struct {
 	SubNetID               string
 	TaskDefARN             string
 	VpcID                  string
+}
+
+func (a *AwsEcs) LoadConfigForCD(ctx context.Context) (awsx.Config, error) {
+	cfg, err := aws.LoadDefaultConfig(ctx, a.CDRegion)
+	// If we don't have an region override for CD, use the current AWS region
+	if a.CDRegion == "" {
+		a.CDRegion = aws.Region(cfg.Region)
+	}
+	return cfg, err
 }
 
 func PlatformToArchOS(platform string) (string, string) {
@@ -58,12 +70,12 @@ func (a *AwsEcs) GetVpcID() string {
 	return a.VpcID
 }
 
-func (a *AwsEcs) MakeARN(service, resource string) string {
+func (a *AwsEcs) MakeCdARN(service, resource string) string {
 	return strings.Join([]string{
 		"arn",
 		"aws",
 		service,
-		string(a.Region),
+		string(a.CDRegion),
 		a.AccountID,
 		resource,
 	}, ":")
