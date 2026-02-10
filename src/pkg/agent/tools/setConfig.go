@@ -45,7 +45,7 @@ func HandleSetConfig(ctx context.Context, loader client.Loader, params SetConfig
 
 	if params.ProjectName == "" {
 		term.Debug("Function invoked: cli.LoadProjectName")
-		projectName, err := cliInterface.LoadProjectName(ctx, loader, provider)
+		projectName, err := cliInterface.LoadProjectName(ctx, loader)
 		if err != nil {
 			return "", fmt.Errorf("failed to load project name: %w", err)
 		}

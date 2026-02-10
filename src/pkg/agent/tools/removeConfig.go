@@ -41,7 +41,7 @@ func HandleRemoveConfigTool(ctx context.Context, loader client.Loader, params Re
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
 	term.Debug("Function invoked: cli.LoadProjectName")
-	projectName, err := cli.LoadProjectName(ctx, loader, provider)
+	projectName, err := cli.LoadProjectName(ctx, loader)
 	if err != nil {
 		return "", fmt.Errorf("failed to load project name: %w", err)
 	}

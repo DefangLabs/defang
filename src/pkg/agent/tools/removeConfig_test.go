@@ -41,7 +41,7 @@ func (m *MockRemoveConfigCLI) NewProvider(ctx context.Context, providerId client
 	return nil // Mock provider
 }
 
-func (m *MockRemoveConfigCLI) LoadProjectName(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
+func (m *MockRemoveConfigCLI) LoadProjectName(ctx context.Context, loader client.Loader) (string, error) {
 	m.CallLog = append(m.CallLog, "LoadProjectName")
 	if m.LoadProjectNameError != nil {
 		return "", m.LoadProjectNameError

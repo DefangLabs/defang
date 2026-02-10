@@ -62,7 +62,7 @@ func HandleLogsTool(ctx context.Context, loader client.Loader, params LogsParams
 	}
 
 	term.Debug("Function invoked: cli.LoadProjectName")
-	projectName, err := cli.LoadProjectName(ctx, loader, provider)
+	projectName, err := cli.LoadProjectName(ctx, loader)
 	if err != nil {
 		return "", fmt.Errorf("failed to load project name: %w", err)
 	}

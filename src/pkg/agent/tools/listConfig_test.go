@@ -41,7 +41,7 @@ func (m *MockListConfigCLI) NewProvider(ctx context.Context, providerId client.P
 	return nil // Mock provider
 }
 
-func (m *MockListConfigCLI) LoadProjectName(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
+func (m *MockListConfigCLI) LoadProjectName(ctx context.Context, loader client.Loader) (string, error) {
 	m.CallLog = append(m.CallLog, "LoadProjectName")
 	if m.LoadProjectNameError != nil {
 		return "", m.LoadProjectNameError

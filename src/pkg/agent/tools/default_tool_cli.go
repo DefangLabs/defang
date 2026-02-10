@@ -63,7 +63,7 @@ func (DefaultToolCLI) ComposeDown(ctx context.Context, projectName string, fabri
 	return cli.ComposeDown(ctx, projectName, fabric, provider)
 }
 
-func (DefaultToolCLI) LoadProjectName(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
+func (DefaultToolCLI) LoadProjectName(ctx context.Context, loader client.Loader) (string, error) {
 	projectName, _, err := loader.LoadProjectName(ctx)
 	return projectName, err
 }
