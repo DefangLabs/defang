@@ -35,17 +35,6 @@ func newMockElicitationsController() *mockElicitationsController {
 	}
 }
 
-func (m *mockElicitationsController) RequestString(ctx context.Context, message, field string) (string, error) {
-	m.callOrder = append(m.callOrder, "RequestString:"+field)
-	if err, exists := m.errors[field]; exists {
-		return "", err
-	}
-	if response, exists := m.responses[field]; exists {
-		return response, nil
-	}
-	return "", errors.New("mock: no response configured for field " + field)
-}
-
 func (m *mockElicitationsController) RequestStringWithOptions(ctx context.Context, message, field string, opts ...func(*elicitations.Options)) (string, error) {
 	m.callOrder = append(m.callOrder, "RequestStringWithOptions:"+field)
 	if err, exists := m.defaultErrors[field]; exists {

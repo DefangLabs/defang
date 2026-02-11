@@ -18,11 +18,6 @@ type MockElicitationsController struct {
 	mock.Mock
 }
 
-func (m *MockElicitationsController) RequestString(ctx context.Context, message, field string) (string, error) {
-	args := m.Called(ctx, message, field)
-	return args.String(0), args.Error(1)
-}
-
 func (m *MockElicitationsController) RequestStringWithOptions(ctx context.Context, message, field string, opts ...func(*elicitations.Options)) (string, error) {
 	args := m.Called(ctx, message, field, opts)
 	return args.String(0), args.Error(1)

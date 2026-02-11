@@ -105,7 +105,7 @@ func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployPa
 
 func requestMissingConfig(ctx context.Context, ec elicitations.Controller, cli CLIInterface, provider client.Provider, projectName string, names []string) error {
 	for _, name := range names {
-		value, err := ec.RequestString(ctx, "This config value needs to be set", name)
+		value, err := ec.RequestStringWithOptions(ctx, "This config value needs to be set", name)
 		if err != nil {
 			return fmt.Errorf("failed to request config %q: %w", name, err)
 		}

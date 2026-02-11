@@ -137,7 +137,7 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 				params.Variables["GCP_PROJECT_ID"] = projectID
 				break
 			}
-			projectID, err := w.ec.RequestString(ctx, "What is your GCP Project ID?:", "gcp_project_id")
+			projectID, err := w.ec.RequestStringWithOptions(ctx, "What is your GCP Project ID?:", "gcp_project_id")
 			if err != nil {
 				return nil, fmt.Errorf("failed to elicit GCP Project ID: %w", err)
 			}
