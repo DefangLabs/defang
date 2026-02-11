@@ -18,7 +18,7 @@ type MockElicitationsController struct {
 	mock.Mock
 }
 
-func (m *MockElicitationsController) RequestStringWithOptions(ctx context.Context, message, field string, opts ...func(*elicitations.Options)) (string, error) {
+func (m *MockElicitationsController) RequestString(ctx context.Context, message, field string, opts ...func(*elicitations.Options)) (string, error) {
 	args := m.Called(ctx, message, field, opts)
 	return args.String(0), args.Error(1)
 }
@@ -187,7 +187,7 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("AWS", nil)
 
 	// Mock wizard parameter collection - region selection (default is us-west-2 for AWS)
-	mockEC.On("RequestStringWithOptions", ctx, "Which region do you want to deploy to?", "region", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
+	mockEC.On("RequestString", ctx, "Which region do you want to deploy to?", "region", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
 		o := &elicitations.Options{}
 		for _, opt := range opts {
 			opt(o)
@@ -196,7 +196,7 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 	})).Return("us-east-1", nil)
 
 	// Mock wizard parameter collection - stack name (default name based on provider and region)
-	mockEC.On("RequestStringWithOptions", ctx, "What do you want to call this stack?:", "stack_name", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
+	mockEC.On("RequestString", ctx, "What do you want to call this stack?:", "stack_name", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
 		o := &elicitations.Options{}
 		for _, opt := range opts {
 			opt(o)
@@ -208,8 +208,8 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 	// If profiles are found on filesystem, it will use RequestEnum
 	awsProfileOptions := []string{"default"}
 	mockEC.On("RequestEnum", ctx, "Which AWS profile do you want to use?", "aws_profile", awsProfileOptions).Return("staging", nil).Maybe()
-	// If no profiles are found, it will use RequestStringWithOptions
-	mockEC.On("RequestStringWithOptions", ctx, "Which AWS profile do you want to use?", "aws_profile", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
+	// If no profiles are found, it will use RequestString
+	mockEC.On("RequestString", ctx, "Which AWS profile do you want to use?", "aws_profile", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
 		o := &elicitations.Options{}
 		for _, opt := range opts {
 			opt(o)
@@ -263,7 +263,7 @@ func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
 	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("AWS", nil)
 
 	// Mock wizard parameter collection - region selection
-	mockEC.On("RequestStringWithOptions", ctx, "Which region do you want to deploy to?", "region", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
+	mockEC.On("RequestString", ctx, "Which region do you want to deploy to?", "region", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
 		o := &elicitations.Options{}
 		for _, opt := range opts {
 			opt(o)
@@ -272,7 +272,7 @@ func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
 	})).Return("us-west-2", nil)
 
 	// Mock wizard parameter collection - stack name (default name based on provider and region)
-	mockEC.On("RequestStringWithOptions", ctx, "What do you want to call this stack?:", "stack_name", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
+	mockEC.On("RequestString", ctx, "What do you want to call this stack?:", "stack_name", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
 		o := &elicitations.Options{}
 		for _, opt := range opts {
 			opt(o)
@@ -284,8 +284,8 @@ func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
 	// If profiles are found on filesystem, it will use RequestEnum
 	awsProfileOptions := []string{"default"}
 	mockEC.On("RequestEnum", ctx, "Which AWS profile do you want to use?", "aws_profile", awsProfileOptions).Return("default", nil).Maybe()
-	// If no profiles are found, it will use RequestStringWithOptions
-	mockEC.On("RequestStringWithOptions", ctx, "Which AWS profile do you want to use?", "aws_profile", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
+	// If no profiles are found, it will use RequestString
+	mockEC.On("RequestString", ctx, "Which AWS profile do you want to use?", "aws_profile", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
 		o := &elicitations.Options{}
 		for _, opt := range opts {
 			opt(o)
@@ -459,7 +459,7 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("AWS", nil)
 
 	// Mock wizard parameter collection - region selection
-	mockEC.On("RequestStringWithOptions", ctx, "Which region do you want to deploy to?", "region", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
+	mockEC.On("RequestString", ctx, "Which region do you want to deploy to?", "region", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
 		o := &elicitations.Options{}
 		for _, opt := range opts {
 			opt(o)
@@ -468,7 +468,7 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 	})).Return("us-east-1", nil)
 
 	// Mock wizard parameter collection - stack name (default name based on provider and region)
-	mockEC.On("RequestStringWithOptions", ctx, "What do you want to call this stack?:", "stack_name", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
+	mockEC.On("RequestString", ctx, "What do you want to call this stack?:", "stack_name", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
 		o := &elicitations.Options{}
 		for _, opt := range opts {
 			opt(o)
@@ -480,8 +480,8 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 	// If profiles are found on filesystem, it will use RequestEnum
 	awsProfileOptions := []string{"default"}
 	mockEC.On("RequestEnum", ctx, "Which AWS profile do you want to use?", "aws_profile", awsProfileOptions).Return("staging", nil).Maybe()
-	// If no profiles are found, it will use RequestStringWithOptions
-	mockEC.On("RequestStringWithOptions", ctx, "Which AWS profile do you want to use?", "aws_profile", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
+	// If no profiles are found, it will use RequestString
+	mockEC.On("RequestString", ctx, "Which AWS profile do you want to use?", "aws_profile", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
 		o := &elicitations.Options{}
 		for _, opt := range opts {
 			opt(o)

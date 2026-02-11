@@ -25,7 +25,7 @@ func WithDefault(value string) func(*Options) {
 }
 
 type Controller interface {
-	RequestStringWithOptions(ctx context.Context, message, field string, opts ...func(*Options)) (string, error)
+	RequestString(ctx context.Context, message, field string, opts ...func(*Options)) (string, error)
 	RequestEnum(ctx context.Context, message, field string, options []string) (string, error)
 	SetSupported(supported bool)
 	IsSupported() bool
@@ -58,7 +58,7 @@ func NewController(client Client) Controller {
 	}
 }
 
-func (c *controller) RequestStringWithOptions(ctx context.Context, message, field string, opts ...func(*Options)) (string, error) {
+func (c *controller) RequestString(ctx context.Context, message, field string, opts ...func(*Options)) (string, error) {
 	var options Options
 	for _, opt := range opts {
 		opt(&options)

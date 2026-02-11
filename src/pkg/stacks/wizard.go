@@ -72,7 +72,7 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 		params.Region = ""
 	} else if params.Region == "" {
 		defaultRegion := client.GetRegion(params.Provider)
-		region, err := w.ec.RequestStringWithOptions(ctx, "Which region do you want to deploy to?", "region",
+		region, err := w.ec.RequestString(ctx, "Which region do you want to deploy to?", "region",
 			elicitations.WithDefault(defaultRegion),
 		)
 		if err != nil {
@@ -83,7 +83,7 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 
 	if params.Name == "" {
 		defaultName := MakeDefaultName(params.Provider, params.Region)
-		name, err := w.ec.RequestStringWithOptions(ctx, "What do you want to call this stack?:", "stack_name",
+		name, err := w.ec.RequestString(ctx, "What do you want to call this stack?:", "stack_name",
 			elicitations.WithDefault(defaultName),
 			elicitations.WithValidator(ValidStackName),
 		)
@@ -98,7 +98,7 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 	case client.ProviderAWS:
 		if params.Variables["AWS_PROFILE"] == "" {
 			if os.Getenv("AWS_PROFILE") != "" {
-				profile, err := w.ec.RequestStringWithOptions(ctx, "Which AWS profile do you want to use?", "aws_profile",
+				profile, err := w.ec.RequestString(ctx, "Which AWS profile do you want to use?", "aws_profile",
 					elicitations.WithDefault(os.Getenv("AWS_PROFILE")),
 				)
 				if err != nil {
@@ -109,7 +109,7 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 			}
 			profiles, err := w.profileLister.ListProfiles()
 			if err != nil || len(profiles) == 0 {
-				profile, err := w.ec.RequestStringWithOptions(ctx, "Which AWS profile do you want to use?", "aws_profile",
+				profile, err := w.ec.RequestString(ctx, "Which AWS profile do you want to use?", "aws_profile",
 					elicitations.WithDefault("default"),
 				)
 				if err != nil {
@@ -128,7 +128,7 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 		if params.Variables["GCP_PROJECT_ID"] == "" {
 			_, envProjectID := pkg.GetFirstEnv(pkg.GCPProjectEnvVars...)
 			if envProjectID != "" {
-				projectID, err := w.ec.RequestStringWithOptions(ctx, "What is your GCP Project ID?:", "gcp_project_id",
+				projectID, err := w.ec.RequestString(ctx, "What is your GCP Project ID?:", "gcp_project_id",
 					elicitations.WithDefault(envProjectID),
 				)
 				if err != nil {
@@ -137,7 +137,7 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 				params.Variables["GCP_PROJECT_ID"] = projectID
 				break
 			}
-			projectID, err := w.ec.RequestStringWithOptions(ctx, "What is your GCP Project ID?:", "gcp_project_id")
+			projectID, err := w.ec.RequestString(ctx, "What is your GCP Project ID?:", "gcp_project_id")
 			if err != nil {
 				return nil, fmt.Errorf("failed to elicit GCP Project ID: %w", err)
 			}

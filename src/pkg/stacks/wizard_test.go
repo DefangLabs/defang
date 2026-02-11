@@ -35,12 +35,18 @@ func newMockElicitationsController() *mockElicitationsController {
 	}
 }
 
-func (m *mockElicitationsController) RequestStringWithOptions(ctx context.Context, message, field string, opts ...func(*elicitations.Options)) (string, error) {
-	m.callOrder = append(m.callOrder, "RequestStringWithOptions:"+field)
+func (m *mockElicitationsController) RequestString(ctx context.Context, message, field string, opts ...func(*elicitations.Options)) (string, error) {
+	m.callOrder = append(m.callOrder, "RequestString:"+field)
 	if err, exists := m.defaultErrors[field]; exists {
 		return "", err
 	}
+	if err, exists := m.errors[field]; exists {
+		return "", err
+	}
 	if response, exists := m.defaultResponses[field]; exists {
+		return response, nil
+	}
+	if response, exists := m.responses[field]; exists {
 		return response, nil
 	}
 	var options elicitations.Options
@@ -127,9 +133,9 @@ func TestWizardCollectParameters(t *testing.T) {
 			},
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithOptions:region",
-				"RequestStringWithOptions:stack_name",
-				"RequestStringWithOptions:aws_profile",
+				"RequestString:region",
+				"RequestString:stack_name",
+				"RequestString:aws_profile",
 			},
 		},
 		{
@@ -155,8 +161,8 @@ func TestWizardCollectParameters(t *testing.T) {
 			},
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithOptions:region",
-				"RequestStringWithOptions:stack_name",
+				"RequestString:region",
+				"RequestString:stack_name",
 				"RequestEnum:aws_profile",
 			},
 		},
@@ -185,9 +191,9 @@ func TestWizardCollectParameters(t *testing.T) {
 			},
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithOptions:region",
-				"RequestStringWithOptions:stack_name",
-				"RequestStringWithOptions:gcp_project_id",
+				"RequestString:region",
+				"RequestString:stack_name",
+				"RequestString:gcp_project_id",
 			},
 		},
 		{
@@ -213,8 +219,8 @@ func TestWizardCollectParameters(t *testing.T) {
 			},
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithOptions:region",
-				"RequestStringWithOptions:stack_name",
+				"RequestString:region",
+				"RequestString:stack_name",
 				"RequestString:gcp_project_id",
 			},
 		},
@@ -234,7 +240,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			},
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithOptions:stack_name",
+				"RequestString:stack_name",
 			},
 		},
 		{
@@ -254,8 +260,8 @@ func TestWizardCollectParameters(t *testing.T) {
 			},
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithOptions:region",
-				"RequestStringWithOptions:stack_name",
+				"RequestString:region",
+				"RequestString:stack_name",
 			},
 		},
 		{
@@ -292,7 +298,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedResult: nil,
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithOptions:region",
+				"RequestString:region",
 			},
 		},
 		{
@@ -308,8 +314,8 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedResult: nil,
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithOptions:region",
-				"RequestStringWithOptions:stack_name",
+				"RequestString:region",
+				"RequestString:stack_name",
 			},
 		},
 		{
@@ -330,8 +336,8 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedResult: nil,
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithOptions:region",
-				"RequestStringWithOptions:stack_name",
+				"RequestString:region",
+				"RequestString:stack_name",
 				"RequestEnum:aws_profile",
 			},
 		},
@@ -351,8 +357,8 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedResult: nil,
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
-				"RequestStringWithOptions:region",
-				"RequestStringWithOptions:stack_name",
+				"RequestString:region",
+				"RequestString:stack_name",
 				"RequestString:gcp_project_id",
 			},
 		},
