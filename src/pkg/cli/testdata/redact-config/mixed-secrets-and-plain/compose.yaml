@@ -1,0 +1,16 @@
+services:
+  frontend:
+    image: nginx
+    environment:
+      APP_NAME: my-frontend
+      PORT: "3000"
+  backend:
+    image: node
+    environment:
+      APP_NAME: my-backend
+      PORT: "8080"
+      DATABASE_URL: postgres://admin:p455w0rd@db.example.com:5432/myapp
+      GITHUB_TOKEN: ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890
+      API_KEY: api-key=50m34p1k3y
+      LOG_LEVEL: info
+      NODE_ENV: production

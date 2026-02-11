@@ -12,7 +12,7 @@ import (
 )
 
 func TestPrintConfigResolutionSummary(t *testing.T) {
-	testAllConfigResolutionFiles(t, func(t *testing.T, name, path string) {
+	testAllConfigResolutionFiles(t, "testdata/config-resolution", func(t *testing.T, name, path string) {
 		stdout, _ := term.SetupTestTerm(t)
 
 		loader := compose.NewLoader(compose.WithPath(path))
@@ -50,11 +50,35 @@ func TestPrintConfigResolutionSummary(t *testing.T) {
 	})
 }
 
-func testAllConfigResolutionFiles(t *testing.T, f func(t *testing.T, name, path string)) {
+func TestPrintRedactedConfigResolutionSummary(t *testing.T) {
+	testAllConfigResolutionFiles(t, "testdata/redact-config", func(t *testing.T, name, path string) {
+		stdout, _ := term.SetupTestTerm(t)
+
+		loader := compose.NewLoader(compose.WithPath(path))
+		proj, err := loader.LoadProject(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = printConfigResolutionSummary(proj, nil)
+		if err != nil {
+			t.Fatalf("PrintConfigResolutionSummary() error = %v", err)
+		}
+
+		output := stdout.Bytes()
+
+		// Compare the output with the golden file
+		if err := pkg.Compare(output, path+".golden"); err != nil {
+			t.Error(err)
+		}
+	})
+}
+
+func testAllConfigResolutionFiles(t *testing.T, dir string, f func(t *testing.T, name, path string)) {
 	t.Helper()
 
 	composeRegex := regexp.MustCompile(`^(?i)(docker-)?compose.ya?ml$`)
-	err := filepath.WalkDir("testdata/configresolution", func(path string, d os.DirEntry, err error) error {
+	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !composeRegex.MatchString(d.Name()) {
 			return err
 		}

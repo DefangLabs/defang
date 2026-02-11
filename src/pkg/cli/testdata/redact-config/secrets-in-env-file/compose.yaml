@@ -1,0 +1,9 @@
+services:
+  web:
+    image: nginx
+    environment:
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      DATABASE_URL: ${DATABASE_URL}
+      API_SECRET: ${API_SECRET}
+      APP_ENV: ${APP_ENV}
+      STATIC_VALUE: hello

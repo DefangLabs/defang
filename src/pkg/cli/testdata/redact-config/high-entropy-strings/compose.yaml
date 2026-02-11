@@ -1,0 +1,9 @@
+services:
+  app:
+    image: python
+    environment:
+      SESSION_SECRET: VEfk5vO0Q53VkK_uicor
+      ENCRYPTION_KEY: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+      SIGNING_KEY: xK9mPqR7sT2vW5yZ8aB3cD6eF
+      APP_ENV: production
+      LOG_LEVEL: info

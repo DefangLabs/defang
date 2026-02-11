@@ -1,0 +1,9 @@
+services:
+  web:
+    image: nginx
+    environment:
+      SAFE_URL: https://example.com/api/v1
+      WEBHOOK_URL: https://user:p455w0rd@example.com
+      CALLBACK_URL: https://user:p845w0rd@hooks.example.com/callback
+      REDIS_URL: rediss://foo:p41fce90d44ac1d891bd21fdbc5dfc1bd7f163e33a6934c30093eaf56c1c23937@ec2-98-85-106-43.compute-1.amazonaws.com:8240
+      REDIS_ALT_URL: rediss://:p41fce90d44ac1d891bd21fdbc5dfc1bd7f163e33a6934c30093eaf56c1c23937@ec2-98-85-106-43.compute-1.amazonaws.com:8240

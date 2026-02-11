@@ -1,0 +1,11 @@
+services:
+  web:
+    image: nginx
+    environment:
+      APP_ENV: production
+      LOG_LEVEL: info
+      PORT: "8080"
+      API_URL: https://api.example.com
+      DOCS_PATH: /leaderboard/api/hubs
+      NODE_ENV: production
+      GREETING: not a secret
