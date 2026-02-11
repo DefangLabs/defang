@@ -18,7 +18,7 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-func (b *ByocAws) fetchAndStreamAlbLogs(ctx context.Context, projectName string, since, end time.Time) (iter.Seq2[cw.LogEvent, error], error) {
+func (b *ByocAws) fetchAndStreamAlbLogs(ctx context.Context, projectName string, since, end time.Time, pattern string) (iter.Seq2[cw.LogEvent, error], error) {
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return nil, err
@@ -30,7 +30,10 @@ func (b *ByocAws) fetchAndStreamAlbLogs(ctx context.Context, projectName string,
 		return nil, err
 	}
 
-	bucketPrefix := fmt.Sprintf("%s-%s-%s-alb-logs", b.Prefix, projectName, b.PulumiStack)
+	bucketPrefix := fmt.Sprintf("%s-%s-alb-logs", projectName, b.PulumiStack)
+	if b.Prefix != "" {
+		bucketPrefix = b.Prefix + "-" + bucketPrefix
+	}
 	term.Debug("Query ALB logs", bucketPrefix)
 	if len(bucketPrefix) > 31 {
 		// HACK: AWS CD truncates the ALB name to 31 characters (because of the long Terraform suffix)
@@ -53,13 +56,13 @@ func (b *ByocAws) fetchAndStreamAlbLogs(ctx context.Context, projectName string,
 	}
 
 	return func(yield func(cw.LogEvent, error) bool) {
-		for logs, err := range b.fetchAndStreamAlbLogsFromBucket(ctx, bucketName, since, end, s3Client) {
+		for logs, err := range b.fetchAndStreamAlbLogsFromBucket(ctx, bucketName, since, end, s3Client, pattern) {
 			if err != nil {
 				yield(cw.LogEvent{}, err)
 				return
 			}
 			for _, log := range logs {
-				timestamp := log.Timestamp.UnixMilli()
+				timestamp := log.Timestamp.UnixMilli() // FIXME: this destroys the original timestamp precision
 				if !yield(cw.LogEvent{
 					Message:   &log.Message,
 					Timestamp: &timestamp,
@@ -82,63 +85,71 @@ func getAlbLogObjectGroupKey(objName string) string {
 	return key
 }
 
-func (b *ByocAws) fetchAndStreamAlbLogsFromBucket(ctx context.Context, bucketName string, since, end time.Time, s3Client s3Lister) iter.Seq2[[]ALBLogEntry, error] {
+func (b *ByocAws) fetchAndStreamAlbLogsFromBucket(ctx context.Context, bucketName string, since, end time.Time, s3Client s3Lister, pattern string) iter.Seq2[[]ALBLogEntry, error] {
 	return func(yield func([]ALBLogEntry, error) bool) {
 		if end.IsZero() {
 			end = time.Now()
 		}
+		if since.IsZero() {
+			since = end.Add(-60 * time.Minute)
+		}
 		// If the end time is 00:00:01Z, we should still consider log files modified at 00:05:03Z
 		// because each file has ~5 minutes of logs and writing the file will have take a few seconds.
 		lastModifiedEnd := end.Add(5*time.Minute + 5*time.Second)
-		for since.Before(end) {
-			year, month, day := since.UTC().Date()
-			objectPrefix := fmt.Sprintf("AWSLogs/%s/elasticloadbalancing/%s/%04d/%02d/%02d/", b.driver.AccountID, b.driver.Region, year, month, day)
 
-			listInput := s3.ListObjectsV2Input{
-				Bucket: &bucketName,
-				Prefix: &objectPrefix,
-				// StartAfter: TODO: if we know the ALB name, we can use this to quickly skip objects < since
-			}
-			var groupKey string
-			var group []s3types.Object
-			for {
-				list, err := s3Client.ListObjectsV2(ctx, &listInput)
-				if err != nil {
-					yield(nil, err)
-					return
-				}
-				for _, obj := range list.Contents {
-					// LastModified is time of latest record. Skip objects with events older than the since-time
-					if obj.LastModified.Before(since) {
-						continue
-					}
-					// Check end-time, but consider that each object has ~5 minutes of logs
-					if obj.LastModified.After(lastModifiedEnd) {
-						yield(readAlbLogsGroup(ctx, bucketName, group, since, end, s3Client)) // flush last one
-						return
-					}
-					if key := getAlbLogObjectGroupKey(*obj.Key); key == groupKey {
-						// Same timespan as the previous object, so add to group for merging.
-						group = append(group, obj)
-					} else {
-						// New timespan, so stream logs from the previous group(s) before starting a new group.
-						if !yield(readAlbLogsGroup(ctx, bucketName, group, since, end, s3Client)) {
-							return
-						}
-						group = []s3types.Object{obj}
-						groupKey = key
-					}
-				}
-				if list.NextContinuationToken == nil {
-					break
-				}
-				listInput.ContinuationToken = list.NextContinuationToken
-			}
-			if !yield(readAlbLogsGroup(ctx, bucketName, group, since, end, s3Client)) {
+		// Use a single listing with the region-level prefix instead of iterating day-by-day.
+		// StartAfter skips to the start date, so empty buckets complete in a single API call.
+		objectPrefix := fmt.Sprintf("AWSLogs/%s/elasticloadbalancing/%s/", b.driver.AccountID, b.driver.Region)
+		year, month, day := since.UTC().Date()
+		startAfter := fmt.Sprintf("AWSLogs/%s/elasticloadbalancing/%s/%04d/%02d/%02d/", b.driver.AccountID, b.driver.Region, year, month, day)
+
+		listInput := s3.ListObjectsV2Input{
+			Bucket:     &bucketName,
+			Prefix:     &objectPrefix,
+			StartAfter: &startAfter,
+		}
+		var groupKey string
+		var group []s3types.Object
+	done:
+		for {
+			list, err := s3Client.ListObjectsV2(ctx, &listInput)
+			if err != nil {
+				yield(nil, err)
 				return
 			}
-			// Keep looping next day's logs (resets time)
-			since = time.Date(year, month, day+1, 0, 0, 0, 0, time.UTC)
+			for _, obj := range list.Contents {
+				// LastModified is time of latest record. Skip objects with events older than the since-time
+				if obj.LastModified.Before(since) {
+					continue
+				}
+				// Check end-time, but consider that each object has ~5 minutes of logs
+				if obj.LastModified.After(lastModifiedEnd) {
+					break done
+				}
+				if key := getAlbLogObjectGroupKey(*obj.Key); key == groupKey {
+					// Same timespan as the previous object, so add to group for merging.
+					group = append(group, obj)
+				} else {
+					// New timespan, so stream logs from the previous group(s) before starting a new group.
+					logs, err := readAlbLogsGroup(ctx, bucketName, group, since, end, s3Client, pattern)
+					if len(logs) > 0 || err != nil {
+						if !yield(logs, err) {
+							return
+						}
+					}
+					group = []s3types.Object{obj}
+					groupKey = key
+				}
+			}
+			if list.NextContinuationToken == nil {
+				break
+			}
+			listInput.ContinuationToken = list.NextContinuationToken
+		}
+		// Flush remaining group
+		logs, err := readAlbLogsGroup(ctx, bucketName, group, since, end, s3Client, pattern)
+		if len(logs) > 0 || err != nil {
+			yield(logs, err)
 		}
 	}
 }
@@ -148,7 +159,7 @@ type ALBLogEntry struct {
 	Timestamp time.Time
 }
 
-func readAlbLogsGroup(ctx context.Context, bucketName string, group []s3types.Object, since, end time.Time, s3Client s3Lister) ([]ALBLogEntry, error) {
+func readAlbLogsGroup(ctx context.Context, bucketName string, group []s3types.Object, since, end time.Time, s3Client s3Lister, pattern string) ([]ALBLogEntry, error) {
 	var allEntries []ALBLogEntry
 	for _, obj := range group {
 		content, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
@@ -158,7 +169,7 @@ func readAlbLogsGroup(ctx context.Context, bucketName string, group []s3types.Ob
 		if err != nil {
 			return nil, err // or continue with other objects?
 		}
-		entries, err := readAlbLogs(content.Body, since, end)
+		entries, err := readAlbLogs(content.Body, since, end, pattern)
 		if err != nil {
 			return nil, err // or continue with other objects?
 		}
@@ -187,7 +198,7 @@ func parseAlbLogTime(logLine string) (time.Time, error) {
 	return time.Parse(time.RFC3339Nano, logLine[timestampStart:timestampEnd])
 }
 
-func readAlbLogs(body io.ReadCloser, since, end time.Time) ([]ALBLogEntry, error) {
+func readAlbLogs(body io.ReadCloser, since, end time.Time, pattern string) ([]ALBLogEntry, error) {
 	defer body.Close()
 	gzipReader, err := gzip.NewReader(body)
 	if err != nil {
@@ -197,6 +208,9 @@ func readAlbLogs(body io.ReadCloser, since, end time.Time) ([]ALBLogEntry, error
 	lineScanner := bufio.NewScanner(gzipReader)
 	for lineScanner.Scan() {
 		logLine := lineScanner.Text()
+		if !strings.Contains(logLine, pattern) {
+			continue
+		}
 		timestamp, err := parseAlbLogTime(logLine)
 		if err != nil {
 			continue // malformed timestamp: ignore

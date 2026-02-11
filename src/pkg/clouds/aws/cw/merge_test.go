@@ -142,7 +142,7 @@ func TestMergeLogEvents_EarlyStop(t *testing.T) {
 }
 
 func TestTakeFirstN(t *testing.T) {
-	tests := []struct {
+	testTakeN(t, TakeFirstN, []struct {
 		name     string
 		input    []int64
 		n        int
@@ -153,19 +153,11 @@ func TestTakeFirstN(t *testing.T) {
 		{"take 0", []int64{1, 2, 3}, 0, []int64{1, 2, 3}},
 		{"take negative", []int64{1, 2, 3}, -1, []int64{1, 2, 3}},
 		{"empty input", nil, 3, nil},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := collect(TakeFirstN(logEvents(tt.input...), tt.n))
-			require.NoError(t, err)
-			assert.Equal(t, tt.expected, got)
-		})
-	}
+	})
 }
 
 func TestTakeLastN(t *testing.T) {
-	tests := []struct {
+	testTakeN(t, TakeLastN, []struct {
 		name     string
 		input    []int64
 		n        int
@@ -176,11 +168,19 @@ func TestTakeLastN(t *testing.T) {
 		{"last 0", []int64{1, 2, 3}, 0, []int64{1, 2, 3}},
 		{"last negative", []int64{1, 2, 3}, -1, []int64{1, 2, 3}},
 		{"empty input", nil, 3, nil},
-	}
+	})
+}
 
+func testTakeN(t *testing.T, takeFn func(iter.Seq2[LogEvent, error], int) iter.Seq2[LogEvent, error], tests []struct {
+	name     string
+	input    []int64
+	n        int
+	expected []int64
+}) {
+	t.Helper()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := collect(TakeLastN(logEvents(tt.input...), tt.n))
+			got, err := collect(takeFn(logEvents(tt.input...), tt.n))
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, got)
 		})

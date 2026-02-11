@@ -10,7 +10,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPendingStream(t *testing.T) {
@@ -31,13 +31,15 @@ func TestPendingStream(t *testing.T) {
 	evts, err := QueryAndTailLogGroup(ctx, cw, LogGroupInput{
 		LogGroupARN: "arn:aws:logs:us-west-2:532501343364:log-group:/ecs/lio/logss:*",
 	}, time.Now().Add(-time.Minute), time.Time{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	for evt, err := range evts {
 		if err != nil {
 			t.Logf("Stream ended: %v", err)
 			break
 		}
-		fmt.Println(*evt.Message)
+		for _, evt := range evt {
+			fmt.Println(*evt.Message)
+		}
 	}
 }

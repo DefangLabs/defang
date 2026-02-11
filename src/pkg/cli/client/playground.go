@@ -89,7 +89,7 @@ func (g *PlaygroundProvider) Subscribe(ctx context.Context, req *defangv1.Subscr
 	if err != nil {
 		return nil, err
 	}
-	return ServerStreamIter(stream), nil
+	return serverStreamIter(stream), nil
 }
 
 func (g *PlaygroundProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
@@ -97,7 +97,23 @@ func (g *PlaygroundProvider) QueryLogs(ctx context.Context, req *defangv1.TailRe
 	if err != nil {
 		return nil, err
 	}
-	return ServerStreamIter(stream), nil
+	return serverStreamIter(stream), nil
+}
+
+// serverStreamIter adapts any ServerStream[T] (including connect-go ServerStreamForClient)
+// to iter.Seq2. The stream is closed when the consumer stops iterating or the stream ends.
+func serverStreamIter[T any](stream ServerStream[T]) iter.Seq2[*T, error] {
+	return func(yield func(*T, error) bool) {
+		defer stream.Close()
+		for stream.Receive() {
+			if !yield(stream.Msg(), nil) {
+				return
+			}
+		}
+		if err := stream.Err(); err != nil {
+			yield(nil, err)
+		}
+	}
 }
 
 func (g *PlaygroundProvider) CdCommand(ctx context.Context, req CdCommandRequest) (types.ETag, error) {

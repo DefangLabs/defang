@@ -235,7 +235,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 
 	term.Debug("Tail request:", tailRequest)
 
-	logs, err := provider.QueryLogs(ctx, tailRequest)
+	logSeq, err := provider.QueryLogs(ctx, tailRequest)
 	if err != nil {
 		return err
 	}
@@ -294,7 +294,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 		}
 	}
 
-	return receiveLogs(ctx, provider, projectName, tailRequest, logs, &options, doSpinner, handler)
+	return receiveLogs(ctx, provider, projectName, tailRequest, logSeq, &options, doSpinner, handler)
 }
 
 func makeHeadBookendOptions(options *TailOptions, firstLogTime time.Time) *TailOptions {
@@ -333,8 +333,8 @@ func printTailBookend(options *TailOptions, lastLogTime time.Time) {
 	}
 }
 
-func receiveLogs(ctx context.Context, provider client.Provider, projectName string, tailRequest *defangv1.TailRequest, logs iter.Seq2[*defangv1.TailResponse, error], options *TailOptions, doSpinner bool, handler LogEntryHandler) error {
-	next, stop := iter.Pull2(logs)
+func receiveLogs(ctx context.Context, provider client.Provider, projectName string, tailRequest *defangv1.TailRequest, logSeq iter.Seq2[*defangv1.TailResponse, error], options *TailOptions, doSpinner bool, handler LogEntryHandler) error {
+	next, stop := iter.Pull2(logSeq)
 	defer stop()
 
 	headBookendPrinted := false
@@ -369,12 +369,12 @@ func receiveLogs(ctx context.Context, provider client.Provider, projectName stri
 				}
 				tailRequest.Since = timestamppb.New(options.Since)
 				stop() // stop the old iterator
-				newLogs, err := provider.QueryLogs(ctx, tailRequest)
+				newLogSeq, err := provider.QueryLogs(ctx, tailRequest)
 				if err != nil {
 					term.Debug("Reconnect failed:", err)
 					return err
 				}
-				next, stop = iter.Pull2(newLogs)
+				next, stop = iter.Pull2(newLogSeq)
 				if !options.Raw {
 					term.Printf("%*s", spaces, "\r") // clear the "reconnecting" message
 				}

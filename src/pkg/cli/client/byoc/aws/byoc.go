@@ -34,7 +34,6 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -694,18 +693,21 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 	//  * No Etag, service:		tail all tasks/services with that service name
 	//  * Etag, no services: 	tail all tasks/services with that Etag
 	//  * Etag, service:		tail that task/service
-	var evts iter.Seq2[cw.LogEvent, error]
+	var logSeq iter.Seq2[cw.LogEvent, error]
 	etag, err := types.ParseEtag(req.Etag)
 	if err != nil && req.Etag != "" {
 		// Assume invalid "etag" is the task ID of the CD task
-		evts, err = b.queryCdLogs(ctx, cwClient, req)
-		// no need to filter events by etag because we only show logs from the specified task ID
+		cdSeq, err := b.queryCdLogs(ctx, cwClient, req)
+		if err != nil {
+			return nil, AnnotateAwsError(err)
+		}
+		logSeq = cw.Flatten(cdSeq)
+		// No need to filter events by etag because we only show logs from the specified task ID
 	} else {
-		evts, err = b.queryLogs(ctx, cwClient, req)
-	}
-
-	if err != nil {
-		return nil, AnnotateAwsError(err)
+		logSeq, err = b.queryLogs(ctx, cwClient, req)
+		if err != nil {
+			return nil, AnnotateAwsError(err)
+		}
 	}
 
 	parser := &logEventParser{
@@ -713,12 +715,20 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 		services: req.Services,
 	}
 	return func(yield func(*defangv1.TailResponse, error) bool) {
-		for evt, err := range evts {
+		for event, err := range logSeq {
 			if err != nil {
-				yield(nil, AnnotateAwsError(err))
-				return
+				// Ignore ResourceNotFoundException errors which can happen if a log stream is missing
+				var x *cwTypes.ResourceNotFoundException
+				if errors.As(err, &x) {
+					term.Debugf("Log stream deleted while tailing, skipping: %v", err)
+					continue
+				}
+				if !yield(nil, AnnotateAwsError(err)) {
+					return
+				}
+				continue
 			}
-			resp := parser.parseEvent(evt)
+			resp := parser.parseEvent(event)
 			if resp != nil {
 				if !yield(resp, nil) {
 					return
@@ -728,7 +738,7 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 	}, nil
 }
 
-func (b *ByocAws) queryCdLogs(ctx context.Context, cwClient *cloudwatchlogs.Client, req *defangv1.TailRequest) (iter.Seq2[cw.LogEvent, error], error) {
+func (b *ByocAws) queryCdLogs(ctx context.Context, cwClient cw.LogsClient, req *defangv1.TailRequest) (iter.Seq2[[]cw.LogEvent, error], error) {
 	var err error
 	b.cdTaskArn, err = b.driver.GetTaskArn(req.Etag) // only fails on missing task ID
 	if err != nil {
@@ -743,7 +753,7 @@ func (b *ByocAws) queryCdLogs(ctx context.Context, cwClient *cloudwatchlogs.Clie
 	}
 }
 
-func (b *ByocAws) queryLogs(ctx context.Context, cwClient *cloudwatchlogs.Client, req *defangv1.TailRequest) (iter.Seq2[cw.LogEvent, error], error) {
+func (b *ByocAws) queryLogs(ctx context.Context, cwClient cw.LogsClient, req *defangv1.TailRequest) (iter.Seq2[cw.LogEvent, error], error) {
 	start := timeutils.AsTime(req.Since, time.Time{})
 	end := timeutils.AsTime(req.Until, time.Time{})
 
@@ -753,15 +763,19 @@ func (b *ByocAws) queryLogs(ctx context.Context, cwClient *cloudwatchlogs.Client
 	}
 	lgis := b.getLogGroupInputs(req.Etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))
 	if req.Follow {
-		return cw.QueryAndTailLogGroups(
+		logSeq, err := cw.QueryAndTailLogGroups(
 			ctx,
 			cwClient,
 			start,
 			end,
 			lgis...,
 		)
+		if err != nil {
+			return nil, err
+		}
+		return cw.Flatten(logSeq), nil
 	} else {
-		evts := cw.QueryLogGroups(
+		logSeq, err := cw.QueryLogGroups(
 			ctx,
 			cwClient,
 			start,
@@ -769,13 +783,26 @@ func (b *ByocAws) queryLogs(ctx context.Context, cwClient *cloudwatchlogs.Client
 			req.Limit,
 			lgis...,
 		)
+		if err != nil {
+			return nil, err
+		}
 		if len(req.Services) == 0 {
-			albIter, err := b.fetchAndStreamAlbLogs(ctx, req.Project, start, end)
-			if err == nil {
-				evts = cw.MergeLogEvents(evts, albIter)
+			albIter, err := b.fetchAndStreamAlbLogs(ctx, req.Project, start, end, req.Pattern)
+			if err != nil {
+				term.Debugf("Failed to fetch ALB logs: %v", err)
+			} else {
+				logSeq = cw.MergeLogEvents(logSeq, albIter)
+				if req.Limit > 0 {
+					// take the first/last n events only from the merged stream
+					if start.IsZero() {
+						logSeq = cw.TakeLastN(logSeq, int(req.Limit))
+					} else {
+						logSeq = cw.TakeFirstN(logSeq, int(req.Limit))
+					}
+				}
 			}
 		}
-		return evts, nil
+		return logSeq, nil
 	}
 }
 
@@ -911,13 +938,13 @@ func (b *ByocAws) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 	}
 
 	lgis := b.getSubscribeLogGroupInputs(req.Project)
-	evts, err := cw.QueryAndTailLogGroups(ctx, cwClient, b.cdStart, time.Time{}, lgis...)
+	logSeq, err := cw.QueryAndTailLogGroups(ctx, cwClient, b.cdStart, time.Time{}, lgis...)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
 
 	etag, _ := types.ParseEtag(req.Etag)
-	return parseSubscribeEvents(evts, etag, req.Services), nil
+	return parseSubscribeEvents(logSeq, etag, req.Services), nil
 }
 
 func (b *ByocAws) getSubscribeLogGroupInputs(projectName string) []cw.LogGroupInput {

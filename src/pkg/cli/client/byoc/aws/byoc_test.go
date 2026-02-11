@@ -6,23 +6,30 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/dns"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestDomainMultipleProjectSupport(t *testing.T) {
@@ -143,9 +150,9 @@ func TestSubscribe(t *testing.T) {
 			}
 
 			// Feed through parseSubscribeEvents
-			evtIter := func(yield func(cw.LogEvent, error) bool) {
+			evtIter := func(yield func([]cw.LogEvent, error) bool) {
 				for _, evt := range cwEvents {
-					if !yield(evt, nil) {
+					if !yield([]cw.LogEvent{evt}, nil) {
 						return
 					}
 				}
@@ -401,4 +408,301 @@ aws_secret_access_key = wJalrXUtnFEMI/KDEFANG/bPxRfiCYEXAMPLEKEY
 			}
 		})
 	}
+}
+
+// mockCWClient implements cw.LogsClient for testing queryLogs and queryCdLogs.
+type mockCWClient struct {
+	events []cwTypes.FilteredLogEvent
+}
+
+func (m *mockCWClient) FilterLogEvents(ctx context.Context, input *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error) {
+	events := m.events
+	if input.Limit != nil && int(*input.Limit) < len(events) {
+		events = events[:*input.Limit]
+	}
+	return &cloudwatchlogs.FilterLogEventsOutput{
+		Events: events,
+	}, nil
+}
+
+func (m *mockCWClient) StartLiveTail(ctx context.Context, input *cloudwatchlogs.StartLiveTailInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.StartLiveTailOutput, error) {
+	return nil, &cwTypes.ResourceNotFoundException{
+		Message: awssdk.String("mock: log group does not exist"),
+	}
+}
+
+// makeMockEvents creates n FilteredLogEvents with sequential timestamps and messages.
+// The log stream name follows the awslogs format: "<service>/<service>_<etag>/<taskID>"
+func makeMockEvents(n int, service, etag string) []cwTypes.FilteredLogEvent {
+	events := make([]cwTypes.FilteredLogEvent, n)
+	for i := range events {
+		ts := int64((i + 1) * 1000) // 1000, 2000, 3000, ...
+		events[i] = cwTypes.FilteredLogEvent{
+			Message:       awssdk.String(fmt.Sprintf("log message %d", i+1)),
+			Timestamp:     &ts,
+			LogStreamName: awssdk.String(fmt.Sprintf("%s/%s_%s/task%d", service, service, etag, i)),
+		}
+	}
+	return events
+}
+
+func newTestByocAws() *ByocAws {
+	b := &ByocAws{
+		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("us-test-2")),
+	}
+	b.driver.AccountID = "123456789012"
+	b.driver.LogGroupARN = "arn:aws:logs:us-test-2:123456789012:log-group:defang-cd-LogGroup:*"
+	b.driver.ClusterName = "test-cluster"
+	b.ByocBaseClient = byoc.NewByocBaseClient("tenant1", b, "beta")
+	return b
+}
+
+func collectEvents(t *testing.T, iter func(func(cw.LogEvent, error) bool)) []cw.LogEvent {
+	t.Helper()
+	var events []cw.LogEvent
+	for evt, err := range iter {
+		require.NoError(t, err)
+		events = append(events, evt)
+	}
+	return events
+}
+
+func TestQueryLogs(t *testing.T) {
+	const etag = "hg2xsgvsldqk"
+	baseTime := time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name      string
+		req       *defangv1.TailRequest
+		numEvents int // how many mock events to create
+		wantCount int // expected number of events returned
+		wantFirst string
+		wantLast  string
+	}{
+		{
+			name: "query, no limit, no times",
+			req: &defangv1.TailRequest{
+				Services: []string{"app"},
+				Project:  "testproject",
+				LogType:  uint32(logs.LogTypeRun),
+			},
+			numEvents: 5,
+			wantCount: 5,
+			wantFirst: "log message 1",
+			wantLast:  "log message 5",
+		},
+		{
+			name: "query, no limit, with start",
+			req: &defangv1.TailRequest{
+				Services: []string{"app"},
+				Since:    timestamppb.New(baseTime),
+				Project:  "testproject",
+				LogType:  uint32(logs.LogTypeRun),
+			},
+			numEvents: 5,
+			wantCount: 5,
+			wantFirst: "log message 1",
+			wantLast:  "log message 5",
+		},
+		{
+			name: "query, no limit, with start and end",
+			req: &defangv1.TailRequest{
+				Services: []string{"app"},
+				Since:    timestamppb.New(baseTime),
+				Until:    timestamppb.New(baseTime.Add(time.Hour)),
+				Project:  "testproject",
+				LogType:  uint32(logs.LogTypeRun),
+			},
+			numEvents: 5,
+			wantCount: 5,
+			wantFirst: "log message 1",
+			wantLast:  "log message 5",
+		},
+		{
+			name: "query, limit 3, with start (TakeFirstN)",
+			req: &defangv1.TailRequest{
+				Services: []string{"app"},
+				Since:    timestamppb.New(baseTime),
+				Limit:    3,
+				Project:  "testproject",
+				LogType:  uint32(logs.LogTypeRun),
+			},
+			numEvents: 5,
+			wantCount: 3,
+			wantFirst: "log message 1",
+			wantLast:  "log message 3",
+		},
+		{
+			name: "query, limit 3, no start (TakeLastN)",
+			req: &defangv1.TailRequest{
+				Services: []string{"app"},
+				Limit:    3,
+				Project:  "testproject",
+				LogType:  uint32(logs.LogTypeRun),
+			},
+			numEvents: 5,
+			wantCount: 3,
+			wantFirst: "log message 3",
+			wantLast:  "log message 5",
+		},
+		{
+			name: "query, limit 3, with start and end",
+			req: &defangv1.TailRequest{
+				Services: []string{"app"},
+				Since:    timestamppb.New(baseTime),
+				Until:    timestamppb.New(baseTime.Add(time.Hour)),
+				Limit:    3,
+				Project:  "testproject",
+				LogType:  uint32(logs.LogTypeRun),
+			},
+			numEvents: 5,
+			wantCount: 3,
+			wantFirst: "log message 1",
+			wantLast:  "log message 3",
+		},
+		{
+			name: "query, limit exceeds events",
+			req: &defangv1.TailRequest{
+				Services: []string{"app"},
+				Since:    timestamppb.New(baseTime),
+				Limit:    10,
+				Project:  "testproject",
+				LogType:  uint32(logs.LogTypeRun),
+			},
+			numEvents: 3,
+			wantCount: 3,
+			wantFirst: "log message 1",
+			wantLast:  "log message 3",
+		},
+		{
+			name: "query, zero events",
+			req: &defangv1.TailRequest{
+				Services: []string{"app"},
+				Since:    timestamppb.New(baseTime),
+				Project:  "testproject",
+				LogType:  uint32(logs.LogTypeRun),
+			},
+			numEvents: 0,
+			wantCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newTestByocAws()
+			mock := &mockCWClient{
+				events: makeMockEvents(tt.numEvents, "app", etag),
+			}
+
+			logSeq, err := b.queryLogs(t.Context(), mock, tt.req)
+			require.NoError(t, err)
+
+			events := collectEvents(t, logSeq)
+			assert.Len(t, events, tt.wantCount)
+
+			if tt.wantCount > 0 {
+				assert.Equal(t, tt.wantFirst, *events[0].Message)
+				assert.Equal(t, tt.wantLast, *events[len(events)-1].Message)
+
+				// Verify ascending timestamp order
+				for i := 1; i < len(events); i++ {
+					assert.LessOrEqual(t, *events[i-1].Timestamp, *events[i].Timestamp, "events not in ascending order at index %d", i)
+				}
+			}
+		})
+	}
+}
+
+func TestQueryLogs_FollowMode(t *testing.T) {
+	b := newTestByocAws()
+	mock := &mockCWClient{
+		events: makeMockEvents(3, "app", "hg2xsgvsldqk"),
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	req := &defangv1.TailRequest{
+		Services: []string{"app"},
+		Follow:   true,
+		Project:  "testproject",
+		LogType:  uint32(logs.LogTypeRun),
+	}
+
+	logSeq, err := b.queryLogs(ctx, mock, req)
+	require.NoError(t, err)
+
+	// Cancel immediately to stop the polling/tailing
+	cancel()
+
+	// Should not panic; may yield context.Canceled errors
+	for _, err := range logSeq {
+		if err != nil {
+			assert.ErrorIs(t, err, context.Canceled)
+		}
+	}
+}
+
+func TestQueryCdLogs(t *testing.T) {
+	baseTime := time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC)
+	taskID := "abc123def456"
+
+	tests := []struct {
+		name      string
+		req       *defangv1.TailRequest
+		numEvents int
+		wantCount int
+	}{
+		{
+			name: "query mode, no limit",
+			req: &defangv1.TailRequest{
+				Etag:  taskID,
+				Since: timestamppb.New(baseTime),
+			},
+			numEvents: 5,
+			wantCount: 5,
+		},
+		{
+			name: "query mode, with limit",
+			req: &defangv1.TailRequest{
+				Etag:  taskID,
+				Since: timestamppb.New(baseTime),
+				Limit: 3,
+			},
+			numEvents: 5,
+			wantCount: 3,
+		},
+		{
+			name: "query mode, with start and end",
+			req: &defangv1.TailRequest{
+				Etag:  taskID,
+				Since: timestamppb.New(baseTime),
+				Until: timestamppb.New(baseTime.Add(time.Hour)),
+			},
+			numEvents: 5,
+			wantCount: 5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newTestByocAws()
+			mock := &mockCWClient{
+				events: makeMockEvents(tt.numEvents, "crun", ""),
+			}
+
+			batchSeq, err := b.queryCdLogs(t.Context(), mock, tt.req)
+			require.NoError(t, err)
+
+			// Flatten and collect
+			logSeq := cw.Flatten(batchSeq)
+			events := collectEvents(t, logSeq)
+			assert.Len(t, events, tt.wantCount)
+		})
+	}
+}
+
+// TestQueryCdLogs_FollowMode is skipped because TailTaskID polls getTaskStatus
+// (real AWS ECS API) when StartLiveTail returns ResourceNotFoundException.
+// Testing follow mode for CD logs requires mocking the ECS DescribeTasks API.
+func TestQueryCdLogs_FollowMode(t *testing.T) {
+	t.Skip("requires ECS API mock for getTaskStatus")
 }

@@ -16,7 +16,7 @@ import (
 func Test_readAlbLogs(t *testing.T) {
 	gz, err := os.Open("testdata/123456789012_elasticloadbalancing_us-west-2_app.defang-agentic-strands-aws7d0286.c9b3756e8ef89456_20260206T0000Z_44.233.47.227_7tj887d8.log.gz")
 	require.NoError(t, err)
-	entries, err := readAlbLogs(gz, time.Time{}, time.Now())
+	entries, err := readAlbLogs(gz, time.Time{}, time.Now(), "")
 	require.NoError(t, err)
 	for _, entry := range entries {
 		t.Logf("%s: %s", entry.Timestamp, entry.Message)
@@ -48,7 +48,7 @@ func Test_streamAlbLogGroup(t *testing.T) {
 	s3Client := mockS3Lister{}
 
 	t.Run("empty group", func(t *testing.T) {
-		entries, err := readAlbLogsGroup(t.Context(), "testdata", nil, time.Time{}, time.Now(), s3Client)
+		entries, err := readAlbLogsGroup(t.Context(), "testdata", nil, time.Time{}, time.Now(), s3Client, "")
 		require.NoError(t, err)
 		require.Empty(t, entries)
 	})
@@ -65,7 +65,7 @@ func Test_streamAlbLogGroup(t *testing.T) {
 				})
 			}
 		}
-		entries, err := readAlbLogsGroup(t.Context(), "testdata", objects, time.Time{}, time.Now(), s3Client)
+		entries, err := readAlbLogsGroup(t.Context(), "testdata", objects, time.Time{}, time.Now(), s3Client, "")
 		require.NoError(t, err)
 		for _, entry := range entries {
 			t.Logf("%s: %s", entry.Timestamp, entry.Message)

@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLogGroupIdentifier(t *testing.T) {
@@ -116,7 +117,7 @@ func TestQueryLogGroups(t *testing.T) {
 		mockFiltererTailer := &mockFiltererTailer{
 			filteredLogEvents: logEvents,
 		}
-		evts := QueryLogGroups(
+		logSeq, err := QueryLogGroups(
 			t.Context(),
 			mockFiltererTailer,
 			tt.since,
@@ -125,9 +126,10 @@ func TestQueryLogGroups(t *testing.T) {
 			int32(tt.limit),
 			logGroups...,
 		)
+		require.NoError(t, err)
 
 		collectedMessages := make([]string, 0)
-		for evt, err := range evts {
+		for evt, err := range logSeq {
 			if err != nil {
 				t.Errorf("Expected no error, but got: %v", err)
 				break

@@ -22,7 +22,19 @@ import (
 // MockIter creates an iter.Seq2 from a pre-populated list of responses and a final error.
 // A nil response in the list acts as a stream-end marker.
 func MockIter[T any](resps []*T, finalErr error) iter.Seq2[*T, error] {
-	return ServerStreamIter[T](&MockServerStream[T]{Resps: resps, Error: finalErr})
+	return func(yield func(*T, error) bool) {
+		for _, resp := range resps {
+			if resp == nil {
+				return
+			}
+			if !yield(resp, nil) {
+				return
+			}
+		}
+		if finalErr != nil {
+			yield(nil, finalErr)
+		}
+	}
 }
 
 type MockProvider struct {
@@ -135,6 +147,37 @@ func (m *MockWaitStream[T]) Err() error {
 func (m *MockWaitStream[T]) Close() error {
 	m.closeOnce.Do(func() { close(m.done) })
 	return nil
+}
+
+// ServerStreamIterCtx adapts a ServerStream to iter.Seq2, closing the stream when the
+// context is canceled. This is needed for blocking streams (e.g. MockWaitStream)
+// where Receive() blocks on a channel and won't return until Close() is called.
+func ServerStreamIterCtx[T any](ctx context.Context, stream ServerStream[T]) iter.Seq2[*T, error] {
+	return func(yield func(*T, error) bool) {
+		var closeOnce sync.Once
+		closeStream := func() { closeOnce.Do(func() { stream.Close() }) }
+
+		// Close the stream when context is canceled to unblock Receive()
+		done := make(chan struct{})
+		go func() {
+			select {
+			case <-ctx.Done():
+				closeStream()
+			case <-done:
+			}
+		}()
+		defer close(done)
+		defer closeStream()
+
+		for stream.Receive() {
+			if !yield(stream.Msg(), nil) {
+				return
+			}
+		}
+		if err := stream.Err(); err != nil {
+			yield(nil, err)
+		}
+	}
 }
 
 type MockFabricClient struct {

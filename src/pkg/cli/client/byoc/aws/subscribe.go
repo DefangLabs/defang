@@ -15,17 +15,20 @@ import (
 
 // parseSubscribeEvents converts CW log events from ECS and builds log groups
 // into SubscribeResponse, filtering by etag and services.
-func parseSubscribeEvents(events iter.Seq2[cw.LogEvent, error], etag types.ETag, services []string) iter.Seq2[*defangv1.SubscribeResponse, error] {
+func parseSubscribeEvents(logSeq iter.Seq2[[]cw.LogEvent, error], etag types.ETag, services []string) iter.Seq2[*defangv1.SubscribeResponse, error] {
 	return func(yield func(*defangv1.SubscribeResponse, error) bool) {
-		for evt, err := range events {
+		for events, err := range logSeq {
 			if err != nil {
-				yield(nil, err)
-				return
-			}
-			resp := parseSubscribeEvent(evt, etag, services)
-			if resp != nil {
-				if !yield(resp, nil) {
+				if !yield(nil, err) {
 					return
+				}
+			}
+			for _, event := range events {
+				resp := parseSubscribeEvent(event, etag, services)
+				if resp != nil {
+					if !yield(resp, nil) {
+						return
+					}
 				}
 			}
 		}

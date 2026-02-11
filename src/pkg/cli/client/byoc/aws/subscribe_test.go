@@ -165,9 +165,9 @@ func TestParseSubscribeEvents(t *testing.T) {
 		),
 	}
 
-	iter := func(yield func(cw.LogEvent, error) bool) {
+	iter := func(yield func([]cw.LogEvent, error) bool) {
 		for _, evt := range events {
-			if !yield(evt, nil) {
+			if !yield([]cw.LogEvent{evt}, nil) {
 				return
 			}
 		}

@@ -1,6 +1,8 @@
 package cw
 
-import "iter"
+import (
+	"iter"
+)
 
 // MergeLogEvents merge-sorts two ascending iterators by Timestamp.
 // Uses iter.Pull2 internally for two-pointer merge.
@@ -22,12 +24,18 @@ func MergeLogEvents(left, right iter.Seq2[LogEvent, error]) iter.Seq2[LogEvent, 
 
 		for lOk && rOk {
 			if lErr != nil {
-				yield(lVal, lErr)
-				return
+				if !yield(lVal, lErr) {
+					return
+				}
+				lVal, lErr, lOk = nextL()
+				continue
 			}
 			if rErr != nil {
-				yield(rVal, rErr)
-				return
+				if !yield(rVal, rErr) {
+					return
+				}
+				rVal, rErr, rOk = nextR()
+				continue
 			}
 			if *lVal.Timestamp <= *rVal.Timestamp {
 				if !yield(lVal, nil) {
@@ -46,16 +54,10 @@ func MergeLogEvents(left, right iter.Seq2[LogEvent, error]) iter.Seq2[LogEvent, 
 			if !yield(lVal, lErr) {
 				return
 			}
-			if lErr != nil {
-				return
-			}
 			lVal, lErr, lOk = nextL()
 		}
 		for rOk {
 			if !yield(rVal, rErr) {
-				return
-			}
-			if rErr != nil {
 				return
 			}
 			rVal, rErr, rOk = nextR()
@@ -74,12 +76,11 @@ func TakeFirstN(seq iter.Seq2[LogEvent, error], n int) iter.Seq2[LogEvent, error
 			if !yield(evt, err) {
 				return
 			}
-			if err != nil {
-				return
-			}
-			count++
-			if count >= n {
-				return
+			if err == nil {
+				count++
+				if count >= n {
+					return
+				}
 			}
 		}
 	}
@@ -94,8 +95,10 @@ func TakeLastN(seq iter.Seq2[LogEvent, error], n int) iter.Seq2[LogEvent, error]
 		var buffer []LogEvent
 		for evt, err := range seq {
 			if err != nil {
-				yield(evt, err)
-				return
+				if !yield(evt, err) {
+					return
+				}
+				continue
 			}
 			buffer = append(buffer, evt)
 			if len(buffer) > n {

@@ -27,7 +27,7 @@ func getLogGroupIdentifier(arnOrId string) string {
 }
 
 type LogsClient interface {
-	FilterLogEventsAPI
+	FilterLogEventsAPIClient
 	StartLiveTailAPI
 }
 
@@ -43,7 +43,7 @@ type StartLiveTailAPI interface {
 	StartLiveTail(ctx context.Context, params *cloudwatchlogs.StartLiveTailInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.StartLiveTailOutput, error)
 }
 
-func TailLogGroup(ctx context.Context, cwClient StartLiveTailAPI, input LogGroupInput) (iter.Seq2[LogEvent, error], error) {
+func TailLogGroup(ctx context.Context, cwClient StartLiveTailAPI, input LogGroupInput) (iter.Seq2[[]LogEvent, error], error) {
 	if input.LogGroupARN == "" {
 		return nil, errors.New("LogGroupARN is required")
 	}
@@ -69,36 +69,33 @@ func TailLogGroup(ctx context.Context, cwClient StartLiveTailAPI, input LogGroup
 	}
 
 	stream := slto.GetStream()
-	return func(yield func(LogEvent, error) bool) {
+	return func(yield func([]LogEvent, error) bool) {
 		defer stream.Close()
 		for {
 			select {
 			case e := <-stream.Events():
 				if err := stream.Err(); err != nil {
-					yield(LogEvent{}, err)
+					yield(nil, err)
 					return
 				}
-				events, err := GetLogEvents(e)
+				events, err := getLogEvents(e)
 				if err != nil {
-					yield(LogEvent{}, err)
-					return
-				}
-				for _, evt := range events {
-					if !yield(evt, nil) {
+					if !yield(nil, err) {
 						return
 					}
 				}
+				if !yield(events, nil) {
+					return
+				}
 			case <-ctx.Done():
-				yield(LogEvent{}, ctx.Err())
+				yield(nil, ctx.Err())
 				return
 			}
 		}
 	}, nil
 }
 
-type FilterLogEventsAPI interface {
-	FilterLogEvents(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error)
-}
+type FilterLogEventsAPIClient = cloudwatchlogs.FilterLogEventsAPIClient
 
 // Flatten converts an iterator of batches into an iterator of individual items.
 func Flatten[T any](seq iter.Seq2[[]T, error]) iter.Seq2[T, error] {
@@ -119,24 +116,16 @@ func Flatten[T any](seq iter.Seq2[[]T, error]) iter.Seq2[T, error] {
 	}
 }
 
-func QueryLogGroups(ctx context.Context, cwClient FilterLogEventsAPI, start, end time.Time, limit int32, logGroups ...LogGroupInput) iter.Seq2[LogEvent, error] {
+func QueryLogGroups(ctx context.Context, cwClient FilterLogEventsAPIClient, start, end time.Time, limit int32, logGroups ...LogGroupInput) (iter.Seq2[LogEvent, error], error) {
 	var merged iter.Seq2[LogEvent, error]
 	for _, lgi := range logGroups {
-		// CloudWatch only supports querying a LogGroup from a timestamp in
-		// ascending order. After we query each LogGroup, we merge the results
-		// and take the last N events. Because we can't tell in advance which
-		// LogGroup will have the most recent events, we have to query all
-		// log groups without limit, and then apply the limit after merging.
-		// TODO: optimize this by simulating a descending query by doing
-		// multiple queries with time windows, starting from the end time
-		// and moving backwards until we have enough events.
-		iter, err := QueryLogGroup(ctx, cwClient, lgi, start, end, 0)
+		logSeq, err := QueryLogGroup(ctx, cwClient, lgi, start, end, limit)
 		if err != nil {
-			continue
+			return nil, err
 		}
-		merged = MergeLogEvents(merged, Flatten(iter)) // Merge sort the log events based on timestamp
+		merged = MergeLogEvents(merged, Flatten(logSeq)) // Merge sort the log events based on timestamp
 		if limit > 0 {
-			// take the first/last n events only
+			// take the first/last n events only from the merged stream
 			if start.IsZero() {
 				merged = TakeLastN(merged, int(limit))
 			} else {
@@ -144,10 +133,10 @@ func QueryLogGroups(ctx context.Context, cwClient FilterLogEventsAPI, start, end
 			}
 		}
 	}
-	return merged
+	return merged, nil
 }
 
-func QueryLogGroup(ctx context.Context, cw FilterLogEventsAPI, lgi LogGroupInput, start, end time.Time, limit int32) (iter.Seq2[[]LogEvent, error], error) {
+func QueryLogGroup(ctx context.Context, cw FilterLogEventsAPIClient, lgi LogGroupInput, start, end time.Time, limit int32) (iter.Seq2[[]LogEvent, error], error) {
 	if lgi.LogGroupARN == "" {
 		return nil, errors.New("LogGroupARN is required")
 	}
@@ -160,15 +149,24 @@ func QueryLogGroup(ctx context.Context, cw FilterLogEventsAPI, lgi LogGroupInput
 		end = time.Now()
 	}
 	if start.IsZero() {
-		return nil, errors.New("start time is required to avoid fetching too many logs")
+		// CloudWatch only supports querying a LogGroup from a timestamp in
+		// ascending order. After we query each LogGroup, we merge the results
+		// and take the last N events. Because we can't tell in advance which
+		// LogGroup will have the most recent events, we have to query all
+		// log groups without limit, and then apply the limit after merging.
+		// TODO: optimize this by simulating a descending query by doing
+		// multiple queries with time windows, starting from the end time
+		// and moving backwards until we have enough events.
+		start = end.Add(-60 * time.Minute)
+		limit = 0
 	}
 
 	params := &cloudwatchlogs.FilterLogEventsInput{
 		LogGroupIdentifier: &logGroupIdentifier,
 		LogStreamNames:     lgi.LogStreamNames,
 		FilterPattern:      pattern,
-		StartTime:          ptr.Int64(start.UnixMilli()),
-		EndTime:            ptr.Int64(end.UnixMilli()),
+		StartTime:          ptr.Int64(start.UnixMilli()),   // rounds down
+		EndTime:            ptr.Int64(end.UnixMilli() + 1), // round up
 	}
 	if lgi.LogStreamNamePrefix != "" {
 		params.LogStreamNamePrefix = &lgi.LogStreamNamePrefix
@@ -228,7 +226,7 @@ func NewCloudWatchLogsClient(ctx context.Context, region aws.Region) (*cloudwatc
 
 type LogEvent = types.LiveTailSessionLogEvent
 
-func GetLogEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {
+func getLogEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {
 	switch ev := e.(type) {
 	case *types.StartLiveTailResponseStreamMemberSessionStart:
 		// fmt.Println("session start:", ev.Value.SessionId)
