@@ -63,6 +63,10 @@ func streamLogs(ctx context.Context, liveUrl string, etag types.ETag) (iter.Seq2
 				return
 			}
 			parts := strings.SplitN(data.Data, " ", 3)
+			if len(parts) < 3 {
+				// Skip malformed messages
+				continue
+			}
 			ts, _ := time.Parse(time.RFC3339Nano, parts[1])
 			resp := &defangv1.TailResponse{
 				Entries: []*defangv1.LogEntry{{
