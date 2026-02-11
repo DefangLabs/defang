@@ -81,6 +81,11 @@ func prepareQuestions(req Request) ([]*survey.Question, error) {
 		if err != nil {
 			return nil, err
 		}
+		if req.Validator != nil {
+			question.Validate = func(ans interface{}) error {
+				return req.Validator(ans)
+			}
+		}
 		questions = append(questions, question)
 	}
 	return questions, nil

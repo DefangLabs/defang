@@ -5,9 +5,27 @@ import (
 	"fmt"
 )
 
+type Validator func(any) error
+
+type Options struct {
+	DefaultValue string
+	Validator    func(any) error
+}
+
+func WithValidator(validator func(any) error) func(*Options) {
+	return func(opts *Options) {
+		opts.Validator = validator
+	}
+}
+
+func WithDefault(value string) func(*Options) {
+	return func(opts *Options) {
+		opts.DefaultValue = value
+	}
+}
+
 type Controller interface {
-	RequestString(ctx context.Context, message, field string) (string, error)
-	RequestStringWithDefault(ctx context.Context, message, field, defaultValue string) (string, error)
+	RequestString(ctx context.Context, message, field string, opts ...func(*Options)) (string, error)
 	RequestEnum(ctx context.Context, message, field string, options []string) (string, error)
 	SetSupported(supported bool)
 	IsSupported() bool
@@ -23,8 +41,9 @@ type controller struct {
 }
 
 type Request struct {
-	Message string
-	Schema  map[string]any
+	Message   string
+	Schema    map[string]any
+	Validator Validator
 }
 
 type Response struct {
@@ -39,19 +58,19 @@ func NewController(client Client) Controller {
 	}
 }
 
-func (c *controller) RequestString(ctx context.Context, message, field string) (string, error) {
-	return c.requestField(ctx, message, field, map[string]any{
+func (c *controller) RequestString(ctx context.Context, message, field string, opts ...func(*Options)) (string, error) {
+	var options Options
+	for _, opt := range opts {
+		opt(&options)
+	}
+	schema := map[string]any{
 		"type":        "string",
 		"description": field,
-	})
-}
-
-func (c *controller) RequestStringWithDefault(ctx context.Context, message, field, defaultValue string) (string, error) {
-	return c.requestField(ctx, message, field, map[string]any{
-		"type":        "string",
-		"description": field,
-		"default":     defaultValue,
-	})
+	}
+	if options.DefaultValue != "" {
+		schema["default"] = options.DefaultValue
+	}
+	return c.requestField(ctx, message, field, schema, options.Validator)
 }
 
 func (c *controller) RequestEnum(ctx context.Context, message, field string, options []string) (string, error) {
@@ -59,10 +78,10 @@ func (c *controller) RequestEnum(ctx context.Context, message, field string, opt
 		"type":        "string",
 		"description": field,
 		"enum":        options,
-	})
+	}, nil)
 }
 
-func (c *controller) requestField(ctx context.Context, message, field string, schema map[string]any) (string, error) {
+func (c *controller) requestField(ctx context.Context, message, field string, schema map[string]any, validator Validator) (string, error) {
 	response, err := c.client.Request(ctx, Request{
 		Message: message,
 		Schema: map[string]any{
@@ -72,6 +91,7 @@ func (c *controller) requestField(ctx context.Context, message, field string, sc
 			},
 			"required": []string{field},
 		},
+		Validator: validator,
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to elicit %s: %w", field, err)
