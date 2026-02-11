@@ -23,8 +23,8 @@ func (m *MockElicitationsController) RequestString(ctx context.Context, message,
 	return args.String(0), args.Error(1)
 }
 
-func (m *MockElicitationsController) RequestStringWithOptions(ctx context.Context, message, field string, options elicitations.Options) (string, error) {
-	args := m.Called(ctx, message, field, options)
+func (m *MockElicitationsController) RequestStringWithOptions(ctx context.Context, message, field string, opts ...func(*elicitations.Options)) (string, error) {
+	args := m.Called(ctx, message, field, opts)
 	return args.String(0), args.Error(1)
 }
 
@@ -192,11 +192,21 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("AWS", nil)
 
 	// Mock wizard parameter collection - region selection (default is us-west-2 for AWS)
-	mockEC.On("RequestStringWithOptions", ctx, "Which region do you want to deploy to?", "region", elicitations.Options{DefaultValue: "us-west-2"}).Return("us-east-1", nil)
+	mockEC.On("RequestStringWithOptions", ctx, "Which region do you want to deploy to?", "region", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
+		o := &elicitations.Options{}
+		for _, opt := range opts {
+			opt(o)
+		}
+		return o.DefaultValue == "us-west-2"
+	})).Return("us-east-1", nil)
 
 	// Mock wizard parameter collection - stack name (default name based on provider and region)
-	mockEC.On("RequestStringWithOptions", ctx, "What do you want to call this stack?:", "stack_name", mock.MatchedBy(func(opts elicitations.Options) bool {
-		return opts.DefaultValue == "awsuseast1" && opts.Validator != nil
+	mockEC.On("RequestStringWithOptions", ctx, "What do you want to call this stack?:", "stack_name", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
+		o := &elicitations.Options{}
+		for _, opt := range opts {
+			opt(o)
+		}
+		return o.DefaultValue == "awsuseast1" && o.Validator != nil
 	})).Return("staging", nil)
 
 	// Mock wizard parameter collection - AWS profile selection (both scenarios)
@@ -204,7 +214,13 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 	awsProfileOptions := []string{"default"}
 	mockEC.On("RequestEnum", ctx, "Which AWS profile do you want to use?", "aws_profile", awsProfileOptions).Return("staging", nil).Maybe()
 	// If no profiles are found, it will use RequestStringWithOptions
-	mockEC.On("RequestStringWithOptions", ctx, "Which AWS profile do you want to use?", "aws_profile", elicitations.Options{DefaultValue: "default"}).Return("staging", nil).Maybe()
+	mockEC.On("RequestStringWithOptions", ctx, "Which AWS profile do you want to use?", "aws_profile", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
+		o := &elicitations.Options{}
+		for _, opt := range opts {
+			opt(o)
+		}
+		return o.DefaultValue == "default"
+	})).Return("staging", nil).Maybe()
 
 	// Mock wizard parameter collection
 	newStackParams := &Parameters{
@@ -252,11 +268,21 @@ func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
 	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("AWS", nil)
 
 	// Mock wizard parameter collection - region selection
-	mockEC.On("RequestStringWithOptions", ctx, "Which region do you want to deploy to?", "region", elicitations.Options{DefaultValue: "us-west-2"}).Return("us-west-2", nil)
+	mockEC.On("RequestStringWithOptions", ctx, "Which region do you want to deploy to?", "region", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
+		o := &elicitations.Options{}
+		for _, opt := range opts {
+			opt(o)
+		}
+		return o.DefaultValue == "us-west-2"
+	})).Return("us-west-2", nil)
 
 	// Mock wizard parameter collection - stack name (default name based on provider and region)
-	mockEC.On("RequestStringWithOptions", ctx, "What do you want to call this stack?:", "stack_name", mock.MatchedBy(func(opts elicitations.Options) bool {
-		return opts.DefaultValue == "awsuswest2" && opts.Validator != nil
+	mockEC.On("RequestStringWithOptions", ctx, "What do you want to call this stack?:", "stack_name", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
+		o := &elicitations.Options{}
+		for _, opt := range opts {
+			opt(o)
+		}
+		return o.DefaultValue == "awsuswest2" && o.Validator != nil
 	})).Return("firststack", nil)
 
 	// Mock wizard parameter collection - AWS profile selection (both scenarios)
@@ -264,7 +290,13 @@ func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
 	awsProfileOptions := []string{"default"}
 	mockEC.On("RequestEnum", ctx, "Which AWS profile do you want to use?", "aws_profile", awsProfileOptions).Return("default", nil).Maybe()
 	// If no profiles are found, it will use RequestStringWithOptions
-	mockEC.On("RequestStringWithOptions", ctx, "Which AWS profile do you want to use?", "aws_profile", elicitations.Options{DefaultValue: "default"}).Return("default", nil).Maybe()
+	mockEC.On("RequestStringWithOptions", ctx, "Which AWS profile do you want to use?", "aws_profile", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
+		o := &elicitations.Options{}
+		for _, opt := range opts {
+			opt(o)
+		}
+		return o.DefaultValue == "default"
+	})).Return("default", nil).Maybe()
 
 	// Mock wizard parameter collection
 	newStackParams := &Parameters{
@@ -432,11 +464,21 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("AWS", nil)
 
 	// Mock wizard parameter collection - region selection
-	mockEC.On("RequestStringWithOptions", ctx, "Which region do you want to deploy to?", "region", elicitations.Options{DefaultValue: "us-west-2"}).Return("us-east-1", nil)
+	mockEC.On("RequestStringWithOptions", ctx, "Which region do you want to deploy to?", "region", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
+		o := &elicitations.Options{}
+		for _, opt := range opts {
+			opt(o)
+		}
+		return o.DefaultValue == "us-west-2"
+	})).Return("us-east-1", nil)
 
 	// Mock wizard parameter collection - stack name (default name based on provider and region)
-	mockEC.On("RequestStringWithOptions", ctx, "What do you want to call this stack?:", "stack_name", mock.MatchedBy(func(opts elicitations.Options) bool {
-		return opts.DefaultValue == "awsuseast1" && opts.Validator != nil
+	mockEC.On("RequestStringWithOptions", ctx, "What do you want to call this stack?:", "stack_name", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
+		o := &elicitations.Options{}
+		for _, opt := range opts {
+			opt(o)
+		}
+		return o.DefaultValue == "awsuseast1" && o.Validator != nil
 	})).Return("staging", nil)
 
 	// Mock wizard parameter collection - AWS profile selection (both scenarios)
@@ -444,7 +486,13 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 	awsProfileOptions := []string{"default"}
 	mockEC.On("RequestEnum", ctx, "Which AWS profile do you want to use?", "aws_profile", awsProfileOptions).Return("staging", nil).Maybe()
 	// If no profiles are found, it will use RequestStringWithOptions
-	mockEC.On("RequestStringWithOptions", ctx, "Which AWS profile do you want to use?", "aws_profile", elicitations.Options{DefaultValue: "default"}).Return("staging", nil).Maybe()
+	mockEC.On("RequestStringWithOptions", ctx, "Which AWS profile do you want to use?", "aws_profile", mock.MatchedBy(func(opts []func(*elicitations.Options)) bool {
+		o := &elicitations.Options{}
+		for _, opt := range opts {
+			opt(o)
+		}
+		return o.DefaultValue == "default"
+	})).Return("staging", nil).Maybe()
 
 	// Mock wizard parameter collection
 	newStackParams := &Parameters{

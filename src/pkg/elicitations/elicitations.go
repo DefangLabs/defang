@@ -12,9 +12,21 @@ type Options struct {
 	Validator    func(any) error
 }
 
+func WithValidator(validator func(any) error) func(*Options) {
+	return func(opts *Options) {
+		opts.Validator = validator
+	}
+}
+
+func WithDefault(value string) func(*Options) {
+	return func(opts *Options) {
+		opts.DefaultValue = value
+	}
+}
+
 type Controller interface {
 	RequestString(ctx context.Context, message, field string) (string, error)
-	RequestStringWithOptions(ctx context.Context, message, field string, options Options) (string, error)
+	RequestStringWithOptions(ctx context.Context, message, field string, opts ...func(*Options)) (string, error)
 	RequestEnum(ctx context.Context, message, field string, options []string) (string, error)
 	SetSupported(supported bool)
 	IsSupported() bool
@@ -48,10 +60,14 @@ func NewController(client Client) Controller {
 }
 
 func (c *controller) RequestString(ctx context.Context, message, field string) (string, error) {
-	return c.RequestStringWithOptions(ctx, message, field, Options{})
+	return c.RequestStringWithOptions(ctx, message, field)
 }
 
-func (c *controller) RequestStringWithOptions(ctx context.Context, message, field string, options Options) (string, error) {
+func (c *controller) RequestStringWithOptions(ctx context.Context, message, field string, opts ...func(*Options)) (string, error) {
+	var options Options
+	for _, opt := range opts {
+		opt(&options)
+	}
 	schema := map[string]any{
 		"type":        "string",
 		"description": field,

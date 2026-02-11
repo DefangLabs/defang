@@ -46,13 +46,17 @@ func (m *mockElicitationsController) RequestString(ctx context.Context, message,
 	return "", errors.New("mock: no response configured for field " + field)
 }
 
-func (m *mockElicitationsController) RequestStringWithOptions(ctx context.Context, message, field string, options elicitations.Options) (string, error) {
+func (m *mockElicitationsController) RequestStringWithOptions(ctx context.Context, message, field string, opts ...func(*elicitations.Options)) (string, error) {
 	m.callOrder = append(m.callOrder, "RequestStringWithOptions:"+field)
 	if err, exists := m.defaultErrors[field]; exists {
 		return "", err
 	}
 	if response, exists := m.defaultResponses[field]; exists {
 		return response, nil
+	}
+	var options elicitations.Options
+	for _, opt := range opts {
+		opt(&options)
 	}
 	return options.DefaultValue, nil
 }
