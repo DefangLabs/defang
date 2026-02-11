@@ -1,8 +1,8 @@
 [95m * Service environment variables resolution summary:
 [0m[1m
 SERVICE   ENVIRONMENT            SOURCE   VALUE[0m
-deployer  AWS_ACCESS_KEY_ID      Compose  AKIAIOSFODNN7EXAMPLE                      
-deployer  AWS_CLIENT_ID          Compose  AROA1234567890ABCDEF                      
-deployer  AWS_SECRET_ACCESS_KEY  Compose  wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY  
-deployer  GITHUB_TOKEN           Compose  ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890  
-deployer  REGION                 Compose  us-east-1                                 
+deployer  AWS_ACCESS_KEY_ID      Compose  AKIA***    
+deployer  AWS_CLIENT_ID          Compose  AROA***    
+deployer  AWS_SECRET_ACCESS_KEY  Compose  wJal***    
+deployer  GITHUB_TOKEN           Compose  ghp_***    
+deployer  REGION                 Compose  us-east-1  

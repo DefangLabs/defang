@@ -1,8 +1,9 @@
 [95m * Service environment variables resolution summary:
 [0m[1m
 SERVICE  ENVIRONMENT   SOURCE   VALUE[0m
-web      API_SECRET    Compose  VEfk5vO0Q53VkK_uicor                                  
-web      APP_ENV       Compose  production                                            
-web      DATABASE_URL  Compose  postgres://dbuser:p455w0rd@db.example.com:5432/myapp  
-web      GITHUB_TOKEN  Compose  ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890              
-web      STATIC_VALUE  Compose  hello                                                 
+web      API_SECRET    Compose  VEfk***     
+web      APP_ENV       Compose  production  
+web      DATABASE_URL  Compose  post***     
+web      GITHUB_TOKEN  Compose  ghp_***     
+web      POSTGRES_URL  Compose  post***     
+web      STATIC_VALUE  Compose  hello       

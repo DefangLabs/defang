@@ -1,9 +1,9 @@
 [95m * Service environment variables resolution summary:
 [0m[1m
 SERVICE  ENVIRONMENT   SOURCE   VALUE[0m
-api      DATABASE_URL  Compose  postgres://dbuser:p455w0rd@db.example.com:5432/myapp                                                       
-api      DB_HOST       Compose  db.example.com                                                                                             
-api      DB_PORT       Compose  5432                                                                                                       
-api      MONGO_URI     Compose  mongodb://admin:s3cretP4ss@mongo.example.com:27017/mydb                                                    
-api      MYSQL_URL     Compose  mysql://root:r00tP4ssw0rd@mysql.example.com:3306/app                                                       
-api      REDIS_URL     Compose  rediss://default:p41fce90d44ac1d891bd21fdbc5dfc1bd7f163e33a6934c30093eaf56c1c23937@redis.example.com:6380  
+api      DATABASE_URL  Compose  post***         
+api      DB_HOST       Compose  db.example.com  
+api      DB_PORT       Compose  5432            
+api      MONGO_URI     Compose  mong***         
+api      MYSQL_URL     Compose  mysq***         
+api      REDIS_URL     Compose  redi***         

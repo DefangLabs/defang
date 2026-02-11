@@ -1,8 +1,8 @@
 [95m * Service environment variables resolution summary:
 [0m[1m
 SERVICE  ENVIRONMENT    SOURCE   VALUE[0m
-backend  API_KEY        Compose  api-key=50m34p1k3y         
-backend  APP_NAME       Compose  my-application             
-backend  AUTH_PASSWORD  Compose  password=hunter2           
-backend  NORMAL_CONFIG  Compose  debug                      
-backend  SECRET_TOKEN   Compose  secret_token=ab12cd34ef56  
+backend  API_KEY        Compose  api-***         
+backend  APP_NAME       Compose  my-application  
+backend  AUTH_PASSWORD  Compose  pass***         
+backend  NORMAL_CONFIG  Compose  debug           
+backend  SECRET_TOKEN   Compose  secr***         
