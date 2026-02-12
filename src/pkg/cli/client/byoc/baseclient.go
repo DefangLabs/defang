@@ -2,6 +2,7 @@ package byoc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"iter"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -91,6 +93,28 @@ func getServiceLabel(serviceName string) string {
 func (b *ByocBaseClient) ServicePrivateDNS(serviceName string) string {
 	// Private services can be accessed by just using the (sanitized) service name
 	return getServiceLabel(serviceName)
+}
+
+func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) {
+	// Get the list of projects from remote
+	stacks, err := b.projectBackend.CdList(ctx, false)
+	if err != nil {
+		return "", fmt.Errorf("no cloud projects found: %w", err)
+	}
+	var projectNames []string
+	for stack := range stacks {
+		projectNames = append(projectNames, stack.Project)
+	}
+
+	if len(projectNames) == 0 {
+		return "", errors.New("no cloud projects found")
+	}
+
+	if len(projectNames) > 1 {
+		return "", ErrMultipleProjects{ProjectNames: projectNames}
+	}
+	term.Debug("Using default project:", projectNames[0])
+	return projectNames[0], nil
 }
 
 type ErrNoPermission string

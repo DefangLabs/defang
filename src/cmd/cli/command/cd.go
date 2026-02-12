@@ -30,7 +30,7 @@ func cdCommand(cmd *cobra.Command, args []string, command client.CdCommand, fabr
 	}
 
 	if len(args) == 0 {
-		projectName, _, err := session.Loader.LoadProjectName(ctx)
+		projectName, err := client.LoadProjectNameWithFallback(ctx, session.Loader, session.Provider)
 		if err != nil {
 			return err
 		}

@@ -81,7 +81,7 @@ var configSetCmd = &cobra.Command{
 			return fmt.Errorf("failed to get account info from provider %q: %w", session.Stack.Provider, err)
 		}
 
-		projectName, _, err := session.Loader.LoadProjectName(ctx)
+		projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), session.Loader, session.Provider)
 		if err != nil {
 			return err
 		}
@@ -199,13 +199,12 @@ var configDeleteCmd = &cobra.Command{
 			return err
 		}
 
-		ctx := cmd.Context()
-		projectName, _, err := session.Loader.LoadProjectName(ctx)
+		projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), session.Loader, session.Provider)
 		if err != nil {
 			return err
 		}
 
-		if err := cli.ConfigDelete(ctx, projectName, session.Provider, names...); err != nil {
+		if err := cli.ConfigDelete(cmd.Context(), projectName, session.Provider, names...); err != nil {
 			// Show a warning (not an error) if the config was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				term.Warn(client.PrettyError(err))
@@ -232,7 +231,7 @@ var configListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		projectName, _, err := session.Loader.LoadProjectName(ctx)
+		projectName, err := client.LoadProjectNameWithFallback(ctx, session.Loader, session.Provider)
 		if err != nil {
 			return err
 		}
