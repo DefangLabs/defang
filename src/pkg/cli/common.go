@@ -130,16 +130,26 @@ func getDeploymentOriginFromEnvironment() defangv1.DeploymentOrigin {
 func getDeploymentOriginMetadataFromEnvironment() map[string]string {
 	metadata := make(map[string]string)
 
-	// https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+	// https://docs.github.com/en/actions/reference/workflows-and-actions/variables
 	if os.Getenv("GITHUB_ACTION") != "" {
 		metadata["GITHUB_REPOSITORY"] = os.Getenv("GITHUB_REPOSITORY")
 		metadata["GITHUB_RUN_ID"] = os.Getenv("GITHUB_RUN_ID")
+		metadata["GITHUB_REF_NAME"] = os.Getenv("GITHUB_REF_NAME")
+		metadata["GIT_AUTHOR_NAME"] = os.Getenv("GIT_AUTHOR_NAME")
+		metadata["GIT_AUTHOR_EMAIL"] = os.Getenv("GIT_AUTHOR_EMAIL")
+		metadata["GIT_COMMITTER_NAME"] = os.Getenv("GIT_COMMITTER_NAME")
+		metadata["GIT_COMMITTER_EMAIL"] = os.Getenv("GIT_COMMITTER_EMAIL")
 	}
 
-	// https://gitlab.com/$CI_PROJECT_PATH/-/jobs/$CI_JOB_ID
+	// https://docs.gitlab.com/ci/variables/predefined_variables/
 	if os.Getenv("GITLAB_CI") != "" {
 		metadata["CI_PROJECT_PATH"] = os.Getenv("CI_PROJECT_PATH")
 		metadata["CI_JOB_ID"] = os.Getenv("CI_JOB_ID")
+		metadata["CI_COMMIT_REF_NAME"] = os.Getenv("CI_COMMIT_REF_NAME")
+		metadata["GIT_AUTHOR_NAME"] = os.Getenv("GIT_AUTHOR_NAME")
+		metadata["GIT_AUTHOR_EMAIL"] = os.Getenv("GIT_AUTHOR_EMAIL")
+		metadata["GIT_COMMITTER_NAME"] = os.Getenv("GIT_COMMITTER_NAME")
+		metadata["GIT_COMMITTER_EMAIL"] = os.Getenv("GIT_COMMITTER_EMAIL")
 	}
 
 	return metadata
