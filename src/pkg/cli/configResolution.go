@@ -19,7 +19,7 @@ type configOutput struct {
 	Source      Source `json:"source,omitempty"`
 }
 
-const configMaskedValue = "*****"
+const configMaskedValue = "******"
 
 type Source string
 
@@ -38,7 +38,7 @@ func maskTrailingConfigValue(value string) string {
 	if len(value) <= 4 {
 		return configMaskedValue
 	}
-	return value[:4] + strings.Repeat("*", 3)
+	return value[:4] + strings.Repeat("*", 2)
 }
 
 // determineConfigSource determines the source of an environment variable
