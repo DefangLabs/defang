@@ -1,0 +1,10 @@
+[95m * Service environment variables resolution summary:
+[0m[1m
+SERVICE  ENVIRONMENT  SOURCE   VALUE[0m
+web      API_URL      Compose  https://api.example.com  
+web      APP_ENV      Compose  production               
+web      DOCS_PATH    Compose  /leaderboard/api/hubs    
+web      GREETING     Compose  not a secret             
+web      LOG_LEVEL    Compose  info                     
+web      NODE_ENV     Compose  production               
+web      PORT         Compose  8080                     

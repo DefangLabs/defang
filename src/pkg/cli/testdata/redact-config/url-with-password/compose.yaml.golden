@@ -1,0 +1,8 @@
+[95m * Service environment variables resolution summary:
+[0m[1m
+SERVICE  ENVIRONMENT    SOURCE   VALUE[0m
+web      CALLBACK_URL   Compose  http**                      
+web      REDIS_ALT_URL  Compose  redi**                      
+web      REDIS_URL      Compose  redi**                      
+web      SAFE_URL       Compose  https://example.com/api/v1  
+web      WEBHOOK_URL    Compose  http**                      

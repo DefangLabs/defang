@@ -1,0 +1,10 @@
+services:
+  web:
+    image: nginx
+    environment:
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      DATABASE_URL: ${DATABASE_URL}
+      POSTGRES_URL: postgres://dbuser:${POSTGRES_PASSWORD}@db.example.com:5432/myapp
+      API_SECRET: ${API_SECRET}
+      APP_ENV: ${APP_ENV}
+      STATIC_VALUE: hello

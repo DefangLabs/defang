@@ -1,0 +1,10 @@
+services:
+  api:
+    image: node
+    environment:
+      DATABASE_URL: postgres://dbuser:p455w0rd@db.example.com:5432/myapp
+      MONGO_URI: mongodb://admin:s3cretP4ss@mongo.example.com:27017/mydb
+      MYSQL_URL: mysql://root:r00tP4ssw0rd@mysql.example.com:3306/app
+      REDIS_URL: rediss://default:p41fce90d44ac1d891bd21fdbc5dfc1bd7f163e33a6934c30093eaf56c1c23937@redis.example.com:6380
+      DB_HOST: db.example.com
+      DB_PORT: "5432"

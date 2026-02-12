@@ -19,7 +19,7 @@ type configOutput struct {
 	Source      Source `json:"source,omitempty"`
 }
 
-const configMaskedValue = "*****"
+const configMaskedValue = "******"
 
 type Source string
 
@@ -33,8 +33,16 @@ func (s Source) String() string {
 	return string(s)
 }
 
+func maskTrailingConfigValue(value string) string {
+	// Mask the value if it looks like a secret and only show the first 4 characters
+	if len(value) <= 4 {
+		return configMaskedValue
+	}
+	return value[:4] + strings.Repeat("*", 2)
+}
+
 // determineConfigSource determines the source of an environment variable
-// and returns the appropriate source type and value to display
+// and returns the appropriate source type and value to display.
 func determineConfigSource(envKey string, envValue *string, defangConfigs map[string]struct{}) (Source, string) {
 	// If the key itself is a defang config, mask it
 	if _, isDefangConfig := defangConfigs[envKey]; isDefangConfig {
@@ -57,7 +65,9 @@ func determineConfigSource(envKey string, envValue *string, defangConfigs map[st
 	return SourceComposeFile, *envValue
 }
 
-func printConfigResolutionSummary(project *types.Project, defangConfig []string) error {
+// printConfigResolutionSummary prints a summary of where each environment variable in the compose file is coming from (compose file, defang config, or interpolation).
+// If redact is true, it will mask values that are from the compose file and look like secrets.
+func printConfigResolutionSummary(project *types.Project, defangConfig []string, redact bool) error {
 	configset := make(map[string]struct{})
 	for _, name := range defangConfig {
 		configset[name] = struct{}{}
@@ -68,6 +78,16 @@ func printConfigResolutionSummary(project *types.Project, defangConfig []string)
 	for serviceName, service := range project.Services {
 		for envKey, envValue := range service.Environment {
 			source, value := determineConfigSource(envKey, envValue, configset)
+			if redact && source == SourceComposeFile {
+				isSecret, _, err := compose.IsSecret(envKey, value)
+				if err != nil {
+					return err
+				}
+
+				if isSecret {
+					value = maskTrailingConfigValue(value)
+				}
+			}
 			projectEnvVars = append(projectEnvVars, configOutput{
 				Service:     serviceName,
 				Environment: envKey,
@@ -97,13 +117,13 @@ func printConfigResolutionSummary(project *types.Project, defangConfig []string)
 	return term.Table(projectEnvVars, "Service", "Environment", "Source", "Value")
 }
 
-func PrintConfigSummaryAndValidate(ctx context.Context, provider client.Provider, project *compose.Project) error {
+func printConfigSummaryAndValidate(ctx context.Context, provider client.Provider, project *compose.Project, redact bool) error {
 	configs, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
 	if err != nil {
 		return err
 	}
 
-	err = printConfigResolutionSummary(project, configs.Names)
+	err = printConfigResolutionSummary(project, configs.Names, redact)
 	if err != nil {
 		return err
 	}
@@ -114,4 +134,12 @@ func PrintConfigSummaryAndValidate(ctx context.Context, provider client.Provider
 	}
 
 	return nil
+}
+
+func PrintConfigSummaryAndValidate(ctx context.Context, provider client.Provider, project *compose.Project) error {
+	return printConfigSummaryAndValidate(ctx, provider, project, false)
+}
+
+func PrintRedactedConfigSummaryAndValidate(ctx context.Context, provider client.Provider, project *compose.Project) error {
+	return printConfigSummaryAndValidate(ctx, provider, project, true)
 }

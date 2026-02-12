@@ -1,0 +1,8 @@
+[95m * Service environment variables resolution summary:
+[0m[1m
+SERVICE   ENVIRONMENT   SOURCE   VALUE[0m
+service1  EMPTY_VAR     Config               
+service1  WITH_VALUE    Compose  some_value  
+service2  EMPTY_STRING  Compose              
+service2  EMPTY_VAR     Config               
+service2  WITH_VALUE    Compose  some_value  

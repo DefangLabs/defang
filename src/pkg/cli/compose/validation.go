@@ -204,19 +204,16 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 	// check for compose file environment variables that may be sensitive
 	for key, value := range svccfg.Environment {
 		if value != nil {
-			// format input as a key-value pair string
-			input := key + "=" + *value
-
 			// call detectConfig to check for sensitive information
-			ds, err := detectConfig(input)
+			isSecret, ds, err := IsSecret(key, *value)
 			if err != nil {
 				return fmt.Errorf("service %q: %w", svccfg.Name, err)
 			}
 
 			// show warning if sensitive information is detected
-			if len(ds) > 0 {
+			if isSecret {
 				term.Warnf("service %q: environment %q may contain sensitive information; consider using 'defang config set %s' to securely store this value", svccfg.Name, key, key)
-				term.Debugf("service %q: environment %q may contain detected secrets of type: %q", svccfg.Name, key, ds)
+				term.Debugf("service %q: environment %q may contain detected secrets of type: %v", svccfg.Name, key, ds)
 			}
 		}
 	}
