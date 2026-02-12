@@ -79,13 +79,13 @@ func printConfigResolutionSummary(project *types.Project, defangConfig []string,
 		for envKey, envValue := range service.Environment {
 			source, value := determineConfigSource(envKey, envValue, configset)
 			if redact && source == SourceComposeFile {
-				isSecret, err := compose.IsSecret(*envValue)
+				isSecret, _, err := compose.IsSecret(envKey, value)
 				if err != nil {
 					return err
 				}
 
 				if isSecret {
-					value = maskTrailingConfigValue(*envValue)
+					value = maskTrailingConfigValue(value)
 				}
 			}
 			projectEnvVars = append(projectEnvVars, configOutput{
