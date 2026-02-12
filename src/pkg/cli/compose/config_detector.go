@@ -6,20 +6,20 @@ import (
 	"github.com/DefangLabs/secret-detector/pkg/scanner"
 )
 
-func IsSecret(input string) (bool, error) {
+func IsSecret(key, value string) (bool, []string, error) {
 	// DetectConfig checks if the input string contains any sensitive information
-	detectorTypes, err := detectConfig(input)
+	detectorTypes, err := detectConfig(key + ": " + value)
 	if err != nil {
-		return false, fmt.Errorf("failed to detect config: %w", err)
+		return false, nil, fmt.Errorf("failed to detect config: %w", err)
 	}
 
 	// If no detectors were triggered, return false
 	if len(detectorTypes) == 0 {
-		return false, nil
+		return false, nil, nil
 	}
 
 	// If any detectors were triggered, return true
-	return true, nil
+	return true, detectorTypes, nil
 }
 
 // assume that the input is a key-value pair string
