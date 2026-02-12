@@ -33,7 +33,7 @@ func detectConfig(input string) (detectorTypes []string, err error) {
 
 	// create a custom scanner config
 	cfg := scanner.NewConfigWithDefaults()
-	cfg.Transformers = []string{"json"}
+	cfg.Transformers = []string{"yaml"}
 	cfg.DetectorConfigs["keyword"] = []string{"3"}
 	cfg.DetectorConfigs["high_entropy_string"] = []string{"3.7"}
 
