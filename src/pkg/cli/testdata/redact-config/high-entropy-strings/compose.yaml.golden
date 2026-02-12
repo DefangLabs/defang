@@ -1,8 +1,8 @@
 [95m * Service environment variables resolution summary:
 [0m[1m
 SERVICE  ENVIRONMENT     SOURCE   VALUE[0m
-app      APP_ENV         Compose  production                                                        
-app      ENCRYPTION_KEY  Compose  9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08  
-app      LOG_LEVEL       Compose  info                                                              
-app      SESSION_SECRET  Compose  VEfk***                                                           
-app      SIGNING_KEY     Compose  xK9m***                                                           
+app      APP_ENV         Compose  production  
+app      ENCRYPTION_KEY  Compose  9f86***     
+app      LOG_LEVEL       Compose  info        
+app      SESSION_SECRET  Compose  VEfk***     
+app      SIGNING_KEY     Compose  xK9m***     
