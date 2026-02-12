@@ -496,7 +496,7 @@ func createHostedZone(t *testing.T, r53Client route53API, projectDomain, comment
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		_, err := r53Client.DeleteHostedZone(t.Context(), &route53.DeleteHostedZoneInput{
+		_, err := r53Client.DeleteHostedZone(context.Background(), &route53.DeleteHostedZoneInput{
 			Id: hz.HostedZone.Id,
 		})
 		if err != nil {
