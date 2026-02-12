@@ -35,7 +35,7 @@ func (s Source) String() string {
 
 func maskTrailingConfigValue(value string) string {
 	// Mask the value if it looks like a secret and only show the first 4 characters
-	if len(value) <= 3 {
+	if len(value) <= 4 {
 		return configMaskedValue
 	}
 	return value[:4] + strings.Repeat("*", 3)
