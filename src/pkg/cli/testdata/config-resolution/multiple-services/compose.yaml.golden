@@ -2,8 +2,8 @@
 [0m[1m
 SERVICE   ENVIRONMENT     SOURCE   VALUE[0m
 service1  APP_ENV         Compose  production  
-service1  DATABASE_URL    Config   *****       
+service1  DATABASE_URL    Config   ******      
 service1  LOG_LEVEL       Compose  info        
-service2  REDIS_PASSWORD  Config   *****       
+service2  REDIS_PASSWORD  Config   ******      
 service2  REDIS_PORT      Compose  6379        
 service3  DB_USER         Compose  Defang      

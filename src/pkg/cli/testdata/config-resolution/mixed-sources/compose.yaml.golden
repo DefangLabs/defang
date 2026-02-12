@@ -4,4 +4,4 @@ SERVICE   ENVIRONMENT  SOURCE                 VALUE[0m
 service1  FROM_ENV     Compose                from_ENV                                    
 service1  PLAIN_VAR    Compose                plain_value                                 
 service1  PUBLIC_URL   Config (interpolated)  https://example-${SECRET_KEY}-from_ENV.com  
-service1  SECRET_KEY   Config                 *****                                       
+service1  SECRET_KEY   Config                 ******                                      

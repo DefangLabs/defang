@@ -1,9 +1,9 @@
 [95m * Service environment variables resolution summary:
 [0m[1m
 SERVICE  ENVIRONMENT   SOURCE   VALUE[0m
-web      API_SECRET    Compose  VEfk***     
+web      API_SECRET    Compose  VEfk**      
 web      APP_ENV       Compose  production  
-web      DATABASE_URL  Compose  post***     
-web      GITHUB_TOKEN  Compose  ghp_***     
-web      POSTGRES_URL  Compose  post***     
+web      DATABASE_URL  Compose  post**      
+web      GITHUB_TOKEN  Compose  ghp_**      
+web      POSTGRES_URL  Compose  post**      
 web      STATIC_VALUE  Compose  hello       
