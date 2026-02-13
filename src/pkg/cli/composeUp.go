@@ -104,7 +104,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		return nil, project, &ComposeError{err}
 	}
 
-	bytes, err := fixedProject.MarshalYAML()
+	bytes, err := compose.MarshalYAML(fixedProject)
 	if err != nil {
 		return nil, project, err
 	}

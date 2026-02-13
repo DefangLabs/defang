@@ -1,0 +1,21 @@
+services:
+  a:
+    build:
+      args:
+        - VERSION
+        - GITSHA=65e1234
+        - INT=1234
+    environment:
+      - VERSION
+      - GITSHA=65e1234
+      - INT=1234
+  b:
+    build:
+      args:
+        GITSHA: 65e1234
+        INT: 1234
+        VERSION:
+    environment:
+      GITSHA: 65e1234
+      INT: 1234
+      VERSION:

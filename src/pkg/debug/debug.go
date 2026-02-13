@@ -189,7 +189,7 @@ func buildDeploymentDebugPrompt(debugConfig DebugConfig) string {
 	}
 
 	if debugConfig.Project != nil {
-		yaml, err := debugConfig.Project.MarshalYAML()
+		yaml, err := compose.MarshalYAML(debugConfig.Project)
 		if err != nil {
 			term.Println("Failed to marshal compose project to YAML for debug:", err)
 		}
