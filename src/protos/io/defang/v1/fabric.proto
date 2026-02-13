@@ -765,6 +765,8 @@ message WhoAmIResponse {
   SubscriptionTier tier = 5;
   bool training_opt_out = 6;
   string tenant_id = 7;
+  google.protobuf.Timestamp paid_until = 8;
+  google.protobuf.Timestamp trial_until = 9;
 }
 
 message EstimateRequest {
