@@ -23,8 +23,10 @@ func MarshalYAML(p *Project) ([]byte, error) {
 	encoder.SetIndent(2)
 	// encoder.CompactSeqIndent() FIXME https://github.com/go-yaml/yaml/pull/753
 	// src := applyMarshallOptions(p, options...)
-	err := encoder.Encode(&root)
-	if err != nil {
+	if err := encoder.Encode(&root); err != nil {
+		return nil, err
+	}
+	if err := encoder.Close(); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
