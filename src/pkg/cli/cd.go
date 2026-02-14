@@ -125,6 +125,9 @@ func TailAndWaitForCD(ctx context.Context, provider client.Provider, projectName
 			tailErr = err
 		}
 	}
+	if errors.Is(cdErr, context.Canceled) {
+		cdErr = nil
+	}
 	return errors.Join(cdErr, tailErr)
 }
 

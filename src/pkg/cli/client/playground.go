@@ -42,8 +42,8 @@ func (g *PlaygroundProvider) Deploy(ctx context.Context, req *DeployRequest) (*d
 	return getMsg(g.GetFabricClient().Deploy(ctx, connect.NewRequest(&req.DeployRequest)))
 }
 
-func (g *PlaygroundProvider) GetDeploymentStatus(ctx context.Context) error {
-	return io.EOF // TODO: implement on fabric, for now assume service is deployed
+func (g *PlaygroundProvider) GetDeploymentStatus(ctx context.Context) (bool, error) {
+	return true, io.EOF // TODO: implement on fabric, for now assume service is deployed
 }
 
 func (g *PlaygroundProvider) Preview(ctx context.Context, req *DeployRequest) (*defangv1.DeployResponse, error) {
@@ -85,12 +85,36 @@ func (g *PlaygroundProvider) CreateUploadURL(ctx context.Context, req *defangv1.
 	return getMsg(g.GetFabricClient().CreateUploadURL(ctx, connect.NewRequest(req)))
 }
 
-func (g *PlaygroundProvider) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error) {
-	return g.GetFabricClient().Subscribe(ctx, connect.NewRequest(req))
+func (g *PlaygroundProvider) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {
+	stream, err := g.GetFabricClient().Subscribe(ctx, connect.NewRequest(req))
+	if err != nil {
+		return nil, err
+	}
+	return serverStreamIter(stream), nil
 }
 
-func (g *PlaygroundProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
-	return g.GetFabricClient().Tail(ctx, connect.NewRequest(req))
+func (g *PlaygroundProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
+	stream, err := g.GetFabricClient().Tail(ctx, connect.NewRequest(req))
+	if err != nil {
+		return nil, err
+	}
+	return serverStreamIter(stream), nil
+}
+
+// serverStreamIter adapts any ServerStream[T] (including connect-go ServerStreamForClient)
+// to iter.Seq2. The stream is closed when the consumer stops iterating or the stream ends.
+func serverStreamIter[T any](stream ServerStream[T]) iter.Seq2[*T, error] {
+	return func(yield func(*T, error) bool) {
+		defer stream.Close()
+		for stream.Receive() {
+			if !yield(stream.Msg(), nil) {
+				return
+			}
+		}
+		if err := stream.Err(); err != nil {
+			yield(nil, err)
+		}
+	}
 }
 
 func (g *PlaygroundProvider) CdCommand(ctx context.Context, req CdCommandRequest) (types.ETag, error) {
