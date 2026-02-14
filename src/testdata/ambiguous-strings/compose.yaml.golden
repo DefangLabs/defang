@@ -1,0 +1,33 @@
+name: ambiguous-strings
+services:
+  a:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GITSHA: "65e1234"
+        INT: "1234"
+        VERSION: "65e1234"
+    environment:
+      GITSHA: "65e1234"
+      INT: "1234"
+      VERSION: "65e1234"
+    networks:
+      default: null
+  b:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GITSHA: "65e1234"
+        INT: "1234"
+        VERSION: "65e1234"
+    environment:
+      GITSHA: "65e1234"
+      INT: "1234"
+      VERSION: "65e1234"
+    networks:
+      default: null
+networks:
+  default:
+    name: ambiguous-strings_default
