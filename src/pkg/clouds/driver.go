@@ -50,7 +50,7 @@ type Driver interface {
 	PutSecret(ctx context.Context, name, value string) error
 	// DeleteSecrets(ctx context.Context, names ...string) error
 	ListSecrets(ctx context.Context) ([]string, error) // no values
-	CreateUploadURL(ctx context.Context, name string) (string, error)
+	CreateUploadURL(ctx context.Context, prefix string, name string) (string, error)
 }
 
 type TaskInfo struct {
