@@ -233,20 +233,20 @@ func NewClient(ctx context.Context) *godo.Client {
 
 var s3InvalidCharsRegexp = regexp.MustCompile(`[^a-zA-Z0-9!_.*'()-]`)
 
-func (d DoApp) CreateUploadURL(ctx context.Context, objectKeyName string) (string, error) {
+func (d DoApp) CreateUploadURL(ctx context.Context, prefix string, filename string) (string, error) {
 	s3Client, err := d.CreateS3Client()
 	if err != nil {
 		return "", err
 	}
 
-	if objectKeyName == "" {
-		objectKeyName = uuid.NewString()
+	if filename == "" {
+		filename = uuid.NewString()
 	} else {
-		if len(objectKeyName) > 64 {
+		if len(filename) > 64 {
 			return "", errors.New("name must be less than 64 characters")
 		}
 		// Sanitize the digest so it's safe to use as a file name
-		objectKeyName = s3InvalidCharsRegexp.ReplaceAllString(objectKeyName, "_")
+		filename = s3InvalidCharsRegexp.ReplaceAllString(filename, "_")
 		// name = path.Join(buildsPath, tenantName.String(), digest); TODO: avoid collisions between tenants
 	}
 
@@ -255,7 +255,7 @@ func (d DoApp) CreateUploadURL(ctx context.Context, objectKeyName string) (strin
 	// so should we just stick to the S3 SDK for all S3 operations, instead of using presigned URLs?
 	req, err := s3.NewPresignClient(s3Client).PresignPutObject(ctx, &s3.PutObjectInput{
 		Bucket: &d.BucketName,
-		Key:    &objectKeyName,
+		Key:    ptr.String(prefix + filename),
 	})
 
 	if err != nil {
