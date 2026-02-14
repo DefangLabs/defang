@@ -326,9 +326,11 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 		printDefangHint("To start a new project, do:", "new")
 	}
 
-	if connect.CodeOf(originalErr) == connect.CodeResourceExhausted && strings.Contains(originalErr.Error(), "maximum number of projects") {
+	playgroundProvider, isPlayground := provider.(*client.PlaygroundProvider)
+
+	if isPlayground && connect.CodeOf(originalErr) == connect.CodeResourceExhausted && strings.Contains(originalErr.Error(), "maximum number of projects") {
 		term.Error("Error:", client.PrettyError(originalErr))
-		err := handleTooManyProjectsError(ctx, provider, originalErr)
+		err := handleTooManyProjectsError(ctx, playgroundProvider, originalErr)
 		if err != nil {
 			return originalErr
 		}
@@ -345,7 +347,7 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 	}, originalErr)
 }
 
-func handleTooManyProjectsError(ctx context.Context, provider client.Provider, originalErr error) error {
+func handleTooManyProjectsError(ctx context.Context, provider *client.PlaygroundProvider, originalErr error) error {
 	projectName, err := provider.RemoteProjectName(ctx)
 	if err != nil {
 		term.Warn("failed to get remote project name:", err)
@@ -438,18 +440,19 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 
-			projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), session.Loader, session.Provider)
+			ctx := cmd.Context()
+			projectName, _, err := session.Loader.LoadProjectName(ctx)
 			if err != nil {
 				return err
 			}
 
-			err = canIUseProvider(cmd.Context(), session.Provider, projectName, 0)
+			err = canIUseProvider(ctx, session.Provider, projectName, 0)
 			if err != nil {
 				return err
 			}
 
 			since := time.Now()
-			deployment, err := cli.ComposeDown(cmd.Context(), projectName, global.Client, session.Provider)
+			deployment, err := cli.ComposeDown(ctx, projectName, global.Client, session.Provider)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
@@ -461,7 +464,7 @@ func makeComposeDownCmd() *cobra.Command {
 
 			term.Info("Deleted services, deployment ID", deployment)
 
-			listConfigs, err := session.Provider.ListConfig(cmd.Context(), &defangv1.ListConfigsRequest{Project: projectName})
+			listConfigs, err := session.Provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: projectName})
 			if err == nil {
 				if len(listConfigs.Names) > 0 {
 					term.Warn("Stored project configs are not deleted.")
@@ -476,7 +479,7 @@ func makeComposeDownCmd() *cobra.Command {
 			}
 
 			tailOptions := newTailOptionsForDown(session.Stack.Name, deployment, since)
-			tailCtx := cmd.Context() // FIXME: stop Tail when the deployment task is done
+			tailCtx := ctx // FIXME: stop Tail when the deployment task is done
 			err = cli.TailAndWaitForCD(tailCtx, session.Provider, projectName, tailOptions)
 			if err != nil && !errors.Is(err, io.EOF) {
 				if connect.CodeOf(err) == connect.CodePermissionDenied {
@@ -600,16 +603,17 @@ func makeComposePsCmd() *cobra.Command {
 				return err
 			}
 
-			projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), session.Loader, session.Provider)
+			ctx := cmd.Context()
+			projectName, _, err := session.Loader.LoadProjectName(ctx)
 			if err != nil {
 				return err
 			}
 
 			if long {
-				return cli.PrintLongServices(cmd.Context(), projectName, session.Provider)
+				return cli.PrintLongServices(ctx, projectName, session.Provider)
 			}
 
-			if err := cli.PrintServices(cmd.Context(), projectName, session.Provider); err != nil {
+			if err := cli.PrintServices(ctx, projectName, session.Provider); err != nil {
 				if errNoServices := new(cli.ErrNoServices); !errors.As(err, errNoServices) {
 					return err
 				}
@@ -732,14 +736,15 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), session.Loader, session.Provider)
+	ctx := cmd.Context()
+	projectName, _, err := session.Loader.LoadProjectName(ctx)
 	if err != nil {
 		return err
 	}
 
 	// Handle 'latest' deployment flag
 	if deployment == "latest" {
-		resp, err := global.Client.ListDeployments(cmd.Context(), &defangv1.ListDeploymentsRequest{
+		resp, err := global.Client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
 			Project: projectName,
 			Stack:   session.Stack.Name,
 			Type:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
