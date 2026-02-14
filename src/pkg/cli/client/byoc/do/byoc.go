@@ -10,6 +10,7 @@ import (
 	"iter"
 	"net/url"
 	"os"
+	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -162,7 +163,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *client.DeployRequest, cmd stri
 		return nil, err
 	}
 
-	payloadUrl, err := b.driver.CreateUploadURL(ctx, etag)
+	payloadUrl, err := b.driver.CreateUploadURL(ctx, path.Join(byoc.UploadPrefix, etag))
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +282,7 @@ func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLReq
 		return nil, err
 	}
 
-	url, err := b.driver.CreateUploadURL(ctx, req.Digest)
+	url, err := b.driver.CreateUploadURL(ctx, path.Join(byoc.UploadPrefix, req.Digest))
 
 	if err != nil {
 		return nil, err
