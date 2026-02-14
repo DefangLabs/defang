@@ -113,6 +113,6 @@ func (l *Local) ListSecrets(ctx context.Context) ([]string, error) {
 	return nil, client.ErrNotImplemented("not implemented for local driver")
 }
 
-func (l *Local) CreateUploadURL(ctx context.Context, name string) (string, error) {
+func (l *Local) CreateUploadURL(ctx context.Context, prefix, name string) (string, error) {
 	return "", client.ErrNotImplemented("not implemented for local driver")
 }
