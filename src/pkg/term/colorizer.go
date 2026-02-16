@@ -178,12 +178,20 @@ func ensureNewline(s string) string {
 	return s
 }
 
-func ensurePrefix(s string, prefix string) string {
+type prefixChars string
+
+const (
+	debugPrefix prefixChars = " - "
+	infoPrefix  prefixChars = " * "
+	warnPrefix  prefixChars = " ! "
+)
+
+func ensurePrefix(prefix prefixChars, s string) string {
 	// Don't add prefix to empty strings or strings that already have it
-	if len(s) == 0 || strings.HasPrefix(s, prefix) {
+	if len(s) == 0 || strings.HasPrefix(s, string(prefix)) {
 		return s
 	}
-	return prefix + s
+	return string(prefix) + s
 }
 
 func (t *Term) Printc(c Color, v ...any) (int, error) {
@@ -195,25 +203,25 @@ func (t *Term) Print(v ...any) (int, error) {
 }
 
 func (t *Term) Println(v ...any) (int, error) {
-	return fmt.Fprint(t.out, ensureNewline(fmt.Sprintln(v...)))
+	return fmt.Fprintln(t.out, v...)
 }
 
 func (t *Term) Printf(format string, v ...any) (int, error) {
-	return fmt.Fprint(t.out, ensureNewline(fmt.Sprintf(format, v...)))
+	return fmt.Fprintf(t.out, format, v...)
 }
 
 func (t *Term) Debug(v ...any) (int, error) {
 	if !t.debug {
 		return 0, nil
 	}
-	return output(t.err, DebugColor, ensurePrefix(fmt.Sprintln(v...), " - "))
+	return output(t.err, DebugColor, ensurePrefix(debugPrefix, fmt.Sprintln(v...)))
 }
 
 func (t *Term) Debugf(format string, v ...any) (int, error) {
 	if !t.debug {
 		return 0, nil
 	}
-	return output(t.err, DebugColor, ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " - ")))
+	return output(t.err, DebugColor, ensureNewline(ensurePrefix(debugPrefix, fmt.Sprintf(format, v...))))
 }
 
 func (t *Term) outOrErr() *termenv.Output {
@@ -224,21 +232,21 @@ func (t *Term) outOrErr() *termenv.Output {
 }
 
 func (t *Term) Info(v ...any) (int, error) {
-	return output(t.outOrErr(), InfoColor, ensurePrefix(fmt.Sprintln(v...), " * "))
+	return output(t.outOrErr(), InfoColor, ensurePrefix(infoPrefix, fmt.Sprintln(v...)))
 }
 
 func (t *Term) Infof(format string, v ...any) (int, error) {
-	return output(t.outOrErr(), InfoColor, ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " * ")))
+	return output(t.outOrErr(), InfoColor, ensureNewline(ensurePrefix(infoPrefix, fmt.Sprintf(format, v...))))
 }
 
 func (t *Term) Warn(v ...any) (int, error) {
-	msg := ensurePrefix(fmt.Sprintln(v...), " ! ")
+	msg := ensurePrefix(warnPrefix, fmt.Sprintln(v...))
 	t.warnings = append(t.warnings, msg)
 	return output(t.outOrErr(), WarnColor, msg)
 }
 
 func (t *Term) Warnf(format string, v ...any) (int, error) {
-	msg := ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " ! "))
+	msg := ensureNewline(ensurePrefix(warnPrefix, fmt.Sprintf(format, v...)))
 	t.warnings = append(t.warnings, msg)
 	return output(t.outOrErr(), WarnColor, msg)
 }
