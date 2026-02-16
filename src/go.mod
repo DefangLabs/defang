@@ -34,12 +34,11 @@ require (
 	github.com/aws/smithy-go v1.24.0
 	github.com/awslabs/goformation/v7 v7.14.9
 	github.com/bufbuild/connect-go v1.10.0
-	github.com/compose-spec/compose-go/v2 v2.7.2-0.20250715094302-8da9902241f9
+	github.com/compose-spec/compose-go/v2 v2.10.1
 	github.com/digitalocean/godo v1.131.1
 	github.com/docker/cli v27.3.1+incompatible
 	github.com/docker/docker v28.0.0+incompatible
 	github.com/firebase/genkit/go v1.2.0
-	github.com/goccy/go-yaml v1.17.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.14.2
@@ -61,7 +60,7 @@ require (
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
-	go.yaml.in/yaml/v3 v3.0.4
+	go.yaml.in/yaml/v4 v4.0.0-rc.3
 	golang.org/x/mod v0.29.0
 	golang.org/x/oauth2 v0.30.0
 	golang.org/x/sys v0.38.0
@@ -99,6 +98,7 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.2.1 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
+	github.com/goccy/go-yaml v1.17.1 // indirect
 	github.com/google/dotprompt/go v0.0.0-20251014011017-8d056e027254 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect

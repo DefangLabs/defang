@@ -17,7 +17,7 @@
       }
     ]
   },
-  "app": {
+  "modellist": {
     "command": null,
     "entrypoint": null,
     "environment": {
@@ -26,7 +26,23 @@
     },
     "image": "app",
     "models": {
-      "ai_model": {}
+      "ai_model": null
+    },
+    "networks": {
+      "default": null,
+      "model_provider_private": null
+    }
+  },
+  "modelmap": {
+    "command": null,
+    "entrypoint": null,
+    "environment": {
+      "AI_MODEL_MODEL": "ai/model",
+      "AI_MODEL_URL": "http://mock-ai-model/api/v1/"
+    },
+    "image": "app",
+    "models": {
+      "ai_model": null
     },
     "networks": {
       "default": null,

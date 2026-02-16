@@ -1,9 +1,16 @@
 name: models
 services:
-  app:
+  modellist:
     image: app
     models:
-      ai_model: {}
+      ai_model: null
+    networks:
+      default: null
+    x-defang-llm: true
+  modelmap:
+    image: app
+    models:
+      ai_model: null
     networks:
       default: null
   withendpoint:
