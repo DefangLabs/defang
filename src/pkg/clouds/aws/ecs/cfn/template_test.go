@@ -6,7 +6,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/stretchr/testify/assert"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func TestGetCacheRepoPrefix(t *testing.T) {

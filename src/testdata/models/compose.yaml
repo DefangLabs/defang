@@ -1,8 +1,13 @@
 services:
-  app:
+  modelmap:
     image: app
-    models: # per docs, should support list as well
-      ai_model: {}
+    models:
+      ai_model:
+  modellist:
+    image: app
+    models:
+      - ai_model
+    x-defang-llm: true
   withendpoint:
     image: app
     models:
