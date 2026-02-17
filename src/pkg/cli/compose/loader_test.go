@@ -24,7 +24,7 @@ func TestLoader(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		yaml, err := proj.MarshalYAML()
+		yaml, err := MarshalYAML(proj)
 		if err != nil {
 			t.Fatal(err)
 		}

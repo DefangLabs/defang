@@ -67,7 +67,7 @@ func TestListPulumiStacks(t *testing.T) {
 	}
 	count := 0
 	for stack := range stacks {
-		if stack != expectedStacks[count] {
+		if stack.String() != expectedStacks[count] {
 			t.Errorf("expected stack %q, got %q", expectedStacks[count], stack)
 		}
 		count++

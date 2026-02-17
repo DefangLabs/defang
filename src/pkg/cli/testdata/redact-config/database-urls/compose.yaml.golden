@@ -1,0 +1,9 @@
+[95m * Service environment variables resolution summary:
+[0m[1m
+SERVICE  ENVIRONMENT   SOURCE   VALUE[0m
+api      DATABASE_URL  Compose  post**          
+api      DB_HOST       Compose  db.example.com  
+api      DB_PORT       Compose  5432            
+api      MONGO_URI     Compose  mong**          
+api      MYSQL_URL     Compose  mysq**          
+api      REDIS_URL     Compose  redi**          

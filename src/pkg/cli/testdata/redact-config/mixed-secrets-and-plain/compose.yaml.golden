@@ -1,0 +1,12 @@
+[95m * Service environment variables resolution summary:
+[0m[1m
+SERVICE   ENVIRONMENT   SOURCE   VALUE[0m
+backend   API_KEY       Compose  api-**       
+backend   APP_NAME      Compose  my-backend   
+backend   DATABASE_URL  Compose  post**       
+backend   GITHUB_TOKEN  Compose  ghp_**       
+backend   LOG_LEVEL     Compose  info         
+backend   NODE_ENV      Compose  production   
+backend   PORT          Compose  8080         
+frontend  APP_NAME      Compose  my-frontend  
+frontend  PORT          Compose  3000         

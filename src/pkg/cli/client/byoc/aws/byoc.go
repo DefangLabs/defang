@@ -17,6 +17,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
@@ -872,6 +873,7 @@ func (b *ByocAws) UpdateServiceInfo(ctx context.Context, si *defangv1.ServiceInf
 }
 
 func (b *ByocAws) TearDownCD(ctx context.Context) error {
+	term.Warn("Deleting the Defang CD cluster; currently existing stacks or configs will not be deleted, but they will be orphaned and they will need to be cleaned up manually")
 	return b.driver.TearDown(ctx)
 }
 
@@ -908,7 +910,7 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	return nil
 }
 
-func (b *ByocAws) CdList(ctx context.Context, allRegions bool) (iter.Seq[string], error) {
+func (b *ByocAws) CdList(ctx context.Context, allRegions bool) (iter.Seq[state.Info], error) {
 	if allRegions {
 		s3Client, err := newS3Client(ctx, b.driver.Region)
 		if err != nil {

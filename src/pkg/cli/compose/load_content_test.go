@@ -18,7 +18,7 @@ func TestRoundTrip(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		content, err := p.MarshalYAML()
+		content, err := MarshalYAML(p)
 		if err != nil {
 			t.Fatal(err)
 		}

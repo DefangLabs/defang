@@ -9,6 +9,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
+
+	byocState "github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 )
 
 type DNSResolver interface {
@@ -67,7 +69,7 @@ type Provider interface {
 	DNSResolver
 	AccountInfo(context.Context) (*AccountInfo, error)
 	CdCommand(context.Context, CdCommandRequest) (types.ETag, error)
-	CdList(context.Context, bool) (iter.Seq[string], error)
+	CdList(context.Context, bool) (iter.Seq[byocState.Info], error)
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
 	DelayBeforeRetry(context.Context) error
 	DeleteConfig(context.Context, *defangv1.Secrets) error

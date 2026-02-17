@@ -15,7 +15,7 @@ import (
 func TestGetDelegationSet(t *testing.T) {
 	t.Skip("broken")
 
-	ctx := context.Background()
+	ctx := t.Context()
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -26,7 +26,7 @@ func TestGetDelegationSet(t *testing.T) {
 	var ds *types.DelegationSet
 	t.Cleanup(func() {
 		if ds != nil {
-			_, err := r53Client.DeleteReusableDelegationSet(ctx, &route53.DeleteReusableDelegationSetInput{
+			_, err := r53Client.DeleteReusableDelegationSet(context.Background(), &route53.DeleteReusableDelegationSetInput{
 				Id: ds.Id,
 			})
 			if err != nil {

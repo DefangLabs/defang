@@ -1,0 +1,9 @@
+services:
+  backend:
+    image: node
+    environment:
+      APP_NAME: my-application
+      API_KEY: api-key=50m34p1k3y
+      SECRET_TOKEN: secret_token=ab12cd34ef56
+      AUTH_PASSWORD: password=hunter12345
+      NORMAL_CONFIG: debug

@@ -1,0 +1,9 @@
+services:
+  deployer:
+    image: alpine
+    environment:
+      GITHUB_TOKEN: ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890
+      AWS_ACCESS_KEY_ID: AKIAIOSFODNN7EXAMPLE
+      AWS_SECRET_ACCESS_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+      AWS_CLIENT_ID: AROA1234567890ABCDEF
+      REGION: us-east-1

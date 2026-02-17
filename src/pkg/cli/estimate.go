@@ -49,7 +49,7 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 		return "", err
 	}
 
-	composeData, err := fixedProject.MarshalYAML()
+	composeData, err := compose.MarshalYAML(fixedProject)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal compose project: %w", err)
 	}

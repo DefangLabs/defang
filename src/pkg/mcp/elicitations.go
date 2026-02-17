@@ -30,10 +30,26 @@ func (c *mcpElicitationsController) Request(ctx context.Context, req elicitation
 		return elicitations.Response{}, err
 	}
 
-	// cast result.Content to map[string]string
+	// cast result.Content to map[string]any
 	contentMap, ok := result.Content.(map[string]any)
 	if !ok {
 		return elicitations.Response{}, fmt.Errorf("invalid eliciation response content type, got %T", result.Content)
+	}
+
+	// TODO: right now you can only pass a single validator even though the
+	// schema can have multiple fields. This is fine for now, because we only
+	// ever have one field in our schemas, but we should eventually support
+	// multiple validators for multiple fields.
+	if req.Validator != nil {
+		if props, ok := req.Schema["properties"].(map[string]any); ok {
+			for field := range props {
+				if value, exists := contentMap[field]; exists {
+					if err := req.Validator(value); err != nil {
+						return elicitations.Response{}, fmt.Errorf("validation failed for field '%s': %w", field, err)
+					}
+				}
+			}
+		}
 	}
 
 	return elicitations.Response{

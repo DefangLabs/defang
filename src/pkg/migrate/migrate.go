@@ -97,7 +97,7 @@ func setupFromHeroku(ctx context.Context, fabric client.FabricClient, surveyor s
 func sanitizeHerokuApplicationInfo(info HerokuApplicationInfo) (interface{}, error) {
 	for key, value := range info.ConfigVars {
 		// Redact sensitive information in config vars
-		isSecret, err := compose.IsSecret(value)
+		isSecret, _, err := compose.IsSecret(key, value)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check if config var %q is a secret: %w", key, err)
 		}

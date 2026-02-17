@@ -18,6 +18,7 @@ func TestDetectConfig(t *testing.T) {
 		{"AROA1234567890ABCDEF", []string{"AWS Client ID"}},
 		{"REDIS_URL=rediss://foo:p41fce90d44ac1d891bd21fdbc5dfc1bd7f163e33a6934c30093eaf56c1c23937@ec2-98-85-106-43.compute-1.amazonaws.com:8240", []string{"URL with password"}},
 		{"REDIS_URL=rediss://:p41fce90d44ac1d891bd21fdbc5dfc1bd7f163e33a6934c30093eaf56c1c23937@ec2-98-85-106-43.compute-1.amazonaws.com:8240", []string{"URL with password"}},
+		{"ENCRYPTION_KEY: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", []string{"High entropy string"}},
 	}
 
 	for _, tt := range tests {
