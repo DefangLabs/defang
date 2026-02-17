@@ -71,7 +71,7 @@ func (m *mockDeployProvider) QueryLogs(ctx context.Context, req *defangv1.TailRe
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.tailStream = client.NewMockWaitStream[defangv1.TailResponse]()
-	return client.ServerStreamIterCtx[defangv1.TailResponse](ctx, m.tailStream), ctx.Err()
+	return client.ServerStreamIterCtx(ctx, m.tailStream), ctx.Err()
 }
 
 func (m *mockDeployProvider) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
@@ -81,9 +81,9 @@ func (m *mockDeployProvider) GetProjectUpdate(ctx context.Context, projectName s
 func (m *mockDeployProvider) GetDeploymentStatus(ctx context.Context) (bool, error) {
 	select {
 	case <-ctx.Done():
-		return false, context.Cause(ctx)
+		return true, context.Cause(ctx)
 	default:
-		return false, m.deploymentStatus
+		return m.deploymentStatus != nil, m.deploymentStatus
 	}
 }
 

@@ -523,6 +523,10 @@ func (b *ByocDo) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) 
 					return
 				}
 			}
+			if err := pkg.SleepWithContext(ctx, 2*time.Second); err != nil {
+				yield(nil, err)
+				return
+			}
 		}
 	}, nil
 }

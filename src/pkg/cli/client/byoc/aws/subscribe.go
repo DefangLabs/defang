@@ -18,17 +18,16 @@ import (
 func parseSubscribeEvents(logSeq iter.Seq2[[]cw.LogEvent, error], etag types.ETag, services []string) iter.Seq2[*defangv1.SubscribeResponse, error] {
 	return func(yield func(*defangv1.SubscribeResponse, error) bool) {
 		for events, err := range logSeq {
-			if err != nil {
-				if !yield(nil, err) {
-					return
-				}
-			}
 			for _, event := range events {
-				resp := parseSubscribeEvent(event, etag, services)
-				if resp != nil {
+				if resp := parseSubscribeEvent(event, etag, services); resp != nil {
 					if !yield(resp, nil) {
 						return
 					}
+				}
+			}
+			if err != nil {
+				if !yield(nil, err) {
+					return
 				}
 			}
 		}

@@ -59,8 +59,9 @@ func streamLogs(ctx context.Context, liveUrl string, etag types.ETag) (iter.Seq2
 				return
 			}
 			if err := json.Unmarshal(message, &data); err != nil {
-				yield(nil, err)
-				return
+				if !yield(nil, err) {
+					return
+				}
 			}
 			parts := strings.SplitN(data.Data, " ", 3)
 			if len(parts) < 3 {

@@ -51,13 +51,20 @@ func getTaskStatus(ctx context.Context, region aws.Region, cluster, taskId strin
 		return false, nil // still running
 	}
 
+	var stoppedReason string
+	if task.StoppedReason != nil {
+		stoppedReason = *task.StoppedReason
+	}
 	switch task.StopCode {
 	default:
-		return true, TaskFailure{task.StopCode, *task.StoppedReason}
+		return true, TaskFailure{task.StopCode, stoppedReason}
 	case ecsTypes.TaskStopCodeEssentialContainerExited:
 		for _, c := range task.Containers {
 			if c.ExitCode != nil && *c.ExitCode != 0 {
-				reason := fmt.Sprintf("%s with code %d", *task.StoppedReason, *c.ExitCode)
+				if stoppedReason == "" {
+					stoppedReason = "essential container exited"
+				}
+				reason := fmt.Sprintf("%s with code %d", stoppedReason, *c.ExitCode)
 				return true, TaskFailure{task.StopCode, reason}
 			}
 		}

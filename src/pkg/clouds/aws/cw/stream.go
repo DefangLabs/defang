@@ -39,7 +39,11 @@ func QueryAndTailLogGroup(ctx context.Context, cwClient LogsClient, lgi LogGroup
 				end = time.Now()
 			}
 			querySeq, err := QueryLogGroup(ctx, cwClient, lgi, start, end, 0)
-			if err == nil {
+			if err != nil {
+				if !yield(nil, err) {
+					return
+				}
+			} else {
 				for events, err := range querySeq {
 					if !yield(events, err) {
 						return
