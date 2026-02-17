@@ -50,13 +50,12 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 		return AuthCodeFlow{}, err
 	}
 
-	state := ar.state
-	authorizeUrl := ar.url.String()
-	term.Debug("Authorization URL:", authorizeUrl)
+	// Create a shortened authorize URL by only including the variable parts (state and code_challenge)
+	authorizeUrl := fmt.Sprintf("%s/cli/%s/%s", OpenAuthClient.issuer, ar.state, ar.challenge)
 
-	term.Println(authorizeUrl)
-	n, _ := term.Printf("Please visit the above URL to log in. (Right click the URL or press ENTER to open browser)\r")
-	defer term.Print(strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
+	term.Println("Please visit the following URL to log in: (Right click the URL or press ENTER to open browser)")
+	n, _ := term.Printf("  %s", authorizeUrl)
+	defer term.Print("\r", strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
 
 	// TODO:This is used to open the browser for GitHub Auth before blocking
 	if mcpFlow {
@@ -67,7 +66,7 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 		if err != nil {
 			go func() {
 				ctx := context.Background()
-				code, err := pollForAuthCode(ctx, state)
+				code, err := pollForAuthCode(ctx, ar.state)
 				if err != nil {
 					term.Errorf("failed to poll for auth code: %v", err)
 					return
@@ -107,7 +106,7 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 		}()
 	}
 
-	code, err := pollForAuthCode(ctx, state)
+	code, err := pollForAuthCode(ctx, ar.state)
 	if err != nil {
 		return AuthCodeFlow{}, err
 	}
