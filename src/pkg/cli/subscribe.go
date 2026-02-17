@@ -84,12 +84,14 @@ func WaitServiceState(
 			continue
 		}
 
-		serviceStates[msg.Name] = msg.State
+		if serviceStates[msg.Name] != targetState {
+			serviceStates[msg.Name] = msg.State
 
-		// exit early on detecting a FAILED state
-		switch msg.State {
-		case defangv1.ServiceState_BUILD_FAILED, defangv1.ServiceState_DEPLOYMENT_FAILED:
-			return serviceStates, client.ErrDeploymentFailed{Service: msg.Name, Message: msg.Status}
+			// exit early on detecting a FAILED state
+			switch msg.State {
+			case defangv1.ServiceState_BUILD_FAILED, defangv1.ServiceState_DEPLOYMENT_FAILED:
+				return serviceStates, client.ErrDeploymentFailed{Service: msg.Name, Message: msg.Status}
+			}
 		}
 
 		if allInState(targetState, serviceStates) {

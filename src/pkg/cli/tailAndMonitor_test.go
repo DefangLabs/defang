@@ -82,6 +82,7 @@ func TestTailAndMonitor(t *testing.T) {
 						{Service: nil, Name: "hasura", Status: " : c7ed06d1bd824a97a6a2b1435f20511b", State: defangv1.ServiceState_NOT_SPECIFIED},
 						{Service: nil, Name: "hasura", Status: " : c7ed06d1bd824a97a6a2b1435f20511b", State: defangv1.ServiceState_NOT_SPECIFIED}, // TASK_ACTIVATING
 						{Service: nil, Name: "hasura", Status: " : c7ed06d1bd824a97a6a2b1435f20511b", State: defangv1.ServiceState_NOT_SPECIFIED}, // TASK_RUNNING
+						{Service: nil, Name: "api", Status: "", State: defangv1.ServiceState_DEPLOYMENT_PENDING},                                  // simulate TASK_STOPPED
 						{Service: nil, Name: "hasura", Status: "", State: defangv1.ServiceState_DEPLOYMENT_COMPLETED},
 						{Service: nil, Name: "hasura", Status: "", State: defangv1.ServiceState_NOT_SPECIFIED}, // CAPACITY_PROVIDER_STEADY_STATE
 						{Service: nil, Name: "hasura", Status: "", State: defangv1.ServiceState_NOT_SPECIFIED}, // SERVICE_STEADY_STATE
