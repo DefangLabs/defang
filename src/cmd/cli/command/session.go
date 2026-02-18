@@ -11,10 +11,12 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/session"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -102,6 +104,9 @@ func newStackManagerForLoader(ctx context.Context, loader *compose.Loader) (sess
 	}
 	projectName, _, err := loader.LoadProjectName(ctx)
 	if err != nil {
+		if !errors.Is(err, types.ErrComposeFileNotFound) {
+			return nil, handleInvalidComposeFileErr(ctx, err)
+		}
 		term.Debugf("Could not determine project name: %v", err)
 	}
 	sm, err := stacks.NewManager(global.Client, targetDirectory, projectName, ec)
@@ -132,4 +137,32 @@ func findTargetDirectory() (string, error) {
 		}
 		wd = parent
 	}
+}
+
+func handleInvalidComposeFileErr(ctx context.Context, err error) error {
+	if global.NonInteractive {
+		return err
+	}
+
+	if !strings.HasPrefix(err.Error(), "yaml: ") && !strings.HasPrefix(err.Error(), "validating ") {
+		return err
+	}
+
+	term.Error("Cannot load project:", err)
+	project, err := compose.NewLoader().CreateProjectForDebug()
+	if err != nil {
+		return err
+	}
+
+	debugger, err := debug.NewDebugger(ctx, global.Cluster, &stacks.Parameters{})
+	if err != nil {
+		return err
+	}
+	debugErr := debugger.DebugComposeLoadError(ctx, debug.DebugConfig{
+		Project: project,
+	}, err)
+	if debugErr != nil {
+		return fmt.Errorf("failed to debug compose load error: %w; original error: %v", debugErr, err)
+	}
+	return err
 }

@@ -115,7 +115,6 @@ func (l *Loader) loadProject(ctx context.Context, suppressWarn bool) (*Project, 
 		if errors.Is(err, errdefs.ErrNotFound) {
 			return nil, types.ErrComposeFileNotFound
 		}
-
 		return nil, err
 	}
 
