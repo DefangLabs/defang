@@ -154,7 +154,11 @@ func handleInvalidComposeFileErr(ctx context.Context, err error) error {
 	if err != nil {
 		return err
 	}
-	return debugger.DebugComposeLoadError(ctx, debug.DebugConfig{
+	debugErr := debugger.DebugComposeLoadError(ctx, debug.DebugConfig{
 		Project: project,
 	}, err)
+	if debugErr != nil {
+		return fmt.Errorf("failed to debug compose load error: %w; original error: %v", debugErr, err)
+	}
+	return err
 }
