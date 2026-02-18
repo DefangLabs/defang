@@ -100,6 +100,14 @@ func (l *Loader) TargetDirectory(ctx context.Context) string {
 	return project.WorkingDir
 }
 
+type ErrInvalidComposeFile struct {
+	error
+}
+
+func (e ErrInvalidComposeFile) Unwrap() error {
+	return e.error
+}
+
 func (l *Loader) loadProject(ctx context.Context, suppressWarn bool) (*Project, error) {
 	if l.cached != nil {
 		return l.cached, nil
@@ -114,6 +122,10 @@ func (l *Loader) loadProject(ctx context.Context, suppressWarn bool) (*Project, 
 	if err != nil {
 		if errors.Is(err, errdefs.ErrNotFound) {
 			return nil, types.ErrComposeFileNotFound
+		}
+
+		if strings.HasPrefix(err.Error(), "yaml: ") {
+			return nil, ErrInvalidComposeFile{fmt.Errorf("failed to parse compose file: %w", err)}
 		}
 
 		return nil, err
