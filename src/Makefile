@@ -191,9 +191,6 @@ PROJECT_NAME := defang-cli
 DOCKER_REPO:=defangio
 DOCKER_IMAGE_NAME:=$(DOCKER_REPO)/$(PROJECT_NAME)
 
-DOCKER_IMAGE_ARM64:=$(DOCKER_IMAGE_NAME):arm64-$(VERSION)
-DOCKER_IMAGE_AMD64:=$(DOCKER_IMAGE_NAME):amd64-$(VERSION)
-
 ## Build and push multi-arch Docker images
 .PHONY: push-images
 push-images: login
