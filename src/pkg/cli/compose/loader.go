@@ -128,6 +128,10 @@ func (l *Loader) loadProject(ctx context.Context, suppressWarn bool) (*Project, 
 			return nil, ErrInvalidComposeFile{fmt.Errorf("failed to parse compose file: %w", err)}
 		}
 
+		if strings.HasPrefix(err.Error(), "validating ") {
+			return nil, ErrInvalidComposeFile{err}
+		}
+
 		return nil, err
 	}
 
