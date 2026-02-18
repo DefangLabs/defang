@@ -194,47 +194,17 @@ DOCKER_IMAGE_NAME:=$(DOCKER_REPO)/$(PROJECT_NAME)
 DOCKER_IMAGE_ARM64:=$(DOCKER_IMAGE_NAME):arm64-$(VERSION)
 DOCKER_IMAGE_AMD64:=$(DOCKER_IMAGE_NAME):amd64-$(VERSION)
 
-.PHONY: image-amd64
-image-amd64:
-	docker build \
-	  --platform linux/amd64 \
-	  -t ${PROJECT_NAME} \
-	  -t $(DOCKER_IMAGE_AMD64) \
-	  --build-arg VERSION=$(VERSION) \
-	  --build-arg GO_VERSION=$(GO_VERSION) \
-	  .
-
-.PHONY: image-arm64
-image-arm64:
-	docker build \
-	  --platform linux/arm64 \
-	  -t ${PROJECT_NAME} \
-	  -t $(DOCKER_IMAGE_ARM64) \
-	  --build-arg VERSION=$(VERSION) \
-	  --build-arg GO_VERSION=$(GO_VERSION) \
-	  .
-
-## Build all docker images and manifest
-.PHONY: images
-images: image-amd64 image-arm64
-
-## Push all docker images
+## Build and push multi-arch Docker images
 .PHONY: push-images
-push-images: images login
-	docker push $(DOCKER_IMAGE_AMD64)
-	docker push $(DOCKER_IMAGE_ARM64)
-	docker manifest create --amend \
-	  $(DOCKER_IMAGE_NAME):$(VERSION) \
-	  $(DOCKER_IMAGE_AMD64) \
-	  $(DOCKER_IMAGE_ARM64)
-	docker manifest create --amend \
-	  $(DOCKER_IMAGE_NAME):latest \
-	  $(DOCKER_IMAGE_AMD64) \
-	  $(DOCKER_IMAGE_ARM64)
-	docker manifest push --purge \
-	  $(DOCKER_IMAGE_NAME):$(VERSION)
-	docker manifest push --purge \
-	  $(DOCKER_IMAGE_NAME):latest
+push-images: login
+	docker buildx build \
+	  --platform linux/amd64,linux/arm64 \
+	  --push \
+	  -t $(DOCKER_IMAGE_NAME):$(VERSION) \
+	  -t $(DOCKER_IMAGE_NAME):latest \
+	  --build-arg VERSION=$(VERSION) \
+	  --build-arg GO_VERSION=$(GO_VERSION) \
+	  .
 
 ## Login to docker
 .PHONY: login
