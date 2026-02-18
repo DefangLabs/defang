@@ -27,7 +27,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 	gcpdns "google.golang.org/api/dns/v1"
 	"google.golang.org/api/googleapi"
 	auditpb "google.golang.org/genproto/googleapis/cloud/audit"

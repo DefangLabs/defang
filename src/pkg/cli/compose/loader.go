@@ -19,7 +19,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/template"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/sirupsen/logrus"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 type Project = composeTypes.Project

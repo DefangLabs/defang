@@ -22,7 +22,7 @@ func TestRoundTrip(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		rt, err := LoadFromContent(t.Context(), content, "should-not-be-used")
+		rt, err := LoadFromContent(t.Context(), content, "**invalid name**")
 		if err != nil {
 			t.Fatal(err)
 		}

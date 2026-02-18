@@ -5,6 +5,8 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,7 +17,6 @@ import (
 
 	defangHttp "github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 )
 
 type ResponseType string
@@ -62,9 +63,10 @@ func WithProvider(provider string) AuthorizeOption {
 }
 
 type AuthorizeResult struct {
-	state    string
-	verifier string
-	url      url.URL
+	state     string
+	verifier  string
+	challenge string
+	url       url.URL
 }
 
 type ExchangeSuccess struct {
@@ -206,14 +208,29 @@ func (c client) Poll(ctx context.Context, state string) (string, error) {
 	return code, nil
 }
 
+func generateState() (string, error) {
+	var b [128 / 8]byte // OAuth 2.0 RFC 6749 recommends at least 128-256 bits of entropy
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", fmt.Errorf("failed to generate random state: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(b[:]), nil // no padding
+}
+
 func (c client) Authorize(redirectURI string, response ResponseType, opts ...AuthorizeOption) (*AuthorizeResult, error) {
 	var as AuthorizeOptions
 	for _, o := range opts {
 		o(&as)
 	}
 
-	result, _ := url.Parse(c.issuer + "/authorize")
-	state := uuid.NewString()
+	result, err := url.Parse(c.issuer + "/authorize")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse issuer URL: %w", err)
+	}
+	state, err := generateState()
+	if err != nil {
+		return nil, err
+	}
+
 	values := url.Values{
 		"client_id":     {c.clientID},
 		"state":         {state},
@@ -225,7 +242,7 @@ func (c client) Authorize(redirectURI string, response ResponseType, opts ...Aut
 	if as.provider != "" {
 		values.Set("provider", as.provider)
 	}
-	var verifier string
+	var verifier, challenge string
 	if as.pkce && response == "code" {
 		pkce, err := GeneratePKCE(64)
 		if err != nil {
@@ -234,12 +251,14 @@ func (c client) Authorize(redirectURI string, response ResponseType, opts ...Aut
 		values.Set("code_challenge_method", string(pkce.Method))
 		values.Set("code_challenge", pkce.Challenge)
 		verifier = pkce.Verifier
+		challenge = pkce.Challenge
 	}
 	result.RawQuery = values.Encode()
 	return &AuthorizeResult{
-		state:    state,
-		verifier: verifier,
-		url:      *result,
+		state:     state,
+		verifier:  verifier,
+		challenge: challenge,
+		url:       *result,
 	}, nil
 }
 
