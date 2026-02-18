@@ -16,6 +16,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -103,8 +104,7 @@ func newStackManagerForLoader(ctx context.Context, loader *compose.Loader) (sess
 	}
 	projectName, _, err := loader.LoadProjectName(ctx)
 	if err != nil {
-		var invalidErr compose.ErrInvalidComposeFile
-		if errors.As(err, &invalidErr) {
+		if !errors.Is(err, types.ErrComposeFileNotFound) {
 			return nil, handleInvalidComposeFileErr(ctx, err)
 		}
 		term.Debugf("Could not determine project name: %v", err)
@@ -141,6 +141,10 @@ func findTargetDirectory() (string, error) {
 
 func handleInvalidComposeFileErr(ctx context.Context, err error) error {
 	if global.NonInteractive {
+		return err
+	}
+
+	if !strings.HasPrefix(err.Error(), "yaml: ") && !strings.HasPrefix(err.Error(), "validating ") {
 		return err
 	}
 
