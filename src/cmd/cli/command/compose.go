@@ -23,7 +23,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
-	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
@@ -83,7 +82,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			project, loadErr := session.Loader.LoadProject(ctx)
 			if loadErr != nil {
-				handleInvalidComposeFileErr(ctx, loadErr)
+				return handleInvalidComposeFileErr(ctx, loadErr)
 			}
 
 			// Check if the user has permission to use the provider
@@ -534,26 +533,7 @@ func makeComposeConfigCmd() *cobra.Command {
 
 			project, loadErr := sessionx.Loader.LoadProject(ctx)
 			if loadErr != nil {
-				if global.NonInteractive {
-					return loadErr
-				}
-
-				term.Error("Cannot load project:", loadErr)
-				project, err := sessionx.Loader.CreateProjectForDebug()
-				if err != nil {
-					term.Warn("Failed to create project for debug:", err)
-					return loadErr
-				}
-
-				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				debugger, err := debug.NewDebugger(ctx, global.Cluster, &global.Stack)
-				if err != nil {
-					term.Warn("Failed to initialize debugger:", err)
-					return loadErr
-				}
-				return debugger.DebugComposeLoadError(ctx, debug.DebugConfig{
-					Project: project,
-				}, loadErr)
+				return handleInvalidComposeFileErr(ctx, loadErr)
 			}
 
 			_, _, err = cli.ComposeUp(ctx, global.Client, sessionx.Provider, sessionx.Stack, cli.ComposeUpParams{
