@@ -594,7 +594,7 @@ func TestQueryLogs(t *testing.T) {
 				events: makeMockEvents(tt.numEvents, "app", etag),
 			}
 
-			logSeq, err := b.queryLogs(t.Context(), mock, tt.req)
+			logSeq, err := b.queryOrTailLogs(t.Context(), mock, tt.req)
 			require.NoError(t, err)
 
 			events := collectEvents(t, logSeq)
@@ -627,7 +627,7 @@ func TestQueryLogs_FollowMode(t *testing.T) {
 		LogType:  uint32(logs.LogTypeRun),
 	}
 
-	logSeq, err := b.queryLogs(ctx, mock, req)
+	logSeq, err := b.queryOrTailLogs(ctx, mock, req)
 	require.NoError(t, err)
 
 	// Cancel immediately to stop the polling/tailing
@@ -689,7 +689,7 @@ func TestQueryCdLogs(t *testing.T) {
 				events: makeMockEvents(tt.numEvents, "crun", ""),
 			}
 
-			batchSeq, err := b.queryCdLogs(t.Context(), mock, tt.req)
+			batchSeq, err := b.queryOrTailCdLogs(t.Context(), mock, tt.req)
 			require.NoError(t, err)
 
 			// Flatten and collect

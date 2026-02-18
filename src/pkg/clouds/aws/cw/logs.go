@@ -117,10 +117,14 @@ func Flatten[T any](seq iter.Seq2[[]T, error]) iter.Seq2[T, error] {
 }
 
 func QueryLogGroups(ctx context.Context, cwClient FilterLogEventsAPIClient, start, end time.Time, limit int32, logGroups ...LogGroupInput) (iter.Seq2[LogEvent, error], error) {
+	if len(logGroups) == 0 {
+		return nil, errors.New("at least one LogGroupInput is required")
+	}
 	var merged iter.Seq2[LogEvent, error]
 	for _, lgi := range logGroups {
 		logSeq, err := QueryLogGroup(ctx, cwClient, lgi, start, end, limit)
 		if err != nil {
+			// This only happens if there's a missing LogGroupARN, in which case we can't proceed at all
 			return nil, err
 		}
 		merged = MergeLogEvents(merged, Flatten(logSeq)) // Merge sort the log events based on timestamp
