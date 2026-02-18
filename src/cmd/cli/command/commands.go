@@ -47,7 +47,7 @@ func Execute(ctx context.Context) error {
 	}
 
 	if err := RootCmd.ExecuteContext(ctx); err != nil {
-		if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
+		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 			term.Error("Error:", client.PrettyError(err))
 			track.Evt("CLI Error", P("err", err))
 		}

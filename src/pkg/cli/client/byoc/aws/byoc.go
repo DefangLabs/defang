@@ -698,14 +698,14 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 	etag, err := types.ParseEtag(req.Etag)
 	if err != nil && req.Etag != "" {
 		// Assume invalid "etag" is the task ID of the CD task
-		cdSeq, err := b.queryCdLogs(ctx, cwClient, req)
+		cdSeq, err := b.queryOrTailCdLogs(ctx, cwClient, req)
 		if err != nil {
 			return nil, AnnotateAwsError(err)
 		}
 		logSeq = cw.Flatten(cdSeq)
 		// No need to filter events by etag because we only show logs from the specified task ID
 	} else {
-		logSeq, err = b.queryLogs(ctx, cwClient, req)
+		logSeq, err = b.queryOrTailLogs(ctx, cwClient, req)
 		if err != nil {
 			return nil, AnnotateAwsError(err)
 		}
@@ -718,10 +718,10 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 	return func(yield func(*defangv1.TailResponse, error) bool) {
 		for event, err := range logSeq {
 			if err != nil {
-				// Ignore ResourceNotFoundException errors which can happen if a log stream is missing
-				var x *cwTypes.ResourceNotFoundException
-				if errors.As(err, &x) {
-					term.Debugf("Log stream deleted while tailing, skipping: %v", err)
+				// Ignore ResourceNotFoundException errors which can only happen if a log stream is missing during Query
+				var resourceNotFound *cwTypes.ResourceNotFoundException
+				if errors.As(err, &resourceNotFound) {
+					term.Debugf("Log stream not found while tailing, skipping: %v", err)
 					continue
 				}
 				if !yield(nil, AnnotateAwsError(err)) {
@@ -739,7 +739,7 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 	}, nil
 }
 
-func (b *ByocAws) queryCdLogs(ctx context.Context, cwClient cw.LogsClient, req *defangv1.TailRequest) (iter.Seq2[[]cw.LogEvent, error], error) {
+func (b *ByocAws) queryOrTailCdLogs(ctx context.Context, cwClient cw.LogsClient, req *defangv1.TailRequest) (iter.Seq2[[]cw.LogEvent, error], error) {
 	var err error
 	b.cdTaskArn, err = b.driver.GetTaskArn(req.Etag) // only fails on missing task ID
 	if err != nil {
@@ -754,7 +754,7 @@ func (b *ByocAws) queryCdLogs(ctx context.Context, cwClient cw.LogsClient, req *
 	}
 }
 
-func (b *ByocAws) queryLogs(ctx context.Context, cwClient cw.LogsClient, req *defangv1.TailRequest) (iter.Seq2[cw.LogEvent, error], error) {
+func (b *ByocAws) queryOrTailLogs(ctx context.Context, cwClient cw.LogsClient, req *defangv1.TailRequest) (iter.Seq2[cw.LogEvent, error], error) {
 	start := timeutils.AsTime(req.Since, time.Time{})
 	end := timeutils.AsTime(req.Until, time.Time{})
 

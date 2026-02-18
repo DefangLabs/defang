@@ -11,7 +11,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 )
 
 const AwsLogsStreamPrefix = CrunProjectName
@@ -91,7 +91,7 @@ func (a *AwsEcs) TailTaskID(ctx context.Context, cwClient cw.StartLiveTailAPI, t
 	for {
 		logSeq, err := cw.TailLogGroup(ctx, cwClient, lgi)
 		if err != nil {
-			var resourceNotFound *types.ResourceNotFoundException
+			var resourceNotFound *cwTypes.ResourceNotFoundException
 			if !errors.As(err, &resourceNotFound) {
 				return nil, err
 			}

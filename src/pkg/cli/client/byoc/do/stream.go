@@ -62,6 +62,7 @@ func streamLogs(ctx context.Context, liveUrl string, etag types.ETag) (iter.Seq2
 				if !yield(nil, err) {
 					return
 				}
+				continue
 			}
 			parts := strings.SplitN(data.Data, " ", 3)
 			if len(parts) < 3 {
