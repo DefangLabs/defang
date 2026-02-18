@@ -11,6 +11,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/session"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -102,6 +103,10 @@ func newStackManagerForLoader(ctx context.Context, loader *compose.Loader) (sess
 	}
 	projectName, _, err := loader.LoadProjectName(ctx)
 	if err != nil {
+		var invalidErr compose.ErrInvalidComposeFile
+		if errors.As(err, &invalidErr) {
+			return nil, handleInvalidComposeFileErr(ctx, err)
+		}
 		term.Debugf("Could not determine project name: %v", err)
 	}
 	sm, err := stacks.NewManager(global.Client, targetDirectory, projectName, ec)
@@ -132,4 +137,24 @@ func findTargetDirectory() (string, error) {
 		}
 		wd = parent
 	}
+}
+
+func handleInvalidComposeFileErr(ctx context.Context, err error) error {
+	if global.NonInteractive {
+		return err
+	}
+
+	term.Error("Cannot load project:", err)
+	project, err := compose.NewLoader().CreateProjectForDebug()
+	if err != nil {
+		return err
+	}
+
+	debugger, err := debug.NewDebugger(ctx, global.Cluster, &stacks.Parameters{})
+	if err != nil {
+		return err
+	}
+	return debugger.DebugComposeLoadError(ctx, debug.DebugConfig{
+		Project: project,
+	}, err)
 }

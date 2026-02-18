@@ -83,23 +83,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			project, loadErr := session.Loader.LoadProject(ctx)
 			if loadErr != nil {
-				if global.NonInteractive {
-					return loadErr
-				}
-
-				term.Error("Cannot load project:", loadErr)
-				project, err := session.Loader.CreateProjectForDebug()
-				if err != nil {
-					return err
-				}
-
-				debugger, err := debug.NewDebugger(ctx, global.Cluster, session.Stack)
-				if err != nil {
-					return err
-				}
-				return debugger.DebugComposeLoadError(ctx, debug.DebugConfig{
-					Project: project,
-				}, loadErr)
+				handleInvalidComposeFileErr(ctx, loadErr)
 			}
 
 			// Check if the user has permission to use the provider
