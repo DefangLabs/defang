@@ -57,6 +57,7 @@ type PrepareDomainDelegationResponse struct {
 	DelegationSetId string
 }
 
+// Deprecated: use iter.Seq or iter.Seq2 instead
 type ServerStream[Res any] interface {
 	Close() error
 	Receive() bool
@@ -73,7 +74,7 @@ type Provider interface {
 	DelayBeforeRetry(context.Context) error
 	DeleteConfig(context.Context, *defangv1.Secrets) error
 	Deploy(context.Context, *DeployRequest) (*defangv1.DeployResponse, error)
-	GetDeploymentStatus(context.Context) error // nil means deployment is pending/running; io.EOF means deployment is done
+	GetDeploymentStatus(context.Context) (bool, error)
 	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 	GetService(context.Context, *defangv1.GetRequest) (*defangv1.ServiceInfo, error)
 	GetServices(context.Context, *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error)
@@ -83,12 +84,12 @@ type Provider interface {
 	PrepareDomainDelegation(context.Context, PrepareDomainDelegationRequest) (*PrepareDomainDelegationResponse, error)
 	Preview(context.Context, *DeployRequest) (*defangv1.DeployResponse, error)
 	PutConfig(context.Context, *defangv1.PutConfigRequest) error
-	QueryLogs(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
+	QueryLogs(context.Context, *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error)
 	// Deprecated: should use stacks instead of ProjectName fallback.
 	RemoteProjectName(context.Context) (string, error)
 	SetCanIUseConfig(*defangv1.CanIUseResponse)
 	SetUpCD(context.Context) error
-	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)
+	Subscribe(context.Context, *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error)
 	TearDownCD(context.Context) error
 }
 

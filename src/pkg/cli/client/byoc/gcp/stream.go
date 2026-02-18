@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"path"
 	"regexp"
 	"strings"
@@ -40,55 +41,14 @@ type ServerStream[T any] struct {
 	parse         LogParser[T]
 	filters       []LogFilter[*T]
 	query         *Query
-	tailer        gcp.Tailer
-
-	lastResp *T
-	lastErr  error
-	respCh   chan *T
-	errCh    chan error
-	cancel   func()
 }
 
-func NewServerStream[T any](ctx context.Context, gcpLogsClient GcpLogsClient, parse LogParser[T], filters ...LogFilter[*T]) (*ServerStream[T], error) {
-	tailer, err := gcpLogsClient.NewTailer(ctx)
-	if err != nil {
-		return nil, err
-	}
-	streamCtx, cancel := context.WithCancel(ctx)
+func NewServerStream[T any](ctx context.Context, gcpLogsClient GcpLogsClient, parse LogParser[T], filters ...LogFilter[*T]) *ServerStream[T] {
 	return &ServerStream[T]{
-		ctx:           streamCtx,
+		ctx:           ctx,
 		gcpLogsClient: gcpLogsClient,
 		parse:         parse,
 		filters:       filters,
-		tailer:        tailer,
-
-		respCh: make(chan *T),
-		errCh:  make(chan error),
-		cancel: cancel,
-	}, nil
-}
-
-func (s *ServerStream[T]) Close() error {
-	s.cancel()
-	s.tailer.Close() // Close the grpc connection
-	return nil
-}
-
-func (s *ServerStream[T]) Receive() bool {
-	select {
-	case s.lastResp = <-s.respCh:
-		return true
-	case err := <-s.errCh:
-		if context.Cause(s.ctx) == io.EOF {
-			s.lastErr = nil
-		} else if errors.Is(err, io.EOF) {
-			s.lastErr = nil
-		} else if isContextCanceledError(err) {
-			s.lastErr = context.Cause(s.ctx)
-		} else {
-			s.lastErr = err
-		}
-		return false
 	}
 }
 
@@ -102,105 +62,135 @@ func isContextCanceledError(err error) bool {
 	return false
 }
 
-func (s *ServerStream[T]) StartFollow(start time.Time) {
+// Follow returns an iterator that queries historical logs then tails live logs.
+func (s *ServerStream[T]) Follow(start time.Time) (iter.Seq2[*T, error], error) {
+	tailer, err := s.gcpLogsClient.NewTailer(s.ctx)
+	if err != nil {
+		return nil, err
+	}
 	query := s.query.GetQuery()
 	term.Debugf("Query and tail logs since %v with query: \n%v", start, query)
-	go func() {
+	return func(yield func(*T, error) bool) {
+		defer tailer.Close()
 		// Only query older logs if start time is more than 10ms ago
 		if !start.IsZero() && start.Unix() > 0 && time.Since(start) > 10*time.Millisecond {
-			s.queryHead(query, 0)
+			lister, err := s.gcpLogsClient.ListLogEntries(s.ctx, query, gcp.OrderAscending)
+			if err != nil {
+				yield(nil, err)
+				return
+			}
+			if !s.yieldList(yield, lister, 0) {
+				return
+			}
 		}
 
 		// Start tailing logs after all older logs are processed
-		if err := s.tailer.Start(s.ctx, query); err != nil {
-			s.errCh <- err
+		if err := tailer.Start(s.ctx, query); err != nil {
+			yield(nil, err)
 			return
 		}
 		for {
-			entry, err := s.tailer.Next(s.ctx)
+			entry, err := tailer.Next(s.ctx)
 			if err != nil {
-				s.errCh <- err
+				if context.Cause(s.ctx) == io.EOF || errors.Is(err, io.EOF) {
+					return
+				}
+				if isContextCanceledError(err) {
+					if cause := context.Cause(s.ctx); cause != nil {
+						yield(nil, cause)
+					}
+					return
+				}
+				yield(nil, err)
 				return
 			}
 			resps, err := s.parseAndFilter(entry)
 			if err != nil {
-				s.errCh <- err
+				yield(nil, err)
 				return
 			}
 			for _, resp := range resps {
-				s.respCh <- resp
+				if !yield(resp, nil) {
+					return
+				}
 			}
 		}
-	}()
+	}, nil
 }
 
-func (s *ServerStream[T]) StartHead(limit int32) {
+// Head returns an iterator that queries logs in ascending order.
+func (s *ServerStream[T]) Head(limit int32) iter.Seq2[*T, error] {
 	query := s.query.GetQuery()
 	term.Debugf("Query logs with query: \n%v", query)
-	go func() {
-		s.queryHead(query, limit)
-	}()
+	return func(yield func(*T, error) bool) {
+		lister, err := s.gcpLogsClient.ListLogEntries(s.ctx, query, gcp.OrderAscending)
+		if err != nil {
+			yield(nil, err)
+			return
+		}
+		s.yieldList(yield, lister, limit)
+	}
 }
 
-func (s *ServerStream[T]) StartTail(limit int32) {
+// Tail returns an iterator that queries logs in descending order, reversing if a limit is set.
+func (s *ServerStream[T]) Tail(limit int32) iter.Seq2[*T, error] {
 	query := s.query.GetQuery()
 	term.Debugf("Query logs with query: \n%v", query)
-	go func() {
-		s.queryTail(query, limit)
-	}()
-}
-
-func (s *ServerStream[T]) queryHead(query string, limit int32) {
-	lister, err := s.gcpLogsClient.ListLogEntries(s.ctx, query, gcp.OrderAscending)
-	if err != nil {
-		s.errCh <- err
-		return
-	}
-	if limit == 0 {
-		err = s.listToChannel(lister)
-		if err != nil && !errors.Is(err, io.EOF) { // Ignore EOF for listing older logs, to proceed to tailing
-			s.errCh <- err
+	return func(yield func(*T, error) bool) {
+		lister, err := s.gcpLogsClient.ListLogEntries(s.ctx, query, gcp.OrderDescending)
+		if err != nil {
+			yield(nil, err)
 			return
 		}
-	} else {
-		buffer, err := s.listToBuffer(lister, limit)
-		if err != nil {
-			s.errCh <- err
+		if limit == 0 {
+			s.yieldList(yield, lister, 0)
+		} else {
+			buffer, err := s.listToBuffer(lister, limit)
+			if err != nil {
+				yield(nil, err)
+				return
+			}
+			// iterate over the buffer in reverse order to send the oldest resps first
+			for i := len(buffer) - 1; i >= 0; i-- {
+				if !yield(buffer[i], nil) {
+					return
+				}
+			}
 		}
-		for i := range buffer {
-			s.respCh <- buffer[i]
-		}
-		s.errCh <- io.EOF
 	}
 }
 
-func (s *ServerStream[T]) queryTail(query string, limit int32) {
-	lister, err := s.gcpLogsClient.ListLogEntries(s.ctx, query, gcp.OrderDescending)
-	if err != nil {
-		s.errCh <- err
-		return
-	}
-	if limit == 0 {
-		err = s.listToChannel(lister)
+// yieldList yields items from lister to yield. Returns true if iteration completed
+// (EOF or limit reached), false if the consumer stopped or an error was yielded.
+func (s *ServerStream[T]) yieldList(yield func(*T, error) bool, lister gcp.Lister, limit int32) bool {
+	count := int32(0)
+	for {
+		if limit > 0 && count >= limit {
+			return true
+		}
+		entry, err := lister.Next()
 		if err != nil {
-			s.errCh <- err
-			return
+			if errors.Is(err, io.EOF) {
+				return true
+			}
+			yield(nil, err)
+			return false
 		}
-	} else {
-		buffer, err := s.listToBuffer(lister, limit)
+		resps, err := s.parseAndFilter(entry)
 		if err != nil {
-			s.errCh <- err
+			yield(nil, err)
+			return false
 		}
-		// iterate over the buffer in reverse order to send the oldest resps first
-		for i := len(buffer) - 1; i >= 0; i-- {
-			s.respCh <- buffer[i]
+		for _, resp := range resps {
+			count++
+			if !yield(resp, nil) {
+				return false
+			}
 		}
-		s.errCh <- io.EOF
 	}
 }
 
 func (s *ServerStream[T]) listToBuffer(lister gcp.Lister, limit int32) ([]*T, error) {
-	received := 0
 	buffer := make([]*T, 0, limit)
 	for range limit {
 		entry, err := lister.Next()
@@ -215,25 +205,8 @@ func (s *ServerStream[T]) listToBuffer(lister gcp.Lister, limit int32) ([]*T, er
 			return nil, err
 		}
 		buffer = append(buffer, resps...)
-		received += len(resps)
 	}
 	return buffer, nil
-}
-
-func (s *ServerStream[T]) listToChannel(lister gcp.Lister) error {
-	for {
-		entry, err := lister.Next()
-		if err != nil {
-			return err
-		}
-		resps, err := s.parseAndFilter(entry)
-		if err != nil {
-			return err
-		}
-		for _, resp := range resps {
-			s.respCh <- resp
-		}
-	}
 }
 
 func (s *ServerStream[T]) parseAndFilter(entry *loggingpb.LogEntry) ([]*T, error) {
@@ -265,19 +238,11 @@ func (s *ServerStream[T]) GetQuery() string {
 	return s.query.GetQuery()
 }
 
-func (s *ServerStream[T]) Err() error {
-	return s.lastErr
-}
-
-func (s *ServerStream[T]) Msg() *T {
-	return s.lastResp
-}
-
 type LogStream struct {
 	*ServerStream[defangv1.TailResponse]
 }
 
-func NewLogStream(ctx context.Context, gcpLogsClient GcpLogsClient, services []string) (*LogStream, error) {
+func NewLogStream(ctx context.Context, gcpLogsClient GcpLogsClient, services []string) *LogStream {
 	restoreServiceName := getServiceNameRestorer(services, gcp.SafeLabelValue,
 		func(entry *defangv1.TailResponse) string { return entry.Service },
 		func(entry *defangv1.TailResponse, name string) *defangv1.TailResponse {
@@ -285,13 +250,9 @@ func NewLogStream(ctx context.Context, gcpLogsClient GcpLogsClient, services []s
 			return entry
 		})
 
-	ss, err := NewServerStream(ctx, gcpLogsClient, getLogEntryParser(ctx, gcpLogsClient), restoreServiceName)
-	if err != nil {
-		return nil, err
-	}
-
+	ss := NewServerStream(ctx, gcpLogsClient, getLogEntryParser(ctx, gcpLogsClient), restoreServiceName)
 	ss.query = NewLogQuery(gcpLogsClient.GetProjectID())
-	return &LogStream{ServerStream: ss}, nil
+	return &LogStream{ServerStream: ss}
 }
 
 func (s *LogStream) AddJobExecutionLog(executionName string) {
@@ -341,7 +302,7 @@ func getServiceNameRestorer[T any](services []string, encode func(string) string
 	}
 }
 
-func NewSubscribeStream(ctx context.Context, driver GcpLogsClient, waitForCD bool, etag string, services []string, filters ...LogFilter[*defangv1.SubscribeResponse]) (*SubscribeStream, error) {
+func NewSubscribeStream(ctx context.Context, driver GcpLogsClient, waitForCD bool, etag string, services []string, filters ...LogFilter[*defangv1.SubscribeResponse]) *SubscribeStream {
 	filters = append(filters, getServiceNameRestorer(services, gcp.SafeLabelValue,
 		func(entry *defangv1.SubscribeResponse) string { return entry.Name },
 		func(entry *defangv1.SubscribeResponse, name string) *defangv1.SubscribeResponse {
@@ -350,12 +311,9 @@ func NewSubscribeStream(ctx context.Context, driver GcpLogsClient, waitForCD boo
 		}),
 	)
 
-	ss, err := NewServerStream(ctx, driver, getActivityParser(ctx, driver, waitForCD, etag), filters...)
-	if err != nil {
-		return nil, err
-	}
+	ss := NewServerStream(ctx, driver, getActivityParser(ctx, driver, waitForCD, etag), filters...)
 	ss.query = NewSubscribeQuery()
-	return &SubscribeStream{ServerStream: ss}, nil
+	return &SubscribeStream{ServerStream: ss}
 }
 
 func (s *SubscribeStream) AddJobExecutionUpdate(executionName string) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"iter"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -59,30 +60,30 @@ func (*mockDeployProvider) Preview(ctx context.Context, req *client.DeployReques
 	return &defangv1.DeployResponse{Services: services, Etag: etag}, ctx.Err()
 }
 
-func (m *mockDeployProvider) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
+func (m *mockDeployProvider) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.subscribeStream = client.NewMockWaitStream[defangv1.SubscribeResponse]()
-	return m.subscribeStream, ctx.Err()
+	return client.ServerStreamIterCtx[defangv1.SubscribeResponse](ctx, m.subscribeStream), ctx.Err()
 }
 
-func (m *mockDeployProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+func (m *mockDeployProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.tailStream = client.NewMockWaitStream[defangv1.TailResponse]()
-	return m.tailStream, ctx.Err()
+	return client.ServerStreamIterCtx(ctx, m.tailStream), ctx.Err()
 }
 
 func (m *mockDeployProvider) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
 	return m.prevProjectUpdate, ctx.Err()
 }
 
-func (m *mockDeployProvider) GetDeploymentStatus(ctx context.Context) error {
+func (m *mockDeployProvider) GetDeploymentStatus(ctx context.Context) (bool, error) {
 	select {
 	case <-ctx.Done():
-		return context.Cause(ctx)
+		return true, context.Cause(ctx)
 	default:
-		return m.deploymentStatus
+		return m.deploymentStatus != nil, m.deploymentStatus
 	}
 }
 
