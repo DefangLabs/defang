@@ -84,8 +84,6 @@ type Provider interface {
 	Preview(context.Context, *DeployRequest) (*defangv1.DeployResponse, error)
 	PutConfig(context.Context, *defangv1.PutConfigRequest) error
 	QueryLogs(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
-	// Deprecated: should use stacks instead of ProjectName fallback.
-	RemoteProjectName(context.Context) (string, error)
 	SetCanIUseConfig(*defangv1.CanIUseResponse)
 	SetUpCD(context.Context) error
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)

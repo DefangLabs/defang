@@ -41,8 +41,8 @@ func HandleServicesTool(ctx context.Context, loader client.Loader, params Servic
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
-	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
-	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
+	term.Debug("Function invoked: cli.LoadProjectName")
+	projectName, err := cli.LoadProjectName(ctx, loader)
 	term.Debugf("Project name loaded: %s", projectName)
 	if err != nil {
 		if strings.Contains(err.Error(), "no projects found") {
