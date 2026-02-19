@@ -143,10 +143,10 @@ func TestStreamToLogEvent(t *testing.T) {
 		},
 	}
 
-	parser := &logEventParser{etag: testEtag, services: []string{"cd", "app", "django", "django-image"}}
+	var byocServiceStream = newByocServerStream(nil, testEtag, []string{"cd", "app", "django", "django-image"}, nil, nil)
 
 	for _, td := range testdata {
-		tailResp := parser.parseEvents([]cw.LogEvent{*td.event})
+		tailResp := byocServiceStream.parseEvents([]cw.LogEvent{*td.event})
 		if (td.wantResp == nil) != (tailResp == nil) {
 			t.Errorf("nil mismatch: expected %v, got %v", td.wantResp, tailResp)
 			continue

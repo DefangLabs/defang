@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"iter"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -31,13 +30,19 @@ func WaitServiceState(
 
 	// Assume "services" are normalized service names
 	subscribeRequest := defangv1.SubscribeRequest{Project: projectName, Etag: etag, Services: services}
-	logs, err := provider.Subscribe(ctx, &subscribeRequest)
+	serverStream, err := provider.Subscribe(ctx, &subscribeRequest)
 	if err != nil {
 		return nil, err
 	}
 
-	next, stop := iter.Pull2(logs)
-	defer stop()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel() // to ensure we close the stream and clean-up this context
+
+	safeCloser := NewSafeCloser(serverStream)
+	go func() {
+		<-ctx.Done()
+		safeCloser.Close()
+	}()
 
 	serviceStates := make(ServiceStates, len(services))
 	// Make sure all services are in the map or `allInState` might return true too early
@@ -47,27 +52,23 @@ func WaitServiceState(
 
 	// Monitor for when all services are completed to end this command
 	for {
-		msg, err, ok := next()
-		if !ok {
-			return serviceStates, nil
-		}
-		if err != nil {
-			// Reconnect on transient errors
-			if isTransientError(err) {
+		if !serverStream.Receive() {
+			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
+			if isTransientError(serverStream.Err()) {
 				if err := provider.DelayBeforeRetry(ctx); err != nil {
 					return serviceStates, err
 				}
-				stop() // stop the old iterator
-				logs, err = provider.Subscribe(ctx, &subscribeRequest)
+				serverStream, err = provider.Subscribe(ctx, &subscribeRequest)
 				if err != nil {
 					return serviceStates, err
 				}
-				next, stop = iter.Pull2(logs)
+				safeCloser.Swap(serverStream) // closes the old stream
 				continue
 			}
-			return serviceStates, err
+			return serviceStates, serverStream.Err()
 		}
 
+		msg := serverStream.Msg()
 		if msg == nil {
 			continue
 		}

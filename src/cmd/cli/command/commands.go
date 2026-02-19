@@ -49,7 +49,6 @@ func Execute(ctx context.Context) error {
 	if err := RootCmd.ExecuteContext(ctx); err != nil {
 		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 			term.Error("Error:", client.PrettyError(err))
-			track.Evt("CLI Error", P("err", err))
 		}
 
 		if err == dryrun.ErrDryRun {
@@ -379,7 +378,12 @@ var RootCmd = &cobra.Command{
 
 		// Use "defer" to track any errors that occur during the command
 		defer func() {
-			track.Cmd(cmd, "Invoked", P("args", args), P("err", err), P("non-interactive", global.NonInteractive), P("provider", global.Stack.Provider))
+			var errString = ""
+			if err != nil {
+				errString = err.Error()
+			}
+
+			track.Cmd(cmd, "Invoked", P("args", args), P("err", errString), P("non-interactive", global.NonInteractive), P("provider", global.Stack.Provider))
 		}()
 
 		// Do this first, since any errors will be printed to the console

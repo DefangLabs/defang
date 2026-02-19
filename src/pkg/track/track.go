@@ -84,6 +84,5 @@ func Cmd(cmd *cobra.Command, verb string, props ...Property) {
 			props = append(props, P(f.Name, f.Value))
 		})
 	}
-	// This was supposed to be strings.Title but that got deprecated, so now we're stuck with strings.ToTitle which makes everything uppercase. Oh well.
 	Evt(strings.ToTitle(command+" "+verb), props...)
 }

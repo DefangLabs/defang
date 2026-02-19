@@ -12,8 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"iter"
-
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -53,8 +51,8 @@ func TestIsProgressDot(t *testing.T) {
 
 type mockTailProvider struct {
 	client.Provider
-	Iters []iter.Seq2[*defangv1.TailResponse, error]
-	Reqs  []*defangv1.TailRequest
+	ServerStreams []client.ServerStream[defangv1.TailResponse]
+	Reqs          []*defangv1.TailRequest
 }
 
 func (mockTailProvider) DelayBeforeRetry(ctx context.Context) error {
@@ -62,25 +60,29 @@ func (mockTailProvider) DelayBeforeRetry(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func (m *mockTailProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
+func (m *mockTailProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	dup, _ := proto.Clone(req).(*defangv1.TailRequest)
 	m.Reqs = append(m.Reqs, dup)
-	if len(m.Iters) == 0 {
+	if len(m.ServerStreams) == 0 {
 		return nil, errors.New("no server stream provided")
 	}
-	it := m.Iters[0]
-	m.Iters = m.Iters[1:]
-	return it, nil
+	ss := m.ServerStreams[0]
+	m.ServerStreams = m.ServerStreams[1:]
+	return ss, nil
 }
+
+type mockTailStream = client.MockServerStream[defangv1.TailResponse]
 
 func (m *mockTailProvider) MockTimestamp(timestamp time.Time) *mockTailProvider {
 	return &mockTailProvider{
-		Iters: []iter.Seq2[*defangv1.TailResponse, error]{
-			client.MockIter([]*defangv1.TailResponse{
-				{Entries: []*defangv1.LogEntry{
-					{Timestamp: timestamppb.New(timestamp)},
-				}},
-			}, nil),
+		ServerStreams: []client.ServerStream[defangv1.TailResponse]{
+			&mockTailStream{
+				Resps: []*defangv1.TailResponse{
+					{Entries: []*defangv1.LogEntry{
+						{Timestamp: timestamppb.New(timestamp)},
+					}},
+				},
+			}, &mockTailStream{Error: io.EOF},
 		},
 	}
 }
@@ -98,24 +100,27 @@ func TestTail(t *testing.T) {
 	const projectName = "project1"
 
 	p := &mockTailProvider{
-		Iters: []iter.Seq2[*defangv1.TailResponse, error]{
-			client.MockIter([]*defangv1.TailResponse{
-				{Service: "service1", Etag: "SOMEETAG", Host: "SOMEHOST", Entries: []*defangv1.LogEntry{
-					{Message: "e1msg1", Timestamp: timestamppb.Now()},
-					{Message: "e1msg2", Timestamp: timestamppb.Now(), Etag: "SOMEOTHERETAG"},                                              // Test event etag override the response etag
-					{Message: "e1msg3", Timestamp: timestamppb.Now(), Etag: "SOMEOTHERETAG2", Host: "SOMEOTHERHOST"},                      // override both etag and host
-					{Message: "e1msg4", Timestamp: timestamppb.Now(), Etag: "SOMEOTHERETAG2", Host: "SOMEOTHERHOST", Service: "service2"}, // override both etag, host and service
-					{Message: "e1err1", Timestamp: timestamppb.Now(), Stderr: true},                                                       // Error message should be in stdout too when not raw
-				}},
-				{Service: "service1", Etag: "SOMEETAG", Host: "SOMEHOST", Entries: []*defangv1.LogEntry{ // Test entry etag does not affect the default values from response
-					{Message: "e2err1", Timestamp: timestamppb.Now(), Stderr: true, Etag: "SOMEOTHERETAG"}, // Error message should be in stdout too when not raw
-					{Message: "e2msg1", Timestamp: timestamppb.Now(), Etag: "ENTRIES2ETAG"},
-					{Message: "e2msg2", Timestamp: timestamppb.Now()},
-					{Message: "e2msg3", Timestamp: timestamppb.Now(), Etag: "SOMEOTHERETAG2", Host: "SOMEOTHERHOST", Service: "service2"}, // override both etag, host and service
-					{Message: "e2msg4", Timestamp: timestamppb.Now()},
-				}},
-			}, connect.NewError(connect.CodeInternal, &cwTypes.SessionStreamingException{})), // to test retries
-			client.MockIter[defangv1.TailResponse](nil, io.EOF),
+		ServerStreams: []client.ServerStream[defangv1.TailResponse]{
+			&mockTailStream{
+				Resps: []*defangv1.TailResponse{
+					{Service: "service1", Etag: "SOMEETAG", Host: "SOMEHOST", Entries: []*defangv1.LogEntry{
+						{Message: "e1msg1", Timestamp: timestamppb.Now()},
+						{Message: "e1msg2", Timestamp: timestamppb.Now(), Etag: "SOMEOTHERETAG"},                                              // Test event etag override the response etag
+						{Message: "e1msg3", Timestamp: timestamppb.Now(), Etag: "SOMEOTHERETAG2", Host: "SOMEOTHERHOST"},                      // override both etag and host
+						{Message: "e1msg4", Timestamp: timestamppb.Now(), Etag: "SOMEOTHERETAG2", Host: "SOMEOTHERHOST", Service: "service2"}, // override both etag, host and service
+						{Message: "e1err1", Timestamp: timestamppb.Now(), Stderr: true},                                                       // Error message should be in stdout too when not raw
+					}},
+					{Service: "service1", Etag: "SOMEETAG", Host: "SOMEHOST", Entries: []*defangv1.LogEntry{ // Test entry etag does not affect the default values from response
+						{Message: "e2err1", Timestamp: timestamppb.Now(), Stderr: true, Etag: "SOMEOTHERETAG"}, // Error message should be in stdout too when not raw
+						{Message: "e2msg1", Timestamp: timestamppb.Now(), Etag: "ENTRIES2ETAG"},
+						{Message: "e2msg2", Timestamp: timestamppb.Now()},
+						{Message: "e2msg3", Timestamp: timestamppb.Now(), Etag: "SOMEOTHERETAG2", Host: "SOMEOTHERHOST", Service: "service2"}, // override both etag, host and service
+						{Message: "e2msg4", Timestamp: timestamppb.Now()},
+					}},
+				},
+				Error: connect.NewError(connect.CodeInternal, &cwTypes.SessionStreamingException{}), // to test retries
+			},
+			&mockTailStream{Error: io.EOF},
 		},
 	}
 
@@ -287,8 +292,8 @@ type mockQueryErrorProvider struct {
 	TailStreamError error
 }
 
-func (m mockQueryErrorProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
-	return client.MockIter[defangv1.TailResponse](nil, m.TailStreamError), nil
+func (m mockQueryErrorProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+	return &mockTailStream{Error: m.TailStreamError}, nil
 }
 
 func TestTailError(t *testing.T) {

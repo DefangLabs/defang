@@ -3,11 +3,9 @@ package client
 import (
 	"context"
 	"errors"
-	"iter"
 	"net/http"
 	"net/url"
 	"path"
-	"sync"
 	"sync/atomic"
 
 	"github.com/DefangLabs/defang/src/pkg/dns"
@@ -18,24 +16,6 @@ import (
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
-// MockIter creates an iter.Seq2 from a pre-populated list of responses and a final error.
-// A nil response in the list acts as a stream-end marker.
-func MockIter[T any](resps []*T, finalErr error) iter.Seq2[*T, error] {
-	return func(yield func(*T, error) bool) {
-		for _, resp := range resps {
-			if resp == nil {
-				return
-			}
-			if !yield(resp, nil) {
-				return
-			}
-		}
-		if finalErr != nil {
-			yield(nil, finalErr)
-		}
-	}
-}
 
 type MockProvider struct {
 	Provider
@@ -109,16 +89,14 @@ func (m *MockServerStream[T]) Err() error {
 // returns messages and errors from channels. It blocks until the channels are
 // closed or an error is received. It is used for testing purposes.
 type MockWaitStream[T any] struct {
-	msg       *T
-	err       error
-	msgCh     chan *T
-	done      chan struct{}
-	closeOnce sync.Once
+	msg   *T
+	err   error
+	msgCh chan *T
 }
 
 // NewMockWaitStream returns a ServerStream that will block until closed.
 func NewMockWaitStream[T any]() *MockWaitStream[T] {
-	return &MockWaitStream[T]{msgCh: make(chan *T), done: make(chan struct{})}
+	return &MockWaitStream[T]{msgCh: make(chan *T)}
 }
 
 func (m *MockWaitStream[T]) Send(msg *T, err error) {
@@ -127,13 +105,9 @@ func (m *MockWaitStream[T]) Send(msg *T, err error) {
 }
 
 func (m *MockWaitStream[T]) Receive() bool {
-	select {
-	case msg, ok := <-m.msgCh:
-		m.msg = msg
-		return ok && msg != nil
-	case <-m.done:
-		return false
-	}
+	msg, ok := <-m.msgCh
+	m.msg = msg
+	return ok && msg != nil
 }
 
 func (m *MockWaitStream[T]) Msg() *T {
@@ -145,39 +119,8 @@ func (m *MockWaitStream[T]) Err() error {
 }
 
 func (m *MockWaitStream[T]) Close() error {
-	m.closeOnce.Do(func() { close(m.done) })
+	close(m.msgCh)
 	return nil
-}
-
-// ServerStreamIterCtx adapts a ServerStream to iter.Seq2, closing the stream when the
-// context is canceled. This is needed for blocking streams (e.g. MockWaitStream)
-// where Receive() blocks on a channel and won't return until Close() is called.
-func ServerStreamIterCtx[T any](ctx context.Context, stream ServerStream[T]) iter.Seq2[*T, error] {
-	return func(yield func(*T, error) bool) {
-		var closeOnce sync.Once
-		closeStream := func() { closeOnce.Do(func() { stream.Close() }) }
-
-		// Close the stream when context is canceled to unblock Receive()
-		done := make(chan struct{})
-		go func() {
-			select {
-			case <-ctx.Done():
-				closeStream()
-			case <-done:
-			}
-		}()
-		defer close(done)
-		defer closeStream()
-
-		for stream.Receive() {
-			if !yield(stream.Msg(), nil) {
-				return
-			}
-		}
-		if err := stream.Err(); err != nil {
-			yield(nil, err)
-		}
-	}
 }
 
 type MockFabricClient struct {

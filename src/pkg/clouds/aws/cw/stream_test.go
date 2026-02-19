@@ -4,13 +4,12 @@ package cw
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPendingStream(t *testing.T) {
@@ -24,22 +23,26 @@ func TestPendingStream(t *testing.T) {
 		t.Skipf("Failed to load AWS config: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-	defer cancel()
-
 	cw := cloudwatchlogs.NewFromConfig(cfg)
-	evts, err := QueryAndTailLogGroup(ctx, cw, LogGroupInput{
+	ps, err := QueryAndTailLogGroup(context.Background(), cw, LogGroupInput{
 		LogGroupARN: "arn:aws:logs:us-west-2:532501343364:log-group:/ecs/lio/logss:*",
 	}, time.Now().Add(-time.Minute), time.Time{})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
-	for evt, err := range evts {
-		if err != nil {
-			t.Logf("Stream ended: %v", err)
-			break
-		}
-		for _, evt := range evt {
-			fmt.Println(*evt.Message)
-		}
+	go func() {
+		time.Sleep(5 * time.Second)
+		ps.Close()
+	}()
+
+	if ps.Err() != nil {
+		t.Errorf("Error: %v", ps.Err())
 	}
+
+	for e := range ps.Events() {
+		if e == nil {
+			t.Errorf("Error: %v", ps.Err())
+		}
+		println(e)
+	}
+	t.Error(ps.Err())
 }

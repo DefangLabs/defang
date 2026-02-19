@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"iter"
 	"path"
 	"time"
 
@@ -23,33 +22,36 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 	}
 	taskId := GetTaskID(taskArn)
 	a.Region = region.FromArn(*taskArn)
-
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	tailIter, err := a.TailTaskID(ctx, cwClient, taskId)
+	es, err := a.TailTaskID(ctx, cwClient, taskId)
 	if err != nil {
 		return err
 	}
 
-	taskch := make(chan error, 1)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	taskch := make(chan error)
+	defer close(taskch)
 	go func() {
 		taskch <- WaitForTask(ctx, taskArn, time.Second*3)
-		cancel() // stop tailing when task finishes
 	}()
 
-	for batch, err := range tailIter {
-		if err != nil {
-			if !errors.Is(err, context.Canceled) {
+	for {
+		select {
+		case e := <-es.Events(): // blocking
+			events, err := cw.GetLogEvents(e)
+			// Print before checking for errors, so we don't lose any logs in case of EOF
+			for _, event := range events {
+				fmt.Println(*event.Message)
+			}
+			if err != nil {
 				return err
 			}
-			break
-		}
-		for _, evt := range batch {
-			fmt.Println(*evt.Message)
+		case <-ctx.Done():
+			return ctx.Err()
+		case err := <-taskch:
+			return err
 		}
 	}
-	return <-taskch
 }
 
 func (a *AwsEcs) GetTaskArn(taskID string) (TaskArn, error) {
@@ -63,20 +65,16 @@ func (a *AwsEcs) GetTaskArn(taskID string) (TaskArn, error) {
 	return &taskArn, nil
 }
 
-func (a *AwsEcs) QueryTaskID(ctx context.Context, cwClient cw.FilterLogEventsAPIClient, taskID string, start, end time.Time, limit int32) (iter.Seq2[[]cw.LogEvent, error], error) {
+func (a *AwsEcs) QueryTaskID(ctx context.Context, cwClient cw.FilterLogEventsAPI, taskID string, start, end time.Time, limit int32) (cw.LiveTailStream, error) {
 	if taskID == "" {
 		return nil, errors.New("taskID is empty")
 	}
 
 	lgi := cw.LogGroupInput{LogGroupARN: a.LogGroupARN, LogStreamNames: []string{GetCDLogStreamForTaskID(taskID)}}
-	logSeq, err := cw.QueryLogGroup(ctx, cwClient, lgi, start, end, limit)
-	if err != nil {
-		return nil, err
-	}
-	return logSeq, nil
+	return cw.QueryLogGroupStream(ctx, cwClient, lgi, start, end, limit)
 }
 
-func (a *AwsEcs) TailTaskID(ctx context.Context, cwClient cw.StartLiveTailAPI, taskID string) (iter.Seq2[[]cw.LogEvent, error], error) {
+func (a *AwsEcs) TailTaskID(ctx context.Context, cwClient cw.StartLiveTailAPI, taskID string) (cw.LiveTailStream, error) {
 	if taskID == "" {
 		return nil, errors.New("taskID is required")
 	}
@@ -89,16 +87,16 @@ func (a *AwsEcs) TailTaskID(ctx context.Context, cwClient cw.StartLiveTailAPI, t
 
 	lgi := cw.LogGroupInput{LogGroupARN: a.LogGroupARN, LogStreamNames: []string{GetCDLogStreamForTaskID(taskID)}}
 	for {
-		logSeq, err := cw.TailLogGroup(ctx, cwClient, lgi)
+		stream, err := cw.TailLogGroup(ctx, cwClient, lgi)
 		if err != nil {
 			var resourceNotFound *cwTypes.ResourceNotFoundException
 			if !errors.As(err, &resourceNotFound) {
 				return nil, err
 			}
 			// The log stream doesn't exist yet, so wait for it to be created, but bail out if the task is stopped
-			done, err := getTaskStatus(ctx, a.Region, a.ClusterName, taskID)
-			if done || err != nil {
-				return nil, err // TODO: handle transient errors
+			err := getTaskStatus(ctx, a.Region, a.ClusterName, taskID)
+			if err != nil {
+				return nil, err
 			}
 			// continue loop, waiting for the log stream to be created; sleep to avoid throttling
 			if err := pkg.SleepWithContext(ctx, time.Second); err != nil {
@@ -106,8 +104,8 @@ func (a *AwsEcs) TailTaskID(ctx context.Context, cwClient cw.StartLiveTailAPI, t
 			}
 			continue
 		}
-		// TODO: should wrap this iter so we can return io.EOF on task stop
-		return logSeq, nil
+		// TODO: should wrap this stream so we can return io.EOF on task stop
+		return stream, nil
 	}
 }
 

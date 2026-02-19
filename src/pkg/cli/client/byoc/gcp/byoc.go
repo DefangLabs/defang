@@ -100,7 +100,7 @@ type gcpDriver interface {
 	EnsureServiceAccountExists(ctx context.Context, serviceAccountId, displayName, description string) (string, error)
 	GetBucketObjectWithServiceAccount(ctx context.Context, bucketName, objectName, serviceAccount string) ([]byte, error)
 	GetBucketWithPrefix(ctx context.Context, prefix string) (string, error)
-	GetBuildStatus(ctx context.Context, startBuildOpName string) (bool, error)
+	GetBuildStatus(ctx context.Context, startBuildOpName string) error
 	GetCurrentPrincipal(ctx context.Context) (string, error)
 	GetDNSZone(ctx context.Context, name string) (*gcpdns.ManagedZone, error)
 	GetRegion() string
@@ -501,7 +501,7 @@ func (b *ByocGcp) Preview(ctx context.Context, req *client.DeployRequest) (*defa
 	return b.deploy(ctx, req, "preview")
 }
 
-func (b *ByocGcp) GetDeploymentStatus(ctx context.Context) (bool, error) {
+func (b *ByocGcp) GetDeploymentStatus(ctx context.Context) error {
 	return b.driver.GetBuildStatus(ctx, b.cdExecution)
 }
 
@@ -572,31 +572,32 @@ func (b *ByocGcp) deploy(ctx context.Context, req *client.DeployRequest, command
 	return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, nil
 }
 
-func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {
+func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
 	ignoreCdSuccess := func(entry *defangv1.SubscribeResponse) *defangv1.SubscribeResponse {
 		if entry.Name != defangCD {
 			return entry
 		}
 		return nil
 	}
-	subscribeStream := NewSubscribeStream(ctx, b.driver, true, req.Etag, req.Services, ignoreCdSuccess)
+	subscribeStream, err := NewSubscribeStream(ctx, b.driver, true, req.Etag, req.Services, ignoreCdSuccess)
+	if err != nil {
+		return nil, err
+	}
 	subscribeStream.AddJobStatusUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
 	subscribeStream.AddServiceStatusUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
-	return subscribeStream.Follow(time.Now())
+	subscribeStream.StartFollow(time.Now())
+	return subscribeStream, nil
 }
 
-func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
-	logStream := b.getLogStream(ctx, b.driver, req)
-	if req.Follow {
-		return logStream.Follow(req.Since.AsTime())
-	} else if req.Since.IsValid() {
-		return logStream.Head(req.Limit), nil
+func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+	return b.getLogStream(ctx, b.driver, req)
+}
+
+func (b *ByocGcp) getLogStream(ctx context.Context, gcpLogsClient GcpLogsClient, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+	logStream, err := NewLogStream(ctx, gcpLogsClient, req.Services)
+	if err != nil {
+		return nil, err
 	}
-	return logStream.Tail(req.Limit), nil
-}
-
-func (b *ByocGcp) getLogStream(ctx context.Context, gcpLogsClient GcpLogsClient, req *defangv1.TailRequest) *LogStream {
-	logStream := NewLogStream(ctx, gcpLogsClient, req.Services)
 
 	if req.Since.IsValid() {
 		logStream.AddSince(req.Since.AsTime())
@@ -612,7 +613,14 @@ func (b *ByocGcp) getLogStream(ctx context.Context, gcpLogsClient GcpLogsClient,
 		logStream.AddServiceLog(b.PulumiStack, req.Project, etag, req.Services) // Service logs
 	}
 	logStream.AddFilter(req.Pattern)
-	return logStream
+	if req.Follow {
+		logStream.StartFollow(req.Since.AsTime())
+	} else if req.Since.IsValid() {
+		logStream.StartHead(req.Limit)
+	} else {
+		logStream.StartTail(req.Limit)
+	}
+	return logStream, nil
 }
 
 func (b *ByocGcp) GetService(ctx context.Context, req *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {

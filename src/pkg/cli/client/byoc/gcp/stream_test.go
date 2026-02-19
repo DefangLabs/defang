@@ -1,7 +1,6 @@
 package gcp
 
 import (
-	"iter"
 	"strconv"
 	"testing"
 
@@ -151,27 +150,28 @@ func TestServerStream_Start(t *testing.T) {
 				tailer: &MockGcpLoggingTailer{},
 			}
 
-			stream := NewServerStream(
+			stream, err := NewServerStream(
 				ctx,
 				mockGcpLogsClient,
 				getLogEntryParser(ctx, mockGcpLogsClient),
 				restoreServiceName,
 			)
+			assert.NoError(t, err)
 			stream.query = NewLogQuery(projectId)
 
-			var logs iter.Seq2[*defangv1.TailResponse, error]
 			if tt.direction == head {
-				logs = stream.Head(tt.limit)
+				stream.StartHead(tt.limit)
 			} else {
-				logs = stream.Tail(tt.limit)
+				stream.StartTail(tt.limit)
 			}
 
-			var collectedMessages []string
-			for response, err := range logs {
-				assert.NoError(t, err)
-				if err != nil {
+			collectedMessages := []string{}
+			for {
+				if !stream.Receive() {
+					assert.NoError(t, stream.Err())
 					break
 				}
+				response := stream.Msg()
 				collectedMessages = append(collectedMessages, response.Entries[0].Message)
 			}
 			assert.Equal(t, len(tt.expectedMsgs), len(collectedMessages))

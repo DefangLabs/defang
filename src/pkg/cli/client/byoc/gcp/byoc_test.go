@@ -180,7 +180,18 @@ func TestGetLogStream(t *testing.T) {
 				tailer: &MockGcpLoggingTailer{},
 			}
 
-			logStream := b.getLogStream(ctx, driver, tt.req)
+			stream, err := b.getLogStream(ctx, driver, tt.req)
+			if err != nil {
+				t.Errorf("getLogStream() error = %v, want nil", err)
+			}
+			if stream == nil {
+				t.Errorf("getLogStream() returned nil tailer, want non-nil")
+			}
+
+			logStream, ok := stream.(*LogStream)
+			if !ok {
+				t.Fatalf("getLogStream() returned wrong type, want *gcp.LogStream")
+			}
 
 			query := logStream.GetQuery()
 			if err := pkg.Compare([]byte(query), "testdata/"+tt.name+".query"); err != nil {
