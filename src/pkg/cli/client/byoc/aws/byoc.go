@@ -12,7 +12,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -22,7 +21,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
@@ -37,7 +35,6 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -56,12 +53,9 @@ type ByocAws struct {
 
 	driver *cfn.AwsEcsCfn // TODO: ecs is stateful, contains the output of the cd cfn stack after SetUpCD
 
-	ecsEventHandlers       []ECSEventHandler
-	codebuildEventHandlers []CodebuildEventHandler
-	handlersLock           sync.RWMutex
-	cdEtag                 types.ETag
-	cdStart                time.Time
-	cdTaskArn              ecs.TaskArn
+	cdEtag    types.ETag
+	cdStart   time.Time
+	cdTaskArn ecs.TaskArn
 
 	needDockerHubCreds bool
 }
@@ -176,15 +170,16 @@ func (b *ByocAws) SetUpCD(ctx context.Context) error {
 	return nil
 }
 
-func (b *ByocAws) GetDeploymentStatus(ctx context.Context) error {
-	if err := ecs.GetTaskStatus(ctx, b.cdTaskArn); err != nil {
+func (b *ByocAws) GetDeploymentStatus(ctx context.Context) (bool, error) {
+	done, err := ecs.GetTaskStatus(ctx, b.cdTaskArn)
+	if err != nil {
 		// check if the task failed; if so, return the a ErrDeploymentFailed error
 		if taskErr := new(ecs.TaskFailure); errors.As(err, taskErr) {
-			return client.ErrDeploymentFailed{Message: taskErr.Error()}
+			return done, client.ErrDeploymentFailed{Message: taskErr.Error()}
 		}
-		return err
+		return done, err
 	}
-	return nil
+	return done, nil
 }
 
 func (b *ByocAws) Deploy(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
@@ -551,7 +546,7 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn,
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging
-		debugEnv := []string{"AWS_REGION=" + b.driver.Region.String()}
+		debugEnv := []string{"AWS_REGION=" + string(b.driver.Region)}
 		if awsProfile := os.Getenv("AWS_PROFILE"); awsProfile != "" {
 			debugEnv = append(debugEnv, "AWS_PROFILE="+awsProfile)
 		}
@@ -679,7 +674,7 @@ func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 	}, nil
 }
 
-func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
 	// FillOutputs is needed to get the CD task ARN or the LogGroup ARNs
 	// if the cloud formation stack has been destroyed, we can still query
 	// logs for builds and services
@@ -699,23 +694,52 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	//  * No Etag, service:		tail all tasks/services with that service name
 	//  * Etag, no services: 	tail all tasks/services with that Etag
 	//  * Etag, service:		tail that task/service
-	var tailStream cw.LiveTailStream
+	var logSeq iter.Seq2[cw.LogEvent, error]
 	etag, err := types.ParseEtag(req.Etag)
 	if err != nil && req.Etag != "" {
 		// Assume invalid "etag" is the task ID of the CD task
-		tailStream, err = b.queryCdLogs(ctx, cwClient, req)
-		// no need to filter events by etag because we only show logs from the specified task ID
+		cdSeq, err := b.queryOrTailCdLogs(ctx, cwClient, req)
+		if err != nil {
+			return nil, AnnotateAwsError(err)
+		}
+		logSeq = cw.Flatten(cdSeq)
+		// No need to filter events by etag because we only show logs from the specified task ID
 	} else {
-		tailStream, err = b.queryLogs(ctx, cwClient, req)
+		logSeq, err = b.queryOrTailLogs(ctx, cwClient, req)
+		if err != nil {
+			return nil, AnnotateAwsError(err)
+		}
 	}
 
-	if err != nil {
-		return nil, AnnotateAwsError(err)
+	parser := &logEventParser{
+		etag:     etag,
+		services: req.Services,
 	}
-	return newByocServerStream(tailStream, etag, req.Services, b, b), nil
+	return func(yield func(*defangv1.TailResponse, error) bool) {
+		for event, err := range logSeq {
+			if err != nil {
+				// Ignore ResourceNotFoundException errors which can only happen if a log stream is missing during Query
+				var resourceNotFound *cwTypes.ResourceNotFoundException
+				if errors.As(err, &resourceNotFound) {
+					term.Debugf("Log stream not found while tailing, skipping: %v", err)
+					continue
+				}
+				if !yield(nil, AnnotateAwsError(err)) {
+					return
+				}
+				continue
+			}
+			resp := parser.parseEvent(event)
+			if resp != nil {
+				if !yield(resp, nil) {
+					return
+				}
+			}
+		}
+	}, nil
 }
 
-func (b *ByocAws) queryCdLogs(ctx context.Context, cwClient *cloudwatchlogs.Client, req *defangv1.TailRequest) (cw.LiveTailStream, error) {
+func (b *ByocAws) queryOrTailCdLogs(ctx context.Context, cwClient cw.LogsClient, req *defangv1.TailRequest) (iter.Seq2[[]cw.LogEvent, error], error) {
 	var err error
 	b.cdTaskArn, err = b.driver.GetTaskArn(req.Etag) // only fails on missing task ID
 	if err != nil {
@@ -730,7 +754,7 @@ func (b *ByocAws) queryCdLogs(ctx context.Context, cwClient *cloudwatchlogs.Clie
 	}
 }
 
-func (b *ByocAws) queryLogs(ctx context.Context, cwClient *cloudwatchlogs.Client, req *defangv1.TailRequest) (cw.LiveTailStream, error) {
+func (b *ByocAws) queryOrTailLogs(ctx context.Context, cwClient cw.LogsClient, req *defangv1.TailRequest) (iter.Seq2[cw.LogEvent, error], error) {
 	start := timeutils.AsTime(req.Since, time.Time{})
 	end := timeutils.AsTime(req.Until, time.Time{})
 
@@ -740,15 +764,19 @@ func (b *ByocAws) queryLogs(ctx context.Context, cwClient *cloudwatchlogs.Client
 	}
 	lgis := b.getLogGroupInputs(req.Etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))
 	if req.Follow {
-		return cw.QueryAndTailLogGroups(
+		logSeq, err := cw.QueryAndTailLogGroups(
 			ctx,
 			cwClient,
 			start,
 			end,
 			lgis...,
 		)
+		if err != nil {
+			return nil, err
+		}
+		return cw.Flatten(logSeq), nil
 	} else {
-		evtsChan, errsChan := cw.QueryLogGroups(
+		logSeq, err := cw.QueryLogGroups(
 			ctx,
 			cwClient,
 			start,
@@ -756,15 +784,26 @@ func (b *ByocAws) queryLogs(ctx context.Context, cwClient *cloudwatchlogs.Client
 			req.Limit,
 			lgis...,
 		)
-		if evtsChan == nil {
-			var errs []error
-			for err := range errsChan {
-				errs = append(errs, err)
-			}
-			return nil, errors.Join(errs...)
+		if err != nil {
+			return nil, err
 		}
-		// TODO: any errors from errsChan should be reported but get dropped
-		return cw.NewStaticLogStream(evtsChan, func() {}), nil
+		if len(req.Services) == 0 {
+			albIter, err := b.fetchAndStreamAlbLogs(ctx, req.Project, start, end, req.Pattern)
+			if err != nil {
+				term.Debugf("Failed to fetch ALB logs: %v", err)
+			} else {
+				logSeq = cw.MergeLogEvents(logSeq, albIter)
+				if req.Limit > 0 {
+					// take the first/last n events only from the merged stream
+					if start.IsZero() {
+						logSeq = cw.TakeLastN(logSeq, int(req.Limit))
+					} else {
+						logSeq = cw.TakeFirstN(logSeq, int(req.Limit))
+					}
+				}
+			}
+		}
+		return logSeq, nil
 	}
 }
 
@@ -890,53 +929,33 @@ func (b *ByocAws) CdList(ctx context.Context, allRegions bool) (iter.Seq[state.I
 	}
 }
 
-type ECSEventHandler interface {
-	HandleECSEvent(evt ecs.Event)
-}
-
-type CodebuildEventHandler interface {
-	HandleCodebuildEvent(evt codebuild.Event)
-}
-
-func (b *ByocAws) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
-	s := &byocSubscribeServerStream{
-		services: req.Services,
-		etag:     req.Etag,
-
-		ch:   make(chan *defangv1.SubscribeResponse),
-		done: make(chan struct{}),
+func (b *ByocAws) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {
+	if err := b.driver.FillOutputs(ctx); err != nil {
+		term.Warnf("Unable to get log group ARNs: %v", err)
 	}
-	b.AddEcsEventHandler(s)
-	b.AddCodebuildEventHandler(s)
-	return s, nil
-}
 
-func (b *ByocAws) HandleECSEvent(evt ecs.Event) {
-	b.handlersLock.RLock()
-	defer b.handlersLock.RUnlock()
-	for _, handler := range b.ecsEventHandlers {
-		handler.HandleECSEvent(evt)
+	cwClient, err := cw.NewCloudWatchLogsClient(ctx, b.driver.Region)
+	if err != nil {
+		return nil, AnnotateAwsError(err)
 	}
-}
 
-func (b *ByocAws) HandleCodebuildEvent(evt codebuild.Event) {
-	b.handlersLock.RLock()
-	defer b.handlersLock.RUnlock()
-	for _, handler := range b.codebuildEventHandlers {
-		handler.HandleCodebuildEvent(evt)
+	lgis := b.getSubscribeLogGroupInputs(req.Project)
+	logSeq, err := cw.QueryAndTailLogGroups(ctx, cwClient, b.cdStart, time.Time{}, lgis...)
+	if err != nil {
+		return nil, AnnotateAwsError(err)
 	}
+
+	etag, _ := types.ParseEtag(req.Etag)
+	return parseSubscribeEvents(logSeq, etag, req.Services), nil
 }
 
-func (b *ByocAws) AddEcsEventHandler(handler ECSEventHandler) {
-	b.handlersLock.Lock()
-	defer b.handlersLock.Unlock()
-	b.ecsEventHandlers = append(b.ecsEventHandlers, handler)
-}
-
-func (b *ByocAws) AddCodebuildEventHandler(handler CodebuildEventHandler) {
-	b.handlersLock.Lock()
-	defer b.handlersLock.Unlock()
-	b.codebuildEventHandlers = append(b.codebuildEventHandlers, handler)
+func (b *ByocAws) getSubscribeLogGroupInputs(projectName string) []cw.LogGroupInput {
+	var groups []cw.LogGroupInput
+	buildsARN := b.makeLogGroupARN(b.StackDir(projectName, "builds"))
+	groups = append(groups, cw.LogGroupInput{LogGroupARN: buildsARN})
+	ecsARN := b.makeLogGroupARN(b.StackDir(projectName, "ecs"))
+	groups = append(groups, cw.LogGroupInput{LogGroupARN: ecsARN})
+	return groups
 }
 
 func (b *ByocAws) GetPrivateDomain(projectName string) string {

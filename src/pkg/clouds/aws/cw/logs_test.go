@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLogGroupIdentifier(t *testing.T) {
@@ -46,7 +47,7 @@ func (m *mockFiltererTailer) StartLiveTail(ctx context.Context, input *cloudwatc
 
 // This is a pretty bad test. It ends up only testing that we can poll for the log group.
 // because our mock StartLiveTail always returns ResourceNotFoundException.
-// That means the test repeatedly tries to open a stream until we call Close() on it.
+// That means the test repeatedly tries to open a stream until context is canceled.
 func TestQueryAndTailLogGroups(t *testing.T) {
 	logGroups := []LogGroupInput{
 		{
@@ -54,20 +55,17 @@ func TestQueryAndTailLogGroups(t *testing.T) {
 		},
 	}
 	mockFiltererTailer := &mockFiltererTailer{}
-	e, err := QueryAndTailLogGroups(t.Context(), mockFiltererTailer, time.Now(), time.Time{}, logGroups...)
+	ctx, cancel := context.WithCancel(t.Context())
+	evts, err := QueryAndTailLogGroups(ctx, mockFiltererTailer, time.Now(), time.Time{}, logGroups...)
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
-	if e.Err() != nil {
-		t.Errorf("Expected no error, but got: %v", e.Err())
-	}
-	err = e.Close()
-	if err != nil {
-		t.Errorf("Expected no error, but got: %v", err)
-	}
-	_, ok := <-e.Events()
-	if ok {
-		t.Error("Expected channel to be closed")
+	// Cancel context to stop the polling
+	cancel()
+	for _, err := range evts {
+		if err != nil && err != context.Canceled {
+			t.Errorf("Expected no error or context.Canceled, but got: %v", err)
+		}
 	}
 }
 
@@ -91,9 +89,9 @@ func TestQueryLogGroups(t *testing.T) {
 	}{
 		{
 			limit:            2,
-			since:            time.Time{},
+			since:            time.Now().Add(-time.Hour),
 			until:            time.Time{},
-			expectedMessages: []string{"Log event 2", "Log event 3"},
+			expectedMessages: []string{"Log event 1", "Log event 2"},
 		},
 		{
 			limit:            2,
@@ -103,9 +101,9 @@ func TestQueryLogGroups(t *testing.T) {
 		},
 		{
 			limit:            2,
-			since:            time.Time{},
+			since:            time.Now().Add(-time.Hour),
 			until:            time.Now(),
-			expectedMessages: []string{"Log event 2", "Log event 3"},
+			expectedMessages: []string{"Log event 1", "Log event 2"},
 		},
 	}
 
@@ -119,7 +117,7 @@ func TestQueryLogGroups(t *testing.T) {
 		mockFiltererTailer := &mockFiltererTailer{
 			filteredLogEvents: logEvents,
 		}
-		eventsCh, errsCh := QueryLogGroups(
+		logSeq, err := QueryLogGroups(
 			t.Context(),
 			mockFiltererTailer,
 			tt.since,
@@ -128,27 +126,19 @@ func TestQueryLogGroups(t *testing.T) {
 			int32(tt.limit),
 			logGroups...,
 		)
+		require.NoError(t, err)
 
 		collectedMessages := make([]string, 0)
-		for {
-			event, ok := <-eventsCh
-			if !ok {
+		for evt, err := range logSeq {
+			if err != nil {
+				t.Errorf("Expected no error, but got: %v", err)
 				break
 			}
-			collectedMessages = append(collectedMessages, *event.Message)
+			collectedMessages = append(collectedMessages, *evt.Message)
 		}
 		assert.Len(t, collectedMessages, tt.limit)
 		for i, expectedMsg := range tt.expectedMessages {
 			assert.Equal(t, expectedMsg, collectedMessages[i])
-		}
-
-		select {
-		case err, ok := <-errsCh:
-			if ok && err != nil {
-				t.Errorf("Expected no error, but got: %v", err)
-			}
-		default:
-			// No error received, as expected
 		}
 	}
 }

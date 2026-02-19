@@ -184,25 +184,25 @@ func (gcp Gcp) RunCloudBuild(ctx context.Context, args CloudBuildArgs) (string, 
 	return op.Name(), nil
 }
 
-func (gcp Gcp) GetBuildStatus(ctx context.Context, startBuildOpName string) error {
+func (gcp Gcp) GetBuildStatus(ctx context.Context, startBuildOpName string) (bool, error) {
 	svc, err := cloudbuild.NewClient(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create Cloud Build client: %w", err)
+		return false, fmt.Errorf("failed to create Cloud Build client: %w", err)
 	}
 	defer svc.Close()
 
 	op := svc.CreateBuildOperation(startBuildOpName)
 	build, err := op.Poll(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to poll build operation: %w", err)
+		return false, fmt.Errorf("failed to poll build operation: %w", err)
 	}
 	if build != nil {
 		if build.Status == cloudbuildpb.Build_SUCCESS {
-			return io.EOF
+			return true, io.EOF // success; EOF is returned for backward compatibility
 		}
-		return client.ErrDeploymentFailed{Message: fmt.Sprintf("build failed with status: %v", build.Status)}
+		return true, client.ErrDeploymentFailed{Message: fmt.Sprintf("build failed with status: %v", build.Status)}
 	}
-	return nil
+	return false, nil
 }
 
 func GetMachineType(machineType *string) MachineType {
