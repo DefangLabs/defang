@@ -582,7 +582,10 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 	subscribeStream := NewSubscribeStream(ctx, b.driver, true, req.Etag, req.Services, ignoreCdSuccess)
 	subscribeStream.AddJobStatusUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
 	subscribeStream.AddServiceStatusUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
-	return subscribeStream.Follow(time.Now())
+
+	now := time.Now()
+	subscribeStream.query.AddSince(now) // Do no query historical events
+	return subscribeStream.Follow(now)
 }
 
 func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {

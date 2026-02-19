@@ -69,11 +69,12 @@ func (s *ServerStream[T]) Follow(start time.Time) (iter.Seq2[*T, error], error) 
 		return nil, err
 	}
 	query := s.query.GetQuery()
+	shouldList := !start.IsZero() && start.Unix() > 0 && time.Since(start) > 10*time.Millisecond
 	term.Debugf("Query and tail logs since %v with query: \n%v", start, query)
 	return func(yield func(*T, error) bool) {
 		defer tailer.Close()
 		// Only query older logs if start time is more than 10ms ago
-		if !start.IsZero() && start.Unix() > 0 && time.Since(start) > 10*time.Millisecond {
+		if shouldList {
 			lister, err := s.gcpLogsClient.ListLogEntries(s.ctx, query, gcp.OrderAscending)
 			if err != nil {
 				yield(nil, err)
