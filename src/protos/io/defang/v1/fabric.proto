@@ -34,9 +34,6 @@ service FabricController {
   rpc Destroy(DestroyRequest) returns (DestroyResponse) {
     option idempotency_level = IDEMPOTENT;
   }
-  rpc Publish(PublishRequest) returns (google.protobuf.Empty) {
-    option deprecated = true;
-  }
   rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
   // rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
   rpc GetServices(GetServicesRequest) returns (GetServicesResponse) {
@@ -234,12 +231,12 @@ message DestroyRequest {
 }
 
 message DestroyResponse {
-  string etag = 1;
+  string etag = 1; // aka deployment ID
 }
 
 message DebugRequest {
   repeated File files = 1;
-  string etag = 2;
+  string etag = 2; // aka deployment ID
   string project = 3;
   string logs = 4;
   repeated string services = 5;
@@ -314,7 +311,7 @@ message DeployRequest {
 
 message DeployResponse {
   repeated ServiceInfo services = 1;
-  string etag = 2;
+  string etag = 2; // aka deployment ID
 }
 
 message DeleteRequest {
@@ -324,7 +321,7 @@ message DeleteRequest {
 }
 
 message DeleteResponse {
-  string etag = 1;
+  string etag = 1; // aka deployment ID
 }
 
 message GenerateFilesRequest {
@@ -389,7 +386,7 @@ message ServiceInfo {
   Service service = 1;
   repeated string endpoints = 2; // list of endpoints, one for each port
   string project = 3; // was: tenant; defaults to tenant ID
-  string etag = 4;
+  string etag = 4; // aka deployment ID
   string status = 5;
   repeated string nat_ips = 6; // comma-separated list of NAT IPs
   repeated string lb_ips = 7; // comma-separated list of internal CIDRs for the load-balancer
@@ -522,7 +519,7 @@ enum DeploymentOrigin {
 }
 
 message Deployment {
-  string id = 1; // aka etag
+  string id = 1; // deployment ID aka etag
   string project = 2;
   string provider_string = 3 [deprecated = true]; // was: provider
   string provider_account_id = 4;
@@ -594,7 +591,7 @@ message Version {
 message TailRequest {
   repeated string services = 1;
   google.protobuf.Timestamp since = 2;
-  string etag = 3;
+  string etag = 3; // aka deployment ID
   string project = 4;
   enum LogType {
     LOG_TYPE_UNSPECIFIED = 0;
@@ -614,7 +611,7 @@ message LogEntry {
   google.protobuf.Timestamp timestamp = 2;
   bool stderr = 3;
   string service = 4;
-  string etag = 5;
+  string etag = 5; // aka deployment ID
   string host = 6;
 }
 
@@ -622,7 +619,7 @@ message TailResponse {
   reserved 1; // was "string raw"
   repeated LogEntry entries = 2;
   string service = 3;
-  string etag = 4;
+  string etag = 4; // aka deployment ID
   string host = 5;
 }
 
@@ -645,6 +642,7 @@ message ProjectUpdate {
   bytes stack_file = 10; // Defang stack file
   string gcp_execution_id = 11;
   string aws_ecs_task_id = 12;
+  string deployment_id = 13; // aka etag
 }
 
 message GetRequest { // was ServiceID
@@ -680,7 +678,7 @@ message DeployEvent {
   DeploymentMode mode = 1;
   string type = 2; // required
   string source = 3;
-  string id = 4; // etag
+  string id = 4; // deployment ID aka etag
   string datacontenttype = 5;
   string dataschema = 6;
   string subject = 7; // tenant|stack; also used as SQS group ID
@@ -688,27 +686,9 @@ message DeployEvent {
   bytes data = 9;
 }
 
-message Event {
-  option deprecated = true;
-  string specversion = 1; // required (but we don't care)
-  string type = 2; // required
-  string source = 3; // required
-  string id = 4; // required
-  string datacontenttype = 5;
-  string dataschema = 6;
-  string subject = 7;
-  google.protobuf.Timestamp time = 8;
-  bytes data = 9;
-}
-
-message PublishRequest {
-  option deprecated = true;
-  Event event = 1;
-}
-
 message SubscribeRequest {
   repeated string services = 1;
-  string etag = 2;
+  string etag = 2; // aka deployment ID
   string project = 3;
 }
 
@@ -794,13 +774,13 @@ message PreviewRequest {
   Provider provider = 1;
   string region = 2;
   DeploymentMode mode = 3;
-  string etag = 4;
+  string etag = 4; // aka deployment ID
   bytes compose = 5; // yaml (or json)
   string project_name = 6;
 }
 
 message PreviewResponse {
-  string etag = 1;
+  string etag = 1; // aka deployment ID
 }
 
 enum SourcePlatform {

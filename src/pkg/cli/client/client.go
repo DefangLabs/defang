@@ -29,7 +29,6 @@ type FabricClient interface {
 	ListDeployments(context.Context, *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error)
 	ListStacks(context.Context, *defangv1.ListStacksRequest) (*defangv1.ListStacksResponse, error)
 	Preview(context.Context, *defangv1.PreviewRequest) (*defangv1.PreviewResponse, error)
-	Publish(context.Context, *defangv1.PublishRequest) error
 	PutDeployment(context.Context, *defangv1.PutDeploymentRequest) error
 	PutStack(context.Context, *defangv1.PutStackRequest) error
 	RevokeToken(context.Context) error
