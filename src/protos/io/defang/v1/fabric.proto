@@ -642,7 +642,7 @@ message ProjectUpdate {
   bytes stack_file = 10; // Defang stack file
   string gcp_execution_id = 11;
   string aws_ecs_task_id = 12;
-  string deployment_id = 13; // aka etag
+  string etag = 13; // aka deployment ID
 }
 
 message GetRequest { // was ServiceID
