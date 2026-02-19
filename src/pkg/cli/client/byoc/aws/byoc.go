@@ -260,6 +260,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		command:         []string{cmd, payloadString},
 		delegateDomain:  req.DelegateDomain,
 		delegationSetId: req.DelegationSetId,
+		etag:            etag,
 		mode:            req.Mode,
 		project:         project.Name,
 		statesUrl:       req.StatesUrl,
@@ -515,6 +516,7 @@ type cdCommand struct {
 	command         []string
 	delegateDomain  string
 	delegationSetId string
+	etag            types.ETag
 	mode            defangv1.DeploymentMode
 	project         string
 
@@ -539,6 +541,10 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn,
 	} else {
 		env["DOMAIN"] = "dummy.domain"
 	}
+	if cmd.etag != "" {
+		env["DEFANG_ETAG"] = cmd.etag
+	}
+
 	env["DEFANG_MODE"] = strings.ToLower(cmd.mode.String())
 	if cmd.dockerHubUsername != "" && cmd.dockerHubAccessToken != "" {
 		arn, err := b.putDockerHubSecret(ctx, cmd.project, cmd.dockerHubUsername, cmd.dockerHubAccessToken)
@@ -789,7 +795,7 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 		} else {
 			cdTail := cw.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern}
 			// If we know the CD task ARN, only tail the logstream for that CD task; FIXME: store the task ID in the project's ProjectUpdate in S3 and use that
-			if b.cdTaskArn != nil && b.cdEtag == etag {
+			if b.cdTaskArn != nil && (b.cdEtag == etag || ecs.GetTaskID(b.cdTaskArn) == etag) {
 				cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.cdTaskArn))}
 			}
 			groups = append(groups, cdTail)
@@ -843,17 +849,18 @@ func (b *ByocAws) CdCommand(ctx context.Context, req client.CdCommandRequest) (s
 	if err := b.SetUpCD(ctx); err != nil {
 		return "", err
 	}
+	etag := types.NewEtag()
 	cmd := cdCommand{
-		project:   req.Project,
 		command:   []string{string(req.Command)},
+		etag:      etag,
+		project:   req.Project,
 		statesUrl: req.StatesUrl,
 		eventsUrl: req.EventsUrl,
 	}
-	cdTaskArn, err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
+	cdTaskArn, err := b.runCdCommand(ctx, cmd)
 	if err != nil {
 		return "", AnnotateAwsError(err)
 	}
-	etag := ecs.GetTaskID(cdTaskArn) // TODO: this is the CD task ID, not the etag
 	b.cdEtag = etag
 	b.cdStart = time.Now()
 	b.cdTaskArn = cdTaskArn
