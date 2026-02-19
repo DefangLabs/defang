@@ -61,9 +61,6 @@ const (
 	// FabricControllerDestroyProcedure is the fully-qualified name of the FabricController's Destroy
 	// RPC.
 	FabricControllerDestroyProcedure = "/io.defang.v1.FabricController/Destroy"
-	// FabricControllerPublishProcedure is the fully-qualified name of the FabricController's Publish
-	// RPC.
-	FabricControllerPublishProcedure = "/io.defang.v1.FabricController/Publish"
 	// FabricControllerSubscribeProcedure is the fully-qualified name of the FabricController's
 	// Subscribe RPC.
 	FabricControllerSubscribeProcedure = "/io.defang.v1.FabricController/Subscribe"
@@ -187,8 +184,6 @@ type FabricControllerClient interface {
 	// Deprecated: do not use.
 	Delete(context.Context, *connect_go.Request[v1.DeleteRequest]) (*connect_go.Response[v1.DeleteResponse], error)
 	Destroy(context.Context, *connect_go.Request[v1.DestroyRequest]) (*connect_go.Response[v1.DestroyResponse], error)
-	// Deprecated: do not use.
-	Publish(context.Context, *connect_go.Request[v1.PublishRequest]) (*connect_go.Response[emptypb.Empty], error)
 	Subscribe(context.Context, *connect_go.Request[v1.SubscribeRequest]) (*connect_go.ServerStreamForClient[v1.SubscribeResponse], error)
 	// rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
 	GetServices(context.Context, *connect_go.Request[v1.GetServicesRequest]) (*connect_go.Response[v1.GetServicesResponse], error)
@@ -301,11 +296,6 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			baseURL+FabricControllerDestroyProcedure,
 			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
 			connect_go.WithClientOptions(opts...),
-		),
-		publish: connect_go.NewClient[v1.PublishRequest, emptypb.Empty](
-			httpClient,
-			baseURL+FabricControllerPublishProcedure,
-			opts...,
 		),
 		subscribe: connect_go.NewClient[v1.SubscribeRequest, v1.SubscribeResponse](
 			httpClient,
@@ -536,7 +526,6 @@ type fabricControllerClient struct {
 	getPlaygroundProjectDomain *connect_go.Client[emptypb.Empty, v1.GetPlaygroundProjectDomainResponse]
 	delete                     *connect_go.Client[v1.DeleteRequest, v1.DeleteResponse]
 	destroy                    *connect_go.Client[v1.DestroyRequest, v1.DestroyResponse]
-	publish                    *connect_go.Client[v1.PublishRequest, emptypb.Empty]
 	subscribe                  *connect_go.Client[v1.SubscribeRequest, v1.SubscribeResponse]
 	getServices                *connect_go.Client[v1.GetServicesRequest, v1.GetServicesResponse]
 	generateFiles              *connect_go.Client[v1.GenerateFilesRequest, v1.GenerateFilesResponse]
@@ -626,13 +615,6 @@ func (c *fabricControllerClient) Delete(ctx context.Context, req *connect_go.Req
 // Destroy calls io.defang.v1.FabricController.Destroy.
 func (c *fabricControllerClient) Destroy(ctx context.Context, req *connect_go.Request[v1.DestroyRequest]) (*connect_go.Response[v1.DestroyResponse], error) {
 	return c.destroy.CallUnary(ctx, req)
-}
-
-// Publish calls io.defang.v1.FabricController.Publish.
-//
-// Deprecated: do not use.
-func (c *fabricControllerClient) Publish(ctx context.Context, req *connect_go.Request[v1.PublishRequest]) (*connect_go.Response[emptypb.Empty], error) {
-	return c.publish.CallUnary(ctx, req)
 }
 
 // Subscribe calls io.defang.v1.FabricController.Subscribe.
@@ -843,8 +825,6 @@ type FabricControllerHandler interface {
 	// Deprecated: do not use.
 	Delete(context.Context, *connect_go.Request[v1.DeleteRequest]) (*connect_go.Response[v1.DeleteResponse], error)
 	Destroy(context.Context, *connect_go.Request[v1.DestroyRequest]) (*connect_go.Response[v1.DestroyResponse], error)
-	// Deprecated: do not use.
-	Publish(context.Context, *connect_go.Request[v1.PublishRequest]) (*connect_go.Response[emptypb.Empty], error)
 	Subscribe(context.Context, *connect_go.Request[v1.SubscribeRequest], *connect_go.ServerStream[v1.SubscribeResponse]) error
 	// rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
 	GetServices(context.Context, *connect_go.Request[v1.GetServicesRequest]) (*connect_go.Response[v1.GetServicesResponse], error)
@@ -953,11 +933,6 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		svc.Destroy,
 		connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
 		connect_go.WithHandlerOptions(opts...),
-	)
-	fabricControllerPublishHandler := connect_go.NewUnaryHandler(
-		FabricControllerPublishProcedure,
-		svc.Publish,
-		opts...,
 	)
 	fabricControllerSubscribeHandler := connect_go.NewServerStreamHandler(
 		FabricControllerSubscribeProcedure,
@@ -1195,8 +1170,6 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerDeleteHandler.ServeHTTP(w, r)
 		case FabricControllerDestroyProcedure:
 			fabricControllerDestroyHandler.ServeHTTP(w, r)
-		case FabricControllerPublishProcedure:
-			fabricControllerPublishHandler.ServeHTTP(w, r)
 		case FabricControllerSubscribeProcedure:
 			fabricControllerSubscribeHandler.ServeHTTP(w, r)
 		case FabricControllerGetServicesProcedure:
@@ -1318,10 +1291,6 @@ func (UnimplementedFabricControllerHandler) Delete(context.Context, *connect_go.
 
 func (UnimplementedFabricControllerHandler) Destroy(context.Context, *connect_go.Request[v1.DestroyRequest]) (*connect_go.Response[v1.DestroyResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Destroy is not implemented"))
-}
-
-func (UnimplementedFabricControllerHandler) Publish(context.Context, *connect_go.Request[v1.PublishRequest]) (*connect_go.Response[emptypb.Empty], error) {
-	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Publish is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) Subscribe(context.Context, *connect_go.Request[v1.SubscribeRequest], *connect_go.ServerStream[v1.SubscribeResponse]) error {

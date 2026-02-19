@@ -86,11 +86,6 @@ func (g GrpcClient) RevokeToken(ctx context.Context) error {
 	return err
 }
 
-func (g GrpcClient) Publish(ctx context.Context, req *defangv1.PublishRequest) error {
-	_, err := g.client.Publish(ctx, connect.NewRequest(req))
-	return err
-}
-
 func (g GrpcClient) PutStack(ctx context.Context, req *defangv1.PutStackRequest) error {
 	_, err := g.client.PutStack(ctx, connect.NewRequest(req))
 	return err
