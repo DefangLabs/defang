@@ -31,10 +31,12 @@ var whoamiCmd = &cobra.Command{
 
 		token := client.GetExistingToken(global.Cluster)
 
-		userInfo, err := auth.FetchUserInfo(ctx, token)
-		if err != nil {
-			// Either the auth service is down, or we're using a Fabric JWT: skip workspace information
-			if global.HasTty {
+		var userInfo *auth.UserInfo
+		// Skip userinfo fetch in non-interactive mode (CI environments)
+		if global.HasTty {
+			userInfo, err = auth.FetchUserInfo(ctx, token)
+			if err != nil {
+				// Either the auth service is down, or we're using a Fabric JWT: skip workspace information
 				term.Warn("Workspace information unavailable:", err)
 			}
 		}
