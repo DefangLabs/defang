@@ -9,19 +9,20 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/processcreds"
+	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
-type Region string
+type Region = r53types.VPCRegion
 
 type Aws struct {
 	AccountID string
 	Region    Region
 }
 
-func (r Region) String() string {
-	return string(r)
-}
+// func (r Region) String() string {
+// 	return string(r)
+// }
 
 func (a *Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
 	cfg, err := LoadDefaultConfig(ctx, a.Region)

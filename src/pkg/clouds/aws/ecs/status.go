@@ -14,7 +14,7 @@ import (
 )
 
 // GetTaskStatus returns nil if the task is still running, io.EOF if the task is stopped successfully, or an error if the task failed.
-func GetTaskStatus(ctx context.Context, taskArn TaskArn) error {
+func GetTaskStatus(ctx context.Context, taskArn TaskArn) (bool, error) {
 	region := region.FromArn(*taskArn)
 	cluster, taskID := SplitClusterTask(taskArn)
 	return getTaskStatus(ctx, region, cluster, taskID)
@@ -31,10 +31,10 @@ func isTaskTerminalStatus(status string) bool {
 }
 
 // getTaskStatus returns nil if the task is still running, io.EOF if the task is stopped successfully, or an error if the task failed.
-func getTaskStatus(ctx context.Context, region aws.Region, cluster, taskId string) error {
+func getTaskStatus(ctx context.Context, region aws.Region, cluster, taskId string) (bool, error) {
 	cfg, err := aws.LoadDefaultConfig(ctx, region)
 	if err != nil {
-		return err
+		return false, err
 	}
 	ecsClient := ecs.NewFromConfig(cfg)
 
@@ -44,26 +44,33 @@ func getTaskStatus(ctx context.Context, region aws.Region, cluster, taskId strin
 		Tasks:   []string{taskId},
 	})
 	if ti == nil || len(ti.Tasks) == 0 {
-		return nil // task doesn't exist yet; TODO: check the actual error from DescribeTasks
+		return false, nil // task doesn't exist (yet); TODO: check the actual error from DescribeTasks
 	}
 	task := ti.Tasks[0]
 	if task.LastStatus == nil || !isTaskTerminalStatus(*task.LastStatus) {
-		return nil // still running
+		return false, nil // still running
 	}
 
+	var stoppedReason string
+	if task.StoppedReason != nil {
+		stoppedReason = *task.StoppedReason
+	}
 	switch task.StopCode {
 	default:
-		return TaskFailure{task.StopCode, *task.StoppedReason}
+		return true, TaskFailure{task.StopCode, stoppedReason}
 	case ecsTypes.TaskStopCodeEssentialContainerExited:
 		for _, c := range task.Containers {
 			if c.ExitCode != nil && *c.ExitCode != 0 {
-				reason := fmt.Sprintf("%s with code %d", *task.StoppedReason, *c.ExitCode)
-				return TaskFailure{task.StopCode, reason}
+				if stoppedReason == "" {
+					stoppedReason = "essential container exited"
+				}
+				reason := fmt.Sprintf("%s with code %d", stoppedReason, *c.ExitCode)
+				return true, TaskFailure{task.StopCode, reason}
 			}
 		}
 		fallthrough
 	case "": // TODO: shouldn't happen
-		return io.EOF // Success
+		return true, io.EOF // Success; EOF returned for backward compatibility
 	}
 }
 
@@ -91,7 +98,7 @@ func WaitForTask(ctx context.Context, taskArn TaskArn, poll time.Duration) error
 			// Handle cancellation
 			return ctx.Err()
 		case <-ticker.C:
-			if err := GetTaskStatus(ctx, taskArn); err != nil {
+			if done, err := GetTaskStatus(ctx, taskArn); done || err != nil {
 				return err
 			}
 		}
