@@ -192,6 +192,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *client.DeployRequest, cmd stri
 	cdCmd := cdCommand{
 		command:        []string{cmd, payloadString},
 		delegateDomain: req.DelegateDomain,
+		etag:           etag,
 		mode:           req.Mode,
 		project:        project.Name,
 		statesUrl:      req.StatesUrl,
@@ -230,9 +231,11 @@ func (b *ByocDo) CdCommand(ctx context.Context, req client.CdCommandRequest) (st
 		return "", err
 	}
 
+	etag := types.NewEtag()
 	cmd := cdCommand{
 		command:        []string{string(req.Command)},
 		delegateDomain: "dummy.domain",
+		etag:           etag,
 		project:        req.Project,
 		statesUrl:      req.StatesUrl,
 		eventsUrl:      req.EventsUrl,
@@ -242,7 +245,6 @@ func (b *ByocDo) CdCommand(ctx context.Context, req client.CdCommandRequest) (st
 		return "", err
 	}
 
-	etag := types.NewEtag()
 	b.cdEtag = etag
 	return etag, nil
 }
@@ -621,6 +623,7 @@ func (b *ByocDo) PrepareDomainDelegation(ctx context.Context, req client.Prepare
 
 type cdCommand struct {
 	command        []string
+	etag           types.ETag
 	project        string
 	delegateDomain string
 	mode           defangv1.DeploymentMode
@@ -638,9 +641,11 @@ func (b *ByocDo) runCdCommand(ctx context.Context, cmd cdCommand) (*godo.App, er
 	if cmd.statesUrl != "" {
 		env = append(env, &godo.AppVariableDefinition{Key: "DEFANG_STATES_UPLOAD_URL", Value: cmd.statesUrl, Type: godo.AppVariableType_Secret})
 	}
-
 	if cmd.eventsUrl != "" {
 		env = append(env, &godo.AppVariableDefinition{Key: "DEFANG_EVENTS_UPLOAD_URL", Value: cmd.eventsUrl, Type: godo.AppVariableType_Secret})
+	}
+	if cmd.etag != "" {
+		env = append(env, &godo.AppVariableDefinition{Key: "DEFANG_ETAG", Value: cmd.etag})
 	}
 
 	if term.DoDebug() {
