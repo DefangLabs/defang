@@ -210,19 +210,19 @@ func (b *ByocDo) deploy(ctx context.Context, req *client.DeployRequest, cmd stri
 	}, nil
 }
 
-func (b *ByocDo) GetDeploymentStatus(ctx context.Context) error {
+func (b *ByocDo) GetDeploymentStatus(ctx context.Context) (bool, error) {
 	deploymentInfo, _, err := b.client.Apps.GetDeployment(ctx, b.cdAppID, b.cdDeploymentID)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	switch deploymentInfo.GetPhase() {
 	default:
-		return nil // pending
+		return false, nil // pending
 	case godo.DeploymentPhase_Active:
-		return io.EOF
+		return true, io.EOF // success; EOF returned for backward compatibility
 	case godo.DeploymentPhase_Error, godo.DeploymentPhase_Canceled:
-		return client.ErrDeploymentFailed{Message: deploymentInfo.Cause}
+		return true, client.ErrDeploymentFailed{Message: deploymentInfo.Cause}
 	}
 }
 
@@ -400,7 +400,7 @@ func (b *ByocDo) PutConfig(ctx context.Context, config *defangv1.PutConfigReques
 	return err
 }
 
-func (b *ByocDo) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+func (b *ByocDo) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
 	var appID, deploymentID string
 
 	if req.Etag != "" && req.Etag == b.cdEtag {
@@ -470,7 +470,7 @@ func (b *ByocDo) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (clie
 				return nil, err
 			}
 
-			return newByocServerStream(ctx, appLiveURL, req.Etag)
+			return streamLogs(ctx, appLiveURL, req.Etag)
 		}
 
 		// Sleep for 10 seconds so we dont spam the DO API
@@ -521,30 +521,35 @@ func (b *ByocDo) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
 	}, nil
 }
 
-func (b *ByocDo) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
+func (b *ByocDo) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {
 	if req.Etag != b.cdEtag || b.cdAppID == "" {
 		return nil, errors.ErrUnsupported // TODO: fetch the deployment ID for the given etag
 	}
-	ctx, cancel := context.WithCancel(ctx) // canceled by subscribeStream.Close()
-	return &subscribeStream{
-		appID:        b.cdAppID,
-		b:            b,
-		deploymentID: b.cdDeploymentID,
-		ctx:          ctx,
-		cancel:       cancel,
-		queue:        make(chan *defangv1.SubscribeResponse, 10),
-	}, nil
-}
+	appID := b.cdAppID
+	deploymentID := b.cdDeploymentID
 
-type subscribeStream struct {
-	appID        string
-	b            *ByocDo
-	ctx          context.Context
-	cancel       context.CancelFunc
-	deploymentID string
-	err          error
-	queue        chan *defangv1.SubscribeResponse
-	msg          *defangv1.SubscribeResponse
+	return func(yield func(*defangv1.SubscribeResponse, error) bool) {
+		for {
+			deployment, _, err := b.client.Apps.GetDeployment(ctx, appID, deploymentID)
+			if err != nil {
+				yield(nil, err)
+				return
+			}
+			for _, service := range deployment.Spec.Services {
+				if !yield(&defangv1.SubscribeResponse{
+					Name:   service.Name,
+					Status: string(deployment.Phase),
+					State:  phaseToState(deployment.Phase),
+				}, nil) {
+					return
+				}
+			}
+			if err := pkg.SleepWithContext(ctx, 2*time.Second); err != nil {
+				yield(nil, err)
+				return
+			}
+		}
+	}, nil
 }
 
 func phaseToState(phase godo.DeploymentPhase) defangv1.ServiceState {
@@ -566,55 +571,6 @@ func phaseToState(phase godo.DeploymentPhase) defangv1.ServiceState {
 	default:
 		return defangv1.ServiceState_NOT_SPECIFIED
 	}
-}
-
-func (s *subscribeStream) Receive() bool {
-	select {
-	case <-s.ctx.Done():
-		s.err = s.ctx.Err()
-		s.msg = nil
-		return false
-	case r := <-s.queue:
-		s.msg = r
-		return true
-	default:
-	}
-	deployment, _, err := s.b.client.Apps.GetDeployment(s.ctx, s.appID, s.deploymentID)
-	if err != nil {
-		s.msg = nil
-		s.err = err
-		return false
-	}
-	for _, service := range deployment.Spec.Services {
-		s.queue <- &defangv1.SubscribeResponse{
-			Name:   service.Name,
-			Status: string(deployment.Phase),
-			State:  phaseToState(deployment.Phase),
-		}
-	}
-
-	select {
-	case resp := <-s.queue:
-		s.msg = resp
-		return true
-	case <-s.ctx.Done():
-		s.err = s.ctx.Err()
-		s.msg = nil
-		return false
-	}
-}
-
-func (s *subscribeStream) Msg() *defangv1.SubscribeResponse {
-	return s.msg
-}
-
-func (s *subscribeStream) Err() error {
-	return s.err
-}
-
-func (s *subscribeStream) Close() error {
-	s.cancel()
-	return nil
 }
 
 func (b *ByocDo) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
