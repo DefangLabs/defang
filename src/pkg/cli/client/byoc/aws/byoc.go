@@ -154,15 +154,19 @@ func (b *ByocAws) SetUpCD(ctx context.Context) error {
 
 	term.Debugf("Using CD image: %q", b.CDImage)
 
-	if err := b.driver.SetUp(ctx, b.makeContainers()); err != nil {
+	created, err := b.driver.SetUp(ctx, b.makeContainers())
+	if err != nil {
 		return AnnotateAwsError(err)
 	}
 
-	// Delete default SecurityGroup rules to comply with stricter AWS account security policies
-	if sgId := b.driver.DefaultSecurityGroupID; sgId != "" {
-		term.Debugf("Cleaning up default Security Group rules (%s)", sgId)
-		if err := b.driver.RevokeDefaultSecurityGroupRules(ctx, sgId); err != nil {
-			term.Warnf("Could not clean up default Security Group rules: %v", err)
+	// Delete default SecurityGroup rules to comply with stricter AWS account security policies;
+	// only needed when the stack (and its VPC) is first created.
+	if created {
+		if sgId := b.driver.DefaultSecurityGroupID; sgId != "" {
+			term.Debugf("Cleaning up default Security Group rules (%s)", sgId)
+			if err := b.driver.RevokeDefaultSecurityGroupRules(ctx, sgId); err != nil {
+				term.Warnf("Could not clean up default Security Group rules: %v", err)
+			}
 		}
 	}
 

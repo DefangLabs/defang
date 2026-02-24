@@ -10,21 +10,21 @@ import (
 	"github.com/docker/docker/api/types/image"
 )
 
-func (d *Docker) SetUp(ctx context.Context, containers []clouds.Container) error {
+func (d *Docker) SetUp(ctx context.Context, containers []clouds.Container) (bool, error) {
 	if len(containers) != 1 {
-		return errors.New("only one container is supported with docker driver")
+		return false, errors.New("only one container is supported with docker driver")
 	}
 	task := containers[0]
 	rc, err := d.ImagePull(ctx, task.Image, image.PullOptions{Platform: task.Platform})
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer rc.Close()
 	_, err = io.Copy(contextAwareWriter{ctx, os.Stderr}, rc) // FIXME: this outputs JSON to stderr
 	d.image = task.Image
 	d.memory = task.Memory
 	d.platform = task.Platform
-	return err
+	return false, err
 }
 
 type contextAwareWriter struct {

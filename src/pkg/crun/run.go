@@ -59,7 +59,7 @@ func Run(ctx context.Context, args RunContainerArgs) error {
 			Platform: args.Platform,
 		},
 	}
-	if err := driver.SetUp(ctx, containers); err != nil {
+	if _, err := driver.SetUp(ctx, containers); err != nil {
 		return err
 	}
 

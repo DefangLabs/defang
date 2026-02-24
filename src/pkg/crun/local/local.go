@@ -32,13 +32,13 @@ func New() *Local {
 	return &Local{}
 }
 
-func (l *Local) SetUp(ctx context.Context, containers []clouds.Container) error {
+func (l *Local) SetUp(ctx context.Context, containers []clouds.Container) (bool, error) {
 	if len(containers) != 1 {
-		return errors.New("expected exactly one container")
+		return false, errors.New("expected exactly one container")
 	}
 	l.entrypoint = containers[0].EntryPoint
 	l.workDir = containers[0].WorkDir
-	return nil
+	return false, nil
 }
 
 func (l *Local) TearDown(ctx context.Context) error {
