@@ -87,7 +87,7 @@ func (bt *BuildTag) Parse(tags []string) error {
 }
 
 func (gcp Gcp) GetBuildInfo(ctx context.Context, buildId string) (*BuildTag, error) {
-	client, err := cloudbuild.NewClient(ctx)
+	client, err := cloudbuild.NewClient(ctx, gcp.Options...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cloudbuild client: %w", err)
 	}
@@ -114,7 +114,7 @@ func (gcp Gcp) GetBuildInfo(ctx context.Context, buildId string) (*BuildTag, err
 }
 
 func (gcp Gcp) RunCloudBuild(ctx context.Context, args CloudBuildArgs) (string, error) {
-	client, err := cloudbuild.NewClient(ctx)
+	client, err := cloudbuild.NewClient(ctx, gcp.Options...)
 	if err != nil {
 		return "", fmt.Errorf("failed to create Cloud Build client: %w", err)
 	}
@@ -185,7 +185,7 @@ func (gcp Gcp) RunCloudBuild(ctx context.Context, args CloudBuildArgs) (string, 
 }
 
 func (gcp Gcp) GetBuildStatus(ctx context.Context, startBuildOpName string) error {
-	svc, err := cloudbuild.NewClient(ctx)
+	svc, err := cloudbuild.NewClient(ctx, gcp.Options...)
 	if err != nil {
 		return fmt.Errorf("failed to create Cloud Build client: %w", err)
 	}

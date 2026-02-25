@@ -10,6 +10,7 @@ import (
 	"cloud.google.com/go/resourcemanager/apiv3/resourcemanagerpb"
 	"github.com/DefangLabs/defang/src/pkg"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 )
 
 type ProjectId string
@@ -98,6 +99,7 @@ func (id ProjectId) Suffix() string {
 type Gcp struct {
 	Region    string
 	ProjectId string
+	Options   []option.ClientOption
 }
 
 func (gcp Gcp) GetProjectID() ProjectId {
@@ -109,7 +111,7 @@ func (gcp Gcp) GetRegion() string {
 }
 
 func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*resourcemanagerpb.Project, error) {
-	client, err := resourcemanager.NewProjectsClient(ctx)
+	client, err := resourcemanager.NewProjectsClient(ctx, gcp.Options...)
 	if err != nil {
 		return nil, fmt.Errorf("unable to ensure project exists, failed to create project client: %w", err)
 	}

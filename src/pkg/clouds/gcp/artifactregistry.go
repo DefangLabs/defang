@@ -9,7 +9,7 @@ import (
 )
 
 func (gcp Gcp) EnsureArtifactRegistryExists(ctx context.Context, repoName string) (string, error) {
-	client, err := artifactregistry.NewClient(ctx)
+	client, err := artifactregistry.NewClient(ctx, gcp.Options...)
 	if err != nil {
 		return "", fmt.Errorf("failed to create artifactregistry client: %w", err)
 	}

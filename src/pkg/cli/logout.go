@@ -17,13 +17,8 @@ func Logout(ctx context.Context, fabricClient client.FabricClient, cluster strin
 		return err
 	}
 
-	// Remove the cached token file
-	tokenFile := client.GetTokenFile(cluster)
-	if err := os.Remove(tokenFile); err != nil && !os.IsNotExist(err) {
-		term.Warn("Failed to remove token file:", err)
-		// Don't return the error - we still consider logout successful
-	} else if err == nil {
-		term.Debug("Removed token file:", tokenFile)
+	if err := client.TokenStore.Delete(client.TokenStorageName(cluster)); err != nil {
+		term.Warn("Failed to remove stored token:", err)
 	}
 
 	// Also remove the JWT web identity token file if it exists

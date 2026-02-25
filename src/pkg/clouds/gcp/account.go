@@ -24,6 +24,7 @@ var FindGoogleDefaultCredentials func(ctx context.Context, scopes ...string) (*g
 // Whole list of possible principal types:
 // https://cloud.google.com/iam/docs/principals-overview#principal-types
 func (gcp Gcp) GetCurrentPrincipal(ctx context.Context) (string, error) {
+	// FIXME: We need to be able to find the principal from the oauth token in the options
 	creds, err := FindGoogleDefaultCredentials(ctx)
 	if err != nil {
 		return "", err

@@ -5,12 +5,19 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGetExistingToken(t *testing.T) {
 	fabric := "test.defang.dev"
 	os.Unsetenv("DEFANG_ACCESS_TOKEN")
+	oldTokenStore := TokenStore
+	stateDir := t.TempDir()
+	TokenStore = &tokenstore.LocalDirTokenStore{Dir: stateDir}
+	t.Cleanup(func() {
+		TokenStore = oldTokenStore
+	})
 
 	t.Run("Get access token from environmental variable", func(t *testing.T) {
 		expectedToken := "env-token"
@@ -22,14 +29,14 @@ func TestGetExistingToken(t *testing.T) {
 		}
 	})
 
-	t.Run("Get access token from file", func(t *testing.T) {
+	t.Run("Get access token from store", func(t *testing.T) {
 		expectedToken := "file-token"
-		tokenFile := GetTokenFile(fabric)
-		err := os.WriteFile(tokenFile, []byte(expectedToken), 0600)
+		err := TokenStore.Save(TokenStorageName(fabric), expectedToken)
 		require.NoError(t, err)
 
 		t.Cleanup(func() {
-			os.Remove(tokenFile)
+			err := TokenStore.Delete(TokenStorageName(fabric))
+			require.NoError(t, err)
 		})
 
 		accessToken := GetExistingToken(fabric)
@@ -39,20 +46,21 @@ func TestGetExistingToken(t *testing.T) {
 	})
 
 	t.Run("Ignore legacy tenant-prefixed token file", func(t *testing.T) {
-		legacyFile := filepath.Join(
-			filepath.Dir(GetTokenFile(fabric)), // same dir tokens normally live in
-			"legacy@"+fabric,
-		)
-		require.NoError(t, os.MkdirAll(filepath.Dir(legacyFile), 0o700))
-		require.NoError(t, os.WriteFile(legacyFile, []byte("legacy-token"), 0o600))
-
-		t.Cleanup(func() {
-			os.Remove(legacyFile)
-		})
+		require.NoError(t, TokenStore.Save("legacy@"+fabric, "legacy-token"))
 
 		accessToken := GetExistingToken("legacy@" + fabric)
 		if accessToken != "" {
 			t.Errorf("expected empty token when legacy file is present, got: %q", accessToken)
+		}
+	})
+
+	t.Run("TokenStore is backwards compatible with older token files", func(t *testing.T) {
+		expectedToken := "file-token"
+		require.NoError(t, os.WriteFile(filepath.Join(stateDir, TokenStorageName(fabric)), []byte(expectedToken), 0600))
+
+		accessToken := GetExistingToken(fabric)
+		if accessToken != expectedToken {
+			t.Errorf("expected %s, got: %s", expectedToken, accessToken)
 		}
 	})
 }

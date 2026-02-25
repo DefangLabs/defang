@@ -8,7 +8,7 @@ import (
 )
 
 func (gcp Gcp) getDNSZone(ctx context.Context, name string) (*dns.ManagedZone, *dns.Service, error) {
-	dnsSvc, err := dns.NewService(ctx)
+	dnsSvc, err := dns.NewService(ctx, gcp.Options...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create DNS service: %w", err)
 	}

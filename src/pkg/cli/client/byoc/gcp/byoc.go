@@ -436,7 +436,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) error {
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		debugEnv := []string{"REGION=" + b.driver.GetRegion()}
-		if gcpProject := os.Getenv("GCP_PROJECT_ID"); gcpProject != "" {
+		if gcpProject := getGcpProjectID(); gcpProject != "" {
 			debugEnv = append(debugEnv, "GCP_PROJECT_ID="+gcpProject)
 		}
 		for k, v := range env {
