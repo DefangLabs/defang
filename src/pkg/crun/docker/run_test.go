@@ -18,7 +18,7 @@ func TestRun(t *testing.T) {
 
 	d := New()
 
-	err := d.SetUp(context.Background(), []clouds.Container{{Image: "alpine:latest", Platform: d.platform}})
+	_, err := d.SetUp(context.Background(), []clouds.Container{{Image: "alpine:latest", Platform: d.platform}})
 	if err != nil {
 		t.Fatal(err)
 	}
