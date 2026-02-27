@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/googleapis/gax-go/v2/apierror"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -29,6 +30,19 @@ func IsAccessNotEnabled(err error) bool {
 			if e.Reason == "accessNotConfigured" {
 				return true
 			}
+			if e.Reason == "SERVICE_DISABLED" {
+				return true
+			}
+		}
+	}
+	var apiErr *apierror.APIError
+	if errors.As(err, &apiErr) {
+		if apiErr.Reason() == "SERVICE_DISABLED" {
+			return true
+		}
+
+		if apiErr.Reason() == "accessNotConfigured" {
+			return true
 		}
 	}
 	return false
