@@ -147,9 +147,9 @@ func NewGlobalConfig() *GlobalConfig {
 
 func (global *GlobalConfig) ToMap() map[string]string {
 	m := make(map[string]string)
-	m["DEFANG_CLUSTER"] = global.FabricAddr
 	m["DEFANG_COLOR"] = global.ColorMode.String()
 	m["DEFANG_DEBUG"] = strconv.FormatBool(global.Debug)
+	m["DEFANG_FABRIC"] = global.FabricAddr
 	m["DEFANG_NON_INTERACTIVE"] = strconv.FormatBool(global.NonInteractive)
 	if global.Stack.Provider != client.ProviderAuto {
 		m["DEFANG_PROVIDER"] = global.Stack.Provider.String()
