@@ -87,19 +87,21 @@ func NonInteractiveGitHubLogin(ctx context.Context, fabric client.FabricClient, 
 		return err
 	}
 
-	err = client.SaveAccessToken(fabricAddr, resp.AccessToken) // creates the state folder too
+	// Create the state folder and write the token to a file
+	if err := client.SaveAccessToken(fabricAddr, resp.AccessToken); err != nil {
+		return err
+	}
 
-	// If AWS_ROLE_ARN is set, we're doing "Assume Role with Web Identity"
+	// Also write the IDToken to a new file, if AWS_WEB_IDENTITY_TOKEN_FILE is empty
 	if os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") == "" {
-		// AWS_ROLE_ARN is set, but AWS_WEB_IDENTITY_TOKEN_FILE is empty: write the token to a new file
 		jwtPath, _ := client.GetWebIdentityTokenFile(fabricAddr)
 		term.Debugf("writing web identity token to %s", jwtPath)
 		if err := os.WriteFile(jwtPath, []byte(idToken), 0600); err != nil {
 			return fmt.Errorf("failed to save web identity token: %w", err)
 		}
-		// Set AWS env vars for this CLI invocation
+		// Set AWS env vars for this CLI invocation; future invocations are handled by client.GetExistingToken
 		os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath)
-		os.Setenv("AWS_ROLE_SESSION_NAME", "testyml") // TODO: from WhoAmI
+		os.Setenv("AWS_ROLE_SESSION_NAME", "defang-cli") // TODO: from WhoAmI
 	} else {
 		term.Debugf("AWS_WEB_IDENTITY_TOKEN_FILE is already set; not writing token to a new file")
 	}
