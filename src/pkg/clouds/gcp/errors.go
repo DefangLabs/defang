@@ -3,6 +3,7 @@ package gcp
 import (
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/googleapis/gax-go/v2/apierror"
@@ -24,24 +25,22 @@ func IsNotFound(err error) bool {
 }
 
 func IsAccessNotEnabled(err error) bool {
+	reasons := []string{
+		"accessNotConfigured",
+		"SERVICE_DISABLED",
+	}
+
 	var gerr *googleapi.Error
 	if errors.As(err, &gerr) && gerr.Code == http.StatusForbidden {
 		for _, e := range gerr.Errors {
-			if e.Reason == "accessNotConfigured" {
-				return true
-			}
-			if e.Reason == "SERVICE_DISABLED" {
+			if slices.Contains(reasons, e.Reason) {
 				return true
 			}
 		}
 	}
 	var apiErr *apierror.APIError
 	if errors.As(err, &apiErr) {
-		if apiErr.Reason() == "SERVICE_DISABLED" {
-			return true
-		}
-
-		if apiErr.Reason() == "accessNotConfigured" {
+		if slices.Contains(reasons, apiErr.Reason()) {
 			return true
 		}
 	}
