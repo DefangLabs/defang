@@ -29,8 +29,8 @@ type MockDestroyCLI struct {
 	CallLog                          []string
 }
 
-func (m *MockDestroyCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("Connect(%s)", cluster))
+func (m *MockDestroyCLI) Connect(ctx context.Context, fabricAddr string) (*client.GrpcClient, error) {
+	m.CallLog = append(m.CallLog, fmt.Sprintf("Connect(%s)", fabricAddr))
 	if m.ConnectError != nil {
 		return nil, m.ConnectError
 	}
@@ -66,8 +66,8 @@ func (m *MockDestroyCLI) CanIUseProvider(ctx context.Context, grpcClient *client
 	return nil
 }
 
-func (m *MockDestroyCLI) InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("InteractiveLoginMCP(%s)", cluster))
+func (m *MockDestroyCLI) InteractiveLoginMCP(ctx context.Context, fabricAddr string, mcpClient string) error {
+	m.CallLog = append(m.CallLog, fmt.Sprintf("InteractiveLoginMCP(%s)", fabricAddr))
 	if m.InteractiveLoginMCPError != nil {
 		return m.InteractiveLoginMCPError
 	}
@@ -168,8 +168,8 @@ func TestHandleDestroyTool(t *testing.T) {
 				},
 			}
 			result, err := HandleDestroyTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
-				Cluster: "test-cluster",
-				Stack:   &stack,
+				FabricAddr: "test-cluster",
+				Stack:      &stack,
 			})
 
 			// Verify error expectations

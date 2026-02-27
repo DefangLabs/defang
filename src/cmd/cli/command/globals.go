@@ -64,9 +64,9 @@ and follow the established naming conventions.
 */
 type GlobalConfig struct {
 	Client         client.FabricClient
-	Cluster        string
 	ColorMode      ColorMode
 	Debug          bool
+	FabricAddr     string
 	HasTty         bool
 	HideUpdate     bool
 	Json           bool
@@ -128,7 +128,7 @@ func NewGlobalConfig() *GlobalConfig {
 
 	return &GlobalConfig{
 		ColorMode:      color,
-		Cluster:        pkg.Getenv("DEFANG_FABRIC", client.DefangFabric),
+		FabricAddr:     pkg.Getenv("DEFANG_FABRIC", client.DefangFabric),
 		Debug:          pkg.GetenvBool("DEFANG_DEBUG"),
 		HasTty:         hastty,
 		HideUpdate:     pkg.GetenvBool("DEFANG_HIDE_UPDATE"),
@@ -147,7 +147,7 @@ func NewGlobalConfig() *GlobalConfig {
 
 func (global *GlobalConfig) ToMap() map[string]string {
 	m := make(map[string]string)
-	m["DEFANG_CLUSTER"] = global.Cluster
+	m["DEFANG_CLUSTER"] = global.FabricAddr
 	m["DEFANG_COLOR"] = global.ColorMode.String()
 	m["DEFANG_DEBUG"] = strconv.FormatBool(global.Debug)
 	m["DEFANG_NON_INTERACTIVE"] = strconv.FormatBool(global.NonInteractive)

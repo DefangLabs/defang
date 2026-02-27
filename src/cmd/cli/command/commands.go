@@ -145,7 +145,7 @@ func SetupCommands(version string) {
 		}
 		return completions, cobra.ShellCompDirectiveNoFileComp
 	})
-	RootCmd.PersistentFlags().StringVar(&global.Cluster, "cluster", global.Cluster, "Defang cluster to connect to")
+	RootCmd.PersistentFlags().StringVar(&global.FabricAddr, "cluster", global.FabricAddr, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster") // only for Defang use
 	RootCmd.PersistentFlags().Var(&global.Tenant, "workspace", "workspace to use")
 	RootCmd.PersistentFlags().VarP(&global.Stack.Provider, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, client.AllProviders()))
@@ -372,7 +372,7 @@ var RootCmd = &cobra.Command{
 		}
 
 		// Create a temporary gRPC client for tracking events before login
-		track.Tracker = cli.Connect(global.Cluster, global.Tenant)
+		track.Tracker = cli.Connect(global.FabricAddr, global.Tenant)
 
 		ctx := cmd.Context()
 		term.SetDebug(global.Debug)
@@ -399,7 +399,7 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		global.Client, err = cli.ConnectWithTenant(ctx, global.Cluster, global.Tenant)
+		global.Client, err = cli.ConnectWithTenant(ctx, global.FabricAddr, global.Tenant)
 		if err != nil {
 			if connect.CodeOf(err) != connect.CodeUnauthenticated {
 				return err
@@ -431,7 +431,7 @@ var RootCmd = &cobra.Command{
 		if global.NonInteractive {
 			err = global.Client.CheckLoginAndToS(ctx)
 		} else {
-			global.Client, err = login.InteractiveRequireLoginAndToS(ctx, global.Client, global.Cluster)
+			global.Client, err = login.InteractiveRequireLoginAndToS(ctx, global.Client, global.FabricAddr)
 		}
 
 		return err
@@ -443,13 +443,13 @@ var RootCmd = &cobra.Command{
 
 		ctx := cmd.Context()
 		var err error
-		global.Client, err = login.InteractiveRequireLoginAndToS(ctx, global.Client, global.Cluster)
+		global.Client, err = login.InteractiveRequireLoginAndToS(ctx, global.Client, global.FabricAddr)
 		if err != nil {
 			return err
 		}
 
 		prompt := "Welcome to Defang. I can help you deploy your project to the cloud."
-		ag, err := agent.New(ctx, global.Cluster, &global.Stack)
+		ag, err := agent.New(ctx, global.FabricAddr, &global.Stack)
 		if err != nil {
 			return err
 		}

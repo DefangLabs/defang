@@ -23,7 +23,7 @@ func prepareInstructions() string {
 
 type ToolTracker struct {
 	providerId *client.ProviderID
-	cluster    string
+	fabricAddr string
 	client     string
 }
 
@@ -31,14 +31,14 @@ func (t *ToolTracker) TrackTool(name string, handler server.ToolHandlerFunc) ser
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		name := request.Params.Name
 		term.Debug("MCP Tool Called: " + name + " with params: " + fmt.Sprintf("%+v", request.Params))
-		track.Evt("MCP Tool Called", track.P("tool", name), track.P("client", t.client), track.P("cluster", t.cluster), track.P("provider", *t.providerId))
+		track.Evt("MCP Tool Called", track.P("tool", name), track.P("client", t.client), track.P("cluster", t.fabricAddr), track.P("provider", *t.providerId))
 		resp, err := handler(ctx, request)
 		if err != nil {
 			term.Error("MCP Tool Failed: "+name, "error", err)
 		} else {
 			term.Debug("MCP Tool Succeeded: " + name)
 		}
-		track.Evt("MCP Tool Done", track.P("tool", name), track.P("client", t.client), track.P("cluster", t.cluster), track.P("provider", *t.providerId), track.P("error", err))
+		track.Evt("MCP Tool Done", track.P("tool", name), track.P("client", t.client), track.P("cluster", t.fabricAddr), track.P("provider", *t.providerId), track.P("error", err))
 		return resp, err
 	}
 }
@@ -84,7 +84,7 @@ func NewDefangMCPServer(version string, client MCPClient, cli agentTools.CLIInte
 	providerID := config.Stack.Provider
 	toolTracker := ToolTracker{
 		providerId: &providerID,
-		cluster:    config.Cluster,
+		fabricAddr: config.FabricAddr,
 		client:     common.MCPDevelopmentClient,
 	}
 	elicitationsClient := NewMCPElicitationsController(s)

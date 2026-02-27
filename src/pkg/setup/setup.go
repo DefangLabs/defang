@@ -22,10 +22,10 @@ import (
 var P = track.P
 
 type SetupClient struct {
-	Surveyor *surveyor.DefaultSurveyor
-	ModelID  string
-	Fabric   client.FabricClient
-	Cluster  string
+	Surveyor   *surveyor.DefaultSurveyor
+	ModelID    string
+	Fabric     client.FabricClient
+	FabricAddr string
 }
 
 func (s *SetupClient) Start(ctx context.Context) (SetupResult, error) {
@@ -226,7 +226,7 @@ func beforeGenerate(directory string) {
 
 func (s *SetupClient) MigrateFromHeroku(ctx context.Context) (SetupResult, error) {
 	var err error
-	s.Fabric, err = login.InteractiveRequireLoginAndToS(ctx, s.Fabric, s.Cluster)
+	s.Fabric, err = login.InteractiveRequireLoginAndToS(ctx, s.Fabric, s.FabricAddr)
 	if err != nil {
 		return SetupResult{}, err
 	}
