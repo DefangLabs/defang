@@ -2,7 +2,6 @@ package gcp
 
 import (
 	"errors"
-	"net/http"
 	"slices"
 	"strings"
 
@@ -31,7 +30,7 @@ func IsAccessNotEnabled(err error) bool {
 	}
 
 	var gerr *googleapi.Error
-	if errors.As(err, &gerr) && gerr.Code == http.StatusForbidden {
+	if errors.As(err, &gerr) {
 		for _, e := range gerr.Errors {
 			if slices.Contains(reasons, e.Reason) {
 				return true
