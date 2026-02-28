@@ -33,11 +33,11 @@ type Agent struct {
 	system    string
 }
 
-func New(ctx context.Context, clusterAddr string, stack *stacks.Parameters) (*Agent, error) {
-	accessToken := client.GetExistingToken(clusterAddr)
+func New(ctx context.Context, fabricAddr string, stack *stacks.Parameters) (*Agent, error) {
+	accessToken := client.GetExistingToken(fabricAddr)
 	aiProvider := "fabric"
 	var providerPlugin api.Plugin
-	addr := client.NormalizeHost(clusterAddr)
+	addr := client.NormalizeHost(fabricAddr)
 	// Generate a random session ID prepended with timestamp for easier sorting
 	sessionID := fmt.Sprintf("%s-%s", time.Now().Format("20060102T150405Z"), pkg.RandomID())
 	providerPlugin = &fabric.OpenAI{
@@ -68,8 +68,8 @@ func New(ctx context.Context, clusterAddr string, stack *stacks.Parameters) (*Ag
 	printer := printer{outStream: os.Stdout}
 	toolManager := NewToolManager(gk, printer)
 	defangTools := tools.CollectDefangTools(ec, tools.StackConfig{
-		Cluster: clusterAddr,
-		Stack:   stack,
+		FabricAddr: fabricAddr,
+		Stack:      stack,
 	})
 	toolManager.RegisterTools(defangTools...)
 	fsTools := CollectFsTools()

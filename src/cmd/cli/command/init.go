@@ -26,10 +26,10 @@ var initCmd = &cobra.Command{
 		}
 
 		setupClient := setup.SetupClient{
-			Surveyor: surveyor.NewDefaultSurveyor(),
-			ModelID:  global.ModelID,
-			Fabric:   global.Client,
-			Cluster:  global.Cluster,
+			Surveyor:   surveyor.NewDefaultSurveyor(),
+			ModelID:    global.ModelID,
+			Fabric:     global.Client,
+			FabricAddr: global.FabricAddr,
 		}
 
 		var result setup.SetupResult

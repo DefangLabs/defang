@@ -34,7 +34,7 @@ func TestLogout(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	ctx := context.Background()
-	url := strings.TrimPrefix(server.URL, "http://")
+	fabricAddr := strings.TrimPrefix(server.URL, "http://")
 
 	// Create a temporary directory for token storage
 	tmpDir := t.TempDir()
@@ -45,8 +45,7 @@ func TestLogout(t *testing.T) {
 	})
 
 	// Create a mock token file
-	cluster := url
-	tokenFile := client.GetTokenFile(cluster)
+	tokenFile := client.GetTokenFile(fabricAddr)
 	t.Logf("Token file path: %s", tokenFile)
 	err := os.MkdirAll(filepath.Dir(tokenFile), 0700)
 	if err != nil {
@@ -74,10 +73,10 @@ func TestLogout(t *testing.T) {
 	}
 
 	// Create a gRPC client
-	grpcClient := client.NewGrpcClient(url, "mock-token", "")
+	grpcClient := client.NewGrpcClient(fabricAddr, "mock-token", "")
 
 	// Perform logout
-	err = Logout(ctx, grpcClient, cluster)
+	err = Logout(ctx, grpcClient, fabricAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +100,7 @@ func TestLogoutWithoutTokenFile(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	ctx := context.Background()
-	url := strings.TrimPrefix(server.URL, "http://")
+	fabricAddr := strings.TrimPrefix(server.URL, "http://")
 
 	// Create a temporary directory for token storage
 	tmpDir := t.TempDir()
@@ -112,11 +111,10 @@ func TestLogoutWithoutTokenFile(t *testing.T) {
 	})
 
 	// Create a gRPC client
-	cluster := url
-	grpcClient := client.NewGrpcClient(url, "mock-token", "")
+	grpcClient := client.NewGrpcClient(fabricAddr, "mock-token", "")
 
 	// Perform logout without token file (should not error)
-	err := Logout(ctx, grpcClient, cluster)
+	err := Logout(ctx, grpcClient, fabricAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +128,7 @@ func TestLogoutWithUnauthenticatedError(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	ctx := context.Background()
-	url := strings.TrimPrefix(server.URL, "http://")
+	fabricAddr := strings.TrimPrefix(server.URL, "http://")
 
 	// Create a temporary directory for token storage
 	tmpDir := t.TempDir()
@@ -141,8 +139,7 @@ func TestLogoutWithUnauthenticatedError(t *testing.T) {
 	})
 
 	// Create a mock token file
-	cluster := url
-	tokenFile := client.GetTokenFile(cluster)
+	tokenFile := client.GetTokenFile(fabricAddr)
 	err := os.MkdirAll(filepath.Dir(tokenFile), 0700)
 	if err != nil {
 		t.Fatal(err)
@@ -153,10 +150,10 @@ func TestLogoutWithUnauthenticatedError(t *testing.T) {
 	}
 
 	// Create a gRPC client
-	grpcClient := client.NewGrpcClient(url, "mock-token", "")
+	grpcClient := client.NewGrpcClient(fabricAddr, "mock-token", "")
 
 	// Perform logout - should succeed even with unauthenticated error
-	err = Logout(ctx, grpcClient, cluster)
+	err = Logout(ctx, grpcClient, fabricAddr)
 	if err != nil {
 		t.Fatal(err)
 	}

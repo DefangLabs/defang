@@ -12,7 +12,7 @@ import (
 )
 
 func ListWorkspaces(cmd *cobra.Command, args []string) error {
-	token := client.GetExistingToken(global.Cluster)
+	token := client.GetExistingToken(global.FabricAddr)
 	if token == "" {
 		return errors.New("no access token found; please log in with `defang login`")
 	}

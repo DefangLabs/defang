@@ -35,7 +35,7 @@ var debugCmd = &cobra.Command{
 			return err
 		}
 
-		debugger, err := debug.NewDebugger(ctx, global.Cluster, session.Stack)
+		debugger, err := debug.NewDebugger(ctx, global.FabricAddr, session.Stack)
 		if err != nil {
 			return err
 		}

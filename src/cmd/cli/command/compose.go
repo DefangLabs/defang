@@ -34,7 +34,7 @@ const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
 
 func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
 	// We can only show services deployed to the prod1 defang SaaS environment.
-	if global.Stack.Provider == client.ProviderDefang && global.Cluster == client.DefaultCluster {
+	if global.Stack.Provider == client.ProviderDefang && global.FabricAddr == client.DefaultFabricAddr {
 		term.Info("Monitor your services' status in the defang portal")
 		for _, serviceInfo := range serviceInfos {
 			term.Println("   -", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
@@ -138,7 +138,7 @@ func makeComposeUpCmd() *cobra.Command {
 			})
 			if err != nil {
 				composeErr := err
-				debugger, err := debug.NewDebugger(ctx, global.Cluster, session.Stack)
+				debugger, err := debug.NewDebugger(ctx, global.FabricAddr, session.Stack)
 				if err != nil {
 					return err
 				}
@@ -167,7 +167,7 @@ func makeComposeUpCmd() *cobra.Command {
 			serviceStates, err := cli.TailAndMonitor(ctx, project, session.Provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
 				deploymentErr := err
-				debugger, err := debug.NewDebugger(ctx, global.Cluster, session.Stack)
+				debugger, err := debug.NewDebugger(ctx, global.FabricAddr, session.Stack)
 				if err != nil {
 					term.Warn("Failed to initialize debugger:", err)
 					return deploymentErr

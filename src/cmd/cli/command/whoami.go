@@ -29,7 +29,7 @@ var whoamiCmd = &cobra.Command{
 			provider = session.Provider
 		}
 
-		token := client.GetExistingToken(global.Cluster)
+		token := client.GetExistingToken(global.FabricAddr)
 
 		var userInfo *auth.UserInfo
 		// Skip userinfo fetch in non-interactive mode (CI environments)

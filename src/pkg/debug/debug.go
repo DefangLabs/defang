@@ -76,8 +76,8 @@ type Debugger struct {
 	surveyor Surveyor
 }
 
-func NewDebugger(ctx context.Context, addr string, stack *stacks.Parameters) (*Debugger, error) {
-	agent, err := agent.New(ctx, addr, stack)
+func NewDebugger(ctx context.Context, fabricAddr string, stack *stacks.Parameters) (*Debugger, error) {
+	agent, err := agent.New(ctx, fabricAddr, stack)
 	if err != nil {
 		return nil, err
 	}

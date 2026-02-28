@@ -154,7 +154,7 @@ func handleInvalidComposeFileErr(ctx context.Context, err error) error {
 		return err
 	}
 
-	debugger, err := debug.NewDebugger(ctx, global.Cluster, &stacks.Parameters{})
+	debugger, err := debug.NewDebugger(ctx, global.FabricAddr, &stacks.Parameters{})
 	if err != nil {
 		return err
 	}

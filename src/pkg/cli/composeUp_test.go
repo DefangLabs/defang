@@ -64,7 +64,7 @@ func (m *mockDeployProvider) Subscribe(ctx context.Context, req *defangv1.Subscr
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.subscribeStream = client.NewMockWaitStream[defangv1.SubscribeResponse]()
-	return client.ServerStreamIterCtx[defangv1.SubscribeResponse](ctx, m.subscribeStream), ctx.Err()
+	return client.ServerStreamIterCtx(ctx, m.subscribeStream), ctx.Err()
 }
 
 func (m *mockDeployProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {

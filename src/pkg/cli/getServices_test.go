@@ -85,6 +85,9 @@ func TestPrintServices(t *testing.T) {
 	})
 
 	t.Run("some services", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping 404 healthcheck test in short mode.")
+		}
 		stdout, _ := term.SetupTestTerm(t)
 
 		err := PrintServices(ctx, "test", &provider)

@@ -46,7 +46,7 @@ type mockGitHubAuthService struct {
 	err         error
 }
 
-func (g mockGitHubAuthService) login(ctx context.Context, cluster string, prompt LoginFlow, mcpClient string) (string, error) {
+func (g mockGitHubAuthService) login(ctx context.Context, fabricAddr string, prompt LoginFlow, mcpClient string) (string, error) {
 	return g.accessToken, g.err
 }
 

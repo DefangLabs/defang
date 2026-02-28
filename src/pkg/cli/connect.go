@@ -12,16 +12,16 @@ import (
 )
 
 // Connect builds a client carrying the requested tenant (name or ID).
-func Connect(cluster string, requestedTenant types.TenantNameOrID) *client.GrpcClient {
-	host := client.NormalizeHost(cluster)
+func Connect(fabricAddr string, requestedTenant types.TenantNameOrID) *client.GrpcClient {
+	host := client.NormalizeHost(fabricAddr)
 	term.Debugf("Using tenant %q for cluster %q", requestedTenant, host)
 
 	accessToken := client.GetExistingToken(host)
 	return client.NewGrpcClient(host, accessToken, requestedTenant)
 }
 
-func ConnectWithTenant(ctx context.Context, addr string, requestedTenant types.TenantNameOrID) (*client.GrpcClient, error) {
-	grpcClient := Connect(addr, requestedTenant)
+func ConnectWithTenant(ctx context.Context, fabricAddr string, requestedTenant types.TenantNameOrID) (*client.GrpcClient, error) {
+	grpcClient := Connect(fabricAddr, requestedTenant)
 
 	resp, err := grpcClient.WhoAmI(ctx)
 	if err != nil {
