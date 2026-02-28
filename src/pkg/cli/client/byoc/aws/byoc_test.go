@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
@@ -693,7 +694,7 @@ func TestQueryCdLogs(t *testing.T) {
 			require.NoError(t, err)
 
 			// Flatten and collect
-			logSeq := cw.Flatten(batchSeq)
+			logSeq := pkg.Flatten(batchSeq)
 			events := collectEvents(t, logSeq)
 			assert.Len(t, events, tt.wantCount)
 		})

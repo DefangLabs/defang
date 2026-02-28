@@ -713,7 +713,7 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 		if err != nil {
 			return nil, AnnotateAwsError(err)
 		}
-		logSeq = cw.Flatten(cdSeq)
+		logSeq = pkg.Flatten(cdSeq)
 		// No need to filter events by etag because we only show logs from the specified task ID
 	} else {
 		logSeq, err = b.queryOrTailLogs(ctx, cwClient, req)
@@ -785,7 +785,7 @@ func (b *ByocAws) queryOrTailLogs(ctx context.Context, cwClient cw.LogsClient, r
 		if err != nil {
 			return nil, err
 		}
-		return cw.Flatten(logSeq), nil
+		return pkg.Flatten(logSeq), nil
 	} else {
 		logSeq, err := cw.QueryLogGroups(
 			ctx,
