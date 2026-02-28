@@ -238,7 +238,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		payloadString = base64.StdEncoding.EncodeToString(data)
 		// TODO: consider making this a proper Data URL: "data:application/protobuf;base64,abcd…"
 	} else {
-		payloadUrl, err := b.driver.CreateUploadURL(ctx, etag)
+		payloadUrl, err := b.driver.CreateUploadURL(ctx, byoc.UploadPrefix, etag)
 		if err != nil {
 			return nil, err
 		}
@@ -676,7 +676,7 @@ func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 		return nil, err
 	}
 
-	url, err := b.driver.CreateUploadURL(ctx, req.Digest)
+	url, err := b.driver.CreateUploadURL(ctx, byoc.UploadPrefix, req.Digest)
 	if err != nil {
 		return nil, err
 	}
