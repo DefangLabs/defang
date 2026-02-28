@@ -110,6 +110,28 @@ release:
 #         --zsh <($out/bin/defang completion zsh) \
 #         --fish <($out/bin/defang completion fish)
 
+brews:
+  - repository:
+      owner: DefangLabs
+      name: homebrew-defang
+      token: "{{ .Env.HOMEBREW_ACTION_TRIGGER_TOKEN }}"
+    name: defang
+    homepage: https://defang.io
+    description: Command-line interface for the Defang Opinionated Platform
+    license: MIT
+    commit_author:
+      name: defang-bot
+      email: bot@defang.io
+    install: |
+      bin.install "defang"
+
+      # Generate and install shell completions
+      bash_completion.install Utils.safe_popen_read(bin/"defang", "completion", "bash") => "defang"
+      zsh_completion.install Utils.safe_popen_read(bin/"defang", "completion", "zsh") => "_defang"
+      fish_completion.install Utils.safe_popen_read(bin/"defang", "completion", "fish") => "defang.fish"
+    test: |
+      system "#{bin}/defang", "--version"
+
 changelog:
   use: github-native
   filters:

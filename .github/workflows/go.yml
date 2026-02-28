@@ -373,6 +373,7 @@ jobs:
         env:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
           GH_PAT_WINGET: ${{ secrets.GH_PAT_WINGET }}
+          HOMEBREW_ACTION_TRIGGER_TOKEN: ${{ secrets.HOMEBREW_ACTION_TRIGGER_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is limited to the current repository
           DISCORD_WEBHOOK_ID: ${{ secrets.DISCORD_WEBHOOK_ID }}
           DISCORD_WEBHOOK_TOKEN: ${{ secrets.DISCORD_WEBHOOK_TOKEN }}
@@ -415,13 +416,16 @@ jobs:
           event-type: cli-autodoc
           client-payload: '{"version": "${{ github.ref_name }}"}'
 
-      - name: Trigger Homebrew Formula Update
-        uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ secrets.HOMEBREW_ACTION_TRIGGER_TOKEN }}
-          repository: DefangLabs/homebrew-defang
-          event-type: update-homebrew-formula
-          client-payload: '{"version": "${{ github.ref_name }}"}'
+      # NOTE: Homebrew formula updates are now handled automatically by GoReleaser with bottles.
+      # The manual trigger below is preserved as documentation of the old approach but is no longer needed.
+      # It can be safely removed in a future cleanup.
+      # - name: Trigger Homebrew Formula Update
+      #   uses: peter-evans/repository-dispatch@v3
+      #   with:
+      #     token: ${{ secrets.HOMEBREW_ACTION_TRIGGER_TOKEN }}
+      #     repository: DefangLabs/homebrew-defang
+      #     event-type: update-homebrew-formula
+      #     client-payload: '{"version": "${{ github.ref_name }}"}'
 
       - name: Checkout tag
         uses: actions/checkout@v4
