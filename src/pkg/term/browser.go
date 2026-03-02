@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/browser"
 )
 
-func OpenBrowserOnEnter(ctx context.Context, url string) func() {
+func OpenBrowserOnEnter(ctx context.Context, url string) (context.Context, func()) {
 	ctx, cancel := context.WithCancel(ctx)
 	input := NewNonBlockingStdin()
 	go func() {
@@ -27,7 +27,7 @@ func OpenBrowserOnEnter(ctx context.Context, url string) func() {
 			}
 		}
 	}()
-	return func() {
+	return ctx, func() {
 		input.Close()
 		cancel()
 	}

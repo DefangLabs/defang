@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/smithy-go/ptr"
@@ -262,12 +262,8 @@ func filterLogEvents(ctx context.Context, cw FilterLogEventsAPI, lgi LogGroupInp
 	}
 }
 
-func NewCloudWatchLogsClient(ctx context.Context, region aws.Region) (*cloudwatchlogs.Client, error) {
-	cfg, err := aws.LoadDefaultConfig(ctx, region)
-	if err != nil {
-		return nil, err
-	}
-	return cloudwatchlogs.NewFromConfig(cfg), nil
+func NewCloudWatchLogsClient(cfg awssdk.Config) *cloudwatchlogs.Client {
+	return cloudwatchlogs.NewFromConfig(cfg)
 }
 
 type LogEvent = types.LiveTailSessionLogEvent

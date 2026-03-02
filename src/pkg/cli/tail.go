@@ -236,7 +236,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 
 	serverStream, err := provider.QueryLogs(ctx, tailRequest)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to query logs: %w", err)
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -382,7 +382,7 @@ func receiveLogs(ctx context.Context, provider client.Provider, projectName stri
 				}
 				return nil
 			}
-			return serverStream.Err()
+			return fmt.Errorf("server stream recevie failed: %v", serverStream.Err())
 		}
 		msg := serverStream.Msg()
 

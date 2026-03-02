@@ -22,8 +22,8 @@ import (
 )
 
 var (
-	clientID     = "807925246520-aeouiqtvpde5i6ka1fpj4lh5dccfcga9.apps.googleusercontent.com"
-	clientSecret = "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" // Client secret for app is not treated as secret
+	clientID     = "807925246520-aeouiqtvpde5i6ka1fpj4lh5dccfcga9.apps.googleusercontent.com" // nolint:gosec,G101 // Client ID for app is not treated as secret
+	clientSecret = "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"                                      // nolint:gosec,G101 // Client secret for app is not treated as secret
 	scopes       = []string{"email", "https://www.googleapis.com/auth/cloud-platform"}
 )
 
@@ -125,7 +125,7 @@ func (gcp *Gcp) InteractiveLogin(ctx context.Context) (oauth2.TokenSource, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen: %w", err)
 	}
-	port := ln.Addr().(*net.TCPAddr).Port
+	port := ln.Addr().(*net.TCPAddr).Port // nolint:forcetypeassert
 	redirectURL := fmt.Sprintf("http://127.0.0.1:%v/", port)
 
 	config := &oauth2.Config{
@@ -147,11 +147,13 @@ func (gcp *Gcp) InteractiveLogin(ctx context.Context) (oauth2.TokenSource, error
 
 	term.Println("Please visit the following URL to log in to Google Cloud Platform: (Right click the URL or press ENTER to open browser)")
 	term.Printf("  %s", authURL)
-	done := term.OpenBrowserOnEnter(ctx, authURL)
+	var done func()
+	ctx, done = term.OpenBrowserOnEnter(ctx, authURL)
 	defer done()
 
 	codeCh := make(chan string)
 	srv := http.Server{
+		ReadHeaderTimeout: 10 * time.Second,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Query().Get("state") != state {
 				http.Error(w, "invalid state", http.StatusBadRequest)

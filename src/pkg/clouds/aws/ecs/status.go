@@ -7,17 +7,23 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecsTypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
 // GetTaskStatus returns nil if the task is still running, io.EOF if the task is stopped successfully, or an error if the task failed.
-func GetTaskStatus(ctx context.Context, taskArn TaskArn) error {
-	region := region.FromArn(*taskArn)
+// It derives the region from the task ARN and uses the receiver's credentials via LoadConfig.
+func (a *AwsEcs) GetTaskStatus(ctx context.Context, taskArn TaskArn) error {
+	cfg, err := a.LoadConfig(ctx)
+	if err != nil {
+		return err
+	}
+	// Override with the region embedded in the task ARN; the task may be in a different region than the driver.
+	cfg.Region = string(region.FromArn(*taskArn))
 	cluster, taskID := SplitClusterTask(taskArn)
-	return getTaskStatus(ctx, region, cluster, taskID)
+	return getTaskStatus(ctx, cfg, cluster, taskID)
 }
 
 func isTaskTerminalStatus(status string) bool {
@@ -31,11 +37,7 @@ func isTaskTerminalStatus(status string) bool {
 }
 
 // getTaskStatus returns nil if the task is still running, io.EOF if the task is stopped successfully, or an error if the task failed.
-func getTaskStatus(ctx context.Context, region aws.Region, cluster, taskId string) error {
-	cfg, err := aws.LoadDefaultConfig(ctx, region)
-	if err != nil {
-		return err
-	}
+func getTaskStatus(ctx context.Context, cfg awssdk.Config, cluster, taskId string) error {
 	ecsClient := ecs.NewFromConfig(cfg)
 
 	// Use DescribeTasks API to check if the task is still running (same as ecs.NewTasksStoppedWaiter)
@@ -79,7 +81,7 @@ func SplitClusterTask(taskArn TaskArn) (string, string) {
 }
 
 // WaitForTask polls the ECS task status. It returns io.EOF if the task is stopped successfully, or an error if the task failed.
-func WaitForTask(ctx context.Context, taskArn TaskArn, poll time.Duration) error {
+func (a *AwsEcs) WaitForTask(ctx context.Context, taskArn TaskArn, poll time.Duration) error {
 	if taskArn == nil {
 		panic("taskArn is nil")
 	}
@@ -91,7 +93,7 @@ func WaitForTask(ctx context.Context, taskArn TaskArn, poll time.Duration) error
 			// Handle cancellation
 			return ctx.Err()
 		case <-ticker.C:
-			if err := GetTaskStatus(ctx, taskArn); err != nil {
+			if err := a.GetTaskStatus(ctx, taskArn); err != nil {
 				return err
 			}
 		}

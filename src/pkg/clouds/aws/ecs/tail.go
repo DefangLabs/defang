@@ -16,12 +16,14 @@ import (
 const AwsLogsStreamPrefix = CrunProjectName
 
 func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
-	cwClient, err := cw.NewCloudWatchLogsClient(ctx, a.Region)
+	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return err
 	}
 	taskId := GetTaskID(taskArn)
 	a.Region = region.FromArn(*taskArn)
+	cfg.Region = string(a.Region)
+	cwClient := cw.NewCloudWatchLogsClient(cfg)
 	es, err := a.TailTaskID(ctx, cwClient, taskId)
 	if err != nil {
 		return err
@@ -32,7 +34,7 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 	taskch := make(chan error)
 	defer close(taskch)
 	go func() {
-		taskch <- WaitForTask(ctx, taskArn, time.Second*3)
+		taskch <- a.WaitForTask(ctx, taskArn, time.Second*3)
 	}()
 
 	for {
@@ -85,6 +87,11 @@ func (a *AwsEcs) TailTaskID(ctx context.Context, cwClient cw.StartLiveTailAPI, t
 		return nil, errors.New("ClusterName is required")
 	}
 
+	cfg, err := a.LoadConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	lgi := cw.LogGroupInput{LogGroupARN: a.LogGroupARN, LogStreamNames: []string{GetCDLogStreamForTaskID(taskID)}}
 	for {
 		stream, err := cw.TailLogGroup(ctx, cwClient, lgi)
@@ -94,8 +101,7 @@ func (a *AwsEcs) TailTaskID(ctx context.Context, cwClient cw.StartLiveTailAPI, t
 				return nil, err
 			}
 			// The log stream doesn't exist yet, so wait for it to be created, but bail out if the task is stopped
-			err := getTaskStatus(ctx, a.Region, a.ClusterName, taskID)
-			if err != nil {
+			if err := getTaskStatus(ctx, cfg, a.ClusterName, taskID); err != nil {
 				return nil, err
 			}
 			// continue loop, waiting for the log stream to be created; sleep to avoid throttling

@@ -82,7 +82,8 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 			return AuthCodeFlow{}, ErrNoBrowser{Err: err, URL: authorizeUrl}
 		}
 	} else {
-		done := term.OpenBrowserOnEnter(ctx, authorizeUrl)
+		var done func()
+		ctx, done = term.OpenBrowserOnEnter(ctx, authorizeUrl)
 		defer done()
 	}
 

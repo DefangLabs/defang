@@ -10,6 +10,7 @@ import (
 	"io"
 	"iter"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,6 +33,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
+	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -137,6 +139,12 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
+
+	b.driver.TokenStore = &tokenstore.LocalDirTokenStore{Dir: filepath.Join(client.StateDir, "providers", "aws")}
+	if err := b.driver.Login(ctx); err != nil {
+		term.Errorf("AWS interactive login failed: %v", err)
+	}
+
 	return b
 }
 
@@ -177,7 +185,7 @@ func (b *ByocAws) SetUpCD(ctx context.Context) error {
 }
 
 func (b *ByocAws) GetDeploymentStatus(ctx context.Context) error {
-	if err := ecs.GetTaskStatus(ctx, b.cdTaskArn); err != nil {
+	if err := b.driver.GetTaskStatus(ctx, b.cdTaskArn); err != nil {
 		// check if the task failed; if so, return the a ErrDeploymentFailed error
 		if taskErr := new(ecs.TaskFailure); errors.As(err, taskErr) {
 			return client.ErrDeploymentFailed{Message: taskErr.Error()}
@@ -694,11 +702,11 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		term.Warnf("Unable to show CD logs: %v", err) // TODO: could skip this warning if the user wasn't asking for CD logs
 	}
 
-	var err error
-	cwClient, err := cw.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region
+	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
+	cwClient := cw.NewCloudWatchLogsClient(cfg) // assume all log groups are in the same region
 
 	// How to tail multiple tasks/services at once?
 	//  * Etag is invalid:		treat Etag as CD task ID and tail only that task's logs
