@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
@@ -11,6 +13,7 @@ import (
 type TokenStore interface {
 	Save(key string, token string) error
 	Load(key string) (string, error)
+	List(prefix string) ([]string, error)
 	Delete(key string) error
 }
 
@@ -27,7 +30,9 @@ func (s *LocalDirTokenStore) Save(key string, token string) error {
 	}
 
 	term.Debug("Saving access token to", tokenFile)
-	os.MkdirAll(s.Dir, 0700)
+	dir, _ := filepath.Split(tokenFile)
+	dir = filepath.Join(s.Dir, dir)
+	os.MkdirAll(dir, 0700)
 	if err := os.WriteFile(tokenFile, []byte(token), 0600); err != nil {
 		return fmt.Errorf("failed to save access token: %w", err)
 	}
@@ -45,6 +50,27 @@ func (s *LocalDirTokenStore) Load(key string) (string, error) {
 		return "", fmt.Errorf("failed to read token: %w", err)
 	}
 	return string(all), nil
+}
+
+func (s *LocalDirTokenStore) List(prefix string) ([]string, error) {
+	if s.Dir == "" {
+		return nil, errors.New("token store directory not set")
+	}
+	dir, filePrefix := filepath.Split(fmt.Sprintf("%s/%s", s.Dir, prefix))
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil // no tokens if directory doesn't exist
+		}
+		return nil, fmt.Errorf("failed to list tokens: %w", err)
+	}
+	var keys []string
+	for _, file := range files {
+		if !file.IsDir() && strings.HasPrefix(file.Name(), filePrefix) {
+			keys = append(keys, file.Name())
+		}
+	}
+	return keys, nil
 }
 
 func (s *LocalDirTokenStore) Delete(key string) error {

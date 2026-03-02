@@ -9,6 +9,7 @@ import (
 	"iter"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
@@ -106,6 +108,7 @@ type gcpDriver interface {
 	GetRegion() string
 	GetServiceAccountEmail(name string) string
 	IterateBucketObjects(ctx context.Context, bucketName, prefix string) (iter.Seq2[*storage.ObjectAttrs, error], error)
+	Login(ctx context.Context) error
 	ListSecrets(ctx context.Context, prefix string) ([]string, error)
 	RunCloudBuild(ctx context.Context, args gcp.CloudBuildArgs) (string, error)
 	SignBytes(ctx context.Context, b []byte, name string) ([]byte, error)
@@ -127,16 +130,31 @@ type ByocGcp struct {
 }
 
 func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string) *ByocGcp {
+	region := getGcpRegion()
+	projectId := getGcpProjectID()
+
+	b := &ByocGcp{driver: &gcp.Gcp{
+		Region:     region,
+		ProjectId:  projectId,
+		TokenStore: &tokenstore.LocalDirTokenStore{Dir: filepath.Join(client.StateDir, "providers", "gcp")},
+	}}
+	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
+
+	if err := b.driver.Login(ctx); err != nil {
+		term.Errorf("GCP interactive login failed: %v", err)
+	}
+
+	return b
+}
+
+func getGcpRegion() string {
 	// Try standard GCP environment variables in order of precedence
 	// Keeping GCP_LOCATION first for backward compatibility
 	_, region := pkg.GetFirstEnv(pkg.GCPRegionEnvVars...)
 	if region == "" {
 		region = client.RegionDefaultGCP
 	}
-	projectId := getGcpProjectID()
-	b := &ByocGcp{driver: &gcp.Gcp{Region: region, ProjectId: projectId}}
-	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
-	return b
+	return region
 }
 
 func getGcpProjectID() string {

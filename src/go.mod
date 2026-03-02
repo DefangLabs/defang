@@ -9,6 +9,7 @@ replace github.com/spf13/cobra v1.8.0 => github.com/DefangLabs/cobra v1.8.0-defa
 require (
 	cloud.google.com/go/artifactregistry v1.17.1
 	cloud.google.com/go/cloudbuild v1.22.2
+	cloud.google.com/go/compute v1.37.0
 	cloud.google.com/go/iam v1.5.2
 	cloud.google.com/go/logging v1.13.0
 	cloud.google.com/go/resourcemanager v1.10.6

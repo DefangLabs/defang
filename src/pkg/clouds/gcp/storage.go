@@ -154,7 +154,7 @@ func (gcp Gcp) CreateUploadURL(ctx context.Context, bucketName, objectName, serv
 }
 
 func (gcp Gcp) SignBytes(ctx context.Context, b []byte, name string) ([]byte, error) {
-	credSvc, err := credentials.NewIamCredentialsClient(ctx)
+	credSvc, err := credentials.NewIamCredentialsClient(ctx, gcp.Options...)
 	if err != nil {
 		return nil, err
 	}
