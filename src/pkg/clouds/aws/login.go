@@ -23,8 +23,9 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/tokenstore"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
 	awssts "github.com/aws/aws-sdk-go-v2/service/sts"
 	"golang.org/x/oauth2"
 )
@@ -50,11 +51,61 @@ type awsTokenCache struct {
 	IDToken      string `json:"idToken"`
 	LoginSession string `json:"loginSession"`
 	DPoPKey      string `json:"dpopKey"`
+	TokenURL     string `json:"tokenUrl"` // endpoint used for token refresh
+}
+
+// awsOAuthCredentialsProvider implements aws.CredentialsProvider using the
+// stored OAuth refresh token. When the access credentials expire it transparently
+// refreshes them via the AWS Sign-In token endpoint and persists the updated token.
+type awsOAuthCredentialsProvider struct {
+	cached     *awsTokenCache
+	tokenStore tokenstore.TokenStore
+	storeKey   string
+}
+
+func (p *awsOAuthCredentialsProvider) Retrieve(ctx context.Context) (awssdk.Credentials, error) {
+	if time.Now().Before(p.cached.AccessToken.ExpiresAt) {
+		return p.toCredentials(), nil
+	}
+
+	// Access token is expired — use the refresh token to get new credentials.
+	term.Debug("AWS OAuth access token expired, refreshing...")
+	refreshed, err := awsRefreshToken(ctx, p.cached)
+	if err != nil {
+		term.Debugf("failed to refresh AWS OAuth token: %v", err)
+		return awssdk.Credentials{}, fmt.Errorf("refreshing AWS OAuth token: %w", err)
+	}
+
+	// Persist the refreshed token so the next run picks up the new values.
+	if p.tokenStore != nil && p.storeKey != "" {
+		tokenBytes, err := json.Marshal(refreshed)
+		if err == nil {
+			if err := p.tokenStore.Save(p.storeKey, string(tokenBytes)); err != nil {
+				term.Warnf("failed to persist refreshed AWS OAuth token: %v", err)
+			} else {
+				term.Debugf("persisted refreshed AWS OAuth token for %q", p.storeKey)
+			}
+		}
+	}
+
+	p.cached = refreshed
+	return p.toCredentials(), nil
+}
+
+func (p *awsOAuthCredentialsProvider) toCredentials() awssdk.Credentials {
+	return awssdk.Credentials{
+		AccessKeyID:     p.cached.AccessToken.AccessKeyID,
+		SecretAccessKey: p.cached.AccessToken.SecretAccessKey,
+		SessionToken:    p.cached.AccessToken.SessionToken,
+		Source:          "AWSSignInOAuth",
+		CanExpire:       true,
+		Expires:         p.cached.AccessToken.ExpiresAt,
+	}
 }
 
 // Login sets up AWS credentials for the session in order of preference:
 //  1. Existing default AWS credentials (env vars, ~/.aws/credentials, instance profile, etc.)
-//  2. Previously saved OAuth tokens from the TokenStore
+//  2. Previously saved OAuth tokens from the TokenStore (auto-refreshed if expired)
 //  3. Interactive browser-based OAuth login
 //
 // On success, a.Credentials is set so that subsequent calls to LoadConfig() use them.
@@ -80,7 +131,7 @@ func (a *Aws) Login(ctx context.Context) error {
 		return nil
 	}
 
-	// 2. Try stored OAuth tokens
+	// 2. Try stored OAuth tokens (including expired ones — the provider will refresh them)
 	if a.TokenStore != nil {
 		term.Debug("checking stored AWS OAuth tokens...")
 		tokenNames, err := a.TokenStore.List(tokenStoreKeyPrefix)
@@ -101,19 +152,23 @@ func (a *Aws) Login(ctx context.Context) error {
 				continue
 			}
 
-			if time.Now().After(cached.AccessToken.ExpiresAt) {
-				term.Debugf("token %q is expired, skipping", name)
+			// Backfill TokenURL for tokens saved before the field was added.
+			if cached.TokenURL == "" {
+				cached.TokenURL = fmt.Sprintf("https://%s.signin.aws.amazon.com/v1/token", a.Region)
+			}
+
+			if cached.RefreshToken == "" && time.Now().After(cached.AccessToken.ExpiresAt) {
+				term.Debugf("token %q is expired and has no refresh token, skipping", name)
 				continue
 			}
 
-			creds := credentials.NewStaticCredentialsProvider(
-				cached.AccessToken.AccessKeyID,
-				cached.AccessToken.SecretAccessKey,
-				cached.AccessToken.SessionToken,
-			)
-			if err := testStoredCredentials(ctx, string(a.Region), creds); err == nil {
+			term.Debugf("testing token %q (expires %s)...", name, cached.AccessToken.ExpiresAt.Format(time.RFC3339))
+			provider := &awsOAuthCredentialsProvider{cached: &cached, tokenStore: a.TokenStore, storeKey: name}
+			// Calling testStoredCredentials triggers Retrieve(), which auto-refreshes
+			// and persists the updated token if the access credentials were expired.
+			if err := testStoredCredentials(ctx, string(a.Region), provider); err == nil {
 				term.Debugf("token %q is valid", name)
-				a.Credentials = creds
+				a.Credentials = awssdk.NewCredentialsCache(provider)
 				return nil
 			} else {
 				term.Debugf("token %q failed validation: %v", name, err)
@@ -128,23 +183,21 @@ func (a *Aws) Login(ctx context.Context) error {
 		return fmt.Errorf("interactive login failed: %w", err)
 	}
 
+	var storeKey string
 	if a.TokenStore != nil {
 		tokenBytes, err := json.Marshal(cached)
 		if err != nil {
 			return fmt.Errorf("failed to marshal token: %w", err)
 		}
 		sum := sha256.Sum256([]byte(cached.LoginSession))
-		key := fmt.Sprintf("%s%x", tokenStoreKeyPrefix, sum)
-		if err := a.TokenStore.Save(key, string(tokenBytes)); err != nil {
+		storeKey = fmt.Sprintf("%s%x", tokenStoreKeyPrefix, sum)
+		if err := a.TokenStore.Save(storeKey, string(tokenBytes)); err != nil {
 			term.Warnf("failed to save AWS OAuth token: %v", err)
 		}
 	}
 
-	a.Credentials = credentials.NewStaticCredentialsProvider(
-		cached.AccessToken.AccessKeyID,
-		cached.AccessToken.SecretAccessKey,
-		cached.AccessToken.SessionToken,
-	)
+	provider := &awsOAuthCredentialsProvider{cached: cached, tokenStore: a.TokenStore, storeKey: storeKey}
+	a.Credentials = awssdk.NewCredentialsCache(provider)
 	return nil
 }
 
@@ -175,8 +228,7 @@ func (a *Aws) InteractiveLogin(ctx context.Context, baseEndpoint string) (*awsTo
 
 	term.Println("Please visit the following URL to log in to AWS: (Right click the URL or press ENTER to open browser)")
 	term.Printf("  %s\n", authURL)
-	var done func()
-	ctx, done = term.OpenBrowserOnEnter(ctx, authURL)
+	ctx, done := term.OpenBrowserOnEnter(ctx, authURL)
 	defer done()
 
 	codeCh := make(chan string, 1)
@@ -271,10 +323,11 @@ type tokenExchangeResponse struct {
 
 type TokenExchangeRequest struct {
 	ClientID     string `json:"clientId"`
-	GrantType    string `json:"grantType"` // must be "authorization_code"
-	Code         string `json:"code"`
-	CodeVerifier string `json:"codeVerifier"`
-	RedirectURI  string `json:"redirectUri"`
+	GrantType    string `json:"grantType"` // "authorization_code" or "refresh_token"
+	Code         string `json:"code,omitempty"`
+	CodeVerifier string `json:"codeVerifier,omitempty"`
+	RedirectURI  string `json:"redirectUri,omitempty"`
+	RefreshToken string `json:"refreshToken,omitempty"`
 }
 
 // awsExchangeCodeForToken calls POST /v1/token with a DPoP-signed request and
@@ -287,7 +340,55 @@ func awsExchangeCodeForToken(ctx context.Context, tokenURL, clientID, authCode, 
 		CodeVerifier: verifier,
 		RedirectURI:  redirectURI,
 	}
+	return awsDoTokenRequest(ctx, tokenURL, clientID, reqBody, key)
+}
 
+// awsRefreshToken uses the stored refresh token + DPoP key to obtain fresh
+// AWS credentials from the token endpoint.
+func awsRefreshToken(ctx context.Context, cached *awsTokenCache) (*awsTokenCache, error) {
+	if cached.RefreshToken == "" {
+		return nil, errors.New("no refresh token available")
+	}
+	if cached.TokenURL == "" {
+		return nil, errors.New("no token URL in cached token; re-login required")
+	}
+
+	key, err := deserializePrivateKey(cached.DPoPKey)
+	if err != nil {
+		return nil, fmt.Errorf("deserializing DPoP key: %w", err)
+	}
+
+	reqBody := TokenExchangeRequest{
+		ClientID:     cached.ClientID,
+		GrantType:    "refresh_token",
+		RefreshToken: cached.RefreshToken,
+	}
+	refreshed, err := awsDoTokenRequest(ctx, cached.TokenURL, cached.ClientID, reqBody, key)
+	if err != nil {
+		return nil, err
+	}
+
+	// The refresh response omits fields that don't change. Keep them from the cached token.
+	if refreshed.RefreshToken == "" {
+		refreshed.RefreshToken = cached.RefreshToken
+	}
+	if refreshed.IDToken == "" {
+		refreshed.IDToken = cached.IDToken
+	}
+	if refreshed.LoginSession == "" {
+		refreshed.LoginSession = cached.LoginSession
+	}
+	if refreshed.TokenURL == "" {
+		refreshed.TokenURL = cached.TokenURL
+	}
+	refreshed.DPoPKey = cached.DPoPKey // always keep the same key
+
+	return refreshed, nil
+}
+
+// awsDoTokenRequest sends a DPoP-signed POST to the token endpoint and parses
+// the response into an awsTokenCache.
+func awsDoTokenRequest(ctx context.Context, tokenURL, clientID string, reqBody TokenExchangeRequest, key *ecdsa.PrivateKey) (*awsTokenCache, error) {
 	dpop, err := awsBuildDPoPHeader(key, tokenURL)
 	if err != nil {
 		return nil, fmt.Errorf("building DPoP header: %w", err)
@@ -322,16 +423,19 @@ func awsExchangeCodeForToken(ctx context.Context, tokenURL, clientID, authCode, 
 	if err := json.Unmarshal(respBytes, &out); err != nil {
 		return nil, fmt.Errorf("parsing token response: %w", err)
 	}
-	if out.IDToken == "" {
-		return nil, errors.New("token response missing idToken")
+
+	// idToken is only present in the initial authorization_code exchange, not in
+	// refresh_token responses. Extract loginSession and accountID only when available.
+	var loginSession, accountID string
+	if out.IDToken != "" {
+		var err error
+		loginSession, err = awsExtractSubFromJWT(out.IDToken)
+		if err != nil {
+			return nil, fmt.Errorf("extracting login session from id_token: %w", err)
+		}
+		accountID = awsExtractAccountFromARN(loginSession)
 	}
 
-	loginSession, err := awsExtractSubFromJWT(out.IDToken)
-	if err != nil {
-		return nil, fmt.Errorf("extracting login session from id_token: %w", err)
-	}
-
-	accountID := awsExtractAccountFromARN(loginSession)
 	expiresAt := time.Now().UTC().Add(time.Duration(out.ExpiresIn) * time.Second)
 
 	cached := &awsTokenCache{
@@ -341,6 +445,7 @@ func awsExchangeCodeForToken(ctx context.Context, tokenURL, clientID, authCode, 
 		IDToken:      out.IDToken,
 		LoginSession: loginSession,
 		DPoPKey:      serializePrivateKey(key),
+		TokenURL:     tokenURL,
 	}
 	cached.AccessToken.AccessKeyID = out.AccessToken.AccessKeyID
 	cached.AccessToken.SecretAccessKey = out.AccessToken.SecretAccessKey
@@ -457,7 +562,7 @@ func (a *Aws) testDefaultCredentials(ctx context.Context) error {
 	return err
 }
 
-func testStoredCredentials(ctx context.Context, region string, creds credentials.StaticCredentialsProvider) error {
+func testStoredCredentials(ctx context.Context, region string, creds awssdk.CredentialsProvider) error {
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion(region),
 		config.WithCredentialsProvider(creds),
@@ -551,4 +656,13 @@ func serializePrivateKey(key *ecdsa.PrivateKey) string {
 		Type:  "EC PRIVATE KEY",
 		Bytes: der,
 	}))
+}
+
+// deserializePrivateKey decodes a PEM-wrapped EC private key produced by serializePrivateKey.
+func deserializePrivateKey(pemStr string) (*ecdsa.PrivateKey, error) {
+	block, _ := pem.Decode([]byte(pemStr))
+	if block == nil {
+		return nil, errors.New("failed to decode PEM block from DPoP key")
+	}
+	return x509.ParseECPrivateKey(block.Bytes)
 }

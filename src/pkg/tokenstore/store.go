@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
@@ -20,10 +21,13 @@ type TokenStore interface {
 // Backwards-compatible token store that saves tokens as files in stateDir
 // TODO: consider using os provided keyring
 type LocalDirTokenStore struct {
+	mu  sync.RWMutex
 	Dir string
 }
 
 func (s *LocalDirTokenStore) Save(key string, token string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	tokenFile, err := s.getTokenFile(key)
 	if err != nil {
 		return err
@@ -31,7 +35,6 @@ func (s *LocalDirTokenStore) Save(key string, token string) error {
 
 	term.Debug("Saving access token to", tokenFile)
 	dir, _ := filepath.Split(tokenFile)
-	dir = filepath.Join(s.Dir, dir)
 	os.MkdirAll(dir, 0700)
 	if err := os.WriteFile(tokenFile, []byte(token), 0600); err != nil {
 		return fmt.Errorf("failed to save access token: %w", err)
@@ -40,6 +43,8 @@ func (s *LocalDirTokenStore) Save(key string, token string) error {
 }
 
 func (s *LocalDirTokenStore) Load(key string) (string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	tokenFile, err := s.getTokenFile(key)
 	if err != nil {
 		return "", err
@@ -53,6 +58,8 @@ func (s *LocalDirTokenStore) Load(key string) (string, error) {
 }
 
 func (s *LocalDirTokenStore) List(prefix string) ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	if s.Dir == "" {
 		return nil, errors.New("token store directory not set")
 	}
@@ -74,6 +81,8 @@ func (s *LocalDirTokenStore) List(prefix string) ([]string, error) {
 }
 
 func (s *LocalDirTokenStore) Delete(key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	tokenFile, err := s.getTokenFile(key)
 	if err != nil {
 		return err
