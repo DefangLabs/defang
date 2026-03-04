@@ -14,7 +14,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -173,7 +172,7 @@ func (a *Aws) Authenticate(ctx context.Context, interactive bool) error {
 			// and persists the updated token if the access credentials were expired.
 			creds, err := a.testCredentialsWithProfile(ctx, name, provider)
 			if err != nil {
-				term.Debugf("token %q failed AWS_PROFILE role validation: %v", name, err)
+				term.Debugf("token %q failed AWS_PROFILE role validation: %v, skipping...", name, err)
 				continue
 			}
 
@@ -187,7 +186,7 @@ func (a *Aws) Authenticate(ctx context.Context, interactive bool) error {
 	if !interactive {
 		return errors.New("no valid AWS credentials found") // TODO: Better error message with possible doc link
 	}
-	term.Debug("no valid credentials found, starting interactive login...")
+	term.Info("no valid credentials found, starting interactive login...")
 	for range 3 {
 		cached, err := a.InteractiveLogin(ctx, baseEndpoint)
 		if err != nil {
@@ -211,7 +210,7 @@ func (a *Aws) Authenticate(ctx context.Context, interactive bool) error {
 
 		creds, err := a.testCredentialsWithProfile(ctx, storeKey, provider)
 		if err != nil {
-			term.Warnf("interactive token failed AWS_PROFILE role validation: %v", err)
+			term.Warnf("Cannot use login credentials: %v, please try again.", err)
 			continue
 		}
 
@@ -229,7 +228,7 @@ func (a *Aws) testCredentialsWithProfile(ctx context.Context, name string, creds
 	}
 
 	// If the stack/env specifies an AWS_PROFILE with role, try assume the role
-	roleArn, err := a.GetStackAwsProfileRoleArn(ctx)
+	roleArn, profile, err := a.GetStackAwsProfileRoleArn(ctx)
 	if err != nil {
 		term.Debugf("failed to get AWS_PROFILE role ARN: %v", err)
 	} else if roleArn != "" {
@@ -242,10 +241,10 @@ func (a *Aws) testCredentialsWithProfile(ctx context.Context, name string, creds
 		if _, err := a.testCredentials(ctx, assumeRoleProvider); err != nil && identity.Account != nil {
 			// If unable to assume, and also not the same account, then this token is not valid for the specified AWS_PROFILE role
 			if *identity.Account != GetAccountID(roleArn) {
-				return nil, fmt.Errorf("token %q is valid but does not have access to the specified AWS_PROFILE role %q, and its of a different account %v as the AWS_PROFILE %v, skipping", name, roleArn, *identity.Account, GetAccountID(roleArn))
+				return nil, fmt.Errorf("login successful, but does not have access to role %q in used by stack aws profile %q; token account %v does not match stack aws profile account %v", roleArn, profile, *identity.Account, GetAccountID(roleArn))
 			}
 			// If cannot assume but it's the same account, we assume its a valid token
-			term.Warnf("token %q is valid for AWS account %v which is same as the account specified by AWS_PROFILE, assume its valid", name, *identity.Account)
+			term.Warnf("login successful for AWS account %v which is same as the account specified by stack aws profile %q, assume its valid", *identity.Account, profile)
 			return creds, nil
 		}
 		// If able to assume the profile role, use the assumed role credentials
@@ -256,20 +255,20 @@ func (a *Aws) testCredentialsWithProfile(ctx context.Context, name string, creds
 	return creds, nil
 }
 
-func (a *Aws) GetStackAwsProfileRoleArn(ctx context.Context) (string, error) {
+func (a *Aws) GetStackAwsProfileRoleArn(ctx context.Context) (string, string, error) {
 	profile := os.Getenv("AWS_PROFILE")
 	if profile == "" {
-		return "", nil
+		return "", "", nil
 	}
 
 	sharedCfg, err := config.LoadSharedConfigProfile(ctx, profile)
 	if err != nil {
-		return "", fmt.Errorf("loading AWS shared config for profile %q: %w", profile, err)
+		return "", "", fmt.Errorf("loading AWS shared config for profile %q: %w", profile, err)
 	}
 	if sharedCfg.Region != "" && sharedCfg.Region != string(a.Region) {
-		return "", fmt.Errorf("AWS_PROFILE environment variable is set to %q which has region %q, but expected region is %q", profile, sharedCfg.Region, a.Region)
+		return "", "", fmt.Errorf("AWS_PROFILE environment variable is set to %q which has region %q, but expected region is %q", profile, sharedCfg.Region, a.Region)
 	}
-	return sharedCfg.RoleARN, nil
+	return sharedCfg.RoleARN, profile, nil
 }
 
 // InteractiveLogin runs the same-device AWS Sign-In OAuth2 + PKCE + DPoP browser flow:
@@ -278,66 +277,34 @@ func (a *Aws) GetStackAwsProfileRoleArn(ctx context.Context) (string, error) {
 //  3. Waits for the callback with code+state
 //  4. Exchanges the code for AWS credentials via DPoP-signed token request
 func (a *Aws) InteractiveLogin(ctx context.Context, baseEndpoint string) (*awsTokenCache, error) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return nil, fmt.Errorf("failed to start local callback server: %w", err)
-	}
-	defer ln.Close()
-	port := ln.Addr().(*net.TCPAddr).Port // nolint:forcetypeassert
-	redirectURI := fmt.Sprintf("http://127.0.0.1:%d/oauth/callback", port)
-
-	config := &oauth2.Config{
-		ClientID: clientIDSameDevice,
-		Endpoint: oauth2.Endpoint{
-			AuthURL: baseEndpoint + "/v1/sessions",
-		},
-		RedirectURL: redirectURI,
-		Scopes:      []string{"openid"},
-	}
-
 	pkce, err := auth.GeneratePKCE(64, auth.S256Method)
 	if err != nil {
 		return nil, fmt.Errorf("generating PKCE parameters: %w", err)
 	}
-	state := rand.Text()[:16] // random state for CSRF protection
 	tokenURL := baseEndpoint + "/v1/token"
 
-	authURL := config.AuthCodeURL(state,
-		oauth2.SetAuthURLParam("code_challenge_method", "SHA-256"), // AWS require this to be "SHA-256" literally, not "S256"
-		oauth2.SetAuthURLParam("code_challenge", pkce.Challenge),
-	)
-
-	term.Println("Please visit the following URL to log in to AWS: (Right click the URL or press ENTER to open browser)")
-	term.Printf("  %s\n", authURL)
-	ctx, done := term.OpenBrowserOnEnter(ctx, authURL)
-	defer done()
-
-	codeCh := make(chan string, 1)
-	srv := &http.Server{
-		ReadHeaderTimeout: 10 * time.Second,
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			q := r.URL.Query()
-			if q.Get("state") != state {
-				http.Error(w, "invalid state", http.StatusBadRequest)
-				return
+	code, redirectURI, err := auth.WaitForOAuthCode(ctx, auth.WaitForOAuthCodeInput{
+		CallbackPath:   "/oauth/callback",
+		Prompt:         "Please visit the following URL to log in to AWS: (Right click the URL or press ENTER to open browser)",
+		Title:          "Logged in to AWS",
+		SuccessMessage: "You have successfully logged in to AWS.",
+		BuildAuthURL: func(redirectURL, state string) string {
+			cfg := &oauth2.Config{
+				ClientID: clientIDSameDevice,
+				Endpoint: oauth2.Endpoint{
+					AuthURL: baseEndpoint + "/v1/sessions",
+				},
+				RedirectURL: redirectURL,
+				Scopes:      []string{"openid"},
 			}
-			code := q.Get("code")
-			if code == "" {
-				http.Error(w, "missing authorization code", http.StatusBadRequest)
-				return
-			}
-			fmt.Fprintln(w, "Authorization successful! You can close this window.")
-			codeCh <- code
-		}),
-	}
-	go srv.Serve(ln) //nolint:errcheck
-	defer srv.Close()
-
-	var code string
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case code = <-codeCh:
+			return cfg.AuthCodeURL(state,
+				oauth2.SetAuthURLParam("code_challenge_method", "SHA-256"), // AWS requires "SHA-256" literally, not "S256"
+				oauth2.SetAuthURLParam("code_challenge", pkce.Challenge),
+			)
+		},
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return RetrieveToken(ctx, tokenURL, clientIDSameDevice, code, pkce.Verifier, redirectURI)

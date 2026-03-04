@@ -2,15 +2,11 @@ package gcp
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
-	"net/http"
 	"os"
 	"slices"
-	"time"
 
 	"cloud.google.com/go/iam/apiv1/iampb"
 	resourcemanager "cloud.google.com/go/resourcemanager/apiv3"
@@ -133,75 +129,42 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 }
 
 func (gcp *Gcp) InteractiveLogin(ctx context.Context) (oauth2.TokenSource, error) {
-	// Find a free port for the redirect URI
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return nil, fmt.Errorf("failed to listen: %w", err)
-	}
-	defer ln.Close()
-	port := ln.Addr().(*net.TCPAddr).Port // nolint:forcetypeassert
-	redirectURL := fmt.Sprintf("http://127.0.0.1:%v/", port)
-
-	config := &oauth2.Config{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
-		RedirectURL:  redirectURL,
-		Scopes:       scopes,
-		Endpoint:     google.Endpoint,
-	}
-
 	pkce, err := auth.GeneratePKCE(64, auth.S256Method)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate PKCE: %w", err)
 	}
-	state := rand.Text()[:16] // random state for CSRF protection
-	authURL := config.AuthCodeURL(state,
-		oauth2.AccessTypeOffline,
-		oauth2.SetAuthURLParam("code_challenge", pkce.Challenge),
-		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
-	)
 
-	term.Println("Please visit the following URL to log in to Google Cloud Platform: (Right click the URL or press ENTER to open browser)")
-	term.Printf("  %s", authURL)
-	var done func()
-	ctx, done = term.OpenBrowserOnEnter(ctx, authURL)
-	defer done()
-
-	codeCh := make(chan string, 1)
-	srv := http.Server{
-		ReadHeaderTimeout: 10 * time.Second,
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			q := r.URL.Query()
-			if q.Get("state") != state {
-				http.Error(w, "invalid state", http.StatusBadRequest)
-				return
-			}
-			code := q.Get("code")
-			if code == "" {
-				http.Error(w, "missing authorization code", http.StatusBadRequest)
-				return
-			}
-			fmt.Fprintln(w, "Authorization successful! You can close this window.")
-			codeCh <- code
-		}),
+	cfg := &oauth2.Config{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		Scopes:       scopes,
+		Endpoint:     google.Endpoint,
 	}
 
-	go srv.Serve(ln) //nolint:errcheck
-	defer srv.Close()
-
-	var code string
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case code = <-codeCh:
+	code, _, err := auth.WaitForOAuthCode(ctx, auth.WaitForOAuthCodeInput{
+		CallbackPath:   "/",
+		Prompt:         "Please visit the following URL to log in to Google Cloud Platform: (Right click the URL or press ENTER to open browser)",
+		Title:          "Logged in to Google Cloud Platform",
+		SuccessMessage: "You have successfully logged in to Google Cloud Platform.",
+		BuildAuthURL: func(redirectURL, state string) string {
+			cfg.RedirectURL = redirectURL
+			return cfg.AuthCodeURL(state,
+				oauth2.AccessTypeOffline,
+				oauth2.SetAuthURLParam("code_challenge", pkce.Challenge),
+				oauth2.SetAuthURLParam("code_challenge_method", "S256"),
+			)
+		},
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	token, err := config.Exchange(ctx, code, oauth2.SetAuthURLParam("code_verifier", pkce.Verifier))
+	token, err := cfg.Exchange(ctx, code, oauth2.SetAuthURLParam("code_verifier", pkce.Verifier))
 	if err != nil {
 		return nil, fmt.Errorf("failed to exchange code for token: %w", err)
 	}
 
-	return config.TokenSource(ctx, token), nil
+	return cfg.TokenSource(ctx, token), nil
 }
 
 func testTokenProjectPermissions(ctx context.Context, projectID string, perms []string, tokenSource oauth2.TokenSource) error {
