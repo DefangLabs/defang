@@ -146,6 +146,9 @@ func NonInteractiveGitHubLogin(ctx context.Context, fabric client.FabricClient, 
 	}
 
 	err = client.SaveAccessToken(cluster, resp.AccessToken) // creates the state folder too
+	if err != nil {
+		return err
+	}
 
 	// If AWS_ROLE_ARN is set, we're doing "Assume Role with Web Identity"
 	if os.Getenv("AWS_ROLE_ARN") != "" && os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") == "" {

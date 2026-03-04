@@ -35,7 +35,9 @@ func (s *LocalDirTokenStore) Save(key string, token string) error {
 
 	term.Debug("Saving access token to", tokenFile)
 	dir, _ := filepath.Split(tokenFile)
-	os.MkdirAll(dir, 0700)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return fmt.Errorf("failed to create token directory: %w", err)
+	}
 	if err := os.WriteFile(tokenFile, []byte(token), 0600); err != nil {
 		return fmt.Errorf("failed to save access token: %w", err)
 	}
@@ -101,5 +103,5 @@ func (s *LocalDirTokenStore) getTokenFile(key string) (string, error) {
 	if key == "" {
 		return "", errors.New("token store key is empty")
 	}
-	return fmt.Sprintf("%s/%s", s.Dir, key), nil
+	return filepath.Join(s.Dir, key), nil
 }

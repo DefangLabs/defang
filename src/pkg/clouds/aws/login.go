@@ -346,6 +346,7 @@ func (a *Aws) InteractiveLogin(ctx context.Context, baseEndpoint string) (*awsTo
 // CrossDeviceLogin runs the cross-device flow for remote/SSH sessions where the
 // browser runs on a different machine. It prints the auth URL and prompts the user
 // to paste the base64-encoded verification code displayed in their browser.
+// TODO: Support corss device login workflow with a flag
 func (a *Aws) CrossDeviceLogin(ctx context.Context, baseEndpoint string) (*awsTokenCache, error) {
 	redirectURI := baseEndpoint + "/v1/sessions/confirmation"
 	pkce, err := auth.GeneratePKCE(64, auth.S256Method)
@@ -476,7 +477,6 @@ func refreshToken(ctx context.Context, cached *awsTokenCache) (*awsTokenCache, e
 // doTokenRequest sends a DPoP-signed POST to the token endpoint and parses
 // the response into an awsTokenCache.
 func doTokenRequest(ctx context.Context, tokenURL, clientID string, reqBody TokenExchangeRequest, key *ecdsa.PrivateKey) (*awsTokenCache, error) {
-	// dpop, err := awsBuildDPoPHeader(key, tokenURL)
 	dpop, err := buildDpopHeader(key, tokenURL)
 	if err != nil {
 		return nil, fmt.Errorf("building DPoP header: %w", err)
@@ -536,6 +536,10 @@ func doTokenRequest(ctx context.Context, tokenURL, clientID string, reqBody Toke
 	}
 
 	expiresAt := time.Now().UTC().Add(time.Duration(out.ExpiresIn) * time.Second)
+	dpopKeyPEM, err := serializePrivateKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("serializing DPoP key: %w", err)
+	}
 
 	cached := &awsTokenCache{
 		TokenType:    out.TokenType,
@@ -543,7 +547,7 @@ func doTokenRequest(ctx context.Context, tokenURL, clientID string, reqBody Toke
 		RefreshToken: out.RefreshToken,
 		IDToken:      out.IDToken,
 		LoginSession: loginSession,
-		DPoPKey:      serializePrivateKey(key),
+		DPoPKey:      dpopKeyPEM,
 		TokenURL:     tokenURL,
 	}
 	cached.AccessToken.AccessKeyID = out.AccessToken.AccessKeyID
@@ -556,7 +560,10 @@ func doTokenRequest(ctx context.Context, tokenURL, clientID string, reqBody Toke
 }
 
 func buildDpopHeader(key *ecdsa.PrivateKey, uri string) (string, error) {
-	u, _ := url.Parse(uri)
+	u, err := url.Parse(uri)
+	if err != nil {
+		return "", fmt.Errorf("parsing token endpoint URL: %w", err)
+	}
 
 	claims := jwt.MapClaims{
 		"htu": u.Scheme + "://" + u.Host + u.Path,
@@ -626,15 +633,15 @@ func parseVerificationCode(encoded string) (code, state string, err error) {
 }
 
 // serializePrivateKey encodes the EC private key as a PEM-wrapped SEC1 block.
-func serializePrivateKey(key *ecdsa.PrivateKey) string {
+func serializePrivateKey(key *ecdsa.PrivateKey) (string, error) {
 	der, err := x509.MarshalECPrivateKey(key)
 	if err != nil {
-		return ""
+		return "", err
 	}
 	return string(pem.EncodeToMemory(&pem.Block{
 		Type:  "EC PRIVATE KEY",
 		Bytes: der,
-	}))
+	})), nil
 }
 
 // deserializePrivateKey decodes a PEM-wrapped EC private key produced by serializePrivateKey.
