@@ -124,6 +124,6 @@ func printProviderMismatchWarnings(ctx context.Context, provider client.Provider
 }
 
 func awsInConfig(ctx context.Context) bool {
-	_, err := aws.LoadDefaultConfig(ctx, aws.Region(""))
+	_, err := aws.LoadDefaultConfig(ctx)
 	return err == nil
 }

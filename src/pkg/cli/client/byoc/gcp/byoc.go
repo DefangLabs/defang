@@ -108,7 +108,7 @@ type gcpDriver interface {
 	GetRegion() string
 	GetServiceAccountEmail(name string) string
 	IterateBucketObjects(ctx context.Context, bucketName, prefix string) (iter.Seq2[*storage.ObjectAttrs, error], error)
-	Login(ctx context.Context) error
+	Authenticate(ctx context.Context, interactive bool) error
 	ListSecrets(ctx context.Context, prefix string) ([]string, error)
 	RunCloudBuild(ctx context.Context, args gcp.CloudBuildArgs) (string, error)
 	SignBytes(ctx context.Context, b []byte, name string) ([]byte, error)
@@ -140,11 +140,11 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 	}}
 	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
 
-	if err := b.driver.Login(ctx); err != nil {
-		term.Errorf("GCP interactive login failed: %v", err)
-	}
-
 	return b
+}
+
+func (b *ByocGcp) Authenticate(ctx context.Context, interactive bool) error {
+	return b.driver.Authenticate(ctx, interactive)
 }
 
 func getGcpRegion() string {

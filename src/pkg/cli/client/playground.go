@@ -31,6 +31,10 @@ func NewPlaygroundProvider(fabricClient FabricClient, stack string) *PlaygroundP
 	}
 }
 
+func (g *PlaygroundProvider) Authenticate(ctx context.Context, interactive bool) error {
+	return nil // no further authentication needed for playground
+}
+
 func (g *PlaygroundProvider) GetStackName() string {
 	return g.Stack
 }

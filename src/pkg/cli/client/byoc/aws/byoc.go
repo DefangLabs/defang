@@ -141,11 +141,11 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
 
 	b.driver.TokenStore = &tokenstore.LocalDirTokenStore{Dir: filepath.Join(client.StateDir, "providers", "aws")}
-	if err := b.driver.Login(ctx); err != nil {
-		term.Errorf("AWS interactive login failed: %v", err)
-	}
-
 	return b
+}
+
+func (b *ByocAws) Authenticate(ctx context.Context, interactive bool) error {
+	return b.driver.Authenticate(ctx, interactive)
 }
 
 func (b *ByocAws) makeContainers() []clouds.Container {
@@ -889,11 +889,12 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 
 func (b *ByocAws) CdList(ctx context.Context, allRegions bool) (iter.Seq[state.Info], error) {
 	if allRegions {
-		s3Client, err := newS3Client(ctx, b.driver.Region)
+		cfg, err := b.driver.LoadConfig(ctx)
 		if err != nil {
 			return nil, AnnotateAwsError(err)
 		}
-		return listPulumiStacksAllRegions(ctx, s3Client)
+		s3Client := s3.NewFromConfig(cfg)
+		return b.listPulumiStacksAllRegions(ctx, s3Client)
 	} else {
 		bucketName := b.bucketName()
 		if bucketName == "" {
@@ -902,7 +903,7 @@ func (b *ByocAws) CdList(ctx context.Context, allRegions bool) (iter.Seq[state.I
 			}
 			bucketName = b.bucketName()
 		}
-		return listPulumiStacksInBucket(ctx, b.driver.Region, bucketName)
+		return b.listPulumiStacksInBucket(ctx, b.driver.Region, bucketName)
 	}
 }
 

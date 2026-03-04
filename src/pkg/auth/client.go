@@ -244,7 +244,7 @@ func (c client) Authorize(redirectURI string, response ResponseType, opts ...Aut
 	}
 	var verifier, challenge string
 	if as.pkce && response == "code" {
-		pkce, err := GeneratePKCE(64)
+		pkce, err := GeneratePKCE(64, S256Method)
 		if err != nil {
 			return nil, err
 		}

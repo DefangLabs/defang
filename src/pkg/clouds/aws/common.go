@@ -27,7 +27,7 @@ func (r Region) String() string {
 }
 
 func (a *Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
-	cfg, err := LoadDefaultConfig(ctx, a.Region)
+	cfg, err := LoadDefaultConfig(ctx, config.WithRegion(string(a.Region)))
 	if err != nil {
 		return cfg, err
 	}
@@ -46,8 +46,8 @@ func (a *Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
 	return cfg, err
 }
 
-func LoadDefaultConfig(ctx context.Context, region Region) (aws.Config, error) {
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(string(region)))
+func LoadDefaultConfig(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
+	cfg, err := config.LoadDefaultConfig(ctx, optFns...)
 	if err != nil {
 		return cfg, err
 	}
@@ -61,7 +61,6 @@ func LoadDefaultConfig(ctx context.Context, region Region) (aws.Config, error) {
 			},
 		),
 	)
-
 	cfg.Credentials = newChainProvider(
 		cliProvider,
 		cfg.Credentials,

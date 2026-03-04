@@ -3,9 +3,8 @@ package gcp
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 
 	"cloud.google.com/go/iam/apiv1/iampb"
 	resourcemanager "cloud.google.com/go/resourcemanager/apiv3"
+	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -27,7 +27,7 @@ var (
 	scopes       = []string{"email", "https://www.googleapis.com/auth/cloud-platform"}
 )
 
-func (gcp *Gcp) Login(ctx context.Context) error {
+func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 	// TODO: Add all required permissions for running gcp byoc
 	requiredPerms := []string{
 		"serviceusage.services.enable",
@@ -93,7 +93,11 @@ func (gcp *Gcp) Login(ctx context.Context) error {
 		}
 	}
 
-	// 4. If no valid tokens, start interactive login flow
+	// 4. If no valid tokens and allow interactive, start interactive login flow
+	if !interactive {
+		return errors.New("No valid gcloud credentials found") // TODO: Better error message with possible doc link
+	}
+
 	term.Debug("no valid tokens found in token store, starting interactive login flow...")
 	tokenSource, err := gcp.InteractiveLogin(ctx)
 	if err != nil {
@@ -125,6 +129,7 @@ func (gcp *Gcp) InteractiveLogin(ctx context.Context) (oauth2.TokenSource, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen: %w", err)
 	}
+	defer ln.Close()
 	port := ln.Addr().(*net.TCPAddr).Port // nolint:forcetypeassert
 	redirectURL := fmt.Sprintf("http://127.0.0.1:%v/", port)
 
@@ -136,12 +141,14 @@ func (gcp *Gcp) InteractiveLogin(ctx context.Context) (oauth2.TokenSource, error
 		Endpoint:     google.Endpoint,
 	}
 
-	verifier, challenge := pkceVerifierAndChallenge()
+	pkce, err := auth.GeneratePKCE(64, auth.S256Method)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate PKCE: %w", err)
+	}
 	state := rand.Text()[:16] // random state for CSRF protection
-	authURL := config.AuthCodeURL(
-		state,
+	authURL := config.AuthCodeURL(state,
 		oauth2.AccessTypeOffline,
-		oauth2.SetAuthURLParam("code_challenge", challenge),
+		oauth2.SetAuthURLParam("code_challenge", pkce.Challenge),
 		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
 	)
 
@@ -155,28 +162,32 @@ func (gcp *Gcp) InteractiveLogin(ctx context.Context) (oauth2.TokenSource, error
 	srv := http.Server{
 		ReadHeaderTimeout: 10 * time.Second,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Query().Get("state") != state {
+			q := r.URL.Query()
+			if q.Get("state") != state {
 				http.Error(w, "invalid state", http.StatusBadRequest)
 				return
 			}
-			code := r.URL.Query().Get("code")
+			code := q.Get("code")
+			if code == "" {
+				http.Error(w, "missing authorization code", http.StatusBadRequest)
+				return
+			}
 			fmt.Fprintln(w, "Authorization successful! You can close this window.")
 			codeCh <- code
 		}),
 	}
 
-	// Handle OAuth callback
-	go func() {
-		srv.Serve(ln)
-	}()
+	go srv.Serve(ln) //nolint:errcheck
+	defer srv.Close()
 
-	code := <-codeCh
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	srv.Shutdown(shutdownCtx)
-	ln.Close()
+	var code string
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case code = <-codeCh:
+	}
 
-	token, err := config.Exchange(ctx, code, oauth2.SetAuthURLParam("code_verifier", verifier))
+	token, err := config.Exchange(ctx, code, oauth2.SetAuthURLParam("code_verifier", pkce.Verifier))
 	if err != nil {
 		return nil, fmt.Errorf("failed to exchange code for token: %w", err)
 	}
@@ -216,13 +227,4 @@ func testTokenProjectPermissions(ctx context.Context, projectID string, perms []
 	}
 
 	return nil
-}
-
-func pkceVerifierAndChallenge() (string, string) {
-	b := make([]byte, 32)
-	rand.Read(b)
-	verifier := base64.RawURLEncoding.EncodeToString(b)
-	hash := sha256.Sum256([]byte(verifier))
-	challenge := base64.RawURLEncoding.EncodeToString(hash[:])
-	return verifier, challenge
 }

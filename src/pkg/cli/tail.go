@@ -382,7 +382,7 @@ func receiveLogs(ctx context.Context, provider client.Provider, projectName stri
 				}
 				return nil
 			}
-			return fmt.Errorf("server stream recevie failed: %v", serverStream.Err())
+			return serverStream.Err()
 		}
 		msg := serverStream.Msg()
 

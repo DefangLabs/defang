@@ -67,6 +67,7 @@ type ServerStream[Res any] interface {
 type Provider interface {
 	DNSResolver
 	AccountInfo(context.Context) (*AccountInfo, error)
+	Authenticate(ctx context.Context, interactive bool) error
 	CdCommand(context.Context, CdCommandRequest) (types.ETag, error)
 	CdList(context.Context, bool) (iter.Seq[byocState.Info], error)
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)

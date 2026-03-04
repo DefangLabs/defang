@@ -44,6 +44,9 @@ func Whoami(ctx context.Context, fabric client.FabricClient, maybeProvider clien
 
 	if maybeProvider != nil {
 		// Add provider account information
+		if err := maybeProvider.Authenticate(ctx, false); err != nil { // Do not interactively login for whoami
+			term.Debug("Unable to authenticate provider:", err)
+		}
 		account, err := maybeProvider.AccountInfo(ctx)
 		if err == nil {
 			showData.Provider = account.Provider

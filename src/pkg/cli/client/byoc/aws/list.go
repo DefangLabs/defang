@@ -16,21 +16,12 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-func newS3Client(ctx context.Context, region aws.Region) (*s3.Client, error) {
-	cfg, err := aws.LoadDefaultConfig(ctx, region)
-	if err != nil {
-		return nil, AnnotateAwsError(err)
-	}
-
-	s3client := s3.NewFromConfig(cfg)
-	return s3client, nil
-}
-
-func listPulumiStacksInBucket(ctx context.Context, region aws.Region, bucketName string) (iter.Seq[state.Info], error) {
-	s3client, err := newS3Client(ctx, region)
+func (b *ByocAws) listPulumiStacksInBucket(ctx context.Context, region aws.Region, bucketName string) (iter.Seq[state.Info], error) {
+	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return nil, err
 	}
+	s3client := s3.NewFromConfig(cfg)
 	stacks, err := ListPulumiStacks(ctx, s3client, bucketName)
 	if err != nil {
 		return nil, err
@@ -107,7 +98,7 @@ func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string)
 	}, nil
 }
 
-func listPulumiStacksAllRegions(ctx context.Context, s3client S3Client) (iter.Seq[state.Info], error) {
+func (b *ByocAws) listPulumiStacksAllRegions(ctx context.Context, s3client S3Client) (iter.Seq[state.Info], error) {
 	// Use a single S3 query to list all buckets with the defang-cd- prefix
 	// This is faster than calling CloudFormation DescribeStacks in each region
 	listBucketsOutput, err := s3client.ListBuckets(ctx, &s3.ListBucketsInput{})
@@ -149,7 +140,7 @@ func listPulumiStacksAllRegions(ctx context.Context, s3client S3Client) (iter.Se
 			wg.Add(1)
 			go func(region aws.Region) {
 				defer wg.Done()
-				stacks, err := listPulumiStacksInBucket(ctx, region, *bucket.Name)
+				stacks, err := b.listPulumiStacksInBucket(ctx, region, *bucket.Name)
 				if err != nil {
 					return
 				}

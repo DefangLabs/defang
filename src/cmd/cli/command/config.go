@@ -10,7 +10,6 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/session"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/bufbuild/connect-go"
 	"github.com/joho/godotenv"
@@ -31,7 +30,6 @@ var configSetCmd = &cobra.Command{
 	Aliases:     []string{"set", "add", "put"},
 	Short:       "Adds or updates a sensitive config value",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := cmd.Context()
 		fromEnv, _ := cmd.Flags().GetBool("env")
 		random, _ := cmd.Flags().GetBool("random")
 		ifNotSet, _ := cmd.Flags().GetBool("if-not-set")
@@ -65,20 +63,12 @@ var configSetCmd = &cobra.Command{
 			return errors.New("too many arguments; provide a single CONFIG or use --env, --random, or --env-file")
 		}
 
-		options := newSessionLoaderOptionsForCommand(cmd)
-		options.GetStackOpts.AllowStackCreation = true
-		sm, err := newStackManagerForLoader(ctx, configureLoader(cmd))
+		session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
+			CheckAccountInfo:   true,
+			AllowStackCreation: true,
+		})
 		if err != nil {
 			return err
-		}
-		sessionLoader := session.NewSessionLoader(global.Client, sm, options)
-		session, err := sessionLoader.LoadSession(ctx)
-		if err != nil {
-			return err
-		}
-		_, err = session.Provider.AccountInfo(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get account info from provider %q: %w", session.Stack.Provider, err)
 		}
 
 		projectName, err := client.LoadProjectNameWithFallback(cmd.Context(), session.Loader, session.Provider)

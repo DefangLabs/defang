@@ -9,7 +9,6 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -22,11 +21,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	awssts "github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 )
 
@@ -70,7 +74,7 @@ func (p *awsOAuthCredentialsProvider) Retrieve(ctx context.Context) (awssdk.Cred
 
 	// Access token is expired — use the refresh token to get new credentials.
 	term.Debug("AWS OAuth access token expired, refreshing...")
-	refreshed, err := awsRefreshToken(ctx, p.cached)
+	refreshed, err := refreshToken(ctx, p.cached)
 	if err != nil {
 		term.Debugf("failed to refresh AWS OAuth token: %v", err)
 		return awssdk.Credentials{}, fmt.Errorf("refreshing AWS OAuth token: %w", err)
@@ -103,13 +107,13 @@ func (p *awsOAuthCredentialsProvider) toCredentials() awssdk.Credentials {
 	}
 }
 
-// Login sets up AWS credentials for the session in order of preference:
+// Authenticate sets up AWS credentials for the session in order of preference:
 //  1. Existing default AWS credentials (env vars, ~/.aws/credentials, instance profile, etc.)
 //  2. Previously saved OAuth tokens from the TokenStore (auto-refreshed if expired)
 //  3. Interactive browser-based OAuth login
 //
 // On success, a.Credentials is set so that subsequent calls to LoadConfig() use them.
-func (a *Aws) Login(ctx context.Context) error {
+func (a *Aws) Authenticate(ctx context.Context, interactive bool) error {
 	// Resolve region before doing anything that requires it
 	if a.Region == "" {
 		region := os.Getenv("AWS_DEFAULT_REGION")
@@ -126,7 +130,7 @@ func (a *Aws) Login(ctx context.Context) error {
 
 	// 1. Try default AWS credentials
 	term.Debugf("checking default AWS credentials for region %s...", a.Region)
-	if err := a.testDefaultCredentials(ctx); err == nil {
+	if _, err := a.testCredentials(ctx, nil); err == nil {
 		term.Debug("found valid default AWS credentials")
 		return nil
 	}
@@ -164,41 +168,108 @@ func (a *Aws) Login(ctx context.Context) error {
 
 			term.Debugf("testing token %q (expires %s)...", name, cached.AccessToken.ExpiresAt.Format(time.RFC3339))
 			provider := &awsOAuthCredentialsProvider{cached: &cached, tokenStore: a.TokenStore, storeKey: name}
-			// Calling testStoredCredentials triggers Retrieve(), which auto-refreshes
+
+			// Calling testCredentialsWithProfile triggers Retrieve(), which auto-refreshes
 			// and persists the updated token if the access credentials were expired.
-			if err := testStoredCredentials(ctx, string(a.Region), provider); err == nil {
-				term.Debugf("token %q is valid", name)
-				a.Credentials = awssdk.NewCredentialsCache(provider)
-				return nil
-			} else {
-				term.Debugf("token %q failed validation: %v", name, err)
+			creds, err := a.testCredentialsWithProfile(ctx, name, provider)
+			if err != nil {
+				term.Debugf("token %q failed AWS_PROFILE role validation: %v", name, err)
+				continue
 			}
+
+			// If no AWS_PROFILE with role specified, any valid token is considered acceptable
+			a.Credentials = awssdk.NewCredentialsCache(creds)
+			return nil
 		}
 	}
 
 	// 3. Interactive browser-based login
+	if !interactive {
+		return errors.New("no valid AWS credentials found") // TODO: Better error message with possible doc link
+	}
 	term.Debug("no valid credentials found, starting interactive login...")
-	cached, err := a.InteractiveLogin(ctx, baseEndpoint)
-	if err != nil {
-		return fmt.Errorf("interactive login failed: %w", err)
-	}
-
-	var storeKey string
-	if a.TokenStore != nil {
-		tokenBytes, err := json.Marshal(cached)
+	for range 3 {
+		cached, err := a.InteractiveLogin(ctx, baseEndpoint)
 		if err != nil {
-			return fmt.Errorf("failed to marshal token: %w", err)
+			return fmt.Errorf("interactive login failed: %w", err)
 		}
-		sum := sha256.Sum256([]byte(cached.LoginSession))
-		storeKey = fmt.Sprintf("%s%x", tokenStoreKeyPrefix, sum)
-		if err := a.TokenStore.Save(storeKey, string(tokenBytes)); err != nil {
-			term.Warnf("failed to save AWS OAuth token: %v", err)
+
+		var storeKey string
+		if a.TokenStore != nil {
+			tokenBytes, err := json.Marshal(cached)
+			if err != nil {
+				return fmt.Errorf("failed to marshal token: %w", err)
+			}
+			sum := sha256.Sum256([]byte(cached.LoginSession))
+			storeKey = fmt.Sprintf("%s%x", tokenStoreKeyPrefix, sum)
+			if err := a.TokenStore.Save(storeKey, string(tokenBytes)); err != nil {
+				term.Warnf("failed to save AWS OAuth token: %v", err)
+			}
 		}
+
+		provider := &awsOAuthCredentialsProvider{cached: cached, tokenStore: a.TokenStore, storeKey: storeKey}
+
+		creds, err := a.testCredentialsWithProfile(ctx, storeKey, provider)
+		if err != nil {
+			term.Warnf("interactive token failed AWS_PROFILE role validation: %v", err)
+			continue
+		}
+
+		a.Credentials = awssdk.NewCredentialsCache(creds)
+		return nil
+	}
+	return errors.New("too many failed aws login attempts")
+}
+
+func (a *Aws) testCredentialsWithProfile(ctx context.Context, name string, creds awssdk.CredentialsProvider) (awssdk.CredentialsProvider, error) {
+	identity, err := a.testCredentials(ctx, creds)
+	if err != nil {
+		term.Debugf("token %q failed validation: %v", name, err)
+		return nil, err
 	}
 
-	provider := &awsOAuthCredentialsProvider{cached: cached, tokenStore: a.TokenStore, storeKey: storeKey}
-	a.Credentials = awssdk.NewCredentialsCache(provider)
-	return nil
+	// If the stack/env specifies an AWS_PROFILE with role, try assume the role
+	roleArn, err := a.GetStackAwsProfileRoleArn(ctx)
+	if err != nil {
+		term.Debugf("failed to get AWS_PROFILE role ARN: %v", err)
+	} else if roleArn != "" {
+		credCfg, err := LoadDefaultConfig(ctx, config.WithRegion(string(a.Region)), config.WithCredentialsProvider(creds))
+		if err != nil {
+			return nil, err
+		}
+		// Try assume the profile role
+		assumeRoleProvider := stscreds.NewAssumeRoleProvider(sts.NewFromConfig(credCfg), roleArn)
+		if _, err := a.testCredentials(ctx, assumeRoleProvider); err != nil && identity.Account != nil {
+			// If unable to assume, and also not the same account, then this token is not valid for the specified AWS_PROFILE role
+			if *identity.Account != GetAccountID(roleArn) {
+				return nil, fmt.Errorf("token %q is valid but does not have access to the specified AWS_PROFILE role %q, and its of a different account %v as the AWS_PROFILE %v, skipping", name, roleArn, *identity.Account, GetAccountID(roleArn))
+			}
+			// If cannot assume but it's the same account, we assume its a valid token
+			term.Warnf("token %q is valid for AWS account %v which is same as the account specified by AWS_PROFILE, assume its valid", name, *identity.Account)
+			return creds, nil
+		}
+		// If able to assume the profile role, use the assumed role credentials
+		term.Debugf("token %q is valid and can assume AWS_PROFILE role %q\n", name, roleArn)
+		return assumeRoleProvider, nil
+	}
+	// If no AWS_PROFILE with role specified, any valid token is considered acceptable
+	return creds, nil
+}
+
+func (a *Aws) GetStackAwsProfileRoleArn(ctx context.Context) (string, error) {
+	profile := os.Getenv("AWS_PROFILE")
+	if profile == "" {
+		return "", nil
+	}
+
+	sharedCfg, err := config.LoadSharedConfigProfile(ctx, profile)
+	if err != nil {
+		return "", fmt.Errorf("loading AWS shared config for profile %q: %w", profile, err)
+	}
+	if sharedCfg.Region != "" && sharedCfg.Region != string(a.Region) {
+		return "", fmt.Errorf("AWS_PROFILE environment variable is set to %q which has region %q, but expected region is %q", profile, sharedCfg.Region, a.Region)
+	}
+	return sharedCfg.RoleARN, nil
 }
 
 // InteractiveLogin runs the same-device AWS Sign-In OAuth2 + PKCE + DPoP browser flow:
@@ -211,20 +282,30 @@ func (a *Aws) InteractiveLogin(ctx context.Context, baseEndpoint string) (*awsTo
 	if err != nil {
 		return nil, fmt.Errorf("failed to start local callback server: %w", err)
 	}
+	defer ln.Close()
 	port := ln.Addr().(*net.TCPAddr).Port // nolint:forcetypeassert
 	redirectURI := fmt.Sprintf("http://127.0.0.1:%d/oauth/callback", port)
 
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return nil, fmt.Errorf("generating EC P-256 key: %w", err)
+	config := &oauth2.Config{
+		ClientID: clientIDSameDevice,
+		Endpoint: oauth2.Endpoint{
+			AuthURL: baseEndpoint + "/v1/sessions",
+		},
+		RedirectURL: redirectURI,
+		Scopes:      []string{"openid"},
 	}
 
-	verifier := oauth2.GenerateVerifier()
-	state := randomHex(16)
-	challenge := awsComputeS256Challenge(verifier)
+	pkce, err := auth.GeneratePKCE(64, auth.S256Method)
+	if err != nil {
+		return nil, fmt.Errorf("generating PKCE parameters: %w", err)
+	}
+	state := rand.Text()[:16] // random state for CSRF protection
 	tokenURL := baseEndpoint + "/v1/token"
 
-	authURL := awsBuildAuthURL(baseEndpoint+"/v1/sessions", clientIDSameDevice, redirectURI, state, challenge)
+	authURL := config.AuthCodeURL(state,
+		oauth2.SetAuthURLParam("code_challenge_method", "SHA-256"), // AWS require this to be "SHA-256" literally, not "S256"
+		oauth2.SetAuthURLParam("code_challenge", pkce.Challenge),
+	)
 
 	term.Println("Please visit the following URL to log in to AWS: (Right click the URL or press ENTER to open browser)")
 	term.Printf("  %s\n", authURL)
@@ -232,41 +313,34 @@ func (a *Aws) InteractiveLogin(ctx context.Context, baseEndpoint string) (*awsTo
 	defer done()
 
 	codeCh := make(chan string, 1)
-	errCh := make(chan error, 1)
 	srv := &http.Server{
 		ReadHeaderTimeout: 10 * time.Second,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			q := r.URL.Query()
 			if q.Get("state") != state {
-				http.Error(w, "state mismatch", http.StatusBadRequest)
-				errCh <- errors.New("state mismatch in OAuth callback")
+				http.Error(w, "invalid state", http.StatusBadRequest)
 				return
 			}
 			code := q.Get("code")
 			if code == "" {
 				http.Error(w, "missing authorization code", http.StatusBadRequest)
-				errCh <- errors.New("no authorization code in callback")
 				return
 			}
-			fmt.Fprint(w, "<html><body><h2>Login successful.</h2><p>You may close this window.</p></body></html>")
+			fmt.Fprintln(w, "Authorization successful! You can close this window.")
 			codeCh <- code
 		}),
 	}
 	go srv.Serve(ln) //nolint:errcheck
+	defer srv.Close()
 
-	var authCode string
+	var code string
 	select {
-	case authCode = <-codeCh:
-	case err = <-errCh:
-		srv.Close()
-		return nil, err
 	case <-ctx.Done():
-		srv.Close()
 		return nil, ctx.Err()
+	case code = <-codeCh:
 	}
-	srv.Close()
 
-	return awsExchangeCodeForToken(ctx, tokenURL, clientIDSameDevice, authCode, verifier, redirectURI, privateKey)
+	return RetrieveToken(ctx, tokenURL, clientIDSameDevice, code, pkce.Verifier, redirectURI)
 }
 
 // CrossDeviceLogin runs the cross-device flow for remote/SSH sessions where the
@@ -274,18 +348,26 @@ func (a *Aws) InteractiveLogin(ctx context.Context, baseEndpoint string) (*awsTo
 // to paste the base64-encoded verification code displayed in their browser.
 func (a *Aws) CrossDeviceLogin(ctx context.Context, baseEndpoint string) (*awsTokenCache, error) {
 	redirectURI := baseEndpoint + "/v1/sessions/confirmation"
-
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	pkce, err := auth.GeneratePKCE(64, auth.S256Method)
 	if err != nil {
-		return nil, fmt.Errorf("generating EC P-256 key: %w", err)
+		return nil, fmt.Errorf("generating PKCE parameters: %w", err)
 	}
-
-	verifier := oauth2.GenerateVerifier()
-	state := randomHex(16)
-	challenge := awsComputeS256Challenge(verifier)
+	state := rand.Text()[:16] // random state for CSRF protection
 	tokenURL := baseEndpoint + "/v1/token"
 
-	authURL := awsBuildAuthURL(baseEndpoint+"/v1/sessions", clientIDCrossDevice, redirectURI, state, challenge)
+	config := &oauth2.Config{
+		ClientID: clientIDCrossDevice,
+		Endpoint: oauth2.Endpoint{
+			AuthURL: baseEndpoint + "/v1/sessions",
+		},
+		RedirectURL: redirectURI,
+		Scopes:      []string{"openid"},
+	}
+
+	authURL := config.AuthCodeURL(state,
+		oauth2.SetAuthURLParam("code_challenge_method", "SHA-256"), // AWS require this to be "SHA-256" literally, not "S256"
+		oauth2.SetAuthURLParam("code_challenge", pkce.Challenge),
+	)
 
 	term.Printf("Browser will not be automatically opened. Please visit the following URL:\n\n  %s\n\n", authURL)
 	term.Print("Enter the authorization code displayed in your browser: ")
@@ -297,7 +379,7 @@ func (a *Aws) CrossDeviceLogin(ctx context.Context, baseEndpoint string) (*awsTo
 	}
 	input = strings.TrimSpace(input)
 
-	authCode, gotState, err := awsParseVerificationCode(input)
+	authCode, gotState, err := parseVerificationCode(input)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +387,7 @@ func (a *Aws) CrossDeviceLogin(ctx context.Context, baseEndpoint string) (*awsTo
 		return nil, fmt.Errorf("state mismatch: got %q, want %q", gotState, state)
 	}
 
-	return awsExchangeCodeForToken(ctx, tokenURL, clientIDCrossDevice, authCode, verifier, redirectURI, privateKey)
+	return RetrieveToken(ctx, tokenURL, clientIDCrossDevice, authCode, pkce.Verifier, redirectURI)
 }
 
 // tokenExchangeResponse mirrors the AWS Sign-In CreateOAuth2Token response body.
@@ -330,9 +412,14 @@ type TokenExchangeRequest struct {
 	RefreshToken string `json:"refreshToken,omitempty"`
 }
 
-// awsExchangeCodeForToken calls POST /v1/token with a DPoP-signed request and
+// RetrieveToken calls POST /v1/token with a DPoP-signed request and
 // returns an awsTokenCache ready to be persisted.
-func awsExchangeCodeForToken(ctx context.Context, tokenURL, clientID, authCode, verifier, redirectURI string, key *ecdsa.PrivateKey) (*awsTokenCache, error) {
+func RetrieveToken(ctx context.Context, tokenURL, clientID, authCode, verifier, redirectURI string) (*awsTokenCache, error) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("generating EC P-256 key: %w", err)
+	}
+
 	reqBody := TokenExchangeRequest{
 		ClientID:     clientID,
 		GrantType:    "authorization_code",
@@ -340,12 +427,12 @@ func awsExchangeCodeForToken(ctx context.Context, tokenURL, clientID, authCode, 
 		CodeVerifier: verifier,
 		RedirectURI:  redirectURI,
 	}
-	return awsDoTokenRequest(ctx, tokenURL, clientID, reqBody, key)
+	return doTokenRequest(ctx, tokenURL, clientID, reqBody, key)
 }
 
-// awsRefreshToken uses the stored refresh token + DPoP key to obtain fresh
+// refreshToken uses the stored refresh token + DPoP key to obtain fresh
 // AWS credentials from the token endpoint.
-func awsRefreshToken(ctx context.Context, cached *awsTokenCache) (*awsTokenCache, error) {
+func refreshToken(ctx context.Context, cached *awsTokenCache) (*awsTokenCache, error) {
 	if cached.RefreshToken == "" {
 		return nil, errors.New("no refresh token available")
 	}
@@ -363,7 +450,7 @@ func awsRefreshToken(ctx context.Context, cached *awsTokenCache) (*awsTokenCache
 		GrantType:    "refresh_token",
 		RefreshToken: cached.RefreshToken,
 	}
-	refreshed, err := awsDoTokenRequest(ctx, cached.TokenURL, cached.ClientID, reqBody, key)
+	refreshed, err := doTokenRequest(ctx, cached.TokenURL, cached.ClientID, reqBody, key)
 	if err != nil {
 		return nil, err
 	}
@@ -386,10 +473,11 @@ func awsRefreshToken(ctx context.Context, cached *awsTokenCache) (*awsTokenCache
 	return refreshed, nil
 }
 
-// awsDoTokenRequest sends a DPoP-signed POST to the token endpoint and parses
+// doTokenRequest sends a DPoP-signed POST to the token endpoint and parses
 // the response into an awsTokenCache.
-func awsDoTokenRequest(ctx context.Context, tokenURL, clientID string, reqBody TokenExchangeRequest, key *ecdsa.PrivateKey) (*awsTokenCache, error) {
-	dpop, err := awsBuildDPoPHeader(key, tokenURL)
+func doTokenRequest(ctx context.Context, tokenURL, clientID string, reqBody TokenExchangeRequest, key *ecdsa.PrivateKey) (*awsTokenCache, error) {
+	// dpop, err := awsBuildDPoPHeader(key, tokenURL)
+	dpop, err := buildDpopHeader(key, tokenURL)
 	if err != nil {
 		return nil, fmt.Errorf("building DPoP header: %w", err)
 	}
@@ -428,12 +516,23 @@ func awsDoTokenRequest(ctx context.Context, tokenURL, clientID string, reqBody T
 	// refresh_token responses. Extract loginSession and accountID only when available.
 	var loginSession, accountID string
 	if out.IDToken != "" {
-		var err error
-		loginSession, err = awsExtractSubFromJWT(out.IDToken)
+		token, _, err := new(jwt.Parser).ParseUnverified(out.IDToken, jwt.MapClaims{})
 		if err != nil {
-			return nil, fmt.Errorf("extracting login session from id_token: %w", err)
+			return nil, fmt.Errorf("parsing id_token JWT: %w", err)
 		}
-		accountID = awsExtractAccountFromARN(loginSession)
+		if claims, ok := token.Claims.(jwt.MapClaims); ok {
+			// AWS puts the login session ARN in the "sub" claim
+			loginSession, ok = claims["sub"].(string)
+			if !ok {
+				return nil, errors.New("id_token missing 'sub' claim")
+			}
+			accountID = GetAccountID(loginSession)
+			if accountID == "" {
+				return nil, fmt.Errorf("failed to extract account ID from login session ARN: %s", loginSession)
+			}
+		} else {
+			return nil, errors.New("unexpected JWT claims type")
+		}
 	}
 
 	expiresAt := time.Now().UTC().Add(time.Duration(out.ExpiresIn) * time.Second)
@@ -456,129 +555,49 @@ func awsDoTokenRequest(ctx context.Context, tokenURL, clientID string, reqBody T
 	return cached, nil
 }
 
-// --- DPoP (RFC 9449) --------------------------------------------------------
+func buildDpopHeader(key *ecdsa.PrivateKey, uri string) (string, error) {
+	u, _ := url.Parse(uri)
 
-// awsBuildDPoPHeader constructs a DPoP proof JWT signed with ES256.
-// The public key is embedded as a JWK in the JOSE header.
-// The signature uses the raw r||s encoding (32 bytes each) as required by JWS ES256.
-func awsBuildDPoPHeader(key *ecdsa.PrivateKey, uri string) (string, error) {
-	pub := key.Public().(*ecdsa.PublicKey) // nolint:forcetypeassert
-	jwk := map[string]string{
+	claims := jwt.MapClaims{
+		"htu": u.Scheme + "://" + u.Host + u.Path,
+		"htm": "POST",
+		"iat": time.Now().Unix(),
+		"jti": uuid.NewString(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
+
+	// Add JWK header
+	pub := key.PublicKey
+	token.Header["jwk"] = map[string]string{
 		"kty": "EC",
 		"crv": "P-256",
-		"x":   awsBase64RawURL(padTo32(pub.X.Bytes())),
-		"y":   awsBase64RawURL(padTo32(pub.Y.Bytes())),
-	}
-	header := map[string]any{
-		"typ": "dpop+jwt",
-		"alg": "ES256",
-		"jwk": jwk,
-	}
-	payload := map[string]any{
-		"htm": "POST",
-		"htu": uri,
-		"iat": time.Now().Unix(),
-		"jti": randomHex(16),
+		"x":   base64.RawURLEncoding.EncodeToString(pub.X.Bytes()),
+		"y":   base64.RawURLEncoding.EncodeToString(pub.Y.Bytes()),
 	}
 
-	headerJSON, err := json.Marshal(header)
-	if err != nil {
-		return "", fmt.Errorf("marshaling DPoP header: %w", err)
-	}
-	payloadJSON, err := json.Marshal(payload)
-	if err != nil {
-		return "", fmt.Errorf("marshaling DPoP payload: %w", err)
-	}
+	token.Header["typ"] = "dpop+jwt"
 
-	headerB64 := awsBase64RawURL(headerJSON)
-	payloadB64 := awsBase64RawURL(payloadJSON)
-	signingInput := headerB64 + "." + payloadB64
-
-	hash := sha256.Sum256([]byte(signingInput))
-	r, s, err := ecdsa.Sign(rand.Reader, key, hash[:])
-	if err != nil {
-		return "", fmt.Errorf("signing DPoP proof: %w", err)
-	}
-
-	// ES256 signature = r || s, each zero-padded to 32 bytes (RFC 7518 §3.4).
-	sig := append(padTo32(r.Bytes()), padTo32(s.Bytes())...)
-	return signingInput + "." + awsBase64RawURL(sig), nil
+	return token.SignedString(key)
 }
 
-// --- PKCE -------------------------------------------------------------------
-
-// awsComputeS256Challenge computes the PKCE code_challenge from a verifier.
-// The challenge method value AWS Sign-In uses is "SHA-256" (not "S256").
-func awsComputeS256Challenge(verifier string) string {
-	h := sha256.Sum256([]byte(verifier))
-	return awsBase64RawURL(h[:])
-}
-
-// --- JWT helpers ------------------------------------------------------------
-
-// awsExtractSubFromJWT decodes the JWT payload without verifying the signature
-// and returns the "sub" claim, which holds the login_session ARN.
-func awsExtractSubFromJWT(token string) (string, error) {
-	parts := strings.Split(token, ".")
-	if len(parts) != 3 {
-		return "", fmt.Errorf("invalid JWT: expected 3 parts, got %d", len(parts))
+func (a *Aws) testCredentials(ctx context.Context, creds awssdk.CredentialsProvider) (*sts.GetCallerIdentityOutput, error) {
+	optFns := []func(*config.LoadOptions) error{
+		config.WithRegion(string(a.Region)),
 	}
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if creds != nil {
+		optFns = append(optFns, config.WithCredentialsProvider(creds))
+	}
+	cfg, err := LoadDefaultConfig(ctx, optFns...)
 	if err != nil {
-		return "", fmt.Errorf("decoding JWT payload: %w", err)
+		return nil, err
 	}
-	var claims map[string]interface{}
-	if err := json.Unmarshal(payload, &claims); err != nil {
-		return "", fmt.Errorf("parsing JWT claims: %w", err)
-	}
-	sub, ok := claims["sub"].(string)
-	if !ok || sub == "" {
-		return "", errors.New("JWT missing 'sub' claim")
-	}
-	return sub, nil
+	return NewStsFromConfig(cfg).GetCallerIdentity(ctx, &awssts.GetCallerIdentityInput{})
 }
 
-// awsExtractAccountFromARN pulls the account ID from an ARN like
-// "arn:aws:signin::123456789012:user/...".
-func awsExtractAccountFromARN(arn string) string {
-	parts := strings.SplitN(arn, ":", 6)
-	if len(parts) >= 5 {
-		return parts[4]
-	}
-	return ""
-}
-
-// --- Credential validation --------------------------------------------------
-
-func (a *Aws) testDefaultCredentials(ctx context.Context) error {
-	cfg, err := LoadDefaultConfig(ctx, a.Region)
-	if err != nil {
-		return err
-	}
-	if cfg.Region == "" {
-		return errors.New("no region configured")
-	}
-	_, err = NewStsFromConfig(cfg).GetCallerIdentity(ctx, &awssts.GetCallerIdentityInput{})
-	return err
-}
-
-func testStoredCredentials(ctx context.Context, region string, creds awssdk.CredentialsProvider) error {
-	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(region),
-		config.WithCredentialsProvider(creds),
-	)
-	if err != nil {
-		return err
-	}
-	_, err = NewStsFromConfig(cfg).GetCallerIdentity(ctx, &awssts.GetCallerIdentityInput{})
-	return err
-}
-
-// --- Cross-device helper ----------------------------------------------------
-
-// awsParseVerificationCode decodes the base64-encoded "state=...&code=..." string
+// parseVerificationCode decodes the base64-encoded "state=...&code=..." string
 // displayed in the browser during the cross-device flow.
-func awsParseVerificationCode(encoded string) (code, state string, err error) {
+func parseVerificationCode(encoded string) (code, state string, err error) {
 	var decoded []byte
 	for _, dec := range []func(string) ([]byte, error){
 		base64.StdEncoding.DecodeString,
@@ -604,46 +623,6 @@ func awsParseVerificationCode(encoded string) (code, state string, err error) {
 		return "", "", errors.New("verification code missing 'code' or 'state' field")
 	}
 	return code, state, nil
-}
-
-// --- OAuth URL builder ------------------------------------------------------
-
-func awsBuildAuthURL(authEndpoint, clientID, redirectURI, state, challenge string) string {
-	conf := &oauth2.Config{
-		ClientID: clientID,
-		Endpoint: oauth2.Endpoint{
-			AuthURL: authEndpoint,
-		},
-		RedirectURL: redirectURI,
-		Scopes:      []string{"openid"},
-	}
-	return conf.AuthCodeURL(state,
-		oauth2.SetAuthURLParam("code_challenge_method", "SHA-256"),
-		oauth2.SetAuthURLParam("code_challenge", challenge),
-	)
-}
-
-// --- Utilities --------------------------------------------------------------
-
-func awsBase64RawURL(data []byte) string {
-	return base64.RawURLEncoding.EncodeToString(data)
-}
-
-// padTo32 zero-pads b on the left to exactly 32 bytes, as required for
-// P-256 coordinates and ES256 signature components.
-func padTo32(b []byte) []byte {
-	if len(b) == 32 {
-		return b
-	}
-	out := make([]byte, 32)
-	copy(out[32-len(b):], b)
-	return out
-}
-
-func randomHex(n int) string {
-	b := make([]byte, n)
-	rand.Read(b)
-	return hex.EncodeToString(b)
 }
 
 // serializePrivateKey encodes the EC private key as a PEM-wrapped SEC1 block.
