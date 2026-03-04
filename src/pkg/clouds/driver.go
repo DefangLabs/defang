@@ -39,7 +39,7 @@ type TaskVolume struct {
 }
 
 type Driver interface {
-	SetUp(ctx context.Context, containers []Container) error
+	SetUp(ctx context.Context, containers []Container) (bool, error) // returns true if newly created
 	TearDown(ctx context.Context) error
 	Run(ctx context.Context, env map[string]string, args ...string) (TaskID, error)
 	Tail(ctx context.Context, taskID TaskID) error

@@ -33,7 +33,7 @@ func TestPrintPlaygroundPortalServiceURLs(t *testing.T) {
 	term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
 
 	global.Stack.Provider = client.ProviderDefang
-	global.Cluster = client.DefaultCluster
+	global.FabricAddr = client.DefaultFabricAddr
 	printPlaygroundPortalServiceURLs([]*defangv1.ServiceInfo{
 		{
 			Service: &defangv1.Service{Name: "service1"},

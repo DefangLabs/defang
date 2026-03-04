@@ -110,10 +110,10 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func testCommand(t *testing.T, args []string, cluster string) error {
+func testCommand(t *testing.T, args []string, fabricAddr string) error {
 	t.Helper()
-	if cluster != "" {
-		args = append(args, "--cluster", strings.TrimPrefix(cluster, "http://"))
+	if fabricAddr != "" {
+		args = append(args, "--cluster", strings.TrimPrefix(fabricAddr, "http://"))
 	}
 	RootCmd.SetArgs(args)
 	return RootCmd.ExecuteContext(context.Background()) // t.Context() only works for first test?

@@ -24,7 +24,7 @@ func Test_configurationPrecedence(t *testing.T) {
 		NonInteractive: false, // set to false just for test instead of !term.IsTerminal() for consistency
 		Verbose:        false,
 		Stack:          stacks.Parameters{Provider: client.ProviderAuto, Mode: modes.ModeUnspecified},
-		Cluster:        "",
+		FabricAddr:     "",
 		Tenant:         "",
 	}
 
@@ -55,7 +55,7 @@ func Test_configurationPrecedence(t *testing.T) {
 			flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
 			flags.StringVarP(&testConfig.Stack.Name, "stack", "s", testConfig.Stack.Name, "stack name (for BYOC providers)")
 			flags.Var(&testConfig.ColorMode, "color", "colorize output")
-			flags.StringVar(&testConfig.Cluster, "cluster", testConfig.Cluster, "Defang cluster to connect to")
+			flags.StringVar(&testConfig.FabricAddr, "cluster", testConfig.FabricAddr, "Defang cluster to connect to")
 			flags.Var(&testConfig.Tenant, "workspace", "workspace name (tenant)")
 			flags.VarP(&testConfig.Stack.Provider, "provider", "P", "bring-your-own-cloud provider")
 			flags.BoolVarP(&testConfig.Verbose, "verbose", "v", testConfig.Verbose, "verbose logging")
@@ -112,8 +112,8 @@ func Test_configurationPrecedence(t *testing.T) {
 			if testConfig.Stack.Mode != tt.expected.Stack.Mode {
 				t.Errorf("expected Stack.Mode to be '%s', got '%s'", tt.expected.Stack.Mode, testConfig.Stack.Mode)
 			}
-			if testConfig.Cluster != tt.expected.Cluster {
-				t.Errorf("expected Cluster to be '%s', got '%s'", tt.expected.Cluster, testConfig.Cluster)
+			if testConfig.FabricAddr != tt.expected.FabricAddr {
+				t.Errorf("expected FabricAddr to be '%s', got '%s'", tt.expected.FabricAddr, testConfig.FabricAddr)
 			}
 			if testConfig.Tenant != tt.expected.Tenant {
 				t.Errorf("expected Tenant to be '%s', got '%s'", tt.expected.Tenant, testConfig.Tenant)

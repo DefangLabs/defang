@@ -8,15 +8,15 @@ import (
 )
 
 func GetClientWithRetry(ctx context.Context, cli CLIInterface, config StackConfig) (*client.GrpcClient, error) {
-	client, err := cli.Connect(ctx, config.Cluster)
+	client, err := cli.Connect(ctx, config.FabricAddr)
 	if err != nil {
-		err = cli.InteractiveLoginMCP(ctx, config.Cluster, common.MCPDevelopmentClient)
+		err = cli.InteractiveLoginMCP(ctx, config.FabricAddr, common.MCPDevelopmentClient)
 		if err != nil {
 			return nil, err
 		}
 
 		// Reconnect with the new token
-		client, err = cli.Connect(ctx, config.Cluster)
+		client, err = cli.Connect(ctx, config.FabricAddr)
 		if err != nil {
 			return nil, err
 		}

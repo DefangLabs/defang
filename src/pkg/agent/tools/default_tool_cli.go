@@ -18,8 +18,8 @@ import (
 )
 
 type StackConfig struct {
-	Cluster string
-	Stack   *stacks.Parameters
+	FabricAddr string
+	Stack      *stacks.Parameters
 }
 
 // DefaultToolCLI implements all tool interfaces as passthroughs to the real CLI logic
@@ -46,9 +46,9 @@ func (DefaultToolCLI) ListConfig(ctx context.Context, provider client.Provider, 
 	return provider.ListConfig(ctx, req)
 }
 
-func (DefaultToolCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
+func (DefaultToolCLI) Connect(ctx context.Context, fabricAddr string) (*client.GrpcClient, error) {
 	// TODO: add workspace support to the MCP server
-	return cli.ConnectWithTenant(ctx, cluster, types.TenantUnset)
+	return cli.ConnectWithTenant(ctx, fabricAddr, types.TenantUnset)
 }
 
 func (DefaultToolCLI) ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, stack *stacks.Parameters, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
@@ -105,6 +105,6 @@ func (DefaultToolCLI) GenerateAuthURL(authPort int) string {
 	return "Please open this URL in your browser: http://127.0.0.1:" + strconv.Itoa(authPort) + " to login"
 }
 
-func (DefaultToolCLI) InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
-	return login.InteractiveLoginMCP(ctx, cluster, mcpClient)
+func (DefaultToolCLI) InteractiveLoginMCP(ctx context.Context, fabricAddr string, mcpClient string) error {
+	return login.InteractiveLoginMCP(ctx, fabricAddr, mcpClient)
 }

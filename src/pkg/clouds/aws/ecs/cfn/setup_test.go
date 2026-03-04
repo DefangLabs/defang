@@ -34,7 +34,7 @@ func TestCloudFormation(t *testing.T) {
 		t.Setenv("DOCKERHUB_USERNAME", "defanglabs2")
 		t.Setenv("DOCKERHUB_ACCESS_TOKEN", "defanglabs")
 
-		err := aws.SetUp(ctx, testContainers)
+		_, err := aws.SetUp(ctx, testContainers)
 		if err != nil {
 			t.Fatal(err)
 		}

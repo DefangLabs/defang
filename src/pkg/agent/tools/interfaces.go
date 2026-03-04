@@ -18,11 +18,11 @@ type CLIInterface interface {
 	ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, stack *stacks.Parameters, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error)
 	ConfigDelete(ctx context.Context, projectName string, provider client.Provider, name string) error
 	ConfigSet(ctx context.Context, projectName string, provider client.Provider, name, value string) error
-	Connect(ctx context.Context, cluster string) (*client.GrpcClient, error)
+	Connect(ctx context.Context, fabricAddr string) (*client.GrpcClient, error)
 	CreatePlaygroundProvider(fabric *client.GrpcClient) client.Provider
 	GenerateAuthURL(authPort int) string
 	GetServices(ctx context.Context, projectName string, provider client.Provider) ([]cli.ServiceLineItem, error)
-	InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error
+	InteractiveLoginMCP(ctx context.Context, fabricAddr string, mcpClient string) error
 	ListConfig(ctx context.Context, provider client.Provider, projectName string) (*defangv1.Secrets, error)
 	LoadProject(ctx context.Context, loader client.Loader) (*compose.Project, error)
 	LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error)

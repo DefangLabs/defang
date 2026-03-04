@@ -1,81 +1,118 @@
 package aws
 
 import (
+	"iter"
 	"slices"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-type byocSubscribeServerStream struct {
-	services []string
-	etag     types.ETag
-
-	ch   chan *defangv1.SubscribeResponse
-	resp *defangv1.SubscribeResponse
-	err  error
-	done chan struct{}
-}
-
-func (s *byocSubscribeServerStream) HandleCodebuildEvent(evt codebuild.Event) {
-	if etag := evt.Etag(); etag == "" || etag != s.etag {
-		return
-	}
-	service := strings.TrimSuffix(evt.Service(), "-image")
-	if len(s.services) > 0 && !slices.Contains(s.services, service) {
-		return
-	}
-	resp := defangv1.SubscribeResponse{
-		Name:   evt.Service(),
-		Status: evt.Status(),
-		State:  evt.State(),
-	}
-	select {
-	case s.ch <- &resp:
-	case <-s.done:
+// parseSubscribeEvents converts CW log events from ECS and builds log groups
+// into SubscribeResponse, filtering by etag and services.
+func parseSubscribeEvents(logSeq iter.Seq2[[]cw.LogEvent, error], etag types.ETag, services []string) iter.Seq2[*defangv1.SubscribeResponse, error] {
+	return func(yield func(*defangv1.SubscribeResponse, error) bool) {
+		for events, err := range logSeq {
+			for _, event := range events {
+				if resp := parseSubscribeEvent(event, etag, services); resp != nil {
+					if !yield(resp, nil) {
+						return
+					}
+				}
+			}
+			if err != nil {
+				if !yield(nil, err) {
+					return
+				}
+			}
+		}
 	}
 }
 
-func (s *byocSubscribeServerStream) HandleECSEvent(evt ecs.Event) {
-	if etag := evt.Etag(); etag == "" || etag != s.etag {
-		return
+func parseSubscribeEvent(evt cw.LogEvent, etag types.ETag, services []string) *defangv1.SubscribeResponse {
+	if evt.LogGroupIdentifier == nil || evt.Message == nil {
+		return nil
 	}
-	if service := evt.Service(); len(s.services) > 0 && !slices.Contains(s.services, service) {
-		return
-	}
-	resp := defangv1.SubscribeResponse{
-		Name:   evt.Service(),
-		Status: evt.Status(),
-		State:  evt.State(),
-	}
-	select {
-	case s.ch <- &resp:
-	case <-s.done:
+
+	switch {
+	case strings.HasSuffix(*evt.LogGroupIdentifier, "/ecs"):
+		return parseECSSubscribeEvent(evt, etag, services)
+	case strings.HasSuffix(*evt.LogGroupIdentifier, "/builds") &&
+		evt.LogStreamName != nil &&
+		codeBuildPrefixRegex.MatchString(*evt.LogStreamName):
+		return parseCodebuildSubscribeEvent(evt, etag, services)
+	default:
+		return nil
 	}
 }
 
-func (s *byocSubscribeServerStream) Close() error {
-	close(s.done)
-	return nil
-}
+func parseECSSubscribeEvent(evt cw.LogEvent, etag types.ETag, services []string) *defangv1.SubscribeResponse {
+	ecsEvt, err := ecs.ParseECSEvent([]byte(*evt.Message))
+	if err != nil {
+		term.Debugf("error parsing ECS event: %v", err)
+		return nil
+	}
 
-func (s *byocSubscribeServerStream) Receive() bool {
-	select {
-	case resp := <-s.ch:
-		s.resp = resp
-		return true
-	case <-s.done:
-		return false
+	if e := ecsEvt.Etag(); e == "" || (etag != "" && e != etag) {
+		return nil
+	}
+	if service := ecsEvt.Service(); len(services) > 0 && !slices.Contains(services, service) {
+		return nil
+	}
+
+	return &defangv1.SubscribeResponse{
+		Name:   ecsEvt.Service(),
+		Status: ecsEvt.Status(),
+		State:  ecsEvt.State(),
 	}
 }
 
-func (s *byocSubscribeServerStream) Msg() *defangv1.SubscribeResponse {
-	return s.resp
-}
+func parseCodebuildSubscribeEvent(evt cw.LogEvent, etag types.ETag, services []string) *defangv1.SubscribeResponse {
+	// Extract service/etag from log stream name: "<service>-image/<service>_<etag>/<build_id>"
+	if evt.LogStreamName == nil {
+		return nil
+	}
+	parts := strings.Split(*evt.LogStreamName, "/")
+	if len(parts) != 3 {
+		return nil
+	}
+	underscore := strings.LastIndexByte(parts[1], '_')
+	if underscore < 0 {
+		return nil
+	}
 
-func (s *byocSubscribeServerStream) Err() error {
-	return s.err
+	cbEtag := parts[1][underscore+1:]
+	cbService := parts[0] // <service>-image
+	cbHost := parts[2]    // build id
+
+	if etag != "" && cbEtag != etag {
+		return nil
+	}
+
+	service := strings.TrimSuffix(cbService, "-image")
+	if len(services) > 0 && !slices.Contains(services, service) {
+		return nil
+	}
+
+	entry := &defangv1.LogEntry{
+		Message: *evt.Message,
+		Service: cbService,
+		Etag:    cbEtag,
+		Host:    cbHost,
+	}
+	cbEvt := codebuild.ParseCodebuildEvent(entry)
+	if cbEvt.State() == defangv1.ServiceState_NOT_SPECIFIED {
+		return nil
+	}
+
+	return &defangv1.SubscribeResponse{
+		Name:   service,
+		Status: cbEvt.Status(),
+		State:  cbEvt.State(),
+	}
 }

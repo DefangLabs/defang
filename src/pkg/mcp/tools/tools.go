@@ -5,16 +5,12 @@ import (
 
 	agentTools "github.com/DefangLabs/defang/src/pkg/agent/tools"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
-	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-type StackConfig struct {
-	Cluster string
-	Stack   *stacks.Parameters
-}
+type StackConfig = agentTools.StackConfig
 
 func translateSchema(schema map[string]any) mcp.ToolInputSchema {
 	if schema == nil {
@@ -81,9 +77,6 @@ func translateGenKitToolsToMCP(genkitTools []ai.Tool) []server.ServerTool {
 }
 
 func CollectTools(ec elicitations.Controller, config StackConfig) []server.ServerTool {
-	genkitTools := agentTools.CollectDefangTools(ec, agentTools.StackConfig{
-		Cluster: config.Cluster,
-		Stack:   config.Stack,
-	})
+	genkitTools := agentTools.CollectDefangTools(ec, config)
 	return translateGenKitToolsToMCP(genkitTools)
 }

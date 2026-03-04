@@ -42,8 +42,8 @@ type MockDeployCLI struct {
 	CallLog                      []string
 }
 
-func (m *MockDeployCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("Connect(%s)", cluster))
+func (m *MockDeployCLI) Connect(ctx context.Context, fabricAddr string) (*client.GrpcClient, error) {
+	m.CallLog = append(m.CallLog, fmt.Sprintf("Connect(%s)", fabricAddr))
 	if m.ConnectError != nil {
 		return &client.GrpcClient{}, m.ConnectError
 	}
@@ -56,7 +56,7 @@ func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.Provi
 	return nil
 }
 
-func (m *MockDeployCLI) InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
+func (m *MockDeployCLI) InteractiveLoginMCP(ctx context.Context, fabricAddr string, mcpClient string) error {
 	m.CallLog = append(m.CallLog, "InteractiveLoginMCP")
 	return m.InteractiveLoginMCPError
 }
@@ -182,8 +182,8 @@ func TestHandleDeployTool(t *testing.T) {
 				},
 			}
 			result, err := HandleDeployTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
-				Cluster: "test-cluster",
-				Stack:   &stack,
+				FabricAddr: "test-cluster",
+				Stack:      &stack,
 			})
 
 			// Verify error expectations

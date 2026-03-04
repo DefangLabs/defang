@@ -12,7 +12,7 @@ var logoutCmd = &cobra.Command{
 	Aliases: []string{"logoff", "revoke"},
 	Short:   "Log out",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := cli.Logout(cmd.Context(), global.Client, global.Cluster); err != nil {
+		if err := cli.Logout(cmd.Context(), global.Client, global.FabricAddr); err != nil {
 			return err
 		}
 		term.Info("Successfully logged out")

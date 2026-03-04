@@ -150,15 +150,15 @@ func (a *AwsEcsCfn) createStackAndWait(ctx context.Context, templateBody string,
 	return a.fillWithOutputs(dso)
 }
 
-func (a *AwsEcsCfn) SetUp(ctx context.Context, containers []clouds.Container) error {
+func (a *AwsEcsCfn) SetUp(ctx context.Context, containers []clouds.Container) (bool, error) {
 	template, err := CreateTemplate(a.stackName, containers)
 	if err != nil {
-		return fmt.Errorf("failed to create CloudFormation template: %w", err)
+		return false, fmt.Errorf("failed to create CloudFormation template: %w", err)
 	}
 
 	templateBody, err := template.YAML()
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// Set parameter values based on current configuration
@@ -199,17 +199,17 @@ func (a *AwsEcsCfn) SetUp(ctx context.Context, containers []clouds.Container) er
 	return a.upsertStackAndWait(ctx, templateBody, parameters...)
 }
 
-func (a *AwsEcsCfn) upsertStackAndWait(ctx context.Context, templateBody []byte, parameters ...cfnTypes.Parameter) error {
+func (a *AwsEcsCfn) upsertStackAndWait(ctx context.Context, templateBody []byte, parameters ...cfnTypes.Parameter) (bool, error) {
 	// Upsert with parameters
 	if err := a.updateStackAndWait(ctx, string(templateBody), parameters); err != nil {
 		// Check if the stack doesn't exist; if so, create it, otherwise return the error
 		var apiError smithy.APIError
 		if ok := errors.As(err, &apiError); !ok || (apiError.ErrorCode() != "ValidationError") || !strings.HasSuffix(apiError.ErrorMessage(), "does not exist") {
-			return err
+			return false, err
 		}
-		return a.createStackAndWait(ctx, string(templateBody), parameters)
+		return true, a.createStackAndWait(ctx, string(templateBody), parameters)
 	}
-	return nil
+	return false, nil
 }
 
 type ErrStackNotFoundException = cfnTypes.StackNotFoundException

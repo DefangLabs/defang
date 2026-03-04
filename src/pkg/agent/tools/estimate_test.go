@@ -30,8 +30,8 @@ type MockEstimateCLI struct {
 	ProviderIDAfterSet       client.ProviderID // Track the providerID that gets set
 }
 
-func (m *MockEstimateCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("Connect(%s)", cluster))
+func (m *MockEstimateCLI) Connect(ctx context.Context, fabricAddr string) (*client.GrpcClient, error) {
+	m.CallLog = append(m.CallLog, fmt.Sprintf("Connect(%s)", fabricAddr))
 	if m.ConnectError != nil {
 		return nil, m.ConnectError
 	}
@@ -68,8 +68,8 @@ func (m *MockEstimateCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.Esti
 	return m.CapturedOutput
 }
 
-func (m *MockEstimateCLI) InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("InteractiveLoginMCP(%s)", cluster))
+func (m *MockEstimateCLI) InteractiveLoginMCP(ctx context.Context, fabricAddr string, mcpClient string) error {
+	m.CallLog = append(m.CallLog, fmt.Sprintf("InteractiveLoginMCP(%s)", fabricAddr))
 	if m.InteractiveLoginMCPError != nil {
 		return m.InteractiveLoginMCPError
 	}
@@ -224,8 +224,8 @@ func TestHandleEstimateTool(t *testing.T) {
 			// Call the function
 			loader := &client.MockLoader{}
 			result, err := HandleEstimateTool(t.Context(), loader, params, mockCLI, StackConfig{
-				Cluster: "test-cluster",
-				Stack:   &stacks.Parameters{Provider: providerID},
+				FabricAddr: "test-cluster",
+				Stack:      &stacks.Parameters{Provider: providerID},
 			})
 
 			// Verify error expectations

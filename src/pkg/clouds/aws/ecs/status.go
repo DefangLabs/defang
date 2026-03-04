@@ -15,10 +15,10 @@ import (
 
 // GetTaskStatus returns nil if the task is still running, io.EOF if the task is stopped successfully, or an error if the task failed.
 // It derives the region from the task ARN and uses the receiver's credentials via LoadConfig.
-func (a *AwsEcs) GetTaskStatus(ctx context.Context, taskArn TaskArn) error {
+func (a *AwsEcs) GetTaskStatus(ctx context.Context, taskArn TaskArn) (bool, error) {
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
-		return err
+		return false, err
 	}
 	// Override with the region embedded in the task ARN; the task may be in a different region than the driver.
 	cfg.Region = string(region.FromArn(*taskArn))
@@ -37,7 +37,7 @@ func isTaskTerminalStatus(status string) bool {
 }
 
 // getTaskStatus returns nil if the task is still running, io.EOF if the task is stopped successfully, or an error if the task failed.
-func getTaskStatus(ctx context.Context, cfg awssdk.Config, cluster, taskId string) error {
+func getTaskStatus(ctx context.Context, cfg awssdk.Config, cluster, taskId string) (bool, error) {
 	ecsClient := ecs.NewFromConfig(cfg)
 
 	// Use DescribeTasks API to check if the task is still running (same as ecs.NewTasksStoppedWaiter)
@@ -46,26 +46,33 @@ func getTaskStatus(ctx context.Context, cfg awssdk.Config, cluster, taskId strin
 		Tasks:   []string{taskId},
 	})
 	if ti == nil || len(ti.Tasks) == 0 {
-		return nil // task doesn't exist yet; TODO: check the actual error from DescribeTasks
+		return false, nil // task doesn't exist (yet); TODO: check the actual error from DescribeTasks
 	}
 	task := ti.Tasks[0]
 	if task.LastStatus == nil || !isTaskTerminalStatus(*task.LastStatus) {
-		return nil // still running
+		return false, nil // still running
 	}
 
+	var stoppedReason string
+	if task.StoppedReason != nil {
+		stoppedReason = *task.StoppedReason
+	}
 	switch task.StopCode {
 	default:
-		return TaskFailure{task.StopCode, *task.StoppedReason}
+		return true, TaskFailure{task.StopCode, stoppedReason}
 	case ecsTypes.TaskStopCodeEssentialContainerExited:
 		for _, c := range task.Containers {
 			if c.ExitCode != nil && *c.ExitCode != 0 {
-				reason := fmt.Sprintf("%s with code %d", *task.StoppedReason, *c.ExitCode)
-				return TaskFailure{task.StopCode, reason}
+				if stoppedReason == "" {
+					stoppedReason = "essential container exited"
+				}
+				reason := fmt.Sprintf("%s with code %d", stoppedReason, *c.ExitCode)
+				return true, TaskFailure{task.StopCode, reason}
 			}
 		}
 		fallthrough
 	case "": // TODO: shouldn't happen
-		return io.EOF // Success
+		return true, io.EOF // Success; EOF returned for backward compatibility
 	}
 }
 
@@ -93,7 +100,7 @@ func (a *AwsEcs) WaitForTask(ctx context.Context, taskArn TaskArn, poll time.Dur
 			// Handle cancellation
 			return ctx.Err()
 		case <-ticker.C:
-			if err := a.GetTaskStatus(ctx, taskArn); err != nil {
+			if done, err := a.GetTaskStatus(ctx, taskArn); done || err != nil {
 				return err
 			}
 		}

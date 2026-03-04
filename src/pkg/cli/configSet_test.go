@@ -15,7 +15,7 @@ type mockConfigManager struct {
 	mock.Mock
 }
 
-func (m mockConfigManager) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
+func (m *mockConfigManager) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
 	args := m.Called(ctx, req)
 	secret, ok := args.Get(0).(*defangv1.Secrets)
 	if !ok && args.Get(0) != nil {
@@ -24,7 +24,7 @@ func (m mockConfigManager) ListConfig(ctx context.Context, req *defangv1.ListCon
 	return secret, args.Error(1)
 }
 
-func (m mockConfigManager) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
+func (m *mockConfigManager) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
 	args := m.Called(ctx, req)
 	return args.Error(0)
 }

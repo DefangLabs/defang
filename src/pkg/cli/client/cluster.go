@@ -11,57 +11,56 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 )
 
-const DefaultCluster = "fabric-prod1.defang.dev"
+const DefaultFabricAddr = "fabric-prod1.defang.dev"
 
-var DefangFabric = pkg.Getenv("DEFANG_FABRIC", DefaultCluster)
+var DefangFabric = pkg.Getenv("DEFANG_FABRIC", DefaultFabricAddr)
 var TokenStore tokenstore.TokenStore = &tokenstore.LocalDirTokenStore{Dir: StateDir}
 
-func NormalizeHost(cluster string) string {
-	if cluster == "" {
-		cluster = DefangFabric
+func NormalizeHost(fabricAddr string) string {
+	if fabricAddr == "" {
+		fabricAddr = DefangFabric
 	}
-	if _, _, err := net.SplitHostPort(cluster); err != nil {
-		cluster = cluster + ":443" // default to https
+	if _, _, err := net.SplitHostPort(fabricAddr); err != nil {
+		fabricAddr = fabricAddr + ":443" // default to https
 	}
-	return cluster
+	return fabricAddr
 }
 
-func TokenStorageName(cluster string) string {
+func TokenStorageName(fabricAddr string) string {
 	// Token files are keyed by normalized host (no tenant prefix, no port) to avoid duplication.
-	if at := strings.LastIndex(cluster, "@"); at >= 0 && at < len(cluster)-1 {
-		cluster = cluster[at+1:] // drop legacy tenant prefix
+	if at := strings.LastIndex(fabricAddr, "@"); at >= 0 && at < len(fabricAddr)-1 {
+		fabricAddr = fabricAddr[at+1:] // drop legacy tenant prefix
 	}
-	host := NormalizeHost(cluster)
+	host := NormalizeHost(fabricAddr)
 	if parsedHost, _, err := net.SplitHostPort(host); err == nil && parsedHost != "" {
 		host = parsedHost
 	}
 	return host
 }
 
-func GetTokenFile(cluster string) string {
-	return filepath.Join(StateDir, TokenStorageName(cluster))
+func GetTokenFile(fabricAddr string) string {
+	return filepath.Join(StateDir, TokenStorageName(fabricAddr))
 }
 
-func GetExistingToken(cluster string) string {
+func GetExistingToken(fabricAddr string) string {
 	var accessToken = os.Getenv("DEFANG_ACCESS_TOKEN")
 
 	if accessToken != "" {
 		term.Debug("Using access token from env DEFANG_ACCESS_TOKEN")
 	} else {
 		var err error
-		accessToken, err = TokenStore.Load(TokenStorageName(cluster))
+		accessToken, err = TokenStore.Load(TokenStorageName(fabricAddr))
 		if err != nil {
-			term.Debugf("failed to load access token for %v: %v", cluster, err)
+			term.Debugf("failed to load access token for %v: %v", fabricAddr, err)
 		}
 
-		if jwtPath, err := GetWebIdentityTokenFile(cluster); err == nil {
-			if os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") == "" {
+		// Check if we wrote an IDToken file during login, if AWS_WEB_IDENTITY_TOKEN_FILE is empty,
+		if os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") == "" {
+			if jwtPath, err := GetWebIdentityTokenFile(fabricAddr); err == nil {
 				term.Debugf("using web identity token from %s", jwtPath)
 				// Set AWS env vars for this CLI invocation
 				os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath)
 				os.Setenv("AWS_ROLE_SESSION_NAME", "defang-cli") // TODO: from WhoAmI
-			} else {
-				term.Debugf("AWS_WEB_IDENTITY_TOKEN_FILE is already set; not using token file")
 			}
 		}
 	}
@@ -69,12 +68,12 @@ func GetExistingToken(cluster string) string {
 	return accessToken
 }
 
-func GetWebIdentityTokenFile(cluster string) (string, error) {
-	jwtPath := filepath.Join(StateDir, TokenStorageName(cluster)) + ".jwt" // TODO: store in TMPDIR instead?
+func GetWebIdentityTokenFile(fabricAddr string) (string, error) {
+	jwtPath := filepath.Join(StateDir, TokenStorageName(fabricAddr)) + ".jwt" // TODO: store in TMPDIR instead?
 	_, err := os.Stat(jwtPath)
 	return jwtPath, err
 }
 
-func SaveAccessToken(cluster, token string) error {
-	return TokenStore.Save(TokenStorageName(cluster), token)
+func SaveAccessToken(fabricAddr, token string) error {
+	return TokenStore.Save(TokenStorageName(fabricAddr), token)
 }

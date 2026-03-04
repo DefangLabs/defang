@@ -16,7 +16,7 @@ func TestLocal(t *testing.T) {
 	ctx := t.Context()
 
 	t.Run("SetUp", func(t *testing.T) {
-		if err := l.SetUp(ctx, []clouds.Container{{EntryPoint: []string{"/bin/sh"}}}); err != nil {
+		if _, err := l.SetUp(ctx, []clouds.Container{{EntryPoint: []string{"/bin/sh"}}}); err != nil {
 			t.Fatal(err)
 		}
 	})

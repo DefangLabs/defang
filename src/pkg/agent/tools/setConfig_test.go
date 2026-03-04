@@ -33,7 +33,7 @@ type MockSetConfigCLI struct {
 	ConfigSetValue           string
 }
 
-func (m *MockSetConfigCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
+func (m *MockSetConfigCLI) Connect(ctx context.Context, fabricAddr string) (*client.GrpcClient, error) {
 	m.ConnectCalled = true
 	if m.ConnectError != nil {
 		return nil, m.ConnectError
@@ -84,7 +84,7 @@ func (m *MockSetConfigCLI) ConfigSet(ctx context.Context, projectName string, pr
 	return m.ConfigSetError
 }
 
-func (m *MockSetConfigCLI) InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
+func (m *MockSetConfigCLI) InteractiveLoginMCP(ctx context.Context, fabricAddr string, mcpClient string) error {
 	if m.InteractiveLoginMCPError != nil {
 		return m.InteractiveLoginMCPError
 	}
@@ -100,7 +100,7 @@ func TestHandleSetConfig(t *testing.T) {
 	)
 	tests := []struct {
 		name                     string
-		cluster                  string
+		fabricAddr               string
 		providerId               client.ProviderID
 		requestArgs              map[string]interface{}
 		mockCLI                  *MockSetConfigCLI
@@ -115,7 +115,7 @@ func TestHandleSetConfig(t *testing.T) {
 		// Input validation tests
 		{
 			name:                     "missing config name",
-			cluster:                  testCluster,
+			fabricAddr:               testCluster,
 			providerId:               client.ProviderID(""),
 			requestArgs:              map[string]interface{}{"value": testValue},
 			mockCLI:                  &MockSetConfigCLI{},
@@ -127,7 +127,7 @@ func TestHandleSetConfig(t *testing.T) {
 		},
 		{
 			name:                     "empty config name",
-			cluster:                  testCluster,
+			fabricAddr:               testCluster,
 			providerId:               client.ProviderID(""),
 			requestArgs:              map[string]interface{}{"name": "", "value": testValue},
 			mockCLI:                  &MockSetConfigCLI{},
@@ -139,7 +139,7 @@ func TestHandleSetConfig(t *testing.T) {
 		},
 		{
 			name:                     "missing config value",
-			cluster:                  testCluster,
+			fabricAddr:               testCluster,
 			providerId:               client.ProviderID(""),
 			requestArgs:              map[string]interface{}{"name": testConfigName},
 			mockCLI:                  &MockSetConfigCLI{},
@@ -151,7 +151,7 @@ func TestHandleSetConfig(t *testing.T) {
 		},
 		{
 			name:                     "empty config value",
-			cluster:                  testCluster,
+			fabricAddr:               testCluster,
 			providerId:               client.ProviderID(""),
 			requestArgs:              map[string]interface{}{"name": testConfigName, "value": ""},
 			mockCLI:                  &MockSetConfigCLI{},
@@ -165,7 +165,7 @@ func TestHandleSetConfig(t *testing.T) {
 		// CLI operation error tests
 		{
 			name:                 "connect error",
-			cluster:              testCluster,
+			fabricAddr:           testCluster,
 			providerId:           client.ProviderID(""),
 			requestArgs:          map[string]interface{}{"name": testConfigName, "value": testValue},
 			mockCLI:              &MockSetConfigCLI{ConnectError: errors.New("connection failed"), InteractiveLoginMCPError: errors.New("connection failed")},
@@ -175,7 +175,7 @@ func TestHandleSetConfig(t *testing.T) {
 		},
 		{
 			name:                     "load project name error",
-			cluster:                  testCluster,
+			fabricAddr:               testCluster,
 			providerId:               client.ProviderID(""),
 			requestArgs:              map[string]interface{}{"name": testConfigName, "value": testValue},
 			mockCLI:                  &MockSetConfigCLI{LoadProjectNameError: errors.New("project loading failed")},
@@ -187,7 +187,7 @@ func TestHandleSetConfig(t *testing.T) {
 		},
 		{
 			name:                     "config set error",
-			cluster:                  testCluster,
+			fabricAddr:               testCluster,
 			providerId:               client.ProviderID(""),
 			requestArgs:              map[string]interface{}{"name": "valid_config_name", "value": testValue},
 			mockCLI:                  &MockSetConfigCLI{ConfigSetError: errors.New("config set failed")},
@@ -201,7 +201,7 @@ func TestHandleSetConfig(t *testing.T) {
 		// Success tests
 		{
 			name:                     "successful config set",
-			cluster:                  testCluster,
+			fabricAddr:               testCluster,
 			providerId:               client.ProviderID(""),
 			requestArgs:              map[string]interface{}{"name": "valid_config_name", "value": testValue},
 			mockCLI:                  &MockSetConfigCLI{},
@@ -213,7 +213,7 @@ func TestHandleSetConfig(t *testing.T) {
 		},
 		{
 			name:                     "successful config set with project name",
-			cluster:                  testCluster,
+			fabricAddr:               testCluster,
 			providerId:               client.ProviderID(""),
 			requestArgs:              map[string]interface{}{"name": "valid_config_name", "value": testValue, "project_name": "test-project"},
 			mockCLI:                  &MockSetConfigCLI{ReturnedProjectName: "test-project"},
@@ -226,7 +226,7 @@ func TestHandleSetConfig(t *testing.T) {
 		},
 		{
 			name:                     "successful config set with random flag",
-			cluster:                  testCluster,
+			fabricAddr:               testCluster,
 			providerId:               client.ProviderID(""),
 			requestArgs:              map[string]interface{}{"name": "valid_config_name", "random": true},
 			mockCLI:                  &MockSetConfigCLI{},
@@ -238,7 +238,7 @@ func TestHandleSetConfig(t *testing.T) {
 		},
 		{
 			name:                     "error when both random and value are provided",
-			cluster:                  testCluster,
+			fabricAddr:               testCluster,
 			providerId:               client.ProviderID(""),
 			requestArgs:              map[string]interface{}{"name": "valid_config_name", "value": "ignored-value", "random": true},
 			mockCLI:                  &MockSetConfigCLI{},
@@ -290,8 +290,8 @@ func TestHandleSetConfig(t *testing.T) {
 				Provider: client.ProviderAWS,
 			}
 			result, err := HandleSetConfig(t.Context(), loader, params, tt.mockCLI, ec, StackConfig{
-				Cluster: tt.cluster,
-				Stack:   &stack,
+				FabricAddr: tt.fabricAddr,
+				Stack:      &stack,
 			})
 
 			if tt.expectedError {

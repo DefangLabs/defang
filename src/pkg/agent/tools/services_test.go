@@ -35,7 +35,7 @@ type MockCLI struct {
 	GetServicesProvider client.Provider
 }
 
-func (m *MockCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
+func (m *MockCLI) Connect(ctx context.Context, fabricAddr string) (*client.GrpcClient, error) {
 	if m.ConnectError != nil {
 		return nil, m.ConnectError
 	}
@@ -90,7 +90,7 @@ func (m *MockCLI) GenerateAuthURL(authPort int) string {
 	return ""
 }
 
-func (m *MockCLI) InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
+func (m *MockCLI) InteractiveLoginMCP(ctx context.Context, fabricAddr string, mcpClient string) error {
 	return nil
 }
 
@@ -265,8 +265,8 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				},
 			}
 			result, err := HandleServicesTool(t.Context(), loader, params, tt.mockCLI, ec, StackConfig{
-				Cluster: "test-cluster",
-				Stack:   &stack,
+				FabricAddr: "test-cluster",
+				Stack:      &stack,
 			})
 
 			// Check Go error expectation

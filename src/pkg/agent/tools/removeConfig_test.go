@@ -28,8 +28,8 @@ type MockRemoveConfigCLI struct {
 	CallLog                   []string
 }
 
-func (m *MockRemoveConfigCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("Connect(%s)", cluster))
+func (m *MockRemoveConfigCLI) Connect(ctx context.Context, fabricAddr string) (*client.GrpcClient, error) {
+	m.CallLog = append(m.CallLog, fmt.Sprintf("Connect(%s)", fabricAddr))
 	if m.ConnectError != nil {
 		return nil, m.ConnectError
 	}
@@ -57,8 +57,8 @@ func (m *MockRemoveConfigCLI) ConfigDelete(ctx context.Context, projectName stri
 	return m.ConfigDeleteError
 }
 
-func (m *MockRemoveConfigCLI) InteractiveLoginMCP(ctx context.Context, cluster string, mcpClient string) error {
-	m.CallLog = append(m.CallLog, fmt.Sprintf("InteractiveLoginMCP(%s)", cluster))
+func (m *MockRemoveConfigCLI) InteractiveLoginMCP(ctx context.Context, fabricAddr string, mcpClient string) error {
+	m.CallLog = append(m.CallLog, fmt.Sprintf("InteractiveLoginMCP(%s)", fabricAddr))
 	if m.InteractiveLoginMCPError != nil {
 		return m.InteractiveLoginMCPError
 	}
@@ -166,8 +166,8 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				Provider: client.ProviderAWS,
 			}
 			result, err := HandleRemoveConfigTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
-				Cluster: "test-cluster",
-				Stack:   &stack,
+				FabricAddr: "test-cluster",
+				Stack:      &stack,
 			})
 
 			// Verify error expectations

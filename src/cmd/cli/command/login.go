@@ -15,11 +15,11 @@ var loginCmd = &cobra.Command{
 		trainingOptOut, _ := cmd.Flags().GetBool("training-opt-out")
 
 		if global.NonInteractive {
-			if err := login.NonInteractiveGitHubLogin(cmd.Context(), global.Client, global.Cluster); err != nil {
+			if err := login.NonInteractiveGitHubLogin(cmd.Context(), global.Client, global.FabricAddr); err != nil {
 				return err
 			}
 		} else {
-			err := login.InteractiveLogin(cmd.Context(), global.Cluster)
+			err := login.InteractiveLogin(cmd.Context(), global.FabricAddr)
 			if err != nil {
 				return err
 			}

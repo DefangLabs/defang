@@ -35,7 +35,7 @@ func TestLogout(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	ctx := context.Background()
-	url := strings.TrimPrefix(server.URL, "http://")
+	fabricAddr := strings.TrimPrefix(server.URL, "http://")
 
 	// Create a temporary directory for token storage
 	tmpDir := t.TempDir()
@@ -48,12 +48,12 @@ func TestLogout(t *testing.T) {
 		client.TokenStore = originalTokenStore
 	})
 
-	if err := client.TokenStore.Save(client.TokenStorageName(url), "mock-token"); err != nil {
+	if err := client.TokenStore.Save(client.TokenStorageName(fabricAddr), "mock-token"); err != nil {
 		t.Fatal(err)
 	}
 
 	// Also create a JWT token file
-	jwtFile, _ := client.GetWebIdentityTokenFile(url)
+	jwtFile, _ := client.GetWebIdentityTokenFile(fabricAddr)
 	t.Logf("JWT file path: %s", jwtFile)
 	err := os.WriteFile(jwtFile, []byte("mock-jwt-token"), 0600)
 	if err != nil {
@@ -61,7 +61,7 @@ func TestLogout(t *testing.T) {
 	}
 
 	// Verify files exist before logout
-	if _, err := client.TokenStore.Load(client.TokenStorageName(url)); err != nil {
+	if _, err := client.TokenStore.Load(client.TokenStorageName(fabricAddr)); err != nil {
 		t.Fatal("Token file should exist before logout")
 	}
 	if _, err := os.Stat(jwtFile); os.IsNotExist(err) {
@@ -69,16 +69,16 @@ func TestLogout(t *testing.T) {
 	}
 
 	// Create a gRPC client
-	grpcClient := client.NewGrpcClient(url, "mock-token", "")
+	grpcClient := client.NewGrpcClient(fabricAddr, "mock-token", "")
 
 	// Perform logout
-	err = Logout(ctx, grpcClient, url)
+	err = Logout(ctx, grpcClient, fabricAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Verify token file was removed
-	if _, err := client.TokenStore.Load(client.TokenStorageName(url)); !errors.Is(err, os.ErrNotExist) {
+	if _, err := client.TokenStore.Load(client.TokenStorageName(fabricAddr)); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("Token file should be removed after logout, but got error: %v", err)
 	}
 
@@ -96,7 +96,7 @@ func TestLogoutWithoutTokenFile(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	ctx := context.Background()
-	url := strings.TrimPrefix(server.URL, "http://")
+	fabricAddr := strings.TrimPrefix(server.URL, "http://")
 
 	// Create a temporary directory for token storage
 	tmpDir := t.TempDir()
@@ -107,11 +107,10 @@ func TestLogoutWithoutTokenFile(t *testing.T) {
 	})
 
 	// Create a gRPC client
-	cluster := url
-	grpcClient := client.NewGrpcClient(url, "mock-token", "")
+	grpcClient := client.NewGrpcClient(fabricAddr, "mock-token", "")
 
 	// Perform logout without token file (should not error)
-	err := Logout(ctx, grpcClient, cluster)
+	err := Logout(ctx, grpcClient, fabricAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +124,7 @@ func TestLogoutWithUnauthenticatedError(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	ctx := context.Background()
-	url := strings.TrimPrefix(server.URL, "http://")
+	fabricAddr := strings.TrimPrefix(server.URL, "http://")
 
 	// Create a temporary directory for token storage
 	tmpDir := t.TempDir()
@@ -138,20 +137,20 @@ func TestLogoutWithUnauthenticatedError(t *testing.T) {
 		client.TokenStore = originalTokenStore
 	})
 
-	if err := client.TokenStore.Save(client.TokenStorageName(url), "mock-token"); err != nil {
+	if err := client.TokenStore.Save(client.TokenStorageName(fabricAddr), "mock-token"); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create a gRPC client
-	grpcClient := client.NewGrpcClient(url, "mock-token", "")
+	grpcClient := client.NewGrpcClient(fabricAddr, "mock-token", "")
 
 	// Perform logout - should succeed even with unauthenticated error
-	if err := Logout(ctx, grpcClient, url); err != nil {
+	if err := Logout(ctx, grpcClient, fabricAddr); err != nil {
 		t.Fatal(err)
 	}
 
 	// Verify token file was still removed
-	if _, err := client.TokenStore.Load(client.TokenStorageName(url)); !errors.Is(err, os.ErrNotExist) {
+	if _, err := client.TokenStore.Load(client.TokenStorageName(fabricAddr)); !errors.Is(err, os.ErrNotExist) {
 		t.Error("Token should be removed from token store after logout even with unauthenticated error")
 	}
 }
