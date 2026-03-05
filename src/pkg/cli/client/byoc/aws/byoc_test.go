@@ -17,6 +17,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -26,6 +27,7 @@ import (
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	"github.com/aws/smithy-go/ptr"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -143,8 +145,8 @@ func TestSubscribe(t *testing.T) {
 				line := lines.Text()
 				cwEvents = append(cwEvents, cw.LogEvent{
 					LogGroupIdentifier: &ecsLogGroup,
-					LogStreamName:      awssdk.String("some-stream"),
-					Message:            awssdk.String(line),
+					LogStreamName:      ptr.String("some-stream"),
+					Message:            ptr.String(line),
 					Timestamp:          &ts,
 				})
 			}
@@ -427,7 +429,7 @@ func (m *mockCWClient) FilterLogEvents(ctx context.Context, input *cloudwatchlog
 
 func (m *mockCWClient) StartLiveTail(ctx context.Context, input *cloudwatchlogs.StartLiveTailInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.StartLiveTailOutput, error) {
 	return nil, &cwTypes.ResourceNotFoundException{
-		Message: awssdk.String("mock: log group does not exist"),
+		Message: ptr.String("mock: log group does not exist"),
 	}
 }
 
@@ -438,9 +440,9 @@ func makeMockEvents(n int, service, etag string) []cwTypes.FilteredLogEvent {
 	for i := range events {
 		ts := int64((i + 1) * 1000) // 1000, 2000, 3000, ...
 		events[i] = cwTypes.FilteredLogEvent{
-			Message:       awssdk.String(fmt.Sprintf("log message %d", i+1)),
+			Message:       ptr.String(fmt.Sprintf("log message %d", i+1)),
 			Timestamp:     &ts,
-			LogStreamName: awssdk.String(fmt.Sprintf("%s/%s_%s/task%d", service, service, etag, i)),
+			LogStreamName: ptr.String(fmt.Sprintf("%s/%s_%s/task%d", service, service, etag, i)),
 		}
 	}
 	return events
@@ -689,7 +691,7 @@ func TestQueryCdLogs(t *testing.T) {
 				events: makeMockEvents(tt.numEvents, "crun", ""),
 			}
 
-			batchSeq, err := b.queryOrTailCdLogs(t.Context(), mock, tt.req)
+			batchSeq, err := b.queryOrTailLogsByTaskID(t.Context(), mock, tt.req, tt.req.Etag)
 			require.NoError(t, err)
 
 			// Flatten and collect
@@ -705,4 +707,48 @@ func TestQueryCdLogs(t *testing.T) {
 // Testing follow mode for CD logs requires mocking the ECS DescribeTasks API.
 func TestQueryCdLogs_FollowMode(t *testing.T) {
 	t.Skip("requires ECS API mock for getTaskStatus")
+}
+
+func TestDeriveTaskID(t *testing.T) {
+	validEtag := types.NewEtag()
+
+	tests := []struct {
+		name       string
+		cdTaskArn  ecs.TaskArn
+		cdEtag     string
+		reqEtag    string
+		wantTaskID string
+	}{
+		{
+			name:       "matching cd etag returns task ID from ARN",
+			cdTaskArn:  ptr.String("arn:aws:ecs:us-west-2:123456789012:task/cluster/abc123def456"),
+			cdEtag:     validEtag,
+			reqEtag:    validEtag,
+			wantTaskID: "abc123def456",
+		},
+		{
+			name:       "invalid etag treated as legacy task ID",
+			reqEtag:    "some-task-id",
+			wantTaskID: "some-task-id",
+		},
+		{
+			name:    "valid etag not matching cd returns empty",
+			cdEtag:  "aaaaaaaaaaaa",
+			reqEtag: "bbbbbbbbbbbb",
+		},
+		{
+			name: "empty etag returns empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newTestByocAws()
+			b.cdTaskArn = tt.cdTaskArn
+			b.cdEtag = tt.cdEtag
+
+			got := b.deriveTaskID(tt.reqEtag)
+			assert.Equal(t, tt.wantTaskID, got)
+		})
+	}
 }
