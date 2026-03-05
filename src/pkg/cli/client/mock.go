@@ -217,6 +217,10 @@ func (m MockFabricClient) PutStack(ctx context.Context, req *defangv1.PutStackRe
 	return nil
 }
 
+func (m MockFabricClient) DeleteStack(ctx context.Context, req *defangv1.DeleteStackRequest) error {
+	return nil
+}
+
 func (m MockFabricClient) PutDeployment(ctx context.Context, req *defangv1.PutDeploymentRequest) error {
 	return nil
 }
