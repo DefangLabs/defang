@@ -3,7 +3,6 @@ package gcp
 import (
 	"context"
 	"fmt"
-	"log"
 	"slices"
 	"time"
 
@@ -245,7 +244,7 @@ func (gcp Gcp) EnsureServiceAccountHasArtifactRegistryRoles(ctx context.Context,
 func (gcp Gcp) EnsurePrincipalHasServiceAccountRoles(ctx context.Context, principal, serviceAccount string, roles []string) error {
 	client, err := iamadm.NewIamClient(ctx, gcp.Options...)
 	if err != nil {
-		log.Fatalf("unable to ensure user service account role, failed to create artifact registry client: %v", err)
+		return fmt.Errorf("unable to ensure user service account role, failed to create artifact registry client: %w", err)
 	}
 	defer client.Close()
 

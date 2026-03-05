@@ -18,6 +18,7 @@ func OpenBrowserOnEnter(ctx context.Context, url string) (context.Context, func(
 			switch b[0] {
 			case 3: // Ctrl-C
 				cancel()
+				return
 			case 10, 13: // Enter or Return
 				err := browser.OpenURL(url)
 				if err != nil {

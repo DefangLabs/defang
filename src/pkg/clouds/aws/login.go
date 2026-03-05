@@ -83,12 +83,13 @@ func (p *awsOAuthCredentialsProvider) Retrieve(ctx context.Context) (awssdk.Cred
 	// Persist the refreshed token so the next run picks up the new values.
 	if p.tokenStore != nil && p.storeKey != "" {
 		tokenBytes, err := json.Marshal(refreshed)
-		if err == nil {
-			if err := p.tokenStore.Save(p.storeKey, string(tokenBytes)); err != nil {
-				term.Warnf("failed to persist refreshed AWS OAuth token: %v", err)
-			} else {
-				term.Debugf("persisted refreshed AWS OAuth token for %q", p.storeKey)
-			}
+		if err != nil {
+			return awssdk.Credentials{}, fmt.Errorf("marshaling refreshed token: %w", err)
+		}
+		if err := p.tokenStore.Save(p.storeKey, string(tokenBytes)); err != nil {
+			term.Warnf("failed to persist refreshed AWS OAuth token: %v", err)
+		} else {
+			term.Debugf("persisted refreshed AWS OAuth token for %q", p.storeKey)
 		}
 	}
 
@@ -126,8 +127,6 @@ func (a *Aws) Authenticate(ctx context.Context, interactive bool) error {
 		a.Region = Region(region)
 	}
 
-	baseEndpoint := fmt.Sprintf("https://%s.signin.aws.amazon.com", a.Region)
-
 	// 1. Try default AWS credentials
 	term.Debugf("checking default AWS credentials for region %s...", a.Region)
 	if _, err := a.testCredentials(ctx, nil); err == nil {
@@ -137,49 +136,12 @@ func (a *Aws) Authenticate(ctx context.Context, interactive bool) error {
 
 	// 2. Try stored OAuth tokens (including expired ones — the provider will refresh them)
 	if a.TokenStore != nil {
-		term.Debug("checking stored AWS OAuth tokens...")
-		tokenNames, err := a.TokenStore.List(tokenStoreKeyPrefix)
+		creds, err := a.findStoredCredentials(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to list tokens: %w", err)
+			return err
 		}
-
-		for _, name := range tokenNames {
-			tokenJSON, err := a.TokenStore.Load(name)
-			if err != nil {
-				term.Debugf("failed to load token %q: %v", name, err)
-				continue
-			}
-
-			var cached awsTokenCache
-			if err := json.Unmarshal([]byte(tokenJSON), &cached); err != nil {
-				term.Debugf("failed to unmarshal token %q: %v", name, err)
-				continue
-			}
-
-			// Backfill TokenURL for tokens saved before the field was added.
-			if cached.TokenURL == "" {
-				cached.TokenURL = fmt.Sprintf("https://%s.signin.aws.amazon.com/v1/token", a.Region)
-			}
-
-			if cached.RefreshToken == "" && time.Now().After(cached.AccessToken.ExpiresAt) {
-				term.Debugf("token %q is expired and has no refresh token, skipping", name)
-				continue
-			}
-
-			term.Debugf("testing token %q (expires %s)...", name, cached.AccessToken.ExpiresAt.Format(time.RFC3339))
-			provider := &awsOAuthCredentialsProvider{cached: &cached, tokenStore: a.TokenStore, storeKey: name}
-
-			// Calling testCredentialsWithProfile triggers Retrieve(), which auto-refreshes
-			// and persists the updated token if the access credentials were expired.
-			creds, err := a.testCredentialsWithProfile(ctx, name, provider)
-			if err != nil {
-				term.Debugf("token %q failed AWS_PROFILE role validation: %v, skipping...", name, err)
-				continue
-			}
-
-			// If no AWS_PROFILE with role specified, any valid token is considered acceptable
+		if creds != nil {
 			a.Credentials = awssdk.NewCredentialsCache(creds)
-			return nil
 		}
 	}
 
@@ -188,17 +150,26 @@ func (a *Aws) Authenticate(ctx context.Context, interactive bool) error {
 		return errors.New("no valid AWS credentials found") // TODO: Better error message with possible doc link
 	}
 	term.Info("no valid credentials found, starting interactive login...")
-	for range 3 {
-		cached, err := a.InteractiveLogin(ctx, baseEndpoint)
+	creds, err := a.tryInteractiveLogin(ctx, 3)
+	if err != nil {
+		return err
+	}
+	a.Credentials = awssdk.NewCredentialsCache(creds)
+	return nil
+}
+
+func (a *Aws) tryInteractiveLogin(ctx context.Context, n int) (awssdk.CredentialsProvider, error) {
+	for range n {
+		cached, err := a.InteractiveLogin(ctx)
 		if err != nil {
-			return fmt.Errorf("interactive login failed: %w", err)
+			return nil, fmt.Errorf("interactive login failed: %w", err)
 		}
 
 		var storeKey string
 		if a.TokenStore != nil {
 			tokenBytes, err := json.Marshal(cached)
 			if err != nil {
-				return fmt.Errorf("failed to marshal token: %w", err)
+				return nil, fmt.Errorf("failed to marshal token: %w", err)
 			}
 			sum := sha256.Sum256([]byte(cached.LoginSession))
 			storeKey = fmt.Sprintf("%s%x", tokenStoreKeyPrefix, sum)
@@ -214,18 +185,64 @@ func (a *Aws) Authenticate(ctx context.Context, interactive bool) error {
 			term.Warnf("Cannot use login credentials: %v, please try again.", err)
 			continue
 		}
-
-		a.Credentials = awssdk.NewCredentialsCache(creds)
-		return nil
+		return creds, nil
 	}
-	return errors.New("too many failed aws login attempts")
+	return nil, errors.New("too many failed aws login attempts")
+}
+
+func (a *Aws) findStoredCredentials(ctx context.Context) (awssdk.CredentialsProvider, error) {
+	term.Debug("checking stored AWS OAuth tokens...")
+	tokenNames, err := a.TokenStore.List(tokenStoreKeyPrefix)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list tokens: %w", err)
+	}
+
+	for _, name := range tokenNames {
+		tokenJSON, err := a.TokenStore.Load(name)
+		if err != nil {
+			term.Debugf("failed to load token %q: %v", name, err)
+			continue
+		}
+
+		var cached awsTokenCache
+		if err := json.Unmarshal([]byte(tokenJSON), &cached); err != nil {
+			term.Debugf("failed to unmarshal token %q: %v", name, err)
+			continue
+		}
+
+		// Backfill TokenURL for tokens saved before the field was added.
+		if cached.TokenURL == "" {
+			cached.TokenURL = fmt.Sprintf("https://%s.signin.aws.amazon.com/v1/token", a.Region)
+		}
+
+		if cached.RefreshToken == "" && time.Now().After(cached.AccessToken.ExpiresAt) {
+			term.Debugf("token %q is expired and has no refresh token, skipping", name)
+			continue
+		}
+
+		term.Debugf("testing token %q (expires %s)...", name, cached.AccessToken.ExpiresAt.Format(time.RFC3339))
+		provider := &awsOAuthCredentialsProvider{cached: &cached, tokenStore: a.TokenStore, storeKey: name}
+
+		// Calling testCredentialsWithProfile triggers Retrieve(), which auto-refreshes
+		// and persists the updated token if the access credentials were expired.
+		// If no AWS_PROFILE with role specified, any valid token is considered acceptable
+		creds, err := a.testCredentialsWithProfile(ctx, name, provider)
+		if err != nil {
+			term.Debugf("token %q failed AWS_PROFILE role validation: %v, skipping...", name, err)
+			continue
+		}
+		return creds, nil
+	}
+	return nil, nil
 }
 
 func (a *Aws) testCredentialsWithProfile(ctx context.Context, name string, creds awssdk.CredentialsProvider) (awssdk.CredentialsProvider, error) {
 	identity, err := a.testCredentials(ctx, creds)
-	if err != nil || identity.Arn == nil {
-		term.Debugf("token %q failed validation: %v", name, err)
-		return nil, err
+	if err != nil {
+		return nil, fmt.Errorf("token %q failed validation: %v", name, err)
+	}
+	if identity.Arn == nil {
+		return nil, errors.New("caller identity ARN is missing")
 	}
 
 	// If the stack/env specifies an AWS_PROFILE with role, try assume the role
@@ -288,7 +305,8 @@ func (a *Aws) GetStackAwsProfileRoleArn(ctx context.Context) (string, string, er
 //  2. Builds the authorization URL and prompts the user to open it (Enter opens browser)
 //  3. Waits for the callback with code+state
 //  4. Exchanges the code for AWS credentials via DPoP-signed token request
-func (a *Aws) InteractiveLogin(ctx context.Context, baseEndpoint string) (*awsTokenCache, error) {
+func (a *Aws) InteractiveLogin(ctx context.Context) (*awsTokenCache, error) {
+	baseEndpoint := fmt.Sprintf("https://%s.signin.aws.amazon.com", a.Region)
 	pkce, err := auth.GeneratePKCE(64, auth.S256Method)
 	if err != nil {
 		return nil, fmt.Errorf("generating PKCE parameters: %w", err)
@@ -325,8 +343,9 @@ func (a *Aws) InteractiveLogin(ctx context.Context, baseEndpoint string) (*awsTo
 // CrossDeviceLogin runs the cross-device flow for remote/SSH sessions where the
 // browser runs on a different machine. It prints the auth URL and prompts the user
 // to paste the base64-encoded verification code displayed in their browser.
-// TODO: Support corss device login workflow with a flag
-func (a *Aws) CrossDeviceLogin(ctx context.Context, baseEndpoint string) (*awsTokenCache, error) {
+// TODO: Support cross device login workflow with a flag
+func (a *Aws) CrossDeviceLogin(ctx context.Context) (*awsTokenCache, error) {
+	baseEndpoint := fmt.Sprintf("https://%s.signin.aws.amazon.com", a.Region)
 	redirectURI := baseEndpoint + "/v1/sessions/confirmation"
 	pkce, err := auth.GeneratePKCE(64, auth.S256Method)
 	if err != nil {
@@ -554,12 +573,16 @@ func buildDpopHeader(key *ecdsa.PrivateKey, uri string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
 
 	// Add JWK header
-	pub := key.PublicKey
+	x := make([]byte, 32)
+	y := make([]byte, 32)
+	key.PublicKey.X.FillBytes(x)
+	key.PublicKey.Y.FillBytes(y)
+
 	token.Header["jwk"] = map[string]string{
 		"kty": "EC",
 		"crv": "P-256",
-		"x":   base64.RawURLEncoding.EncodeToString(pub.X.Bytes()),
-		"y":   base64.RawURLEncoding.EncodeToString(pub.Y.Bytes()),
+		"x":   base64.RawURLEncoding.EncodeToString(x),
+		"y":   base64.RawURLEncoding.EncodeToString(y),
 	}
 
 	token.Header["typ"] = "dpop+jwt"

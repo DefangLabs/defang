@@ -21,6 +21,7 @@ func (b *ByocAws) listPulumiStacksInBucket(ctx context.Context, region aws.Regio
 	if err != nil {
 		return nil, err
 	}
+	cfg.Region = string(region)
 	s3client := s3.NewFromConfig(cfg)
 	stacks, err := ListPulumiStacks(ctx, s3client, bucketName)
 	if err != nil {

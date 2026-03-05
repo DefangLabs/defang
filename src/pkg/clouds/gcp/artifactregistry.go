@@ -13,6 +13,7 @@ func (gcp Gcp) EnsureArtifactRegistryExists(ctx context.Context, repoName string
 	if err != nil {
 		return "", fmt.Errorf("failed to create artifactregistry client: %w", err)
 	}
+	defer client.Close()
 
 	parent := fmt.Sprintf("projects/%s/locations/%s", gcp.ProjectId, gcp.Region)
 	fullRepoName := fmt.Sprintf("%s/repositories/%s", parent, repoName)

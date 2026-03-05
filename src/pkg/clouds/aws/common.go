@@ -71,10 +71,7 @@ func LoadDefaultConfig(ctx context.Context, optFns ...func(*config.LoadOptions) 
 
 func GetAccountID(arn string) string {
 	parts := strings.Split(arn, ":")
-	if len(parts) < 5 {
-		return "" // return empty string if the ARN is malformed
-	}
-	return parts[4]
+	return parts[4] // panics if the ARN is malformed
 }
 
 func newChainProvider(providers ...aws.CredentialsProvider) aws.CredentialsProvider {

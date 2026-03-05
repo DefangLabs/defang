@@ -151,7 +151,7 @@ func (gcp Gcp) Run(ctx context.Context, jobId string, env map[string]string, cmd
 func (gcp Gcp) GetExecutionEnv(ctx context.Context, executionName string) (map[string]string, error) {
 	client, err := run.NewExecutionsClient(ctx, gcp.Options...)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create cloud run executions client: %v\n", err)
+		return nil, fmt.Errorf("failed to create cloud run executions client: %w", err)
 	}
 	defer client.Close()
 

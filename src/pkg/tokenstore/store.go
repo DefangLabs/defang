@@ -65,7 +65,21 @@ func (s *LocalDirTokenStore) List(prefix string) ([]string, error) {
 	if s.Dir == "" {
 		return nil, errors.New("token store directory not set")
 	}
-	dir, filePrefix := filepath.Split(fmt.Sprintf("%s/%s", s.Dir, prefix))
+	dir, filePrefix := filepath.Split(filepath.Join(s.Dir, prefix))
+
+	// Ensure the resolved directory is within the token store base directory to prevent path traversal
+	dir, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve token directory: %w", err)
+	}
+	baseDir, err := filepath.Abs(s.Dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve token store directory: %w", err)
+	}
+	if !strings.HasPrefix(dir, baseDir) {
+		return nil, errors.New("invalid token prefix")
+	}
+
 	files, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -89,7 +103,7 @@ func (s *LocalDirTokenStore) Delete(key string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.Remove(tokenFile); err != nil {
+	if err := os.Remove(tokenFile); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("failed to delete token: %w", err)
 	}
 	term.Debug("Removed token file:", tokenFile)
@@ -103,5 +117,17 @@ func (s *LocalDirTokenStore) getTokenFile(key string) (string, error) {
 	if key == "" {
 		return "", errors.New("token store key is empty")
 	}
-	return filepath.Join(s.Dir, key), nil
+	tokenFilePath := filepath.Join(s.Dir, key)
+	absTokenFilePath, err := filepath.Abs(tokenFilePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve token file path: %w", err)
+	}
+	absDir, err := filepath.Abs(s.Dir)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve token store directory: %w", err)
+	}
+	if !strings.HasPrefix(absTokenFilePath, absDir) {
+		return "", errors.New("invalid token key")
+	}
+	return absTokenFilePath, nil
 }
