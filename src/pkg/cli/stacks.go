@@ -62,8 +62,17 @@ func RemoveStack(ctx context.Context, client StacksRemover, ec elicitations.Cont
 		if !ec.IsSupported() {
 			return fmt.Errorf("stack %q has an active deployment; re-run in interactive mode to confirm deletion", name)
 		}
+		prompt := fmt.Sprintf(
+			`Stack %q has an active deployment. In order to avoid orphaned resources and unexpected costs, we recommend running 'defang down -s %s' to spin down the stack before deletion.
+
+If you choose to proceed without spinning the stack down, be aware that Defang will lose the ability to manage or track these resources.
+
+Are you sure you want to delete it?`,
+			name,
+			name,
+		)
 		answer, err := ec.RequestEnum(ctx,
-			fmt.Sprintf("Stack %q may still have active resources. Deleting this stack will not modify or remove any active resources, it will only remove Defang's ability to manage them. Are you sure you want to delete it?", name),
+			prompt,
 			"confirm",
 			[]string{"yes", "no"},
 		)
