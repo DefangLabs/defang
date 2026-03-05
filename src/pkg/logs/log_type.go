@@ -16,11 +16,11 @@ func (e ErrInvalidLogType) Error() string {
 }
 
 const (
-	_LogTypeUnused LogType = 1 << iota
+	LogTypeUnspecified LogType = 0
+	LogTypeCD          LogType = 1 << iota
 	LogTypeRun
 	LogTypeBuild
-	LogTypeUnspecified LogType = 0
-	LogTypeAll         LogType = 0xFFFFFFFF
+	LogTypeAll LogType = 0xFFFFFFFF
 )
 
 var AllLogTypes = []LogType{
@@ -32,12 +32,14 @@ var AllLogTypes = []LogType{
 var (
 	logType_name = map[LogType]string{
 		LogTypeUnspecified: "UNSPECIFIED",
+		LogTypeCD:          "CD",
 		LogTypeRun:         "RUN",
 		LogTypeBuild:       "BUILD",
 		LogTypeAll:         "ALL",
 	}
 	logType_value = map[string]LogType{
 		"UNSPECIFIED": LogTypeUnspecified,
+		"CD":          LogTypeCD,
 		"RUN":         LogTypeRun,
 		"BUILD":       LogTypeBuild,
 		"ALL":         LogTypeAll,

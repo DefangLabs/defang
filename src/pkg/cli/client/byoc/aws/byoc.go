@@ -712,7 +712,7 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 	//  * Valid Etag, no services: 	tail all tasks/services with that Etag
 	//  * Valid Etag, service:		tail that task/service
 	var logSeq iter.Seq2[cw.LogEvent, error]
-	if taskID := b.deriveTaskID(req.Etag); taskID != "" {
+	if taskID := b.deriveTaskID(req.Etag); taskID != "" && logs.LogType(req.LogType) == logs.LogTypeCD {
 		cdSeq, err := b.queryOrTailLogsByTaskID(ctx, cwClient, req, taskID)
 		if err != nil {
 			return nil, AnnotateAwsError(err)
@@ -773,10 +773,10 @@ func (b *ByocAws) deriveTaskID(reqEtag string) string {
 	if b.cdTaskArn != nil && b.cdEtag == reqEtag {
 		return ecs.GetTaskID(b.cdTaskArn)
 	}
-	if _, err := types.ParseEtag(reqEtag); err == nil {
-		return ""
+	if _, err := types.ParseEtag(reqEtag); err != nil {
+		return reqEtag // legacy: assume invalid etag is a task ID
 	}
-	return reqEtag // legacy: assume invalid etag is a task ID
+	return ""
 }
 
 func (b *ByocAws) queryOrTailLogs(ctx context.Context, cwClient cw.LogsClient, req *defangv1.TailRequest) (iter.Seq2[cw.LogEvent, error], error) {
@@ -846,7 +846,7 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 
 	var groups []cw.LogGroupInput
 	// Tail CD and builds
-	if logType.Has(logs.LogTypeBuild) {
+	if logType.Has(logs.LogTypeCD) {
 		if b.driver.LogGroupARN == "" {
 			term.Debug("CD stack LogGroupARN is not set; skipping CD logs")
 		} else {
@@ -858,6 +858,8 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 			groups = append(groups, cdTail)
 			term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames, filter)
 		}
+	}
+	if logType.Has(logs.LogTypeBuild) && projectName != "" {
 		buildsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "builds")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service
 		term.Debug("Query builds logs", buildsTail.LogGroupARN, filter)
 		groups = append(groups, buildsTail)
@@ -866,7 +868,7 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 		groups = append(groups, ecsTail)
 	}
 	// Tail services
-	if logType.Has(logs.LogTypeRun) {
+	if logType.Has(logs.LogTypeRun) && projectName != "" {
 		servicesTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "logs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts
 		if service != "" && etag != "" {
 			servicesTail.LogStreamNamePrefix = service + "/" + service + "_" + etag

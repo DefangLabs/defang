@@ -502,7 +502,7 @@ func newTailOptionsForDown(stack, deployment string, since time.Time) cli.TailOp
 			return nil // keep tailing logs
 		},
 		Verbose: global.Verbose,
-		LogType: logs.LogTypeAll,
+		LogType: logs.LogTypeCD,
 	}
 }
 

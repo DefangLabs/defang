@@ -97,7 +97,7 @@ func CdCommandAndTail(ctx context.Context, provider client.Provider, projectName
 
 	options := TailOptions{
 		Deployment: etag,
-		LogType:    logs.LogTypeBuild,
+		LogType:    logs.LogTypeCD,
 		Since:      since,
 		Verbose:    verbose,
 		Stack:      provider.GetStackName(),
