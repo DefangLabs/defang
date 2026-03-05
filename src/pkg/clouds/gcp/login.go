@@ -6,11 +6,16 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
+	"path/filepath"
 	"slices"
+	"strings"
 
 	"cloud.google.com/go/iam/apiv1/iampb"
 	resourcemanager "cloud.google.com/go/resourcemanager/apiv3"
 	"github.com/DefangLabs/defang/src/pkg/auth"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/github"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -23,6 +28,56 @@ var (
 	scopes       = []string{"email", "https://www.googleapis.com/auth/cloud-platform"}
 )
 
+// Example credentials.json for workload identity federation with GitHub Actions:
+//
+//	{
+//	 "universe_domain": "googleapis.com",
+//	 "type": "external_account",
+//	 "audience": "//iam.googleapis.com/projects/979169844604/locations/global/workloadIdentityPools/defang-github/providers/github-actions-mu4q9u",
+//	 "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
+//	 "token_url": "https://sts.googleapis.com/v1/token",
+//	 "credential_source": {
+//	   "file": "/home/edw/defang/tmp/gcptokencred/token.jwt",
+//	   "format": {
+//	     "type": "text"
+//	   }
+//	 }
+//	}
+//
+// Example credentials.json for user credentials from `gcloud auth application-default login`:
+//
+//	{
+//	  "account": "",
+//	  "client_id": "764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com", // FIXED client id for gcloud cli
+//	  "client_secret": "d-FL95Q19q7MQmFpd7hHD0Ty", // Fixed client secret for gcloud cli, not a secret
+//	  "quota_project_id": "test-quota-project-id",
+//	  "refresh_token": "1//XXXXXXXXXXXXXXXXXXXXXXXXXXXX-YYYYYY-BZjZCABhoInO4zaMg6DhZzl2gMbr273cB5Mo1nBSNL5FjntKhUaMJW2IFnKAZmZE",
+//	  "type": "authorized_user",
+//	  "universe_domain": "googleapis.com"
+//	}
+type GoogleAuthCredentials struct {
+	Account          string                      `json:"account,omitempty"`
+	ClientID         string                      `json:"client_id,omitempty"`
+	ClientSecret     string                      `json:"client_secret,omitempty"`
+	QuotaProjectID   string                      `json:"quota_project_id,omitempty"`
+	RefreshToken     string                      `json:"refresh_token,omitempty"`
+	UniverseDomain   string                      `json:"universe_domain,omitempty"`
+	Type             string                      `json:"type,omitempty"`
+	Audience         string                      `json:"audience,omitempty"`
+	SubjectTokenType string                      `json:"subject_token_type,omitempty"`
+	TokenURL         string                      `json:"token_url,omitempty"`
+	CredentialSource *GoogleAuthCredentialSource `json:"credential_source,omitempty"`
+}
+
+type GoogleAuthCredentialSource struct {
+	File   string                      `json:"file,omitempty"`
+	Format *GoogleAuthCredentialFormat `json:"format,omitempty"`
+}
+
+type GoogleAuthCredentialFormat struct {
+	Type string `json:"type,omitempty"`
+}
+
 func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 	// TODO: Add all required permissions for running gcp byoc
 	requiredPerms := []string{
@@ -30,6 +85,55 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 		"storage.buckets.create",
 		"iam.serviceAccounts.create",
 		"cloudbuild.builds.create",
+	}
+
+	// If both ACTIONS_ID_TOKEN_REQUEST_URL and GOOGLE_WORKLOAD_IDENTITY_PROVIDER are set, we're doing "Workload Identity Federation" with GCP using github id token
+	githubTokenReqUrl := os.Getenv("ACTIONS_ID_TOKEN_REQUEST_URL")
+	gcpProvider := os.Getenv("GOOGLE_WORKLOAD_IDENTITY_PROVIDER")
+	term.Debugf("ACTIONS_ID_TOKEN_REQUEST_URL=%q, GOOGLE_WORKLOAD_IDENTITY_PROVIDER=%q", githubTokenReqUrl, gcpProvider)
+	if githubTokenReqUrl != "" && gcpProvider != "" {
+		// 1. convert the identity provider to aud in credentials.json below
+		// In credentials.json audience is in the format: //iam.googleapis.com/projects/996411251390/locations/global/workloadIdentityPools/defang-github/providers/github-actions-r6xx29
+		audience := gcpProvider
+		if !strings.HasPrefix(audience, "//iam.googleapis.com/") {
+			audience = "//" + path.Join("iam.googleapis.com", audience)
+		}
+
+		// 2. use the aud to get the github id token and save it to a file, which will be referenced in credentials.json as the credential source
+		gcpIdToken, err := github.GetIdToken(ctx, audience) // WIF provider requires the jwt audience to match the provider resource name
+		if err != nil {
+			return fmt.Errorf("non-interactive login failed: %w", err)
+		}
+		project, pool, provider, err := parseWIFProvider(audience)
+		if err != nil {
+			return fmt.Errorf("failed to parse WIF provider %q: %w", audience, err)
+		}
+		tokenKey := fmt.Sprintf("%s-%s-%s.jwt", project, pool, provider)
+		jwtPath := filepath.Join(client.StateDir, tokenKey)
+		if err := os.WriteFile(jwtPath, []byte(gcpIdToken), 0600); err != nil {
+			return fmt.Errorf("failed to save web identity token for gcp: %w", err)
+		}
+
+		// 3. Create a credentials.json to be used as the GOOGLE_APPLICATION_CREDENTIALS for GCP authentication
+		credentials := GoogleAuthCredentials{
+			UniverseDomain:   "googleapis.com",
+			Type:             "external_account",
+			Audience:         audience,
+			SubjectTokenType: "urn:ietf:params:oauth:token-type:jwt",
+			TokenURL:         "https://sts.googleapis.com/v1/token",
+			CredentialSource: &GoogleAuthCredentialSource{
+				File: jwtPath, // reference the file where we saved the github id token above
+				Format: &GoogleAuthCredentialFormat{
+					Type: "text", // type text for encoded jwt
+				},
+			},
+		}
+		credsPath, err := writeCredentialsFile(tokenKey, credentials)
+		if err != nil {
+			return err
+		}
+		// Not an official env var, but our GCP integration will look for this when the provider is set to GCP and this env var is present
+		os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", credsPath)
 	}
 
 	// 1. Try the default application credentials or from the "GOOGLE_APPLICATION_CREDENTIALS" env var if set
@@ -199,4 +303,32 @@ func testTokenProjectPermissions(ctx context.Context, projectID string, perms []
 	}
 
 	return nil
+}
+
+func writeCredentialsFile(key string, creds GoogleAuthCredentials) (string, error) {
+	credsBytes, err := json.Marshal(creds)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal credentials: %w", err)
+	}
+
+	credsPath := path.Join(client.StateDir, key+"-gcp-creds") + ".json"
+	term.Debugf("writing credentials file to %s", credsPath)
+	if err := os.WriteFile(credsPath, credsBytes, 0600); err != nil {
+		return "", fmt.Errorf("failed to save credentials file: %w", err)
+	}
+	return credsPath, nil
+}
+
+func parseWIFProvider(s string) (project, pool, provider string, err error) {
+	parts := strings.Split(s, "/")
+
+	if len(parts) != 11 ||
+		parts[3] != "projects" ||
+		parts[5] != "locations" ||
+		parts[7] != "workloadIdentityPools" ||
+		parts[9] != "providers" {
+		return "", "", "", fmt.Errorf("invalid WIF provider string: %q", s)
+	}
+
+	return parts[4], parts[8], parts[10], nil
 }
