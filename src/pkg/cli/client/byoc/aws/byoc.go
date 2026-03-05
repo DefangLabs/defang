@@ -55,7 +55,7 @@ type ByocAws struct {
 
 	cdEtag    types.ETag
 	cdStart   time.Time
-	cdTaskArn ecs.TaskArn // for GetDeploymentStatus
+	cdTaskArn ecs.TaskArn
 
 	needDockerHubCreds bool
 }
@@ -699,27 +699,22 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 		return nil, AnnotateAwsError(err)
 	}
 
-	parser := &logEventParser{
-		etag:     req.Etag,
-		services: req.Services,
-	}
-
 	// How to tail multiple tasks/services at once?
-	//  * Etag matches CD task:		tail only that CD task's logs
-	//  * Etag is invalid:			treat Etag as a task ID and tail only that task's logs
-	//  * No Etag, no services:		tail all tasks/services
-	//  * No Etag, service:			tail all tasks/services with that service name
-	//  * Valid Etag, no services: 	tail all tasks/services with that Etag
-	//  * Valid Etag, service:		tail that task/service
+	//  * Etag is invalid:		treat Etag as CD task ID and tail only that task's logs
+	//  * No Etag, no services:	tail all tasks/services
+	//  * No Etag, service:		tail all tasks/services with that service name
+	//  * Etag, no services: 	tail all tasks/services with that Etag
+	//  * Etag, service:		tail that task/service
 	var logSeq iter.Seq2[cw.LogEvent, error]
-	if taskID := b.deriveTaskID(req.Etag); taskID != "" {
-		cdSeq, err := b.queryOrTailLogsByTaskID(ctx, cwClient, req, taskID)
+	etag, err := types.ParseEtag(req.Etag)
+	if err != nil && req.Etag != "" {
+		// Assume invalid "etag" is the task ID of the CD task
+		cdSeq, err := b.queryOrTailCdLogs(ctx, cwClient, req)
 		if err != nil {
 			return nil, AnnotateAwsError(err)
 		}
 		logSeq = cw.Flatten(cdSeq)
 		// No need to filter events by etag because we only show logs from the specified task ID
-		parser.etag = "" // disable etag filtering
 	} else {
 		logSeq, err = b.queryOrTailLogs(ctx, cwClient, req)
 		if err != nil {
@@ -727,6 +722,10 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 		}
 	}
 
+	parser := &logEventParser{
+		etag:     etag,
+		services: req.Services,
+	}
 	return func(yield func(*defangv1.TailResponse, error) bool) {
 		for event, err := range logSeq {
 			if err != nil {
@@ -751,32 +750,19 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 	}, nil
 }
 
-func (b *ByocAws) queryOrTailLogsByTaskID(ctx context.Context, cwClient cw.LogsClient, req *defangv1.TailRequest, taskID string) (iter.Seq2[[]cw.LogEvent, error], error) {
-	if b.cdTaskArn == nil {
-		var err error
-		b.cdTaskArn, err = b.driver.GetTaskArn(taskID) // only fails on missing task ID
-		if err != nil {
-			return nil, err
-		}
+func (b *ByocAws) queryOrTailCdLogs(ctx context.Context, cwClient cw.LogsClient, req *defangv1.TailRequest) (iter.Seq2[[]cw.LogEvent, error], error) {
+	var err error
+	b.cdTaskArn, err = b.driver.GetTaskArn(req.Etag) // only fails on missing task ID
+	if err != nil {
+		return nil, err
 	}
 	if req.Follow {
-		return b.driver.TailTaskID(ctx, cwClient, taskID)
+		return b.driver.TailTaskID(ctx, cwClient, req.Etag)
 	} else {
 		start := timeutils.AsTime(req.Since, time.Time{})
 		end := timeutils.AsTime(req.Until, time.Time{})
-		return b.driver.QueryTaskID(ctx, cwClient, taskID, start, end, req.Limit)
+		return b.driver.QueryTaskID(ctx, cwClient, req.Etag, start, end, req.Limit)
 	}
-}
-
-// deriveTaskID returns the CD task ID if the etag refers to a CD task, or empty string otherwise.
-func (b *ByocAws) deriveTaskID(reqEtag string) string {
-	if b.cdTaskArn != nil && b.cdEtag == reqEtag {
-		return ecs.GetTaskID(b.cdTaskArn)
-	}
-	if _, err := types.ParseEtag(reqEtag); err == nil {
-		return ""
-	}
-	return reqEtag // legacy: assume invalid etag is a task ID
 }
 
 func (b *ByocAws) queryOrTailLogs(ctx context.Context, cwClient cw.LogsClient, req *defangv1.TailRequest) (iter.Seq2[cw.LogEvent, error], error) {
