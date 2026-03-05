@@ -24,6 +24,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
@@ -222,7 +223,7 @@ func (a *Aws) Authenticate(ctx context.Context, interactive bool) error {
 
 func (a *Aws) testCredentialsWithProfile(ctx context.Context, name string, creds awssdk.CredentialsProvider) (awssdk.CredentialsProvider, error) {
 	identity, err := a.testCredentials(ctx, creds)
-	if err != nil {
+	if err != nil || identity.Arn == nil {
 		term.Debugf("token %q failed validation: %v", name, err)
 		return nil, err
 	}
@@ -230,8 +231,19 @@ func (a *Aws) testCredentialsWithProfile(ctx context.Context, name string, creds
 	// If the stack/env specifies an AWS_PROFILE with role, try assume the role
 	roleArn, profile, err := a.GetStackAwsProfileRoleArn(ctx)
 	if err != nil {
-		term.Debugf("failed to get AWS_PROFILE role ARN: %v", err)
+		term.Warnf("failed to get AWS_PROFILE role ARN: %v", err)
+	} else if profile == "" {
+		term.Warn("AWS_PROFILE environment variable is not set, skipping AWS_PROFILE role validation")
 	} else if roleArn != "" {
+		same, err := sameRole(*identity.Arn, roleArn)
+		if err != nil {
+			term.Warnf("failed to compare token identity with AWS_PROFILE role: %v", err)
+		} else if same {
+			term.Debugf("token %q identity %q matches AWS_PROFILE role %q", name, *identity.Arn, roleArn)
+			return creds, nil
+		}
+
+		term.Debugf("checking if token %q identity %q can assume AWS_PROFILE role %q", name, *identity.Arn, roleArn)
 		credCfg, err := LoadDefaultConfig(ctx, config.WithRegion(string(a.Region)), config.WithCredentialsProvider(creds))
 		if err != nil {
 			return nil, err
@@ -618,4 +630,55 @@ func deserializePrivateKey(pemStr string) (*ecdsa.PrivateKey, error) {
 		return nil, errors.New("failed to decode PEM block from DPoP key")
 	}
 	return x509.ParseECPrivateKey(block.Bytes)
+}
+
+func sameRole(arn1, arn2 string) (bool, error) {
+	a1, err := parseRoleArn(arn1)
+	if err != nil {
+		return false, fmt.Errorf("parsing ARN %q: %w", arn1, err)
+	}
+
+	a2, err := parseRoleArn(arn2)
+	if err != nil {
+		return false, fmt.Errorf("parsing ARN %q: %w", arn2, err)
+	}
+	return *a1 == *a2, nil
+}
+
+type parsedRoleArn struct {
+	Partition string
+	AccountID string
+	RoleName  string
+}
+
+func parseRoleArn(arnStr string) (*parsedRoleArn, error) {
+	a, err := arn.Parse(arnStr)
+	if err != nil {
+		return nil, fmt.Errorf("parsing ARN %q: %w", arnStr, err)
+	}
+	switch a.Service {
+	case "iam":
+		parts := strings.Split(a.Resource, "/")
+		if len(parts) < 2 || parts[0] != "role" {
+			return nil, fmt.Errorf("unexpected IAM ARN resource format in %q: expected 'role'", arnStr)
+		}
+		return &parsedRoleArn{
+			Partition: a.Partition,
+			AccountID: a.AccountID,
+			RoleName:  strings.Join(parts[1:], "/"),
+		}, nil
+	case "sts":
+		parts := strings.Split(a.Resource, "/")
+		if len(parts) < 3 || parts[0] != "assumed-role" {
+			return nil, fmt.Errorf("unexpected STS ARN resource format in %q: expected 'assumed-role'", arnStr)
+		}
+		return &parsedRoleArn{
+			Partition: a.Partition,
+			AccountID: a.AccountID,
+			// For assumed-role ARNs, we are not interested in session name which is the last part
+			RoleName: strings.Join(parts[1:len(parts)-1], "/"),
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported ARN service %q in %q", a.Service, arnStr)
+	}
 }
