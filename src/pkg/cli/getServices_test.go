@@ -388,7 +388,7 @@ func TestRunHealthcheck(t *testing.T) {
 		},
 		{
 			name:            "Invalid endpoint",
-			endpoint:        "https://invalid-endpoint",
+			endpoint:        "http://invalid-endpoint",
 			healthcheckPath: "/healthy",
 			expectedStatus:  "",
 			expectedErr:     true,
