@@ -125,7 +125,7 @@ func createUsableDelegationSet(ctx context.Context, domain string, r53Client aws
 			return delegationSet, nil
 		}
 	}
-	return nil, errors.New("failed to create a usable delegation set without conflicting NS records after multiple attempts")
+	return nil, errors.New("could not find a usable set of DNS servers; if you are on a VPN, disable it and retry, as it may intercept DNS lookups")
 }
 
 func nameServersHasConflict(ctx context.Context, nameServers []string, domains []string, resolverAt func(string) dns.Resolver) (bool, error) {
