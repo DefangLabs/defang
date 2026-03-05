@@ -63,7 +63,7 @@ func New(ctx context.Context, fabricAddr string, stack *stacks.Parameters) (*Age
 	)
 
 	elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
-	ec := elicitations.NewController(elicitationsClient)
+	ec := elicitations.NewController(elicitationsClient, true)
 
 	printer := printer{outStream: os.Stdout}
 	toolManager := NewToolManager(gk, printer)

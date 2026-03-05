@@ -38,7 +38,7 @@ var authNeededForPlayground = map[string]string{authNeeded: "playground"} // req
 var P = track.P
 
 var elicitationsClient = elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
-var ec = elicitations.NewController(elicitationsClient)
+var ec = elicitations.NewController(elicitationsClient, global.Interactive())
 
 func Execute(ctx context.Context) error {
 	if term.StdoutCanColor() {

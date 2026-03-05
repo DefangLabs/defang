@@ -143,7 +143,7 @@ func TestHandleListConfigTool(t *testing.T) {
 					"strategy":     "profile",
 					"profile_name": "default",
 				},
-			})
+			}, true)
 
 			stack := stacks.Parameters{
 				Name:     "test-stack",
