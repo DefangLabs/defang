@@ -78,8 +78,8 @@ func TestLocalDirTokenStore_DeleteMissingKey(t *testing.T) {
 	dir := t.TempDir()
 	s := &LocalDirTokenStore{Dir: dir}
 
-	if err := s.Delete("nonexistent"); err == nil {
-		t.Error("Delete of missing key: expected error, got nil")
+	if err := s.Delete("nonexistent"); err != nil {
+		t.Errorf("Delete of missing key: expected no error, got %v", err)
 	}
 }
 
