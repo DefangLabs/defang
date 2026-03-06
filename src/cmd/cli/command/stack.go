@@ -169,8 +169,14 @@ func makeStackRemoveCmd() *cobra.Command {
 		Args:    cobra.ExactArgs(1),
 		Short:   "Remove an existing Defang deployment stack",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
 			name := args[0]
-			return stacks.RemoveInDirectory(".", name)
+			loader := configureLoader(cmd)
+			projectName, _, err := loader.LoadProjectName(ctx)
+			if err != nil {
+				return err
+			}
+			return cli.RemoveStack(ctx, global.Client, ec, projectName, name)
 		},
 	}
 	return stackRemoveCmd
