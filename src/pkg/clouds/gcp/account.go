@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
 
@@ -24,39 +25,48 @@ var FindGoogleDefaultCredentials func(ctx context.Context, scopes ...string) (*g
 // Whole list of possible principal types:
 // https://cloud.google.com/iam/docs/principals-overview#principal-types
 func (gcp Gcp) GetCurrentPrincipal(ctx context.Context) (string, error) {
-	creds, err := FindGoogleDefaultCredentials(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	// Unmarshal creds.JSON into a struct that includes both possible fields
-	var key struct {
-		ClientEmail                    string `json:"client_email"`
-		Type                           string `json:"type"`
-		Audience                       string `json:"audience"`
-		ServiceAccountImpersonationURL string `json:"service_account_impersonation_url"`
-	}
-	err = json.Unmarshal(creds.JSON, &key)
-	if err == nil {
-		if key.Type == "external_account" {
-			return removeProvider("principalSet:" + key.Audience), nil
+	var token *oauth2.Token
+	if gcp.TokenSource != nil {
+		var err error
+		token, err = gcp.TokenSource.Token()
+		if err != nil {
+			return "", fmt.Errorf("failed to retrieve token from provided TokenSource: %w", err)
 		}
-		if key.Type == "impersonated_service_account" {
-			serviceAccount, err := parseServiceAccountFromURL(key.ServiceAccountImpersonationURL)
-			if err != nil {
-				return "", err
+	} else {
+		creds, err := FindGoogleDefaultCredentials(ctx)
+		if err != nil {
+			return "", err
+		}
+
+		// Unmarshal creds.JSON into a struct that includes both possible fields
+		var key struct {
+			ClientEmail                    string `json:"client_email"`
+			Type                           string `json:"type"`
+			Audience                       string `json:"audience"`
+			ServiceAccountImpersonationURL string `json:"service_account_impersonation_url"`
+		}
+		err = json.Unmarshal(creds.JSON, &key)
+		if err == nil {
+			if key.Type == "external_account" {
+				return removeProvider("principalSet:" + key.Audience), nil
 			}
-			return "serviceAccount:" + serviceAccount, nil
+			if key.Type == "impersonated_service_account" {
+				serviceAccount, err := parseServiceAccountFromURL(key.ServiceAccountImpersonationURL)
+				if err != nil {
+					return "", err
+				}
+				return "serviceAccount:" + serviceAccount, nil
+			}
+			if key.ClientEmail != "" {
+				return getPrincipalFromEmail(key.ClientEmail), nil
+			}
 		}
-		if key.ClientEmail != "" {
-			return getPrincipalFromEmail(key.ClientEmail), nil
-		}
-	}
 
-	// Fallback: get token and try to extract email
-	token, err := creds.TokenSource.Token()
-	if err != nil {
-		return "", fmt.Errorf("failed to retrieve token: %w", err)
+		// Fallback: get token and try to extract email
+		token, err = creds.TokenSource.Token()
+		if err != nil {
+			return "", fmt.Errorf("failed to retrieve token: %w", err)
+		}
 	}
 
 	// Try to extract email from id_token if present

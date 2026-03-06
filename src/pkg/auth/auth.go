@@ -38,8 +38,6 @@ const (
 )
 
 func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(string), mcpClient string) (AuthCodeFlow, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	redirectUri := OpenAuthClient.GetPollRedirectURI()
 
 	opts := []AuthorizeOption{
@@ -84,26 +82,9 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 			return AuthCodeFlow{}, ErrNoBrowser{Err: err, URL: authorizeUrl}
 		}
 	} else {
-		input := term.NewNonBlockingStdin()
-		defer input.Close() // abort the read
-		go func() {
-			var b [1]byte
-			for {
-				if _, err := input.Read(b[:]); err != nil {
-					return // exit goroutine
-				}
-				switch b[0] {
-				case 3: // Ctrl-C
-					cancel()
-				case 10, 13: // Enter or Return
-					err := browser.OpenURL(authorizeUrl)
-					if err != nil {
-						term.Errorf("failed to open browser: %v", err)
-					}
-				default:
-				}
-			}
-		}()
+		var done func()
+		ctx, done = term.OpenBrowserOnEnter(ctx, authorizeUrl)
+		defer done()
 	}
 
 	code, err := pollForAuthCode(ctx, ar.state)

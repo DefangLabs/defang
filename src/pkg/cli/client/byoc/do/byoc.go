@@ -79,6 +79,11 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 	return b
 }
 
+func (b *ByocDo) Authenticate(ctx context.Context, interactive bool) error {
+	// TODO: Implement
+	return nil
+}
+
 func (b *ByocDo) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
 	s3client, err := b.driver.CreateS3Client()
 	if err != nil {

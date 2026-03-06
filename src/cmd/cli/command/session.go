@@ -21,7 +21,8 @@ import (
 )
 
 type commandSessionOpts struct {
-	CheckAccountInfo bool
+	CheckAccountInfo   bool
+	AllowStackCreation bool
 }
 
 func newCommandSession(cmd *cobra.Command) (*session.Session, error) {
@@ -34,6 +35,7 @@ func newCommandSessionWithOpts(cmd *cobra.Command, opts commandSessionOpts) (*se
 	ctx := cmd.Context()
 
 	options := newSessionLoaderOptionsForCommand(cmd)
+	options.AllowStackCreation = opts.AllowStackCreation
 	sm, err := newStackManagerForLoader(ctx, configureLoader(cmd))
 	if err != nil {
 		term.Debugf("Could not create stack manager: %v", err)
@@ -44,6 +46,9 @@ func newCommandSessionWithOpts(cmd *cobra.Command, opts commandSessionOpts) (*se
 		return nil, err
 	}
 	if opts.CheckAccountInfo {
+		if err := session.Provider.Authenticate(ctx, !global.NonInteractive); err != nil {
+			return nil, fmt.Errorf("failed to authenticate with provider %q: %w", session.Stack.Provider, err)
+		}
 		_, err = session.Provider.AccountInfo(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get account info from provider %q: %w", session.Stack.Provider, err)

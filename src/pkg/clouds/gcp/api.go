@@ -12,7 +12,7 @@ import (
 )
 
 func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
-	service, err := serviceusage.NewService(ctx)
+	service, err := serviceusage.NewService(ctx, gcp.Options...)
 	if err != nil {
 		return fmt.Errorf("failed to create Service Usage client: %w", err)
 	}

@@ -9,7 +9,10 @@ import (
 	resourcemanager "cloud.google.com/go/resourcemanager/apiv3"
 	"cloud.google.com/go/resourcemanager/apiv3/resourcemanagerpb"
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/tokenstore"
+	"golang.org/x/oauth2"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 )
 
 type ProjectId string
@@ -96,8 +99,11 @@ func (id ProjectId) Suffix() string {
 }
 
 type Gcp struct {
-	Region    string
-	ProjectId string
+	Region      string
+	ProjectId   string
+	TokenSource oauth2.TokenSource
+	TokenStore  tokenstore.TokenStore
+	Options     []option.ClientOption
 }
 
 func (gcp Gcp) GetProjectID() ProjectId {
@@ -109,7 +115,7 @@ func (gcp Gcp) GetRegion() string {
 }
 
 func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*resourcemanagerpb.Project, error) {
-	client, err := resourcemanager.NewProjectsClient(ctx)
+	client, err := resourcemanager.NewProjectsClient(ctx, gcp.Options...)
 	if err != nil {
 		return nil, fmt.Errorf("unable to ensure project exists, failed to create project client: %w", err)
 	}

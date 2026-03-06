@@ -92,12 +92,12 @@ func NonInteractiveGitHubLogin(ctx context.Context, fabric client.FabricClient, 
 		return err
 	}
 
-	// Also write the IDToken to a new file, if AWS_WEB_IDENTITY_TOKEN_FILE is empty
-	if os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") == "" {
-		jwtPath, _ := client.GetWebIdentityTokenFile(fabricAddr)
-		term.Debugf("writing web identity token to %s", jwtPath)
-		if err := os.WriteFile(jwtPath, []byte(idToken), 0600); err != nil {
-			return fmt.Errorf("failed to save web identity token: %w", err)
+	// If AWS_ROLE_ARN is set, we're doing "Assume Role with Web Identity"
+	if os.Getenv("AWS_ROLE_ARN") != "" && os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") == "" {
+		// AWS_ROLE_ARN is set, but AWS_WEB_IDENTITY_TOKEN_FILE is empty: write the token to a new file
+		jwtPath, err := writeWebIdentityToken(fabricAddr, resp.AccessToken)
+		if err != nil {
+			return err
 		}
 		// Set AWS env vars for this CLI invocation; future invocations are handled by client.GetExistingToken
 		os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath)
@@ -107,6 +107,15 @@ func NonInteractiveGitHubLogin(ctx context.Context, fabric client.FabricClient, 
 	}
 
 	return err
+}
+
+func writeWebIdentityToken(fabricAddr, token string) (string, error) {
+	jwtPath, _ := client.GetWebIdentityTokenFile(fabricAddr)
+	term.Debugf("writing web identity token to %s", jwtPath)
+	if err := os.WriteFile(jwtPath, []byte(token), 0600); err != nil {
+		return "", fmt.Errorf("failed to save web identity token: %w", err)
+	}
+	return jwtPath, nil
 }
 
 // InteractiveRequireLoginAndToS ensures the user is logged in and has agreed to the terms of service.
