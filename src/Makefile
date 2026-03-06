@@ -150,15 +150,15 @@ increment-major-version:
 
 .PHONY: patch-release
 patch-release: pull test no-diff increment-patch-version
-	git push --follow-tags --tags
+	git push origin 'refs/tags/v*:refs/tags/v*'
 
 .PHONY: minor-release
 minor-release: pull test no-diff increment-minor-version
-	git push --follow-tags --tags
+	git push origin 'refs/tags/v*:refs/tags/v*'
 
 .PHONY: major-release
 major-release: pull test no-diff increment-major-version
-	git push --follow-tags --tags
+	git push origin 'refs/tags/v*:refs/tags/v*'
 
 .PHONY: release
 release:
