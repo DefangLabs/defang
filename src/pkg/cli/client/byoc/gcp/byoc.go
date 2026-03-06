@@ -586,17 +586,17 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 
 	now := time.Now()
 	subscribeStream.query.AddSince(now) // Do no query historical events
-	return subscribeStream.Follow(now)
+	return subscribeStream.Follow(ctx, now)
 }
 
 func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
 	logStream := b.getLogStream(ctx, b.driver, req)
 	if req.Follow {
-		return logStream.Follow(req.Since.AsTime())
+		return logStream.Follow(ctx, req.Since.AsTime())
 	} else if req.Since.IsValid() {
-		return logStream.Head(req.Limit), nil
+		return logStream.Head(ctx, req.Limit), nil
 	}
-	return logStream.Tail(req.Limit), nil
+	return logStream.Tail(ctx, req.Limit), nil
 }
 
 func (b *ByocGcp) getLogStream(ctx context.Context, gcpLogsClient GcpLogsClient, req *defangv1.TailRequest) *LogStream {
