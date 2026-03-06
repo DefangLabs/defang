@@ -126,21 +126,21 @@ pull:
 
 .PHONY: increment-patch-version
 increment-patch-version:
-	LATEST_TAG=$$(git tag -l 'v*' --sort=-v:refname | head -n1); \
+	@LATEST_TAG=$$(git tag -l 'v*' --sort=-v:refname | head -n1); \
 	NEW_TAG=$$(echo $$LATEST_TAG | awk -F. '{$$NF = $$NF + 1;} 1' OFS=.); \
 	echo $$NEW_TAG; \
 	git tag $$NEW_TAG
 
 .PHONY: increment-minor-version
 increment-minor-version:
-	LATEST_TAG=$$(git tag -l 'v*' --sort=-v:refname | head -n1); \
+	@LATEST_TAG=$$(git tag -l 'v*' --sort=-v:refname | head -n1); \
 	NEW_TAG=$$(echo $$LATEST_TAG | awk -F. '{$$(NF-1) = $$(NF-1) + 1; $$NF = 0;} 1' OFS=.); \
 	echo $$NEW_TAG; \
 	git tag $$NEW_TAG
 
 .PHONY: increment-major-version
 increment-major-version:
-	LATEST_TAG=$$(git tag -l 'v*' --sort=-v:refname | head -n1); \
+	@LATEST_TAG=$$(git tag -l 'v*' --sort=-v:refname | head -n1); \
 	NEW_TAG=$$(echo $$LATEST_TAG | awk -F. '{maj=substr($$1,2)+1; printf "v%d.0.0\n", maj}'); \
 	echo $$NEW_TAG; \
 	git tag $$NEW_TAG
