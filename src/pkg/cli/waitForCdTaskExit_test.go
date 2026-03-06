@@ -18,11 +18,12 @@ type mockCdWaiter struct {
 
 func (m *mockCdWaiter) GetDeploymentStatus(ctx context.Context) (bool, error) {
 	err := m.getDeploymentStatusErr
+	done := err != nil
 	// This logic was copied from AWS provider, to ensure the errs work correctly
 	if taskErr := new(ecs.TaskFailure); errors.As(err, taskErr) {
-		return false, client.ErrDeploymentFailed{Message: taskErr.Error()}
+		return done, client.ErrDeploymentFailed{Message: taskErr.Error()}
 	}
-	return false, err
+	return done, err
 }
 
 func TestWaitForCdTaskExit(t *testing.T) {
