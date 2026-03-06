@@ -16,7 +16,7 @@ func Preview(ctx context.Context, project *compose.Project, fabric client.Fabric
 
 	options := TailOptions{
 		Deployment: resp.Etag,
-		LogType:    logs.LogTypeBuild,
+		LogType:    logs.LogTypeBuild | logs.LogTypeCD,
 		Verbose:    true,
 		Stack:      provider.GetStackName(),
 	}

@@ -609,7 +609,7 @@ func (b *ByocGcp) getLogStream(ctx context.Context, gcpLogsClient GcpLogsClient,
 		logStream.AddUntil(req.Until.AsTime())
 	}
 	etag := req.Etag
-	if logs.LogType(req.LogType).Has(logs.LogTypeBuild) {
+	if logs.LogType(req.LogType).Has(logs.LogTypeBuild) || logs.LogType(req.LogType).Has(logs.LogTypeCD) {
 		logStream.AddCloudBuildLog(b.PulumiStack, req.Project, etag, req.Services) // CD logs and CloudBuild logs
 	}
 	if logs.LogType(req.LogType).Has(logs.LogTypeRun) {
