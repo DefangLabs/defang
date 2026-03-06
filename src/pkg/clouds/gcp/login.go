@@ -297,7 +297,7 @@ func (gcp *Gcp) InteractiveLogin(ctx context.Context) (oauth2.TokenSource, error
 	return cfg.TokenSource(ctx, token), nil
 }
 
-func testTokenProjectPermissions(ctx context.Context, projectID string, perms []string, tokenSource oauth2.TokenSource) error {
+var testTokenProjectPermissions = func(ctx context.Context, projectID string, perms []string, tokenSource oauth2.TokenSource) error {
 	var options []option.ClientOption
 	if tokenSource != nil {
 		options = append(options, option.WithTokenSource(tokenSource))

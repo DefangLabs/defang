@@ -6,11 +6,15 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/DefangLabs/defang/src/pkg/tokenstore"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 )
 
 // makeTestJWT creates a minimal unsigned JWT with the given claims for testing ParseUnverified.
@@ -424,4 +428,112 @@ func TestSameRole(t *testing.T) {
 			}
 		})
 	}
+}
+
+// validAwsToken returns a marshalled awsTokenCache with a non-expired access token.
+func validAwsToken(t *testing.T, tokenURL string) string {
+	t.Helper()
+	var cached awsTokenCache
+	cached.AccessToken.AccessKeyID = "AKID"
+	cached.AccessToken.SecretAccessKey = "SECRET"
+	cached.AccessToken.SessionToken = "SESSION"
+	cached.AccessToken.ExpiresAt = time.Now().Add(time.Hour)
+	cached.TokenType = "Bearer"
+	cached.ClientID = clientIDSameDevice
+	cached.RefreshToken = "refresh-token"
+	cached.TokenURL = tokenURL
+	b, err := json.Marshal(cached)
+	if err != nil {
+		t.Fatalf("marshaling token: %v", err)
+	}
+	return string(b)
+}
+
+func TestFindStoredCredentials(t *testing.T) {
+	// Override STS so no real AWS calls are made.
+	origSts := NewStsFromConfig
+	NewStsFromConfig = func(_ awssdk.Config) StsClientAPI { return MockStsClientAPI{} }
+	t.Cleanup(func() { NewStsFromConfig = origSts })
+
+	const region = "us-east-1"
+
+	t.Run("empty store returns nil", func(t *testing.T) {
+		a := &Aws{Region: region, TokenStore: tokenstore.NewMemTokenStore()}
+		creds, err := a.findStoredCredentials(t.Context())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if creds != nil {
+			t.Error("expected nil credentials for empty store")
+		}
+	})
+
+	t.Run("list error propagates", func(t *testing.T) {
+		store := tokenstore.NewMemTokenStore()
+		store.ListErr = errors.New("disk failure")
+		a := &Aws{Region: region, TokenStore: store}
+		_, err := a.findStoredCredentials(t.Context())
+		if err == nil {
+			t.Error("expected error from List failure")
+		}
+	})
+
+	t.Run("invalid JSON is skipped", func(t *testing.T) {
+		store := tokenstore.NewMemTokenStore()
+		store.Save(tokenStoreKeyPrefix+"bad", "not-json") //nolint:errcheck
+		a := &Aws{Region: region, TokenStore: store}
+		creds, err := a.findStoredCredentials(t.Context())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if creds != nil {
+			t.Error("expected nil: bad token should be skipped")
+		}
+	})
+
+	t.Run("expired token without refresh token is skipped", func(t *testing.T) {
+		var cached awsTokenCache
+		cached.AccessToken.ExpiresAt = time.Now().Add(-time.Hour) // expired
+		// RefreshToken intentionally empty
+		b, _ := json.Marshal(cached)
+
+		store := tokenstore.NewMemTokenStore()
+		store.Save(tokenStoreKeyPrefix+"expired", string(b)) //nolint:errcheck
+		a := &Aws{Region: region, TokenStore: store}
+		creds, err := a.findStoredCredentials(t.Context())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if creds != nil {
+			t.Error("expected nil: expired token with no refresh should be skipped")
+		}
+	})
+
+	t.Run("valid non-expired token returns provider", func(t *testing.T) {
+		store := tokenstore.NewMemTokenStore()
+		store.Save(tokenStoreKeyPrefix+"valid", validAwsToken(t, "https://us-east-1.signin.aws.amazon.com/v1/token")) //nolint:errcheck
+		a := &Aws{Region: region, TokenStore: store}
+		creds, err := a.findStoredCredentials(t.Context())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if creds == nil {
+			t.Error("expected non-nil credentials provider")
+		}
+	})
+
+	t.Run("missing TokenURL is backfilled from region", func(t *testing.T) {
+		var cached awsTokenCache
+		cached.AccessToken.ExpiresAt = time.Now().Add(time.Hour)
+		cached.TokenURL = "" // missing — should be backfilled
+		b, _ := json.Marshal(cached)
+
+		store := tokenstore.NewMemTokenStore()
+		store.Save(tokenStoreKeyPrefix+"nourl", string(b)) //nolint:errcheck
+		a := &Aws{Region: region, TokenStore: store}
+		_, err := a.findStoredCredentials(t.Context())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
 }

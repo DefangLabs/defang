@@ -1,6 +1,143 @@
 package gcp
 
-import "testing"
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/DefangLabs/defang/src/pkg/tokenstore"
+	"golang.org/x/oauth2"
+)
+
+func marshalToken(t *testing.T, tok oauth2.Token) string {
+	t.Helper()
+	b, err := json.Marshal(tok)
+	if err != nil {
+		t.Fatalf("marshaling token: %v", err)
+	}
+	return string(b)
+}
+
+func TestFindStoredCredentials_GCP(t *testing.T) {
+	t.Run("nil token store returns nil", func(t *testing.T) {
+		gcp := &Gcp{}
+		ts, err := gcp.findStoredCredentials(t.Context())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if ts != nil {
+			t.Error("expected nil token source for nil TokenStore")
+		}
+	})
+
+	t.Run("empty store returns nil", func(t *testing.T) {
+		gcp := &Gcp{TokenStore: tokenstore.NewMemTokenStore()}
+		ts, err := gcp.findStoredCredentials(t.Context())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if ts != nil {
+			t.Error("expected nil token source for empty store")
+		}
+	})
+
+	t.Run("list error propagates", func(t *testing.T) {
+		store := tokenstore.NewMemTokenStore()
+		store.ListErr = errors.New("disk failure")
+		gcp := &Gcp{TokenStore: store}
+		_, err := gcp.findStoredCredentials(t.Context())
+		if err == nil {
+			t.Error("expected error from List failure")
+		}
+	})
+
+	t.Run("invalid JSON is skipped", func(t *testing.T) {
+		store := tokenstore.NewMemTokenStore()
+		store.Save("bad-token", "not-json") //nolint:errcheck
+		gcp := &Gcp{TokenStore: store}
+		ts, err := gcp.findStoredCredentials(t.Context())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if ts != nil {
+			t.Error("expected nil: bad token should be skipped")
+		}
+	})
+
+	t.Run("token without permissions is skipped", func(t *testing.T) {
+		orig := testTokenProjectPermissions
+		testTokenProjectPermissions = func(_ context.Context, _ string, _ []string, _ oauth2.TokenSource) error {
+			return errors.New("missing permissions")
+		}
+		t.Cleanup(func() { testTokenProjectPermissions = orig })
+
+		store := tokenstore.NewMemTokenStore()
+		store.Save("user@example.com", marshalToken(t, oauth2.Token{ //nolint:errcheck
+			AccessToken: "tok",
+			Expiry:      time.Now().Add(time.Hour),
+		}))
+		gcp := &Gcp{TokenStore: store}
+		ts, err := gcp.findStoredCredentials(t.Context())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if ts != nil {
+			t.Error("expected nil: token without permissions should be skipped")
+		}
+	})
+
+	t.Run("valid token with permissions returns token source", func(t *testing.T) {
+		orig := testTokenProjectPermissions
+		testTokenProjectPermissions = func(_ context.Context, _ string, _ []string, _ oauth2.TokenSource) error {
+			return nil // all permissions granted
+		}
+		t.Cleanup(func() { testTokenProjectPermissions = orig })
+
+		tok := oauth2.Token{
+			AccessToken:  "access-token",
+			RefreshToken: "refresh-token",
+			Expiry:       time.Now().Add(time.Hour),
+		}
+		store := tokenstore.NewMemTokenStore()
+		store.Save("user@example.com", marshalToken(t, tok)) //nolint:errcheck
+		gcp := &Gcp{TokenStore: store}
+		ts, err := gcp.findStoredCredentials(t.Context())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if ts == nil {
+			t.Error("expected non-nil token source")
+		}
+	})
+
+	t.Run("multiple tokens: first with permissions wins", func(t *testing.T) {
+		orig := testTokenProjectPermissions
+		calls := 0
+		testTokenProjectPermissions = func(_ context.Context, _ string, _ []string, _ oauth2.TokenSource) error {
+			calls++
+			return nil // all pass
+		}
+		t.Cleanup(func() { testTokenProjectPermissions = orig })
+
+		store := tokenstore.NewMemTokenStore()
+		tok := oauth2.Token{AccessToken: "tok", Expiry: time.Now().Add(time.Hour)}
+		store.Save("user-a@example.com", marshalToken(t, tok)) //nolint:errcheck
+		store.Save("user-b@example.com", marshalToken(t, tok)) //nolint:errcheck
+		gcp := &Gcp{TokenStore: store}
+		ts, err := gcp.findStoredCredentials(t.Context())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if ts == nil {
+			t.Error("expected non-nil token source")
+		}
+		if calls != 1 {
+			t.Errorf("expected 1 permission check (stop after first match), got %d", calls)
+		}
+	})
+}
 
 func TestParseWIFProvider(t *testing.T) {
 	tests := []struct {
