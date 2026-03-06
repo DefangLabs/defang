@@ -21,7 +21,7 @@ func WaitForCdTaskExit(ctx context.Context, provider client.Provider) error {
 		case <-ticker.C:
 			done, err := provider.GetDeploymentStatus(ctx)
 			term.Debugf("Polled CD task status: done=%v, err=%v", done, err)
-			if err != nil || done {
+			if err != nil {
 				// End condition: EOF indicates that the task has completed successfully
 				if errors.Is(err, io.EOF) {
 					return nil
@@ -32,6 +32,9 @@ func WaitForCdTaskExit(ctx context.Context, provider client.Provider) error {
 					continue
 				}
 				return err
+			}
+			if done {
+				return nil
 			}
 			// the task is still running and we continue polling
 		case <-ctx.Done(): // Stop the loop when the context is cancelled
