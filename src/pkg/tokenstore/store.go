@@ -65,7 +65,10 @@ func (s *LocalDirTokenStore) List(prefix string) ([]string, error) {
 	if s.Dir == "" {
 		return nil, errors.New("token store directory not set")
 	}
-	dir, filePrefix := filepath.Split(filepath.Join(s.Dir, prefix))
+	dir, filePrefix := s.Dir, prefix
+	if prefix != "" {
+		dir, filePrefix = filepath.Split(filepath.Join(s.Dir, prefix))
+	}
 
 	// Ensure the resolved directory is within the token store base directory to prevent path traversal
 	dir, err := filepath.Abs(dir)
@@ -77,6 +80,7 @@ func (s *LocalDirTokenStore) List(prefix string) ([]string, error) {
 		return nil, fmt.Errorf("failed to resolve token store directory: %w", err)
 	}
 	if !strings.HasPrefix(dir, baseDir) {
+		term.Warnf("Invalid token prefix %q: resolved directory %q is outside of token store base directory %q", prefix, dir, baseDir)
 		return nil, errors.New("invalid token prefix")
 	}
 
