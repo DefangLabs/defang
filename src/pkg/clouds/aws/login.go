@@ -361,7 +361,7 @@ func (a *Aws) CrossDeviceLogin(ctx context.Context) (*awsTokenCache, error) {
 	config := &oauth2.Config{
 		ClientID: clientIDCrossDevice,
 		Endpoint: oauth2.Endpoint{
-			AuthURL: baseEndpoint + "/v1/sessions",
+			AuthURL: baseEndpoint + "/v1/authorize",
 		},
 		RedirectURL: redirectURI,
 		Scopes:      []string{"openid"},
