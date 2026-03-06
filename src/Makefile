@@ -137,7 +137,7 @@ increment-minor-version:
 	@git tag $$( \
 		git tag -l 'v*' --sort=-v:refname | \
 		head -n1 | \
-		awk -F. '{$$(NF-1) = $$((NF-1)) + 1; $$NF = 0;} 1' OFS=. \
+		awk -F. '{$$(NF-1) = $$(NF-1) + 1; $$NF = 0;} 1' OFS=. \
 	)
 
 .PHONY: increment-major-version
