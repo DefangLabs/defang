@@ -8,6 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
 )
 
@@ -35,9 +36,27 @@ func makeStackNewCmd() *cobra.Command {
 		Args:    cobra.MaximumNArgs(1),
 		Short:   "Create a new Defang deployment stack",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+
 			var stackName string
 			if len(args) > 0 {
 				stackName = args[0]
+			}
+
+			loader := configureLoader(cmd)
+			projectName, _, err := loader.LoadProjectName(ctx)
+			if err != nil {
+				return err
+			}
+
+			if stackName != "" {
+				exists, err := stackExists(ctx, projectName, stackName)
+				if err != nil {
+					return err
+				}
+				if exists {
+					return fmt.Errorf("stack with name %q already exists in project %q", stackName, projectName)
+				}
 			}
 
 			var region, _ = cmd.Flags().GetString("region")
@@ -54,10 +73,17 @@ func makeStackNewCmd() *cobra.Command {
 				return err
 			}
 
-			ctx := cmd.Context()
-			err := PromptForStackParameters(ctx, &params)
+			err = PromptForStackParameters(ctx, &params)
 			if err != nil {
 				return err
+			}
+
+			exists, err := stackExists(ctx, projectName, params.Name)
+			if err != nil {
+				return err
+			}
+			if exists {
+				return fmt.Errorf("stack with name %q already exists in project %q", params.Name, projectName)
 			}
 
 			term.Debugf("Creating stack with parameters: %+v\n", params)
@@ -190,4 +216,22 @@ func PromptForStackParameters(ctx context.Context, params *stacks.Parameters) er
 	*params = *newParams
 
 	return nil
+}
+
+func stackExists(ctx context.Context, project string, stack string) (bool, error) {
+	resp, err := global.Client.ListStacks(ctx, &defangv1.ListStacksRequest{
+		Project: project,
+	})
+	if err != nil {
+		return false, err
+	}
+
+	if stack != "" {
+		for _, s := range resp.GetStacks() {
+			if s.GetName() == stack {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
