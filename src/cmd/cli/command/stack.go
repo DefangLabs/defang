@@ -43,6 +43,10 @@ func makeStackNewCmd() *cobra.Command {
 				stackName = args[0]
 			}
 
+			if err := stacks.ValidateStackName(stackName); err != nil {
+				return fmt.Errorf("invalid stack name %q: %v", stackName, err)
+			}
+
 			loader := configureLoader(cmd)
 			projectName, _, err := loader.LoadProjectName(ctx)
 			if err != nil {
