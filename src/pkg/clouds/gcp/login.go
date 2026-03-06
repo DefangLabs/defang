@@ -127,7 +127,12 @@ func (gcp *Gcp) tryInteraciveLogin(ctx context.Context, n int) error {
 			return fmt.Errorf("interactive login failed: %w", err)
 		}
 		if err := testTokenProjectPermissions(ctx, gcp.ProjectId, requiredPerms, tokenSource); err != nil {
-			term.Warnf("Token from interactive login is missing required permissions on project %q: %v\n", gcp.ProjectId, err)
+			if errors.As(err, &ErrorMissingPermissions{}) {
+				term.Warnf("Token from interactive login is missing required permissions on project %q: %v\nPlease ensure your user has the following permissions: %v\n", gcp.ProjectId, err, requiredPerms)
+			} else {
+				term.Warnf("Failed to validate token from interactive login on project %q: %v\n", gcp.ProjectId, err)
+			}
+			term.Warn("Please try logging in again with an account that has the required permissions.")
 			continue
 		}
 		gcp.Options = append(gcp.Options, option.WithTokenSource(tokenSource))
@@ -297,6 +302,12 @@ func (gcp *Gcp) InteractiveLogin(ctx context.Context) (oauth2.TokenSource, error
 	return cfg.TokenSource(ctx, token), nil
 }
 
+type ErrorMissingPermissions []string
+
+func (e ErrorMissingPermissions) Error() string {
+	return fmt.Sprintf("token is missing required permissions: %v", []string(e))
+}
+
 var testTokenProjectPermissions = func(ctx context.Context, projectID string, perms []string, tokenSource oauth2.TokenSource) error {
 	var options []option.ClientOption
 	if tokenSource != nil {
@@ -318,14 +329,14 @@ var testTokenProjectPermissions = func(ctx context.Context, projectID string, pe
 		return fmt.Errorf("API call failed: %w", err)
 	}
 
-	missingPerms := []string{}
+	var errMissingPerms ErrorMissingPermissions
 	for _, p := range perms {
 		if !slices.Contains(resp.Permissions, p) {
-			missingPerms = append(missingPerms, p)
+			errMissingPerms = append(errMissingPerms, p)
 		}
 	}
-	if len(missingPerms) > 0 {
-		return fmt.Errorf("token is missing required permissions: %v", missingPerms)
+	if len(errMissingPerms) > 0 {
+		return errMissingPerms
 	}
 
 	return nil

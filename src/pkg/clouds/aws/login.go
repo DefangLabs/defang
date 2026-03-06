@@ -269,8 +269,12 @@ func (a *Aws) testCredentialsWithProfile(ctx context.Context, name string, creds
 		assumeRoleProvider := stscreds.NewAssumeRoleProvider(sts.NewFromConfig(credCfg), roleArn)
 		if _, err := a.testCredentials(ctx, assumeRoleProvider); err != nil && identity.Account != nil {
 			// If unable to assume, and also not the same account, then this token is not valid for the specified AWS_PROFILE role
-			if *identity.Account != GetAccountID(roleArn) {
-				return nil, fmt.Errorf("login successful, but does not have access to role %q in used by stack aws profile %q; token account %v does not match stack aws profile account %v", roleArn, profile, *identity.Account, GetAccountID(roleArn))
+			parsedArn, err := arn.Parse(roleArn)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse AWS_PROFILE role ARN %q: %w", roleArn, err)
+			}
+			if *identity.Account != parsedArn.AccountID {
+				return nil, fmt.Errorf("login successful, but does not have access to role %q in used by stack aws profile %q; token account %v does not match stack aws profile account %v", roleArn, profile, *identity.Account, parsedArn.AccountID)
 			}
 			// If cannot assume but it's the same account, we assume its a valid token
 			term.Warnf("login successful for AWS account %v which is same as the account specified by stack aws profile %q, assume its valid", *identity.Account, profile)
@@ -525,7 +529,11 @@ func doTokenRequest(ctx context.Context, tokenURL, clientID string, reqBody Toke
 			if !ok {
 				return nil, errors.New("id_token missing 'sub' claim")
 			}
-			accountID = GetAccountID(loginSession)
+			parsedArn, err := arn.Parse(loginSession)
+			if err != nil {
+				return nil, fmt.Errorf("parsing login session ARN: %w", err)
+			}
+			accountID = parsedArn.AccountID
 			if accountID == "" {
 				return nil, fmt.Errorf("failed to extract account ID from login session ARN: %s", loginSession)
 			}
