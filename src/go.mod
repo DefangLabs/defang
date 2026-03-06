@@ -36,7 +36,7 @@ require (
 	github.com/bufbuild/connect-go v1.10.0
 	github.com/compose-spec/compose-go/v2 v2.10.1
 	github.com/digitalocean/godo v1.131.1
-	github.com/docker/cli v27.3.1+incompatible
+	github.com/docker/cli v29.2.0+incompatible
 	github.com/docker/docker v28.0.0+incompatible
 	github.com/firebase/genkit/go v1.2.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
