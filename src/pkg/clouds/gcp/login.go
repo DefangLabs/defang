@@ -153,6 +153,9 @@ func (gcp *Gcp) tryInteraciveLogin(ctx context.Context, n int) error {
 }
 
 func (gcp *Gcp) findStoredCredentials(ctx context.Context) (oauth2.TokenSource, error) {
+	if gcp.TokenStore == nil {
+		return nil, nil
+	}
 	config := &oauth2.Config{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
@@ -189,8 +192,10 @@ func (gcp *Gcp) findStoredCredentials(ctx context.Context) (oauth2.TokenSource, 
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal updated token: %w", err)
 				}
-				if err := gcp.TokenStore.Save(name, string(bytes)); err != nil {
-					return nil, fmt.Errorf("failed to save updated token: %w", err)
+				if gcp.TokenStore != nil {
+					if err := gcp.TokenStore.Save(name, string(bytes)); err != nil {
+						return nil, fmt.Errorf("failed to save updated token: %w", err)
+					}
 				}
 			}
 			return tokenSource, nil

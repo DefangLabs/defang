@@ -491,7 +491,8 @@ func doTokenRequest(ctx context.Context, tokenURL, clientID string, reqBody Toke
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("DPoP", dpop)
 
-	resp, err := http.DefaultClient.Do(req)
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("token request: %w", err)
 	}
