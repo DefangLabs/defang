@@ -27,7 +27,7 @@ func TestMakeDefaultName(t *testing.T) {
 			if result != tt.expected {
 				t.Errorf("MakeDefaultName() = %q, want %q", result, tt.expected)
 			}
-			if !validStackName.MatchString(result) {
+			if !StackNamePattern.MatchString(result) {
 				t.Errorf("MakeDefaultName() produced invalid stack name: %q", result)
 			}
 		})
