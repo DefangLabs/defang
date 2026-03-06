@@ -27,7 +27,7 @@ func TestMakeDefaultName(t *testing.T) {
 			if result != tt.expected {
 				t.Errorf("MakeDefaultName() = %q, want %q", result, tt.expected)
 			}
-			if !validStackName.MatchString(result) {
+			if !StackNamePattern.MatchString(result) {
 				t.Errorf("MakeDefaultName() produced invalid stack name: %q", result)
 			}
 		})
@@ -199,10 +199,10 @@ func TestRemove(t *testing.T) {
 
 	t.Run("remove non-existing stack", func(t *testing.T) {
 		t.Chdir(t.TempDir())
-		err := RemoveInDirectory(".", "non_existing_stack")
+		err := RemoveInDirectory(".", "nonexistingstack")
 		// expect an error when trying to remove a non-existing stack
 		assert.Error(t, err)
-		assert.ErrorContains(t, err, "remove .defang/non_existing_stack: no such file or directory")
+		assert.ErrorContains(t, err, "remove .defang/nonexistingstack: no such file or directory")
 	})
 }
 
