@@ -31,19 +31,7 @@ func (m *mockStacksManager) List(ctx context.Context) ([]stacks.ListItem, error)
 	return result, args.Error(1)
 }
 
-func (m *mockStacksManager) LoadLocal(name string) (*stacks.Parameters, error) {
-	args := m.Called(name)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	result, ok := args.Get(0).(*stacks.Parameters)
-	if !ok {
-		return nil, args.Error(1)
-	}
-	return result, args.Error(1)
-}
-
-func (m *mockStacksManager) GetRemote(ctx context.Context, name string) (*stacks.Parameters, error) {
+func (m *mockStacksManager) Load(ctx context.Context, name string) (*stacks.Parameters, error) {
 	args := m.Called(ctx, name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

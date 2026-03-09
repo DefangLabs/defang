@@ -147,6 +147,7 @@ func makeStackDefaultCmd() *cobra.Command {
 }
 
 func makeStackRemoveCmd() *cobra.Command {
+	var force bool
 	var stackRemoveCmd = &cobra.Command{
 		Use:     "remove STACK_NAME",
 		Aliases: []string{"rm"},
@@ -156,13 +157,24 @@ func makeStackRemoveCmd() *cobra.Command {
 			ctx := cmd.Context()
 			name := args[0]
 			loader := configureLoader(cmd)
+			sm, err := newStackManagerForLoader(ctx, loader)
+			if err != nil {
+				return err
+			}
 			projectName, _, err := loader.LoadProjectName(ctx)
 			if err != nil {
 				return err
 			}
-			return cli.RemoveStack(ctx, global.Client, ec, projectName, name)
+
+			stack, err := sm.Load(ctx, name)
+			if err != nil {
+				return fmt.Errorf("could not load stack parameters: %w", err)
+			}
+			provider := cli.NewProvider(ctx, stack.Provider, global.Client, stack.Name)
+			return cli.RemoveStack(ctx, global.Client, provider, ec, projectName, name, force)
 		},
 	}
+	stackRemoveCmd.Flags().BoolVarP(&force, "force", "", false, "Force removal of the stack even if it has active deployments")
 	return stackRemoveCmd
 }
 
