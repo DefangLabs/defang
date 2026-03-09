@@ -31,7 +31,7 @@ func CdCommand(ctx context.Context, projectName string, provider client.Provider
 	}
 
 	var statesUrl, eventsUrl string
-	if _, ok := provider.(*client.PlaygroundProvider); !ok { // Do not need upload URLs for Playground
+	if _, ok := provider.(*client.PlaygroundProvider); !ok && command != client.CdCommandList { // Do not need upload URLs for Playground/List
 		var err error
 		statesUrl, eventsUrl, err = GetStatesAndEventsUploadUrls(ctx, projectName, provider, fabric)
 		if err != nil {
@@ -97,7 +97,7 @@ func CdCommandAndTail(ctx context.Context, provider client.Provider, projectName
 
 	options := TailOptions{
 		Deployment: etag,
-		LogType:    logs.LogTypeBuild,
+		LogType:    logs.LogTypeCD,
 		Since:      since,
 		Verbose:    verbose,
 		Stack:      provider.GetStackName(),
