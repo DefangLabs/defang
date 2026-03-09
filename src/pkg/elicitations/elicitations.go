@@ -51,10 +51,10 @@ type Response struct {
 	Content map[string]any
 }
 
-func NewController(client Client, supported bool) Controller {
+func NewController(client Client) Controller {
 	return &controller{
 		client:    client,
-		supported: supported,
+		supported: true,
 	}
 }
 

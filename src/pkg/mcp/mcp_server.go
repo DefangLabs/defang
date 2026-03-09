@@ -88,7 +88,7 @@ func NewDefangMCPServer(version string, client MCPClient, cli agentTools.CLIInte
 		client:     common.MCPDevelopmentClient,
 	}
 	elicitationsClient := NewMCPElicitationsController(s)
-	ec := elicitations.NewController(elicitationsClient, true)
+	ec := elicitations.NewController(elicitationsClient)
 	elicitationsController = &ec
 	defangTools := tools.CollectTools(ec, config)
 	for i := range defangTools {

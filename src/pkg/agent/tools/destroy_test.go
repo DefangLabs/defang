@@ -160,7 +160,7 @@ func TestHandleDestroyTool(t *testing.T) {
 					"strategy":     "profile",
 					"profile_name": "default",
 				},
-			}, true)
+			})
 			// Call the function
 			params := DestroyParams{
 				LoaderParams: common.LoaderParams{
