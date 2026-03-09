@@ -221,19 +221,12 @@ func PromptForStackParameters(ctx context.Context, params *stacks.Parameters) er
 }
 
 func stackExists(ctx context.Context, project string, stack string) (bool, error) {
-	resp, err := global.Client.ListStacks(ctx, &defangv1.ListStacksRequest{
+	resp, err := global.Client.GetStack(ctx, &defangv1.GetStackRequest{
 		Project: project,
+		Stack:   stack,
 	})
 	if err != nil {
 		return false, err
 	}
-
-	if stack != "" {
-		for _, s := range resp.GetStacks() {
-			if s.GetName() == stack {
-				return true, nil
-			}
-		}
-	}
-	return false, nil
+	return resp.GetStack() != nil, nil
 }
