@@ -18,15 +18,24 @@ import (
 // mockFabricClientWithStacks is a minimal FabricClient mock for testing stackExists.
 type mockFabricClientWithStacks struct {
 	client.MockFabricClient
-	existingStacks []*defangv1.Stack
-	listStacksErr  error
+	existingStacks  []*defangv1.Stack
+	listStacksErr   error
+	expectedProject string
 }
 
-func (m mockFabricClientWithStacks) ListStacks(_ context.Context, _ *defangv1.ListStacksRequest) (*defangv1.ListStacksResponse, error) {
+func (m mockFabricClientWithStacks) GetStack(_ context.Context, req *defangv1.GetStackRequest) (*defangv1.GetStackResponse, error) {
 	if m.listStacksErr != nil {
 		return nil, m.listStacksErr
 	}
-	return &defangv1.ListStacksResponse{Stacks: m.existingStacks}, nil
+	if m.expectedProject != "" && req.Project != m.expectedProject {
+		return &defangv1.GetStackResponse{}, nil
+	}
+	for _, s := range m.existingStacks {
+		if s.Name == req.Stack {
+			return &defangv1.GetStackResponse{Stack: s}, nil
+		}
+	}
+	return &defangv1.GetStackResponse{}, nil
 }
 
 const testComposeYaml = `services:
@@ -305,30 +314,34 @@ func TestStackExists(t *testing.T) {
 	t.Cleanup(func() { global.Client = origClient })
 
 	tests := []struct {
-		name           string
-		stackName      string
-		existingStacks []*defangv1.Stack
-		listStacksErr  error
-		want           bool
-		wantErr        bool
+		name            string
+		stackName       string
+		existingStacks  []*defangv1.Stack
+		listStacksErr   error
+		expectedProject string
+		want            bool
+		wantErr         bool
 	}{
 		{
-			name:           "stack exists",
-			stackName:      "mystack",
-			existingStacks: []*defangv1.Stack{{Name: "mystack"}},
-			want:           true,
+			name:            "stack exists",
+			stackName:       "mystack",
+			existingStacks:  []*defangv1.Stack{{Name: "mystack"}},
+			expectedProject: "testproject",
+			want:            true,
 		},
 		{
-			name:           "stack not found among others",
-			stackName:      "mystack",
-			existingStacks: []*defangv1.Stack{{Name: "otherstack"}, {Name: "anotherstack"}},
-			want:           false,
+			name:            "stack not found among others",
+			stackName:       "mystack",
+			existingStacks:  []*defangv1.Stack{{Name: "otherstack"}, {Name: "anotherstack"}},
+			expectedProject: "testproject",
+			want:            false,
 		},
 		{
-			name:           "no stacks exist",
-			stackName:      "mystack",
-			existingStacks: []*defangv1.Stack{},
-			want:           false,
+			name:            "no stacks exist",
+			stackName:       "mystack",
+			existingStacks:  []*defangv1.Stack{},
+			expectedProject: "testproject",
+			want:            false,
 		},
 		{
 			name:      "empty stack name always returns false",
@@ -337,10 +350,18 @@ func TestStackExists(t *testing.T) {
 				{Name: "mystack"},
 				{Name: ""},
 			},
-			want: false,
+			expectedProject: "testproject",
+			want:            false,
 		},
 		{
-			name:          "ListStacks error is propagated",
+			name:            "wrong project returns false",
+			stackName:       "mystack",
+			existingStacks:  []*defangv1.Stack{{Name: "mystack"}},
+			expectedProject: "otherproject",
+			want:            false,
+		},
+		{
+			name:          "GetStack error is propagated",
 			stackName:     "mystack",
 			listStacksErr: context.DeadlineExceeded,
 			wantErr:       true,
@@ -350,8 +371,9 @@ func TestStackExists(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			global.Client = mockFabricClientWithStacks{
-				existingStacks: tt.existingStacks,
-				listStacksErr:  tt.listStacksErr,
+				existingStacks:  tt.existingStacks,
+				listStacksErr:   tt.listStacksErr,
+				expectedProject: tt.expectedProject,
 			}
 
 			got, err := stackExists(t.Context(), "testproject", tt.stackName)

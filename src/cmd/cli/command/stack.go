@@ -220,6 +220,9 @@ func PromptForStackParameters(ctx context.Context, params *stacks.Parameters) er
 }
 
 func stackExists(ctx context.Context, project string, stack string) (bool, error) {
+	if stack == "" {
+		return false, nil
+	}
 	resp, err := global.Client.GetStack(ctx, &defangv1.GetStackRequest{
 		Project: project,
 		Stack:   stack,
