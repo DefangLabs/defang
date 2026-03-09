@@ -372,6 +372,8 @@ var RootCmd = &cobra.Command{
 			global.Verbose = true
 		}
 
+		ec.SetSupported(global.Interactive())
+
 		// Create a temporary gRPC client for tracking events before login
 		track.Tracker = cli.Connect(global.FabricAddr, global.Tenant)
 
