@@ -2,7 +2,6 @@ package command
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -85,8 +84,6 @@ func makeStackListCmd() *cobra.Command {
 		Args:    cobra.NoArgs,
 		Short:   "List existing Defang deployment stacks",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			jsonMode, _ := cmd.Flags().GetBool("json")
-
 			ctx := cmd.Context()
 			loader := configureLoader(cmd)
 			projectName, _, err := loader.LoadProjectName(ctx)
@@ -101,19 +98,6 @@ func makeStackListCmd() *cobra.Command {
 
 			stacks, err := sm.List(ctx)
 			if err != nil {
-				return err
-			}
-
-			if jsonMode {
-				jsonData := []byte("[]")
-				if len(stacks) > 0 {
-					jsonData, err = json.MarshalIndent(stacks, "", "  ")
-					if err != nil {
-						return err
-					}
-				}
-
-				_, err = term.Print(string(jsonData) + "\n")
 				return err
 			}
 
