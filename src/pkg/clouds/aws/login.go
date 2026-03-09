@@ -267,11 +267,14 @@ func (a *Aws) testCredentialsWithProfile(ctx context.Context, name string, creds
 		}
 		// Try assume the profile role
 		assumeRoleProvider := stscreds.NewAssumeRoleProvider(sts.NewFromConfig(credCfg), roleArn)
-		if _, err := a.testCredentials(ctx, assumeRoleProvider); err != nil && identity.Account != nil {
+		if _, err := a.testCredentials(ctx, assumeRoleProvider); err != nil {
 			// If unable to assume, and also not the same account, then this token is not valid for the specified AWS_PROFILE role
 			parsedArn, err := arn.Parse(roleArn)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse AWS_PROFILE role ARN %q: %w", roleArn, err)
+			}
+			if identity.Account == nil {
+				return nil, fmt.Errorf("login successful, but caller identity account is missing, cannot validate access to AWS_PROFILE role %q used by stack aws profile %q", roleArn, profile)
 			}
 			if *identity.Account != parsedArn.AccountID {
 				return nil, fmt.Errorf("login successful, but does not have access to role %q in used by stack aws profile %q; token account %v does not match stack aws profile account %v", roleArn, profile, *identity.Account, parsedArn.AccountID)

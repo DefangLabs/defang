@@ -117,10 +117,10 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 		return errors.New("No valid gcloud credentials found") // TODO: Better error message with possible doc link
 	}
 	term.Debug("no valid tokens found in token store, starting interactive login flow...")
-	return gcp.tryInteraciveLogin(ctx, 3)
+	return gcp.tryInteractiveLogin(ctx, 3)
 }
 
-func (gcp *Gcp) tryInteraciveLogin(ctx context.Context, n int) error {
+func (gcp *Gcp) tryInteractiveLogin(ctx context.Context, n int) error {
 	for range n {
 		tokenSource, err := gcp.InteractiveLogin(ctx)
 		if err != nil {
@@ -148,6 +148,10 @@ func (gcp *Gcp) tryInteraciveLogin(ctx context.Context, n int) error {
 		bytes, err := json.Marshal(currentToken)
 		if err != nil {
 			return fmt.Errorf("failed to marshal token: %w", err)
+		}
+		if gcp.TokenStore == nil {
+			term.Warn("No token store configured, skipping persisting token")
+			return nil
 		}
 		if err := gcp.TokenStore.Save(tokenName, string(bytes)); err != nil {
 			return fmt.Errorf("failed to save token: %w", err)
