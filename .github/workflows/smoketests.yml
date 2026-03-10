@@ -19,6 +19,20 @@ jobs:
       - name: Trigger Workflow
         uses: actions/github-script@v7
         with:
+          # If this token is expired, you can regenerate by following these steps:
+          # 1. Navigate to https://github.com/settings/personal-access-tokens/new
+          # 2. Fill out the form with the following values:
+          #   * Token name: defang-mvp-workflow-dispatch-token
+          #   * Description: This token will be used by a workflow in the `DefangLabs/defang` repository to trigger a workflow run in the `DefangLabs/defang-mvp` repository.
+          #   * Resource Owner: Defang Labs
+          #   * Expiration: 366 days
+          #   * Repositories:
+          #     * DefangLabs/defang-mvp
+          #   * Repository Permissions:
+          #     * Actions (read and write access)
+          #     * Metadata (read only)
+          # 3. Click "Generate token"
+          # 4. Copy the new token into the `DEFANG_MVP_ACTIONS_DISPATCH_TOKEN` secret in the `smoketest` environment
           github-token: ${{ secrets.DEFANG_MVP_ACTIONS_DISPATCH_TOKEN }}
           script: |
             await github.rest.actions.createWorkflowDispatch({
