@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
@@ -228,6 +229,9 @@ func stackExists(ctx context.Context, project string, stack string) (bool, error
 		Stack:   stack,
 	})
 	if err != nil {
+		if connect.CodeOf(err) == connect.CodeNotFound {
+			return false, nil
+		}
 		return false, err
 	}
 	return resp.GetStack() != nil, nil
