@@ -147,7 +147,7 @@ increment-major-version:
 
 .PHONY: push-tags
 push-tags:
-	git push origin refs/tags/v*
+	git push origin 'refs/tags/v*'
 
 .PHONY: patch-release
 patch-release: pull test no-diff increment-patch-version push-tags
