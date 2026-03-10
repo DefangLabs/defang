@@ -139,30 +139,30 @@ func findTargetDirectory() (string, error) {
 	}
 }
 
-func handleInvalidComposeFileErr(ctx context.Context, err error) error {
+func handleInvalidComposeFileErr(ctx context.Context, loadErr error) error {
 	if global.NonInteractive {
-		return err
+		return loadErr
 	}
 
-	if !strings.HasPrefix(err.Error(), "yaml: ") && !strings.HasPrefix(err.Error(), "validating ") {
-		return err
+	if !strings.HasPrefix(loadErr.Error(), "yaml: ") && !strings.HasPrefix(loadErr.Error(), "validating ") {
+		return loadErr
 	}
 
-	term.Error("Cannot load project:", err)
+	term.Error("Cannot load project:", loadErr)
 	project, err := compose.NewLoader().CreateProjectForDebug()
 	if err != nil {
-		return err
+		return fmt.Errorf("%w; original error: %w", err, loadErr)
 	}
 
 	debugger, err := debug.NewDebugger(ctx, global.FabricAddr, &stacks.Parameters{})
 	if err != nil {
-		return err
+		return fmt.Errorf("%w; original error: %w", err, loadErr)
 	}
 	debugErr := debugger.DebugComposeLoadError(ctx, debug.DebugConfig{
 		Project: project,
-	}, err)
+	}, loadErr)
 	if debugErr != nil {
-		return fmt.Errorf("failed to debug compose load error: %w; original error: %v", debugErr, err)
+		return fmt.Errorf("failed to debug compose load error: %w; original error: %v", debugErr, loadErr)
 	}
-	return err
+	return loadErr
 }
