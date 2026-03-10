@@ -220,50 +220,51 @@ func setupGithubTokenCredentials(ctx context.Context) error {
 	githubTokenReqUrl := os.Getenv("ACTIONS_ID_TOKEN_REQUEST_URL")
 	gcpProvider := os.Getenv("GOOGLE_WORKLOAD_IDENTITY_PROVIDER")
 	term.Debugf("ACTIONS_ID_TOKEN_REQUEST_URL=%q, GOOGLE_WORKLOAD_IDENTITY_PROVIDER=%q", githubTokenReqUrl, gcpProvider)
-	if githubTokenReqUrl != "" && gcpProvider != "" {
-		// 1. convert the identity provider to aud in credentials.json below
-		// In credentials.json audience is in the format: //iam.googleapis.com/projects/996411251390/locations/global/workloadIdentityPools/defang-github/providers/github-actions-r6xx29
-		audience := gcpProvider
-		if !strings.HasPrefix(audience, "//iam.googleapis.com/") {
-			audience = "//" + path.Join("iam.googleapis.com", audience)
-		}
-
-		// 2. use the aud to get the github id token and save it to a file, which will be referenced in credentials.json as the credential source
-		gcpIdToken, err := github.GetIdToken(ctx, audience) // WIF provider requires the jwt audience to match the provider resource name
-		if err != nil {
-			return fmt.Errorf("non-interactive login failed: %w", err)
-		}
-		project, pool, provider, err := parseWIFProvider(audience)
-		if err != nil {
-			return fmt.Errorf("failed to parse WIF provider %q: %w", audience, err)
-		}
-		tokenKey := fmt.Sprintf("%s-%s-%s.jwt", project, pool, provider)
-		jwtPath := filepath.Join(client.StateDir, tokenKey)
-		if err := os.WriteFile(jwtPath, []byte(gcpIdToken), 0600); err != nil {
-			return fmt.Errorf("failed to save web identity token for gcp: %w", err)
-		}
-
-		// 3. Create a credentials.json to be used as the GOOGLE_APPLICATION_CREDENTIALS for GCP authentication
-		credentials := GoogleAuthCredentials{
-			UniverseDomain:   "googleapis.com",
-			Type:             "external_account",
-			Audience:         audience,
-			SubjectTokenType: "urn:ietf:params:oauth:token-type:jwt",
-			TokenURL:         "https://sts.googleapis.com/v1/token",
-			CredentialSource: &GoogleAuthCredentialSource{
-				File: jwtPath, // reference the file where we saved the github id token above
-				Format: &GoogleAuthCredentialFormat{
-					Type: "text", // type text for encoded jwt
-				},
-			},
-		}
-		credsPath, err := writeCredentialsFile(tokenKey, credentials)
-		if err != nil {
-			return err
-		}
-		// Not an official env var, but our GCP integration will look for this when the provider is set to GCP and this env var is present
-		os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", credsPath)
+	if githubTokenReqUrl == "" || gcpProvider == "" {
+		return nil
 	}
+	// 1. convert the identity provider to aud in credentials.json below
+	// In credentials.json audience is in the format: //iam.googleapis.com/projects/996411251390/locations/global/workloadIdentityPools/defang-github/providers/github-actions-r6xx29
+	audience := gcpProvider
+	if !strings.HasPrefix(audience, "//iam.googleapis.com/") {
+		audience = "//" + path.Join("iam.googleapis.com", audience)
+	}
+
+	// 2. use the aud to get the github id token and save it to a file, which will be referenced in credentials.json as the credential source
+	gcpIdToken, err := github.GetIdToken(ctx, audience) // WIF provider requires the jwt audience to match the provider resource name
+	if err != nil {
+		return fmt.Errorf("non-interactive login failed: %w", err)
+	}
+	project, pool, provider, err := parseWIFProvider(audience)
+	if err != nil {
+		return fmt.Errorf("failed to parse WIF provider %q: %w", audience, err)
+	}
+	tokenKey := fmt.Sprintf("%s-%s-%s.jwt", project, pool, provider)
+	jwtPath := filepath.Join(client.StateDir, tokenKey)
+	if err := os.WriteFile(jwtPath, []byte(gcpIdToken), 0600); err != nil {
+		return fmt.Errorf("failed to save web identity token for gcp: %w", err)
+	}
+
+	// 3. Create a credentials.json to be used as the GOOGLE_APPLICATION_CREDENTIALS for GCP authentication
+	credentials := GoogleAuthCredentials{
+		UniverseDomain:   "googleapis.com",
+		Type:             "external_account",
+		Audience:         audience,
+		SubjectTokenType: "urn:ietf:params:oauth:token-type:jwt",
+		TokenURL:         "https://sts.googleapis.com/v1/token",
+		CredentialSource: &GoogleAuthCredentialSource{
+			File: jwtPath, // reference the file where we saved the github id token above
+			Format: &GoogleAuthCredentialFormat{
+				Type: "text", // type text for encoded jwt
+			},
+		},
+	}
+	credsPath, err := writeCredentialsFile(tokenKey, credentials)
+	if err != nil {
+		return err
+	}
+	// Not an official env var, but our GCP integration will look for this when the provider is set to GCP and this env var is present
+	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", credsPath)
 	return nil
 }
 
