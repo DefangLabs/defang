@@ -184,12 +184,12 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 		{
 			name: "stack already exists",
 			parameters: stacks.Parameters{
-				Name:     "existing-stack",
+				Name:     "existingstack",
 				Provider: client.ProviderAWS,
 				Region:   "us-test-2",
 				Mode:     modes.ModeAffordable,
 			},
-			existingStacks: []*defangv1.Stack{{Name: "existing-stack", Project: ""}},
+			existingStacks: []*defangv1.Stack{{Name: "existingstack", Project: ""}},
 			expectErr:      true,
 		},
 	}
