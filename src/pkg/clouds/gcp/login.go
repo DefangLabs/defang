@@ -17,10 +17,20 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/github"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	gax "github.com/googleapis/gax-go/v2"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 )
+
+type projectsClientIface interface {
+	TestIamPermissions(ctx context.Context, req *iampb.TestIamPermissionsRequest, opts ...gax.CallOption) (*iampb.TestIamPermissionsResponse, error)
+	Close() error
+}
+
+var newProjectsClient = func(ctx context.Context, opts ...option.ClientOption) (projectsClientIface, error) {
+	return resourcemanager.NewProjectsClient(ctx, opts...)
+}
 
 var (
 	clientID     = "807925246520-aeouiqtvpde5i6ka1fpj4lh5dccfcga9.apps.googleusercontent.com" // nolint:gosec,G101 // Client ID for app is not treated as secret
@@ -313,12 +323,12 @@ func (e ErrorMissingPermissions) Error() string {
 	return fmt.Sprintf("token is missing required permissions: %v", []string(e))
 }
 
-var testTokenProjectPermissions = func(ctx context.Context, projectID string, perms []string, tokenSource oauth2.TokenSource) error {
+func testTokenProjectPermissions(ctx context.Context, projectID string, perms []string, tokenSource oauth2.TokenSource) error {
 	var options []option.ClientOption
 	if tokenSource != nil {
 		options = append(options, option.WithTokenSource(tokenSource))
 	}
-	client, err := resourcemanager.NewProjectsClient(ctx, options...)
+	client, err := newProjectsClient(ctx, options...)
 	if err != nil {
 		return fmt.Errorf("creating client: %w", err)
 	}

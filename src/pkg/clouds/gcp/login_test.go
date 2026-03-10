@@ -7,9 +7,34 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/iam/apiv1/iampb"
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
+	gax "github.com/googleapis/gax-go/v2"
 	"golang.org/x/oauth2"
+	"google.golang.org/api/option"
 )
+
+// mockProjectsClient implements projectsClientIface for testing.
+type mockProjectsClient struct {
+	testIamPermissionsFunc func(ctx context.Context, req *iampb.TestIamPermissionsRequest, opts ...gax.CallOption) (*iampb.TestIamPermissionsResponse, error)
+}
+
+func (m *mockProjectsClient) TestIamPermissions(ctx context.Context, req *iampb.TestIamPermissionsRequest, opts ...gax.CallOption) (*iampb.TestIamPermissionsResponse, error) {
+	return m.testIamPermissionsFunc(ctx, req, opts...)
+}
+
+func (m *mockProjectsClient) Close() error { return nil }
+
+// mockNewProjectsClient replaces newProjectsClient for the duration of a test,
+// returning a client whose TestIamPermissions always calls fn.
+func mockNewProjectsClient(t *testing.T, fn func(ctx context.Context, req *iampb.TestIamPermissionsRequest, opts ...gax.CallOption) (*iampb.TestIamPermissionsResponse, error)) {
+	t.Helper()
+	orig := newProjectsClient
+	newProjectsClient = func(ctx context.Context, opts ...option.ClientOption) (projectsClientIface, error) {
+		return &mockProjectsClient{testIamPermissionsFunc: fn}, nil
+	}
+	t.Cleanup(func() { newProjectsClient = orig })
+}
 
 func marshalToken(t *testing.T, tok oauth2.Token) string {
 	t.Helper()
@@ -18,6 +43,14 @@ func marshalToken(t *testing.T, tok oauth2.Token) string {
 		t.Fatalf("marshaling token: %v", err)
 	}
 	return string(b)
+}
+
+func allPermsGranted(_ context.Context, req *iampb.TestIamPermissionsRequest, _ ...gax.CallOption) (*iampb.TestIamPermissionsResponse, error) {
+	return &iampb.TestIamPermissionsResponse{Permissions: req.Permissions}, nil
+}
+
+func noPermsGranted(_ context.Context, _ *iampb.TestIamPermissionsRequest, _ ...gax.CallOption) (*iampb.TestIamPermissionsResponse, error) {
+	return &iampb.TestIamPermissionsResponse{}, nil
 }
 
 func TestFindStoredCredentials_GCP(t *testing.T) {
@@ -67,11 +100,7 @@ func TestFindStoredCredentials_GCP(t *testing.T) {
 	})
 
 	t.Run("token without permissions is skipped", func(t *testing.T) {
-		orig := testTokenProjectPermissions
-		testTokenProjectPermissions = func(_ context.Context, _ string, _ []string, _ oauth2.TokenSource) error {
-			return errors.New("missing permissions")
-		}
-		t.Cleanup(func() { testTokenProjectPermissions = orig })
+		mockNewProjectsClient(t, noPermsGranted)
 
 		store := tokenstore.NewMemTokenStore()
 		store.Save("user@example.com", marshalToken(t, oauth2.Token{ //nolint:errcheck
@@ -89,11 +118,7 @@ func TestFindStoredCredentials_GCP(t *testing.T) {
 	})
 
 	t.Run("valid token with permissions returns token source", func(t *testing.T) {
-		orig := testTokenProjectPermissions
-		testTokenProjectPermissions = func(_ context.Context, _ string, _ []string, _ oauth2.TokenSource) error {
-			return nil // all permissions granted
-		}
-		t.Cleanup(func() { testTokenProjectPermissions = orig })
+		mockNewProjectsClient(t, allPermsGranted)
 
 		tok := oauth2.Token{
 			AccessToken:  "access-token",
@@ -113,13 +138,11 @@ func TestFindStoredCredentials_GCP(t *testing.T) {
 	})
 
 	t.Run("multiple tokens: first with permissions wins", func(t *testing.T) {
-		orig := testTokenProjectPermissions
 		calls := 0
-		testTokenProjectPermissions = func(_ context.Context, _ string, _ []string, _ oauth2.TokenSource) error {
+		mockNewProjectsClient(t, func(ctx context.Context, req *iampb.TestIamPermissionsRequest, opts ...gax.CallOption) (*iampb.TestIamPermissionsResponse, error) {
 			calls++
-			return nil // all pass
-		}
-		t.Cleanup(func() { testTokenProjectPermissions = orig })
+			return &iampb.TestIamPermissionsResponse{Permissions: req.Permissions}, nil
+		})
 
 		store := tokenstore.NewMemTokenStore()
 		tok := oauth2.Token{AccessToken: "tok", Expiry: time.Now().Add(time.Hour)}
@@ -135,6 +158,85 @@ func TestFindStoredCredentials_GCP(t *testing.T) {
 		}
 		if calls != 1 {
 			t.Errorf("expected 1 permission check (stop after first match), got %d", calls)
+		}
+	})
+}
+
+func TestAuthenticate_GCP(t *testing.T) {
+	t.Run("valid ADC credentials authenticate successfully", func(t *testing.T) {
+		mockNewProjectsClient(t, allPermsGranted)
+
+		gcp := &Gcp{ProjectId: "test-project"}
+		if err := gcp.Authenticate(t.Context(), false); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("ADC missing perms, stored token valid", func(t *testing.T) {
+		calls := 0
+		mockNewProjectsClient(t, func(ctx context.Context, req *iampb.TestIamPermissionsRequest, opts ...gax.CallOption) (*iampb.TestIamPermissionsResponse, error) {
+			calls++
+			if calls == 1 {
+				// First call: ADC check — return no permissions
+				return &iampb.TestIamPermissionsResponse{}, nil
+			}
+			// Subsequent calls: stored token check — grant all permissions
+			return &iampb.TestIamPermissionsResponse{Permissions: req.Permissions}, nil
+		})
+
+		tok := oauth2.Token{
+			AccessToken:  "stored-token",
+			RefreshToken: "refresh",
+			Expiry:       time.Now().Add(time.Hour),
+		}
+		store := tokenstore.NewMemTokenStore()
+		store.Save("user@example.com", marshalToken(t, tok)) //nolint:errcheck
+
+		gcp := &Gcp{ProjectId: "test-project", TokenStore: store}
+		if err := gcp.Authenticate(t.Context(), false); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if gcp.TokenSource == nil {
+			t.Error("expected TokenSource to be set after finding stored credentials")
+		}
+	})
+
+	t.Run("ADC missing perms, no stored credentials, non-interactive returns error", func(t *testing.T) {
+		mockNewProjectsClient(t, noPermsGranted)
+
+		gcp := &Gcp{ProjectId: "test-project", TokenStore: tokenstore.NewMemTokenStore()}
+		err := gcp.Authenticate(t.Context(), false)
+		if err == nil {
+			t.Fatal("expected error for non-interactive with no valid credentials")
+		}
+	})
+
+	t.Run("newProjectsClient error falls through to stored credentials", func(t *testing.T) {
+		calls := 0
+		orig := newProjectsClient
+		newProjectsClient = func(ctx context.Context, opts ...option.ClientOption) (projectsClientIface, error) {
+			calls++
+			if calls == 1 {
+				return nil, errors.New("ADC unavailable")
+			}
+			return &mockProjectsClient{testIamPermissionsFunc: allPermsGranted}, nil
+		}
+		t.Cleanup(func() { newProjectsClient = orig })
+
+		tok := oauth2.Token{
+			AccessToken:  "stored-token",
+			RefreshToken: "refresh",
+			Expiry:       time.Now().Add(time.Hour),
+		}
+		store := tokenstore.NewMemTokenStore()
+		store.Save("user@example.com", marshalToken(t, tok)) //nolint:errcheck
+
+		gcp := &Gcp{ProjectId: "test-project", TokenStore: store}
+		if err := gcp.Authenticate(t.Context(), false); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if gcp.TokenSource == nil {
+			t.Error("expected TokenSource to be set after finding stored credentials")
 		}
 	})
 }
