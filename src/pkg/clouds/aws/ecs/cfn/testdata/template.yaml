@@ -568,7 +568,8 @@ Resources:
     TaskDefinition:
         Properties:
             ContainerDefinitions:
-                - Image: alpine:latest
+                - Essential: true
+                  Image: alpine:latest
                   LogConfiguration:
                     LogDriver: awslogs
                     Options:
@@ -579,7 +580,8 @@ Resources:
                         awslogs-stream-prefix: defang
                   Name: main
                   StopTimeout: 120
-                - Image:
+                - Essential: true
+                  Image:
                     Fn::If:
                         - EnableDockerPullThroughCache
                         - Fn::Sub: ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/test-docker-public/library/alpine:latest
@@ -594,7 +596,8 @@ Resources:
                         awslogs-stream-prefix: defang
                   Name: main2
                   StopTimeout: 120
-                - Image:
+                - Essential: true
+                  Image:
                     Fn::If:
                         - EnablePullThroughCache
                         - Fn::Sub: ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/test-ecr-public/docker/library/alpine:latest
