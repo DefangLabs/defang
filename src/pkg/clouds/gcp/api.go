@@ -2,13 +2,18 @@ package gcp
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"google.golang.org/api/serviceusage/v1"
+)
+
+const (
+	// we have seen it take up to 3 minutes to enable APIs and create new service accounts
+	maxRetries    = 36
+	retryInterval = 5 * time.Second
 )
 
 func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
@@ -19,7 +24,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 
 	projectName := "projects/" + gcp.ProjectId
 
-	for i := range 3 {
+	for i := range maxRetries {
 		term.Debugf("Enabling services: %v\n", apis)
 		req := &serviceusage.BatchEnableServicesRequest{
 			ServiceIds: apis,
@@ -27,9 +32,9 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 
 		operation, err := service.Services.BatchEnable(projectName, req).Context(ctx).Do()
 		if err != nil {
-			if i < 2 {
-				term.Debugf("Failed to enable services, will retry in 5s: %v\n", err)
-				if err := pkg.SleepWithContext(ctx, 5*time.Second); err != nil {
+			if i < maxRetries-1 {
+				term.Debugf("Failed to enable services, will retry in %v: %v\n", retryInterval, err)
+				if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
 					return err
 				}
 				continue
@@ -44,9 +49,9 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 				term.Warnf("Failed to get operation status: %v\n", err)
 			} else if op.Done { // Check if the operation is done
 				if op.Error != nil {
-					if i < 2 {
-						term.Debugf("Failed to enable services operation, will retry in 5s: %v\n", op.Error)
-						if err := pkg.SleepWithContext(ctx, 5*time.Second); err != nil {
+					if i < maxRetries-1 {
+						term.Debugf("Failed to enable services operation, will retry in %v: %v\n", retryInterval, op.Error)
+						if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
 							return err
 						}
 						break
@@ -60,5 +65,5 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 			}
 		}
 	}
-	return errors.New("failed to enable services after 3 attempts") // This should never be reached
+	return fmt.Errorf("failed to enable services after %d retries", maxRetries) // This should never be reached
 }
