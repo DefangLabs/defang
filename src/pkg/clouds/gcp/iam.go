@@ -194,19 +194,10 @@ func (gcp Gcp) EnsurePrincipalHasBucketRoles(ctx context.Context, bucketName, pr
 	}
 
 	term.Infof("Updating IAM policy for principal %s on bucket %s", principal, bucketName)
-	for i := range maxRetries { // Service account might not be visible for a few seconds after creation for policy attachment
-		if err := bucket.IAM().SetPolicy(ctx, policy); err != nil {
-			if i < maxRetries-1 {
-				term.Infof("Failed to set IAM policy, will retry in %v: %v\n", retryInterval, err)
-				if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
-					return err
-				}
-				continue
-			}
-			return fmt.Errorf("failed to set IAM policy for bucket %s: %w", bucketName, err)
-		} else {
-			break
-		}
+	if err := retryWithContext(ctx, func() error { // Service account might not be visible for a few seconds after creation for policy attachment
+		return bucket.IAM().SetPolicy(ctx, policy)
+	}); err != nil {
+		return fmt.Errorf("failed to set IAM policy for bucket %s: %w", bucketName, err)
 	}
 
 checkPolicy:
@@ -271,22 +262,11 @@ func (gcp Gcp) EnsurePrincipalHasServiceAccountRoles(ctx context.Context, princi
 	}
 
 	term.Infof("Updating IAM policy for %s on service account %s", principal, serviceAccount)
-	for i := range maxRetries { // Service account might not be visible for a few seconds after creation for policy attachment
-		if _, err := client.SetIamPolicy(ctx, &iamadm.SetIamPolicyRequest{
-			Resource: resource,
-			Policy:   policy,
-		}); err != nil {
-			if i < maxRetries-1 {
-				term.Infof("Failed to set IAM policy for service account %s, will retry in %v: %v\n", serviceAccount, retryInterval, err)
-				if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
-					return err
-				}
-				continue
-			}
-			return fmt.Errorf("failed to set IAM policy for service account %s: %w", serviceAccount, err)
-		} else {
-			break
-		}
+	if err := retryWithContext(ctx, func() error { // Service account might not be visible for a few seconds after creation for policy attachment
+		_, err := client.SetIamPolicy(ctx, &iamadm.SetIamPolicyRequest{Resource: resource, Policy: policy})
+		return err
+	}); err != nil {
+		return fmt.Errorf("failed to set IAM policy for service account %s: %w", serviceAccount, err)
 	}
 
 checkPolicy:
@@ -351,19 +331,11 @@ func ensurePrincipalHasRolesWithResource(ctx context.Context, client resourceWit
 	}
 	term.Infof("Updating IAM policy for resource %s", resource)
 
-	for i := range maxRetries { // Service account might not be visible for a few seconds after creation for policy attachment
-		if _, err := client.SetIamPolicy(ctx, &iampb.SetIamPolicyRequest{Resource: resource, Policy: policy}); err != nil {
-			if i < maxRetries-1 {
-				term.Infof("Failed to set IAM policy for resource %s, will retry in %v: %v\n", resource, retryInterval, err)
-				if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
-					return err
-				}
-				continue
-			}
-			return fmt.Errorf("failed to set IAM policy for resource %s: %w", resource, err)
-		} else {
-			break
-		}
+	if err := retryWithContext(ctx, func() error { // Service account might not be visible for a few seconds after creation for policy attachment
+		_, err := client.SetIamPolicy(ctx, &iampb.SetIamPolicyRequest{Resource: resource, Policy: policy})
+		return err
+	}); err != nil {
+		return fmt.Errorf("failed to set IAM policy for resource %s: %w", resource, err)
 	}
 
 	for start := time.Now(); time.Since(start) < 5*time.Minute; {

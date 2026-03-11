@@ -16,6 +16,24 @@ const (
 	retryInterval = 5 * time.Second
 )
 
+// retryWithContext calls op up to maxRetries times, sleeping retryInterval between attempts.
+// It returns the last error if all attempts fail.
+func retryWithContext(ctx context.Context, op func() error) error {
+	var err error
+	for i := range maxRetries {
+		if err = op(); err == nil {
+			return nil
+		}
+		if i < maxRetries-1 {
+			term.Debugf("Operation failed, will retry in %v: %v\n", retryInterval, err)
+			if sleepErr := pkg.SleepWithContext(ctx, retryInterval); sleepErr != nil {
+				return sleepErr
+			}
+		}
+	}
+	return err
+}
+
 func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 	service, err := serviceusage.NewService(ctx)
 	if err != nil {
@@ -24,21 +42,11 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 
 	projectName := "projects/" + gcp.ProjectId
 
-	for i := range maxRetries {
+	return retryWithContext(ctx, func() error {
 		term.Debugf("Enabling services: %v\n", apis)
-		req := &serviceusage.BatchEnableServicesRequest{
-			ServiceIds: apis,
-		}
-
+		req := &serviceusage.BatchEnableServicesRequest{ServiceIds: apis}
 		operation, err := service.Services.BatchEnable(projectName, req).Context(ctx).Do()
 		if err != nil {
-			if i < maxRetries-1 {
-				term.Debugf("Failed to enable services, will retry in %v: %v\n", retryInterval, err)
-				if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
-					return err
-				}
-				continue
-			}
 			return fmt.Errorf("failed to batch enable services: %w", err)
 		}
 
@@ -47,16 +55,9 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 			op, err := opService.Get(operation.Name).Context(ctx).Do()
 			if err != nil {
 				term.Warnf("Failed to get operation status: %v\n", err)
-			} else if op.Done { // Check if the operation is done
+			} else if op.Done {
 				if op.Error != nil {
-					if i < maxRetries-1 {
-						term.Debugf("Failed to enable services operation, will retry in %v: %v\n", retryInterval, op.Error)
-						if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
-							return err
-						}
-						break
-					}
-					return fmt.Errorf("error in operation: %v", op.Error)
+					return fmt.Errorf("enable services operation failed: %v", op.Error)
 				}
 				return nil
 			}
@@ -64,6 +65,5 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 				return err
 			}
 		}
-	}
-	return fmt.Errorf("failed to enable services after %d retries", maxRetries) // This should never be reached
+	})
 }
