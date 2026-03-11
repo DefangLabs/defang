@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"slices"
 	"sort"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -44,14 +45,17 @@ func (a *Aws) DeleteSecrets(ctx context.Context, names ...string) error {
 
 	svc := NewSsmFromConfig(cfg)
 
-	o, err := svc.DeleteParameters(ctx, &ssm.DeleteParametersInput{
-		Names: names, // works because getSecretID is a no-op
-	})
-	if err != nil {
-		return err
-	}
-	if len(o.InvalidParameters) > 0 && len(o.DeletedParameters) == 0 {
-		return &types.ParameterNotFound{}
+	// SSM DeleteParameters only allows up to 10 parameters at a time, so we need to chunk the input
+	for chunk := range slices.Chunk(names, 10) {
+		o, err := svc.DeleteParameters(ctx, &ssm.DeleteParametersInput{
+			Names: chunk, // works because getSecretID is a no-op
+		})
+		if err != nil {
+			return err
+		}
+		if len(o.InvalidParameters) > 0 && len(o.DeletedParameters) == 0 {
+			return &types.ParameterNotFound{}
+		}
 	}
 	return nil
 }
