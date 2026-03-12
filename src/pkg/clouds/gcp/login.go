@@ -33,8 +33,12 @@ var newProjectsClient = func(ctx context.Context, opts ...option.ClientOption) (
 }
 
 var (
-	clientID     = "807925246520-aeouiqtvpde5i6ka1fpj4lh5dccfcga9.apps.googleusercontent.com" // nolint:gosec,G101 // Client ID for app is not treated as secret
-	clientSecret = "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"                                      // nolint:gosec,G101 // Client secret for app is not a secret, desktop APP client secrets is considered public information
+	clientID = "513566466873-r6s52lv410ceuo37b2qu5122r0tu6brb.apps.googleusercontent.com" // nolint:gosec,G101 // Client ID for app is not a secret
+	// Client secret for app is not a secret, desktop APP client secrets is considered public information
+	// See: https://developers.google.com/identity/protocols/oauth2/#installed
+	// Numerous opensource projects have their google cloud client_secret committed in source code, including gcloud cli itself, and gomote:
+	// https://github.com/golang/build/blob/master/internal/iapclient/iapclient.go#L38
+	clientSecret = "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" // nolint:gosec,G101
 	scopes       = []string{"email", "https://www.googleapis.com/auth/cloud-platform"}
 
 	// TODO: Add all required permissions for running gcp byoc
