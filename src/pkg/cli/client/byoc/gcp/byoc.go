@@ -14,6 +14,7 @@ import (
 
 	"cloud.google.com/go/logging/apiv2/loggingpb"
 	"cloud.google.com/go/storage"
+	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
@@ -26,7 +27,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/bufbuild/connect-go"
 	"go.yaml.in/yaml/v4"
 	gcpdns "google.golang.org/api/dns/v1"
 	"google.golang.org/api/googleapi"
