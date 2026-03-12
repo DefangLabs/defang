@@ -4305,6 +4305,7 @@ type ProjectUpdate struct {
 	GcpExecutionId        string         `protobuf:"bytes,11,opt,name=gcp_execution_id,json=gcpExecutionId,proto3" json:"gcp_execution_id,omitempty"`
 	AwsEcsTaskId          string         `protobuf:"bytes,12,opt,name=aws_ecs_task_id,json=awsEcsTaskId,proto3" json:"aws_ecs_task_id,omitempty"`
 	Etag                  string         `protobuf:"bytes,13,opt,name=etag,proto3" json:"etag,omitempty"` // aka deployment ID
+	PulumiVersion         string         `protobuf:"bytes,14,opt,name=pulumi_version,json=pulumiVersion,proto3" json:"pulumi_version,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -4427,6 +4428,13 @@ func (x *ProjectUpdate) GetAwsEcsTaskId() string {
 func (x *ProjectUpdate) GetEtag() string {
 	if x != nil {
 		return x.Etag
+	}
+	return ""
+}
+
+func (x *ProjectUpdate) GetPulumiVersion() string {
+	if x != nil {
+		return x.PulumiVersion
 	}
 	return ""
 }
@@ -5897,7 +5905,7 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\bservices\x18\x01 \x03(\v2\x19.io.defang.v1.ServiceInfoR\bservices\x12\x18\n" +
 	"\aproject\x18\x02 \x01(\tR\aproject\x129\n" +
 	"\n" +
-	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\x81\x04\n" +
+	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\xa8\x04\n" +
 	"\rProjectUpdate\x125\n" +
 	"\bservices\x18\x01 \x03(\v2\x19.io.defang.v1.ServiceInfoR\bservices\x12\x17\n" +
 	"\aalb_arn\x18\x02 \x01(\tR\x06albArn\x12\x1c\n" +
@@ -5914,7 +5922,8 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	" \x01(\fR\tstackFile\x12(\n" +
 	"\x10gcp_execution_id\x18\v \x01(\tR\x0egcpExecutionId\x12%\n" +
 	"\x0faws_ecs_task_id\x18\f \x01(\tR\fawsEcsTaskId\x12\x12\n" +
-	"\x04etag\x18\r \x01(\tR\x04etag\":\n" +
+	"\x04etag\x18\r \x01(\tR\x04etag\x12%\n" +
+	"\x0epulumi_version\x18\x0e \x01(\tR\rpulumiVersion\":\n" +
 	"\n" +
 	"GetRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +

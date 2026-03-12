@@ -643,6 +643,7 @@ message ProjectUpdate {
   string gcp_execution_id = 11;
   string aws_ecs_task_id = 12;
   string etag = 13; // aka deployment ID
+  string pulumi_version = 14;
 }
 
 message GetRequest { // was ServiceID

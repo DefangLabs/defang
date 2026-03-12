@@ -525,11 +525,12 @@ func (b *ByocGcp) deploy(ctx context.Context, req *client.DeployRequest, command
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
-		CdVersion: b.CDImage,
-		Compose:   req.Compose,
-		Etag:      etag,
-		Mode:      req.Mode,
-		Services:  serviceInfos,
+		CdVersion:     b.CDImage,
+		Compose:       req.Compose,
+		Etag:          etag,
+		Mode:          req.Mode,
+		PulumiVersion: b.PulumiVersion,
+		Services:      serviceInfos,
 	})
 	if err != nil {
 		return nil, err

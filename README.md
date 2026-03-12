@@ -198,6 +198,7 @@ The Defang CLI recognizes the following environment variables:
 - `COMPOSE_PATH_SEPARATOR` - The path separator to use for `COMPOSE_FILE`; defaults to `:` on Unix/MacOS and `;` on Windows
 - `COMPOSE_PROJECT_NAME` - The name of the project to use; overrides the `name` in the Compose file
 - `DEFANG_ACCESS_TOKEN` - The access token to use for authentication; if not specified, uses token from `defang login`
+- `DEFANG_ALLOW_UPGRADE` - If set to `true`, allows upgrading the CD image and Pulumi version to the latest available; defaults to `false`, ie. previously deployed versions will be used to avoid unexpected upgrades
 - `DEFANG_BUILD_CONTEXT_LIMIT` - The maximum size of the build context when building container images; defaults to `100MiB`
 - `DEFANG_CD_BUCKET` - The S3 bucket to use for the BYOC CD pipeline; defaults to `defang-cd-bucket-…`
 - `DEFANG_CD_IMAGE` - The image to use for the Continuous Deployment (CD) pipeline; defaults to `public.ecr.aws/defang-io/cd:public-beta`

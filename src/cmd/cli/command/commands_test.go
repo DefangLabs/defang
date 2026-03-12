@@ -398,7 +398,7 @@ func TestNewProvider(t *testing.T) {
 		})
 
 		p := cli.NewProvider(ctx, client.ProviderAWS, client.MockFabricClient{}, "")
-		err := canIUseProvider(ctx, p, "project", 0)
+		err := canIUseProvider(ctx, p, "project", 0, false)
 		if err != nil {
 			t.Errorf("CanIUseProvider() failed: %v", err)
 		}
@@ -430,7 +430,7 @@ func TestNewProvider(t *testing.T) {
 		})
 
 		p := cli.NewProvider(ctx, client.ProviderAWS, client.MockFabricClient{}, "")
-		err := canIUseProvider(ctx, p, "project", 0)
+		err := canIUseProvider(ctx, p, "project", 0, false)
 		if err != nil {
 			t.Errorf("CanIUseProvider() failed: %v", err)
 		}

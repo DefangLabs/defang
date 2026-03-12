@@ -2,12 +2,13 @@ package client
 
 import (
 	"context"
+	"os"
 
-	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func CanIUseProvider(ctx context.Context, client FabricClient, provider Provider, projectName string, serviceCount int) error {
+func CanIUseProvider(ctx context.Context, client FabricClient, provider Provider, projectName string, serviceCount int, allowUpgrade bool) error {
 	info, err := provider.AccountInfo(ctx)
 	if err != nil {
 		return err
@@ -27,17 +28,43 @@ func CanIUseProvider(ctx context.Context, client FabricClient, provider Provider
 		return err
 	}
 
-	// Allow local override of the CD image and Pulumi version
-	resp.CdImage = pkg.Getenv("DEFANG_CD_IMAGE", resp.CdImage)
-	resp.PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", resp.PulumiVersion)
-	// FIXME: use previous CD image for refresh/down/destroy/cancel commands
-	// if resp.CdImage == "previous" {
-	// 	if projUpdate, err := provider.GetProjectUpdate(ctx, projectName); err != nil {
-	// 		term.Debugf("unable to get project update for project %s: %v", projectName, err)
-	// 	} else if projUpdate != nil {
-	// 		resp.CdImage = projUpdate.CdVersion
-	// 	}
-	// }
+	// Hard override from env vars takes absolute precedence
+	cdOverride := os.Getenv("DEFANG_CD_IMAGE")
+	if cdOverride != "" {
+		resp.CdImage = cdOverride
+	}
+	pulumiOverride := os.Getenv("DEFANG_PULUMI_VERSION")
+	if pulumiOverride != "" {
+		resp.PulumiVersion = pulumiOverride
+	}
+
+	// Version pinning: use previous versions unless explicitly upgrading or overridden by env
+	if projectName != "" && (cdOverride == "" || pulumiOverride == "") {
+		if projUpdate, err := provider.GetProjectUpdate(ctx, projectName); err != nil || projUpdate == nil {
+			term.Debugf("unable to get project update for %q: %v", projectName, err)
+		} else {
+			if cdOverride == "" {
+				resp.CdImage = pinVersion(resp.CdImage, projUpdate.CdVersion, "CD image", allowUpgrade)
+			}
+			if pulumiOverride == "" {
+				resp.PulumiVersion = pinVersion(resp.PulumiVersion, projUpdate.PulumiVersion, "Pulumi version", allowUpgrade)
+			}
+		}
+	}
+
 	provider.SetCanIUseConfig(resp)
 	return nil
+}
+
+func pinVersion(latest, previous, label string, allowUpgrade bool) string {
+	if previous == "" || latest == previous {
+		return latest
+	}
+	if allowUpgrade {
+		term.Infof("Upgrading %s from %s to %s", label, previous, latest)
+		return latest
+	} else {
+		term.Warnf("A newer %s is available (%s); using previously deployed version (%s). To upgrade, re-run with --allow-upgrade or set DEFANG_ALLOW_UPGRADE=1", label, latest, previous)
+		return previous
+	}
 }

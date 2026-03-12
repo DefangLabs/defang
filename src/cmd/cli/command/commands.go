@@ -173,6 +173,7 @@ func SetupCommands(version string) {
 	// CD command
 	RootCmd.AddCommand(cdCmd)
 	cdCmd.PersistentFlags().StringVar(&byoc.DefangPulumiBackend, "pulumi-backend", "", `specify an alternate Pulumi backend URL or "pulumi-cloud"`)
+	cdCmd.PersistentFlags().Bool("allow-upgrade", pkg.GetenvBool("DEFANG_ALLOW_UPGRADE"), "allow upgrading the CD image and Pulumi version to the latest available")
 	cdCmd.AddCommand(cdDestroyCmd)
 	cdCmd.AddCommand(cdDownCmd)
 	cdCmd.AddCommand(cdRefreshCmd)
@@ -470,6 +471,6 @@ func isUpgradeCommand(cmd *cobra.Command) bool {
 	return cmd.Name() == "upgrade"
 }
 
-func canIUseProvider(ctx context.Context, provider client.Provider, projectName string, serviceCount int) error {
-	return client.CanIUseProvider(ctx, global.Client, provider, projectName, serviceCount)
+func canIUseProvider(ctx context.Context, provider client.Provider, projectName string, serviceCount int, allowUpgrade bool) error {
+	return client.CanIUseProvider(ctx, global.Client, provider, projectName, serviceCount, allowUpgrade)
 }
