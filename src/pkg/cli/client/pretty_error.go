@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/bufbuild/connect-go"
 )
 
 func PrettyError(err error) error {

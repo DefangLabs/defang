@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
+	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/types"
-	"github.com/bufbuild/connect-go"
 )
 
 const TenantHeader = "X-Defang-Tenant-Id"
