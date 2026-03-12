@@ -4,9 +4,9 @@ import (
 	"context"
 	"os"
 
+	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/bufbuild/connect-go"
 )
 
 func Logout(ctx context.Context, fabricClient client.FabricClient, fabricAddr string) error {

@@ -37,6 +37,7 @@ func TestLogTypeString(t *testing.T) {
 		want  string
 	}{
 		{"unspecified", LogTypeUnspecified, "UNSPECIFIED"},
+		{"cd", LogTypeCD, "CD"},
 		{"run", LogTypeRun, "RUN"},
 		{"build", LogTypeBuild, "BUILD"},
 		{"run and build", LogTypeRun | LogTypeBuild, "RUN,BUILD"},

@@ -44,7 +44,7 @@ flowchart LR
 ```
 
 1. **You write** a standard Docker Compose file
-2. **Defang CLI** validates your config and talks to the Fabric API
+2. **Defang CLI** validates your Compose project and uploads the project to storage in your AWS/GCP account
 3. **CD runs in your cloud** — a deployment task spins up in your AWS/GCP account
 4. **Infrastructure is created** — containers, DNS, load balancing, and secrets are provisioned
 

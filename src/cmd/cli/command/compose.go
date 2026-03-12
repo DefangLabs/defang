@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -25,7 +26,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
 )
 
@@ -502,7 +502,7 @@ func newTailOptionsForDown(stack, deployment string, since time.Time) cli.TailOp
 			return nil // keep tailing logs
 		},
 		Verbose: global.Verbose,
-		LogType: logs.LogTypeAll,
+		LogType: logs.LogTypeCD,
 	}
 }
 

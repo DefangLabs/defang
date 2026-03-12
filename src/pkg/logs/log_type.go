@@ -2,6 +2,7 @@ package logs
 
 import (
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -16,14 +17,15 @@ func (e ErrInvalidLogType) Error() string {
 }
 
 const (
-	_LogTypeUnused LogType = 1 << iota
+	LogTypeCD LogType = 1 << iota
 	LogTypeRun
 	LogTypeBuild
 	LogTypeUnspecified LogType = 0
-	LogTypeAll         LogType = 0xFFFFFFFF
+	LogTypeAll         LogType = math.MaxUint32
 )
 
 var AllLogTypes = []LogType{
+	LogTypeCD,
 	LogTypeRun,
 	LogTypeBuild,
 	LogTypeAll,
@@ -32,12 +34,14 @@ var AllLogTypes = []LogType{
 var (
 	logType_name = map[LogType]string{
 		LogTypeUnspecified: "UNSPECIFIED",
+		LogTypeCD:          "CD",
 		LogTypeRun:         "RUN",
 		LogTypeBuild:       "BUILD",
 		LogTypeAll:         "ALL",
 	}
 	logType_value = map[string]LogType{
 		"UNSPECIFIED": LogTypeUnspecified,
+		"CD":          LogTypeCD,
 		"RUN":         LogTypeRun,
 		"BUILD":       LogTypeBuild,
 		"ALL":         LogTypeAll,

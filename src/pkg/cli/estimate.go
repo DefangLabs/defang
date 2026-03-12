@@ -71,7 +71,8 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 	var pulumiPreviewLogLines []string
 	tailOptions := TailOptions{
 		Deployment: resp.Etag,
-		LogType:    logs.LogTypeBuild,
+		Follow:     true,
+		LogType:    logs.LogTypeCD,
 		Since:      since,
 		Verbose:    true,
 	}

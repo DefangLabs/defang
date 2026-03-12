@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
+	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
-	"github.com/bufbuild/connect-go"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -80,11 +80,11 @@ func TestConnect(t *testing.T) {
 		t.Cleanup(server.Close)
 
 		_, err := ConnectWithTenant(ctx, strings.TrimPrefix(server.URL, "http://"), types.TenantUnset)
-		if expected, actual := "internal: protocol error: no Grpc-Status trailer: unexpected EOF", err.Error(); expected != actual {
+		if expected, actual := `unknown: invalid content-type: ""; expecting "application/grpc"`, err.Error(); expected != actual {
 			t.Errorf("expected %v, got: %v", expected, actual)
 		}
-		if !client.IsNetworkError(err) {
-			t.Errorf("expected network error, got: %v", err)
+		if client.IsNetworkError(err) {
+			t.Errorf("expected non-network error, got: %v", err)
 		}
 	})
 
