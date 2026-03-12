@@ -39,11 +39,7 @@ func GenerateWithAI(ctx context.Context, client client.FabricClient, args Genera
 	if term.DoDebug() {
 		// Print the files that were generated
 		for _, file := range response.Files {
-			term.Printc(term.DebugColor, file.Name+"\n```")
-			term.Printc(term.DebugColor, file.Content)
-			term.Printc(term.DebugColor, "```")
-			term.Println("")
-			term.Println("")
+			term.Debugf("%s\n```\n%s\n```\n", file.Name, file.Content)
 		}
 	}
 

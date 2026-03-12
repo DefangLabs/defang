@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -92,7 +91,7 @@ func setupDebugLog() func() {
 			f.Close()
 			os.Rename(tmpPath, finalPath) //nolint:errcheck
 			if term.DoDebug() {
-				fmt.Fprintf(os.Stderr, " * Debug log written to: %s\n", finalPath)
+				term.Infof("Debug log written to: %s", finalPath)
 			}
 		})
 	}
