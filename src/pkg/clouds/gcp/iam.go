@@ -354,7 +354,7 @@ func ensurePrincipalHasRolesWithResource(ctx context.Context, client resourceWit
 	for i := range maxAttempts { // Service account might not be visible for a few seconds after creation for policy attachment
 		if _, err := client.SetIamPolicy(ctx, &iampb.SetIamPolicyRequest{Resource: resource, Policy: policy}); err != nil {
 			if i < maxAttempts-1 {
-				term.Infof("Failed to set IAM policy for resource %s, will retry in %v: %v\n", resource, retryInterval, err)
+				term.Debugf("Failed to set IAM policy for resource %s, will retry in %v: %v\n", resource, retryInterval, err)
 				if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
 					return err
 				}
