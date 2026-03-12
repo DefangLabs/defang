@@ -1,20 +1,17 @@
 package pkg
 
 import (
-	"bytes"
 	"context"
-	"fmt"
 	"io"
+	"iter"
 	"math/rand"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/pmezard/go-difflib/difflib"
 )
 
 var (
@@ -159,44 +156,6 @@ func IsValidTime(t time.Time) bool {
 	return t.Year() > 1970
 }
 
-func Compare(actual []byte, goldenFile string) error {
-	// Replace the absolute path in context to make the golden file portable
-	absPath, _ := filepath.Abs(goldenFile)
-	actual = bytes.ReplaceAll(actual, []byte(filepath.Dir(absPath)), []byte{'.'})
-
-	golden, err := os.ReadFile(goldenFile)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("failed to read golden file: %w", err)
-		}
-		return os.WriteFile(goldenFile, actual, 0644)
-	} else {
-		if err := Diff(string(actual), string(golden)); err != nil {
-			return fmt.Errorf("%s %w", goldenFile, err)
-		}
-	}
-	return nil
-}
-
-func Diff(actualRaw, goldenRaw string) error {
-	if actualRaw == goldenRaw {
-		return nil
-	}
-
-	// Show the diff (but only the lines that differ to avoid overwhelming output)
-	diff, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
-		A:        difflib.SplitLines(goldenRaw),
-		B:        difflib.SplitLines(actualRaw),
-		FromFile: "Expected",
-		FromDate: "",
-		ToFile:   "Actual",
-		ToDate:   "",
-		Context:  1,
-	})
-
-	return fmt.Errorf("mismatch:\n%s", diff)
-}
-
 var shellSpecialChars = regexp.MustCompile(`[^\w@%+=:,./-]`) // copied from al.essio.dev/pkg/shellescape
 
 // ShellQuote returns a shell-quoted string of the given arguments.
@@ -225,4 +184,23 @@ func DoInEnv() string {
 func GcpInEnv() string {
 	env, _ := GetFirstEnv(GCPProjectEnvVars...)
 	return env
+}
+
+// Flatten converts an iterator of batches into an iterator of individual items.
+func Flatten[T any](seq iter.Seq2[[]T, error]) iter.Seq2[T, error] {
+	return func(yield func(T, error) bool) {
+		for items, err := range seq {
+			for _, item := range items {
+				if !yield(item, nil) {
+					return
+				}
+			}
+			if err != nil {
+				var zero T
+				if !yield(zero, err) {
+					return
+				}
+			}
+		}
+	}
 }

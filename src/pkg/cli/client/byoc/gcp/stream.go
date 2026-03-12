@@ -28,24 +28,22 @@ type LogParser[T any] func(*loggingpb.LogEntry) ([]*T, error)
 type LogFilter[T any] func(entry T) T
 
 type GcpLogsClient interface {
-	ListLogEntries(ctx context.Context, query string, order gcp.Order) (gcp.Lister, error)
-	NewTailer(ctx context.Context) (gcp.Tailer, error)
+	ListLogEntries(ctx context.Context, query string, order gcp.Order) (iter.Seq2[[]*loggingpb.LogEntry, error], error)
+	TailLogEntries(ctx context.Context, query string) (iter.Seq2[[]*loggingpb.LogEntry, error], error)
 	GetExecutionEnv(ctx context.Context, executionName string) (map[string]string, error)
 	GetProjectID() gcp.ProjectId
 	GetBuildInfo(ctx context.Context, buildId string) (*gcp.BuildTag, error)
 }
 
 type ServerStream[T any] struct {
-	ctx           context.Context
 	gcpLogsClient GcpLogsClient
 	parse         LogParser[T]
 	filters       []LogFilter[*T]
 	query         *Query
 }
 
-func NewServerStream[T any](ctx context.Context, gcpLogsClient GcpLogsClient, parse LogParser[T], filters ...LogFilter[*T]) *ServerStream[T] {
+func NewServerStream[T any](gcpLogsClient GcpLogsClient, parse LogParser[T], filters ...LogFilter[*T]) *ServerStream[T] {
 	return &ServerStream[T]{
-		ctx:           ctx,
 		gcpLogsClient: gcpLogsClient,
 		parse:         parse,
 		filters:       filters,
@@ -63,41 +61,36 @@ func isContextCanceledError(err error) bool {
 }
 
 // Follow returns an iterator that queries historical logs then tails live logs.
-func (s *ServerStream[T]) Follow(start time.Time) (iter.Seq2[*T, error], error) {
-	tailer, err := s.gcpLogsClient.NewTailer(s.ctx)
+func (s *ServerStream[T]) Follow(ctx context.Context, start time.Time) (iter.Seq2[*T, error], error) {
+	query := s.query.GetQuery()
+	shouldList := !start.IsZero() && start.Unix() > 0 && time.Since(start) > 10*time.Millisecond
+	// Establish tail connection eagerly so the server starts buffering entries while we list historical logs
+	tailIter, err := s.gcpLogsClient.TailLogEntries(ctx, query)
 	if err != nil {
 		return nil, err
 	}
-	query := s.query.GetQuery()
-	shouldList := !start.IsZero() && start.Unix() > 0 && time.Since(start) > 10*time.Millisecond
 	term.Debugf("Query and tail logs since %v with query: \n%v", start, query)
 	return func(yield func(*T, error) bool) {
-		defer tailer.Close()
 		// Only query older logs if start time is more than 10ms ago
 		if shouldList {
-			lister, err := s.gcpLogsClient.ListLogEntries(s.ctx, query, gcp.OrderAscending)
+			listIter, err := s.gcpLogsClient.ListLogEntries(ctx, query, gcp.OrderAscending)
 			if err != nil {
 				yield(nil, err)
 				return
 			}
-			if !s.yieldList(yield, lister, 0) {
+			if !s.yieldList(yield, listIter, 0) {
 				return
 			}
 		}
 
-		// Start tailing logs after all older logs are processed
-		if err := tailer.Start(s.ctx, query); err != nil {
-			yield(nil, err)
-			return
-		}
-		for {
-			entry, err := tailer.Next(s.ctx)
+		// Tail live logs after all older logs are processed
+		for entries, err := range tailIter {
 			if err != nil {
-				if context.Cause(s.ctx) == io.EOF || errors.Is(err, io.EOF) {
+				if context.Cause(ctx) == io.EOF || errors.Is(err, io.EOF) {
 					return
 				}
 				if isContextCanceledError(err) {
-					if cause := context.Cause(s.ctx); cause != nil {
+					if cause := context.Cause(ctx); cause != nil {
 						yield(nil, cause)
 					}
 					return
@@ -105,14 +98,16 @@ func (s *ServerStream[T]) Follow(start time.Time) (iter.Seq2[*T, error], error) 
 				yield(nil, err)
 				return
 			}
-			resps, err := s.parseAndFilter(entry)
-			if err != nil {
-				yield(nil, err)
-				return
-			}
-			for _, resp := range resps {
-				if !yield(resp, nil) {
+			for _, entry := range entries {
+				resps, err := s.parseAndFilter(entry)
+				if err != nil {
+					yield(nil, err)
 					return
+				}
+				for _, resp := range resps {
+					if !yield(resp, nil) {
+						return
+					}
 				}
 			}
 		}
@@ -120,33 +115,33 @@ func (s *ServerStream[T]) Follow(start time.Time) (iter.Seq2[*T, error], error) 
 }
 
 // Head returns an iterator that queries logs in ascending order.
-func (s *ServerStream[T]) Head(limit int32) iter.Seq2[*T, error] {
+func (s *ServerStream[T]) Head(ctx context.Context, limit int32) iter.Seq2[*T, error] {
 	query := s.query.GetQuery()
 	term.Debugf("Query logs with query: \n%v", query)
 	return func(yield func(*T, error) bool) {
-		lister, err := s.gcpLogsClient.ListLogEntries(s.ctx, query, gcp.OrderAscending)
+		listIter, err := s.gcpLogsClient.ListLogEntries(ctx, query, gcp.OrderAscending)
 		if err != nil {
 			yield(nil, err)
 			return
 		}
-		s.yieldList(yield, lister, limit)
+		s.yieldList(yield, listIter, limit)
 	}
 }
 
 // Tail returns an iterator that queries logs in descending order, reversing if a limit is set.
-func (s *ServerStream[T]) Tail(limit int32) iter.Seq2[*T, error] {
+func (s *ServerStream[T]) Tail(ctx context.Context, limit int32) iter.Seq2[*T, error] {
 	query := s.query.GetQuery()
 	term.Debugf("Query logs with query: \n%v", query)
 	return func(yield func(*T, error) bool) {
-		lister, err := s.gcpLogsClient.ListLogEntries(s.ctx, query, gcp.OrderDescending)
+		listIter, err := s.gcpLogsClient.ListLogEntries(ctx, query, gcp.OrderDescending)
 		if err != nil {
 			yield(nil, err)
 			return
 		}
 		if limit == 0 {
-			s.yieldList(yield, lister, 0)
+			s.yieldList(yield, listIter, 0)
 		} else {
-			buffer, err := s.listToBuffer(lister, limit)
+			buffer, err := s.listToBuffer(listIter, limit)
 			if err != nil {
 				yield(nil, err)
 				return
@@ -161,51 +156,52 @@ func (s *ServerStream[T]) Tail(limit int32) iter.Seq2[*T, error] {
 	}
 }
 
-// yieldList yields items from lister to yield. Returns true if iteration completed
-// (EOF or limit reached), false if the consumer stopped or an error was yielded.
-func (s *ServerStream[T]) yieldList(yield func(*T, error) bool, lister gcp.Lister, limit int32) bool {
+// yieldList yields items from entries to yield. Returns true if iteration completed
+// (end of entries or limit reached), false if the consumer stopped or an error was yielded.
+func (s *ServerStream[T]) yieldList(yield func(*T, error) bool, seq iter.Seq2[[]*loggingpb.LogEntry, error], limit int32) bool {
 	count := int32(0)
-	for {
-		if limit > 0 && count >= limit {
-			return true
-		}
-		entry, err := lister.Next()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return true
-			}
-			yield(nil, err)
-			return false
-		}
-		resps, err := s.parseAndFilter(entry)
+	for entries, err := range seq {
 		if err != nil {
 			yield(nil, err)
 			return false
 		}
-		for _, resp := range resps {
-			count++
-			if !yield(resp, nil) {
+		for _, entry := range entries {
+			resps, err := s.parseAndFilter(entry)
+			if err != nil {
+				yield(nil, err)
 				return false
+			}
+			for _, resp := range resps {
+				count++
+				if !yield(resp, nil) {
+					return false
+				}
+				if limit > 0 && count >= limit {
+					return true
+				}
 			}
 		}
 	}
+	return true
 }
 
-func (s *ServerStream[T]) listToBuffer(lister gcp.Lister, limit int32) ([]*T, error) {
+func (s *ServerStream[T]) listToBuffer(seq iter.Seq2[[]*loggingpb.LogEntry, error], limit int32) ([]*T, error) {
 	buffer := make([]*T, 0, limit)
-	for range limit {
-		entry, err := lister.Next()
+	for entries, err := range seq {
 		if err != nil {
-			if errors.Is(err, io.EOF) {
+			return nil, err
+		}
+		for _, entry := range entries {
+			resps, err := s.parseAndFilter(entry)
+			if err != nil {
+				return nil, err
+			}
+			buffer = append(buffer, resps...)
+			if len(buffer) >= int(limit) {
+				buffer = buffer[:limit]
 				return buffer, nil
 			}
-			return nil, err
 		}
-		resps, err := s.parseAndFilter(entry)
-		if err != nil {
-			return nil, err
-		}
-		buffer = append(buffer, resps...)
 	}
 	return buffer, nil
 }
@@ -251,7 +247,7 @@ func NewLogStream(ctx context.Context, gcpLogsClient GcpLogsClient, services []s
 			return entry
 		})
 
-	ss := NewServerStream(ctx, gcpLogsClient, getLogEntryParser(ctx, gcpLogsClient), restoreServiceName)
+	ss := NewServerStream(gcpLogsClient, getLogEntryParser(ctx, gcpLogsClient), restoreServiceName)
 	ss.query = NewLogQuery(gcpLogsClient.GetProjectID())
 	return &LogStream{ServerStream: ss}
 }
@@ -312,7 +308,7 @@ func NewSubscribeStream(ctx context.Context, driver GcpLogsClient, waitForCD boo
 		}),
 	)
 
-	ss := NewServerStream(ctx, driver, getActivityParser(ctx, driver, waitForCD, etag), filters...)
+	ss := NewServerStream(driver, getActivityParser(ctx, driver, waitForCD, etag), filters...)
 	ss.query = NewSubscribeQuery()
 	return &SubscribeStream{ServerStream: ss}
 }

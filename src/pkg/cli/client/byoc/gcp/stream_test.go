@@ -1,9 +1,12 @@
 package gcp
 
 import (
+	"context"
+	"errors"
 	"iter"
 	"strconv"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/logging/apiv2/loggingpb"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
@@ -67,6 +70,45 @@ func makeMockLogEntries(n int) []*loggingpb.LogEntry {
 	return logEntries
 }
 
+func newTestStream(t *testing.T, listEntries, tailEntries []*loggingpb.LogEntry) *ServerStream[defangv1.TailResponse] {
+	t.Helper()
+	ctx := t.Context()
+	projectId := gcp.ProjectId("test-project-12345")
+	services := []string{}
+	restoreServiceName := getServiceNameRestorer(services, gcp.SafeLabelValue,
+		func(entry *defangv1.TailResponse) string { return entry.Service },
+		func(entry *defangv1.TailResponse, name string) *defangv1.TailResponse {
+			entry.Service = name
+			return entry
+		})
+
+	mockClient := &MockGcpLogsClient{
+		listEntries: listEntries,
+		tailEntries: tailEntries,
+	}
+
+	stream := NewServerStream(
+		mockClient,
+		getLogEntryParser(ctx, mockClient),
+		restoreServiceName,
+	)
+	stream.query = NewLogQuery(projectId)
+	return stream
+}
+
+func collectMessages(t *testing.T, logs iter.Seq2[*defangv1.TailResponse, error]) []string {
+	t.Helper()
+	var msgs []string
+	for response, err := range logs {
+		assert.NoError(t, err)
+		if err != nil {
+			break
+		}
+		msgs = append(msgs, response.Entries[0].Message)
+	}
+	return msgs
+}
+
 func TestServerStream_Start(t *testing.T) {
 	type directionType string
 	const (
@@ -125,16 +167,6 @@ func TestServerStream_Start(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := t.Context()
-			projectId := gcp.ProjectId("test-project-12345")
-			services := []string{}
-			restoreServiceName := getServiceNameRestorer(services, gcp.SafeLabelValue,
-				func(entry *defangv1.TailResponse) string { return entry.Service },
-				func(entry *defangv1.TailResponse, name string) *defangv1.TailResponse {
-					entry.Service = name
-					return entry
-				})
-
 			logEntries := makeMockLogEntries(tt.streamSize)
 
 			// Reverse log entries for tail direction to simulate descending order
@@ -144,38 +176,179 @@ func TestServerStream_Start(t *testing.T) {
 				}
 			}
 
-			mockGcpLogsClient := &MockGcpLogsClient{
-				lister: &MockGcpLoggingLister{
-					logEntries: logEntries,
-				},
-				tailer: &MockGcpLoggingTailer{},
-			}
-
-			stream := NewServerStream(
-				ctx,
-				mockGcpLogsClient,
-				getLogEntryParser(ctx, mockGcpLogsClient),
-				restoreServiceName,
-			)
-			stream.query = NewLogQuery(projectId)
+			stream := newTestStream(t, logEntries, nil)
 
 			var logs iter.Seq2[*defangv1.TailResponse, error]
 			if tt.direction == head {
-				logs = stream.Head(tt.limit)
+				logs = stream.Head(t.Context(), tt.limit)
 			} else {
-				logs = stream.Tail(tt.limit)
+				logs = stream.Tail(t.Context(), tt.limit)
 			}
 
-			var collectedMessages []string
-			for response, err := range logs {
-				assert.NoError(t, err)
-				if err != nil {
-					break
-				}
-				collectedMessages = append(collectedMessages, response.Entries[0].Message)
-			}
-			assert.Equal(t, len(tt.expectedMsgs), len(collectedMessages))
+			collectedMessages := collectMessages(t, logs)
 			assert.Equal(t, tt.expectedMsgs, collectedMessages)
 		})
 	}
+}
+
+func TestServerStream_HeadNoLimit(t *testing.T) {
+	entries := makeMockLogEntries(5)
+	stream := newTestStream(t, entries, nil)
+	msgs := collectMessages(t, stream.Head(t.Context(), 0))
+	assert.Len(t, msgs, 5)
+	assert.Equal(t, "Log entry number 0", msgs[0])
+	assert.Equal(t, "Log entry number 4", msgs[4])
+}
+
+func TestServerStream_TailNoLimit(t *testing.T) {
+	// Descending order entries (4,3,2,1,0)
+	entries := makeMockLogEntries(5)
+	for i, j := 0, len(entries)-1; i < j; i, j = i+1, j-1 {
+		entries[i], entries[j] = entries[j], entries[i]
+	}
+	stream := newTestStream(t, entries, nil)
+	msgs := collectMessages(t, stream.Tail(t.Context(), 0))
+	// With limit=0, no reversal — entries come in descending order
+	assert.Len(t, msgs, 5)
+	assert.Equal(t, "Log entry number 4", msgs[0])
+	assert.Equal(t, "Log entry number 0", msgs[4])
+}
+
+func TestServerStream_EmptyStream(t *testing.T) {
+	stream := newTestStream(t, nil, nil)
+
+	t.Run("Head", func(t *testing.T) {
+		msgs := collectMessages(t, stream.Head(t.Context(), 10))
+		assert.Empty(t, msgs)
+	})
+
+	t.Run("Tail", func(t *testing.T) {
+		msgs := collectMessages(t, stream.Tail(t.Context(), 10))
+		assert.Empty(t, msgs)
+	})
+}
+
+func TestServerStream_Follow(t *testing.T) {
+	listEntries := makeMockLogEntries(3)
+	tailEntries := []*loggingpb.LogEntry{
+		{
+			Payload:   &loggingpb.LogEntry_TextPayload{TextPayload: "tail entry 0"},
+			Timestamp: timestamppb.Now(),
+		},
+		{
+			Payload:   &loggingpb.LogEntry_TextPayload{TextPayload: "tail entry 1"},
+			Timestamp: timestamppb.Now(),
+		},
+	}
+
+	stream := newTestStream(t, listEntries, tailEntries)
+	// Use a start time in the past to trigger historical listing
+	logs, err := stream.Follow(t.Context(), time.Now().Add(-time.Hour))
+	assert.NoError(t, err)
+
+	msgs := collectMessages(t, logs)
+	assert.Equal(t, []string{
+		"Log entry number 0",
+		"Log entry number 1",
+		"Log entry number 2",
+		"tail entry 0",
+		"tail entry 1",
+	}, msgs)
+}
+
+func TestServerStream_FollowNoHistory(t *testing.T) {
+	tailEntries := []*loggingpb.LogEntry{
+		{
+			Payload:   &loggingpb.LogEntry_TextPayload{TextPayload: "tail only"},
+			Timestamp: timestamppb.Now(),
+		},
+	}
+
+	stream := newTestStream(t, nil, tailEntries)
+	// Zero start time skips historical listing
+	logs, err := stream.Follow(t.Context(), time.Time{})
+	assert.NoError(t, err)
+
+	msgs := collectMessages(t, logs)
+	assert.Equal(t, []string{"tail only"}, msgs)
+}
+
+func TestServerStream_ListError(t *testing.T) {
+	testErr := errors.New("list error")
+	errorIter := func(yield func([]*loggingpb.LogEntry, error) bool) {
+		yield(nil, testErr)
+	}
+
+	ctx := t.Context()
+	mockClient := &MockGcpLogsClient{}
+	stream := NewServerStream(
+		mockClient,
+		getLogEntryParser(ctx, mockClient),
+	)
+	stream.query = NewLogQuery("test-project")
+
+	// Override the client to return an error iterator
+	stream.gcpLogsClient = &errorListClient{
+		MockGcpLogsClient: *mockClient,
+		listIter:          errorIter,
+	}
+
+	var gotErr error
+	for _, err := range stream.Head(ctx, 10) {
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+	assert.ErrorIs(t, gotErr, testErr)
+}
+
+type errorListClient struct {
+	MockGcpLogsClient
+	listIter iter.Seq2[[]*loggingpb.LogEntry, error]
+}
+
+func (e *errorListClient) ListLogEntries(ctx context.Context, query string, order gcp.Order) (iter.Seq2[[]*loggingpb.LogEntry, error], error) {
+	return e.listIter, nil
+}
+
+func TestServerStream_TailError(t *testing.T) {
+	testErr := errors.New("tail error")
+	errorIter := func(yield func([]*loggingpb.LogEntry, error) bool) {
+		yield(nil, testErr)
+	}
+
+	ctx := t.Context()
+	mockClient := &MockGcpLogsClient{}
+	stream := NewServerStream(
+		mockClient,
+		getLogEntryParser(ctx, mockClient),
+	)
+	stream.query = NewLogQuery("test-project")
+
+	stream.gcpLogsClient = &errorTailClient{
+		MockGcpLogsClient: *mockClient,
+		tailIter:          errorIter,
+	}
+
+	logs, err := stream.Follow(t.Context(), time.Time{})
+	assert.NoError(t, err)
+
+	var gotErr error
+	for _, err := range logs {
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+	assert.ErrorIs(t, gotErr, testErr)
+}
+
+type errorTailClient struct {
+	MockGcpLogsClient
+	tailIter iter.Seq2[[]*loggingpb.LogEntry, error]
+}
+
+func (e *errorTailClient) TailLogEntries(ctx context.Context, query string) (iter.Seq2[[]*loggingpb.LogEntry, error], error) {
+	return e.tailIter, nil
 }
