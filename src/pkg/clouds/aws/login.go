@@ -160,7 +160,15 @@ func (a *Aws) Authenticate(ctx context.Context, interactive bool) error {
 
 func (a *Aws) tryInteractiveLogin(ctx context.Context, n int) (awssdk.CredentialsProvider, error) {
 	for range n {
-		cached, err := a.InteractiveLogin(ctx)
+		var cached *awsTokenCache
+		var err error
+		// VS Code dev containers sets REMOTE_CONTAINERS=true, so we use that as a heuristic to determine when to use the cross-device flow which doesn't rely on opening a browser on the same machine.
+		if os.Getenv("REMOTE_CONTAINERS") == "true" {
+			term.Debug("detected REMOTE_CONTAINERS environment variable, using cross-device login flow")
+			cached, err = a.CrossDeviceLogin(ctx)
+		} else {
+			cached, err = a.InteractiveLogin(ctx)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("interactive login failed: %w", err)
 		}
