@@ -1,19 +1,43 @@
 package azure
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage/v2"
 )
+
+// cliTimeout overrides the default 10s timeout for CLI-based credentials.
+// The Azure CLI can be slow to start, especially when installed via Nix.
+const cliTimeout = 30 * time.Second
 
 type Azure struct {
 	Location       Location
 	SubscriptionID string
 }
 
-func (a Azure) NewCreds() (*azidentity.DefaultAzureCredential, error) {
+// tokenCredentialWithTimeout wraps an azcore.TokenCredential to ensure
+// GetToken has a minimum deadline, overriding the SDK's default 10s CLI timeout.
+type tokenCredentialWithTimeout struct {
+	cred    azcore.TokenCredential
+	timeout time.Duration
+}
+
+func (t *tokenCredentialWithTimeout) GetToken(ctx context.Context, opts policy.TokenRequestOptions) (azcore.AccessToken, error) {
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, t.timeout)
+		defer cancel()
+	}
+	return t.cred.GetToken(ctx, opts)
+}
+
+func (a Azure) NewCreds() (azcore.TokenCredential, error) {
 	if len(a.SubscriptionID) == 0 {
 		return nil, errors.New("environment variable AZURE_SUBSCRIPTION_ID is not set")
 	}
@@ -23,7 +47,7 @@ func (a Azure) NewCreds() (*azidentity.DefaultAzureCredential, error) {
 		return nil, fmt.Errorf("failed to create default Azure credentials: %w", err)
 	}
 
-	return cred, nil
+	return &tokenCredentialWithTimeout{cred: cred, timeout: cliTimeout}, nil
 }
 
 func (a Azure) NewStorageAccountsClient() (*armstorage.AccountsClient, error) {
