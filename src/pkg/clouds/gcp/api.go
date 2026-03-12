@@ -54,7 +54,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 						if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
 							return err
 						}
-						break
+						continue
 					}
 					return fmt.Errorf("error in operation: %v", op.Error)
 				}
