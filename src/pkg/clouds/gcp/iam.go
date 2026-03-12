@@ -194,9 +194,9 @@ func (gcp Gcp) EnsurePrincipalHasBucketRoles(ctx context.Context, bucketName, pr
 	}
 
 	term.Infof("Updating IAM policy for principal %s on bucket %s", principal, bucketName)
-	for i := range maxRetries { // Service account might not be visible for a few seconds after creation for policy attachment
+	for i := range maxAttempts { // Service account might not be visible for a few seconds after creation for policy attachment
 		if err := bucket.IAM().SetPolicy(ctx, policy); err != nil {
-			if i < maxRetries-1 {
+			if i < maxAttempts-1 {
 				term.Infof("Failed to set IAM policy, will retry in %v: %v\n", retryInterval, err)
 				if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
 					return err
@@ -271,12 +271,12 @@ func (gcp Gcp) EnsurePrincipalHasServiceAccountRoles(ctx context.Context, princi
 	}
 
 	term.Infof("Updating IAM policy for %s on service account %s", principal, serviceAccount)
-	for i := range maxRetries { // Service account might not be visible for a few seconds after creation for policy attachment
+	for i := range maxAttempts { // Service account might not be visible for a few seconds after creation for policy attachment
 		if _, err := client.SetIamPolicy(ctx, &iamadm.SetIamPolicyRequest{
 			Resource: resource,
 			Policy:   policy,
 		}); err != nil {
-			if i < maxRetries-1 {
+			if i < maxAttempts-1 {
 				term.Infof("Failed to set IAM policy for service account %s, will retry in %v: %v\n", serviceAccount, retryInterval, err)
 				if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
 					return err
@@ -351,9 +351,9 @@ func ensurePrincipalHasRolesWithResource(ctx context.Context, client resourceWit
 	}
 	term.Infof("Updating IAM policy for resource %s", resource)
 
-	for i := range maxRetries { // Service account might not be visible for a few seconds after creation for policy attachment
+	for i := range maxAttempts { // Service account might not be visible for a few seconds after creation for policy attachment
 		if _, err := client.SetIamPolicy(ctx, &iampb.SetIamPolicyRequest{Resource: resource, Policy: policy}); err != nil {
-			if i < maxRetries-1 {
+			if i < maxAttempts-1 {
 				term.Infof("Failed to set IAM policy for resource %s, will retry in %v: %v\n", resource, retryInterval, err)
 				if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
 					return err

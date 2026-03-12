@@ -12,7 +12,7 @@ import (
 
 const (
 	// we have seen it take up to 3 minutes to enable APIs and create new service accounts
-	maxRetries    = 36
+	maxAttempts   = 36
 	retryInterval = 5 * time.Second
 )
 
@@ -24,7 +24,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 
 	projectName := "projects/" + gcp.ProjectId
 
-	for i := range maxRetries {
+	for i := range maxAttempts {
 		term.Debugf("Enabling services: %v\n", apis)
 		req := &serviceusage.BatchEnableServicesRequest{
 			ServiceIds: apis,
@@ -32,7 +32,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 
 		operation, err := service.Services.BatchEnable(projectName, req).Context(ctx).Do()
 		if err != nil {
-			if i < maxRetries-1 {
+			if i < maxAttempts-1 {
 				term.Debugf("Failed to enable services, will retry in %v: %v\n", retryInterval, err)
 				if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
 					return err
@@ -49,7 +49,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 				term.Warnf("Failed to get operation status: %v\n", err)
 			} else if op.Done { // Check if the operation is done
 				if op.Error != nil {
-					if i < maxRetries-1 {
+					if i < maxAttempts-1 {
 						term.Debugf("Failed to enable services operation, will retry in %v: %v\n", retryInterval, op.Error)
 						if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
 							return err
@@ -65,5 +65,5 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 			}
 		}
 	}
-	return fmt.Errorf("failed to enable services after %d retries", maxRetries) // This should never be reached
+	return fmt.Errorf("failed to enable services after %d attempts", maxAttempts) // This should never be reached
 }
