@@ -6,9 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"connectrpc.com/connect"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
-	"github.com/bufbuild/connect-go"
 )
 
 type grpcMockHandler struct {

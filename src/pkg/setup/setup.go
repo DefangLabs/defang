@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"connectrpc.com/connect"
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -16,7 +17,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/surveyor"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
-	"github.com/bufbuild/connect-go"
 )
 
 var P = track.P

@@ -7,12 +7,12 @@ import (
 	"os"
 	"strings"
 
+	"connectrpc.com/connect"
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/session"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/bufbuild/connect-go"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 )

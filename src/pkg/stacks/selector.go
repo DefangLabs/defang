@@ -50,7 +50,7 @@ func (ss *stackSelector) SelectStack(ctx context.Context, opts SelectStackOption
 		if opts.AllowStackCreation {
 			return ss.createStack(ctx)
 		} else {
-			return nil, errors.New("no stacks available to select")
+			return nil, errors.New("no stacks available to select in this workspace")
 		}
 	}
 	labelMap := MakeStackSelectorLabels(stackList)

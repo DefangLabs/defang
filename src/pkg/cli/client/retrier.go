@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/bufbuild/connect-go"
 )
 
 type Retrier struct{}

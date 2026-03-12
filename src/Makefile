@@ -4,14 +4,13 @@ ifndef WITHOUT-NIX
 ifneq (,$(shell command -v nix))
 USING-NIX := true
 override GO :=
-override BUF :=
 endif
 endif
 
 GO_VERSION := $(shell grep '^go ' go.mod | cut -d ' ' -f 2)
 
 
-# Use Makes to auto-install all deps if/when needed (go & buf)
+# Use Makes to auto-install all deps if/when needed (go)
 ifndef USING-NIX
 R := $(abspath $(dir $(shell pwd)))
 M := $R/.cache/makes
@@ -24,7 +23,6 @@ GO-VERSION ?= $(GO_VERSION).0
 
 include $M/init.mk
 include $M/go.mk
-include $M/buf.mk
 include $M/clean.mk
 include $M/shell.mk
 
@@ -43,7 +41,7 @@ PROTOS := \
 
 PROTOS-DEPS := \
   protos/io/defang/v1/fabric.proto \
-  buf.gen.yaml \
+  protos/google/type/money.proto \
 
 BINARY_NAME := defang
 GOFLAGS := -ldflags "-X main.version=$(VERSION)"
@@ -60,9 +58,13 @@ build: $(BINARY_NAME)
 .PHONY: protos
 protos: $(PROTOS)
 
-$(PROTOS) &: $(BUF) $(PROTOS-DEPS)
-	cd protos && buf lint
-	buf generate protos
+MONEY_M := Mgoogle/type/money.proto=github.com/DefangLabs/defang/src/protos/google/type
+
+$(PROTOS) &: $(PROTOS-DEPS)
+	protoc -I protos \
+	  --go_out=protos --go_opt=paths=source_relative,$(MONEY_M) \
+	  --connect-go_out=protos --connect-go_opt=paths=source_relative,$(MONEY_M) \
+	  protos/io/defang/v1/fabric.proto protos/google/type/money.proto
 
 .PHONY: install
 install: $(BINARY_NAME)
@@ -126,39 +128,37 @@ pull:
 
 .PHONY: increment-patch-version
 increment-patch-version:
-	git tag $$( \
-	  git tag -l 'v*' --sort=-v:refname | \
-	  head -n1 | \
-	  awk -F. '{$$NF = $$NF + 1;} 1' OFS=. \
-	)
+	@LATEST_TAG=$$(git tag -l 'v*' --sort=-v:refname | head -n1); \
+	NEW_TAG=$$(echo $$LATEST_TAG | awk -F. '{$$NF = $$NF + 1;} 1' OFS=.); \
+	echo $$NEW_TAG; \
+	git tag $$NEW_TAG;
 
 .PHONY: increment-minor-version
 increment-minor-version:
-	@git tag $$( \
-		git tag -l 'v*' --sort=-v:refname | \
-		head -n1 | \
-		awk -F. '{$$(NF-1) = $$((NF-1)) + 1; $$NF = 0;} 1' OFS=. \
-	)
+	@LATEST_TAG=$$(git tag -l 'v*' --sort=-v:refname | head -n1); \
+	NEW_TAG=$$(echo $$LATEST_TAG | awk -F. '{$$(NF-1) = $$(NF-1) + 1; $$NF = 0;} 1' OFS=.); \
+	echo $$NEW_TAG; \
+	git tag $$NEW_TAG;
 
 .PHONY: increment-major-version
 increment-major-version:
-	@git tag $$( \
-		git tag -l 'v*' --sort=-v:refname | \
-		head -n1 | \
-		awk -F. '{maj=substr($$1,2)+1; printf "v%d.0.0\n", maj}' \
-	)
+	@LATEST_TAG=$$(git tag -l 'v*' --sort=-v:refname | head -n1); \
+	NEW_TAG=$$(echo $$LATEST_TAG | awk -F. '{maj=substr($$1,2)+1; printf "v%d.0.0\n", maj}'); \
+	echo $$NEW_TAG; \
+	git tag $$NEW_TAG;
+
+.PHONY: push-tags
+push-tags:
+	git push origin 'refs/tags/v*'
 
 .PHONY: patch-release
-patch-release: pull test no-diff increment-patch-version
-	git push --follow-tags --tags
+patch-release: pull test no-diff increment-patch-version push-tags
 
 .PHONY: minor-release
-minor-release: pull test no-diff increment-minor-version
-	git push --follow-tags --tags
+minor-release: pull test no-diff increment-minor-version push-tags
 
 .PHONY: major-release
-major-release: pull test no-diff increment-major-version
-	git push --follow-tags --tags
+major-release: pull test no-diff increment-major-version push-tags
 
 .PHONY: release
 release:

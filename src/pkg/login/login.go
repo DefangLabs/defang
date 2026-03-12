@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -14,7 +15,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/bufbuild/connect-go"
 )
 
 type LoginFlow = auth.LoginFlow

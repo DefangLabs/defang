@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
@@ -17,7 +18,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/bufbuild/connect-go"
 )
 
 func CdCommand(ctx context.Context, projectName string, provider client.Provider, fabric client.FabricClient, command client.CdCommand) (types.ETag, error) {
@@ -31,7 +31,7 @@ func CdCommand(ctx context.Context, projectName string, provider client.Provider
 	}
 
 	var statesUrl, eventsUrl string
-	if _, ok := provider.(*client.PlaygroundProvider); !ok { // Do not need upload URLs for Playground
+	if _, ok := provider.(*client.PlaygroundProvider); !ok && command != client.CdCommandList { // Do not need upload URLs for Playground/List
 		var err error
 		statesUrl, eventsUrl, err = GetStatesAndEventsUploadUrls(ctx, projectName, provider, fabric)
 		if err != nil {
@@ -97,7 +97,7 @@ func CdCommandAndTail(ctx context.Context, provider client.Provider, projectName
 
 	options := TailOptions{
 		Deployment: etag,
-		LogType:    logs.LogTypeBuild,
+		LogType:    logs.LogTypeCD,
 		Since:      since,
 		Verbose:    verbose,
 		Stack:      provider.GetStackName(),

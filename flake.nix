@@ -18,7 +18,6 @@
           mkShell {
             buildInputs = [
               bashInteractive # full bash with readline/completion so prompts render correctly
-              buf
               crane
               git
               gnumake
@@ -31,6 +30,10 @@
               nixfmt-rfc-style
               nodejs_24 # for Pulumi, must match values in package.json
               openssh
+              protobuf # protoc
+              protoc-gen-connect-go
+              protoc-gen-go
+              protolint
               pulumi
               pulumiPackages.pulumi-nodejs
               google-cloud-sdk
