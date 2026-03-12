@@ -15,7 +15,7 @@ service FabricController {
   }
   rpc GetVersion(google.protobuf.Empty) returns (Version) {
     option idempotency_level = NO_SIDE_EFFECTS;
-  }
+  }; // public
   rpc Token(TokenRequest) returns (TokenResponse); // public
 
   rpc RevokeToken(google.protobuf.Empty) returns (google.protobuf.Empty);
@@ -161,6 +161,7 @@ enum Provider {
   AWS = 2;
   DIGITALOCEAN = 3;
   GCP = 4;
+  AZURE = 5;
 }
 
 message Stack {
@@ -651,7 +652,8 @@ message GetRequest { // was ServiceID
 }
 
 message Service {
-  option deprecated = true; // still used by pulumi-defang provider in state files
+  option deprecated =
+      true; // still used by pulumi-defang provider in state files
   string name = 1;
   reserved 2; // was: string image
   reserved 3; // was: Platform platform

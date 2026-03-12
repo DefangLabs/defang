@@ -10,7 +10,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -143,7 +142,7 @@ func listPulumiStacksAllRegions(ctx context.Context, s3client S3Client) (iter.Se
 			// GetBucketLocation returns empty string for us-east-1 buckets
 			bucketRegion := aws.Region(locationOutput.LocationConstraint)
 			if bucketRegion == "" {
-				bucketRegion = region.USEast1
+				bucketRegion = aws.RegionUSEast1
 			}
 
 			wg.Add(1)

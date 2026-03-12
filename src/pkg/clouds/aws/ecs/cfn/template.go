@@ -491,12 +491,15 @@ func CreateTemplate(stack string, containers []clouds.Container) (*cloudformatio
 		}
 
 		var dependsOn []ecs.TaskDefinition_ContainerDependency
-		if container.DependsOn != nil {
-			for name, condition := range container.DependsOn {
-				dependsOn = append(dependsOn, ecs.TaskDefinition_ContainerDependency{
-					Condition:     ptr.String(string(condition)),
-					ContainerName: ptr.String(name),
-				})
+		if !container.IsInit {
+			// Add COMPLETE dependencies to any init-containers
+			for _, c := range containers {
+				if c.IsInit {
+					dependsOn = append(dependsOn, ecs.TaskDefinition_ContainerDependency{
+						Condition:     ptr.String("COMPLETE"),
+						ContainerName: ptr.String(c.Name),
+					})
+				}
 			}
 		}
 
@@ -522,8 +525,8 @@ func CreateTemplate(stack string, containers []clouds.Container) (*cloudformatio
 		def := ecs.TaskDefinition_ContainerDefinition{
 			Name:        name,
 			Image:       image,
-			StopTimeout: ptr.Int(120), // TODO: make this configurable
-			Essential:   container.Essential,
+			StopTimeout: ptr.Int(120),                // TODO: make this configurable
+			Essential:   ptr.Bool(!container.IsInit), // init containers are not essential
 			Cpu:         cpuShares,
 			LogConfiguration: &ecs.TaskDefinition_LogConfiguration{
 				LogDriver: "awslogs",

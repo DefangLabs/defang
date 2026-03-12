@@ -13,7 +13,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds"
 	common "github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	awsecs "github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfnTypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
@@ -37,7 +36,7 @@ func OptionVPCAndSubnetID(ctx context.Context, vpcID, subnetID string) func(clou
 	}
 }
 
-func New(stack string, region region.Region) *AwsEcsCfn {
+func New(stack string, region common.Region) *AwsEcsCfn {
 	if stack == "" {
 		panic("stack must be set")
 	}

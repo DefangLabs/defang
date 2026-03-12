@@ -20,16 +20,15 @@ const (
 type Container struct {
 	Image       string
 	Name        string
-	Cpus        float32
+	Cpus        float64
 	Memory      uint64
 	Platform    string
-	Essential   *bool // default true
+	IsInit      bool // whether this container is an init container (non-essential)
 	Volumes     []TaskVolume
-	VolumesFrom []string // container (default rw), container:rw, or container:ro
+	VolumesFrom []string // "container" (default rw), "container:rw", or "container:ro"
 	EntryPoint  []string
 	Command     []string // overridden by Run()
-	WorkDir     string
-	DependsOn   map[string]ContainerCondition // container name -> condition
+	WorkDir     string   // Deprecated: not supported by ACI
 }
 
 type TaskVolume struct {

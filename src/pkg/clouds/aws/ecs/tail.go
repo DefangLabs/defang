@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 )
 
@@ -22,7 +22,7 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 		return err
 	}
 	taskId := GetTaskID(taskArn)
-	a.Region = region.FromArn(*taskArn)
+	a.Region = aws.RegionFromArn(*taskArn)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
