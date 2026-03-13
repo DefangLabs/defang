@@ -19,6 +19,7 @@ func Logout(ctx context.Context, fabricClient client.FabricClient, fabricAddr st
 
 	if err := client.TokenStore.Delete(client.TokenStorageName(fabricAddr)); err != nil {
 		term.Warn("Failed to remove stored token:", err)
+		// Don't return the error - we still consider logout successful
 	}
 
 	// Also remove the JWT web identity token file if it exists
