@@ -5,7 +5,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 // mockCanIUseProvider implements Provider with just the methods CanIUseProvider needs.
@@ -50,16 +52,13 @@ func (m *mockCanIUseFabric) CanIUse(_ context.Context, req *defangv1.CanIUseRequ
 		return nil, m.err
 	}
 	// Return a copy so tests can't accidentally share state
-	return &defangv1.CanIUseResponse{
-		CdImage:       m.resp.CdImage,
-		PulumiVersion: m.resp.PulumiVersion,
-		Gpu:           m.resp.Gpu,
-		AllowScaling:  m.resp.AllowScaling,
-	}, nil
+	//nolint:forcetypeassert
+	return proto.Clone(m.resp).(*defangv1.CanIUseResponse), nil
 }
 
 func TestCanIUseProvider(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
+	term.SetDebug(testing.Verbose())
 
 	tests := []struct {
 		name          string
@@ -69,6 +68,7 @@ func TestCanIUseProvider(t *testing.T) {
 		pulumiEnv     string // DEFANG_PULUMI_VERSION override
 		fabricCD      string // what fabric returns
 		fabricPulumi  string // what fabric returns
+		fabricForced  bool   // force upgrade flag
 		fabricErr     error  // CanIUse error (e.g. permission denied)
 		prevCD        string // previously deployed
 		prevPulumi    string // previously deployed
@@ -82,34 +82,35 @@ func TestCanIUseProvider(t *testing.T) {
 		{
 			name:         "new project uses latest from fabric",
 			projectName:  "myproject",
-			fabricCD:     "cd:v2.0",
-			fabricPulumi: "3.100.0",
+			fabricCD:     "cd:v2",
+			fabricPulumi: "3.100",
 			// prevErr is nil, projectUpdate is nil → providers return (nil, nil) for new projects
-			wantCD:     "cd:v2.0",
-			wantPulumi: "3.100.0",
+			wantCD:     "cd:v2",
+			wantPulumi: "3.100",
 		},
 		{
-			name:          "existing project pins to previous versions",
+			name:          "fabric can override even with allowUpgrade false",
 			projectName:   "myproject",
-			fabricCD:      "cd:v2.0",
-			fabricPulumi:  "3.100.0",
-			prevCD:        "cd:v1.0",
-			prevPulumi:    "3.90.0",
-			wantCD:        "cd:v1.0",
-			wantPulumi:    "3.90.0",
-			wantReqCD:     "cd:v1.0",
-			wantReqPulumi: "3.90.0",
+			fabricCD:      "cd:v2",
+			fabricPulumi:  "3.100",
+			fabricForced:  true,
+			prevCD:        "cd:v1",
+			prevPulumi:    "3.90",
+			wantCD:        "cd:v2",
+			wantPulumi:    "3.100",
+			wantReqCD:     "cd:v1",
+			wantReqPulumi: "3.90",
 		},
 		{
 			name:          "allow-upgrade uses latest from fabric",
 			projectName:   "myproject",
 			allowUpgrade:  true,
-			fabricCD:      "cd:v2.0",
-			fabricPulumi:  "3.100.0",
-			prevCD:        "cd:v1.0",
-			prevPulumi:    "3.90.0",
-			wantCD:        "cd:v2.0",
-			wantPulumi:    "3.100.0",
+			fabricCD:      "cd:v2",
+			fabricPulumi:  "3.100",
+			prevCD:        "cd:v1",
+			prevPulumi:    "3.90",
+			wantCD:        "cd:v2",
+			wantPulumi:    "3.100",
 			wantReqCD:     "", // not sent when allowUpgrade
 			wantReqPulumi: "",
 		},
@@ -117,73 +118,73 @@ func TestCanIUseProvider(t *testing.T) {
 			name:         "env override takes precedence over everything",
 			projectName:  "myproject",
 			cdEnv:        "cd:custom",
-			pulumiEnv:    "3.50.0",
-			fabricCD:     "cd:v2.0",
-			fabricPulumi: "3.100.0",
-			prevCD:       "cd:v1.0",
-			prevPulumi:   "3.90.0",
+			pulumiEnv:    "3.50",
+			fabricCD:     "cd:v2",
+			fabricPulumi: "3.100",
+			prevCD:       "cd:v1",
+			prevPulumi:   "3.90",
 			wantCD:       "cd:custom",
-			wantPulumi:   "3.50.0",
+			wantPulumi:   "3.50",
 		},
 		{
 			name:          "same versions no change",
 			projectName:   "myproject",
-			fabricCD:      "cd:v1.0",
-			fabricPulumi:  "3.90.0",
-			prevCD:        "cd:v1.0",
-			prevPulumi:    "3.90.0",
-			wantCD:        "cd:v1.0",
-			wantPulumi:    "3.90.0",
-			wantReqCD:     "cd:v1.0",
-			wantReqPulumi: "3.90.0",
+			fabricCD:      "cd:v1",
+			fabricPulumi:  "3.90",
+			prevCD:        "cd:v1",
+			prevPulumi:    "3.90",
+			wantCD:        "cd:v1",
+			wantPulumi:    "3.90",
+			wantReqCD:     "cd:v1",
+			wantReqPulumi: "3.90",
 		},
 		{
 			name:         "empty project name skips pinning",
 			projectName:  "",
-			fabricCD:     "cd:v2.0",
-			fabricPulumi: "3.100.0",
-			wantCD:       "cd:v2.0",
-			wantPulumi:   "3.100.0",
+			fabricCD:     "cd:v2",
+			fabricPulumi: "3.100",
+			wantCD:       "cd:v2",
+			wantPulumi:   "3.100",
 		},
 		{
 			name:         "nil project update uses latest",
 			projectName:  "myproject",
-			fabricCD:     "cd:v2.0",
-			fabricPulumi: "3.100.0",
+			fabricCD:     "cd:v2",
+			fabricPulumi: "3.100",
 			// prevCD/prevPulumi left empty, projectUpdate will be nil
-			wantCD:     "cd:v2.0",
-			wantPulumi: "3.100.0",
+			wantCD:     "cd:v2",
+			wantPulumi: "3.100",
 		},
 		{
 			name:          "previous CD set but previous Pulumi empty pins CD only",
 			projectName:   "myproject",
-			fabricCD:      "cd:v2.0",
-			fabricPulumi:  "3.100.0",
-			prevCD:        "cd:v1.0",
+			fabricCD:      "cd:v2",
+			fabricPulumi:  "3.100",
+			prevCD:        "cd:v1",
 			prevPulumi:    "",
-			wantCD:        "cd:v1.0",
-			wantPulumi:    "3.100.0",
-			wantReqCD:     "cd:v1.0",
+			wantCD:        "cd:v1",
+			wantPulumi:    "3.100",
+			wantReqCD:     "cd:v1",
 			wantReqPulumi: "",
 		},
 		{
 			name:          "partial env override: CD from env, Pulumi pinned",
 			projectName:   "myproject",
 			cdEnv:         "cd:custom",
-			fabricCD:      "cd:v2.0",
-			fabricPulumi:  "3.100.0",
-			prevCD:        "cd:v1.0",
-			prevPulumi:    "3.90.0",
+			fabricCD:      "cd:v2",
+			fabricPulumi:  "3.100",
+			prevCD:        "cd:v1",
+			prevPulumi:    "3.90",
 			wantCD:        "cd:custom",
-			wantPulumi:    "3.90.0",
-			wantReqCD:     "cd:v1.0", // still fetched because Pulumi needs pinning
-			wantReqPulumi: "3.90.0",
+			wantPulumi:    "3.90",
+			wantReqCD:     "cd:v1", // still fetched because Pulumi needs pinning
+			wantReqPulumi: "3.90",
 		},
 		{
 			name:         "GetProjectUpdate error propagates",
 			projectName:  "myproject",
-			fabricCD:     "cd:v2.0",
-			fabricPulumi: "3.100.0",
+			fabricCD:     "cd:v2",
+			fabricPulumi: "3.100",
 			prevErr:      errors.New("transient S3 error"),
 			wantErr:      true,
 		},
@@ -220,6 +221,7 @@ func TestCanIUseProvider(t *testing.T) {
 				resp: &defangv1.CanIUseResponse{
 					CdImage:       tt.fabricCD,
 					PulumiVersion: tt.fabricPulumi,
+					ForcedVersion: tt.fabricForced,
 				},
 				err: tt.fabricErr,
 			}
@@ -243,11 +245,11 @@ func TestCanIUseProvider(t *testing.T) {
 			}
 
 			// Verify what was sent to the fabric
-			if fabric.lastReq.CdVersion != tt.wantReqCD {
-				t.Errorf("request CdVersion = %q, want %q", fabric.lastReq.CdVersion, tt.wantReqCD)
+			if fabric.lastReq.PreferCdVersion != tt.wantReqCD {
+				t.Errorf("request CdVersion = %q, want %q", fabric.lastReq.PreferCdVersion, tt.wantReqCD)
 			}
-			if fabric.lastReq.PulumiVersion != tt.wantReqPulumi {
-				t.Errorf("request PulumiVersion = %q, want %q", fabric.lastReq.PulumiVersion, tt.wantReqPulumi)
+			if fabric.lastReq.PreferPulumiVersion != tt.wantReqPulumi {
+				t.Errorf("request PulumiVersion = %q, want %q", fabric.lastReq.PreferPulumiVersion, tt.wantReqPulumi)
 			}
 		})
 	}
@@ -264,53 +266,53 @@ func TestPinVersion(t *testing.T) {
 	}{
 		{
 			name:     "empty previous returns latest",
-			latest:   "v2.0",
+			latest:   "v2",
 			previous: "",
 			upgrade:  false,
-			want:     "v2.0",
+			want:     "v2",
 		},
 		{
 			name:     "same version returns latest",
-			latest:   "v1.0",
-			previous: "v1.0",
+			latest:   "v1",
+			previous: "v1",
 			upgrade:  false,
-			want:     "v1.0",
+			want:     "v1",
 		},
 		{
 			name:     "newer available without upgrade returns previous",
-			latest:   "v2.0",
-			previous: "v1.0",
+			latest:   "v2",
+			previous: "v1",
 			upgrade:  false,
-			want:     "v1.0",
+			want:     "v1",
 		},
 		{
 			name:     "newer available with upgrade returns latest",
-			latest:   "v2.0",
-			previous: "v1.0",
+			latest:   "v2",
+			previous: "v1",
 			upgrade:  true,
-			want:     "v2.0",
+			want:     "v2",
 		},
 		{
 			name:     "downgrade without upgrade returns previous",
-			latest:   "v1.0",
-			previous: "v2.0",
+			latest:   "v1",
+			previous: "v2",
 			upgrade:  false,
-			want:     "v2.0",
+			want:     "v2",
 		},
 		{
 			name:     "downgrade with upgrade returns latest",
-			latest:   "v1.0",
-			previous: "v2.0",
+			latest:   "v1",
+			previous: "v2",
 			upgrade:  true,
-			want:     "v1.0",
+			want:     "v1",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := pinVersion(tt.latest, tt.previous, "test", tt.upgrade)
+			got := resolveVersion("", tt.latest, tt.previous, "test", tt.upgrade, false)
 			if got != tt.want {
-				t.Errorf("pinVersion(%q, %q, upgrade=%v) = %q, want %q", tt.latest, tt.previous, tt.upgrade, got, tt.want)
+				t.Errorf("resolveVersion(%q, %q, upgrade=%v) = %q, want %q", tt.latest, tt.previous, tt.upgrade, got, tt.want)
 			}
 		})
 	}

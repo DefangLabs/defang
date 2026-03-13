@@ -185,7 +185,6 @@ type FabricControllerClient interface {
 	Delete(context.Context, *connect.Request[v1.DeleteRequest]) (*connect.Response[v1.DeleteResponse], error)
 	Destroy(context.Context, *connect.Request[v1.DestroyRequest]) (*connect.Response[v1.DestroyResponse], error)
 	Subscribe(context.Context, *connect.Request[v1.SubscribeRequest]) (*connect.ServerStreamForClient[v1.SubscribeResponse], error)
-	// rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
 	GetServices(context.Context, *connect.Request[v1.GetServicesRequest]) (*connect.Response[v1.GetServicesResponse], error)
 	GenerateFiles(context.Context, *connect.Request[v1.GenerateFilesRequest]) (*connect.Response[v1.GenerateFilesResponse], error)
 	StartGenerate(context.Context, *connect.Request[v1.GenerateFilesRequest]) (*connect.Response[v1.StartGenerateResponse], error)
@@ -874,7 +873,6 @@ type FabricControllerHandler interface {
 	Delete(context.Context, *connect.Request[v1.DeleteRequest]) (*connect.Response[v1.DeleteResponse], error)
 	Destroy(context.Context, *connect.Request[v1.DestroyRequest]) (*connect.Response[v1.DestroyResponse], error)
 	Subscribe(context.Context, *connect.Request[v1.SubscribeRequest], *connect.ServerStream[v1.SubscribeResponse]) error
-	// rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
 	GetServices(context.Context, *connect.Request[v1.GetServicesRequest]) (*connect.Response[v1.GetServicesResponse], error)
 	GenerateFiles(context.Context, *connect.Request[v1.GenerateFilesRequest]) (*connect.Response[v1.GenerateFilesResponse], error)
 	StartGenerate(context.Context, *connect.Request[v1.GenerateFilesRequest]) (*connect.Response[v1.StartGenerateResponse], error)

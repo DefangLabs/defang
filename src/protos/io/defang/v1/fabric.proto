@@ -35,7 +35,6 @@ service FabricController {
     option idempotency_level = IDEMPOTENT;
   }
   rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
-  // rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
   rpc GetServices(GetServicesRequest) returns (GetServicesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
@@ -287,8 +286,8 @@ message CanIUseRequest {
   string stack = 4;
   string region = 5;
   string provider_account_id = 6;
-  string cd_version = 7; // currently deployed CD image; empty for new projects or when --allow-upgrade is set
-  string pulumi_version = 8; // currently deployed Pulumi version; empty for new projects or when --allow-upgrade is set
+  string prefer_cd_version = 7; // currently deployed CD image; empty for new projects or when --allow-upgrade is set
+  string prefer_pulumi_version = 8; // currently deployed Pulumi version; empty for new projects or when --allow-upgrade is set
 }
 
 message CanIUseResponse {
@@ -298,6 +297,7 @@ message CanIUseResponse {
   bool allow_scaling = 4;
   string pulumi_version = 5;
   bytes signature = 6;
+  bool forced_version = 7; // force use of the returned CD image and Pulumi version
 }
 
 message DeployRequest {
