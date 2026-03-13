@@ -36,11 +36,9 @@ func GenerateWithAI(ctx context.Context, client client.FabricClient, args Genera
 		return nil, err
 	}
 
-	if term.DoDebug() {
-		// Print the files that were generated
-		for _, file := range response.Files {
-			term.Debugf("%s\n```\n%s\n```\n", file.Name, file.Content)
-		}
+	// file.Content can be large; skip string formatting when debug output won't be captured
+	for _, file := range response.Files {
+		term.Debugf("%s\n```\n%s\n```\n", file.Name, file.Content)
 	}
 
 	// Write each file to disk
