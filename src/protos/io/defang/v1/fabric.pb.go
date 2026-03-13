@@ -1845,6 +1845,8 @@ type CanIUseRequest struct {
 	Stack             string                 `protobuf:"bytes,4,opt,name=stack,proto3" json:"stack,omitempty"`
 	Region            string                 `protobuf:"bytes,5,opt,name=region,proto3" json:"region,omitempty"`
 	ProviderAccountId string                 `protobuf:"bytes,6,opt,name=provider_account_id,json=providerAccountId,proto3" json:"provider_account_id,omitempty"`
+	CdVersion         string                 `protobuf:"bytes,7,opt,name=cd_version,json=cdVersion,proto3" json:"cd_version,omitempty"`             // currently deployed CD image; empty for new projects or when --allow-upgrade is set
+	PulumiVersion     string                 `protobuf:"bytes,8,opt,name=pulumi_version,json=pulumiVersion,proto3" json:"pulumi_version,omitempty"` // currently deployed Pulumi version; empty for new projects or when --allow-upgrade is set
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -1917,6 +1919,20 @@ func (x *CanIUseRequest) GetRegion() string {
 func (x *CanIUseRequest) GetProviderAccountId() string {
 	if x != nil {
 		return x.ProviderAccountId
+	}
+	return ""
+}
+
+func (x *CanIUseRequest) GetCdVersion() string {
+	if x != nil {
+		return x.CdVersion
+	}
+	return ""
+}
+
+func (x *CanIUseRequest) GetPulumiVersion() string {
+	if x != nil {
+		return x.PulumiVersion
 	}
 	return ""
 }
@@ -5706,14 +5722,17 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x04arch\x18\x05 \x01(\tR\x04arch\x1a=\n" +
 	"\x0fPropertiesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe1\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa7\x02\n" +
 	"\x0eCanIUseRequest\x12\x18\n" +
 	"\aproject\x18\x01 \x01(\tR\aproject\x122\n" +
 	"\bprovider\x18\x02 \x01(\x0e2\x16.io.defang.v1.ProviderR\bprovider\x12#\n" +
 	"\rservice_count\x18\x03 \x01(\x05R\fserviceCount\x12\x14\n" +
 	"\x05stack\x18\x04 \x01(\tR\x05stack\x12\x16\n" +
 	"\x06region\x18\x05 \x01(\tR\x06region\x12.\n" +
-	"\x13provider_account_id\x18\x06 \x01(\tR\x11providerAccountId\"\xae\x01\n" +
+	"\x13provider_account_id\x18\x06 \x01(\tR\x11providerAccountId\x12\x1d\n" +
+	"\n" +
+	"cd_version\x18\a \x01(\tR\tcdVersion\x12%\n" +
+	"\x0epulumi_version\x18\b \x01(\tR\rpulumiVersion\"\xae\x01\n" +
 	"\x0fCanIUseResponse\x12\x19\n" +
 	"\bcd_image\x18\x02 \x01(\tR\acdImage\x12\x10\n" +
 	"\x03gpu\x18\x03 \x01(\bR\x03gpu\x12#\n" +
