@@ -138,7 +138,7 @@ var cdListCmd = &cobra.Command{
 				return errors.New("--all cannot be used with --remote")
 			}
 
-			err = canIUseProvider(cmd.Context(), session.Provider, "", 0, false)
+			err = canIUseProvider(cmd.Context(), session.Provider, "", 0, true) // safe to use latest CD image
 			if err != nil {
 				return err
 			}
