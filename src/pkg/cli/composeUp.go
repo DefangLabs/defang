@@ -123,10 +123,17 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		return nil, project, errors.New("failed to get delegate domain")
 	}
 
-	if prevUpdate, err := provider.GetProjectUpdate(ctx, project.Name); err == nil && prevUpdate != nil {
+	// Check previous deployment mode for compatibility with new deployment mode.
+	if prevUpdate, err := provider.GetProjectUpdate(ctx, project.Name); err != nil {
+		if !errors.Is(err, client.ErrNotExist) {
+			return nil, project, err
+		}
+		// New project, no previous deployment mode to check
+	} else {
 		prevMode := modes.Mode(prevUpdate.Mode)
 		mode, err = checkDeploymentMode(prevMode, mode)
-		if err != nil {
+		// Ignore mode compatibility errors in estimation mode
+		if err != nil && upload != compose.UploadModeEstimate {
 			return nil, project, err
 		}
 	}

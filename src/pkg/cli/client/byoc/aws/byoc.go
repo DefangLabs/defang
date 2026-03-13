@@ -583,7 +583,7 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn,
 
 func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
 	if projectName == "" {
-		return nil, nil
+		return nil, client.ErrNotExist
 	}
 	bucketName := b.bucketName()
 	if bucketName == "" {
@@ -592,7 +592,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 			var cfnErr *cfn.ErrStackNotFoundException
 			if errors.As(err, &cfnErr) {
 				term.Debugf("FillOutputs: %v", err)
-				return nil, nil // no bucket = no services yet
+				return nil, client.ErrNotExist // no bucket = no services yet
 			}
 			return nil, AnnotateAwsError(err)
 		}
@@ -615,7 +615,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 	if err != nil {
 		if aws.IsS3NoSuchKeyError(err) {
 			term.Debug("s3.GetObject:", err)
-			return nil, nil // no services yet
+			return nil, client.ErrNotExist // no services yet
 		}
 		return nil, AnnotateAwsError(err)
 	}
@@ -636,15 +636,16 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 func (b *ByocAws) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
 	projUpdate, err := b.GetProjectUpdate(ctx, req.Project)
 	if err != nil {
+		if errors.Is(err, client.ErrNotExist) {
+			return &defangv1.GetServicesResponse{}, nil
+		}
 		return nil, err
 	}
 
-	listServiceResp := defangv1.GetServicesResponse{}
-	if projUpdate != nil {
-		listServiceResp.Services = projUpdate.Services
-		listServiceResp.Project = projUpdate.Project
-	}
-	return &listServiceResp, nil
+	return &defangv1.GetServicesResponse{
+		Services: projUpdate.Services,
+		Project:  projUpdate.Project,
+	}, nil
 }
 
 func (b *ByocAws) getSecretID(projectName, name string) string {

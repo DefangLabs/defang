@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
 	"iter"
 	"net/url"
 	"os"
@@ -92,7 +93,7 @@ func (b *ByocDo) GetProjectUpdate(ctx context.Context, projectName string) (*def
 
 	if bucketName == "" {
 		// bucket is not created yet; return empty update in that case
-		return nil, nil // no services yet
+		return nil, client.ErrNotExist // no services yet
 	}
 
 	path := b.GetProjectUpdatePath(projectName)
@@ -104,7 +105,7 @@ func (b *ByocDo) GetProjectUpdate(ctx context.Context, projectName string) (*def
 	if err != nil {
 		if aws.IsS3NoSuchKeyError(err) {
 			term.Debug("s3.GetObject:", err)
-			return nil, nil // no services yet
+			return nil, client.ErrNotExist // no services yet
 		}
 		return nil, awsbyoc.AnnotateAwsError(err)
 	}

@@ -63,7 +63,7 @@ func (m mockGetServiceInfosProvider) UpdateServiceInfo(ctx context.Context, serv
 }
 
 func (m mockGetServiceInfosProvider) GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error) {
-	return nil, nil
+	return nil, client.ErrNotExist
 }
 
 func (mockGetServiceInfosProvider) GetPrivateDomain(projectName string) string {

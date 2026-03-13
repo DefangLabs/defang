@@ -56,7 +56,7 @@ func (g *PlaygroundProvider) Estimate(ctx context.Context, req *defangv1.Estimat
 }
 
 func (g *PlaygroundProvider) GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error) {
-	return nil, errors.New("the project update command is not valid for the Defang playground; did you forget --stack or --provider?")
+	return nil, ErrNotExist // Playground doesn't track project updates
 }
 
 func (g *PlaygroundProvider) GetService(ctx context.Context, req *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {

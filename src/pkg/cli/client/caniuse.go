@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -20,11 +21,14 @@ func CanIUseProvider(ctx context.Context, client FabricClient, provider Provider
 	// Look up previously deployed versions to send to fabric and for client-side pinning
 	var prevCD, prevPulumi string
 	if projectName != "" && !allowUpgrade && (cdOverride == "" || pulumiOverride == "") {
-		if pu, err := provider.GetProjectUpdate(ctx, projectName); err != nil || pu == nil {
-			term.Debugf("unable to get project update for %q: %v", projectName, err)
+		if prevUpdate, err := provider.GetProjectUpdate(ctx, projectName); err != nil {
+			if !errors.Is(err, ErrNotExist) {
+				return err
+			}
+			// New project, no previous versions to pin to
 		} else {
-			prevCD = pu.CdVersion
-			prevPulumi = pu.PulumiVersion
+			prevCD = prevUpdate.CdVersion
+			prevPulumi = prevUpdate.PulumiVersion
 		}
 	}
 
