@@ -7,19 +7,18 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"path/filepath"
 	"slices"
 	"strings"
 
 	"cloud.google.com/go/iam/apiv1/iampb"
 	resourcemanager "cloud.google.com/go/resourcemanager/apiv3"
 	"github.com/DefangLabs/defang/src/pkg/auth"
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/github"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	gax "github.com/googleapis/gax-go/v2"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"golang.org/x/oauth2/google/externalaccount"
 	"google.golang.org/api/option"
 )
 
@@ -101,14 +100,9 @@ type GoogleAuthCredentialFormat struct {
 }
 
 func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
-	if err := setupGithubTokenCredentials(ctx); err != nil {
-		term.Warnf("failed to setup github token credentials for workload identity federation: %v", err)
-	}
-
 	// 1. Try the default application credentials or from the "GOOGLE_APPLICATION_CREDENTIALS" env var if set
 	//    - if the user has login with glcoud cli with application default credentials
 	//    - if the user has set GOOGLE_APPLICATION_CREDENTIALS to a service account key file with required permissions
-	//    - if "GOOGLE_WORKLOAD_IDENTITY_PROVIDER" was set and a credential.json was created for the provider using github token in pkg/login/login.go
 	term.Debugf("checking if application default credentials are available and has permission, GOOGLE_APPLICATION_CREDENTIALS=%q...", os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
 	if err := testTokenProjectPermissions(ctx, gcp.ProjectId, requiredPerms, nil); err == nil {
 		term.Debug("found valid application default credentials with required permissions")
@@ -116,7 +110,23 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 		return nil
 	}
 
-	// 2. Try load previously saved tokens from the token store
+	// 2. Try GitHub Actions OIDC token if running in GitHub Actions with Workload Identity Federation set up
+	if tokenSource, principal, err := findGithubCredentials(ctx); err != nil {
+		term.Warnf("failed to get GitHub Actions OIDC token source: %v", err)
+	} else if tokenSource != nil {
+		term.Debug("found GitHub Actions OIDC token source, testing permissions...")
+		if err := testTokenProjectPermissions(ctx, gcp.ProjectId, requiredPerms, tokenSource); err != nil {
+			term.Warnf("GitHub Actions OIDC token is missing required permissions on project %q: %v\nPlease ensure your workload identity provider and github actions permissions are set up correctly: https://docs.defang.com/defang-byoc/gcp/github-actions\n", gcp.ProjectId, err)
+		} else {
+			term.Debug("GitHub Actions OIDC token has required permissions")
+			gcp.Options = append(gcp.Options, option.WithTokenSource(tokenSource))
+			gcp.TokenSource = tokenSource
+			gcp.Principal = principal
+			return nil
+		}
+	}
+
+	// 3. Try load previously saved tokens from the token store
 	if tokenSource, err := gcp.findStoredCredentials(ctx); err != nil {
 		term.Warnf("failed to load stored credentials: %v", err)
 	} else if tokenSource != nil {
@@ -126,7 +136,7 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 		return nil
 	}
 
-	// 3. If no valid tokens and allow interactive, start interactive login flow
+	// 4. If no valid tokens and allow interactive, start interactive login flow
 	if !interactive {
 		return errors.New("No valid gcloud credentials found") // TODO: Better error message with possible doc link
 	}
@@ -229,57 +239,60 @@ func (gcp *Gcp) findStoredCredentials(ctx context.Context) (oauth2.TokenSource, 
 	return nil, nil
 }
 
-func setupGithubTokenCredentials(ctx context.Context) error {
+func findGithubCredentials(ctx context.Context) (oauth2.TokenSource, string, error) {
 	// If both ACTIONS_ID_TOKEN_REQUEST_URL and GOOGLE_WORKLOAD_IDENTITY_PROVIDER are set, we're doing "Workload Identity Federation" with GCP using github id token
 	githubTokenReqUrl := os.Getenv("ACTIONS_ID_TOKEN_REQUEST_URL")
 	gcpProvider := os.Getenv("GOOGLE_WORKLOAD_IDENTITY_PROVIDER")
 	term.Debugf("ACTIONS_ID_TOKEN_REQUEST_URL=%q, GOOGLE_WORKLOAD_IDENTITY_PROVIDER=%q", githubTokenReqUrl, gcpProvider)
 	if githubTokenReqUrl == "" || gcpProvider == "" {
-		return nil
+		return nil, "", nil
 	}
-	// 1. convert the identity provider to aud in credentials.json below
-	// In credentials.json audience is in the format: //iam.googleapis.com/projects/996411251390/locations/global/workloadIdentityPools/defang-github/providers/github-actions-r6xx29
+	// 1. get canonical audience from the gcpProvider
+	// expected audience format: //iam.googleapis.com/projects/996411251390/locations/global/workloadIdentityPools/defang-github/providers/github-actions-r6xx29
 	audience := gcpProvider
 	if !strings.HasPrefix(audience, "//iam.googleapis.com/") {
 		audience = "//" + path.Join("iam.googleapis.com", audience)
 	}
 
-	// 2. use the aud to get the github id token and save it to a file, which will be referenced in credentials.json as the credential source
-	gcpIdToken, err := github.GetIdToken(ctx, audience) // WIF provider requires the jwt audience to match the provider resource name
-	if err != nil {
-		return fmt.Errorf("non-interactive login failed: %w", err)
-	}
-	project, pool, provider, err := parseWIFProvider(audience)
-	if err != nil {
-		return fmt.Errorf("failed to parse WIF provider %q: %w", audience, err)
-	}
-	tokenKey := fmt.Sprintf("%s-%s-%s.jwt", project, pool, provider)
-	jwtPath := filepath.Join(client.StateDir, tokenKey)
-	if err := os.WriteFile(jwtPath, []byte(gcpIdToken), 0600); err != nil {
-		return fmt.Errorf("failed to save web identity token for gcp: %w", err)
+	cfg := &externalaccount.Config{
+		Audience:             audience,
+		SubjectTokenType:     "urn:ietf:params:oauth:token-type:jwt",
+		TokenURL:             "https://sts.googleapis.com/v1/token",
+		Scopes:               []string{"https://www.googleapis.com/auth/cloud-platform"},
+		SubjectTokenSupplier: github.TokenSupplier{Audience: audience},
 	}
 
-	// 3. Create a credentials.json to be used as the GOOGLE_APPLICATION_CREDENTIALS for GCP authentication
-	credentials := GoogleAuthCredentials{
-		UniverseDomain:   "googleapis.com",
-		Type:             "external_account",
-		Audience:         audience,
-		SubjectTokenType: "urn:ietf:params:oauth:token-type:jwt",
-		TokenURL:         "https://sts.googleapis.com/v1/token",
-		CredentialSource: &GoogleAuthCredentialSource{
-			File: jwtPath, // reference the file where we saved the github id token above
-			Format: &GoogleAuthCredentialFormat{
-				Type: "text", // type text for encoded jwt
-			},
-		},
-	}
-	credsPath, err := writeCredentialsFile(tokenKey, credentials)
+	tokenSource, err := externalaccount.NewTokenSource(ctx, *cfg)
 	if err != nil {
-		return err
+		return nil, "", fmt.Errorf("failed to create external account token source: %w", err)
 	}
-	// Not an official env var, but our GCP integration will look for this when the provider is set to GCP and this env var is present
-	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", credsPath)
-	return nil
+
+	principalSet, err := audienceToPrincipalSet(audience)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to convert audience to principal set: %w", err)
+	}
+
+	return tokenSource, principalSet, nil
+}
+
+func audienceToPrincipalSet(audience string) (string, error) {
+	// audience:      //iam.googleapis.com/projects/.../workloadIdentityPools/POOL/providers/PROVIDER
+	// principalSet:  principalSet://iam.googleapis.com/projects/.../workloadIdentityPools/POOL/*
+
+	const prefix = "//iam.googleapis.com/"
+	if !strings.HasPrefix(audience, prefix) {
+		return "", fmt.Errorf("unexpected audience format: %q", audience)
+	}
+
+	// Find and strip everything from "/providers/" onward
+	providerIdx := strings.Index(audience, "/providers/")
+	if providerIdx == -1 {
+		return "", fmt.Errorf("audience missing /providers/ segment: %q", audience)
+	}
+
+	poolPath := audience[:providerIdx] // "//iam.googleapis.com/projects/.../workloadIdentityPools/POOL"
+
+	return "principalSet:" + poolPath + "/*", nil
 }
 
 func (gcp *Gcp) InteractiveLogin(ctx context.Context) (oauth2.TokenSource, error) {
@@ -359,20 +372,6 @@ func testTokenProjectPermissions(ctx context.Context, projectID string, perms []
 	}
 
 	return nil
-}
-
-func writeCredentialsFile(key string, creds GoogleAuthCredentials) (string, error) {
-	credsBytes, err := json.Marshal(creds)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal credentials: %w", err)
-	}
-
-	credsPath := filepath.Join(client.StateDir, key+"-gcp-creds") + ".json"
-	term.Debugf("writing credentials file to %s", credsPath)
-	if err := os.WriteFile(credsPath, credsBytes, 0600); err != nil {
-		return "", fmt.Errorf("failed to save credentials file: %w", err)
-	}
-	return credsPath, nil
 }
 
 func parseWIFProvider(s string) (project, pool, provider string, err error) {

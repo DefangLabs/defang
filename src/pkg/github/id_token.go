@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/http"
+	"golang.org/x/oauth2/google/externalaccount"
 )
 
 // GitHub OIDC docs: https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect
@@ -49,4 +50,12 @@ func GetIdToken(ctx context.Context, audience string) (string, error) {
 		return "", err
 	}
 	return actionsIdTokenResponse.Value, nil
+}
+
+type TokenSupplier struct {
+	Audience string
+}
+
+func (g TokenSupplier) SubjectToken(ctx context.Context, opts externalaccount.SupplierOptions) (string, error) {
+	return GetIdToken(ctx, g.Audience)
 }

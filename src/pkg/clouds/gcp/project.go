@@ -101,6 +101,7 @@ func (id ProjectId) Suffix() string {
 type Gcp struct {
 	Region      string
 	ProjectId   string
+	Principal   string
 	TokenSource oauth2.TokenSource
 	TokenStore  tokenstore.TokenStore
 	Options     []option.ClientOption

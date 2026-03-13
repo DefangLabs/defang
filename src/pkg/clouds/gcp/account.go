@@ -26,6 +26,9 @@ var FindGoogleDefaultCredentials func(ctx context.Context, scopes ...string) (*g
 // https://cloud.google.com/iam/docs/principals-overview#principal-types
 func (gcp Gcp) GetCurrentPrincipal(ctx context.Context) (string, error) {
 	var token *oauth2.Token
+	if gcp.Principal != "" {
+		return gcp.Principal, nil
+	}
 	if gcp.TokenSource != nil {
 		var err error
 		token, err = gcp.TokenSource.Token()

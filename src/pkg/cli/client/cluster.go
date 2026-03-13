@@ -38,10 +38,6 @@ func TokenStorageName(fabricAddr string) string {
 	return host
 }
 
-func GetTokenFile(fabricAddr string) string {
-	return filepath.Join(StateDir, TokenStorageName(fabricAddr))
-}
-
 func GetExistingToken(fabricAddr string) string {
 	var accessToken = os.Getenv("DEFANG_ACCESS_TOKEN")
 
