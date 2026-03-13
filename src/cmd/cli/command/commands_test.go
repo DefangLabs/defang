@@ -174,13 +174,16 @@ func TestCommandGates(t *testing.T) {
 		},
 	}
 
-	prevSts, prevSsm := awsdriver.NewStsFromConfig, awsdriver.NewSsmFromConfig
+	prevSts, prevSsm, prevS3 := awsdriver.NewStsFromConfig, awsdriver.NewSsmFromConfig, awsdriver.NewS3FromConfig
 	t.Cleanup(func() {
 		awsdriver.NewStsFromConfig = prevSts
 		awsdriver.NewSsmFromConfig = prevSsm
+		awsdriver.NewS3FromConfig = prevS3
 	})
 	awsdriver.NewStsFromConfig = func(aws.Config) awsdriver.StsClientAPI { return &awsdriver.MockStsClientAPI{} }
 	awsdriver.NewSsmFromConfig = func(aws.Config) awsdriver.SsmParametersAPI { return &MockSsmClient{} }
+	awsdriver.NewS3FromConfig = func(aws.Config) awsdriver.S3GetObjectAPI { return &awsdriver.MockS3ClientAPI{} }
+	t.Setenv("DEFANG_CD_BUCKET", "test-bucket") // skip FillOutputs in GetProjectUpdate
 
 	for _, tt := range testData {
 		t.Run(tt.name, func(t *testing.T) {
@@ -398,7 +401,7 @@ func TestNewProvider(t *testing.T) {
 		})
 
 		p := cli.NewProvider(ctx, client.ProviderAWS, client.MockFabricClient{}, "")
-		err := canIUseProvider(ctx, p, "project", 0, false)
+		err := canIUseProvider(ctx, p, "project", 0, true)
 		if err != nil {
 			t.Errorf("CanIUseProvider() failed: %v", err)
 		}
@@ -430,7 +433,7 @@ func TestNewProvider(t *testing.T) {
 		})
 
 		p := cli.NewProvider(ctx, client.ProviderAWS, client.MockFabricClient{}, "")
-		err := canIUseProvider(ctx, p, "project", 0, false)
+		err := canIUseProvider(ctx, p, "project", 0, true)
 		if err != nil {
 			t.Errorf("CanIUseProvider() failed: %v", err)
 		}

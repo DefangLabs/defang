@@ -588,7 +588,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 	bucketName := b.bucketName()
 	if bucketName == "" {
 		if err := b.driver.FillOutputs(ctx); err != nil {
-			// FillOutputs might fail if the stack is not created yet; return empty update in that case
+			// FillOutputs might fail if the stack is not created yet; return ErrNotExist (no bucket = no services yet)
 			var cfnErr *cfn.ErrStackNotFoundException
 			if errors.As(err, &cfnErr) {
 				term.Debugf("FillOutputs: %v", err)
@@ -604,7 +604,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 		return nil, AnnotateAwsError(err)
 	}
 
-	s3Client := s3.NewFromConfig(cfg)
+	s3Client := aws.NewS3FromConfig(cfg)
 	path := b.GetProjectUpdatePath(projectName)
 
 	term.Debug("Getting services from bucket:", bucketName, path)
