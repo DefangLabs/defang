@@ -230,11 +230,12 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
-		CdVersion: b.CDImage,
-		Compose:   req.Compose,
-		Etag:      etag,
-		Mode:      req.Mode,
-		Services:  serviceInfos,
+		CdVersion:     b.CDImage,
+		Compose:       req.Compose,
+		Etag:          etag,
+		Mode:          req.Mode,
+		PulumiVersion: b.PulumiVersion,
+		Services:      serviceInfos,
 	})
 	if err != nil {
 		return nil, err
@@ -590,16 +591,16 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn,
 
 func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
 	if projectName == "" {
-		return nil, nil
+		return nil, client.ErrNotExist
 	}
 	bucketName := b.bucketName()
 	if bucketName == "" {
 		if err := b.driver.FillOutputs(ctx); err != nil {
-			// FillOutputs might fail if the stack is not created yet; return empty update in that case
+			// FillOutputs might fail if the stack is not created yet; return ErrNotExist (no bucket = no services yet)
 			var cfnErr *cfn.ErrStackNotFoundException
 			if errors.As(err, &cfnErr) {
 				term.Debugf("FillOutputs: %v", err)
-				return nil, nil // no bucket = no services yet
+				return nil, client.ErrNotExist // no bucket = no services yet
 			}
 			return nil, AnnotateAwsError(err)
 		}
@@ -611,7 +612,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 		return nil, AnnotateAwsError(err)
 	}
 
-	s3Client := s3.NewFromConfig(cfg)
+	s3Client := aws.NewS3FromConfig(cfg)
 	path := b.GetProjectUpdatePath(projectName)
 
 	term.Debug("Getting services from bucket:", bucketName, path)
@@ -622,7 +623,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 	if err != nil {
 		if aws.IsS3NoSuchKeyError(err) {
 			term.Debug("s3.GetObject:", err)
-			return nil, nil // no services yet
+			return nil, client.ErrNotExist // no services yet
 		}
 		return nil, AnnotateAwsError(err)
 	}
@@ -643,15 +644,16 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 func (b *ByocAws) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
 	projUpdate, err := b.GetProjectUpdate(ctx, req.Project)
 	if err != nil {
+		if errors.Is(err, client.ErrNotExist) {
+			return &defangv1.GetServicesResponse{}, nil
+		}
 		return nil, err
 	}
 
-	listServiceResp := defangv1.GetServicesResponse{}
-	if projUpdate != nil {
-		listServiceResp.Services = projUpdate.Services
-		listServiceResp.Project = projUpdate.Project
-	}
-	return &listServiceResp, nil
+	return &defangv1.GetServicesResponse{
+		Services: projUpdate.Services,
+		Project:  projUpdate.Project,
+	}, nil
 }
 
 func (b *ByocAws) getSecretID(projectName, name string) string {

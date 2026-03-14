@@ -19,8 +19,9 @@ var cdCmd = &cobra.Command{
 	Hidden:  true,
 }
 
-func cdCommand(cmd *cobra.Command, args []string, command client.CdCommand, fabric client.FabricClient) error {
+func cdCommand(cmd *cobra.Command, command client.CdCommand, args []string, fabric client.FabricClient) error {
 	ctx := cmd.Context()
+	allowUpgrade, _ := cmd.Flags().GetBool("allow-upgrade")
 
 	session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
 		CheckAccountInfo: true,
@@ -39,7 +40,7 @@ func cdCommand(cmd *cobra.Command, args []string, command client.CdCommand, fabr
 
 	var errs []error
 	for _, projectName := range args {
-		err := canIUseProvider(ctx, session.Provider, projectName, 0)
+		err := canIUseProvider(ctx, session.Provider, projectName, 0, allowUpgrade)
 		if err != nil {
 			return err
 		}
@@ -53,7 +54,7 @@ var cdDestroyCmd = &cobra.Command{
 	Annotations: authNeededAlways, // need subscription
 	Short:       "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cdCommand(cmd, args, client.CdCommandDestroy, global.Client)
+		return cdCommand(cmd, client.CdCommandDestroy, args, global.Client)
 	},
 }
 
@@ -62,7 +63,7 @@ var cdDownCmd = &cobra.Command{
 	Annotations: authNeededAlways, // need subscription
 	Short:       "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cdCommand(cmd, args, client.CdCommandDown, global.Client)
+		return cdCommand(cmd, client.CdCommandDown, args, global.Client)
 	},
 }
 
@@ -71,7 +72,7 @@ var cdRefreshCmd = &cobra.Command{
 	Annotations: authNeededAlways, // need subscription
 	Short:       "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cdCommand(cmd, args, client.CdCommandRefresh, global.Client)
+		return cdCommand(cmd, client.CdCommandRefresh, args, global.Client)
 	},
 }
 
@@ -80,7 +81,7 @@ var cdCancelCmd = &cobra.Command{
 	Annotations: authNeededAlways, // need subscription
 	Short:       "Cancel the current CD operation",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cdCommand(cmd, args, client.CdCommandCancel, global.Client)
+		return cdCommand(cmd, client.CdCommandCancel, args, global.Client)
 	},
 }
 
@@ -89,7 +90,7 @@ var cdOutputsCmd = &cobra.Command{
 	Annotations: authNeededAlways, // need subscription
 	Short:       "Get the outputs of the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cdCommand(cmd, args, client.CdCommandOutputs, global.Client)
+		return cdCommand(cmd, client.CdCommandOutputs, args, global.Client)
 	},
 }
 
@@ -137,7 +138,7 @@ var cdListCmd = &cobra.Command{
 				return errors.New("--all cannot be used with --remote")
 			}
 
-			err = canIUseProvider(cmd.Context(), session.Provider, "", 0)
+			err = canIUseProvider(cmd.Context(), session.Provider, "", 0, true) // safe to use latest CD image
 			if err != nil {
 				return err
 			}
@@ -166,7 +167,8 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		err = canIUseProvider(ctx, session.Provider, project.Name, 1) // 1 SDU for BYOC preview
+		allowUpgrade, _ := cmd.Flags().GetBool("allow-upgrade")
+		err = canIUseProvider(ctx, session.Provider, project.Name, 1, allowUpgrade) // 1 SDU for BYOC preview
 		if err != nil {
 			return err
 		}
@@ -193,7 +195,7 @@ var cdInstallCmd = &cobra.Command{
 			return err
 		}
 
-		if err := canIUseProvider(ctx, session.Provider, "", 0); err != nil {
+		if err := canIUseProvider(ctx, session.Provider, "", 0, false); err != nil {
 			return err
 		}
 
@@ -210,7 +212,7 @@ var cdCloudformationCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		provider := aws.NewByocProvider(cmd.Context(), global.Client.GetTenantName(), global.Stack.Name)
 
-		if err := canIUseProvider(cmd.Context(), provider, "", 0); err != nil {
+		if err := canIUseProvider(cmd.Context(), provider, "", 0, false); err != nil {
 			return err
 		}
 

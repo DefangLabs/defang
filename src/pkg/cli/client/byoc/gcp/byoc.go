@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+
 	"iter"
 	"os"
 	"path"
@@ -543,11 +544,12 @@ func (b *ByocGcp) deploy(ctx context.Context, req *client.DeployRequest, command
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
-		CdVersion: b.CDImage,
-		Compose:   req.Compose,
-		Etag:      etag,
-		Mode:      req.Mode,
-		Services:  serviceInfos,
+		CdVersion:     b.CDImage,
+		Compose:       req.Compose,
+		Etag:          etag,
+		Mode:          req.Mode,
+		PulumiVersion: b.PulumiVersion,
+		Services:      serviceInfos,
 	})
 	if err != nil {
 		return nil, err
@@ -653,16 +655,16 @@ func (b *ByocGcp) GetService(ctx context.Context, req *defangv1.GetRequest) (*de
 func (b *ByocGcp) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
 	projUpdate, err := b.GetProjectUpdate(ctx, req.Project)
 	if err != nil {
+		if errors.Is(err, client.ErrNotExist) {
+			return &defangv1.GetServicesResponse{}, nil
+		}
 		return nil, err
 	}
 
-	listServiceResp := defangv1.GetServicesResponse{}
-	if projUpdate != nil {
-		listServiceResp.Services = projUpdate.Services
-		listServiceResp.Project = projUpdate.Project
-	}
-
-	return &listServiceResp, nil
+	return &defangv1.GetServicesResponse{
+		Services: projUpdate.Services,
+		Project:  projUpdate.Project,
+	}, nil
 }
 
 type ConflictDelegateDomainError struct {
@@ -815,14 +817,14 @@ func (b *ByocGcp) TearDownCD(ctx context.Context) error {
 
 func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
 	if projectName == "" {
-		return nil, nil
+		return nil, client.ErrNotExist
 	}
 	bucketName, err := b.driver.GetBucketWithPrefix(ctx, DefangCDProjectName)
 	if err != nil {
 		return nil, annotateGcpError(err)
 	}
 	if bucketName == "" {
-		return nil, nil // no bucket = no services yet
+		return nil, client.ErrNotExist // no bucket = no services yet
 	}
 
 	path := b.GetProjectUpdatePath(projectName)
@@ -834,7 +836,7 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 	if err != nil {
 		term.Debugf("Failed to get project bucket object from bucket %q at path %q with service account %q: %v", bucketName, path, uploadSA, err)
 		if errors.Is(err, gcp.ErrObjectNotExist) {
-			return nil, nil // no services yet
+			return nil, client.ErrNotExist // no services yet
 		}
 		return nil, err
 	}

@@ -58,6 +58,7 @@ func makeComposeUpCmd() *cobra.Command {
 			var force, _ = cmd.Flags().GetBool("force")
 			var detach, _ = cmd.Flags().GetBool("detach")
 			var waitTimeout, _ = cmd.Flags().GetInt("wait-timeout")
+			var allowUpgrade, _ = cmd.Flags().GetBool("allow-upgrade")
 
 			upload := compose.UploadModeDefault
 			if force {
@@ -82,7 +83,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			// Check if the user has permission to use the provider
-			err = canIUseProvider(ctx, session.Provider, project.Name, len(project.Services))
+			err = canIUseProvider(ctx, session.Provider, project.Name, len(project.Services), allowUpgrade)
 			if err != nil {
 				return err
 			}
@@ -208,6 +209,7 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().Bool("wait", true, "wait for services to be running|healthy") // docker-compose compatibility
 	_ = composeUpCmd.Flags().MarkHidden("wait")
 	composeUpCmd.Flags().Int("wait-timeout", -1, "maximum duration to wait for the project to be running|healthy") // docker-compose compatibility
+	composeUpCmd.Flags().Bool("allow-upgrade", pkg.GetenvBool("DEFANG_ALLOW_UPGRADE"), "allow upgrading the CD image and Pulumi version to the latest available")
 	return composeUpCmd
 }
 
@@ -411,6 +413,7 @@ func makeComposeDownCmd() *cobra.Command {
 		Short:       "Reads a Compose file and deprovisions its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var detach, _ = cmd.Flags().GetBool("detach")
+			var allowUpgrade, _ = cmd.Flags().GetBool("allow-upgrade")
 
 			session, err := newCommandSession(cmd)
 			if err != nil {
@@ -422,7 +425,7 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 
-			err = canIUseProvider(cmd.Context(), session.Provider, projectName, 0)
+			err = canIUseProvider(cmd.Context(), session.Provider, projectName, 0, allowUpgrade)
 			if err != nil {
 				return err
 			}
@@ -478,6 +481,7 @@ func makeComposeDownCmd() *cobra.Command {
 	composeDownCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	composeDownCmd.Flags().Bool("tail", false, "tail the service logs after deleting") // no-op, but keep for backwards compatibility
 	_ = composeDownCmd.Flags().MarkHidden("tail")
+	composeDownCmd.Flags().Bool("allow-upgrade", pkg.GetenvBool("DEFANG_ALLOW_UPGRADE"), "allow upgrading the CD image and Pulumi version to the latest available")
 	return composeDownCmd
 }
 

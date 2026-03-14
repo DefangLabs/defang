@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"io/fs"
 
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -43,6 +44,9 @@ type Property struct {
 	Name  string
 	Value any
 }
+
+// ErrNotExist is returned by GetProjectUpdate when the project has not been deployed yet.
+var ErrNotExist = fs.ErrNotExist
 
 type ErrNotImplemented string
 

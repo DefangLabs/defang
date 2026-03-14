@@ -75,7 +75,13 @@ func (m *mockDeployProvider) QueryLogs(ctx context.Context, req *defangv1.TailRe
 }
 
 func (m *mockDeployProvider) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
-	return m.prevProjectUpdate, ctx.Err()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if m.prevProjectUpdate == nil {
+		return nil, client.ErrNotExist
+	}
+	return m.prevProjectUpdate, nil
 }
 
 func (m *mockDeployProvider) GetDeploymentStatus(ctx context.Context) (bool, error) {

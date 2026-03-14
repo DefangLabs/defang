@@ -20,7 +20,7 @@
       "AWS_PROFILE": "defang-sandbox"
     },
     "go.buildTags": "integration",
-    "go.testFlags": ["-short", "-race"],
+    "go.testFlags": ["-short", "-race", "-v"],
     "go.testTimeout": "300s",
     "makefile.configureOnOpen": false
   }
