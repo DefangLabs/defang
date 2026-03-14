@@ -691,7 +691,7 @@ func TestQueryCdLogs(t *testing.T) {
 				events: makeMockEvents(tt.numEvents, "crun", ""),
 			}
 
-			batchSeq, err := b.queryOrTailLogsByTaskID(t.Context(), mock, tt.req, tt.req.Etag)
+			batchSeq, err := b.queryOrTailLogsByBuildID(t.Context(), mock, tt.req, awscodebuild.BuildID(&tt.req.Etag))
 			require.NoError(t, err)
 
 			// Flatten and collect
@@ -714,14 +714,14 @@ func TestDeriveTaskID(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		cdTaskArn  awscodebuild.BuildID
+		cdBuildId  awscodebuild.BuildID
 		cdEtag     string
 		reqEtag    string
 		wantTaskID string
 	}{
 		{
 			name:       "matching cd etag returns build ID",
-			cdTaskArn:  ptr.String("defang:abc123def456"),
+			cdBuildId:  ptr.String("defang:abc123def456"),
 			cdEtag:     validEtag,
 			reqEtag:    validEtag,
 			wantTaskID: "defang:abc123def456",
@@ -744,7 +744,7 @@ func TestDeriveTaskID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := newTestByocAws()
-			b.cdTaskArn = tt.cdTaskArn
+			b.cdBuildId = tt.cdBuildId
 			b.cdEtag = tt.cdEtag
 
 			got := b.deriveTaskID(tt.reqEtag)

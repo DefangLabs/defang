@@ -45,8 +45,7 @@ func (a *AwsCodeBuild) Run(ctx context.Context, image string, env map[string]str
 		return nil, err
 	}
 
-	buildID := *output.Build.Id
-	return &buildID, nil
+	return output.Build.Id, nil
 }
 
 func (a *AwsCodeBuild) Stop(ctx context.Context, buildID BuildID) error {

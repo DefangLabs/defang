@@ -2,7 +2,6 @@ package codebuild
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"time"
 
@@ -12,11 +11,11 @@ import (
 )
 
 // GetBuildStatus returns (done, error). Returns io.EOF on success, an error on failure, nil if still running.
-func GetBuildStatus(ctx context.Context, cfg aws.Config, buildID string) (bool, error) {
+func GetBuildStatus(ctx context.Context, cfg aws.Config, buildID BuildID) (bool, error) {
 	client := cb.NewFromConfig(cfg)
 
 	output, err := client.BatchGetBuilds(ctx, &cb.BatchGetBuildsInput{
-		Ids: []string{buildID},
+		Ids: []string{*buildID},
 	})
 	if err != nil {
 		return false, err
@@ -50,7 +49,7 @@ func GetBuildStatus(ctx context.Context, cfg aws.Config, buildID string) (bool, 
 }
 
 // WaitForBuild polls the CodeBuild build status. Returns io.EOF on success, or an error on failure.
-func WaitForBuild(ctx context.Context, cfg aws.Config, buildID string, poll time.Duration) error {
+func WaitForBuild(ctx context.Context, cfg aws.Config, buildID BuildID, poll time.Duration) error {
 	ticker := time.NewTicker(poll)
 	defer ticker.Stop()
 	for {
@@ -70,5 +69,5 @@ type BuildFailure struct {
 }
 
 func (f BuildFailure) Error() string {
-	return fmt.Sprintf("CodeBuild: %s", f.Reason)
+	return "CodeBuild: " + f.Reason
 }

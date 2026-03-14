@@ -14,8 +14,8 @@ import (
 
 const AwsLogsStreamPrefix = CrunProjectName
 
-func (a *AwsCodeBuild) QueryBuildID(ctx context.Context, cwClient cw.FilterLogEventsAPIClient, buildID string, start, end time.Time, limit int32) (iter.Seq2[[]cw.LogEvent, error], error) {
-	if buildID == "" {
+func (a *AwsCodeBuild) QueryBuildID(ctx context.Context, cwClient cw.FilterLogEventsAPIClient, buildID BuildID, start, end time.Time, limit int32) (iter.Seq2[[]cw.LogEvent, error], error) {
+	if buildID == nil {
 		return nil, errors.New("buildID is empty")
 	}
 
@@ -27,8 +27,8 @@ func (a *AwsCodeBuild) QueryBuildID(ctx context.Context, cwClient cw.FilterLogEv
 	return logSeq, nil
 }
 
-func (a *AwsCodeBuild) TailBuildID(ctx context.Context, cwClient cw.StartLiveTailAPI, buildID string) (iter.Seq2[[]cw.LogEvent, error], error) {
-	if buildID == "" {
+func (a *AwsCodeBuild) TailBuildID(ctx context.Context, cwClient cw.StartLiveTailAPI, buildID BuildID) (iter.Seq2[[]cw.LogEvent, error], error) {
+	if buildID == nil {
 		return nil, errors.New("buildID is required")
 	}
 	if a.LogGroupARN == "" {
@@ -65,17 +65,9 @@ func (a *AwsCodeBuild) TailBuildID(ctx context.Context, cwClient cw.StartLiveTai
 
 // GetCDLogStreamForBuildID returns the CloudWatch log stream name for a CodeBuild build.
 // CodeBuild log streams use the build UUID (the part after the colon in the build ID).
-func GetCDLogStreamForBuildID(buildID string) string {
-	if _, after, ok := strings.Cut(buildID, ":"); ok {
+func GetCDLogStreamForBuildID(buildID BuildID) string {
+	if _, after, ok := strings.Cut(*buildID, ":"); ok {
 		return after
 	}
-	return buildID
-}
-
-// GetBuildID extracts the build ID string from a TaskArn.
-func GetBuildID(taskArn BuildID) string {
-	if taskArn == nil {
-		return ""
-	}
-	return *taskArn
+	return *buildID
 }

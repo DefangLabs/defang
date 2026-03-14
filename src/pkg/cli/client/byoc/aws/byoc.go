@@ -56,7 +56,7 @@ type ByocAws struct {
 
 	cdEtag    types.ETag
 	cdStart   time.Time
-	cdTaskArn awscodebuild.BuildID // for GetDeploymentStatus
+	cdBuildId awscodebuild.BuildID // for GetDeploymentStatus
 
 	needDockerHubCreds bool
 }
@@ -170,8 +170,7 @@ func (b *ByocAws) GetDeploymentStatus(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	buildID := awscodebuild.GetBuildID(b.cdTaskArn)
-	done, err := awscodebuild.GetBuildStatus(ctx, cfg, buildID)
+	done, err := awscodebuild.GetBuildStatus(ctx, cfg, b.cdBuildId)
 	if err != nil {
 		if buildErr := new(awscodebuild.BuildFailure); errors.As(err, buildErr) {
 			return done, client.ErrDeploymentFailed{Message: buildErr.Error()}
@@ -275,13 +274,13 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		}
 	}
 
-	cdTaskArn, err := b.runCdCommand(ctx, cdCmd)
+	cdBuildId, err := b.runCdCommand(ctx, cdCmd)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
 	b.cdEtag = etag
 	b.cdStart = time.Now()
-	b.cdTaskArn = cdTaskArn
+	b.cdBuildId = cdBuildId
 
 	for _, si := range serviceInfos {
 		if si.UseAcmeCert {
@@ -732,8 +731,8 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 	//  * Valid Etag, no services: 	tail all tasks/services with that Etag
 	//  * Valid Etag, service:		tail that task/service
 	var logSeq iter.Seq2[cw.LogEvent, error]
-	if taskID := b.deriveTaskID(req.Etag); taskID != "" && logs.LogType(req.LogType) == logs.LogTypeCD {
-		cdSeq, err := b.queryOrTailLogsByTaskID(ctx, cwClient, req, taskID)
+	if buildID := b.deriveTaskID(req.Etag); buildID != nil && logs.LogType(req.LogType) == logs.LogTypeCD {
+		cdSeq, err := b.queryOrTailLogsByBuildID(ctx, cwClient, req, buildID)
 		if err != nil {
 			return nil, AnnotateAwsError(err)
 		}
@@ -771,25 +770,25 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 	}, nil
 }
 
-func (b *ByocAws) queryOrTailLogsByTaskID(ctx context.Context, cwClient cw.LogsClient, req *defangv1.TailRequest, taskID string) (iter.Seq2[[]cw.LogEvent, error], error) {
+func (b *ByocAws) queryOrTailLogsByBuildID(ctx context.Context, cwClient cw.LogsClient, req *defangv1.TailRequest, buildID awscodebuild.BuildID) (iter.Seq2[[]cw.LogEvent, error], error) {
 	if req.Follow {
-		return b.driver.TailBuildID(ctx, cwClient, taskID)
+		return b.driver.TailBuildID(ctx, cwClient, buildID)
 	} else {
 		start := timeutils.AsTime(req.Since, time.Time{})
 		end := timeutils.AsTime(req.Until, time.Time{})
-		return b.driver.QueryBuildID(ctx, cwClient, taskID, start, end, req.Limit)
+		return b.driver.QueryBuildID(ctx, cwClient, buildID, start, end, req.Limit)
 	}
 }
 
-// deriveTaskID returns the CD task ID if the etag refers to a CD task, or empty string otherwise.
-func (b *ByocAws) deriveTaskID(reqEtag string) string {
-	if b.cdTaskArn != nil && b.cdEtag == reqEtag {
-		return awscodebuild.GetBuildID(b.cdTaskArn)
+// deriveTaskID returns the CD buildID if the etag refers to a CD task, or empty string otherwise.
+func (b *ByocAws) deriveTaskID(reqEtag string) awscodebuild.BuildID {
+	if b.cdBuildId != nil && b.cdEtag == reqEtag {
+		return b.cdBuildId
 	}
 	if _, err := types.ParseEtag(reqEtag); err != nil {
-		return reqEtag // legacy: assume invalid etag is a task ID
+		return awscodebuild.BuildID(&reqEtag) // legacy: assume invalid etag is a task ID
 	}
-	return ""
+	return nil
 }
 
 func (b *ByocAws) queryOrTailLogs(ctx context.Context, cwClient cw.LogsClient, req *defangv1.TailRequest) (iter.Seq2[cw.LogEvent, error], error) {
@@ -865,8 +864,8 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 		} else {
 			cdTail := cw.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern}
 			// If we know the CD task ARN, only tail the logstream for that CD task; FIXME: store the task ID in the project's ProjectUpdate in S3 and use that
-			if b.cdTaskArn != nil && (b.cdEtag == etag || awscodebuild.GetBuildID(b.cdTaskArn) == etag) {
-				cdTail.LogStreamNames = []string{awscodebuild.GetCDLogStreamForBuildID(awscodebuild.GetBuildID(b.cdTaskArn))}
+			if b.cdBuildId != nil && (b.cdEtag == etag || *b.cdBuildId == etag) {
+				cdTail.LogStreamNames = []string{awscodebuild.GetCDLogStreamForBuildID(b.cdBuildId)}
 			}
 			groups = append(groups, cdTail)
 			term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames, filter)
@@ -929,13 +928,13 @@ func (b *ByocAws) CdCommand(ctx context.Context, req client.CdCommandRequest) (s
 		statesUrl: req.StatesUrl,
 		eventsUrl: req.EventsUrl,
 	}
-	cdTaskArn, err := b.runCdCommand(ctx, cmd)
+	cdBuildId, err := b.runCdCommand(ctx, cmd)
 	if err != nil {
 		return "", AnnotateAwsError(err)
 	}
 	b.cdEtag = etag
 	b.cdStart = time.Now()
-	b.cdTaskArn = cdTaskArn
+	b.cdBuildId = cdBuildId
 	return etag, nil
 }
 

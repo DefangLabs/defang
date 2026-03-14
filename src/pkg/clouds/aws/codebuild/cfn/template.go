@@ -185,7 +185,7 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 	// 1. S3 bucket (for deployment state)
 	const _bucket = "Bucket"
 	template.Resources[_bucket] = &s3.Bucket{
-		Tags:                        defaultTags,
+		Tags:                            defaultTags,
 		AWSCloudFormationDeletionPolicy: policies.DeletionPolicy(cloudformation.If(_condRetainS3Bucket, "RetainExceptOnCreate", "Delete")),
 		VersioningConfiguration: &s3.Bucket_VersioningConfiguration{
 			Status: "Enabled",

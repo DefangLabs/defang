@@ -3,7 +3,6 @@ package codebuild
 import (
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 )
 
@@ -13,7 +12,7 @@ const (
 	CrunProjectName   = "defang"
 )
 
-type BuildID = clouds.TaskID
+type BuildID *string
 
 type AwsCodeBuild struct {
 	aws.Aws

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -177,21 +176,6 @@ func (a *AwsCfn) SetUp(ctx context.Context, force bool) (bool, error) {
 			ParameterValue: ptr.String(strconv.FormatBool(!pkg.GetenvBool("DEFANG_NO_CACHE"))),
 		},
 	}
-
-	// Add Docker Hub credentials if available from environment
-	if dockerHubUsername := os.Getenv("DOCKERHUB_USERNAME"); dockerHubUsername != "" {
-		parameters = append(parameters, cfnTypes.Parameter{
-			ParameterKey:   ptr.String(ParamsDockerHubUsername),
-			ParameterValue: ptr.String(dockerHubUsername),
-		})
-	}
-	if dockerHubToken := pkg.Getenv("DOCKERHUB_TOKEN", os.Getenv("DOCKERHUB_ACCESS_TOKEN")); dockerHubToken != "" {
-		parameters = append(parameters, cfnTypes.Parameter{
-			ParameterKey:   ptr.String(ParamsDockerHubAccessToken),
-			ParameterValue: ptr.String(dockerHubToken),
-		})
-	}
-	// TODO: support DOCKER_AUTH_CONFIG
 
 	return a.upsertStackAndWait(ctx, templateBody, force, parameters...)
 }
