@@ -4,7 +4,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/stretchr/testify/assert"
 	"go.yaml.in/yaml/v4"
 )
@@ -34,34 +33,18 @@ func TestGetCacheRepoPrefix(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
-			if got := getCacheRepoPrefix(tt.prefix, tt.suffix); got != tt.want {
-				t.Errorf("getCacheRepoPrefix() = %q, want %q", got, tt.want)
+			if got := GetCacheRepoPrefix(tt.prefix, tt.suffix); got != tt.want {
+				t.Errorf("GetCacheRepoPrefix() = %q, want %q", got, tt.want)
 			} else if len(got) > maxCachePrefixLength {
-				t.Errorf("getCacheRepoPrefix() = %q, want length <= %v", got, maxCachePrefixLength)
+				t.Errorf("GetCacheRepoPrefix() = %q, want length <= %v", got, maxCachePrefixLength)
 			}
 		})
 	}
 }
 
-var testContainers = []clouds.Container{
-	{
-		Image: "alpine:latest",
-	},
-	{
-		Image: "docker.io/library/alpine:latest",
-		Name:  "main2",
-	},
-	{
-		Name:     "main3",
-		Image:    "public.ecr.aws/docker/library/alpine:latest",
-		Memory:   512_000_000,
-		Platform: "linux/amd64",
-	},
-}
-
 func createTestTemplate(t *testing.T) []byte {
 	t.Helper()
-	template, err := CreateTemplate("test", testContainers)
+	template, err := CreateTemplate("test")
 	if err != nil {
 		t.Fatalf("Error creating template: %v", err)
 	}

@@ -16,9 +16,9 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	awscodebuild "github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild/cfn"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -454,7 +454,7 @@ func newTestByocAws() *ByocAws {
 	}
 	b.driver.AccountID = "123456789012"
 	b.driver.LogGroupARN = "arn:aws:logs:us-test-2:123456789012:log-group:defang-cd-LogGroup:*"
-	b.driver.ClusterName = "test-cluster"
+	b.driver.ProjectName = "test-project"
 	b.ByocBaseClient = byoc.NewByocBaseClient("tenant1", b, "beta")
 	return b
 }
@@ -714,17 +714,17 @@ func TestDeriveTaskID(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		cdTaskArn  ecs.TaskArn
+		cdTaskArn  awscodebuild.BuildID
 		cdEtag     string
 		reqEtag    string
 		wantTaskID string
 	}{
 		{
-			name:       "matching cd etag returns task ID from ARN",
-			cdTaskArn:  ptr.String("arn:aws:ecs:us-west-2:123456789012:task/cluster/abc123def456"),
+			name:       "matching cd etag returns build ID",
+			cdTaskArn:  ptr.String("defang:abc123def456"),
 			cdEtag:     validEtag,
 			reqEtag:    validEtag,
-			wantTaskID: "abc123def456",
+			wantTaskID: "defang:abc123def456",
 		},
 		{
 			name:       "invalid etag treated as legacy task ID",
