@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
@@ -25,13 +26,14 @@ func TestGetExistingToken(t *testing.T) {
 		}
 	})
 
-	t.Run("Get access token from file", func(t *testing.T) {
+	t.Run("Get access token from token store", func(t *testing.T) {
 		expectedToken := "file-token"
-		tokenFile := client.GetTokenFile(fabric)
-		os.WriteFile(tokenFile, []byte(expectedToken), 0600)
+		originalTokenStore := client.TokenStore
+		client.TokenStore = &tokenstore.LocalDirTokenStore{Dir: t.TempDir()}
+		client.TokenStore.Save(client.TokenStorageName(fabric), expectedToken)
 
 		t.Cleanup(func() {
-			os.Remove(tokenFile)
+			client.TokenStore = originalTokenStore
 		})
 
 		accessToken := client.GetExistingToken(fabric)
@@ -57,13 +59,14 @@ func TestInteractiveLogin(t *testing.T) {
 	// use a temp dir for the token file
 	prevStateDir := client.StateDir
 	client.StateDir = filepath.Join(t.TempDir(), "defang")
+	originalTokenStore := client.TokenStore
+	client.TokenStore = &tokenstore.LocalDirTokenStore{Dir: t.TempDir()}
 
 	t.Cleanup(func() {
 		authService = prevGithubAuthService
 		client.StateDir = prevStateDir
+		client.TokenStore = originalTokenStore
 	})
-
-	tokenFile := client.GetTokenFile(fabric)
 
 	t.Run("Expect accessToken to be stored when InteractiveLogin() succeeds", func(t *testing.T) {
 		authService = mockGitHubAuthService{accessToken: accessToken}
@@ -72,12 +75,12 @@ func TestInteractiveLogin(t *testing.T) {
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
-		savedToken, err := os.ReadFile(tokenFile)
+		savedToken, err := client.TokenStore.Load(client.TokenStorageName(fabric))
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
-		if string(savedToken) != accessToken {
-			t.Errorf("expected %s, got: %s", accessToken, string(savedToken))
+		if savedToken != accessToken {
+			t.Errorf("expected %s, got: %s", accessToken, savedToken)
 		}
 	})
 
@@ -114,16 +117,20 @@ func TestNonInteractiveLogin(t *testing.T) {
 		// use a prevStateDir dir for the token file
 		prevStateDir := client.StateDir
 		client.StateDir = filepath.Join(t.TempDir(), "defang")
+		originalTokenStore := client.TokenStore
+		client.TokenStore = &tokenstore.LocalDirTokenStore{Dir: t.TempDir()}
 
-		t.Cleanup(func() { client.StateDir = prevStateDir })
+		t.Cleanup(func() {
+			client.StateDir = prevStateDir
+			client.TokenStore = originalTokenStore
+		})
 
 		err := NonInteractiveGitHubLogin(ctx, mockClient, fabric)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
 
-		tokenFile := client.GetTokenFile(fabric)
-		savedToken, err := os.ReadFile(tokenFile)
+		savedToken, err := client.TokenStore.Load(client.TokenStorageName(fabric))
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}

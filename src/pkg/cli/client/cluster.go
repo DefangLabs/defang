@@ -1,7 +1,6 @@
 package client
 
 import (
-	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -9,11 +8,13 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 )
 
 const DefaultFabricAddr = "fabric-prod1.defang.dev"
 
 var DefangFabric = pkg.Getenv("DEFANG_FABRIC", DefaultFabricAddr)
+var TokenStore tokenstore.TokenStore = &tokenstore.LocalDirTokenStore{Dir: StateDir}
 
 func NormalizeHost(fabricAddr string) string {
 	if fabricAddr == "" {
@@ -25,7 +26,7 @@ func NormalizeHost(fabricAddr string) string {
 	return fabricAddr
 }
 
-func tokenStorageName(fabricAddr string) string {
+func TokenStorageName(fabricAddr string) string {
 	// Token files are keyed by normalized host (no tenant prefix, no port) to avoid duplication.
 	if at := strings.LastIndex(fabricAddr, "@"); at >= 0 && at < len(fabricAddr)-1 {
 		fabricAddr = fabricAddr[at+1:] // drop legacy tenant prefix
@@ -37,21 +38,17 @@ func tokenStorageName(fabricAddr string) string {
 	return host
 }
 
-func GetTokenFile(fabricAddr string) string {
-	return filepath.Join(StateDir, tokenStorageName(fabricAddr))
-}
-
 func GetExistingToken(fabricAddr string) string {
 	var accessToken = os.Getenv("DEFANG_ACCESS_TOKEN")
 
 	if accessToken != "" {
 		term.Debug("Using access token from env DEFANG_ACCESS_TOKEN")
 	} else {
-		tokenFile := GetTokenFile(fabricAddr)
-
-		term.Debug("Reading access token from file", tokenFile)
-		all, _ := os.ReadFile(tokenFile)
-		accessToken = string(all) // might be empty
+		var err error
+		accessToken, err = TokenStore.Load(TokenStorageName(fabricAddr))
+		if err != nil {
+			term.Debugf("failed to load access token for %v: %v", fabricAddr, err)
+		}
 
 		// Check if we wrote an IDToken file during login, if AWS_WEB_IDENTITY_TOKEN_FILE is empty,
 		if os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") == "" {
@@ -68,17 +65,11 @@ func GetExistingToken(fabricAddr string) string {
 }
 
 func GetWebIdentityTokenFile(fabricAddr string) (string, error) {
-	jwtPath := GetTokenFile(fabricAddr) + ".jwt" // TODO: store in TMPDIR instead?
+	jwtPath := filepath.Join(StateDir, TokenStorageName(fabricAddr)) + ".jwt" // TODO: store in TMPDIR instead?
 	_, err := os.Stat(jwtPath)
 	return jwtPath, err
 }
 
 func SaveAccessToken(fabricAddr, token string) error {
-	tokenFile := GetTokenFile(fabricAddr)
-	term.Debug("Saving access token to", tokenFile)
-	os.MkdirAll(StateDir, 0700)
-	if err := os.WriteFile(tokenFile, []byte(token), 0600); err != nil {
-		return fmt.Errorf("failed to save access token: %w", err)
-	}
-	return nil
+	return TokenStore.Save(TokenStorageName(fabricAddr), token)
 }

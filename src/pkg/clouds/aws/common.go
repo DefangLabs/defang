@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/processcreds"
@@ -16,8 +17,10 @@ import (
 type Region = r53types.VPCRegion
 
 type Aws struct {
-	AccountID string
-	Region    Region
+	AccountID   string
+	Region      Region
+	TokenStore  tokenstore.TokenStore
+	Credentials aws.CredentialsProvider
 }
 
 // func (r Region) String() string {
@@ -25,7 +28,7 @@ type Aws struct {
 // }
 
 func (a *Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
-	cfg, err := LoadDefaultConfig(ctx, a.Region)
+	cfg, err := LoadDefaultConfig(ctx, config.WithRegion(string(a.Region)))
 	if err != nil {
 		return cfg, err
 	}
@@ -33,6 +36,10 @@ func (a *Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
 		return cfg, errors.New("missing AWS region: set AWS_REGION or edit your AWS profile at ~/.aws/config")
 	}
 	a.Region = Region(cfg.Region)
+	// Use OAuth credentials from Login() if available, taking priority over the default chain
+	if a.Credentials != nil {
+		cfg.Credentials = a.Credentials
+	}
 	// Get caller identity to determine account ID
 	if output, err := NewStsFromConfig(cfg).GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{}); err == nil {
 		a.AccountID = *output.Account
@@ -40,8 +47,8 @@ func (a *Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
 	return cfg, err
 }
 
-func LoadDefaultConfig(ctx context.Context, region Region) (aws.Config, error) {
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(string(region)))
+func LoadDefaultConfig(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
+	cfg, err := config.LoadDefaultConfig(ctx, optFns...)
 	if err != nil {
 		return cfg, err
 	}
@@ -55,7 +62,6 @@ func LoadDefaultConfig(ctx context.Context, region Region) (aws.Config, error) {
 			},
 		),
 	)
-
 	cfg.Credentials = newChainProvider(
 		cliProvider,
 		cfg.Credentials,

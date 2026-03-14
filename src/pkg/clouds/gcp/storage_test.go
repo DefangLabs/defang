@@ -50,7 +50,12 @@ func TestGetCloudStorageClientWithServiceAccount(t *testing.T) {
 		return nil, nil
 	}
 
-	if client, err := getCloudStorageClientWithServiceAccount(t.Context(), "fake-service-account"); err != nil {
+	gcp := Gcp{
+		ProjectId: "fake-project-id",
+		Region:    "fake-region",
+	}
+
+	if client, err := gcp.getCloudStorageClientWithServiceAccount(t.Context(), "fake-service-account"); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else if client != mockClient {
 		t.Errorf("expected client to be %v but got %v", mockClient, client)

@@ -10,6 +10,7 @@ import (
 	"io"
 	"iter"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -31,6 +32,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
+	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -131,7 +133,13 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
+
+	b.driver.TokenStore = &tokenstore.LocalDirTokenStore{Dir: filepath.Join(client.StateDir, "providers", "aws")}
 	return b
+}
+
+func (b *ByocAws) Authenticate(ctx context.Context, interactive bool) error {
+	return b.driver.Authenticate(ctx, interactive)
 }
 
 func (b *ByocAws) makeContainers() []clouds.Container {
@@ -175,7 +183,7 @@ func (b *ByocAws) SetUpCD(ctx context.Context) error {
 }
 
 func (b *ByocAws) GetDeploymentStatus(ctx context.Context) (bool, error) {
-	done, err := ecs.GetTaskStatus(ctx, b.cdTaskArn)
+	done, err := b.driver.GetTaskStatus(ctx, b.cdTaskArn)
 	if err != nil {
 		// check if the task failed; if so, return the a ErrDeploymentFailed error
 		if taskErr := new(ecs.TaskFailure); errors.As(err, taskErr) {
@@ -693,11 +701,11 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 		term.Warnf("Unable to show CD logs: %v", err) // TODO: could skip this warning if the user wasn't asking for CD logs
 	}
 
-	var err error
-	cwClient, err := cw.NewCloudWatchLogsClient(ctx, b.driver.Region) // assume all log groups are in the same region
+	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
+	cwClient := cw.NewCloudWatchLogsClient(cfg) // assume all log groups are in the same region
 
 	parser := &logEventParser{
 		etag:     req.Etag,
@@ -940,11 +948,12 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 
 func (b *ByocAws) CdList(ctx context.Context, allRegions bool) (iter.Seq[state.Info], error) {
 	if allRegions {
-		s3Client, err := newS3Client(ctx, b.driver.Region)
+		cfg, err := b.driver.LoadConfig(ctx)
 		if err != nil {
 			return nil, AnnotateAwsError(err)
 		}
-		return listPulumiStacksAllRegions(ctx, s3Client)
+		s3Client := s3.NewFromConfig(cfg)
+		return b.listPulumiStacksAllRegions(ctx, s3Client)
 	} else {
 		bucketName := b.bucketName()
 		if bucketName == "" {
@@ -953,7 +962,7 @@ func (b *ByocAws) CdList(ctx context.Context, allRegions bool) (iter.Seq[state.I
 			}
 			bucketName = b.bucketName()
 		}
-		return listPulumiStacksInBucket(ctx, b.driver.Region, bucketName)
+		return b.listPulumiStacksInBucket(ctx, b.driver.Region, bucketName)
 	}
 }
 
@@ -962,10 +971,11 @@ func (b *ByocAws) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 		term.Warnf("Unable to get log group ARNs: %v", err)
 	}
 
-	cwClient, err := cw.NewCloudWatchLogsClient(ctx, b.driver.Region)
+	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
+	cwClient := cw.NewCloudWatchLogsClient(cfg)
 
 	lgis := b.getSubscribeLogGroupInputs(req.Project)
 	logSeq, err := cw.QueryAndTailLogGroups(ctx, cwClient, b.cdStart, time.Time{}, lgis...)

@@ -13,7 +13,7 @@ import (
 )
 
 func (gcp Gcp) NewTailer(ctx context.Context) (Tailer, error) {
-	client, err := logging.NewClient(ctx)
+	client, err := logging.NewClient(ctx, gcp.Options...)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ const (
 )
 
 func (gcp Gcp) ListLogEntries(ctx context.Context, query string, order Order) (Lister, error) {
-	client, err := logging.NewClient(ctx)
+	client, err := logging.NewClient(ctx, gcp.Options...)
 	if err != nil {
 		return nil, err
 	}

@@ -9,6 +9,7 @@ import (
 	"iter"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"go.yaml.in/yaml/v4"
@@ -106,6 +108,7 @@ type gcpDriver interface {
 	GetRegion() string
 	GetServiceAccountEmail(name string) string
 	IterateBucketObjects(ctx context.Context, bucketName, prefix string) (iter.Seq2[*storage.ObjectAttrs, error], error)
+	Authenticate(ctx context.Context, interactive bool) error
 	ListSecrets(ctx context.Context, prefix string) ([]string, error)
 	RunCloudBuild(ctx context.Context, args gcp.CloudBuildArgs) (string, error)
 	SignBytes(ctx context.Context, b []byte, name string) ([]byte, error)
@@ -127,16 +130,31 @@ type ByocGcp struct {
 }
 
 func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string) *ByocGcp {
+	region := getGcpRegion()
+	projectId := getGcpProjectID()
+
+	b := &ByocGcp{driver: &gcp.Gcp{
+		Region:     region,
+		ProjectId:  projectId,
+		TokenStore: &tokenstore.LocalDirTokenStore{Dir: filepath.Join(client.StateDir, "providers", "gcp")},
+	}}
+	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
+
+	return b
+}
+
+func (b *ByocGcp) Authenticate(ctx context.Context, interactive bool) error {
+	return b.driver.Authenticate(ctx, interactive)
+}
+
+func getGcpRegion() string {
 	// Try standard GCP environment variables in order of precedence
 	// Keeping GCP_LOCATION first for backward compatibility
 	_, region := pkg.GetFirstEnv(pkg.GCPRegionEnvVars...)
 	if region == "" {
 		region = client.RegionDefaultGCP
 	}
-	projectId := getGcpProjectID()
-	b := &ByocGcp{driver: &gcp.Gcp{Region: region, ProjectId: projectId}}
-	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
-	return b
+	return region
 }
 
 func getGcpProjectID() string {
@@ -436,7 +454,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) error {
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		debugEnv := []string{"REGION=" + b.driver.GetRegion()}
-		if gcpProject := os.Getenv("GCP_PROJECT_ID"); gcpProject != "" {
+		if gcpProject := getGcpProjectID(); gcpProject != "" {
 			debugEnv = append(debugEnv, "GCP_PROJECT_ID="+gcpProject)
 		}
 		for k, v := range env {

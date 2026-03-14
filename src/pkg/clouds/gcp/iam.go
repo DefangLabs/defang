@@ -3,7 +3,6 @@ package gcp
 import (
 	"context"
 	"fmt"
-	"log"
 	"slices"
 	"time"
 
@@ -20,7 +19,7 @@ import (
 )
 
 func (gcp Gcp) EnsureRoleExists(ctx context.Context, roleId, title, description string, permissions []string) (string, error) {
-	client, err := iamadm.NewIamClient(ctx)
+	client, err := iamadm.NewIamClient(ctx, gcp.Options...)
 	if err != nil {
 		return "", fmt.Errorf("unable to ensure role exists, failed to create Iam client: %w", err)
 	}
@@ -90,7 +89,7 @@ func (gcp Gcp) EnsureRoleExists(ctx context.Context, roleId, title, description 
 }
 
 func (gcp Gcp) EnsureServiceAccountExists(ctx context.Context, serviceAccountId, displayName, description string) (string, error) {
-	client, err := iamadm.NewIamClient(ctx)
+	client, err := iamadm.NewIamClient(ctx, gcp.Options...)
 	if err != nil {
 		return "", fmt.Errorf("unable to ensure Service Account exists, failed to create Iam Client: %w", err)
 	}
@@ -154,7 +153,7 @@ func (gcp Gcp) EnsureServiceAccountExists(ctx context.Context, serviceAccountId,
 }
 
 func (gcp Gcp) EnsurePrincipalHasRoles(ctx context.Context, serviceAccount string, roles []string) error {
-	client, err := resourcemanager.NewProjectsClient(ctx)
+	client, err := resourcemanager.NewProjectsClient(ctx, gcp.Options...)
 	if err != nil {
 		return fmt.Errorf("failed to create resource manager client: %w", err)
 	}
@@ -165,7 +164,7 @@ func (gcp Gcp) EnsurePrincipalHasRoles(ctx context.Context, serviceAccount strin
 }
 
 func (gcp Gcp) EnsurePrincipalHasBucketRoles(ctx context.Context, bucketName, principal string, roles []string) error {
-	client, err := storage.NewClient(ctx)
+	client, err := storage.NewClient(ctx, gcp.Options...)
 	if err != nil {
 		return fmt.Errorf("failed to create storage client: %w", err)
 	}
@@ -232,7 +231,7 @@ checkPolicy:
 }
 
 func (gcp Gcp) EnsureServiceAccountHasArtifactRegistryRoles(ctx context.Context, repo, serviceAccount string, roles []string) error {
-	client, err := artifactregistry.NewClient(ctx)
+	client, err := artifactregistry.NewClient(ctx, gcp.Options...)
 	if err != nil {
 		return fmt.Errorf("unable to ensure service account artifact registry role, failed to create artifact registry client: %w", err)
 	}
@@ -243,9 +242,9 @@ func (gcp Gcp) EnsureServiceAccountHasArtifactRegistryRoles(ctx context.Context,
 
 // TODO: Investigate if this can be merged with EnsureServiceAccountHasRoles
 func (gcp Gcp) EnsurePrincipalHasServiceAccountRoles(ctx context.Context, principal, serviceAccount string, roles []string) error {
-	client, err := iamadm.NewIamClient(ctx)
+	client, err := iamadm.NewIamClient(ctx, gcp.Options...)
 	if err != nil {
-		log.Fatalf("unable to ensure user service account role, failed to create artifact registry client: %v", err)
+		return fmt.Errorf("unable to ensure user service account role, failed to create iam client: %w", err)
 	}
 	defer client.Close()
 

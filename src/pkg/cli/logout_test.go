@@ -2,14 +2,15 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -40,32 +41,27 @@ func TestLogout(t *testing.T) {
 	tmpDir := t.TempDir()
 	originalStateDir := client.StateDir
 	client.StateDir = tmpDir
+	originalTokenStore := client.TokenStore
+	client.TokenStore = &tokenstore.LocalDirTokenStore{Dir: tmpDir}
 	t.Cleanup(func() {
 		client.StateDir = originalStateDir
+		client.TokenStore = originalTokenStore
 	})
 
-	// Create a mock token file
-	tokenFile := client.GetTokenFile(fabricAddr)
-	t.Logf("Token file path: %s", tokenFile)
-	err := os.MkdirAll(filepath.Dir(tokenFile), 0700)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = os.WriteFile(tokenFile, []byte("mock-token"), 0600)
-	if err != nil {
+	if err := client.TokenStore.Save(client.TokenStorageName(fabricAddr), "mock-token"); err != nil {
 		t.Fatal(err)
 	}
 
 	// Also create a JWT token file
-	jwtFile := tokenFile + ".jwt"
+	jwtFile, _ := client.GetWebIdentityTokenFile(fabricAddr)
 	t.Logf("JWT file path: %s", jwtFile)
-	err = os.WriteFile(jwtFile, []byte("mock-jwt-token"), 0600)
+	err := os.WriteFile(jwtFile, []byte("mock-jwt-token"), 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Verify files exist before logout
-	if _, err := os.Stat(tokenFile); os.IsNotExist(err) {
+	if _, err := client.TokenStore.Load(client.TokenStorageName(fabricAddr)); err != nil {
 		t.Fatal("Token file should exist before logout")
 	}
 	if _, err := os.Stat(jwtFile); os.IsNotExist(err) {
@@ -82,7 +78,7 @@ func TestLogout(t *testing.T) {
 	}
 
 	// Verify token file was removed
-	if _, err := os.Stat(tokenFile); !os.IsNotExist(err) {
+	if _, err := client.TokenStore.Load(client.TokenStorageName(fabricAddr)); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("Token file should be removed after logout, but got error: %v", err)
 	}
 
@@ -134,18 +130,14 @@ func TestLogoutWithUnauthenticatedError(t *testing.T) {
 	tmpDir := t.TempDir()
 	originalStateDir := client.StateDir
 	client.StateDir = tmpDir
+	originalTokenStore := client.TokenStore
+	client.TokenStore = &tokenstore.LocalDirTokenStore{Dir: tmpDir}
 	t.Cleanup(func() {
 		client.StateDir = originalStateDir
+		client.TokenStore = originalTokenStore
 	})
 
-	// Create a mock token file
-	tokenFile := client.GetTokenFile(fabricAddr)
-	err := os.MkdirAll(filepath.Dir(tokenFile), 0700)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = os.WriteFile(tokenFile, []byte("mock-token"), 0600)
-	if err != nil {
+	if err := client.TokenStore.Save(client.TokenStorageName(fabricAddr), "mock-token"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -153,13 +145,12 @@ func TestLogoutWithUnauthenticatedError(t *testing.T) {
 	grpcClient := client.NewGrpcClient(fabricAddr, "mock-token", "")
 
 	// Perform logout - should succeed even with unauthenticated error
-	err = Logout(ctx, grpcClient, fabricAddr)
-	if err != nil {
+	if err := Logout(ctx, grpcClient, fabricAddr); err != nil {
 		t.Fatal(err)
 	}
 
 	// Verify token file was still removed
-	if _, err := os.Stat(tokenFile); !os.IsNotExist(err) {
-		t.Error("Token file should be removed after logout even with unauthenticated error")
+	if _, err := client.TokenStore.Load(client.TokenStorageName(fabricAddr)); !errors.Is(err, os.ErrNotExist) {
+		t.Error("Token should be removed from token store after logout even with unauthenticated error")
 	}
 }

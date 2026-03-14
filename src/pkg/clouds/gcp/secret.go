@@ -11,7 +11,7 @@ import (
 )
 
 func (gcp Gcp) CreateSecret(ctx context.Context, secretID string) (string, error) {
-	client, err := secretmanager.NewClient(ctx)
+	client, err := secretmanager.NewClient(ctx, gcp.Options...)
 	if err != nil {
 		return "", fmt.Errorf("failed to create secretmanager client: %w", err)
 	}
@@ -37,7 +37,7 @@ func (gcp Gcp) CreateSecret(ctx context.Context, secretID string) (string, error
 }
 
 func (gcp Gcp) AddSecretVersion(ctx context.Context, secretName string, payload []byte) (string, error) {
-	client, err := secretmanager.NewClient(ctx)
+	client, err := secretmanager.NewClient(ctx, gcp.Options...)
 	if err != nil {
 		return "", fmt.Errorf("failed to create secretmanager client: %w", err)
 	}
@@ -59,7 +59,7 @@ func (gcp Gcp) AddSecretVersion(ctx context.Context, secretName string, payload 
 
 // CleanupOldVersions keeps only the two most recent enabled versions of a secret.
 func (gcp Gcp) CleanupOldVersionsExcept(ctx context.Context, secretName string, keep int) error {
-	client, err := secretmanager.NewClient(ctx)
+	client, err := secretmanager.NewClient(ctx, gcp.Options...)
 	if err != nil {
 		return fmt.Errorf("failed to create secretmanager client: %w", err)
 	}
@@ -93,7 +93,7 @@ func (gcp Gcp) CleanupOldVersionsExcept(ctx context.Context, secretName string, 
 }
 
 func (gcp Gcp) ListSecrets(ctx context.Context, prefix string) ([]string, error) {
-	client, err := secretmanager.NewClient(ctx)
+	client, err := secretmanager.NewClient(ctx, gcp.Options...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create secretmanager client: %w", err)
 	}
@@ -122,7 +122,7 @@ func (gcp Gcp) ListSecrets(ctx context.Context, prefix string) ([]string, error)
 }
 
 func (gcp Gcp) DeleteSecret(ctx context.Context, secretName string) error {
-	client, err := secretmanager.NewClient(ctx)
+	client, err := secretmanager.NewClient(ctx, gcp.Options...)
 	if err != nil {
 		return fmt.Errorf("failed to create secretmanager client: %w", err)
 	}

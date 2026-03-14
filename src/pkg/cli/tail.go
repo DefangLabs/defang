@@ -237,7 +237,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 
 	logSeq, err := provider.QueryLogs(ctx, tailRequest)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to query logs: %w", err)
 	}
 
 	ctx, cancel := context.WithCancel(ctx)

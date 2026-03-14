@@ -36,7 +36,7 @@ type PKCE struct {
 	Method
 }
 
-func GeneratePKCE(length int) (PKCE, error) {
+func GeneratePKCE(length int, method Method) (PKCE, error) {
 	if length < 43 || length > 128 {
 		return PKCE{}, errors.New(
 			"code verifier length must be between 43 and 128 characters",
@@ -46,7 +46,6 @@ func GeneratePKCE(length int) (PKCE, error) {
 	if err != nil {
 		return PKCE{}, err
 	}
-	const method = S256Method
 	challenge := generateChallenge(verifier, method)
 	return PKCE{
 		Verifier:  verifier,
