@@ -249,11 +249,10 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 		},
 	}
 
-	// 5. CodeBuild project
-	const _codeBuildProject = "CodeBuildProject"
+	// 5. CodeBuild project (CFN does not prefix CodeBuild project names with the stack name)
+	const _codeBuildProject = "DefangCD"
 	template.Resources[_codeBuildProject] = &codebuild.Project{
 		Tags: defaultTags,
-		Name: ptr.String(prefix + "project"),
 		Source: &codebuild.Project_Source{
 			Type:      "NO_SOURCE",
 			BuildSpec: ptr.String("version: 0.2\nphases:\n  build:\n    commands:\n      - echo 'buildspec should be overridden at StartBuild time'\n"),
@@ -261,8 +260,12 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 		Artifacts: &codebuild.Project_Artifacts{
 			Type: "NO_ARTIFACTS",
 		},
+		Cache: &codebuild.Project_ProjectCache{
+			Type:  "LOCAL",
+			Modes: []string{"LOCAL_DOCKER_LAYER_CACHE"},
+		},
 		Environment: &codebuild.Project_Environment{
-			ComputeType: "BUILD_GENERAL1_SMALL",
+			ComputeType: "BUILD_GENERAL1_MEDIUM",
 			Type:        "LINUX_CONTAINER",
 			Image:       "aws/codebuild/amazonlinux2-x86_64-standard:5.0", // placeholder; overridden at StartBuild time
 		},

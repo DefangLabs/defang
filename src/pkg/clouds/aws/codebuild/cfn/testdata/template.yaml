@@ -111,7 +111,7 @@ Outputs:
     codeBuildProjectName:
         Description: Name of the CodeBuild project
         Value:
-            Ref: CodeBuildProject
+            Ref: DefangCD
     dockerCachePrefix:
         Condition: EnableDockerPullThroughCache
         Description: ECR pull-through cache prefix for Docker Hub
@@ -266,44 +266,6 @@ Resources:
                   Value:
                     Ref: AWS::Region
         Type: AWS::IAM::Role
-    CodeBuildProject:
-        Properties:
-            Artifacts:
-                Type: NO_ARTIFACTS
-            Environment:
-                ComputeType: BUILD_GENERAL1_SMALL
-                Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
-                Type: LINUX_CONTAINER
-            LogsConfig:
-                CloudWatchLogs:
-                    GroupName:
-                        Ref: LogGroup
-                    Status: ENABLED
-            Name: test-cd
-            ServiceRole:
-                Ref: CodeBuildServiceRole
-            Source:
-                BuildSpec: |
-                    version: 0.2
-                    phases:
-                      build:
-                        commands:
-                          - echo 'buildspec should be overridden at StartBuild time'
-                Type: NO_SOURCE
-            Tags:
-                - Key: defang:CreatedBy
-                  Value: defang
-                - Key: defang:Prefix
-                  Value: test
-                - Key: defang:ManagedBy
-                  Value: CloudFormation
-                - Key: defang:CloudFormationStackName
-                  Value:
-                    Ref: AWS::StackName
-                - Key: defang:CloudFormationStackRegion
-                  Value:
-                    Ref: AWS::Region
-        Type: AWS::CodeBuild::Project
     CodeBuildServiceRole:
         Properties:
             AssumeRolePolicyDocument:
@@ -329,6 +291,47 @@ Resources:
                   Value:
                     Ref: AWS::Region
         Type: AWS::IAM::Role
+    DefangCD:
+        Properties:
+            Artifacts:
+                Type: NO_ARTIFACTS
+            Cache:
+                Modes:
+                    - LOCAL_DOCKER_LAYER_CACHE
+                Type: LOCAL
+            Environment:
+                ComputeType: BUILD_GENERAL1_MEDIUM
+                Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+                Type: LINUX_CONTAINER
+            LogsConfig:
+                CloudWatchLogs:
+                    GroupName:
+                        Ref: LogGroup
+                    Status: ENABLED
+            ServiceRole:
+                Ref: CodeBuildServiceRole
+            Source:
+                BuildSpec: |
+                    version: 0.2
+                    phases:
+                      build:
+                        commands:
+                          - echo 'buildspec should be overridden at StartBuild time'
+                Type: NO_SOURCE
+            Tags:
+                - Key: defang:CreatedBy
+                  Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
+        Type: AWS::CodeBuild::Project
     LogGroup:
         Properties:
             RetentionInDays: 1

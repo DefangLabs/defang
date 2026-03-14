@@ -19,7 +19,7 @@ func (a *AwsCodeBuild) QueryBuildID(ctx context.Context, cwClient cw.FilterLogEv
 		return nil, errors.New("buildID is empty")
 	}
 
-	lgi := cw.LogGroupInput{LogGroupARN: a.LogGroupARN, LogStreamNames: []string{GetCDLogStreamForBuildID(buildID)}}
+	lgi := cw.LogGroupInput{LogGroupARN: a.LogGroupARN, LogStreamNames: []string{GetLogStreamForBuildID(buildID)}}
 	logSeq, err := cw.QueryLogGroup(ctx, cwClient, lgi, start, end, limit)
 	if err != nil {
 		return nil, err
@@ -40,7 +40,7 @@ func (a *AwsCodeBuild) TailBuildID(ctx context.Context, cwClient cw.StartLiveTai
 		return nil, err
 	}
 
-	lgi := cw.LogGroupInput{LogGroupARN: a.LogGroupARN, LogStreamNames: []string{GetCDLogStreamForBuildID(buildID)}}
+	lgi := cw.LogGroupInput{LogGroupARN: a.LogGroupARN, LogStreamNames: []string{GetLogStreamForBuildID(buildID)}}
 	for {
 		logSeq, err := cw.TailLogGroup(ctx, cwClient, lgi)
 		if err != nil {
@@ -63,9 +63,9 @@ func (a *AwsCodeBuild) TailBuildID(ctx context.Context, cwClient cw.StartLiveTai
 	}
 }
 
-// GetCDLogStreamForBuildID returns the CloudWatch log stream name for a CodeBuild build.
+// GetLogStreamForBuildID returns the CloudWatch log stream name for a CodeBuild build.
 // CodeBuild log streams use the build UUID (the part after the colon in the build ID).
-func GetCDLogStreamForBuildID(buildID BuildID) string {
+func GetLogStreamForBuildID(buildID BuildID) string {
 	if _, after, ok := strings.Cut(*buildID, ":"); ok {
 		return after
 	}

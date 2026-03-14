@@ -702,39 +702,36 @@ func TestQueryCdLogs(t *testing.T) {
 	}
 }
 
-// TestQueryCdLogs_FollowMode is skipped because TailTaskID polls getTaskStatus
-// (real AWS ECS API) when StartLiveTail returns ResourceNotFoundException.
-// Testing follow mode for CD logs requires mocking the ECS DescribeTasks API.
-func TestQueryCdLogs_FollowMode(t *testing.T) {
-	t.Skip("requires ECS API mock for getTaskStatus")
-}
-
-func TestDeriveTaskID(t *testing.T) {
+func TestDeriveBuildID(t *testing.T) {
 	validEtag := types.NewEtag()
 
 	tests := []struct {
-		name       string
-		cdBuildId  awscodebuild.BuildID
-		cdEtag     string
-		reqEtag    string
-		wantTaskID string
+		name        string
+		cdBuildId   awscodebuild.BuildID
+		cdEtag      string
+		reqEtag     string
+		wantBuildID awscodebuild.BuildID
 	}{
 		{
-			name:       "matching cd etag returns build ID",
-			cdBuildId:  ptr.String("defang:abc123def456"),
-			cdEtag:     validEtag,
-			reqEtag:    validEtag,
-			wantTaskID: "defang:abc123def456",
+			name:        "matching cd etag returns build ID",
+			cdBuildId:   ptr.String("defang:abc123def456"),
+			cdEtag:      validEtag,
+			reqEtag:     validEtag,
+			wantBuildID: ptr.String("defang:abc123def456"),
 		},
 		{
-			name:       "invalid etag treated as legacy task ID",
-			reqEtag:    "some-task-id",
-			wantTaskID: "some-task-id",
+			name:        "invalid etag treated as legacy build ID",
+			reqEtag:     "some-build-id",
+			wantBuildID: ptr.String("some-build-id"),
 		},
 		{
 			name:    "valid etag not matching cd returns empty",
 			cdEtag:  "aaaaaaaaaaaa",
 			reqEtag: "bbbbbbbbbbbb",
+		},
+		{
+			name:    "valid etag without cd build ID returns empty",
+			reqEtag: "cccccccccccc",
 		},
 		{
 			name: "empty etag returns empty",
@@ -747,8 +744,8 @@ func TestDeriveTaskID(t *testing.T) {
 			b.cdBuildId = tt.cdBuildId
 			b.cdEtag = tt.cdEtag
 
-			got := b.deriveTaskID(tt.reqEtag)
-			assert.Equal(t, tt.wantTaskID, got)
+			got := b.deriveBuildID(tt.reqEtag)
+			assert.Equal(t, tt.wantBuildID, got)
 		})
 	}
 }

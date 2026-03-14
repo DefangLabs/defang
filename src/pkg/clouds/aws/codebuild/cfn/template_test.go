@@ -60,13 +60,13 @@ func TestCreateTemplate(t *testing.T) {
 
 	const goldenYaml = "testdata/template.yaml"
 	expected, err := os.ReadFile(goldenYaml)
-	if err != nil {
-		if os.IsNotExist(err) {
-			err := os.WriteFile(goldenYaml, actual, 0644)
-			t.Fatalf("Golden file created: %s: %v", goldenYaml, err)
-		} else {
-			t.Fatalf("Error reading golden file: %v", err)
+	if os.IsNotExist(err) || os.Getenv("UPDATE_GOLDEN") != "" {
+		if err := os.WriteFile(goldenYaml, actual, 0644); err != nil {
+			t.Fatalf("Error writing golden file: %v", err)
 		}
+		t.Fatalf("Golden file updated: %s", goldenYaml)
+	} else if err != nil {
+		t.Fatalf("Error reading golden file: %v", err)
 	}
 
 	// HACK: Unmarshal and marshal again to normalize indentation and formatting

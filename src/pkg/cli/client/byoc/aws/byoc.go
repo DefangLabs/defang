@@ -731,7 +731,7 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 	//  * Valid Etag, no services: 	tail all tasks/services with that Etag
 	//  * Valid Etag, service:		tail that task/service
 	var logSeq iter.Seq2[cw.LogEvent, error]
-	if buildID := b.deriveTaskID(req.Etag); buildID != nil && logs.LogType(req.LogType) == logs.LogTypeCD {
+	if buildID := b.deriveBuildID(req.Etag); buildID != nil && logs.LogType(req.LogType) == logs.LogTypeCD {
 		cdSeq, err := b.queryOrTailLogsByBuildID(ctx, cwClient, req, buildID)
 		if err != nil {
 			return nil, AnnotateAwsError(err)
@@ -780,8 +780,11 @@ func (b *ByocAws) queryOrTailLogsByBuildID(ctx context.Context, cwClient cw.Logs
 	}
 }
 
-// deriveTaskID returns the CD buildID if the etag refers to a CD task, or empty string otherwise.
-func (b *ByocAws) deriveTaskID(reqEtag string) awscodebuild.BuildID {
+// deriveBuildID returns the BuildID if the etag refers to a CD CodeBuild build, or nil otherwise.
+func (b *ByocAws) deriveBuildID(reqEtag string) awscodebuild.BuildID {
+	if reqEtag == "" {
+		return nil
+	}
 	if b.cdBuildId != nil && b.cdEtag == reqEtag {
 		return b.cdBuildId
 	}
@@ -865,7 +868,7 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 			cdTail := cw.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern}
 			// If we know the CD task ARN, only tail the logstream for that CD task; FIXME: store the task ID in the project's ProjectUpdate in S3 and use that
 			if b.cdBuildId != nil && (b.cdEtag == etag || *b.cdBuildId == etag) {
-				cdTail.LogStreamNames = []string{awscodebuild.GetCDLogStreamForBuildID(b.cdBuildId)}
+				cdTail.LogStreamNames = []string{awscodebuild.GetLogStreamForBuildID(b.cdBuildId)}
 			}
 			groups = append(groups, cdTail)
 			term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames, filter)
