@@ -196,8 +196,6 @@ func TestSetDefaultStack(t *testing.T) {
 func TestRemoveStack(t *testing.T) {
 	ctx := context.Background()
 
-	defaultStackParams := &stacks.Parameters{Name: "mystack", Provider: client.ProviderAWS, Region: "us-east-1", Mode: modes.ModeAffordable}
-
 	noActiveDeployment := &mockCdListProvider{}
 	activeDeployment := &mockCdListProvider{
 		infos: []state.Info{{Project: "my-project", Stack: "mystack"}},
@@ -206,8 +204,6 @@ func TestRemoveStack(t *testing.T) {
 	t.Run("list deployments error", func(t *testing.T) {
 		remover := &mockStacksRemover{}
 		ec := &mockElicitationsController{}
-		sm := &mockStacksLoader{}
-		sm.On("Load", ctx, "mystack").Return(defaultStackParams, nil)
 		provider := &mockCdListProvider{err: errors.New("network error")}
 
 		err := RemoveStack(ctx, remover, provider, ec, "my-project", "mystack", false)
@@ -223,8 +219,6 @@ func TestRemoveStack(t *testing.T) {
 
 		remover := &mockStacksRemover{}
 		ec := &mockElicitationsController{}
-		sm := &mockStacksLoader{}
-		sm.On("Load", ctx, "mystack").Return(defaultStackParams, nil)
 		remover.On("DeleteStack", ctx, mock.AnythingOfType("*defangv1.DeleteStackRequest")).Return(nil)
 
 		err = RemoveStack(ctx, remover, noActiveDeployment, ec, "my-project", "mystack", false)
@@ -240,8 +234,6 @@ func TestRemoveStack(t *testing.T) {
 
 		remover := &mockStacksRemover{}
 		ec := &mockElicitationsController{}
-		sm := &mockStacksLoader{}
-		sm.On("Load", ctx, "mystack").Return(defaultStackParams, nil)
 		remover.On("DeleteStack", ctx, mock.AnythingOfType("*defangv1.DeleteStackRequest")).Return(nil)
 
 		err = RemoveStack(ctx, remover, noActiveDeployment, ec, "my-project", "mystack", false)
@@ -253,8 +245,6 @@ func TestRemoveStack(t *testing.T) {
 	t.Run("last deployment is up, non-interactive returns error", func(t *testing.T) {
 		remover := &mockStacksRemover{}
 		ec := &mockElicitationsController{}
-		sm := &mockStacksLoader{}
-		sm.On("Load", ctx, "mystack").Return(defaultStackParams, nil)
 		ec.On("IsSupported").Return(false)
 
 		err := RemoveStack(ctx, remover, activeDeployment, ec, "my-project", "mystack", false)
@@ -266,8 +256,6 @@ func TestRemoveStack(t *testing.T) {
 	t.Run("last deployment is up, user declines", func(t *testing.T) {
 		remover := &mockStacksRemover{}
 		ec := &mockElicitationsController{}
-		sm := &mockStacksLoader{}
-		sm.On("Load", ctx, "mystack").Return(defaultStackParams, nil)
 		ec.On("IsSupported").Return(true)
 		ec.On("RequestEnum", ctx, mock.AnythingOfType("string"), "confirm", []string{"yes", "no"}).Return("no", nil)
 
@@ -284,8 +272,6 @@ func TestRemoveStack(t *testing.T) {
 
 		remover := &mockStacksRemover{}
 		ec := &mockElicitationsController{}
-		sm := &mockStacksLoader{}
-		sm.On("Load", ctx, "mystack").Return(defaultStackParams, nil)
 		ec.On("IsSupported").Return(true)
 		ec.On("RequestEnum", ctx, mock.AnythingOfType("string"), "confirm", []string{"yes", "no"}).Return("yes", nil)
 		remover.On("DeleteStack", ctx, mock.AnythingOfType("*defangv1.DeleteStackRequest")).Return(nil)
@@ -299,8 +285,6 @@ func TestRemoveStack(t *testing.T) {
 	t.Run("delete stack remote error", func(t *testing.T) {
 		remover := &mockStacksRemover{}
 		ec := &mockElicitationsController{}
-		sm := &mockStacksLoader{}
-		sm.On("Load", ctx, "mystack").Return(defaultStackParams, nil)
 		remover.On("DeleteStack", ctx, mock.AnythingOfType("*defangv1.DeleteStackRequest")).Return(errors.New("dynamo error"))
 
 		err := RemoveStack(ctx, remover, noActiveDeployment, ec, "my-project", "mystack", false)
@@ -316,8 +300,6 @@ func TestRemoveStack(t *testing.T) {
 
 		remover := &mockStacksRemover{}
 		ec := &mockElicitationsController{}
-		sm := &mockStacksLoader{}
-		sm.On("Load", ctx, "mystack").Return(defaultStackParams, nil)
 		remover.On("DeleteStack", ctx, mock.AnythingOfType("*defangv1.DeleteStackRequest")).Return(nil)
 
 		err = RemoveStack(ctx, remover, activeDeployment, ec, "my-project", "mystack", true)
@@ -329,8 +311,6 @@ func TestRemoveStack(t *testing.T) {
 	t.Run("force with active deployment, delete remote error", func(t *testing.T) {
 		remover := &mockStacksRemover{}
 		ec := &mockElicitationsController{}
-		sm := &mockStacksLoader{}
-		sm.On("Load", ctx, "mystack").Return(defaultStackParams, nil)
 		remover.On("DeleteStack", ctx, mock.AnythingOfType("*defangv1.DeleteStackRequest")).Return(errors.New("remote error"))
 
 		err := RemoveStack(ctx, remover, activeDeployment, ec, "my-project", "mystack", true)
@@ -346,9 +326,6 @@ func TestRemoveStack(t *testing.T) {
 
 		remover := &mockStacksRemover{}
 		ec := &mockElicitationsController{}
-		sm := &mockStacksLoader{}
-		betaStackParams := &stacks.Parameters{Name: "beta", Provider: client.ProviderAWS, Region: "us-east-1", Mode: modes.ModeAffordable}
-		sm.On("Load", ctx, "beta").Return(betaStackParams, nil)
 		remover.On("DeleteStack", ctx, &defangv1.DeleteStackRequest{Project: "acme", Stack: "beta"}).Return(nil)
 
 		err = RemoveStack(ctx, remover, noActiveDeployment, ec, "acme", "beta", false)
