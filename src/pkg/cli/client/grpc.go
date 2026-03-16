@@ -100,6 +100,11 @@ func (g GrpcClient) ListStacks(ctx context.Context, req *defangv1.ListStacksRequ
 	return getMsg(g.client.ListStacks(ctx, connect.NewRequest(req)))
 }
 
+func (g GrpcClient) DeleteStack(ctx context.Context, req *defangv1.DeleteStackRequest) error {
+	_, err := getMsg(g.client.DeleteStack(ctx, connect.NewRequest(req)))
+	return err
+}
+
 func (g GrpcClient) ListDeployments(ctx context.Context, req *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error) {
 	return getMsg(g.client.ListDeployments(ctx, connect.NewRequest(req)))
 }

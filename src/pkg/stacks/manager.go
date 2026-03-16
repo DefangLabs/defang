@@ -123,7 +123,7 @@ func (sm *manager) ListRemote(ctx context.Context) ([]ListItem, error) {
 		}
 		stackParams = append(stackParams, ListItem{
 			Parameters: *params,
-			DeployedAt: timeutils.AsTime(stack.GetLastDeployedAt(), time.Time{}),
+			DeployedAt: timeutils.AsTime(stack.GetLastDeployedAt(), time.Time{}).Local(),
 			Default:    stack.GetIsDefault(),
 		})
 	}

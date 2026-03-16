@@ -16,6 +16,7 @@ import (
 
 type StacksManager interface {
 	TargetDirectory(context.Context) string
+	Load(ctx context.Context, name string) (*stacks.Parameters, error)
 	GetStack(ctx context.Context, opts stacks.GetStackOpts) (*stacks.Parameters, string, error)
 }
 

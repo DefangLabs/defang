@@ -2,7 +2,6 @@ package command
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -85,8 +84,6 @@ func makeStackListCmd() *cobra.Command {
 		Args:    cobra.NoArgs,
 		Short:   "List existing Defang deployment stacks",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			jsonMode, _ := cmd.Flags().GetBool("json")
-
 			ctx := cmd.Context()
 			loader := configureLoader(cmd)
 			projectName, _, err := loader.LoadProjectName(ctx)
@@ -101,19 +98,6 @@ func makeStackListCmd() *cobra.Command {
 
 			stacks, err := sm.List(ctx)
 			if err != nil {
-				return err
-			}
-
-			if jsonMode {
-				jsonData := []byte("[]")
-				if len(stacks) > 0 {
-					jsonData, err = json.MarshalIndent(stacks, "", "  ")
-					if err != nil {
-						return err
-					}
-				}
-
-				_, err = term.Print(string(jsonData) + "\n")
 				return err
 			}
 
@@ -163,16 +147,34 @@ func makeStackDefaultCmd() *cobra.Command {
 }
 
 func makeStackRemoveCmd() *cobra.Command {
+	var force bool
 	var stackRemoveCmd = &cobra.Command{
 		Use:     "remove STACK_NAME",
 		Aliases: []string{"rm"},
 		Args:    cobra.ExactArgs(1),
 		Short:   "Remove an existing Defang deployment stack",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
 			name := args[0]
-			return stacks.RemoveInDirectory(".", name)
+			loader := configureLoader(cmd)
+			sm, err := newStackManagerForLoader(ctx, loader)
+			if err != nil {
+				return err
+			}
+			projectName, _, err := loader.LoadProjectName(ctx)
+			if err != nil {
+				return err
+			}
+
+			stack, err := sm.Load(ctx, name)
+			if err != nil {
+				return fmt.Errorf("could not load stack parameters: %w", err)
+			}
+			provider := cli.NewProvider(ctx, stack.Provider, global.Client, stack.Name)
+			return cli.RemoveStack(ctx, global.Client, provider, ec, projectName, name, force)
 		},
 	}
+	stackRemoveCmd.Flags().BoolVarP(&force, "force", "", false, "Force removal of the stack even if it has active deployments")
 	return stackRemoveCmd
 }
 
