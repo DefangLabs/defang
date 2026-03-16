@@ -73,7 +73,7 @@ func (a *AwsEcsCfn) updateStackAndWait(ctx context.Context, templateBody string,
 			if *output.OutputKey == OutputsTemplateVersion {
 				deployedRev, _ := strconv.Atoi(*output.OutputValue)
 				if deployedRev > TemplateRevision {
-					return fmt.Errorf("This CLI has an older CloudFormation template than the deployed %s stack: please update the CLI", a.stackName)
+					return fmt.Errorf("This version of the CLI expects CloudFormation template v%d, but the deployed %s stack is v%d: please update the CLI", TemplateRevision, a.stackName, deployedRev)
 				}
 			}
 		}
