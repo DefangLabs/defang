@@ -182,6 +182,7 @@ jobs:
         working-directory: src
 
       - name: Add dummy config
+        id: add-dummy-config
         run: echo blah | go run ./cmd/cli -C testdata/sanity config set --provider=defang -n dummy --debug
         working-directory: src
 
@@ -193,6 +194,11 @@ jobs:
       - name: Run sanity tests DOWN
         continue-on-error: true # until we have multi-project support in playground
         run: go run ./cmd/cli -C testdata/sanity compose down --provider=defang --detach --debug
+        working-directory: src
+
+      - name: Remove dummy config
+        if: steps.add-dummy-config.conclusion == 'success' # only clean up if the config was added
+        run: go run ./cmd/cli -C testdata/sanity config rm --provider=defang -n dummy --debug
         working-directory: src
 
   build-and-sign:
