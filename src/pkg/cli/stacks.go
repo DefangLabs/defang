@@ -59,7 +59,7 @@ func RemoveStack(ctx context.Context, client StacksRemover, provider client.Prov
 			return err
 		}
 		if hasActiveDeployment {
-			confirmed, err := confirmRemoveStack(ec, name)
+			confirmed, err := confirmRemoveStack(ctx, ec, name)
 			if err != nil {
 				return err
 			}
@@ -103,7 +103,7 @@ func stackHasActiveDeployment(ctx context.Context, provider client.Provider, pro
 	return false, nil
 }
 
-func confirmRemoveStack(ec elicitations.Controller, name string) (bool, error) {
+func confirmRemoveStack(ctx context.Context, ec elicitations.Controller, name string) (bool, error) {
 	if !ec.IsSupported() {
 		return false, fmt.Errorf("stack %q has an active deployment; re-run in interactive mode to confirm deletion", name)
 	}
@@ -116,7 +116,7 @@ Are you sure you want to delete it?`,
 		name,
 		name,
 	)
-	answer, err := ec.RequestEnum(context.Background(),
+	answer, err := ec.RequestEnum(ctx,
 		prompt,
 		"confirm",
 		[]string{"yes", "no"},
