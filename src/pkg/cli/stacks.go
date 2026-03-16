@@ -53,17 +53,19 @@ func SetDefaultStack(ctx context.Context, stacksPutter StacksPutter, stacksLoade
 }
 
 func RemoveStack(ctx context.Context, client StacksRemover, provider client.Provider, ec elicitations.Controller, projectName, name string, force bool) error {
-	hasActiveDeployment, err := stackHasActiveDeployment(ctx, provider, projectName, name)
-	if err != nil {
-		return err
-	}
-	if hasActiveDeployment && !force {
-		confirmed, err := confirmRemoveStack(ec, name)
+	if !force {
+		hasActiveDeployment, err := stackHasActiveDeployment(ctx, provider, projectName, name)
 		if err != nil {
 			return err
 		}
-		if !confirmed {
-			return errors.New("stack deletion cancelled")
+		if hasActiveDeployment {
+			confirmed, err := confirmRemoveStack(ec, name)
+			if err != nil {
+				return err
+			}
+			if !confirmed {
+				return errors.New("stack deletion cancelled")
+			}
 		}
 	}
 
