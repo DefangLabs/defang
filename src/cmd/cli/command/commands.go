@@ -187,6 +187,7 @@ func SetupCommands(version string) {
 	cdPreviewCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	cdPreviewCmd.RegisterFlagCompletionFunc("mode", cobra.FixedCompletions(modes.AllDeploymentModes(), cobra.ShellCompDirectiveNoFileComp))
 	cdCmd.AddCommand(cdPreviewCmd)
+	cdInstallCmd.Flags().Bool("force", false, "force the installation of the CD resources into the cluster (allow downgrades)")
 	cdCmd.AddCommand(cdInstallCmd)
 	cdCmd.AddCommand(cdCloudformationCmd)
 

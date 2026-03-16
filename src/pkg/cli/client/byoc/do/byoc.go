@@ -148,7 +148,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *client.DeployRequest, cmd stri
 		return nil, err
 	}
 
-	if err := b.SetUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx, false); err != nil {
 		return nil, err
 	}
 
@@ -234,7 +234,7 @@ func (b *ByocDo) GetDeploymentStatus(ctx context.Context) (bool, error) {
 }
 
 func (b *ByocDo) CdCommand(ctx context.Context, req client.CdCommandRequest) (string, error) {
-	if err := b.SetUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx, false); err != nil {
 		return "", err
 	}
 
@@ -287,7 +287,7 @@ func (b *ByocDo) CdList(ctx context.Context, _allRegions bool) (iter.Seq[state.I
 }
 
 func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	if err := b.SetUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx, false); err != nil {
 		return nil, err
 	}
 
@@ -671,7 +671,7 @@ func (b *ByocDo) environment(projectName, delegateDomain string, mode defangv1.D
 	return env, nil
 }
 
-func (b *ByocDo) SetUpCD(ctx context.Context) error {
+func (b *ByocDo) SetUpCD(ctx context.Context, force bool) error {
 	if b.SetupDone {
 		return nil
 	}

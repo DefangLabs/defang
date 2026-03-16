@@ -60,7 +60,7 @@ func (a *AwsEcsCfn) newClient(ctx context.Context) (*cloudformation.Client, erro
 	return cloudformation.NewFromConfig(cfg), nil
 }
 
-func (a *AwsEcsCfn) updateStackAndWait(ctx context.Context, templateBody string, parameters []cfnTypes.Parameter) error {
+func (a *AwsEcsCfn) updateStackAndWait(ctx context.Context, templateBody string, force bool, parameters []cfnTypes.Parameter) error {
 	cfn, err := a.newClient(ctx)
 	if err != nil {
 		return err
@@ -72,7 +72,7 @@ func (a *AwsEcsCfn) updateStackAndWait(ctx context.Context, templateBody string,
 		for _, output := range dso.Stacks[0].Outputs {
 			if *output.OutputKey == OutputsTemplateVersion {
 				deployedRev, _ := strconv.Atoi(*output.OutputValue)
-				if deployedRev > TemplateRevision {
+				if deployedRev > TemplateRevision && !force {
 					return fmt.Errorf("This version of the CLI expects CloudFormation template v%d, but the deployed %s stack is v%d: please update the CLI", TemplateRevision, a.stackName, deployedRev)
 				}
 			}
@@ -150,7 +150,7 @@ func (a *AwsEcsCfn) createStackAndWait(ctx context.Context, templateBody string,
 	return a.fillWithOutputs(dso)
 }
 
-func (a *AwsEcsCfn) SetUp(ctx context.Context, containers []clouds.Container) (bool, error) {
+func (a *AwsEcsCfn) SetUp(ctx context.Context, containers []clouds.Container, force bool) (bool, error) {
 	template, err := CreateTemplate(a.stackName, containers)
 	if err != nil {
 		return false, fmt.Errorf("failed to create CloudFormation template: %w", err)
@@ -196,12 +196,12 @@ func (a *AwsEcsCfn) SetUp(ctx context.Context, containers []clouds.Container) (b
 	}
 	// TODO: support DOCKER_AUTH_CONFIG
 
-	return a.upsertStackAndWait(ctx, templateBody, parameters...)
+	return a.upsertStackAndWait(ctx, templateBody, force, parameters...)
 }
 
-func (a *AwsEcsCfn) upsertStackAndWait(ctx context.Context, templateBody []byte, parameters ...cfnTypes.Parameter) (bool, error) {
+func (a *AwsEcsCfn) upsertStackAndWait(ctx context.Context, templateBody []byte, force bool, parameters ...cfnTypes.Parameter) (bool, error) {
 	// Upsert with parameters
-	if err := a.updateStackAndWait(ctx, string(templateBody), parameters); err != nil {
+	if err := a.updateStackAndWait(ctx, string(templateBody), force, parameters); err != nil {
 		// Check if the stack doesn't exist; if so, create it, otherwise return the error
 		var apiError smithy.APIError
 		if ok := errors.As(err, &apiError); !ok || (apiError.ErrorCode() != "ValidationError") || !strings.HasSuffix(apiError.ErrorMessage(), "does not exist") {

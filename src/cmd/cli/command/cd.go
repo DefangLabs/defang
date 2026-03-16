@@ -199,7 +199,8 @@ var cdInstallCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.InstallCD(ctx, session.Provider)
+		force, _ := cmd.Flags().GetBool("force")
+		return cli.InstallCD(ctx, session.Provider, force)
 	},
 }
 

@@ -9,10 +9,10 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-func InstallCD(ctx context.Context, provider client.Provider) error {
+func InstallCD(ctx context.Context, provider client.Provider, force bool) error {
 	if dryrun.DoDryRun {
 		return errors.New("dry run")
 	}
 	term.Info("Installing the CD resources into the cluster")
-	return provider.SetUpCD(ctx)
+	return provider.SetUpCD(ctx, force)
 }
