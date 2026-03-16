@@ -1,25 +1,18 @@
 package cfn
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-
 	awscodebuild "github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/awslabs/goformation/v7/cloudformation"
 	"github.com/awslabs/goformation/v7/cloudformation/codebuild"
-	"github.com/awslabs/goformation/v7/cloudformation/ecr"
 	"github.com/awslabs/goformation/v7/cloudformation/iam"
 	"github.com/awslabs/goformation/v7/cloudformation/logs"
 	"github.com/awslabs/goformation/v7/cloudformation/policies"
 	"github.com/awslabs/goformation/v7/cloudformation/s3"
-	"github.com/awslabs/goformation/v7/cloudformation/secretsmanager"
 	"github.com/awslabs/goformation/v7/cloudformation/tags"
 )
 
 const (
-	maxCachePrefixLength = 20 // prefix must be 2-20 characters long; should be 30 https://github.com/hashicorp/terraform-provider-aws/pull/34716
-
 	TagKeyCreatedBy   = "defang:CreatedBy"
 	TagKeyManagedBy   = "defang:ManagedBy"
 	TagKeyPrefix      = "defang:Prefix"
@@ -27,24 +20,12 @@ const (
 	TagKeyStackRegion = "defang:CloudFormationStackRegion"
 )
 
-func GetCacheRepoPrefix(prefix, suffix string) string {
-	repo := prefix + suffix
-	if len(repo) > maxCachePrefixLength {
-		// Cache repo name is too long; hash it and use the first 6 chars
-		hash := sha256.Sum256([]byte(prefix))
-		return hex.EncodeToString(hash[:])[:6] + "-" + suffix
-	}
-	return repo
-}
-
-const TemplateRevision = 4 // bump this when the template changes!
+const TemplateRevision = 5 // bump this when the template changes!
 
 // CreateTemplate creates a parameterized CloudFormation template for the CD infrastructure.
 // Uses CodeBuild instead of ECS for running Pulumi deployments.
 func CreateTemplate(stack string) (*cloudformation.Template, error) {
 	const oidcProviderDefaultAud = "sts.amazonaws.com"
-
-	prefix := stack + "-"
 
 	defaultTags := []tags.Tag{
 		{
@@ -78,23 +59,6 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 		Default:       ptr.String("true"),
 		AllowedValues: []any{"true", "false"},
 		Description:   ptr.String("Whether to retain the S3 bucket on stack deletion"),
-	}
-	template.Parameters[ParamsEnablePullThroughCache] = cloudformation.Parameter{
-		Type:          "String",
-		Default:       ptr.String("true"),
-		AllowedValues: []any{"true", "false"},
-		Description:   ptr.String("Whether to enable ECR pull-through cache"),
-	}
-	template.Parameters[ParamsDockerHubUsername] = cloudformation.Parameter{
-		Type:        "String",
-		Default:     ptr.String(""),
-		Description: ptr.String("Docker Hub username for private registry access (optional)"),
-	}
-	template.Parameters[ParamsDockerHubAccessToken] = cloudformation.Parameter{
-		Type:        "String",
-		Default:     ptr.String(""),
-		Description: ptr.String("Docker Hub access token for private registry access (optional)"),
-		NoEcho:      ptr.Bool(true),
 	}
 	template.Parameters[ParamsOidcProviderIssuer] = cloudformation.Parameter{
 		Type:        "String",
@@ -136,19 +100,12 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 					"Parameters": []string{ParamsOidcProviderIssuer, ParamsOidcProviderSubjects, ParamsOidcProviderAudiences, ParamsCIRoleName, ParamsOidcProviderThumbprints, ParamsOidcProviderClaims},
 				},
 				{
-					"Label":      map[string]string{"default": "Container Registry (ECR Pull-Through Cache)"},
-					"Parameters": []string{ParamsEnablePullThroughCache, ParamsDockerHubUsername, ParamsDockerHubAccessToken},
-				},
-				{
 					"Label":      map[string]string{"default": "Storage Configuration"},
 					"Parameters": []string{ParamsRetainBucket},
 				},
 			},
 			"ParameterLabels": map[string]interface{}{
 				ParamsRetainBucket:            map[string]string{"default": "Retain S3 Bucket on Delete"},
-				ParamsEnablePullThroughCache:  map[string]string{"default": "Enable ECR Pull-Through Cache"},
-				ParamsDockerHubUsername:       map[string]string{"default": "Docker Hub Username"},
-				ParamsDockerHubAccessToken:    map[string]string{"default": "Docker Hub Access Token"},
 				ParamsOidcProviderIssuer:      map[string]string{"default": "OIDC Provider Issuer URL"},
 				ParamsOidcProviderSubjects:    map[string]string{"default": "OIDC Trusted Subject Patterns"},
 				ParamsOidcProviderAudiences:   map[string]string{"default": "OIDC Trusted Audiences"},
@@ -162,14 +119,6 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 	// Conditions
 	const _condRetainS3Bucket = "RetainS3Bucket"
 	template.Conditions[_condRetainS3Bucket] = cloudformation.Equals(cloudformation.Ref(ParamsRetainBucket), "true")
-	const _condEnablePullThroughCache = "EnablePullThroughCache"
-	template.Conditions[_condEnablePullThroughCache] = cloudformation.Equals(cloudformation.Ref(ParamsEnablePullThroughCache), "true")
-	const _condEnableDockerPullThroughCache = "EnableDockerPullThroughCache"
-	template.Conditions[_condEnableDockerPullThroughCache] = cloudformation.And([]string{
-		cloudformation.Equals(cloudformation.Ref(ParamsEnablePullThroughCache), "true"),
-		cloudformation.Not([]string{cloudformation.Equals(cloudformation.Ref(ParamsDockerHubUsername), "")}),
-		cloudformation.Not([]string{cloudformation.Equals(cloudformation.Ref(ParamsDockerHubAccessToken), "")}),
-	})
 	const _condOidcProvider = "OidcProvider"
 	template.Conditions[_condOidcProvider] = cloudformation.And([]string{
 		cloudformation.Not([]string{cloudformation.Equals(cloudformation.Ref(ParamsOidcProviderIssuer), "")}),
@@ -199,36 +148,7 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 		RetentionInDays: ptr.Int(1),
 	}
 
-	// 3. ECR pull-through cache rules
-	ecrPublicPrefix := GetCacheRepoPrefix(prefix, "ecr-public")
-	dockerPublicPrefix := GetCacheRepoPrefix(prefix, "docker-public")
-
-	const _pullThroughCache = "PullThroughCache"
-	template.Resources[_pullThroughCache] = &ecr.PullThroughCacheRule{
-		AWSCloudFormationCondition: _condEnablePullThroughCache,
-		EcrRepositoryPrefix:        ptr.String(ecrPublicPrefix),
-		UpstreamRegistryUrl:        ptr.String(awscodebuild.EcrPublicRegistry),
-	}
-
-	// #nosec G101 - not a secret
-	const _privateRepoSecret = "PrivateRepoSecret"
-	template.Resources[_privateRepoSecret] = &secretsmanager.Secret{
-		AWSCloudFormationCondition: _condEnableDockerPullThroughCache,
-		Tags:                       defaultTags,
-		Description:                ptr.String("Docker Hub credentials for the ECR pull-through cache rule"),
-		Name:                       ptr.String("ecr-pullthroughcache/" + dockerPublicPrefix),
-		SecretString:               ptr.String(cloudformation.Sub(`{"username":"${` + ParamsDockerHubUsername + `}","accessToken":"${` + ParamsDockerHubAccessToken + `}"}`)),
-	}
-
-	const _pullThroughCacheDocker = "PullThroughCacheDocker"
-	template.Resources[_pullThroughCacheDocker] = &ecr.PullThroughCacheRule{
-		AWSCloudFormationCondition: _condEnableDockerPullThroughCache,
-		EcrRepositoryPrefix:        ptr.String(dockerPublicPrefix),
-		UpstreamRegistryUrl:        ptr.String("registry-1.docker.io"),
-		CredentialArn:              cloudformation.RefPtr(_privateRepoSecret),
-	}
-
-	// 4. CodeBuild service role
+	// 3. CodeBuild service role
 	const _codeBuildServiceRole = "CodeBuildServiceRole"
 	template.Resources[_codeBuildServiceRole] = &iam.Role{
 		Tags: defaultTags,
@@ -245,7 +165,55 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 			},
 		},
 		ManagedPolicyArns: []string{
-			"arn:aws:iam::aws:policy/AdministratorAccess", // TODO: restrict
+			"arn:aws:iam::aws:policy/PowerUserAccess",
+		},
+	}
+
+	// 3b. IAM policy for CodeBuild service role. The Pulumi CD/tenant stack
+	// (pulumi/cd/ and pulumi/shared/) creates the following IAM resource types:
+	//   - aws.iam.Role (task roles, execution role, codebuild role, instance profile role)
+	//   - aws.iam.Policy (route53 sidecar, bedrock)
+	//   - aws.iam.RolePolicy + RolePoliciesExclusive (inline policies)
+	//   - aws.iam.RolePolicyAttachment (attaching managed policies)
+	//   - aws.iam.InstanceProfile (EC2/GPU nodes)
+	// Each Pulumi resource type maps to the CRUD + read actions below.
+	// PassRole is needed because Pulumi passes roles to ECS, EC2, and CodeBuild.
+	// CreateServiceLinkedRole is needed because ECS/ELB create SLRs on first use.
+	// IT departments can attach additional policies to the role without affecting this one.
+	const _codeBuildIAMPolicy = "CodeBuildIAMPolicy"
+	template.Resources[_codeBuildIAMPolicy] = &iam.ManagedPolicy{
+		Roles: []string{
+			cloudformation.Ref(_codeBuildServiceRole),
+		},
+		PolicyDocument: map[string]any{
+			"Version": "2012-10-17",
+			"Statement": []map[string]any{
+				{
+					"Effect": "Allow",
+					"Action": []string{
+						"iam:CreateRole", "iam:GetRole", "iam:UpdateRole", "iam:DeleteRole",
+						"iam:TagRole", "iam:UntagRole",
+						"iam:UpdateAssumeRolePolicy",
+						"iam:ListRolePolicies", "iam:ListAttachedRolePolicies",
+						"iam:ListInstanceProfilesForRole",
+
+						"iam:CreatePolicy", "iam:GetPolicy", "iam:DeletePolicy",
+						"iam:CreatePolicyVersion", "iam:DeletePolicyVersion",
+						"iam:GetPolicyVersion", "iam:ListPolicyVersions",
+
+						"iam:PutRolePolicy", "iam:GetRolePolicy", "iam:DeleteRolePolicy",
+						"iam:AttachRolePolicy", "iam:DetachRolePolicy",
+
+						"iam:CreateInstanceProfile", "iam:GetInstanceProfile",
+						"iam:DeleteInstanceProfile",
+						"iam:AddRoleToInstanceProfile", "iam:RemoveRoleFromInstanceProfile",
+
+						"iam:PassRole",
+						"iam:CreateServiceLinkedRole",
+					},
+					"Resource": "*",
+				},
+			},
 		},
 	}
 
@@ -265,9 +233,10 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 			Modes: []string{"LOCAL_DOCKER_LAYER_CACHE"},
 		},
 		Environment: &codebuild.Project_Environment{
-			ComputeType: "BUILD_GENERAL1_MEDIUM",
-			Type:        "LINUX_CONTAINER",
-			Image:       "aws/codebuild/amazonlinux2-x86_64-standard:5.0", // placeholder; overridden at StartBuild time
+			ComputeType:              "BUILD_GENERAL1_MEDIUM",
+			Type:                     "LINUX_CONTAINER",
+			Image:                    "aws/codebuild/amazonlinux2-x86_64-standard:5.0", // placeholder; overridden at StartBuild time
+			ImagePullCredentialsType: ptr.String("CODEBUILD"),
 		},
 		ServiceRole: cloudformation.Ref(_codeBuildServiceRole),
 		LogsConfig: &codebuild.Project_LogsConfig{
@@ -324,7 +293,7 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 			"ExtraClaims": cloudformation.If(_condOidcClaims, cloudformation.Join("", []any{",", cloudformation.Join(",", cloudformation.Ref(ParamsOidcProviderClaims))}), ""),
 		}),
 		ManagedPolicyArns: []string{
-			"arn:aws:iam::aws:policy/AdministratorAccess",
+			"arn:aws:iam::aws:policy/PowerUserAccess",
 		},
 	}
 
@@ -345,16 +314,6 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 	template.Outputs[OutputsCodeBuildProjectName] = cloudformation.Output{
 		Description: ptr.String("Name of the CodeBuild project"),
 		Value:       cloudformation.Ref(_codeBuildProject),
-	}
-	template.Outputs[OutputsEcrCachePrefix] = cloudformation.Output{
-		Condition:   ptr.String(_condEnablePullThroughCache),
-		Description: ptr.String("ECR pull-through cache prefix for public ECR"),
-		Value:       ecrPublicPrefix,
-	}
-	template.Outputs[OutputsDockerCachePrefix] = cloudformation.Output{
-		Condition:   ptr.String(_condEnableDockerPullThroughCache),
-		Description: ptr.String("ECR pull-through cache prefix for Docker Hub"),
-		Value:       dockerPublicPrefix,
 	}
 	template.Outputs[OutputsTemplateVersion] = cloudformation.Output{
 		Description: ptr.String("Version of this CloudFormation template"),

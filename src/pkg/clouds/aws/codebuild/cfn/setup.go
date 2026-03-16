@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	common "github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	awscodebuild "github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
@@ -72,9 +71,6 @@ func (a *AwsCfn) updateStackAndWait(ctx context.Context, templateBody string, fo
 		}
 		templateParams := map[string]struct{}{
 			ParamsCIRoleName:              {},
-			ParamsDockerHubAccessToken:    {},
-			ParamsDockerHubUsername:       {},
-			ParamsEnablePullThroughCache:  {},
 			ParamsOidcProviderAudiences:   {},
 			ParamsOidcProviderClaims:      {},
 			ParamsOidcProviderIssuer:      {},
@@ -171,10 +167,6 @@ func (a *AwsCfn) SetUp(ctx context.Context, force bool) (bool, error) {
 			ParameterKey:   ptr.String(ParamsRetainBucket),
 			ParameterValue: ptr.String(strconv.FormatBool(a.RetainBucket)),
 		},
-		{
-			ParameterKey:   ptr.String(ParamsEnablePullThroughCache),
-			ParameterValue: ptr.String(strconv.FormatBool(!pkg.GetenvBool("DEFANG_NO_CACHE"))),
-		},
 	}
 
 	return a.upsertStackAndWait(ctx, templateBody, force, parameters...)
@@ -231,10 +223,6 @@ func (a *AwsCfn) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) error
 			a.CIRoleARN = *output.OutputValue
 		case OutputsCodeBuildProjectName:
 			a.ProjectName = *output.OutputValue
-		case OutputsDockerCachePrefix:
-			a.DockerCachePrefix = *output.OutputValue
-		case OutputsEcrCachePrefix:
-			a.EcrCachePrefix = *output.OutputValue
 		}
 	}
 

@@ -1,22 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Conditions:
-    EnableDockerPullThroughCache:
-        Fn::And:
-            - Fn::Equals:
-                - Ref: EnablePullThroughCache
-                - "true"
-            - Fn::Not:
-                - Fn::Equals:
-                    - Ref: DockerHubUsername
-                    - ""
-            - Fn::Not:
-                - Fn::Equals:
-                    - Ref: DockerHubAccessToken
-                    - ""
-    EnablePullThroughCache:
-        Fn::Equals:
-            - Ref: EnablePullThroughCache
-            - "true"
     OidcClaims:
         Fn::Not:
             - Fn::Equals:
@@ -66,24 +49,12 @@ Metadata:
                 - OidcProviderThumbprints
                 - OidcProviderClaims
             - Label:
-                default: Container Registry (ECR Pull-Through Cache)
-              Parameters:
-                - EnablePullThroughCache
-                - DockerHubUsername
-                - DockerHubAccessToken
-            - Label:
                 default: Storage Configuration
               Parameters:
                 - RetainBucket
         ParameterLabels:
             CIRoleName:
                 default: CI Role Name
-            DockerHubAccessToken:
-                default: Docker Hub Access Token
-            DockerHubUsername:
-                default: Docker Hub Username
-            EnablePullThroughCache:
-                default: Enable ECR Pull-Through Cache
             OidcProviderAudiences:
                 default: OIDC Trusted Audiences
             OidcProviderClaims:
@@ -112,14 +83,6 @@ Outputs:
         Description: Name of the CodeBuild project
         Value:
             Ref: DefangCD
-    dockerCachePrefix:
-        Condition: EnableDockerPullThroughCache
-        Description: ECR pull-through cache prefix for Docker Hub
-        Value: test-docker-public
-    ecrCachePrefix:
-        Condition: EnablePullThroughCache
-        Description: ECR pull-through cache prefix for public ECR
-        Value: test-ecr-public
     logGroupArn:
         Description: ARN of the CloudWatch log group
         Value:
@@ -128,27 +91,11 @@ Outputs:
                 - Arn
     templateVersion:
         Description: Version of this CloudFormation template
-        Value: 4
+        Value: 5
 Parameters:
     CIRoleName:
         Default: ""
         Description: Name of the CI role (optional)
-        Type: String
-    DockerHubAccessToken:
-        Default: ""
-        Description: Docker Hub access token for private registry access (optional)
-        NoEcho: true
-        Type: String
-    DockerHubUsername:
-        Default: ""
-        Description: Docker Hub username for private registry access (optional)
-        Type: String
-    EnablePullThroughCache:
-        AllowedValues:
-            - "true"
-            - "false"
-        Default: "true"
-        Description: Whether to enable ECR pull-through cache
         Type: String
     OidcProviderAudiences:
         Default: sts.amazonaws.com
@@ -246,7 +193,7 @@ Resources:
                             - '","'
                             - Ref: OidcProviderSubjects
             ManagedPolicyArns:
-                - arn:aws:iam::aws:policy/AdministratorAccess
+                - arn:aws:iam::aws:policy/PowerUserAccess
             RoleName:
                 Fn::If:
                     - OverrideCIRoleName
@@ -266,6 +213,46 @@ Resources:
                   Value:
                     Ref: AWS::Region
         Type: AWS::IAM::Role
+    CodeBuildIAMPolicy:
+        Properties:
+            PolicyDocument:
+                Statement:
+                    - Action:
+                        - iam:CreateRole
+                        - iam:GetRole
+                        - iam:UpdateRole
+                        - iam:DeleteRole
+                        - iam:TagRole
+                        - iam:UntagRole
+                        - iam:UpdateAssumeRolePolicy
+                        - iam:ListRolePolicies
+                        - iam:ListAttachedRolePolicies
+                        - iam:ListInstanceProfilesForRole
+                        - iam:CreatePolicy
+                        - iam:GetPolicy
+                        - iam:DeletePolicy
+                        - iam:CreatePolicyVersion
+                        - iam:DeletePolicyVersion
+                        - iam:GetPolicyVersion
+                        - iam:ListPolicyVersions
+                        - iam:PutRolePolicy
+                        - iam:GetRolePolicy
+                        - iam:DeleteRolePolicy
+                        - iam:AttachRolePolicy
+                        - iam:DetachRolePolicy
+                        - iam:CreateInstanceProfile
+                        - iam:GetInstanceProfile
+                        - iam:DeleteInstanceProfile
+                        - iam:AddRoleToInstanceProfile
+                        - iam:RemoveRoleFromInstanceProfile
+                        - iam:PassRole
+                        - iam:CreateServiceLinkedRole
+                      Effect: Allow
+                      Resource: '*'
+                Version: "2012-10-17"
+            Roles:
+                - Ref: CodeBuildServiceRole
+        Type: AWS::IAM::ManagedPolicy
     CodeBuildServiceRole:
         Properties:
             AssumeRolePolicyDocument:
@@ -276,7 +263,7 @@ Resources:
                         Service: codebuild.amazonaws.com
                 Version: "2012-10-17"
             ManagedPolicyArns:
-                - arn:aws:iam::aws:policy/AdministratorAccess
+                - arn:aws:iam::aws:policy/PowerUserAccess
             Tags:
                 - Key: defang:CreatedBy
                   Value: defang
@@ -302,6 +289,7 @@ Resources:
             Environment:
                 ComputeType: BUILD_GENERAL1_MEDIUM
                 Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+                ImagePullCredentialsType: CODEBUILD
                 Type: LINUX_CONTAINER
             LogsConfig:
                 CloudWatchLogs:
@@ -375,38 +363,3 @@ Resources:
             Url:
                 Fn::Sub: https://${OidcProviderIssuer}
         Type: AWS::IAM::OIDCProvider
-    PrivateRepoSecret:
-        Condition: EnableDockerPullThroughCache
-        Properties:
-            Description: Docker Hub credentials for the ECR pull-through cache rule
-            Name: ecr-pullthroughcache/test-docker-public
-            SecretString:
-                Fn::Sub: '{"username":"${DockerHubUsername}","accessToken":"${DockerHubAccessToken}"}'
-            Tags:
-                - Key: defang:CreatedBy
-                  Value: defang
-                - Key: defang:Prefix
-                  Value: test
-                - Key: defang:ManagedBy
-                  Value: CloudFormation
-                - Key: defang:CloudFormationStackName
-                  Value:
-                    Ref: AWS::StackName
-                - Key: defang:CloudFormationStackRegion
-                  Value:
-                    Ref: AWS::Region
-        Type: AWS::SecretsManager::Secret
-    PullThroughCache:
-        Condition: EnablePullThroughCache
-        Properties:
-            EcrRepositoryPrefix: test-ecr-public
-            UpstreamRegistryUrl: public.ecr.aws
-        Type: AWS::ECR::PullThroughCacheRule
-    PullThroughCacheDocker:
-        Condition: EnableDockerPullThroughCache
-        Properties:
-            CredentialArn:
-                Ref: PrivateRepoSecret
-            EcrRepositoryPrefix: test-docker-public
-            UpstreamRegistryUrl: registry-1.docker.io
-        Type: AWS::ECR::PullThroughCacheRule

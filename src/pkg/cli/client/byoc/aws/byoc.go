@@ -572,30 +572,9 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild
 		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
 	}
 
-	// Rewrite Docker Hub images to use ECR pull-through cache to avoid rate limiting
-	image := b.CDImage
-	if b.driver.DockerCachePrefix != "" && dockerhub.IsDockerHubImage(image) {
-		parsed, err := dockerhub.ParseImage(image)
-		if err == nil {
-			repo := parsed.Repo
-			if !strings.Contains(repo, "/") {
-				repo = "library/" + repo
-			}
-			ecrImage := fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/%s/%s", b.driver.AccountID, b.driver.Region, b.driver.DockerCachePrefix, repo)
-			if parsed.Tag != "" {
-				ecrImage += ":" + parsed.Tag
-			}
-			if parsed.Digest != "" {
-				ecrImage += "@" + parsed.Digest
-			}
-			term.Debugf("Rewriting image %q to ECR pull-through cache: %q", image, ecrImage)
-			image = ecrImage
-		}
-	}
-
 	// Prepend the entrypoint; CodeBuild runs buildspec commands in a shell, not via Docker ENTRYPOINT
 	args := append([]string{"node", "lib/index.js"}, cmd.command...)
-	return b.driver.Run(ctx, image, env, args...)
+	return b.driver.Run(ctx, b.CDImage, env, args...)
 }
 
 func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
