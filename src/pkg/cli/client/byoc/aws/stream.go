@@ -87,8 +87,8 @@ func (p *logEventParser) parseEvents(events []cw.LogEvent) *defangv1.TailRespons
 			if err == nil {
 				response.Service = parts[1][:underscore]
 				response.Etag = etag
-				break
 			}
+			break
 		}
 		term.Debugf("unrecognized log stream format: %s", *first.LogStreamName)
 		return nil // skip, ignore sidecar logs (like route53-sidecar or fluentbit)
