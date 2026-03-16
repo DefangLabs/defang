@@ -153,16 +153,21 @@ func makeComposeUpCmd() *cobra.Command {
 				return nil
 			}
 
-			// show users the current streaming logs
-			tailSource := "all services"
-			if deploy.Etag != "" {
-				tailSource = "deployment ID " + deploy.Etag
+			waitTimeoutDuration := time.Duration(waitTimeout) * time.Second
+			var serviceStates map[string]defangv1.ServiceState
+			if global.Verbose || global.NonInteractive {
+				tailOptions := newTailOptionsForDeploy(session.Stack.Name, deploy.Etag, since, global.Verbose)
+				tailOptions.Follow = true
+				term.Info("Tailing logs for deployment ID", deploy.Etag, "; press Ctrl+C to detach:")
+				serviceStates, err = cli.TailAndMonitor(ctx, project, session.Provider, waitTimeoutDuration, tailOptions)
+				if err != nil {
+					return err
+				}
+			} else {
+				term.Info("Live tail logs with `defang tail --deployment=" + deploy.Etag + "`")
+				serviceStates, err = cli.Monitor(ctx, project, session.Provider, waitTimeoutDuration, deploy.Etag)
 			}
-			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
-
-			tailOptions := newTailOptionsForDeploy(session.Stack.Name, deploy.Etag, since, global.Verbose)
-			serviceStates, err := cli.TailAndMonitor(ctx, project, session.Provider, time.Duration(waitTimeout)*time.Second, tailOptions)
-			if err != nil {
+			if err != nil && !errors.Is(err, context.Canceled) {
 				deploymentErr := err
 				debugger, err := debug.NewDebugger(ctx, global.FabricAddr, session.Stack)
 				if err != nil {
