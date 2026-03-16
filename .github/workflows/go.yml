@@ -28,11 +28,52 @@ jobs:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
 
+      - name: Sanitize branch name for artifact
+        id: branch
+        run: echo "name=$(echo '${{ github.ref_name }}' | tr '/' '-')" >> $GITHUB_OUTPUT
+
       - name: Run Go unit tests
-        run: go test -test.short -v ./...
+        run: go test -test.short -v -coverprofile=coverage.out -covermode=atomic ./...
         working-directory: src
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # to avoid GH rate limits
+
+      - name: Generate coverage summary
+        run: go tool cover -func=coverage.out | tee coverage.txt
+        working-directory: src
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ steps.branch.outputs.name }}
+          path: src/coverage.txt
+          overwrite: true
+
+      - name: Download main branch coverage
+        if: github.ref != 'refs/heads/main'
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: go.yml
+          branch: main
+          name: coverage-main
+          path: coverage-main
+        continue-on-error: true # no baseline yet on first run
+
+      - name: Check coverage regression
+        if: github.ref != 'refs/heads/main'
+        run: |
+          if [ ! -f coverage-main/coverage.txt ]; then
+            echo "No main coverage baseline found, skipping comparison"
+            exit 0
+          fi
+          main_pct=$(grep '^total:' coverage-main/coverage.txt | awk '{print $3}' | tr -d '%')
+          curr_pct=$(grep '^total:' src/coverage.txt | awk '{print $3}' | tr -d '%')
+          echo "Main: ${main_pct}%  Current branch: ${curr_pct}%"
+          if awk "BEGIN { exit !(${curr_pct} < ${main_pct}) }"; then
+            echo "ERROR: Coverage decreased from ${main_pct}% to ${curr_pct}%"
+            exit 1
+          fi
+          echo "Coverage OK (${curr_pct}% >= ${main_pct}%)"
 
       - name: Verify Go modules
         working-directory: src
