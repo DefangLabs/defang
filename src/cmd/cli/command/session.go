@@ -103,9 +103,15 @@ func doubleCheckProjectName(projectName string) {
 }
 
 func newStackManagerForLoader(ctx context.Context, loader *compose.Loader) (session.StacksManager, error) {
-	targetDirectory, err := findTargetDirectory()
+	targetDirectory, err := loader.ProjectWorkingDir(ctx)
 	if err != nil {
-		targetDirectory = loader.TargetDirectory(ctx)
+		// No project directory; look for .defang directory in current or parent directories
+		targetDirectory, _ = findTargetDirectory(".")
+	} else {
+		// The .defang directory might be in the project directory or a parent directory; if not found, use the project directory
+		if td, err := findTargetDirectory(targetDirectory); err == nil {
+			targetDirectory = td
+		}
 	}
 	projectName, _, err := loader.LoadProjectName(ctx)
 	if err != nil {
@@ -121,11 +127,7 @@ func newStackManagerForLoader(ctx context.Context, loader *compose.Loader) (sess
 	return sm, nil
 }
 
-func findTargetDirectory() (string, error) {
-	wd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("failed to get working directory: %w", err)
-	}
+func findTargetDirectory(wd string) (string, error) {
 	for {
 		info, err := os.Stat(filepath.Join(wd, stacks.Directory))
 		if err != nil {
