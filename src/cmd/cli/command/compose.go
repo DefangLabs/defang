@@ -164,7 +164,7 @@ func makeComposeUpCmd() *cobra.Command {
 					return err
 				}
 			} else {
-				term.Info("Live tail logs with `defang tail --deployment=" + deploy.Etag + "`")
+				printDefangHint("Live tail logs", fmt.Sprintf("tail --deployment=%s --since=%s", deploy.Etag, time.Since(since)))
 				serviceStates, err = cli.MonitorWithTUI(ctx, project, session.Provider, waitTimeoutDuration, deploy.Etag)
 			}
 			if err != nil && !errors.Is(err, context.Canceled) {
