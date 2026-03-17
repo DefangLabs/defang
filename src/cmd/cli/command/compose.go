@@ -164,6 +164,7 @@ func makeComposeUpCmd() *cobra.Command {
 					return err
 				}
 			} else {
+				term.Info("Monitoring deployment ID", deploy.Etag, "; press Ctrl+C to detach:")
 				printDefangHint("Live tail logs", fmt.Sprintf("tail --deployment=%s --since=%s", deploy.Etag, time.Since(since)))
 				serviceStates, err = cli.MonitorWithTUI(ctx, project, session.Provider, waitTimeoutDuration, deploy.Etag)
 			}
