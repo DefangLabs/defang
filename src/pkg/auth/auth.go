@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
+	"path"
 	"strings"
 	"time"
 
@@ -37,6 +39,10 @@ const (
 	McpFlow LoginFlow = true
 )
 
+func GetAuthorizeUrl(authType string, parts ...string) string {
+	return fmt.Sprintf("%s/%s/%s", OpenAuthClient.issuer, authType, path.Join(parts...))
+}
+
 func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(string), mcpClient string) (AuthCodeFlow, error) {
 	redirectUri := OpenAuthClient.GetPollRedirectURI()
 
@@ -49,7 +55,7 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 	}
 
 	// Create a shortened authorize URL by only including the variable parts (state and code_challenge)
-	authorizeUrl := fmt.Sprintf("%s/cli/%s/%s", OpenAuthClient.issuer, ar.state, ar.challenge)
+	authorizeUrl := GetAuthorizeUrl("cli", ar.state, ar.challenge)
 
 	term.Println("Please visit the following URL to log in: (Right click the URL or press ENTER to open browser)")
 	n, _ := term.Printf("  %s", authorizeUrl)
@@ -94,27 +100,46 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 	return AuthCodeFlow{code: code, redirectUri: redirectUri, verifier: ar.verifier}, nil
 }
 
-func pollForAuthCode(ctx context.Context, state string) (string, error) {
+func Poll(ctx context.Context, key string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
 	for {
-		code, err := OpenAuthClient.Poll(ctx, state)
+		result, err := OpenAuthClient.Poll(ctx, key)
 		if err != nil {
 			if errors.Is(err, ErrPollTimeout) {
 				term.Debug("poll timed out, retrying...")
-				continue // retry
+				continue
 			}
 			var unexpectedError ErrUnexpectedStatus
 			if errors.As(err, &unexpectedError) && unexpectedError.StatusCode >= 500 {
 				term.Debugf("received server error: %s, retrying...", unexpectedError.Status)
-				continue // retry
+				continue
 			}
-			return "", err
+			return nil, err
 		}
-
-		return code, nil
+		return result, nil
 	}
+}
+
+func pollForAuthCode(ctx context.Context, state string) (string, error) {
+	body, err := Poll(ctx, state)
+	if err != nil {
+		return "", err
+	}
+	// Parse the response body as form-urlencoded
+	query, err := url.ParseQuery(string(body))
+	if err != nil {
+		return "", fmt.Errorf("failed to parse response: %w", err)
+	}
+	if errorMsg := query.Get("error"); errorMsg != "" {
+		return "", fmt.Errorf("authentication failed: %s", query.Get("error_description"))
+	}
+	code := query.Get("code")
+	if code == "" {
+		return "", errors.New("no code received from auth server")
+	}
+	return code, nil
 }
 
 func ExchangeCodeForToken(ctx context.Context, code AuthCodeFlow, ss ...scope.Scope) (string, error) {

@@ -1,7 +1,6 @@
 package aws
 
 import (
-	"bufio"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -31,7 +30,6 @@ import (
 	awssts "github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"golang.org/x/oauth2"
 )
 
 const (
@@ -142,6 +140,7 @@ func (a *Aws) Authenticate(ctx context.Context, interactive bool) error {
 		}
 		if creds != nil {
 			a.Credentials = awssdk.NewCredentialsCache(creds)
+			return nil
 		}
 	}
 
@@ -160,15 +159,8 @@ func (a *Aws) Authenticate(ctx context.Context, interactive bool) error {
 
 func (a *Aws) tryInteractiveLogin(ctx context.Context, n int) (awssdk.CredentialsProvider, error) {
 	for range n {
-		var cached *awsTokenCache
-		var err error
-		// VS Code dev containers sets REMOTE_CONTAINERS=true, so we use that as a heuristic to determine when to use the cross-device flow which doesn't rely on opening a browser on the same machine.
-		if os.Getenv("REMOTE_CONTAINERS") == "true" {
-			term.Debug("detected REMOTE_CONTAINERS environment variable, using cross-device login flow")
-			cached, err = a.CrossDeviceLogin(ctx)
-		} else {
-			cached, err = a.InteractiveLogin(ctx)
-		}
+		// Defaults to cross-device flow which works in more environments (e.g. SSH, Dev Containers)
+		cached, err := a.CrossDeviceLogin(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("interactive login failed: %w", err)
 		}
@@ -326,7 +318,6 @@ func (a *Aws) InteractiveLogin(ctx context.Context) (*awsTokenCache, error) {
 	if err != nil {
 		return nil, fmt.Errorf("generating PKCE parameters: %w", err)
 	}
-	tokenURL := baseEndpoint + "/v1/token"
 
 	code, redirectURI, err := auth.WaitForOAuthCode(ctx, auth.WaitForOAuthCodeInput{
 		CallbackPath:   "/oauth/callback",
@@ -334,24 +325,23 @@ func (a *Aws) InteractiveLogin(ctx context.Context) (*awsTokenCache, error) {
 		Title:          "Logged in to AWS",
 		SuccessMessage: "You have successfully logged in to AWS.",
 		BuildAuthURL: func(redirectURL, state string) string {
-			cfg := &oauth2.Config{
-				ClientID: clientIDSameDevice,
-				Endpoint: oauth2.Endpoint{
-					AuthURL: baseEndpoint + "/v1/sessions",
-				},
-				RedirectURL: redirectURL,
-				Scopes:      []string{"openid"},
+			// Extract the port from the redirect URL to construct the shortened auth URL with the correct callback port
+			// Since the callback url is required to be http://127.0.0.1:{port}/oauth/callback, it is coded in the auth shortener.
+			port := "8080" // default port if parsing fails
+			parsed, err := url.Parse(redirectURL)
+			if err != nil {
+				term.Warnf("failed to parse redirect URL %q, assume port 8080: %v", redirectURL, err)
+			} else {
+				port = parsed.Port()
 			}
-			return cfg.AuthCodeURL(state,
-				oauth2.SetAuthURLParam("code_challenge_method", "SHA-256"), // AWS requires "SHA-256" literally, not "S256"
-				oauth2.SetAuthURLParam("code_challenge", pkce.Challenge),
-			)
+			return auth.GetAuthorizeUrl("aws", "same", string(a.Region), state, pkce.Challenge, port)
 		},
 	})
 	if err != nil {
 		return nil, err
 	}
 
+	tokenURL := baseEndpoint + "/v1/token"
 	return RetrieveToken(ctx, tokenURL, clientIDSameDevice, code, pkce.Verifier, redirectURI)
 }
 
@@ -360,38 +350,26 @@ func (a *Aws) InteractiveLogin(ctx context.Context) (*awsTokenCache, error) {
 // to paste the base64-encoded verification code displayed in their browser.
 // TODO: Support cross device login workflow with a flag
 func (a *Aws) CrossDeviceLogin(ctx context.Context) (*awsTokenCache, error) {
-	baseEndpoint := fmt.Sprintf("https://%s.signin.aws.amazon.com", a.Region)
-	redirectURI := baseEndpoint + "/v1/sessions/confirmation"
 	pkce, err := auth.GeneratePKCE(64, auth.S256Method)
 	if err != nil {
 		return nil, fmt.Errorf("generating PKCE parameters: %w", err)
 	}
 	state := rand.Text()[:16] // random state for CSRF protection
-	tokenURL := baseEndpoint + "/v1/token"
+	authURL := auth.GetAuthorizeUrl("aws", "cross", string(a.Region), state, pkce.Challenge)
 
-	config := &oauth2.Config{
-		ClientID: clientIDCrossDevice,
-		Endpoint: oauth2.Endpoint{
-			AuthURL: baseEndpoint + "/v1/authorize",
-		},
-		RedirectURL: redirectURI,
-		Scopes:      []string{"openid"},
-	}
-
-	authURL := config.AuthCodeURL(state,
-		oauth2.SetAuthURLParam("code_challenge_method", "SHA-256"), // AWS require this to be "SHA-256" literally, not "S256"
-		oauth2.SetAuthURLParam("code_challenge", pkce.Challenge),
-	)
-
-	term.Printf("Browser will not be automatically opened. Please visit the following URL:\n\n  %s\n\n", authURL)
+	term.Println("Please visit the following URL to log in to AWS: (Right click the URL or press ENTER to open browser)")
+	term.Printf("  %s\n", authURL)
 	term.Print("Enter the authorization code displayed in your browser: ")
+	ctx, inputCh, done := term.OpenBrowserWithInputOnEnter(ctx, authURL)
+	defer done()
 
-	reader := bufio.NewReader(os.Stdin)
-	input, err := reader.ReadString('\n')
-	if err != nil {
-		return nil, fmt.Errorf("reading verification code: %w", err)
+	var input string
+	select {
+	case input = <-inputCh:
+		input = strings.TrimSpace(input)
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
-	input = strings.TrimSpace(input)
 
 	authCode, gotState, err := parseVerificationCode(input)
 	if err != nil {
@@ -401,6 +379,9 @@ func (a *Aws) CrossDeviceLogin(ctx context.Context) (*awsTokenCache, error) {
 		return nil, fmt.Errorf("state mismatch: got %q, want %q", gotState, state)
 	}
 
+	baseEndpoint := fmt.Sprintf("https://%s.signin.aws.amazon.com", a.Region)
+	tokenURL := baseEndpoint + "/v1/token"
+	redirectURI := baseEndpoint + "/v1/sessions/confirmation"
 	return RetrieveToken(ctx, tokenURL, clientIDCrossDevice, authCode, pkce.Verifier, redirectURI)
 }
 
