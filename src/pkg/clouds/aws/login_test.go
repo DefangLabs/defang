@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	awssts "github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
 // makeTestJWT creates a minimal unsigned JWT with the given claims for testing ParseUnverified.
@@ -534,6 +536,59 @@ func TestFindStoredCredentials(t *testing.T) {
 		_, err := a.findStoredCredentials(t.Context())
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+}
+
+// failStsAPI is an STS mock that always returns an error.
+type failStsAPI struct{}
+
+func (failStsAPI) GetCallerIdentity(ctx context.Context, params *awssts.GetCallerIdentityInput, optFns ...func(*awssts.Options)) (*awssts.GetCallerIdentityOutput, error) {
+	return nil, errors.New("no credentials available")
+}
+
+func (failStsAPI) AssumeRole(ctx context.Context, params *awssts.AssumeRoleInput, optFns ...func(*awssts.Options)) (*awssts.AssumeRoleOutput, error) {
+	return nil, errors.New("no credentials available")
+}
+
+func TestAuthenticate_AWS(t *testing.T) {
+	const region = "us-east-1"
+
+	t.Run("stored credentials are used when default credentials fail", func(t *testing.T) {
+		// First call: no default credentials. Subsequent calls: stored token validates OK.
+		calls := 0
+		origSts := NewStsFromConfig
+		NewStsFromConfig = func(cfg awssdk.Config) StsClientAPI {
+			calls++
+			if calls == 1 {
+				return failStsAPI{}
+			}
+			return MockStsClientAPI{}
+		}
+		t.Cleanup(func() { NewStsFromConfig = origSts })
+
+		store := tokenstore.NewMemTokenStore()
+		store.Save(tokenStoreKeyPrefix+"valid", validAwsToken(t, "https://us-east-1.signin.aws.amazon.com/v1/token")) //nolint:errcheck
+
+		a := &Aws{Region: region, TokenStore: store}
+		err := a.Authenticate(t.Context(), false)
+		if err != nil {
+			t.Fatalf("Authenticate() error = %v", err)
+		}
+		if a.Credentials == nil {
+			t.Error("expected Credentials to be set after finding stored token")
+		}
+	})
+
+	t.Run("non-interactive with no credentials returns error", func(t *testing.T) {
+		origSts := NewStsFromConfig
+		NewStsFromConfig = func(cfg awssdk.Config) StsClientAPI { return failStsAPI{} }
+		t.Cleanup(func() { NewStsFromConfig = origSts })
+
+		a := &Aws{Region: region, TokenStore: tokenstore.NewMemTokenStore()}
+		err := a.Authenticate(t.Context(), false)
+		if err == nil {
+			t.Fatal("expected error when no credentials available")
 		}
 	})
 }
