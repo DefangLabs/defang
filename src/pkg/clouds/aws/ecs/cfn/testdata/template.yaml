@@ -99,7 +99,7 @@ Metadata:
             OidcProviderClaims:
                 default: Additional OIDC Claim Conditions
             OidcProviderIssuer:
-                default: OIDC Provider Issuer URL
+                default: OIDC Provider Issuer
             OidcProviderSubjects:
                 default: OIDC Trusted Subject Patterns
             OidcProviderThumbprints:

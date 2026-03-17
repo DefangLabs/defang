@@ -170,7 +170,7 @@ func CreateTemplate(stack string, containers []clouds.Container) (*cloudformatio
 				ParamsEnablePullThroughCache:  map[string]string{"default": "Enable ECR Pull-Through Cache"},
 				ParamsDockerHubUsername:       map[string]string{"default": "Docker Hub Username"},
 				ParamsDockerHubAccessToken:    map[string]string{"default": "Docker Hub Access Token"},
-				ParamsOidcProviderIssuer:      map[string]string{"default": "OIDC Provider Issuer URL"},
+				ParamsOidcProviderIssuer:      map[string]string{"default": "OIDC Provider Issuer"},
 				ParamsOidcProviderSubjects:    map[string]string{"default": "OIDC Trusted Subject Patterns"},
 				ParamsOidcProviderAudiences:   map[string]string{"default": "OIDC Trusted Audiences"},
 				ParamsOidcProviderThumbprints: map[string]string{"default": "OIDC Provider Thumbprints"},
