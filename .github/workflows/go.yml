@@ -50,7 +50,7 @@ jobs:
           overwrite: true
 
       - name: Download main branch coverage
-        if: github.ref != 'refs/heads/main'
+        if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v')
         uses: dawidd6/action-download-artifact@1f8785ff7a5130826f848e7f72725c85d241860f
         with:
           workflow: go.yml
@@ -60,7 +60,7 @@ jobs:
         continue-on-error: true # no baseline yet on first run
 
       - name: Check coverage regression
-        if: github.ref != 'refs/heads/main'
+        if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v')
         run: |
           if [ ! -f coverage-main/coverage.txt ]; then
             echo "No main coverage baseline found, skipping comparison"
