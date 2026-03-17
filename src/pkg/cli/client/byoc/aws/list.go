@@ -33,7 +33,7 @@ func (b *ByocAws) listPulumiStacksInBucket(ctx context.Context, region aws.Regio
 				Project:   st.Project,
 				Stack:     st.Name,
 				Workspace: string(st.Workspace),
-				Region:    string(region),
+				CdRegion:  string(region),
 			}
 			if !yield(info) {
 				break
