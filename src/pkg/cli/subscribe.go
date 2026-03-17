@@ -81,6 +81,11 @@ func WatchServiceState(
 			continue
 		}
 
+		// Don't regress from terminal states (e.g. a TASK_STOPPED after DEPLOYMENT_COMPLETED)
+		currentState := serviceStates[msg.Name]
+		if currentState == defangv1.ServiceState_DEPLOYMENT_COMPLETED || currentState == defangv1.ServiceState_DEPLOYMENT_FAILED {
+			continue
+		}
 		serviceStates[msg.Name] = msg.State
 		err = cb(msg, &serviceStates)
 		if err != nil {
