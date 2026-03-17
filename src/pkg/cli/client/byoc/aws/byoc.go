@@ -404,7 +404,7 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 
 	r53Client := route53.NewFromConfig(cfg)
 
-	domain = dns.Normalize(strings.ToLower(domain))
+	domain = dns.Normalize(domain)
 	for {
 		zones, err := aws.GetHostedZonesByName(ctx, domain, r53Client)
 		if errors.Is(err, aws.ErrZoneNotFound) {
