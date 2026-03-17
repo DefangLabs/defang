@@ -140,7 +140,7 @@ func (g *PlaygroundProvider) TearDownCD(ctx context.Context) error {
 	return errors.New("the teardown command is not valid for the Defang playground; did you forget --stack or --provider?")
 }
 
-func (g *PlaygroundProvider) SetUpCD(ctx context.Context) error {
+func (g *PlaygroundProvider) SetUpCD(ctx context.Context, force bool) error {
 	return errors.New("this command is not valid for the Defang playground; did you forget --stack or --provider?")
 }
 

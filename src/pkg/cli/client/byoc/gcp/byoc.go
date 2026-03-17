@@ -165,7 +165,7 @@ func getGcpProjectID() string {
 	return projectId
 }
 
-func (b *ByocGcp) SetUpCD(ctx context.Context) error {
+func (b *ByocGcp) SetUpCD(ctx context.Context, force bool) error {
 	if b.setupDone {
 		return nil
 	}
@@ -370,7 +370,7 @@ func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 }
 
 func (b *ByocGcp) CdCommand(ctx context.Context, req client.CdCommandRequest) (types.ETag, error) {
-	if err := b.SetUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx, false); err != nil {
 		return "", err
 	}
 	etag := types.NewEtag()
@@ -499,7 +499,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) error {
 }
 
 func (b *ByocGcp) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	if err := b.SetUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx, false); err != nil {
 		return nil, err
 	}
 
@@ -533,7 +533,7 @@ func (b *ByocGcp) deploy(ctx context.Context, req *client.DeployRequest, command
 
 	// FIXME: Get cd image tag for the project
 
-	if err := b.SetUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx, false); err != nil {
 		return nil, err
 	}
 

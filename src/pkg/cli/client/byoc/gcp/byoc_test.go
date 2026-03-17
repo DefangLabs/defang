@@ -30,7 +30,7 @@ func TestSetUpCD(t *testing.T) {
 		t.Errorf("AccountInfo() error = %v, want nil", err)
 	}
 	t.Logf("account: %+v", account)
-	if err := b.SetUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx, false); err != nil {
 		t.Errorf("SetUpCD() error = %v, want nil", err)
 	}
 

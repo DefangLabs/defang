@@ -155,14 +155,14 @@ func (b *ByocAws) PrintCloudFormationTemplate() ([]byte, error) {
 	return template.YAML()
 }
 
-func (b *ByocAws) SetUpCD(ctx context.Context) error {
+func (b *ByocAws) SetUpCD(ctx context.Context, force bool) error {
 	if b.SetupDone {
 		return nil
 	}
 
 	term.Debugf("Using CD image: %q", b.CDImage)
 
-	created, err := b.driver.SetUp(ctx, b.makeContainers())
+	created, err := b.driver.SetUp(ctx, b.makeContainers(), force)
 	if err != nil {
 		return AnnotateAwsError(err)
 	}
@@ -214,7 +214,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		return nil, err
 	}
 
-	if err := b.SetUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx, false); err != nil {
 		return nil, err
 	}
 
@@ -682,7 +682,7 @@ func (b *ByocAws) ListConfig(ctx context.Context, req *defangv1.ListConfigsReque
 }
 
 func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	if err := b.SetUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx, false); err != nil {
 		return nil, err
 	}
 
@@ -915,7 +915,7 @@ func (b *ByocAws) TearDownCD(ctx context.Context) error {
 }
 
 func (b *ByocAws) CdCommand(ctx context.Context, req client.CdCommandRequest) (string, error) {
-	if err := b.SetUpCD(ctx); err != nil {
+	if err := b.SetUpCD(ctx, false); err != nil {
 		return "", err
 	}
 	etag := types.NewEtag()

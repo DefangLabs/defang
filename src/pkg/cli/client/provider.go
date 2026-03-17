@@ -89,7 +89,7 @@ type Provider interface {
 	// Deprecated: should use stacks instead of ProjectName fallback.
 	RemoteProjectName(context.Context) (string, error)
 	SetCanIUseConfig(*defangv1.CanIUseResponse)
-	SetUpCD(context.Context) error
+	SetUpCD(context.Context, bool) error
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error)
 	TearDownCD(context.Context) error
 }
