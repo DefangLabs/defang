@@ -76,7 +76,7 @@ func (l *Loader) LoadProjectName(ctx context.Context) (string, bool, error) {
 		return l.options.ProjectName, false, nil
 	}
 
-	project, err := l.loadProject(ctx, true)
+	project, err := l.loadProject(ctx, true) // FIXME: warnings are dropped because the project will have been cached
 	if err != nil {
 		if errors.Is(err, types.ErrComposeFileNotFound) {
 			return "", false, fmt.Errorf("no --project-name specified and %w", err)
@@ -91,13 +91,13 @@ func (l *Loader) LoadProject(ctx context.Context) (*Project, error) {
 	return l.loadProject(ctx, false)
 }
 
-func (l *Loader) TargetDirectory(ctx context.Context) string {
-	project, _ := l.loadProject(ctx, true)
-	if project == nil {
-		return ""
+func (l *Loader) ProjectWorkingDir(ctx context.Context) (string, error) {
+	project, err := l.loadProject(ctx, true) // FIXME: warnings are dropped because the project will have been cached
+	if err != nil {
+		return "", err
 	}
 
-	return project.WorkingDir
+	return project.WorkingDir, nil
 }
 
 func (l *Loader) loadProject(ctx context.Context, suppressWarn bool) (*Project, error) {

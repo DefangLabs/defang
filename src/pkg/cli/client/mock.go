@@ -281,8 +281,8 @@ func (m MockLoader) LoadProjectName(context.Context) (string, bool, error) {
 	return m.Project.Name, false, m.Error
 }
 
-func (m MockLoader) TargetDirectory(context.Context) string {
-	return "."
+func (m MockLoader) ProjectWorkingDir(context.Context) (string, error) {
+	return ".", nil
 }
 
 func (m MockLoader) CreateProjectForDebug() (*composeTypes.Project, error) {

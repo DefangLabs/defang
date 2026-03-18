@@ -49,7 +49,7 @@ func NewManager(fabric Lister, targetDirectory string, projectName string, ec el
 	}, nil
 }
 
-func (sm *manager) TargetDirectory(context.Context) string {
+func (sm *manager) TargetDirectory() string {
 	return sm.targetDirectory
 }
 
@@ -269,7 +269,7 @@ func (sm *manager) getSpecifiedStack(ctx context.Context, name string) (*Paramet
 		return nil, "", fmt.Errorf("failed to save imported stack %q to local directory: %w", name, err)
 	}
 	if stackFilename != "" {
-		term.Infof("Stack %q loaded and saved to %q. Add this file to source control", name, stackFilename)
+		term.Infof("Stack %q loaded and saved to %q. Add this file to source control.", name, stackFilename)
 	}
 	return stack, whence + " and previous deployment", nil
 }
