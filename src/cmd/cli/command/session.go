@@ -128,6 +128,11 @@ func newStackManagerForLoader(ctx context.Context, loader *compose.Loader) (sess
 }
 
 func findTargetDirectory(wd string) (string, error) {
+	wd, err := filepath.Abs(wd)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path of %s: %w", wd, err)
+	}
+
 	for {
 		info, err := os.Stat(filepath.Join(wd, stacks.Directory))
 		if err != nil {
