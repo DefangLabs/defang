@@ -334,7 +334,7 @@ func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[state.
 				Stack:     st.Name,
 				Project:   st.Project,
 				Workspace: string(st.Workspace),
-				Region:    b.driver.GetRegion(),
+				CdRegion:  b.driver.GetRegion(),
 			}
 			if !yield(stack) {
 				break

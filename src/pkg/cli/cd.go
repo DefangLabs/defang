@@ -12,7 +12,6 @@ import (
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -145,13 +144,7 @@ func CdListFromStorage(ctx context.Context, provider client.Provider, allRegions
 		return err
 	}
 
-	stacks := slices.Collect(func(yield func(state.Info) bool) {
-		for stackInfo := range stacksIter {
-			if !yield(stackInfo) {
-				return
-			}
-		}
-	})
+	stacks := slices.Collect(stacksIter)
 
 	if len(stacks) == 0 {
 		accountInfo, err := provider.AccountInfo(ctx)
@@ -164,7 +157,7 @@ func CdListFromStorage(ctx context.Context, provider client.Provider, allRegions
 		term.Printf("No projects found in %v\n", accountInfo)
 	}
 
-	return term.Table(stacks, "Project", "Stack", "Workspace", "Region")
+	return term.Table(stacks, "Project", "Stack", "Workspace", "CdRegion")
 }
 
 func GetStatesAndEventsUploadUrls(ctx context.Context, projectName string, provider client.Provider, fabric client.FabricClient) (statesUrl string, eventsUrl string, err error) {
