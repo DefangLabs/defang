@@ -106,7 +106,7 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 			},
 			"ParameterLabels": map[string]interface{}{
 				ParamsRetainBucket:            map[string]string{"default": "Retain S3 Bucket on Delete"},
-				ParamsOidcProviderIssuer:      map[string]string{"default": "OIDC Provider Issuer URL"},
+				ParamsOidcProviderIssuer:      map[string]string{"default": "OIDC Provider Issuer"},
 				ParamsOidcProviderSubjects:    map[string]string{"default": "OIDC Trusted Subject Patterns"},
 				ParamsOidcProviderAudiences:   map[string]string{"default": "OIDC Trusted Audiences"},
 				ParamsOidcProviderThumbprints: map[string]string{"default": "OIDC Provider Thumbprints"},
