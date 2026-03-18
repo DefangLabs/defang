@@ -18,7 +18,7 @@ type AwsCodeBuild struct {
 	CIRoleARN    string
 	LogGroupARN  string
 	ProjectName  string // CodeBuild project name
-	RetainBucket bool
+	RetainBucket bool   // CloudFormation template input parameter
 }
 
 func (a *AwsCodeBuild) MakeARN(service, resource string) string {

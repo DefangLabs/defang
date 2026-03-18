@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -64,32 +65,14 @@ func (a *AwsCfn) updateStackAndWait(ctx context.Context, templateBody string, fo
 				}
 			}
 		}
-		// Set "Use previous value" for parameters in both the old stack and new template
-		newParams := map[string]struct{}{}
-		for _, newParam := range parameters {
-			newParams[*newParam.ParameterKey] = struct{}{}
+		// Remove any parameters that have UsePreviousValue set, but are not in the previously deployed stack
+		previousParams := make(map[string]bool)
+		for _, p := range dso.Stacks[0].Parameters {
+			previousParams[*p.ParameterKey] = true
 		}
-		templateParams := map[string]struct{}{
-			ParamsCIRoleName:              {},
-			ParamsOidcProviderAudiences:   {},
-			ParamsOidcProviderClaims:      {},
-			ParamsOidcProviderIssuer:      {},
-			ParamsOidcProviderSubjects:    {},
-			ParamsOidcProviderThumbprints: {},
-			ParamsRetainBucket:            {},
-		}
-		for _, param := range dso.Stacks[0].Parameters {
-			if _, ok := newParams[*param.ParameterKey]; ok {
-				continue // already set explicitly
-			}
-			if _, ok := templateParams[*param.ParameterKey]; !ok {
-				continue // parameter no longer exists in the new template
-			}
-			parameters = append(parameters, cfnTypes.Parameter{
-				ParameterKey:     param.ParameterKey,
-				UsePreviousValue: ptr.Bool(true),
-			})
-		}
+		parameters = slices.DeleteFunc(parameters, func(p cfnTypes.Parameter) bool {
+			return p.UsePreviousValue != nil && *p.UsePreviousValue && !previousParams[*p.ParameterKey]
+		})
 	}
 
 	uso, err := cfn.UpdateStack(ctx, &cloudformation.UpdateStackInput{
@@ -161,12 +144,18 @@ func (a *AwsCfn) SetUp(ctx context.Context, force bool) (bool, error) {
 		return false, err
 	}
 
-	// Set parameter values based on current configuration
-	parameters := []cfnTypes.Parameter{
-		{
-			ParameterKey:   ptr.String(ParamsRetainBucket),
-			ParameterValue: ptr.String(strconv.FormatBool(a.RetainBucket)),
-		},
+	// Set parameter values based on current configuration or leave nil to use previous values or defaults
+	var parameters []cfnTypes.Parameter
+	for key := range template.Parameters {
+		param := cfnTypes.Parameter{
+			ParameterKey:     ptr.String(key),
+			UsePreviousValue: ptr.Bool(true),
+		}
+		if key == ParamsRetainBucket {
+			param.ParameterValue = ptr.String(strconv.FormatBool(a.RetainBucket))
+			param.UsePreviousValue = nil
+		}
+		parameters = append(parameters, param)
 	}
 
 	return a.upsertStackAndWait(ctx, templateBody, force, parameters...)
