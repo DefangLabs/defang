@@ -202,6 +202,11 @@ func (a *AwsCfn) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) error
 	if len(dso.Stacks) != 1 {
 		return fmt.Errorf("expected 1 CloudFormation stack, got %d", len(dso.Stacks))
 	}
+
+	a.LogGroupARN = ""
+	a.BucketName = ""
+	a.CIRoleARN = ""
+	a.ProjectName = ""
 	for _, output := range dso.Stacks[0].Outputs {
 		switch *output.OutputKey {
 		case OutputsLogGroupARN:

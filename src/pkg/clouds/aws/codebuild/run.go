@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	cb "github.com/aws/aws-sdk-go-v2/service/codebuild"
+	"github.com/aws/aws-sdk-go-v2/service/codebuild"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	"github.com/aws/smithy-go/ptr"
 )
@@ -29,8 +29,8 @@ func (a *AwsCodeBuild) Run(ctx context.Context, image string, env map[string]str
 	// CodeBuild overrides the image's WORKDIR; use `cd` to restore it before running the command
 	buildspec := "version: 0.2\nphases:\n  build:\n    commands:\n      - cd /app && " + command + "\n"
 
-	client := cb.NewFromConfig(cfg)
-	input := &cb.StartBuildInput{
+	client := codebuild.NewFromConfig(cfg)
+	input := &codebuild.StartBuildInput{
 		ProjectName:                  ptr.String(a.ProjectName),
 		ImageOverride:                ptr.String(image),
 		EnvironmentVariablesOverride: envOverrides,
@@ -54,8 +54,8 @@ func (a *AwsCodeBuild) Stop(ctx context.Context, buildID BuildID) error {
 		return err
 	}
 
-	client := cb.NewFromConfig(cfg)
-	_, err = client.StopBuild(ctx, &cb.StopBuildInput{
+	client := codebuild.NewFromConfig(cfg)
+	_, err = client.StopBuild(ctx, &codebuild.StopBuildInput{
 		Id: buildID,
 	})
 	return err

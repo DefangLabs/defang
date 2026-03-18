@@ -91,7 +91,7 @@ Outputs:
                 - Arn
     templateVersion:
         Description: Version of this CloudFormation template
-        Value: 5
+        Value: 4
 Parameters:
     CIRoleName:
         Default: ""
@@ -132,6 +132,11 @@ Resources:
                 - RetainExceptOnCreate
                 - Delete
         Properties:
+            PublicAccessBlockConfiguration:
+                BlockPublicAcls: true
+                BlockPublicPolicy: true
+                IgnorePublicAcls: true
+                RestrictPublicBuckets: true
             Tags:
                 - Key: defang:CreatedBy
                   Value: defang
@@ -228,6 +233,15 @@ Resources:
                         - iam:ListRolePolicies
                         - iam:ListAttachedRolePolicies
                         - iam:ListInstanceProfilesForRole
+                        - iam:PutRolePolicy
+                        - iam:GetRolePolicy
+                        - iam:DeleteRolePolicy
+                        - iam:AttachRolePolicy
+                        - iam:DetachRolePolicy
+                      Effect: Allow
+                      Resource:
+                        Fn::Sub: arn:aws:iam::${AWS::AccountId}:role/*
+                    - Action:
                         - iam:CreatePolicy
                         - iam:GetPolicy
                         - iam:DeletePolicy
@@ -235,18 +249,55 @@ Resources:
                         - iam:DeletePolicyVersion
                         - iam:GetPolicyVersion
                         - iam:ListPolicyVersions
-                        - iam:PutRolePolicy
-                        - iam:GetRolePolicy
-                        - iam:DeleteRolePolicy
-                        - iam:AttachRolePolicy
-                        - iam:DetachRolePolicy
+                      Effect: Allow
+                      Resource:
+                        Fn::Sub: arn:aws:iam::${AWS::AccountId}:policy/*
+                    - Action:
                         - iam:CreateInstanceProfile
                         - iam:GetInstanceProfile
                         - iam:DeleteInstanceProfile
                         - iam:AddRoleToInstanceProfile
                         - iam:RemoveRoleFromInstanceProfile
-                        - iam:PassRole
-                        - iam:CreateServiceLinkedRole
+                      Effect: Allow
+                      Resource:
+                        Fn::Sub: arn:aws:iam::${AWS::AccountId}:instance-profile/*
+                    - Action: iam:PassRole
+                      Effect: Allow
+                      Resource:
+                        Fn::Sub: arn:aws:iam::${AWS::AccountId}:role/*
+                    - Action: iam:CreateServiceLinkedRole
+                      Effect: Allow
+                      Resource:
+                        Fn::Sub: arn:aws:iam::${AWS::AccountId}:role/aws-service-role/*
+                Version: "2012-10-17"
+            Roles:
+                - Ref: CodeBuildServiceRole
+        Type: AWS::IAM::ManagedPolicy
+    CodeBuildServicePolicy:
+        Properties:
+            PolicyDocument:
+                Statement:
+                    - Action:
+                        - ecs:*
+                        - ec2:*
+                        - elasticloadbalancing:*
+                        - route53:*
+                        - logs:*
+                        - cloudwatch:*
+                        - s3:*
+                        - ecr:*
+                        - ecr-public:*
+                        - secretsmanager:*
+                        - acm:*
+                        - autoscaling:*
+                        - application-autoscaling:*
+                        - servicediscovery:*
+                        - ssm:*
+                        - kms:*
+                        - codebuild:*
+                        - bedrock:*
+                        - sts:GetCallerIdentity
+                        - sts:AssumeRole
                       Effect: Allow
                       Resource: '*'
                 Version: "2012-10-17"
@@ -262,8 +313,6 @@ Resources:
                       Principal:
                         Service: codebuild.amazonaws.com
                 Version: "2012-10-17"
-            ManagedPolicyArns:
-                - arn:aws:iam::aws:policy/PowerUserAccess
             Tags:
                 - Key: defang:CreatedBy
                   Value: defang

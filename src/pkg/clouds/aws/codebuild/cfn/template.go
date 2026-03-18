@@ -20,7 +20,7 @@ const (
 	TagKeyStackRegion = "defang:CloudFormationStackRegion"
 )
 
-const TemplateRevision = 5 // bump this when the template changes!
+const TemplateRevision = 4 // bump this when the template changes!
 
 // CreateTemplate creates a parameterized CloudFormation template for the CD infrastructure.
 // Uses CodeBuild instead of ECS for running Pulumi deployments.
@@ -139,6 +139,12 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 		VersioningConfiguration: &s3.Bucket_VersioningConfiguration{
 			Status: "Enabled",
 		},
+		PublicAccessBlockConfiguration: &s3.Bucket_PublicAccessBlockConfiguration{
+			BlockPublicAcls:       ptr.Bool(true),
+			BlockPublicPolicy:     ptr.Bool(true),
+			IgnorePublicAcls:      ptr.Bool(true),
+			RestrictPublicBuckets: ptr.Bool(true),
+		},
 	}
 
 	// 2. CloudWatch log group
@@ -176,10 +182,10 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 	//   - aws.iam.RolePolicy + RolePoliciesExclusive (inline policies)
 	//   - aws.iam.RolePolicyAttachment (attaching managed policies)
 	//   - aws.iam.InstanceProfile (EC2/GPU nodes)
-	// Each Pulumi resource type maps to the CRUD + read actions below.
+	// Each Pulumi resource type maps to the CRUD + read actions below, scoped to
+	// the specific IAM resource types in the current account.
 	// PassRole is needed because Pulumi passes roles to ECS, EC2, and CodeBuild.
 	// CreateServiceLinkedRole is needed because ECS/ELB create SLRs on first use.
-	// IT departments can attach additional policies to the role without affecting this one.
 	const _codeBuildIAMPolicy = "CodeBuildIAMPolicy"
 	template.Resources[_codeBuildIAMPolicy] = &iam.ManagedPolicy{
 		Roles: []string{
@@ -196,22 +202,38 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 						"iam:UpdateAssumeRolePolicy",
 						"iam:ListRolePolicies", "iam:ListAttachedRolePolicies",
 						"iam:ListInstanceProfilesForRole",
-
+						"iam:PutRolePolicy", "iam:GetRolePolicy", "iam:DeleteRolePolicy",
+						"iam:AttachRolePolicy", "iam:DetachRolePolicy",
+					},
+					"Resource": cloudformation.Sub("arn:aws:iam::${AWS::AccountId}:role/*"),
+				},
+				{
+					"Effect": "Allow",
+					"Action": []string{
 						"iam:CreatePolicy", "iam:GetPolicy", "iam:DeletePolicy",
 						"iam:CreatePolicyVersion", "iam:DeletePolicyVersion",
 						"iam:GetPolicyVersion", "iam:ListPolicyVersions",
-
-						"iam:PutRolePolicy", "iam:GetRolePolicy", "iam:DeleteRolePolicy",
-						"iam:AttachRolePolicy", "iam:DetachRolePolicy",
-
+					},
+					"Resource": cloudformation.Sub("arn:aws:iam::${AWS::AccountId}:policy/*"),
+				},
+				{
+					"Effect": "Allow",
+					"Action": []string{
 						"iam:CreateInstanceProfile", "iam:GetInstanceProfile",
 						"iam:DeleteInstanceProfile",
 						"iam:AddRoleToInstanceProfile", "iam:RemoveRoleFromInstanceProfile",
-
-						"iam:PassRole",
-						"iam:CreateServiceLinkedRole",
 					},
-					"Resource": "*",
+					"Resource": cloudformation.Sub("arn:aws:iam::${AWS::AccountId}:instance-profile/*"),
+				},
+				{
+					"Effect":   "Allow",
+					"Action":   "iam:PassRole",
+					"Resource": cloudformation.Sub("arn:aws:iam::${AWS::AccountId}:role/*"),
+				},
+				{
+					"Effect":   "Allow",
+					"Action":   "iam:CreateServiceLinkedRole",
+					"Resource": cloudformation.Sub("arn:aws:iam::${AWS::AccountId}:role/aws-service-role/*"),
 				},
 			},
 		},

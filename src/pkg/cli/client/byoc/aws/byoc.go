@@ -168,14 +168,14 @@ func (b *ByocAws) SetUpCD(ctx context.Context, force bool) error {
 func (b *ByocAws) GetDeploymentStatus(ctx context.Context) (bool, error) {
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
-		return false, err
+		return false, AnnotateAwsError(err)
 	}
 	done, err := awscodebuild.GetBuildStatus(ctx, cfg, b.cdBuildId)
 	if err != nil {
 		if buildErr := new(awscodebuild.BuildFailure); errors.As(err, buildErr) {
 			return done, client.ErrDeploymentFailed{Message: buildErr.Error()}
 		}
-		return done, err
+		return done, AnnotateAwsError(err)
 	}
 	return done, nil
 }
@@ -308,7 +308,7 @@ func (b *ByocAws) putDockerHubSecret(ctx context.Context, projectName string, us
 
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
-		return "", err
+		return "", AnnotateAwsError(err)
 	}
 
 	secretsmanagerClient := secretsmanager.NewFromConfig(cfg)
