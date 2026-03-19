@@ -166,46 +166,27 @@ func (c client) GetPollRedirectURI() string {
 	return c.issuer + "/clients/auth"
 }
 
-func (c client) Poll(ctx context.Context, state string) (string, error) {
-	// Poll the server for the auth result
+func (c client) Poll(ctx context.Context, state string) ([]byte, error) {
 	pollUrl := fmt.Sprintf("%s/clients/auth/poll?state=%s", c.issuer, state)
 
 	resp, err := defangHttp.PostFormWithContext(ctx, pollUrl, nil)
 	if err != nil {
-		return "", fmt.Errorf("poll request failed: %w", err)
+		return nil, fmt.Errorf("poll request failed: %w", err)
 	}
-
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusRequestTimeout {
-		return "", ErrPollTimeout
+		return nil, ErrPollTimeout
 	}
-
 	if resp.StatusCode != http.StatusOK {
-		return "", ErrUnexpectedStatus{StatusCode: resp.StatusCode, Status: resp.Status}
+		return nil, ErrUnexpectedStatus{StatusCode: resp.StatusCode, Status: resp.Status}
 	}
 
-	// Parse the response body as form-urlencoded
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
+		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
-
-	query, err := url.ParseQuery(string(body))
-	if err != nil {
-		return "", fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	if errorMsg := query.Get("error"); errorMsg != "" {
-		return "", fmt.Errorf("authentication failed: %s", query.Get("error_description"))
-	}
-
-	code := query.Get("code")
-	if code == "" {
-		return "", errors.New("no code received from auth server")
-	}
-
-	return code, nil
+	return body, nil
 }
 
 func generateState() (string, error) {
