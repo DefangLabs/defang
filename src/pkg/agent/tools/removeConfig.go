@@ -31,7 +31,8 @@ func HandleRemoveConfigTool(ctx context.Context, loader client.Loader, params Re
 		return "", err
 	}
 
-	sm, err := stacks.NewManager(client, loader.TargetDirectory(ctx), params.ProjectName, ec)
+	workingDir, _ := loader.ProjectWorkingDir(ctx)
+	sm, err := stacks.NewManager(client, workingDir, params.ProjectName, ec)
 	if err != nil {
 		return "", fmt.Errorf("failed to create stack manager: %w", err)
 	}

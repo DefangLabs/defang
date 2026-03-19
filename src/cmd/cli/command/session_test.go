@@ -14,6 +14,7 @@ func TestNewStackManagerForCommand(t *testing.T) {
 	tests := []struct {
 		name           string
 		directory      string
+		paths          []string
 		projectName    string
 		expectedTarget string
 		expectedError  string
@@ -49,12 +50,48 @@ func TestNewStackManagerForCommand(t *testing.T) {
 			projectName:    "myproject",
 			expectedTarget: "",
 		},
+		{
+			name:           "outside a project directory - refer to compose file in child",
+			directory:      ".",
+			paths:          []string{"with-project-and-stack/compose.yaml"},
+			expectedTarget: "with-project-and-stack",
+		},
+		{
+			name:           "outside a project directory - refer to compose file in sibling",
+			directory:      "without-stack",
+			paths:          []string{"../with-project-and-stack/compose.yaml"},
+			expectedTarget: "../with-project-and-stack",
+		},
+		{
+			name:           "outside a project directory - refer to compose file in parent",
+			directory:      "with-project-and-stack/child",
+			paths:          []string{"../compose.yaml"},
+			expectedTarget: "..",
+		},
+		{
+			name:           "outside a project directory - refer to compose file in child",
+			directory:      ".",
+			paths:          []string{"without-stack/compose.yaml"},
+			expectedTarget: "without-stack",
+		},
+		{
+			name:           "outside a project directory - refer to compose file in sibling",
+			directory:      "with-project-and-stack",
+			paths:          []string{"../without-stack/compose.yaml"},
+			expectedTarget: "../without-stack",
+		},
+		{
+			name:           "outside a project directory - refer to compose file in parent",
+			directory:      "without-stack/child",
+			paths:          []string{"../compose.yaml"},
+			expectedTarget: "..",
+		},
 	}
 
 	for _, tt := range tests {
 		tempDir := t.TempDir()
 		// copy testdata to tempDir
-		err := copyDir("testdata", tempDir)
+		err := os.CopyFS(tempDir, os.DirFS("testdata"))
 		if err != nil {
 			t.Fatalf("failed to copy testdata: %v", err)
 		}
@@ -62,7 +99,7 @@ func TestNewStackManagerForCommand(t *testing.T) {
 			testDir := filepath.Join(tempDir, tt.directory)
 			t.Chdir(testDir)
 
-			loader := compose.NewLoader(compose.WithProjectName(tt.projectName))
+			loader := compose.NewLoader(compose.WithProjectName(tt.projectName), compose.WithPath(tt.paths...))
 			sm, err := newStackManagerForLoader(t.Context(), loader)
 			if tt.expectedError != "" {
 				assert.EqualError(t, err, tt.expectedError)
@@ -71,9 +108,9 @@ func TestNewStackManagerForCommand(t *testing.T) {
 			require.NoError(t, err, "expected no error but got one")
 
 			if tt.expectedTarget == "" {
-				assert.Equal(t, "", sm.TargetDirectory(t.Context()))
+				assert.Equal(t, "", sm.TargetDirectory())
 			} else {
-				actualTarget := sm.TargetDirectory(t.Context())
+				actualTarget := sm.TargetDirectory()
 				expectedAbs, err := filepath.Abs(tt.expectedTarget)
 				if err != nil {
 					t.Fatalf("failed to get absolute path: %v", err)
@@ -82,32 +119,4 @@ func TestNewStackManagerForCommand(t *testing.T) {
 			}
 		})
 	}
-}
-
-func copyDir(src string, dst string) error {
-	entries, err := os.ReadDir(src)
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		srcPath := filepath.Join(src, entry.Name())
-		dstPath := filepath.Join(dst, entry.Name())
-		if entry.IsDir() {
-			if err := os.Mkdir(dstPath, 0755); err != nil {
-				return err
-			}
-			if err := copyDir(srcPath, dstPath); err != nil {
-				return err
-			}
-		} else {
-			data, err := os.ReadFile(srcPath)
-			if err != nil {
-				return err
-			}
-			if err := os.WriteFile(dstPath, data, 0644); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
