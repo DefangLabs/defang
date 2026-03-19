@@ -130,7 +130,7 @@ func TestPrintEstimate(t *testing.T) {
 Estimate for Deployment Mode: AFFORDABLE
 
 This mode is optimized for low cost and rapid iteration. Your application
-will deployed with spot instances. Databases will be provisioned using
+will be deployed with spot instances. Databases will be provisioned using
 resources optimized for burstable memory. Deployments are replaced entirely on
 updates, so there may be small windows of downtime during redeployment.
 Services will be exposed directly to the public internet for easy debugging.

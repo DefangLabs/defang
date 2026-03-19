@@ -96,7 +96,7 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 
 var affordableModeEstimateSummary = `
 This mode is optimized for low cost and rapid iteration. Your application
-will deployed with spot instances. Databases will be provisioned using
+will be deployed with spot instances. Databases will be provisioned using
 resources optimized for burstable memory. Deployments are replaced entirely on
 updates, so there may be small windows of downtime during redeployment.
 Services will be exposed directly to the public internet for easy debugging.
@@ -110,7 +110,7 @@ be deployed to a private subnet with a NAT gateway for outbound internet access.
 
 var highAvailabilityModeEstimateSummary = `
 This mode prioritizes availability. Your application
-will deployed with on-demand instances in multiple availability zones.
+will be deployed with on-demand instances in multiple availability zones.
 Databases will be provisioned using resources optimized for production.
 Services in the "internal" network will be deployed to a private subnet with a
 NAT gateway for outbound internet access.`
