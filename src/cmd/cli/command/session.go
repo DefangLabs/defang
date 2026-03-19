@@ -105,6 +105,7 @@ func doubleCheckProjectName(projectName string) {
 func newStackManagerForLoader(ctx context.Context, loader *compose.Loader) (session.StacksManager, error) {
 	targetDirectory, err := loader.ProjectWorkingDir(ctx)
 	if err != nil {
+		term.Debugf("Could not determine project working directory: %v", err)
 		// No project directory; look for .defang directory in current or parent directories
 		targetDirectory, _ = findTargetDirectory(".")
 	} else {
