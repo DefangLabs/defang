@@ -44,10 +44,7 @@ func OpenBrowserOnEnter(ctx context.Context, url string) (context.Context, func(
 			}
 		}
 	}()
-	return ctx, func() {
-		input.Close()
-		cancel()
-	}
+	return ctx, cancel
 }
 
 func OpenBrowserWithInputOnEnter(ctx context.Context, url string) (context.Context, <-chan string, func()) {
@@ -93,8 +90,5 @@ func OpenBrowserWithInputOnEnter(ctx context.Context, url string) (context.Conte
 		}
 		close(inputChan)
 	}()
-	return ctx, inputChan, func() {
-		input.Close()
-		cancel()
-	}
+	return ctx, inputChan, cancel
 }

@@ -333,6 +333,10 @@ func pollServerForGCP(t *testing.T, payload []byte) *httptest.Server {
 			return
 		}
 		var pubKey [32]byte
+		if len(pubKeyBytes) != len(pubKey) {
+			http.Error(w, "bad state length", http.StatusBadRequest)
+			return
+		}
 		copy(pubKey[:], pubKeyBytes)
 
 		ciphertext, err := box.SealAnonymous(nil, payload, &pubKey, cryptorand.Reader)

@@ -79,7 +79,7 @@ func TestPoll(t *testing.T) {
 		calls := 0
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			calls++
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			http.Error(w, "timeout", http.StatusRequestTimeout)
 		}))
 		t.Cleanup(server.Close)
 
@@ -87,15 +87,15 @@ func TestPoll(t *testing.T) {
 		OpenAuthClient = NewClient("test", server.URL)
 		t.Cleanup(func() { OpenAuthClient = orig })
 
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
 
 		_, err := Poll(ctx, "state")
 		if err == nil {
 			t.Error("expected error after context cancellation")
 		}
-		if calls < 1 {
-			t.Error("expected server to be called at least once")
+		if calls < 2 {
+			t.Error("expected server to be called at least twice")
 		}
 	})
 
