@@ -446,9 +446,8 @@ func createArchive(ctx context.Context, root string, dockerfile string, contentT
 
 	doProgress := term.StdoutCanColor() && term.IsTerminal()
 	err := walkContextFolder(root, dockerfile, writeIgnoreFileYes, func(path string, de os.DirEntry, slashPath string) error {
-		if term.DoDebug() {
-			term.Debug("Adding", slashPath)
-		} else if doProgress {
+		term.Debug("Adding", slashPath)
+		if doProgress {
 			term.Printf("%4d %s\r", fileCount, slashPath)
 			defer term.ClearLine()
 		}
