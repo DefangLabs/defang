@@ -165,6 +165,10 @@ func (b *ByocAws) SetUpCD(ctx context.Context, force bool) error {
 	return nil
 }
 
+func (*ByocAws) Driver() string {
+	return "codebuild"
+}
+
 func (b *ByocAws) GetDeploymentStatus(ctx context.Context) (bool, error) {
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {

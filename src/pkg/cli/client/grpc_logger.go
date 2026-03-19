@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg"
@@ -17,13 +18,6 @@ type grpcLogger struct {
 
 func (g grpcLogger) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		// Add a request ID to the context
-		requestId := pkg.RandomID()
-		req.Header().Add("X-Request-Id", requestId)
-
-		// Get the request type name
-		reqType := req.Spec().Procedure
-
 		// Convert request payload to JSON for logging
 		payload, err := json.Marshal(req.Any())
 		if err != nil {
@@ -35,23 +29,22 @@ func (g grpcLogger) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 			payload = append(payload[:maxPayloadLength], []byte("…")...)
 		}
 
-		term.Debug(g.prefix, requestId, reqType, string(payload))
+		g.logRequest(req.Header(), req.Spec().Procedure, string(payload))
 		return next(ctx, req)
 	}
+}
+func (g grpcLogger) logRequest(header http.Header, reqType, payload string) {
+	// Add a request ID to the context
+	requestId := pkg.RandomID()
+	header.Add("X-Request-Id", requestId)
+
+	term.Debug(g.prefix, requestId, reqType, payload)
 }
 
 func (g grpcLogger) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
 	return func(ctx context.Context, spec connect.Spec) connect.StreamingClientConn {
 		conn := next(ctx, spec)
-
-		// Add a request ID to the context
-		requestId := pkg.RandomID()
-		conn.RequestHeader().Add("X-Request-Id", requestId)
-
-		// Get the request type name
-		reqType := spec.Procedure
-
-		term.Debug(g.prefix, requestId, reqType, "streaming connection established")
+		g.logRequest(conn.RequestHeader(), spec.Procedure, "streaming connection established")
 		return conn
 	}
 }

@@ -41,6 +41,7 @@ func CanIUseProvider(ctx context.Context, client FabricClient, provider Provider
 		Stack:               provider.GetStackName(),
 		PreferCdVersion:     preferCdVersion,
 		PreferPulumiVersion: preferPulumiVersion,
+		Driver:              provider.Driver(),
 	})
 	if err != nil {
 		return err

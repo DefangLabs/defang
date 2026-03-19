@@ -273,37 +273,6 @@ Resources:
             Roles:
                 - Ref: CodeBuildServiceRole
         Type: AWS::IAM::ManagedPolicy
-    CodeBuildServicePolicy:
-        Properties:
-            PolicyDocument:
-                Statement:
-                    - Action:
-                        - ecs:*
-                        - ec2:*
-                        - elasticloadbalancing:*
-                        - route53:*
-                        - logs:*
-                        - cloudwatch:*
-                        - s3:*
-                        - ecr:*
-                        - ecr-public:*
-                        - secretsmanager:*
-                        - acm:*
-                        - autoscaling:*
-                        - application-autoscaling:*
-                        - servicediscovery:*
-                        - ssm:*
-                        - kms:*
-                        - codebuild:*
-                        - bedrock:*
-                        - sts:GetCallerIdentity
-                        - sts:AssumeRole
-                      Effect: Allow
-                      Resource: '*'
-                Version: "2012-10-17"
-            Roles:
-                - Ref: CodeBuildServiceRole
-        Type: AWS::IAM::ManagedPolicy
     CodeBuildServiceRole:
         Properties:
             AssumeRolePolicyDocument:
@@ -313,6 +282,8 @@ Resources:
                       Principal:
                         Service: codebuild.amazonaws.com
                 Version: "2012-10-17"
+            ManagedPolicyArns:
+                - arn:aws:iam::aws:policy/PowerUserAccess
             Tags:
                 - Key: defang:CreatedBy
                   Value: defang
