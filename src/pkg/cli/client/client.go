@@ -30,6 +30,7 @@ type FabricClient interface {
 	GetVersions(context.Context) (*defangv1.Version, error)
 	ListDeployments(context.Context, *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error)
 	ListStacks(context.Context, *defangv1.ListStacksRequest) (*defangv1.ListStacksResponse, error)
+	GetStack(context.Context, *defangv1.GetStackRequest) (*defangv1.GetStackResponse, error)
 	Preview(context.Context, *defangv1.PreviewRequest) (*defangv1.PreviewResponse, error)
 	PutDeployment(context.Context, *defangv1.PutDeploymentRequest) error
 	PutStack(context.Context, *defangv1.PutStackRequest) error
