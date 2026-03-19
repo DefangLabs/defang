@@ -79,7 +79,7 @@ func TestPoll(t *testing.T) {
 		calls := 0
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			calls++
-			http.Error(w, "timeout", http.StatusRequestTimeout)
+			http.Error(w, "internal error", http.StatusInternalServerError)
 		}))
 		t.Cleanup(server.Close)
 
@@ -87,7 +87,7 @@ func TestPoll(t *testing.T) {
 		OpenAuthClient = NewClient("test", server.URL)
 		t.Cleanup(func() { OpenAuthClient = orig })
 
-		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second) // Retry client retires per second
 		defer cancel()
 
 		_, err := Poll(ctx, "state")
