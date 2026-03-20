@@ -2,14 +2,21 @@ package gcp
 
 import (
 	"context"
+	cryptorand "crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"cloud.google.com/go/iam/apiv1/iampb"
+	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	gax "github.com/googleapis/gax-go/v2"
+	"golang.org/x/crypto/nacl/box"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/option"
 )
@@ -321,4 +328,131 @@ func TestParseWIFProvider(t *testing.T) {
 			}
 		})
 	}
+}
+
+// pollServerForGCP starts an httptest server that simulates the auth portal's
+// poll endpoint for GCP interactive login. The handler extracts the public key
+// from the state query parameter, encrypts payload with it using box.SealAnonymous,
+// and returns base64-encoded ciphertext.
+func pollServerForGCP(t *testing.T, payload []byte) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pubKeyB64 := r.URL.Query().Get("state")
+		pubKeyBytes, err := base64.URLEncoding.DecodeString(pubKeyB64)
+		if err != nil {
+			http.Error(w, "bad state: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		var pubKey [32]byte
+		if len(pubKeyBytes) != len(pubKey) {
+			http.Error(w, "bad state length", http.StatusBadRequest)
+			return
+		}
+		copy(pubKey[:], pubKeyBytes)
+
+		ciphertext, err := box.SealAnonymous(nil, payload, &pubKey, cryptorand.Reader)
+		if err != nil {
+			http.Error(w, "encryption failed", http.StatusInternalServerError)
+			return
+		}
+		w.Write([]byte(base64.StdEncoding.EncodeToString(ciphertext))) //nolint:errcheck
+	}))
+}
+
+func TestInteractiveLogin_GCP(t *testing.T) {
+	t.Run("invalid base64 response returns error", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("!!!not valid base64!!!")) //nolint:errcheck
+		}))
+		t.Cleanup(srv.Close)
+
+		orig := auth.OpenAuthClient
+		auth.OpenAuthClient = auth.NewClient("test", srv.URL)
+		t.Cleanup(func() { auth.OpenAuthClient = orig })
+
+		gcp := &Gcp{}
+		_, err := gcp.InteractiveLogin(t.Context())
+		if err == nil {
+			t.Fatal("expected error for invalid base64")
+		}
+		if !strings.Contains(err.Error(), "failed to decode encrypted token") {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("decryption with wrong key returns error", func(t *testing.T) {
+		// Encrypt with a different key than what InteractiveLogin will generate
+		wrongPub, _, err := box.GenerateKey(cryptorand.Reader)
+		if err != nil {
+			t.Fatalf("generating wrong key: %v", err)
+		}
+		ciphertext, err := box.SealAnonymous(nil, []byte("secret"), wrongPub, cryptorand.Reader)
+		if err != nil {
+			t.Fatalf("encrypting: %v", err)
+		}
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte(base64.StdEncoding.EncodeToString(ciphertext))) //nolint:errcheck
+		}))
+		t.Cleanup(srv.Close)
+
+		orig := auth.OpenAuthClient
+		auth.OpenAuthClient = auth.NewClient("test", srv.URL)
+		t.Cleanup(func() { auth.OpenAuthClient = orig })
+
+		gcp := &Gcp{}
+		_, err = gcp.InteractiveLogin(t.Context())
+		if err == nil {
+			t.Fatal("expected decryption failure")
+		}
+		if !strings.Contains(err.Error(), "failed to decrypt token") {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("invalid JSON after decryption returns error", func(t *testing.T) {
+		srv := pollServerForGCP(t, []byte("not-valid-json"))
+		t.Cleanup(srv.Close)
+
+		orig := auth.OpenAuthClient
+		auth.OpenAuthClient = auth.NewClient("test", srv.URL)
+		t.Cleanup(func() { auth.OpenAuthClient = orig })
+
+		gcp := &Gcp{}
+		_, err := gcp.InteractiveLogin(t.Context())
+		if err == nil {
+			t.Fatal("expected error for invalid JSON")
+		}
+		if !strings.Contains(err.Error(), "failed to parse token") {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("success returns token source", func(t *testing.T) {
+		wantToken := oauth2.Token{
+			AccessToken:  "gcp-access-token",
+			RefreshToken: "gcp-refresh-token",
+			Expiry:       time.Now().Add(time.Hour),
+		}
+		tokenJSON, err := json.Marshal(wantToken)
+		if err != nil {
+			t.Fatalf("marshaling token: %v", err)
+		}
+
+		srv := pollServerForGCP(t, tokenJSON)
+		t.Cleanup(srv.Close)
+
+		orig := auth.OpenAuthClient
+		auth.OpenAuthClient = auth.NewClient("test", srv.URL)
+		t.Cleanup(func() { auth.OpenAuthClient = orig })
+
+		gcp := &Gcp{}
+		ts, err := gcp.InteractiveLogin(t.Context())
+		if err != nil {
+			t.Fatalf("InteractiveLogin() error = %v", err)
+		}
+		if ts == nil {
+			t.Error("expected non-nil token source")
+		}
+	})
 }

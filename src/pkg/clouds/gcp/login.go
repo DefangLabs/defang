@@ -2,6 +2,8 @@ package gcp
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +18,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/github"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	gax "github.com/googleapis/gax-go/v2"
+	"golang.org/x/crypto/nacl/box"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/oauth2/google/externalaccount"
@@ -302,9 +305,38 @@ func audienceToPrincipalSet(audience string) (string, error) {
 }
 
 func (gcp *Gcp) InteractiveLogin(ctx context.Context) (oauth2.TokenSource, error) {
-	pkce, err := auth.GeneratePKCE(64, auth.S256Method)
+	pubKey, privKey, err := box.GenerateKey(rand.Reader)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate PKCE: %w", err)
+		return nil, fmt.Errorf("failed to generate keypair: %w", err)
+	}
+
+	publicKeyBase64 := base64.URLEncoding.EncodeToString(pubKey[:])
+	authorizeURL := auth.GetAuthorizeUrl("gcp", publicKeyBase64)
+
+	term.Println("Please visit the following URL to log in to Google Cloud Platform: (Right click the URL or press ENTER to open browser)")
+	term.Printf("  %s\n", authorizeURL)
+
+	ctx, done := term.OpenBrowserOnEnter(ctx, authorizeURL)
+	defer done()
+
+	encryptedToken, err := auth.Poll(ctx, publicKeyBase64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to poll for token: %w", err)
+	}
+
+	ciphertext, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(encryptedToken)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode encrypted token: %w", err)
+	}
+
+	tokenJSON, ok := box.OpenAnonymous(nil, ciphertext, pubKey, privKey)
+	if !ok {
+		return nil, errors.New("failed to decrypt token")
+	}
+
+	var token oauth2.Token
+	if err := json.Unmarshal(tokenJSON, &token); err != nil {
+		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}
 
 	cfg := &oauth2.Config{
@@ -313,31 +345,7 @@ func (gcp *Gcp) InteractiveLogin(ctx context.Context) (oauth2.TokenSource, error
 		Scopes:       scopes,
 		Endpoint:     google.Endpoint,
 	}
-
-	code, _, err := auth.WaitForOAuthCode(ctx, auth.WaitForOAuthCodeInput{
-		CallbackPath:   "/",
-		Prompt:         "Please visit the following URL to log in to Google Cloud Platform: (Right click the URL or press ENTER to open browser)",
-		Title:          "Logged in to Google Cloud Platform",
-		SuccessMessage: "You have successfully logged in to Google Cloud Platform.",
-		BuildAuthURL: func(redirectURL, state string) string {
-			cfg.RedirectURL = redirectURL
-			return cfg.AuthCodeURL(state,
-				oauth2.AccessTypeOffline,
-				oauth2.SetAuthURLParam("code_challenge", pkce.Challenge),
-				oauth2.SetAuthURLParam("code_challenge_method", "S256"),
-			)
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	token, err := cfg.Exchange(ctx, code, oauth2.SetAuthURLParam("code_verifier", pkce.Verifier))
-	if err != nil {
-		return nil, fmt.Errorf("failed to exchange code for token: %w", err)
-	}
-
-	return cfg.TokenSource(ctx, token), nil
+	return cfg.TokenSource(ctx, &token), nil
 }
 
 type ErrorMissingPermissions []string

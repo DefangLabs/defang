@@ -5,28 +5,39 @@ import (
 	"fmt"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/ecsserviceaction"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/ecstaskstatechange"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 type Cache interface {
-	Get(string) string
-	Set(string, string)
+	Get(string) types.ETag
+	Set(string, types.ETag)
 }
 
-type LocalCache map[string]string
-
-var DeploymentEtags Cache = make(LocalCache)
-
-func (c LocalCache) Get(k string) string {
-	return c[k]
+type LocalCache struct {
+	data  map[string]string
+	mutex sync.RWMutex
 }
 
-func (c LocalCache) Set(k, v string) {
-	c[k] = v
+func (c *LocalCache) Get(k string) types.ETag {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	return c.data[k]
+}
+
+func (c *LocalCache) Set(k string, v types.ETag) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.data[k] = v
+}
+
+var DeploymentEtags Cache = &LocalCache{
+	data: make(map[string]types.ETag),
 }
 
 type ECSServiceAction = ecsserviceaction.ECSServiceAction
@@ -40,7 +51,7 @@ type ECSDeploymentStateChange struct {
 
 type Event interface {
 	Service() string
-	Etag() string
+	Etag() types.ETag
 	Host() string
 	Status() string
 	State() defangv1.ServiceState
@@ -136,7 +147,7 @@ func (e *TaskStateChangeEvent) Service() string {
 	}
 	return service
 }
-func (e *TaskStateChangeEvent) Etag() string {
+func (e *TaskStateChangeEvent) Etag() types.ETag {
 	var etag string
 	override := e.Detail.Overrides.ContainerOverrides[0]
 	i := strings.LastIndex(override.Name, "_")
@@ -209,7 +220,7 @@ func (e *KanikoTaskStateChangeEvent) Service() string {
 	return service
 }
 
-func (e *KanikoTaskStateChangeEvent) Etag() string {
+func (e *KanikoTaskStateChangeEvent) Etag() types.ETag {
 	override := e.getKanikoOverride()
 	if override == nil {
 		return ""
@@ -283,7 +294,7 @@ func (e *KanikoTaskStateChangeEvent) getKanikoOverride() *ecstaskstatechange.Ove
 func (e *ServiceActionEvent) Service() string {
 	return serviceNameFromResources(e.Resources)
 }
-func (e *ServiceActionEvent) Etag() string {
+func (e *ServiceActionEvent) Etag() types.ETag {
 	return ""
 }
 func (e *ServiceActionEvent) Host() string {
@@ -299,7 +310,7 @@ func (e *ServiceActionEvent) State() defangv1.ServiceState {
 func (e *DeploymentStateChangeEvent) Service() string {
 	return serviceNameFromResources(e.Resources)
 }
-func (e *DeploymentStateChangeEvent) Etag() string {
+func (e *DeploymentStateChangeEvent) Etag() types.ETag {
 	return DeploymentEtags.Get(e.Detail.DeploymentId)
 }
 func (e *DeploymentStateChangeEvent) Host() string {
