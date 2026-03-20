@@ -31,6 +31,10 @@ var newProjectsClient = func(ctx context.Context, opts ...option.ClientOption) (
 	return resourcemanager.NewProjectsClient(ctx, opts...)
 }
 
+var ensureAPIsEnabled = func(ctx context.Context, g Gcp, apis ...string) error {
+	return g.EnsureAPIsEnabled(ctx, apis...)
+}
+
 var (
 	clientID = "513566466873-r6s52lv410ceuo37b2qu5122r0tu6brb.apps.googleusercontent.com" // nolint:gosec,G101 // Client ID for app is not a secret
 	// Client secret for app is not a secret, desktop APP client secrets is considered public information
@@ -348,8 +352,7 @@ func testTokenProjectPermissions(ctx context.Context, projectID string, perms []
 		options = append(options, option.WithTokenSource(tokenSource))
 	}
 
-	g := Gcp{ProjectId: projectID, Options: options}
-	if err := g.EnsureAPIsEnabled(ctx, "cloudresourcemanager.googleapis.com"); err != nil {
+	if err := ensureAPIsEnabled(ctx, Gcp{ProjectId: projectID, Options: options}, "cloudresourcemanager.googleapis.com"); err != nil {
 		return fmt.Errorf("unable to enable resource manager in project %v: %w", projectID, err)
 	}
 
