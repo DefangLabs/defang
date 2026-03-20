@@ -9,9 +9,8 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
+	awscodebuild "github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
 	"github.com/DefangLabs/defang/src/pkg/modes"
-	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
 func TestPreviewStops(t *testing.T) {
@@ -36,7 +35,7 @@ func TestPreviewStops(t *testing.T) {
 		err       error
 		wantError string
 	}{
-		{"CD task fails", ecs.TaskFailure{Reason: types.TaskStopCodeEssentialContainerExited, Detail: "exit code 1"}, "EssentialContainerExited: exit code 1"},
+		{"CD build fails", awscodebuild.BuildFailure{Reason: "exit code 1"}, "CodeBuild: exit code 1"},
 		{"CD task succeeds", io.EOF, ""},
 	}
 

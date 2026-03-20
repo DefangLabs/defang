@@ -22,6 +22,10 @@ func (m *mockCanIUseProvider) AccountInfo(context.Context) (*AccountInfo, error)
 	return &AccountInfo{AccountID: "123", Provider: ProviderAWS, Region: "us-east-1"}, nil
 }
 
+func (*mockCanIUseProvider) Driver() string {
+	return "mock-driver"
+}
+
 func (m *mockCanIUseProvider) GetProjectUpdate(_ context.Context, _ string) (*defangv1.ProjectUpdate, error) {
 	if m.projectErr != nil {
 		return nil, m.projectErr

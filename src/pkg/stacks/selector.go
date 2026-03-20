@@ -116,13 +116,13 @@ func printStacksInfoMessage(stacks []string) {
 	if betaExists {
 		infoLine := "This project was deployed with an implicit Stack called 'beta' before Stacks were introduced."
 		if len(stacks) == 1 {
-			infoLine += "\n   To update your existing deployment, select the 'beta' Stack.\n" +
-				"Creating a new Stack will result in a separate deployment instance."
+			infoLine += "\n - To update your existing deployment, select the 'beta' Stack.\n" +
+				" - Creating a new Stack will result in a separate deployment instance."
 		}
-		infoLine += "\n   To learn more about Stacks, visit: https://s.defang.io/stacks"
+		infoLine += "\n - To learn more about Stacks, visit: https://s.defang.io/stacks"
 		term.Println(infoLine)
 	}
-	term.Printf("To skip this prompt, run this command with --stack=%s\n", "<stack_name>")
+	term.Printf("  To skip this prompt, run this command with --stack=%s\n", "<stack_name>")
 }
 
 func MakeStackSelectorLabels(stacks []ListItem) map[string]string {

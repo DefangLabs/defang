@@ -50,6 +50,10 @@ func (g *PlaygroundProvider) GetDeploymentStatus(ctx context.Context) (bool, err
 	return true, io.EOF // TODO: implement on fabric, for now assume service is deployed
 }
 
+func (*PlaygroundProvider) Driver() string {
+	return "playground"
+}
+
 func (g *PlaygroundProvider) Preview(ctx context.Context, req *DeployRequest) (*defangv1.DeployResponse, error) {
 	req.Preview = true
 	return g.Deploy(ctx, req)

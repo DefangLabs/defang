@@ -8,7 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild/cfn"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/aws-sdk-go-v2/service/servicequotas"
 	quotaTypes "github.com/aws/aws-sdk-go-v2/service/servicequotas/types"

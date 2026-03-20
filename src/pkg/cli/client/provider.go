@@ -75,6 +75,7 @@ type Provider interface {
 	DelayBeforeRetry(context.Context) error
 	DeleteConfig(context.Context, *defangv1.Secrets) error
 	Deploy(context.Context, *DeployRequest) (*defangv1.DeployResponse, error)
+	Driver() string
 	GetDeploymentStatus(context.Context) (bool, error)
 	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 	GetService(context.Context, *defangv1.GetRequest) (*defangv1.ServiceInfo, error)
