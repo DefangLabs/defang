@@ -104,7 +104,9 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 	//    - if the user has login with glcoud cli with application default credentials
 	//    - if the user has set GOOGLE_APPLICATION_CREDENTIALS to a service account key file with required permissions
 	term.Debugf("checking if application default credentials are available and has permission, GOOGLE_APPLICATION_CREDENTIALS=%q...", os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
-	if err := testTokenProjectPermissions(ctx, gcp.ProjectId, requiredPerms, nil); err == nil {
+	if err := testTokenProjectPermissions(ctx, gcp.ProjectId, requiredPerms, nil); err != nil {
+		term.Debugf("the application default credentials are missing permissions: %v", err)
+	} else {
 		term.Debug("found valid application default credentials with required permissions")
 		// No need to pass down ADC token source via options since ADC is automatically used by gcp sdk
 		return nil
@@ -345,6 +347,12 @@ func testTokenProjectPermissions(ctx context.Context, projectID string, perms []
 	if tokenSource != nil {
 		options = append(options, option.WithTokenSource(tokenSource))
 	}
+
+	g := Gcp{ProjectId: projectID, Options: options}
+	if err := g.EnsureAPIsEnabled(ctx, "cloudresourcemanager.googleapis.com"); err != nil {
+		return fmt.Errorf("unable to enable resource manager in project %v: %w", projectID, err)
+	}
+
 	client, err := newProjectsClient(ctx, options...)
 	if err != nil {
 		return fmt.Errorf("creating client: %w", err)
