@@ -36,7 +36,7 @@ func (g grpcLogger) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 func (g grpcLogger) logRequest(header http.Header, reqType, payload string) {
 	// Add a request ID to the context
 	requestId := pkg.RandomID()
-	header.Add("X-Request-Id", requestId)
+	header.Set("X-Request-Id", requestId)
 
 	term.Debug(g.prefix, requestId, reqType, payload)
 }
