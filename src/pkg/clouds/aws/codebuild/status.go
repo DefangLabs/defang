@@ -26,6 +26,10 @@ func GetBuildStatus(ctx context.Context, cfg aws.Config, buildID BuildID) (bool,
 	}
 
 	build := output.Builds[0] // assume only one build per request
+	return buildStatus(build)
+}
+
+func buildStatus(build cbtypes.Build) (bool, error) {
 	switch build.BuildStatus {
 	case cbtypes.StatusTypeInProgress:
 		return false, nil
