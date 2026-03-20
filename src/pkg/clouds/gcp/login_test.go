@@ -34,13 +34,19 @@ func (m *mockProjectsClient) Close() error { return nil }
 
 // mockNewProjectsClient replaces newProjectsClient for the duration of a test,
 // returning a client whose TestIamPermissions always calls fn.
+// It also stubs out ensureAPIsEnabled so tests don't hit the real Service Usage API.
 func mockNewProjectsClient(t *testing.T, fn func(ctx context.Context, req *iampb.TestIamPermissionsRequest, opts ...gax.CallOption) (*iampb.TestIamPermissionsResponse, error)) {
 	t.Helper()
-	orig := newProjectsClient
+	origClient := newProjectsClient
 	newProjectsClient = func(ctx context.Context, opts ...option.ClientOption) (projectsClientIface, error) {
 		return &mockProjectsClient{testIamPermissionsFunc: fn}, nil
 	}
-	t.Cleanup(func() { newProjectsClient = orig })
+	origEnsure := ensureAPIsEnabled
+	ensureAPIsEnabled = func(ctx context.Context, g Gcp, apis ...string) error { return nil }
+	t.Cleanup(func() {
+		newProjectsClient = origClient
+		ensureAPIsEnabled = origEnsure
+	})
 }
 
 func marshalToken(t *testing.T, tok oauth2.Token) string {
@@ -228,7 +234,12 @@ func TestAuthenticate_GCP(t *testing.T) {
 			}
 			return &mockProjectsClient{testIamPermissionsFunc: allPermsGranted}, nil
 		}
-		t.Cleanup(func() { newProjectsClient = orig })
+		origEnsure := ensureAPIsEnabled
+		ensureAPIsEnabled = func(ctx context.Context, g Gcp, apis ...string) error { return nil }
+		t.Cleanup(func() {
+			newProjectsClient = orig
+			ensureAPIsEnabled = origEnsure
+		})
 
 		tok := oauth2.Token{
 			AccessToken:  "stored-token",
