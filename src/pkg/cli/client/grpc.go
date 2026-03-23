@@ -37,7 +37,7 @@ func NewGrpcClient(host, accessToken string, requestedTenant types.TenantNameOrI
 		connect.WithGRPC(),
 		connect.WithInterceptors(
 			grpcLogger{"fabricClient"},
-			auth.NewAuthInterceptor(accessToken, requestedTenant),
+			auth.NewAuthInterceptor(accessToken, requestedTenant, ""),
 			Retrier{},
 		),
 	)

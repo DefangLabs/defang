@@ -1,4 +1,4 @@
-package ecs
+package codebuild
 
 import (
 	"context"
@@ -15,7 +15,7 @@ var s3InvalidCharsRegexp = regexp.MustCompile(`[^a-zA-Z0-9!_.*'()-]`)
 
 const prefix = "uploads/"
 
-func (a *AwsEcs) CreateUploadURL(ctx context.Context, name string) (string, error) {
+func (a *AwsCodeBuild) CreateUploadURL(ctx context.Context, name string) (string, error) {
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return "", err
