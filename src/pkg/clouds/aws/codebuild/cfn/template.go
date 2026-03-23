@@ -259,6 +259,7 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 			Type:                     "LINUX_CONTAINER",
 			Image:                    "aws/codebuild/amazonlinux2-x86_64-standard:5.0", // placeholder; overridden at StartBuild time
 			ImagePullCredentialsType: ptr.String("CODEBUILD"),
+			PrivilegedMode:           ptr.Bool(true), // required for LOCAL_DOCKER_LAYER_CACHE
 		},
 		ServiceRole: cloudformation.Ref(_codeBuildServiceRole),
 		LogsConfig: &codebuild.Project_LogsConfig{

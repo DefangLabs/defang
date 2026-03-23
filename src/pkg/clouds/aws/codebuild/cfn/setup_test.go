@@ -42,7 +42,7 @@ func TestCloudFormation(t *testing.T) {
 	})
 
 	t.Run("Run", func(t *testing.T) {
-		taskid, err := aws.Run(ctx, "aws/codebuild/amazonlinux2-x86_64-standard:5.0", nil, "echo", "hello")
+		taskid, err := aws.Run(ctx, "/app", "aws/codebuild/amazonlinux2-x86_64-standard:5.0", nil, "echo", "hello")
 		if err != nil {
 			t.Fatal(err)
 		}

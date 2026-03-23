@@ -578,7 +578,7 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild
 
 	// Prepend the entrypoint; CodeBuild runs buildspec commands in a shell, not via Docker ENTRYPOINT
 	args := append([]string{"node", "lib/index.js"}, cmd.command...)
-	return b.driver.Run(ctx, b.CDImage, env, args...)
+	return b.driver.Run(ctx, "/app", b.CDImage, env, args...)
 }
 
 func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
