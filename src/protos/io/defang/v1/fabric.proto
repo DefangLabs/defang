@@ -299,6 +299,7 @@ message CanIUseResponse {
   string pulumi_version = 5;
   bytes signature = 6;
   bool forced_version = 7; // force use of the returned CD image and Pulumi version
+  string forced_reason = 8;
 }
 
 message DeployRequest {

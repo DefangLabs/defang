@@ -47,9 +47,14 @@ func CanIUseProvider(ctx context.Context, client FabricClient, provider Provider
 		return err
 	}
 
+	forcedReason := resp.ForcedReason
+	if resp.ForcedVersion && forcedReason == "" {
+		forcedReason = "the previous CD image is incompatible with your CLI"
+	}
+
 	// Resolve each version: env override > client-side pinning > fabric response
-	resp.CdImage = resolveVersion(cdOverride, resp.CdImage, preferCdVersion, "CD image", allowUpgrade, resp.ForcedVersion)
-	resp.PulumiVersion = resolveVersion(pulumiOverride, resp.PulumiVersion, preferPulumiVersion, "Pulumi version", allowUpgrade, resp.ForcedVersion)
+	resp.CdImage = resolveVersion(cdOverride, resp.CdImage, preferCdVersion, "CD image", allowUpgrade, forcedReason)
+	resp.PulumiVersion = resolveVersion(pulumiOverride, resp.PulumiVersion, preferPulumiVersion, "Pulumi version", allowUpgrade, forcedReason)
 
 	provider.SetCanIUseConfig(resp)
 	return nil
@@ -58,24 +63,24 @@ func CanIUseProvider(ctx context.Context, client FabricClient, provider Provider
 type versionLabel string
 
 // resolveVersion picks the version to use: env override > force upgrade > allow upgrade > pin to previous > latest.
-func resolveVersion(fromEnv, fromServer, previous string, label versionLabel, allowUpgrade, serverForced bool) string {
+func resolveVersion(fromEnv, fromFabric, previous string, label versionLabel, allowUpgrade bool, forcedReason string) string {
 	if fromEnv != "" {
 		term.Debugf("Using %s from env: %s", label, fromEnv)
 		return fromEnv
 	}
-	if previous == "" || fromServer == previous {
-		term.Debugf("Using %s: %s", label, fromServer)
-		return fromServer
+	if previous == "" || fromFabric == previous {
+		term.Debugf("Using %s: %s", label, fromFabric)
+		return fromFabric
 	}
-	if serverForced {
-		term.Debugf("Using %s from server: %s", label, fromServer)
-		term.Warnf("Force-upgrading %s...", label)
-		return fromServer
+	if forcedReason != "" {
+		term.Debugf("Using %s from fabric: %s", label, fromFabric)
+		term.Warnf("Overriding %s: %s", label, forcedReason)
+		return fromFabric
 	}
 	if allowUpgrade {
-		term.Debugf("Using latest %s: %s", label, fromServer)
-		term.Infof("Upgrading %s...", label)
-		return fromServer
+		term.Debugf("Using latest %s: %s", label, fromFabric)
+		term.Infof("Upgrading %s to latest", label)
+		return fromFabric
 	}
 	term.Debugf("Using previous %s: %s", label, previous)
 	term.Warnf("A newer %s is available; using previously deployed version. To upgrade, re-run with --allow-upgrade or set DEFANG_ALLOW_UPGRADE=1", label)

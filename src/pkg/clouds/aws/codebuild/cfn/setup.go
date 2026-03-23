@@ -55,11 +55,12 @@ func (a *AwsCfn) updateStackAndWait(ctx context.Context, templateBody string, fo
 	}
 
 	// Check the template version first, to avoid updating to an outdated template; TODO: can we use StackPolicy/Conditions instead?
+	var deployedRev int
 	// TODO: should check all regions
 	if dso, err := cfn.DescribeStacks(ctx, &cloudformation.DescribeStacksInput{StackName: &a.stackName}); err == nil && len(dso.Stacks) == 1 {
 		for _, output := range dso.Stacks[0].Outputs {
 			if *output.OutputKey == OutputsTemplateVersion {
-				deployedRev, _ := strconv.Atoi(*output.OutputValue)
+				deployedRev, _ = strconv.Atoi(*output.OutputValue)
 				if deployedRev > TemplateRevision && !force {
 					return fmt.Errorf("This version of the CLI expects CloudFormation template v%d, but the deployed %s stack is v%d: please update the CLI", TemplateRevision, a.stackName, deployedRev)
 				}
@@ -96,7 +97,12 @@ func (a *AwsCfn) updateStackAndWait(ctx context.Context, templateBody string, fo
 		StackName: uso.StackId,
 	}, stackTimeout)
 	if err != nil {
-		return fmt.Errorf("failed to update CloudFormation stack: check the CloudFormation console (https://%s.console.aws.amazon.com/cloudformation/home) for the %q stack to learn more: %w", a.AwsCodeBuild.Region, a.stackName, err)
+		var extra string
+		if deployedRev == 3 && TemplateRevision == 4 {
+			// Upgrade from 3->4 involves deleting the VPC, which will fail / timeout when the VPC, or any SG, is in use.
+			extra = " check if the VPC or any security group is still in use and delete them manually before retrying the update;"
+		}
+		return fmt.Errorf("failed to update CloudFormation stack:%s check the CloudFormation console (https://%s.console.aws.amazon.com/cloudformation/home) for the %q stack to learn more: %w", extra, a.AwsCodeBuild.Region, a.stackName, err)
 	}
 	return a.fillWithOutputs(dso)
 }

@@ -314,7 +314,7 @@ func TestPinVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := resolveVersion("", tt.latest, tt.previous, "test", tt.upgrade, false)
+			got := resolveVersion("", tt.latest, tt.previous, "test", tt.upgrade, "")
 			if got != tt.want {
 				t.Errorf("resolveVersion(%q, %q, upgrade=%v) = %q, want %q", tt.latest, tt.previous, tt.upgrade, got, tt.want)
 			}
