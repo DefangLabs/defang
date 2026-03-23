@@ -249,6 +249,7 @@ Resources:
                         - iam:DeletePolicyVersion
                         - iam:GetPolicyVersion
                         - iam:ListPolicyVersions
+                        - iam:TagPolicy
                       Effect: Allow
                       Resource:
                         Fn::Sub: arn:aws:iam::${AWS::AccountId}:policy/*
@@ -258,6 +259,7 @@ Resources:
                         - iam:DeleteInstanceProfile
                         - iam:AddRoleToInstanceProfile
                         - iam:RemoveRoleFromInstanceProfile
+                        - iam:TagInstanceProfile
                       Effect: Allow
                       Resource:
                         Fn::Sub: arn:aws:iam::${AWS::AccountId}:instance-profile/*
