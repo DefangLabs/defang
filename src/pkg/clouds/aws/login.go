@@ -127,7 +127,9 @@ func (a *Aws) Authenticate(ctx context.Context, interactive bool) error {
 
 	// 1. Try default AWS credentials
 	term.Debugf("checking default AWS credentials for region %s...", a.Region)
-	if _, err := a.testCredentials(ctx, nil); err == nil {
+	if _, err := a.testCredentials(ctx, nil); err != nil {
+		term.Debugf("default AWS credentials invalid: %v", err)
+	} else {
 		term.Debug("found valid default AWS credentials")
 		return nil
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/auth"
@@ -92,10 +93,9 @@ func NonInteractiveGitHubLogin(ctx context.Context, fabric client.FabricClient, 
 		return err
 	}
 
-	// If AWS_ROLE_ARN is set, we're doing "Assume Role with Web Identity"
-	if os.Getenv("AWS_ROLE_ARN") != "" && os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") == "" {
-		// AWS_ROLE_ARN is set, but AWS_WEB_IDENTITY_TOKEN_FILE is empty: write the token to a new file
-		jwtPath, err := writeWebIdentityToken(fabricAddr, resp.AccessToken)
+	// write the IDToken to a new file, if AWS_WEB_IDENTITY_TOKEN_FILE is empty
+	if os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") == "" {
+		jwtPath, err := writeWebIdentityToken(fabricAddr, idToken)
 		if err != nil {
 			return err
 		}
@@ -112,6 +112,10 @@ func NonInteractiveGitHubLogin(ctx context.Context, fabric client.FabricClient, 
 func writeWebIdentityToken(fabricAddr, token string) (string, error) {
 	jwtPath, _ := client.GetWebIdentityTokenFile(fabricAddr)
 	term.Debugf("writing web identity token to %s", jwtPath)
+	dir, _ := filepath.Split(jwtPath)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return "", fmt.Errorf("failed to create web identity token directory: %w", err)
+	}
 	if err := os.WriteFile(jwtPath, []byte(token), 0600); err != nil {
 		return "", fmt.Errorf("failed to save web identity token: %w", err)
 	}

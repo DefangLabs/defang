@@ -115,10 +115,11 @@ func TestNonInteractiveLogin(t *testing.T) {
 		}
 
 		// use a prevStateDir dir for the token file
+		tempDir := t.TempDir()
 		prevStateDir := client.StateDir
-		client.StateDir = filepath.Join(t.TempDir(), "defang")
+		client.StateDir = filepath.Join(tempDir, "defang")
 		originalTokenStore := client.TokenStore
-		client.TokenStore = &tokenstore.LocalDirTokenStore{Dir: t.TempDir()}
+		client.TokenStore = &tokenstore.LocalDirTokenStore{Dir: client.StateDir}
 
 		t.Cleanup(func() {
 			client.StateDir = prevStateDir
@@ -130,7 +131,7 @@ func TestNonInteractiveLogin(t *testing.T) {
 			t.Fatalf("expected no error, got %v", err)
 		}
 
-		savedToken, err := client.TokenStore.Load(client.TokenStorageName(fabric))
+		savedToken, err := client.TokenStore.Load(client.TokenStorageName(fabric) + ".jwt")
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
