@@ -2,11 +2,17 @@ package auth
 
 import (
 	"context"
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	retryablehttp "github.com/hashicorp/go-retryablehttp"
+
+	defangHttp "github.com/DefangLabs/defang/src/pkg/http"
 )
 
 func TestGetAuthorizeUrl(t *testing.T) {
@@ -219,4 +225,109 @@ func TestPollForAuthCode(t *testing.T) {
 			t.Errorf("pollForAuthCode() = %q, want %q", code, "my+code=")
 		}
 	})
+}
+
+// fastRetryClient returns an *http.Client backed by retryablehttp with RetryMax=0
+// and no wait between attempts, so "giving up after" errors are returned immediately.
+func fastRetryClient() *http.Client {
+	c := retryablehttp.NewClient()
+	c.RetryMax = 0
+	c.RetryWaitMin = 0
+	c.RetryWaitMax = 0
+	c.Logger = log.New(io.Discard, "", 0)
+	return c.StandardClient()
+}
+
+// TestPoll_GivingUpAfterRetries_Retries verifies that when the retriablehttp transport
+// returns a "giving up after X attempt(s)" error (without context cancellation), Poll
+// retries the outer loop and eventually succeeds.
+func TestPoll_GivingUpAfterRetries_Retries(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls == 1 {
+			// Close the connection without a response to produce a transport-level
+			// error that retryablehttp will wrap as "giving up after 1 attempt(s)".
+			hj, ok := w.(http.Hijacker)
+			if !ok {
+				t.Error("ResponseWriter does not support Hijack")
+				http.Error(w, "hijack not supported", http.StatusInternalServerError)
+				return
+			}
+			conn, _, err := hj.Hijack()
+			if err != nil {
+				t.Errorf("Hijack() error = %v", err)
+				return
+			}
+			conn.Close()
+			return
+		}
+		// Second outer-loop attempt succeeds.
+		state := r.URL.Query().Get("state")
+		w.Write([]byte("code=testcode&state=" + state)) //nolint:errcheck
+	}))
+	t.Cleanup(server.Close)
+
+	orig := OpenAuthClient
+	OpenAuthClient = NewClient("test", server.URL)
+	t.Cleanup(func() { OpenAuthClient = orig })
+
+	origClient := defangHttp.DefaultClient
+	defangHttp.DefaultClient = fastRetryClient()
+	t.Cleanup(func() { defangHttp.DefaultClient = origClient })
+
+	body, err := Poll(t.Context(), "teststate")
+	if err != nil {
+		t.Fatalf("Poll() unexpected error = %v", err)
+	}
+	if !strings.Contains(string(body), "code=testcode") {
+		t.Errorf("Poll() body = %q, want to contain code=testcode", string(body))
+	}
+	if calls < 2 {
+		t.Errorf("expected at least 2 server calls (1 connection error + 1 success), got %d", calls)
+	}
+}
+
+// TestPoll_GivingUpAfterRetries_ContextDone verifies that when the context is done
+// (either Canceled or DeadlineExceeded), Poll does not retry even if the error
+// contains "giving up after".
+func TestPoll_GivingUpAfterRetries_ContextDone(t *testing.T) {
+	for _, name := range []string{"context.Canceled", "context.DeadlineExceeded"} {
+		t.Run(name, func(t *testing.T) {
+			calls := 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				http.Error(w, "server error", http.StatusInternalServerError)
+			}))
+			t.Cleanup(server.Close)
+
+			orig := OpenAuthClient
+			OpenAuthClient = NewClient("test", server.URL)
+			t.Cleanup(func() { OpenAuthClient = orig })
+
+			origClient := defangHttp.DefaultClient
+			defangHttp.DefaultClient = fastRetryClient()
+			t.Cleanup(func() { defangHttp.DefaultClient = origClient })
+
+			var ctx context.Context
+			if name == "context.Canceled" {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(context.Background())
+				cancel()
+			} else {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithDeadline(context.Background(), time.Now())
+				defer cancel()
+			}
+
+			_, err := Poll(ctx, "teststate")
+			if err == nil {
+				t.Fatal("expected error for done context")
+			}
+			// Poll must not spin retrying when the context is already done.
+			if calls > 1 {
+				t.Errorf("expected at most 1 server call with done context, got %d", calls)
+			}
+		})
+	}
 }

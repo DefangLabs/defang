@@ -247,7 +247,7 @@ func (a *Aws) findStoredCredentials(ctx context.Context) (awssdk.CredentialsProv
 func (a *Aws) testCredentialsWithProfile(ctx context.Context, name string, creds awssdk.CredentialsProvider) (awssdk.CredentialsProvider, error) {
 	identity, err := a.testCredentials(ctx, creds)
 	if err != nil {
-		return nil, fmt.Errorf("token %q failed validation: %v", name, err)
+		return nil, fmt.Errorf("token %q failed validation: %w", name, err)
 	}
 	if identity.Arn == nil {
 		return nil, errors.New("caller identity ARN is missing")

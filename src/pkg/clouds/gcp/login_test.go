@@ -112,7 +112,9 @@ func TestFindStoredCredentials_GCP(t *testing.T) {
 		}
 	})
 
-	t.Run("token without permissions is skipped", func(t *testing.T) {
+	t.Run("token without permissions returns error", func(t *testing.T) {
+		// As of the context-cancellation fix, a token failing the permission
+		// check immediately returns an error (so context.Canceled can propagate).
 		mockNewProjectsClient(t, noPermsGranted)
 
 		store := tokenstore.NewMemTokenStore()
@@ -121,12 +123,9 @@ func TestFindStoredCredentials_GCP(t *testing.T) {
 			Expiry:      time.Now().Add(time.Hour),
 		}))
 		gcp := &Gcp{TokenStore: store}
-		ts, err := gcp.findStoredCredentials(t.Context())
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if ts != nil {
-			t.Error("expected nil: token without permissions should be skipped")
+		_, err := gcp.findStoredCredentials(t.Context())
+		if err == nil {
+			t.Error("expected error when token is missing required permissions")
 		}
 	})
 
@@ -357,6 +356,91 @@ func pollServerForGCP(t *testing.T, payload []byte) *httptest.Server {
 		}
 		w.Write([]byte(base64.StdEncoding.EncodeToString(ciphertext))) //nolint:errcheck
 	}))
+}
+
+func TestAuthenticate_GCP_ContextCanceled(t *testing.T) {
+	// Helper: replace ensureAPIsEnabled so testTokenProjectPermissions returns
+	// context.Canceled (wrapped via %w, so errors.Is still works).
+	cancelEnsureAPIs := func(t *testing.T) {
+		t.Helper()
+		orig := ensureAPIsEnabled
+		ensureAPIsEnabled = func(ctx context.Context, g Gcp, apis ...string) error {
+			return context.Canceled
+		}
+		t.Cleanup(func() { ensureAPIsEnabled = orig })
+	}
+
+	t.Run("context canceled at ADC check returns immediately", func(t *testing.T) {
+		cancelEnsureAPIs(t)
+
+		store := tokenstore.NewMemTokenStore()
+		tok := oauth2.Token{AccessToken: "tok", Expiry: time.Now().Add(time.Hour)}
+		store.Save("user@example.com", marshalToken(t, tok)) //nolint:errcheck
+
+		gcp := &Gcp{ProjectId: "test-project", TokenStore: store}
+		err := gcp.Authenticate(t.Context(), false)
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("Authenticate() error = %v, want context.Canceled", err)
+		}
+		// TokenSource must not be set — we fast-failed before finding credentials.
+		if gcp.TokenSource != nil {
+			t.Error("expected TokenSource to remain nil after fast-fail")
+		}
+	})
+
+	t.Run("context canceled at stored credentials check returns immediately", func(t *testing.T) {
+		adcFailed := false
+		calls := 0
+		orig := ensureAPIsEnabled
+		ensureAPIsEnabled = func(ctx context.Context, g Gcp, apis ...string) error {
+			calls++
+			if !adcFailed {
+				adcFailed = true
+				return errors.New("ADC unavailable") // ADC step fails (not canceled)
+			}
+			return context.Canceled // stored-creds step is canceled
+		}
+		t.Cleanup(func() { ensureAPIsEnabled = orig })
+
+		origClient := newProjectsClient
+		newProjectsClient = func(ctx context.Context, opts ...option.ClientOption) (projectsClientIface, error) {
+			return nil, errors.New("no client needed for this test path")
+		}
+		t.Cleanup(func() { newProjectsClient = origClient })
+
+		store := tokenstore.NewMemTokenStore()
+		tok := oauth2.Token{AccessToken: "tok", Expiry: time.Now().Add(time.Hour)}
+		store.Save("user@example.com", marshalToken(t, tok)) //nolint:errcheck
+
+		gcp := &Gcp{ProjectId: "test-project", TokenStore: store}
+		err := gcp.Authenticate(t.Context(), false)
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("Authenticate() error = %v, want context.Canceled", err)
+		}
+	})
+}
+
+func TestFindStoredCredentials_GCP_ContextCanceled(t *testing.T) {
+	// When testTokenProjectPermissions returns context.Canceled (wrapped via ensureAPIsEnabled),
+	// findStoredCredentials must return the error immediately.
+	orig := ensureAPIsEnabled
+	ensureAPIsEnabled = func(ctx context.Context, g Gcp, apis ...string) error {
+		return context.Canceled
+	}
+	t.Cleanup(func() { ensureAPIsEnabled = orig })
+
+	store := tokenstore.NewMemTokenStore()
+	tok := oauth2.Token{AccessToken: "tok", Expiry: time.Now().Add(time.Hour)}
+	store.Save("user@example.com", marshalToken(t, tok)) //nolint:errcheck
+
+	gcp := &Gcp{ProjectId: "test-project", TokenStore: store}
+	ts, err := gcp.findStoredCredentials(t.Context())
+	if ts != nil {
+		t.Error("expected nil token source on context.Canceled")
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("findStoredCredentials() error = %v, want context.Canceled", err)
+	}
 }
 
 func TestInteractiveLogin_GCP(t *testing.T) {
