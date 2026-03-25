@@ -560,21 +560,24 @@ func (f failStsAPI) AssumeRole(ctx context.Context, params *awssts.AssumeRoleInp
 }
 
 func TestAuthenticate_ContextCanceled_DefaultCredentials(t *testing.T) {
-	// When testCredentials returns context.Canceled, Authenticate must fast-fail
-	// without trying other credential sources.
+	// When the context is done, Authenticate must fast-fail without trying other
+	// credential sources. Uses a pre-cancelled context so ctx.Err() != nil.
 	called := 0
 	origSts := NewStsFromConfig
 	NewStsFromConfig = func(_ awssdk.Config) StsClientAPI {
 		called++
-		return failStsAPI{err: context.Canceled}
+		return failStsAPI{} // returns generic error so the ctx.Err() branch is reached
 	}
 	t.Cleanup(func() { NewStsFromConfig = origSts })
 
 	store := tokenstore.NewMemTokenStore()
 	store.Save(tokenStoreKeyPrefix+"valid", validAwsToken(t)) //nolint:errcheck
 
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
 	a := &Aws{Region: "us-east-1", TokenStore: store}
-	err := a.Authenticate(t.Context(), false)
+	err := a.Authenticate(ctx, false)
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("Authenticate() error = %v, want context.Canceled", err)
 	}
@@ -584,21 +587,24 @@ func TestAuthenticate_ContextCanceled_DefaultCredentials(t *testing.T) {
 }
 
 func TestFindStoredCredentials_ContextCanceled(t *testing.T) {
-	// When testCredentialsWithProfile returns context.Canceled, findStoredCredentials
-	// must propagate it immediately rather than skipping the token.
+	// When the context is done, findStoredCredentials must abort immediately
+	// rather than skipping the token and continuing.
 	origSts := NewStsFromConfig
 	NewStsFromConfig = func(_ awssdk.Config) StsClientAPI {
-		return failStsAPI{err: context.Canceled}
+		return failStsAPI{} // returns generic error so the ctx.Err() branch is reached
 	}
 	t.Cleanup(func() { NewStsFromConfig = origSts })
 
 	store := tokenstore.NewMemTokenStore()
 	store.Save(tokenStoreKeyPrefix+"valid", validAwsToken(t)) //nolint:errcheck
 
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
 	a := &Aws{Region: "us-east-1", TokenStore: store}
-	creds, err := a.findStoredCredentials(t.Context())
+	creds, err := a.findStoredCredentials(ctx)
 	if creds != nil {
-		t.Error("expected nil credentials on context.Canceled")
+		t.Error("expected nil credentials when context is done")
 	}
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("findStoredCredentials() error = %v, want context.Canceled", err)

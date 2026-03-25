@@ -128,8 +128,8 @@ func (a *Aws) Authenticate(ctx context.Context, interactive bool) error {
 	// 1. Try default AWS credentials
 	term.Debugf("checking default AWS credentials for region %s...", a.Region)
 	if _, err := a.testCredentials(ctx, nil); err != nil {
-		if errors.Is(err, context.Canceled) { // Fast fail if context is canceled, no need to try other credential sources
-			return err
+		if ctx.Err() != nil { // Fast fail if context is done, no need to try other credential sources
+			return ctx.Err()
 		}
 		term.Debugf("default AWS credentials invalid: %v", err)
 	} else {
@@ -233,8 +233,8 @@ func (a *Aws) findStoredCredentials(ctx context.Context) (awssdk.CredentialsProv
 		// If no AWS_PROFILE with role specified, any valid token is considered acceptable
 		creds, err := a.testCredentialsWithProfile(ctx, name, provider)
 		if err != nil {
-			if errors.Is(err, context.Canceled) {
-				return nil, err
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
 			}
 			term.Debugf("token %q failed AWS_PROFILE role validation: %v, skipping...", name, err)
 			continue
