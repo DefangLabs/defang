@@ -111,6 +111,12 @@ func Poll(ctx context.Context, key string) ([]byte, error) {
 				term.Debug("poll timed out, retrying...")
 				continue
 			}
+			// retriablehttp would return a "giving up after X attempt(s)" error, but no retry if the context was cancelled
+			var urlError *url.Error
+			if errors.As(err, &urlError) && strings.Contains(err.Error(), "giving up after") && !errors.Is(err, context.Canceled) {
+				term.Debugf("poll timed out: %v, retrying...", urlError)
+				continue
+			}
 			var unexpectedError ErrUnexpectedStatus
 			if errors.As(err, &unexpectedError) && unexpectedError.StatusCode >= 500 {
 				term.Debugf("received server error: %s, retrying...", unexpectedError.Status)
