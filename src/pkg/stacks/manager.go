@@ -197,21 +197,27 @@ type GetStackOpts struct {
 	SelectStackOptions
 }
 
+func GetFallbackStack(defaults Parameters) (*Parameters, string, error) {
+	if defaults.Provider != client.ProviderAuto && defaults.Provider != "" {
+		whence := "DEFANG_PROVIDER"
+		var fromEnv client.ProviderID
+		if err := fromEnv.Set(os.Getenv("DEFANG_PROVIDER")); err == nil && fromEnv != defaults.Provider {
+			whence = "--provider flag"
+		}
+		defaults.Name = DefaultBeta
+		return &defaults, whence, nil
+	}
+	return nil, "", errors.New("no provider specified")
+}
+
 func (sm *manager) GetStack(ctx context.Context, opts GetStackOpts) (*Parameters, string, error) {
 	// use --stack if available
 	if opts.Default.Name != "" {
 		return sm.getSpecifiedStack(ctx, opts.Default.Name) // TODO: merge with opts.Default?
 	}
-	// use --provider if available
-	if opts.Default.Provider != client.ProviderAuto && opts.Default.Provider != "" {
-		whence := "DEFANG_PROVIDER"
-		var fromEnv client.ProviderID
-		if err := fromEnv.Set(os.Getenv("DEFANG_PROVIDER")); err == nil && fromEnv != opts.Default.Provider {
-			whence = "--provider flag"
-		}
-		fallback := opts.Default
-		fallback.Name = DefaultBeta
-		return &fallback, whence, nil
+	// use legacy --provider if available
+	if fallback, whence, err := GetFallbackStack(opts.Default); err == nil {
+		return fallback, whence, nil
 	}
 	// fallback to interactive
 	if opts.Interactive {

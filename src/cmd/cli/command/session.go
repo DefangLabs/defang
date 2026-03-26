@@ -38,6 +38,9 @@ func newCommandSessionWithOpts(cmd *cobra.Command, opts commandSessionOpts) (*se
 	options.AllowStackCreation = opts.AllowStackCreation
 	sm, err := newStackManagerForLoader(ctx, configureLoader(options.LoaderOptions))
 	if err != nil {
+		if !errors.Is(err, types.ErrComposeFileNotFound) {
+			return nil, err
+		}
 		term.Debugf("Could not create stack manager: %v", err)
 	}
 	sessionLoader := session.NewSessionLoader(global.Client, sm, options)
@@ -107,6 +110,9 @@ func doubleCheckProjectName(projectName string) {
 func newStackManagerForLoader(ctx context.Context, loader *compose.Loader) (session.StacksManager, error) {
 	targetDirectory, err := loader.ProjectWorkingDir(ctx)
 	if err != nil {
+		if !errors.Is(err, types.ErrComposeFileNotFound) {
+			return nil, handleInvalidComposeFileErr(ctx, err)
+		}
 		term.Debugf("Could not determine project working directory: %v", err)
 		// No project directory; look for .defang directory in current or parent directories
 		targetDirectory, _ = findTargetDirectory(".")
@@ -118,9 +124,6 @@ func newStackManagerForLoader(ctx context.Context, loader *compose.Loader) (sess
 	}
 	projectName, _, err := loader.LoadProjectName(ctx)
 	if err != nil {
-		if !errors.Is(err, types.ErrComposeFileNotFound) {
-			return nil, handleInvalidComposeFileErr(ctx, err)
-		}
 		term.Debugf("Could not determine project name: %v", err)
 	}
 	sm, err := stacks.NewManager(global.Client, targetDirectory, projectName, ec)
