@@ -95,12 +95,11 @@ func TestNewStackManager(t *testing.T) {
 		},
 	}
 
-	oldGlobal := global
+	oldProvider := global.Stack.Provider
 	t.Cleanup(func() {
-		global = oldGlobal
+		global.Stack.Provider = oldProvider
 	})
 	global.Stack.Provider = "defang" // avoids invoking gRPC for listing remote stacks
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tempDir := t.TempDir()
