@@ -273,9 +273,9 @@ Resources:
                         Fn::Sub: arn:aws:iam::${AWS::AccountId}:role/aws-service-role/*
                 Version: "2012-10-17"
             Roles:
-                - Ref: CodeBuildServiceRole
+                - Ref: TaskRole
         Type: AWS::IAM::ManagedPolicy
-    CodeBuildServiceRole:
+    TaskRole:
         Properties:
             AssumeRolePolicyDocument:
                 Statement:
@@ -320,7 +320,7 @@ Resources:
                         Ref: LogGroup
                     Status: ENABLED
             ServiceRole:
-                Ref: CodeBuildServiceRole
+                Ref: TaskRole
             Source:
                 BuildSpec: |
                     version: 0.2
