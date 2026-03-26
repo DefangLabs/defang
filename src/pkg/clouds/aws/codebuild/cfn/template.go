@@ -154,9 +154,9 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 		RetentionInDays: ptr.Int(1),
 	}
 
-	// 3. CodeBuild service role
-	const _codeBuildServiceRole = "CodeBuildServiceRole"
-	template.Resources[_codeBuildServiceRole] = &iam.Role{
+	// 3. CodeBuild service role (logical ID kept as "TaskRole" for backwards compatibility with existing CFN stacks)
+	const _taskRole = "TaskRole"
+	template.Resources[_taskRole] = &iam.Role{
 		Tags: defaultTags,
 		AssumeRolePolicyDocument: map[string]any{
 			"Version": "2012-10-17",
@@ -189,7 +189,7 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 	const _codeBuildIAMPolicy = "CodeBuildIAMPolicy"
 	template.Resources[_codeBuildIAMPolicy] = &iam.ManagedPolicy{
 		Roles: []string{
-			cloudformation.Ref(_codeBuildServiceRole),
+			cloudformation.Ref(_taskRole),
 		},
 		PolicyDocument: map[string]any{
 			"Version": "2012-10-17",
@@ -263,7 +263,7 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 			ImagePullCredentialsType: ptr.String("CODEBUILD"),
 			PrivilegedMode:           ptr.Bool(true), // required for LOCAL_DOCKER_LAYER_CACHE
 		},
-		ServiceRole: cloudformation.Ref(_codeBuildServiceRole),
+		ServiceRole: cloudformation.Ref(_taskRole),
 		LogsConfig: &codebuild.Project_LogsConfig{
 			CloudWatchLogs: &codebuild.Project_CloudWatchLogsConfig{
 				Status:    "ENABLED",
