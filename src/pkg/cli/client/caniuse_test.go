@@ -22,6 +22,10 @@ func (m *mockCanIUseProvider) AccountInfo(context.Context) (*AccountInfo, error)
 	return &AccountInfo{AccountID: "123", Provider: ProviderAWS, Region: "us-east-1"}, nil
 }
 
+func (*mockCanIUseProvider) Driver() string {
+	return "mock-driver"
+}
+
 func (m *mockCanIUseProvider) GetProjectUpdate(_ context.Context, _ string) (*defangv1.ProjectUpdate, error) {
 	if m.projectErr != nil {
 		return nil, m.projectErr
@@ -310,7 +314,7 @@ func TestPinVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := resolveVersion("", tt.latest, tt.previous, "test", tt.upgrade, false)
+			got := resolveVersion("", tt.latest, tt.previous, "test", tt.upgrade, "")
 			if got != tt.want {
 				t.Errorf("resolveVersion(%q, %q, upgrade=%v) = %q, want %q", tt.latest, tt.previous, tt.upgrade, got, tt.want)
 			}

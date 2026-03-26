@@ -4,12 +4,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 type Event interface {
 	Service() string
-	Etag() string
+	Etag() types.ETag
 	Host() string
 	Status() string
 	State() defangv1.ServiceState
@@ -56,7 +57,7 @@ func (e *CodebuildEvent) Service() string {
 	return e.service
 }
 
-func (e *CodebuildEvent) Etag() string {
+func (e *CodebuildEvent) Etag() types.ETag {
 	return e.etag
 }
 

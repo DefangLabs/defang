@@ -671,6 +671,10 @@ func (b *ByocDo) environment(projectName, delegateDomain string, mode defangv1.D
 	return env, nil
 }
 
+func (*ByocDo) Driver() string {
+	return "app platform"
+}
+
 func (b *ByocDo) SetUpCD(ctx context.Context, force bool) error {
 	if b.SetupDone {
 		return nil

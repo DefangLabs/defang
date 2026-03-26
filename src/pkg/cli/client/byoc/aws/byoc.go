@@ -21,11 +21,10 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/clouds"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	awscodebuild "github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild/cfn"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/dockerhub"
 	"github.com/DefangLabs/defang/src/pkg/http"
@@ -53,11 +52,11 @@ type Config = awssdk.Config
 type ByocAws struct {
 	*byoc.ByocBaseClient
 
-	driver *cfn.AwsEcsCfn // TODO: ecs is stateful, contains the output of the cd cfn stack after SetUpCD
+	driver *cfn.AwsCfn // TODO: ecs is stateful, contains the output of the cd cfn stack after SetUpCD
 
 	cdEtag    types.ETag
 	cdStart   time.Time
-	cdTaskArn ecs.TaskArn // for GetDeploymentStatus
+	cdBuildId awscodebuild.BuildID // for GetDeploymentStatus
 
 	needDockerHubCreds bool
 }
@@ -142,13 +141,8 @@ func (b *ByocAws) Authenticate(ctx context.Context, interactive bool) error {
 	return b.driver.Authenticate(ctx, interactive)
 }
 
-func (b *ByocAws) makeContainers() []clouds.Container {
-	return makeContainers(b.PulumiVersion, b.CDImage)
-}
-
 func (b *ByocAws) PrintCloudFormationTemplate() ([]byte, error) {
-	containers := b.makeContainers()
-	template, err := cfn.CreateTemplate(byoc.CdTaskPrefix, containers)
+	template, err := cfn.CreateTemplate(byoc.CdTaskPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -162,34 +156,30 @@ func (b *ByocAws) SetUpCD(ctx context.Context, force bool) error {
 
 	term.Debugf("Using CD image: %q", b.CDImage)
 
-	created, err := b.driver.SetUp(ctx, b.makeContainers(), force)
+	_, err := b.driver.SetUp(ctx, force)
 	if err != nil {
 		return AnnotateAwsError(err)
-	}
-
-	// Delete default SecurityGroup rules to comply with stricter AWS account security policies;
-	// only needed when the stack (and its VPC) is first created.
-	if created {
-		if sgId := b.driver.DefaultSecurityGroupID; sgId != "" {
-			term.Debugf("Cleaning up default Security Group rules (%s)", sgId)
-			if err := b.driver.RevokeDefaultSecurityGroupRules(ctx, sgId); err != nil {
-				term.Warnf("Could not clean up default Security Group rules: %v", err)
-			}
-		}
 	}
 
 	b.SetupDone = true
 	return nil
 }
 
+func (*ByocAws) Driver() string {
+	return "codebuild"
+}
+
 func (b *ByocAws) GetDeploymentStatus(ctx context.Context) (bool, error) {
-	done, err := b.driver.GetTaskStatus(ctx, b.cdTaskArn)
+	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
-		// check if the task failed; if so, return the a ErrDeploymentFailed error
-		if taskErr := new(ecs.TaskFailure); errors.As(err, taskErr) {
-			return done, client.ErrDeploymentFailed{Message: taskErr.Error()}
+		return false, AnnotateAwsError(err)
+	}
+	done, err := awscodebuild.GetBuildStatus(ctx, cfg, b.cdBuildId)
+	if err != nil {
+		if buildErr := new(awscodebuild.BuildFailure); errors.As(err, buildErr) {
+			return done, client.ErrDeploymentFailed{Message: buildErr.Error()}
 		}
-		return done, err
+		return done, AnnotateAwsError(err)
 	}
 	return done, nil
 }
@@ -288,13 +278,13 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		}
 	}
 
-	cdTaskArn, err := b.runCdCommand(ctx, cdCmd)
+	cdBuildId, err := b.runCdCommand(ctx, cdCmd)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
 	b.cdEtag = etag
 	b.cdStart = time.Now()
-	b.cdTaskArn = cdTaskArn
+	b.cdBuildId = cdBuildId
 
 	for _, si := range serviceInfos {
 		if si.UseAcmeCert {
@@ -322,7 +312,7 @@ func (b *ByocAws) putDockerHubSecret(ctx context.Context, projectName string, us
 
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
-		return "", err
+		return "", AnnotateAwsError(err)
 	}
 
 	secretsmanagerClient := secretsmanager.NewFromConfig(cfg)
@@ -535,7 +525,7 @@ type cdCommand struct {
 	eventsUrl string
 }
 
-func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn, error) {
+func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild.BuildID, error) {
 	// Setup the deployment environment
 	env, err := b.environment(cmd.project)
 	if err != nil {
@@ -586,7 +576,9 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (ecs.TaskArn,
 		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
 	}
 
-	return b.driver.Run(ctx, env, cmd.command...)
+	// Prepend the entrypoint; CodeBuild runs buildspec commands in a shell, not via Docker ENTRYPOINT
+	args := append([]string{"node", "lib/index.js"}, cmd.command...)
+	return b.driver.Run(ctx, "/app", b.CDImage, env, args...)
 }
 
 func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
@@ -722,8 +714,8 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 	//  * Valid Etag, no services: 	tail all tasks/services with that Etag
 	//  * Valid Etag, service:		tail that task/service
 	var logSeq iter.Seq2[cw.LogEvent, error]
-	if taskID := b.deriveTaskID(req.Etag); taskID != "" && logs.LogType(req.LogType) == logs.LogTypeCD {
-		cdSeq, err := b.queryOrTailLogsByTaskID(ctx, cwClient, req, taskID)
+	if buildID := b.deriveBuildID(req.Etag); buildID != nil && logs.LogType(req.LogType) == logs.LogTypeCD {
+		cdSeq, err := b.queryOrTailLogsByBuildID(ctx, cwClient, req, buildID)
 		if err != nil {
 			return nil, AnnotateAwsError(err)
 		}
@@ -761,32 +753,28 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 	}, nil
 }
 
-func (b *ByocAws) queryOrTailLogsByTaskID(ctx context.Context, cwClient cw.LogsClient, req *defangv1.TailRequest, taskID string) (iter.Seq2[[]cw.LogEvent, error], error) {
-	if b.cdTaskArn == nil {
-		var err error
-		b.cdTaskArn, err = b.driver.GetTaskArn(taskID) // only fails on missing task ID
-		if err != nil {
-			return nil, err
-		}
-	}
+func (b *ByocAws) queryOrTailLogsByBuildID(ctx context.Context, cwClient cw.LogsClient, req *defangv1.TailRequest, buildID awscodebuild.BuildID) (iter.Seq2[[]cw.LogEvent, error], error) {
 	if req.Follow {
-		return b.driver.TailTaskID(ctx, cwClient, taskID)
+		return b.driver.TailBuildID(ctx, cwClient, buildID)
 	} else {
 		start := timeutils.AsTime(req.Since, time.Time{})
 		end := timeutils.AsTime(req.Until, time.Time{})
-		return b.driver.QueryTaskID(ctx, cwClient, taskID, start, end, req.Limit)
+		return b.driver.QueryBuildID(ctx, cwClient, buildID, start, end, req.Limit)
 	}
 }
 
-// deriveTaskID returns the CD task ID if the etag refers to a CD task, or empty string otherwise.
-func (b *ByocAws) deriveTaskID(reqEtag string) string {
-	if b.cdTaskArn != nil && b.cdEtag == reqEtag {
-		return ecs.GetTaskID(b.cdTaskArn)
+// deriveBuildID returns the BuildID if the etag refers to a CD CodeBuild build, or nil otherwise.
+func (b *ByocAws) deriveBuildID(reqEtag string) awscodebuild.BuildID {
+	if reqEtag == "" {
+		return nil
+	}
+	if b.cdBuildId != nil && b.cdEtag == reqEtag {
+		return b.cdBuildId
 	}
 	if _, err := types.ParseEtag(reqEtag); err != nil {
-		return reqEtag // legacy: assume invalid etag is a task ID
+		return awscodebuild.BuildID(&reqEtag) // legacy: assume invalid etag is a task ID
 	}
-	return ""
+	return nil
 }
 
 func (b *ByocAws) queryOrTailLogs(ctx context.Context, cwClient cw.LogsClient, req *defangv1.TailRequest) (iter.Seq2[cw.LogEvent, error], error) {
@@ -862,8 +850,8 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 		} else {
 			cdTail := cw.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern}
 			// If we know the CD task ARN, only tail the logstream for that CD task; FIXME: store the task ID in the project's ProjectUpdate in S3 and use that
-			if b.cdTaskArn != nil && (b.cdEtag == etag || ecs.GetTaskID(b.cdTaskArn) == etag) {
-				cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.cdTaskArn))}
+			if b.cdBuildId != nil && (b.cdEtag == etag || *b.cdBuildId == etag) {
+				cdTail.LogStreamNames = []string{awscodebuild.GetLogStreamForBuildID(b.cdBuildId)}
 			}
 			groups = append(groups, cdTail)
 			term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames, filter)
@@ -926,13 +914,13 @@ func (b *ByocAws) CdCommand(ctx context.Context, req client.CdCommandRequest) (s
 		statesUrl: req.StatesUrl,
 		eventsUrl: req.EventsUrl,
 	}
-	cdTaskArn, err := b.runCdCommand(ctx, cmd)
+	cdBuildId, err := b.runCdCommand(ctx, cmd)
 	if err != nil {
 		return "", AnnotateAwsError(err)
 	}
 	b.cdEtag = etag
 	b.cdStart = time.Now()
-	b.cdTaskArn = cdTaskArn
+	b.cdBuildId = cdBuildId
 	return etag, nil
 }
 

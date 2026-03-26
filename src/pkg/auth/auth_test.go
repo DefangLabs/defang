@@ -87,7 +87,7 @@ func TestPoll(t *testing.T) {
 		OpenAuthClient = NewClient("test", server.URL)
 		t.Cleanup(func() { OpenAuthClient = orig })
 
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second) // Retry client retires per second
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 
 		_, err := Poll(ctx, "state")
@@ -219,4 +219,43 @@ func TestPollForAuthCode(t *testing.T) {
 			t.Errorf("pollForAuthCode() = %q, want %q", code, "my+code=")
 		}
 	})
+}
+
+// TestPoll_ContextDone verifies that Poll returns immediately when the context is
+// done (Canceled or DeadlineExceeded) without retrying.
+func TestPoll_ContextDone(t *testing.T) {
+	for _, name := range []string{"context.Canceled", "context.DeadlineExceeded"} {
+		t.Run(name, func(t *testing.T) {
+			calls := 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				http.Error(w, "server error", http.StatusInternalServerError)
+			}))
+			t.Cleanup(server.Close)
+
+			c := NewClient("test", server.URL)
+			orig := OpenAuthClient
+			OpenAuthClient = c
+			t.Cleanup(func() { OpenAuthClient = orig })
+
+			var ctx context.Context
+			if name == "context.Canceled" {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(context.Background())
+				cancel()
+			} else {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithDeadline(context.Background(), time.Now())
+				defer cancel()
+			}
+
+			_, err := Poll(ctx, "teststate")
+			if err == nil {
+				t.Fatal("expected error for done context")
+			}
+			if calls > 1 {
+				t.Errorf("Poll must not retry with done context, got %d server calls", calls)
+			}
+		})
+	}
 }

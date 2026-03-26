@@ -127,7 +127,12 @@ func (a *Aws) Authenticate(ctx context.Context, interactive bool) error {
 
 	// 1. Try default AWS credentials
 	term.Debugf("checking default AWS credentials for region %s...", a.Region)
-	if _, err := a.testCredentials(ctx, nil); err == nil {
+	if _, err := a.testCredentials(ctx, nil); err != nil {
+		if ctx.Err() != nil { // Fast fail if context is done, no need to try other credential sources
+			return ctx.Err()
+		}
+		term.Debugf("default AWS credentials invalid: %v", err)
+	} else {
 		term.Debug("found valid default AWS credentials")
 		return nil
 	}
@@ -228,6 +233,9 @@ func (a *Aws) findStoredCredentials(ctx context.Context) (awssdk.CredentialsProv
 		// If no AWS_PROFILE with role specified, any valid token is considered acceptable
 		creds, err := a.testCredentialsWithProfile(ctx, name, provider)
 		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 			term.Debugf("token %q failed AWS_PROFILE role validation: %v, skipping...", name, err)
 			continue
 		}
@@ -239,7 +247,7 @@ func (a *Aws) findStoredCredentials(ctx context.Context) (awssdk.CredentialsProv
 func (a *Aws) testCredentialsWithProfile(ctx context.Context, name string, creds awssdk.CredentialsProvider) (awssdk.CredentialsProvider, error) {
 	identity, err := a.testCredentials(ctx, creds)
 	if err != nil {
-		return nil, fmt.Errorf("token %q failed validation: %v", name, err)
+		return nil, fmt.Errorf("token %q failed validation: %w", name, err)
 	}
 	if identity.Arn == nil {
 		return nil, errors.New("caller identity ARN is missing")

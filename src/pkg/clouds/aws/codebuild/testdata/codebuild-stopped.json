@@ -1,0 +1,96 @@
+{
+  "$metadata": {
+    "httpStatusCode": 200,
+    "requestId": "35faf0c1-f718-4dd6-b313-9e67140f1bdc",
+    "attempts": 1,
+    "totalRetryDelay": 0
+  },
+  "builds": [
+    {
+      "arn": "arn:aws:codebuild:us-west-2:381492210770:build/app-image-accfe92:80805190-2345-4b6b-8f0e-af1edc3d6d7a",
+      "artifacts": {
+        "location": "",
+        "overrideArtifactName": false,
+        "type": "no_artifacts"
+      },
+      "buildComplete": true,
+      "buildNumber": 20,
+      "buildStatus": "STOPPED",
+      "cache": {
+        "modes": ["LOCAL_DOCKER_LAYER_CACHE", "LOCAL_SOURCE_CACHE"],
+        "type": "LOCAL"
+      },
+      "currentPhase": "COMPLETED",
+      "encryptionKey": "arn:aws:kms:us-west-2:381492210770:alias/aws/s3",
+      "endTime": "2025-11-29T02:02:21.479Z",
+      "environment": {
+        "computeType": "BUILD_GENERAL1_LARGE",
+        "environmentVariables": [
+          {
+            "name": "AWS_ACCOUNT_ID",
+            "type": "PLAINTEXT",
+            "value": "381492210770"
+          },
+          {
+            "name": "AWS_DEFAULT_REGION",
+            "type": "PLAINTEXT",
+            "value": "us-west-2"
+          }
+        ],
+        "image": "aws/codebuild/amazonlinux-x86_64-standard:5.0",
+        "imagePullCredentialsType": "CODEBUILD",
+        "privilegedMode": true,
+        "type": "LINUX_CONTAINER"
+      },
+      "id": "app-image-accfe92:80805190-2345-4b6b-8f0e-af1edc3d6d7a",
+      "initiator": "admin/aws-sdk-js-1764381741099",
+      "logs": {
+        "cloudWatchLogs": {
+          "groupName": "/Defang/html-css-js/test2/builds",
+          "status": "ENABLED",
+          "streamName": "app-image/app_1doati2vuc7v"
+        },
+        "cloudWatchLogsArn": "arn:aws:logs:us-west-2:381492210770:log-group:null:log-stream:null",
+        "deepLink": "https://console.aws.amazon.com/cloudwatch/home?region=us-west-2#logsV2:log-groups",
+        "s3Logs": {
+          "encryptionDisabled": false,
+          "status": "DISABLED"
+        }
+      },
+      "phases": [
+        {
+          "durationInSeconds": 0,
+          "endTime": "2025-11-29T02:02:21.409Z",
+          "phaseStatus": "SUCCEEDED",
+          "phaseType": "SUBMITTED",
+          "startTime": "2025-11-29T02:02:21.353Z"
+        },
+        {
+          "durationInSeconds": 0,
+          "endTime": "2025-11-29T02:02:21.479Z",
+          "phaseStatus": "STOPPED",
+          "phaseType": "QUEUED",
+          "startTime": "2025-11-29T02:02:21.409Z"
+        },
+        {
+          "phaseType": "COMPLETED",
+          "startTime": "2025-11-29T02:02:21.479Z"
+        }
+      ],
+      "projectName": "app-image-accfe92",
+      "queuedTimeoutInMinutes": 480,
+      "secondarySourceVersions": [],
+      "secondarySources": [],
+      "serviceRole": "arn:aws:iam::381492210770:role/Defang-html-css-js-test2-code-build-roleus-west-2",
+      "source": {
+        "buildspec": "version: 0.2\nphases:\n  pre_build:\n    commands:\n      - tar -xzf sha256-T7iSdNuO_vTAJsuH2uQcjFPe93mJ7CuOldFH7FRtLaI_.tar.gz -C $CODEBUILD_SRC_DIR\n      - rm sha256-T7iSdNuO_vTAJsuH2uQcjFPe93mJ7CuOldFH7FRtLaI_.tar.gz\n      - mkdir -p /root/.docker\n      - echo '{\"credHelpers\":{\"public.ecr.aws\":\"ecr-login\",\"381492210770.dkr.ecr.us-west-2.amazonaws.com\":\"ecr-login\"}}' > /root/.docker/config.json\n      - mkdir -p /etc/docker/ && echo '{\"registry-mirrors\":[\"https://381492210770.dkr.ecr.us-west-2.amazonaws.com/defang-html-css-js-test280dd33\",\"http://localhost:5000\"]}' > /etc/docker/daemon.json\n      - |-\n        echo '\n        [registry.\"docker.io\"]\n          mirrors = [\n            \"https://381492210770.dkr.ecr.us-west-2.amazonaws.com/defang-html-css-js-test280dd33\", \"http://localhost:5000\"\n          ]\n        ' > /tmp/buildkitd.toml\n      - kill -HUP $(pidof dockerd)\n      - |-\n        cat > /tmp/nginx.conf.tmpl << EOF\n        events {}\n        http {\n            server {\n\n                set \\$token \"\";\n        __TOKEN__\n\n                listen 80;\n                location = /v2/ {\n                    proxy_pass https://public.ecr.aws/v2/;\n                    proxy_intercept_errors on;\n                    proxy_set_header Authorization \"Bearer \\$token\";\n                    proxy_ssl_server_name on;\n\n                    error_page 404 = @fallback;\n                }\n\n                location ~ ^/v2/(.+) {\n                    # Capture the rest of the path\n                    set \\$rest \\$1;\n\n                    # Build upstream path: /v2/docker/<rest>\n                    proxy_pass https://public.ecr.aws/v2/docker/\\$rest;\n                    proxy_intercept_errors on;\n                    proxy_set_header Authorization \"Bearer \\$token\";\n                    proxy_ssl_server_name on;\n\n                    error_page 404 = @fallback;\n                }\n\n                location @fallback {\n                    proxy_pass https://registry-1.docker.io;\n                    proxy_intercept_errors on;\n                    proxy_ssl_server_name on;\n\n                    error_page 429 = @throttled;\n                }\n\n                location @throttled {\n                    return 429 \"Docker Hub rate limit exceeded. Please do `docker login` before deployment.\\n\";\n                }\n            }\n        }\n\n        EOF\n      - TOKEN_BLOCK=$(echo \"https://public.ecr.aws\" | docker-credential-ecr-login get | jq -j '\"\\(.Username):\\(.Secret)\"' | base64 -w 1024 | awk '{ print \"set $token \\\"${token}\" $0 \"\\\";\" }')\n      - awk -v token_block=\"$TOKEN_BLOCK\" '{ if ($0 ~ /__TOKEN__/) { print token_block } else { print } }' /tmp/nginx.conf.tmpl > /tmp/nginx.conf\n      - docker run -d -p 5000:80 --restart=always --name dockerhub-ecr-mirror -v /tmp/nginx.conf:/etc/nginx/nginx.conf:ro public.ecr.aws/nginx/nginx:stable-alpine\n      - sleep 3\n      - docker buildx create --use --driver=docker-container --buildkitd-config=/tmp/buildkitd.toml --driver-opt network=host --use --platform linux/amd64\n  build:\n    commands:\n      - echo Building the Docker image...\n      - docker buildx build -t 381492210770.dkr.ecr.us-west-2.amazonaws.com/html-css-js/test2-build:app-image-c2165c65-x86_64 -f Dockerfile --push --cache-from=type=registry,ref=381492210770.dkr.ecr.us-west-2.amazonaws.com/html-css-js/test2-build:defang-cache --cache-to=type=registry,image-manifest=true,oci-mediatypes=true,mode=max,ref=381492210770.dkr.ecr.us-west-2.amazonaws.com/html-css-js/test2-build:defang-cache --platform linux/amd64  ${CODEBUILD_SRC_DIR}\n",
+        "insecureSsl": false,
+        "location": "defang-cd-bucket-cybpbzz8hzm7/uploads/sha256-T7iSdNuO_vTAJsuH2uQcjFPe93mJ7CuOldFH7FRtLaI_.tar.gz",
+        "type": "S3"
+      },
+      "startTime": "2025-11-29T02:02:21.353Z",
+      "timeoutInMinutes": 45
+    }
+  ],
+  "buildsNotFound": []
+}

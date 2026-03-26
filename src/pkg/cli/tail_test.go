@@ -16,12 +16,12 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
+	awscodebuild "github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
-	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
+
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -304,7 +304,7 @@ func TestTailError(t *testing.T) {
 	}{
 		{"cancel", context.Canceled, cancelError},
 		{"timeout", context.DeadlineExceeded, cancelError},
-		{"cd task failure", ecs.TaskFailure{Reason: types.TaskStopCodeEssentialContainerExited}, "EssentialContainerExited: "},
+		{"cd build failure", awscodebuild.BuildFailure{Reason: "build failed"}, "CodeBuild: build failed"},
 		{"eof", io.EOF, "EOF"},
 		{"nil", nil, ""},
 	}

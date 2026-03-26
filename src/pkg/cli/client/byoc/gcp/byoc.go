@@ -165,6 +165,10 @@ func getGcpProjectID() string {
 	return projectId
 }
 
+func (*ByocGcp) Driver() string {
+	return "cloudbuild"
+}
+
 func (b *ByocGcp) SetUpCD(ctx context.Context, force bool) error {
 	if b.setupDone {
 		return nil

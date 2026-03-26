@@ -288,6 +288,7 @@ message CanIUseRequest {
   string provider_account_id = 6;
   string prefer_cd_version = 7; // currently deployed CD image; empty for new projects or when --allow-upgrade is set
   string prefer_pulumi_version = 8; // currently deployed Pulumi version; empty for new projects or when --allow-upgrade is set
+  string driver = 9;
 }
 
 message CanIUseResponse {
@@ -298,6 +299,7 @@ message CanIUseResponse {
   string pulumi_version = 5;
   bytes signature = 6;
   bool forced_version = 7; // force use of the returned CD image and Pulumi version
+  string forced_reason = 8;
 }
 
 message DeployRequest {
