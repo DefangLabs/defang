@@ -169,7 +169,7 @@ func (c client) GetPollRedirectURI() string {
 func (c client) Poll(ctx context.Context, state string) ([]byte, error) {
 	pollUrl := fmt.Sprintf("%s/clients/auth/poll?state=%s", c.issuer, state)
 
-	resp, err := defangHttp.PostFormWithContext(ctx, pollUrl, nil)
+	resp, err := c.PostWithContext(ctx, pollUrl, "application/x-www-form-urlencoded", nil)
 	if err != nil {
 		return nil, fmt.Errorf("poll request failed: %w", err)
 	}
@@ -187,6 +187,20 @@ func (c client) Poll(ctx context.Context, state string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 	return body, nil
+}
+
+func (c client) PostWithContext(ctx context.Context, url, contentType string, body io.Reader) (*http.Response, error) {
+	hreq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
+	if err != nil {
+		return nil, err
+	}
+	if contentType != "" {
+		hreq.Header.Set("Content-Type", contentType)
+	}
+	httpClient := &http.Client{
+		Timeout: 30 * time.Second, // a reasonable timeout accommodating possible long polling waits
+	}
+	return httpClient.Do(hreq)
 }
 
 func generateState() (string, error) {

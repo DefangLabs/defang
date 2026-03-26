@@ -433,7 +433,7 @@ func TestSameRole(t *testing.T) {
 }
 
 // validAwsToken returns a marshalled awsTokenCache with a non-expired access token.
-func validAwsToken(t *testing.T, tokenURL string) string {
+func validAwsToken(t *testing.T) string {
 	t.Helper()
 	var cached awsTokenCache
 	cached.AccessToken.AccessKeyID = "AKID"
@@ -443,7 +443,7 @@ func validAwsToken(t *testing.T, tokenURL string) string {
 	cached.TokenType = "Bearer"
 	cached.ClientID = clientIDSameDevice
 	cached.RefreshToken = "refresh-token"
-	cached.TokenURL = tokenURL
+	cached.TokenURL = "https://us-east-1.signin.aws.amazon.com/v1/token"
 	b, err := json.Marshal(cached)
 	if err != nil {
 		t.Fatalf("marshaling token: %v", err)
@@ -513,7 +513,7 @@ func TestFindStoredCredentials(t *testing.T) {
 
 	t.Run("valid non-expired token returns provider", func(t *testing.T) {
 		store := tokenstore.NewMemTokenStore()
-		store.Save(tokenStoreKeyPrefix+"valid", validAwsToken(t, "https://us-east-1.signin.aws.amazon.com/v1/token")) //nolint:errcheck
+		store.Save(tokenStoreKeyPrefix+"valid", validAwsToken(t)) //nolint:errcheck
 		a := &Aws{Region: region, TokenStore: store}
 		creds, err := a.findStoredCredentials(t.Context())
 		if err != nil {
@@ -540,15 +540,75 @@ func TestFindStoredCredentials(t *testing.T) {
 	})
 }
 
-// failStsAPI is an STS mock that always returns an error.
-type failStsAPI struct{}
+// failStsAPI is an STS mock that always returns the configured error (default: "no credentials available").
+type failStsAPI struct {
+	err error
+}
 
-func (failStsAPI) GetCallerIdentity(ctx context.Context, params *awssts.GetCallerIdentityInput, optFns ...func(*awssts.Options)) (*awssts.GetCallerIdentityOutput, error) {
+func (f failStsAPI) GetCallerIdentity(ctx context.Context, params *awssts.GetCallerIdentityInput, optFns ...func(*awssts.Options)) (*awssts.GetCallerIdentityOutput, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
 	return nil, errors.New("no credentials available")
 }
 
-func (failStsAPI) AssumeRole(ctx context.Context, params *awssts.AssumeRoleInput, optFns ...func(*awssts.Options)) (*awssts.AssumeRoleOutput, error) {
+func (f failStsAPI) AssumeRole(ctx context.Context, params *awssts.AssumeRoleInput, optFns ...func(*awssts.Options)) (*awssts.AssumeRoleOutput, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
 	return nil, errors.New("no credentials available")
+}
+
+func TestAuthenticate_ContextCanceled_DefaultCredentials(t *testing.T) {
+	// When the context is done, Authenticate must fast-fail without trying other
+	// credential sources. Uses a pre-cancelled context so ctx.Err() != nil.
+	called := 0
+	origSts := NewStsFromConfig
+	NewStsFromConfig = func(_ awssdk.Config) StsClientAPI {
+		called++
+		return failStsAPI{} // returns generic error so the ctx.Err() branch is reached
+	}
+	t.Cleanup(func() { NewStsFromConfig = origSts })
+
+	store := tokenstore.NewMemTokenStore()
+	store.Save(tokenStoreKeyPrefix+"valid", validAwsToken(t)) //nolint:errcheck
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	a := &Aws{Region: "us-east-1", TokenStore: store}
+	err := a.Authenticate(ctx, false)
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("Authenticate() error = %v, want context.Canceled", err)
+	}
+	if called > 1 {
+		t.Errorf("expected exactly 1 STS call before fast-fail, got %d", called)
+	}
+}
+
+func TestFindStoredCredentials_ContextCanceled(t *testing.T) {
+	// When the context is done, findStoredCredentials must abort immediately
+	// rather than skipping the token and continuing.
+	origSts := NewStsFromConfig
+	NewStsFromConfig = func(_ awssdk.Config) StsClientAPI {
+		return failStsAPI{} // returns generic error so the ctx.Err() branch is reached
+	}
+	t.Cleanup(func() { NewStsFromConfig = origSts })
+
+	store := tokenstore.NewMemTokenStore()
+	store.Save(tokenStoreKeyPrefix+"valid", validAwsToken(t)) //nolint:errcheck
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	a := &Aws{Region: "us-east-1", TokenStore: store}
+	creds, err := a.findStoredCredentials(ctx)
+	if creds != nil {
+		t.Error("expected nil credentials when context is done")
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("findStoredCredentials() error = %v, want context.Canceled", err)
+	}
 }
 
 func TestAuthenticate_AWS(t *testing.T) {
@@ -568,7 +628,7 @@ func TestAuthenticate_AWS(t *testing.T) {
 		t.Cleanup(func() { NewStsFromConfig = origSts })
 
 		store := tokenstore.NewMemTokenStore()
-		store.Save(tokenStoreKeyPrefix+"valid", validAwsToken(t, "https://us-east-1.signin.aws.amazon.com/v1/token")) //nolint:errcheck
+		store.Save(tokenStoreKeyPrefix+"valid", validAwsToken(t)) //nolint:errcheck
 
 		a := &Aws{Region: region, TokenStore: store}
 		err := a.Authenticate(t.Context(), false)
