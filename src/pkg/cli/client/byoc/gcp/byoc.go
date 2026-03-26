@@ -410,6 +410,7 @@ type CloudBuildStep struct {
 }
 
 func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) error {
+	// From https://www.pulumi.com/docs/iac/concepts/state-and-backends/#google-cloud-storage
 	defangStateUrl := `gs://` + b.bucket
 	pulumiBackendKey, pulumiBackendValue, err := byoc.GetPulumiBackend(defangStateUrl)
 	if err != nil {

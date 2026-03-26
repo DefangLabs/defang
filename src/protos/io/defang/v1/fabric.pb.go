@@ -34,6 +34,7 @@ const (
 	Provider_AWS                  Provider = 2
 	Provider_DIGITALOCEAN         Provider = 3
 	Provider_GCP                  Provider = 4
+	Provider_AZURE                Provider = 5
 )
 
 // Enum value maps for Provider.
@@ -44,6 +45,7 @@ var (
 		2: "AWS",
 		3: "DIGITALOCEAN",
 		4: "GCP",
+		5: "AZURE",
 	}
 	Provider_value = map[string]int32{
 		"PROVIDER_UNSPECIFIED": 0,
@@ -51,6 +53,7 @@ var (
 		"AWS":                  2,
 		"DIGITALOCEAN":         3,
 		"GCP":                  4,
+		"AZURE":                5,
 	}
 )
 

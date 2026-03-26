@@ -226,3 +226,8 @@ func GcpInEnv() string {
 	env, _ := GetFirstEnv(GCPProjectEnvVars...)
 	return env
 }
+
+func AzureInEnv() string {
+	env, _ := GetFirstEnv("AZURE_SUBSCRIPTION_ID", "AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET")
+	return env
+}
