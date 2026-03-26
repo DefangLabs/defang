@@ -26,9 +26,13 @@ type Session struct {
 	Provider client.Provider
 }
 
-type SessionLoaderOptions struct {
+type LoaderOptions struct {
 	ProjectName      string
 	ComposeFilePaths []string
+}
+
+type SessionLoaderOptions struct {
+	LoaderOptions
 	stacks.GetStackOpts
 }
 

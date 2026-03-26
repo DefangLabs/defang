@@ -36,7 +36,7 @@ func newCommandSessionWithOpts(cmd *cobra.Command, opts commandSessionOpts) (*se
 
 	options := newSessionLoaderOptionsForCommand(cmd)
 	options.AllowStackCreation = opts.AllowStackCreation
-	sm, err := newStackManagerForLoader(ctx, configureLoader(cmd))
+	sm, err := newStackManagerForLoader(ctx, configureLoader(options.LoaderOptions))
 	if err != nil {
 		term.Debugf("Could not create stack manager: %v", err)
 	}
@@ -79,8 +79,10 @@ func newSessionLoaderOptionsForCommand(cmd *cobra.Command) session.SessionLoader
 		}
 	}
 	return session.SessionLoaderOptions{
-		ComposeFilePaths: configPaths,
-		ProjectName:      projectName,
+		LoaderOptions: session.LoaderOptions{
+			ComposeFilePaths: configPaths,
+			ProjectName:      projectName,
+		},
 		GetStackOpts: stacks.GetStackOpts{
 			Interactive: !global.NonInteractive,
 			Default:     global.Stack,

@@ -6,11 +6,12 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewStackManagerForCommand(t *testing.T) {
+func TestNewStackManager(t *testing.T) {
 	tests := []struct {
 		name           string
 		directory      string
@@ -86,37 +87,63 @@ func TestNewStackManagerForCommand(t *testing.T) {
 			paths:          []string{"../compose.yaml"},
 			expectedTarget: "..",
 		},
+		{
+			name:          "invalid compose file - returns error",
+			directory:     "invalid-compose",
+			paths:         []string{"compose.yaml"},
+			expectedError: "additional properties 'blah' not allowed",
+		},
 	}
 
+	oldGlobal := global
+	t.Cleanup(func() {
+		global = oldGlobal
+	})
+	global.Stack.Provider = "defang" // avoids invoking gRPC for listing remote stacks
+
 	for _, tt := range tests {
-		tempDir := t.TempDir()
-		// copy testdata to tempDir
-		err := os.CopyFS(tempDir, os.DirFS("testdata"))
-		if err != nil {
-			t.Fatalf("failed to copy testdata: %v", err)
-		}
 		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			// copy testdata to tempDir
+			err := os.CopyFS(tempDir, os.DirFS("testdata"))
+			if err != nil {
+				t.Fatalf("failed to copy testdata: %v", err)
+			}
+
 			testDir := filepath.Join(tempDir, tt.directory)
 			t.Chdir(testDir)
 
-			loader := compose.NewLoader(compose.WithProjectName(tt.projectName), compose.WithPath(tt.paths...))
-			sm, err := newStackManagerForLoader(t.Context(), loader)
-			if tt.expectedError != "" {
-				assert.EqualError(t, err, tt.expectedError)
-				return
-			}
-			require.NoError(t, err, "expected no error but got one")
-
-			if tt.expectedTarget == "" {
-				assert.Equal(t, "", sm.TargetDirectory())
-			} else {
-				actualTarget := sm.TargetDirectory()
-				expectedAbs, err := filepath.Abs(tt.expectedTarget)
-				if err != nil {
-					t.Fatalf("failed to get absolute path: %v", err)
+			t.Run("newStackManagerForLoader", func(t *testing.T) {
+				loader := compose.NewLoader(compose.WithProjectName(tt.projectName), compose.WithPath(tt.paths...))
+				sm, err := newStackManagerForLoader(t.Context(), loader)
+				if tt.expectedError != "" {
+					assert.ErrorContains(t, err, tt.expectedError)
+					return
 				}
-				assert.Equal(t, expectedAbs, actualTarget)
-			}
+				require.NoError(t, err, "expected no error but got one")
+
+				if tt.expectedTarget == "" {
+					assert.Equal(t, "", sm.TargetDirectory())
+				} else {
+					actualTarget := sm.TargetDirectory()
+					expectedAbs, err := filepath.Abs(tt.expectedTarget)
+					require.NoError(t, err, "failed to get absolute path")
+					assert.Equal(t, expectedAbs, actualTarget)
+				}
+			})
+
+			t.Run("newCommandSessionWithOpts", func(t *testing.T) {
+				cmd := &cobra.Command{}
+				cmd.Flags().String("project-name", tt.projectName, "")
+				cmd.Flags().StringArray("file", tt.paths, "")
+				cmd.SetContext(t.Context())
+				_, err = newCommandSessionWithOpts(cmd, commandSessionOpts{})
+				if tt.expectedError != "" {
+					assert.ErrorContains(t, err, tt.expectedError)
+					return
+				}
+				require.NoError(t, err, "expected no error but got one")
+			})
 		})
 	}
 }

@@ -41,7 +41,7 @@ func isSafePath(path string) bool {
 
 func CollectFsTools() []ai.Tool {
 	return []ai.Tool{
-		ai.NewTool[ReadFileParams, string](
+		ai.NewTool(
 			"read_file",
 			"Read the contents of a file from the local filesystem",
 			func(ctx *ai.ToolContext, params ReadFileParams) (string, error) {
@@ -55,7 +55,7 @@ func CollectFsTools() []ai.Tool {
 				return string(bytes), nil
 			},
 		),
-		ai.NewTool[FindFilesParams, string](
+		ai.NewTool(
 			"find_files",
 			"Find files in a directory on the local filesystem matching a given pattern",
 			func(ctx *ai.ToolContext, params FindFilesParams) (string, error) {
@@ -86,7 +86,7 @@ func CollectFsTools() []ai.Tool {
 				return string(b), nil
 			},
 		),
-		ai.NewTool[ListFilesParams, string](
+		ai.NewTool(
 			"list_files",
 			"List files in a directory on the local filesystem",
 			func(ctx *ai.ToolContext, params ListFilesParams) (string, error) {
