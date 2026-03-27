@@ -198,7 +198,7 @@ Resources:
                             - '","'
                             - Ref: OidcProviderSubjects
             ManagedPolicyArns:
-                - arn:aws:iam::aws:policy/PowerUserAccess
+                - arn:aws:iam::aws:policy/AdministratorAccess
             RoleName:
                 Fn::If:
                     - OverrideCIRoleName
@@ -275,31 +275,6 @@ Resources:
             Roles:
                 - Ref: TaskRole
         Type: AWS::IAM::ManagedPolicy
-    TaskRole:
-        Properties:
-            AssumeRolePolicyDocument:
-                Statement:
-                    - Action: sts:AssumeRole
-                      Effect: Allow
-                      Principal:
-                        Service: codebuild.amazonaws.com
-                Version: "2012-10-17"
-            ManagedPolicyArns:
-                - arn:aws:iam::aws:policy/PowerUserAccess
-            Tags:
-                - Key: defang:CreatedBy
-                  Value: defang
-                - Key: defang:Prefix
-                  Value: test
-                - Key: defang:ManagedBy
-                  Value: CloudFormation
-                - Key: defang:CloudFormationStackName
-                  Value:
-                    Ref: AWS::StackName
-                - Key: defang:CloudFormationStackRegion
-                  Value:
-                    Ref: AWS::Region
-        Type: AWS::IAM::Role
     DefangCD:
         Properties:
             Artifacts:
@@ -386,3 +361,28 @@ Resources:
             Url:
                 Fn::Sub: https://${OidcProviderIssuer}
         Type: AWS::IAM::OIDCProvider
+    TaskRole:
+        Properties:
+            AssumeRolePolicyDocument:
+                Statement:
+                    - Action: sts:AssumeRole
+                      Effect: Allow
+                      Principal:
+                        Service: codebuild.amazonaws.com
+                Version: "2012-10-17"
+            ManagedPolicyArns:
+                - arn:aws:iam::aws:policy/PowerUserAccess
+            Tags:
+                - Key: defang:CreatedBy
+                  Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
+        Type: AWS::IAM::Role
