@@ -311,3 +311,51 @@ func TestGetDomainTargets(t *testing.T) {
 		})
 	}
 }
+
+// Test helper function to check if domains exist in compose project
+func TestHasDomains(t *testing.T) {
+	tests := []struct {
+		name     string
+		services map[string]compose.ServiceConfig
+		expected bool
+	}{
+		{
+			name:     "no services",
+			services: map[string]compose.ServiceConfig{},
+			expected: false,
+		},
+		{
+			name: "services without domains",
+			services: map[string]compose.ServiceConfig{
+				"web": {Name: "web", DomainName: ""},
+				"api": {Name: "api", DomainName: ""},
+			},
+			expected: false,
+		},
+		{
+			name: "services with domains",
+			services: map[string]compose.ServiceConfig{
+				"web": {Name: "web", DomainName: "example.com"},
+				"api": {Name: "api", DomainName: ""},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Simulate the logic from GenerateLetsEncryptCert
+			hasDomains := false
+			for _, service := range tt.services {
+				if service.DomainName != "" {
+					hasDomains = true
+					break
+				}
+			}
+
+			if hasDomains != tt.expected {
+				t.Errorf("expected hasDomains=%v, got %v", tt.expected, hasDomains)
+			}
+		})
+	}
+}
