@@ -74,9 +74,10 @@ func TestAddingPrefix(t *testing.T) {
 	t.Cleanup(func() {
 		DefaultTerm = defaultTerm
 	})
-	var stdout, stderr bytes.Buffer
+	var stdout, stderr, debugLog bytes.Buffer
 	DefaultTerm = NewTerm(os.Stdin, &stdout, &stderr)
 	DefaultTerm.SetDebug(true)
+	DefaultTerm.SetDebugLog(&debugLog)
 
 	Debug("Hello, World!")
 	Debugf("Hello, %s!", "World")
@@ -110,16 +111,28 @@ func TestAddingPrefix(t *testing.T) {
 		}
 	}
 
-	expectedErr := []string{
-		" - Hello, World!",
-		" - Hello, World!",
-		" - Hello, World!",
-		" - Hello, World!",
+	if stderr.String() != "" {
+		t.Errorf("Expected stderr to be empty (debug goes to log file), got %q", stderr.String())
 	}
-	gotErr := strings.Split(strings.TrimRight(stderr.String(), "\n"), "\n")
-	for i, line := range gotErr {
-		if line != expectedErr[i] {
-			t.Errorf("Expected line %v in stderr to be %q, got %q", i, expectedErr[i], line)
+
+	expectedLog := []string{
+		" - Hello, World!",
+		" - Hello, World!",
+		" - Hello, World!",
+		" - Hello, World!",
+		" * Hello, World!",
+		" * Hello, World!",
+		" * Hello, World!",
+		" * Hello, World!",
+		" ! Hello, World!",
+		" ! Hello, World!",
+		" ! Hello, World!",
+		" ! Hello, World!",
+	}
+	gotLog := strings.Split(strings.TrimRight(debugLog.String(), "\n"), "\n")
+	for i, line := range gotLog {
+		if line != expectedLog[i] {
+			t.Errorf("Expected line %v in debug log to be %q, got %q", i, expectedLog[i], line)
 		}
 	}
 }

@@ -23,6 +23,8 @@ type Term struct {
 	hasDarkBg  bool
 
 	warnings []string
+
+	debugLog io.Writer // always-on file writer for all log levels; nil until set
 }
 
 var DefaultTerm = NewTerm(os.Stdin, os.Stdout, os.Stderr)
@@ -83,6 +85,16 @@ func (t *Term) ForceColor(color bool) {
 
 func (t *Term) SetDebug(debug bool) {
 	t.debug = debug
+}
+
+func (t *Term) SetDebugLog(w io.Writer) {
+	t.debugLog = w
+}
+
+func (t *Term) teeLog(msg string) {
+	if t.debugLog != nil {
+		fmt.Fprint(t.debugLog, msg)
+	}
 }
 
 func (t *Term) SetJSON(json bool) {
@@ -211,17 +223,19 @@ func (t *Term) Printf(format string, v ...any) (int, error) {
 }
 
 func (t *Term) Debug(v ...any) (int, error) {
-	if !t.debug {
+	if t.debugLog == nil {
 		return 0, nil
 	}
-	return output(t.err, DebugColor, ensurePrefix(debugPrefix, fmt.Sprintln(v...)))
+	msg := ensurePrefix(debugPrefix, fmt.Sprintln(v...))
+	return fmt.Fprint(t.debugLog, msg)
 }
 
 func (t *Term) Debugf(format string, v ...any) (int, error) {
-	if !t.debug {
+	if t.debugLog == nil {
 		return 0, nil
 	}
-	return output(t.err, DebugColor, ensureNewline(ensurePrefix(debugPrefix, fmt.Sprintf(format, v...))))
+	msg := ensureNewline(ensurePrefix(debugPrefix, fmt.Sprintf(format, v...)))
+	return fmt.Fprint(t.debugLog, msg)
 }
 
 func (t *Term) outOrErr() *termenv.Output {
@@ -232,32 +246,41 @@ func (t *Term) outOrErr() *termenv.Output {
 }
 
 func (t *Term) Info(v ...any) (int, error) {
-	return output(t.outOrErr(), InfoColor, ensurePrefix(infoPrefix, fmt.Sprintln(v...)))
+	msg := ensurePrefix(infoPrefix, fmt.Sprintln(v...))
+	t.teeLog(msg)
+	return output(t.outOrErr(), InfoColor, msg)
 }
 
 func (t *Term) Infof(format string, v ...any) (int, error) {
-	return output(t.outOrErr(), InfoColor, ensureNewline(ensurePrefix(infoPrefix, fmt.Sprintf(format, v...))))
+	msg := ensureNewline(ensurePrefix(infoPrefix, fmt.Sprintf(format, v...)))
+	t.teeLog(msg)
+	return output(t.outOrErr(), InfoColor, msg)
 }
 
 func (t *Term) Warn(v ...any) (int, error) {
 	msg := ensurePrefix(warnPrefix, fmt.Sprintln(v...))
 	t.warnings = append(t.warnings, msg)
+	t.teeLog(msg)
 	return output(t.outOrErr(), WarnColor, msg)
 }
 
 func (t *Term) Warnf(format string, v ...any) (int, error) {
 	msg := ensureNewline(ensurePrefix(warnPrefix, fmt.Sprintf(format, v...)))
 	t.warnings = append(t.warnings, msg)
+	t.teeLog(msg)
 	return output(t.outOrErr(), WarnColor, msg)
 }
 
 func (t *Term) Error(v ...any) (int, error) {
-	return output(t.err, ErrorColor, fmt.Sprintln(v...))
+	msg := fmt.Sprintln(v...)
+	t.teeLog(msg)
+	return output(t.err, ErrorColor, msg)
 }
 
 func (t *Term) Errorf(format string, v ...any) (int, error) {
-	line := ensureNewline(fmt.Sprintf(format, v...))
-	return output(t.err, ErrorColor, line)
+	msg := ensureNewline(fmt.Sprintf(format, v...))
+	t.teeLog(msg)
+	return output(t.err, ErrorColor, msg)
 }
 
 // Deprecated: use proper error handling instead
@@ -370,6 +393,10 @@ func ForceColor(color bool) {
 
 func SetDebug(debug bool) {
 	DefaultTerm.SetDebug(debug)
+}
+
+func SetDebugLog(w io.Writer) {
+	DefaultTerm.SetDebugLog(w)
 }
 
 func SetJSON(json bool) {
