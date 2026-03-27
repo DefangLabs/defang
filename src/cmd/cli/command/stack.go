@@ -85,7 +85,7 @@ func makeStackListCmd() *cobra.Command {
 		Short:   "List existing Defang deployment stacks",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-			loader := configureLoader(cmd)
+			loader := configureLoaderForCommand(cmd)
 			projectName, _, err := loader.LoadProjectName(ctx)
 			if err != nil {
 				return err
@@ -124,7 +124,7 @@ func makeStackDefaultCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 			name := args[0]
-			loader := configureLoader(cmd)
+			loader := configureLoaderForCommand(cmd)
 			projectName, _, err := loader.LoadProjectName(ctx)
 			if err != nil {
 				return err
@@ -158,7 +158,7 @@ func makeStackRemoveCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 			name := args[0]
-			loader := configureLoader(cmd)
+			loader := configureLoaderForCommand(cmd)
 			sm, err := newStackManagerForLoader(ctx, loader)
 			if err != nil {
 				return err

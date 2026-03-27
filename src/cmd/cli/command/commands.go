@@ -25,6 +25,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/migrate"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/scope"
+	"github.com/DefangLabs/defang/src/pkg/session"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -461,9 +462,13 @@ var RootCmd = &cobra.Command{
 	},
 }
 
-func configureLoader(cmd *cobra.Command) *compose.Loader {
+func configureLoaderForCommand(cmd *cobra.Command) *compose.Loader {
 	loaderFlags := newSessionLoaderOptionsForCommand(cmd)
-	return compose.NewLoader(compose.WithProjectName(loaderFlags.ProjectName), compose.WithPath(loaderFlags.ComposeFilePaths...))
+	return configureLoader(loaderFlags.LoaderOptions)
+}
+
+func configureLoader(loaderOptions session.LoaderOptions) *compose.Loader {
+	return compose.NewLoader(compose.WithProjectName(loaderOptions.ProjectName), compose.WithPath(loaderOptions.ComposeFilePaths...))
 }
 
 func isCompletionCommand(cmd *cobra.Command) bool {

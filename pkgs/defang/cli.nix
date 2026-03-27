@@ -7,7 +7,7 @@ buildGo124Module {
   pname = "defang-cli";
   version = "git";
   src = lib.cleanSource ../../src;
-  vendorHash = "sha256-T++59e5WnRkCDuXCq72aXi8qgS3Ay9IkJZZAWU2Ko94=";
+  vendorHash = "sha256-fFlfX+TU6Je6AwWezGpUMkBt9WxxhzMuj7hQwmCnn1s=";
 
   subPackages = [ "cmd/cli" ];
 
