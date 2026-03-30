@@ -3,23 +3,21 @@ package aci
 import (
 	"context"
 	"fmt"
-	"math"
 	"os"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerinstance/armcontainerinstance/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage/v2"
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/clouds"
+	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 const containerGroupPrefix = "defang-cd-"
 const storageAccountPrefix = "defangcd"
 const blobContainerName = "uploads"
 
-func (c *ContainerInstance) SetUp(ctx context.Context, containers []clouds.Container) error {
+func (c *ContainerInstance) SetUpResourceGroup(ctx context.Context) error {
 	resourceGroupClient, err := c.newResourceGroupClient()
 	if err != nil {
 		return err
@@ -30,55 +28,6 @@ func (c *ContainerInstance) SetUp(ctx context.Context, containers []clouds.Conta
 	if err != nil {
 		return fmt.Errorf("failed to create resource group: %w", err)
 	}
-
-	c.containerGroupProps = &armcontainerinstance.ContainerGroupPropertiesProperties{
-		OSType: to.Ptr(armcontainerinstance.OperatingSystemTypesLinux), // TODO: from Platform
-		// Priority:      to.Ptr(armcontainerinstance.ContainerGroupPrioritySpot),
-		RestartPolicy: to.Ptr(armcontainerinstance.ContainerGroupRestartPolicyNever),
-	}
-	if username := os.Getenv("DOCKERHUB_USERNAME"); username != "" {
-		c.containerGroupProps.ImageRegistryCredentials = append(c.containerGroupProps.ImageRegistryCredentials, &armcontainerinstance.ImageRegistryCredential{
-			Server:   to.Ptr("index.docker.io"),
-			Username: to.Ptr(username),
-			Password: to.Ptr(pkg.Getenv("DOCKERHUB_TOKEN", os.Getenv("DOCKERHUB_PASSWORD"))),
-		})
-	}
-
-	for _, container := range containers {
-		if container.IsInit {
-			properties := &armcontainerinstance.InitContainerPropertiesDefinition{
-				Command: to.SliceOfPtrs(container.Command...),
-				Image:   to.Ptr(container.Image),
-			}
-			c.containerGroupProps.InitContainers = append(c.containerGroupProps.InitContainers, &armcontainerinstance.InitContainerDefinition{
-				Name:       to.Ptr(container.Name),
-				Properties: properties,
-			})
-		} else {
-			cpus := math.Max(0.01, container.Cpus)                                      // ensure minimum CPU is 0.01
-			memoryInGB := math.Max(0.1, float64(container.Memory)/1024.0/1024.0/1024.0) // convert from B to GB, minimum 0.1
-			properties := &armcontainerinstance.ContainerProperties{
-				Command: to.SliceOfPtrs(container.Command...),
-				Image:   to.Ptr(container.Image),
-				Resources: &armcontainerinstance.ResourceRequirements{
-					Requests: &armcontainerinstance.ResourceRequests{
-						CPU:        to.Ptr(math.Round(100*cpus) / 100),      // round to 2 decimal places
-						MemoryInGB: to.Ptr(math.Round(10*memoryInGB) * 0.1), // Round to 1 decimal place
-					},
-				},
-			}
-			c.containerGroupProps.Containers = append(c.containerGroupProps.Containers, &armcontainerinstance.Container{
-				Name:       to.Ptr(container.Name),
-				Properties: properties,
-			})
-		}
-	}
-
-	_, err = c.SetUpStorageAccount(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get storage account name: %w", err)
-	}
-
 	return nil
 }
 
@@ -188,6 +137,8 @@ func (c *ContainerInstance) SetUpStorageAccount(ctx context.Context) (string, er
 		return "", fmt.Errorf("failed to create blob container: %w", err)
 	}
 	c.BlobContainerName = *container.Name
+
+	term.Infof("Using storage account %s and blob container %s", storageAccount, blobContainerName)
 
 	return storageAccount, nil
 }

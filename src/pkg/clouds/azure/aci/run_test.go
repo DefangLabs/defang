@@ -5,8 +5,6 @@ package aci
 import (
 	"context"
 	"testing"
-
-	"github.com/DefangLabs/defang/src/pkg/clouds"
 )
 
 func TestRun(t *testing.T) {
@@ -16,14 +14,9 @@ func TestRun(t *testing.T) {
 
 	containerInstance := NewContainerInstance(testResourceGroupName, "westeurope")
 
-	err := containerInstance.SetUp(ctx, []clouds.Container{
-		{
-			Name:  "test-container",
-			Image: "library/alpine:latest",
-		},
-	})
+	err := containerInstance.SetUpResourceGroup(ctx)
 	if err != nil {
-		t.Fatalf("SetUp failed: %v", err)
+		t.Fatalf("SetUpResourceGroup failed: %v", err)
 	}
 
 	t.Cleanup(func() {
@@ -33,7 +26,7 @@ func TestRun(t *testing.T) {
 		// }
 	})
 
-	taskID, err := containerInstance.Run(ctx, nil)
+	taskID, err := containerInstance.Run(ctx, nil, nil)
 	if err != nil {
 		t.Fatalf("Run failed: %v", err)
 	}

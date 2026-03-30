@@ -6,8 +6,6 @@ import (
 	"context"
 	"io"
 	"testing"
-
-	"github.com/DefangLabs/defang/src/pkg/clouds"
 )
 
 func TestTail(t *testing.T) {
@@ -17,15 +15,9 @@ func TestTail(t *testing.T) {
 
 	containerInstance := NewContainerInstance(testResourceGroupName, "westeurope")
 
-	err := containerInstance.SetUp(ctx, []clouds.Container{
-		{
-			Name:    "test-container",
-			Image:   "library/alpine:latest",
-			Command: []string{"sh", "-c", "sleep 3; cat /etc/hosts"},
-		},
-	})
+	err := containerInstance.SetUpResourceGroup(ctx)
 	if err != nil {
-		t.Fatalf("SetUp failed: %v", err)
+		t.Fatalf("SetUpResourceGroup failed: %v", err)
 	}
 
 	t.Cleanup(func() {
@@ -35,7 +27,7 @@ func TestTail(t *testing.T) {
 		// }
 	})
 
-	taskID, err := containerInstance.Run(ctx, nil)
+	taskID, err := containerInstance.Run(ctx, nil, nil)
 	if err != nil {
 		t.Fatalf("Run failed: %v", err)
 	}
@@ -50,7 +42,7 @@ func TestTail(t *testing.T) {
 		}
 	})
 
-	err = containerInstance.Tail(ctx, taskID)
+	err = containerInstance.Tail(ctx, taskID, "")
 	if err != io.EOF {
 		t.Fatalf("Tail failed: %v", err)
 	}

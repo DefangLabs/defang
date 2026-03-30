@@ -7,17 +7,16 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerinstance/armcontainerinstance/v2"
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/clouds"
 )
 
-type ContainerGroupName = clouds.TaskID
+type ContainerGroupName = *string
 
 // safeAppend is like append but avoids mutating any aliases of the slice.
 func safeAppend[T any](slice []T, elems ...T) []T {
 	return append(slice[:len(slice):len(slice)], elems...)
 }
 
-func (c *ContainerInstance) Run(ctx context.Context, env map[string]string, args ...string) (ContainerGroupName, error) {
+func (c *ContainerInstance) Run(ctx context.Context, containers []*armcontainerinstance.Container, env map[string]string, args ...string) (ContainerGroupName, error) {
 	containerGroupClient, err := c.newContainerGroupClient()
 	if err != nil {
 		return nil, err
@@ -32,8 +31,9 @@ func (c *ContainerInstance) Run(ctx context.Context, env map[string]string, args
 		})
 	}
 
-	clone := *c.containerGroupProps
-	for i, container := range clone.Containers {
+	clone := *c.ContainerGroupProps
+	clone.Containers = make([]*armcontainerinstance.Container, len(containers))
+	for i, container := range containers {
 		newProps := *container.Properties
 		newProps.Command = safeAppend(newProps.Command, commandArgs...) // TODO: probably should only be done for the first container
 		newProps.EnvironmentVariables = safeAppend(newProps.EnvironmentVariables, envVars...)
@@ -59,10 +59,5 @@ func (c *ContainerInstance) Run(ctx context.Context, env map[string]string, args
 		return nil, fmt.Errorf("failed to start container group: %w", err)
 	}
 
-	// createResponse.Done()
-	// res, err := createResponse.PollUntilDone(ctx, nil)
-	// if err != nil {
-	// 	return nil, err
-	// }
 	return &groupName, nil
 }

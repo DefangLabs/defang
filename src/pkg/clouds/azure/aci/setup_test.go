@@ -5,8 +5,6 @@ package aci
 import (
 	"context"
 	"testing"
-
-	"github.com/DefangLabs/defang/src/pkg/clouds"
 )
 
 func TestSetup(t *testing.T) {
@@ -16,17 +14,10 @@ func TestSetup(t *testing.T) {
 
 	c := NewContainerInstance(testResourceGroupName, "westeurope")
 
-	t.Run("SetUp", func(t *testing.T) {
-		err := c.SetUp(context.Background(), []clouds.Container{
-			{
-				Name:   "test-container",
-				Image:  "library/nginx:latest",
-				Cpus:   1,
-				Memory: 1024 * 1024 * 1024, // 1 GB in B
-			},
-		})
+	t.Run("SetUpResourceGroup", func(t *testing.T) {
+		err := c.SetUpResourceGroup(context.Background())
 		if err != nil {
-			t.Errorf("Failed to set up container instance: %v", err)
+			t.Errorf("Failed to set up resource group: %v", err)
 		}
 	})
 

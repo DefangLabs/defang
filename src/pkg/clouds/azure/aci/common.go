@@ -11,7 +11,8 @@ import (
 
 type ContainerInstance struct {
 	azure.Azure
-	containerGroupProps *armcontainerinstance.ContainerGroupPropertiesProperties
+	ContainerGroupProps *armcontainerinstance.ContainerGroupPropertiesProperties
+	resourceGroupPrefix string
 	resourceGroupName   string
 	StorageAccount      string
 	BlobContainerName   string
@@ -21,14 +22,21 @@ func NewContainerInstance(resourceGroupPrefix string, location azure.Location) *
 	if location == "" {
 		location = azure.Location(os.Getenv("AZURE_LOCATION"))
 	}
-	return &ContainerInstance{
+	ci := &ContainerInstance{
 		Azure: azure.Azure{
-			Location:       location,
 			SubscriptionID: os.Getenv("AZURE_SUBSCRIPTION_ID"),
 		},
-		resourceGroupName: resourceGroupPrefix + location.String(),
-		StorageAccount:    os.Getenv("DEFANG_CD_BUCKET"),
+		resourceGroupPrefix: resourceGroupPrefix,
+		StorageAccount:      os.Getenv("DEFANG_CD_BUCKET"),
 	}
+	ci.SetLocation(location)
+	return ci
+}
+
+// SetLocation updates the location and recomputes the resource group name.
+func (c *ContainerInstance) SetLocation(loc azure.Location) {
+	c.Location = loc
+	c.resourceGroupName = c.resourceGroupPrefix + loc.String()
 }
 
 func (c ContainerInstance) newContainerGroupClient() (*armcontainerinstance.ContainerGroupsClient, error) {

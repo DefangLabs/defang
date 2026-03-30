@@ -20,10 +20,8 @@ type logEntry struct {
 	Err     error
 }
 
-func (c *ContainerInstance) Tail(ctx context.Context, groupName ContainerGroupName) error {
-	container := c.containerGroupProps.Containers[0]
-
-	ch, err := c.StreamLogs(ctx, groupName, *container.Name)
+func (c *ContainerInstance) Tail(ctx context.Context, groupName ContainerGroupName, containerName string) error {
+	ch, err := c.StreamLogs(ctx, groupName, containerName)
 	if err != nil {
 		return err
 	}
