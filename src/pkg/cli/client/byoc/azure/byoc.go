@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"iter"
 	"net/http"
 	"os"
@@ -33,6 +34,7 @@ type ByocAzure struct {
 
 	driver           *aci.ContainerInstance
 	cdContainerGroup aci.ContainerGroupName
+	cdDeploymentID   string
 }
 
 var _ client.Provider = (*ByocAzure)(nil)
@@ -287,6 +289,7 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 		return nil, err
 	}
 	b.cdContainerGroup = taskID
+	b.cdDeploymentID = etag
 	return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, nil
 }
 
@@ -368,8 +371,62 @@ func (b *ByocAzure) PutConfig(context.Context, *defangv1.PutConfigRequest) error
 }
 
 // QueryLogs implements client.Provider.
-func (b *ByocAzure) QueryLogs(context.Context, *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
-	return nil, fmt.Errorf("QueryLogs: %w", errors.ErrUnsupported)
+// Only CD container logs are supported; service logs are not yet implemented.
+func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
+	// Match the request etag to the stored CD etag so we tail the correct container group instance.
+	if b.cdContainerGroup == nil || (req.Etag != "" && req.Etag != b.cdDeploymentID) {
+		return nil, fmt.Errorf("QueryLogs: no matching CD deployment for etag %q", req.Etag)
+	}
+
+	const cdContainerName = "defang-cd"
+	etag := b.cdDeploymentID
+
+	if req.Follow {
+		ch, err := b.driver.StreamLogs(ctx, b.cdContainerGroup, cdContainerName)
+		if err != nil {
+			return nil, err
+		}
+		return func(yield func(*defangv1.TailResponse, error) bool) {
+			for entry := range ch {
+				if entry.Err != nil {
+					yield(nil, entry.Err)
+					return
+				}
+				if !yield(&defangv1.TailResponse{
+					Entries: []*defangv1.LogEntry{{
+						Message: entry.Message,
+						Stderr:  entry.Stderr,
+						Service: cdContainerName,
+						Etag:    etag,
+					}},
+					Service: cdContainerName,
+					Etag:    etag,
+				}, nil) {
+					return
+				}
+			}
+		}, nil
+	}
+
+	// Non-follow: return current log snapshot then stop.
+	content, err := b.driver.QueryLogs(ctx, b.cdContainerGroup, cdContainerName)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return nil, err
+	}
+	return func(yield func(*defangv1.TailResponse, error) bool) {
+		if content == "" {
+			return
+		}
+		yield(&defangv1.TailResponse{
+			Entries: []*defangv1.LogEntry{{
+				Message: content,
+				Service: cdContainerName,
+				Etag:    etag,
+			}},
+			Service: cdContainerName,
+			Etag:    etag,
+		}, nil)
+	}, nil
 }
 
 // RemoteProjectName implements client.Provider.
@@ -386,7 +443,10 @@ func (b *ByocAzure) ServiceDNS(host string) string {
 
 // Subscribe implements client.Provider.
 func (b *ByocAzure) Subscribe(context.Context, *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {
-	return nil, fmt.Errorf("Subscribe: %w", errors.ErrUnsupported)
+	// return nil, fmt.Errorf("Subscribe: %w", errors.ErrUnsupported)
+	return func(yield func(*defangv1.SubscribeResponse, error) bool) {
+		// TODO: Implement subscription to deployment events for Azure
+	}, nil
 }
 
 // TearDown implements client.Provider.

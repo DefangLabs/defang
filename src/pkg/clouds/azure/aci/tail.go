@@ -14,7 +14,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type logEntry struct {
+type LogEntry struct {
 	Message string
 	Stderr  bool
 	Err     error
@@ -62,7 +62,7 @@ func (c *ContainerInstance) QueryLogs(ctx context.Context, groupName ContainerGr
 	}
 }
 
-func (c *ContainerInstance) StreamLogs(ctx context.Context, groupName ContainerGroupName, containerName string) (<-chan logEntry, error) {
+func (c *ContainerInstance) StreamLogs(ctx context.Context, groupName ContainerGroupName, containerName string) (<-chan LogEntry, error) {
 	client, err := c.newContainerClient()
 	if err != nil {
 		return nil, err
@@ -97,7 +97,7 @@ func (c *ContainerInstance) StreamLogs(ctx context.Context, groupName ContainerG
 		_ = conn.Close() // unblock conn.ReadMessage
 	}()
 
-	ch := make(chan logEntry)
+	ch := make(chan LogEntry)
 	go func() {
 		defer close(ch)
 		defer cancel()
@@ -107,7 +107,7 @@ func (c *ContainerInstance) StreamLogs(ctx context.Context, groupName ContainerG
 			if err != nil {
 				if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
 					select {
-					case ch <- logEntry{Err: err}:
+					case ch <- LogEntry{Err: err}:
 					case <-ctx.Done():
 					}
 				}
@@ -115,7 +115,7 @@ func (c *ContainerInstance) StreamLogs(ctx context.Context, groupName ContainerG
 			}
 			stdioFd := logLine[0]
 			select {
-			case ch <- logEntry{Message: string(logLine[1:]), Stderr: stdioFd == 2}:
+			case ch <- LogEntry{Message: string(logLine[1:]), Stderr: stdioFd == 2}:
 			case <-ctx.Done():
 				return
 			}
