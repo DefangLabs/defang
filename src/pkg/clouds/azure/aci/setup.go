@@ -2,18 +2,22 @@ package aci
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v3"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/msi/armmsi"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage/v2"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/google/uuid"
 )
 
-const containerGroupPrefix = "defang-cd-"
 const storageAccountPrefix = "defangcd"
 const blobContainerName = "uploads"
 
@@ -141,4 +145,65 @@ func (c *ContainerInstance) SetUpStorageAccount(ctx context.Context) (string, er
 	term.Infof("Using storage account %s and blob container %s", storageAccount, blobContainerName)
 
 	return storageAccount, nil
+}
+
+const managedIdentityName = "defang-cd-identity"
+
+// storageBlobDataContributorRoleID is the well-known Azure role definition ID for Storage Blob Data Contributor.
+const storageBlobDataContributorRoleID = "ba92f5b4-2d11-453d-a403-e96b0029c9fe"
+
+// SetUpManagedIdentity creates (or retrieves) a user-assigned managed identity and assigns it
+// Storage Blob Data Reader on the storage account. The identity resource ID is stored in
+// c.ManagedIdentityID.
+func (c *ContainerInstance) SetUpManagedIdentity(ctx context.Context) error {
+	cred, err := c.NewCreds()
+	if err != nil {
+		return err
+	}
+
+	msiClient, err := armmsi.NewUserAssignedIdentitiesClient(c.SubscriptionID, cred, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create MSI client: %w", err)
+	}
+
+	identity, err := msiClient.CreateOrUpdate(ctx, c.resourceGroupName, managedIdentityName, armmsi.Identity{
+		Location: c.Location.Ptr(),
+	}, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create managed identity: %w", err)
+	}
+	c.ManagedIdentityID = *identity.ID
+	principalID := *identity.Properties.PrincipalID
+
+	// Assign Storage Blob Data Reader on the storage account.
+	storageAccountScope := fmt.Sprintf(
+		"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s",
+		c.SubscriptionID, c.resourceGroupName, c.StorageAccount,
+	)
+	roleDefID := fmt.Sprintf(
+		"/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s",
+		c.SubscriptionID, storageBlobDataContributorRoleID,
+	)
+
+	raClient, err := armauthorization.NewRoleAssignmentsClient(c.SubscriptionID, cred, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create role assignments client: %w", err)
+	}
+
+	_, err = raClient.Create(ctx, storageAccountScope, uuid.NewString(), armauthorization.RoleAssignmentCreateParameters{
+		Properties: &armauthorization.RoleAssignmentProperties{
+			PrincipalID:      to.Ptr(principalID),
+			RoleDefinitionID: to.Ptr(roleDefID),
+			PrincipalType:    to.Ptr(armauthorization.PrincipalTypeServicePrincipal),
+		},
+	}, nil)
+	if err != nil {
+		// RoleAssignmentExists (code 409) is benign — the assignment is already in place.
+		var respErr *azcore.ResponseError
+		if !errors.As(err, &respErr) || respErr.ErrorCode != "RoleAssignmentExists" {
+			return fmt.Errorf("failed to assign Storage Blob Data Reader role: %w", err)
+		}
+	}
+
+	return nil
 }

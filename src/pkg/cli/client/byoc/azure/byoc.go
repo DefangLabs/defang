@@ -21,12 +21,14 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	cloudazure "github.com/DefangLabs/defang/src/pkg/clouds/azure"
+	"github.com/DefangLabs/defang/src/pkg/clouds/azure/aca"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/aci"
 	defanghttp "github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type ByocAzure struct {
@@ -170,6 +172,9 @@ func (b *ByocAzure) setUp(ctx context.Context) error {
 	if _, err := b.driver.SetUpStorageAccount(ctx); err != nil {
 		return fmt.Errorf("failed to set up storage account: %w", err)
 	}
+	if err := b.driver.SetUpManagedIdentity(ctx); err != nil {
+		return fmt.Errorf("failed to set up managed identity: %w", err)
+	}
 	return nil
 }
 
@@ -254,13 +259,13 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 		if resp.StatusCode != 200 && resp.StatusCode != 201 {
 			return nil, fmt.Errorf("unexpected status code during upload: %s", resp.Status)
 		}
-		payload = defanghttp.RemoveQueryParam(uploadURL)
+		payload = defanghttp.RemoveQueryParam(uploadURL) // managed identity provides blob read access
 	}
 
 	// Allow local debug run when DEFANG_PULUMI_DIR is set; returns ErrLocalPulumiStopped when run locally.
-	if err := byoc.DebugPulumiNodeJS(ctx, env, verb, payload); err != nil {
-		return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, err
-	}
+	// if err := byoc.DebugPulumiNodeJS(ctx, env, verb, payload); err != nil {
+	// 	return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, err
+	// }
 
 	// Convert KEY=VALUE slice to map for ACI Run
 	envMap := make(map[string]string, len(env))
@@ -284,7 +289,7 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 		},
 	}
 
-	taskID, err := b.driver.Run(ctx, containers, envMap, "node", "lib/index.js", verb, payload)
+	taskID, err := b.driver.Run(ctx, containers, envMap, "/app/cd", verb, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -382,33 +387,76 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 	etag := b.cdDeploymentID
 
 	if req.Follow {
-		ch, err := b.driver.StreamLogs(ctx, b.cdContainerGroup, cdContainerName)
+		cdCh, err := b.driver.PollLogs(ctx, b.cdContainerGroup, cdContainerName)
 		if err != nil {
 			return nil, err
 		}
+
+		acaClient := &aca.ContainerApp{
+			Azure:         b.driver.Azure,
+			ResourceGroup: b.driver.ResourceGroupName(),
+		}
+		acaCh := acaClient.WatchLogs(ctx)
+
 		return func(yield func(*defangv1.TailResponse, error) bool) {
-			for entry := range ch {
-				if entry.Err != nil {
-					yield(nil, entry.Err)
-					return
-				}
-				if !yield(&defangv1.TailResponse{
-					Entries: []*defangv1.LogEntry{{
-						Message: entry.Message,
-						Stderr:  entry.Stderr,
+			for {
+				select {
+				case entry, ok := <-cdCh:
+					if !ok {
+						cdCh = nil
+						continue
+					}
+					if entry.Err != nil {
+						if !yield(nil, entry.Err) {
+							return
+						}
+						continue
+					}
+					if !yield(&defangv1.TailResponse{
+						Entries: []*defangv1.LogEntry{{
+							Message:   entry.Message,
+							Stderr:    entry.Stderr,
+							Service:   cdContainerName,
+							Etag:      etag,
+							Timestamp: timestamppb.New(entry.Time),
+						}},
 						Service: cdContainerName,
 						Etag:    etag,
-					}},
-					Service: cdContainerName,
-					Etag:    etag,
-				}, nil) {
+					}, nil) {
+						return
+					}
+				case svc, ok := <-acaCh:
+					if !ok {
+						acaCh = nil
+						continue
+					}
+					if svc.Err != nil {
+						term.Debugf("Container Apps log error for %q: %v", svc.AppName, svc.Err)
+						continue
+					}
+					if !yield(&defangv1.TailResponse{
+						Entries: []*defangv1.LogEntry{{
+							Message:   svc.Message,
+							Service:   svc.AppName,
+							Etag:      etag,
+							Timestamp: timestamppb.Now(),
+						}},
+						Service: svc.AppName,
+						Etag:    etag,
+					}, nil) {
+						return
+					}
+				case <-ctx.Done():
+					return
+				}
+				if cdCh == nil && acaCh == nil {
 					return
 				}
 			}
 		}, nil
 	}
 
-	// Non-follow: return current log snapshot then stop.
+	// Non-follow: return current log snapshot via ACI ListLogs.
 	content, err := b.driver.QueryLogs(ctx, b.cdContainerGroup, cdContainerName)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, err
@@ -419,9 +467,10 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 		}
 		yield(&defangv1.TailResponse{
 			Entries: []*defangv1.LogEntry{{
-				Message: content,
-				Service: cdContainerName,
-				Etag:    etag,
+				Message:   content,
+				Service:   cdContainerName,
+				Etag:      etag,
+				Timestamp: timestamppb.Now(),
 			}},
 			Service: cdContainerName,
 			Etag:    etag,

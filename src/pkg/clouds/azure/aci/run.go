@@ -6,8 +6,23 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerinstance/armcontainerinstance/v2"
-	"github.com/DefangLabs/defang/src/pkg"
 )
+
+const cdContainerGroupName = "defang-cd"
+
+// containerGroupIdentity returns a user-assigned identity block if one has been configured,
+// or nil if no managed identity is set up yet.
+func (c *ContainerInstance) containerGroupIdentity() *armcontainerinstance.ContainerGroupIdentity {
+	if c.ManagedIdentityID == "" {
+		return nil
+	}
+	return &armcontainerinstance.ContainerGroupIdentity{
+		Type: to.Ptr(armcontainerinstance.ResourceIdentityTypeUserAssigned),
+		UserAssignedIdentities: map[string]*armcontainerinstance.UserAssignedIdentities{
+			c.ManagedIdentityID: {},
+		},
+	}
+}
 
 type ContainerGroupName = *string
 
@@ -35,7 +50,9 @@ func (c *ContainerInstance) Run(ctx context.Context, containers []*armcontaineri
 	clone.Containers = make([]*armcontainerinstance.Container, len(containers))
 	for i, container := range containers {
 		newProps := *container.Properties
-		newProps.Command = safeAppend(newProps.Command, commandArgs...) // TODO: probably should only be done for the first container
+		if i == 0 {
+			newProps.Command = safeAppend(newProps.Command, commandArgs...)
+		}
 		newProps.EnvironmentVariables = safeAppend(newProps.EnvironmentVariables, envVars...)
 		clone.Containers[i] = &armcontainerinstance.Container{
 			Name:       container.Name,
@@ -43,10 +60,11 @@ func (c *ContainerInstance) Run(ctx context.Context, containers []*armcontaineri
 		}
 	}
 
-	groupName := containerGroupPrefix + pkg.RandomID()
+	groupName := cdContainerGroupName
 	group := armcontainerinstance.ContainerGroup{
 		Name:       to.Ptr(groupName),
 		Location:   c.Location.Ptr(),
+		Identity:   c.containerGroupIdentity(),
 		Properties: &clone,
 	}
 	_, err = containerGroupClient.BeginCreateOrUpdate(ctx, c.resourceGroupName, groupName, group, nil)

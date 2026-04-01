@@ -60,8 +60,8 @@ func (c *ContainerInstance) CreateUploadURL(ctx context.Context, blobName string
 		return "", err
 	}
 
-	// Create SAS; TODO: how does AZURE_STORAGE_SAS_TOKEN env var work?
-	perms := sas.BlobPermissions{Create: true, Write: true, Read: true} // read is for ACR
+	// Create SAS for upload only; read access is granted via the managed identity.
+	perms := sas.BlobPermissions{Create: true, Write: true}
 	sasQueryParams, err := sas.BlobSignatureValues{
 		BlobName:      blobName,
 		ContainerName: c.BlobContainerName,

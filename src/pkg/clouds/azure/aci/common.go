@@ -16,6 +16,7 @@ type ContainerInstance struct {
 	resourceGroupName   string
 	StorageAccount      string
 	BlobContainerName   string
+	ManagedIdentityID   string // resource ID of the user-assigned managed identity
 }
 
 func NewContainerInstance(resourceGroupPrefix string, location azure.Location) *ContainerInstance {
@@ -37,6 +38,10 @@ func NewContainerInstance(resourceGroupPrefix string, location azure.Location) *
 func (c *ContainerInstance) SetLocation(loc azure.Location) {
 	c.Location = loc
 	c.resourceGroupName = c.resourceGroupPrefix + loc.String()
+}
+
+func (c *ContainerInstance) ResourceGroupName() string {
+	return c.resourceGroupName
 }
 
 func (c ContainerInstance) newContainerGroupClient() (*armcontainerinstance.ContainerGroupsClient, error) {
