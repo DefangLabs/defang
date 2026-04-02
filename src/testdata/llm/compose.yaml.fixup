@@ -1,23 +1,8 @@
 {
-  "alt-repo": {
-    "command": null,
-    "entrypoint": null,
-    "image": "altrepo.com/openai-access-gateway:latest",
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "host",
-        "target": 80,
-        "protocol": "tcp"
-      }
-    ]
-  },
   "gateway-with-ports": {
     "command": null,
     "entrypoint": null,
-    "image": "defang.io/openai-access-gateway:latest",
+    "image": "litellm/litellm:latest",
     "networks": {
       "default": null
     },
@@ -34,14 +19,14 @@
   "gateway-without-ports": {
     "command": null,
     "entrypoint": null,
-    "image": "defang.io/openai-access-gateway:latest",
+    "image": "litellm/litellm:latest",
     "networks": {
       "default": null
     },
     "ports": [
       {
         "mode": "host",
-        "target": 80,
+        "target": 4000,
         "protocol": "tcp"
       }
     ]
@@ -49,9 +34,16 @@
   "llm": {
     "command": null,
     "entrypoint": null,
-    "image": "llm:latest",
+    "image": "litellm/litellm:latest",
     "networks": {
       "default": null
-    }
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 4000,
+        "protocol": "tcp"
+      }
+    ]
   }
 }

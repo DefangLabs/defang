@@ -1,12 +1,7 @@
 name: llm
 services:
-  alt-repo:
-    image: altrepo.com/openai-access-gateway:latest
-    networks:
-      default: null
-    x-defang-llm: true
   gateway-with-ports:
-    image: defang.io/openai-access-gateway:latest
+    image: litellm/litellm:latest
     networks:
       default: null
     ports:
@@ -16,12 +11,12 @@ services:
         protocol: tcp
     x-defang-llm: true
   gateway-without-ports:
-    image: defang.io/openai-access-gateway:latest
+    image: litellm/litellm:latest
     networks:
       default: null
     x-defang-llm: true
   llm:
-    image: llm:latest
+    image: litellm/litellm:latest
     networks:
       default: null
     x-defang-llm: true
