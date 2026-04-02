@@ -1,18 +1,14 @@
 services:
   llm:
     x-defang-llm: true
-    image: "llm:latest"
+    image: "litellm/litellm:latest"
 
   gateway-with-ports:
     x-defang-llm: true
-    image: "defang.io/openai-access-gateway:latest"
+    image: "litellm/litellm:latest"
     ports:
       - 5678:5678
 
   gateway-without-ports:
     x-defang-llm: true
-    image: "defang.io/openai-access-gateway:latest"
-
-  alt-repo:
-    x-defang-llm: true
-    image: "altrepo.com/openai-access-gateway:latest"
+    image: "litellm/litellm:latest"
