@@ -60,8 +60,10 @@ func (c *ContainerInstance) CreateUploadURL(ctx context.Context, blobName string
 		return "", err
 	}
 
-	// Create SAS for upload only; read access is granted via the managed identity.
-	perms := sas.BlobPermissions{Create: true, Write: true}
+	// Read permission is required: ACR tasks fetch the build context directly from the blob URL.
+	// The CD container payload uses managed identity for read access, but ACR has no identity
+	// attached and relies solely on the SAS token to download the build context archive.
+	perms := sas.BlobPermissions{Create: true, Write: true, Read: true}
 	sasQueryParams, err := sas.BlobSignatureValues{
 		BlobName:      blobName,
 		ContainerName: c.BlobContainerName,
