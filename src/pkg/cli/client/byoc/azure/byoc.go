@@ -10,7 +10,6 @@ import (
 	"iter"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
@@ -23,6 +22,7 @@ import (
 	cloudazure "github.com/DefangLabs/defang/src/pkg/clouds/azure"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/aca"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/aci"
+	"github.com/DefangLabs/defang/src/pkg/clouds/azure/appcfg"
 	defanghttp "github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -35,6 +35,7 @@ type ByocAzure struct {
 	*byoc.ByocBaseClient
 
 	driver           *aci.ContainerInstance
+	appCfg           *appcfg.AppConfiguration
 	cdContainerGroup aci.ContainerGroupName
 	cdDeploymentID   string
 }
@@ -61,8 +62,23 @@ func (b *ByocAzure) SetUpCD(context.Context, bool) error {
 }
 
 // CdCommand implements byoc.ProjectBackend.
-func (b *ByocAzure) CdCommand(context.Context, client.CdCommandRequest) (types.ETag, error) {
-	return "", fmt.Errorf("CdCommand: %w", errors.ErrUnsupported)
+func (b *ByocAzure) CdCommand(ctx context.Context, req client.CdCommandRequest) (types.ETag, error) {
+	if err := b.setUp(ctx); err != nil {
+		return "", err
+	}
+	etag := pkg.RandomID()
+	envMap, err := b.buildCdEnv(req.Project)
+	if err != nil {
+		return "", err
+	}
+	containers := b.cdContainers()
+	taskID, err := b.driver.Run(ctx, containers, envMap, "/app/cd", string(req.Command))
+	if err != nil {
+		return "", err
+	}
+	b.cdContainerGroup = taskID
+	b.cdDeploymentID = etag
+	return etag, nil
 }
 
 // CdList implements byoc.ProjectBackend.
@@ -135,8 +151,18 @@ func (b *ByocAzure) Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.
 }
 
 // DeleteConfig implements client.Provider.
-func (b *ByocAzure) DeleteConfig(context.Context, *defangv1.Secrets) error {
-	return fmt.Errorf("DeleteConfig: %w", errors.ErrUnsupported)
+func (b *ByocAzure) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
+	if err := b.setUp(ctx); err != nil {
+		return err
+	}
+	for _, name := range secrets.Names {
+		key := b.StackDir(secrets.Project, name)
+		term.Debugf("Deleting App Configuration key %q", key)
+		if err := b.appCfg.DeleteSetting(ctx, key); err != nil {
+			return fmt.Errorf("failed to delete config %q: %w", name, err)
+		}
+	}
+	return nil
 }
 
 func (b *ByocAzure) setUp(ctx context.Context) error {
@@ -175,7 +201,59 @@ func (b *ByocAzure) setUp(ctx context.Context) error {
 	if err := b.driver.SetUpManagedIdentity(ctx); err != nil {
 		return fmt.Errorf("failed to set up managed identity: %w", err)
 	}
+
+	b.appCfg = appcfg.New(b.driver.ResourceGroupName(), b.driver.Location, b.driver.SubscriptionID)
+	if err := b.appCfg.SetUp(ctx); err != nil {
+		return fmt.Errorf("failed to set up App Configuration store: %w", err)
+	}
 	return nil
+}
+
+// buildCdEnv returns the environment map that every CD container run needs.
+func (b *ByocAzure) buildCdEnv(projectName string) (map[string]string, error) {
+	defangStateUrl := fmt.Sprintf(`azblob://%s?storage_account=%s`, b.driver.BlobContainerName, b.driver.StorageAccount)
+	pulumiBackendKey, pulumiBackendValue, err := byoc.GetPulumiBackend(defangStateUrl)
+	if err != nil {
+		return nil, err
+	}
+	env := map[string]string{
+		"AZURE_LOCATION":             b.driver.Location.String(),
+		"AZURE_SUBSCRIPTION_ID":      b.driver.SubscriptionID,
+		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"),
+		"DEFANG_JSON":                os.Getenv("DEFANG_JSON"),
+		"DEFANG_ORG":                 string(b.TenantLabel),
+		"DEFANG_PREFIX":              b.Prefix,
+		"DEFANG_STATE_URL":           defangStateUrl,
+		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
+		"PROJECT":                    projectName,
+		pulumiBackendKey:             pulumiBackendValue,          // TODO: make secret
+		"PULUMI_CONFIG_PASSPHRASE":   byoc.PulumiConfigPassphrase, // TODO: make secret
+		"PULUMI_COPILOT":             "false",
+		"PULUMI_SKIP_UPDATE_CHECK":   "true",
+		"STACK":                      b.PulumiStack,
+	}
+	if !term.StdoutCanColor() {
+		env["NO_COLOR"] = "1"
+	}
+	return env, nil
+}
+
+// cdContainers returns the container definition for the CD runner.
+func (b *ByocAzure) cdContainers() []*armcontainerinstance.Container {
+	return []*armcontainerinstance.Container{
+		{
+			Name: to.Ptr("defang-cd"),
+			Properties: &armcontainerinstance.ContainerProperties{
+				Image: to.Ptr(b.CDImage),
+				Resources: &armcontainerinstance.ResourceRequirements{
+					Requests: &armcontainerinstance.ResourceRequests{
+						CPU:        to.Ptr(2.0),
+						MemoryInGB: to.Ptr(8.0),
+					},
+				},
+			},
+		},
+	}
 }
 
 // Deploy implements client.Provider.
@@ -213,31 +291,9 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 		return nil, err
 	}
 
-	// From https://www.pulumi.com/docs/iac/concepts/state-and-backends/#azure-blob-storage
-	defangStateUrl := fmt.Sprintf(`azblob://%s?storage_account=%s`, b.driver.BlobContainerName, b.driver.StorageAccount)
-	pulumiBackendKey, pulumiBackendValue, err := byoc.GetPulumiBackend(defangStateUrl)
+	envMap, err := b.buildCdEnv(project.Name)
 	if err != nil {
 		return nil, err
-	}
-	env := []string{
-		"AZURE_LOCATION=" + b.driver.Location.String(),
-		"AZURE_SUBSCRIPTION_ID=" + b.driver.SubscriptionID,
-		"DEFANG_DEBUG=" + os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
-		"DEFANG_JSON=" + os.Getenv("DEFANG_JSON"),
-		"DEFANG_ORG=" + string(b.TenantLabel),
-		"DEFANG_PREFIX=" + b.Prefix,
-		"DEFANG_STATE_URL=" + defangStateUrl,
-		"NPM_CONFIG_UPDATE_NOTIFIER=" + "false",
-		// "PRIVATE_DOMAIN=" + byoc.GetPrivateDomain(projectName), TODO: implement
-		"PROJECT=" + project.Name,                                 // may be empty
-		pulumiBackendKey + "=" + pulumiBackendValue,               // TODO: make secret
-		"PULUMI_CONFIG_PASSPHRASE=" + byoc.PulumiConfigPassphrase, // TODO: make secret
-		"PULUMI_COPILOT=false",
-		"PULUMI_SKIP_UPDATE_CHECK=true",
-		"STACK=" + b.PulumiStack,
-	}
-	if !term.StdoutCanColor() {
-		env = append(env, "NO_COLOR=1")
 	}
 
 	var payload string
@@ -267,29 +323,7 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 	// 	return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, err
 	// }
 
-	// Convert KEY=VALUE slice to map for ACI Run
-	envMap := make(map[string]string, len(env))
-	for _, kv := range env {
-		k, v, _ := strings.Cut(kv, "=")
-		envMap[k] = v
-	}
-
-	containers := []*armcontainerinstance.Container{
-		{
-			Name: to.Ptr("defang-cd"),
-			Properties: &armcontainerinstance.ContainerProperties{
-				Image: to.Ptr(b.CDImage),
-				Resources: &armcontainerinstance.ResourceRequirements{
-					Requests: &armcontainerinstance.ResourceRequests{
-						CPU:        to.Ptr(2.0),
-						MemoryInGB: to.Ptr(8.0),
-					},
-				},
-			},
-		},
-	}
-
-	taskID, err := b.driver.Run(ctx, containers, envMap, "/app/cd", verb, payload)
+	taskID, err := b.driver.Run(ctx, b.cdContainers(), envMap, "/app/cd", verb, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -299,8 +333,11 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 }
 
 // Destroy implements client.Provider.
-func (b *ByocAzure) Destroy(context.Context, *defangv1.DestroyRequest) (types.ETag, error) {
-	return "", fmt.Errorf("Destroy: %w", errors.ErrUnsupported)
+func (b *ByocAzure) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error) {
+	return b.CdCommand(ctx, client.CdCommandRequest{
+		Command: client.CdCommandDestroy,
+		Project: req.Project,
+	})
 }
 
 // GetDeploymentStatus implements client.Provider.
@@ -314,7 +351,7 @@ func (b *ByocAzure) GetDeploymentStatus(ctx context.Context) (bool, error) {
 
 // GetPrivateDomain implements byoc.ProjectBackend.
 func (b *ByocAzure) GetPrivateDomain(projectName string) string {
-	panic("unimplemented")
+	return b.GetProjectLabel(projectName) + ".internal"
 }
 
 // GetProjectUpdate implements byoc.ProjectBackend.
@@ -355,9 +392,17 @@ func (b *ByocAzure) GetServices(context.Context, *defangv1.GetServicesRequest) (
 }
 
 // ListConfig implements client.Provider.
-func (b *ByocAzure) ListConfig(context.Context, *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
-	// return nil, errors.ErrUnsupported
-	return &defangv1.Secrets{}, nil
+func (b *ByocAzure) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
+	prefix := b.StackDir(req.Project, "")
+	term.Debugf("Listing App Configuration keys with prefix %q", prefix)
+	names, err := b.appCfg.ListSettings(ctx, prefix)
+	if err != nil {
+		return nil, err
+	}
+	return &defangv1.Secrets{Names: names}, nil
 }
 
 // PrepareDomainDelegation implements client.Provider.
@@ -371,8 +416,13 @@ func (b *ByocAzure) Preview(ctx context.Context, req *client.DeployRequest) (*de
 }
 
 // PutConfig implements client.Provider.
-func (b *ByocAzure) PutConfig(context.Context, *defangv1.PutConfigRequest) error {
-	return fmt.Errorf("PutConfig: %w", errors.ErrUnsupported)
+func (b *ByocAzure) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
+	if err := b.setUp(ctx); err != nil {
+		return err
+	}
+	key := b.StackDir(req.Project, req.Name)
+	term.Debugf("Putting App Configuration key %q", key)
+	return b.appCfg.PutSetting(ctx, key, req.Value)
 }
 
 // QueryLogs implements client.Provider.
