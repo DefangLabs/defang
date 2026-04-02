@@ -149,12 +149,37 @@ func (c *ContainerInstance) SetUpStorageAccount(ctx context.Context) (string, er
 
 const managedIdentityName = "defang-cd-identity"
 
-// storageBlobDataContributorRoleID is the well-known Azure role definition ID for Storage Blob Data Contributor.
-const storageBlobDataContributorRoleID = "ba92f5b4-2d11-453d-a403-e96b0029c9fe"
+// Well-known Azure built-in role definition IDs.
+const (
+	storageBlobDataContributorRoleID = "ba92f5b4-2d11-453d-a403-e96b0029c9fe"
+	contributorRoleID                = "b24988ac-6180-42a0-ab88-20f7382dd24c"
+	userAccessAdministratorRoleID    = "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9"
+)
 
-// SetUpManagedIdentity creates (or retrieves) a user-assigned managed identity and assigns it
-// Storage Blob Data Reader on the storage account. The identity resource ID is stored in
-// c.ManagedIdentityID.
+// assignRole assigns a built-in role to the given principal at the given scope.
+// It silently ignores RoleAssignmentExists errors (idempotent).
+func assignRole(ctx context.Context, raClient *armauthorization.RoleAssignmentsClient, subscriptionID, scope, roleDefID, principalID string) error {
+	fullRoleDefID := fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", subscriptionID, roleDefID)
+	_, err := raClient.Create(ctx, scope, uuid.NewString(), armauthorization.RoleAssignmentCreateParameters{
+		Properties: &armauthorization.RoleAssignmentProperties{
+			PrincipalID:      to.Ptr(principalID),
+			RoleDefinitionID: to.Ptr(fullRoleDefID),
+			PrincipalType:    to.Ptr(armauthorization.PrincipalTypeServicePrincipal),
+		},
+	}, nil)
+	if err != nil {
+		var respErr *azcore.ResponseError
+		if !errors.As(err, &respErr) || respErr.ErrorCode != "RoleAssignmentExists" {
+			return err
+		}
+	}
+	return nil
+}
+
+// SetUpManagedIdentity creates (or retrieves) a user-assigned managed identity, assigns it
+// Contributor on the subscription (for Pulumi to provision resources), and Storage Blob Data
+// Contributor on the storage account (for Pulumi state and payload access).
+// The identity resource ID is stored in c.ManagedIdentityID.
 func (c *ContainerInstance) SetUpManagedIdentity(ctx context.Context) error {
 	cred, err := c.NewCreds()
 	if err != nil {
@@ -175,34 +200,28 @@ func (c *ContainerInstance) SetUpManagedIdentity(ctx context.Context) error {
 	c.ManagedIdentityID = *identity.ID
 	principalID := *identity.Properties.PrincipalID
 
-	// Assign Storage Blob Data Reader on the storage account.
-	storageAccountScope := fmt.Sprintf(
-		"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s",
-		c.SubscriptionID, c.resourceGroupName, c.StorageAccount,
-	)
-	roleDefID := fmt.Sprintf(
-		"/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s",
-		c.SubscriptionID, storageBlobDataContributorRoleID,
-	)
-
 	raClient, err := armauthorization.NewRoleAssignmentsClient(c.SubscriptionID, cred, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create role assignments client: %w", err)
 	}
 
-	_, err = raClient.Create(ctx, storageAccountScope, uuid.NewString(), armauthorization.RoleAssignmentCreateParameters{
-		Properties: &armauthorization.RoleAssignmentProperties{
-			PrincipalID:      to.Ptr(principalID),
-			RoleDefinitionID: to.Ptr(roleDefID),
-			PrincipalType:    to.Ptr(armauthorization.PrincipalTypeServicePrincipal),
-		},
-	}, nil)
-	if err != nil {
-		// RoleAssignmentExists (code 409) is benign — the assignment is already in place.
-		var respErr *azcore.ResponseError
-		if !errors.As(err, &respErr) || respErr.ErrorCode != "RoleAssignmentExists" {
-			return fmt.Errorf("failed to assign Storage Blob Data Reader role: %w", err)
-		}
+	// Contributor + User Access Administrator on the subscription so Pulumi can provision any
+	// Azure resource and create role assignments (e.g. ACR pull role for Container Apps).
+	subscriptionScope := "/subscriptions/" + c.SubscriptionID
+	if err := assignRole(ctx, raClient, c.SubscriptionID, subscriptionScope, contributorRoleID, principalID); err != nil {
+		return fmt.Errorf("failed to assign Contributor role: %w", err)
+	}
+	if err := assignRole(ctx, raClient, c.SubscriptionID, subscriptionScope, userAccessAdministratorRoleID, principalID); err != nil {
+		return fmt.Errorf("failed to assign User Access Administrator role: %w", err)
+	}
+
+	// Storage Blob Data Contributor on the storage account for Pulumi state and payload access.
+	storageScope := fmt.Sprintf(
+		"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s",
+		c.SubscriptionID, c.resourceGroupName, c.StorageAccount,
+	)
+	if err := assignRole(ctx, raClient, c.SubscriptionID, storageScope, storageBlobDataContributorRoleID, principalID); err != nil {
+		return fmt.Errorf("failed to assign Storage Blob Data Contributor role: %w", err)
 	}
 
 	return nil
