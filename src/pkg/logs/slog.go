@@ -66,9 +66,6 @@ func (h *termHandler) Handle(ctx context.Context, r slog.Record) error {
 }
 
 func (h *termHandler) Enabled(ctx context.Context, level slog.Level) bool {
-	if level == slog.LevelDebug {
-		return h.t.DoDebug()
-	}
 	return true
 }
 
