@@ -229,9 +229,10 @@ func parsePortString(port string) (uint32, error) {
 
 func fixupLLM(svccfg *composeTypes.ServiceConfig) {
 	image := GetImageRepo(svccfg.Image)
-	if strings.HasSuffix(image, "/openai-access-gateway") && len(svccfg.Ports) == 0 {
+	if strings.HasSuffix(image, "/litellm") && len(svccfg.Ports) == 0 {
 		// HACK: we must have at least one host port to get a CNAME for the service
-		var port uint32 = 80
+		// litellm listens on 4000 by default
+		var port uint32 = 4000
 		term.Debugf("service %q: adding LLM host port %d", svccfg.Name, port)
 		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	}
@@ -368,11 +369,12 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 	if svccfg.Environment == nil {
 		svccfg.Environment = composeTypes.MappingWithEquals{}
 	}
-	if _, exists := svccfg.Environment["OPENAI_API_KEY"]; !exists {
-		svccfg.Environment["OPENAI_API_KEY"] = &empty // disable auth; see https://github.com/DefangLabs/openai-access-gateway/pull/5
+	if _, exists := svccfg.Environment["LITELLM_MASTER_KEY"]; !exists {
+		svccfg.Environment["LITELLM_MASTER_KEY"] = &empty // disable auth; see https://github.com/DefangLabs/openai-access-gateway/pull/5
 	}
 	// svccfg.HealthCheck = &composeTypes.ServiceHealthCheckConfig{} TODO: add healthcheck
-	svccfg.Image = "defangio/openai-access-gateway"
+	svccfg.Image = "litellm/litellm:latest"
+	svccfg.Command = []string{"--drop_params", "--model", model}
 	if svccfg.Networks == nil {
 		// New compose-go versions do not create networks for "provider:" services, so we need to create it here
 		svccfg.Networks = make(map[string]*composeTypes.ServiceNetworkConfig)
@@ -380,7 +382,7 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 		delete(svccfg.Networks, "default") // remove the default network
 	}
 	svccfg.Networks[modelProviderNetwork] = nil
-	svccfg.Ports = []composeTypes.ServicePortConfig{{Target: 80, Mode: Mode_HOST, Protocol: Protocol_TCP}}
+	svccfg.Ports = []composeTypes.ServicePortConfig{{Target: 4000, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	svccfg.Provider = nil // remove "provider:" because current backend will not accept it
 	project.Networks[modelProviderNetwork] = composeTypes.NetworkConfig{Name: modelProviderNetwork}
 
