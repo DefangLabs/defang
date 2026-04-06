@@ -587,20 +587,7 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 				term.Warnf("missing request in audit log for instance group manager %v", path.Base(auditLog.GetResourceName()))
 				return nil, nil
 			}
-			labels := GetListInStruct(request, "allInstancesConfig.properties.labels")
-			if labels == nil {
-				term.Warnf("missing labels in audit log for instance group manager %v", path.Base(auditLog.GetResourceName()))
-				return nil, nil
-			}
-			// Find the service name from the labels
-			serviceName := ""
-			for _, label := range labels {
-				fields := label.GetStructValue().GetFields()
-				if fields["key"].GetStringValue() == "defang-service" {
-					serviceName = fields["value"].GetStringValue()
-					break
-				}
-			}
+			serviceName := GetValueInStruct(request, "allInstancesConfig.properties.labels.defang-service")
 			if serviceName == "" {
 				term.Warnf("missing defang-service label in audit log for instance group manager %v", path.Base(auditLog.GetResourceName()))
 				return nil, nil
