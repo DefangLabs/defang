@@ -227,12 +227,14 @@ func parsePortString(port string) (uint32, error) {
 	}
 }
 
+const liteLLMPort uint32 = 4000
+
 func fixupLLM(svccfg *composeTypes.ServiceConfig) {
 	image := GetImageRepo(svccfg.Image)
 	if strings.HasSuffix(image, "/litellm") && len(svccfg.Ports) == 0 {
 		// HACK: we must have at least one host port to get a CNAME for the service
 		// litellm listens on 4000 by default
-		var port uint32 = 4000
+		var port uint32 = liteLLMPort
 		term.Debugf("service %q: adding LLM host port %d", svccfg.Name, port)
 		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	}
@@ -382,7 +384,7 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 		delete(svccfg.Networks, "default") // remove the default network
 	}
 	svccfg.Networks[modelProviderNetwork] = nil
-	svccfg.Ports = []composeTypes.ServicePortConfig{{Target: 4000, Mode: Mode_HOST, Protocol: Protocol_TCP}}
+	svccfg.Ports = []composeTypes.ServicePortConfig{{Target: liteLLMPort, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	svccfg.Provider = nil // remove "provider:" because current backend will not accept it
 	project.Networks[modelProviderNetwork] = composeTypes.NetworkConfig{Name: modelProviderNetwork}
 
