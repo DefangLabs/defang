@@ -87,8 +87,11 @@ type Lister interface {
 }
 
 type gcpLoggingLister struct {
-	it     *logging.LogEntryIterator
-	client *logging.Client
+	it        *logging.LogEntryIterator
+	client    *logging.Client
+	lastToken string
+	pages     int
+	entries   int
 }
 
 type Order string
@@ -115,13 +118,25 @@ func (gcp Gcp) ListLogEntries(ctx context.Context, query string, order Order) (L
 }
 
 func (l *gcpLoggingLister) Next() (*loggingpb.LogEntry, error) {
+	// Detect page fetches: the iterator's NextPageToken changes each time a new
+	// page is fetched from the API (each page = one read request against quota).
+	if token := l.it.PageInfo().Token; token != l.lastToken {
+		l.lastToken = token
+		l.pages++
+		term.Debugf("[gcp read-req] ListLogEntries page fetch #%d (entries so far: %d)", l.pages, l.entries)
+	}
 	entry, err := l.it.Next()
 	if err == iterator.Done {
+		term.Debugf("[gcp read-req] ListLogEntries done: %d page(s), %d entries total", l.pages, l.entries)
 		term.Debugf("Closing log lister client")
 		if err := l.client.Close(); err != nil {
 			return nil, err
 		}
 		return nil, io.EOF
 	}
-	return entry, err
+	if err != nil {
+		return nil, err
+	}
+	l.entries++
+	return entry, nil
 }
