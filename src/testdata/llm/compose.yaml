@@ -1,4 +1,13 @@
 services:
+  alt-repo:
+    x-defang-llm: true
+    image: "altrepo.com/litellm:latest"
+    networks:
+      default: null
+    ports:
+      - mode: host
+        target: "4000"
+        protocol: tcp
   llm:
     x-defang-llm: true
     image: "llm:latest"

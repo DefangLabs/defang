@@ -9,7 +9,7 @@
     "environment": {
       "LITELLM_MASTER_KEY": ""
     },
-    "image": "litellm/litellm:latest",
+    "image": "litellm/litellm:v1.82.3-stable.patch.3",
     "networks": {
       "model_provider_private": null
     },
@@ -63,7 +63,7 @@
     "environment": {
       "LITELLM_MASTER_KEY": ""
     },
-    "image": "litellm/litellm:latest",
+    "image": "litellm/litellm:v1.82.3-stable.patch.3",
     "networks": {
       "model_provider_private": null
     },

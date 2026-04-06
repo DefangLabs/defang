@@ -1,4 +1,19 @@
 {
+  "alt-repo": {
+    "command": null,
+    "entrypoint": null,
+    "image": "altrepo.com/litellm:latest",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 4000,
+        "protocol": "tcp"
+      }
+    ]
+  },
   "gateway-with-ports": {
     "command": null,
     "entrypoint": null,
@@ -34,7 +49,7 @@
   "llm": {
     "command": null,
     "entrypoint": null,
-    "image": "litellm/litellm:latest",
+    "image": "llm:latest",
     "networks": {
       "default": null
     }

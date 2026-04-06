@@ -1,5 +1,14 @@
 name: llm
 services:
+  alt-repo:
+    image: altrepo.com/litellm:latest
+    networks:
+      default: null
+    ports:
+      - mode: host
+        target: 4000
+        protocol: tcp
+    x-defang-llm: true
   gateway-with-ports:
     image: litellm/litellm:latest
     networks:
