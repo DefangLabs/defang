@@ -66,7 +66,7 @@ func (e *CodebuildEvent) Host() string {
 }
 
 func (e *CodebuildEvent) Status() string {
-	return ""
+	return e.message
 }
 
 func parseCodebuildMessage(message string) defangv1.ServiceState {
