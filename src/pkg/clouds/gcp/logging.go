@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	logging "cloud.google.com/go/logging/apiv2"
 	"cloud.google.com/go/logging/apiv2/loggingpb"
@@ -41,7 +42,9 @@ type gcpLoggingTailer struct {
 	tleClient loggingpb.LoggingServiceV2_TailLogEntriesClient
 	client    *logging.Client
 
-	cache []*loggingpb.LogEntry
+	cache     []*loggingpb.LogEntry
+	recvCount int
+	recvStart time.Time
 }
 
 func (t *gcpLoggingTailer) Start(ctx context.Context, query string) error {
@@ -58,6 +61,11 @@ func (t *gcpLoggingTailer) Start(ctx context.Context, query string) error {
 
 func (t *gcpLoggingTailer) Next(ctx context.Context) (*loggingpb.LogEntry, error) {
 	if len(t.cache) == 0 {
+		if t.recvStart.IsZero() {
+			t.recvStart = time.Now()
+		}
+		t.recvCount++
+		term.Debugf("[gcp read-req] TailLogEntries.Recv #%d (%.1fs since first recv)", t.recvCount, time.Since(t.recvStart).Seconds())
 		resp, err := t.tleClient.Recv()
 		if err != nil {
 			return nil, err
@@ -76,6 +84,11 @@ func (t *gcpLoggingTailer) Next(ctx context.Context) (*loggingpb.LogEntry, error
 func (t *gcpLoggingTailer) Close() error {
 	// TODO: find out how to properly close the client
 	term.Debugf("Closing log tailer")
+	if t.recvCount > 0 {
+		elapsed := time.Since(t.recvStart)
+		term.Debugf("[gcp read-req] TailLogEntries closed: %d Recv calls over %.1fs (%.1f/min)",
+			t.recvCount, elapsed.Seconds(), float64(t.recvCount)/elapsed.Minutes())
+	}
 	e1 := t.tleClient.CloseSend()
 	term.Debugf("Closing log tailer client")
 	e2 := t.client.Close()
