@@ -1,7 +1,7 @@
 services:
   llm:
     x-defang-llm: true
-    image: "litellm/litellm:latest"
+    image: "llm:latest"
 
   gateway-with-ports:
     x-defang-llm: true

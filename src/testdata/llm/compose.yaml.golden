@@ -16,7 +16,7 @@ services:
       default: null
     x-defang-llm: true
   llm:
-    image: litellm/litellm:latest
+    image: llm:latest
     networks:
       default: null
     x-defang-llm: true

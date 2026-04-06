@@ -370,10 +370,10 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 		svccfg.Environment = composeTypes.MappingWithEquals{}
 	}
 	if _, exists := svccfg.Environment["LITELLM_MASTER_KEY"]; !exists {
-		svccfg.Environment["LITELLM_MASTER_KEY"] = &empty // disable auth; see https://github.com/DefangLabs/openai-access-gateway/pull/5
+		svccfg.Environment["LITELLM_MASTER_KEY"] = &empty
 	}
 	// svccfg.HealthCheck = &composeTypes.ServiceHealthCheckConfig{} TODO: add healthcheck
-	svccfg.Image = "litellm/litellm:latest"
+	svccfg.Image = "litellm/litellm:v1.82.3-stable.patch.3"
 	svccfg.Command = []string{"--drop_params", "--model", model}
 	if svccfg.Networks == nil {
 		// New compose-go versions do not create networks for "provider:" services, so we need to create it here
