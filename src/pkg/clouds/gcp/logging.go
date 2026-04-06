@@ -13,6 +13,7 @@ import (
 )
 
 func (gcp Gcp) NewTailer(ctx context.Context) (Tailer, error) {
+	term.Debugf("[gcp read-req] NewTailer: opening TailLogEntries stream")
 	client, err := logging.NewClient(ctx, gcp.Options...)
 	if err != nil {
 		return nil, err
@@ -44,6 +45,7 @@ type gcpLoggingTailer struct {
 }
 
 func (t *gcpLoggingTailer) Start(ctx context.Context, query string) error {
+	term.Debugf("[gcp read-req] TailLogEntries.Send (Start)")
 	req := &loggingpb.TailLogEntriesRequest{
 		ResourceNames: []string{"projects/" + t.projectId},
 		Filter:        query,
@@ -97,6 +99,7 @@ const (
 )
 
 func (gcp Gcp) ListLogEntries(ctx context.Context, query string, order Order) (Lister, error) {
+	term.Debugf("[gcp read-req] ListLogEntries (order=%s)", order)
 	client, err := logging.NewClient(ctx, gcp.Options...)
 	if err != nil {
 		return nil, err

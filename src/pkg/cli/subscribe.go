@@ -54,6 +54,7 @@ func WaitServiceState(
 		if err != nil {
 			// Reconnect on transient errors
 			if isTransientError(err) {
+				term.Debugf("[gcp read-req] WaitServiceState: transient error, reconnecting subscribe stream: %v", err)
 				if err := provider.DelayBeforeRetry(ctx); err != nil {
 					return serviceStates, err
 				}

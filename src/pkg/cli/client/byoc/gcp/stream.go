@@ -102,6 +102,7 @@ func (s *ServerStream[T]) Follow(start time.Time) (iter.Seq2[*T, error], error) 
 					}
 					return
 				}
+				term.Debugf("[gcp read-req] Follow: tailer error (will surface to caller): %v", err)
 				yield(nil, err)
 				return
 			}
