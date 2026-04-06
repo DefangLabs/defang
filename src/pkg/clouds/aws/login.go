@@ -35,7 +35,7 @@ import (
 const (
 	clientIDSameDevice  = "arn:aws:signin:::devtools/same-device"
 	clientIDCrossDevice = "arn:aws:signin:::devtools/cross-device"
-	tokenStoreKeyPrefix = "aws-oauth-" // nolint:gosec,G101 // This is not a secret
+	tokenStoreKeyPrefix = "aws-oauth-" // nolint:gosec // This is not a secret
 )
 
 // awsTokenCache is the on-disk representation of AWS OAuth credentials.
