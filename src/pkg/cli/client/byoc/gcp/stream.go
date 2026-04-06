@@ -106,6 +106,9 @@ func (s *ServerStream[T]) Follow(start time.Time) (iter.Seq2[*T, error], error) 
 				yield(nil, err)
 				return
 			}
+			if entry == nil {
+				continue // empty Recv response (heartbeat/suppression), keep looping
+			}
 			resps, err := s.parseAndFilter(entry)
 			if err != nil {
 				yield(nil, err)
