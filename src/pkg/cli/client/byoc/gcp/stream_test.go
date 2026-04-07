@@ -1,9 +1,11 @@
 package gcp
 
 import (
+	"context"
 	"iter"
 	"strconv"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/logging/apiv2/loggingpb"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
@@ -178,4 +180,73 @@ func TestServerStream_Start(t *testing.T) {
 			assert.Equal(t, tt.expectedMsgs, collectedMessages)
 		})
 	}
+}
+
+// TestServerStream_Follow_SkipsNilEntries verifies that Follow() skips nil entries
+// returned by the tailer (heartbeat or suppression-info responses from GCP) and
+// continues yielding real log entries without error.
+func TestServerStream_Follow_SkipsNilEntries(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	t.Cleanup(cancel)
+
+	// instanceId avoids a nil-pointer dereference in the parser when Resource is absent.
+	svcLabels := map[string]string{"defang-service": "svc", "instanceId": "inst1"}
+
+	realEntry := &loggingpb.LogEntry{
+		Payload:   &loggingpb.LogEntry_TextPayload{TextPayload: "real log"},
+		Labels:    svcLabels,
+		Timestamp: timestamppb.Now(),
+	}
+
+	// cancelEntry is a sentinel: when the tailer returns it, we cancel the context
+	// so the Follow loop exits cleanly rather than blocking forever.
+	cancelEntry := &loggingpb.LogEntry{
+		Payload:   &loggingpb.LogEntry_TextPayload{TextPayload: "cancel"},
+		Labels:    svcLabels,
+		Timestamp: timestamppb.Now(),
+	}
+
+	tailerEntries := []*loggingpb.LogEntry{
+		nil, // heartbeat — must be skipped
+		realEntry,
+		nil, // suppression info — must be skipped
+		cancelEntry,
+	}
+
+	mockClient := &MockGcpLogsClient{
+		lister: &MockGcpLoggingLister{},
+		tailer: &MockGcpLoggingTailer{
+			MockGcpLoggingLister: MockGcpLoggingLister{logEntries: tailerEntries},
+		},
+	}
+
+	services := []string{"svc"}
+	restoreServiceName := getServiceNameRestorer(services, gcp.SafeLabelValue,
+		func(entry *defangv1.TailResponse) string { return entry.Service },
+		func(entry *defangv1.TailResponse, name string) *defangv1.TailResponse {
+			entry.Service = name
+			return entry
+		})
+
+	stream := NewServerStream(ctx, mockClient, getLogEntryParser(ctx, mockClient), restoreServiceName)
+	stream.query = NewLogQuery(mockClient.GetProjectID())
+
+	seq, err := stream.Follow(time.Time{}) // zero start → skip listing, go straight to tail
+	assert.NoError(t, err)
+
+	var messages []string
+	for resp, err := range seq {
+		assert.NoError(t, err)
+		if err != nil {
+			break
+		}
+		msg := resp.Entries[0].Message
+		messages = append(messages, msg)
+		if msg == "cancel" {
+			cancel()
+		}
+	}
+
+	assert.Equal(t, []string{"real log", "cancel"}, messages,
+		"Follow() should skip nil tailer entries and yield real entries")
 }
