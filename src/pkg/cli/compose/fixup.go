@@ -363,7 +363,7 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 	// Local Docker sets [SERVICE]_URL and [SERVICE]_MODEL environment variables on the dependent services
 	envName := strings.ToUpper(svccfg.Name) // TODO: handle characters that are not allowed in env vars, like '-'
 	endpointEnvVar := envName + "_URL"
-	urlVal := "http://" + svccfg.Name + "/api/v1/"
+	urlVal := "http://" + svccfg.Name + ":" + strconv.FormatUint(uint64(liteLLMPort), 10) + "/api/v1/"
 	modelEnvVar := envName + "_MODEL"
 
 	empty := ""
