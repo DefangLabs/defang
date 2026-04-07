@@ -192,7 +192,7 @@ func isTransientError(err error) bool {
 
 	// GCP grpc transient errors
 	if st, ok := status.FromError(err); ok {
-		transientCodes := []codes.Code{codes.Unavailable, codes.Internal}
+		transientCodes := []codes.Code{codes.Unavailable, codes.Internal, codes.ResourceExhausted}
 		if slices.Contains(transientCodes, st.Code()) {
 			return true
 		}

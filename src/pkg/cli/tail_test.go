@@ -22,9 +22,40 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+func TestIsTransientError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil", nil, false},
+		{"eof", io.EOF, false},
+		{"connect unavailable", connect.NewError(connect.CodeUnavailable, errors.New("unavailable")), true},
+		{"connect internal non-wire", connect.NewError(connect.CodeInternal, errors.New("internal")), true},
+		{"connect permission denied", connect.NewError(connect.CodePermissionDenied, errors.New("denied")), false},
+		{"grpc unavailable", mustGRPCStatus(codes.Unavailable, "unavailable"), true},
+		{"grpc internal", mustGRPCStatus(codes.Internal, "internal"), true},
+		{"grpc resource exhausted", mustGRPCStatus(codes.ResourceExhausted, "quota exceeded"), true},
+		{"grpc permission denied", mustGRPCStatus(codes.PermissionDenied, "denied"), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isTransientError(tt.err); got != tt.want {
+				t.Errorf("isTransientError(%v) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
+	}
+}
+
+func mustGRPCStatus(code codes.Code, msg string) error {
+	return grpcstatus.Error(code, msg)
+}
 
 func TestIsProgressDot(t *testing.T) {
 	tests := []struct {
