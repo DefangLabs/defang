@@ -31,11 +31,11 @@ type mockDeployProvider struct {
 	lock              sync.Mutex
 }
 
-func (d *mockDeployProvider) Deploy(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
+func (d *mockDeployProvider) Deploy(ctx context.Context, req *client.DeployRequest) (*client.DeployResponse, error) {
 	return d.Preview(ctx, req)
 }
 
-func (*mockDeployProvider) Preview(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
+func (*mockDeployProvider) Preview(ctx context.Context, req *client.DeployRequest) (*client.DeployResponse, error) {
 	if len(req.Compose) == 0 {
 		return nil, errors.New("DeployRequest needs Compose")
 	}
@@ -57,7 +57,7 @@ func (*mockDeployProvider) Preview(ctx context.Context, req *client.DeployReques
 		})
 	}
 
-	return &defangv1.DeployResponse{Services: services, Etag: etag}, ctx.Err()
+	return &client.DeployResponse{DeployResponse: &defangv1.DeployResponse{Services: services, Etag: etag}}, ctx.Err()
 }
 
 func (m *mockDeployProvider) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {

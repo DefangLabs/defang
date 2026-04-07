@@ -45,7 +45,7 @@ func TestSetUpCD(t *testing.T) {
 		command: []string{"up", payload},
 	}
 
-	if err := b.runCdCommand(ctx, cmd); err != nil {
+	if _, err := b.runCdCommand(ctx, cmd); err != nil {
 		t.Errorf("CdCommand() error = %v, want nil", err)
 	}
 }
@@ -108,9 +108,9 @@ func (m *MockGcpLoggingTailer) Next(ctx context.Context) (*loggingpb.LogEntry, e
 
 func TestGetLogStream(t *testing.T) {
 	tests := []struct {
-		name        string
-		req         *defangv1.TailRequest
-		cdExecution string
+		name      string
+		req       *defangv1.TailRequest
+		cdBuildId string
 	}{
 		// TODO: use golang 1.25 synctest to avoid needing a fixed Since in every test case
 		{name: "no_args", req: &defangv1.TailRequest{}},
@@ -164,7 +164,7 @@ func TestGetLogStream(t *testing.T) {
 			LogType: uint32(logs.LogTypeAll),
 			Etag:    "test-etag",
 		},
-			cdExecution: "test-execution-id",
+			cdBuildId: "test-execution-id",
 		},
 	}
 
@@ -173,7 +173,7 @@ func TestGetLogStream(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := NewByocProvider(ctx, "testTenantID", "")
-			b.cdExecution = tt.cdExecution
+			b.cdBuildId = tt.cdBuildId
 
 			driver := &MockGcpLogsClient{
 				lister: &MockGcpLoggingLister{},

@@ -49,6 +49,8 @@ type putDeploymentParams struct {
 	StatesUrl    string
 	EventsUrl    string
 	ServiceInfos []*defangv1.ServiceInfo
+	CdType       defangv1.CdType
+	CdId         string
 }
 
 func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric client.FabricClient, stack *stacks.Parameters, req putDeploymentParams) error {
@@ -110,6 +112,8 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 			Origin:            origin,
 			OriginMetadata:    originMetadata,
 			Services:          req.ServiceInfos,
+			CdId:              req.CdId,
+			CdType:            req.CdType,
 		},
 	})
 }
