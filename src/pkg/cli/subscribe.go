@@ -57,7 +57,7 @@ func WaitServiceState(
 			// a minute and DelayBeforeRetry backs off exponentially up to 1 minute).
 			if isTransientError(err) {
 				if connect.CodeOf(err) == connect.CodeResourceExhausted {
-					term.Warn("GCP logging quota exceeded; will retry subscribe stream after backoff.")
+					term.Warnf("quota exceeded; will retry subscribe stream after backoff: %v", err)
 				} else {
 					term.Debugf("WaitServiceState: transient error, reconnecting subscribe stream: %v", err)
 				}
