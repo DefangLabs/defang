@@ -6,47 +6,45 @@
 
 ## Develop Once, Deploy Anywhere.
 
-Take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.
+Take your app from Compose to a secure and scalable deployment on your favorite cloud in minutes.
 
 ### How It Works
 
 ```mermaid
 flowchart LR
-    subgraph local["Your Machine or CI/CD"]
-        compose["compose.yaml"]
-        cli["Defang CLI"]
-        style cli stroke-width:3px
-  end
 
-    subgraph defang["Defang Backend"]
-        fabric["Fabric gRPC API"]
-        style fabric stroke-width:3px
-    end
+subgraph local["Your Machine or CI/CD"]
+    compose["compose.yaml"] --> cli["Defang CLI"]
+end
 
-    subgraph cloud["Your Cloud Account"]
-        cd["Defang CD Task"]
-        style cd stroke-width:3px
-        secrets["Config & Secrets"]
-        subgraph infra["Infrastructure"]
-            lb["Load Balancer"]
-            containers["Containers"]
-            db["DB"]
-            dns["DNS"]
-        end
-    end
+subgraph defang["Defang Backend"]
+    fabric["Fabric API (gRPC)"]
+end
 
-    compose --> cli
-    cli <--> fabric
-    cli --> cd
-    cli --> secrets
-    cd --> infra
-    containers --> db
+subgraph cloud["Your Cloud Account"]
+    secrets["Config & Secrets"]
+    cd["Defang CD Task"]
+    logs["Logs"]
+    runtime["Load Balancer, Containers, DB, Cache, LLM, DNS, Roles"]
+end
+
+%% control plane
+cli <-.-> fabric
+
+%% deploy
+cli --> secrets
+cli --> cd
+cd --> runtime
+
+%% observability
+cli -.-> logs
 ```
 
-1. **You write** a standard Docker Compose file
+1. **You write** a standard Docker **Compose** file
 2. **Defang CLI** validates your Compose project and uploads the project to storage in your AWS/GCP account
 3. **CD runs in your cloud** — a deployment task spins up in your AWS/GCP account
-4. **Infrastructure is created** — containers, DNS, load balancing, and secrets are provisioned
+4. **Infrastructure is created** — containers, DNS, load balancing, and roles are provisioned
+5. **Monitor** the deployment and tail or query runtime logs with the Defang CLI
 
 Your code and secrets never leave your cloud account. Defang orchestrates the deployment, but everything runs in your infrastructure.
 
