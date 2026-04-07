@@ -160,7 +160,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 
 	var statesUrl, eventsUrl string
 	var action defangv1.DeploymentAction
-	var resp *defangv1.DeployResponse
+	var resp *client.DeployResponse
 	if upload == compose.UploadModePreview || upload == compose.UploadModeEstimate {
 		resp, err = provider.Preview(ctx, deployRequest)
 		if err != nil {
@@ -204,6 +204,8 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		StatesUrl:    statesUrl,
 		EventsUrl:    eventsUrl,
 		ServiceInfos: resp.Services,
+		CdType:       resp.CdType,
+		CdId:         resp.CdId,
 	})
 	if err != nil {
 		term.Debug("Failed to record deployment:", err)
@@ -216,5 +218,5 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 			PrintObject(serviceInfo.Service.Name, serviceInfo)
 		}
 	}
-	return resp, project, nil
+	return resp.DeployResponse, project, nil
 }

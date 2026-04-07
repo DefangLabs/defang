@@ -57,12 +57,12 @@ func TestDestroy(t *testing.T) {
 	grpcClient := Connect(url, types.TenantUnset)
 	fabric := client.PlaygroundProvider{FabricClient: grpcClient}
 
-	etag, err := fabric.CdCommand(ctx, client.CdCommandRequest{Command: "destroy", Project: "test-project"})
+	resp, err := fabric.CdCommand(ctx, client.CdCommandRequest{Command: "destroy", Project: "test-project"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if etag != "test-destroy-etag" {
-		t.Fatalf("expected etag %q, got %q", "test-destroy-etag", etag)
+	if resp.ETag != "test-destroy-etag" {
+		t.Fatalf("expected etag %q, got %q", "test-destroy-etag", resp.ETag)
 	}
 }

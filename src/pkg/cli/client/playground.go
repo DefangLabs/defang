@@ -39,11 +39,12 @@ func (g *PlaygroundProvider) GetStackName() string {
 	return g.Stack
 }
 
-func (g *PlaygroundProvider) Deploy(ctx context.Context, req *DeployRequest) (*defangv1.DeployResponse, error) {
+func (g *PlaygroundProvider) Deploy(ctx context.Context, req *DeployRequest) (*DeployResponse, error) {
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		return nil, errors.New("DEFANG_PULUMI_DIR is set, but not supported by the Playground provider")
 	}
-	return getMsg(g.GetFabricClient().Deploy(ctx, connect.NewRequest(&req.DeployRequest)))
+	resp, err := getMsg(g.GetFabricClient().Deploy(ctx, connect.NewRequest(&req.DeployRequest)))
+	return &DeployResponse{DeployResponse: resp}, err
 }
 
 func (g *PlaygroundProvider) GetDeploymentStatus(ctx context.Context) (bool, error) {
@@ -54,7 +55,7 @@ func (*PlaygroundProvider) Driver() string {
 	return "playground"
 }
 
-func (g *PlaygroundProvider) Preview(ctx context.Context, req *DeployRequest) (*defangv1.DeployResponse, error) {
+func (g *PlaygroundProvider) Preview(ctx context.Context, req *DeployRequest) (*DeployResponse, error) {
 	req.Preview = true
 	return g.Deploy(ctx, req)
 }
@@ -125,11 +126,15 @@ func serverStreamIter[T any](stream ServerStream[T]) iter.Seq2[*T, error] {
 	}
 }
 
-func (g *PlaygroundProvider) CdCommand(ctx context.Context, req CdCommandRequest) (types.ETag, error) {
+func (g *PlaygroundProvider) CdCommand(ctx context.Context, req CdCommandRequest) (*CdCommandResponse, error) {
 	if req.Command == CdCommandDestroy {
-		return g.destroy(ctx, &defangv1.DestroyRequest{Project: req.Project})
+		etag, err := g.destroy(ctx, &defangv1.DestroyRequest{Project: req.Project})
+		if err != nil {
+			return nil, err
+		}
+		return &CdCommandResponse{ETag: etag}, nil
 	}
-	return "", errors.New("the CD command is not valid for the Defang playground; did you forget --stack or --provider?")
+	return nil, errors.New("the CD command is not valid for the Defang playground; did you forget --stack or --provider?")
 }
 
 func (g *PlaygroundProvider) destroy(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error) {
