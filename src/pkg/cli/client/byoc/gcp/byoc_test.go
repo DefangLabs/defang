@@ -76,6 +76,9 @@ func (m MockGcpLogsClient) GetBuildInfo(ctx context.Context, buildId string) (*g
 		Etag:    "test-etag",
 	}, nil
 }
+func (m MockGcpLogsClient) GetInstanceGroupManagerLabels(ctx context.Context, project, region, name string) (map[string]string, error) {
+	return nil, nil
+}
 
 type MockGcpLoggingLister struct {
 	logEntries []*loggingpb.LogEntry
