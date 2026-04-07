@@ -178,7 +178,7 @@ func (sm *manager) GetRemote(ctx context.Context, name string) (*Parameters, err
 		}
 	}
 	if remoteStack == nil {
-		return nil, &ErrNotExist{StackName: name}
+		return nil, &ErrNotExist{ProjectName: sm.projectName, StackName: name}
 	}
 
 	return &remoteStack.Parameters, nil
@@ -226,10 +226,10 @@ func (sm *manager) GetStack(ctx context.Context, opts GetStackOpts) (*Parameters
 	// fallback to default stack for project
 	stack, whence, err := sm.getDefaultStack(ctx)
 	if err != nil {
-		if !errors.Is(err, ErrDefaultStackNotSet) {
+		var defaultStackNotSet *ErrDefaultStackNotSet
+		if !errors.As(err, &defaultStackNotSet) {
 			return nil, "", err
 		}
-
 		// no default stack for project; use fallback
 		whence := "fallback stack"
 		fallback := opts.Default
@@ -241,14 +241,21 @@ func (sm *manager) GetStack(ctx context.Context, opts GetStackOpts) (*Parameters
 }
 
 type ErrNotExist struct {
-	StackName string
+	ProjectName string
+	StackName   string
 }
 
 func (e *ErrNotExist) Error() string {
-	return fmt.Sprintf("stack %q does not exist", e.StackName)
+	return fmt.Sprintf("stack %q does not exist for project %q", e.StackName, e.ProjectName)
 }
 
-var ErrDefaultStackNotSet = errors.New("no default stack set for project")
+type ErrDefaultStackNotSet struct {
+	ProjectName string
+}
+
+func (e *ErrDefaultStackNotSet) Error() string {
+	return fmt.Sprintf("no default stack set for project %q", e.ProjectName)
+}
 
 func (sm *manager) getSpecifiedStack(ctx context.Context, name string) (*Parameters, string, error) {
 	whence := "--stack flag"
@@ -303,7 +310,7 @@ func (sm *manager) getDefaultStack(ctx context.Context) (*Parameters, string, er
 		if connect.CodeOf(err) != connect.CodeNotFound {
 			return nil, "", err
 		}
-		return nil, "", ErrDefaultStackNotSet
+		return nil, "", &ErrDefaultStackNotSet{ProjectName: sm.projectName}
 	}
 
 	whence := "default stack from server"
