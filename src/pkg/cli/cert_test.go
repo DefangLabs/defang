@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composetypes "github.com/compose-spec/compose-go/v2/types"
@@ -241,6 +242,139 @@ func TestHttpClient(t *testing.T) {
 	if mr.calls != 2 {
 		t.Fatalf("expected 2nd dns lookup after cache expiry, but got %v", mr.calls)
 	}
+}
+
+type mockCertProvider struct {
+	client.MockProvider
+	services *defangv1.GetServicesResponse
+	err      error
+}
+
+func (m *mockCertProvider) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
+	return m.services, m.err
+}
+
+type mockCertFabricClient struct {
+	client.MockFabricClient
+	verifyDNSCalls int
+}
+
+func (m *mockCertFabricClient) VerifyDNSSetup(ctx context.Context, req *defangv1.VerifyDNSSetupRequest) error {
+	m.verifyDNSCalls++
+	return nil // DNS verified successfully
+}
+
+func TestGenerateLetsEncryptCert(t *testing.T) {
+	t.Run("error when no services", func(t *testing.T) {
+		provider := &mockCertProvider{
+			services: &defangv1.GetServicesResponse{Services: nil},
+		}
+		project := &compose.Project{Name: "test"}
+		err := GenerateLetsEncryptCert(t.Context(), project, nil, provider)
+		if err == nil {
+			t.Fatal("expected error for empty services")
+		}
+		if !strings.Contains(err.Error(), "no services found") {
+			t.Errorf("expected 'no services found' error, got: %v", err)
+		}
+	})
+
+	t.Run("GetServices error propagated", func(t *testing.T) {
+		provider := &mockCertProvider{
+			err: errors.New("provider error"),
+		}
+		project := &compose.Project{Name: "test"}
+		err := GenerateLetsEncryptCert(t.Context(), project, nil, provider)
+		if err == nil || err.Error() != "provider error" {
+			t.Errorf("expected provider error, got: %v", err)
+		}
+	})
+
+	t.Run("skips service without UseAcmeCert", func(t *testing.T) {
+		provider := &mockCertProvider{
+			services: &defangv1.GetServicesResponse{
+				Services: []*defangv1.ServiceInfo{
+					{
+						Service:     &defangv1.Service{Name: "web"},
+						UseAcmeCert: false,
+						Domainname:  "example.com",
+					},
+				},
+			},
+		}
+		project := &compose.Project{
+			Name: "test",
+			Services: compose.Services{
+				"web": {DomainName: "example.com"},
+			},
+		}
+		// Should not error and should log "no domainname found" (cnt == 0)
+		err := GenerateLetsEncryptCert(t.Context(), project, nil, provider)
+		if err != nil {
+			t.Errorf("expected no error, got: %v", err)
+		}
+	})
+
+	t.Run("skips service not in project", func(t *testing.T) {
+		provider := &mockCertProvider{
+			services: &defangv1.GetServicesResponse{
+				Services: []*defangv1.ServiceInfo{
+					{
+						Service:     &defangv1.Service{Name: "unknown"},
+						UseAcmeCert: true,
+						Domainname:  "example.com",
+					},
+				},
+			},
+		}
+		project := &compose.Project{
+			Name:     "test",
+			Services: compose.Services{},
+		}
+		err := GenerateLetsEncryptCert(t.Context(), project, nil, provider)
+		if err != nil {
+			t.Errorf("expected no error, got: %v", err)
+		}
+	})
+
+	t.Run("calls generateCert for UseAcmeCert service", func(t *testing.T) {
+		fabricClient := &mockCertFabricClient{}
+		provider := &mockCertProvider{
+			services: &defangv1.GetServicesResponse{
+				Services: []*defangv1.ServiceInfo{
+					{
+						Service:     &defangv1.Service{Name: "web"},
+						UseAcmeCert: true,
+						Domainname:  "example.com",
+						PublicFqdn:  "web.test.defang.app",
+						Endpoints:   []string{"8080--web.test.defang.app"},
+					},
+				},
+			},
+		}
+		project := &compose.Project{
+			Name: "test",
+			Services: compose.Services{
+				"web": {
+					Name:       "web",
+					DomainName: "example.com",
+					Ports: []composetypes.ServicePortConfig{
+						{Mode: compose.Mode_INGRESS},
+					},
+				},
+			},
+		}
+		// Use short timeout so generateCert doesn't block on TLS/HTTP waits
+		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+		defer cancel()
+		err := GenerateLetsEncryptCert(ctx, project, fabricClient, provider)
+		if err != nil {
+			t.Errorf("expected no error, got: %v", err)
+		}
+		if fabricClient.verifyDNSCalls == 0 {
+			t.Error("expected VerifyDNSSetup to be called (generateCert was reached)")
+		}
+	})
 }
 
 func TestGetDomainTargets(t *testing.T) {
