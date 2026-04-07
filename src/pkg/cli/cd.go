@@ -38,8 +38,8 @@ func CdCommand(ctx context.Context, projectName string, provider client.Provider
 		}
 	}
 
-	etag, err := provider.CdCommand(ctx, client.CdCommandRequest{Project: projectName, Command: command, StatesUrl: statesUrl, EventsUrl: eventsUrl})
-	if err != nil || etag == "" {
+	cd, err := provider.CdCommand(ctx, client.CdCommandRequest{Project: projectName, Command: command, StatesUrl: statesUrl, EventsUrl: eventsUrl})
+	if err != nil || cd == nil || cd.ETag == "" {
 		return "", err
 	}
 
@@ -57,17 +57,19 @@ func CdCommand(ctx context.Context, projectName string, provider client.Provider
 	case client.CdCommandRefresh:
 		err := putDeploymentAndStack(ctx, provider, fabric, nil, putDeploymentParams{
 			Action:      action,
-			ETag:        etag,
+			CdId:        cd.CdId,
+			CdType:      cd.CdType,
+			ETag:        cd.ETag,
+			EventsUrl:   eventsUrl,
 			ProjectName: projectName,
 			StatesUrl:   statesUrl,
-			EventsUrl:   eventsUrl,
 		})
 		if err != nil {
 			term.Debug("Failed to record deployment:", err)
 			term.Warn("Unable to update deployment history; deployment will proceed anyway.")
 		}
 	}
-	return etag, nil
+	return cd.ETag, nil
 }
 
 func deleteSubdomain(ctx context.Context, projectName string, provider client.Provider, fabric client.FabricClient) error {
