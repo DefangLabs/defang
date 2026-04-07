@@ -56,7 +56,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 			// When CD fails, stop WaitServiceState
 			cancelSvcStatus(cdErr)
 		} else {
-				term.Info("Deployment complete. Waiting for services to be healthy...")
+			term.Info("Deployment complete. Waiting for services to be healthy...")
 		}
 	}()
 
