@@ -102,12 +102,8 @@ func (s *ServerStream[T]) Follow(start time.Time) (iter.Seq2[*T, error], error) 
 					}
 					return
 				}
-				term.Debugf("[gcp read-req] Follow: tailer error (will surface to caller): %v", err)
 				yield(nil, err)
 				return
-			}
-			if entry == nil {
-				continue // empty Recv response (heartbeat/suppression), keep looping
 			}
 			resps, err := s.parseAndFilter(entry)
 			if err != nil {
@@ -588,7 +584,20 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 				term.Warnf("missing request in audit log for instance group manager %v", path.Base(auditLog.GetResourceName()))
 				return nil, nil
 			}
-			serviceName := GetValueInStruct(request, "allInstancesConfig.properties.labels.defang-service")
+			labels := GetListInStruct(request, "allInstancesConfig.properties.labels")
+			if labels == nil {
+				term.Warnf("missing labels in audit log for instance group manager %v", path.Base(auditLog.GetResourceName()))
+				return nil, nil
+			}
+			// Find the service name from the labels
+			serviceName := ""
+			for _, label := range labels {
+				fields := label.GetStructValue().GetFields()
+				if fields["key"].GetStringValue() == "defang-service" {
+					serviceName = fields["value"].GetStringValue()
+					break
+				}
+			}
 			if serviceName == "" {
 				term.Warnf("missing defang-service label in audit log for instance group manager %v", path.Base(auditLog.GetResourceName()))
 				return nil, nil
