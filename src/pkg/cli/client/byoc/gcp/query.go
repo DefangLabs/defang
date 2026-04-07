@@ -289,22 +289,26 @@ func (q *Query) AddComputeEngineInstanceGroupInsertOrPatch(stack, project, etag 
 
 	if stack != "" {
 		query += fmt.Sprintf(`
-protoPayload.request.allInstancesConfig.properties.labels."defang-stack"="%v"`, gcp.SafeLabelValue(stack))
+protoPayload.request.allInstancesConfig.properties.labels.key="defang-stack"
+protoPayload.request.allInstancesConfig.properties.labels.value="%v"`, gcp.SafeLabelValue(stack))
 	}
 
 	if project != "" {
 		query += fmt.Sprintf(`
-protoPayload.request.allInstancesConfig.properties.labels."defang-project"="%v"`, gcp.SafeLabelValue(project))
+protoPayload.request.allInstancesConfig.properties.labels.key="defang-project"
+protoPayload.request.allInstancesConfig.properties.labels.value="%v"`, gcp.SafeLabelValue(project))
 	}
 
 	if etag != "" {
 		query += fmt.Sprintf(`
-protoPayload.request.allInstancesConfig.properties.labels."defang-etag"="%v"`, gcp.SafeLabelValue(etag))
+protoPayload.request.allInstancesConfig.properties.labels.key="defang-etag"
+protoPayload.request.allInstancesConfig.properties.labels.value="%v"`, gcp.SafeLabelValue(etag))
 	}
 
 	if len(services) > 0 {
 		query += fmt.Sprintf(`
-protoPayload.request.allInstancesConfig.properties.labels."defang-service"=~"^(%v)$"`, servicesPattern(services))
+protoPayload.request.allInstancesConfig.properties.labels.key="defang-service"
+protoPayload.request.allInstancesConfig.properties.labels.value=~"^(%v)$"`, servicesPattern(services))
 	}
 
 	q.AddQuery(query)

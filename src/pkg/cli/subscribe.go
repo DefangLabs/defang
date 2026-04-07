@@ -54,7 +54,6 @@ func WaitServiceState(
 		if err != nil {
 			// Reconnect on transient errors
 			if isTransientError(err) {
-				term.Debugf("[gcp read-req] WaitServiceState: transient error, reconnecting subscribe stream: %v", err)
 				if err := provider.DelayBeforeRetry(ctx); err != nil {
 					return serviceStates, err
 				}
@@ -68,15 +67,6 @@ func WaitServiceState(
 			}
 			return serviceStates, err
 		}
-
-		pendingServices := []string{}
-		for _, service := range services {
-			if serviceStates[service] != targetState {
-				pendingServices = append(pendingServices, service)
-			}
-		}
-
-		term.Infof("Waiting for %q to be in state %s...\n", pendingServices, targetState) // TODO: don't print in Go-routine
 
 		if msg == nil {
 			continue
