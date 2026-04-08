@@ -6,6 +6,9 @@ on:
       - ".github/workflows/**"
       - ".github/actions/**"
 
+permissions:
+  contents: read
+
 jobs:
   lint-actions:
     runs-on: ubuntu-latest
