@@ -503,7 +503,7 @@ jobs:
 
           echo "Setting version number to ${version_number}"
           # update version placeholder in package.json with version matching binary.
-          npm version "${version_number}"
+          npm version "${version_number}" --no-git-tag-version
 
           # install dependencies
           npm ci --ignore-scripts
