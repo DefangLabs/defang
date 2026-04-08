@@ -82,7 +82,7 @@ func WaitServiceState(
 			}
 		}
 
-		term.Infof("Waiting for %q to be in state %s...\n", pendingServices, targetState) // TODO: don't print in Go-routine
+		term.Infof("Waiting for services to finish deploying: %q\n", pendingServices) // TODO: don't print in Go-routine
 
 		if msg == nil {
 			continue
