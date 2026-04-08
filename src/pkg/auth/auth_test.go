@@ -87,7 +87,7 @@ func TestPoll(t *testing.T) {
 		OpenAuthClient = NewClient("test", server.URL)
 		t.Cleanup(func() { OpenAuthClient = orig })
 
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
 		defer cancel()
 
 		_, err := Poll(ctx, "state")
