@@ -2,11 +2,13 @@ package gcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/serviceusage/v1"
 )
 
@@ -32,6 +34,12 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 
 		operation, err := service.Services.BatchEnable(projectName, req).Context(ctx).Do()
 		if err != nil {
+			// Do not retry on permission errors
+			var apiErr *googleapi.Error
+			if errors.As(err, &apiErr) && (apiErr.Code == 403 || apiErr.Code == 401) {
+				return fmt.Errorf("permission denied when enabling services: %w", err)
+			}
+			term.Printf("Error: %+v (%T)\n", err, err)
 			if i < maxAttempts-1 {
 				term.Debugf("Failed to enable services, will retry in %v: %v\n", retryInterval, err)
 				if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
