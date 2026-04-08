@@ -1,15 +1,13 @@
 import AdmZip from "adm-zip";
-import axios from "axios";
 import * as child_process from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import * as tar from "tar";
 import { promisify } from "util";
-import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __dirname = path.dirname(__filename);
 
 // regex to match semantic version (from semver.org)
 const SEMVER_REGEX =
@@ -18,18 +16,18 @@ const SEMVER_REGEX =
 const EXECUTABLE = "defang";
 const URL_LATEST_RELEASE =
   "https://api.github.com/repos/DefangLabs/defang/releases/latest";
-const HTTP_STATUS_OK = 200;
 
-const exec = promisify(child_process.exec);
-async function getLatestVersion(): Promise<string> {
-  const response = await axios.get(URL_LATEST_RELEASE);
-  if (response.status !== HTTP_STATUS_OK) {
+const execFile = promisify(child_process.execFile);
+async function getLatestVersion(): Promise<string | undefined> {
+  const response = await fetch(URL_LATEST_RELEASE);
+  if (!response.ok) {
     throw new Error(
       `Failed to get latest version from GitHub. Status code: ${response.status}`
     );
   }
 
-  return response.data?.tag_name?.replace("v", "").trim();
+  const data = await response.json() as { tag_name?: string };
+  return data.tag_name?.replace("v", "").trim();
 }
 
 async function downloadAppArchive(
@@ -47,28 +45,25 @@ async function downloadFile(
   downloadTargetFile: string
 ): Promise<string | null> {
   try {
-    const response = await axios.get(downloadUrl, {
-      responseType: "arraybuffer",
-      headers: {
-        "Content-Type": "application/octet-stream",
-      },
-    });
+    const response = await fetch(downloadUrl);
 
-    if (response.data == null) {
+    if (!response.ok) {
       throw new Error(
-        `Failed to download ${downloadUrl}. No data in response.`
+        `Failed to download ${downloadUrl}. Status code: ${response.status}`
       );
     }
 
+    const buffer = Buffer.from(await response.arrayBuffer());
+
     // write data to file, will overwrite if file already exists
-    await fs.promises.writeFile(downloadTargetFile, response.data);
+    await fs.promises.writeFile(downloadTargetFile, buffer);
 
     return downloadTargetFile;
   } catch (error) {
     console.error(error);
 
     // something went wrong, clean up by deleting the downloaded file if it exists
-    await fs.promises.unlink(downloadTargetFile);
+    await fs.promises.rm(downloadTargetFile, { force: true });
     return null;
   }
 }
@@ -106,7 +101,7 @@ async function extractZip(
     }
     const executableFullName = EXECUTABLE + extension;
     const result = zip.extractEntryTo(executableFullName, outputPath, true, true);
-    await fs.promises.chmod(path.join(outputPath, executableFullName), 755);
+    await fs.promises.chmod(path.join(outputPath, executableFullName), 0o755);
     return result;
   } catch (error) {
     console.error(`An error occurred during zip extraction: ${error}`);
@@ -195,8 +190,8 @@ function getPathToExecutable(): string | null {
 }
 
 function extractCLIVersions(versionInfo: string): {
-  defangCLI: string;
-  latestCLI: string;
+  defangCLI: string | null;
+  latestCLI: string | null;
 } {
   // parse the CLI version info
   // e.g.
@@ -205,9 +200,9 @@ function extractCLIVersions(versionInfo: string): {
   // Defang Fabric: v0.5.0-643-abcdef012
   //
   const regex = /^([A-Za-z ]+):\s*v?(\d+\.\d+\.\d+(?:-[\w.-]+)?)$/gm;
-  const versions: any = {
-    defangCLI: null,
-    latestCLI: null,
+  const versions = {
+    defangCLI: null as string | null,
+    latestCLI: null as string | null,
   };
 
   for (const [, label, version] of versionInfo.matchAll(regex)) {
@@ -233,11 +228,11 @@ async function getVersionInfo(): Promise<VersionInfo> {
       // there is no executable, so we can't get the version info from the CLI
       const latestVersion = await getLatestVersion();
 
-      return { current: null, latest: latestVersion };
+      return { current: null, latest: latestVersion ?? null };
     }
 
     // Exec output contains both stderr and stdout outputs
-    const versionInfo = await exec(quoteIfNeeded(execPath) + " version");
+    const versionInfo = await execFile(execPath, ["version"]);
 
     const verInfo = extractCLIVersions(versionInfo.stdout);
     result.current = verInfo.defangCLI;
