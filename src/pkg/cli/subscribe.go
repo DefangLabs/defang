@@ -88,7 +88,7 @@ func WaitServiceState(
 			continue
 		}
 
-		term.Debugf("service %s with state ( %s ) and status: %s\n", msg.Name, msg.State, msg.Status) // TODO: don't print in Go-routine
+		term.Debugf("Service update: %s: state=%s and status=%s\n", msg.Name, msg.State, msg.Status) // TODO: don't print in Go-routine
 
 		if _, ok := serviceStates[msg.Name]; !ok {
 			term.Debugf("unexpected service %s update", msg.Name) // TODO: don't print in Go-routine
