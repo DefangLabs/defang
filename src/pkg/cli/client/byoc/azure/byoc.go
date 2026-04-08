@@ -62,23 +62,27 @@ func (b *ByocAzure) SetUpCD(context.Context, bool) error {
 }
 
 // CdCommand implements byoc.ProjectBackend.
-func (b *ByocAzure) CdCommand(ctx context.Context, req client.CdCommandRequest) (types.ETag, error) {
+func (b *ByocAzure) CdCommand(ctx context.Context, req client.CdCommandRequest) (*client.CdCommandResponse, error) {
 	if err := b.setUp(ctx); err != nil {
-		return "", err
+		return nil, err
 	}
 	etag := pkg.RandomID()
 	envMap, err := b.buildCdEnv(req.Project)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	containers := b.cdContainers()
 	taskID, err := b.driver.Run(ctx, containers, envMap, "/app/cd", string(req.Command))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	b.cdContainerGroup = taskID
 	b.cdDeploymentID = etag
-	return etag, nil
+	return &client.CdCommandResponse{
+		CdId:   *taskID,
+		CdType: defangv1.CdType_CD_TYPE_AZURE_ACI_JOBID,
+		ETag:   etag,
+	}, nil
 }
 
 // CdList implements byoc.ProjectBackend.
@@ -257,11 +261,11 @@ func (b *ByocAzure) cdContainers() []*armcontainerinstance.Container {
 }
 
 // Deploy implements client.Provider.
-func (b *ByocAzure) Deploy(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocAzure) Deploy(ctx context.Context, req *client.DeployRequest) (*client.DeployResponse, error) {
 	return b.deploy(ctx, req, "up")
 }
 
-func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb string) (*defangv1.DeployResponse, error) {
+func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb string) (*client.DeployResponse, error) {
 	if b.CDImage == "" {
 		return nil, errors.New("CD image is not set; please set the DEFANG_CD_IMAGE environment variable")
 	}
@@ -329,16 +333,22 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 	}
 	b.cdContainerGroup = taskID
 	b.cdDeploymentID = etag
-	return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, nil
+	return &client.DeployResponse{
+		CdId:   *taskID,
+		CdType: defangv1.CdType_CD_TYPE_AZURE_ACI_JOBID,
+		DeployResponse: &defangv1.DeployResponse{
+			Etag: etag, Services: serviceInfos,
+		},
+	}, nil
 }
 
-// Destroy implements client.Provider.
-func (b *ByocAzure) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error) {
-	return b.CdCommand(ctx, client.CdCommandRequest{
-		Command: client.CdCommandDestroy,
-		Project: req.Project,
-	})
-}
+// // Destroy implements client.Provider.
+// func (b *ByocAzure) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error) {
+// 	return b.CdCommand(ctx, client.CdCommandRequest{
+// 		Command: client.CdCommandDestroy,
+// 		Project: req.Project,
+// 	})
+// }
 
 // GetDeploymentStatus implements client.Provider.
 func (b *ByocAzure) GetDeploymentStatus(ctx context.Context) (bool, error) {
@@ -411,7 +421,7 @@ func (b *ByocAzure) PrepareDomainDelegation(context.Context, client.PrepareDomai
 }
 
 // Preview implements client.Provider.
-func (b *ByocAzure) Preview(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocAzure) Preview(ctx context.Context, req *client.DeployRequest) (*client.DeployResponse, error) {
 	return b.deploy(ctx, req, "preview")
 }
 

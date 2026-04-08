@@ -127,7 +127,7 @@ type ByocGcp struct {
 	uploadServiceAccount string
 	delegateDomainZone   string
 
-	cdExecution string
+	cdBuildId string
 }
 
 func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string) *ByocGcp {
@@ -373,9 +373,9 @@ func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 	}, nil
 }
 
-func (b *ByocGcp) CdCommand(ctx context.Context, req client.CdCommandRequest) (types.ETag, error) {
+func (b *ByocGcp) CdCommand(ctx context.Context, req client.CdCommandRequest) (*client.CdCommandResponse, error) {
 	if err := b.SetUpCD(ctx, false); err != nil {
-		return "", err
+		return nil, err
 	}
 	etag := types.NewEtag()
 	cmd := cdCommand{
@@ -385,11 +385,15 @@ func (b *ByocGcp) CdCommand(ctx context.Context, req client.CdCommandRequest) (t
 		statesUrl: req.StatesUrl,
 		eventsUrl: req.EventsUrl,
 	}
-	err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
+	buildId, err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return etag, nil
+	return &client.CdCommandResponse{
+		CdId:   buildId,
+		CdType: defangv1.CdType_CD_TYPE_GCP_CLOUDBUILD_BUILDID,
+		ETag:   etag,
+	}, nil
 }
 
 type cdCommand struct {
@@ -409,12 +413,12 @@ type CloudBuildStep struct {
 	Env        []string `yaml:"env,omitempty"`
 }
 
-func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) error {
+func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, error) {
 	// From https://www.pulumi.com/docs/iac/concepts/state-and-backends/#google-cloud-storage
 	defangStateUrl := `gs://` + b.bucket
 	pulumiBackendKey, pulumiBackendValue, err := byoc.GetPulumiBackend(defangStateUrl)
 	if err != nil {
-		return err
+		return "", err
 	}
 	env := map[string]string{
 		"DEFANG_CD_IMAGE":          b.CDImage,                 // used by down/destroy to schedule cleanup job with the same image
@@ -467,7 +471,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) error {
 			debugEnv = append(debugEnv, k+"="+v)
 		}
 		if err := byoc.DebugPulumiGolang(ctx, debugEnv, cmd.command...); err != nil {
-			return err
+			return "", err
 		}
 	}
 
@@ -484,10 +488,10 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) error {
 		},
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 	term.Debugf("Starting CD in cloudbuild at: %v", time.Now().Format(time.RFC3339))
-	execution, err := b.driver.RunCloudBuild(ctx, gcp.CloudBuildArgs{
+	buildId, err := b.driver.RunCloudBuild(ctx, gcp.CloudBuildArgs{
 		Steps:          string(steps),
 		ServiceAccount: &b.cdServiceAccount,
 		Tags: []string{
@@ -496,11 +500,11 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) error {
 		},
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
-	b.cdExecution = execution
+	b.cdBuildId = buildId
 
-	return nil
+	return buildId, nil
 }
 
 func (b *ByocGcp) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
@@ -517,19 +521,19 @@ func (b *ByocGcp) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 	}
 	return &defangv1.UploadURLResponse{Url: url}, nil
 }
-func (b *ByocGcp) Deploy(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocGcp) Deploy(ctx context.Context, req *client.DeployRequest) (*client.DeployResponse, error) {
 	return b.deploy(ctx, req, "up")
 }
 
-func (b *ByocGcp) Preview(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocGcp) Preview(ctx context.Context, req *client.DeployRequest) (*client.DeployResponse, error) {
 	return b.deploy(ctx, req, "preview")
 }
 
 func (b *ByocGcp) GetDeploymentStatus(ctx context.Context) (bool, error) {
-	return b.driver.GetBuildStatus(ctx, b.cdExecution)
+	return b.driver.GetBuildStatus(ctx, b.cdBuildId)
 }
 
-func (b *ByocGcp) deploy(ctx context.Context, req *client.DeployRequest, command string) (*defangv1.DeployResponse, error) {
+func (b *ByocGcp) deploy(ctx context.Context, req *client.DeployRequest, command string) (*client.DeployResponse, error) {
 	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
 	project, err := compose.LoadFromContent(ctx, req.Compose, "")
 	if err != nil {
@@ -591,11 +595,16 @@ func (b *ByocGcp) deploy(ctx context.Context, req *client.DeployRequest, command
 		statesUrl:      req.StatesUrl,
 		eventsUrl:      req.EventsUrl,
 	}
-	if err := b.runCdCommand(ctx, cdCmd); err != nil {
+	buildId, err := b.runCdCommand(ctx, cdCmd)
+	if err != nil {
 		return nil, err
 	}
 
-	return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, nil
+	return &client.DeployResponse{
+		CdId:           buildId,
+		CdType:         defangv1.CdType_CD_TYPE_GCP_CLOUDBUILD_BUILDID,
+		DeployResponse: &defangv1.DeployResponse{Etag: etag, Services: serviceInfos},
+	}, nil
 }
 
 func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {

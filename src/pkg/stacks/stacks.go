@@ -193,7 +193,7 @@ func Marshal(params *Parameters) (string, error) {
 	if params == nil {
 		return "", nil
 	}
-	return godotenv.Marshal(params.ToMap())
+	return godotenv.Marshal(params.ToMap()) // TODO: should append LF at EOF
 }
 
 func RemoveInDirectory(workingDirectory, name string) error {

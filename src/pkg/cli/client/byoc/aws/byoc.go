@@ -184,15 +184,15 @@ func (b *ByocAws) GetDeploymentStatus(ctx context.Context) (bool, error) {
 	return done, nil
 }
 
-func (b *ByocAws) Deploy(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocAws) Deploy(ctx context.Context, req *client.DeployRequest) (*client.DeployResponse, error) {
 	return b.deploy(ctx, req, "up")
 }
 
-func (b *ByocAws) Preview(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocAws) Preview(ctx context.Context, req *client.DeployRequest) (*client.DeployResponse, error) {
 	return b.deploy(ctx, req, "preview")
 }
 
-func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd string) (*defangv1.DeployResponse, error) {
+func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd string) (*client.DeployResponse, error) {
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
@@ -292,9 +292,13 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		}
 	}
 
-	return &defangv1.DeployResponse{
-		Services: serviceInfos, // TODO: Should we use the retrieved services instead?
-		Etag:     etag,
+	return &client.DeployResponse{
+		CdType: defangv1.CdType_CD_TYPE_AWS_CODEBUILD_BUILDID,
+		CdId:   *cdBuildId,
+		DeployResponse: &defangv1.DeployResponse{
+			Services: serviceInfos, // TODO: Should we use the retrieved services instead?
+			Etag:     etag,
+		},
 	}, nil
 }
 
@@ -904,9 +908,9 @@ func (b *ByocAws) TearDownCD(ctx context.Context) error {
 	return b.driver.TearDown(ctx)
 }
 
-func (b *ByocAws) CdCommand(ctx context.Context, req client.CdCommandRequest) (string, error) {
+func (b *ByocAws) CdCommand(ctx context.Context, req client.CdCommandRequest) (*client.CdCommandResponse, error) {
 	if err := b.SetUpCD(ctx, false); err != nil {
-		return "", err
+		return nil, err
 	}
 	etag := types.NewEtag()
 	cmd := cdCommand{
@@ -918,12 +922,12 @@ func (b *ByocAws) CdCommand(ctx context.Context, req client.CdCommandRequest) (s
 	}
 	cdBuildId, err := b.runCdCommand(ctx, cmd)
 	if err != nil {
-		return "", AnnotateAwsError(err)
+		return nil, AnnotateAwsError(err)
 	}
 	b.cdEtag = etag
 	b.cdStart = time.Now()
 	b.cdBuildId = cdBuildId
-	return etag, nil
+	return &client.CdCommandResponse{ETag: etag, CdType: defangv1.CdType_CD_TYPE_AWS_CODEBUILD_BUILDID, CdId: *cdBuildId}, nil
 }
 
 func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {

@@ -6,14 +6,13 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 type mockComposeDown struct {
 	client.MockProvider
 	MockAccountInfo func(ctx context.Context) (*client.AccountInfo, error)
-	MockCdCommand   func(ctx context.Context, req client.CdCommandRequest) (types.ETag, error)
+	MockCdCommand   func(ctx context.Context, req client.CdCommandRequest) (*client.CdCommandResponse, error)
 	MockDelete      func(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error)
 	request         map[string]any
 }
@@ -27,7 +26,7 @@ func (m mockComposeDown) AccountInfo(
 func (m mockComposeDown) CdCommand(
 	ctx context.Context,
 	req client.CdCommandRequest,
-) (types.ETag, error) {
+) (*client.CdCommandResponse, error) {
 	return m.MockCdCommand(ctx, req)
 }
 
@@ -45,9 +44,9 @@ func TestComposeDown(t *testing.T) {
 		MockAccountInfo: func(ctx context.Context) (*client.AccountInfo, error) {
 			return &client.AccountInfo{}, nil
 		},
-		MockCdCommand: func(ctx context.Context, req client.CdCommandRequest) (types.ETag, error) {
+		MockCdCommand: func(ctx context.Context, req client.CdCommandRequest) (*client.CdCommandResponse, error) {
 			mockProvider.request["CdCommandRequest"] = &req
-			return "eTagDestroy", nil
+			return &client.CdCommandResponse{ETag: "eTagDestroy"}, nil
 		},
 		MockDelete: func(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
 			mockProvider.request["DeleteRequest"] = req

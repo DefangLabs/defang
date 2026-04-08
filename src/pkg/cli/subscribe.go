@@ -5,6 +5,7 @@ import (
 	"errors"
 	"iter"
 
+	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -52,8 +53,14 @@ func WaitServiceState(
 			return serviceStates, nil
 		}
 		if err != nil {
-			// Reconnect on transient errors
+			// Reconnect on transient errors (including ResourceExhausted — quota resets within
+			// a minute and DelayBeforeRetry backs off exponentially up to 1 minute).
 			if isTransientError(err) {
+				if connect.CodeOf(err) == connect.CodeResourceExhausted {
+					term.Warnf("quota exceeded; will retry subscribe stream after backoff: %v", err)
+				} else {
+					term.Debugf("WaitServiceState: transient error, reconnecting subscribe stream: %v", err)
+				}
 				if err := provider.DelayBeforeRetry(ctx); err != nil {
 					return serviceStates, err
 				}

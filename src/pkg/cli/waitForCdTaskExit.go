@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 var pollDuration = 2 * time.Second
@@ -20,7 +19,7 @@ func WaitForCdTaskExit(ctx context.Context, provider client.Provider) error {
 		select {
 		case <-ticker.C:
 			done, err := provider.GetDeploymentStatus(ctx)
-			term.Debugf("Polled CD task status: done=%v, err=%v", done, err)
+			// term.Debugf("Polled CD task status: done=%v, err=%v", done, err)
 			if err != nil {
 				// End condition: EOF indicates that the task has completed successfully
 				if errors.Is(err, io.EOF) {

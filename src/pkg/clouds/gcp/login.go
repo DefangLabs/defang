@@ -112,6 +112,9 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 	//    - if the user has set GOOGLE_APPLICATION_CREDENTIALS to a service account key file with required permissions
 	term.Debugf("checking if application default credentials are available and has permission, GOOGLE_APPLICATION_CREDENTIALS=%q...", os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
 	if err := testTokenProjectPermissions(ctx, gcp.ProjectId, requiredPerms, nil); err != nil {
+		if ctx.Err() != nil { // Fast fail if context is done, no need to try other credential sources
+			return ctx.Err()
+		}
 		term.Debugf("the application default credentials are missing permissions: %v", err)
 	} else {
 		term.Debug("found valid application default credentials with required permissions")
@@ -121,6 +124,9 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 
 	// 2. Try GitHub Actions OIDC token if running in GitHub Actions with Workload Identity Federation set up
 	if tokenSource, principal, err := findGithubCredentials(ctx); err != nil {
+		if ctx.Err() != nil { // Fast fail if context is done, no need to try other credential sources
+			return ctx.Err()
+		}
 		term.Warnf("failed to get GitHub Actions OIDC token source: %v", err)
 	} else if tokenSource != nil {
 		term.Debug("found GitHub Actions OIDC token source, testing permissions...")
@@ -137,6 +143,9 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 
 	// 3. Try load previously saved tokens from the token store
 	if tokenSource, err := gcp.findStoredCredentials(ctx); err != nil {
+		if ctx.Err() != nil { // Fast fail if context is done, no need to try other credential sources
+			return ctx.Err()
+		}
 		term.Warnf("failed to load stored credentials: %v", err)
 	} else if tokenSource != nil {
 		term.Debug("found valid stored credentials with required permissions")
@@ -242,7 +251,11 @@ func (gcp *Gcp) findStoredCredentials(ctx context.Context) (oauth2.TokenSource, 
 			}
 			return tokenSource, nil
 		} else {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 			term.Debugf("Token %q is missing required permissions: %v\n", name, err)
+			continue
 		}
 	}
 	return nil, nil

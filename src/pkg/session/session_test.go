@@ -140,7 +140,7 @@ func TestLoadSession(t *testing.T) {
 			if tt.existingStack == nil {
 				if tt.options.Default.Name != "" {
 					// For specified non-existing stack, return ErrNotExist
-					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", &stacks.ErrNotExist{StackName: tt.options.Default.Name})
+					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", &stacks.ErrNotExist{ProjectName: "projectName", StackName: tt.options.Default.Name})
 				} else if tt.getStackError != nil {
 					sm.On("GetStack", ctx, mock.Anything).Maybe().Return(nil, "", tt.getStackError)
 				}

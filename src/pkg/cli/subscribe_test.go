@@ -12,6 +12,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // mockSubscribeProvider mocks the provider for Subscribe.
@@ -281,6 +283,11 @@ func TestWaitServiceStateStreamReceive(t *testing.T) {
 		{
 			name:        "stream receive returns internal error and retry to connect",
 			err:         connect.NewError(connect.CodeInternal, errors.New("internal error")),
+			expectRetry: true,
+		},
+		{
+			name:        "stream receive returns resource exhausted error and retry to connect",
+			err:         status.Error(codes.ResourceExhausted, "quota exceeded"),
 			expectRetry: true,
 		},
 	}

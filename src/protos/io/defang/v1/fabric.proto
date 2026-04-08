@@ -542,6 +542,16 @@ message Deployment {
   DeploymentOrigin origin = 16;
   map<string, string> origin_metadata = 17;
   repeated ServiceInfo services = 18;
+  CdType cd_type = 19;
+  string cd_id = 20;
+}
+
+enum CdType {
+  CD_TYPE_UNSPECIFIED = 0;
+  CD_TYPE_AWS_CODEBUILD_BUILDID = 1;
+  CD_TYPE_GCP_CLOUDBUILD_BUILDID = 2;
+  CD_TYPE_DO_APPPLATFORM_DEPLOYMENTID = 3;
+  CD_TYPE_AZURE_ACI_JOBID = 4;
 }
 
 enum DeploymentStatus {

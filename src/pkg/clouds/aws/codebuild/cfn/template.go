@@ -318,7 +318,7 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 			"ExtraClaims": cloudformation.If(_condOidcClaims, cloudformation.Join("", []any{",", cloudformation.Join(",", cloudformation.Ref(ParamsOidcProviderClaims))}), ""),
 		}),
 		ManagedPolicyArns: []string{
-			"arn:aws:iam::aws:policy/PowerUserAccess",
+			"arn:aws:iam::aws:policy/AdministratorAccess", // updates this stack, so has to have permission to create/update roles
 		},
 	}
 
