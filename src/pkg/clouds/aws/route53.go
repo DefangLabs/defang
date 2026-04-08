@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/route53/types"
@@ -33,7 +34,7 @@ type Route53API interface {
 
 func CreateDelegationSet(ctx context.Context, zoneId *string, r53 Route53API) (*types.DelegationSet, error) {
 	params := &route53.CreateReusableDelegationSetInput{
-		CallerReference: ptr.String("Created by Defang CLI " + time.Now().Format(time.RFC3339Nano)),
+		CallerReference: ptr.String("Created by Defang CLI " + time.Now().Format(time.RFC3339) + " " + pkg.RandomID()),
 		HostedZoneId:    zoneId,
 	}
 	resp, err := r53.CreateReusableDelegationSet(ctx, params)

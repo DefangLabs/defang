@@ -122,7 +122,7 @@ func printStacksInfoMessage(stacks []string) {
 		infoLine += "\n - To learn more about Stacks, visit: https://s.defang.io/stacks"
 		term.Println(infoLine)
 	}
-	term.Printf("  To skip this prompt, run this command with --stack=%s\n", "<stack_name>")
+	term.Printf("To skip this prompt, run this command with --stack=%s\n", "<stack_name>")
 }
 
 func MakeStackSelectorLabels(stacks []ListItem) map[string]string {
