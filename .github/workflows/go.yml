@@ -30,7 +30,7 @@ jobs:
 
       - name: Sanitize branch name for artifact
         id: branch
-        run: echo "name=$(echo '${{ github.ref_name }}' | tr '/' '-')" >> $GITHUB_OUTPUT
+        run: echo "name=$(echo '${{ github.ref_name }}' | tr '/' '-')" >> "$GITHUB_OUTPUT"
 
       - name: Run Go unit tests
         run: go test -test.short -v -coverprofile=coverage.out -covermode=atomic ./...
@@ -128,7 +128,7 @@ jobs:
         run: |
           set -o pipefail
           make test-nix 2>&1 | tee /tmp/nix-test-output.log
-          exit ${PIPESTATUS[0]}
+          exit "${PIPESTATUS[0]}"
 
       - name: Update vendorHash if needed
         if: steps.nix-test.outcome == 'failure'
@@ -498,11 +498,12 @@ jobs:
         working-directory: ./pkgs/npm
         run: |
           # Get version number without the 'v'
-          export version_number=`echo "${{ github.ref_name }}" | cut -c2- `
+          version_number=$(echo "${{ github.ref_name }}" | cut -c2-)
+          export version_number
 
           echo "Setting version number to ${version_number}"
           # update version placeholder in package.json with version matching binary.
-          npm version ${version_number}
+          npm version "${version_number}"
 
           # install dependencies
           npm ci --ignore-scripts
