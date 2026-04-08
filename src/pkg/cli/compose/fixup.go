@@ -37,6 +37,12 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 	}
 	slices.Sort(config.Names) // sort for binary search
 
+	accountInfo, err := provider.AccountInfo(ctx)
+	if err != nil {
+		term.Debugf("failed to get account info to fixup services: %v", err)
+		accountInfo = &client.AccountInfo{}
+	}
+
 	// Fixup any pseudo services (this might create port configs, which will affect service name replacement by ReplaceServiceNameWithDNS)
 	for _, svccfg := range project.Services {
 		repo := GetImageRepo(svccfg.Image)
@@ -63,7 +69,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 		}
 
 		if svccfg.Provider != nil && svccfg.Provider.Type == "model" && svccfg.Image == "" && svccfg.Build == nil {
-			fixupModelProvider(&svccfg, project)
+			fixupModelProvider(&svccfg, project, accountInfo)
 		}
 
 		if _, llm := svccfg.Extensions["x-defang-llm"]; llm {
@@ -87,7 +93,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 
 	for name, model := range project.Models {
 		model.Name = name // ensure the model has a name
-		svccfg := fixupModel(model, project)
+		svccfg := fixupModel(model, project, accountInfo)
 		project.Services[svccfg.Name] = *svccfg
 	}
 
@@ -342,24 +348,24 @@ func fixupIngressPorts(svccfg *composeTypes.ServiceConfig) {
 // Declare a private network for the model provider
 const modelProviderNetwork = "model_provider_private"
 
-func fixupModel(model composeTypes.ModelConfig, project *composeTypes.Project) *composeTypes.ServiceConfig {
+func fixupModel(model composeTypes.ModelConfig, project *composeTypes.Project, info *client.AccountInfo) *composeTypes.ServiceConfig {
 	svccfg := &composeTypes.ServiceConfig{
 		Name:       model.Name,
 		Extensions: model.Extensions,
 	}
-	makeAccessGatewayService(svccfg, project, model.Model) // TODO: pass other model options too
+	makeAccessGatewayService(svccfg, project, model.Model, info) // TODO: pass other model options too
 	return svccfg
 }
 
-func fixupModelProvider(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project) {
+func fixupModelProvider(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, info *client.AccountInfo) {
 	var model string
 	if modelVals := svccfg.Provider.Options["model"]; len(modelVals) == 1 {
 		model = modelVals[0]
 	}
-	makeAccessGatewayService(svccfg, project, model)
+	makeAccessGatewayService(svccfg, project, model, info)
 }
 
-func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, model string) {
+func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, model string, info *client.AccountInfo) {
 	// Local Docker sets [SERVICE]_URL and [SERVICE]_MODEL environment variables on the dependent services
 	envName := strings.ToUpper(svccfg.Name) // TODO: handle characters that are not allowed in env vars, like '-'
 	endpointEnvVar := envName + "_URL"
@@ -370,9 +376,40 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 	if svccfg.Environment == nil {
 		svccfg.Environment = composeTypes.MappingWithEquals{}
 	}
+
+	alias := model
+	switch info.Provider {
+	case client.ProviderAWS:
+		switch model {
+		case "chat-default":
+			model = "us.amazon.nova-2-lite-v1:0"
+		case "embedding-default":
+			model = "amazon.titan-embed-text-v2:0"
+		}
+		model = modelWithProvider(model, "bedrock")
+		if info.Region != "" {
+			svccfg.Environment["AWS_REGION"] = &info.Region
+		}
+	case client.ProviderGCP:
+		switch model {
+		case "chat-default":
+			model = "gemini-2.5-flash"
+		case "embedding-default":
+			model = "gemini-embedding-001"
+		}
+		model = modelWithProvider(model, "vertex_ai")
+		if info.AccountID != "" {
+			svccfg.Environment["VERTEXAI_PROJECT"] = &info.AccountID
+		}
+		if info.Region != "" {
+			svccfg.Environment["VERTEXAI_LOCATION"] = &info.Region
+		}
+	}
+
 	// svccfg.HealthCheck = &composeTypes.ServiceHealthCheckConfig{} TODO: add healthcheck
 	svccfg.Image = "litellm/litellm:v1.82.3-stable.patch.3"
-	svccfg.Command = []string{"--drop_params", "--model", model}
+	command := []string{"--drop_params", "--model", model, "--alias", alias}
+	svccfg.Command = command
 	if svccfg.Networks == nil {
 		// New compose-go versions do not create networks for "provider:" services, so we need to create it here
 		svccfg.Networks = make(map[string]*composeTypes.ServiceNetworkConfig)
@@ -457,6 +494,13 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 			}
 		}
 	}
+}
+
+func modelWithProvider(model, prefix string) string {
+	if strings.Contains(model, "/") {
+		return model // already has a provider prefix
+	}
+	return prefix + "/" + model
 }
 
 func GetImageRepo(image string) string {

@@ -3,12 +3,14 @@
     "command": [
       "--drop_params",
       "--model",
+      "ai/smollm2",
+      "--alias",
       "ai/smollm2"
     ],
     "entrypoint": null,
     "environment": {
       "DEBUG": "true",
-      "LITELLM_MASTER_KEY": ""
+      "LITELLM_MASTER_KEY": "networkisalreadyprivate"
     },
     "image": "litellm/litellm:v1.82.3-stable.patch.3",
     "networks": {
@@ -33,7 +35,8 @@
     "entrypoint": null,
     "environment": {
       "AI_RUNNER_MODEL": "ai/smollm2",
-      "AI_RUNNER_URL": "http://mock-ai-runner/api/v1/"
+      "AI_RUNNER_URL": "http://mock-ai-runner:4000/v1/",
+      "OPENAI_API_KEY": "networkisalreadyprivate"
     },
     "image": "my-chat-app",
     "networks": {

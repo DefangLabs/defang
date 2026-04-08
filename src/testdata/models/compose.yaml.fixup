@@ -3,11 +3,13 @@
     "command": [
       "--drop_params",
       "--model",
+      "ai/model",
+      "--alias",
       "ai/model"
     ],
     "entrypoint": null,
     "environment": {
-      "LITELLM_MASTER_KEY": ""
+      "LITELLM_MASTER_KEY": "networkisalreadyprivate"
     },
     "image": "litellm/litellm:v1.82.3-stable.patch.3",
     "networks": {
@@ -26,7 +28,7 @@
     "entrypoint": null,
     "environment": {
       "AI_MODEL_MODEL": "ai/model",
-      "AI_MODEL_URL": "http://mock-ai-model/api/v1/"
+      "AI_MODEL_URL": "http://mock-ai-model:4000/v1/"
     },
     "image": "app",
     "models": {
@@ -42,7 +44,7 @@
     "entrypoint": null,
     "environment": {
       "AI_MODEL_MODEL": "ai/model",
-      "AI_MODEL_URL": "http://mock-ai-model/api/v1/"
+      "AI_MODEL_URL": "http://mock-ai-model:4000/v1/"
     },
     "image": "app",
     "models": {
@@ -57,11 +59,13 @@
     "command": [
       "--drop_params",
       "--model",
+      "ai/model",
+      "--alias",
       "ai/model"
     ],
     "entrypoint": null,
     "environment": {
-      "LITELLM_MASTER_KEY": ""
+      "LITELLM_MASTER_KEY": "networkisalreadyprivate"
     },
     "image": "litellm/litellm:v1.82.3-stable.patch.3",
     "networks": {
@@ -79,7 +83,7 @@
     "command": null,
     "entrypoint": null,
     "environment": {
-      "MODEL_URL": "http://mock-my-model/api/v1/",
+      "MODEL_URL": "http://mock-my-model:4000/v1/",
       "MY_MODEL_MODEL": "ai/model"
     },
     "image": "app",
