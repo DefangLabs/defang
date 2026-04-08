@@ -104,6 +104,9 @@ func Poll(ctx context.Context, key string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
+	retryDelay := 500 * time.Millisecond
+	const maxRetryDelay = 5 * time.Second
+
 	for {
 		result, err := OpenAuthClient.Poll(ctx, key)
 		if err != nil {
@@ -113,7 +116,13 @@ func Poll(ctx context.Context, key string) ([]byte, error) {
 			}
 			var unexpectedError ErrUnexpectedStatus
 			if errors.As(err, &unexpectedError) && unexpectedError.StatusCode >= 500 {
-				term.Debugf("received server error: %s, retrying...", unexpectedError.Status)
+				term.Debugf("received server error: %s, retrying in %v...", unexpectedError.Status, retryDelay)
+				select {
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				case <-time.After(retryDelay):
+				}
+				retryDelay = min(retryDelay*2, maxRetryDelay)
 				continue
 			}
 			return nil, err
