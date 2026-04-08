@@ -43,7 +43,7 @@ describe("Testing getLatestVersion()", () => {
       json: () => Promise.resolve({ tag_name: "" }),
     } as unknown as Response);
 
-    await expect(clilib.getLatestVersion()).to.eventually.equal("");
+    await expect(clilib.getLatestVersion()).to.eventually.be.undefined;
   });
 
   it("ill-formed tag_name", async () => {
@@ -53,6 +53,24 @@ describe("Testing getLatestVersion()", () => {
     } as unknown as Response);
 
     await expect(clilib.getLatestVersion()).to.eventually.be.undefined;
+  });
+
+  it("non-semver tag_name", async () => {
+    sandbox.stub(global, "fetch").resolves({
+      ok: true,
+      json: () => Promise.resolve({ tag_name: "nightly-20260408" }),
+    } as unknown as Response);
+
+    await expect(clilib.getLatestVersion()).to.eventually.be.undefined;
+  });
+
+  it("tag_name with v in version string", async () => {
+    sandbox.stub(global, "fetch").resolves({
+      ok: true,
+      json: () => Promise.resolve({ tag_name: "v1.2.3-dev.4" }),
+    } as unknown as Response);
+
+    await expect(clilib.getLatestVersion()).to.eventually.equal("1.2.3-dev.4");
   });
 });
 

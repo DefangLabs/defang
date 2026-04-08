@@ -27,7 +27,8 @@ async function getLatestVersion(): Promise<string | undefined> {
   }
 
   const data = await response.json() as { tag_name?: string };
-  return data.tag_name?.replace("v", "").trim();
+  const version = data.tag_name?.trim().replace(/^v/, "");
+  return version && SEMVER_REGEX.test(version) ? version : undefined;
 }
 
 async function downloadAppArchive(
