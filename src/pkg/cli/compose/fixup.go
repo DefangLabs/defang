@@ -363,16 +363,12 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 	// Local Docker sets [SERVICE]_URL and [SERVICE]_MODEL environment variables on the dependent services
 	envName := strings.ToUpper(svccfg.Name) // TODO: handle characters that are not allowed in env vars, like '-'
 	endpointEnvVar := envName + "_URL"
-	urlVal := "http://" + svccfg.Name + ":" + strconv.FormatUint(uint64(liteLLMPort), 10) + "/api/v1/"
+	urlVal := "http://" + svccfg.Name + ":" + strconv.FormatUint(uint64(liteLLMPort), 10) + "/v1/"
 	modelEnvVar := envName + "_MODEL"
 
-	empty := ""
 	// svccfg.Deploy.Resources.Reservations.Limits = &composeTypes.Resources{} TODO: avoid memory limits warning
 	if svccfg.Environment == nil {
 		svccfg.Environment = composeTypes.MappingWithEquals{}
-	}
-	if _, exists := svccfg.Environment["LITELLM_MASTER_KEY"]; !exists {
-		svccfg.Environment["LITELLM_MASTER_KEY"] = &empty
 	}
 	// svccfg.HealthCheck = &composeTypes.ServiceHealthCheckConfig{} TODO: add healthcheck
 	svccfg.Image = "litellm/litellm:v1.82.3-stable.patch.3"
@@ -388,6 +384,30 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 	svccfg.Provider = nil // remove "provider:" because current backend will not accept it
 	project.Networks[modelProviderNetwork] = composeTypes.NetworkConfig{Name: modelProviderNetwork}
 
+	liteLLMMasterKey, exists := svccfg.Environment["LITELLM_MASTER_KEY"]
+	if !exists {
+		openAIKey := ""
+		for _, service := range project.Services {
+			if _, ok := service.DependsOn[svccfg.Name]; ok {
+				if key, ok := service.Environment["OPENAI_API_KEY"]; ok {
+					if openAIKey == "" {
+						openAIKey = *key
+					} else if *key != openAIKey {
+						term.Errorf("multiple different OPENAI_API_KEY values found in services depending on %q", svccfg.Name)
+						break
+					}
+				}
+			}
+		}
+		if openAIKey == "" {
+			key := "networkisalreadyprivate"
+			liteLLMMasterKey = &key
+		} else {
+			liteLLMMasterKey = &openAIKey
+		}
+		svccfg.Environment["LITELLM_MASTER_KEY"] = liteLLMMasterKey
+	}
+
 	// Set environment variables (url and model) for any service that depends on the model
 	for _, dependency := range project.Services {
 		if _, ok := dependency.DependsOn[svccfg.Name]; ok {
@@ -400,6 +420,9 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 			}
 			if _, ok := dependency.Environment[modelEnvVar]; !ok && model != "" {
 				dependency.Environment[modelEnvVar] = &model
+			}
+			if _, ok := dependency.Environment["OPENAI_API_KEY"]; !ok {
+				dependency.Environment["OPENAI_API_KEY"] = liteLLMMasterKey
 			}
 		}
 

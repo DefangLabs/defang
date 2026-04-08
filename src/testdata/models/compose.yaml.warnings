@@ -1,3 +1,4 @@
+ ! service "ai_model": environment "LITELLM_MASTER_KEY" may contain sensitive information; consider using 'defang config set LITELLM_MASTER_KEY' to securely store this value
  ! service "ai_model": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "modellist": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "modelmap": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
