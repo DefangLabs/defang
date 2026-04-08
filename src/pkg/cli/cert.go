@@ -84,9 +84,19 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 		return err
 	}
 
+	if len(services.Services) == 0 {
+		return fmt.Errorf("no services found for project %q; deployment may not be finished yet", project.Name)
+	}
+
 	cnt := 0
 	for _, serviceInfo := range services.Services {
-		if service, ok := project.Services[serviceInfo.Service.Name]; ok && service.DomainName != "" && serviceInfo.ZoneId == "" {
+		if !serviceInfo.UseAcmeCert {
+			continue
+		}
+		if service, ok := project.Services[serviceInfo.Service.Name]; ok {
+			if service.DomainName != serviceInfo.Domainname {
+				term.Warnf("service %q: domainname %q in compose file does not match deployed value %q", service.Name, service.DomainName, serviceInfo.Domainname)
+			}
 			cnt++
 			targets := getDomainTargets(serviceInfo, service)
 			domains := []string{service.DomainName}
@@ -120,6 +130,7 @@ func getDomainTargets(serviceInfo *defangv1.ServiceInfo, service compose.Service
 		return targets
 	}
 }
+
 func generateCert(ctx context.Context, domain string, targets []string, client client.FabricClient) {
 	term.Infof("Checking DNS setup for %v", domain)
 	if err := waitForCNAME(ctx, domain, targets, client); err != nil {
