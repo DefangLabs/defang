@@ -90,6 +90,9 @@ func readLogChunk(ctx context.Context, logURL string, offset int64, yield func(s
 		return offset, nil
 	}
 	if resp.StatusCode != http.StatusPartialContent && resp.StatusCode != http.StatusOK {
+		if !yield("", fmt.Errorf("unexpected log response status: %s", resp.Status)) {
+			return offset, errStopped
+		}
 		return offset, nil
 	}
 
@@ -105,6 +108,9 @@ func readLogChunk(ctx context.Context, logURL string, offset int64, yield func(s
 	}
 
 	text := string(body)
+	if len(text) == 0 {
+		return offset, nil
+	}
 	lines := strings.Split(text, "\n")
 
 	// If the last byte is not a newline, the last line is incomplete — hold it back

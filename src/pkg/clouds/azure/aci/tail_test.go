@@ -9,7 +9,9 @@ import (
 )
 
 func TestTail(t *testing.T) {
-	t.SkipNow() // too slow for CI
+	if testing.Short() {
+		t.Skip("skipping slow integration test in short mode")
+	}
 
 	ctx := context.Background()
 

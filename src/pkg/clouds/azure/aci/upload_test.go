@@ -26,7 +26,7 @@ func TestCreateUploadURL(t *testing.T) {
 		t.Fatal("expected non-empty upload URL")
 	}
 
-	t.Logf("Upload URL: %s", url)
+	t.Log("Upload URL generated")
 	header := http.Header{"Content-Type": []string{"application/text"}}
 	header.Set("X-Ms-Blob-Type", "BlockBlob")
 	resp, err := http.PutWithHeader(context.Background(), url, header, strings.NewReader("test content"))

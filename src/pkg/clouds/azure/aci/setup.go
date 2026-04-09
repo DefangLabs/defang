@@ -138,9 +138,15 @@ func (c *ContainerInstance) SetUpStorageAccount(ctx context.Context) (string, er
 	}
 	container, err := containerClient.Create(ctx, c.resourceGroupName, storageAccount, blobContainerName, armstorage.BlobContainer{}, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to create blob container: %w", err)
+		var respErr *azcore.ResponseError
+		if errors.As(err, &respErr) && respErr.ErrorCode == "ContainerAlreadyExists" {
+			c.BlobContainerName = blobContainerName
+		} else {
+			return "", fmt.Errorf("failed to create blob container: %w", err)
+		}
+	} else {
+		c.BlobContainerName = *container.Name
 	}
-	c.BlobContainerName = *container.Name
 
 	term.Infof("Using storage account %s and blob container %s", storageAccount, blobContainerName)
 

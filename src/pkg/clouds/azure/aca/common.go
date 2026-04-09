@@ -3,6 +3,7 @@ package aca
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -150,7 +151,7 @@ func (c *ContainerApp) ResolveLogTarget(ctx context.Context, appName, revision, 
 		revision = *app.Properties.LatestRevisionName
 
 		// Opportunistically pick the container name from the app template.
-		if container == "" && app.Properties.Template != nil && len(app.Properties.Template.Containers) > 0 {
+		if container == "" && app.Properties.Template != nil && len(app.Properties.Template.Containers) > 0 && app.Properties.Template.Containers[0].Name != nil {
 			container = *app.Properties.Template.Containers[0].Name
 		}
 	}
@@ -167,10 +168,13 @@ func (c *ContainerApp) ResolveLogTarget(ctx context.Context, appName, revision, 
 		if len(list.Value) == 0 {
 			return "", "", "", fmt.Errorf("no replicas found for revision %q", revision)
 		}
+		if list.Value[0].Name == nil {
+			return "", "", "", errors.New("replica has no name")
+		}
 		replica = *list.Value[0].Name
 
 		// Opportunistically pick the container from the replica if still unset.
-		if container == "" && len(list.Value[0].Properties.Containers) > 0 {
+		if container == "" && list.Value[0].Properties != nil && len(list.Value[0].Properties.Containers) > 0 && list.Value[0].Properties.Containers[0].Name != nil {
 			container = *list.Value[0].Properties.Containers[0].Name
 		}
 	}

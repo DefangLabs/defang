@@ -26,11 +26,6 @@ func (c *ContainerInstance) containerGroupIdentity() *armcontainerinstance.Conta
 
 type ContainerGroupName = *string
 
-// safeAppend is like append but avoids mutating any aliases of the slice.
-func safeAppend[T any](slice []T, elems ...T) []T {
-	return append(slice[:len(slice):len(slice)], elems...)
-}
-
 func (c *ContainerInstance) Run(ctx context.Context, containers []*armcontainerinstance.Container, env map[string]string, args ...string) (ContainerGroupName, error) {
 	containerGroupClient, err := c.newContainerGroupClient()
 	if err != nil {
@@ -47,13 +42,19 @@ func (c *ContainerInstance) Run(ctx context.Context, containers []*armcontaineri
 	}
 
 	clone := *c.ContainerGroupProps
+	if len(containers) == 0 {
+		containers = c.ContainerGroupProps.Containers
+	}
 	clone.Containers = make([]*armcontainerinstance.Container, len(containers))
 	for i, container := range containers {
+		if container == nil || container.Properties == nil {
+			return nil, fmt.Errorf("container %d has nil properties", i)
+		}
 		newProps := *container.Properties
 		if i == 0 {
-			newProps.Command = safeAppend(newProps.Command, commandArgs...)
+			newProps.Command = append(newProps.Command, commandArgs...)
 		}
-		newProps.EnvironmentVariables = safeAppend(newProps.EnvironmentVariables, envVars...)
+		newProps.EnvironmentVariables = append(newProps.EnvironmentVariables, envVars...)
 		clone.Containers[i] = &armcontainerinstance.Container{
 			Name:       container.Name,
 			Properties: &newProps,
@@ -67,14 +68,20 @@ func (c *ContainerInstance) Run(ctx context.Context, containers []*armcontaineri
 		Identity:   c.containerGroupIdentity(),
 		Properties: &clone,
 	}
-	_, err = containerGroupClient.BeginCreateOrUpdate(ctx, c.resourceGroupName, groupName, group, nil)
+	createPoller, err := containerGroupClient.BeginCreateOrUpdate(ctx, c.resourceGroupName, groupName, group, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container group: %w", err)
 	}
+	if _, err := createPoller.PollUntilDone(ctx, nil); err != nil {
+		return nil, fmt.Errorf("failed to complete container group creation: %w", err)
+	}
 
-	_, err = containerGroupClient.BeginStart(ctx, c.resourceGroupName, groupName, nil)
+	startPoller, err := containerGroupClient.BeginStart(ctx, c.resourceGroupName, groupName, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start container group: %w", err)
+	}
+	if _, err := startPoller.PollUntilDone(ctx, nil); err != nil {
+		return nil, fmt.Errorf("failed to complete container group start: %w", err)
 	}
 
 	return &groupName, nil

@@ -52,7 +52,10 @@ func (c *ContainerInstance) CreateUploadURL(ctx context.Context, blobName string
 		if err != nil {
 			return "", err
 		}
-		storageKey = *keys.Keys[0].Value // or [1]?
+		if len(keys.Keys) == 0 || keys.Keys[0].Value == nil {
+			return "", errors.New("no storage account keys returned")
+		}
+		storageKey = *keys.Keys[0].Value
 	}
 
 	keyCred, err := azblob.NewSharedKeyCredential(c.StorageAccount, storageKey)
@@ -70,7 +73,6 @@ func (c *ContainerInstance) CreateUploadURL(ctx context.Context, blobName string
 		ExpiryTime:    expiry,
 		Permissions:   perms.String(),
 		Protocol:      sas.ProtocolHTTPS,
-		StartTime:     now,
 	}.SignWithSharedKey(keyCred)
 	if err != nil {
 		return "", err

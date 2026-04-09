@@ -2,6 +2,7 @@ package aci
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"iter"
@@ -10,6 +11,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 )
+
+const maxBlobDownloadSize = 32 * 1024 * 1024 // 32 MiB
 
 // BlobItem represents a blob in the storage account container.
 type BlobItem struct {
@@ -30,6 +33,9 @@ func (c *ContainerInstance) newSharedKeyCredential(ctx context.Context) (*azblob
 		keys, err := accountsClient.ListKeys(ctx, c.resourceGroupName, c.StorageAccount, nil)
 		if err != nil {
 			return nil, err
+		}
+		if len(keys.Keys) == 0 || keys.Keys[0].Value == nil {
+			return nil, errors.New("no storage account keys returned")
 		}
 		storageKey = *keys.Keys[0].Value
 	}
@@ -88,5 +94,5 @@ func (c *ContainerInstance) DownloadBlob(ctx context.Context, blobName string) (
 		return nil, err
 	}
 	defer resp.Body.Close()
-	return io.ReadAll(resp.Body)
+	return io.ReadAll(io.LimitReader(resp.Body, maxBlobDownloadSize))
 }

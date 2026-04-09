@@ -52,8 +52,12 @@ func (c *ContainerInstance) QueryLogs(ctx context.Context, groupName ContainerGr
 		if err != nil {
 			var respErr *azcore.ResponseError
 			if errors.As(err, &respErr) && respErr.ErrorCode == "ContainerGroupDeploymentNotReady" {
-				time.Sleep(time.Second) // Wait before retrying
-				continue                // Retry if the deployment is not ready yet
+				select {
+				case <-ctx.Done():
+					return "", ctx.Err()
+				case <-time.After(time.Second):
+					continue // Retry if the deployment is not ready yet
+				}
 			}
 			return "", fmt.Errorf("failed to list logs: %w", err)
 		}
@@ -133,8 +137,12 @@ func (c *ContainerInstance) StreamLogs(ctx context.Context, groupName ContainerG
 		if err != nil {
 			var respErr *azcore.ResponseError
 			if errors.As(err, &respErr) && respErr.ErrorCode == "ContainerNotFound" {
-				time.Sleep(time.Second) // Wait before retrying
-				continue                // Retry if the container is not found yet
+				select {
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				case <-time.After(time.Second):
+					continue // Retry if the container is not found yet
+				}
 			}
 			return nil, fmt.Errorf("failed to attach to container: %w", err)
 		}
@@ -144,10 +152,14 @@ func (c *ContainerInstance) StreamLogs(ctx context.Context, groupName ContainerG
 	header := http.Header{}
 	header.Set("Authorization", *attachResponse.Password)
 	conn, resp, err := websocket.DefaultDialer.DialContext(ctx, *attachResponse.WebSocketURI, header)
-	defer resp.Body.Close()
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to websocket (%s): %w", resp.Status, err)
+		if resp != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("failed to connect to websocket (%s): %w", resp.Status, err)
+		}
+		return nil, fmt.Errorf("failed to connect to websocket: %w", err)
 	}
+	defer resp.Body.Close()
 
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -171,6 +183,9 @@ func (c *ContainerInstance) StreamLogs(ctx context.Context, groupName ContainerG
 					}
 				}
 				return
+			}
+			if len(logLine) == 0 {
+				continue
 			}
 			stdioFd := logLine[0]
 			select {
