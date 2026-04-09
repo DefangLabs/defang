@@ -47,6 +47,39 @@ func (a *Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
 	return cfg, err
 }
 
+func (a *Aws) MakeRegionalARN(service, resourceId string) string {
+	if a.AccountID == "" {
+		panic("AWS AccountID must be set to make ARN")
+	}
+	return MakeARN(
+		"aws", // aws-cn, aws-us-gov
+		service,
+		string(a.Region),
+		a.AccountID,
+		resourceId,
+	)
+}
+
+func MakeARN(partition, service, region, accountId, resourceId string) string {
+	if partition == "" {
+		panic("partition must be set to make ARN")
+	}
+	if service == "" {
+		panic("service must be set to make ARN")
+	}
+	if resourceId == "" {
+		panic("resourceId must be set to make ARN")
+	}
+	return strings.Join([]string{
+		"arn",
+		partition,
+		service,
+		region,    // can be empty, eg. for IAM
+		accountId, // can be empty, eg. for S3
+		resourceId,
+	}, ":")
+}
+
 func LoadDefaultConfig(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
 	cfg, err := config.LoadDefaultConfig(ctx, optFns...)
 	if err != nil {

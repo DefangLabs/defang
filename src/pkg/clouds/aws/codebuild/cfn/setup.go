@@ -9,9 +9,8 @@ import (
 	"strings"
 	"time"
 
-	common "github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	awscodebuild "github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfnTypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
@@ -26,14 +25,14 @@ type AwsCfn struct {
 
 const stackTimeout = time.Minute * 3
 
-func New(stack string, region region.Region) *AwsCfn {
+func New(stack string, region aws.Region) *AwsCfn {
 	if stack == "" {
 		panic("stack must be set")
 	}
 	return &AwsCfn{
 		stackName: stack,
 		AwsCodeBuild: awscodebuild.AwsCodeBuild{
-			Aws:          common.Aws{Region: region},
+			Aws:          aws.Aws{Region: region},
 			RetainBucket: true,
 		},
 	}
@@ -227,7 +226,7 @@ func (a *AwsCfn) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) error
 	}
 
 	if a.AccountID == "" && a.LogGroupARN != "" {
-		a.AccountID = common.GetAccountID(a.LogGroupARN)
+		a.AccountID = aws.GetAccountID(a.LogGroupARN)
 	}
 	return nil
 }
