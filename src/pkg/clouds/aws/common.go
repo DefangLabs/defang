@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -21,13 +22,20 @@ type Aws struct {
 	Region      Region
 	TokenStore  tokenstore.TokenStore
 	Credentials aws.CredentialsProvider
+
+	cfgOnce sync.Once
+	cfg     aws.Config
+	cfgErr  error
 }
 
-// func (r Region) String() string {
-// 	return string(r)
-// }
-
 func (a *Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
+	a.cfgOnce.Do(func() {
+		a.cfg, a.cfgErr = a.loadConfig(ctx)
+	})
+	return a.cfg, a.cfgErr
+}
+
+func (a *Aws) loadConfig(ctx context.Context) (aws.Config, error) {
 	cfg, err := LoadDefaultConfig(ctx, config.WithRegion(string(a.Region)))
 	if err != nil {
 		return cfg, err
