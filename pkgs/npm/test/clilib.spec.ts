@@ -1,4 +1,3 @@
-import axios, {type AxiosResponse } from "axios";
 import * as chai from "chai";
 import chaiAsPromised from "chai-as-promised";
 import fs from "fs";
@@ -21,81 +20,82 @@ describe("Testing getLatestVersion()", () => {
   });
 
   it("sanity", async () => {
-    const mockResponse: AxiosResponse = {
-      status: 200,
-      data: {
-        tag_name: "v0.5.32",
-      },
-    } as AxiosResponse;
-    sandbox.stub(axios, "get").returns(Promise.resolve(mockResponse));
+    sandbox.stub(global, "fetch").resolves({
+      ok: true,
+      json: () => Promise.resolve({ tag_name: "v0.5.32" }),
+    } as unknown as Response);
 
     await expect(clilib.getLatestVersion()).to.eventually.equal("0.5.32");
   });
 
   it("bad HTTP Status", async () => {
-    const mockResponse: AxiosResponse = {
+    sandbox.stub(global, "fetch").resolves({
+      ok: false,
       status: 500,
-    } as AxiosResponse;
-    sandbox.stub(axios, "get").returns(Promise.reject(mockResponse));
+    } as Response);
 
     await expect(clilib.getLatestVersion()).to.be.rejected;
   });
 
   it("empty tag_name", async () => {
-    const mockResponse: AxiosResponse = {
-      status: 200,
-      data: {
-        tag_name: "",
-      },
-    } as AxiosResponse;
-    sandbox.stub(axios, "get").returns(Promise.resolve(mockResponse));
+    sandbox.stub(global, "fetch").resolves({
+      ok: true,
+      json: () => Promise.resolve({ tag_name: "" }),
+    } as unknown as Response);
 
-    await expect(clilib.getLatestVersion()).to.eventually.equal("");
+    await expect(clilib.getLatestVersion()).to.eventually.be.undefined;
   });
 
   it("ill-formed tag_name", async () => {
-    const mockResponse: AxiosResponse = {
-      status: 200,
-      data: {},
-    } as AxiosResponse;
-    sandbox.stub(axios, "get").returns(Promise.resolve(mockResponse));
+    sandbox.stub(global, "fetch").resolves({
+      ok: true,
+      json: () => Promise.resolve({}),
+    } as unknown as Response);
 
     await expect(clilib.getLatestVersion()).to.eventually.be.undefined;
+  });
+
+  it("non-semver tag_name", async () => {
+    sandbox.stub(global, "fetch").resolves({
+      ok: true,
+      json: () => Promise.resolve({ tag_name: "nightly-20260408" }),
+    } as unknown as Response);
+
+    await expect(clilib.getLatestVersion()).to.eventually.be.undefined;
+  });
+
+  it("tag_name with v in version string", async () => {
+    sandbox.stub(global, "fetch").resolves({
+      ok: true,
+      json: () => Promise.resolve({ tag_name: "v1.2.3-dev.4" }),
+    } as unknown as Response);
+
+    await expect(clilib.getLatestVersion()).to.eventually.equal("1.2.3-dev.4");
   });
 });
 
 describe("Testing downloadFile()", () => {
-  let axiosGetStub: sinon.SinonStub;
+  let fetchStub: sinon.SinonStub;
   let writeStub: sinon.SinonStub;
   let unlinkStub: sinon.SinonStub;
 
   let downloadFileName = "target";
   const url = "url";
-  const header = {
-    responseType: "arraybuffer",
-    headers: {
-      "Content-Type": "application/octet-stream",
-    },
-  };
-  let mockResponse: AxiosResponse;
 
   beforeEach(() => {
     sandbox = sinon.createSandbox();
 
     downloadFileName = "target";
-    mockResponse = {
-      status: 200,
-      data: {},
-    } as AxiosResponse;
 
-    axiosGetStub = sandbox
-      .stub(axios, "get")
-      .returns(Promise.resolve(mockResponse));
+    fetchStub = sandbox.stub(global, "fetch").resolves({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+    } as unknown as Response);
     writeStub = sandbox
       .stub(fs.promises, "writeFile")
       .callsFake(() => Promise.resolve());
     unlinkStub = sandbox
-      .stub(fs.promises, "unlink")
+      .stub(fs.promises, "rm")
       .callsFake(() => Promise.resolve());
   });
 
@@ -108,19 +108,19 @@ describe("Testing downloadFile()", () => {
       clilib.downloadFile(url, downloadFileName)
     ).to.eventually.equal(downloadFileName);
 
-    sinon.assert.calledWith(axiosGetStub, url, header);
-    sinon.assert.calledWith(writeStub, downloadFileName, mockResponse.data);
+    sinon.assert.calledWith(fetchStub, url);
+    sinon.assert.calledOnce(writeStub);
     sinon.assert.notCalled(unlinkStub);
   });
 
   it("download fails path", async () => {
-    axiosGetStub.returns(Promise.reject("failed"));
+    fetchStub.returns(Promise.reject("failed"));
     const targetFile = await clilib.downloadFile(url, downloadFileName);
     await expect(
       clilib.downloadFile(url, downloadFileName)
     ).to.eventually.equal(targetFile);
 
-    sinon.assert.calledWith(axiosGetStub, url, header);
+    sinon.assert.calledWith(fetchStub, url);
     sinon.assert.notCalled(writeStub);
     sinon.assert.calledWith(unlinkStub, downloadFileName);
   });
@@ -128,7 +128,7 @@ describe("Testing downloadFile()", () => {
   it("write failed", async () => {
     writeStub.returns(Promise.reject("failed"));
     await expect(clilib.downloadFile(url, downloadFileName)).to.eventually.null;
-    sinon.assert.calledWith(axiosGetStub, url, header);
+    sinon.assert.calledWith(fetchStub, url);
     sinon.assert.calledWith(unlinkStub, downloadFileName);
   });
 });
