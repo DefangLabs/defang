@@ -18,6 +18,7 @@
           mkShell {
             buildInputs = [
               azure-cli
+              actionlint
               bashInteractive # full bash with readline/completion so prompts render correctly
               crane
               git
