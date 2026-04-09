@@ -81,7 +81,7 @@ func Cmd(cmd *cobra.Command, verb string, props ...Property) {
 			P("version", cmd.Root().Version),
 		)
 		cmd.Flags().Visit(func(f *pflag.Flag) {
-			props = append(props, P(f.Name, f.Value))
+			props = append(props, P(f.Name, f.Value.String()))
 		})
 	}
 	// This was supposed to be strings.Title but that got deprecated, so now we're stuck with strings.ToTitle which makes everything uppercase. Oh well.
