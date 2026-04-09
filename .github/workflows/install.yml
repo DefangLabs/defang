@@ -7,8 +7,8 @@ on:
     branches:
       - "**"
     paths:
-      - '.github/workflows/install.yml'
-      - 'src/bin/install'
+      - ".github/workflows/install.yml"
+      - "src/bin/install"
 
 jobs:
   install:
@@ -31,3 +31,9 @@ jobs:
 
       - name: Sanity check
         run: defang --version
+
+      - name: Install with bash (nightly)
+        shell: bash
+        run: bash <(curl -fsSL s.defang.io/install) nightly
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # alt name
