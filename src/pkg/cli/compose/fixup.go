@@ -446,7 +446,9 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 	}
 
 	// Set environment variables (url and model) for any service that depends on the model
-	for _, dependency := range project.Services {
+	for name, dependency := range project.Services {
+		changed := false
+
 		if _, ok := dependency.DependsOn[svccfg.Name]; ok {
 			if dependency.Environment == nil {
 				dependency.Environment = make(composeTypes.MappingWithEquals)
@@ -461,6 +463,7 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 			if _, ok := dependency.Environment["OPENAI_API_KEY"]; !ok {
 				dependency.Environment["OPENAI_API_KEY"] = liteLLMMasterKey
 			}
+			changed = true
 		}
 
 		if modelDep, ok := dependency.Models[svccfg.Name]; ok {
@@ -492,6 +495,11 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 					Required:  true,
 				}
 			}
+			changed = true
+		}
+
+		if changed {
+			project.Services[name] = dependency
 		}
 	}
 }

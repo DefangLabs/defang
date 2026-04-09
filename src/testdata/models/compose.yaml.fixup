@@ -25,6 +25,12 @@
   },
   "modellist": {
     "command": null,
+    "depends_on": {
+      "ai_model": {
+        "condition": "service_started",
+        "required": true
+      }
+    },
     "entrypoint": null,
     "environment": {
       "AI_MODEL_MODEL": "ai/model",
@@ -41,6 +47,12 @@
   },
   "modelmap": {
     "command": null,
+    "depends_on": {
+      "ai_model": {
+        "condition": "service_started",
+        "required": true
+      }
+    },
     "entrypoint": null,
     "environment": {
       "AI_MODEL_MODEL": "ai/model",
@@ -81,6 +93,12 @@
   },
   "withendpoint": {
     "command": null,
+    "depends_on": {
+      "my_model": {
+        "condition": "service_started",
+        "required": true
+      }
+    },
     "entrypoint": null,
     "environment": {
       "MODEL_URL": "http://mock-my-model:4000/v1/",
