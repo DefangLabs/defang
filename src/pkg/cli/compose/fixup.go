@@ -372,6 +372,14 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 	urlVal := "http://" + svccfg.Name + ":" + strconv.FormatUint(uint64(liteLLMPort), 10) + "/v1/"
 	modelEnvVar := envName + "_MODEL"
 
+	resolvedModel, masterKey := configureAccessGateway(svccfg, project, model, info)
+	wireDependentServices(project, svccfg.Name, urlVal, resolvedModel, masterKey, endpointEnvVar, modelEnvVar)
+}
+
+// configureAccessGateway resolves the model name for the target provider, configures
+// the LiteLLM container (image, command, network, port), and derives LITELLM_MASTER_KEY.
+// Returns the resolved model string and the master key pointer.
+func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, model string, info *client.AccountInfo) (string, *string) {
 	// svccfg.Deploy.Resources.Reservations.Limits = &composeTypes.Resources{} TODO: avoid memory limits warning
 	if svccfg.Environment == nil {
 		svccfg.Environment = composeTypes.MappingWithEquals{}
@@ -408,8 +416,7 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 
 	// svccfg.HealthCheck = &composeTypes.ServiceHealthCheckConfig{} TODO: add healthcheck
 	svccfg.Image = "litellm/litellm:v1.82.3-stable.patch.3"
-	command := []string{"--drop_params", "--model", model, "--alias", alias}
-	svccfg.Command = command
+	svccfg.Command = []string{"--drop_params", "--model", model, "--alias", alias}
 	if svccfg.Networks == nil {
 		// New compose-go versions do not create networks for "provider:" services, so we need to create it here
 		svccfg.Networks = make(map[string]*composeTypes.ServiceNetworkConfig)
@@ -421,7 +428,7 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 	svccfg.Provider = nil // remove "provider:" because current backend will not accept it
 	project.Networks[modelProviderNetwork] = composeTypes.NetworkConfig{Name: modelProviderNetwork}
 
-	liteLLMMasterKey, exists := svccfg.Environment["LITELLM_MASTER_KEY"]
+	masterKey, exists := svccfg.Environment["LITELLM_MASTER_KEY"]
 	if !exists {
 		openAIKey := ""
 		for _, service := range project.Services {
@@ -438,18 +445,23 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 		}
 		if openAIKey == "" {
 			key := "networkisalreadyprivate"
-			liteLLMMasterKey = &key
+			masterKey = &key
 		} else {
-			liteLLMMasterKey = &openAIKey
+			masterKey = &openAIKey
 		}
-		svccfg.Environment["LITELLM_MASTER_KEY"] = liteLLMMasterKey
+		svccfg.Environment["LITELLM_MASTER_KEY"] = masterKey
 	}
 
-	// Set environment variables (url and model) for any service that depends on the model
+	return model, masterKey
+}
+
+// wireDependentServices injects URL, model, and API-key env vars and adds the
+// model-provider network to every service that depends on svcName.
+func wireDependentServices(project *composeTypes.Project, svcName, urlVal, model string, masterKey *string, endpointEnvVar, modelEnvVar string) {
 	for name, dependency := range project.Services {
 		changed := false
 
-		if _, ok := dependency.DependsOn[svccfg.Name]; ok {
+		if _, ok := dependency.DependsOn[svcName]; ok {
 			if dependency.Environment == nil {
 				dependency.Environment = make(composeTypes.MappingWithEquals)
 			}
@@ -461,12 +473,12 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 				dependency.Environment[modelEnvVar] = &model
 			}
 			if _, ok := dependency.Environment["OPENAI_API_KEY"]; !ok {
-				dependency.Environment["OPENAI_API_KEY"] = liteLLMMasterKey
+				dependency.Environment["OPENAI_API_KEY"] = masterKey
 			}
 			changed = true
 		}
 
-		if modelDep, ok := dependency.Models[svccfg.Name]; ok {
+		if modelDep, ok := dependency.Models[svcName]; ok {
 			endpointVar := endpointEnvVar
 			if modelDep != nil && modelDep.EndpointVariable != "" {
 				endpointVar = modelDep.EndpointVariable
@@ -486,11 +498,11 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 				dependency.Environment[modelVar] = &model
 			}
 			// If the model is not already declared as a dependency, add it
-			if _, ok := dependency.DependsOn[svccfg.Name]; !ok {
+			if _, ok := dependency.DependsOn[svcName]; !ok {
 				if dependency.DependsOn == nil {
 					dependency.DependsOn = make(map[string]composeTypes.ServiceDependency)
 				}
-				dependency.DependsOn[svccfg.Name] = composeTypes.ServiceDependency{
+				dependency.DependsOn[svcName] = composeTypes.ServiceDependency{
 					Condition: composeTypes.ServiceConditionStarted,
 					Required:  true,
 				}
