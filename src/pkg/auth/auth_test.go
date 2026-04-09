@@ -227,9 +227,9 @@ func TestPollForAuthCode(t *testing.T) {
 func TestPoll_ContextDone(t *testing.T) {
 	for _, name := range []string{"context.Canceled", "context.DeadlineExceeded"} {
 		t.Run(name, func(t *testing.T) {
-			calls := 0
+			var calls atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				calls++
+				calls.Add(1)
 				http.Error(w, "server error", http.StatusInternalServerError)
 			}))
 			t.Cleanup(server.Close)
@@ -254,8 +254,8 @@ func TestPoll_ContextDone(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error for done context")
 			}
-			if calls > 1 {
-				t.Errorf("Poll must not retry with done context, got %d server calls", calls)
+			if calls.Load() > 1 {
+				t.Errorf("Poll must not retry with done context, got %d server calls", calls.Load())
 			}
 		})
 	}
