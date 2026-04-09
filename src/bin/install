@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 #######################################################################################
 #                                                                                     #
 # This script installs the latest release of Defang from GitHub. It is designed       #
@@ -12,8 +12,8 @@
 # Pin to a specific version using DEFANG_INSTALL_VERSION or:                          #
 #                                                                                     #
 # bash <(curl -fsSL s.defang.io/install) 3.5.2                                        #
-# bash <(curl -fsSL s.defang.io/install) v3.5.2                                       #
-# bash <(curl -fsSL s.defang.io/install) nightly                                      #
+# curl -fsSL s.defang.io/install | sh -s -- v3.5.2                                    #
+# curl -fsSL s.defang.io/install | bash -s -- nightly                                 #
 #                                                                                     #
 #######################################################################################
 
@@ -35,23 +35,23 @@ echo "\
 
 # Parse arguments: [-y] [version]
 for _arg in "$@"; do
-    if [[ "$_arg" == "-y" ]]; then
-        REPLY="y" # TODO: this will fail in Fish shell
+    if [ "$_arg" = "-y" ]; then
+        REPLY="y"
         CI="1"
-    elif [[ -z "$DEFANG_INSTALL_VERSION" ]]; then
+    elif [ -z "$DEFANG_INSTALL_VERSION" ]; then
         DEFANG_INSTALL_VERSION="$_arg"
     fi
 done
 
-if [[ "$CI" == "1" ]] || [[ "$CI" == "true" ]]; then
+if [ "$CI" = "1" ] || [ "$CI" = "true" ]; then
     REPLY="y"
     CI="1"
 fi
 
 # check if DEFANG_INSTALL_VERSION is set and set the release path accordingly
-if [[ -z "$DEFANG_INSTALL_VERSION" ]]; then
+if [ -z "$DEFANG_INSTALL_VERSION" ]; then
     RELEASE_PATH="latest"
-elif [[ "$DEFANG_INSTALL_VERSION" == "nightly" ]]; then
+elif [ "$DEFANG_INSTALL_VERSION" = "nightly" ]; then
     RELEASE_PATH="tags/nightly"
 else
     RELEASE_PATH="tags/v${DEFANG_INSTALL_VERSION#v}"
@@ -60,16 +60,16 @@ fi
 # Anonymous API request to GitHub are rate limited to 60 requests per hour.
 # Check whether the user has set a GitHub token to increase the rate limit.
 AUTH_HEADER=""
-if [[ -n "$GITHUB_TOKEN" ]]; then
+if [ -n "$GITHUB_TOKEN" ]; then
     AUTH_HEADER="Authorization: Bearer $GITHUB_TOKEN"
-elif [[ -n "$GH_TOKEN" ]]; then
+elif [ -n "$GH_TOKEN" ]; then
     AUTH_HEADER="Authorization: Bearer $GH_TOKEN"
 fi
 
 # Echo fetching the release path either latest or the version
 echo "Fetching the ${RELEASE_PATH#tags/} release of defang..."
 # Download the release information from GitHub, using the token if available, but falling back to anonymous access
-RELEASE_JSON=$([[ -n "$AUTH_HEADER" ]] &&
+RELEASE_JSON=$([ -n "$AUTH_HEADER" ] &&
     curl -fsSL -H "$AUTH_HEADER" https://api.github.com/repos/DefangLabs/defang/releases/$RELEASE_PATH ||
     curl -fsSL https://api.github.com/repos/DefangLabs/defang/releases/$RELEASE_PATH)
 
@@ -200,27 +200,32 @@ _prompt_and_append_to_file() {
     echo
     echo "  $line"
     echo
-    if [[ "$CI" != "1" ]]; then
+    if [ "$CI" != "1" ]; then
         # Prompt the user for confirmation
-        echo -n "$prompt $profile_file? (y/n) "
+        printf "%s %s? (y/n) " "$prompt" "$profile_file"
         read REPLY
         echo    # move to a new line
     fi
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        # Append the line to the profile file
-        echo >> "$profile_file"
-        echo "$line # Added by Defang install" >> "$profile_file"
-    else
-        # Print the command for the user to run manually
-        echo "To manually add the required line, run the following command:"
-        echo
-        echo "  echo '$line' >> \"$profile_file\""
-        echo
-    fi
+    case "$REPLY" in
+        [Yy])
+            # Append the line to the profile file
+            echo >> "$profile_file"
+            echo "$line # Added by Defang install" >> "$profile_file"
+            ;;
+        *)
+            # Print the command for the user to run manually
+            echo "To manually add the required line, run the following command:"
+            echo
+            echo "  echo '$line' >> \"$profile_file\""
+            echo
+            ;;
+    esac
 }
 
 # Add the installation directory to PATH if not already present
-if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+case ":$PATH:" in
+    *":$INSTALL_DIR:"*) ;;
+    *)
     echo "Adding $INSTALL_DIR to your PATH for this session."
     export PATH="$PATH:$INSTALL_DIR"
 
@@ -231,20 +236,21 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
     FOUND_PROFILE_FILE=false
     for CURRENT_SHELL in bash zsh ksh; do
         # If the profile file exists in the user's home directory, add a line to it
-        if [[ -f "$HOME/.${CURRENT_SHELL}rc" ]]; then
+        if [ -f "$HOME/.${CURRENT_SHELL}rc" ]; then
             FOUND_PROFILE_FILE=true
             _prompt_and_append_to_file "Can we append the necessary line to" "$HOME/.${CURRENT_SHELL}rc" "$EXPORT_PATH"
         fi
     done
 
     # If no profile file was found
-    if [[ $FOUND_PROFILE_FILE == false ]]; then
+    if [ "$FOUND_PROFILE_FILE" = false ]; then
         # Get the name of the current shell
         CURRENT_SHELL="$(basename "${SHELL:-$0}")"
         # Prompt the user to create a new profile file
         _prompt_and_append_to_file "No existing profile file found. Can we create" "$HOME/.${CURRENT_SHELL}rc" "$EXPORT_PATH"
     fi
-fi
+    ;;
+esac
 
 # Usage: _generate_completion_script "shell" "path/to/completion/_script"
 _generate_completion_script() {
@@ -262,7 +268,7 @@ _install_completion_script() {
     case $shell in
         bash)
             _generate_completion_script $shell "$HOME/.local/share/bash-completion.d/defang" || return 11
-            if [[ -z "$BASH_COMPLETION_VERSINFO" ]]; then
+            if [ -z "$BASH_COMPLETION_VERSINFO" ]; then
                 echo "Warning: bash completions require package bash-completion to be installed."
                 return 14
             fi
@@ -270,9 +276,10 @@ _install_completion_script() {
             ;;
         zsh)
             _generate_completion_script $shell "$HOME/.local/share/zsh/site-functions/_defang" || return 12
-            if [[ ":$FPATH:" != *":$HOME/.local/share/zsh/site_functions:"* ]]; then
-                _prompt_and_append_to_file "Can we add shell completions to" "$HOME/$profile_file" "fpath=(\$HOME/.local/share/zsh/site-functions \$fpath)"
-            fi
+            case ":$FPATH:" in
+                *":$HOME/.local/share/zsh/site_functions:"*) ;;
+                *) _prompt_and_append_to_file "Can we add shell completions to" "$HOME/$profile_file" "fpath=(\$HOME/.local/share/zsh/site-functions \$fpath)" ;;
+            esac
             ;;
         *) return 13 ;;
     esac
@@ -280,7 +287,7 @@ _install_completion_script() {
 
 _install_completion_script $SHELL || true
 CURRENT_SHELL=${0#-}
-[[ $CURRENT_SHELL != $SHELL ]] && _install_completion_script $CURRENT_SHELL || true
+[ "$CURRENT_SHELL" != "$SHELL" ] && _install_completion_script $CURRENT_SHELL || true
 
 # Cleanup: Remove the temporary directory
 echo "Cleaning up..."
