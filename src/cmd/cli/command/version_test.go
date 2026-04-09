@@ -75,4 +75,17 @@ func TestVersion(t *testing.T) {
 			t.Fatalf("Version() failed: %v", err)
 		}
 	})
+
+	t.Run("json", func(t *testing.T) {
+		mockService := &mockFabricService{}
+		_, handler := defangv1connect.NewFabricControllerHandler(mockService)
+
+		server := httptest.NewServer(handler)
+		t.Cleanup(server.Close)
+
+		err := testCommand(t, []string{"version", "--json"}, server.URL)
+		if err != nil {
+			t.Fatalf("Version() --json failed: %v", err)
+		}
+	})
 }

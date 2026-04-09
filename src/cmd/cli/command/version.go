@@ -42,15 +42,29 @@ var versionCmd = &cobra.Command{
 	Aliases: []string{"ver", "stat", "status"}, // for backwards compatibility
 	Short:   "Get version information for the CLI and Fabric service",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
+		cliVersion := GetCurrentVersion()
+
+		if global.Json {
+			latestVersion, err := github.GetLatestReleaseTag(ctx)
+			fabricVersion, err2 := cli.GetVersion(ctx, global.Client)
+			info := struct {
+				CLI    string `json:"cli"`
+				Latest string `json:"latest,omitempty"`
+				Fabric string `json:"fabric,omitempty"`
+			}{cliVersion, latestVersion, fabricVersion}
+			return errors.Join(err, err2, term.Table(info))
+		}
+
 		term.Printc(term.BrightCyan, "Defang CLI:    ")
-		term.Println(GetCurrentVersion())
+		term.Println(cliVersion)
 
 		term.Printc(term.BrightCyan, "Latest CLI:    ")
-		ver, err := github.GetLatestReleaseTag(cmd.Context())
+		ver, err := github.GetLatestReleaseTag(ctx)
 		term.Println(ver)
 
 		term.Printc(term.BrightCyan, "Defang Fabric: ")
-		ver, err2 := cli.GetVersion(cmd.Context(), global.Client)
+		ver, err2 := cli.GetVersion(ctx, global.Client)
 		term.Println(ver)
 		return errors.Join(err, err2)
 	},
