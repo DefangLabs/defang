@@ -212,10 +212,12 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		term.Warn("Unable to update deployment history; deployment will proceed anyway.")
 	}
 
-	if term.DoDebug() {
-		term.Println("Project:", project.Name)
-		for _, serviceInfo := range resp.Services {
-			PrintObject(serviceInfo.Service.Name, serviceInfo)
+	term.Debugf("Project: %s", project.Name)
+	for _, serviceInfo := range resp.Services {
+		if b, err := MarshalPretty(serviceInfo.Service.Name, serviceInfo); err != nil {
+			term.Debugf("MarshalPretty error: %v", err)
+		} else {
+			term.Debug(string(b))
 		}
 	}
 	return resp.DeployResponse, project, nil
