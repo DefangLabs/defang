@@ -100,10 +100,18 @@ var originalLocal = time.Local
 
 // SetUTCMode sets the local time zone to UTC.
 func SetUTCMode(enable bool) {
+	// The conditional guards avoid writing to time.Local when it already has
+	// the correct value; this prevents a data race with stdlib reads (e.g.
+	// time.Now) that we cannot synchronize because the read side is a plain
+	// load inside the Go runtime, eg. net/http.(*conn).setState()
 	if enable {
-		time.Local = time.UTC
+		if time.Local != time.UTC {
+			time.Local = time.UTC
+		}
 	} else {
-		time.Local = originalLocal
+		if time.Local != originalLocal {
+			time.Local = originalLocal
+		}
 	}
 }
 
