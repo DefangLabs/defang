@@ -47,7 +47,7 @@ func makeStackNewCmd() *cobra.Command {
 				}
 			}
 
-			loader := configureLoader(cmd)
+			loader := configureLoaderForCommand(cmd)
 			projectName, _, err := loader.LoadProjectName(ctx)
 			if err != nil {
 				return err
