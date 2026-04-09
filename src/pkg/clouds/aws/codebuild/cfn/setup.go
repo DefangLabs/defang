@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
@@ -21,6 +22,8 @@ import (
 type AwsCfn struct {
 	awscodebuild.AwsCodeBuild
 	stackName string
+	fillOnce  sync.Once
+	fillErr   error
 }
 
 const stackTimeout = time.Minute * 3
@@ -182,6 +185,13 @@ func (a *AwsCfn) upsertStackAndWait(ctx context.Context, templateBody []byte, fo
 type ErrStackNotFoundException = cfnTypes.StackNotFoundException
 
 func (a *AwsCfn) FillOutputs(ctx context.Context) error {
+	a.fillOnce.Do(func() {
+		a.fillErr = a.describeAndFillOutputs(ctx)
+	})
+	return a.fillErr
+}
+
+func (a *AwsCfn) describeAndFillOutputs(ctx context.Context) error {
 	cfn, err := a.newClient(ctx)
 	if err != nil {
 		return err
