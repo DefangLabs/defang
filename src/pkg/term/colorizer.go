@@ -68,7 +68,7 @@ func NewTerm(stdin FileReader, stdout, stderr io.Writer) *Term {
 	return t
 }
 
-func (t Term) Stdio() (FileReader, termenv.File, io.Writer) {
+func (t *Term) Stdio() (FileReader, termenv.File, io.Writer) {
 	return t.stdin, t.out.TTY(), t.err
 }
 
