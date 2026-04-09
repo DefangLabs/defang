@@ -275,9 +275,18 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 							cancel() // cancel the tail context
 						case 10, 13: // Enter or Return
 							term.Println(" ") // empty line, but overwrite the spinner
+						case 'd', 'D':
+							debug := !term.DoDebug()
+							term.SetDebug(debug)
+							debugStr := "OFF"
+							if debug {
+								debugStr = "ON"
+							}
+							term.Info("Debug mode", debugStr)
+							track.Evt("Debug Toggled", P("debug", debug))
 						case 'v', 'V':
 							verbose := !options.Verbose
-							options.Verbose = verbose
+							options.Verbose = verbose // FIXME: race
 							modeStr := "OFF"
 							if verbose {
 								modeStr = "ON"

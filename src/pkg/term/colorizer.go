@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync/atomic"
 
 	"github.com/muesli/termenv"
 	"golang.org/x/term"
@@ -16,7 +17,7 @@ type Term struct {
 	stdin          FileReader
 	stdout, stderr io.Writer
 	out, err       *termenv.Output
-	debug          bool
+	debug          atomic.Bool
 	json           bool
 
 	isTerminal bool
@@ -82,7 +83,7 @@ func (t *Term) ForceColor(color bool) {
 }
 
 func (t *Term) SetDebug(debug bool) {
-	t.debug = debug
+	t.debug.Store(debug)
 }
 
 func (t *Term) SetJSON(json bool) {
@@ -93,7 +94,7 @@ func (t *Term) SetJSON(json bool) {
 }
 
 func (t *Term) DoDebug() bool {
-	return t.debug
+	return t.debug.Load()
 }
 
 func (t *Term) HasDarkBackground() bool {
@@ -211,14 +212,14 @@ func (t *Term) Printf(format string, v ...any) (int, error) {
 }
 
 func (t *Term) Debug(v ...any) (int, error) {
-	if !t.debug {
+	if !t.DoDebug() {
 		return 0, nil
 	}
 	return output(t.err, DebugColor, ensurePrefix(debugPrefix, fmt.Sprintln(v...)))
 }
 
 func (t *Term) Debugf(format string, v ...any) (int, error) {
-	if !t.debug {
+	if !t.DoDebug() {
 		return 0, nil
 	}
 	return output(t.err, DebugColor, ensureNewline(ensurePrefix(debugPrefix, fmt.Sprintf(format, v...))))
