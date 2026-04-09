@@ -7,11 +7,11 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
-	common "github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	awscodebuild "github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfnTypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
@@ -22,18 +22,20 @@ import (
 type AwsCfn struct {
 	awscodebuild.AwsCodeBuild
 	stackName string
+	fillOnce  sync.Once
+	fillErr   error
 }
 
 const stackTimeout = time.Minute * 3
 
-func New(stack string, region region.Region) *AwsCfn {
+func New(stack string, region aws.Region) *AwsCfn {
 	if stack == "" {
 		panic("stack must be set")
 	}
 	return &AwsCfn{
 		stackName: stack,
 		AwsCodeBuild: awscodebuild.AwsCodeBuild{
-			Aws:          common.Aws{Region: region},
+			Aws:          aws.Aws{Region: region},
 			RetainBucket: true,
 		},
 	}
@@ -183,6 +185,13 @@ func (a *AwsCfn) upsertStackAndWait(ctx context.Context, templateBody []byte, fo
 type ErrStackNotFoundException = cfnTypes.StackNotFoundException
 
 func (a *AwsCfn) FillOutputs(ctx context.Context) error {
+	a.fillOnce.Do(func() {
+		a.fillErr = a.describeAndFillOutputs(ctx)
+	})
+	return a.fillErr
+}
+
+func (a *AwsCfn) describeAndFillOutputs(ctx context.Context) error {
 	cfn, err := a.newClient(ctx)
 	if err != nil {
 		return err
@@ -227,7 +236,7 @@ func (a *AwsCfn) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) error
 	}
 
 	if a.AccountID == "" && a.LogGroupARN != "" {
-		a.AccountID = common.GetAccountID(a.LogGroupARN)
+		a.AccountID = aws.GetAccountID(a.LogGroupARN)
 	}
 	return nil
 }
