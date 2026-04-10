@@ -84,7 +84,7 @@ func paramsFromMap(variables map[string]string) (*Parameters, error) {
 	}, nil
 }
 
-var StackNamePattern = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
+var stackNamePattern = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
 
 const (
 	DefaultBeta = "beta"
@@ -261,7 +261,7 @@ func PrintCreateMessage(stackName string) {
 }
 
 func ValidateStackName(val string) error {
-	if !StackNamePattern.MatchString(val) {
+	if !stackNamePattern.MatchString(val) {
 		return errors.New("Value must be alphanumeric and start with a letter")
 	}
 	return nil
