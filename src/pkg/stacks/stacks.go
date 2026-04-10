@@ -142,9 +142,21 @@ func CreateInDirectory(workingDirectory string, params Parameters) (string, erro
 	return filename, nil
 }
 
+func (p *Parameters) Account() string {
+	switch p.Provider {
+	case client.ProviderAWS:
+		return p.Variables["AWS_PROFILE"]
+	case client.ProviderGCP:
+		return p.Variables["GCP_PROJECT_ID"]
+	default:
+		return ""
+	}
+}
+
 // for shell printing for converting to string format of StackParameters
 type ListItem struct {
 	Parameters
+	Account    string
 	Default    bool
 	DeployedAt time.Time
 }
@@ -179,6 +191,7 @@ func ListInDirectory(workingDirectory string) ([]ListItem, error) {
 		}
 		stacks = append(stacks, ListItem{
 			Parameters: *params,
+			Account:    params.Account(),
 		})
 	}
 
