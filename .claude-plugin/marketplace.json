@@ -20,7 +20,15 @@
       "repository": "https://github.com/DefangLabs/defang",
       "license": "Apache-2.0",
       "category": "infrastructure",
-      "keywords": ["deploy", "cloud", "aws", "gcp", "digitalocean", "docker", "compose"]
+      "keywords": [
+        "deploy",
+        "cloud",
+        "aws",
+        "gcp",
+        "digitalocean",
+        "docker",
+        "compose"
+      ]
     }
   ]
 }

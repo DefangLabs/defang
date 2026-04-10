@@ -1,4 +1,5 @@
 ---
+name: deploy
 description: Deploy the current project to the cloud using Defang. Guides through CLI setup, authentication, compose file creation, stack selection, config management, and deployment.
 ---
 
@@ -11,8 +12,6 @@ Run `defang --version` to confirm the CLI is installed. If it is not found, inst
 - npm: `npm install -g @defang-io/defang`
 - Homebrew: `brew install DefangLabs/defang/defang`
 - curl: `eval "$(curl -fsSL s.defang.io/install)"`
-
-If you installed defang for the first time, run `/reload-plugins` to activate the Defang MCP server.
 
 ## Step 2: Authenticate
 
