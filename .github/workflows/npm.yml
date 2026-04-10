@@ -1,0 +1,30 @@
+name: NPM package
+
+on:
+  push:
+    branches:
+      - "**"
+    paths:
+      - ".github/workflows/npm.yml"
+      - "pkgs/npm/**"
+
+permissions:
+  contents: read
+
+jobs:
+  npm-build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Install node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        with:
+          node-version: "24"
+
+      - name: Build and test npm package
+        working-directory: ./pkgs/npm
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+          npm test
