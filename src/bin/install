@@ -42,6 +42,7 @@ for _arg in "$@"; do
         DEFANG_INSTALL_VERSION="$_arg"
     fi
 done
+unset _arg
 
 if [ "$CI" = "1" ] || [ "$CI" = "true" ]; then
     REPLY="y"
@@ -277,7 +278,7 @@ _install_completion_script() {
         zsh)
             _generate_completion_script $shell "$HOME/.local/share/zsh/site-functions/_defang" || return 12
             case ":$FPATH:" in
-                *":$HOME/.local/share/zsh/site_functions:"*) ;;
+                *":$HOME/.local/share/zsh/site-functions:"*) ;;
                 *) _prompt_and_append_to_file "Can we add shell completions to" "$HOME/$profile_file" "fpath=(\$HOME/.local/share/zsh/site-functions \$fpath)" ;;
             esac
             ;;
