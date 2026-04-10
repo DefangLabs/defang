@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git ls-remote:*)",
+      "Bash(sort:*)",
+      "Bash(docker pull:*)"
+    ]
+  }
+}

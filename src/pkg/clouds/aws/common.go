@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -21,13 +22,20 @@ type Aws struct {
 	Region      Region
 	TokenStore  tokenstore.TokenStore
 	Credentials aws.CredentialsProvider
+
+	cfgOnce sync.Once
+	cfg     aws.Config
+	cfgErr  error
 }
 
-// func (r Region) String() string {
-// 	return string(r)
-// }
-
 func (a *Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
+	a.cfgOnce.Do(func() {
+		a.cfg, a.cfgErr = a.loadConfig(ctx)
+	})
+	return a.cfg, a.cfgErr
+}
+
+func (a *Aws) loadConfig(ctx context.Context) (aws.Config, error) {
 	cfg, err := LoadDefaultConfig(ctx, config.WithRegion(string(a.Region)))
 	if err != nil {
 		return cfg, err
@@ -45,6 +53,39 @@ func (a *Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
 		a.AccountID = *output.Account
 	}
 	return cfg, err
+}
+
+func (a *Aws) MakeRegionalARN(service, resourceId string) string {
+	if a.AccountID == "" {
+		panic("AWS AccountID must be set to make ARN")
+	}
+	return MakeARN(
+		"aws", // aws-cn, aws-us-gov
+		service,
+		string(a.Region),
+		a.AccountID,
+		resourceId,
+	)
+}
+
+func MakeARN(partition, service, region, accountId, resourceId string) string {
+	if partition == "" {
+		panic("partition must be set to make ARN")
+	}
+	if service == "" {
+		panic("service must be set to make ARN")
+	}
+	if resourceId == "" {
+		panic("resourceId must be set to make ARN")
+	}
+	return strings.Join([]string{
+		"arn",
+		partition,
+		service,
+		region,    // can be empty, eg. for IAM
+		accountId, // can be empty, eg. for S3
+		resourceId,
+	}, ":")
 }
 
 func LoadDefaultConfig(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {

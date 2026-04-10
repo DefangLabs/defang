@@ -84,7 +84,7 @@ func paramsFromMap(variables map[string]string) (*Parameters, error) {
 	}, nil
 }
 
-var validStackName = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
+var stackNamePattern = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
 
 const (
 	DefaultBeta = "beta"
@@ -100,8 +100,8 @@ func CreateInDirectory(workingDirectory string, params Parameters) (string, erro
 	if params.Name == "" {
 		return "", errors.New("stack name cannot be empty")
 	}
-	if !validStackName.MatchString(params.Name) {
-		return "", errors.New("stack name must start with a letter and contain only lowercase letters and numbers")
+	if err := ValidateStackName(params.Name); err != nil {
+		return "", err
 	}
 
 	content, err := Marshal(&params)
@@ -200,6 +200,9 @@ func RemoveInDirectory(workingDirectory, name string) error {
 	if name == "" {
 		return errors.New("stack name cannot be empty")
 	}
+	if err := ValidateStackName(name); err != nil {
+		return err
+	}
 	path := filename(workingDirectory, name)
 	// delete the stack file
 	return os.Remove(path)
@@ -255,4 +258,11 @@ func PrintCreateMessage(stackName string) {
 			"To learn more about stacks, visit https://s.defang.io/stacks\n",
 		stackName,
 	)
+}
+
+func ValidateStackName(val string) error {
+	if !stackNamePattern.MatchString(val) {
+		return errors.New("Value must be alphanumeric and start with a letter")
+	}
+	return nil
 }

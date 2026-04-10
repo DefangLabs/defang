@@ -20,20 +20,20 @@ jobs:
   go-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
 
       - name: Sanitize branch name for artifact
         id: branch
-        run: echo "name=$(echo '${{ github.ref_name }}' | tr '/' '-')" >> $GITHUB_OUTPUT
+        run: echo "name=$(echo '${{ github.ref_name }}' | tr '/' '-')" >> "$GITHUB_OUTPUT"
 
       - name: Run Go unit tests
-        run: go test -test.short -v -coverprofile=coverage.out -covermode=atomic ./...
+        run: go test -race -test.short -v -coverprofile=coverage.out -covermode=atomic ./...
         working-directory: src
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # to avoid GH rate limits
@@ -43,7 +43,7 @@ jobs:
         working-directory: src
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: coverage-${{ steps.branch.outputs.name }}
           path: src/coverage.txt
@@ -51,7 +51,7 @@ jobs:
 
       - name: Download main branch coverage
         if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v')
-        uses: dawidd6/action-download-artifact@1f8785ff7a5130826f848e7f72725c85d241860f
+        uses: dawidd6/action-download-artifact@8305c0f1062bb0d184d09ef4493ecb9288447732 # v20
         with:
           workflow: go.yml
           branch: main
@@ -115,10 +115,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v26
+        uses: cachix/install-nix-action@616559265b40713947b9c190a8ff4b507b5df49b # v31
         with:
           nix_path: nixpkgs=channel:nixos-unstable
 
@@ -128,7 +128,7 @@ jobs:
         run: |
           set -o pipefail
           make test-nix 2>&1 | tee /tmp/nix-test-output.log
-          exit ${PIPESTATUS[0]}
+          exit "${PIPESTATUS[0]}"
 
       - name: Update vendorHash if needed
         if: steps.nix-test.outcome == 'failure'
@@ -196,16 +196,16 @@ jobs:
   #         role-chaining: true
   #         role-to-assume: arn:aws:iam::426819183542:role/admin # adminUserRoleArn from defang-io/bootstrap stack
 
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
   #     - name: Set up Go
-  #       uses: actions/setup-go@v5
+  #       uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
   #       with:
   #         go-version-file: src/go.mod
   #         cache-dependency-path: src/go.sum
 
   #     - name: Run sanity tests
-  #       run: go run ./cmd/cli -C testdata/sanity compose up --debug
+  #       run: go run -race ./cmd/cli -C testdata/sanity compose up --debug
   #       working-directory: src
 
   go-playground-test:
@@ -214,36 +214,36 @@ jobs:
     env:
       COMPOSE_PROJECT_NAME: ${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
 
       - name: Login using GitHub token
-        run: go run ./cmd/cli login --debug
+        run: go run -race ./cmd/cli login --debug
         working-directory: src
 
       - name: Add dummy config
         id: add-dummy-config
-        run: echo blah | go run ./cmd/cli -C testdata/sanity config set --provider=defang -n dummy --debug
+        run: echo blah | go run -race ./cmd/cli -C testdata/sanity config set --provider=defang -n dummy --debug
         working-directory: src
 
       - name: Run sanity tests UP
         continue-on-error: true # until we have multi-project support in playground
-        run: go run ./cmd/cli -C testdata/sanity compose up --provider=defang --debug
+        run: go run -race ./cmd/cli -C testdata/sanity compose up --provider=defang --debug
         working-directory: src
 
       - name: Run sanity tests DOWN
         continue-on-error: true # until we have multi-project support in playground
-        run: go run ./cmd/cli -C testdata/sanity compose down --provider=defang --detach --debug
+        run: go run -race ./cmd/cli -C testdata/sanity compose down --provider=defang --detach --debug
         working-directory: src
 
       - name: Remove dummy config
         if: steps.add-dummy-config.conclusion == 'success' # only clean up if the config was added
-        run: go run ./cmd/cli -C testdata/sanity config rm --provider=defang -n dummy --debug
+        run: go run -race ./cmd/cli -C testdata/sanity config rm --provider=defang -n dummy --debug
         working-directory: src
 
   build-and-sign:
@@ -257,10 +257,10 @@ jobs:
       GOCACHE: 'D:\golang\cache'
       GOMODCACHE: 'D:\golang\modcache'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
@@ -270,7 +270,7 @@ jobs:
         working-directory: src
 
       - name: Install GoReleaser Pro
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
         with:
           distribution: goreleaser-pro
           install-only: true
@@ -293,14 +293,14 @@ jobs:
 
       # From https://github.com/Azure/trusted-signing-action/pull/37
       - name: Azure login
-        uses: azure/login@v2
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Trusted Signing
-        uses: Azure/trusted-signing-action@v0.3.20
+        uses: Azure/trusted-signing-action@b443cf8ea4124818d2ea9f043cba29fc3ec47b16 # v1.2.0
         with:
           endpoint: https://wus2.codesigning.azure.net/ # from Azure portal
           trusted-signing-account-name: DefangLabs # from Azure portal
@@ -335,7 +335,7 @@ jobs:
         working-directory: src\dist\windows
 
       - name: Upload dist-win folder
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: dist-win
           path: src/dist
@@ -348,10 +348,10 @@ jobs:
     needs: go-test
     runs-on: macos-latest # for codesign and notarytool
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
@@ -361,7 +361,7 @@ jobs:
       #   working-directory: src
 
       - name: Run GoReleaser (macOS)
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
         with:
           distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
@@ -379,7 +379,7 @@ jobs:
           MACOS_NOTARIZATION_APP_PW: ${{ secrets.MACOS_NOTARIZATION_APP_PW }}
 
       - name: Upload dist-mac folder
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: dist-mac
           path: src/dist
@@ -396,21 +396,21 @@ jobs:
     permissions:
       contents: write # to upload archives as GitHub Releases
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0 # for release notes
 
       - name: Install Nix (for nix-prefetch-url)
-        uses: cachix/install-nix-action@v26
+        uses: cachix/install-nix-action@616559265b40713947b9c190a8ff4b507b5df49b # v31
 
       - name: Download dist-mac folder
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: dist-mac
           path: src/dist
 
       - name: Download dist-win folder
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: dist-win
           path: src/dist
@@ -419,13 +419,13 @@ jobs:
         run: ls -lR src/dist
 
       - name: Set up Go # not sure why this is needed for release
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
         with:
           distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
@@ -446,19 +446,19 @@ jobs:
     needs:
       - go-release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Set up QEMU (for multi-arch builds)
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
 
       - name: Build and push Docker images and manifests
         working-directory: src
@@ -469,7 +469,7 @@ jobs:
     environment: release
     steps:
       - name: Trigger CLI Autodoc
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4
         with:
           token: ${{ secrets.DOCS_ACTION_TRIGGER_TOKEN }}
           repository: DefangLabs/defang-docs
@@ -477,7 +477,7 @@ jobs:
           client-payload: '{"version": "${{ github.ref_name }}"}'
 
       - name: Trigger Homebrew Formula Update
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4
         with:
           token: ${{ secrets.HOMEBREW_ACTION_TRIGGER_TOKEN }}
           repository: DefangLabs/homebrew-defang
@@ -485,12 +485,12 @@ jobs:
           client-payload: '{"version": "${{ github.ref_name }}"}'
 
       - name: Checkout tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Install node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
-          node-version: "20" # same as the version in flake.nix
+          node-version: "24" # same as the version in flake.nix
           registry-url: https://registry.npmjs.org
 
       - name: Build npm package
@@ -498,11 +498,12 @@ jobs:
         working-directory: ./pkgs/npm
         run: |
           # Get version number without the 'v'
-          export version_number=`echo "${{ github.ref_name }}" | cut -c2- `
+          version_number=$(echo "${{ github.ref_name }}" | cut -c2-)
+          export version_number
 
           echo "Setting version number to ${version_number}"
           # update version placeholder in package.json with version matching binary.
-          npm version ${version_number}
+          npm version "${version_number}" --no-git-tag-version
 
           # install dependencies
           npm ci --ignore-scripts
@@ -522,7 +523,7 @@ jobs:
     needs: [go-release, post-release, nix-shell-test, push-docker]
     steps:
       - name: Slack Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           MSG_MINIMAL: actions url
           SLACK_COLOR: failure

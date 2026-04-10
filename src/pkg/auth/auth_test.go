@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -76,9 +77,9 @@ func TestPoll(t *testing.T) {
 	})
 
 	t.Run("5xx retries until context cancelled", func(t *testing.T) {
-		calls := 0
+		var calls atomic.Int32
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			calls++
+			calls.Add(1)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 		}))
 		t.Cleanup(server.Close)
@@ -87,22 +88,22 @@ func TestPoll(t *testing.T) {
 		OpenAuthClient = NewClient("test", server.URL)
 		t.Cleanup(func() { OpenAuthClient = orig })
 
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
 		defer cancel()
 
 		_, err := Poll(ctx, "state")
 		if err == nil {
 			t.Error("expected error after context cancellation")
 		}
-		if calls < 2 {
+		if calls.Load() < 2 {
 			t.Error("expected server to be called at least twice")
 		}
 	})
 
 	t.Run("408 retries until context cancelled", func(t *testing.T) {
-		calls := 0
+		var calls atomic.Int32
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			calls++
+			calls.Add(1)
 			w.WriteHeader(http.StatusRequestTimeout)
 		}))
 		t.Cleanup(server.Close)
@@ -118,15 +119,15 @@ func TestPoll(t *testing.T) {
 		if err == nil {
 			t.Error("expected error after context cancellation")
 		}
-		if calls < 2 {
-			t.Errorf("expected at least 2 calls for timeout retries, got %d", calls)
+		if calls.Load() < 2 {
+			t.Errorf("expected at least 2 calls for timeout retries, got %d", calls.Load())
 		}
 	})
 
 	t.Run("4xx does not retry", func(t *testing.T) {
-		calls := 0
+		var calls atomic.Int32
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			calls++
+			calls.Add(1)
 			http.Error(w, "bad request", http.StatusBadRequest)
 		}))
 		t.Cleanup(server.Close)
@@ -139,8 +140,8 @@ func TestPoll(t *testing.T) {
 		if err == nil {
 			t.Error("expected error for 4xx response")
 		}
-		if calls != 1 {
-			t.Errorf("expected exactly 1 call (no retry for 4xx), got %d", calls)
+		if calls.Load() != 1 {
+			t.Errorf("expected exactly 1 call (no retry for 4xx), got %d", calls.Load())
 		}
 	})
 }
@@ -226,9 +227,9 @@ func TestPollForAuthCode(t *testing.T) {
 func TestPoll_ContextDone(t *testing.T) {
 	for _, name := range []string{"context.Canceled", "context.DeadlineExceeded"} {
 		t.Run(name, func(t *testing.T) {
-			calls := 0
+			var calls atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				calls++
+				calls.Add(1)
 				http.Error(w, "server error", http.StatusInternalServerError)
 			}))
 			t.Cleanup(server.Close)
@@ -253,8 +254,8 @@ func TestPoll_ContextDone(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error for done context")
 			}
-			if calls > 1 {
-				t.Errorf("Poll must not retry with done context, got %d server calls", calls)
+			if calls.Load() > 1 {
+				t.Errorf("Poll must not retry with done context, got %d server calls", calls.Load())
 			}
 		})
 	}
