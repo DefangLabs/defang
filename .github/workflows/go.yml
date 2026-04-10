@@ -33,7 +33,7 @@ jobs:
         run: echo "name=$(echo '${{ github.ref_name }}' | tr '/' '-')" >> "$GITHUB_OUTPUT"
 
       - name: Run Go unit tests
-        run: go test -test.short -v -coverprofile=coverage.out -covermode=atomic ./...
+        run: go test -race -test.short -v -coverprofile=coverage.out -covermode=atomic ./...
         working-directory: src
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # to avoid GH rate limits
@@ -51,7 +51,7 @@ jobs:
 
       - name: Download main branch coverage
         if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v')
-        uses: dawidd6/action-download-artifact@1f8785ff7a5130826f848e7f72725c85d241860f # v18
+        uses: dawidd6/action-download-artifact@8305c0f1062bb0d184d09ef4493ecb9288447732 # v20
         with:
           workflow: go.yml
           branch: main
@@ -118,7 +118,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Install Nix
-        uses: cachix/install-nix-action@e4f4bde15728394ded896ef07491a85f2eb24956 # v31
+        uses: cachix/install-nix-action@616559265b40713947b9c190a8ff4b507b5df49b # v31
         with:
           nix_path: nixpkgs=channel:nixos-unstable
 
@@ -205,7 +205,7 @@ jobs:
   #         cache-dependency-path: src/go.sum
 
   #     - name: Run sanity tests
-  #       run: go run ./cmd/cli -C testdata/sanity compose up --debug
+  #       run: go run -race ./cmd/cli -C testdata/sanity compose up --debug
   #       working-directory: src
 
   go-playground-test:
@@ -223,27 +223,27 @@ jobs:
           cache-dependency-path: src/go.sum
 
       - name: Login using GitHub token
-        run: go run ./cmd/cli login --debug
+        run: go run -race ./cmd/cli login --debug
         working-directory: src
 
       - name: Add dummy config
         id: add-dummy-config
-        run: echo blah | go run ./cmd/cli -C testdata/sanity config set --provider=defang -n dummy --debug
+        run: echo blah | go run -race ./cmd/cli -C testdata/sanity config set --provider=defang -n dummy --debug
         working-directory: src
 
       - name: Run sanity tests UP
         continue-on-error: true # until we have multi-project support in playground
-        run: go run ./cmd/cli -C testdata/sanity compose up --provider=defang --debug
+        run: go run -race ./cmd/cli -C testdata/sanity compose up --provider=defang --debug
         working-directory: src
 
       - name: Run sanity tests DOWN
         continue-on-error: true # until we have multi-project support in playground
-        run: go run ./cmd/cli -C testdata/sanity compose down --provider=defang --detach --debug
+        run: go run -race ./cmd/cli -C testdata/sanity compose down --provider=defang --detach --debug
         working-directory: src
 
       - name: Remove dummy config
         if: steps.add-dummy-config.conclusion == 'success' # only clean up if the config was added
-        run: go run ./cmd/cli -C testdata/sanity config rm --provider=defang -n dummy --debug
+        run: go run -race ./cmd/cli -C testdata/sanity config rm --provider=defang -n dummy --debug
         working-directory: src
 
   build-and-sign:
@@ -270,7 +270,7 @@ jobs:
         working-directory: src
 
       - name: Install GoReleaser Pro
-        uses: goreleaser/goreleaser-action@9a127d869fb706213d29cdf8eef3a4ea2b869415 # v7
+        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
         with:
           distribution: goreleaser-pro
           install-only: true
@@ -293,7 +293,7 @@ jobs:
 
       # From https://github.com/Azure/trusted-signing-action/pull/37
       - name: Azure login
-        uses: azure/login@2dd0bbf4064d5a1812889dc200bb8eed2597f82a # v3
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -361,7 +361,7 @@ jobs:
       #   working-directory: src
 
       - name: Run GoReleaser (macOS)
-        uses: goreleaser/goreleaser-action@9a127d869fb706213d29cdf8eef3a4ea2b869415 # v7
+        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
         with:
           distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
@@ -401,7 +401,7 @@ jobs:
           fetch-depth: 0 # for release notes
 
       - name: Install Nix (for nix-prefetch-url)
-        uses: cachix/install-nix-action@e4f4bde15728394ded896ef07491a85f2eb24956 # v31
+        uses: cachix/install-nix-action@616559265b40713947b9c190a8ff4b507b5df49b # v31
 
       - name: Download dist-mac folder
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -425,7 +425,7 @@ jobs:
           cache-dependency-path: src/go.sum
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@9a127d869fb706213d29cdf8eef3a4ea2b869415 # v7
+        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
         with:
           distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
@@ -523,7 +523,7 @@ jobs:
     needs: [go-release, post-release, nix-shell-test, push-docker]
     steps:
       - name: Slack Notification
-        uses: rtCamp/action-slack-notify@cdf0a2130cbcdfd82ba5fcac8e076370bf381b36 # v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           MSG_MINIMAL: actions url
           SLACK_COLOR: failure

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,6 +16,7 @@ var (
 	StateDir  = filepath.Join(stateDir, "defang")
 	statePath = filepath.Join(StateDir, "state.json")
 	state     State
+	stateOnce sync.Once
 )
 
 type State struct {
@@ -30,6 +32,12 @@ func initState(path string) State {
 		state.write(path)
 	}
 	return state
+}
+
+func ensureState() {
+	stateOnce.Do(func() {
+		state = initState(statePath)
+	})
 }
 
 func (state State) write(path string) error {
@@ -52,14 +60,16 @@ func (state State) termsAccepted() bool {
 }
 
 func GetAnonID() string {
-	state = initState(statePath)
+	ensureState()
 	return state.AnonID
 }
 
 func AcceptTerms() error {
+	ensureState()
 	return state.acceptTerms()
 }
 
 func TermsAccepted() bool {
+	ensureState()
 	return state.termsAccepted()
 }
