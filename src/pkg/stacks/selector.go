@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
@@ -144,10 +145,19 @@ func stackLabelParts(stacks []ListItem) [][]string {
 		if !s.DeployedAt.IsZero() {
 			deployedAt = "last deployed " + s.DeployedAt.Format("Jan 2 2006")
 		}
+		provider := s.Provider
+		account := ""
+		switch provider {
+		case client.ProviderAWS:
+			account, _ = s.Variables["AWS_PROFILE"]
+		case client.ProviderGCP:
+			account, _ = s.Variables["GCP_PROJECT_ID"]
+		}
 		parts := []string{
 			s.Name,
-			s.Provider.String(),
+			provider.String(),
 			s.Region,
+			account,
 			deployedAt,
 		}
 		partsList = append(partsList, parts)
