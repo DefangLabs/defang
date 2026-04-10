@@ -599,6 +599,13 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 				term.Warnf("missing defang-service label in instance group manager %v", managerName)
 				return nil, nil
 			}
+			if etag != "" {
+				labelEtag := labels["defang-etag"]
+				if labelEtag != etag {
+					term.Warnf("skipping instance group manager %v: etag mismatch (got %q, want %q)", managerName, labelEtag, etag)
+					return nil, nil
+				}
+			}
 			rootTriggerId := entry.GetLabels()["compute.googleapis.com/root_trigger_id"]
 			if rootTriggerId == "" {
 				term.Warnf("missing root_trigger_id in audit log for instance group manager %v", path.Base(auditLog.GetResourceName()))
