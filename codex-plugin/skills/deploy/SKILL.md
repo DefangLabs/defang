@@ -41,7 +41,8 @@ defang stack new
 ```
 
 Required parameters:
-- **Name**: alphanumeric, cannot start with a number (e.g., `my-app-prod`)
+
+- **Name**: alphanumeric, cannot start with a number (e.g., `production`)
 - **Provider**: `aws`, `gcp`, or `digitalocean`
 - **Region**: e.g., `us-east-1` (AWS), `us-central1` (GCP)
 - **Deployment Mode**: controls cost and resiliency
@@ -86,6 +87,7 @@ defang compose up
 ```
 
 Useful flags:
+
 - `-d` / `--detach`: return immediately without streaming logs
 - `--force`: force a fresh image build even if nothing changed
 - `--mode affordable|balanced|high_availability`: override the stack's deployment mode
