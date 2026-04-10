@@ -62,7 +62,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 
 	go func() {
 		wg.Wait()
-		pkg.SleepWithContext(ctx, 2*time.Second) // a delay before cancelling tail to make sure we get last status messages
+		pkg.SleepWithContext(ctx, 6*time.Second) // a delay before cancelling tail to make sure we get last log messages
 		cancelTail(errMonitoringDone)            // cancel the tail when both goroutines are done
 	}()
 

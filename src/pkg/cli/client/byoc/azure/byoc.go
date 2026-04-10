@@ -1,0 +1,574 @@
+package azure
+
+import (
+	"bytes"
+	"context"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"io"
+	"iter"
+	"net/http"
+	"os"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerinstance/armcontainerinstance/v2"
+	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	cloudazure "github.com/DefangLabs/defang/src/pkg/clouds/azure"
+	"github.com/DefangLabs/defang/src/pkg/clouds/azure/aca"
+	"github.com/DefangLabs/defang/src/pkg/clouds/azure/aci"
+	"github.com/DefangLabs/defang/src/pkg/clouds/azure/appcfg"
+	defanghttp "github.com/DefangLabs/defang/src/pkg/http"
+	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+type ByocAzure struct {
+	*byoc.ByocBaseClient
+
+	driver           *aci.ContainerInstance
+	appCfg           *appcfg.AppConfiguration
+	cdContainerGroup aci.ContainerGroupName
+	cdDeploymentID   string
+}
+
+var _ client.Provider = (*ByocAzure)(nil)
+
+func NewByocProvider(ctx context.Context, tenantLabel types.TenantLabel, stack string) *ByocAzure {
+	b := &ByocAzure{
+		driver: aci.NewContainerInstance("defang-cd", ""), // default location => from AZURE_LOCATION env var
+	}
+	b.ByocBaseClient = byoc.NewByocBaseClient(tenantLabel, b, stack)
+	return b
+}
+
+func (b *ByocAzure) Driver() string {
+	return "azure"
+}
+
+// SetUpCD implements client.Provider.
+func (b *ByocAzure) SetUpCD(context.Context, bool) error {
+	// return fmt.Errorf("SetUpCD: %w", errors.ErrUnsupported)
+	term.Debugf("SetUpCD: no-op for Azure; CD environment will be set up on demand during Deploy")
+	return nil
+}
+
+// CdCommand implements byoc.ProjectBackend.
+func (b *ByocAzure) CdCommand(ctx context.Context, req client.CdCommandRequest) (*client.CdCommandResponse, error) {
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
+	etag := pkg.RandomID()
+	envMap, err := b.buildCdEnv(req.Project)
+	if err != nil {
+		return nil, err
+	}
+	containers := b.cdContainers()
+	taskID, err := b.driver.Run(ctx, containers, envMap, "/app/cd", string(req.Command))
+	if err != nil {
+		return nil, err
+	}
+	b.cdContainerGroup = taskID
+	b.cdDeploymentID = etag
+	return &client.CdCommandResponse{
+		CdId:   *taskID,
+		CdType: defangv1.CdType_CD_TYPE_AZURE_ACI_JOBID,
+		ETag:   etag,
+	}, nil
+}
+
+// CdList implements byoc.ProjectBackend.
+func (b *ByocAzure) CdList(ctx context.Context, _ bool) (iter.Seq[state.Info], error) {
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
+
+	blobs, err := b.driver.IterateBlobs(ctx, ".pulumi/stacks/")
+	if err != nil {
+		return nil, err
+	}
+
+	return func(yield func(state.Info) bool) {
+		for item, err := range blobs {
+			if err != nil {
+				term.Debugf("Error iterating blobs: %v", err)
+				return
+			}
+			st, err := state.ParsePulumiStateFile(ctx, item, b.driver.BlobContainerName, func(ctx context.Context, _, blobName string) ([]byte, error) {
+				return b.driver.DownloadBlob(ctx, blobName)
+			})
+			if err != nil {
+				term.Debugf("Skipping %q: %v", item.Name(), err)
+				continue
+			}
+			if st == nil {
+				continue
+			}
+			if !yield(state.Info{
+				Project:   st.Project,
+				Stack:     st.Name,
+				Workspace: string(st.Workspace),
+				CdRegion:  b.driver.Location.String(),
+			}) {
+				return
+			}
+		}
+	}, nil
+}
+
+// AccountInfo implements client.Provider.
+func (b *ByocAzure) AccountInfo(context.Context) (*client.AccountInfo, error) {
+	return &client.AccountInfo{
+		AccountID: b.driver.SubscriptionID,
+		Provider:  client.ProviderAzure,
+		Region:    b.driver.Location.String(),
+	}, nil
+}
+
+// CreateUploadURL implements client.Provider.
+func (b *ByocAzure) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
+
+	url, err := b.driver.CreateUploadURL(ctx, req.Digest)
+	if err != nil {
+		return nil, err
+	}
+
+	return &defangv1.UploadURLResponse{
+		Url: url,
+	}, nil
+}
+
+// Delete implements client.Provider.
+func (b *ByocAzure) Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
+	return nil, fmt.Errorf("Delete: %w", errors.ErrUnsupported)
+}
+
+// DeleteConfig implements client.Provider.
+func (b *ByocAzure) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
+	if err := b.setUp(ctx); err != nil {
+		return err
+	}
+	for _, name := range secrets.Names {
+		key := b.StackDir(secrets.Project, name)
+		term.Debugf("Deleting App Configuration key %q", key)
+		if err := b.appCfg.DeleteSetting(ctx, key); err != nil {
+			return fmt.Errorf("failed to delete config %q: %w", name, err)
+		}
+	}
+	return nil
+}
+
+func (b *ByocAzure) setUp(ctx context.Context) error {
+	// Lazily initialize location from AZURE_LOCATION env var (set by LoadStackEnv from the stack file).
+	// Azure SDK does not natively support AZURE_LOCATION, so we handle it ourselves.
+	if b.driver.Location == "" {
+		loc := cloudazure.Location(os.Getenv("AZURE_LOCATION"))
+		if loc == "" {
+			return errors.New("AZURE_LOCATION is not set; please ensure your stack includes the Azure region")
+		}
+		b.driver.SetLocation(loc)
+	}
+	// Similarly, AZURE_SUBSCRIPTION_ID may be set by LoadStackEnv after construction.
+	if b.driver.SubscriptionID == "" {
+		b.driver.SubscriptionID = os.Getenv("AZURE_SUBSCRIPTION_ID")
+	}
+	if err := b.driver.SetUpResourceGroup(ctx); err != nil {
+		return err
+	}
+
+	b.driver.ContainerGroupProps = &armcontainerinstance.ContainerGroupPropertiesProperties{
+		OSType:        to.Ptr(armcontainerinstance.OperatingSystemTypesLinux), // TODO: from Platform
+		RestartPolicy: to.Ptr(armcontainerinstance.ContainerGroupRestartPolicyNever),
+	}
+	if username := os.Getenv("DOCKERHUB_USERNAME"); username != "" {
+		b.driver.ContainerGroupProps.ImageRegistryCredentials = append(b.driver.ContainerGroupProps.ImageRegistryCredentials, &armcontainerinstance.ImageRegistryCredential{
+			Server:   to.Ptr("index.docker.io"),
+			Username: to.Ptr(username),
+			Password: to.Ptr(pkg.Getenv("DOCKERHUB_TOKEN", os.Getenv("DOCKERHUB_PASSWORD"))),
+		})
+	}
+
+	if _, err := b.driver.SetUpStorageAccount(ctx); err != nil {
+		return fmt.Errorf("failed to set up storage account: %w", err)
+	}
+	if err := b.driver.SetUpManagedIdentity(ctx); err != nil {
+		return fmt.Errorf("failed to set up managed identity: %w", err)
+	}
+
+	b.appCfg = appcfg.New(b.driver.ResourceGroupName(), b.driver.Location, b.driver.SubscriptionID)
+	if err := b.appCfg.SetUp(ctx); err != nil {
+		return fmt.Errorf("failed to set up App Configuration store: %w", err)
+	}
+	return nil
+}
+
+// buildCdEnv returns the environment map that every CD container run needs.
+func (b *ByocAzure) buildCdEnv(projectName string) (map[string]string, error) {
+	defangStateUrl := fmt.Sprintf(`azblob://%s?storage_account=%s`, b.driver.BlobContainerName, b.driver.StorageAccount)
+	pulumiBackendKey, pulumiBackendValue, err := byoc.GetPulumiBackend(defangStateUrl)
+	if err != nil {
+		return nil, err
+	}
+	env := map[string]string{
+		"AZURE_LOCATION":             b.driver.Location.String(),
+		"AZURE_SUBSCRIPTION_ID":      b.driver.SubscriptionID,
+		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"),
+		"DEFANG_JSON":                os.Getenv("DEFANG_JSON"),
+		"DEFANG_ORG":                 string(b.TenantLabel),
+		"DEFANG_PREFIX":              b.Prefix,
+		"DEFANG_STATE_URL":           defangStateUrl,
+		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
+		"PROJECT":                    projectName,
+		pulumiBackendKey:             pulumiBackendValue,          // TODO: make secret
+		"PULUMI_CONFIG_PASSPHRASE":   byoc.PulumiConfigPassphrase, // TODO: make secret
+		"PULUMI_COPILOT":             "false",
+		"PULUMI_SKIP_UPDATE_CHECK":   "true",
+		"STACK":                      b.PulumiStack,
+	}
+	if !term.StdoutCanColor() {
+		env["NO_COLOR"] = "1"
+	}
+	return env, nil
+}
+
+// cdContainers returns the container definition for the CD runner.
+func (b *ByocAzure) cdContainers() []*armcontainerinstance.Container {
+	return []*armcontainerinstance.Container{
+		{
+			Name: to.Ptr("defang-cd"),
+			Properties: &armcontainerinstance.ContainerProperties{
+				Image: to.Ptr(b.CDImage),
+				Resources: &armcontainerinstance.ResourceRequirements{
+					Requests: &armcontainerinstance.ResourceRequests{
+						CPU:        to.Ptr(2.0),
+						MemoryInGB: to.Ptr(8.0),
+					},
+				},
+			},
+		},
+	}
+}
+
+// Deploy implements client.Provider.
+func (b *ByocAzure) Deploy(ctx context.Context, req *client.DeployRequest) (*client.DeployResponse, error) {
+	return b.deploy(ctx, req, "up")
+}
+
+func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb string) (*client.DeployResponse, error) {
+	if b.CDImage == "" {
+		return nil, errors.New("CD image is not set; please set the DEFANG_CD_IMAGE environment variable")
+	}
+
+	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
+	project, err := compose.LoadFromContent(ctx, req.Compose, "")
+	if err != nil {
+		return nil, err
+	}
+
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
+
+	etag := pkg.RandomID()
+	serviceInfos, err := b.GetServiceInfos(ctx, project.Name, req.DelegateDomain, etag, project.Services)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := proto.Marshal(&defangv1.ProjectUpdate{
+		CdVersion: b.CDImage,
+		Compose:   req.Compose,
+		Services:  serviceInfos,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	envMap, err := b.buildCdEnv(project.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	var payload string
+	if len(data) < 1000 {
+		payload = base64.StdEncoding.EncodeToString(data)
+	} else {
+		uploadURL, err := b.driver.CreateUploadURL(ctx, etag)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := defanghttp.PutWithHeader(ctx, uploadURL, http.Header{
+			"Content-Type":   []string{"application/protobuf"},
+			"x-ms-blob-type": []string{"BlockBlob"},
+		}, bytes.NewReader(data))
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 && resp.StatusCode != 201 {
+			return nil, fmt.Errorf("unexpected status code during upload: %s", resp.Status)
+		}
+		payload = defanghttp.RemoveQueryParam(uploadURL) // managed identity provides blob read access
+	}
+
+	// Allow local debug run when DEFANG_PULUMI_DIR is set; returns ErrLocalPulumiStopped when run locally.
+	// if err := byoc.DebugPulumiNodeJS(ctx, env, verb, payload); err != nil {
+	// 	return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, err
+	// }
+
+	taskID, err := b.driver.Run(ctx, b.cdContainers(), envMap, "/app/cd", verb, payload)
+	if err != nil {
+		return nil, err
+	}
+	b.cdContainerGroup = taskID
+	b.cdDeploymentID = etag
+	return &client.DeployResponse{
+		CdId:   *taskID,
+		CdType: defangv1.CdType_CD_TYPE_AZURE_ACI_JOBID,
+		DeployResponse: &defangv1.DeployResponse{
+			Etag: etag, Services: serviceInfos,
+		},
+	}, nil
+}
+
+// // Destroy implements client.Provider.
+// func (b *ByocAzure) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error) {
+// 	return b.CdCommand(ctx, client.CdCommandRequest{
+// 		Command: client.CdCommandDestroy,
+// 		Project: req.Project,
+// 	})
+// }
+
+// GetDeploymentStatus implements client.Provider.
+func (b *ByocAzure) GetDeploymentStatus(ctx context.Context) (bool, error) {
+	done, err := b.driver.GetContainerGroupStatus(ctx, b.cdContainerGroup)
+	if err != nil {
+		return done, client.ErrDeploymentFailed{Message: err.Error()}
+	}
+	return done, nil
+}
+
+// GetPrivateDomain implements byoc.ProjectBackend.
+func (b *ByocAzure) GetPrivateDomain(projectName string) string {
+	return b.GetProjectLabel(projectName) + ".internal"
+}
+
+// GetProjectUpdate implements byoc.ProjectBackend.
+func (b *ByocAzure) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
+	if projectName == "" {
+		return nil, client.ErrNotExist
+	}
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
+
+	path := b.GetProjectUpdatePath(projectName)
+	term.Debug("Getting project update from blob:", b.driver.BlobContainerName, path)
+	pbBytes, err := b.driver.DownloadBlob(ctx, path)
+	if err != nil {
+		var respErr *azcore.ResponseError
+		if errors.As(err, &respErr) && respErr.StatusCode == 404 {
+			return nil, client.ErrNotExist // no services yet
+		}
+		return nil, err
+	}
+
+	var projUpdate defangv1.ProjectUpdate
+	if err := proto.Unmarshal(pbBytes, &projUpdate); err != nil {
+		return nil, err
+	}
+	return &projUpdate, nil
+}
+
+// GetService implements client.Provider.
+func (b *ByocAzure) GetService(context.Context, *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
+	return nil, fmt.Errorf("GetService: %w", errors.ErrUnsupported)
+}
+
+// GetServices implements client.Provider.
+func (b *ByocAzure) GetServices(context.Context, *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
+	return nil, fmt.Errorf("GetServices: %w", errors.ErrUnsupported)
+}
+
+// ListConfig implements client.Provider.
+func (b *ByocAzure) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
+	prefix := b.StackDir(req.Project, "")
+	term.Debugf("Listing App Configuration keys with prefix %q", prefix)
+	names, err := b.appCfg.ListSettings(ctx, prefix)
+	if err != nil {
+		return nil, err
+	}
+	return &defangv1.Secrets{Names: names}, nil
+}
+
+// PrepareDomainDelegation implements client.Provider.
+func (b *ByocAzure) PrepareDomainDelegation(context.Context, client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
+	return nil, nil // TODO: implement domain delegation for Azure
+}
+
+// Preview implements client.Provider.
+func (b *ByocAzure) Preview(ctx context.Context, req *client.DeployRequest) (*client.DeployResponse, error) {
+	return b.deploy(ctx, req, "preview")
+}
+
+// PutConfig implements client.Provider.
+func (b *ByocAzure) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
+	if err := b.setUp(ctx); err != nil {
+		return err
+	}
+	key := b.StackDir(req.Project, req.Name)
+	term.Debugf("Putting App Configuration key %q", key)
+	return b.appCfg.PutSetting(ctx, key, req.Value)
+}
+
+// QueryLogs implements client.Provider.
+// Only CD container logs are supported; service logs are not yet implemented.
+func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
+	// Match the request etag to the stored CD etag so we tail the correct container group instance.
+	if b.cdContainerGroup == nil || (req.Etag != "" && req.Etag != b.cdDeploymentID) {
+		return nil, fmt.Errorf("QueryLogs: no matching CD deployment for etag %q", req.Etag)
+	}
+
+	const cdContainerName = "defang-cd"
+	etag := b.cdDeploymentID
+
+	if req.Follow {
+		cdCh, err := b.driver.PollLogs(ctx, b.cdContainerGroup, cdContainerName)
+		if err != nil {
+			return nil, err
+		}
+
+		acaClient := &aca.ContainerApp{
+			Azure:         b.driver.Azure,
+			ResourceGroup: b.driver.ResourceGroupName(),
+		}
+		acaCh := acaClient.WatchLogs(ctx)
+
+		return func(yield func(*defangv1.TailResponse, error) bool) {
+			for {
+				select {
+				case entry, ok := <-cdCh:
+					if !ok {
+						cdCh = nil
+						continue
+					}
+					if entry.Err != nil {
+						if !yield(nil, entry.Err) {
+							return
+						}
+						continue
+					}
+					if !yield(&defangv1.TailResponse{
+						Entries: []*defangv1.LogEntry{{
+							Message:   entry.Message,
+							Stderr:    entry.Stderr,
+							Service:   cdContainerName,
+							Etag:      etag,
+							Timestamp: timestamppb.New(entry.Time),
+						}},
+						Service: cdContainerName,
+						Etag:    etag,
+					}, nil) {
+						return
+					}
+				case svc, ok := <-acaCh:
+					if !ok {
+						acaCh = nil
+						continue
+					}
+					if svc.Err != nil {
+						term.Debugf("Container Apps log error for %q: %v", svc.AppName, svc.Err)
+						continue
+					}
+					if !yield(&defangv1.TailResponse{
+						Entries: []*defangv1.LogEntry{{
+							Message:   svc.Message,
+							Service:   svc.AppName,
+							Etag:      etag,
+							Timestamp: timestamppb.Now(),
+						}},
+						Service: svc.AppName,
+						Etag:    etag,
+					}, nil) {
+						return
+					}
+				case <-ctx.Done():
+					return
+				}
+				if cdCh == nil && acaCh == nil {
+					return
+				}
+			}
+		}, nil
+	}
+
+	// Non-follow: return current log snapshot via ACI ListLogs.
+	content, err := b.driver.QueryLogs(ctx, b.cdContainerGroup, cdContainerName)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return nil, err
+	}
+	return func(yield func(*defangv1.TailResponse, error) bool) {
+		if content == "" {
+			return
+		}
+		yield(&defangv1.TailResponse{
+			Entries: []*defangv1.LogEntry{{
+				Message:   content,
+				Service:   cdContainerName,
+				Etag:      etag,
+				Timestamp: timestamppb.Now(),
+			}},
+			Service: cdContainerName,
+			Etag:    etag,
+		}, nil)
+	}, nil
+}
+
+// RemoteProjectName implements client.Provider.
+// Subtle: this method shadows the method (*ByocBaseClient).RemoteProjectName of ByocAzure.ByocBaseClient.
+func (b *ByocAzure) RemoteProjectName(context.Context) (string, error) {
+	return "", fmt.Errorf("RemoteProjectName: %w", errors.ErrUnsupported)
+}
+
+// ServiceDNS implements client.Provider.
+// Subtle: this method shadows the method (*ByocBaseClient).ServiceDNS of ByocAzure.ByocBaseClient.
+func (b *ByocAzure) ServiceDNS(host string) string {
+	return host
+}
+
+// Subscribe implements client.Provider.
+func (b *ByocAzure) Subscribe(context.Context, *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {
+	// return nil, fmt.Errorf("Subscribe: %w", errors.ErrUnsupported)
+	return func(yield func(*defangv1.SubscribeResponse, error) bool) {
+		// TODO: Implement subscription to deployment events for Azure
+	}, nil
+}
+
+// TearDown implements client.Provider.
+func (b *ByocAzure) TearDown(ctx context.Context) error {
+	return b.driver.TearDown(ctx)
+}
+
+// TearDownCD implements client.Provider.
+func (b *ByocAzure) TearDownCD(context.Context) error {
+	return fmt.Errorf("TearDownCD: %w", errors.ErrUnsupported)
+}
+
+// UpdateShardDomain implements client.DNSResolver.
+func (b *ByocAzure) UpdateShardDomain(context.Context) error {
+	return fmt.Errorf("UpdateShardDomain: %w", errors.ErrUnsupported)
+}

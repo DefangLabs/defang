@@ -11,11 +11,11 @@ type ProviderID string
 
 const (
 	ProviderAuto   ProviderID = "auto"
-	ProviderDefang ProviderID = "defang"
 	ProviderAWS    ProviderID = "aws"
+	ProviderAzure  ProviderID = "azure"
+	ProviderDefang ProviderID = "defang"
 	ProviderDO     ProviderID = "digitalocean"
 	ProviderGCP    ProviderID = "gcp"
-	// ProviderAzure  ProviderID = "azure"
 )
 
 var allProviders = []ProviderID{
@@ -24,7 +24,7 @@ var allProviders = []ProviderID{
 	ProviderAWS,
 	ProviderDO,
 	ProviderGCP,
-	// ProviderAzure,
+	ProviderAzure,
 }
 
 func AllProviders() []ProviderID {
@@ -39,10 +39,12 @@ func (p ProviderID) Name() string {
 	switch p {
 	case ProviderAuto:
 		return "Auto"
-	case ProviderDefang:
-		return "Defang Playground"
 	case ProviderAWS:
 		return "AWS"
+	case ProviderAzure:
+		return "Azure"
+	case ProviderDefang:
+		return "Defang Playground"
 	case ProviderDO:
 		return "DigitalOcean"
 	case ProviderGCP:
@@ -54,10 +56,12 @@ func (p ProviderID) Name() string {
 
 func (p ProviderID) Value() defangv1.Provider {
 	switch p {
-	case ProviderDefang:
-		return defangv1.Provider_DEFANG
 	case ProviderAWS:
 		return defangv1.Provider_AWS
+	case ProviderAzure:
+		return defangv1.Provider_AZURE
+	case ProviderDefang:
+		return defangv1.Provider_DEFANG
 	case ProviderDO:
 		return defangv1.Provider_DIGITALOCEAN
 	case ProviderGCP:
@@ -80,10 +84,12 @@ func (p *ProviderID) Set(str string) error {
 
 func (p *ProviderID) SetValue(val defangv1.Provider) {
 	switch val {
-	case defangv1.Provider_DEFANG:
-		*p = ProviderDefang
 	case defangv1.Provider_AWS:
 		*p = ProviderAWS
+	case defangv1.Provider_AZURE:
+		*p = ProviderAzure
+	case defangv1.Provider_DEFANG:
+		*p = ProviderDefang
 	case defangv1.Provider_DIGITALOCEAN:
 		*p = ProviderDO
 	case defangv1.Provider_GCP:

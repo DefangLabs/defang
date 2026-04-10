@@ -143,6 +143,16 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 			}
 			params.Variables["GCP_PROJECT_ID"] = projectID
 		}
+	case client.ProviderAzure:
+		if params.Variables["AZURE_SUBSCRIPTION_ID"] == "" {
+			subscriptionID, err := w.ec.RequestString(ctx, "What is your Azure Subscription ID?:", "azure_subscription_id",
+				elicitations.WithDefault(os.Getenv("AZURE_SUBSCRIPTION_ID")),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to elicit Azure Subscription ID: %w", err)
+			}
+			params.Variables["AZURE_SUBSCRIPTION_ID"] = subscriptionID
+		}
 	}
 
 	return params, nil
