@@ -164,6 +164,73 @@ func TestMakeAccessGatewayServiceLiteLLMMasterKey(t *testing.T) {
 	})
 }
 
+func TestFixupLLM(t *testing.T) {
+	tests := []struct {
+		name          string
+		image         string
+		existingPorts []composeTypes.ServicePortConfig
+		wantPort      bool
+	}{
+		{
+			name:     "registry with port and tag adds litellm port",
+			image:    "registry.example:5000/litellm:latest",
+			wantPort: true,
+		},
+		{
+			name:     "registry with port and no tag adds litellm port",
+			image:    "registry.example:5000/litellm",
+			wantPort: true,
+		},
+		{
+			name:     "standard registry with path and tag adds litellm port",
+			image:    "ghcr.io/berriai/litellm:main-latest",
+			wantPort: true,
+		},
+		{
+			name:     "image with digest adds litellm port",
+			image:    "ghcr.io/berriai/litellm@sha256:abc123",
+			wantPort: true,
+		},
+		{
+			name:     "non-litellm image does not add port",
+			image:    "registry.example:5000/other:tag",
+			wantPort: false,
+		},
+		{
+			name:  "litellm image with existing ports does not add port",
+			image: "ghcr.io/berriai/litellm:main-latest",
+			existingPorts: []composeTypes.ServicePortConfig{
+				{Target: 8080, Mode: Mode_HOST, Protocol: Protocol_TCP},
+			},
+			wantPort: false,
+		},
+		{
+			name:     "bare image name without slash does not match",
+			image:    "litellm:latest",
+			wantPort: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := composeTypes.ServiceConfig{
+				Name:  "llm",
+				Image: tt.image,
+				Ports: tt.existingPorts,
+			}
+			fixupLLM(&svc)
+			if tt.wantPort {
+				require.Len(t, svc.Ports, 1)
+				assert.Equal(t, liteLLMPort, svc.Ports[0].Target)
+				assert.Equal(t, Mode_HOST, svc.Ports[0].Mode)
+				assert.Equal(t, Protocol_TCP, svc.Ports[0].Protocol)
+			} else {
+				assert.Equal(t, tt.existingPorts, svc.Ports)
+			}
+		})
+	}
+}
+
 func TestModelWithProvider(t *testing.T) {
 	assert.Equal(t, "bedrock/my-model", modelWithProvider("my-model", "bedrock"))
 	assert.Equal(t, "bedrock/my-model", modelWithProvider("bedrock/my-model", "bedrock"))

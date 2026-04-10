@@ -236,8 +236,19 @@ func parsePortString(port string) (uint32, error) {
 const liteLLMPort uint32 = 4000
 
 func fixupLLM(svccfg *composeTypes.ServiceConfig) {
-	image := GetImageRepo(svccfg.Image)
-	if strings.HasSuffix(image, "/litellm") && len(svccfg.Ports) == 0 {
+	// Strip tag/digest: only remove the suffix after ':' or '@' if it appears after the last '/'
+	// so that a registry port (e.g. registry.example:5000/litellm:latest) is handled correctly.
+	// Check '@' before ':' so that digest refs (name@sha256:hex) are cut at the '@', not inside the hex.
+	sanitizedImage := svccfg.Image
+	lastSlash := strings.LastIndex(sanitizedImage, "/")
+	suffix := sanitizedImage[lastSlash+1:]
+	if i := strings.IndexByte(suffix, '@'); i >= 0 {
+		sanitizedImage = sanitizedImage[:lastSlash+1+i]
+	} else if i := strings.IndexByte(suffix, ':'); i >= 0 {
+		sanitizedImage = sanitizedImage[:lastSlash+1+i]
+	}
+	sanitizedImage = strings.ToLower(sanitizedImage)
+	if strings.HasSuffix(sanitizedImage, "/litellm") && len(svccfg.Ports) == 0 {
 		// HACK: we must have at least one host port to get a CNAME for the service
 		// litellm listens on 4000 by default
 		var port uint32 = liteLLMPort
