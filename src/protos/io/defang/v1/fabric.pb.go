@@ -88,21 +88,21 @@ type StackStatus int32
 
 const (
 	StackStatus_STACK_STATUS_UNSPECIFIED StackStatus = 0
-	StackStatus_UP                       StackStatus = 1
-	StackStatus_DOWN                     StackStatus = 2
+	StackStatus_STACK_STATUS_UP          StackStatus = 1
+	StackStatus_STACK_STATUS_DOWN        StackStatus = 2
 )
 
 // Enum value maps for StackStatus.
 var (
 	StackStatus_name = map[int32]string{
 		0: "STACK_STATUS_UNSPECIFIED",
-		1: "UP",
-		2: "DOWN",
+		1: "STACK_STATUS_UP",
+		2: "STACK_STATUS_DOWN",
 	}
 	StackStatus_value = map[string]int32{
 		"STACK_STATUS_UNSPECIFIED": 0,
-		"UP":                       1,
-		"DOWN":                     2,
+		"STACK_STATUS_UP":          1,
+		"STACK_STATUS_DOWN":        2,
 	}
 )
 
@@ -6200,11 +6200,11 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x03AWS\x10\x02\x12\x10\n" +
 	"\fDIGITALOCEAN\x10\x03\x12\a\n" +
 	"\x03GCP\x10\x04\x12\t\n" +
-	"\x05AZURE\x10\x05*=\n" +
+	"\x05AZURE\x10\x05*W\n" +
 	"\vStackStatus\x12\x1c\n" +
-	"\x18STACK_STATUS_UNSPECIFIED\x10\x00\x12\x06\n" +
-	"\x02UP\x10\x01\x12\b\n" +
-	"\x04DOWN\x10\x02*T\n" +
+	"\x18STACK_STATUS_UNSPECIFIED\x10\x00\x12\x13\n" +
+	"\x0fSTACK_STATUS_UP\x10\x01\x12\x15\n" +
+	"\x11STACK_STATUS_DOWN\x10\x02*T\n" +
 	"\x0eDeploymentMode\x12\x14\n" +
 	"\x10MODE_UNSPECIFIED\x10\x00\x12\x0f\n" +
 	"\vDEVELOPMENT\x10\x01\x12\v\n" +

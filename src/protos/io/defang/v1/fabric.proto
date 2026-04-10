@@ -165,8 +165,8 @@ enum Provider {
 
 enum StackStatus {
   STACK_STATUS_UNSPECIFIED = 0;
-  UP = 1;
-  DOWN = 2;
+  STACK_STATUS_UP = 1;
+  STACK_STATUS_DOWN = 2;
 }
 
 message Stack {
