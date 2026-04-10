@@ -82,13 +82,13 @@ func WaitServiceState(
 			}
 		}
 
-		term.Infof("Waiting for %q to be in state %s...\n", pendingServices, targetState) // TODO: don't print in Go-routine
+		term.Infof("Waiting for services to finish deploying: %q\n", pendingServices) // TODO: don't print in Go-routine
 
 		if msg == nil {
 			continue
 		}
 
-		term.Debugf("service %s with state ( %s ) and status: %s\n", msg.Name, msg.State, msg.Status) // TODO: don't print in Go-routine
+		term.Debugf("Service update: %s: state=%s and status=%s\n", msg.Name, msg.State, msg.Status) // TODO: don't print in Go-routine
 
 		if _, ok := serviceStates[msg.Name]; !ok {
 			term.Debugf("unexpected service %s update", msg.Name) // TODO: don't print in Go-routine

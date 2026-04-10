@@ -63,6 +63,10 @@ func (MockProvider) UpdateShardDomain(ctx context.Context) error {
 	return nil
 }
 
+func (MockProvider) AccountInfo(context.Context) (*AccountInfo, error) {
+	return &AccountInfo{}, nil
+}
+
 func (MockProvider) GetStackName() string {
 	return "test"
 }
