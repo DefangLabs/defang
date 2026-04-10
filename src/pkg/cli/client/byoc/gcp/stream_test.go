@@ -287,6 +287,7 @@ func makeAuditLogEntry(resourceType string, resourceLabels, entryLabels map[stri
 func TestActivityParser_GceInstanceGroupManager(t *testing.T) {
 	tests := []struct {
 		name          string
+		etag          string
 		labels        map[string]string
 		labelsErr     error
 		rootTriggerId string
@@ -327,13 +328,48 @@ func TestActivityParser_GceInstanceGroupManager(t *testing.T) {
 				State: defangv1.ServiceState_DEPLOYMENT_PENDING,
 			},
 		},
+		// etag scoping tests
+		{
+			name:          "etag matches — accepted",
+			etag:          "abc123",
+			labels:        map[string]string{"defang-service": "my-svc", "defang-etag": "abc123"},
+			rootTriggerId: "trigger-abc",
+			wantResp: &defangv1.SubscribeResponse{
+				Name:  "my-svc",
+				State: defangv1.ServiceState_DEPLOYMENT_PENDING,
+			},
+		},
+		{
+			name:          "etag mismatch — skipped",
+			etag:          "abc123",
+			labels:        map[string]string{"defang-service": "my-svc", "defang-etag": "other-etag"},
+			rootTriggerId: "trigger-abc",
+			wantResp:      nil,
+		},
+		{
+			name:          "defang-etag label missing when etag expected — skipped",
+			etag:          "abc123",
+			labels:        map[string]string{"defang-service": "my-svc"},
+			rootTriggerId: "trigger-abc",
+			wantResp:      nil,
+		},
+		{
+			name:          "no expected etag — etag label ignored",
+			etag:          "",
+			labels:        map[string]string{"defang-service": "my-svc", "defang-etag": "any-etag"},
+			rootTriggerId: "trigger-abc",
+			wantResp: &defangv1.SubscribeResponse{
+				Name:  "my-svc",
+				State: defangv1.ServiceState_DEPLOYMENT_PENDING,
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
 			mock := &activityParserMock{labels: tt.labels, labelsErr: tt.labelsErr}
-			parser := getActivityParser(ctx, mock, false, "")
+			parser := getActivityParser(ctx, mock, false, tt.etag)
 
 			entry := makeAuditLogEntry(
 				"gce_instance_group_manager",
