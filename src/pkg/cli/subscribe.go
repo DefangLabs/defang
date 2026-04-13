@@ -75,11 +75,20 @@ func WaitServiceState(
 			return serviceStates, err
 		}
 
+		pendingServices := []string{}
+		for _, service := range services {
+			if serviceStates[service] != targetState {
+				pendingServices = append(pendingServices, service)
+			}
+		}
+
+		term.Infof("Waiting for services to finish deploying: %q\n", pendingServices) // TODO: don't print in Go-routine
+
 		if msg == nil {
 			continue
 		}
 
-		term.Debugf("service %s with state ( %s ) and status: %s\n", msg.Name, msg.State, msg.Status) // TODO: don't print in Go-routine
+		term.Debugf("Service update: %s: state=%s and status=%s\n", msg.Name, msg.State, msg.Status) // TODO: don't print in Go-routine
 
 		if _, ok := serviceStates[msg.Name]; !ok {
 			term.Debugf("unexpected service %s update", msg.Name) // TODO: don't print in Go-routine

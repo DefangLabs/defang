@@ -111,9 +111,9 @@ func TestStackListCmd(t *testing.T) {
 					Mode:     modes.ModeBalanced,
 				},
 			},
-			expectOutput: "NAME        DEFAULT  PROVIDER  REGION       MODE        DEPLOYEDAT\n" +
-				"teststack1           aws       us-test-2    AFFORDABLE    \n" +
-				"teststack2           gcp       us-central1  BALANCED      \n",
+			expectOutput: "NAME        DEFAULT  PROVIDER  REGION       ACCOUNT  MODE        DEPLOYEDAT\n" +
+				"teststack1           aws       us-test-2             AFFORDABLE    \n" +
+				"teststack2           gcp       us-central1           BALANCED      \n",
 		},
 	}
 	for _, tt := range tests {

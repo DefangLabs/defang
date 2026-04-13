@@ -1,28 +1,40 @@
 {
   "ai_model": {
-    "command": null,
+    "command": [
+      "--drop_params",
+      "--model",
+      "ai/model",
+      "--alias",
+      "ai/model"
+    ],
     "entrypoint": null,
     "environment": {
-      "OPENAI_API_KEY": ""
+      "LITELLM_MASTER_KEY": "networkisalreadyprivate"
     },
-    "image": "defangio/openai-access-gateway",
+    "image": "litellm/litellm:v1.82.3-stable.patch.3",
     "networks": {
       "model_provider_private": null
     },
     "ports": [
       {
         "mode": "host",
-        "target": 80,
+        "target": 4000,
         "protocol": "tcp"
       }
     ]
   },
   "modellist": {
     "command": null,
+    "depends_on": {
+      "ai_model": {
+        "condition": "service_started",
+        "required": true
+      }
+    },
     "entrypoint": null,
     "environment": {
       "AI_MODEL_MODEL": "ai/model",
-      "AI_MODEL_URL": "http://mock-ai-model/api/v1/"
+      "AI_MODEL_URL": "http://mock-ai-model:4000/v1/"
     },
     "image": "app",
     "models": {
@@ -35,10 +47,16 @@
   },
   "modelmap": {
     "command": null,
+    "depends_on": {
+      "ai_model": {
+        "condition": "service_started",
+        "required": true
+      }
+    },
     "entrypoint": null,
     "environment": {
       "AI_MODEL_MODEL": "ai/model",
-      "AI_MODEL_URL": "http://mock-ai-model/api/v1/"
+      "AI_MODEL_URL": "http://mock-ai-model:4000/v1/"
     },
     "image": "app",
     "models": {
@@ -50,28 +68,40 @@
     }
   },
   "my_model": {
-    "command": null,
+    "command": [
+      "--drop_params",
+      "--model",
+      "ai/model",
+      "--alias",
+      "ai/model"
+    ],
     "entrypoint": null,
     "environment": {
-      "OPENAI_API_KEY": ""
+      "LITELLM_MASTER_KEY": "networkisalreadyprivate"
     },
-    "image": "defangio/openai-access-gateway",
+    "image": "litellm/litellm:v1.82.3-stable.patch.3",
     "networks": {
       "model_provider_private": null
     },
     "ports": [
       {
         "mode": "host",
-        "target": 80,
+        "target": 4000,
         "protocol": "tcp"
       }
     ]
   },
   "withendpoint": {
     "command": null,
+    "depends_on": {
+      "my_model": {
+        "condition": "service_started",
+        "required": true
+      }
+    },
     "entrypoint": null,
     "environment": {
-      "MODEL_URL": "http://mock-my-model/api/v1/",
+      "MODEL_URL": "http://mock-my-model:4000/v1/",
       "MY_MODEL_MODEL": "ai/model"
     },
     "image": "app",

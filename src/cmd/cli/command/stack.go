@@ -137,7 +137,7 @@ func makeStackListCmd() *cobra.Command {
 				return err
 			}
 
-			columns := []string{"Name", "Default", "Provider", "Region", "Mode", "DeployedAt"}
+			columns := []string{"Name", "Default", "Provider", "Region", "Account", "Mode", "DeployedAt"}
 			return term.Table(stacks, columns...)
 		},
 	}

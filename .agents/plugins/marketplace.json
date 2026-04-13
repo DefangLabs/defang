@@ -1,0 +1,22 @@
+{
+  "name": "defang-skills",
+  "owner": {
+    "name": "DefangLabs",
+    "email": "support@defang.io"
+  },
+  "plugins": [
+    {
+      "name": "defang",
+      "source": {
+        "source": "local",
+        "path": "./codex-plugin"
+      },
+      "description": "Deploy Docker Compose apps to your own cloud account using Defang. Includes a /defang:deploy skill and Defang MCP server integration.",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Infrastructure"
+    }
+  ]
+}

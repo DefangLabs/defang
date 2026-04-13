@@ -76,6 +76,17 @@ $ defang up --stack=awsuswest2
 
 The Defang Model Context Protocol [(MCP)](https://docs.defang.io/docs/concepts/mcp) Server is tailored for developers who work primarily within integrated development environments (IDEs). It enables seamless cloud deployment from supported editors such as Cursor, Windsurf, VS Code, VS Code Insiders and Claude delivering a fully integrated experience without leaving your development environment.
 
+## Claude Code Plugin
+
+Install the Defang plugin for [Claude Code](https://claude.ai/code) to deploy directly from any Claude Code session — no CLI required upfront:
+
+```shell
+/plugin marketplace add DefangLabs/defang
+/plugin install defang@defang-skills
+```
+
+After installing, use `/defang:deploy` to guide you through deploying your project. The Defang MCP server activates automatically once the Defang CLI is installed.
+
 ## This repo includes:
 
 - Public releases of the Defang CLI; [click here](https://github.com/DefangLabs/defang/releases/latest/) for the latest version
