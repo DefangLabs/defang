@@ -137,24 +137,30 @@ func makeStackListCmd() *cobra.Command {
 				return err
 			}
 
-			filteredStacks := make([]stacks.ListItem, 0, len(stackList))
-			for _, stack := range stackList {
-				if stack.Status == defangv1.StackStatus_STACK_STATUS_DOWN {
-					continue
+			all, _ := cmd.Flags().GetBool("all")
+			if !all {
+				filteredStacks := make([]stacks.ListItem, 0, len(stackList))
+				for _, stack := range stackList {
+					if stack.Status == defangv1.StackStatus_STACK_STATUS_DOWN {
+						continue
+					}
+					filteredStacks = append(filteredStacks, stack)
 				}
-				filteredStacks = append(filteredStacks, stack)
-			}
 
-			if len(filteredStacks) == 0 {
-				_, err = term.Infof("All stacks in the current directory are down.\n")
-				return err
+				if len(filteredStacks) == 0 {
+					_, err = term.Infof("All stacks in the current directory are down.\n")
+					return err
+				}
+
+				stackList = filteredStacks
 			}
 
 			columns := []string{"Name", "Default", "Provider", "Region", "Account", "Mode", "DeployedAt"}
-			return term.Table(filteredStacks, columns...)
+			return term.Table(stackList, columns...)
 		},
 	}
 	stackListCmd.Flags().Bool("json", false, "Output in JSON format")
+	stackListCmd.Flags().BoolP("all", "a", false, "Include stacks that are down")
 	return stackListCmd
 }
 
