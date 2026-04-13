@@ -22,7 +22,14 @@ Look for any compose.yaml files in the current directory or parent directories. 
 defang stack ls
 ```
 
-Note the active stack (provider, region, deployment mode). If no stack is selected, ask the user to select one or run `defang stack default STACK_NAME`.
+Interpret the output as follows:
+
+- **No stacks listed** — No deployment has been made yet. Stop here and inform the user: "No deployment found yet." Ask them to either run the project's deploy command (e.g., `/defang:deploy`) to create one, or verify they are in the correct project directory before continuing.
+- **Stacks listed but none marked as default** — A deployment exists but no stack is active. Ask the user which stack to debug, then set it as the default:
+  ```bash
+  defang stack default STACK_NAME
+  ```
+- **A stack is already active** — Note its provider, region, and deployment mode and continue to the next step.
 
 ## Step 5: Check deployment status
 
