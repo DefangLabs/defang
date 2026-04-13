@@ -134,6 +134,11 @@ func makeStackListCmd() *cobra.Command {
 				return err
 			}
 
+			if len(stackList) == 0 {
+				_, err = term.Infof("No Defang stacks found in the current directory.\n")
+				return err
+			}
+
 			filteredStacks := make([]stacks.ListItem, 0, len(stackList))
 			for _, stack := range stackList {
 				if stack.Status == defangv1.StackStatus_STACK_STATUS_DOWN {
@@ -143,7 +148,7 @@ func makeStackListCmd() *cobra.Command {
 			}
 
 			if len(filteredStacks) == 0 {
-				_, err = term.Infof("No Defang stacks found in the current directory.\n")
+				_, err = term.Infof("All stacks in the current directory are down.\n")
 				return err
 			}
 
