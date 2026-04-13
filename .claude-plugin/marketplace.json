@@ -11,7 +11,7 @@
     {
       "name": "defang",
       "source": "./claude-plugin",
-      "description": "Deploy Docker Compose apps to your own cloud account using Defang. Includes a /defang:deploy skill and Defang MCP server integration.",
+      "description": "Deploy Docker Compose apps to your own cloud account using Defang. Includes /defang:deploy and /defang:estimate skills and Defang MCP server integration.",
       "version": "1.0.0",
       "author": {
         "name": "DefangLabs"
