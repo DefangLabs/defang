@@ -127,18 +127,26 @@ func makeStackListCmd() *cobra.Command {
 				return err
 			}
 
-			stacks, err := sm.List(ctx)
+			stackList, err := sm.List(ctx)
 			if err != nil {
 				return err
 			}
 
-			if len(stacks) == 0 {
+			filteredStacks := make([]stacks.ListItem, 0, len(stackList))
+			for _, stack := range stackList {
+				if stack.Status == defangv1.StackStatus_STACK_STATUS_DOWN {
+					continue
+				}
+				filteredStacks = append(filteredStacks, stack)
+			}
+
+			if len(filteredStacks) == 0 {
 				_, err = term.Infof("No Defang stacks found in the current directory.\n")
 				return err
 			}
 
 			columns := []string{"Name", "Default", "Provider", "Region", "Account", "Mode", "DeployedAt"}
-			return term.Table(stacks, columns...)
+			return term.Table(filteredStacks, columns...)
 		},
 	}
 	stackListCmd.Flags().Bool("json", false, "Output in JSON format")
