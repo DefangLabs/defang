@@ -37,6 +37,12 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 	}
 	slices.Sort(config.Names) // sort for binary search
 
+	accountInfo, err := provider.AccountInfo(ctx)
+	if err != nil {
+		term.Debugf("failed to get account info to fixup services: %v", err)
+		accountInfo = &client.AccountInfo{}
+	}
+
 	// Fixup any pseudo services (this might create port configs, which will affect service name replacement by ReplaceServiceNameWithDNS)
 	for _, svccfg := range project.Services {
 		repo := GetImageRepo(svccfg.Image)
@@ -63,7 +69,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 		}
 
 		if svccfg.Provider != nil && svccfg.Provider.Type == "model" && svccfg.Image == "" && svccfg.Build == nil {
-			fixupModelProvider(&svccfg, project)
+			fixupModelProvider(&svccfg, project, accountInfo)
 		}
 
 		if _, llm := svccfg.Extensions["x-defang-llm"]; llm {
@@ -87,7 +93,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 
 	for name, model := range project.Models {
 		model.Name = name // ensure the model has a name
-		svccfg := fixupModel(model, project)
+		svccfg := fixupModel(model, project, accountInfo)
 		project.Services[svccfg.Name] = *svccfg
 	}
 
@@ -227,11 +233,25 @@ func parsePortString(port string) (uint32, error) {
 	}
 }
 
+const liteLLMPort uint32 = 4000
+
 func fixupLLM(svccfg *composeTypes.ServiceConfig) {
-	image := GetImageRepo(svccfg.Image)
-	if strings.HasSuffix(image, "/openai-access-gateway") && len(svccfg.Ports) == 0 {
+	// Strip tag/digest: only remove the suffix after ':' or '@' if it appears after the last '/'
+	// so that a registry port (e.g. registry.example:5000/litellm:latest) is handled correctly.
+	// Check '@' before ':' so that digest refs (name@sha256:hex) are cut at the '@', not inside the hex.
+	sanitizedImage := svccfg.Image
+	lastSlash := strings.LastIndex(sanitizedImage, "/")
+	suffix := sanitizedImage[lastSlash+1:]
+	if i := strings.IndexByte(suffix, '@'); i >= 0 {
+		sanitizedImage = sanitizedImage[:lastSlash+1+i]
+	} else if i := strings.IndexByte(suffix, ':'); i >= 0 {
+		sanitizedImage = sanitizedImage[:lastSlash+1+i]
+	}
+	sanitizedImage = strings.ToLower(sanitizedImage)
+	if strings.HasSuffix(sanitizedImage, "/litellm") && len(svccfg.Ports) == 0 {
 		// HACK: we must have at least one host port to get a CNAME for the service
-		var port uint32 = 80
+		// litellm listens on 4000 by default
+		var port uint32 = liteLLMPort
 		term.Debugf("service %q: adding LLM host port %d", svccfg.Name, port)
 		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	}
@@ -339,40 +359,75 @@ func fixupIngressPorts(svccfg *composeTypes.ServiceConfig) {
 // Declare a private network for the model provider
 const modelProviderNetwork = "model_provider_private"
 
-func fixupModel(model composeTypes.ModelConfig, project *composeTypes.Project) *composeTypes.ServiceConfig {
+func fixupModel(model composeTypes.ModelConfig, project *composeTypes.Project, info *client.AccountInfo) *composeTypes.ServiceConfig {
 	svccfg := &composeTypes.ServiceConfig{
 		Name:       model.Name,
 		Extensions: model.Extensions,
 	}
-	makeAccessGatewayService(svccfg, project, model.Model) // TODO: pass other model options too
+	makeAccessGatewayService(svccfg, project, model.Model, info) // TODO: pass other model options too
 	return svccfg
 }
 
-func fixupModelProvider(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project) {
+func fixupModelProvider(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, info *client.AccountInfo) {
 	var model string
 	if modelVals := svccfg.Provider.Options["model"]; len(modelVals) == 1 {
 		model = modelVals[0]
 	}
-	makeAccessGatewayService(svccfg, project, model)
+	makeAccessGatewayService(svccfg, project, model, info)
 }
 
-func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, model string) {
+func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, model string, info *client.AccountInfo) {
 	// Local Docker sets [SERVICE]_URL and [SERVICE]_MODEL environment variables on the dependent services
 	envName := strings.ToUpper(svccfg.Name) // TODO: handle characters that are not allowed in env vars, like '-'
 	endpointEnvVar := envName + "_URL"
-	urlVal := "http://" + svccfg.Name + "/api/v1/"
+	urlVal := "http://" + svccfg.Name + ":" + strconv.FormatUint(uint64(liteLLMPort), 10) + "/v1/"
 	modelEnvVar := envName + "_MODEL"
 
-	empty := ""
+	resolvedModel, masterKey := configureAccessGateway(svccfg, project, model, info)
+	wireDependentServices(project, svccfg.Name, urlVal, resolvedModel, masterKey, endpointEnvVar, modelEnvVar)
+}
+
+// configureAccessGateway resolves the model name for the target provider, configures
+// the LiteLLM container (image, command, network, port), and derives LITELLM_MASTER_KEY.
+// Returns the resolved model string and the master key pointer.
+func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, model string, info *client.AccountInfo) (string, *string) {
 	// svccfg.Deploy.Resources.Reservations.Limits = &composeTypes.Resources{} TODO: avoid memory limits warning
 	if svccfg.Environment == nil {
 		svccfg.Environment = composeTypes.MappingWithEquals{}
 	}
-	if _, exists := svccfg.Environment["OPENAI_API_KEY"]; !exists {
-		svccfg.Environment["OPENAI_API_KEY"] = &empty // disable auth; see https://github.com/DefangLabs/openai-access-gateway/pull/5
+
+	alias := model
+	switch info.Provider {
+	case client.ProviderAWS:
+		switch model {
+		case "chat-default":
+			model = "us.amazon.nova-2-lite-v1:0"
+		case "embedding-default":
+			model = "amazon.titan-embed-text-v2:0"
+		}
+		model = modelWithProvider(model, "bedrock")
+		if info.Region != "" {
+			svccfg.Environment["AWS_REGION"] = &info.Region
+		}
+	case client.ProviderGCP:
+		switch model {
+		case "chat-default":
+			model = "gemini-2.5-flash"
+		case "embedding-default":
+			model = "gemini-embedding-001"
+		}
+		model = modelWithProvider(model, "vertex_ai")
+		if info.AccountID != "" {
+			svccfg.Environment["VERTEXAI_PROJECT"] = &info.AccountID
+		}
+		if info.Region != "" {
+			svccfg.Environment["VERTEXAI_LOCATION"] = &info.Region
+		}
 	}
+
 	// svccfg.HealthCheck = &composeTypes.ServiceHealthCheckConfig{} TODO: add healthcheck
-	svccfg.Image = "defangio/openai-access-gateway"
+	svccfg.Image = "litellm/litellm:v1.82.3-stable.patch.3"
+	svccfg.Command = []string{"--drop_params", "--model", model, "--alias", alias}
 	if svccfg.Networks == nil {
 		// New compose-go versions do not create networks for "provider:" services, so we need to create it here
 		svccfg.Networks = make(map[string]*composeTypes.ServiceNetworkConfig)
@@ -380,13 +435,44 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 		delete(svccfg.Networks, "default") // remove the default network
 	}
 	svccfg.Networks[modelProviderNetwork] = nil
-	svccfg.Ports = []composeTypes.ServicePortConfig{{Target: 80, Mode: Mode_HOST, Protocol: Protocol_TCP}}
+	svccfg.Ports = []composeTypes.ServicePortConfig{{Target: liteLLMPort, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	svccfg.Provider = nil // remove "provider:" because current backend will not accept it
 	project.Networks[modelProviderNetwork] = composeTypes.NetworkConfig{Name: modelProviderNetwork}
 
-	// Set environment variables (url and model) for any service that depends on the model
-	for _, dependency := range project.Services {
-		if _, ok := dependency.DependsOn[svccfg.Name]; ok {
+	masterKey, exists := svccfg.Environment["LITELLM_MASTER_KEY"]
+	if !exists {
+		openAIKey := ""
+		for _, service := range project.Services {
+			if _, ok := service.DependsOn[svccfg.Name]; ok {
+				if key, ok := service.Environment["OPENAI_API_KEY"]; ok {
+					if openAIKey == "" {
+						openAIKey = *key
+					} else if *key != openAIKey {
+						term.Errorf("multiple different OPENAI_API_KEY values found in services depending on %q", svccfg.Name)
+						break
+					}
+				}
+			}
+		}
+		if openAIKey == "" {
+			key := "networkisalreadyprivate"
+			masterKey = &key
+		} else {
+			masterKey = &openAIKey
+		}
+		svccfg.Environment["LITELLM_MASTER_KEY"] = masterKey
+	}
+
+	return model, masterKey
+}
+
+// wireDependentServices injects URL, model, and API-key env vars and adds the
+// model-provider network to every service that depends on svcName.
+func wireDependentServices(project *composeTypes.Project, svcName, urlVal, model string, masterKey *string, endpointEnvVar, modelEnvVar string) {
+	for name, dependency := range project.Services {
+		changed := false
+
+		if _, ok := dependency.DependsOn[svcName]; ok {
 			if dependency.Environment == nil {
 				dependency.Environment = make(composeTypes.MappingWithEquals)
 			}
@@ -397,9 +483,13 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 			if _, ok := dependency.Environment[modelEnvVar]; !ok && model != "" {
 				dependency.Environment[modelEnvVar] = &model
 			}
+			if _, ok := dependency.Environment["OPENAI_API_KEY"]; !ok {
+				dependency.Environment["OPENAI_API_KEY"] = masterKey
+			}
+			changed = true
 		}
 
-		if modelDep, ok := dependency.Models[svccfg.Name]; ok {
+		if modelDep, ok := dependency.Models[svcName]; ok {
 			endpointVar := endpointEnvVar
 			if modelDep != nil && modelDep.EndpointVariable != "" {
 				endpointVar = modelDep.EndpointVariable
@@ -419,17 +509,29 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 				dependency.Environment[modelVar] = &model
 			}
 			// If the model is not already declared as a dependency, add it
-			if _, ok := dependency.DependsOn[svccfg.Name]; !ok {
+			if _, ok := dependency.DependsOn[svcName]; !ok {
 				if dependency.DependsOn == nil {
 					dependency.DependsOn = make(map[string]composeTypes.ServiceDependency)
 				}
-				dependency.DependsOn[svccfg.Name] = composeTypes.ServiceDependency{
+				dependency.DependsOn[svcName] = composeTypes.ServiceDependency{
 					Condition: composeTypes.ServiceConditionStarted,
 					Required:  true,
 				}
 			}
+			changed = true
+		}
+
+		if changed {
+			project.Services[name] = dependency
 		}
 	}
+}
+
+func modelWithProvider(model, prefix string) string {
+	if strings.Contains(model, "/") {
+		return model // already has a provider prefix
+	}
+	return prefix + "/" + model
 }
 
 func GetImageRepo(image string) string {

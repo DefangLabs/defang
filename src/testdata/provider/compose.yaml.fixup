@@ -1,19 +1,25 @@
 {
   "ai_runner": {
-    "command": null,
+    "command": [
+      "--drop_params",
+      "--model",
+      "ai/smollm2",
+      "--alias",
+      "ai/smollm2"
+    ],
     "entrypoint": null,
     "environment": {
       "DEBUG": "true",
-      "OPENAI_API_KEY": ""
+      "LITELLM_MASTER_KEY": "networkisalreadyprivate"
     },
-    "image": "defangio/openai-access-gateway",
+    "image": "litellm/litellm:v1.82.3-stable.patch.3",
     "networks": {
       "model_provider_private": null
     },
     "ports": [
       {
         "mode": "host",
-        "target": 80,
+        "target": 4000,
         "protocol": "tcp"
       }
     ]
@@ -29,7 +35,8 @@
     "entrypoint": null,
     "environment": {
       "AI_RUNNER_MODEL": "ai/smollm2",
-      "AI_RUNNER_URL": "http://mock-ai-runner/api/v1/"
+      "AI_RUNNER_URL": "http://mock-ai-runner:4000/v1/",
+      "OPENAI_API_KEY": "networkisalreadyprivate"
     },
     "image": "my-chat-app",
     "networks": {

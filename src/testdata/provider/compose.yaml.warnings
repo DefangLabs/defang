@@ -1,2 +1,4 @@
+ ! service "ai_runner": environment "LITELLM_MASTER_KEY" may contain sensitive information; consider using 'defang config set LITELLM_MASTER_KEY' to securely store this value
  ! service "ai_runner": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "chat": environment "OPENAI_API_KEY" may contain sensitive information; consider using 'defang config set OPENAI_API_KEY' to securely store this value
  ! service "chat": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors

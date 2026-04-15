@@ -100,10 +100,18 @@ var originalLocal = time.Local
 
 // SetUTCMode sets the local time zone to UTC.
 func SetUTCMode(enable bool) {
+	// The conditional guards avoid writing to time.Local when it already has
+	// the correct value; this prevents a data race with stdlib reads (e.g.
+	// time.Now) that we cannot synchronize because the read side is a plain
+	// load inside the Go runtime, eg. net/http.(*conn).setState()
 	if enable {
-		time.Local = time.UTC
+		if time.Local != time.UTC {
+			time.Local = time.UTC
+		}
 	} else {
-		time.Local = originalLocal
+		if time.Local != originalLocal {
+			time.Local = originalLocal
+		}
 	}
 }
 
@@ -275,9 +283,18 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 							cancel() // cancel the tail context
 						case 10, 13: // Enter or Return
 							term.Println(" ") // empty line, but overwrite the spinner
+						case 'd', 'D':
+							debug := !term.DoDebug()
+							term.SetDebug(debug)
+							debugStr := "OFF"
+							if debug {
+								debugStr = "ON"
+							}
+							term.Info("Debug mode", debugStr)
+							track.Evt("Debug Toggled", P("debug", debug))
 						case 'v', 'V':
 							verbose := !options.Verbose
-							options.Verbose = verbose
+							options.Verbose = verbose // FIXME: race
 							modeStr := "OFF"
 							if verbose {
 								modeStr = "ON"

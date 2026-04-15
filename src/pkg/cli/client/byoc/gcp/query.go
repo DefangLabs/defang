@@ -285,33 +285,10 @@ protoPayload.response.spec.template.metadata.labels."defang-service"=~"^(%v)$"`,
 }
 
 func (q *Query) AddComputeEngineInstanceGroupInsertOrPatch(stack, project, etag string, services []string) {
-	query := `protoPayload.methodName=~"beta.compute.regionInstanceGroupManagers.(insert|patch)" AND operation.first="true"`
-
-	if stack != "" {
-		query += fmt.Sprintf(`
-protoPayload.request.allInstancesConfig.properties.labels.key="defang-stack"
-protoPayload.request.allInstancesConfig.properties.labels.value="%v"`, gcp.SafeLabelValue(stack))
-	}
-
-	if project != "" {
-		query += fmt.Sprintf(`
-protoPayload.request.allInstancesConfig.properties.labels.key="defang-project"
-protoPayload.request.allInstancesConfig.properties.labels.value="%v"`, gcp.SafeLabelValue(project))
-	}
-
-	if etag != "" {
-		query += fmt.Sprintf(`
-protoPayload.request.allInstancesConfig.properties.labels.key="defang-etag"
-protoPayload.request.allInstancesConfig.properties.labels.value="%v"`, gcp.SafeLabelValue(etag))
-	}
-
-	if len(services) > 0 {
-		query += fmt.Sprintf(`
-protoPayload.request.allInstancesConfig.properties.labels.key="defang-service"
-protoPayload.request.allInstancesConfig.properties.labels.value=~"^(%v)$"`, servicesPattern(services))
-	}
-
-	q.AddQuery(query)
+	// Do not filter by allInstancesConfig.properties.labels here: PATCH requests only carry changed
+	// fields and omit labels when only the instance template is being updated. The parser reads
+	// labels from the live resource via GetInstanceGroupManagerLabels instead.
+	q.AddQuery(`protoPayload.methodName=~"beta.compute.regionInstanceGroupManagers.(insert|patch)" AND operation.first="true"`)
 }
 
 func (q *Query) AddComputeEngineInstanceGroupAddInstances() {

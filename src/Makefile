@@ -72,11 +72,11 @@ install: $(BINARY_NAME)
 
 .PHONY: test
 test: tidy $(GO) $(PROTOS)
-	set -o pipefail && go test -short ./... | $(FAIL-RED)
+	set -o pipefail && go test -race -short ./... | $(FAIL-RED)
 
 .PHONY: integ
 integ: $(GO) $(PROTOS)
-	set -o pipefail && go test -v -tags=integration ./... | $(FAIL-RED)
+	set -o pipefail && go test -race -v -tags=integration ./... | $(FAIL-RED)
 
 .PHONY: linux-amd64
 linux-amd64: $(GO) test
