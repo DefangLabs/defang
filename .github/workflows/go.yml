@@ -39,7 +39,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # to avoid GH rate limits
 
       - name: Generate coverage summary
-        run: go tool cover -func=coverage.out | tee coverage.txt
+        run: |
+          grep -v '/src/protos/' coverage.out > coverage.filtered.out
+          go tool cover -func=coverage.filtered.out | tee coverage.txt
         working-directory: src
 
       - name: Upload coverage report
