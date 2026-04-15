@@ -53,13 +53,15 @@ func makeStackNewCmd() *cobra.Command {
 				return err
 			}
 
-			if stackName != "" {
+			if stackName != "" && global.Interactive() {
+				// Avoid prompting for stack parameters (interactive mode), if the stack name is provided, but the
+				// given stack name already exists in the project. The PutStack gRPC call would fail.
 				exists, err := stackExists(ctx, projectName, stackName)
 				if err != nil {
 					return err
 				}
 				if exists {
-					return fmt.Errorf("stack with name %q already exists in project %q", stackName, projectName)
+					return fmt.Errorf("a stack with name %q already exists in project %q", stackName, projectName)
 				}
 			}
 

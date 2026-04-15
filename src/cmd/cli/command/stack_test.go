@@ -144,20 +144,20 @@ func TestStackListCmd(t *testing.T) {
 	}
 }
 
-func TestNonInteractiveStackNewCmd(t *testing.T) {
+func TestStackNewCmd(t *testing.T) {
 	origClient := global.Client
 	origNI := global.NonInteractive
-	global.NonInteractive = true
 	t.Cleanup(func() {
 		global.Client = origClient
 		global.NonInteractive = origNI
 	})
 
 	tests := []struct {
+		interactive    bool
 		name           string
 		parameters     stacks.Parameters
 		existingStacks []*defangv1.Stack
-		expectErr      bool
+		expectErr      string
 	}{
 		{
 			name: "valid parameters",
@@ -168,7 +168,6 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 				Mode:     modes.ModeAffordable,
 			},
 			existingStacks: []*defangv1.Stack{},
-			expectErr:      false,
 		},
 		{
 			name: "missing stack name",
@@ -179,7 +178,7 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 				Mode:     modes.ModeAffordable,
 			},
 			existingStacks: []*defangv1.Stack{},
-			expectErr:      true,
+			expectErr:      "invalid stack name",
 		},
 		{
 			name: "stack already exists",
@@ -190,12 +189,24 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 				Mode:     modes.ModeAffordable,
 			},
 			existingStacks: []*defangv1.Stack{{Name: "existingstack", Project: ""}},
-			expectErr:      true,
+		},
+		{
+			name:        "stack already exists; interactive mode should error",
+			interactive: true,
+			parameters: stacks.Parameters{
+				Name:     "existingstack",
+				Provider: client.ProviderAWS,
+				Region:   "us-test-2",
+				Mode:     modes.ModeAffordable,
+			},
+			existingStacks: []*defangv1.Stack{{Name: "existingstack", Project: ""}},
+			expectErr:      "already exists",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			global.NonInteractive = !tt.interactive
 			t.Chdir(t.TempDir())
 			os.WriteFile("compose.yaml", []byte(testComposeYaml), 0644)
 
@@ -207,8 +218,10 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 			stackCreateCmd.Flags().Set("region", tt.parameters.Region)
 
 			err := stackCreateCmd.RunE(stackCreateCmd, []string{tt.parameters.Name})
-			if (err != nil) != tt.expectErr {
-				t.Errorf("RunE() error = %v, expectErr %v", err, tt.expectErr)
+			if tt.expectErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorContains(t, err, tt.expectErr)
 			}
 		})
 	}
