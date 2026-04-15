@@ -11,7 +11,7 @@
         "source": "local",
         "path": "./codex-plugin"
       },
-      "description": "Deploy Docker Compose apps to your own cloud account using Defang. Includes a /defang:deploy skill and Defang MCP server integration.",
+      "description": "Deploy Docker Compose apps to your own cloud account using Defang. Includes /defang:deploy, /defang:estimate, and /defang:debug skills and Defang MCP server integration.",
       "policy": {
         "installation": "AVAILABLE",
         "authentication": "ON_INSTALL"
