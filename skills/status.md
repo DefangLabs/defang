@@ -1,4 +1,4 @@
-Debug the current Defang project by inspecting deployment status and logs for errors.
+Check the current Defang project status by inspecting deployment state and logs for errors.
 
 ## Step 1: Validate the CLI
 
@@ -25,7 +25,7 @@ defang stack ls
 Interpret the output as follows:
 
 - **No stacks listed** — No deployment has been made yet. Stop here and inform the user: "No deployment found yet." Ask them to either run the project's deploy command (e.g., `/defang:deploy`) to create one, or verify they are in the correct project directory before continuing.
-- **Stacks listed but none marked as default** — A deployment exists but no stack is active. Ask the user which stack to debug, then set it as the default:
+- **Stacks listed but none marked as default** — A deployment exists but no stack is active. Ask the user which stack to check, then set it as the default:
   ```bash
   defang stack default STACK_NAME
   ```
