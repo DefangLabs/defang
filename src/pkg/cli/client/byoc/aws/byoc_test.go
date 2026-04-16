@@ -94,18 +94,6 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 	}
 }
 
-type FakeLoader struct {
-	ProjectName string
-}
-
-func (f FakeLoader) LoadProject(ctx context.Context) (*composeTypes.Project, error) {
-	return &composeTypes.Project{Name: f.ProjectName}, nil
-}
-
-func (f FakeLoader) LoadProjectName(ctx context.Context) (string, bool, error) {
-	return f.ProjectName, false, nil
-}
-
 //go:embed testdata/*.json
 var testDir embed.FS
 
