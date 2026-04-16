@@ -1,9 +1,13 @@
 {
   "permissions": {
     "allow": [
+      "Bash(docker pull:*)",
       "Bash(git ls-remote:*)",
+      "Bash(go vet:*)",
+      "Bash(head:*)",
       "Bash(sort:*)",
-      "Bash(docker pull:*)"
+      "Bash(tail:*)",
+      "Bash(xxd:*)"
     ]
   }
 }

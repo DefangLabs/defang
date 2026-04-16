@@ -123,7 +123,6 @@ type ByocGcp struct {
 
 	bucket               string
 	cdServiceAccount     string
-	setupDone            bool
 	uploadServiceAccount string
 	delegateDomainZone   string
 
@@ -170,7 +169,7 @@ func (*ByocGcp) Driver() string {
 }
 
 func (b *ByocGcp) SetUpCD(ctx context.Context, force bool) error {
-	if b.setupDone {
+	if b.SetupDone {
 		return nil
 	}
 	// TODO: Handle project creation flow
@@ -286,7 +285,7 @@ func (b *ByocGcp) SetUpCD(ctx context.Context, force bool) error {
 	// 5. Setup Cloud Run Job
 	term.Debugf("Using CD image: %q", b.CDImage)
 
-	b.setupDone = true
+	b.SetupDone = true
 	return nil
 }
 

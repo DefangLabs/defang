@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 )
 
 func TestCloudFormation(t *testing.T) {
@@ -15,7 +14,7 @@ func TestCloudFormation(t *testing.T) {
 	}
 
 	user := pkg.GetCurrentUser() // avoid conflict with other users in the same account
-	aws := New("crun-test-"+user, region.Region("us-west-2"))
+	aws := New("crun-test-"+user, "us-west-2")
 	if aws == nil {
 		t.Fatal("aws is nil")
 	}

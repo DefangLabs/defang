@@ -837,7 +837,7 @@ func (b *ByocAws) queryOrTailLogs(ctx context.Context, cwClient cw.LogsClient, r
 }
 
 func (b *ByocAws) makeLogGroupARN(name string) string {
-	return b.driver.MakeARN("logs", "log-group:"+name)
+	return b.driver.MakeRegionalARN("logs", "log-group:"+name)
 }
 
 func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filter string, logType logs.LogType) []cw.LogGroupInput {

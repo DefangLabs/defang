@@ -136,6 +136,15 @@ const (
 	// FabricControllerVerifyDNSSetupProcedure is the fully-qualified name of the FabricController's
 	// VerifyDNSSetup RPC.
 	FabricControllerVerifyDNSSetupProcedure = "/io.defang.v1.FabricController/VerifyDNSSetup"
+	// FabricControllerResolveIPAddrProcedure is the fully-qualified name of the FabricController's
+	// ResolveIPAddr RPC.
+	FabricControllerResolveIPAddrProcedure = "/io.defang.v1.FabricController/ResolveIPAddr"
+	// FabricControllerResolveCNAMEProcedure is the fully-qualified name of the FabricController's
+	// ResolveCNAME RPC.
+	FabricControllerResolveCNAMEProcedure = "/io.defang.v1.FabricController/ResolveCNAME"
+	// FabricControllerResolveNSProcedure is the fully-qualified name of the FabricController's
+	// ResolveNS RPC.
+	FabricControllerResolveNSProcedure = "/io.defang.v1.FabricController/ResolveNS"
 	// FabricControllerGetSelectedProviderProcedure is the fully-qualified name of the
 	// FabricController's GetSelectedProvider RPC.
 	FabricControllerGetSelectedProviderProcedure = "/io.defang.v1.FabricController/GetSelectedProvider"
@@ -216,6 +225,9 @@ type FabricControllerClient interface {
 	// Endpoint for GDPR compliance
 	DeleteMe(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[emptypb.Empty], error)
 	VerifyDNSSetup(context.Context, *connect.Request[v1.VerifyDNSSetupRequest]) (*connect.Response[emptypb.Empty], error)
+	ResolveIPAddr(context.Context, *connect.Request[v1.ResolveIPAddrRequest]) (*connect.Response[v1.ResolveIPAddrResponse], error)
+	ResolveCNAME(context.Context, *connect.Request[v1.ResolveCNAMERequest]) (*connect.Response[v1.ResolveCNAMEResponse], error)
+	ResolveNS(context.Context, *connect.Request[v1.ResolveNSRequest]) (*connect.Response[v1.ResolveNSResponse], error)
 	// Deprecated: do not use.
 	GetSelectedProvider(context.Context, *connect.Request[v1.GetSelectedProviderRequest]) (*connect.Response[v1.GetSelectedProviderResponse], error)
 	// Deprecated: do not use.
@@ -482,6 +494,27 @@ func NewFabricControllerClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
+		resolveIPAddr: connect.NewClient[v1.ResolveIPAddrRequest, v1.ResolveIPAddrResponse](
+			httpClient,
+			baseURL+FabricControllerResolveIPAddrProcedure,
+			connect.WithSchema(fabricControllerMethods.ByName("ResolveIPAddr")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		resolveCNAME: connect.NewClient[v1.ResolveCNAMERequest, v1.ResolveCNAMEResponse](
+			httpClient,
+			baseURL+FabricControllerResolveCNAMEProcedure,
+			connect.WithSchema(fabricControllerMethods.ByName("ResolveCNAME")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		resolveNS: connect.NewClient[v1.ResolveNSRequest, v1.ResolveNSResponse](
+			httpClient,
+			baseURL+FabricControllerResolveNSProcedure,
+			connect.WithSchema(fabricControllerMethods.ByName("ResolveNS")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
 		getSelectedProvider: connect.NewClient[v1.GetSelectedProviderRequest, v1.GetSelectedProviderResponse](
 			httpClient,
 			baseURL+FabricControllerGetSelectedProviderProcedure,
@@ -599,6 +632,9 @@ type fabricControllerClient struct {
 	track                      *connect.Client[v1.TrackRequest, emptypb.Empty]
 	deleteMe                   *connect.Client[emptypb.Empty, emptypb.Empty]
 	verifyDNSSetup             *connect.Client[v1.VerifyDNSSetupRequest, emptypb.Empty]
+	resolveIPAddr              *connect.Client[v1.ResolveIPAddrRequest, v1.ResolveIPAddrResponse]
+	resolveCNAME               *connect.Client[v1.ResolveCNAMERequest, v1.ResolveCNAMEResponse]
+	resolveNS                  *connect.Client[v1.ResolveNSRequest, v1.ResolveNSResponse]
 	getSelectedProvider        *connect.Client[v1.GetSelectedProviderRequest, v1.GetSelectedProviderResponse]
 	setSelectedProvider        *connect.Client[v1.SetSelectedProviderRequest, emptypb.Empty]
 	canIUse                    *connect.Client[v1.CanIUseRequest, v1.CanIUseResponse]
@@ -800,6 +836,21 @@ func (c *fabricControllerClient) VerifyDNSSetup(ctx context.Context, req *connec
 	return c.verifyDNSSetup.CallUnary(ctx, req)
 }
 
+// ResolveIPAddr calls io.defang.v1.FabricController.ResolveIPAddr.
+func (c *fabricControllerClient) ResolveIPAddr(ctx context.Context, req *connect.Request[v1.ResolveIPAddrRequest]) (*connect.Response[v1.ResolveIPAddrResponse], error) {
+	return c.resolveIPAddr.CallUnary(ctx, req)
+}
+
+// ResolveCNAME calls io.defang.v1.FabricController.ResolveCNAME.
+func (c *fabricControllerClient) ResolveCNAME(ctx context.Context, req *connect.Request[v1.ResolveCNAMERequest]) (*connect.Response[v1.ResolveCNAMEResponse], error) {
+	return c.resolveCNAME.CallUnary(ctx, req)
+}
+
+// ResolveNS calls io.defang.v1.FabricController.ResolveNS.
+func (c *fabricControllerClient) ResolveNS(ctx context.Context, req *connect.Request[v1.ResolveNSRequest]) (*connect.Response[v1.ResolveNSResponse], error) {
+	return c.resolveNS.CallUnary(ctx, req)
+}
+
 // GetSelectedProvider calls io.defang.v1.FabricController.GetSelectedProvider.
 //
 // Deprecated: do not use.
@@ -904,6 +955,9 @@ type FabricControllerHandler interface {
 	// Endpoint for GDPR compliance
 	DeleteMe(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[emptypb.Empty], error)
 	VerifyDNSSetup(context.Context, *connect.Request[v1.VerifyDNSSetupRequest]) (*connect.Response[emptypb.Empty], error)
+	ResolveIPAddr(context.Context, *connect.Request[v1.ResolveIPAddrRequest]) (*connect.Response[v1.ResolveIPAddrResponse], error)
+	ResolveCNAME(context.Context, *connect.Request[v1.ResolveCNAMERequest]) (*connect.Response[v1.ResolveCNAMEResponse], error)
+	ResolveNS(context.Context, *connect.Request[v1.ResolveNSRequest]) (*connect.Response[v1.ResolveNSResponse], error)
 	// Deprecated: do not use.
 	GetSelectedProvider(context.Context, *connect.Request[v1.GetSelectedProviderRequest]) (*connect.Response[v1.GetSelectedProviderResponse], error)
 	// Deprecated: do not use.
@@ -1166,6 +1220,27 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect.Han
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
+	fabricControllerResolveIPAddrHandler := connect.NewUnaryHandler(
+		FabricControllerResolveIPAddrProcedure,
+		svc.ResolveIPAddr,
+		connect.WithSchema(fabricControllerMethods.ByName("ResolveIPAddr")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	fabricControllerResolveCNAMEHandler := connect.NewUnaryHandler(
+		FabricControllerResolveCNAMEProcedure,
+		svc.ResolveCNAME,
+		connect.WithSchema(fabricControllerMethods.ByName("ResolveCNAME")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	fabricControllerResolveNSHandler := connect.NewUnaryHandler(
+		FabricControllerResolveNSProcedure,
+		svc.ResolveNS,
+		connect.WithSchema(fabricControllerMethods.ByName("ResolveNS")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
 	fabricControllerGetSelectedProviderHandler := connect.NewUnaryHandler(
 		FabricControllerGetSelectedProviderProcedure,
 		svc.GetSelectedProvider,
@@ -1316,6 +1391,12 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect.Han
 			fabricControllerDeleteMeHandler.ServeHTTP(w, r)
 		case FabricControllerVerifyDNSSetupProcedure:
 			fabricControllerVerifyDNSSetupHandler.ServeHTTP(w, r)
+		case FabricControllerResolveIPAddrProcedure:
+			fabricControllerResolveIPAddrHandler.ServeHTTP(w, r)
+		case FabricControllerResolveCNAMEProcedure:
+			fabricControllerResolveCNAMEHandler.ServeHTTP(w, r)
+		case FabricControllerResolveNSProcedure:
+			fabricControllerResolveNSHandler.ServeHTTP(w, r)
 		case FabricControllerGetSelectedProviderProcedure:
 			fabricControllerGetSelectedProviderHandler.ServeHTTP(w, r)
 		case FabricControllerSetSelectedProviderProcedure:
@@ -1489,6 +1570,18 @@ func (UnimplementedFabricControllerHandler) DeleteMe(context.Context, *connect.R
 
 func (UnimplementedFabricControllerHandler) VerifyDNSSetup(context.Context, *connect.Request[v1.VerifyDNSSetupRequest]) (*connect.Response[emptypb.Empty], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.VerifyDNSSetup is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) ResolveIPAddr(context.Context, *connect.Request[v1.ResolveIPAddrRequest]) (*connect.Response[v1.ResolveIPAddrResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.ResolveIPAddr is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) ResolveCNAME(context.Context, *connect.Request[v1.ResolveCNAMERequest]) (*connect.Response[v1.ResolveCNAMEResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.ResolveCNAME is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) ResolveNS(context.Context, *connect.Request[v1.ResolveNSRequest]) (*connect.Response[v1.ResolveNSResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.ResolveNS is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) GetSelectedProvider(context.Context, *connect.Request[v1.GetSelectedProviderRequest]) (*connect.Response[v1.GetSelectedProviderResponse], error) {

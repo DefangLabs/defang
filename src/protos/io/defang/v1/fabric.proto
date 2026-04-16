@@ -114,6 +114,16 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
+  rpc ResolveIPAddr(ResolveIPAddrRequest) returns (ResolveIPAddrResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ResolveCNAME(ResolveCNAMERequest) returns (ResolveCNAMEResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ResolveNS(ResolveNSRequest) returns (ResolveNSResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
   rpc GetSelectedProvider(GetSelectedProviderRequest) returns (GetSelectedProviderResponse) {
     option deprecated = true; // deprecated in favor of stacks; kept for old CLI clients
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -224,6 +234,33 @@ message SetSelectedProviderRequest {
 message VerifyDNSSetupRequest {
   string domain = 1;
   repeated string targets = 2;
+}
+
+message ResolveIPAddrRequest {
+  string domain = 1;
+  string ns_server = 2; // optional; if empty, resolve from root
+}
+
+message ResolveIPAddrResponse {
+  repeated string ip_addrs = 1;
+}
+
+message ResolveCNAMERequest {
+  string domain = 1;
+  string ns_server = 2; // optional; if empty, resolve from root
+}
+
+message ResolveCNAMEResponse {
+  string cname = 1;
+}
+
+message ResolveNSRequest {
+  string domain = 1;
+  string ns_server = 2; // optional; if empty, resolve from root
+}
+
+message ResolveNSResponse {
+  repeated string hosts = 1;
 }
 
 message DestroyRequest {

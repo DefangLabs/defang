@@ -2,6 +2,7 @@ package command
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"testing"
 
@@ -13,6 +14,33 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
+
+// mockFabricClientWithStacks is a minimal FabricClient mock for testing stackExists.
+type mockFabricClientWithStacks struct {
+	client.MockFabricClient
+	existingStacks  []*defangv1.Stack
+	listStacksErr   error
+	expectedProject string
+}
+
+func (m mockFabricClientWithStacks) GetStack(_ context.Context, req *defangv1.GetStackRequest) (*defangv1.GetStackResponse, error) {
+	if m.listStacksErr != nil {
+		return nil, m.listStacksErr
+	}
+	if m.expectedProject != "" && req.Project != m.expectedProject {
+		return &defangv1.GetStackResponse{}, nil
+	}
+	for _, s := range m.existingStacks {
+		if s.Name == req.Stack {
+			return &defangv1.GetStackResponse{Stack: s}, nil
+		}
+	}
+	return &defangv1.GetStackResponse{}, nil
+}
+
+const testComposeYaml = `services:
+  web:
+    image: nginx`
 
 func MockTerm(t *testing.T, stdout *bytes.Buffer, stdin *bytes.Reader) {
 	t.Helper()
@@ -83,9 +111,9 @@ func TestStackListCmd(t *testing.T) {
 					Mode:     modes.ModeBalanced,
 				},
 			},
-			expectOutput: "NAME        DEFAULT  PROVIDER  REGION       MODE        DEPLOYEDAT\n" +
-				"teststack1           aws       us-test-2    AFFORDABLE    \n" +
-				"teststack2           gcp       us-central1  BALANCED      \n",
+			expectOutput: "NAME        DEFAULT  PROVIDER  REGION       ACCOUNT  MODE        DEPLOYEDAT\n" +
+				"teststack1           aws       us-test-2             AFFORDABLE    \n" +
+				"teststack2           gcp       us-central1           BALANCED      \n",
 		},
 	}
 	for _, tt := range tests {
@@ -116,13 +144,20 @@ func TestStackListCmd(t *testing.T) {
 	}
 }
 
-func TestNonInteractiveStackNewCmd(t *testing.T) {
-	var stackCreateCmd = makeStackNewCmd()
+func TestStackNewCmd(t *testing.T) {
+	origClient := global.Client
+	origNI := global.NonInteractive
+	t.Cleanup(func() {
+		global.Client = origClient
+		global.NonInteractive = origNI
+	})
 
 	tests := []struct {
-		name       string
-		parameters stacks.Parameters
-		expectErr  bool
+		interactive    bool
+		name           string
+		parameters     stacks.Parameters
+		existingStacks []*defangv1.Stack
+		expectErr      string
 	}{
 		{
 			name: "valid parameters",
@@ -132,7 +167,7 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 				Region:   "us-test-2",
 				Mode:     modes.ModeAffordable,
 			},
-			expectErr: false,
+			existingStacks: []*defangv1.Stack{},
 		},
 		{
 			name: "missing stack name",
@@ -142,25 +177,51 @@ func TestNonInteractiveStackNewCmd(t *testing.T) {
 				Region:   "us-test-2",
 				Mode:     modes.ModeAffordable,
 			},
-			expectErr: true,
+			existingStacks: []*defangv1.Stack{},
+			expectErr:      "invalid stack name",
+		},
+		{
+			name: "stack already exists",
+			parameters: stacks.Parameters{
+				Name:     "existingstack",
+				Provider: client.ProviderAWS,
+				Region:   "us-test-2",
+				Mode:     modes.ModeAffordable,
+			},
+			existingStacks: []*defangv1.Stack{{Name: "existingstack", Project: ""}},
+		},
+		{
+			name:        "stack already exists; interactive mode should error",
+			interactive: true,
+			parameters: stacks.Parameters{
+				Name:     "existingstack",
+				Provider: client.ProviderAWS,
+				Region:   "us-test-2",
+				Mode:     modes.ModeAffordable,
+			},
+			existingStacks: []*defangv1.Stack{{Name: "existingstack", Project: ""}},
+			expectErr:      "already exists",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			global.NonInteractive = !tt.interactive
 			t.Chdir(t.TempDir())
-			args := []string{tt.parameters.Name}
-			// Set flags
+			os.WriteFile("compose.yaml", []byte(testComposeYaml), 0644)
+
+			global.Client = mockFabricClientWithStacks{existingStacks: tt.existingStacks}
+
+			// Recreate the cmd each subtest so flags reset cleanly
+			stackCreateCmd := makeStackNewCmd()
+			stackCreateCmd.SetContext(t.Context())
 			stackCreateCmd.Flags().Set("region", tt.parameters.Region)
 
-			// Mock non-interactive mode
-			ni := global.NonInteractive
-			global.NonInteractive = true
-			t.Cleanup(func() { global.NonInteractive = ni })
-
-			err := stackCreateCmd.RunE(stackCreateCmd, args)
-			if (err != nil) != tt.expectErr {
-				t.Errorf("RunE() error = %v, expectErr %v", err, tt.expectErr)
+			err := stackCreateCmd.RunE(stackCreateCmd, []string{tt.parameters.Name})
+			if tt.expectErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorContains(t, err, tt.expectErr)
 			}
 		})
 	}
@@ -256,6 +317,84 @@ func TestLoadStackEnv(t *testing.T) {
 				if value := os.Getenv(key); value != expectedValue {
 					t.Errorf("Environment variable %s = %s; want %s", key, value, expectedValue)
 				}
+			}
+		})
+	}
+}
+
+func TestStackExists(t *testing.T) {
+	origClient := global.Client
+	t.Cleanup(func() { global.Client = origClient })
+
+	tests := []struct {
+		name            string
+		stackName       string
+		existingStacks  []*defangv1.Stack
+		listStacksErr   error
+		expectedProject string
+		want            bool
+		wantErr         bool
+	}{
+		{
+			name:            "stack exists",
+			stackName:       "mystack",
+			existingStacks:  []*defangv1.Stack{{Name: "mystack"}},
+			expectedProject: "testproject",
+			want:            true,
+		},
+		{
+			name:            "stack not found among others",
+			stackName:       "mystack",
+			existingStacks:  []*defangv1.Stack{{Name: "otherstack"}, {Name: "anotherstack"}},
+			expectedProject: "testproject",
+			want:            false,
+		},
+		{
+			name:            "no stacks exist",
+			stackName:       "mystack",
+			existingStacks:  []*defangv1.Stack{},
+			expectedProject: "testproject",
+			want:            false,
+		},
+		{
+			name:      "empty stack name always returns false",
+			stackName: "",
+			existingStacks: []*defangv1.Stack{
+				{Name: "mystack"},
+				{Name: ""},
+			},
+			expectedProject: "testproject",
+			want:            false,
+		},
+		{
+			name:            "wrong project returns false",
+			stackName:       "mystack",
+			existingStacks:  []*defangv1.Stack{{Name: "mystack"}},
+			expectedProject: "otherproject",
+			want:            false,
+		},
+		{
+			name:          "GetStack error is propagated",
+			stackName:     "mystack",
+			listStacksErr: context.DeadlineExceeded,
+			wantErr:       true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			global.Client = mockFabricClientWithStacks{
+				existingStacks:  tt.existingStacks,
+				listStacksErr:   tt.listStacksErr,
+				expectedProject: tt.expectedProject,
+			}
+
+			got, err := stackExists(t.Context(), "testproject", tt.stackName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("stackExists() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("stackExists() = %v, want %v", got, tt.want)
 			}
 		})
 	}

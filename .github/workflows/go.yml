@@ -33,13 +33,15 @@ jobs:
         run: echo "name=$(echo '${{ github.ref_name }}' | tr '/' '-')" >> "$GITHUB_OUTPUT"
 
       - name: Run Go unit tests
-        run: go test -test.short -v -coverprofile=coverage.out -covermode=atomic ./...
+        run: go test -race -test.short -v -coverprofile=coverage.out -covermode=atomic ./...
         working-directory: src
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # to avoid GH rate limits
 
       - name: Generate coverage summary
-        run: go tool cover -func=coverage.out | tee coverage.txt
+        run: |
+          grep -v '/src/protos/' coverage.out > coverage.filtered.out
+          go tool cover -func=coverage.filtered.out | tee coverage.txt
         working-directory: src
 
       - name: Upload coverage report
@@ -205,7 +207,7 @@ jobs:
   #         cache-dependency-path: src/go.sum
 
   #     - name: Run sanity tests
-  #       run: go run ./cmd/cli -C testdata/sanity compose up --debug
+  #       run: go run -race ./cmd/cli -C testdata/sanity compose up --debug
   #       working-directory: src
 
   go-playground-test:
@@ -223,27 +225,27 @@ jobs:
           cache-dependency-path: src/go.sum
 
       - name: Login using GitHub token
-        run: go run ./cmd/cli login --debug
+        run: go run -race ./cmd/cli login --debug
         working-directory: src
 
       - name: Add dummy config
         id: add-dummy-config
-        run: echo blah | go run ./cmd/cli -C testdata/sanity config set --provider=defang -n dummy --debug
+        run: echo blah | go run -race ./cmd/cli -C testdata/sanity config set --provider=defang -n dummy --debug
         working-directory: src
 
       - name: Run sanity tests UP
         continue-on-error: true # until we have multi-project support in playground
-        run: go run ./cmd/cli -C testdata/sanity compose up --provider=defang --debug
+        run: go run -race ./cmd/cli -C testdata/sanity compose up --provider=defang --debug
         working-directory: src
 
       - name: Run sanity tests DOWN
         continue-on-error: true # until we have multi-project support in playground
-        run: go run ./cmd/cli -C testdata/sanity compose down --provider=defang --detach --debug
+        run: go run -race ./cmd/cli -C testdata/sanity compose down --provider=defang --detach --debug
         working-directory: src
 
       - name: Remove dummy config
         if: steps.add-dummy-config.conclusion == 'success' # only clean up if the config was added
-        run: go run ./cmd/cli -C testdata/sanity config rm --provider=defang -n dummy --debug
+        run: go run -race ./cmd/cli -C testdata/sanity config rm --provider=defang -n dummy --debug
         working-directory: src
 
   build-and-sign:

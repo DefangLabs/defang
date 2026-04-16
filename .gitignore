@@ -11,3 +11,4 @@ node_modules/
 *.log
 *.txt
 tmp/
+.claude/settings.local.json
