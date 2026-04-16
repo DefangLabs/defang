@@ -17,6 +17,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -364,6 +365,21 @@ func TestGetServices(t *testing.T) {
 		}
 		res, err := b.GetServices(t.Context(), &defangv1.GetServicesRequest{
 			Project: "project2",
+		})
+		require.NoError(t, err)
+		assert.Empty(t, res.Services)
+	})
+
+	t.Run("first deployment 403 = no services", func(t *testing.T) {
+		b.driver = &mockGcpDriver{
+			bucketName: "bucket-a",
+			getBucketObjectWithServiceAccountError: &googleapi.Error{
+				Code:    403,
+				Message: "Permission 'iam.serviceAccounts.getAccessToken' denied on resource (or it may not exist).",
+			},
+		}
+		res, err := b.GetServices(t.Context(), &defangv1.GetServicesRequest{
+			Project: "project1",
 		})
 		require.NoError(t, err)
 		assert.Empty(t, res.Services)

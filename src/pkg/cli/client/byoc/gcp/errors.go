@@ -3,7 +3,6 @@ package gcp
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"google.golang.org/api/googleapi"
@@ -40,21 +39,4 @@ func annotateGcpError(err error) error {
 		return briefErr
 	}
 	return err
-}
-
-// Used to get nested values from the detail of a googleapi.Error
-func GetGoogleAPIErrorDetail(detail any, path string) string {
-	if path == "" {
-		value, ok := detail.(string)
-		if ok {
-			return value
-		}
-		return ""
-	}
-	dm, ok := detail.(map[string]any)
-	if !ok {
-		return ""
-	}
-	key, rest, _ := strings.Cut(path, ".")
-	return GetGoogleAPIErrorDetail(dm[key], rest)
 }
