@@ -1,4 +1,4 @@
-package aci
+package cd
 
 import (
 	"context"
@@ -23,14 +23,14 @@ type BlobItem struct {
 func (b BlobItem) Name() string { return b.name }
 func (b BlobItem) Size() int64  { return b.size }
 
-func (c *ContainerInstance) newSharedKeyCredential(ctx context.Context) (*azblob.SharedKeyCredential, error) {
+func (d *Driver) newSharedKeyCredential(ctx context.Context) (*azblob.SharedKeyCredential, error) {
 	storageKey := os.Getenv("AZURE_STORAGE_KEY")
 	if storageKey == "" {
-		accountsClient, err := c.NewStorageAccountsClient()
+		accountsClient, err := d.NewStorageAccountsClient()
 		if err != nil {
 			return nil, err
 		}
-		keys, err := accountsClient.ListKeys(ctx, c.resourceGroupName, c.StorageAccount, nil)
+		keys, err := accountsClient.ListKeys(ctx, d.resourceGroupName, d.StorageAccount, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -39,21 +39,21 @@ func (c *ContainerInstance) newSharedKeyCredential(ctx context.Context) (*azblob
 		}
 		storageKey = *keys.Keys[0].Value
 	}
-	return azblob.NewSharedKeyCredential(c.StorageAccount, storageKey)
+	return azblob.NewSharedKeyCredential(d.StorageAccount, storageKey)
 }
 
-func (c *ContainerInstance) newBlobContainerClient(ctx context.Context) (*container.Client, error) {
-	keyCred, err := c.newSharedKeyCredential(ctx)
+func (d *Driver) newBlobContainerClient(ctx context.Context) (*container.Client, error) {
+	keyCred, err := d.newSharedKeyCredential(ctx)
 	if err != nil {
 		return nil, err
 	}
-	containerURL := fmt.Sprintf("https://%s.blob.core.windows.net/%s", c.StorageAccount, c.BlobContainerName)
+	containerURL := fmt.Sprintf("https://%s.blob.core.windows.net/%s", d.StorageAccount, d.BlobContainerName)
 	return container.NewClientWithSharedKeyCredential(containerURL, keyCred, nil)
 }
 
 // IterateBlobs returns an iterator over blobs with the given prefix.
-func (c *ContainerInstance) IterateBlobs(ctx context.Context, prefix string) (iter.Seq2[BlobItem, error], error) {
-	client, err := c.newBlobContainerClient(ctx)
+func (d *Driver) IterateBlobs(ctx context.Context, prefix string) (iter.Seq2[BlobItem, error], error) {
+	client, err := d.newBlobContainerClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -84,8 +84,8 @@ func (c *ContainerInstance) IterateBlobs(ctx context.Context, prefix string) (it
 }
 
 // DownloadBlob fetches the contents of a blob by name.
-func (c *ContainerInstance) DownloadBlob(ctx context.Context, blobName string) ([]byte, error) {
-	client, err := c.newBlobContainerClient(ctx)
+func (d *Driver) DownloadBlob(ctx context.Context, blobName string) ([]byte, error) {
+	client, err := d.newBlobContainerClient(ctx)
 	if err != nil {
 		return nil, err
 	}

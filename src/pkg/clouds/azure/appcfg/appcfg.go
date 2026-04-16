@@ -2,6 +2,8 @@ package appcfg
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -9,12 +11,36 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azappconfig"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appconfiguration/armappconfiguration"
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-const storeNamePrefix = "defangcfg"
+// storeNameSuffixLen is the length in hex chars of the uniqueness suffix appended to the
+// App Configuration store name. 12 hex chars = 48 bits of entropy, plenty to avoid
+// collisions across projects/subscriptions.
+const storeNameSuffixLen = 12
+
+// StoreName returns the deterministic Azure App Configuration store name for the given
+// resource group in the given subscription.
+//
+// App Configuration store names must be globally unique across Azure (5–50 chars,
+// alphanumeric + hyphens). The name is built as {resource-group}-{suffix} where the
+// suffix is a hash of (subscription_id, resource_group). Hashing both inputs guarantees
+// the suffix differs between projects/subscriptions even if the resource-group portion
+// has to be truncated to fit the 50-char limit.
+//
+// Both the CLI (when creating the store) and the Pulumi provider (when looking it up)
+// call this function, so neither side needs to pass the name to the other.
+func StoreName(resourceGroupName, subscriptionID string) string {
+	h := sha256.Sum256([]byte(subscriptionID + "|" + resourceGroupName))
+	suffix := hex.EncodeToString(h[:])[:storeNameSuffixLen]
+
+	name := resourceGroupName + "-" + suffix
+	if len(name) > 50 {
+		name = name[:50-1-len(suffix)] + "-" + suffix
+	}
+	return name
+}
 
 // AppConfiguration wraps an Azure App Configuration store.
 type AppConfiguration struct {
@@ -59,8 +85,9 @@ func (a *AppConfiguration) fetchConnectionString(ctx context.Context, client *ar
 	return fmt.Errorf("no read-write access key found for App Configuration store %s", a.StoreName)
 }
 
-// SetUp creates the App Configuration store if it doesn't already exist in the resource group,
-// fetches its read-write connection string, and populates StoreName and connectionString.
+// SetUp creates the App Configuration store (using the deterministic StoreName) if it
+// doesn't already exist, fetches its read-write connection string, and populates
+// StoreName and connectionString.
 func (a *AppConfiguration) SetUp(ctx context.Context) error {
 	cred, err := a.NewCreds()
 	if err != nil {
@@ -72,25 +99,8 @@ func (a *AppConfiguration) SetUp(ctx context.Context) error {
 		return err
 	}
 
-	// Look for an existing store in the resource group.
-	pager := client.NewListByResourceGroupPager(a.resourceGroupName, nil)
-	for pager.More() {
-		page, err := pager.NextPage(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to list App Configuration stores: %w", err)
-		}
-		for _, store := range page.Value {
-			if store.Name != nil && strings.HasPrefix(*store.Name, storeNamePrefix) {
-				a.StoreName = *store.Name
-				term.Debugf("Using existing App Configuration store %s", a.StoreName)
-				return a.fetchConnectionString(ctx, client)
-			}
-		}
-	}
-
-	// None found — create one.
-	a.StoreName = storeNamePrefix + pkg.RandomID()
-	term.Debugf("Creating App Configuration store %s", a.StoreName)
+	a.StoreName = StoreName(a.resourceGroupName, a.SubscriptionID)
+	term.Debugf("Creating or updating App Configuration store %s", a.StoreName)
 	poller, err := client.BeginCreate(ctx, a.resourceGroupName, a.StoreName, armappconfiguration.ConfigurationStore{
 		Location: a.Location.Ptr(),
 		SKU:      &armappconfiguration.SKU{Name: to.Ptr("Free")},
