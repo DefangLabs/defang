@@ -28,7 +28,7 @@ func (mp ErrMultipleProjects) Error() string {
 }
 
 type ProjectBackend interface {
-	CdCommand(context.Context, client.CdCommandRequest) (types.ETag, error)
+	CdCommand(context.Context, client.CdCommandRequest) (*client.CdCommandResponse, error)
 	CdList(context.Context, bool) (iter.Seq[state.Info], error)
 	GetPrivateDomain(projectName string) string
 	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
@@ -71,10 +71,6 @@ func NewByocBaseClient(tenantLabel types.TenantLabel, backend ProjectBackend, st
 
 func (b *ByocBaseClient) GetStackName() string {
 	return b.PulumiStack
-}
-
-func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
-	return nil, client.ErrNotImplemented("AI debugging is not yet supported for BYOC")
 }
 
 func (b *ByocBaseClient) SetCanIUseConfig(quotas *defangv1.CanIUseResponse) {

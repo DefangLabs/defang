@@ -33,6 +33,7 @@ type GcpLogsClient interface {
 	GetExecutionEnv(ctx context.Context, executionName string) (map[string]string, error)
 	GetProjectID() gcp.ProjectId
 	GetBuildInfo(ctx context.Context, buildId string) (*gcp.BuildTag, error)
+	GetInstanceGroupManagerLabels(ctx context.Context, project, region, name string) (map[string]string, error)
 }
 
 type ServerStream[T any] struct {
@@ -104,6 +105,9 @@ func (s *ServerStream[T]) Follow(start time.Time) (iter.Seq2[*T, error], error) 
 				}
 				yield(nil, err)
 				return
+			}
+			if entry == nil {
+				continue // empty Recv response (heartbeat/suppression), keep looping
 			}
 			resps, err := s.parseAndFilter(entry)
 			if err != nil {
@@ -579,28 +583,28 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 				return nil, nil
 			}
 		case "gce_instance_group_manager": // Compute engine update start
-			request := auditLog.GetRequest()
-			if request == nil {
-				term.Warnf("missing request in audit log for instance group manager %v", path.Base(auditLog.GetResourceName()))
+			// The patch request body only contains changed fields (e.g. the new instance template),
+			// so allInstancesConfig.properties.labels is absent for updates. Read labels from the
+			// live resource instead using the manager name, project, and region from resource labels.
+			project := entry.Resource.Labels["project_id"]
+			region := entry.Resource.Labels["location"]
+			managerName := entry.Resource.Labels["instance_group_manager_name"]
+			labels, err := gcpLogsClient.GetInstanceGroupManagerLabels(ctx, project, region, managerName)
+			if err != nil {
+				term.Warnf("failed to get instance group manager labels for %v: %v", managerName, err)
 				return nil, nil
 			}
-			labels := GetListInStruct(request, "allInstancesConfig.properties.labels")
-			if labels == nil {
-				term.Warnf("missing labels in audit log for instance group manager %v", path.Base(auditLog.GetResourceName()))
-				return nil, nil
-			}
-			// Find the service name from the labels
-			serviceName := ""
-			for _, label := range labels {
-				fields := label.GetStructValue().GetFields()
-				if fields["key"].GetStringValue() == "defang-service" {
-					serviceName = fields["value"].GetStringValue()
-					break
-				}
-			}
+			serviceName := labels["defang-service"]
 			if serviceName == "" {
-				term.Warnf("missing defang-service label in audit log for instance group manager %v", path.Base(auditLog.GetResourceName()))
+				term.Warnf("missing defang-service label in instance group manager %v", managerName)
 				return nil, nil
+			}
+			if etag != "" {
+				labelEtag := labels["defang-etag"]
+				if labelEtag != etag {
+					term.Warnf("skipping instance group manager %v: etag mismatch (got %q, want %q)", managerName, labelEtag, etag)
+					return nil, nil
+				}
 			}
 			rootTriggerId := entry.GetLabels()["compute.googleapis.com/root_trigger_id"]
 			if rootTriggerId == "" {

@@ -17,6 +17,7 @@
           with pkgs;
           mkShell {
             buildInputs = [
+              actionlint
               bashInteractive # full bash with readline/completion so prompts render correctly
               crane
               git

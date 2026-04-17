@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
 )
 
@@ -35,9 +37,32 @@ func makeStackNewCmd() *cobra.Command {
 		Args:    cobra.MaximumNArgs(1),
 		Short:   "Create a new Defang deployment stack",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+
 			var stackName string
 			if len(args) > 0 {
 				stackName = args[0]
+				if err := stacks.ValidateStackName(stackName); err != nil {
+					return fmt.Errorf("invalid stack name %q: %v", stackName, err)
+				}
+			}
+
+			loader := configureLoaderForCommand(cmd)
+			projectName, _, err := loader.LoadProjectName(ctx)
+			if err != nil {
+				return err
+			}
+
+			if stackName != "" && global.Interactive() {
+				// Avoid prompting for stack parameters (interactive mode), if the stack name is provided, but the
+				// given stack name already exists in the project. The PutStack gRPC call would fail.
+				exists, err := stackExists(ctx, projectName, stackName)
+				if err != nil {
+					return err
+				}
+				if exists {
+					return fmt.Errorf("a stack with name %q already exists in project %q", stackName, projectName)
+				}
 			}
 
 			var region, _ = cmd.Flags().GetString("region")
@@ -54,10 +79,17 @@ func makeStackNewCmd() *cobra.Command {
 				return err
 			}
 
-			ctx := cmd.Context()
-			err := PromptForStackParameters(ctx, &params)
+			err = PromptForStackParameters(ctx, &params)
 			if err != nil {
 				return err
+			}
+
+			exists, err := stackExists(ctx, projectName, params.Name)
+			if err != nil {
+				return err
+			}
+			if exists {
+				return fmt.Errorf("stack with name %q already exists in project %q", params.Name, projectName)
 			}
 
 			term.Debugf("Creating stack with parameters: %+v\n", params)
@@ -85,7 +117,7 @@ func makeStackListCmd() *cobra.Command {
 		Short:   "List existing Defang deployment stacks",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-			loader := configureLoader(cmd)
+			loader := configureLoaderForCommand(cmd)
 			projectName, _, err := loader.LoadProjectName(ctx)
 			if err != nil {
 				return err
@@ -107,7 +139,7 @@ func makeStackListCmd() *cobra.Command {
 				return err
 			}
 
-			columns := []string{"Name", "Default", "Provider", "Region", "Mode", "DeployedAt"}
+			columns := []string{"Name", "Default", "Provider", "Region", "Account", "Mode", "DeployedAt"}
 			return term.Table(stacks, columns...)
 		},
 	}
@@ -124,7 +156,7 @@ func makeStackDefaultCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 			name := args[0]
-			loader := configureLoader(cmd)
+			loader := configureLoaderForCommand(cmd)
 			projectName, _, err := loader.LoadProjectName(ctx)
 			if err != nil {
 				return err
@@ -158,7 +190,7 @@ func makeStackRemoveCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 			name := args[0]
-			loader := configureLoader(cmd)
+			loader := configureLoaderForCommand(cmd)
 			sm, err := newStackManagerForLoader(ctx, loader)
 			if err != nil {
 				return err
@@ -190,4 +222,21 @@ func PromptForStackParameters(ctx context.Context, params *stacks.Parameters) er
 	*params = *newParams
 
 	return nil
+}
+
+func stackExists(ctx context.Context, project string, stack string) (bool, error) {
+	if stack == "" {
+		return false, nil
+	}
+	resp, err := global.Client.GetStack(ctx, &defangv1.GetStackRequest{
+		Project: project,
+		Stack:   stack,
+	})
+	if err != nil {
+		if connect.CodeOf(err) == connect.CodeNotFound {
+			return false, nil
+		}
+		return false, err
+	}
+	return resp.GetStack() != nil, nil
 }

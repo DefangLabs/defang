@@ -17,6 +17,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -45,7 +46,7 @@ func TestSetUpCD(t *testing.T) {
 		command: []string{"up", payload},
 	}
 
-	if err := b.runCdCommand(ctx, cmd); err != nil {
+	if _, err := b.runCdCommand(ctx, cmd); err != nil {
 		t.Errorf("CdCommand() error = %v, want nil", err)
 	}
 }
@@ -75,6 +76,10 @@ func (m MockGcpLogsClient) GetBuildInfo(ctx context.Context, buildId string) (*g
 		Service: "test-service",
 		Etag:    "test-etag",
 	}, nil
+}
+
+func (m MockGcpLogsClient) GetInstanceGroupManagerLabels(ctx context.Context, project, region, name string) (map[string]string, error) {
+	return nil, nil
 }
 
 type MockGcpLoggingLister struct {
@@ -108,9 +113,9 @@ func (m *MockGcpLoggingTailer) Next(ctx context.Context) (*loggingpb.LogEntry, e
 
 func TestGetLogStream(t *testing.T) {
 	tests := []struct {
-		name        string
-		req         *defangv1.TailRequest
-		cdExecution string
+		name      string
+		req       *defangv1.TailRequest
+		cdBuildId string
 	}{
 		// TODO: use golang 1.25 synctest to avoid needing a fixed Since in every test case
 		{name: "no_args", req: &defangv1.TailRequest{}},
@@ -164,7 +169,7 @@ func TestGetLogStream(t *testing.T) {
 			LogType: uint32(logs.LogTypeAll),
 			Etag:    "test-etag",
 		},
-			cdExecution: "test-execution-id",
+			cdBuildId: "test-execution-id",
 		},
 	}
 
@@ -173,7 +178,7 @@ func TestGetLogStream(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := NewByocProvider(ctx, "testTenantID", "")
-			b.cdExecution = tt.cdExecution
+			b.cdBuildId = tt.cdBuildId
 
 			driver := &MockGcpLogsClient{
 				lister: &MockGcpLoggingLister{},
@@ -360,6 +365,21 @@ func TestGetServices(t *testing.T) {
 		}
 		res, err := b.GetServices(t.Context(), &defangv1.GetServicesRequest{
 			Project: "project2",
+		})
+		require.NoError(t, err)
+		assert.Empty(t, res.Services)
+	})
+
+	t.Run("first deployment 403 = no services", func(t *testing.T) {
+		b.driver = &mockGcpDriver{
+			bucketName: "bucket-a",
+			getBucketObjectWithServiceAccountError: &googleapi.Error{
+				Code:    403,
+				Message: "Permission 'iam.serviceAccounts.getAccessToken' denied on resource (or it may not exist).",
+			},
+		}
+		res, err := b.GetServices(t.Context(), &defangv1.GetServicesRequest{
+			Project: "project1",
 		})
 		require.NoError(t, err)
 		assert.Empty(t, res.Services)

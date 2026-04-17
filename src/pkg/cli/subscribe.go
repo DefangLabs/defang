@@ -5,6 +5,7 @@ import (
 	"errors"
 	"iter"
 
+	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -52,8 +53,14 @@ func WaitServiceState(
 			return serviceStates, nil
 		}
 		if err != nil {
-			// Reconnect on transient errors
+			// Reconnect on transient errors (including ResourceExhausted — quota resets within
+			// a minute and DelayBeforeRetry backs off exponentially up to 1 minute).
 			if isTransientError(err) {
+				if connect.CodeOf(err) == connect.CodeResourceExhausted {
+					term.Warnf("quota exceeded; will retry subscribe stream after backoff: %v", err)
+				} else {
+					term.Debugf("WaitServiceState: transient error, reconnecting subscribe stream: %v", err)
+				}
 				if err := provider.DelayBeforeRetry(ctx); err != nil {
 					return serviceStates, err
 				}
@@ -68,11 +75,20 @@ func WaitServiceState(
 			return serviceStates, err
 		}
 
+		pendingServices := []string{}
+		for _, service := range services {
+			if serviceStates[service] != targetState {
+				pendingServices = append(pendingServices, service)
+			}
+		}
+
+		term.Infof("Waiting for services to finish deploying: %q\n", pendingServices) // TODO: don't print in Go-routine
+
 		if msg == nil {
 			continue
 		}
 
-		term.Debugf("service %s with state ( %s ) and status: %s\n", msg.Name, msg.State, msg.Status) // TODO: don't print in Go-routine
+		term.Debugf("Service update: %s: state=%s and status=%s\n", msg.Name, msg.State, msg.Status) // TODO: don't print in Go-routine
 
 		if _, ok := serviceStates[msg.Name]; !ok {
 			term.Debugf("unexpected service %s update", msg.Name) // TODO: don't print in Go-routine

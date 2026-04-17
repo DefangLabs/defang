@@ -1,0 +1,388 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Conditions:
+    OidcClaims:
+        Fn::Not:
+            - Fn::Equals:
+                - Fn::Join:
+                    - ""
+                    - Ref: OidcProviderClaims
+                - ""
+    OidcProvider:
+        Fn::And:
+            - Fn::Not:
+                - Fn::Equals:
+                    - Ref: OidcProviderIssuer
+                    - ""
+            - Fn::Not:
+                - Fn::Equals:
+                    - Fn::Join:
+                        - ""
+                        - Ref: OidcProviderSubjects
+                    - ""
+    OidcThumbprints:
+        Fn::Not:
+            - Fn::Equals:
+                - Fn::Join:
+                    - ""
+                    - Ref: OidcProviderThumbprints
+                - ""
+    OverrideCIRoleName:
+        Fn::Not:
+            - Fn::Equals:
+                - Ref: CIRoleName
+                - ""
+    RetainS3Bucket:
+        Fn::Equals:
+            - Ref: RetainBucket
+            - "true"
+Description: 'Defang AWS CloudFormation template for the CD task. Do not delete this stack in the AWS console: use the Defang CLI instead. To create this stack, scroll down to acknowledge the risks and press ''Create stack''.'
+Metadata:
+    AWS::CloudFormation::Interface:
+        ParameterGroups:
+            - Label:
+                default: CI/CD Integration (OIDC)
+              Parameters:
+                - OidcProviderIssuer
+                - OidcProviderSubjects
+                - OidcProviderAudiences
+                - CIRoleName
+                - OidcProviderThumbprints
+                - OidcProviderClaims
+            - Label:
+                default: Storage Configuration
+              Parameters:
+                - RetainBucket
+        ParameterLabels:
+            CIRoleName:
+                default: CI Role Name
+            OidcProviderAudiences:
+                default: OIDC Trusted Audiences
+            OidcProviderClaims:
+                default: Additional OIDC Claim Conditions
+            OidcProviderIssuer:
+                default: OIDC Provider Issuer
+            OidcProviderSubjects:
+                default: OIDC Trusted Subject Patterns
+            OidcProviderThumbprints:
+                default: OIDC Provider Thumbprints
+            RetainBucket:
+                default: Retain S3 Bucket on Delete
+Outputs:
+    bucketName:
+        Description: Name of the S3 bucket
+        Value:
+            Ref: Bucket
+    ciRoleArn:
+        Condition: OidcProvider
+        Description: ARN of the CI role
+        Value:
+            Fn::GetAtt:
+                - CIRole
+                - Arn
+    codeBuildProjectName:
+        Description: Name of the CodeBuild project
+        Value:
+            Ref: DefangCD
+    logGroupArn:
+        Description: ARN of the CloudWatch log group
+        Value:
+            Fn::GetAtt:
+                - LogGroup
+                - Arn
+    templateVersion:
+        Description: Version of this CloudFormation template
+        Value: 4
+Parameters:
+    CIRoleName:
+        Default: ""
+        Description: Name of the CI role (optional)
+        Type: String
+    OidcProviderAudiences:
+        Default: sts.amazonaws.com
+        Description: OIDC provider trusted audience(s) (optional)
+        Type: CommaDelimitedList
+    OidcProviderClaims:
+        Default: ""
+        Description: Additional OIDC claim conditions as comma-separated JSON "key":"value" pairs (optional)
+        Type: CommaDelimitedList
+    OidcProviderIssuer:
+        Default: ""
+        Description: OIDC provider trusted issuer (optional)
+        Type: String
+    OidcProviderSubjects:
+        Default: ""
+        Description: OIDC provider trusted subject pattern(s) (optional)
+        Type: CommaDelimitedList
+    OidcProviderThumbprints:
+        Default: ""
+        Description: OIDC provider thumbprint(s) (optional)
+        Type: CommaDelimitedList
+    RetainBucket:
+        AllowedValues:
+            - "true"
+            - "false"
+        Default: "true"
+        Description: Whether to retain the S3 bucket on stack deletion
+        Type: String
+Resources:
+    Bucket:
+        DeletionPolicy:
+            Fn::If:
+                - RetainS3Bucket
+                - RetainExceptOnCreate
+                - Delete
+        Properties:
+            PublicAccessBlockConfiguration:
+                BlockPublicAcls: true
+                BlockPublicPolicy: true
+                IgnorePublicAcls: true
+                RestrictPublicBuckets: true
+            Tags:
+                - Key: defang:CreatedBy
+                  Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
+            VersioningConfiguration:
+                Status: Enabled
+        Type: AWS::S3::Bucket
+    CIRole:
+        Condition: OidcProvider
+        Properties:
+            AssumeRolePolicyDocument:
+                Fn::Sub:
+                    - |-
+                      {
+                          "Version": "2012-10-17",
+                          "Statement": [{
+                              "Effect": "Allow",
+                              "Principal": {
+                                  "Federated": "${Provider}"
+                              },
+                              "Action": "sts:AssumeRoleWithWebIdentity",
+                              "Condition": {
+                                  "StringEquals": {
+                                      "${OidcProviderIssuer}:aud": [ "${Audiences}" ]${ExtraClaims}
+                                  },
+                                  "StringLike": {
+                                      "${OidcProviderIssuer}:sub": [ "${Subjects}" ]
+                                  }
+                              }
+                          }]
+                      }
+                    - Audiences:
+                        Fn::Join:
+                            - '","'
+                            - Ref: OidcProviderAudiences
+                      ExtraClaims:
+                        Fn::If:
+                            - OidcClaims
+                            - Fn::Join:
+                                - ""
+                                - - ','
+                                  - Fn::Join:
+                                        - ','
+                                        - Ref: OidcProviderClaims
+                            - ""
+                      Provider:
+                        Ref: OIDCProvider
+                      Subjects:
+                        Fn::Join:
+                            - '","'
+                            - Ref: OidcProviderSubjects
+            ManagedPolicyArns:
+                - arn:aws:iam::aws:policy/AdministratorAccess
+            RoleName:
+                Fn::If:
+                    - OverrideCIRoleName
+                    - Ref: CIRoleName
+                    - Ref: AWS::NoValue
+            Tags:
+                - Key: defang:CreatedBy
+                  Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
+        Type: AWS::IAM::Role
+    CodeBuildIAMPolicy:
+        Properties:
+            PolicyDocument:
+                Statement:
+                    - Action:
+                        - iam:CreateRole
+                        - iam:GetRole
+                        - iam:UpdateRole
+                        - iam:DeleteRole
+                        - iam:TagRole
+                        - iam:UntagRole
+                        - iam:UpdateAssumeRolePolicy
+                        - iam:ListRolePolicies
+                        - iam:ListAttachedRolePolicies
+                        - iam:ListInstanceProfilesForRole
+                        - iam:PutRolePolicy
+                        - iam:GetRolePolicy
+                        - iam:DeleteRolePolicy
+                        - iam:AttachRolePolicy
+                        - iam:DetachRolePolicy
+                      Effect: Allow
+                      Resource:
+                        Fn::Sub: arn:aws:iam::${AWS::AccountId}:role/*
+                    - Action:
+                        - iam:CreatePolicy
+                        - iam:GetPolicy
+                        - iam:DeletePolicy
+                        - iam:CreatePolicyVersion
+                        - iam:DeletePolicyVersion
+                        - iam:GetPolicyVersion
+                        - iam:ListPolicyVersions
+                        - iam:TagPolicy
+                      Effect: Allow
+                      Resource:
+                        Fn::Sub: arn:aws:iam::${AWS::AccountId}:policy/*
+                    - Action:
+                        - iam:CreateInstanceProfile
+                        - iam:GetInstanceProfile
+                        - iam:DeleteInstanceProfile
+                        - iam:AddRoleToInstanceProfile
+                        - iam:RemoveRoleFromInstanceProfile
+                        - iam:TagInstanceProfile
+                      Effect: Allow
+                      Resource:
+                        Fn::Sub: arn:aws:iam::${AWS::AccountId}:instance-profile/*
+                    - Action: iam:PassRole
+                      Effect: Allow
+                      Resource:
+                        Fn::Sub: arn:aws:iam::${AWS::AccountId}:role/*
+                    - Action: iam:CreateServiceLinkedRole
+                      Effect: Allow
+                      Resource:
+                        Fn::Sub: arn:aws:iam::${AWS::AccountId}:role/aws-service-role/*
+                Version: "2012-10-17"
+            Roles:
+                - Ref: TaskRole
+        Type: AWS::IAM::ManagedPolicy
+    DefangCD:
+        Properties:
+            Artifacts:
+                Type: NO_ARTIFACTS
+            Cache:
+                Modes:
+                    - LOCAL_DOCKER_LAYER_CACHE
+                Type: LOCAL
+            Environment:
+                ComputeType: BUILD_GENERAL1_MEDIUM
+                Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+                ImagePullCredentialsType: CODEBUILD
+                PrivilegedMode: true
+                Type: LINUX_CONTAINER
+            LogsConfig:
+                CloudWatchLogs:
+                    GroupName:
+                        Ref: LogGroup
+                    Status: ENABLED
+            ServiceRole:
+                Ref: TaskRole
+            Source:
+                BuildSpec: |
+                    version: 0.2
+                    phases:
+                      build:
+                        commands:
+                          - echo 'buildspec should be overridden at StartBuild time'
+                Type: NO_SOURCE
+            Tags:
+                - Key: defang:CreatedBy
+                  Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
+        Type: AWS::CodeBuild::Project
+    LogGroup:
+        Properties:
+            RetentionInDays: 1
+            Tags:
+                - Key: defang:CreatedBy
+                  Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
+        Type: AWS::Logs::LogGroup
+    OIDCProvider:
+        Condition: OidcProvider
+        Properties:
+            ClientIdList:
+                Ref: OidcProviderAudiences
+            Tags:
+                - Key: defang:CreatedBy
+                  Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
+            ThumbprintList:
+                Fn::If:
+                    - OidcThumbprints
+                    - Ref: OidcProviderThumbprints
+                    - Ref: AWS::NoValue
+            Url:
+                Fn::Sub: https://${OidcProviderIssuer}
+        Type: AWS::IAM::OIDCProvider
+    TaskRole:
+        Properties:
+            AssumeRolePolicyDocument:
+                Statement:
+                    - Action: sts:AssumeRole
+                      Effect: Allow
+                      Principal:
+                        Service: codebuild.amazonaws.com
+                Version: "2012-10-17"
+            ManagedPolicyArns:
+                - arn:aws:iam::aws:policy/PowerUserAccess
+            Tags:
+                - Key: defang:CreatedBy
+                  Value: defang
+                - Key: defang:Prefix
+                  Value: test
+                - Key: defang:ManagedBy
+                  Value: CloudFormation
+                - Key: defang:CloudFormationStackName
+                  Value:
+                    Ref: AWS::StackName
+                - Key: defang:CloudFormationStackRegion
+                  Value:
+                    Ref: AWS::Region
+        Type: AWS::IAM::Role

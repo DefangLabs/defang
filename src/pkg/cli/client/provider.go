@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 
@@ -39,11 +38,22 @@ type CdCommandRequest struct {
 	EventsUrl string
 }
 
+type CdCommandResponse struct {
+	CdId   string
+	CdType defangv1.CdType
+	ETag   string
+}
+
 type DeployRequest struct {
 	defangv1.DeployRequest
-
-	StatesUrl string
 	EventsUrl string
+	StatesUrl string
+}
+
+type DeployResponse struct {
+	*defangv1.DeployResponse
+	CdId   string
+	CdType defangv1.CdType
 }
 
 type PrepareDomainDelegationRequest struct {
@@ -69,12 +79,13 @@ type Provider interface {
 	DNSResolver
 	AccountInfo(context.Context) (*AccountInfo, error)
 	Authenticate(ctx context.Context, interactive bool) error
-	CdCommand(context.Context, CdCommandRequest) (types.ETag, error)
+	CdCommand(context.Context, CdCommandRequest) (*CdCommandResponse, error)
 	CdList(context.Context, bool) (iter.Seq[byocState.Info], error)
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
 	DelayBeforeRetry(context.Context) error
 	DeleteConfig(context.Context, *defangv1.Secrets) error
-	Deploy(context.Context, *DeployRequest) (*defangv1.DeployResponse, error)
+	Deploy(context.Context, *DeployRequest) (*DeployResponse, error)
+	Driver() string
 	GetDeploymentStatus(context.Context) (bool, error)
 	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 	GetService(context.Context, *defangv1.GetRequest) (*defangv1.ServiceInfo, error)
@@ -83,7 +94,7 @@ type Provider interface {
 	GetStackNameForDomain() string
 	ListConfig(context.Context, *defangv1.ListConfigsRequest) (*defangv1.Secrets, error)
 	PrepareDomainDelegation(context.Context, PrepareDomainDelegationRequest) (*PrepareDomainDelegationResponse, error)
-	Preview(context.Context, *DeployRequest) (*defangv1.DeployResponse, error)
+	Preview(context.Context, *DeployRequest) (*DeployResponse, error)
 	PutConfig(context.Context, *defangv1.PutConfigRequest) error
 	QueryLogs(context.Context, *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error)
 	// Deprecated: should use stacks instead of ProjectName fallback.

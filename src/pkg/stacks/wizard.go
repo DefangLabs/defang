@@ -195,8 +195,8 @@ func (f *FileSystemAWSProfileLister) ListProfiles() ([]string, error) {
 	return result, nil
 }
 
+// this is an elicitations validator function
 func ValidStackName(val any) error {
-	// the reflect value of the result
 	value := reflect.ValueOf(val)
 	str, ok := value.Interface().(string)
 	if !ok {
@@ -206,18 +206,5 @@ func ValidStackName(val any) error {
 		return errors.New("Value cannot be empty")
 	}
 
-	// if the value starts with a number, return an error
-	firstChar := str[0]
-	if firstChar >= '0' && firstChar <= '9' {
-		return errors.New("Value must not start with a number")
-	}
-
-	// if the value is not alphanumeric return an error
-	for _, r := range str {
-		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')) {
-			return errors.New("Value must be alphanumeric")
-		}
-	}
-
-	return nil
+	return ValidateStackName(str)
 }

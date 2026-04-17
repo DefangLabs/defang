@@ -84,7 +84,7 @@ func paramsFromMap(variables map[string]string) (*Parameters, error) {
 	}, nil
 }
 
-var validStackName = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
+var stackNamePattern = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
 
 const (
 	DefaultBeta = "beta"
@@ -100,8 +100,8 @@ func CreateInDirectory(workingDirectory string, params Parameters) (string, erro
 	if params.Name == "" {
 		return "", errors.New("stack name cannot be empty")
 	}
-	if !validStackName.MatchString(params.Name) {
-		return "", errors.New("stack name must start with a letter and contain only lowercase letters and numbers")
+	if err := ValidateStackName(params.Name); err != nil {
+		return "", err
 	}
 
 	content, err := Marshal(&params)
@@ -142,9 +142,21 @@ func CreateInDirectory(workingDirectory string, params Parameters) (string, erro
 	return filename, nil
 }
 
+func (p *Parameters) Account() string {
+	switch p.Provider {
+	case client.ProviderAWS:
+		return p.Variables["AWS_PROFILE"]
+	case client.ProviderGCP:
+		return p.Variables["GCP_PROJECT_ID"]
+	default:
+		return ""
+	}
+}
+
 // for shell printing for converting to string format of StackParameters
 type ListItem struct {
 	Parameters
+	Account    string
 	Default    bool
 	DeployedAt time.Time
 }
@@ -179,6 +191,7 @@ func ListInDirectory(workingDirectory string) ([]ListItem, error) {
 		}
 		stacks = append(stacks, ListItem{
 			Parameters: *params,
+			Account:    params.Account(),
 		})
 	}
 
@@ -193,12 +206,15 @@ func Marshal(params *Parameters) (string, error) {
 	if params == nil {
 		return "", nil
 	}
-	return godotenv.Marshal(params.ToMap())
+	return godotenv.Marshal(params.ToMap()) // TODO: should append LF at EOF
 }
 
 func RemoveInDirectory(workingDirectory, name string) error {
 	if name == "" {
 		return errors.New("stack name cannot be empty")
+	}
+	if err := ValidateStackName(name); err != nil {
+		return err
 	}
 	path := filename(workingDirectory, name)
 	// delete the stack file
@@ -255,4 +271,11 @@ func PrintCreateMessage(stackName string) {
 			"To learn more about stacks, visit https://s.defang.io/stacks\n",
 		stackName,
 	)
+}
+
+func ValidateStackName(val string) error {
+	if !stackNamePattern.MatchString(val) {
+		return errors.New("Value must be alphanumeric and start with a letter")
+	}
+	return nil
 }

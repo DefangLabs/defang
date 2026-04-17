@@ -1,52 +1,50 @@
 [![Go package](https://github.com/DefangLabs/defang/actions/workflows/go.yml/badge.svg?branch=main)](https://github.com/DefangLabs/defang/actions/workflows/go.yml)
-![Discord](https://img.shields.io/discord/1233224785450897561)
+[![Discord](https://img.shields.io/discord/1233224785450897561)](https://s.defang.io/discord)
 ![GitHub Release](https://img.shields.io/github/v/release/DefangLabs/defang)
 
 ### ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/Logos/Element_Wordmark_Slogan/JPG/Dark_Colour_Glow.jpg)
 
 ## Develop Once, Deploy Anywhere.
 
-Take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.
+Take your app from Compose to a secure and scalable deployment on your favorite cloud in minutes.
 
 ### How It Works
 
 ```mermaid
 flowchart LR
-    subgraph local["Your Machine or CI/CD"]
-        compose["compose.yaml"]
-        cli["Defang CLI"]
-        style cli stroke-width:3px
-  end
 
-    subgraph defang["Defang Backend"]
-        fabric["Fabric gRPC API"]
-        style fabric stroke-width:3px
-    end
+subgraph local["Your Machine or CI/CD"]
+    compose["compose.yaml"] --> cli["Defang CLI"]
+end
 
-    subgraph cloud["Your Cloud Account"]
-        cd["Defang CD Task"]
-        style cd stroke-width:3px
-        secrets["Config & Secrets"]
-        subgraph infra["Infrastructure"]
-            lb["Load Balancer"]
-            containers["Containers"]
-            db["DB"]
-            dns["DNS"]
-        end
-    end
+subgraph defang["Defang Backend"]
+    fabric["Fabric API (gRPC)"]
+end
 
-    compose --> cli
-    cli <--> fabric
-    cli --> cd
-    cli --> secrets
-    cd --> infra
-    containers --> db
+subgraph cloud["Your Cloud Account"]
+    secrets["Config & Secrets"]
+    cd["Defang CD Task"]
+    logs["Logs"]
+    runtime["Load Balancer, Containers, DB, Cache, LLM, DNS, Roles"]
+end
+
+%% control plane
+cli <-.-> fabric
+
+%% deploy
+cli --> secrets
+cli --> cd
+cd --> runtime
+
+%% observability
+cli -.-> logs
 ```
 
-1. **You write** a standard Docker Compose file
+1. **You write** a standard Docker **Compose** file
 2. **Defang CLI** validates your Compose project and uploads the project to storage in your AWS/GCP account
 3. **CD runs in your cloud** — a deployment task spins up in your AWS/GCP account
-4. **Infrastructure is created** — containers, DNS, load balancing, and secrets are provisioned
+4. **Infrastructure is created** — containers, DNS, load balancing, and roles are provisioned
+5. **Monitor** the deployment and tail or query runtime logs with the Defang CLI
 
 Your code and secrets never leave your cloud account. Defang orchestrates the deployment, but everything runs in your infrastructure.
 
@@ -77,6 +75,17 @@ $ defang up --stack=awsuswest2
 [![Add to Kiro](https://kiro.dev/images/add-to-kiro.svg)](https://kiro.dev/launch/mcp/add?name=defang&config=%7B%22command%22%3A%20%22npx%22%2C%20%22args%22%3A%20%5B%22-y%22%2C%20%22defang%40latest%22%2C%20%22mcp%22%2C%20%22serve%22%2C%20%22--client%3Dkiro%22%5D%2C%20%22disabled%22%3A%20false%2C%20%22autoApprove%22%3A%20%5B%5D%7D)
 
 The Defang Model Context Protocol [(MCP)](https://docs.defang.io/docs/concepts/mcp) Server is tailored for developers who work primarily within integrated development environments (IDEs). It enables seamless cloud deployment from supported editors such as Cursor, Windsurf, VS Code, VS Code Insiders and Claude delivering a fully integrated experience without leaving your development environment.
+
+## Claude Code Plugin
+
+Install the Defang plugin for [Claude Code](https://claude.ai/code) to deploy directly from any Claude Code session — no CLI required upfront:
+
+```shell
+/plugin marketplace add DefangLabs/defang
+/plugin install defang@defang-skills
+```
+
+After installing, use `/defang:deploy` to guide you through deploying your project. The Defang MCP server activates automatically once the Defang CLI is installed.
 
 ## This repo includes:
 

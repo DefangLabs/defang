@@ -16,9 +16,9 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	awscodebuild "github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild/cfn"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -92,18 +92,6 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 			}
 		})
 	}
-}
-
-type FakeLoader struct {
-	ProjectName string
-}
-
-func (f FakeLoader) LoadProject(ctx context.Context) (*composeTypes.Project, error) {
-	return &composeTypes.Project{Name: f.ProjectName}, nil
-}
-
-func (f FakeLoader) LoadProjectName(ctx context.Context) (string, bool, error) {
-	return f.ProjectName, false, nil
 }
 
 //go:embed testdata/*.json
@@ -454,7 +442,7 @@ func newTestByocAws() *ByocAws {
 	}
 	b.driver.AccountID = "123456789012"
 	b.driver.LogGroupARN = "arn:aws:logs:us-test-2:123456789012:log-group:defang-cd-LogGroup:*"
-	b.driver.ClusterName = "test-cluster"
+	b.driver.ProjectName = "test-project"
 	b.ByocBaseClient = byoc.NewByocBaseClient("tenant1", b, "beta")
 	return b
 }
@@ -691,7 +679,7 @@ func TestQueryCdLogs(t *testing.T) {
 				events: makeMockEvents(tt.numEvents, "crun", ""),
 			}
 
-			batchSeq, err := b.queryOrTailLogsByTaskID(t.Context(), mock, tt.req, tt.req.Etag)
+			batchSeq, err := b.queryOrTailLogsByBuildID(t.Context(), mock, tt.req, awscodebuild.BuildID(&tt.req.Etag))
 			require.NoError(t, err)
 
 			// Flatten and collect
@@ -702,39 +690,36 @@ func TestQueryCdLogs(t *testing.T) {
 	}
 }
 
-// TestQueryCdLogs_FollowMode is skipped because TailTaskID polls getTaskStatus
-// (real AWS ECS API) when StartLiveTail returns ResourceNotFoundException.
-// Testing follow mode for CD logs requires mocking the ECS DescribeTasks API.
-func TestQueryCdLogs_FollowMode(t *testing.T) {
-	t.Skip("requires ECS API mock for getTaskStatus")
-}
-
-func TestDeriveTaskID(t *testing.T) {
+func TestDeriveBuildID(t *testing.T) {
 	validEtag := types.NewEtag()
 
 	tests := []struct {
-		name       string
-		cdTaskArn  ecs.TaskArn
-		cdEtag     string
-		reqEtag    string
-		wantTaskID string
+		name        string
+		cdBuildId   awscodebuild.BuildID
+		cdEtag      string
+		reqEtag     string
+		wantBuildID awscodebuild.BuildID
 	}{
 		{
-			name:       "matching cd etag returns task ID from ARN",
-			cdTaskArn:  ptr.String("arn:aws:ecs:us-west-2:123456789012:task/cluster/abc123def456"),
-			cdEtag:     validEtag,
-			reqEtag:    validEtag,
-			wantTaskID: "abc123def456",
+			name:        "matching cd etag returns build ID",
+			cdBuildId:   ptr.String("defang:abc123def456"),
+			cdEtag:      validEtag,
+			reqEtag:     validEtag,
+			wantBuildID: ptr.String("defang:abc123def456"),
 		},
 		{
-			name:       "invalid etag treated as legacy task ID",
-			reqEtag:    "some-task-id",
-			wantTaskID: "some-task-id",
+			name:        "invalid etag treated as legacy build ID",
+			reqEtag:     "some-build-id",
+			wantBuildID: ptr.String("some-build-id"),
 		},
 		{
 			name:    "valid etag not matching cd returns empty",
 			cdEtag:  "aaaaaaaaaaaa",
 			reqEtag: "bbbbbbbbbbbb",
+		},
+		{
+			name:    "valid etag without cd build ID returns empty",
+			reqEtag: "cccccccccccc",
 		},
 		{
 			name: "empty etag returns empty",
@@ -744,11 +729,11 @@ func TestDeriveTaskID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := newTestByocAws()
-			b.cdTaskArn = tt.cdTaskArn
+			b.cdBuildId = tt.cdBuildId
 			b.cdEtag = tt.cdEtag
 
-			got := b.deriveTaskID(tt.reqEtag)
-			assert.Equal(t, tt.wantTaskID, got)
+			got := b.deriveBuildID(tt.reqEtag)
+			assert.Equal(t, tt.wantBuildID, got)
 		})
 	}
 }

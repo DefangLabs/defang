@@ -37,7 +37,7 @@ func NewGrpcClient(host, accessToken string, requestedTenant types.TenantNameOrI
 		connect.WithGRPC(),
 		connect.WithInterceptors(
 			grpcLogger{"fabricClient"},
-			auth.NewAuthInterceptor(accessToken, requestedTenant),
+			auth.NewAuthInterceptor(accessToken, requestedTenant, ""),
 			Retrier{},
 		),
 	)
@@ -103,6 +103,10 @@ func (g GrpcClient) ListStacks(ctx context.Context, req *defangv1.ListStacksRequ
 func (g GrpcClient) DeleteStack(ctx context.Context, req *defangv1.DeleteStackRequest) error {
 	_, err := getMsg(g.client.DeleteStack(ctx, connect.NewRequest(req)))
 	return err
+}
+
+func (g GrpcClient) GetStack(ctx context.Context, req *defangv1.GetStackRequest) (*defangv1.GetStackResponse, error) {
+	return getMsg(g.client.GetStack(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) ListDeployments(ctx context.Context, req *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error) {

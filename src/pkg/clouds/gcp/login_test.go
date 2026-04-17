@@ -34,13 +34,19 @@ func (m *mockProjectsClient) Close() error { return nil }
 
 // mockNewProjectsClient replaces newProjectsClient for the duration of a test,
 // returning a client whose TestIamPermissions always calls fn.
+// It also stubs out ensureAPIsEnabled so tests don't hit the real Service Usage API.
 func mockNewProjectsClient(t *testing.T, fn func(ctx context.Context, req *iampb.TestIamPermissionsRequest, opts ...gax.CallOption) (*iampb.TestIamPermissionsResponse, error)) {
 	t.Helper()
-	orig := newProjectsClient
+	origClient := newProjectsClient
 	newProjectsClient = func(ctx context.Context, opts ...option.ClientOption) (projectsClientIface, error) {
 		return &mockProjectsClient{testIamPermissionsFunc: fn}, nil
 	}
-	t.Cleanup(func() { newProjectsClient = orig })
+	origEnsure := ensureAPIsEnabled
+	ensureAPIsEnabled = func(ctx context.Context, g Gcp, apis ...string) error { return nil }
+	t.Cleanup(func() {
+		newProjectsClient = origClient
+		ensureAPIsEnabled = origEnsure
+	})
 }
 
 func marshalToken(t *testing.T, tok oauth2.Token) string {
@@ -228,7 +234,12 @@ func TestAuthenticate_GCP(t *testing.T) {
 			}
 			return &mockProjectsClient{testIamPermissionsFunc: allPermsGranted}, nil
 		}
-		t.Cleanup(func() { newProjectsClient = orig })
+		origEnsure := ensureAPIsEnabled
+		ensureAPIsEnabled = func(ctx context.Context, g Gcp, apis ...string) error { return nil }
+		t.Cleanup(func() {
+			newProjectsClient = orig
+			ensureAPIsEnabled = origEnsure
+		})
 
 		tok := oauth2.Token{
 			AccessToken:  "stored-token",
@@ -346,6 +357,59 @@ func pollServerForGCP(t *testing.T, payload []byte) *httptest.Server {
 		}
 		w.Write([]byte(base64.StdEncoding.EncodeToString(ciphertext))) //nolint:errcheck
 	}))
+}
+
+func TestAuthenticate_GCP_ContextCanceled(t *testing.T) {
+	// Authenticate must fast-fail with context.Canceled when the context is done,
+	// without setting TokenSource or trying other credential sources.
+	orig := ensureAPIsEnabled
+	ensureAPIsEnabled = func(ctx context.Context, g Gcp, apis ...string) error {
+		return errors.New("API unavailable") // non-nil so the ctx.Err() check is reached
+	}
+	t.Cleanup(func() { ensureAPIsEnabled = orig })
+
+	store := tokenstore.NewMemTokenStore()
+	tok := oauth2.Token{AccessToken: "tok", Expiry: time.Now().Add(time.Hour)}
+	store.Save("user@example.com", marshalToken(t, tok)) //nolint:errcheck
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // pre-cancel so ctx.Err() != nil on the first check
+
+	gcp := &Gcp{ProjectId: "test-project", TokenStore: store}
+	err := gcp.Authenticate(ctx, false)
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("Authenticate() error = %v, want context.Canceled", err)
+	}
+	if gcp.TokenSource != nil {
+		t.Error("expected TokenSource to remain nil after fast-fail")
+	}
+}
+
+func TestFindStoredCredentials_GCP_ContextCanceled(t *testing.T) {
+	// findStoredCredentials must abort and return ctx.Err() when the context is done,
+	// regardless of what error testTokenProjectPermissions returns.
+	orig := ensureAPIsEnabled
+	ensureAPIsEnabled = func(ctx context.Context, g Gcp, apis ...string) error {
+		return errors.New("API unavailable") // non-nil so the else branch is taken
+	}
+	t.Cleanup(func() { ensureAPIsEnabled = orig })
+
+	store := tokenstore.NewMemTokenStore()
+	tok := oauth2.Token{AccessToken: "tok", Expiry: time.Now().Add(time.Hour)}
+	store.Save("user@example.com", marshalToken(t, tok)) //nolint:errcheck
+
+	// Pre-cancel the context so ctx.Err() != nil inside findStoredCredentials.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	gcp := &Gcp{ProjectId: "test-project", TokenStore: store}
+	ts, err := gcp.findStoredCredentials(ctx)
+	if ts != nil {
+		t.Error("expected nil token source when context is done")
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("findStoredCredentials() error = %v, want context.Canceled", err)
+	}
 }
 
 func TestInteractiveLogin_GCP(t *testing.T) {

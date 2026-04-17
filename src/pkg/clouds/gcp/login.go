@@ -34,13 +34,17 @@ var newProjectsClient = func(ctx context.Context, opts ...option.ClientOption) (
 	return resourcemanager.NewProjectsClient(ctx, opts...)
 }
 
+var ensureAPIsEnabled = func(ctx context.Context, g Gcp, apis ...string) error {
+	return g.EnsureAPIsEnabled(ctx, apis...)
+}
+
 var (
-	clientID = "513566466873-r6s52lv410ceuo37b2qu5122r0tu6brb.apps.googleusercontent.com" // nolint:gosec,G101 // Client ID for app is not a secret
+	clientID = "513566466873-r6s52lv410ceuo37b2qu5122r0tu6brb.apps.googleusercontent.com" // nolint:gosec // Client ID for app is not a secret
 	// Client secret for app is not a secret, desktop APP client secrets is considered public information
 	// See: https://developers.google.com/identity/protocols/oauth2/#installed
 	// Numerous opensource projects have their google cloud client_secret committed in source code, including gcloud cli itself, and gomote:
 	// https://github.com/golang/build/blob/master/internal/iapclient/iapclient.go#L38
-	clientSecret = "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" // nolint:gosec,G101
+	clientSecret = "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" // nolint:gosec
 	scopes       = []string{"email", "https://www.googleapis.com/auth/cloud-platform"}
 
 	// TODO: Add all required permissions for running gcp byoc
@@ -107,7 +111,12 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 	//    - if the user has login with glcoud cli with application default credentials
 	//    - if the user has set GOOGLE_APPLICATION_CREDENTIALS to a service account key file with required permissions
 	term.Debugf("checking if application default credentials are available and has permission, GOOGLE_APPLICATION_CREDENTIALS=%q...", os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
-	if err := testTokenProjectPermissions(ctx, gcp.ProjectId, requiredPerms, nil); err == nil {
+	if err := testTokenProjectPermissions(ctx, gcp.ProjectId, requiredPerms, nil); err != nil {
+		if ctx.Err() != nil { // Fast fail if context is done, no need to try other credential sources
+			return ctx.Err()
+		}
+		term.Debugf("the application default credentials are missing permissions: %v", err)
+	} else {
 		term.Debug("found valid application default credentials with required permissions")
 		// No need to pass down ADC token source via options since ADC is automatically used by gcp sdk
 		return nil
@@ -115,6 +124,9 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 
 	// 2. Try GitHub Actions OIDC token if running in GitHub Actions with Workload Identity Federation set up
 	if tokenSource, principal, err := findGithubCredentials(ctx); err != nil {
+		if ctx.Err() != nil { // Fast fail if context is done, no need to try other credential sources
+			return ctx.Err()
+		}
 		term.Warnf("failed to get GitHub Actions OIDC token source: %v", err)
 	} else if tokenSource != nil {
 		term.Debug("found GitHub Actions OIDC token source, testing permissions...")
@@ -131,6 +143,9 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 
 	// 3. Try load previously saved tokens from the token store
 	if tokenSource, err := gcp.findStoredCredentials(ctx); err != nil {
+		if ctx.Err() != nil { // Fast fail if context is done, no need to try other credential sources
+			return ctx.Err()
+		}
 		term.Warnf("failed to load stored credentials: %v", err)
 	} else if tokenSource != nil {
 		term.Debug("found valid stored credentials with required permissions")
@@ -236,7 +251,11 @@ func (gcp *Gcp) findStoredCredentials(ctx context.Context) (oauth2.TokenSource, 
 			}
 			return tokenSource, nil
 		} else {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 			term.Debugf("Token %q is missing required permissions: %v\n", name, err)
+			continue
 		}
 	}
 	return nil, nil
@@ -353,6 +372,11 @@ func testTokenProjectPermissions(ctx context.Context, projectID string, perms []
 	if tokenSource != nil {
 		options = append(options, option.WithTokenSource(tokenSource))
 	}
+
+	if err := ensureAPIsEnabled(ctx, Gcp{ProjectId: projectID, Options: options}, "cloudresourcemanager.googleapis.com"); err != nil {
+		return fmt.Errorf("unable to enable resource manager in project %v: %w", projectID, err)
+	}
+
 	client, err := newProjectsClient(ctx, options...)
 	if err != nil {
 		return fmt.Errorf("creating client: %w", err)

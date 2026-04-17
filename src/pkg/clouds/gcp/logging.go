@@ -62,7 +62,9 @@ func (t *gcpLoggingTailer) Next(ctx context.Context) (*loggingpb.LogEntry, error
 		}
 		t.cache = resp.GetEntries()
 		if len(t.cache) == 0 {
-			return nil, errors.New("no log entries found")
+			// GCP may send empty responses (heartbeats, suppression info); return nil
+			// so the caller can continue looping without treating this as an error.
+			return nil, nil
 		}
 	}
 

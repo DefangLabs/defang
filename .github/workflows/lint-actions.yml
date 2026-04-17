@@ -1,0 +1,33 @@
+name: Lint GitHub Actions
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - ".github/actions/**"
+
+permissions:
+  contents: read
+
+jobs:
+  lint-actions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Run actionlint
+        run: |
+          echo "::add-matcher::.github/actionlint-matcher.json"
+          curl -fsSL "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz" -o actionlint.tar.gz
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  actionlint.tar.gz" | sha256sum -c
+          tar xzf actionlint.tar.gz actionlint
+          ./actionlint -color
+
+      - name: Check for non-SHA-pinned actions
+        run: |
+          # Match uses: lines where @ is NOT followed by a 40-char hex SHA
+          # Ignore commented-out lines
+          if grep -rPn '^\s+uses:\s+\S+@(?![0-9a-f]{40}\b)' .github/workflows/ .github/actions/; then
+            echo "::error::Found actions not pinned to a commit SHA. Use the full SHA with a version comment, e.g. actions/checkout@abc123...def # v6"
+            exit 1
+          fi

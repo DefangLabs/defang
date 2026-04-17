@@ -133,15 +133,15 @@ func (b *ByocDo) GetProjectUpdate(ctx context.Context, projectName string) (*def
 	return &projUpdate, nil
 }
 
-func (b *ByocDo) Preview(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocDo) Preview(ctx context.Context, req *client.DeployRequest) (*client.DeployResponse, error) {
 	return b.deploy(ctx, req, "preview")
 }
 
-func (b *ByocDo) Deploy(ctx context.Context, req *client.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocDo) Deploy(ctx context.Context, req *client.DeployRequest) (*client.DeployResponse, error) {
 	return b.deploy(ctx, req, "up")
 }
 
-func (b *ByocDo) deploy(ctx context.Context, req *client.DeployRequest, cmd string) (*defangv1.DeployResponse, error) {
+func (b *ByocDo) deploy(ctx context.Context, req *client.DeployRequest, cmd string) (*client.DeployResponse, error) {
 	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
 	project, err := compose.LoadFromContent(ctx, req.Compose, "")
 	if err != nil {
@@ -205,15 +205,19 @@ func (b *ByocDo) deploy(ctx context.Context, req *client.DeployRequest, cmd stri
 		statesUrl:      req.StatesUrl,
 		eventsUrl:      req.EventsUrl,
 	}
-	_, err = b.runCdCommand(ctx, cdCmd)
+	app, err := b.runCdCommand(ctx, cdCmd)
 	if err != nil {
 		return nil, err
 	}
 
 	b.cdEtag = etag
-	return &defangv1.DeployResponse{
-		Services: serviceInfos,
-		Etag:     etag,
+	return &client.DeployResponse{
+		DeployResponse: &defangv1.DeployResponse{
+			Services: serviceInfos,
+			Etag:     etag,
+		},
+		CdType: defangv1.CdType_CD_TYPE_DO_APPPLATFORM_DEPLOYMENTID,
+		CdId:   app.PendingDeployment.ID,
 	}, nil
 }
 
@@ -233,9 +237,9 @@ func (b *ByocDo) GetDeploymentStatus(ctx context.Context) (bool, error) {
 	}
 }
 
-func (b *ByocDo) CdCommand(ctx context.Context, req client.CdCommandRequest) (string, error) {
+func (b *ByocDo) CdCommand(ctx context.Context, req client.CdCommandRequest) (*client.CdCommandResponse, error) {
 	if err := b.SetUpCD(ctx, false); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	etag := types.NewEtag()
@@ -247,13 +251,17 @@ func (b *ByocDo) CdCommand(ctx context.Context, req client.CdCommandRequest) (st
 		statesUrl:      req.StatesUrl,
 		eventsUrl:      req.EventsUrl,
 	}
-	_, err := b.runCdCommand(ctx, cmd)
+	app, err := b.runCdCommand(ctx, cmd)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	b.cdEtag = etag
-	return etag, nil
+	return &client.CdCommandResponse{
+		CdType: defangv1.CdType_CD_TYPE_DO_APPPLATFORM_DEPLOYMENTID,
+		CdId:   app.PendingDeployment.ID,
+		ETag:   etag,
+	}, nil
 }
 
 func (b *ByocDo) CdList(ctx context.Context, _allRegions bool) (iter.Seq[state.Info], error) {
@@ -669,6 +677,10 @@ func (b *ByocDo) environment(projectName, delegateDomain string, mode defangv1.D
 		env = append(env, &godo.AppVariableDefinition{Key: "NO_COLOR", Value: "1"})
 	}
 	return env, nil
+}
+
+func (*ByocDo) Driver() string {
+	return "app platform"
 }
 
 func (b *ByocDo) SetUpCD(ctx context.Context, force bool) error {

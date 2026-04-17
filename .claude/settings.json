@@ -14,6 +14,13 @@
       "Bash(git diff:*)",
       "Bash(git log:*)",
       "Bash(git show:*)"
+      "Bash(docker pull:*)",
+      "Bash(git ls-remote:*)",
+      "Bash(go vet:*)",
+      "Bash(head:*)",
+      "Bash(sort:*)",
+      "Bash(tail:*)",
+      "Bash(xxd:*)"
     ]
   }
 }

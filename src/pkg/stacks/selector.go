@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
@@ -116,10 +117,10 @@ func printStacksInfoMessage(stacks []string) {
 	if betaExists {
 		infoLine := "This project was deployed with an implicit Stack called 'beta' before Stacks were introduced."
 		if len(stacks) == 1 {
-			infoLine += "\n   To update your existing deployment, select the 'beta' Stack.\n" +
-				"Creating a new Stack will result in a separate deployment instance."
+			infoLine += "\n - To update your existing deployment, select the 'beta' Stack.\n" +
+				" - Creating a new Stack will result in a separate deployment instance."
 		}
-		infoLine += "\n   To learn more about Stacks, visit: https://s.defang.io/stacks"
+		infoLine += "\n - To learn more about Stacks, visit: https://s.defang.io/stacks"
 		term.Println(infoLine)
 	}
 	term.Printf("To skip this prompt, run this command with --stack=%s\n", "<stack_name>")
@@ -144,10 +145,19 @@ func stackLabelParts(stacks []ListItem) [][]string {
 		if !s.DeployedAt.IsZero() {
 			deployedAt = "last deployed " + s.DeployedAt.Format("Jan 2 2006")
 		}
+		provider := s.Provider
+		account := ""
+		switch provider {
+		case client.ProviderAWS:
+			account, _ = s.Variables["AWS_PROFILE"]
+		case client.ProviderGCP:
+			account, _ = s.Variables["GCP_PROJECT_ID"]
+		}
 		parts := []string{
 			s.Name,
-			s.Provider.String(),
+			provider.String(),
 			s.Region,
+			account,
 			deployedAt,
 		}
 		partsList = append(partsList, parts)

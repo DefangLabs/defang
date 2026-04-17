@@ -1,0 +1,166 @@
+{
+  "$metadata": {
+    "httpStatusCode": 200,
+    "requestId": "0ef4e7b3-81bc-4d79-a1e4-0bfdb24bfe50",
+    "attempts": 1,
+    "totalRetryDelay": 0
+  },
+  "builds": [
+    {
+      "arn": "arn:aws:codebuild:us-test-2:123456789012:build/app-image-2beb4dc:188cd8ff-eea1-485a-ab58-7c5b1d2bc882",
+      "artifacts": {
+        "location": "",
+        "overrideArtifactName": false,
+        "type": "no_artifacts"
+      },
+      "autoRetryConfig": { "autoRetryLimit": 0, "autoRetryNumber": 0 },
+      "buildComplete": true,
+      "buildNumber": 5,
+      "buildStatus": "FAILED",
+      "cache": {
+        "modes": ["LOCAL_DOCKER_LAYER_CACHE", "LOCAL_SOURCE_CACHE"],
+        "type": "LOCAL"
+      },
+      "currentPhase": "COMPLETED",
+      "encryptionKey": "arn:aws:kms:us-test-2:123456789012:alias/aws/s3",
+      "endTime": "2025-10-27T22:31:11.266Z",
+      "environment": {
+        "computeType": "BUILD_GENERAL1_LARGE",
+        "customEntrypoint": false,
+        "environmentVariables": [
+          {
+            "name": "AWS_ACCOUNT_ID",
+            "type": "PLAINTEXT",
+            "value": "123456789012"
+          },
+          {
+            "name": "AWS_DEFAULT_REGION",
+            "type": "PLAINTEXT",
+            "value": "us-test-2"
+          }
+        ],
+        "image": "aws/codebuild/amazonlinux-x86_64-standard:5.0",
+        "imagePullCredentialsType": "CODEBUILD",
+        "privilegedMode": true,
+        "type": "LINUX_CONTAINER"
+      },
+      "id": "app-image-2beb4dc:188cd8ff-eea1-485a-ab58-7c5b1d2bc882",
+      "initiator": "defang-cd-TaskRole-eJ6hq8smnEcq/d92decf976b3456297e62ef9086786b8",
+      "logs": {
+        "cloudWatchLogs": {
+          "groupName": "/Defang/html-css-js/beta/builds",
+          "status": "ENABLED",
+          "streamName": "app-image/app_2h5wfow3w4y0"
+        },
+        "cloudWatchLogsArn": "arn:aws:logs:us-test-2:123456789012:log-group:/Defang/html-css-js/beta/builds:log-stream:app-image/app_2h5wfow3w4y0/188cd8ff-eea1-485a-ab58-7c5b1d2bc882",
+        "deepLink": "https://console.aws.amazon.com/cloudwatch/home?region=us-test-2#logsV2:log-groups/log-group/$252FDefang$252Fhtml-css-js$252Fbeta$252Fbuilds/log-events/app-image$252Fapp_2h5wfow3w4y0$252F188cd8ff-eea1-485a-ab58-7c5b1d2bc882",
+        "groupName": "/Defang/html-css-js/beta/builds",
+        "s3Logs": { "encryptionDisabled": false, "status": "DISABLED" },
+        "streamName": "app-image/app_2h5wfow3w4y0/188cd8ff-eea1-485a-ab58-7c5b1d2bc882"
+      },
+      "phases": [
+        {
+          "durationInSeconds": 0,
+          "endTime": "2025-10-27T22:30:37.594Z",
+          "phaseStatus": "SUCCEEDED",
+          "phaseType": "SUBMITTED",
+          "startTime": "2025-10-27T22:30:37.506Z"
+        },
+        {
+          "durationInSeconds": 0,
+          "endTime": "2025-10-27T22:30:38.200Z",
+          "phaseStatus": "SUCCEEDED",
+          "phaseType": "QUEUED",
+          "startTime": "2025-10-27T22:30:37.594Z"
+        },
+        {
+          "contexts": [{ "message": "", "statusCode": "" }],
+          "durationInSeconds": 13,
+          "endTime": "2025-10-27T22:30:51.581Z",
+          "phaseStatus": "SUCCEEDED",
+          "phaseType": "PROVISIONING",
+          "startTime": "2025-10-27T22:30:38.200Z"
+        },
+        {
+          "contexts": [{ "message": "", "statusCode": "" }],
+          "durationInSeconds": 1,
+          "endTime": "2025-10-27T22:30:52.935Z",
+          "phaseStatus": "SUCCEEDED",
+          "phaseType": "DOWNLOAD_SOURCE",
+          "startTime": "2025-10-27T22:30:51.581Z"
+        },
+        {
+          "contexts": [{ "message": "", "statusCode": "" }],
+          "durationInSeconds": 0,
+          "endTime": "2025-10-27T22:30:53.006Z",
+          "phaseStatus": "SUCCEEDED",
+          "phaseType": "INSTALL",
+          "startTime": "2025-10-27T22:30:52.935Z"
+        },
+        {
+          "contexts": [{ "message": "", "statusCode": "" }],
+          "durationInSeconds": 9,
+          "endTime": "2025-10-27T22:31:02.787Z",
+          "phaseStatus": "SUCCEEDED",
+          "phaseType": "PRE_BUILD",
+          "startTime": "2025-10-27T22:30:53.006Z"
+        },
+        {
+          "contexts": [
+            {
+              "message": "Error while executing command: docker buildx build -t 123456789012.dkr.ecr.us-test-2.amazonaws.com/html-css-js/kaniko-build:app-image-103b5989-x86_64 -f Dockerfile --push --platform linux/amd64  ${CODEBUILD_SRC_DIR}. Reason: exit status 1",
+              "statusCode": "COMMAND_EXECUTION_ERROR"
+            }
+          ],
+          "durationInSeconds": 8,
+          "endTime": "2025-10-27T22:31:10.838Z",
+          "phaseStatus": "FAILED",
+          "phaseType": "BUILD",
+          "startTime": "2025-10-27T22:31:02.787Z"
+        },
+        {
+          "contexts": [{ "message": "", "statusCode": "" }],
+          "durationInSeconds": 0,
+          "endTime": "2025-10-27T22:31:10.882Z",
+          "phaseStatus": "SUCCEEDED",
+          "phaseType": "POST_BUILD",
+          "startTime": "2025-10-27T22:31:10.838Z"
+        },
+        {
+          "contexts": [{ "message": "", "statusCode": "" }],
+          "durationInSeconds": 0,
+          "endTime": "2025-10-27T22:31:10.949Z",
+          "phaseStatus": "SUCCEEDED",
+          "phaseType": "UPLOAD_ARTIFACTS",
+          "startTime": "2025-10-27T22:31:10.882Z"
+        },
+        {
+          "contexts": [{ "message": "", "statusCode": "" }],
+          "durationInSeconds": 0,
+          "endTime": "2025-10-27T22:31:11.266Z",
+          "phaseStatus": "SUCCEEDED",
+          "phaseType": "FINALIZING",
+          "startTime": "2025-10-27T22:31:10.949Z"
+        },
+        {
+          "phaseType": "COMPLETED",
+          "startTime": "2025-10-27T22:31:11.266Z"
+        }
+      ],
+      "projectName": "app-image-2beb4dc",
+      "queuedTimeoutInMinutes": 480,
+      "secondarySourceVersions": [],
+      "secondarySources": [],
+      "serviceRole": "arn:aws:iam::123456789012:role/Defang-html-css-js-beta-code-build-roleus-west-2",
+      "source": {
+        "buildspec": "version: 0.2\nphases:\n  pre_build:\n    commands: [\"nohup /usr/bin/dockerd --host=unix:///var/run/docker.sock --host=tcp://127.0.0.1:2375 --storage-driver=overlay2 &\",\"timeout 15 sh -c \\\"until docker info; do echo .; sleep 1; done\\\"\",\"echo \\\"Docker daemon is up!\\\"\",\"tar -xzf sha256-IY_H6uXExcLbOvKUa3SCPbLbWNj2fJNK_iApPkDbXcM_.tar.gz -C $CODEBUILD_SRC_DIR\",\"aws ecr get-login-password --region us-test-2 | docker login --username AWS --password-stdin 123456789012.dkr.ecr.us-test-2.amazonaws.com/html-css-js/kaniko-build\"]\n  build:\n    commands:\n      - echo Building the Docker image...\n      - docker buildx create --use --driver=docker-container --platform linux/amd64\n      - docker buildx build -t 123456789012.dkr.ecr.us-test-2.amazonaws.com/html-css-js/kaniko-build:app-image-103b5989-x86_64 -f Dockerfile --push --platform linux/amd64  ${CODEBUILD_SRC_DIR}\n",
+        "insecureSsl": false,
+        "location": "defang-cd-bucket-ren6kjmnovwj/uploads/sha256-IY_H6uXExcLbOvKUa3SCPbLbWNj2fJNK_iApPkDbXcM_.tar.gz",
+        "type": "S3"
+      },
+      "startTime": "2025-10-27T22:30:37.506Z",
+      "timeoutInMinutes": 60
+    }
+  ],
+  "buildsNotFound": []
+}

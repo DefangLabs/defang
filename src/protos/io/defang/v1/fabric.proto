@@ -15,7 +15,7 @@ service FabricController {
   }
   rpc GetVersion(google.protobuf.Empty) returns (Version) {
     option idempotency_level = NO_SIDE_EFFECTS;
-  }
+  }; // public
   rpc Token(TokenRequest) returns (TokenResponse); // public
 
   rpc RevokeToken(google.protobuf.Empty) returns (google.protobuf.Empty);
@@ -114,6 +114,16 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
+  rpc ResolveIPAddr(ResolveIPAddrRequest) returns (ResolveIPAddrResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ResolveCNAME(ResolveCNAMERequest) returns (ResolveCNAMEResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ResolveNS(ResolveNSRequest) returns (ResolveNSResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
   rpc GetSelectedProvider(GetSelectedProviderRequest) returns (GetSelectedProviderResponse) {
     option deprecated = true; // deprecated in favor of stacks; kept for old CLI clients
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -160,6 +170,7 @@ enum Provider {
   AWS = 2;
   DIGITALOCEAN = 3;
   GCP = 4;
+  AZURE = 5;
 }
 
 message Stack {
@@ -225,6 +236,33 @@ message VerifyDNSSetupRequest {
   repeated string targets = 2;
 }
 
+message ResolveIPAddrRequest {
+  string domain = 1;
+  string ns_server = 2; // optional; if empty, resolve from root
+}
+
+message ResolveIPAddrResponse {
+  repeated string ip_addrs = 1;
+}
+
+message ResolveCNAMERequest {
+  string domain = 1;
+  string ns_server = 2; // optional; if empty, resolve from root
+}
+
+message ResolveCNAMEResponse {
+  string cname = 1;
+}
+
+message ResolveNSRequest {
+  string domain = 1;
+  string ns_server = 2; // optional; if empty, resolve from root
+}
+
+message ResolveNSResponse {
+  repeated string hosts = 1;
+}
+
 message DestroyRequest {
   string project = 1; // defaults to tenant ID
 }
@@ -288,6 +326,7 @@ message CanIUseRequest {
   string provider_account_id = 6;
   string prefer_cd_version = 7; // currently deployed CD image; empty for new projects or when --allow-upgrade is set
   string prefer_pulumi_version = 8; // currently deployed Pulumi version; empty for new projects or when --allow-upgrade is set
+  string driver = 9;
 }
 
 message CanIUseResponse {
@@ -298,6 +337,7 @@ message CanIUseResponse {
   string pulumi_version = 5;
   bytes signature = 6;
   bool forced_version = 7; // force use of the returned CD image and Pulumi version
+  string forced_reason = 8;
 }
 
 message DeployRequest {
@@ -539,6 +579,16 @@ message Deployment {
   DeploymentOrigin origin = 16;
   map<string, string> origin_metadata = 17;
   repeated ServiceInfo services = 18;
+  CdType cd_type = 19;
+  string cd_id = 20;
+}
+
+enum CdType {
+  CD_TYPE_UNSPECIFIED = 0;
+  CD_TYPE_AWS_CODEBUILD_BUILDID = 1;
+  CD_TYPE_GCP_CLOUDBUILD_BUILDID = 2;
+  CD_TYPE_DO_APPPLATFORM_DEPLOYMENTID = 3;
+  CD_TYPE_AZURE_ACI_JOBID = 4;
 }
 
 enum DeploymentStatus {
