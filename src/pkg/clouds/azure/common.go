@@ -39,7 +39,9 @@ func (t *tokenCredentialWithTimeout) GetToken(ctx context.Context, opts policy.T
 	return t.cred.GetToken(ctx, opts)
 }
 
-func (a Azure) NewCreds() (azcore.TokenCredential, error) {
+// NewCredsFunc builds a TokenCredential for ARM calls. Tests can override this
+// to inject a fake credential; the default implementation is DefaultAzureCredential.
+var NewCredsFunc = func(a Azure) (azcore.TokenCredential, error) {
 	if len(a.SubscriptionID) == 0 {
 		return nil, errors.New("environment variable AZURE_SUBSCRIPTION_ID is not set")
 	}
@@ -51,6 +53,14 @@ func (a Azure) NewCreds() (azcore.TokenCredential, error) {
 
 	return &tokenCredentialWithTimeout{cred: cred, timeout: cliTimeout}, nil
 }
+
+func (a Azure) NewCreds() (azcore.TokenCredential, error) {
+	return NewCredsFunc(a)
+}
+
+// ManagementEndpoint is the base URL for Azure Resource Manager REST calls.
+// It is exposed as a variable so tests can swap in an httptest.Server URL.
+var ManagementEndpoint = "https://management.azure.com"
 
 // ArmToken returns a Bearer token scoped to the Azure management endpoint,
 // suitable for direct REST API calls that the ARM SDK does not expose.
@@ -80,8 +90,8 @@ func (a Azure) FetchLogStreamAuthToken(ctx context.Context, resourceGroup, resou
 	}
 
 	url := fmt.Sprintf(
-		"https://management.azure.com/subscriptions/%s/resourceGroups/%s/providers/%s/getAuthToken?api-version=%s",
-		a.SubscriptionID, resourceGroup, resourcePath, apiVersion,
+		"%s/subscriptions/%s/resourceGroups/%s/providers/%s/getAuthToken?api-version=%s",
+		ManagementEndpoint, a.SubscriptionID, resourceGroup, resourcePath, apiVersion,
 	)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, http.NoBody)
 	if err != nil {

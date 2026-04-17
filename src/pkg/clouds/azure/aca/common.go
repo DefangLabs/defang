@@ -50,8 +50,8 @@ func (c *ContainerApp) getEventStreamBase(ctx context.Context, appName string) (
 	}
 
 	url := fmt.Sprintf(
-		"https://management.azure.com/subscriptions/%s/resourceGroups/%s/providers/Microsoft.App/containerApps/%s?api-version=%s",
-		c.SubscriptionID, c.ResourceGroup, appName, apiVersion,
+		"%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.App/containerApps/%s?api-version=%s",
+		cloudazure.ManagementEndpoint, c.SubscriptionID, c.ResourceGroup, appName, apiVersion,
 	)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -103,8 +103,13 @@ func (c *ContainerApp) ResolveLogTarget(ctx context.Context, appName, revision, 
 		revision = *app.Properties.LatestRevisionName
 
 		// Opportunistically pick the container name from the app template.
-		if container == "" && app.Properties.Template != nil && len(app.Properties.Template.Containers) > 0 && app.Properties.Template.Containers[0].Name != nil {
-			container = *app.Properties.Template.Containers[0].Name
+		if container == "" && app.Properties.Template != nil {
+			for _, ctr := range app.Properties.Template.Containers {
+				if ctr != nil && ctr.Name != nil {
+					container = *ctr.Name
+					break
+				}
+			}
 		}
 	}
 
@@ -117,17 +122,23 @@ func (c *ContainerApp) ResolveLogTarget(ctx context.Context, appName, revision, 
 		if err != nil {
 			return "", "", "", fmt.Errorf("list replicas: %w", err)
 		}
-		if len(list.Value) == 0 {
+		if len(list.Value) == 0 || list.Value[0] == nil {
 			return "", "", "", fmt.Errorf("no replicas found for revision %q", revision)
 		}
-		if list.Value[0].Name == nil {
+		rep := list.Value[0]
+		if rep.Name == nil {
 			return "", "", "", errors.New("replica has no name")
 		}
-		replica = *list.Value[0].Name
+		replica = *rep.Name
 
 		// Opportunistically pick the container from the replica if still unset.
-		if container == "" && list.Value[0].Properties != nil && len(list.Value[0].Properties.Containers) > 0 && list.Value[0].Properties.Containers[0].Name != nil {
-			container = *list.Value[0].Properties.Containers[0].Name
+		if container == "" && rep.Properties != nil {
+			for _, ctr := range rep.Properties.Containers {
+				if ctr != nil && ctr.Name != nil {
+					container = *ctr.Name
+					break
+				}
+			}
 		}
 	}
 

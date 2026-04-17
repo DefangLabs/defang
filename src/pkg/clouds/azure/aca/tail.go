@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -29,10 +30,19 @@ func (c *ContainerApp) WatchLogs(ctx context.Context) <-chan ServiceLogEntry {
 	out := make(chan ServiceLogEntry)
 	go func() {
 		defer close(out)
-		known := map[string]struct{}{}
+		// streaming tracks apps that currently have a live tail goroutine. An
+		// app is re-added to the map on the next poll once its goroutine exits
+		// (so replicas that roll or streams that drop mid-run are retried).
+		var mu sync.Mutex
+		streaming := map[string]struct{}{}
 
 		startTailing := func(appName string) {
 			go func() {
+				defer func() {
+					mu.Lock()
+					delete(streaming, appName)
+					mu.Unlock()
+				}()
 				appCh, err := c.StreamLogs(ctx, appName, "", "", "", true)
 				if err != nil {
 					select {
@@ -51,23 +61,38 @@ func (c *ContainerApp) WatchLogs(ctx context.Context) <-chan ServiceLogEntry {
 			}()
 		}
 
+		sendErr := func(err error) {
+			select {
+			case out <- ServiceLogEntry{LogEntry: LogEntry{Err: err}}:
+			case <-ctx.Done():
+			}
+		}
+
 		poll := func() {
 			client, err := c.newContainerAppsClient()
 			if err != nil {
+				sendErr(fmt.Errorf("WatchLogs: create container apps client: %w", err))
 				return
 			}
 			pager := client.NewListByResourceGroupPager(c.ResourceGroup, nil)
 			for pager.More() {
 				page, err := pager.NextPage(ctx)
 				if err != nil {
+					sendErr(fmt.Errorf("WatchLogs: list container apps: %w", err))
 					return
 				}
 				for _, app := range page.Value {
-					name := *app.Name
-					if _, seen := known[name]; seen {
+					if app == nil || app.Name == nil {
 						continue
 					}
-					known[name] = struct{}{}
+					name := *app.Name
+					mu.Lock()
+					if _, active := streaming[name]; active {
+						mu.Unlock()
+						continue
+					}
+					streaming[name] = struct{}{}
+					mu.Unlock()
 					startTailing(name)
 				}
 			}

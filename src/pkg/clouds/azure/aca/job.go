@@ -34,6 +34,9 @@ const (
 	jobAPIVersion = "2024-02-02-preview"
 )
 
+// logAnalyticsEndpoint is the base URL for the Log Analytics query API, overridable for tests.
+var logAnalyticsEndpoint = "https://api.loganalytics.io"
+
 // JobRequest contains parameters for starting a Container Apps Job execution.
 type JobRequest struct {
 	Image   string
@@ -627,8 +630,8 @@ func (j *Job) getCDContainerLogStreamURL(ctx context.Context, executionName stri
 	}
 
 	url := fmt.Sprintf(
-		"https://management.azure.com/subscriptions/%s/resourceGroups/%s/providers/Microsoft.App/jobs/%s/executions/%s/replicas?api-version=%s",
-		j.SubscriptionID, j.ResourceGroup, cdJobName, executionName, jobAPIVersion,
+		"%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.App/jobs/%s/executions/%s/replicas?api-version=%s",
+		cloudazure.ManagementEndpoint, j.SubscriptionID, j.ResourceGroup, cdJobName, executionName, jobAPIVersion,
 	)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -797,6 +800,13 @@ func (j *Job) fetchLogsFromWorkspace(ctx context.Context, executionName string) 
 	if err != nil {
 		return "", err
 	}
+	return j.fetchLogsByWorkspaceID(ctx, workspaceID, executionName)
+}
+
+// fetchLogsByWorkspaceID is the lower half of fetchLogsFromWorkspace, kept separate
+// so tests can exercise it with a known workspace ID without needing the SDK
+// workspaces client to be mocked.
+func (j *Job) fetchLogsByWorkspaceID(ctx context.Context, workspaceID, executionName string) (string, error) {
 	token, err := j.getLogAnalyticsToken(ctx)
 	if err != nil {
 		return "", err
@@ -818,7 +828,7 @@ func (j *Job) fetchLogsFromWorkspace(ctx context.Context, executionName string) 
 		return "", err
 	}
 
-	url := "https://api.loganalytics.io/v1/workspaces/" + workspaceID + "/query"
+	url := logAnalyticsEndpoint + "/v1/workspaces/" + workspaceID + "/query"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return "", err
