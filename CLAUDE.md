@@ -191,7 +191,7 @@ This requires: `protoc`, `protoc-gen-go`, `protoc-gen-connect-go`
 
 CI verifies proto files are up to date. If you change `fabric.proto`, regenerate and commit the generated files.
 
-The proto file is shared with `defang-mvp` (Fabric backend). Coordinate proto changes across both repos.
+The proto file is shared with the Fabric backend. Coordinate proto changes across both repos.
 
 ---
 
@@ -213,7 +213,7 @@ Triggered on every push to any branch and on tags.
 
 ### Other Workflows
 
-- **smoketests.yml** -- Triggers defang-mvp smoke tests on main push
+- **smoketests.yml** -- Triggers Fabric backend smoke tests on main push
 - **nightly.yml** -- Nightly builds
 - **install.yml** -- Installation script tests
 
@@ -250,9 +250,9 @@ Call `update_task_status` at these milestones:
 ### Cross-Repo Coordination
 
 Use `dispatch_task` when changes span repos:
-- **Proto changes** require updates in both `defang` (CLI) and `defang-mvp` (Fabric backend)
+- **Proto changes** require updates in both the CLI and the Fabric backend
 - **New CLI commands** may need corresponding Fabric RPCs
-- **New provider features** may need Pulumi updates in `defang-mvp`
+- **New provider features** may need Pulumi updates in the Fabric backend
 
 ### Before Modifying Shared Interfaces
 
