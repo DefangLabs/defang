@@ -5,6 +5,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/azure"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/do"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -43,6 +44,8 @@ func NewProvider(ctx context.Context, providerID client.ProviderID, fabricClient
 		provider = do.NewByocProvider(ctx, fabricClient.GetTenantName(), stack)
 	case client.ProviderGCP:
 		provider = gcp.NewByocProvider(ctx, fabricClient.GetTenantName(), stack)
+	case client.ProviderAzure:
+		provider = azure.NewByocProvider(ctx, fabricClient.GetTenantName(), stack)
 	default:
 		provider = client.NewPlaygroundProvider(fabricClient, stack)
 	}
