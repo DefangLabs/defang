@@ -1,16 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cd src && go test:*)",
       "Bash(cd src && go build:*)",
-      "Bash(cd src && go vet:*)",
       "Bash(cd src && go mod tidy:*)",
-      "Bash(git status:*)",
+      "Bash(cd src && go test:*)",
+      "Bash(cd src && go vet:*)",
+      "Bash(docker pull:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
-      "Bash(git show:*)"
-      "Bash(docker pull:*)",
       "Bash(git ls-remote:*)",
+      "Bash(git show:*)",
+      "Bash(git status:*)",
       "Bash(go vet:*)",
       "Bash(head:*)",
       "Bash(sort:*)",
