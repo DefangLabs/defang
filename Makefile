@@ -41,11 +41,17 @@ endif
 .PHONY: update-nix-vendor-hash
 update-nix-vendor-hash:
 	sed -i.bak -E 's|(vendorHash = "sha256-)[A-Za-z0-9+/=]+(")|\10AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\2|' pkgs/defang/cli.nix
-	$(MAKE) nix-run 2>&1 | grep -o 'sha256-[A-Za-z0-9+/=]\+' | tail -n1 | xargs -I {} sed -i.bak -E 's|(vendorHash = ")[^"]+(")|vendorHash = "{}"|' pkgs/defang/cli.nix
-	rm pkgs/defang/cli.nix.bak
-	git add pkgs/defang/cli.nix
-	@echo 'cli.nix vendorHash has been updated; commit and push'
-	@false
+	@NEW_HASH=$$($(MAKE) nix-run 2>&1 | grep -o 'sha256-[A-Za-z0-9+/=]\+' | tail -n1); \
+	if [ -z "$$NEW_HASH" ]; then \
+		echo '❌ Failed to extract new vendorHash from nix build output; restoring cli.nix'; \
+		mv pkgs/defang/cli.nix.bak pkgs/defang/cli.nix; \
+		exit 2; \
+	fi; \
+	sed -i.bak -E "s|(vendorHash = \")[^\"]+(\")|\\1$$NEW_HASH\\2|" pkgs/defang/cli.nix; \
+	rm pkgs/defang/cli.nix.bak; \
+	git add pkgs/defang/cli.nix; \
+	echo 'cli.nix vendorHash has been updated; commit and push'; \
+	exit 1
 
 .PHONY: nix-run
 nix-run:
