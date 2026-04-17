@@ -20,6 +20,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	cloudazure "github.com/DefangLabs/defang/src/pkg/clouds/azure"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/aca"
+	"github.com/DefangLabs/defang/src/pkg/clouds/azure/acr"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/appcfg"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/cd"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/keyvault"
@@ -623,11 +624,21 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 			}
 		}()
 
+		projectRG := b.projectResourceGroupName(req.Project)
+
+		// Watch Container App logs from the PROJECT resource group.
 		acaClient := &aca.ContainerApp{
 			Azure:         b.driver.Azure,
-			ResourceGroup: b.driver.ResourceGroupName(),
+			ResourceGroup: projectRG,
 		}
 		acaCh := acaClient.WatchLogs(ctx)
+
+		// Watch ACR build logs from the PROJECT resource group.
+		buildWatcher := &acr.BuildLogWatcher{
+			Azure:         b.driver.Azure,
+			ResourceGroup: projectRG,
+		}
+		buildCh := buildWatcher.WatchBuildLogs(ctx)
 
 		return func(yield func(*defangv1.TailResponse, error) bool) {
 			for {
@@ -676,10 +687,32 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 					}, nil) {
 						return
 					}
+				case build, ok := <-buildCh:
+					if !ok {
+						buildCh = nil
+						continue
+					}
+					if build.Err != nil {
+						term.Debugf("ACR build log error for %q: %v", build.Service, build.Err)
+						continue
+					}
+					if !yield(&defangv1.TailResponse{
+						Entries: []*defangv1.LogEntry{{
+							Message:   build.Line,
+							Service:   build.Service + "-build",
+							Etag:      etag,
+							Stderr:    true, // show build logs even when not verbose
+							Timestamp: timestamppb.Now(),
+						}},
+						Service: build.Service + "-build",
+						Etag:    etag,
+					}, nil) {
+						return
+					}
 				case <-ctx.Done():
 					return
 				}
-				if cdCh == nil && acaCh == nil {
+				if cdCh == nil && acaCh == nil && buildCh == nil {
 					return
 				}
 			}
