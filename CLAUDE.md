@@ -262,6 +262,21 @@ Use `create_idea` for improvements discovered during work:
 - Potential refactoring opportunities
 - Documentation gaps
 
+### Knowledge Graph
+
+SAM maintains a persistent knowledge graph across sessions. Use it to preserve context that will help future agents:
+
+- **`add_knowledge`** — Store observations when you learn something non-obvious about:
+  - **User preferences**: how the user likes to work, review style, communication preferences (entityType: `preference`)
+  - **Code conventions**: patterns or decisions not captured in CLAUDE.md (entityType: `style`)
+  - **Architecture decisions**: why something was built a certain way (entityType: `context`)
+  - **Project context**: ongoing initiatives, deadlines, blockers (entityType: `context`)
+- **`search_knowledge`** — Query before making key decisions (e.g., search "Provider" before adding a new cloud provider, search "testing" before changing test patterns)
+- **`update_knowledge`** / **`remove_knowledge`** — Keep knowledge accurate. If you discover an observation is outdated or wrong, update or remove it.
+- **`confirm_knowledge`** — If you verify an existing observation is still correct, confirm it to keep it fresh.
+
+Do NOT store: code patterns derivable from the codebase, git history, ephemeral task details, or anything already in CLAUDE.md.
+
 ### SAM Workflow Summary
 
 ```
