@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appcontainers/armappcontainers"
 	cloudazure "github.com/DefangLabs/defang/src/pkg/clouds/azure"
 )
@@ -36,63 +35,16 @@ func (c *ContainerApp) newReplicasClient() (*armappcontainers.ContainerAppsRevis
 	return armappcontainers.NewContainerAppsRevisionReplicasClient(c.SubscriptionID, cred, nil)
 }
 
-// armToken returns a Bearer token scoped to the Azure management endpoint.
-func (c *ContainerApp) armToken(ctx context.Context) (string, error) {
-	cred, err := c.NewCreds()
-	if err != nil {
-		return "", err
-	}
-	tok, err := cred.GetToken(ctx, policy.TokenRequestOptions{
-		Scopes: []string{"https://management.azure.com/.default"},
-	})
-	if err != nil {
-		return "", err
-	}
-	return tok.Token, nil
-}
-
 // getAuthToken fetches a short-lived token for the Container Apps log-stream endpoint.
 // This operation is not yet exposed in the ARM Go SDK, so we call the REST API directly.
 func (c *ContainerApp) getAuthToken(ctx context.Context, appName string) (string, error) {
-	armTok, err := c.armToken(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	url := fmt.Sprintf(
-		"https://management.azure.com/subscriptions/%s/resourceGroups/%s/providers/Microsoft.App/containerApps/%s/getAuthToken?api-version=%s",
-		c.SubscriptionID, c.ResourceGroup, appName, apiVersion,
-	)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, http.NoBody)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Authorization", "Bearer "+armTok)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("getAuthToken: HTTP %s", resp.Status)
-	}
-
-	var result struct {
-		Properties struct {
-			Token string `json:"token"`
-		} `json:"properties"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("getAuthToken: decode response: %w", err)
-	}
-	return result.Properties.Token, nil
+	return c.FetchLogStreamAuthToken(ctx, c.ResourceGroup, "Microsoft.App/containerApps/"+appName, apiVersion)
 }
 
 // getEventStreamBase returns the host portion of the container app's eventStreamEndpoint
 // (everything before "/subscriptions/"). This is not in SDK v1.1.0, so we call the REST API directly.
 func (c *ContainerApp) getEventStreamBase(ctx context.Context, appName string) (string, error) {
-	armTok, err := c.armToken(ctx)
+	armTok, err := c.ArmToken(ctx)
 	if err != nil {
 		return "", err
 	}

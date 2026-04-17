@@ -9,7 +9,6 @@ import (
 	"iter"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -35,14 +34,13 @@ import (
 type ByocAzure struct {
 	*byoc.ByocBaseClient
 
-	driver        *cd.Driver
-	job           *aca.Job
-	appCfg        *appcfg.AppConfiguration
-	kv            *keyvault.KeyVault
-	cdRunID       string
-	cdEtag        string
-	cdLogsDrained bool // true once we've drained CD logs from Log Analytics for cdRunID
-	setUpDone     bool // true once full setUp has completed; prevents redundant API calls
+	driver    *cd.Driver
+	job       *aca.Job
+	appCfg    *appcfg.AppConfiguration
+	kv        *keyvault.KeyVault
+	cdRunID   string
+	cdEtag    string
+	setUpDone bool // true once full setUp has completed; prevents redundant API calls
 }
 
 var _ client.Provider = (*ByocAzure)(nil)
@@ -93,7 +91,6 @@ func (b *ByocAzure) CdCommand(ctx context.Context, req client.CdCommandRequest) 
 	}
 	b.cdRunID = execName
 	b.cdEtag = etag
-	b.cdLogsDrained = false
 	return &client.CdCommandResponse{
 		CdId:   execName,
 		CdType: defangv1.CdType_CD_TYPE_AZURE_ACI_JOBID,
@@ -403,7 +400,6 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 	}
 	b.cdRunID = execName
 	b.cdEtag = etag
-	b.cdLogsDrained = false
 	return &client.DeployResponse{
 		CdId:   execName,
 		CdType: defangv1.CdType_CD_TYPE_AZURE_ACI_JOBID,
@@ -413,14 +409,9 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 	}, nil
 }
 
-// GetDeploymentStatus implements client.Provider.
-//
-// When the CD job first reaches a terminal state, we synchronously drain Log Analytics
-// for its container output and print it directly to the terminal. This blocks the call
-// for up to ~3 minutes while LA finishes ingesting/indexing the logs (which can lag
-// significantly behind real time). Doing the drain here — instead of in TailJobLogs —
-// keeps the CD-job lifecycle (driven by WaitForCdTaskExit polling this method) and the
-// log printing on the same goroutine, so the program doesn't exit before logs flush.
+// GetDeploymentStatus implements client.Provider. CD container output is streamed
+// live via QueryLogs (follow=true) rather than drained from Log Analytics here,
+// so this method can return as soon as the job reaches a terminal state.
 func (b *ByocAzure) GetDeploymentStatus(ctx context.Context) (bool, error) {
 	if b.cdRunID == "" {
 		return false, nil
@@ -432,13 +423,6 @@ func (b *ByocAzure) GetDeploymentStatus(ctx context.Context) (bool, error) {
 	if !status.IsTerminal() {
 		return false, nil
 	}
-
-	// First terminal detection: print CD logs from LA before reporting "done".
-	if !b.cdLogsDrained {
-		b.cdLogsDrained = true
-		b.drainCDLogs(ctx)
-	}
-
 	if !status.IsSuccess() {
 		msg := string(status.Status)
 		if status.ErrorMessage != "" {
@@ -447,65 +431,6 @@ func (b *ByocAzure) GetDeploymentStatus(ctx context.Context) (bool, error) {
 		return true, client.ErrDeploymentFailed{Message: fmt.Sprintf("CD job %s: %s", b.cdRunID, msg)}
 	}
 	return true, nil
-}
-
-// drainCDLogs polls Log Analytics for container output of b.cdRunID and prints any
-// new lines directly to the terminal. Polls for up to drainTotalBudget so freshly-
-// terminated executions get a chance for LA ingestion+indexing to catch up. Stops
-// early once two consecutive polls yield no new lines (logs have stabilized).
-func (b *ByocAzure) drainCDLogs(ctx context.Context) {
-	const (
-		drainTotalBudget    = 3 * time.Minute
-		drainPollInterval   = 5 * time.Second
-		consecutiveQuietMax = 2
-	)
-
-	deadline := time.Now().Add(drainTotalBudget)
-	seen := make(map[string]struct{})
-	consecutiveQuiet := 0
-	gotAny := false
-
-	for time.Now().Before(deadline) {
-		logs, err := b.job.ReadJobLogs(ctx, b.cdRunID)
-		if err != nil {
-			term.Debugf("drainCDLogs: query error: %v", err)
-		} else if logs != "" {
-			newLines := 0
-			for _, line := range strings.Split(strings.TrimRight(logs, "\n"), "\n") {
-				if _, ok := seen[line]; ok {
-					continue
-				}
-				seen[line] = struct{}{}
-				term.Println(line)
-				newLines++
-			}
-			if newLines > 0 {
-				gotAny = true
-				consecutiveQuiet = 0
-			} else if gotAny {
-				consecutiveQuiet++
-			}
-		} else if gotAny {
-			consecutiveQuiet++
-		}
-
-		if gotAny && consecutiveQuiet >= consecutiveQuietMax {
-			return
-		}
-
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(drainPollInterval):
-		}
-	}
-
-	if !gotAny {
-		term.Warnf("No CD container output captured from Log Analytics within %s. View later with:"+
-			"\n  az monitor log-analytics query --workspace $(az monitor log-analytics workspace show -g %s -n defang-cd --query customerId -o tsv)"+
-			" --analytics-query 'ContainerAppConsoleLogs_CL | where ContainerGroupName_s startswith \"%s-\" | order by TimeGenerated asc'",
-			drainTotalBudget, b.driver.ResourceGroupName(), b.cdRunID)
-	}
 }
 
 // GetPrivateDomain implements byoc.ProjectBackend.

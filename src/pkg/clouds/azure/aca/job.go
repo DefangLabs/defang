@@ -1,6 +1,7 @@
 package aca
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -8,6 +9,7 @@ import (
 	"fmt"
 	"iter"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,6 +29,9 @@ const (
 	cdEnvironmentName  = "defang-cd"
 	cdLogWorkspaceName = "defang-cd"
 	jobLogPollInterval = 3 * time.Second
+	// jobAPIVersion is required for job getAuthToken / executions/replicas which
+	// are not yet exposed in the stable SDK or the 2023-05-01 API version.
+	jobAPIVersion = "2024-02-02-preview"
 )
 
 // JobRequest contains parameters for starting a Container Apps Job execution.
@@ -507,25 +512,40 @@ func (j *Job) GetJobExecutionStatus(ctx context.Context, executionName string) (
 	return nil, fmt.Errorf("execution %q not found", executionName)
 }
 
-// TailJobLogs returns an iter that yields a single terminal error if the CD job
-// failed, and nothing otherwise. Container output is NOT streamed here — the
-// ByocAzure provider drains and prints CD logs synchronously inside its
-// GetDeploymentStatus method (which the CLI polls via WaitForCdTaskExit). Doing
-// the printing there guarantees the program stays alive long enough for Azure
-// Log Analytics to ingest+index the container output, which can lag by several
-// minutes behind real time and is unworkable for a streaming iter.
+// TailJobLogs streams real-time container logs from the running job execution
+// by opening the container's logStreamEndpoint (the same one the Azure portal
+// uses). This delivers output within seconds, unlike Log Analytics (ReadJobLogs)
+// which typically lags by minutes. If the execution fails, the iterator yields
+// a terminal error after the stream closes. For historical queries on older
+// executions, use ReadJobLogs.
+//
+// The stream can drop mid-execution (e.g. when the log endpoint reports a
+// transient "Kubernetes error" while the replica is starting), so we reconnect
+// until the job reaches a terminal state.
 func (j *Job) TailJobLogs(ctx context.Context, executionName string) (iter.Seq2[string, error], error) {
 	return func(yield func(string, error) bool) {
+		// 300 on the first successful connect catches output emitted during pod
+		// startup; 0 on reconnects avoids re-printing lines after a transient drop.
+		const initialBackfill = 300
+		connected := false
+
 		for {
-			status, err := j.GetJobExecutionStatus(ctx, executionName)
-			if err != nil {
-				if ctx.Err() != nil {
-					return
-				}
-				yield("", fmt.Errorf("failed to get execution status: %w", err))
+			if ctx.Err() != nil {
 				return
 			}
-			if status.IsTerminal() {
+
+			status, err := j.GetJobExecutionStatus(ctx, executionName)
+			if err == nil && status.IsTerminal() {
+				// Drain any remaining logs once more and then return. If we never
+				// successfully streamed anything, request backfill; otherwise just
+				// pick up trailing output we haven't seen.
+				backfill := 0
+				if !connected {
+					backfill = initialBackfill
+				}
+				if logCh, err := j.streamJobExecutionLogs(ctx, executionName, backfill); err == nil {
+					forwardStream(ctx, logCh, yield)
+				}
 				if !status.IsSuccess() {
 					msg := string(status.Status)
 					if status.ErrorMessage != "" {
@@ -535,13 +555,196 @@ func (j *Job) TailJobLogs(ctx context.Context, executionName string) (iter.Seq2[
 				}
 				return
 			}
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(jobLogPollInterval):
+
+			backfill := 0
+			if !connected {
+				backfill = initialBackfill
 			}
+			logCh, err := j.streamJobExecutionLogs(ctx, executionName, backfill)
+			if err != nil {
+				term.Debugf("TailJobLogs: waiting for replica: %v", err)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(jobLogPollInterval):
+				}
+				continue
+			}
+			gotLines, keepGoing := forwardStream(ctx, logCh, yield)
+			if !keepGoing {
+				return
+			}
+			// Only mark as connected after actually receiving a line. A stream
+			// that opens and closes immediately (e.g. transient Kubernetes error)
+			// shouldn't consume our one-shot backfill budget.
+			if gotLines {
+				connected = true
+			}
+			// Stream closed — loop back to reconnect or detect terminal state.
 		}
 	}, nil
+}
+
+// forwardStream forwards all log lines from ch to yield. Returns (gotLines, keepGoing):
+// gotLines is true when at least one message was forwarded, keepGoing is false
+// when yield signals an early exit (consumer stopped iterating).
+func forwardStream(ctx context.Context, ch <-chan LogEntry, yield func(string, error) bool) (bool, bool) {
+	gotLines := false
+	for entry := range ch {
+		if ctx.Err() != nil {
+			return gotLines, false
+		}
+		if entry.Err != nil {
+			if !yield("", entry.Err) {
+				return gotLines, false
+			}
+			continue
+		}
+		gotLines = true
+		if !yield(entry.Message, nil) {
+			return gotLines, false
+		}
+	}
+	return gotLines, true
+}
+
+// getJobAuthToken fetches a short-lived bearer token accepted by the job's
+// logStreamEndpoint. The token differs from the ARM token and is required even
+// though the URL is already scoped to the subscription.
+func (j *Job) getJobAuthToken(ctx context.Context) (string, error) {
+	return j.FetchLogStreamAuthToken(ctx, j.ResourceGroup, "Microsoft.App/jobs/"+cdJobName, jobAPIVersion)
+}
+
+// getCDContainerLogStreamURL lists the execution's replicas and returns the
+// logstream URL of the main cdJobName container, only once the container has
+// reached a runningState where the log endpoint actually serves output
+// (Running or Terminated — anything earlier returns a Kubernetes error).
+// Returns an empty string (no error) while the replica is still initialising.
+func (j *Job) getCDContainerLogStreamURL(ctx context.Context, executionName string) (string, error) {
+	armTok, err := j.ArmToken(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	url := fmt.Sprintf(
+		"https://management.azure.com/subscriptions/%s/resourceGroups/%s/providers/Microsoft.App/jobs/%s/executions/%s/replicas?api-version=%s",
+		j.SubscriptionID, j.ResourceGroup, cdJobName, executionName, jobAPIVersion,
+	)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+armTok)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("listReplicas: HTTP %s", resp.Status)
+	}
+
+	var result struct {
+		Value []struct {
+			Properties struct {
+				Containers []struct {
+					Name              string `json:"name"`
+					RunningState      string `json:"runningState"`
+					LogStreamEndpoint string `json:"logStreamEndpoint"`
+				} `json:"containers"`
+			} `json:"properties"`
+		} `json:"value"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("listReplicas: decode: %w", err)
+	}
+
+	for _, r := range result.Value {
+		for _, c := range r.Properties.Containers {
+			if c.Name != cdJobName || c.LogStreamEndpoint == "" {
+				continue
+			}
+			switch c.RunningState {
+			case "Running", "Terminated":
+				return c.LogStreamEndpoint, nil
+			}
+		}
+	}
+	return "", nil
+}
+
+// streamJobExecutionLogs opens the job container's logStreamEndpoint and
+// returns a channel that emits log lines until the container exits or ctx is
+// cancelled. Returns an error when the replica is not yet available so the
+// caller can retry.
+//
+// backfillLines controls how much of the container's existing log buffer is
+// replayed on connect (capped at 300 by the API). Use a large value on the
+// first connect to capture output emitted during pod startup, and 0 on
+// reconnects so we don't re-print lines we already streamed.
+func (j *Job) streamJobExecutionLogs(ctx context.Context, executionName string, backfillLines int) (<-chan LogEntry, error) {
+	streamURL, err := j.getCDContainerLogStreamURL(ctx, executionName)
+	if err != nil {
+		return nil, err
+	}
+	if streamURL == "" {
+		return nil, errors.New("no replica container with logStreamEndpoint yet")
+	}
+
+	authToken, err := j.getJobAuthToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, streamURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+authToken)
+	q := req.URL.Query()
+	q.Set("follow", "true")
+	q.Set("output", "text")
+	if backfillLines > 0 {
+		q.Set("tailLines", strconv.Itoa(backfillLines))
+	}
+	req.URL.RawQuery = q.Encode()
+
+	resp, err := http.DefaultClient.Do(req) // nolint: bodyclose // body is closed in the goroutine
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		_ = resp.Body.Close()
+		return nil, fmt.Errorf("logstream: HTTP %s", resp.Status)
+	}
+
+	ch := make(chan LogEntry)
+	go func() {
+		defer close(ch)
+		defer resp.Body.Close()
+		scanner := bufio.NewScanner(resp.Body)
+		// Pulumi output lines can be long (especially Diagnostics blocks).
+		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if line == "" {
+				continue
+			}
+			select {
+			case ch <- LogEntry{Message: line}:
+			case <-ctx.Done():
+				return
+			}
+		}
+		if err := scanner.Err(); err != nil && ctx.Err() == nil {
+			select {
+			case ch <- LogEntry{Err: err}:
+			case <-ctx.Done():
+			}
+		}
+	}()
+	return ch, nil
 }
 
 // ReadJobLogs returns all log output captured for a job execution from Log Analytics.
