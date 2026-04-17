@@ -29,7 +29,7 @@
               golangci-lint
               goreleaser
               nixfmt-rfc-style
-              nodejs_24 # for Pulumi, must match values in package.json
+              nodejs_24 # for Pulumi, must match values in package.json and npm-build/action.yml
               openssh
               protobuf # protoc
               protoc-gen-connect-go
