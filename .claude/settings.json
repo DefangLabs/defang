@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd src && make build:*)",
+      "Bash(cd src && make test:*)",
+      "Bash(cd src && make lint:*)",
+      "Bash(cd src && make lint-fix:*)",
+      "Bash(cd src && make tidy:*)",
+      "Bash(cd src && go test:*)",
+      "Bash(cd src && go build:*)",
+      "Bash(cd src && go vet:*)",
+      "Bash(cd src && go mod tidy:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)"
+    ]
+  }
+}
