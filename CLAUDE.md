@@ -254,24 +254,6 @@ Use `dispatch_task` when changes span repos:
 - **New CLI commands** may need corresponding Fabric RPCs
 - **New provider features** may need Pulumi updates in the Fabric backend
 
-### Before Modifying Shared Interfaces
-
-Call `list_project_agents` before changing:
-- `fabric.proto` -- defines the CLI-to-Fabric contract
-- `FabricClient` interface (`pkg/cli/client/client.go`)
-- `Provider` interface (`pkg/cli/client/provider.go`)
-- `ByocBaseClient` (`pkg/cli/client/byoc/baseclient.go`)
-
-These are consumed by multiple providers and the Fabric backend.
-
-### CI Verification
-
-Call `get_ci_status` after pushing to verify:
-- Unit tests pass
-- Coverage has not regressed
-- Proto files are up to date
-- Cross-platform builds succeed
-
 ### Capturing Ideas
 
 Use `create_idea` for improvements discovered during work:
@@ -284,11 +266,9 @@ Use `create_idea` for improvements discovered during work:
 
 ```
 1. Research  -> update_task_status("in_progress", "Researching codebase")
-2. Plan      -> list_project_agents (if touching shared interfaces)
-3. Implement -> push early, push often
-4. Test      -> cd src && make test
-5. Push      -> git push
-6. Verify    -> get_ci_status
-7. PR        -> gh pr create
-8. Complete  -> update_task_status("done", "PR created: <url>")
+2. Implement -> push early, push often
+3. Test      -> cd src && make test
+4. Push      -> git push
+5. PR        -> gh pr create
+6. Complete  -> update_task_status("done", "PR created: <url>")
 ```
