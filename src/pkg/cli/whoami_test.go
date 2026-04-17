@@ -58,7 +58,7 @@ func TestWhoami(t *testing.T) {
 
 	want := ShowAccountData{
 		Provider:       client.ProviderDefang,
-		SubscriberTier: defangv1.SubscriptionTier_PRO,
+		SubscriberTier: "Pro",
 		Region:         "us-west-2",
 		Workspace:      "Tenant One",
 		Tenant:         "tenant-1",
