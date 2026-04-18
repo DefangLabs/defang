@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -177,16 +178,16 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 					if hasSubstitution(templ, key) {
 						// We don't (yet) support substitution patterns during deployment
 						if inEnv && !suppressWarn {
-							term.Warnf("Environment variable %q is ignored; add it to `.env` if needed", key)
+							slog.Warn(fmt.Sprintf("Environment variable %q is ignored; add it to `.env` if needed", key))
 						} else {
-							term.Debugf("Unresolved environment variable %q", key)
+							slog.Debug(fmt.Sprintf("Unresolved environment variable %q", key))
 						}
 						return "", false
 					}
 					if inEnv && !suppressWarn {
-						term.Warnf("Environment variable %q is ignored; add it to `.env` or it may be resolved from config during deployment", key)
+						slog.Warn(fmt.Sprintf("Environment variable %q is ignored; add it to `.env` or it may be resolved from config during deployment", key))
 					} else {
-						term.Debugf("Environment variable %q was not resolved locally. It may be resolved from config during deployment", key)
+						slog.Debug(fmt.Sprintf("Environment variable %q was not resolved locally. It may be resolved from config during deployment", key))
 					}
 					// Leave unresolved variables as-is for resolution later by CD
 					return "${" + key + "}", true

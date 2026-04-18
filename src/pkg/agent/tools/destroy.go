@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
@@ -11,7 +12,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
-	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 type DestroyParams struct {
@@ -19,7 +19,7 @@ type DestroyParams struct {
 }
 
 func HandleDestroyTool(ctx context.Context, loader client.Loader, params DestroyParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
-	term.Debug("Function invoked: cli.Connect")
+	slog.Debug("Function invoked: cli.Connect")
 	client, err := GetClientWithRetry(ctx, cli, sc)
 	if err != nil {
 		var noBrowserErr auth.ErrNoBrowser
@@ -39,7 +39,7 @@ func HandleDestroyTool(ctx context.Context, loader client.Loader, params Destroy
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
-	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
+	slog.Debug("Function invoked: cli.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
 		return "", fmt.Errorf("failed to load project name: %w", err)
@@ -50,7 +50,7 @@ func HandleDestroyTool(ctx context.Context, loader client.Loader, params Destroy
 		return "", fmt.Errorf("failed to use provider: %w", err)
 	}
 
-	term.Debug("Function invoked: cli.ComposeDown")
+	slog.Debug("Function invoked: cli.ComposeDown")
 	deployment, err := cli.ComposeDown(ctx, projectName, client, provider)
 	if err != nil {
 		if connect.CodeOf(err) == connect.CodeNotFound {

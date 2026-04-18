@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -164,13 +165,13 @@ var configSetCmd = &cobra.Command{
 			if err != nil {
 				errs = append(errs, err)
 			} else if ifNotSet && !didSet {
-				term.Info("Config", name, "is already set; skipping due to --if-not-set flag")
+				slog.Info(fmt.Sprintln("Config", name, "is already set; skipping due to --if-not-set flag"))
 			} else {
-				term.Info("Updated value for", name)
+				slog.Info(fmt.Sprintln("Updated value for", name))
 			}
 		}
 
-		term.Infof("Successfully set %d config value(s)", len(envMap)-len(errs))
+		slog.Info(fmt.Sprintf("Successfully set %d config value(s)", len(envMap)-len(errs)))
 
 		printDefangHint("To update the deployed values, do:", "compose up")
 		return errors.Join(errs...)
@@ -197,12 +198,12 @@ var configDeleteCmd = &cobra.Command{
 		if err := cli.ConfigDelete(cmd.Context(), projectName, session.Provider, names...); err != nil {
 			// Show a warning (not an error) if the config was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
-				term.Warn(client.PrettyError(err))
+				slog.Warn(fmt.Sprintf("%v", client.PrettyError(err)))
 				return nil
 			}
 			return err
 		}
-		term.Info("Deleted", names)
+		slog.Info(fmt.Sprintln("Deleted", names))
 
 		printDefangHint("To list the configs (but not their values), do:", "config ls")
 		return nil

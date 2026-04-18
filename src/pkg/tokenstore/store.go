@@ -3,12 +3,11 @@ package tokenstore
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
-
-	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 type TokenStore interface {
@@ -33,7 +32,7 @@ func (s *LocalDirTokenStore) Save(key string, token string) error {
 		return err
 	}
 
-	term.Debug("Saving access token to", tokenFile)
+	slog.Debug(fmt.Sprintln("Saving access token to", tokenFile))
 	dir, _ := filepath.Split(tokenFile)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return fmt.Errorf("failed to create token directory: %w", err)
@@ -51,7 +50,7 @@ func (s *LocalDirTokenStore) Load(key string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	term.Debug("Reading access token from file", tokenFile)
+	slog.Debug(fmt.Sprintln("Reading access token from file", tokenFile))
 	all, err := os.ReadFile(tokenFile)
 	if err != nil {
 		return "", fmt.Errorf("failed to read token: %w", err)
@@ -80,7 +79,7 @@ func (s *LocalDirTokenStore) List(prefix string) ([]string, error) {
 		return nil, fmt.Errorf("failed to resolve token store directory: %w", err)
 	}
 	if !strings.HasPrefix(dir, baseDir) {
-		term.Warnf("Invalid token prefix %q: resolved directory %q is outside of token store base directory %q", prefix, dir, baseDir)
+		slog.Warn(fmt.Sprintf("Invalid token prefix %q: resolved directory %q is outside of token store base directory %q", prefix, dir, baseDir))
 		return nil, errors.New("invalid token prefix")
 	}
 
@@ -110,7 +109,7 @@ func (s *LocalDirTokenStore) Delete(key string) error {
 	if err := os.Remove(tokenFile); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("failed to delete token: %w", err)
 	}
-	term.Debug("Removed token file:", tokenFile)
+	slog.Debug(fmt.Sprintln("Removed token file:", tokenFile))
 	return nil
 }
 

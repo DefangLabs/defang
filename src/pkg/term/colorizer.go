@@ -261,6 +261,31 @@ func (t *Term) Errorf(format string, v ...any) (int, error) {
 	return output(t.err, ErrorColor, line)
 }
 
+// WriteDebug writes a pre-formatted debug message (newline added if missing).
+func (t *Term) WriteDebug(msg string) (int, error) {
+	if !t.DoDebug() {
+		return 0, nil
+	}
+	return output(t.err, DebugColor, ensurePrefix(debugPrefix, ensureNewline(msg)))
+}
+
+// WriteInfo writes a pre-formatted info message (newline added if missing).
+func (t *Term) WriteInfo(msg string) (int, error) {
+	return output(t.outOrErr(), InfoColor, ensurePrefix(infoPrefix, ensureNewline(msg)))
+}
+
+// WriteWarn writes a pre-formatted warning message (newline added if missing) and accumulates it.
+func (t *Term) WriteWarn(msg string) (int, error) {
+	msg = ensurePrefix(warnPrefix, ensureNewline(msg))
+	t.warnings = append(t.warnings, msg)
+	return output(t.outOrErr(), WarnColor, msg)
+}
+
+// WriteError writes a pre-formatted error message (newline added if missing).
+func (t *Term) WriteError(msg string) (int, error) {
+	return output(t.err, ErrorColor, ensureNewline(msg))
+}
+
 // Deprecated: use proper error handling instead
 func (t *Term) Fatal(msg any) {
 	Error("Error:", msg)

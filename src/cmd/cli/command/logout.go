@@ -1,8 +1,9 @@
 package command
 
 import (
+	"log/slog"
+
 	"github.com/DefangLabs/defang/src/pkg/cli"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/cobra"
 )
 
@@ -15,7 +16,7 @@ var logoutCmd = &cobra.Command{
 		if err := cli.Logout(cmd.Context(), global.Client, global.FabricAddr); err != nil {
 			return err
 		}
-		term.Info("Successfully logged out")
+		slog.Info("Successfully logged out")
 		return nil
 	},
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
@@ -44,7 +45,7 @@ func checkDeploymentMode(prevMode, newMode modes.Mode) (modes.Mode, error) {
 	switch newMode {
 	case modes.ModeUnspecified:
 		if prevMode != modes.ModeUnspecified {
-			term.Debug("No deployment mode specified; using previous deployment mode:", prevMode)
+			slog.Debug(fmt.Sprintln("No deployment mode specified; using previous deployment mode:", prevMode))
 			newMode = prevMode
 		}
 	case modes.ModeAffordable:
@@ -52,11 +53,11 @@ func checkDeploymentMode(prevMode, newMode modes.Mode) (modes.Mode, error) {
 		case modes.ModeHighAvailability:
 			return newMode, fmt.Errorf("will not downgrade deployment mode from %s to %s; use %s", prevMode, newMode, modes.ModeBalanced)
 		case modes.ModeBalanced:
-			term.Warnf("Downgrading deployment mode from %s to %s", prevMode, newMode)
+			slog.Warn(fmt.Sprintf("Downgrading deployment mode from %s to %s", prevMode, newMode))
 		}
 	case modes.ModeBalanced:
 		if prevMode == modes.ModeHighAvailability {
-			term.Warnf("Downgrading deployment mode from %s to %s", prevMode, newMode)
+			slog.Warn(fmt.Sprintf("Downgrading deployment mode from %s to %s", prevMode, newMode))
 		}
 	case modes.ModeHighAvailability:
 		// from anything to high-availability is allowed
@@ -119,7 +120,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		Stack:   provider.GetStackNameForDomain(),
 	})
 	if err != nil {
-		term.Debug("GetDelegateSubdomainZone failed:", err)
+		slog.Debug(fmt.Sprintln("GetDelegateSubdomainZone failed:", err))
 		return nil, project, errors.New("failed to get delegate domain")
 	}
 
@@ -208,8 +209,8 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		CdId:         resp.CdId,
 	})
 	if err != nil {
-		term.Debug("Failed to record deployment:", err)
-		term.Warn("Unable to update deployment history; deployment will proceed anyway.")
+		slog.Debug(fmt.Sprintln("Failed to record deployment:", err))
+		slog.Warn("Unable to update deployment history; deployment will proceed anyway.")
 	}
 
 	if term.DoDebug() {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -14,7 +15,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
-	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 type ServicesParams struct {
@@ -22,7 +22,7 @@ type ServicesParams struct {
 }
 
 func HandleServicesTool(ctx context.Context, loader client.Loader, params ServicesParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
-	term.Debug("Function invoked: cli.Connect")
+	slog.Debug("Function invoked: cli.Connect")
 	client, err := GetClientWithRetry(ctx, cli, sc)
 	if err != nil {
 		var noBrowserErr auth.ErrNoBrowser
@@ -42,9 +42,9 @@ func HandleServicesTool(ctx context.Context, loader client.Loader, params Servic
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
-	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
+	slog.Debug("Function invoked: cli.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
-	term.Debugf("Project name loaded: %s", projectName)
+	slog.Debug("Project name loaded: " + projectName)
 	if err != nil {
 		if strings.Contains(err.Error(), "no projects found") {
 			return "no projects found on Playground", nil
@@ -68,7 +68,7 @@ func HandleServicesTool(ctx context.Context, loader client.Loader, params Servic
 	// Convert to JSON
 	jsonData, jsonErr := json.Marshal(serviceResponse)
 	if jsonErr == nil {
-		term.Debugf("Successfully loaded services with count: %d", len(serviceResponse))
+		slog.Debug(fmt.Sprintf("Successfully loaded services with count: %d", len(serviceResponse)))
 		return string(jsonData) + "\nIf you would like to see more details about your deployed projects, please visit the Defang portal at https://portal.defang.io/projects", nil
 	}
 

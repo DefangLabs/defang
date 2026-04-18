@@ -2,10 +2,11 @@ package cli
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -33,7 +34,7 @@ func Whoami(ctx context.Context, fabric client.FabricClient, maybeProvider clien
 		tenantSelection = types.TenantNameOrID(resp.TenantId)
 	}
 
-	term.Debug("User ID: " + resp.UserId)
+	slog.Debug("User ID: " + resp.UserId)
 	showData := ShowAccountData{
 		Region:         resp.Region,
 		SubscriberTier: resp.Tier,
@@ -45,7 +46,7 @@ func Whoami(ctx context.Context, fabric client.FabricClient, maybeProvider clien
 	if maybeProvider != nil {
 		// Add provider account information
 		if err := maybeProvider.Authenticate(ctx, false); err != nil { // Do not interactively login for whoami
-			term.Debug("Unable to authenticate provider:", err)
+			slog.Debug(fmt.Sprintln("Unable to authenticate provider:", err))
 		}
 		account, err := maybeProvider.AccountInfo(ctx)
 		if err == nil {

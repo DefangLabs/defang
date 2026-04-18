@@ -1,6 +1,8 @@
 package command
 
 import (
+	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 
@@ -95,7 +97,7 @@ func NewGlobalConfig() *GlobalConfig {
 	if fromEnv, ok := os.LookupEnv("DEFANG_COLOR"); ok {
 		err := color.Set(fromEnv)
 		if err != nil {
-			term.Debugf("invalid DEFANG_COLOR value: %v", err)
+			slog.Debug(fmt.Sprintf("invalid DEFANG_COLOR value: %v", err))
 		}
 	}
 
@@ -103,7 +105,7 @@ func NewGlobalConfig() *GlobalConfig {
 	if fromEnv, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
 		err := provider.Set(fromEnv)
 		if err != nil {
-			term.Debugf("invalid DEFANG_PROVIDER value: %v", err)
+			slog.Debug(fmt.Sprintf("invalid DEFANG_PROVIDER value: %v", err))
 		}
 	}
 
@@ -111,7 +113,7 @@ func NewGlobalConfig() *GlobalConfig {
 	if fromEnv, ok := os.LookupEnv("DEFANG_MODE"); ok {
 		err := mode.Set(fromEnv)
 		if err != nil {
-			term.Debugf("invalid DEFANG_MODE value: %v", err)
+			slog.Debug(fmt.Sprintf("invalid DEFANG_MODE value: %v", err))
 		}
 	}
 
@@ -123,7 +125,7 @@ func NewGlobalConfig() *GlobalConfig {
 		tenant = types.TenantNameOrID(fromEnv)
 	} else if fromEnv, ok := os.LookupEnv("DEFANG_ORG"); ok {
 		tenant = types.TenantNameOrID(fromEnv)
-		term.Warn("DEFANG_ORG is deprecated; use DEFANG_WORKSPACE instead")
+		slog.Warn("DEFANG_ORG is deprecated; use DEFANG_WORKSPACE instead")
 	}
 
 	return &GlobalConfig{

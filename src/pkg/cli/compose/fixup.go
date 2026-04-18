@@ -3,6 +3,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
@@ -32,14 +32,14 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
 	config, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
 	if err != nil {
-		term.Debugf("failed to load config: %v", err)
+		slog.Debug(fmt.Sprintf("failed to load config: %v", err))
 		config = &defangv1.Secrets{}
 	}
 	slices.Sort(config.Names) // sort for binary search
 
 	accountInfo, err := provider.AccountInfo(ctx)
 	if err != nil {
-		term.Debugf("failed to get account info to fixup services: %v", err)
+		slog.Debug(fmt.Sprintf("failed to get account info to fixup services: %v", err))
 		accountInfo = &client.AccountInfo{}
 	}
 
@@ -83,7 +83,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 
 		// Ignore "build" config if we have "image", unless in --build or --force mode
 		if svccfg.Image != "" && svccfg.Build != nil && upload != UploadModeDigest && upload != UploadModeForce {
-			term.Warnf("service %q: using published image instead of rebuilding; pass --build to build and publish a new image", svccfg.Name)
+			slog.Warn(fmt.Sprintf("service %q: using published image instead of rebuilding; pass --build to build and publish a new image", svccfg.Name))
 			svccfg.Build = nil
 		}
 
@@ -107,7 +107,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 				// Check if the dockerfile exists
 				dockerfilePath := filepath.Join(svccfg.Build.Context, svccfg.Build.Dockerfile)
 				if _, err := os.Stat(dockerfilePath); err != nil {
-					term.Debugf("stat %q: %v", dockerfilePath, err)
+					slog.Debug(fmt.Sprintf("stat %q: %v", dockerfilePath, err))
 					// In this case we know that the dockerfile is not in the location the compose file specifies,
 					// so can assume that the dockerfile has been normalized to the default "Dockerfile".
 					if svccfg.Build.Dockerfile != "Dockerfile" {
@@ -155,14 +155,14 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 			}
 
 			if len(removedArgs) > 0 {
-				term.Warnf("service %q: skipping unset build argument %q", svccfg.Name, removedArgs)
+				slog.Warn(fmt.Sprintf("service %q: skipping unset build argument %q", svccfg.Name, removedArgs))
 			}
 		}
 
 		// Fixup secret references; secrets are supposed to be files, not env, but it's kept for backward compatibility
 		for i, secret := range svccfg.Secrets {
 			if i == 0 { // only warn once
-				term.Warnf("service %q: secrets will be exposed as environment variables, not files (use 'environment' instead)", svccfg.Name)
+				slog.Warn(fmt.Sprintf("service %q: secrets will be exposed as environment variables, not files (use 'environment' instead)", svccfg.Name))
 			}
 			svccfg.Environment[secret.Source] = nil
 		}
@@ -176,7 +176,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 			// A bug in Compose-go env file parsing can cause empty keys
 			if key == "" {
 				if !shownOnce {
-					term.Warnf("service %q: skipping unset environment variable key", svccfg.Name)
+					slog.Warn(fmt.Sprintf("service %q: skipping unset environment variable key", svccfg.Name))
 					shownOnce = true
 				}
 				delete(svccfg.Environment, key) // remove the empty key; this is safe
@@ -204,17 +204,17 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 		}
 
 		if len(notAdjusted) > 0 {
-			term.Warnf("service %q: environment variable(s) %q will use the `defang config` value instead of adjusted service name", svccfg.Name, notAdjusted)
+			slog.Warn(fmt.Sprintf("service %q: environment variable(s) %q will use the `defang config` value instead of adjusted service name", svccfg.Name, notAdjusted))
 		}
 
 		if len(overridden) > 0 {
-			term.Warnf("service %q: environment variable(s) %q overridden by config", svccfg.Name, overridden)
+			slog.Warn(fmt.Sprintf("service %q: environment variable(s) %q overridden by config", svccfg.Name, overridden))
 		}
 
 		_, scaling := svccfg.Extensions["x-defang-autoscaling"]
 		if scaling {
 			if _, ok := provider.(*client.PlaygroundProvider); ok {
-				term.Warnf("service %q: auto-scaling is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
+				slog.Warn(fmt.Sprintf("service %q: auto-scaling is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name))
 			}
 		}
 
@@ -252,7 +252,7 @@ func fixupLLM(svccfg *composeTypes.ServiceConfig) {
 		// HACK: we must have at least one host port to get a CNAME for the service
 		// litellm listens on 4000 by default
 		var port uint32 = liteLLMPort
-		term.Debugf("service %q: adding LLM host port %d", svccfg.Name, port)
+		slog.Debug(fmt.Sprintf("service %q: adding LLM host port %d", svccfg.Name, port))
 		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	}
 }
@@ -260,7 +260,7 @@ func fixupLLM(svccfg *composeTypes.ServiceConfig) {
 func fixupPostgresService(svccfg *composeTypes.ServiceConfig, provider client.Provider, upload UploadMode) error {
 	_, managedPostgres := svccfg.Extensions["x-defang-postgres"]
 	if _, ok := provider.(*client.PlaygroundProvider); ok && managedPostgres && upload != UploadModeEstimate {
-		term.Warnf("service %q: managed postgres is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
+		slog.Warn(fmt.Sprintf("service %q: managed postgres is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name))
 	}
 	if len(svccfg.Ports) == 0 {
 		// HACK: we must have at least one host port to get a CNAME for the service
@@ -273,7 +273,7 @@ func fixupPostgresService(svccfg *composeTypes.ServiceConfig, provider client.Pr
 				return err
 			}
 		}
-		term.Debugf("service %q: adding postgres host port %d", svccfg.Name, port)
+		slog.Debug(fmt.Sprintf("service %q: adding postgres host port %d", svccfg.Name, port))
 		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	} else {
 		fixupIngressPorts(svccfg)
@@ -284,7 +284,7 @@ func fixupPostgresService(svccfg *composeTypes.ServiceConfig, provider client.Pr
 func fixupMongoService(svccfg *composeTypes.ServiceConfig, provider client.Provider, upload UploadMode) error {
 	_, managedMongo := svccfg.Extensions["x-defang-mongodb"]
 	if _, ok := provider.(*client.PlaygroundProvider); ok && managedMongo && upload != UploadModeEstimate {
-		term.Warnf("service %q: managed mongodb is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
+		slog.Warn(fmt.Sprintf("service %q: managed mongodb is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name))
 	}
 	if len(svccfg.Ports) == 0 {
 		// HACK: we must have at least one host port to get a CNAME for the service
@@ -311,7 +311,7 @@ func fixupMongoService(svccfg *composeTypes.ServiceConfig, provider client.Provi
 			}
 			break // done
 		}
-		term.Debugf("service %q: adding mongodb host port %d", svccfg.Name, port)
+		slog.Debug(fmt.Sprintf("service %q: adding mongodb host port %d", svccfg.Name, port))
 		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	} else {
 		fixupIngressPorts(svccfg)
@@ -322,7 +322,7 @@ func fixupMongoService(svccfg *composeTypes.ServiceConfig, provider client.Provi
 func fixupRedisService(svccfg *composeTypes.ServiceConfig, provider client.Provider, upload UploadMode) error {
 	_, managedRedis := svccfg.Extensions["x-defang-redis"]
 	if _, ok := provider.(*client.PlaygroundProvider); ok && managedRedis && upload != UploadModeEstimate {
-		term.Warnf("service %q: Managed redis is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
+		slog.Warn(fmt.Sprintf("service %q: Managed redis is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name))
 	}
 	if len(svccfg.Ports) == 0 {
 		// HACK: we must have at least one host port to get a CNAME for the service https://redis.io/docs/latest/operate/oss_and_stack/management/config/
@@ -339,7 +339,7 @@ func fixupRedisService(svccfg *composeTypes.ServiceConfig, provider client.Provi
 				// continue; last one wins
 			}
 		}
-		term.Debugf("service %q: adding redis host port %d", svccfg.Name, port)
+		slog.Debug(fmt.Sprintf("service %q: adding redis host port %d", svccfg.Name, port))
 		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	} else {
 		fixupIngressPorts(svccfg)
@@ -350,7 +350,7 @@ func fixupRedisService(svccfg *composeTypes.ServiceConfig, provider client.Provi
 func fixupIngressPorts(svccfg *composeTypes.ServiceConfig) {
 	for i, port := range svccfg.Ports {
 		if port.Mode == Mode_INGRESS || port.Mode == "" {
-			term.Debugf("service %q: changing port %d to host mode", svccfg.Name, port.Target)
+			slog.Debug(fmt.Sprintf("service %q: changing port %d to host mode", svccfg.Name, port.Target))
 			svccfg.Ports[i].Mode = Mode_HOST
 		}
 	}
@@ -448,7 +448,7 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 					if openAIKey == "" {
 						openAIKey = *key
 					} else if *key != openAIKey {
-						term.Errorf("multiple different OPENAI_API_KEY values found in services depending on %q", svccfg.Name)
+						slog.Error(fmt.Sprintf("multiple different OPENAI_API_KEY values found in services depending on %q", svccfg.Name))
 						break
 					}
 				}
@@ -542,16 +542,16 @@ func GetImageRepo(image string) string {
 func fixupPort(port composeTypes.ServicePortConfig) composeTypes.ServicePortConfig {
 	switch port.Mode {
 	case "":
-		term.Warnf("port %d: no 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)", port.Target)
+		slog.Warn(fmt.Sprintf("port %d: no 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)", port.Target))
 		fallthrough
 	case Mode_INGRESS:
 		// This code is unnecessarily complex because compose-go silently converts short `ports:` syntax to ingress+tcp
 		if port.Protocol == Protocol_UDP {
-			term.Warnf("port %d: UDP ports default to 'host' mode (add 'mode: host' to silence)", port.Target)
+			slog.Warn(fmt.Sprintf("port %d: UDP ports default to 'host' mode (add 'mode: host' to silence)", port.Target))
 			port.Mode = Mode_HOST
 		} else {
 			if port.Published != "" {
-				term.Debugf("port %d: ignoring 'published: %s' in 'ingress' mode", port.Target, port.Published)
+				slog.Debug(fmt.Sprintf("port %d: ignoring 'published: %s' in 'ingress' mode", port.Target, port.Published))
 			}
 			if port.AppProtocol == "" {
 				// TCP ingress is not supported; assuming HTTP (add 'app_protocol: http' to silence)"

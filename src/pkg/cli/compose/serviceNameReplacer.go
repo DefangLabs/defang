@@ -2,12 +2,13 @@ package compose
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
@@ -29,7 +30,7 @@ type ServiceNameReplacer struct {
 func NewServiceNameReplacer(ctx context.Context, dnsResolver client.DNSResolver, project *composeTypes.Project) ServiceNameReplacer {
 	var skipPublicReplacement bool
 	if err := dnsResolver.UpdateShardDomain(ctx); err != nil {
-		term.Debugf("failed to update shard domain: %v", err)
+		slog.Debug(fmt.Sprintf("failed to update shard domain: %v", err))
 		skipPublicReplacement = true
 	}
 	// Create a regexp to detect private service names in environment variable and build arg values
@@ -74,7 +75,7 @@ func (s *ServiceNameReplacer) replaceServiceNameWithDNS(value string) string {
 			serviceEnd := match[3]
 			serviceName := value[serviceStart:serviceEnd]
 			if s.skipPublicReplacement {
-				term.Warnf("service %q: reference to public DNS cannot be replaced in %q, use `defang login` and try again", serviceName, value)
+				slog.Warn(fmt.Sprintf("service %q: reference to public DNS cannot be replaced in %q, use `defang login` and try again", serviceName, value))
 			} else {
 				return value[:serviceStart] + s.dnsResolver.ServicePublicDNS(NormalizeServiceName(serviceName), s.projectName) + value[serviceEnd:]
 			}
@@ -88,9 +89,9 @@ func (s *ServiceNameReplacer) ReplaceServiceNameWithDNS(serviceName string, key,
 	val := s.replaceServiceNameWithDNS(value)
 
 	if val != value {
-		term.Debugf("service %q: service name was adjusted: %s %q assigned value %q", serviceName, fixupTarget, key, val)
+		slog.Debug(fmt.Sprintf("service %q: service name was adjusted: %s %q assigned value %q", serviceName, fixupTarget, key, val))
 	} else if s.publicServiceNames != nil && s.publicServiceNames.MatchString(value) {
-		term.Debugf("service %q: service name in the %s %q was not adjusted; only references to other services with port mode set to 'host' will be fixed-up", serviceName, fixupTarget, key)
+		slog.Debug(fmt.Sprintf("service %q: service name in the %s %q was not adjusted; only references to other services with port mode set to 'host' will be fixed-up", serviceName, fixupTarget, key))
 	}
 
 	return val

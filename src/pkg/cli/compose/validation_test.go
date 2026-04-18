@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"os"
 	"slices"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -37,8 +39,9 @@ func TestValidationAndConvert(t *testing.T) {
 	}
 
 	testAllComposeFiles(t, func(t *testing.T, name, path string) {
-		logs := new(bytes.Buffer)
-		term.DefaultTerm = term.NewTerm(os.Stdin, logs, logs)
+		logBuf := new(bytes.Buffer)
+		term.DefaultTerm = term.NewTerm(os.Stdin, logBuf, logBuf)
+		slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 
 		options := LoaderOptions{ConfigPaths: []string{path}}
 		loader := Loader{options: options}
@@ -53,7 +56,7 @@ func TestValidationAndConvert(t *testing.T) {
 
 		if err := FixupServices(t.Context(), mockClient, project, UploadModeIgnore); err != nil {
 			t.Logf("Service conversion failed: %v", err)
-			logs.WriteString("Error: " + err.Error() + "\n") // no coverage!
+			logBuf.WriteString("Error: " + err.Error() + "\n") // no coverage!
 		}
 
 		listConfigNames, err := listConfigNamesFunc(t.Context())
@@ -62,7 +65,7 @@ func TestValidationAndConvert(t *testing.T) {
 		}
 		if err := ValidateProjectConfig(project, listConfigNames); err != nil {
 			t.Logf("Project config validation failed: %v", err)
-			logs.WriteString("Error: " + err.Error() + "\n")
+			logBuf.WriteString("Error: " + err.Error() + "\n")
 		}
 
 		mode := modes.ModeAffordable
@@ -71,16 +74,16 @@ func TestValidationAndConvert(t *testing.T) {
 		}
 		if err := ValidateProject(project, mode); err != nil {
 			t.Logf("Project validation failed: %v", err)
-			logs.WriteString("Error: " + err.Error() + "\n") // no coverage!
+			logBuf.WriteString("Error: " + err.Error() + "\n") // no coverage!
 		}
 
 		// The order of the services is not guaranteed, so we sort the logs before comparing
-		logLines := strings.SplitAfter(logs.String(), "\n")
+		logLines := strings.SplitAfter(logBuf.String(), "\n")
 		slices.Sort(logLines)
-		logs = bytes.NewBufferString(strings.Join(logLines, ""))
+		logBuf = bytes.NewBufferString(strings.Join(logLines, ""))
 
 		// Compare the logs with the warnings file
-		if err := pkg.Compare(logs.Bytes(), path+".warnings"); err != nil {
+		if err := pkg.Compare(logBuf.Bytes(), path+".warnings"); err != nil {
 			t.Error(err)
 		}
 	})

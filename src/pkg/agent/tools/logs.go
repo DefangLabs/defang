@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
@@ -13,7 +14,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
 )
 
@@ -41,7 +41,7 @@ func HandleLogsTool(ctx context.Context, loader client.Loader, params LogsParams
 		}
 	}
 
-	term.Debug("Function invoked: cli.Connect")
+	slog.Debug("Function invoked: cli.Connect")
 	client, err := GetClientWithRetry(ctx, cli, sc)
 	if err != nil {
 		var noBrowserErr auth.ErrNoBrowser
@@ -62,12 +62,12 @@ func HandleLogsTool(ctx context.Context, loader client.Loader, params LogsParams
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
 
-	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
+	slog.Debug("Function invoked: cli.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
 		return "", fmt.Errorf("failed to load project name: %w", err)
 	}
-	term.Debug("Project name loaded:", projectName)
+	slog.Debug(fmt.Sprintln("Project name loaded:", projectName))
 
 	err = cli.CanIUseProvider(ctx, client, provider, projectName, 0)
 	if err != nil {
@@ -86,7 +86,7 @@ func HandleLogsTool(ctx context.Context, loader client.Loader, params LogsParams
 	})
 
 	if err != nil {
-		term.Error("Failed to fetch logs", "error", err)
+		slog.Error(fmt.Sprintln("Failed to fetch logs", "error", err))
 		return "", fmt.Errorf("failed to fetch logs: %w", err)
 	}
 

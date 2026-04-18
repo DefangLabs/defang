@@ -3,6 +3,7 @@ package stacks
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -180,13 +181,13 @@ func ListInDirectory(workingDirectory string) ([]ListItem, error) {
 		filename := filename(workingDirectory, file.Name())
 		content, err := os.ReadFile(filename)
 		if err != nil {
-			term.Warnf("Skipping unreadable stack file %s: %v\n", filename, err)
+			slog.Warn(fmt.Sprintf("Skipping unreadable stack file %s: %v\n", filename, err))
 			continue
 		}
 
 		params, err := NewParametersFromContent(file.Name(), content)
 		if err != nil {
-			term.Warnf("Skipping invalid stack file %s: %v\n", filename, err)
+			slog.Warn(fmt.Sprintf("Skipping invalid stack file %s: %v\n", filename, err))
 			continue
 		}
 		stacks = append(stacks, ListItem{
@@ -245,7 +246,7 @@ func LoadStackEnv(params Parameters, overload bool) error {
 	paramsMap := params.ToMap()
 	for key, value := range paramsMap {
 		if envValue, ok := currentEnv[key]; ok && envValue != value && !overload {
-			term.Warnf("The variable %q is set in both the stack and the environment. The value from the environment will be used.\n", key)
+			slog.Warn(fmt.Sprintf("The variable %q is set in both the stack and the environment. The value from the environment will be used.\n", key))
 		}
 		if _, ok := currentEnv[key]; !ok || overload {
 			err := os.Setenv(key, value)
@@ -263,7 +264,7 @@ func filename(workingDirectory, stackname string) string {
 }
 
 func PrintCreateMessage(stackName string) {
-	term.Infof("A stack file has been created at `.defang/%s`.", stackName)
+	slog.Info(fmt.Sprintf("A stack file has been created at `.defang/%s`.", stackName))
 	term.Printf(
 		"This file contains the configuration for this stack.\n"+
 			"We recommend you commit this file to source control, so it can be used by everyone on your team.\n"+

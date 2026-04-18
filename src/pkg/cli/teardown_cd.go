@@ -5,12 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
-	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 var ErrExistingStacks = errors.New("there are still deployed stacks")
@@ -34,9 +34,9 @@ func TearDownCD(ctx context.Context, provider client.Provider, force bool) error
 	})
 
 	if len(stacks) > 0 {
-		term.Info("Some stacks are currently deployed. Run the following commands to tear them down:")
+		slog.Info("Some stacks are currently deployed. Run the following commands to tear them down:")
 		for _, stack := range stacks {
-			term.Infof("  `defang down --workspace %s --project-name %s --stack %s`\n", stack.Workspace, stack.Project, stack.Stack)
+			slog.Info(fmt.Sprintf("  `defang down --workspace %s --project-name %s --stack %s`\n", stack.Workspace, stack.Project, stack.Stack))
 		}
 		if !force {
 			return ErrExistingStacks

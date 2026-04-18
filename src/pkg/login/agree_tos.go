@@ -3,6 +3,8 @@ package login
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -19,7 +21,7 @@ func InteractiveAgreeToS(ctx context.Context, fabric client.FabricClient) error 
 	if client.TermsAccepted() {
 		// The user has already agreed to the terms of service recently
 		if err := nonInteractiveAgreeToS(ctx, fabric); err != nil {
-			term.Debug("unable to agree to terms:", err) // not fatal
+			slog.Debug(fmt.Sprintln("unable to agree to terms:", err)) // not fatal
 		}
 		return nil
 	}
@@ -50,7 +52,7 @@ func NonInteractiveAgreeToS(ctx context.Context, fabric client.FabricClient) err
 
 	// Persist the terms agreement in the state file so that we don't ask again
 	if err := client.AcceptTerms(); err != nil {
-		term.Debug("unable to persist terms agreement:", err) // not fatal
+		slog.Debug(fmt.Sprintln("unable to persist terms agreement:", err)) // not fatal
 	}
 
 	return nonInteractiveAgreeToS(ctx, fabric)
@@ -60,6 +62,6 @@ func nonInteractiveAgreeToS(ctx context.Context, fabric client.FabricClient) err
 	if err := fabric.AgreeToS(ctx); err != nil {
 		return err
 	}
-	term.Info("You have agreed to the Defang terms of service")
+	slog.Info("You have agreed to the Defang terms of service")
 	return nil
 }

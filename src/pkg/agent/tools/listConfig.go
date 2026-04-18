@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
@@ -11,7 +12,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
-	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 type ListConfigParams struct {
@@ -20,7 +20,7 @@ type ListConfigParams struct {
 
 // HandleListConfigTool handles the list config tool logic
 func HandleListConfigTool(ctx context.Context, loader client.Loader, params ListConfigParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
-	term.Debug("Function invoked: cli.Connect")
+	slog.Debug("Function invoked: cli.Connect")
 	client, err := GetClientWithRetry(ctx, cli, sc)
 	if err != nil {
 		var noBrowserErr auth.ErrNoBrowser
@@ -41,14 +41,14 @@ func HandleListConfigTool(ctx context.Context, loader client.Loader, params List
 		return "", fmt.Errorf("failed to setup provider: %w", err)
 	}
 
-	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
+	slog.Debug("Function invoked: cli.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
 		return "", fmt.Errorf("failed to load project name: %w", err)
 	}
-	term.Debug("Project name loaded:", projectName)
+	slog.Debug(fmt.Sprintln("Project name loaded:", projectName))
 
-	term.Debug("Function invoked: cli.ConfigList")
+	slog.Debug("Function invoked: cli.ConfigList")
 	config, err := cli.ListConfig(ctx, provider, projectName)
 	if err != nil {
 		return "", fmt.Errorf("failed to list config variables: %w", err)

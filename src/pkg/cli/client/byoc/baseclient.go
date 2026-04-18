@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"log/slog"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -13,7 +14,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -109,7 +109,7 @@ func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) 
 	if len(projectNames) > 1 {
 		return "", ErrMultipleProjects{ProjectNames: projectNames}
 	}
-	term.Debug("Using default project:", projectNames[0])
+	slog.Debug(fmt.Sprintln("Using default project:", projectNames[0]))
 	return projectNames[0], nil
 }
 

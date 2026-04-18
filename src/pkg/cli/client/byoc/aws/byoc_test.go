@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -360,6 +361,7 @@ aws_secret_access_key = wJalrXUtnFEMI/KDEFANG/bPxRfiCYEXAMPLEKEY
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stdout, _ := term.SetupTestTerm(t)
+			slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 
 			if tt.configFiles {
 				// Point AWS SDK to our fake config files

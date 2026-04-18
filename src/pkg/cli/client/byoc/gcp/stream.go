@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"log/slog"
 	"path"
 	"regexp"
 	"strings"
@@ -14,7 +15,6 @@ import (
 	"cloud.google.com/go/logging/apiv2/loggingpb"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	auditpb "google.golang.org/genproto/googleapis/cloud/audit"
 	"google.golang.org/grpc/codes"
@@ -71,7 +71,7 @@ func (s *ServerStream[T]) Follow(start time.Time) (iter.Seq2[*T, error], error) 
 	}
 	query := s.query.GetQuery()
 	shouldList := !start.IsZero() && start.Unix() > 0 && time.Since(start) > 10*time.Millisecond
-	term.Debugf("Query and tail logs since %v with query: \n%v", start, query)
+	slog.Debug(fmt.Sprintf("Query and tail logs since %v with query: \n%v", start, query))
 	return func(yield func(*T, error) bool) {
 		defer tailer.Close()
 		// Only query older logs if start time is more than 10ms ago
@@ -126,7 +126,7 @@ func (s *ServerStream[T]) Follow(start time.Time) (iter.Seq2[*T, error], error) 
 // Head returns an iterator that queries logs in ascending order.
 func (s *ServerStream[T]) Head(limit int32) iter.Seq2[*T, error] {
 	query := s.query.GetQuery()
-	term.Debugf("Query logs with query: \n%v", query)
+	slog.Debug(fmt.Sprintf("Query logs with query: \n%v", query))
 	return func(yield func(*T, error) bool) {
 		lister, err := s.gcpLogsClient.ListLogEntries(s.ctx, query, gcp.OrderAscending)
 		if err != nil {
@@ -140,7 +140,7 @@ func (s *ServerStream[T]) Head(limit int32) iter.Seq2[*T, error] {
 // Tail returns an iterator that queries logs in descending order, reversing if a limit is set.
 func (s *ServerStream[T]) Tail(limit int32) iter.Seq2[*T, error] {
 	query := s.query.GetQuery()
-	term.Debugf("Query logs with query: \n%v", query)
+	slog.Debug(fmt.Sprintf("Query logs with query: \n%v", query))
 	return func(yield func(*T, error) bool) {
 		lister, err := s.gcpLogsClient.ListLogEntries(s.ctx, query, gcp.OrderDescending)
 		if err != nil {
@@ -486,13 +486,13 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 		}
 
 		if entry.GetProtoPayload().GetTypeUrl() != "type.googleapis.com/google.cloud.audit.AuditLog" {
-			term.Warnf("unexpected log entry type : %v", entry.GetProtoPayload().GetTypeUrl())
+			slog.Warn(fmt.Sprintf("unexpected log entry type : %v", entry.GetProtoPayload().GetTypeUrl()))
 			return nil, nil
 		}
 
 		auditLog := new(auditpb.AuditLog)
 		if err := entry.GetProtoPayload().UnmarshalTo(auditLog); err != nil {
-			term.Warnf("failed to unmarshal audit log : %v", err)
+			slog.Warn(fmt.Sprintf("failed to unmarshal audit log : %v", err))
 			return nil, nil
 		}
 
@@ -528,7 +528,7 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 					Status: status.GetMessage(),
 				}}, nil
 			} else {
-				term.Warnf("missing request and response in audit log for service %v", path.Base(auditLog.GetResourceName()))
+				slog.Warn(fmt.Sprintf("missing request and response in audit log for service %v", path.Base(auditLog.GetResourceName())))
 				return nil, nil
 			}
 
@@ -551,7 +551,7 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 				serviceName := GetValueInStruct(response, "spec.template.metadata.labels.defang-service")
 				status := auditLog.GetStatus()
 				if status == nil {
-					term.Warnf("missing status in audit log for job %v", path.Base(auditLog.GetResourceName()))
+					slog.Warn(fmt.Sprintf("missing status in audit log for job %v", path.Base(auditLog.GetResourceName())))
 					return nil, nil
 				}
 				var state defangv1.ServiceState
@@ -579,7 +579,7 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 				// Report all ready services when CD is successful, prevents cli deploy stop before cd is done
 				return getReadyServicesCompletedResps(auditLog.GetStatus().GetMessage()), nil // Ignore success cd status when we are waiting for service status
 			} else {
-				term.Warnf("unexpected execution name in audit log : %v", executionName)
+				slog.Warn(fmt.Sprintf("unexpected execution name in audit log : %v", executionName))
 				return nil, nil
 			}
 		case "gce_instance_group_manager": // Compute engine update start
@@ -591,24 +591,24 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 			managerName := entry.Resource.Labels["instance_group_manager_name"]
 			labels, err := gcpLogsClient.GetInstanceGroupManagerLabels(ctx, project, region, managerName)
 			if err != nil {
-				term.Warnf("failed to get instance group manager labels for %v: %v", managerName, err)
+				slog.Warn(fmt.Sprintf("failed to get instance group manager labels for %v: %v", managerName, err))
 				return nil, nil
 			}
 			serviceName := labels["defang-service"]
 			if serviceName == "" {
-				term.Warnf("missing defang-service label in instance group manager %v", managerName)
+				slog.Warn(fmt.Sprintf("missing defang-service label in instance group manager %v", managerName))
 				return nil, nil
 			}
 			if etag != "" {
 				labelEtag := labels["defang-etag"]
 				if labelEtag != etag {
-					term.Warnf("skipping instance group manager %v: etag mismatch (got %q, want %q)", managerName, labelEtag, etag)
+					slog.Warn(fmt.Sprintf("skipping instance group manager %v: etag mismatch (got %q, want %q)", managerName, labelEtag, etag))
 					return nil, nil
 				}
 			}
 			rootTriggerId := entry.GetLabels()["compute.googleapis.com/root_trigger_id"]
 			if rootTriggerId == "" {
-				term.Warnf("missing root_trigger_id in audit log for instance group manager %v", path.Base(auditLog.GetResourceName()))
+				slog.Warn(fmt.Sprintf("missing root_trigger_id in audit log for instance group manager %v", path.Base(auditLog.GetResourceName())))
 			} else {
 				computeEngineRootTriggers[rootTriggerId] = serviceName
 			}
@@ -622,12 +622,12 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 			rootTriggerId := entry.GetLabels()["compute.googleapis.com/root_trigger_id"]
 			serviceName, ok := computeEngineRootTriggers[rootTriggerId]
 			if !ok {
-				term.Debugf("ignored root trigger id %v for instance group insert", rootTriggerId)
+				slog.Debug(fmt.Sprintf("ignored root trigger id %v for instance group insert", rootTriggerId))
 				return nil, nil
 			}
 			response := auditLog.GetResponse()
 			if response == nil {
-				term.Warnf("missing response in audit log for instance group %v", path.Base(auditLog.GetResourceName()))
+				slog.Warn(fmt.Sprintf("missing response in audit log for instance group %v", path.Base(auditLog.GetResourceName())))
 				return nil, nil
 			}
 			status := response.GetFields()["status"].GetStringValue()
@@ -653,7 +653,7 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 			}
 			bt, err := gcpLogsClient.GetBuildInfo(ctx, buildId) // TODO: Cache the build IDs?
 			if err != nil {
-				term.Warnf("failed to get build tag for build %v: %v", buildId, err)
+				slog.Warn(fmt.Sprintf("failed to get build tag for build %v: %v", buildId, err))
 				return nil, nil
 			}
 
@@ -707,7 +707,7 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 				}}, nil
 			}
 		default:
-			term.Warnf("unexpected resource type : %v", entry.Resource.Type)
+			slog.Warn(fmt.Sprintf("unexpected resource type : %v", entry.Resource.Type))
 			return nil, nil
 		}
 	}

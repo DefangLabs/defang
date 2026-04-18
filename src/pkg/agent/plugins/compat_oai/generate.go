@@ -19,9 +19,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/packages/param"
@@ -258,7 +258,7 @@ func (g *ModelGenerator) generateStream(ctx context.Context, handleChunk func(co
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request params for debug: %w", err)
 	}
-	_, _ = term.Debugf("Chat.Completions.NewStreaming: %s", string(reqParams))
+	slog.Debug("Chat.Completions.NewStreaming: " + string(reqParams))
 	stream := g.client.Chat.Completions.NewStreaming(ctx, *g.request)
 	defer stream.Close()
 

@@ -3,11 +3,11 @@ package resources
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -26,7 +26,7 @@ var samplesExamplesPath = filepath.Join(client.StateDir, "samples_examples.json"
 
 // setupDocumentationResource configures and adds the documentation resource to the MCP server
 func setupDocumentationResource(s *server.MCPServer) {
-	term.Info("Creating documentation resource")
+	slog.Info("Creating documentation resource")
 	docResource := mcp.NewResource(
 		"doc:///knowledge_base/knowledge_base.json",
 		"knowledge_base",
@@ -38,7 +38,7 @@ func setupDocumentationResource(s *server.MCPServer) {
 		// Read the file
 		file, err := os.ReadFile(knowledgeBasePath)
 		if err != nil {
-			term.Error("Failed to read resource file", "error", err, "path", "knowledge_base.json")
+			slog.Error(fmt.Sprintln("Failed to read resource file", "error", err, "path", "knowledge_base.json"))
 			return nil, fmt.Errorf("failed to read resource file knowledge_base.json: %w", err)
 		}
 
@@ -55,7 +55,7 @@ func setupDocumentationResource(s *server.MCPServer) {
 
 // setupSamplesResource configures and adds the samples examples resource to the MCP server
 func setupSamplesResource(s *server.MCPServer) {
-	term.Info("Creating samples examples resource")
+	slog.Info("Creating samples examples resource")
 	samplesResource := mcp.NewResource(
 		"doc:///knowledge_base/samples_examples.json",
 		"defang_dockerfile_and_compose_examples",
@@ -68,7 +68,7 @@ func setupSamplesResource(s *server.MCPServer) {
 		// Read the file
 		file, err := os.ReadFile(samplesExamplesPath)
 		if err != nil {
-			term.Error("Failed to read resource file", "error", err, "path", "samples_examples.json")
+			slog.Error(fmt.Sprintln("Failed to read resource file", "error", err, "path", "samples_examples.json"))
 			return nil, fmt.Errorf("failed to read resource file samples_examples.json: %w", err)
 		}
 

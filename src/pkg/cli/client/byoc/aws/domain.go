@@ -3,11 +3,12 @@ package aws
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/dns"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/service/route53/types"
 )
 
@@ -27,7 +28,7 @@ func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, st
 		if !errors.Is(err, aws.ErrZoneNotFound) {
 			return nil, "", err // TODO: we should not fail deployment if GetHostedZonesByName fails
 		}
-		term.Debugf("Zone %q not found, delegation set will be created", projectDomain)
+		slog.Debug(fmt.Sprintf("Zone %q not found, delegation set will be created", projectDomain))
 	} else {
 		// Case 2: Get the NS records for the existing subdomain zone
 		delegationSet, err = getOrCreateDelegationSetByZones(ctx, zones, projectName, stackName, r53Client)
@@ -42,10 +43,10 @@ func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, st
 		// but this is acceptable because the next time the zone is deployed, we'll get the existing delegation set from the zone.
 		delegationSet, err = findUsableDelegationSet(ctx, projectDomain, r53Client, resolverAt)
 		if err != nil {
-			term.Warnf("Failed to find existing usable delegation set: %v, creating a new one", err)
+			slog.Warn(fmt.Sprintf("Failed to find existing usable delegation set: %v, creating a new one", err))
 		}
 		if delegationSet != nil {
-			term.Debug("Reusing existing usable Route53 delegation set:", *delegationSet.Id)
+			slog.Debug(fmt.Sprintln("Reusing existing usable Route53 delegation set:", *delegationSet.Id))
 		} else {
 			delegationSet, err = createUsableDelegationSet(ctx, projectDomain, r53Client, resolverAt)
 			if err != nil {
@@ -58,7 +59,7 @@ func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, st
 		return nil, "", errors.New("no NS records found for the delegation set") // should not happen
 	}
 	if delegationSet.Id != nil {
-		term.Debug("Route53 delegation set ID:", *delegationSet.Id)
+		slog.Debug(fmt.Sprintln("Route53 delegation set ID:", *delegationSet.Id))
 		delegationSetId = strings.TrimPrefix(*delegationSet.Id, "/delegationset/")
 	}
 
@@ -87,7 +88,7 @@ func findUsableDelegationSet(ctx context.Context, domain string, r53Client aws.R
 		if len(hostedZones) >= 100 {
 			// A delegation set can only be associated with up to 100 hosted zones by default
 			// (https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/DNSLimitations.html#limits-api-entities-hosted-zones)
-			term.Debugf("Delegation set %q has reached the maximum number of hosted zones (100), skipping", *delegationSet.Id)
+			slog.Debug(fmt.Sprintf("Delegation set %q has reached the maximum number of hosted zones (100), skipping", *delegationSet.Id))
 			continue
 		}
 		return &delegationSet, nil
@@ -119,7 +120,7 @@ func createUsableDelegationSet(ctx context.Context, domain string, r53Client aws
 				// up to 100 delegation sets can be created per account, failure is non-fatal
 				// there is no direct actionable remedy for the user too.
 				// TODO: find and reuse empty delegation sets to avoid hitting the limit
-				term.Debugf("Failed to delete conflicting delegation set %q: %v", *delegationSet.Id, err)
+				slog.Debug(fmt.Sprintf("Failed to delete conflicting delegation set %q: %v", *delegationSet.Id, err))
 			}
 		} else {
 			return delegationSet, nil
@@ -137,7 +138,7 @@ func nameServersHasConflict(ctx context.Context, nameServers []string, domains [
 				return false, err
 			} else if len(records) > 0 {
 				// Records found, meaning the NS server is conflicting
-				term.Debugf("Name server %q has conflicting records for domain %q: %v", nsServer, domain, records)
+				slog.Debug(fmt.Sprintf("Name server %q has conflicting records for domain %q: %v", nsServer, domain, records))
 				return true, nil
 			}
 		}
@@ -155,7 +156,7 @@ func getOrCreateDelegationSetByZones(ctx context.Context, zones []*types.HostedZ
 		}
 		// Ignore zones that were created by an older CLI (2a), or another way (2c) or belong to a different project/stack (2d)
 		if tags["defang:project"] != projectName || tags["defang:stack"] != stackName {
-			term.Debugf("ignored zone %q as it belongs to a different project/stack (%q/%q), skipping", projectDomain, tags["defang:project"], tags["defang:stack"])
+			slog.Debug(fmt.Sprintf("ignored zone %q as it belongs to a different project/stack (%q/%q), skipping", projectDomain, tags["defang:project"], tags["defang:stack"]))
 			continue
 		}
 
@@ -164,7 +165,7 @@ func getOrCreateDelegationSetByZones(ctx context.Context, zones []*types.HostedZ
 		// Create or get the reusable delegation set for the existing subdomain zone
 		delegationSet, err = aws.CreateDelegationSet(ctx, zone.Id, r53Client)
 		if delegationSetAlreadyReusable := new(types.DelegationSetAlreadyReusable); errors.As(err, &delegationSetAlreadyReusable) {
-			term.Debug("Route53 delegation set already created:", err)
+			slog.Debug(fmt.Sprintln("Route53 delegation set already created:", err))
 			delegationSet, err = aws.GetDelegationSetByZone(ctx, zone.Id, r53Client)
 		}
 		if err != nil {

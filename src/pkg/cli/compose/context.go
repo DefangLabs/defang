@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -219,7 +220,7 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 		return fmt.Sprintf("s3://cd-preview/%s%s", service, archiveType.Extension), nil
 	}
 
-	term.Info("Packaging the project files for", service, "at", root)
+	slog.Info(fmt.Sprintln("Packaging the project files for", service, "at", root))
 	buffer, err := createArchive(ctx, build.Context, build.Dockerfile, archiveType)
 	if err != nil {
 		return "", err
@@ -230,7 +231,7 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 	case UploadModeDefault, UploadModeDigest:
 		// Calculate the digest of the tarball and pass it to the fabric controller (to avoid building the same image twice)
 		digest = calcDigest(buffer.Bytes())
-		term.Debugf("Digest for %q: %s", service, digest)
+		slog.Debug(fmt.Sprintf("Digest for %q: %s", service, digest))
 	case UploadModePreview:
 		// For preview, we invoke the CD "preview" command, which will want a valid (S3) URL for diff, even though it won't be used
 		digest = calcDigest(buffer.Bytes())
@@ -241,7 +242,7 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 		panic("unexpected UploadMode value")
 	}
 
-	term.Info("Uploading the project files for", service)
+	slog.Info(fmt.Sprintln("Uploading the project files for", service))
 	return uploadArchive(ctx, provider, projectName, buffer, archiveType, digest)
 }
 
@@ -297,7 +298,7 @@ func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
 	if err != nil {
 		return nil
 	}
-	term.Debug("Reading .dockerignore file from", ignorefile)
+	slog.Debug(fmt.Sprintln("Reading .dockerignore file from", ignorefile))
 	return reader
 }
 
@@ -306,7 +307,7 @@ func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
 // Returns the filename of the written file and an error.
 func writeDefaultIgnoreFile(cwd string, dockerignore string) (string, error) {
 	path := filepath.Join(cwd, dockerignore)
-	term.Debug("Writing .dockerignore file to", path)
+	slog.Debug(fmt.Sprintln("Writing .dockerignore file to", path))
 
 	err := os.WriteFile(path, []byte(defaultDockerIgnore), 0644)
 	if err != nil {
@@ -369,7 +370,7 @@ func walkContextFolder(root, dockerfile string, writeIgnore writeIgnoreFile, fn 
 
 	if dockerignore == "" && writeIgnore {
 		// Generate a default .dockerignore file if none exists (to be included in the context)
-		term.Warn("No .dockerignore file found; creating default .dockerignore; you may add this to source control (git)")
+		slog.Warn("No .dockerignore file found; creating default .dockerignore; you may add this to source control (git)")
 		var err error
 		dockerignore, err = writeDefaultIgnoreFile(root, dotdockerignore)
 		if err != nil {
@@ -412,7 +413,7 @@ func walkContextFolder(root, dockerfile string, writeIgnore writeIgnoreFile, fn 
 				return err
 			}
 			if ignore {
-				term.Debug("Ignoring", relPath) // TODO: avoid printing in this function
+				slog.Debug(fmt.Sprintln("Ignoring", relPath)) // TODO: avoid printing in this function
 				if de.IsDir() {
 					return filepath.SkipDir
 				}
@@ -447,7 +448,7 @@ func createArchive(ctx context.Context, root string, dockerfile string, contentT
 	doProgress := term.StdoutCanColor() && term.IsTerminal()
 	err := walkContextFolder(root, dockerfile, writeIgnoreFileYes, func(path string, de os.DirEntry, slashPath string) error {
 		if term.DoDebug() {
-			term.Debug("Adding", slashPath)
+			slog.Debug(fmt.Sprintln("Adding", slashPath))
 		} else if doProgress {
 			term.Printf("%4d %s\r", fileCount, slashPath)
 			defer term.ClearLine()
@@ -474,7 +475,7 @@ func createArchive(ctx context.Context, root string, dockerfile string, contentT
 
 		fileCount++
 		if fileCount == ContextFileLimit+1 {
-			term.Warnf("the build context contains more than %d files; use --debug or create .dockerignore to exclude caches and build artifacts", ContextFileLimit)
+			slog.Warn(fmt.Sprintf("the build context contains more than %d files; use --debug or create .dockerignore to exclude caches and build artifacts", ContextFileLimit))
 		}
 
 		bufLen := buf.Len()
@@ -483,7 +484,7 @@ func createArchive(ctx context.Context, root string, dockerfile string, contentT
 			return fmt.Errorf("the build context is limited to %s; consider downloading large files in the Dockerfile or set the DEFANG_BUILD_CONTEXT_LIMIT environment variable", units.BytesSize(float64(ContextSizeHardLimit)))
 		}
 		if bufLen <= ContextSizeSoftLimit && buf.Len() > ContextSizeSoftLimit {
-			term.Warnf("the build context is larger than %s; use --debug or create .dockerignore to exclude caches and build artifacts", units.BytesSize(float64(buf.Len())))
+			slog.Warn(fmt.Sprintf("the build context is larger than %s; use --debug or create .dockerignore to exclude caches and build artifacts", units.BytesSize(float64(buf.Len()))))
 		}
 		return err
 	})

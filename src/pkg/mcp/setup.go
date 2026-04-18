@@ -3,6 +3,7 @@ package mcp
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -10,10 +11,8 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/pelletier/go-toml/v2"
-
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
+	"github.com/pelletier/go-toml/v2"
 )
 
 // MCPServerConfig represents the configuration for an MCP server
@@ -344,7 +343,7 @@ func SetupClient(clientStr string) error {
 		return err
 	}
 
-	term.Infof("Updating %q\n", configPath)
+	slog.Info(fmt.Sprintf("Updating %q\n", configPath))
 
 	// Create the directory if it doesn't exist
 	configDir := filepath.Dir(configPath)
@@ -357,7 +356,7 @@ func SetupClient(clientStr string) error {
 		return fmt.Errorf("failed to update MCP config file for client %q: %w", client, err)
 	}
 
-	term.Infof("Ensure %s is upgraded to the latest version and restarted for MCP settings to take effect.\n", client)
+	slog.Info(fmt.Sprintf("Ensure %s is upgraded to the latest version and restarted for MCP settings to take effect.\n", client))
 
 	return nil
 }

@@ -3,11 +3,12 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"iter"
+	"log/slog"
 
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -24,7 +25,7 @@ func WaitServiceState(
 	etag types.ETag,
 	services []string,
 ) (ServiceStates, error) {
-	term.Debugf("waiting for services %v to reach state %s\n", services, targetState) // TODO: don't print in Go-routine
+	slog.Debug(fmt.Sprintf("waiting for services %v to reach state %s\n", services, targetState)) // TODO: don't print in Go-routine
 
 	if len(services) == 0 {
 		return nil, ErrNothingToMonitor
@@ -57,9 +58,9 @@ func WaitServiceState(
 			// a minute and DelayBeforeRetry backs off exponentially up to 1 minute).
 			if isTransientError(err) {
 				if connect.CodeOf(err) == connect.CodeResourceExhausted {
-					term.Warnf("quota exceeded; will retry subscribe stream after backoff: %v", err)
+					slog.Warn(fmt.Sprintf("quota exceeded; will retry subscribe stream after backoff: %v", err))
 				} else {
-					term.Debugf("WaitServiceState: transient error, reconnecting subscribe stream: %v", err)
+					slog.Debug(fmt.Sprintf("WaitServiceState: transient error, reconnecting subscribe stream: %v", err))
 				}
 				if err := provider.DelayBeforeRetry(ctx); err != nil {
 					return serviceStates, err
@@ -82,16 +83,16 @@ func WaitServiceState(
 			}
 		}
 
-		term.Infof("Waiting for services to finish deploying: %q\n", pendingServices) // TODO: don't print in Go-routine
+		slog.Info(fmt.Sprintf("Waiting for services to finish deploying: %q\n", pendingServices)) // TODO: don't print in Go-routine
 
 		if msg == nil {
 			continue
 		}
 
-		term.Debugf("Service update: %s: state=%s and status=%s\n", msg.Name, msg.State, msg.Status) // TODO: don't print in Go-routine
+		slog.Debug(fmt.Sprintf("Service update: %s: state=%s and status=%s\n", msg.Name, msg.State, msg.Status)) // TODO: don't print in Go-routine
 
 		if _, ok := serviceStates[msg.Name]; !ok {
-			term.Debugf("unexpected service %s update", msg.Name) // TODO: don't print in Go-routine
+			slog.Debug(fmt.Sprintf("unexpected service %s update", msg.Name)) // TODO: don't print in Go-routine
 			continue
 		}
 		if msg.State == defangv1.ServiceState_NOT_SPECIFIED {

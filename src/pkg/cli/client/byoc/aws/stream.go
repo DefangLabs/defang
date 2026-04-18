@@ -2,6 +2,8 @@ package aws
 
 import (
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"regexp"
 	"slices"
 	"strings"
@@ -11,7 +13,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/logs"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -90,7 +91,7 @@ func (p *logEventParser) parseEvents(events []cw.LogEvent) *defangv1.TailRespons
 			}
 			break
 		}
-		term.Debugf("unrecognized log stream format: %s", *first.LogStreamName)
+		slog.Debug("unrecognized log stream format: " + *first.LogStreamName)
 		return nil // skip, ignore sidecar logs (like route53-sidecar or fluentbit)
 	}
 
@@ -123,7 +124,7 @@ func (p *logEventParser) parseEvents(events []cw.LogEvent) *defangv1.TailRespons
 		} else if parseECSEventRecords {
 			evt, err := ecs.ParseECSEvent([]byte(*event.Message))
 			if err != nil {
-				term.Debugf("error parsing ECS event, output raw event log: %v", err)
+				slog.Debug(fmt.Sprintf("error parsing ECS event, output raw event log: %v", err))
 			} else {
 				entry.Service = evt.Service()
 				entry.Etag = evt.Etag()

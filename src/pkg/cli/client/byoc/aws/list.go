@@ -2,15 +2,16 @@ package aws
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"iter"
+	"log/slog"
 	"strings"
 	"sync"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -61,7 +62,7 @@ type S3Client interface {
 func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string) (iter.Seq[state.PulumiState], error) {
 	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
 
-	term.Debug("Listing stacks in bucket:", bucketName)
+	slog.Debug(fmt.Sprintln("Listing stacks in bucket:", bucketName))
 	out, err := s3client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: &bucketName,
 		Prefix: &prefix,
@@ -85,7 +86,7 @@ func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string)
 				return io.ReadAll(getObjectOutput.Body)
 			})
 			if err != nil {
-				term.Debugf("Skipping %q in bucket %s: %v", *obj.Key, bucketName, AnnotateAwsError(err))
+				slog.Debug(fmt.Sprintf("Skipping %q in bucket %s: %v", *obj.Key, bucketName, AnnotateAwsError(err)))
 				continue
 			}
 			if state != nil {
@@ -127,7 +128,7 @@ func (b *ByocAws) listPulumiStacksAllRegions(ctx context.Context, s3client S3Cli
 				Bucket: bucket.Name,
 			})
 			if err != nil {
-				term.Debugf("Skipping bucket %s: failed to get location: %v", *bucket.Name, AnnotateAwsError(err))
+				slog.Debug(fmt.Sprintf("Skipping bucket %s: failed to get location: %v", *bucket.Name, AnnotateAwsError(err)))
 				continue
 			}
 
