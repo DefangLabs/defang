@@ -1,8 +1,9 @@
 package command
 
 import (
+	"log/slog"
+
 	"github.com/DefangLabs/defang/src/pkg/login"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
 )
@@ -32,7 +33,7 @@ var loginCmd = &cobra.Command{
 			if err := global.Client.SetOptions(cmd.Context(), req); err != nil {
 				return err
 			}
-			term.Info("Options updated successfully")
+			slog.Info("Options updated successfully")
 		}
 		return nil
 	},

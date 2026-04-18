@@ -3,11 +3,13 @@ package command
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"os"
 	"testing"
 
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -31,6 +33,7 @@ func TestPrintPlaygroundPortalServiceURLs(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
+	slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 
 	global.Stack.Provider = client.ProviderDefang
 	global.FabricAddr = client.DefaultFabricAddr

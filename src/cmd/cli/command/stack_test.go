@@ -3,10 +3,12 @@ package command
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"os"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -50,6 +52,7 @@ func MockTerm(t *testing.T, stdout *bytes.Buffer, stdin *bytes.Reader) {
 		&FakeStdout{stdout},
 		new(bytes.Buffer),
 	)
+	slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 	t.Cleanup(func() {
 		term.DefaultTerm = oldTerm
 	})

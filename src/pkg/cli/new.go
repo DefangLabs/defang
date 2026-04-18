@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,7 +37,7 @@ func FetchSamples(ctx context.Context) ([]Sample, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	term.Debug(resp.Header)
+	slog.Debug(fmt.Sprintf("%v", resp.Header))
 	reader := resp.Body
 	if resp.Header.Get("Content-Encoding") == "gzip" {
 		reader, err = gzip.NewReader(resp.Body)
@@ -69,14 +70,14 @@ func copyFromSamples(ctx context.Context, dir string, names []string, skipExisti
 		return err
 	}
 	defer resp.Body.Close()
-	term.Debug(resp.Header)
+	slog.Debug(fmt.Sprintf("%v", resp.Header))
 	tarball, err := gzip.NewReader(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read tarball: %w", err)
 	}
 	defer tarball.Close()
 	tarReader := tar.NewReader(tarball)
-	term.Info("Copying files to disk...")
+	slog.Info("Copying files to disk...")
 
 	sampleFound := false
 
@@ -114,7 +115,7 @@ func copyFromSamples(ctx context.Context, dir string, names []string, skipExisti
 					if !skipExisting || !os.IsExist(err) {
 						return err
 					}
-					term.Warnf("File already exists, skipping: %q", path)
+					slog.Warn(fmt.Sprintf("File already exists, skipping: %q", path))
 				}
 			}
 		}

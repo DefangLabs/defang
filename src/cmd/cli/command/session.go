@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,7 +42,7 @@ func newCommandSessionWithOpts(cmd *cobra.Command, opts commandSessionOpts) (*se
 		if !errors.Is(err, types.ErrComposeFileNotFound) {
 			return nil, err
 		}
-		term.Debugf("Could not create stack manager: %v", err)
+		slog.Debug(fmt.Sprintf("Could not create stack manager: %v", err))
 	}
 	sessionLoader := session.NewSessionLoader(global.Client, sm, options)
 	session, err := sessionLoader.LoadSession(ctx)
@@ -69,15 +70,15 @@ func newSessionLoaderOptionsForCommand(cmd *cobra.Command) session.SessionLoader
 		var maybeProvider client.ProviderID
 		if maybeProvider.Set(projectName) == nil && !cmd.Flag("provider").Changed {
 			// using -p with a provider name instead of -P
-			term.Warnf("Project name %q looks like a provider name; did you mean to use -P=%s instead of -p?", projectName, projectName)
+			slog.Warn(fmt.Sprintf("Project name %q looks like a provider name; did you mean to use -P=%s instead of -p?", projectName, projectName))
 			doubleCheckProjectName(projectName)
 		} else if strings.HasPrefix(projectName, "roject-name") {
 			// -project-name= instead of --project-name
-			term.Warn("Did you mean to use --project-name instead of -project-name?")
+			slog.Warn("Did you mean to use --project-name instead of -project-name?")
 			doubleCheckProjectName(projectName)
 		} else if strings.HasPrefix(projectName, "rovider") {
 			// -provider= instead of --provider
-			term.Warn("Did you mean to use --provider instead of -provider?")
+			slog.Warn("Did you mean to use --provider instead of -provider?")
 			doubleCheckProjectName(projectName)
 		}
 	}
@@ -113,7 +114,7 @@ func newStackManagerForLoader(ctx context.Context, loader *compose.Loader) (sess
 		if !errors.Is(err, types.ErrComposeFileNotFound) {
 			return nil, handleInvalidComposeFileErr(ctx, err)
 		}
-		term.Debugf("Could not determine project working directory: %v", err)
+		slog.Debug(fmt.Sprintf("Could not determine project working directory: %v", err))
 		// No project directory; look for .defang directory in current or parent directories
 		targetDirectory, _ = findTargetDirectory(".")
 	} else {
@@ -124,7 +125,7 @@ func newStackManagerForLoader(ctx context.Context, loader *compose.Loader) (sess
 	}
 	projectName, _, err := loader.LoadProjectName(ctx)
 	if err != nil {
-		term.Debugf("Could not determine project name: %v", err)
+		slog.Debug(fmt.Sprintf("Could not determine project name: %v", err))
 	}
 	sm, err := stacks.NewManager(global.Client, targetDirectory, projectName, ec)
 	if err != nil {
@@ -166,7 +167,7 @@ func handleInvalidComposeFileErr(ctx context.Context, loadErr error) error {
 		return loadErr
 	}
 
-	term.Error("Cannot load project:", loadErr)
+	slog.Error(fmt.Sprintln("Cannot load project:", loadErr))
 	project, err := compose.NewLoader().CreateProjectForDebug()
 	if err != nil {
 		return fmt.Errorf("%w; original error: %w", err, loadErr)

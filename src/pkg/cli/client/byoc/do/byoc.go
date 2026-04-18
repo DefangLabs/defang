@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 
 	"iter"
 	"net/url"
@@ -109,7 +110,7 @@ func (b *ByocDo) GetProjectUpdate(ctx context.Context, projectName string) (*def
 
 	if err != nil {
 		if aws.IsS3NoSuchKeyError(err) {
-			term.Debug("s3.GetObject:", err)
+			slog.Debug(fmt.Sprintln("s3.GetObject:", err))
 			return nil, client.ErrNotExist // no services yet
 		}
 		return nil, awsbyoc.AnnotateAwsError(err)
@@ -426,7 +427,7 @@ func (b *ByocDo) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter
 
 	if deploymentID == "" || appID == "" {
 		//Look up the CD app directly instead of relying on the etag
-		term.Debug("Fetching app and deployment ID for app", appPlatform.CdName)
+		slog.Debug(fmt.Sprintln("Fetching app and deployment ID for app", appPlatform.CdName))
 		cdApp, err := b.getAppByName(ctx, appPlatform.CdName)
 		if err != nil {
 			return nil, err
@@ -446,7 +447,7 @@ func (b *ByocDo) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter
 		return nil, errors.New("no deployments found")
 	}
 
-	term.Info("Waiting for CD command to finish gathering logs")
+	slog.Info("Waiting for CD command to finish gathering logs")
 	for {
 		deploymentInfo, _, err := b.client.Apps.GetDeployment(ctx, appID, deploymentID)
 		if err != nil {
@@ -455,7 +456,7 @@ func (b *ByocDo) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter
 
 		logType := logs.LogType(req.LogType)
 
-		term.Debugf("Deployment phase: %s", deploymentInfo.GetPhase())
+		slog.Debug(fmt.Sprintf("Deployment phase: %s", deploymentInfo.GetPhase()))
 		switch deploymentInfo.GetPhase() {
 		case godo.DeploymentPhase_PendingBuild, godo.DeploymentPhase_PendingDeploy, godo.DeploymentPhase_Deploying:
 			// Do nothing; check again in 10 seconds
@@ -496,7 +497,7 @@ func (b *ByocDo) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter
 }
 
 func (b *ByocDo) TearDownCD(ctx context.Context) error {
-	term.Warn("Deleting the Defang CD app; currently existing stacks or configs will not be deleted, but they will be orphaned and they will need to be cleaned up manually")
+	slog.Warn("Deleting the Defang CD app; currently existing stacks or configs will not be deleted, but they will be orphaned and they will need to be cleaned up manually")
 	app, err := b.getAppByName(ctx, appPlatform.CdName)
 	if err != nil {
 		return err
@@ -699,7 +700,7 @@ func (b *ByocDo) SetUpCD(ctx context.Context, force bool) error {
 		if resp.StatusCode != 404 {
 			return err
 		}
-		term.Debug("Creating new registry")
+		slog.Debug("Creating new registry")
 		// Create registry if it doesn't exist
 		registry, _, err = b.client.Registry.Create(ctx, &godo.RegistryCreateRequest{
 			Name:                 pkg.RandomID(), // has to be globally unique

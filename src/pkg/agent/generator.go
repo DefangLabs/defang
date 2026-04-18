@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log/slog"
 
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 )
@@ -73,7 +74,7 @@ func (g *Generator) HandleMessage(ctx context.Context, prompt string, maxTurns i
 			if errors.Is(err, context.Canceled) {
 				return err
 			}
-			term.Debugf("error: %v", err)
+			slog.Debug(fmt.Sprintf("error: %v", err))
 			continue
 		}
 

@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/http"
-	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 const latestUrl = "https://api.github.com/repos/DefangLabs/defang/releases/latest"
@@ -35,12 +35,12 @@ func GetLatestReleaseTag(ctx context.Context) (string, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		term.Debug(resp.Header)
+		slog.Debug(fmt.Sprintf("%v", resp.Header))
 		// The primary rate limit for unauthenticated requests is 60 requests per hour, per IP.
 		// The API returns a 403 status code when the rate limit is exceeded.
 		githubError := githubError{Message: resp.Status}
 		if err := json.NewDecoder(resp.Body).Decode(&githubError); err != nil {
-			term.Debugf("Failed to decode GitHub response: %v", err)
+			slog.Debug(fmt.Sprintf("Failed to decode GitHub response: %v", err))
 		}
 		return "", fmt.Errorf("error fetching release info from GitHub: %s", githubError.Message)
 	}

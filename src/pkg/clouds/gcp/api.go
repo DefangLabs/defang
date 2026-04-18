@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -27,7 +28,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 	projectName := "projects/" + gcp.ProjectId
 
 	for i := range maxAttempts {
-		term.Debugf("Enabling services: %v\n", apis)
+		slog.Debug(fmt.Sprintf("Enabling services: %v\n", apis))
 		req := &serviceusage.BatchEnableServicesRequest{
 			ServiceIds: apis,
 		}
@@ -41,7 +42,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 			}
 			term.Printf("Error: %+v (%T)\n", err, err)
 			if i < maxAttempts-1 {
-				term.Debugf("Failed to enable services, will retry in %v: %v\n", retryInterval, err)
+				slog.Debug(fmt.Sprintf("Failed to enable services, will retry in %v: %v\n", retryInterval, err))
 				if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
 					return err
 				}
@@ -54,11 +55,11 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 		for {
 			op, err := opService.Get(operation.Name).Context(ctx).Do()
 			if err != nil {
-				term.Warnf("Failed to get operation status: %v\n", err)
+				slog.Warn(fmt.Sprintf("Failed to get operation status: %v\n", err))
 			} else if op.Done { // Check if the operation is done
 				if op.Error != nil {
 					if i < maxAttempts-1 {
-						term.Debugf("Failed to enable services operation, will retry in %v: %v\n", retryInterval, op.Error)
+						slog.Debug(fmt.Sprintf("Failed to enable services operation, will retry in %v: %v\n", retryInterval, op.Error))
 						if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
 							return err
 						}

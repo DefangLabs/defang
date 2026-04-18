@@ -1,6 +1,9 @@
 package command
 
 import (
+	"fmt"
+	"log/slog"
+
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -24,7 +27,7 @@ var whoamiCmd = &cobra.Command{
 			CheckAccountInfo: false, // because we do it inside cli.Whoami
 		})
 		if err != nil {
-			term.Warnf("Provider account information not available: %v", err)
+			slog.Warn(fmt.Sprintf("Provider account information not available: %v", err))
 		} else {
 			provider = session.Provider
 		}
@@ -37,7 +40,7 @@ var whoamiCmd = &cobra.Command{
 			userInfo, err = auth.FetchUserInfo(ctx, token)
 			if err != nil {
 				// Either the auth service is down, or we're using a Fabric JWT: skip workspace information
-				term.Warn("Workspace information unavailable:", err)
+				slog.Warn(fmt.Sprintln("Workspace information unavailable:", err))
 			}
 		}
 

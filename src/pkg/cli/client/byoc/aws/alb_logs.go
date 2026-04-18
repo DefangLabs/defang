@@ -8,12 +8,12 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"log/slog"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -34,7 +34,7 @@ func (b *ByocAws) fetchAndStreamAlbLogs(ctx context.Context, projectName string,
 	if b.Prefix != "" {
 		bucketPrefix = b.Prefix + "-" + bucketPrefix
 	}
-	term.Debug("Query ALB logs", bucketPrefix)
+	slog.Debug(fmt.Sprintln("Query ALB logs", bucketPrefix))
 	if len(bucketPrefix) > 31 {
 		// HACK: AWS CD truncates the ALB name to 31 characters (because of the long Terraform suffix)
 		bucketPrefix = bucketPrefix[:31]

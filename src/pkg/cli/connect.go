@@ -2,19 +2,20 @@ package cli
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/do"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 // Connect builds a client carrying the requested tenant (name or ID).
 func Connect(fabricAddr string, requestedTenant types.TenantNameOrID) *client.GrpcClient {
 	host := client.NormalizeHost(fabricAddr)
-	term.Debugf("Using tenant %q for cluster %q", requestedTenant, host)
+	slog.Debug(fmt.Sprintf("Using tenant %q for cluster %q", requestedTenant, host))
 
 	accessToken := client.GetExistingToken(host)
 	return client.NewGrpcClient(host, accessToken, requestedTenant)
@@ -25,7 +26,7 @@ func ConnectWithTenant(ctx context.Context, fabricAddr string, requestedTenant t
 
 	resp, err := grpcClient.WhoAmI(ctx)
 	if err != nil {
-		term.Debug("Unable to validate tenant with server:", err)
+		slog.Debug(fmt.Sprintln("Unable to validate tenant with server:", err))
 		return grpcClient, err
 	}
 
@@ -35,7 +36,7 @@ func ConnectWithTenant(ctx context.Context, fabricAddr string, requestedTenant t
 
 func NewProvider(ctx context.Context, providerID client.ProviderID, fabricClient client.FabricClient, stack string) client.Provider {
 	var provider client.Provider
-	term.Debugf("Creating %s provider", providerID)
+	slog.Debug(fmt.Sprintf("Creating %s provider", providerID))
 	switch providerID {
 	case client.ProviderAWS:
 		provider = aws.NewByocProvider(ctx, fabricClient.GetTenantName(), stack)

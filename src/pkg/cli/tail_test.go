@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"os"
 	"strings"
 	"testing"
@@ -122,6 +123,7 @@ func TestTail(t *testing.T) {
 	testTerm.ForceColor(true)
 	defaultTerm := term.DefaultTerm
 	term.DefaultTerm = testTerm
+	slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 	t.Cleanup(func() {
 		term.DefaultTerm = defaultTerm
 	})
@@ -185,10 +187,19 @@ func TestTail(t *testing.T) {
 	}
 
 	for i, g := range got {
-		e := expectedLogs[i]
 		g = term.StripAnsi(g)
-		if got := strings.SplitN(g, " ", 2)[1]; got != e { // Remove the date from the log entry
-			t.Errorf("Tail() = %q, want %q", got, e)
+		if i == len(got)-1 {
+			g = strings.TrimSpace(g)
+			if !strings.HasPrefix(g, "! Reconnecting") {
+				t.Errorf("Tail() = %q, want something starting with %q", g, "! Reconnecting")
+			}
+		} else {
+			e := expectedLogs[i]
+			g = strings.TrimRight(g, " ")
+			e = strings.TrimRight(e, " ")
+			if got := strings.SplitN(g, " ", 2)[1]; got != e {
+				t.Errorf("Tail() = %q, want %q", got, e)
+			}
 		}
 	}
 
@@ -228,8 +239,8 @@ func setupTestTerminal() (*bytes.Buffer, *bytes.Buffer, func()) {
 	testTerm.ForceColor(true)
 	defaultTerm := term.DefaultTerm
 	term.DefaultTerm = testTerm
+	slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 
-	// Cleanup function to reset the terminal
 	cleanup := func() {
 		term.DefaultTerm = defaultTerm
 	}

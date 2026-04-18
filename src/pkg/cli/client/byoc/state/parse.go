@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"path"
 	"strconv"
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
@@ -86,12 +86,12 @@ func ParsePulumiStateFile(ctx context.Context, obj BucketObj, bucket string, obj
 		Name:    path.Base(stackFile), // legacy logic to derive stack name from file name
 	}
 	if state.Version != 3 {
-		term.Debug("Skipping Pulumi state with version", state.Version)
+		slog.Debug(fmt.Sprintln("Skipping Pulumi state with version", state.Version))
 	} else if len(state.Checkpoint.Latest.PendingOperations) > 0 {
 		for _, op := range state.Checkpoint.Latest.PendingOperations {
 			parts := strings.Split(op.Resource.Urn, "::") // prefix::project::type::resource => {urn:provider:stack}::{project}::{plugin:file:class}::{name}
 			if len(parts) < 4 {
-				term.Debug("Skipping pending operation with malformed URN:", op.Resource.Urn)
+				slog.Debug(fmt.Sprintln("Skipping pending operation with malformed URN:", op.Resource.Urn))
 				continue
 			}
 			stack.Pending = append(stack.Pending, parts[3])

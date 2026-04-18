@@ -1,14 +1,15 @@
 package aws
 
 import (
+	"fmt"
 	"iter"
+	"log/slog"
 	"slices"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -54,7 +55,7 @@ func parseSubscribeEvent(evt cw.LogEvent, etag types.ETag, services []string) *d
 func parseECSSubscribeEvent(evt cw.LogEvent, etag types.ETag, services []string) *defangv1.SubscribeResponse {
 	ecsEvt, err := ecs.ParseECSEvent([]byte(*evt.Message))
 	if err != nil {
-		term.Debugf("error parsing ECS event: %v", err)
+		slog.Debug(fmt.Sprintf("error parsing ECS event: %v", err))
 		return nil
 	}
 

@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -51,7 +52,7 @@ func PrintLongServices(ctx context.Context, projectName string, provider client.
 }
 
 func GetServices(ctx context.Context, projectName string, provider client.Provider) ([]ServiceLineItem, error) {
-	term.Debugf("Listing services in project %q", projectName)
+	slog.Debug(fmt.Sprintf("Listing services in project %q", projectName))
 
 	servicesResponse, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: projectName})
 	if err != nil {
@@ -112,7 +113,7 @@ func GetHealthcheckResults(ctx context.Context, serviceInfos []*defangv1.Service
 				defer wg.Done()
 				result, err := RunHealthcheck(ctx, serviceInfo.Service.Name, "https://"+endpoint, serviceInfo.HealthcheckPath)
 				if err != nil {
-					term.Debugf("Healthcheck error for service %q at endpoint %q: %s", serviceInfo.Service.Name, endpoint, err.Error())
+					slog.Debug(fmt.Sprintf("Healthcheck error for service %q at endpoint %q: %s", serviceInfo.Service.Name, endpoint, err.Error()))
 					result = "error"
 				}
 				*results[serviceInfo.Service.Name] = result
@@ -135,17 +136,17 @@ func RunHealthcheck(ctx context.Context, name, endpoint, path string) (string, e
 	if err != nil {
 		return "", err
 	}
-	term.Debugf("[%s] checking health at %s", name, url)
+	slog.Debug(fmt.Sprintf("[%s] checking health at %s", name, url))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
-		term.Debugf("[%s] ✔ healthy", name)
+		slog.Debug(fmt.Sprintf("[%s] ✔ healthy", name))
 		return "healthy", nil
 	} else {
-		term.Debugf("[%s] ✘ unhealthy (%s)", name, resp.Status)
+		slog.Debug(fmt.Sprintf("[%s] ✘ unhealthy (%s)", name, resp.Status))
 		return "unhealthy (" + resp.Status + ")", nil
 	}
 }
@@ -211,7 +212,7 @@ func PrintServiceStatesAndEndpoints(services []ServiceLineItem) error {
 	}
 
 	if showCertGenerateHint {
-		term.Info("Run `defang cert generate` to get a TLS certificate for your service(s)")
+		slog.Info("Run `defang cert generate` to get a TLS certificate for your service(s)")
 	}
 
 	return nil

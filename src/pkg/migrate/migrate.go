@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"runtime"
 	"slices"
 	"strings"
@@ -12,7 +13,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/surveyor"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"go.yaml.in/yaml/v4"
 )
@@ -26,7 +26,7 @@ func InteractiveSetup(ctx context.Context, fabric client.FabricClient, surveyor 
 		sourcePlatform = selected
 	}
 
-	term.Debugf("Selected source platform: %s", sourcePlatform)
+	slog.Debug(fmt.Sprintf("Selected source platform: %s", sourcePlatform))
 
 	var composeFileContents string
 	var err error
@@ -56,7 +56,7 @@ func setupFromHeroku(ctx context.Context, fabric client.FabricClient, surveyor s
 
 	// Here you can add logic to process the retrieved apps and set up the project accordingly
 	// For now, we just print the apps
-	term.Debugf("Your Heroku applications: %+v\n", apps)
+	slog.Debug(fmt.Sprintf("Your Heroku applications: %+v\n", apps))
 
 	appNames := make([]string, len(apps))
 	for i, app := range apps {
@@ -68,23 +68,23 @@ func setupFromHeroku(ctx context.Context, fabric client.FabricClient, surveyor s
 		return "", fmt.Errorf("failed to select source application: %w", err)
 	}
 
-	term.Infof("Collecting information about %q...", sourceApp)
+	slog.Info(fmt.Sprintf("Collecting information about %q...", sourceApp))
 
 	applicationInfo, err := collectHerokuApplicationInfo(ctx, herokuClient, sourceApp)
 	if err != nil {
 		return "", fmt.Errorf("failed to collect Heroku application info: %w", err)
 	}
 
-	term.Debugf("Application info: %+v\n", applicationInfo)
+	slog.Debug(fmt.Sprintf("Application info: %+v\n", applicationInfo))
 
 	sanitizedApplicationInfo, err := sanitizeHerokuApplicationInfo(applicationInfo)
 	if err != nil {
 		return "", fmt.Errorf("failed to sanitize Heroku application info: %w", err)
 	}
 
-	term.Debugf("Sanitized application info: %+v\n", sanitizedApplicationInfo)
+	slog.Debug(fmt.Sprintf("Sanitized application info: %+v\n", sanitizedApplicationInfo))
 
-	term.Info("Generating compose file...")
+	slog.Info("Generating compose file...")
 
 	composeFileContents, err := generateComposeFile(ctx, fabric, defangv1.SourcePlatform_SOURCE_PLATFORM_HEROKU, sourceApp, sanitizedApplicationInfo)
 	if err != nil {
@@ -129,7 +129,7 @@ func generateComposeFile(ctx context.Context, fabric client.FabricClient, platfo
 		}
 
 		responseStr := string(resp.Compose)
-		term.Debugf("Received compose response: %+v", responseStr)
+		slog.Debug(fmt.Sprintf("Received compose response: %+v", responseStr))
 
 		// assume the response is markdown,
 		// extract the contents of the first code block if there is one
@@ -140,7 +140,7 @@ func generateComposeFile(ctx context.Context, fabric client.FabricClient, platfo
 				composeContent = responseStr
 			} else {
 				previousError = err.Error()
-				term.Debugf("Failed to extract code block: %v. Retrying...", err)
+				slog.Debug(fmt.Sprintf("Failed to extract code block: %v. Retrying...", err))
 				continue
 			}
 		}
@@ -156,7 +156,7 @@ func generateComposeFile(ctx context.Context, fabric client.FabricClient, platfo
 		_, err = compose.LoadFromContentWithInterpolation(ctx, []byte(composeContent), projectName)
 		if err != nil {
 			previousError = err.Error()
-			term.Debugf("Invalid compose file received: %v. Retrying...", err)
+			slog.Debug(fmt.Sprintf("Invalid compose file received: %v. Retrying...", err))
 			continue
 		}
 

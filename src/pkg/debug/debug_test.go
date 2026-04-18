@@ -3,6 +3,7 @@ package debug
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"testing"
 	"time"
@@ -10,7 +11,6 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -164,7 +164,7 @@ func TestDebugComposeLoadError(t *testing.T) {
 
 			_, loadErr := loader.LoadProject(ctx)
 			if loadErr != nil {
-				term.Error("Cannot load project:", loadErr)
+				slog.Error(fmt.Sprintln("Cannot load project:", loadErr))
 				project, err := loader.CreateProjectForDebug()
 				assert.NoError(t, err, "CreateProjectForDebug should not return an error")
 

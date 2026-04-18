@@ -3,13 +3,14 @@ package byoc
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 const (
@@ -44,7 +45,7 @@ func GetPulumiBackend(stateUrl string) (string, string, error) {
 }
 
 func runLocalCommand(ctx context.Context, dir string, env []string, cmd ...string) error {
-	term.Debug("Running local command `", cmd, "` in dir ", dir)
+	slog.Debug(fmt.Sprintln("Running local command `", cmd, "` in dir ", dir))
 	// TODO - use enums to define commands instead of passing strings down from the caller
 	// #nosec G204
 	command := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
@@ -58,7 +59,7 @@ func runLocalCommand(ctx context.Context, dir string, env []string, cmd ...strin
 func DebugPulumiNodeJS(ctx context.Context, env []string, cmd ...string) error {
 	// Locally we use the "dev" script from package.json to run Pulumi commands, which uses ts-node
 	localCmd := append([]string{"npm", "run", "dev"}, cmd...)
-	term.Debug(strings.Join(append(env, localCmd...), " "))
+	slog.Debug(strings.Join(append(env, localCmd...), " "))
 
 	dir := os.Getenv("DEFANG_PULUMI_DIR")
 	if dir == "" {
@@ -79,7 +80,7 @@ func DebugPulumiNodeJS(ctx context.Context, env []string, cmd ...string) error {
 
 func DebugPulumiGolang(ctx context.Context, env []string, cmd ...string) error {
 	localCmd := append([]string{"go", "run", "./..."}, cmd...)
-	term.Debug(strings.Join(append(env, localCmd...), " "))
+	slog.Debug(strings.Join(append(env, localCmd...), " "))
 
 	dir := os.Getenv("DEFANG_PULUMI_DIR")
 	if dir == "" {
