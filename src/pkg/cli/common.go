@@ -67,8 +67,7 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 			return err
 		}
 
-		// TODO: should we always update the stack and upload the stack file?
-		if err := fabric.PutStack(ctx, &defangv1.PutStackRequest{
+		err = fabric.PutStack(ctx, &defangv1.PutStackRequest{
 			Stack: &defangv1.Stack{
 				Name:              provider.GetStackName(),
 				Project:           req.ProjectName,
@@ -79,8 +78,9 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 				LastDeployedAt:    now,
 				StackFile:         []byte(stackFile),
 			},
-		}); err != nil {
-			return err
+		})
+		if err != nil {
+			term.Debugf("Failed to put stack for deployment: %v", err)
 		}
 	}
 
