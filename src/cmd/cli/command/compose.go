@@ -38,7 +38,7 @@ func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
 	if global.Stack.Provider == client.ProviderDefang && global.FabricAddr == client.DefaultFabricAddr {
 		slog.Info("Monitor your services' status in the defang portal")
 		for _, serviceInfo := range serviceInfos {
-			term.Println("   -", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
+			slog.Info("   - " + SERVICE_PORTAL_URL + "/" + serviceInfo.Service.Name)
 		}
 	}
 }

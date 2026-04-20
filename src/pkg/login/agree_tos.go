@@ -26,7 +26,7 @@ func InteractiveAgreeToS(ctx context.Context, fabric client.FabricClient) error 
 		return nil
 	}
 
-	term.Println("Our latest terms of service can be found at https://s.defang.io/tos")
+	slog.Info("Our latest terms of service can be found at https://s.defang.io/tos")
 
 	var agreeToS bool
 	err := survey.AskOne(&survey.Confirm{

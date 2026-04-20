@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/http"
-	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 var ErrSampleNotFound = errors.New("sample not found")
@@ -102,7 +101,7 @@ func copyFromSamples(ctx context.Context, dir string, names []string, skipExisti
 			prefix := fmt.Sprintf("%s-%s/samples/%s/", repo, branch, name)
 			if base, ok := strings.CutPrefix(h.Name, prefix); ok && len(base) > 0 {
 				sampleFound = true
-				term.Println("   -", base)
+				slog.Info("   - " + base)
 				path := filepath.Join(dir, subdir, base)
 				if h.FileInfo().IsDir() {
 					if err := os.MkdirAll(path, 0755); err != nil {

@@ -157,7 +157,7 @@ func CdListFromStorage(ctx context.Context, provider client.Provider, allRegions
 		if allRegions {
 			accountInfo.Region = ""
 		}
-		term.Printf("No projects found in %v\n", accountInfo)
+		slog.Info(fmt.Sprintf("No projects found in %v", accountInfo))
 	}
 
 	return term.Table(stacks, "Project", "Stack", "Workspace", "CdRegion")

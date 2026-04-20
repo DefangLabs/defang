@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/serviceusage/v1"
 )
@@ -40,7 +39,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 			if errors.As(err, &apiErr) && (apiErr.Code == 403 || apiErr.Code == 401) {
 				return fmt.Errorf("permission denied when enabling services: %w", err)
 			}
-			term.Printf("Error: %+v (%T)\n", err, err)
+			slog.Error(fmt.Sprintf("Error: %+v (%T)", err, err))
 			if i < maxAttempts-1 {
 				slog.Debug(fmt.Sprintf("Failed to enable services, will retry in %v: %v\n", retryInterval, err))
 				if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {

@@ -327,7 +327,7 @@ func (gcp *Gcp) InteractiveLogin(ctx context.Context) (oauth2.TokenSource, error
 	publicKeyBase64 := base64.URLEncoding.EncodeToString(pubKey[:])
 	authorizeURL := auth.GetAuthorizeUrl("gcp", publicKeyBase64)
 
-	term.Println("Please visit the following URL to log in to Google Cloud Platform: (Right click the URL or press ENTER to open browser)")
+	slog.Info("Please visit the following URL to log in to Google Cloud Platform: (Right click the URL or press ENTER to open browser)")
 	term.Printf("  %s\n", authorizeURL)
 
 	ctx, done := term.OpenBrowserOnEnter(ctx, authorizeURL)

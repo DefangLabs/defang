@@ -214,7 +214,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 	}
 
 	if term.DoDebug() {
-		term.Println("Project:", project.Name)
+		slog.Debug("Project: " + project.Name)
 		for _, serviceInfo := range resp.Services {
 			PrintObject(serviceInfo.Service.Name, serviceInfo)
 		}

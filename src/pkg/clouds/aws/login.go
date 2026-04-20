@@ -366,7 +366,7 @@ func (a *Aws) CrossDeviceLogin(ctx context.Context) (*awsTokenCache, error) {
 	state := rand.Text()[:16] // random state for CSRF protection
 	authURL := auth.GetAuthorizeUrl("aws", "cross", string(a.Region), state, pkce.Challenge)
 
-	term.Println("Please visit the following URL to log in to AWS: (Right click the URL or press ENTER to open browser)")
+	slog.Info("Please visit the following URL to log in to AWS: (Right click the URL or press ENTER to open browser)")
 	term.Printf("  %s\n", authURL)
 	term.Print("Enter the authorization code displayed in your browser: ")
 	ctx, inputCh, done := term.OpenBrowserWithInputOnEnter(ctx, authURL)
