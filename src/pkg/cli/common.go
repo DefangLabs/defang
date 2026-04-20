@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 
+	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -80,7 +81,11 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 			},
 		})
 		if err != nil {
-			term.Debugf("Failed to put stack for deployment: %v", err)
+			if connect.CodeOf(err) == connect.CodeAlreadyExists {
+				term.Debugf("Stack %q already exists; proceeding to track deployment: %v", provider.GetStackName(), err)
+			} else {
+				return err
+			}
 		}
 	}
 

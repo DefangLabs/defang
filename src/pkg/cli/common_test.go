@@ -5,12 +5,13 @@ import (
 	"errors"
 	"testing"
 
+	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 type mockFabricForCommon struct {
-	client.MockFabricClient
+	client.FabricClient
 	putStackErr         error
 	putDeploymentCalled bool
 }
@@ -24,38 +25,57 @@ func (m *mockFabricForCommon) PutDeployment(_ context.Context, _ *defangv1.PutDe
 	return nil
 }
 
-func TestPutDeploymentAndStack_ContinuesOnPutStackError(t *testing.T) {
-	fabric := &mockFabricForCommon{
-		putStackErr: errors.New("PutStack failed"),
+func TestPutDeploymentAndStack(t *testing.T) {
+	tests := []struct {
+		name              string
+		putStackErr       error
+		wantErr           bool
+		wantPutDeployment bool
+	}{
+		{
+			name:              "PutStack AlreadyExists, but PutDeployment is still called",
+			putStackErr:       connect.NewError(connect.CodeAlreadyExists, errors.New("stack already exists")),
+			wantErr:           false,
+			wantPutDeployment: true,
+		},
+		{
+			name:              "PutStack failed, PutDeployment errors",
+			putStackErr:       errors.New("PutStack failed"),
+			wantErr:           true,
+			wantPutDeployment: false,
+		},
+		{
+			name:              "PutStack succeeds, and PutDeployment is called",
+			putStackErr:       nil,
+			wantErr:           false,
+			wantPutDeployment: true,
+		},
 	}
-	provider := client.MockProvider{}
 
-	err := putDeploymentAndStack(context.Background(), provider, fabric, nil, putDeploymentParams{
-		Action:      defangv1.DeploymentAction_DEPLOYMENT_ACTION_UP,
-		ProjectName: "test-project",
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fabric := &mockFabricForCommon{
+				putStackErr: tt.putStackErr,
+			}
+			provider := client.MockProvider{}
 
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-	if !fabric.putDeploymentCalled {
-		t.Error("PutDeployment should be called even when PutStack fails")
-	}
-}
+			err := putDeploymentAndStack(context.Background(), provider, fabric, nil, putDeploymentParams{
+				Action:      defangv1.DeploymentAction_DEPLOYMENT_ACTION_UP,
+				ProjectName: "test-project",
+			})
 
-func TestPutDeploymentAndStack_CallsDeploymentOnSuccess(t *testing.T) {
-	fabric := &mockFabricForCommon{}
-	provider := client.MockProvider{}
-
-	err := putDeploymentAndStack(context.Background(), provider, fabric, nil, putDeploymentParams{
-		Action:      defangv1.DeploymentAction_DEPLOYMENT_ACTION_UP,
-		ProjectName: "test-project",
-	})
-
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-	if !fabric.putDeploymentCalled {
-		t.Error("PutDeployment should be called when PutStack succeeds")
+			if err != nil {
+				if !tt.wantErr {
+					t.Fatalf("expected no error, got: %v", err)
+				}
+			} else {
+				if tt.wantErr {
+					t.Fatalf("expected error, got nil")
+				}
+			}
+			if fabric.putDeploymentCalled != tt.wantPutDeployment {
+				t.Errorf("expected PutDeploymentCalled to be %v, got %v", tt.wantPutDeployment, fabric.putDeploymentCalled)
+			}
+		})
 	}
 }
