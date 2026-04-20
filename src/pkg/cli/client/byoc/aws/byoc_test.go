@@ -361,6 +361,8 @@ aws_secret_access_key = wJalrXUtnFEMI/KDEFANG/bPxRfiCYEXAMPLEKEY
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stdout, _ := term.SetupTestTerm(t)
+			prevLogger := slog.Default()
+			t.Cleanup(func() { slog.SetDefault(prevLogger) })
 			slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 
 			if tt.configFiles {

@@ -123,9 +123,11 @@ func TestTail(t *testing.T) {
 	testTerm.ForceColor(true)
 	defaultTerm := term.DefaultTerm
 	term.DefaultTerm = testTerm
+	prevLogger := slog.Default()
 	slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 	t.Cleanup(func() {
 		term.DefaultTerm = defaultTerm
+		slog.SetDefault(prevLogger)
 	})
 
 	const projectName = "project1"
@@ -239,10 +241,12 @@ func setupTestTerminal() (*bytes.Buffer, *bytes.Buffer, func()) {
 	testTerm.ForceColor(true)
 	defaultTerm := term.DefaultTerm
 	term.DefaultTerm = testTerm
+	prevLogger := slog.Default()
 	slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 
 	cleanup := func() {
 		term.DefaultTerm = defaultTerm
+		slog.SetDefault(prevLogger)
 	}
 
 	return &stdout, &stderr, cleanup

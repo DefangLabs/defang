@@ -48,7 +48,7 @@ func ConfigureAgentLoader(params LoaderParams) (*compose.Loader, error) {
 	}
 	composeFilePaths := params.ComposeFilePaths
 	if len(composeFilePaths) > 0 {
-		slog.Debug(fmt.Sprintf("Compose file paths provided: %s", composeFilePaths))
+		slog.Debug(fmt.Sprintf("Compose file paths provided: %v", composeFilePaths))
 		slog.Debug("Function invoked: compose.NewLoader")
 		return compose.NewLoader(compose.WithPath(composeFilePaths...)), nil
 	}

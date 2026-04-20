@@ -150,7 +150,7 @@ func generateCert(ctx context.Context, domain string, targets []string, client c
 	}
 	slog.Info(fmt.Sprintf("Triggering cert generation for %v", domain))
 	if err := triggerCertGeneration(ctx, domain); err != nil {
-		slog.Error("Error triggering cert generation, please try again")
+		slog.Error("Error triggering cert generation, please try again", "domain", domain, "err", err)
 		return
 	}
 

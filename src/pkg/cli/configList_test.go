@@ -55,6 +55,8 @@ func TestConfigList(t *testing.T) {
 
 	t.Run("no configs", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
+		prevLogger := slog.Default()
+		t.Cleanup(func() { slog.SetDefault(prevLogger) })
 		slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 
 		err := ConfigList(ctx, "emptyconfigs", &provider)
@@ -72,6 +74,8 @@ func TestConfigList(t *testing.T) {
 
 	t.Run("some configs", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
+		prevLogger := slog.Default()
+		t.Cleanup(func() { slog.SetDefault(prevLogger) })
 		slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 
 		err := ConfigList(ctx, "test", &provider)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -360,7 +361,7 @@ func getHerokuAuthTokenFromCLI() (string, error) {
 		return "", err
 	}
 
-	slog.Debug(fmt.Sprintf("received output from heroku cli: %s", output))
+	slog.Debug("Received output from heroku CLI authorization command")
 
 	var result struct {
 		AccessToken struct {
@@ -368,9 +369,13 @@ func getHerokuAuthTokenFromCLI() (string, error) {
 		} `json:"access_token"`
 	}
 	err = json.Unmarshal(output, &result)
-	if err != nil || result.AccessToken.Token == "" {
+	if err != nil {
 		slog.Debug(fmt.Sprintf("Failed to parse Heroku CLI output: %v", err))
 		return "", err
+	}
+	if result.AccessToken.Token == "" {
+		slog.Debug("Heroku CLI output did not include an access token")
+		return "", errors.New("heroku CLI returned an empty access token")
 	}
 
 	slog.Debug("Successfully obtained Heroku token via CLI")

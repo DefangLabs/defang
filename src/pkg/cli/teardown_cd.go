@@ -36,7 +36,7 @@ func TearDownCD(ctx context.Context, provider client.Provider, force bool) error
 	if len(stacks) > 0 {
 		slog.Info("Some stacks are currently deployed. Run the following commands to tear them down:")
 		for _, stack := range stacks {
-			slog.Info(fmt.Sprintf("  `defang down --workspace %s --project-name %s --stack %s`\n", stack.Workspace, stack.Project, stack.Stack))
+			slog.Info(fmt.Sprintf("  `defang down --workspace %s --project-name %s --stack %s`", stack.Workspace, stack.Project, stack.Stack))
 		}
 		if !force {
 			return ErrExistingStacks

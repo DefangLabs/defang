@@ -165,9 +165,9 @@ var configSetCmd = &cobra.Command{
 			if err != nil {
 				errs = append(errs, err)
 			} else if ifNotSet && !didSet {
-				slog.Info(fmt.Sprintln("Config", name, "is already set; skipping due to --if-not-set flag"))
+				slog.Info(fmt.Sprintf("Config %s is already set; skipping due to --if-not-set flag", name))
 			} else {
-				slog.Info(fmt.Sprintln("Updated value for", name))
+				slog.Info("Updated value for " + name)
 			}
 		}
 

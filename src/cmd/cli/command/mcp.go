@@ -8,6 +8,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/agent/tools"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/server"
@@ -45,6 +46,7 @@ var mcpServerCmd = &cobra.Command{
 			defer logFile.Close()
 			term.DefaultTerm = term.NewTerm(os.Stdin, logFile, logFile)
 			term.SetDebug(true)
+			slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 		}
 
 		// Create a new MCP server

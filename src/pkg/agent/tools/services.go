@@ -44,13 +44,13 @@ func HandleServicesTool(ctx context.Context, loader client.Loader, params Servic
 	}
 	slog.Debug("Function invoked: cli.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
-	slog.Debug("Project name loaded: " + projectName)
 	if err != nil {
 		if strings.Contains(err.Error(), "no projects found") {
 			return "no projects found on Playground", nil
 		}
 		return "", fmt.Errorf("failed to load project name: %w", err)
 	}
+	slog.Debug("Project name loaded: " + projectName)
 
 	serviceResponse, err := cli.GetServices(ctx, projectName, provider)
 	if err != nil {

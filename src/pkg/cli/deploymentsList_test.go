@@ -64,6 +64,8 @@ func TestDeploymentsList(t *testing.T) {
 
 	t.Run("no deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
+		prevLogger := slog.Default()
+		t.Cleanup(func() { slog.SetDefault(prevLogger) })
 		slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 		err := DeploymentsList(ctx, grpcClient, ListDeploymentsParams{
 			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY,
@@ -84,6 +86,8 @@ func TestDeploymentsList(t *testing.T) {
 
 	t.Run("some deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
+		prevLogger := slog.Default()
+		t.Cleanup(func() { slog.SetDefault(prevLogger) })
 		slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 		err := DeploymentsList(ctx, grpcClient, ListDeploymentsParams{
 			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY,
@@ -137,6 +141,8 @@ func TestActiveDeployments(t *testing.T) {
 	t.Run("no active deployments", func(t *testing.T) {
 		fabricServer.testDeploymentsData = nil
 		stdout, _ := term.SetupTestTerm(t)
+		prevLogger := slog.Default()
+		t.Cleanup(func() { slog.SetDefault(prevLogger) })
 		slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 
 		err := DeploymentsList(ctx, grpcClient, ListDeploymentsParams{
@@ -174,6 +180,8 @@ func TestActiveDeployments(t *testing.T) {
 		fabricServer.testDeploymentsData = activeDeployments
 
 		stdout, _ := term.SetupTestTerm(t)
+		prevLogger := slog.Default()
+		t.Cleanup(func() { slog.SetDefault(prevLogger) })
 		slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 		err := DeploymentsList(ctx, grpcClient, ListDeploymentsParams{
 			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,

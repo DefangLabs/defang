@@ -41,7 +41,9 @@ func (h *termHandler) Handle(ctx context.Context, r slog.Record) error {
 		strVal := a.String()
 		if len(strVal) > 80 {
 			runes := []rune(strVal)
-			strVal = string(runes[:77]) + "..."
+			if len(runes) > 77 {
+				strVal = string(runes[:77]) + "..."
+			}
 		}
 		sb.WriteString(strVal)
 		return true
@@ -86,7 +88,9 @@ func (h *termHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 		strVal := a.String()
 		if len(strVal) > 80 {
 			runes := []rune(strVal)
-			strVal = string(runes[:77]) + "..."
+			if len(runes) > 77 {
+				strVal = string(runes[:77]) + "..."
+			}
 		}
 		sb.WriteString(strVal)
 	}
