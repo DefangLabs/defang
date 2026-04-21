@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
@@ -30,6 +31,7 @@ import (
 	awssts "github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/pkg/browser"
 )
 
 const (
@@ -368,18 +370,32 @@ func (a *Aws) CrossDeviceLogin(ctx context.Context) (*awsTokenCache, error) {
 	term.Println("Please visit the following URL to log in to AWS: (Right click the URL or press ENTER to open browser)")
 	term.Printf("  %s\n", authURL)
 	term.Print("Enter the authorization code displayed in your browser: ")
-	ctx, inputCh, done := term.OpenBrowserWithInputOnEnter(ctx, authURL)
-	defer done()
+	browserOpened := false
+	var code string
+	for code == "" {
+		err = survey.AskOne(
+			&survey.Input{
+				Message: "Code",
+			},
+			&code,
+			survey.WithStdio(term.DefaultTerm.Stdio()),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("reading authorization code: %w", err)
+		}
 
-	var input string
-	select {
-	case input = <-inputCh:
-		input = strings.TrimSpace(input)
-	case <-ctx.Done():
-		return nil, ctx.Err()
+		code = strings.TrimSpace(code)
+
+		if code == "" && !browserOpened {
+			err := browser.OpenURL(authURL)
+			if err != nil {
+				term.Warn("failed to open browser automatically, please open the URL above manually")
+			}
+			browserOpened = true
+		}
 	}
 
-	authCode, gotState, err := parseVerificationCode(input)
+	authCode, gotState, err := parseVerificationCode(code)
 	if err != nil {
 		return nil, err
 	}
