@@ -206,3 +206,15 @@ func (g GrpcClient) GenerateCompose(ctx context.Context, req *defangv1.GenerateC
 func (g GrpcClient) GetDefaultStack(ctx context.Context, req *defangv1.GetDefaultStackRequest) (*defangv1.GetStackResponse, error) {
 	return getMsg(g.client.GetDefaultStack(ctx, connect.NewRequest(req)))
 }
+
+func (g GrpcClient) ResolveIPAddr(ctx context.Context, req *defangv1.ResolveIPAddrRequest) (*defangv1.ResolveIPAddrResponse, error) {
+	return getMsg(g.client.ResolveIPAddr(ctx, connect.NewRequest(req)))
+}
+
+func (g GrpcClient) ResolveCNAME(ctx context.Context, req *defangv1.ResolveCNAMERequest) (*defangv1.ResolveCNAMEResponse, error) {
+	return getMsg(g.client.ResolveCNAME(ctx, connect.NewRequest(req)))
+}
+
+func (g GrpcClient) ResolveNS(ctx context.Context, req *defangv1.ResolveNSRequest) (*defangv1.ResolveNSResponse, error) {
+	return getMsg(g.client.ResolveNS(ctx, connect.NewRequest(req)))
+}
