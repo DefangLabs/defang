@@ -43,6 +43,10 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 		accountInfo = &client.AccountInfo{}
 	}
 
+	if len(project.Name) > 16 {
+		term.Warnf("project name %q is longer than 16 characters, you may run into issues with resource name length", project.Name)
+	}
+
 	// Fixup any pseudo services (this might create port configs, which will affect service name replacement by ReplaceServiceNameWithDNS)
 	for _, svccfg := range project.Services {
 		repo := GetImageRepo(svccfg.Image)
@@ -66,6 +70,10 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 			if err := fixupMongoService(&svccfg, provider, upload); err != nil {
 				return fmt.Errorf("service %q: %w", svccfg.Name, err)
 			}
+		}
+
+		if len(svccfg.Name) > 16 {
+			term.Warnf("service %q: service name is longer than 16 characters, you may run into issues with resource name length", svccfg.Name)
 		}
 
 		if svccfg.Provider != nil && svccfg.Provider.Type == "model" && svccfg.Image == "" && svccfg.Build == nil {
