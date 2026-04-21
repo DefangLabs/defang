@@ -34,6 +34,9 @@ type FabricClient interface {
 	Preview(context.Context, *defangv1.PreviewRequest) (*defangv1.PreviewResponse, error)
 	PutDeployment(context.Context, *defangv1.PutDeploymentRequest) error
 	PutStack(context.Context, *defangv1.PutStackRequest) error
+	ResolveCNAME(context.Context, *defangv1.ResolveCNAMERequest) (*defangv1.ResolveCNAMEResponse, error)
+	ResolveIPAddr(context.Context, *defangv1.ResolveIPAddrRequest) (*defangv1.ResolveIPAddrResponse, error)
+	ResolveNS(context.Context, *defangv1.ResolveNSRequest) (*defangv1.ResolveNSResponse, error)
 	RevokeToken(context.Context) error
 	SetOptions(context.Context, *defangv1.SetOptionsRequest) error
 	Token(context.Context, *defangv1.TokenRequest) (*defangv1.TokenResponse, error)
