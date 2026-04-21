@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -29,6 +30,10 @@ type FabricResolverClient interface {
 	ResolveNS(context.Context, *defangv1.ResolveNSRequest) (*defangv1.ResolveNSResponse, error)
 }
 
+// fabricMu guards concurrent access to fabricClient and the ResolverAt
+// assignment inside UseFabricResolver.
+var fabricMu sync.RWMutex
+
 // fabricClient is set by UseFabricResolver. When non-nil, RootResolver and
 // ResolverAt route DNS lookups through the fabric gRPC API.
 var fabricClient FabricResolverClient
@@ -37,10 +42,18 @@ var fabricClient FabricResolverClient
 // called, RootResolver{} and ResolverAt(nsServer) both issue remote RPCs
 // instead of performing direct UDP DNS queries.
 func UseFabricResolver(c FabricResolverClient) {
+	fabricMu.Lock()
+	defer fabricMu.Unlock()
 	fabricClient = c
 	ResolverAt = func(nsServer string) Resolver {
 		return FabricResolver{Client: c, NSServer: nsServer}
 	}
+}
+
+func getFabricClient() FabricResolverClient {
+	fabricMu.RLock()
+	defer fabricMu.RUnlock()
+	return fabricClient
 }
 
 // FabricResolver performs DNS lookups via the fabric gRPC API. An empty
@@ -119,8 +132,8 @@ var rootServers = []*net.NS{
 }
 
 func (r RootResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
-	if fabricClient != nil {
-		return FabricResolver{Client: fabricClient}.LookupIPAddr(ctx, domain)
+	if c := getFabricClient(); c != nil {
+		return FabricResolver{Client: c}.LookupIPAddr(ctx, domain)
 	}
 	for range 10 {
 		ips, err := r.getResolver(ctx, domain).LookupIPAddr(ctx, domain)
@@ -138,15 +151,15 @@ func (r RootResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IP
 }
 
 func (r RootResolver) LookupCNAME(ctx context.Context, domain string) (string, error) {
-	if fabricClient != nil {
-		return FabricResolver{Client: fabricClient}.LookupCNAME(ctx, domain)
+	if c := getFabricClient(); c != nil {
+		return FabricResolver{Client: c}.LookupCNAME(ctx, domain)
 	}
 	return r.getResolver(ctx, domain).LookupCNAME(ctx, domain)
 }
 
 func (r RootResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS, error) {
-	if fabricClient != nil {
-		return FabricResolver{Client: fabricClient}.LookupNS(ctx, domain)
+	if c := getFabricClient(); c != nil {
+		return FabricResolver{Client: c}.LookupNS(ctx, domain)
 	}
 	return r.getResolver(ctx, domain).LookupNS(ctx, domain)
 }
