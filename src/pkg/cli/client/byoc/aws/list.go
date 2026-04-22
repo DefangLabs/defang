@@ -62,7 +62,7 @@ type S3Client interface {
 func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string) (iter.Seq[state.PulumiState], error) {
 	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
 
-	slog.Debug(fmt.Sprintln("Listing stacks in bucket:", bucketName))
+	slog.Debug(fmt.Sprint("Listing stacks in bucket:", bucketName))
 	out, err := s3client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: &bucketName,
 		Prefix: &prefix,

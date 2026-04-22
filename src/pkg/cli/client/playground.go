@@ -184,7 +184,7 @@ func (g *PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, err
 	if resp.Project == "" {
 		return "", errors.New("no Playground projects found")
 	}
-	slog.Debug(fmt.Sprintln("Using default Playground project: ", resp.Project))
+	slog.Debug(fmt.Sprint("Using default Playground project: ", resp.Project))
 	return resp.Project, nil
 }
 

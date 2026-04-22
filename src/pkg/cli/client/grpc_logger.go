@@ -39,7 +39,7 @@ func (g grpcLogger) logRequest(header http.Header, reqType, payload string) {
 	requestId := pkg.RandomID()
 	header.Set("X-Request-Id", requestId)
 
-	slog.Debug(fmt.Sprintln(g.prefix, requestId, reqType, payload))
+	slog.Debug(fmt.Sprint(g.prefix, requestId, reqType, payload))
 }
 
 func (g grpcLogger) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {

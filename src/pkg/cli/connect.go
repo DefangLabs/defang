@@ -26,7 +26,7 @@ func ConnectWithTenant(ctx context.Context, fabricAddr string, requestedTenant t
 
 	resp, err := grpcClient.WhoAmI(ctx)
 	if err != nil {
-		slog.Debug(fmt.Sprintln("Unable to validate tenant with server:", err))
+		slog.Debug(fmt.Sprint("Unable to validate tenant with server:", err))
 		return grpcClient, err
 	}
 

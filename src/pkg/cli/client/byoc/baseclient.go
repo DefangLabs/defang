@@ -109,7 +109,7 @@ func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) 
 	if len(projectNames) > 1 {
 		return "", ErrMultipleProjects{ProjectNames: projectNames}
 	}
-	slog.Debug(fmt.Sprintln("Using default project:", projectNames[0]))
+	slog.Debug(fmt.Sprint("Using default project:", projectNames[0]))
 	return projectNames[0], nil
 }
 

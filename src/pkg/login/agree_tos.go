@@ -21,7 +21,7 @@ func InteractiveAgreeToS(ctx context.Context, fabric client.FabricClient) error 
 	if client.TermsAccepted() {
 		// The user has already agreed to the terms of service recently
 		if err := nonInteractiveAgreeToS(ctx, fabric); err != nil {
-			slog.Debug(fmt.Sprintln("unable to agree to terms:", err)) // not fatal
+			slog.Debug(fmt.Sprint("unable to agree to terms:", err)) // not fatal
 		}
 		return nil
 	}
@@ -52,7 +52,7 @@ func NonInteractiveAgreeToS(ctx context.Context, fabric client.FabricClient) err
 
 	// Persist the terms agreement in the state file so that we don't ask again
 	if err := client.AcceptTerms(); err != nil {
-		slog.Debug(fmt.Sprintln("unable to persist terms agreement:", err)) // not fatal
+		slog.Debug(fmt.Sprint("unable to persist terms agreement:", err)) // not fatal
 	}
 
 	return nonInteractiveAgreeToS(ctx, fabric)

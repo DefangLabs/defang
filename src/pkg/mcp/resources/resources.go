@@ -38,7 +38,7 @@ func setupDocumentationResource(s *server.MCPServer) {
 		// Read the file
 		file, err := os.ReadFile(knowledgeBasePath)
 		if err != nil {
-			slog.ErrorContext(ctx, fmt.Sprintln("Failed to read resource file", "error", err, "path", "knowledge_base.json"))
+			slog.ErrorContext(ctx, fmt.Sprint("Failed to read resource file", "error", err, "path", "knowledge_base.json"))
 			return nil, fmt.Errorf("failed to read resource file knowledge_base.json: %w", err)
 		}
 
@@ -68,7 +68,7 @@ func setupSamplesResource(s *server.MCPServer) {
 		// Read the file
 		file, err := os.ReadFile(samplesExamplesPath)
 		if err != nil {
-			slog.ErrorContext(ctx, fmt.Sprintln("Failed to read resource file", "error", err, "path", "samples_examples.json"))
+			slog.ErrorContext(ctx, fmt.Sprint("Failed to read resource file", "error", err, "path", "samples_examples.json"))
 			return nil, fmt.Errorf("failed to read resource file samples_examples.json: %w", err)
 		}
 

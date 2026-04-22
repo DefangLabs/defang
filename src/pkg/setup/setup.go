@@ -244,7 +244,7 @@ func (s *SetupClient) MigrateFromHeroku(ctx context.Context) (SetupResult, error
 		return SetupResult{}, fmt.Errorf("failed to write compose file: %w", err)
 	}
 
-	slog.InfoContext(ctx, fmt.Sprintln("Compose file written to", composeFilePath))
+	slog.InfoContext(ctx, fmt.Sprint("Compose file written to", composeFilePath))
 	slog.InfoContext(ctx, "Your application is now ready to deploy with Defang.")
 	slog.InfoContext(ctx, "For next steps, visit https://s.defang.io/from-heroku")
 

@@ -242,7 +242,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 		Limit:    options.Limit,
 	}
 
-	slog.Debug(fmt.Sprintln("Tail request:", tailRequest))
+	slog.Debug(fmt.Sprint("Tail request:", tailRequest))
 
 	logSeq, err := provider.QueryLogs(ctx, tailRequest)
 	if err != nil {
@@ -291,7 +291,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 							if debug {
 								debugStr = "ON"
 							}
-							slog.InfoContext(ctx, fmt.Sprintln("Debug mode", debugStr))
+							slog.InfoContext(ctx, fmt.Sprint("Debug mode", debugStr))
 							track.Evt("Debug Toggled", P("debug", debug))
 						case 'v', 'V':
 							verbose := !options.Verbose
@@ -303,7 +303,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 							if toggleCount++; toggleCount == 4 && !verbose {
 								modeStr += ". I like the way you work it, no verbosity."
 							}
-							slog.InfoContext(ctx, fmt.Sprintln("Verbose mode", modeStr))
+							slog.InfoContext(ctx, fmt.Sprint("Verbose mode", modeStr))
 							track.Evt("Verbose Toggled", P("verbose", verbose), P("toggleCount", toggleCount))
 						}
 					}
@@ -377,7 +377,7 @@ func receiveLogs(ctx context.Context, provider client.Provider, projectName stri
 
 			// Reconnect on transient errors
 			if isTransientError(err) {
-				slog.Debug(fmt.Sprintln("Disconnected:", err))
+				slog.Debug(fmt.Sprint("Disconnected:", err))
 				var spaces int
 				if !options.Raw {
 					slog.WarnContext(ctx, "Reconnecting...\r")
@@ -390,7 +390,7 @@ func receiveLogs(ctx context.Context, provider client.Provider, projectName stri
 				stop() // stop the old iterator
 				newLogSeq, err := provider.QueryLogs(ctx, tailRequest)
 				if err != nil {
-					slog.Debug(fmt.Sprintln("Reconnect failed:", err))
+					slog.Debug(fmt.Sprint("Reconnect failed:", err))
 					return err
 				}
 				next, stop = iter.Pull2(newLogSeq)
@@ -445,7 +445,7 @@ func handleLogEntryMsgs(msg *defangv1.TailResponse, doSpinner bool, skipDuplicat
 
 		err := handler(e, options, term.DefaultTerm)
 		if err != nil {
-			slog.Debug(fmt.Sprintln("Ending tail loop", err))
+			slog.Debug(fmt.Sprint("Ending tail loop", err))
 			return err
 		}
 

@@ -116,7 +116,7 @@ func makeComposeUpCmd() *cobra.Command {
 					Mode:     session.Stack.Mode,
 				})
 				if err != nil {
-					slog.Debug(fmt.Sprintln("Failed to create stack:", err))
+					slog.Debug(fmt.Sprint("Failed to create stack:", err))
 				}
 			}
 
@@ -161,7 +161,7 @@ func makeComposeUpCmd() *cobra.Command {
 			if deploy.Etag != "" {
 				tailSource = "deployment ID " + deploy.Etag
 			}
-			slog.InfoContext(ctx, fmt.Sprintln("Tailing logs for", tailSource, "; press Ctrl+C to detach:"))
+			slog.InfoContext(ctx, fmt.Sprint("Tailing logs for", tailSource, "; press Ctrl+C to detach:"))
 
 			tailOptions := newTailOptionsForDeploy(session.Stack.Name, deploy.Etag, since, global.Verbose)
 			serviceStates, err := cli.TailAndMonitor(ctx, project, session.Provider, time.Duration(waitTimeout)*time.Second, tailOptions)
@@ -169,7 +169,7 @@ func makeComposeUpCmd() *cobra.Command {
 				deploymentErr := err
 				debugger, err := debug.NewDebugger(ctx, global.FabricAddr, session.Stack)
 				if err != nil {
-					slog.WarnContext(ctx, fmt.Sprintln("Failed to initialize debugger:", err))
+					slog.WarnContext(ctx, fmt.Sprint("Failed to initialize debugger:", err))
 					return deploymentErr
 				}
 				handleTailAndMonitorErr(ctx, deploymentErr, debugger, debug.DebugConfig{
@@ -256,7 +256,7 @@ func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.D
 }
 
 func printExistingDeployments(existingDeployments []*defangv1.Deployment) {
-	slog.Info("This project was previously deployed to the following locations:")
+	fmt.Println("This project was previously deployed to the following locations:")
 	deploymentStrings := make([]string, 0, len(existingDeployments))
 	for _, dep := range existingDeployments {
 		var providerId client.ProviderID
@@ -284,7 +284,7 @@ func confirmDeploymentToNewLocation() (bool, error) {
 
 func promptToCreateStack(ctx context.Context, targetDirectory string, params stacks.Parameters) error {
 	if global.NonInteractive {
-		slog.InfoContext(ctx, "Consider creating a stack to manage your deployments.")
+		fmt.Println("Consider creating a stack to manage your deployments.")
 		printDefangHint("To create a stack, do:", "stack new --name="+params.Name)
 		return nil
 	}
@@ -311,7 +311,7 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 	}
 
 	if connect.CodeOf(originalErr) == connect.CodeResourceExhausted && strings.Contains(originalErr.Error(), "maximum number of projects") {
-		slog.ErrorContext(ctx, fmt.Sprintln("Error:", client.PrettyError(originalErr)))
+		slog.ErrorContext(ctx, fmt.Sprint("Error:", client.PrettyError(originalErr)))
 		err := handleTooManyProjectsError(ctx, provider, originalErr)
 		if err != nil {
 			return originalErr
@@ -323,7 +323,7 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 		return originalErr
 	}
 
-	slog.ErrorContext(ctx, fmt.Sprintln("Error:", client.PrettyError(originalErr)))
+	slog.ErrorContext(ctx, fmt.Sprint("Error:", client.PrettyError(originalErr)))
 	return debugger.DebugDeploymentError(ctx, debug.DebugConfig{
 		Project: project,
 	}, originalErr)
@@ -332,7 +332,7 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 func handleTooManyProjectsError(ctx context.Context, provider client.Provider, originalErr error) error {
 	projectName, err := provider.RemoteProjectName(ctx)
 	if err != nil {
-		slog.WarnContext(ctx, fmt.Sprintln("failed to get remote project name:", err))
+		slog.WarnContext(ctx, fmt.Sprint("failed to get remote project name:", err))
 		return originalErr
 	}
 
@@ -344,7 +344,7 @@ func handleTooManyProjectsError(ctx context.Context, provider client.Provider, o
 
 	_, err = cli.InteractiveComposeDown(ctx, projectName, global.Client, provider)
 	if err != nil {
-		slog.WarnContext(ctx, fmt.Sprintln("ComposeDown failed:", err))
+		slog.WarnContext(ctx, fmt.Sprint("ComposeDown failed:", err))
 		printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
 		return originalErr
 	} else {
@@ -444,7 +444,7 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 
-			slog.Info(fmt.Sprintln("Deleted services, deployment ID", deployment))
+			slog.Info(fmt.Sprint("Deleted services, deployment ID", deployment))
 
 			listConfigs, err := session.Provider.ListConfig(cmd.Context(), &defangv1.ListConfigsRequest{Project: projectName})
 			if err == nil {
@@ -521,7 +521,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				CheckAccountInfo: false,
 			})
 			if err != nil {
-				slog.WarnContext(ctx, fmt.Sprintln("unable to load stack:", err, "- some information may not be up-to-date"))
+				slog.WarnContext(ctx, fmt.Sprint("unable to load stack:", err, "- some information may not be up-to-date"))
 				sessionx = &session.Session{
 					Loader:   configureLoaderForCommand(cmd),
 					Provider: client.NewPlaygroundProvider(global.Client, stacks.DefaultBeta),
@@ -531,7 +531,7 @@ func makeComposeConfigCmd() *cobra.Command {
 
 			_, err = sessionx.Provider.AccountInfo(ctx)
 			if err != nil {
-				slog.WarnContext(ctx, fmt.Sprintln("unable to connect to cloud provider:", err, "- some information may not be up-to-date"))
+				slog.WarnContext(ctx, fmt.Sprint("unable to connect to cloud provider:", err, "- some information may not be up-to-date"))
 			}
 
 			project, loadErr := sessionx.Loader.LoadProject(ctx)
@@ -677,7 +677,7 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 	if pkg.IsValidTime(untilTs) {
 		rangeStr += " until " + untilTs.Format(time.RFC3339Nano)
 	}
-	slog.Info(fmt.Sprintf("Showing logs%s; press Ctrl+C to stop:", rangeStr))
+	fmt.Printf("Showing logs%s; press Ctrl+C to stop:\n", rangeStr)
 
 	services := args
 	if len(name) > 0 {

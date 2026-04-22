@@ -46,7 +46,7 @@ func HandleListConfigTool(ctx context.Context, loader client.Loader, params List
 	if err != nil {
 		return "", fmt.Errorf("failed to load project name: %w", err)
 	}
-	slog.Debug(fmt.Sprintln("Project name loaded:", projectName))
+	slog.Debug(fmt.Sprint("Project name loaded:", projectName))
 
 	slog.Debug("Function invoked: cli.ConfigList")
 	config, err := cli.ListConfig(ctx, provider, projectName)

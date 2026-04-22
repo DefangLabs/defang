@@ -28,7 +28,7 @@ type AuthService interface {
 type OpenAuthService struct{}
 
 func (OpenAuthService) login(ctx context.Context, fabricAddr string, flow LoginFlow, mcpClient string) (string, error) {
-	slog.Debug(fmt.Sprintln("Logging in to", fabricAddr))
+	slog.Debug(fmt.Sprint("Logging in to", fabricAddr))
 
 	code, err := auth.StartAuthCodeFlow(ctx, flow, func(token string) {
 		client.SaveAccessToken(fabricAddr, token)
@@ -130,7 +130,7 @@ func InteractiveRequireLoginAndToS(ctx context.Context, fabric client.FabricClie
 	if err = fabric.CheckLoginAndToS(ctx); err != nil {
 		// Login interactively now; only do this for authorization-related errors
 		if connect.CodeOf(err) == connect.CodeUnauthenticated {
-			slog.Debug(fmt.Sprintln("Server error:", err))
+			slog.Debug(fmt.Sprint("Server error:", err))
 			slog.WarnContext(ctx, "Please log in to continue.")
 			term.ResetWarnings() // clear any previous warnings so we don't show them again
 

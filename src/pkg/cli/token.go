@@ -21,7 +21,7 @@ func Token(ctx context.Context, client client.FabricClient, tenant types.TenantN
 	}
 
 	code, err := auth.StartAuthCodeFlow(ctx, false, func(token string) {
-		slog.Debug(fmt.Sprintln("Getting access token for scope:", s))
+		slog.Debug(fmt.Sprint("Getting access token for scope:", s))
 	}, "token-cli")
 	if err != nil {
 		return err

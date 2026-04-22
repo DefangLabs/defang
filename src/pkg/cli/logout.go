@@ -19,7 +19,7 @@ func Logout(ctx context.Context, fabricClient client.FabricClient, fabricAddr st
 	}
 
 	if err := client.TokenStore.Delete(client.TokenStorageName(fabricAddr)); err != nil {
-		slog.WarnContext(ctx, fmt.Sprintln("Failed to remove stored token:", err))
+		slog.WarnContext(ctx, fmt.Sprint("Failed to remove stored token:", err))
 		// Don't return the error - we still consider logout successful
 	}
 
@@ -27,9 +27,9 @@ func Logout(ctx context.Context, fabricClient client.FabricClient, fabricAddr st
 	jwtFile, err := client.GetWebIdentityTokenFile(fabricAddr)
 	if err == nil {
 		if err := os.Remove(jwtFile); err != nil && !os.IsNotExist(err) {
-			slog.WarnContext(ctx, fmt.Sprintln("Failed to remove JWT token file:", err))
+			slog.WarnContext(ctx, fmt.Sprint("Failed to remove JWT token file:", err))
 		} else if err == nil {
-			slog.Debug(fmt.Sprintln("Removed JWT token file:", jwtFile))
+			slog.Debug(fmt.Sprint("Removed JWT token file:", jwtFile))
 		}
 	}
 

@@ -164,7 +164,7 @@ func TestDebugComposeLoadError(t *testing.T) {
 
 			_, loadErr := loader.LoadProject(ctx)
 			if loadErr != nil {
-				slog.Error(fmt.Sprintln("Cannot load project:", loadErr))
+				slog.Error(fmt.Sprint("Cannot load project:", loadErr))
 				project, err := loader.CreateProjectForDebug()
 				assert.NoError(t, err, "CreateProjectForDebug should not return an error")
 

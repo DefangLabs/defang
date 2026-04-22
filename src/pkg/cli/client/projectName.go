@@ -14,7 +14,7 @@ func LoadProjectNameWithFallback(ctx context.Context, loader Loader, provider Pr
 		if err == nil {
 			return projectName, nil
 		}
-		slog.Debug(fmt.Sprintln("Failed to load local project:", err))
+		slog.Debug(fmt.Sprint("Failed to load local project:", err))
 		loadErr = err
 	}
 	slog.Debug("Trying to get the remote project name from the provider")

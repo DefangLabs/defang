@@ -81,7 +81,7 @@ func deleteSubdomain(ctx context.Context, projectName string, provider client.Pr
 	})
 	if err != nil {
 		// This can fail when the project was deployed from a different workspace than the current one
-		slog.Debug(fmt.Sprintln("DeleteSubdomainZone failed:", err))
+		slog.Debug(fmt.Sprint("DeleteSubdomainZone failed:", err))
 		if connect.CodeOf(err) == connect.CodeNotFound {
 			slog.WarnContext(ctx, "Subdomain not found; did you mean to destroy a different project or stack?")
 		}
@@ -122,7 +122,7 @@ func TailAndWaitForCD(ctx context.Context, provider client.Provider, projectName
 	// blocking call to tail
 	var tailErr error
 	if err := streamLogs(ctx, provider, projectName, tailOptions, logEntryPrintHandler); err != nil {
-		slog.Debug(fmt.Sprintln("Tail stopped with", err, errors.Unwrap(err)))
+		slog.Debug(fmt.Sprint("Tail stopped with", err, errors.Unwrap(err)))
 		if !errors.Is(err, context.Canceled) {
 			tailErr = err
 		}

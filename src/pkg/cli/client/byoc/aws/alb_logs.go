@@ -34,7 +34,7 @@ func (b *ByocAws) fetchAndStreamAlbLogs(ctx context.Context, projectName string,
 	if b.Prefix != "" {
 		bucketPrefix = b.Prefix + "-" + bucketPrefix
 	}
-	slog.Debug(fmt.Sprintln("Query ALB logs", bucketPrefix))
+	slog.Debug(fmt.Sprint("Query ALB logs", bucketPrefix))
 	if len(bucketPrefix) > 31 {
 		// HACK: AWS CD truncates the ALB name to 31 characters (because of the long Terraform suffix)
 		bucketPrefix = bucketPrefix[:31]

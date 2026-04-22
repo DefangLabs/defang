@@ -26,7 +26,7 @@ func SetupKnowledgeBase() error {
 	// Create knowledge base directory if it doesn't exist
 	slog.Debug("Creating knowledge base directory: " + KnowledgeBaseDir)
 	if err := os.MkdirAll(KnowledgeBaseDir, 0700); err != nil {
-		slog.Error(fmt.Sprintln("Failed to create knowledge base directory", "error", err))
+		slog.Error(fmt.Sprint("Failed to create knowledge base directory", "error", err))
 		return err
 	}
 
@@ -34,7 +34,7 @@ func SetupKnowledgeBase() error {
 		slog.Debug("Downloading knowledge base file: " + filename)
 		err := downloadKnowledgeBase(KnowledgeBaseDir+"/"+filename, "/"+DocumentationEndpoint+"/"+filename)
 		if err != nil {
-			slog.Error(fmt.Sprintln("Failed to download knowledge base file", "error", err, "filename", filename))
+			slog.Error(fmt.Sprint("Failed to download knowledge base file", "error", err, "filename", filename))
 			return err
 		}
 	}
@@ -48,7 +48,7 @@ func downloadKnowledgeBase(filepath string, path string) (err error) {
 	out, err := os.Create(filepath)
 	slog.Debug("Creating file: " + filepath)
 	if err != nil {
-		slog.Error(fmt.Sprintln("Failed to create file", "error", err, "filepath", filepath))
+		slog.Error(fmt.Sprint("Failed to create file", "error", err, "filepath", filepath))
 		return err
 	}
 	defer out.Close()
@@ -57,7 +57,7 @@ func downloadKnowledgeBase(filepath string, path string) (err error) {
 	resp, err := http.Get(AskDefangBaseURL + path)
 	slog.Debug("Downloading file: " + path)
 	if err != nil {
-		slog.Error(fmt.Sprintln("Failed to download file", "error", err, "url", path))
+		slog.Error(fmt.Sprint("Failed to download file", "error", err, "url", path))
 		return err
 	}
 	defer resp.Body.Close()
@@ -65,7 +65,7 @@ func downloadKnowledgeBase(filepath string, path string) (err error) {
 	// Check server response
 	slog.Debug("Checking server response: " + resp.Status)
 	if resp.StatusCode != http.StatusOK {
-		slog.Error(fmt.Sprintln("Failed to download file", "error", fmt.Errorf("bad status: %s", resp.Status), "url", path))
+		slog.Error(fmt.Sprint("Failed to download file", "error", fmt.Errorf("bad status: %s", resp.Status), "url", path))
 		return fmt.Errorf("bad status: %s", resp.Status)
 	}
 
@@ -73,7 +73,7 @@ func downloadKnowledgeBase(filepath string, path string) (err error) {
 	slog.Debug("Copying Using IO Copy: " + filepath)
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
-		slog.Error(fmt.Sprintln("Failed to write file", "error", err, "filepath", filepath))
+		slog.Error(fmt.Sprint("Failed to write file", "error", err, "filepath", filepath))
 		return err
 	}
 

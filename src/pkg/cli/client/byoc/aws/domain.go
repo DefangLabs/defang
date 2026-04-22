@@ -46,7 +46,7 @@ func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, st
 			slog.WarnContext(ctx, fmt.Sprintf("Failed to find existing usable delegation set: %v, creating a new one", err))
 		}
 		if delegationSet != nil {
-			slog.Debug(fmt.Sprintln("Reusing existing usable Route53 delegation set:", *delegationSet.Id))
+			slog.Debug(fmt.Sprint("Reusing existing usable Route53 delegation set:", *delegationSet.Id))
 		} else {
 			delegationSet, err = createUsableDelegationSet(ctx, projectDomain, r53Client, resolverAt)
 			if err != nil {
@@ -59,7 +59,7 @@ func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, st
 		return nil, "", errors.New("no NS records found for the delegation set") // should not happen
 	}
 	if delegationSet.Id != nil {
-		slog.Debug(fmt.Sprintln("Route53 delegation set ID:", *delegationSet.Id))
+		slog.Debug(fmt.Sprint("Route53 delegation set ID:", *delegationSet.Id))
 		delegationSetId = strings.TrimPrefix(*delegationSet.Id, "/delegationset/")
 	}
 
@@ -165,7 +165,7 @@ func getOrCreateDelegationSetByZones(ctx context.Context, zones []*types.HostedZ
 		// Create or get the reusable delegation set for the existing subdomain zone
 		delegationSet, err = aws.CreateDelegationSet(ctx, zone.Id, r53Client)
 		if delegationSetAlreadyReusable := new(types.DelegationSetAlreadyReusable); errors.As(err, &delegationSetAlreadyReusable) {
-			slog.Debug(fmt.Sprintln("Route53 delegation set already created:", err))
+			slog.Debug(fmt.Sprint("Route53 delegation set already created:", err))
 			delegationSet, err = aws.GetDelegationSetByZone(ctx, zone.Id, r53Client)
 		}
 		if err != nil {

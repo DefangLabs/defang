@@ -32,7 +32,7 @@ func (s *LocalDirTokenStore) Save(key string, token string) error {
 		return err
 	}
 
-	slog.Debug(fmt.Sprintln("Saving access token to", tokenFile))
+	slog.Debug(fmt.Sprint("Saving access token to", tokenFile))
 	dir, _ := filepath.Split(tokenFile)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return fmt.Errorf("failed to create token directory: %w", err)
@@ -50,7 +50,7 @@ func (s *LocalDirTokenStore) Load(key string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	slog.Debug(fmt.Sprintln("Reading access token from file", tokenFile))
+	slog.Debug(fmt.Sprint("Reading access token from file", tokenFile))
 	all, err := os.ReadFile(tokenFile)
 	if err != nil {
 		return "", fmt.Errorf("failed to read token: %w", err)

@@ -45,7 +45,7 @@ func checkDeploymentMode(prevMode, newMode modes.Mode) (modes.Mode, error) {
 	switch newMode {
 	case modes.ModeUnspecified:
 		if prevMode != modes.ModeUnspecified {
-			slog.Debug(fmt.Sprintln("No deployment mode specified; using previous deployment mode:", prevMode))
+			slog.Debug(fmt.Sprint("No deployment mode specified; using previous deployment mode:", prevMode))
 			newMode = prevMode
 		}
 	case modes.ModeAffordable:
@@ -120,7 +120,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		Stack:   provider.GetStackNameForDomain(),
 	})
 	if err != nil {
-		slog.Debug(fmt.Sprintln("GetDelegateSubdomainZone failed:", err))
+		slog.Debug(fmt.Sprint("GetDelegateSubdomainZone failed:", err))
 		return nil, project, errors.New("failed to get delegate domain")
 	}
 
@@ -209,7 +209,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		CdId:         resp.CdId,
 	})
 	if err != nil {
-		slog.Debug(fmt.Sprintln("Failed to record deployment:", err))
+		slog.Debug(fmt.Sprint("Failed to record deployment:", err))
 		slog.WarnContext(ctx, "Unable to update deployment history; deployment will proceed anyway.")
 	}
 

@@ -311,7 +311,7 @@ func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[state.
 	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
 
 	uploadSA := b.driver.GetServiceAccountEmail(DefangUploadServiceAccountName)
-	slog.Debug(fmt.Sprintln("Getting services from pulumi stacks bucket:", bucketName, prefix, uploadSA))
+	slog.Debug(fmt.Sprint("Getting services from pulumi stacks bucket:", bucketName, prefix, uploadSA))
 	objLoader := func(ctx context.Context, bucket, object string) ([]byte, error) {
 		return b.driver.GetBucketObjectWithServiceAccount(ctx, bucket, object, uploadSA)
 	}
@@ -843,7 +843,7 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 
 	// Current user might not have object viewer access to the bucket, use the upload service account to get the object
 	uploadSA := b.driver.GetServiceAccountEmail(DefangUploadServiceAccountName)
-	slog.Debug(fmt.Sprintln("Getting services from bucket:", bucketName, path, uploadSA))
+	slog.Debug(fmt.Sprint("Getting services from bucket:", bucketName, path, uploadSA))
 	pbBytes, err := b.driver.GetBucketObjectWithServiceAccount(ctx, bucketName, path, uploadSA)
 	if err != nil {
 		slog.Debug(fmt.Sprintf("Failed to get project bucket object from bucket %q at path %q with service account %q: %v", bucketName, path, uploadSA, err))

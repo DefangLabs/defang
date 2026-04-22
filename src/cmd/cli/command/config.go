@@ -203,7 +203,7 @@ var configDeleteCmd = &cobra.Command{
 			}
 			return err
 		}
-		slog.Info(fmt.Sprintln("Deleted", names))
+		slog.Info(fmt.Sprint("Deleted", names))
 
 		printDefangHint("To list the configs (but not their values), do:", "config ls")
 		return nil

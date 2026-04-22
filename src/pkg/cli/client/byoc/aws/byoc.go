@@ -92,7 +92,7 @@ func AnnotateAwsError(err error) error {
 	if err == nil {
 		return nil
 	}
-	slog.Debug(fmt.Sprintln("AWS error:", err))
+	slog.Debug(fmt.Sprint("AWS error:", err))
 	if strings.Contains(err.Error(), "missing AWS region:") {
 		return ErrMissingAwsRegion{err}
 	}
@@ -612,14 +612,14 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 	s3Client := aws.NewS3FromConfig(cfg)
 	path := b.GetProjectUpdatePath(projectName)
 
-	slog.Debug(fmt.Sprintln("Getting services from bucket:", bucketName, path))
+	slog.Debug(fmt.Sprint("Getting services from bucket:", bucketName, path))
 	getObjectOutput, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: &bucketName,
 		Key:    &path,
 	})
 	if err != nil {
 		if aws.IsS3NoSuchKeyError(err) {
-			slog.Debug(fmt.Sprintln("s3.GetObject:", err))
+			slog.Debug(fmt.Sprint("s3.GetObject:", err))
 			return nil, client.ErrNotExist // no services yet
 		}
 		return nil, AnnotateAwsError(err)
@@ -859,15 +859,15 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 				cdTail.LogStreamNames = []string{awscodebuild.GetLogStreamForBuildID(b.cdBuildId)}
 			}
 			groups = append(groups, cdTail)
-			slog.Debug(fmt.Sprintln("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames, filter))
+			slog.Debug(fmt.Sprint("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames, filter))
 		}
 	}
 	if logType.Has(logs.LogTypeBuild) && projectName != "" {
 		buildsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "builds")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service
-		slog.Debug(fmt.Sprintln("Query builds logs", buildsTail.LogGroupARN, filter))
+		slog.Debug(fmt.Sprint("Query builds logs", buildsTail.LogGroupARN, filter))
 		groups = append(groups, buildsTail)
 		ecsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "ecs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
-		slog.Debug(fmt.Sprintln("Query ecs events logs", ecsTail.LogGroupARN, filter))
+		slog.Debug(fmt.Sprint("Query ecs events logs", ecsTail.LogGroupARN, filter))
 		groups = append(groups, ecsTail)
 	}
 	// Tail services
@@ -876,7 +876,7 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 		if service != "" && etag != "" {
 			servicesTail.LogStreamNamePrefix = service + "/" + service + "_" + etag
 		}
-		slog.Debug(fmt.Sprintln("Query services logs", servicesTail.LogGroupARN, servicesTail.LogStreamNamePrefix, pattern))
+		slog.Debug(fmt.Sprint("Query services logs", servicesTail.LogGroupARN, servicesTail.LogStreamNamePrefix, pattern))
 		groups = append(groups, servicesTail)
 	}
 	return groups
@@ -934,7 +934,7 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	for i, name := range secrets.Names {
 		ids[i] = b.getSecretID(secrets.Project, name)
 	}
-	slog.Debug(fmt.Sprintln("Deleting parameters", ids))
+	slog.Debug(fmt.Sprint("Deleting parameters", ids))
 	if err := b.driver.DeleteSecrets(ctx, ids...); err != nil {
 		return AnnotateAwsError(err)
 	}

@@ -50,7 +50,7 @@ func Execute(ctx context.Context) error {
 
 	if err := RootCmd.ExecuteContext(ctx); err != nil {
 		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			slog.ErrorContext(ctx, fmt.Sprintln("Error:", client.PrettyError(err)))
+			slog.ErrorContext(ctx, fmt.Sprint("Error:", client.PrettyError(err)))
 			track.Evt("CLI Error", P("err", err))
 		}
 
@@ -107,7 +107,7 @@ func Execute(ctx context.Context) error {
 
 	if global.HasTty && !global.HideUpdate && pkg.RandomIndex(10) == 0 {
 		if latest, err := github.GetLatestReleaseTag(ctx); err == nil && isNewer(GetCurrentVersion(), latest) {
-			slog.Debug(fmt.Sprintln("Latest Version:", latest, "Current Version:", GetCurrentVersion()))
+			slog.Debug("Newer version", "github", latest, "current", GetCurrentVersion())
 			fmt.Println("A newer version of the CLI is available at https://github.com/DefangLabs/defang/releases/latest")
 			if pkg.RandomIndex(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
 				fmt.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
@@ -410,14 +410,14 @@ var RootCmd = &cobra.Command{
 			if connect.CodeOf(err) != connect.CodeUnauthenticated {
 				return err
 			}
-			slog.Debug(fmt.Sprintln("Using existing token failed; continuing to allow login/ToS flow:", err))
+			slog.Debug(fmt.Sprint("Using existing token failed; continuing to allow login/ToS flow:", err))
 		}
 
 		track.Tracker = global.Client // update tracker with the real client
 
 		if v, err := global.Client.GetVersions(ctx); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
-			slog.Debug(fmt.Sprintln("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin))
+			slog.Debug(fmt.Sprint("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin))
 			if global.HasTty && isNewer(version, v.CliMin) && !isUpgradeCommand(cmd) {
 				slog.WarnContext(ctx, "Your CLI version is outdated. Please upgrade to the latest version by running:\n\n  defang upgrade\n")
 				global.HideUpdate = true // hide the upgrade hint at the end

@@ -220,7 +220,7 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 		return fmt.Sprintf("s3://cd-preview/%s%s", service, archiveType.Extension), nil
 	}
 
-	slog.InfoContext(ctx, fmt.Sprintln("Packaging the project files for", service, "at", root))
+	slog.InfoContext(ctx, fmt.Sprint("Packaging the project files for", service, "at", root))
 	buffer, err := createArchive(ctx, build.Context, build.Dockerfile, archiveType)
 	if err != nil {
 		return "", err
@@ -242,7 +242,7 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 		panic("unexpected UploadMode value")
 	}
 
-	slog.InfoContext(ctx, fmt.Sprintln("Uploading the project files for", service))
+	slog.InfoContext(ctx, fmt.Sprint("Uploading the project files for", service))
 	return uploadArchive(ctx, provider, projectName, buffer, archiveType, digest)
 }
 
@@ -298,7 +298,7 @@ func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
 	if err != nil {
 		return nil
 	}
-	slog.Debug(fmt.Sprintln("Reading .dockerignore file from", ignorefile))
+	slog.Debug(fmt.Sprint("Reading .dockerignore file from", ignorefile))
 	return reader
 }
 
@@ -307,7 +307,7 @@ func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
 // Returns the filename of the written file and an error.
 func writeDefaultIgnoreFile(cwd string, dockerignore string) (string, error) {
 	path := filepath.Join(cwd, dockerignore)
-	slog.Debug(fmt.Sprintln("Writing .dockerignore file to", path))
+	slog.Debug(fmt.Sprint("Writing .dockerignore file to", path))
 
 	err := os.WriteFile(path, []byte(defaultDockerIgnore), 0644)
 	if err != nil {
@@ -413,7 +413,7 @@ func walkContextFolder(root, dockerfile string, writeIgnore writeIgnoreFile, fn 
 				return err
 			}
 			if ignore {
-				slog.Debug(fmt.Sprintln("Ignoring", relPath)) // TODO: avoid printing in this function
+				slog.Debug(fmt.Sprint("Ignoring", relPath)) // TODO: avoid printing in this function
 				if de.IsDir() {
 					return filepath.SkipDir
 				}
@@ -448,7 +448,7 @@ func createArchive(ctx context.Context, root string, dockerfile string, contentT
 	doProgress := term.StdoutCanColor() && term.IsTerminal()
 	err := walkContextFolder(root, dockerfile, writeIgnoreFileYes, func(path string, de os.DirEntry, slashPath string) error {
 		if term.DoDebug() {
-			slog.Debug(fmt.Sprintln("Adding", slashPath))
+			slog.Debug(fmt.Sprint("Adding", slashPath))
 		} else if doProgress {
 			term.Printf("%4d %s\r", fileCount, slashPath)
 			defer term.ClearLine()

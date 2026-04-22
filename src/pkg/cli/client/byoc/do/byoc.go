@@ -110,7 +110,7 @@ func (b *ByocDo) GetProjectUpdate(ctx context.Context, projectName string) (*def
 
 	if err != nil {
 		if aws.IsS3NoSuchKeyError(err) {
-			slog.Debug(fmt.Sprintln("s3.GetObject:", err))
+			slog.Debug(fmt.Sprint("s3.GetObject:", err))
 			return nil, client.ErrNotExist // no services yet
 		}
 		return nil, awsbyoc.AnnotateAwsError(err)
@@ -427,7 +427,7 @@ func (b *ByocDo) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter
 
 	if deploymentID == "" || appID == "" {
 		//Look up the CD app directly instead of relying on the etag
-		slog.Debug(fmt.Sprintln("Fetching app and deployment ID for app", appPlatform.CdName))
+		slog.Debug(fmt.Sprint("Fetching app and deployment ID for app", appPlatform.CdName))
 		cdApp, err := b.getAppByName(ctx, appPlatform.CdName)
 		if err != nil {
 			return nil, err

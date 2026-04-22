@@ -34,7 +34,7 @@ func (t *ToolTracker) TrackTool(name string, handler server.ToolHandlerFunc) ser
 		track.Evt("MCP Tool Called", track.P("tool", name), track.P("client", t.client), track.P("cluster", t.fabricAddr), track.P("provider", *t.providerId))
 		resp, err := handler(ctx, request)
 		if err != nil {
-			slog.ErrorContext(ctx, fmt.Sprintln("MCP Tool Failed: "+name, "error", err))
+			slog.ErrorContext(ctx, fmt.Sprint("MCP Tool Failed: "+name, "error", err))
 		} else {
 			slog.Debug("MCP Tool Succeeded: " + name)
 		}

@@ -73,7 +73,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 	// blocking call to tail
 	var tailErr error
 	if err := Tail(tailCtx, provider, project.Name, tailOptions); err != nil {
-		slog.Debug(fmt.Sprintln("Tail while monitoring stopped with", err, errors.Unwrap(err)))
+		slog.Debug(fmt.Sprint("Tail while monitoring stopped with", err, errors.Unwrap(err)))
 
 		if connect.CodeOf(err) == connect.CodePermissionDenied {
 			slog.WarnContext(ctx, "Unable to tail logs. Waiting for the deployment to finish.")

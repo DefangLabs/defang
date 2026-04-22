@@ -67,7 +67,7 @@ func HandleLogsTool(ctx context.Context, loader client.Loader, params LogsParams
 	if err != nil {
 		return "", fmt.Errorf("failed to load project name: %w", err)
 	}
-	slog.Debug(fmt.Sprintln("Project name loaded:", projectName))
+	slog.Debug(fmt.Sprint("Project name loaded:", projectName))
 
 	err = cli.CanIUseProvider(ctx, client, provider, projectName, 0)
 	if err != nil {
@@ -86,7 +86,7 @@ func HandleLogsTool(ctx context.Context, loader client.Loader, params LogsParams
 	})
 
 	if err != nil {
-		slog.ErrorContext(ctx, fmt.Sprintln("Failed to fetch logs", "error", err))
+		slog.ErrorContext(ctx, fmt.Sprint("Failed to fetch logs", "error", err))
 		return "", fmt.Errorf("failed to fetch logs: %w", err)
 	}
 

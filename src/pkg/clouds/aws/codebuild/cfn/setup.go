@@ -94,7 +94,7 @@ func (a *AwsCfn) updateStackAndWait(ctx context.Context, templateBody string, fo
 		return err // might call createStackAndWait depending on the error
 	}
 
-	slog.InfoContext(ctx, fmt.Sprintln("Waiting for CloudFormation stack", a.stackName, "to be updated...")) // TODO: verbose only
+	slog.InfoContext(ctx, fmt.Sprint("Waiting for CloudFormation stack", a.stackName, "to be updated...")) // TODO: verbose only
 	dso, err := cloudformation.NewStackUpdateCompleteWaiter(cfn, update1s).WaitForOutput(ctx, &cloudformation.DescribeStacksInput{
 		StackName: uso.StackId,
 	}, stackTimeout)
@@ -131,7 +131,7 @@ func (a *AwsCfn) createStackAndWait(ctx context.Context, templateBody string, pa
 		}
 	}
 
-	slog.InfoContext(ctx, fmt.Sprintln("Waiting for CloudFormation stack", a.stackName, "to be created...")) // TODO: verbose only
+	slog.InfoContext(ctx, fmt.Sprint("Waiting for CloudFormation stack", a.stackName, "to be created...")) // TODO: verbose only
 	dso, err := cloudformation.NewStackCreateCompleteWaiter(cfn, create1s).WaitForOutput(ctx, &cloudformation.DescribeStacksInput{
 		StackName: ptr.String(a.stackName),
 	}, stackTimeout)
@@ -262,7 +262,7 @@ func (a *AwsCfn) TearDown(ctx context.Context) error {
 		return err
 	}
 
-	slog.InfoContext(ctx, fmt.Sprintln("Waiting for CloudFormation stack", a.stackName, "to be deleted...")) // TODO: verbose only
+	slog.InfoContext(ctx, fmt.Sprint("Waiting for CloudFormation stack", a.stackName, "to be deleted...")) // TODO: verbose only
 	return cloudformation.NewStackDeleteCompleteWaiter(cfn, delete1s).Wait(ctx, &cloudformation.DescribeStacksInput{
 		StackName: ptr.String(a.stackName),
 	}, stackTimeout)

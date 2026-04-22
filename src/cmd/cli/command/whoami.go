@@ -40,7 +40,7 @@ var whoamiCmd = &cobra.Command{
 			userInfo, err = auth.FetchUserInfo(ctx, token)
 			if err != nil {
 				// Either the auth service is down, or we're using a Fabric JWT: skip workspace information
-				slog.WarnContext(ctx, fmt.Sprintln("Workspace information unavailable:", err))
+				slog.WarnContext(ctx, fmt.Sprint("Workspace information unavailable:", err))
 			}
 		}
 
