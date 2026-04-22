@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
 
@@ -192,7 +191,7 @@ func buildDeploymentDebugPrompt(debugConfig DebugConfig) string {
 	if debugConfig.Project != nil {
 		yaml, err := compose.MarshalYAML(debugConfig.Project)
 		if err != nil {
-			slog.Warn("Failed to marshal compose project to YAML for debug", "err", err)
+			fmt.Println("Failed to marshal compose project to YAML for debug:", err)
 		}
 		prompt += fmt.Sprintf(
 			"The compose files are at %s. The compose file is as follows:\n\n%s",

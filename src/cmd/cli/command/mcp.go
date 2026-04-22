@@ -60,12 +60,12 @@ var mcpServerCmd = &cobra.Command{
 		}
 
 		// Start the server
-		slog.Info("Starting Defang MCP server")
+		fmt.Println("Starting Defang MCP server")
 		if err := server.ServeStdio(s); err != nil {
 			return err
 		}
 
-		slog.Info("Server shutdown")
+		fmt.Println("Server shutdown")
 
 		return nil
 	},

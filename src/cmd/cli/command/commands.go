@@ -102,15 +102,15 @@ func Execute(ctx context.Context) error {
 	}
 
 	if global.HasTty && term.HadWarnings() {
-		slog.Info("For help with warnings, check our FAQ at https://s.defang.io/warnings")
+		fmt.Println("For help with warnings, check our FAQ at https://s.defang.io/warnings")
 	}
 
 	if global.HasTty && !global.HideUpdate && pkg.RandomIndex(10) == 0 {
 		if latest, err := github.GetLatestReleaseTag(ctx); err == nil && isNewer(GetCurrentVersion(), latest) {
 			slog.Debug(fmt.Sprintln("Latest Version:", latest, "Current Version:", GetCurrentVersion()))
-			slog.Info("A newer version of the CLI is available at https://github.com/DefangLabs/defang/releases/latest")
+			fmt.Println("A newer version of the CLI is available at https://github.com/DefangLabs/defang/releases/latest")
 			if pkg.RandomIndex(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
-				slog.Info("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
+				fmt.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
 			}
 		}
 	}

@@ -58,7 +58,7 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 	// Create a shortened authorize URL by only including the variable parts (state and code_challenge)
 	authorizeUrl := GetAuthorizeUrl("cli", ar.state, ar.challenge)
 
-	slog.Info("Please visit the following URL to log in: (Right click the URL or press ENTER to open browser)")
+	fmt.Println("Please visit the following URL to log in: (Right click the URL or press ENTER to open browser)")
 	n, _ := term.Printf("  %s", authorizeUrl)
 	defer term.Print("\r", strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
 

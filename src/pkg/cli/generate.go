@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -43,6 +44,8 @@ func GenerateWithAI(ctx context.Context, client client.FabricClient, args Genera
 			term.Printc(term.DebugColor, file.Name+"\n```")
 			term.Printc(term.DebugColor, file.Content)
 			term.Printc(term.DebugColor, "```")
+			fmt.Println("")
+			fmt.Println("")
 		}
 	}
 
@@ -53,7 +56,7 @@ func GenerateWithAI(ctx context.Context, client client.FabricClient, args Genera
 	}
 	for _, file := range response.Files {
 		// Print the files that were generated
-		slog.Info("   - " + file.Name)
+		fmt.Println("   -", file.Name)
 		// TODO: this will overwrite existing files
 		if err = os.WriteFile(filepath.Join(args.Folder, file.Name), []byte(file.Content), 0644); err != nil {
 			return nil, err
