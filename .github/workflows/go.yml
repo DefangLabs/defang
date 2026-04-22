@@ -489,29 +489,11 @@ jobs:
       - name: Checkout tag
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - name: Install node
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
-        with:
-          node-version: "24" # same as the version in flake.nix
-          registry-url: https://registry.npmjs.org
-
       - name: Build npm package
-        shell: bash
-        working-directory: ./pkgs/npm
-        run: |
-          # Get version number without the 'v'
-          version_number=$(echo "${{ github.ref_name }}" | cut -c2-)
-          export version_number
-
-          echo "Setting version number to ${version_number}"
-          # update version placeholder in package.json with version matching binary.
-          npm version "${version_number}" --no-git-tag-version
-
-          # install dependencies
-          npm ci --ignore-scripts
-
-          # build
-          npm run build
+        uses: ./.github/actions/npm-build
+        with:
+          registry-url: https://registry.npmjs.org
+          version: ${{ github.ref_name }}
 
       - run: npm publish --access public
         shell: bash
