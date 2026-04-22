@@ -108,7 +108,7 @@ func (gcp Gcp) EnsureServiceAccountExists(ctx context.Context, serviceAccountId,
 		if i < maxAttempts-1 {
 			term.Debugf("IAM API not yet usable, will retry in %v: %v\n", retryInterval, err)
 			if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
-				return "", err
+				return "", fmt.Errorf("waiting for IAM API propagation before checking service account %q: %w", serviceAccountId, err)
 			}
 		}
 	}
