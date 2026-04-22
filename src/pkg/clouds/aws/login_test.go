@@ -432,6 +432,7 @@ func TestCollectAuthCode(t *testing.T) {
 
 	t.Run("browser open error does not abort the loop", func(t *testing.T) {
 		calls := 0
+		browserCalls := 0
 		code, err := collectAuthCode(
 			func() (string, error) {
 				calls++
@@ -440,7 +441,10 @@ func TestCollectAuthCode(t *testing.T) {
 				}
 				return "code", nil
 			},
-			func(string) error { return errors.New("no browser") },
+			func(string) error {
+				browserCalls++
+				return errors.New("no browser")
+			},
 			"https://example.com",
 		)
 		if err != nil {
@@ -448,6 +452,9 @@ func TestCollectAuthCode(t *testing.T) {
 		}
 		if code != "code" {
 			t.Errorf("code = %q, want %q", code, "code")
+		}
+		if browserCalls != 1 {
+			t.Errorf("browser opened %d times, want 1", browserCalls)
 		}
 	})
 
