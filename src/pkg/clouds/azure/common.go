@@ -12,6 +12,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage/v2"
+	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 )
 
 // cliTimeout overrides the default 10s timeout for CLI-based credentials.
@@ -21,6 +22,14 @@ const cliTimeout = 30 * time.Second
 type Azure struct {
 	Location       Location
 	SubscriptionID string
+	// Cred is populated by Authenticate and, when non-nil, is returned by
+	// NewCreds instead of building a fresh DefaultAzureCredential.
+	Cred azcore.TokenCredential
+	// TokenStore persists the AuthenticationRecord returned by the
+	// device-code flow so future invocations can silently reuse the user's
+	// session (the actual refresh token lives in the OS-level token cache,
+	// not the TokenStore).
+	TokenStore tokenstore.TokenStore
 }
 
 // tokenCredentialWithTimeout wraps an azcore.TokenCredential to ensure
@@ -40,8 +49,12 @@ func (t *tokenCredentialWithTimeout) GetToken(ctx context.Context, opts policy.T
 }
 
 // NewCredsFunc builds a TokenCredential for ARM calls. Tests can override this
-// to inject a fake credential; the default implementation is DefaultAzureCredential.
+// to inject a fake credential; the default implementation returns any cred
+// populated by Authenticate, falling back to DefaultAzureCredential.
 var NewCredsFunc = func(a Azure) (azcore.TokenCredential, error) {
+	if a.Cred != nil {
+		return a.Cred, nil
+	}
 	if len(a.SubscriptionID) == 0 {
 		return nil, errors.New("environment variable AZURE_SUBSCRIPTION_ID is not set")
 	}

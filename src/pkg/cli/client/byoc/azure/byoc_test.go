@@ -150,12 +150,6 @@ func TestUnsupportedOps(t *testing.T) {
 	if _, err := b.Delete(context.Background(), nil); err == nil {
 		t.Error("Delete should return unsupported")
 	}
-	if _, err := b.GetService(context.Background(), nil); err == nil {
-		t.Error("GetService should return unsupported")
-	}
-	if _, err := b.GetServices(context.Background(), nil); err == nil {
-		t.Error("GetServices should return unsupported")
-	}
 	if _, err := b.RemoteProjectName(context.Background()); err == nil {
 		t.Error("RemoteProjectName should return unsupported")
 	}
@@ -164,6 +158,29 @@ func TestUnsupportedOps(t *testing.T) {
 	}
 	if err := b.UpdateShardDomain(context.Background()); err == nil {
 		t.Error("UpdateShardDomain should return unsupported")
+	}
+}
+
+func TestGetServicesEmptyProjectReturnsEmpty(t *testing.T) {
+	// Empty project name short-circuits GetProjectUpdate with ErrNotExist,
+	// and GetServices translates that into an empty response — same contract
+	// as the AWS/GCP providers.
+	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
+	resp, err := b.GetServices(context.Background(), &defangv1.GetServicesRequest{Project: ""})
+	if err != nil {
+		t.Fatalf("GetServices(empty project): %v", err)
+	}
+	if len(resp.Services) != 0 {
+		t.Errorf("expected empty services, got %d", len(resp.Services))
+	}
+}
+
+func TestGetServiceEmptyProjectNotFound(t *testing.T) {
+	// With no deployments, GetService should surface a NotFound for any name.
+	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
+	_, err := b.GetService(context.Background(), &defangv1.GetRequest{Project: "", Name: "app"})
+	if err == nil {
+		t.Error("GetService should fail when the named service doesn't exist")
 	}
 }
 
@@ -246,13 +263,16 @@ func TestQueryLogsEtagMismatch(t *testing.T) {
 	}
 }
 
-func TestAuthenticate(t *testing.T) {
+func TestAuthenticateNonInteractiveFailsWithoutCreds(t *testing.T) {
+	// Point the SDK at an ARM endpoint that returns 401 so DefaultAzureCredential's
+	// token always fails validation — no real Azure call is made by our code beyond
+	// hitting the subscription endpoint.
 	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
-	if err := b.Authenticate(context.Background(), false); err != nil {
-		t.Errorf("Authenticate: %v", err)
-	}
-	if err := b.Authenticate(context.Background(), true); err != nil {
-		t.Errorf("Authenticate(interactive=true): %v", err)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	// interactive=false: no valid creds → error.
+	if err := b.Authenticate(ctx, false); err == nil {
+		t.Error("Authenticate(interactive=false) should fail without working creds")
 	}
 }
 
@@ -413,7 +433,7 @@ func TestBuildCdEnv(t *testing.T) {
 	if got := env["STACK"]; got != "test-stack" {
 		t.Errorf("STACK = %q", got)
 	}
-	if got := env["DEFANG_STATE_URL"]; got != "azblob://uploads?storage_account=acct" {
+	if got := env["DEFANG_STATE_URL"]; got != "azblob://pulumi?storage_account=acct" {
 		t.Errorf("DEFANG_STATE_URL = %q", got)
 	}
 	if _, ok := env["PULUMI_CONFIG_PASSPHRASE"]; !ok {

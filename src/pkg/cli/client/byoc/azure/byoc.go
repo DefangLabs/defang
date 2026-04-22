@@ -9,8 +9,11 @@ import (
 	"iter"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -20,11 +23,11 @@ import (
 	cloudazure "github.com/DefangLabs/defang/src/pkg/clouds/azure"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/aca"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/acr"
-	"github.com/DefangLabs/defang/src/pkg/clouds/azure/appcfg"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/cd"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/keyvault"
 	defanghttp "github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/proto"
@@ -36,7 +39,6 @@ type ByocAzure struct {
 
 	driver    *cd.Driver
 	job       *aca.Job
-	appCfg    *appcfg.AppConfiguration
 	kv        *keyvault.KeyVault
 	cdRunID   string
 	cdEtag    string
@@ -51,6 +53,7 @@ func NewByocProvider(ctx context.Context, tenantLabel types.TenantLabel, stack s
 		job:    &aca.Job{},
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(tenantLabel, b, stack)
+	b.driver.TokenStore = &tokenstore.LocalDirTokenStore{Dir: filepath.Join(client.StateDir, "providers", "azure")}
 	return b
 }
 
@@ -167,10 +170,16 @@ func (b *ByocAzure) Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.
 	return nil, fmt.Errorf("Delete: %w", errors.ErrUnsupported)
 }
 
-// DeleteConfig implements client.Provider.
+// DeleteConfig implements client.Provider. Read-only for discovery: if the
+// Key Vault doesn't exist yet, there's nothing to delete — return success
+// instead of provisioning it just to tear down.
 func (b *ByocAzure) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
-	if err := b.setUpForConfig(ctx, secrets.Project); err != nil {
+	found, err := b.findForConfig(ctx, secrets.Project)
+	if err != nil {
 		return err
+	}
+	if !found {
+		return nil // nothing configured yet, nothing to delete
 	}
 	for _, name := range secrets.Names {
 		key := b.StackDir(secrets.Project, name)
@@ -178,10 +187,6 @@ func (b *ByocAzure) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets)
 		term.Debugf("Deleting Key Vault secret %q", secretName)
 		if err := b.kv.DeleteSecret(ctx, secretName); err != nil {
 			return fmt.Errorf("failed to delete Key Vault secret %q: %w", name, err)
-		}
-		term.Debugf("Deleting App Configuration key %q", key)
-		if err := b.appCfg.DeleteSetting(ctx, key); err != nil {
-			return fmt.Errorf("failed to delete config %q: %w", name, err)
 		}
 	}
 	return nil
@@ -213,9 +218,35 @@ func (b *ByocAzure) projectResourceGroupName(projectName string) string {
 	return "defang-" + projectName + "-" + b.PulumiStack + "-" + b.driver.Location.String()
 }
 
-// setUpForConfig sets up the project-specific App Configuration store and Key Vault.
-// It creates (or reuses) a resource group named {project}-{stack}-{location}, distinct from
-// the shared CD resource group, so each project deployment has its own parameter store.
+// findForConfig is a read-only variant of setUpForConfig. It resolves
+// location/subscription and binds to a pre-existing Key Vault without
+// creating anything. Returns (true, nil) when the vault exists,
+// (false, nil) when it or its resource group doesn't — which callers like
+// ListConfig / DeleteConfig treat as "nothing configured yet".
+func (b *ByocAzure) findForConfig(ctx context.Context, projectName string) (bool, error) {
+	if err := b.setUpLocation(); err != nil {
+		return false, err
+	}
+	if b.kv != nil {
+		return true, nil
+	}
+	rgName := b.projectResourceGroupName(projectName)
+	kv := keyvault.New(rgName, b.driver.Azure)
+	found, err := kv.Find(ctx)
+	if err != nil {
+		return false, err
+	}
+	if !found {
+		return false, nil
+	}
+	b.kv = kv
+	return true, nil
+}
+
+// setUpForConfig creates the project-specific Key Vault (and the resource
+// group that holds it) on first use. Idempotent. b.kv is only cached on
+// successful SetUp, so a failed attempt doesn't mask the root cause for
+// subsequent config operations within the same process.
 func (b *ByocAzure) setUpForConfig(ctx context.Context, projectName string) error {
 	if err := b.setUpLocation(); err != nil {
 		return err
@@ -224,17 +255,12 @@ func (b *ByocAzure) setUpForConfig(ctx context.Context, projectName string) erro
 	if err := b.driver.CreateResourceGroup(ctx, rgName); err != nil {
 		return err
 	}
-	if b.appCfg == nil {
-		b.appCfg = appcfg.New(rgName, b.driver.Location, b.driver.SubscriptionID)
-		if err := b.appCfg.SetUp(ctx); err != nil {
-			return err
-		}
-	}
 	if b.kv == nil {
-		b.kv = keyvault.New(rgName, b.driver.Location, b.driver.SubscriptionID)
-		if err := b.kv.SetUp(ctx); err != nil {
+		kv := keyvault.New(rgName, b.driver.Azure)
+		if err := kv.SetUp(ctx); err != nil {
 			return err
 		}
+		b.kv = kv
 	}
 	return nil
 }
@@ -288,7 +314,10 @@ func (b *ByocAzure) setUpJob(ctx context.Context, envMap map[string]string) erro
 
 // buildCdEnv returns the environment map that every CD container run needs.
 func (b *ByocAzure) buildCdEnv(projectName string) (map[string]string, error) {
-	defangStateUrl := fmt.Sprintf(`azblob://%s?storage_account=%s`, b.driver.BlobContainerName, b.driver.StorageAccount)
+	// Pulumi state lives in its own container (`pulumi`), separate from the
+	// `uploads` container (etag payloads, tarballs) and the `projects`
+	// container (project.pb audit blobs written by the CD task).
+	defangStateUrl := fmt.Sprintf(`azblob://%s?storage_account=%s`, cd.PulumiContainerName, b.driver.StorageAccount)
 	pulumiBackendKey, pulumiBackendValue, err := byoc.GetPulumiBackend(defangStateUrl)
 	if err != nil {
 		return nil, err
@@ -438,21 +467,39 @@ func (b *ByocAzure) GetPrivateDomain(projectName string) string {
 	return b.GetProjectLabel(projectName) + ".internal"
 }
 
-// GetProjectUpdate implements byoc.ProjectBackend.
+// GetProjectUpdate implements byoc.ProjectBackend. It is read-only — it does
+// not create the CD resource group, storage account, container apps
+// environment, or any other provisioning side effect. On a subscription
+// where defang has never been deployed the storage account lookup returns
+// nothing and we report client.ErrNotExist immediately.
+//
+// The blob lives in the dedicated `projects` container (populated by the CD
+// task before each deploy) at key `{project}/{stack}/project.pb`.
 func (b *ByocAzure) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
 	if projectName == "" {
 		return nil, client.ErrNotExist
 	}
-	if err := b.setUp(ctx); err != nil {
+	if err := b.setUpLocation(); err != nil {
 		return nil, err
 	}
+	storageAccount, err := b.driver.FindStorageAccount(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if storageAccount == "" {
+		// CD storage account hasn't been provisioned yet.
+		return nil, client.ErrNotExist
+	}
 
-	path := b.GetProjectUpdatePath(projectName)
-	term.Debug("Getting project update from blob:", b.driver.BlobContainerName, path)
-	pbBytes, err := b.driver.DownloadBlob(ctx, path)
+	// GetProjectUpdatePath returns "projects/{project}/{stack}/project.pb".
+	// The `projects` container already provides the top-level namespace, so
+	// strip the leading "projects/" when addressing the blob.
+	key := strings.TrimPrefix(b.GetProjectUpdatePath(projectName), "projects/")
+	term.Debug("Getting project update from blob:", cd.ProjectsContainerName, key)
+	pbBytes, err := b.driver.DownloadBlobFromContainer(ctx, cd.ProjectsContainerName, key)
 	if err != nil {
 		var respErr *azcore.ResponseError
-		if errors.As(err, &respErr) && respErr.StatusCode == 404 {
+		if errors.As(err, &respErr) && (respErr.StatusCode == 404 || respErr.ErrorCode == "ContainerNotFound" || respErr.ErrorCode == "BlobNotFound") {
 			return nil, client.ErrNotExist // no services yet
 		}
 		return nil, err
@@ -465,26 +512,62 @@ func (b *ByocAzure) GetProjectUpdate(ctx context.Context, projectName string) (*
 	return &projUpdate, nil
 }
 
-// GetService implements client.Provider.
-func (b *ByocAzure) GetService(context.Context, *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
-	return nil, fmt.Errorf("GetService: %w", errors.ErrUnsupported)
-}
-
-// GetServices implements client.Provider.
-func (b *ByocAzure) GetServices(context.Context, *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
-	return nil, fmt.Errorf("GetServices: %w", errors.ErrUnsupported)
-}
-
-// ListConfig implements client.Provider.
-func (b *ByocAzure) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
-	if err := b.setUpForConfig(ctx, req.Project); err != nil {
-		return nil, err
-	}
-	prefix := b.StackDir(req.Project, "")
-	term.Debugf("Listing App Configuration keys with prefix %q", prefix)
-	names, err := b.appCfg.ListSettings(ctx, prefix)
+// GetService implements client.Provider by fetching GetServices and filtering
+// to the requested name — same pattern as the AWS and GCP providers.
+func (b *ByocAzure) GetService(ctx context.Context, req *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
+	all, err := b.GetServices(ctx, &defangv1.GetServicesRequest{Project: req.Project})
 	if err != nil {
 		return nil, err
+	}
+	for _, service := range all.Services {
+		if service.Service.Name == req.Name {
+			return service, nil
+		}
+	}
+	return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("service %q not found", req.Name))
+}
+
+// GetServices implements client.Provider by reading the ProjectUpdate blob
+// that the CD task uploads during Deploy — same pattern as the AWS and GCP
+// providers.
+func (b *ByocAzure) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
+	projUpdate, err := b.GetProjectUpdate(ctx, req.Project)
+	if err != nil {
+		if errors.Is(err, client.ErrNotExist) {
+			return &defangv1.GetServicesResponse{}, nil
+		}
+		return nil, err
+	}
+	return &defangv1.GetServicesResponse{
+		Services: projUpdate.Services,
+		Project:  projUpdate.Project,
+	}, nil
+}
+
+// ListConfig implements client.Provider. Read-only: when the project's
+// App Configuration store or Key Vault hasn't been provisioned yet, returns
+// an empty list instead of creating them.
+func (b *ByocAzure) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
+	found, err := b.findForConfig(ctx, req.Project)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return &defangv1.Secrets{}, nil // nothing configured yet
+	}
+	prefix := b.StackDir(req.Project, "")
+	secretPrefix := keyvault.ToSecretName(prefix)
+	term.Debugf("Listing Key Vault secrets with prefix %q (sanitized: %q)", prefix, secretPrefix)
+	entries, err := b.kv.ListSecrets(ctx, secretPrefix)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		if e.OriginalKey == "" || !strings.HasPrefix(e.OriginalKey, prefix) {
+			continue
+		}
+		names = append(names, strings.TrimPrefix(e.OriginalKey, prefix))
 	}
 	return &defangv1.Secrets{Names: names}, nil
 }
@@ -504,15 +587,13 @@ func (b *ByocAzure) PutConfig(ctx context.Context, req *defangv1.PutConfigReques
 	if err := b.setUpForConfig(ctx, req.Project); err != nil {
 		return err
 	}
-	// Write to Key Vault (primary) and App Config (for backward compatibility).
 	key := b.StackDir(req.Project, req.Name)
 	secretName := keyvault.ToSecretName(key)
 	term.Debugf("Putting Key Vault secret %q (original key %q)", secretName, key)
 	if err := b.kv.PutSecret(ctx, secretName, req.Value, key); err != nil {
 		return fmt.Errorf("failed to put Key Vault secret: %w", err)
 	}
-	term.Debugf("Putting App Configuration key %q", key)
-	return b.appCfg.PutSetting(ctx, key, req.Value)
+	return nil
 }
 
 // QueryLogs implements client.Provider.

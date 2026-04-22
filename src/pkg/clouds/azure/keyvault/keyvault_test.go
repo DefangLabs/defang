@@ -81,7 +81,7 @@ func TestToSecretName(t *testing.T) {
 }
 
 func TestNew(t *testing.T) {
-	kv := New("rg-name", azure.LocationWestUS2, "sub-id")
+	kv := New("rg-name", azure.Azure{Location: azure.LocationWestUS2, SubscriptionID: "sub-id"})
 	if kv == nil {
 		t.Fatal("New returned nil")
 	}
@@ -106,7 +106,7 @@ func TestSecretURL(t *testing.T) {
 }
 
 func TestVaultNameAndURLFields(t *testing.T) {
-	kv := New("rg", azure.LocationWestUS2, "sub")
+	kv := New("rg", azure.Azure{Location: azure.LocationWestUS2, SubscriptionID: "sub"})
 	// VaultName and vaultURL are populated by SetUp; zero values before that.
 	if kv.VaultName != "" {
 		t.Errorf("VaultName before SetUp = %q, want empty", kv.VaultName)
@@ -127,7 +127,7 @@ func TestVaultNameAndURLFields(t *testing.T) {
 
 func TestNewSecretsClientNotSetUp(t *testing.T) {
 	useFakeCred(t, "x", nil)
-	kv := New("rg", azure.LocationWestUS2, "sub")
+	kv := New("rg", azure.Azure{Location: azure.LocationWestUS2, SubscriptionID: "sub"})
 	if _, err := kv.newSecretsClient(); err == nil {
 		t.Error("newSecretsClient should fail when vaultURL empty")
 	}
@@ -135,7 +135,7 @@ func TestNewSecretsClientNotSetUp(t *testing.T) {
 
 func TestNewSecretsClientOK(t *testing.T) {
 	useFakeCred(t, "tok", nil)
-	kv := New("rg", azure.LocationWestUS2, "sub")
+	kv := New("rg", azure.Azure{Location: azure.LocationWestUS2, SubscriptionID: "sub"})
 	kv.vaultURL = "https://kv.vault.azure.net"
 	if _, err := kv.newSecretsClient(); err != nil {
 		t.Errorf("newSecretsClient: %v", err)
@@ -144,7 +144,7 @@ func TestNewSecretsClientOK(t *testing.T) {
 
 func TestPutDeleteListSecretNotSetUp(t *testing.T) {
 	useFakeCred(t, "x", nil)
-	kv := New("rg", azure.LocationWestUS2, "sub")
+	kv := New("rg", azure.Azure{Location: azure.LocationWestUS2, SubscriptionID: "sub"})
 	if err := kv.PutSecret(context.Background(), "s", "v", "k"); err == nil {
 		t.Error("PutSecret should fail when vault not set up")
 	}

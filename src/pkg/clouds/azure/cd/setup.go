@@ -16,7 +16,22 @@ import (
 )
 
 const storageAccountPrefix = "defangcd"
-const blobContainerName = "uploads"
+
+// Container names used in the CD storage account. Keep them DNS-safe:
+// 3–63 chars, lowercase alphanumeric + hyphens (no leading/trailing hyphen).
+const (
+	// UploadsContainerName holds per-deploy payloads (etag blobs) and source tarballs.
+	UploadsContainerName = "uploads"
+	// PulumiContainerName is the dedicated Pulumi state backend container.
+	PulumiContainerName = "pulumi"
+	// ProjectsContainerName holds {project}/{stack}/project.pb audit blobs
+	// written by the CD task before each deploy.
+	ProjectsContainerName = "projects"
+
+	// blobContainerName is kept for backward compatibility with existing
+	// callers that default to the uploads container.
+	blobContainerName = UploadsContainerName
+)
 
 // CreateResourceGroup creates or updates an Azure resource group with the given name.
 func (d *Driver) CreateResourceGroup(ctx context.Context, name string) error {
@@ -74,6 +89,40 @@ func (d *Driver) getStorageAccount(ctx context.Context, accountsClient *armstora
 	return "", nil
 }
 
+// FindStorageAccount is a read-only variant of SetUpStorageAccount: it locates
+// the defang CD storage account (and remembers its container) without
+// creating anything. Returns ("", nil) when the storage account or blob
+// container doesn't exist yet — typical for a subscription where defang has
+// never been deployed. On success, d.StorageAccount and d.BlobContainerName
+// are populated for subsequent DownloadBlob / IterateBlobs calls.
+func (d *Driver) FindStorageAccount(ctx context.Context) (string, error) {
+	if d.StorageAccount != "" && d.BlobContainerName != "" {
+		return d.StorageAccount, nil
+	}
+	accountsClient, err := d.NewStorageAccountsClient()
+	if err != nil {
+		return "", err
+	}
+	storageAccount, err := d.getStorageAccount(ctx, accountsClient)
+	if err != nil {
+		var respErr *azcore.ResponseError
+		if errors.As(err, &respErr) && respErr.StatusCode == 404 {
+			return "", nil // resource group doesn't exist yet
+		}
+		return "", err
+	}
+	if storageAccount == "" {
+		return "", nil
+	}
+	d.StorageAccount = storageAccount
+	// The blob container is always created with the well-known name; its
+	// existence is implied by the storage account being present on a
+	// defang-managed subscription. We don't verify it here — DownloadBlob /
+	// IterateBlobs will return 404 if it doesn't exist yet.
+	d.BlobContainerName = blobContainerName
+	return storageAccount, nil
+}
+
 func (d *Driver) SetUpStorageAccount(ctx context.Context) (string, error) {
 	// Idempotency: skip if already set up.
 	if d.StorageAccount != "" && d.BlobContainerName != "" {
@@ -111,19 +160,17 @@ func (d *Driver) SetUpStorageAccount(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create blob containers client: %w", err)
 	}
-	container, err := containerClient.Create(ctx, d.resourceGroupName, storageAccount, blobContainerName, armstorage.BlobContainer{}, nil)
-	if err != nil {
-		var respErr *azcore.ResponseError
-		if errors.As(err, &respErr) && respErr.ErrorCode == "ContainerAlreadyExists" {
-			d.BlobContainerName = blobContainerName
-		} else {
-			return "", fmt.Errorf("failed to create blob container: %w", err)
+	for _, name := range []string{UploadsContainerName, PulumiContainerName, ProjectsContainerName} {
+		if _, err := containerClient.Create(ctx, d.resourceGroupName, storageAccount, name, armstorage.BlobContainer{}, nil); err != nil {
+			var respErr *azcore.ResponseError
+			if !errors.As(err, &respErr) || respErr.ErrorCode != "ContainerAlreadyExists" {
+				return "", fmt.Errorf("failed to create blob container %q: %w", name, err)
+			}
 		}
-	} else {
-		d.BlobContainerName = *container.Name
 	}
+	d.BlobContainerName = UploadsContainerName
 
-	term.Infof("Using storage account %s and blob container %s", storageAccount, blobContainerName)
+	term.Infof("Using storage account %s (containers: %s, %s, %s)", storageAccount, UploadsContainerName, PulumiContainerName, ProjectsContainerName)
 
 	return storageAccount, nil
 }

@@ -271,7 +271,7 @@ func TestNewBlobContainerClientFromEnv(t *testing.T) {
 	d.SubscriptionID = "sub"
 	d.StorageAccount = "myacct"
 	d.BlobContainerName = "uploads"
-	client, err := d.newBlobContainerClient(context.Background())
+	client, err := d.newBlobContainerClient(context.Background(), "uploads")
 	if err != nil {
 		t.Fatalf("newBlobContainerClient: %v", err)
 	}

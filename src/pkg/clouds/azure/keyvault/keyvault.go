@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
@@ -57,12 +58,13 @@ type KeyVault struct {
 	vaultURL          string
 }
 
-func New(resourceGroupName string, loc azure.Location, subscriptionID string) *KeyVault {
+// New builds a KeyVault client rooted in the given resource group. The Azure
+// value is copied in full so that an authenticated credential (Azure.Cred,
+// set by Authenticate) propagates to subsequent SDK calls instead of each
+// component silently falling back to DefaultAzureCredential.
+func New(resourceGroupName string, az azure.Azure) *KeyVault {
 	return &KeyVault{
-		Azure: azure.Azure{
-			Location:       loc,
-			SubscriptionID: subscriptionID,
-		},
+		Azure:             az,
 		resourceGroupName: resourceGroupName,
 	}
 }
@@ -80,6 +82,32 @@ func (kv *KeyVault) getTenantID(ctx context.Context, cred azcore.TokenCredential
 		return "", errors.New("subscription has no tenant ID")
 	}
 	return *resp.TenantID, nil
+}
+
+// Find is a read-only variant of SetUp: it binds to an existing Key Vault by
+// its deterministic VaultName without creating one. Returns (true, nil) when
+// the vault exists, (false, nil) when it or its resource group doesn't, and
+// (false, err) on any other failure.
+func (kv *KeyVault) Find(ctx context.Context) (bool, error) {
+	cred, err := kv.NewCreds()
+	if err != nil {
+		return false, err
+	}
+	client, err := armkeyvault.NewVaultsClient(kv.SubscriptionID, cred, nil)
+	if err != nil {
+		return false, err
+	}
+	name := VaultName(kv.resourceGroupName, kv.SubscriptionID)
+	if _, err := client.Get(ctx, kv.resourceGroupName, name, nil); err != nil {
+		var respErr *azcore.ResponseError
+		if errors.As(err, &respErr) && (respErr.StatusCode == 404 || respErr.ErrorCode == "ResourceGroupNotFound" || respErr.ErrorCode == "ResourceNotFound" || respErr.ErrorCode == "VaultNotFound") {
+			return false, nil
+		}
+		return false, fmt.Errorf("looking up Key Vault %q: %w", name, err)
+	}
+	kv.VaultName = name
+	kv.vaultURL = VaultURL(name)
+	return true, nil
 }
 
 // SetUp creates the Key Vault (using the deterministic VaultName) if it doesn't
@@ -126,13 +154,41 @@ func (kv *KeyVault) SetUp(ctx context.Context) error {
 		return fmt.Errorf("failed to poll Key Vault creation: %w", err)
 	}
 
-	// Assign Key Vault Secrets Officer to the current user so the CLI can manage secrets.
-	// The vault uses RBAC, so even the creator needs an explicit role assignment.
+	// Assign Key Vault Secrets Officer to the current user so the CLI can
+	// manage secrets. The vault uses RBAC, so even the creator needs an
+	// explicit role assignment.
 	if err := kv.assignSecretsOfficerRole(ctx, cred, *result.ID); err != nil {
-		term.Debugf("warning: failed to assign Key Vault Secrets Officer role: %v", err)
+		oid := kv.currentUserOID(ctx, cred)
+		if oid == "" {
+			oid = "<your-object-id>"
+		}
+		return fmt.Errorf(
+			"assigning Key Vault Secrets Officer role failed: %w\n\n"+
+				"Your current Azure identity (oid=%s) cannot write role assignments at subscription %s. Possible reasons:\n\n"+
+				"  1. Your RBAC role on this subscription is Contributor — which does NOT include Microsoft.Authorization/roleAssignments/write. You need Owner or User Access Administrator. Check with:\n"+
+				"       az role assignment list --assignee %s --subscription %s -o table\n\n"+
+				"  2. You hold an Azure AD / Entra ID directory role (e.g. Global Admin) but haven't elevated to Azure RBAC. Go to Entra ID → Properties → 'Access management for Azure resources' → Yes, then sign in again.\n\n"+
+				"  3. Your Owner / UAA role is eligible under Privileged Identity Management (PIM) and must be activated for this session before running defang.\n\n"+
+				"  4. You're a guest user in this tenant. Guests typically cannot create role assignments.\n\n"+
+				"Workaround (run once as a subscription Owner):\n"+
+				"  az role assignment create --role 'Key Vault Secrets Officer' --assignee %s --scope %s",
+			err, oid, kv.SubscriptionID, oid, kv.SubscriptionID, oid, *result.ID)
 	}
 
 	return nil
+}
+
+// currentUserOID returns the object ID of the caller behind cred, extracted
+// from an ARM-scoped access token's "oid" claim. Returns empty string if the
+// token can't be acquired or parsed — callers should render a placeholder.
+func (kv *KeyVault) currentUserOID(ctx context.Context, cred azcore.TokenCredential) string {
+	tok, err := cred.GetToken(ctx, policy.TokenRequestOptions{
+		Scopes: []string{"https://management.azure.com/.default"},
+	})
+	if err != nil {
+		return ""
+	}
+	return objectIDFromJWT(tok.Token)
 }
 
 // assignSecretsOfficerRole assigns Key Vault Secrets Officer to the current caller.
@@ -217,6 +273,11 @@ func (kv *KeyVault) newSecretsClient() (*azsecrets.Client, error) {
 // PutSecret creates or updates a secret in the vault. The originalKey tag
 // preserves the exact config key name (which may contain underscores that
 // were replaced in the secret name).
+//
+// Immediately after SetUp, Azure RBAC can take up to ~60s to propagate the
+// Key Vault Secrets Officer role assignment to the vault's data plane. A
+// transient 403 ForbiddenByRbac is therefore retried with backoff before
+// giving up.
 func (kv *KeyVault) PutSecret(ctx context.Context, name, value, originalKey string) error {
 	client, err := kv.newSecretsClient()
 	if err != nil {
@@ -228,8 +289,35 @@ func (kv *KeyVault) PutSecret(ctx context.Context, name, value, originalKey stri
 			"original-key": to.Ptr(originalKey),
 		},
 	}
-	_, err = client.SetSecret(ctx, name, params, nil)
-	return err
+	return retryOnForbiddenByRbac(ctx, func(ctx context.Context) error {
+		_, err := client.SetSecret(ctx, name, params, nil)
+		return err
+	})
+}
+
+// retryOnForbiddenByRbac retries op with exponential backoff while it fails
+// with 403 ForbiddenByRbac — the canonical signature of a freshly-assigned
+// Key Vault role that hasn't propagated yet. Gives up after ~60s total.
+func retryOnForbiddenByRbac(ctx context.Context, op func(context.Context) error) error {
+	const maxAttempts = 6
+	delay := 2 * time.Second
+	for attempt := 0; ; attempt++ {
+		err := op(ctx)
+		if err == nil {
+			return nil
+		}
+		var respErr *azcore.ResponseError
+		if !errors.As(err, &respErr) || respErr.ErrorCode != "ForbiddenByRbac" || attempt >= maxAttempts-1 {
+			return err
+		}
+		term.Debugf("Key Vault returned ForbiddenByRbac (likely RBAC propagation), retrying in %s (attempt %d/%d)", delay, attempt+1, maxAttempts)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(delay):
+		}
+		delay *= 2
+	}
 }
 
 // DeleteSecret removes a secret from the vault.

@@ -42,18 +42,24 @@ func (d *Driver) newSharedKeyCredential(ctx context.Context) (*azblob.SharedKeyC
 	return azblob.NewSharedKeyCredential(d.StorageAccount, storageKey)
 }
 
-func (d *Driver) newBlobContainerClient(ctx context.Context) (*container.Client, error) {
+func (d *Driver) newBlobContainerClient(ctx context.Context, containerName string) (*container.Client, error) {
 	keyCred, err := d.newSharedKeyCredential(ctx)
 	if err != nil {
 		return nil, err
 	}
-	containerURL := fmt.Sprintf("https://%s.blob.core.windows.net/%s", d.StorageAccount, d.BlobContainerName)
+	containerURL := fmt.Sprintf("https://%s.blob.core.windows.net/%s", d.StorageAccount, containerName)
 	return container.NewClientWithSharedKeyCredential(containerURL, keyCred, nil)
 }
 
-// IterateBlobs returns an iterator over blobs with the given prefix.
+// IterateBlobs returns an iterator over blobs in the default uploads container
+// whose names start with prefix.
 func (d *Driver) IterateBlobs(ctx context.Context, prefix string) (iter.Seq2[BlobItem, error], error) {
-	client, err := d.newBlobContainerClient(ctx)
+	return d.IterateBlobsInContainer(ctx, d.BlobContainerName, prefix)
+}
+
+// IterateBlobsInContainer is the container-explicit variant of IterateBlobs.
+func (d *Driver) IterateBlobsInContainer(ctx context.Context, containerName, prefix string) (iter.Seq2[BlobItem, error], error) {
+	client, err := d.newBlobContainerClient(ctx, containerName)
 	if err != nil {
 		return nil, err
 	}
@@ -83,9 +89,14 @@ func (d *Driver) IterateBlobs(ctx context.Context, prefix string) (iter.Seq2[Blo
 	}, nil
 }
 
-// DownloadBlob fetches the contents of a blob by name.
+// DownloadBlob fetches a blob from the default uploads container.
 func (d *Driver) DownloadBlob(ctx context.Context, blobName string) ([]byte, error) {
-	client, err := d.newBlobContainerClient(ctx)
+	return d.DownloadBlobFromContainer(ctx, d.BlobContainerName, blobName)
+}
+
+// DownloadBlobFromContainer is the container-explicit variant of DownloadBlob.
+func (d *Driver) DownloadBlobFromContainer(ctx context.Context, containerName, blobName string) ([]byte, error) {
+	client, err := d.newBlobContainerClient(ctx, containerName)
 	if err != nil {
 		return nil, err
 	}
