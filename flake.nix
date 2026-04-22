@@ -20,6 +20,7 @@
               actionlint
               bashInteractive # full bash with readline/completion so prompts render correctly
               crane
+              gh
               git
               gnumake
               less
