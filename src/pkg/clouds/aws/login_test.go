@@ -366,6 +366,106 @@ func TestRefreshTokenSuccess(t *testing.T) {
 	}
 }
 
+func TestCollectAuthCode(t *testing.T) {
+	noopBrowser := func(string) error { return nil }
+
+	t.Run("non-empty first response returns immediately without opening browser", func(t *testing.T) {
+		browserOpened := false
+		code, err := collectAuthCode(
+			func() (string, error) { return "mycode", nil },
+			func(string) error { browserOpened = true; return nil },
+			"https://example.com",
+		)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if code != "mycode" {
+			t.Errorf("code = %q, want %q", code, "mycode")
+		}
+		if browserOpened {
+			t.Error("browser should not have been opened")
+		}
+	})
+
+	t.Run("whitespace-only response is treated as empty", func(t *testing.T) {
+		calls := 0
+		code, err := collectAuthCode(
+			func() (string, error) {
+				calls++
+				if calls == 1 {
+					return "   ", nil
+				}
+				return "realcode", nil
+			},
+			noopBrowser,
+			"https://example.com",
+		)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if code != "realcode" {
+			t.Errorf("code = %q, want %q", code, "realcode")
+		}
+	})
+
+	t.Run("empty response opens browser once then retries", func(t *testing.T) {
+		browserCalls := 0
+		calls := 0
+		_, err := collectAuthCode(
+			func() (string, error) {
+				calls++
+				if calls < 3 {
+					return "", nil
+				}
+				return "code", nil
+			},
+			func(string) error { browserCalls++; return nil },
+			"https://example.com",
+		)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if browserCalls != 1 {
+			t.Errorf("browser opened %d times, want 1", browserCalls)
+		}
+	})
+
+	t.Run("browser open error does not abort the loop", func(t *testing.T) {
+		calls := 0
+		code, err := collectAuthCode(
+			func() (string, error) {
+				calls++
+				if calls == 1 {
+					return "", nil
+				}
+				return "code", nil
+			},
+			func(string) error { return errors.New("no browser") },
+			"https://example.com",
+		)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if code != "code" {
+			t.Errorf("code = %q, want %q", code, "code")
+		}
+	})
+
+	t.Run("askFn error is returned", func(t *testing.T) {
+		_, err := collectAuthCode(
+			func() (string, error) { return "", errors.New("interrupted") },
+			noopBrowser,
+			"https://example.com",
+		)
+		if err == nil {
+			t.Fatal("expected error from askFn")
+		}
+		if !strings.Contains(err.Error(), "interrupted") {
+			t.Errorf("error = %q, want it to contain %q", err.Error(), "interrupted")
+		}
+	})
+}
+
 func TestSameRole(t *testing.T) {
 	tests := []struct {
 		name    string
