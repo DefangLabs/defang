@@ -20,5 +20,8 @@ jobs:
 
       - name: Build and test npm package
         uses: ./.github/actions/npm-build
-        with:
-          run-tests: "true"
+
+      - name: Test npm package
+        shell: bash
+        working-directory: "./pkgs/npm"
+        run: npm test

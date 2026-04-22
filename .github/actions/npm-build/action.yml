@@ -14,9 +14,6 @@ inputs:
   version:
     description: Package version to set (e.g. from a git tag). Skipped if empty.
     default: ""
-  run-tests:
-    description: Whether to run tests after building
-    default: "false"
 
 runs:
   using: composite
@@ -45,9 +42,3 @@ runs:
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: npm run build
-
-    - name: Test
-      if: inputs.run-tests == 'true'
-      shell: bash
-      working-directory: ${{ inputs.working-directory }}
-      run: npm test
