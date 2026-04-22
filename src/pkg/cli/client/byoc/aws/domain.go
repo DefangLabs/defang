@@ -28,7 +28,7 @@ func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, st
 		if !errors.Is(err, aws.ErrZoneNotFound) {
 			return nil, "", err // TODO: we should not fail deployment if GetHostedZonesByName fails
 		}
-		slog.Debug(fmt.Sprintf("Zone %q not found, delegation set will be created", projectDomain))
+		slog.Debug("Zone not found, delegation set will be created", "domain", projectDomain)
 	} else {
 		// Case 2: Get the NS records for the existing subdomain zone
 		delegationSet, err = getOrCreateDelegationSetByZones(ctx, zones, projectName, stackName, r53Client)
@@ -88,7 +88,7 @@ func findUsableDelegationSet(ctx context.Context, domain string, r53Client aws.R
 		if len(hostedZones) >= 100 {
 			// A delegation set can only be associated with up to 100 hosted zones by default
 			// (https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/DNSLimitations.html#limits-api-entities-hosted-zones)
-			slog.Debug(fmt.Sprintf("Delegation set %q has reached the maximum number of hosted zones (100), skipping", *delegationSet.Id))
+			slog.Debug("Delegation set has reached the maximum number of hosted zones (100), skipping", "delegationSetId", *delegationSet.Id)
 			continue
 		}
 		return &delegationSet, nil
@@ -120,7 +120,7 @@ func createUsableDelegationSet(ctx context.Context, domain string, r53Client aws
 				// up to 100 delegation sets can be created per account, failure is non-fatal
 				// there is no direct actionable remedy for the user too.
 				// TODO: find and reuse empty delegation sets to avoid hitting the limit
-				slog.Debug(fmt.Sprintf("Failed to delete conflicting delegation set %q: %v", *delegationSet.Id, err))
+				slog.Debug("Failed to delete conflicting delegation set", "delegationSetId", *delegationSet.Id, "err", err)
 			}
 		} else {
 			return delegationSet, nil
@@ -138,7 +138,7 @@ func nameServersHasConflict(ctx context.Context, nameServers []string, domains [
 				return false, err
 			} else if len(records) > 0 {
 				// Records found, meaning the NS server is conflicting
-				slog.Debug(fmt.Sprintf("Name server %q has conflicting records for domain %q: %v", nsServer, domain, records))
+				slog.Debug("Name server has conflicting records for domain", "nsServer", nsServer, "domain", domain, "records", records)
 				return true, nil
 			}
 		}
@@ -156,7 +156,7 @@ func getOrCreateDelegationSetByZones(ctx context.Context, zones []*types.HostedZ
 		}
 		// Ignore zones that were created by an older CLI (2a), or another way (2c) or belong to a different project/stack (2d)
 		if tags["defang:project"] != projectName || tags["defang:stack"] != stackName {
-			slog.Debug(fmt.Sprintf("ignored zone %q as it belongs to a different project/stack (%q/%q), skipping", projectDomain, tags["defang:project"], tags["defang:stack"]))
+			slog.Debug("ignored zone as it belongs to a different project/stack, skipping", "domain", projectDomain, "project", tags["defang:project"], "stack", tags["defang:stack"])
 			continue
 		}
 

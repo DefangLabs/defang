@@ -37,7 +37,7 @@ func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterf
 	}
 
 	applicationInfo.Dynos = dynos
-	slog.Debug(fmt.Sprintf("Dynos for the selected application: %+v\n", dynos))
+	slog.Debug("Dynos for the selected application", "dynos", dynos)
 
 	dynoSizes := make(map[string]HerokuDynoSize)
 	for _, dyno := range dynos {
@@ -49,7 +49,7 @@ func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterf
 	}
 
 	applicationInfo.DynoSizes = dynoSizes
-	slog.Debug(fmt.Sprintf("Dyno sizes for the selected application: %+v\n", dynoSizes))
+	slog.Debug("Dyno sizes for the selected application", "dynoSizes", dynoSizes)
 
 	releaseTasks, err := client.GetReleaseTasks(ctx, appName)
 	if err != nil {
@@ -57,7 +57,7 @@ func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterf
 	}
 
 	applicationInfo.ReleaseTasks = releaseTasks
-	slog.Debug(fmt.Sprintf("Release tasks for the selected application: %+v\n", releaseTasks))
+	slog.Debug("Release tasks for the selected application", "releaseTasks", releaseTasks)
 
 	slog.InfoContext(ctx, "Identifying configured addons")
 	addons, err := client.ListAddons(ctx, appName)
@@ -65,7 +65,7 @@ func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterf
 		return HerokuApplicationInfo{}, fmt.Errorf("failed to list Heroku addons: %w", err)
 	}
 	applicationInfo.Addons = addons
-	slog.Debug(fmt.Sprintf("Addons for the selected application: %+v\n", addons))
+	slog.Debug("Addons for the selected application", "addons", addons)
 
 	for _, addon := range addons {
 		if addon.AddonService.Name == "heroku-postgresql" {
@@ -77,7 +77,7 @@ func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterf
 		}
 	}
 
-	slog.Debug(fmt.Sprintf("Postgres info for the selected application: %+v\n", applicationInfo.PGInfo))
+	slog.Debug("Postgres info for the selected application", "pgInfo", applicationInfo.PGInfo)
 
 	configVars, err := client.ListConfigVars(ctx, appName)
 	if err != nil {
@@ -327,7 +327,7 @@ func authenticateHerokuCLI() error {
 	cmd.Stdin = bytes.NewBuffer([]byte{'\n'})
 	_, err = cmd.Output()
 	if err != nil {
-		slog.Debug(fmt.Sprintf("Failed to run `heroku login`: %v", err))
+		slog.Debug("Failed to run `heroku login`", "err", err)
 		return err
 	}
 
@@ -349,7 +349,7 @@ func getHerokuAuthTokenFromCLI() (string, error) {
 	slog.Info("The Heroku CLI is installed, we'll use it to generate a short-lived authorization token")
 	err = authenticateHerokuCLI()
 	if err != nil {
-		slog.Debug(fmt.Sprintf("Failed to authenticate Heroku CLI: %v", err))
+		slog.Debug("Failed to authenticate Heroku CLI", "err", err)
 		return "", err
 	}
 	slog.Debug("Successfully authenticated with Heroku")
@@ -357,7 +357,7 @@ func getHerokuAuthTokenFromCLI() (string, error) {
 	cmd := exec.Command("heroku", "authorizations:create", "--expires-in=300", "--json")
 	output, err := cmd.Output()
 	if err != nil {
-		slog.Debug(fmt.Sprintf("Failed to run `heroku authorizations:create`: %v", err))
+		slog.Debug("Failed to run `heroku authorizations:create`", "err", err)
 		return "", err
 	}
 
@@ -370,7 +370,7 @@ func getHerokuAuthTokenFromCLI() (string, error) {
 	}
 	err = json.Unmarshal(output, &result)
 	if err != nil {
-		slog.Debug(fmt.Sprintf("Failed to parse Heroku CLI output: %v", err))
+		slog.Debug("Failed to parse Heroku CLI output", "err", err)
 		return "", err
 	}
 	if result.AccessToken.Token == "" {

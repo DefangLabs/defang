@@ -95,9 +95,9 @@ func makeComposeUpCmd() *cobra.Command {
 				Type:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
 				Stack:   session.Stack.Name,
 			}); err != nil {
-				slog.Debug(fmt.Sprintf("ListDeployments failed: %v", err))
+				slog.Debug("ListDeployments failed", "err", err)
 			} else if accountInfo, err := session.Provider.AccountInfo(ctx); err != nil {
-				slog.Debug(fmt.Sprintf("AccountInfo failed: %v", err))
+				slog.Debug("AccountInfo failed", "err", err)
 			} else if len(resp.Deployments) > 0 {
 				workingDir, _ := session.Loader.ProjectWorkingDir(ctx)
 				confirmed, err := confirmDeployment(workingDir, resp.Deployments, accountInfo, session.Provider.GetStackName())
@@ -247,7 +247,7 @@ func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.D
 			Mode:     global.Stack.Mode,
 		})
 		if err != nil {
-			slog.Debug(fmt.Sprintf("Failed to create stack %v", err))
+			slog.Debug("Failed to create stack", "err", err)
 		} else {
 			stacks.PrintCreateMessage(stackName)
 		}
@@ -452,7 +452,7 @@ func makeComposeDownCmd() *cobra.Command {
 					slog.Warn("Stored project configs are not deleted.")
 				}
 			} else {
-				slog.Debug(fmt.Sprintf("ListConfigs failed: %v", err))
+				slog.Debug("ListConfigs failed", "err", err)
 			}
 
 			if detach {

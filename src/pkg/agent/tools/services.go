@@ -68,7 +68,7 @@ func HandleServicesTool(ctx context.Context, loader client.Loader, params Servic
 	// Convert to JSON
 	jsonData, jsonErr := json.Marshal(serviceResponse)
 	if jsonErr == nil {
-		slog.Debug(fmt.Sprintf("Successfully loaded services with count: %d", len(serviceResponse)))
+		slog.Debug("Successfully loaded services", "count", len(serviceResponse))
 		return string(jsonData) + "\nIf you would like to see more details about your deployed projects, please visit the Defang portal at https://portal.defang.io/projects", nil
 	}
 

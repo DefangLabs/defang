@@ -155,7 +155,7 @@ func (b *ByocAws) SetUpCD(ctx context.Context, force bool) error {
 		return nil
 	}
 
-	slog.Debug(fmt.Sprintf("Using CD image: %q", b.CDImage))
+	slog.Debug("Using CD image", "image", b.CDImage)
 
 	_, err := b.driver.SetUp(ctx, force)
 	if err != nil {
@@ -270,10 +270,10 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		slog.Debug("Docker Hub credentials are needed for image pulls")
 		dockerHubUser, dockerHubPass, err := dockerhub.GetDockerHubCredentials(ctx)
 		if err != nil {
-			slog.Debug(fmt.Sprintf("Could not retrieve Docker Hub credentials: %v", err))
+			slog.Debug("Could not retrieve Docker Hub credentials", "err", err)
 			slog.WarnContext(ctx, "Docker Hub credentials are required to avoid pull throttling. Please run `docker login` or set the DOCKERHUB_USERNAME and DOCKERHUB_TOKEN environment variables. Without valid credentials, image pulls may be rate-limited or fail.")
 		} else {
-			slog.Debug(fmt.Sprintf("Using Docker Hub credentials with user %v", dockerHubUser))
+			slog.Debug("Using Docker Hub credentials", "user", dockerHubUser)
 			cdCmd.dockerHubUsername = dockerHubUser
 			cdCmd.dockerHubAccessToken = dockerHubPass
 		}
@@ -365,7 +365,7 @@ func (b *ByocAws) checkRequiresDockerHubToken(ctx context.Context, project *comp
 
 		found, err := b.driver.CheckImageExistOnPublicECR(ctx, ecrRepo, tag)
 		if err != nil {
-			slog.Debug(fmt.Sprintf("Error checking image %q on Public ECR: %v, assuming credentials needed", image, err))
+			slog.Debug("Error checking image on Public ECR, assuming credentials needed", "image", image, "err", err)
 			found = false
 		}
 		if !found {
@@ -379,7 +379,7 @@ func (b *ByocAws) checkRequiresDockerHubToken(ctx context.Context, project *comp
 	}
 	if len(missingDockerhubImages) > 0 {
 		b.needDockerHubCreds = true
-		slog.Debug(fmt.Sprintf("Docker Hub images not found on Public ECR: %v", missingDockerhubImages))
+		slog.Debug("Docker Hub images not found on Public ECR", "images", missingDockerhubImages)
 		track.Evt("NeedsDockerHubCreds", track.P("images", strings.Join(missingDockerhubImages, ",")))
 	}
 	return nil
@@ -596,7 +596,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 			// FillOutputs might fail if the stack is not created yet; return ErrNotExist (no bucket = no services yet)
 			var cfnErr *cfn.ErrStackNotFoundException
 			if errors.As(err, &cfnErr) {
-				slog.Debug(fmt.Sprintf("FillOutputs: %v", err))
+				slog.Debug("FillOutputs", "err", err)
 				return nil, client.ErrNotExist // no bucket = no services yet
 			}
 			return nil, AnnotateAwsError(err)
@@ -659,14 +659,14 @@ func (b *ByocAws) getSecretID(projectName, name string) string {
 
 func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.PutConfigRequest) error {
 	fqn := b.getSecretID(secret.Project, secret.Name)
-	slog.Debug(fmt.Sprintf("Putting parameter %q", fqn))
+	slog.Debug("Putting parameter", "fqn", fqn)
 	err := b.driver.PutSecret(ctx, fqn, secret.Value)
 	return AnnotateAwsError(err)
 }
 
 func (b *ByocAws) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
 	prefix := b.getSecretID(req.Project, "")
-	slog.Debug(fmt.Sprintf("Listing parameters with prefix %q", prefix))
+	slog.Debug("Listing parameters with prefix", "prefix", prefix)
 	awsSecrets, err := b.driver.ListSecretsByPrefix(ctx, prefix)
 	if err != nil {
 		return nil, err
@@ -740,7 +740,7 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 				// Ignore ResourceNotFoundException errors which can only happen if a log stream is missing during Query
 				var resourceNotFound *cwTypes.ResourceNotFoundException
 				if errors.As(err, &resourceNotFound) {
-					slog.Debug(fmt.Sprintf("Log stream not found while tailing, skipping: %v", err))
+					slog.Debug("Log stream not found while tailing, skipping", "err", err)
 					continue
 				}
 				if !yield(nil, AnnotateAwsError(err)) {
@@ -818,7 +818,7 @@ func (b *ByocAws) queryOrTailLogs(ctx context.Context, cwClient cw.LogsClient, r
 		if len(req.Services) == 0 {
 			albIter, err := b.fetchAndStreamAlbLogs(ctx, req.Project, start, end, req.Pattern)
 			if err != nil {
-				slog.Debug(fmt.Sprintf("Failed to fetch ALB logs: %v", err))
+				slog.Debug("Failed to fetch ALB logs", "err", err)
 			} else {
 				logSeq = cw.MergeLogEvents(logSeq, albIter)
 				if req.Limit > 0 {

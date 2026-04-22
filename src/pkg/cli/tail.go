@@ -147,7 +147,7 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 		options.LogType = logs.LogTypeAll
 	}
 
-	slog.Debug(fmt.Sprintf("Tailing %s logs in project %q", options.LogType, projectName))
+	slog.Debug("Tailing logs in project", "logType", options.LogType, "project", projectName)
 
 	if options.Deployment != "" {
 		_, err := types.ParseEtag(options.Deployment)

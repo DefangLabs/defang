@@ -124,7 +124,7 @@ func (t *ToolManager) EqualPrevious(toolRequests []*ai.ToolRequest) bool {
 	for _, req := range toolRequests {
 		inputs, err := json.Marshal(req.Input)
 		if err != nil {
-			slog.Debug(fmt.Sprintf("error marshaling tool request input: %v", err))
+			slog.Debug("error marshaling tool request input", "err", err)
 			continue
 		}
 		currJSON := fmt.Sprintf("%s:%s", req.Name, inputs)

@@ -26,7 +26,7 @@ func InteractiveSetup(ctx context.Context, fabric client.FabricClient, surveyor 
 		sourcePlatform = selected
 	}
 
-	slog.Debug(fmt.Sprintf("Selected source platform: %s", sourcePlatform))
+	slog.Debug("Selected source platform", "sourcePlatform", sourcePlatform)
 
 	var composeFileContents string
 	var err error
@@ -56,7 +56,7 @@ func setupFromHeroku(ctx context.Context, fabric client.FabricClient, surveyor s
 
 	// Here you can add logic to process the retrieved apps and set up the project accordingly
 	// For now, we just print the apps
-	slog.Debug(fmt.Sprintf("Your Heroku applications: %+v\n", apps))
+	slog.Debug("Your Heroku applications", "apps", apps)
 
 	appNames := make([]string, len(apps))
 	for i, app := range apps {
@@ -75,14 +75,14 @@ func setupFromHeroku(ctx context.Context, fabric client.FabricClient, surveyor s
 		return "", fmt.Errorf("failed to collect Heroku application info: %w", err)
 	}
 
-	slog.Debug(fmt.Sprintf("Application info: %+v\n", applicationInfo))
+	slog.Debug("Application info", "applicationInfo", applicationInfo)
 
 	sanitizedApplicationInfo, err := sanitizeHerokuApplicationInfo(applicationInfo)
 	if err != nil {
 		return "", fmt.Errorf("failed to sanitize Heroku application info: %w", err)
 	}
 
-	slog.Debug(fmt.Sprintf("Sanitized application info: %+v\n", sanitizedApplicationInfo))
+	slog.Debug("Sanitized application info", "sanitizedApplicationInfo", sanitizedApplicationInfo)
 
 	slog.InfoContext(ctx, "Generating compose file...")
 
@@ -129,7 +129,7 @@ func generateComposeFile(ctx context.Context, fabric client.FabricClient, platfo
 		}
 
 		responseStr := string(resp.Compose)
-		slog.Debug(fmt.Sprintf("Received compose response: %+v", responseStr))
+		slog.Debug("Received compose response", "response", responseStr)
 
 		// assume the response is markdown,
 		// extract the contents of the first code block if there is one
@@ -140,7 +140,7 @@ func generateComposeFile(ctx context.Context, fabric client.FabricClient, platfo
 				composeContent = responseStr
 			} else {
 				previousError = err.Error()
-				slog.Debug(fmt.Sprintf("Failed to extract code block: %v. Retrying...", err))
+				slog.Debug("Failed to extract code block. Retrying...", "err", err)
 				continue
 			}
 		}
@@ -156,7 +156,7 @@ func generateComposeFile(ctx context.Context, fabric client.FabricClient, platfo
 		_, err = compose.LoadFromContentWithInterpolation(ctx, []byte(composeContent), projectName)
 		if err != nil {
 			previousError = err.Error()
-			slog.Debug(fmt.Sprintf("Invalid compose file received: %v. Retrying...", err))
+			slog.Debug("Invalid compose file received. Retrying...", "err", err)
 			continue
 		}
 

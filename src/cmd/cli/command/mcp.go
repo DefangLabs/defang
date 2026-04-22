@@ -90,18 +90,18 @@ var mcpSetupCmd = &cobra.Command{
 				client = string(mcp.MCPClientWindsurf)
 			}
 
-			slog.Debug(fmt.Sprintf("Using MCP client flag: %q", client))
+			slog.Debug("Using MCP client flag", "client", client)
 			if err := mcp.SetupClient(client); err != nil {
 				return err
 			}
 		} else {
-			slog.Debug(fmt.Sprintf("Using MCP client picker: %q", client))
+			slog.Debug("Using MCP client picker", "client", client)
 			clients, err := mcp.SelectMCPclients()
 			if err != nil {
 				return err
 			}
 			for _, client := range clients {
-				slog.Debug(fmt.Sprintf("Selected MCP client using picker: %q", client))
+				slog.Debug("Selected MCP client using picker", "client", client)
 
 				if err := mcp.SetupClient(client); err != nil {
 					return err

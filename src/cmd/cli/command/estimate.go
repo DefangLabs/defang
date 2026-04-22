@@ -55,7 +55,7 @@ func makeEstimateCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("failed to run estimate: %w", err)
 			}
-			slog.Debug(fmt.Sprintf("Estimate: %+v", estimate))
+			slog.Debug("Estimate", "estimate", estimate)
 
 			cli.PrintEstimate(global.Stack.Mode, estimate, term.DefaultTerm)
 

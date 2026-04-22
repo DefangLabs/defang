@@ -283,7 +283,7 @@ func (b *ByocGcp) SetUpCD(ctx context.Context, force bool) error {
 		}
 	}
 
-	slog.Debug(fmt.Sprintf("Using CD image: %q", b.CDImage))
+	slog.Debug("Using CD image", "image", b.CDImage)
 
 	b.SetupDone = true
 	return nil
@@ -322,12 +322,12 @@ func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[state.
 	return func(yield func(state.Info) bool) {
 		for obj, err := range seq {
 			if err != nil {
-				slog.Debug(fmt.Sprintf("Error listing object in bucket %s: %v", bucketName, annotateGcpError(err)))
+				slog.Debug("Error listing object in bucket", "bucket", bucketName, "err", annotateGcpError(err))
 				continue
 			}
 			st, err := state.ParsePulumiStateFile(ctx, gcpObj{obj}, bucketName, objLoader)
 			if err != nil {
-				slog.Debug(fmt.Sprintf("Skipping %q in bucket %s: %v", obj.Name, bucketName, annotateGcpError(err)))
+				slog.Debug("Skipping object in bucket", "object", obj.Name, "bucket", bucketName, "err", annotateGcpError(err))
 				continue
 			}
 			if st == nil {
@@ -488,7 +488,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 	if err != nil {
 		return "", err
 	}
-	slog.Debug(fmt.Sprintf("Starting CD in cloudbuild at: %v", time.Now().Format(time.RFC3339)))
+	slog.Debug("Starting CD in cloudbuild", "at", time.Now().Format(time.RFC3339))
 	buildId, err := b.driver.RunCloudBuild(ctx, gcp.CloudBuildArgs{
 		Steps:          string(steps),
 		ServiceAccount: &b.cdServiceAccount,
@@ -711,7 +711,7 @@ func (b *ByocGcp) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 		return nil, annotateGcpError(err)
 	} else {
 		b.delegateDomainZone = zone.Name
-		slog.Debug(fmt.Sprintf("Zone %s created with nameservers %v", zone.Name, zone.NameServers))
+		slog.Debug("Zone created with nameservers", "zone", zone.Name, "nameservers", zone.NameServers)
 		return &client.PrepareDomainDelegationResponse{
 			NameServers: zone.NameServers,
 		}, nil
@@ -721,7 +721,7 @@ func (b *ByocGcp) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 func (b *ByocGcp) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
 	for _, name := range req.Names {
 		secretId := b.resourceName(req.Project, name)
-		slog.Debug(fmt.Sprintf("Deleting secret %q", secretId))
+		slog.Debug("Deleting secret", "secretId", secretId)
 		if err := b.driver.DeleteSecret(ctx, secretId); err != nil {
 			return fmt.Errorf("failed to delete secret %q: %w", secretId, err)
 		}
@@ -750,7 +750,7 @@ func (b *ByocGcp) ListConfig(ctx context.Context, req *defangv1.ListConfigsReque
 
 func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
 	secretId := b.resourceName(req.Project, req.Name)
-	slog.Debug(fmt.Sprintf("Creating secret %q", secretId))
+	slog.Debug("Creating secret", "secretId", secretId)
 
 	if _, err := b.driver.CreateSecret(ctx, secretId); err != nil {
 		if gcp.IsAccessNotEnabled(err) {
@@ -761,13 +761,13 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 		}
 		if err != nil {
 			if stat, ok := status.FromError(err); ok && stat.Code() == codes.AlreadyExists {
-				slog.Debug(fmt.Sprintf("Secret %q already exists", secretId))
+				slog.Debug("Secret already exists", "secretId", secretId)
 			} else {
 				return fmt.Errorf("failed to create secret %q: %w", secretId, err)
 			}
 		}
 	}
-	slog.Debug(fmt.Sprintf("Adding a new secret version for %q", secretId))
+	slog.Debug("Adding a new secret version", "secretId", secretId)
 	if _, err := b.driver.AddSecretVersion(ctx, secretId, []byte(req.Value)); err != nil {
 		return fmt.Errorf("failed to add secret version for %q: %w", secretId, err)
 	}
@@ -846,7 +846,7 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 	slog.Debug(fmt.Sprint("Getting services from bucket:", bucketName, path, uploadSA))
 	pbBytes, err := b.driver.GetBucketObjectWithServiceAccount(ctx, bucketName, path, uploadSA)
 	if err != nil {
-		slog.Debug(fmt.Sprintf("Failed to get project bucket object from bucket %q at path %q with service account %q: %v", bucketName, path, uploadSA, err))
+		slog.Debug("Failed to get project bucket object", "bucket", bucketName, "path", path, "serviceAccount", uploadSA, "err", err)
 		// Handle the case where the object does not exist, or where we do not have permission to view the object, ie.
 		// "Permission 'iam.serviceAccounts.getAccessToken' denied on resource (or it may not exist)."  #2051
 		if errors.Is(err, gcp.ErrObjectNotExist) || strings.Contains(err.Error(), "(or it may not exist)") {

@@ -75,7 +75,7 @@ func (p *awsOAuthCredentialsProvider) Retrieve(ctx context.Context) (awssdk.Cred
 	slog.Debug("AWS OAuth access token expired, refreshing...")
 	refreshed, err := refreshToken(ctx, p.cached)
 	if err != nil {
-		slog.Debug(fmt.Sprintf("failed to refresh AWS OAuth token: %v", err))
+		slog.Debug("failed to refresh AWS OAuth token", "error", err)
 		return awssdk.Credentials{}, fmt.Errorf("refreshing AWS OAuth token: %w", err)
 	}
 
@@ -88,7 +88,7 @@ func (p *awsOAuthCredentialsProvider) Retrieve(ctx context.Context) (awssdk.Cred
 		if err := p.tokenStore.Save(p.storeKey, string(tokenBytes)); err != nil {
 			slog.WarnContext(ctx, fmt.Sprintf("failed to persist refreshed AWS OAuth token: %v", err))
 		} else {
-			slog.Debug(fmt.Sprintf("persisted refreshed AWS OAuth token for %q", p.storeKey))
+			slog.Debug("persisted refreshed AWS OAuth token", "storeKey", p.storeKey)
 		}
 	}
 
@@ -127,12 +127,12 @@ func (a *Aws) Authenticate(ctx context.Context, interactive bool) error {
 	}
 
 	// 1. Try default AWS credentials
-	slog.Debug(fmt.Sprintf("checking default AWS credentials for region %s...", a.Region))
+	slog.Debug("checking default AWS credentials...", "region", a.Region)
 	if _, err := a.testCredentials(ctx, nil); err != nil {
 		if ctx.Err() != nil { // Fast fail if context is done, no need to try other credential sources
 			return ctx.Err()
 		}
-		slog.Debug(fmt.Sprintf("default AWS credentials invalid: %v", err))
+		slog.Debug("default AWS credentials invalid", "error", err)
 	} else {
 		slog.Debug("found valid default AWS credentials")
 		return nil
@@ -206,13 +206,13 @@ func (a *Aws) findStoredCredentials(ctx context.Context) (awssdk.CredentialsProv
 	for _, name := range tokenNames {
 		tokenJSON, err := a.TokenStore.Load(name)
 		if err != nil {
-			slog.Debug(fmt.Sprintf("failed to load token %q: %v", name, err))
+			slog.Debug("failed to load token", "name", name, "error", err)
 			continue
 		}
 
 		var cached awsTokenCache
 		if err := json.Unmarshal([]byte(tokenJSON), &cached); err != nil {
-			slog.Debug(fmt.Sprintf("failed to unmarshal token %q: %v", name, err))
+			slog.Debug("failed to unmarshal token", "name", name, "error", err)
 			continue
 		}
 
@@ -222,11 +222,11 @@ func (a *Aws) findStoredCredentials(ctx context.Context) (awssdk.CredentialsProv
 		}
 
 		if cached.RefreshToken == "" && time.Now().After(cached.AccessToken.ExpiresAt) {
-			slog.Debug(fmt.Sprintf("token %q is expired and has no refresh token, skipping", name))
+			slog.Debug("token is expired and has no refresh token, skipping", "name", name)
 			continue
 		}
 
-		slog.Debug(fmt.Sprintf("testing token %q (expires %s)...", name, cached.AccessToken.ExpiresAt.Format(time.RFC3339)))
+		slog.Debug("testing token...", "name", name, "expires", cached.AccessToken.ExpiresAt.Format(time.RFC3339))
 		provider := &awsOAuthCredentialsProvider{cached: &cached, tokenStore: a.TokenStore, storeKey: name}
 
 		// Calling testCredentialsWithProfile triggers Retrieve(), which auto-refreshes
@@ -237,7 +237,7 @@ func (a *Aws) findStoredCredentials(ctx context.Context) (awssdk.CredentialsProv
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
 			}
-			slog.Debug(fmt.Sprintf("token %q failed AWS_PROFILE role validation: %v, skipping...", name, err))
+			slog.Debug("token failed AWS_PROFILE role validation, skipping...", "name", name, "error", err)
 			continue
 		}
 		return creds, nil
@@ -265,11 +265,11 @@ func (a *Aws) testCredentialsWithProfile(ctx context.Context, name string, creds
 		if err != nil {
 			slog.WarnContext(ctx, fmt.Sprintf("failed to compare token identity with AWS_PROFILE role: %v", err))
 		} else if same {
-			slog.Debug(fmt.Sprintf("token %q identity %q matches AWS_PROFILE role %q", name, *identity.Arn, roleArn))
+			slog.Debug("token identity matches AWS_PROFILE role", "name", name, "arn", *identity.Arn, "roleArn", roleArn)
 			return creds, nil
 		}
 
-		slog.Debug(fmt.Sprintf("checking if token %q identity %q can assume AWS_PROFILE role %q", name, *identity.Arn, roleArn))
+		slog.Debug("checking if token identity can assume AWS_PROFILE role", "name", name, "arn", *identity.Arn, "roleArn", roleArn)
 		credCfg, err := LoadDefaultConfig(ctx, config.WithRegion(string(a.Region)), config.WithCredentialsProvider(creds))
 		if err != nil {
 			return nil, err
@@ -293,7 +293,7 @@ func (a *Aws) testCredentialsWithProfile(ctx context.Context, name string, creds
 			return creds, nil
 		}
 		// If able to assume the profile role, use the assumed role credentials
-		slog.Debug(fmt.Sprintf("token %q is valid and can assume AWS_PROFILE role %q\n", name, roleArn))
+		slog.Debug("token is valid and can assume AWS_PROFILE role", "name", name, "roleArn", roleArn)
 		return assumeRoleProvider, nil
 	}
 	// If no AWS_PROFILE with role specified, any valid token is considered acceptable

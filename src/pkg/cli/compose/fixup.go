@@ -32,14 +32,14 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
 	config, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
 	if err != nil {
-		slog.Debug(fmt.Sprintf("failed to load config: %v", err))
+		slog.Debug("failed to load config", "err", err)
 		config = &defangv1.Secrets{}
 	}
 	slices.Sort(config.Names) // sort for binary search
 
 	accountInfo, err := provider.AccountInfo(ctx)
 	if err != nil {
-		slog.Debug(fmt.Sprintf("failed to get account info to fixup services: %v", err))
+		slog.Debug("failed to get account info to fixup services", "err", err)
 		accountInfo = &client.AccountInfo{}
 	}
 
@@ -107,7 +107,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 				// Check if the dockerfile exists
 				dockerfilePath := filepath.Join(svccfg.Build.Context, svccfg.Build.Dockerfile)
 				if _, err := os.Stat(dockerfilePath); err != nil {
-					slog.Debug(fmt.Sprintf("stat %q: %v", dockerfilePath, err))
+					slog.Debug("stat dockerfile", "path", dockerfilePath, "err", err)
 					// In this case we know that the dockerfile is not in the location the compose file specifies,
 					// so can assume that the dockerfile has been normalized to the default "Dockerfile".
 					if svccfg.Build.Dockerfile != "Dockerfile" {
@@ -252,7 +252,7 @@ func fixupLLM(svccfg *composeTypes.ServiceConfig) {
 		// HACK: we must have at least one host port to get a CNAME for the service
 		// litellm listens on 4000 by default
 		var port uint32 = liteLLMPort
-		slog.Debug(fmt.Sprintf("service %q: adding LLM host port %d", svccfg.Name, port))
+		slog.Debug("adding LLM host port", "service", svccfg.Name, "port", port)
 		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	}
 }
@@ -273,7 +273,7 @@ func fixupPostgresService(svccfg *composeTypes.ServiceConfig, provider client.Pr
 				return err
 			}
 		}
-		slog.Debug(fmt.Sprintf("service %q: adding postgres host port %d", svccfg.Name, port))
+		slog.Debug("adding postgres host port", "service", svccfg.Name, "port", port)
 		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	} else {
 		fixupIngressPorts(svccfg)
@@ -311,7 +311,7 @@ func fixupMongoService(svccfg *composeTypes.ServiceConfig, provider client.Provi
 			}
 			break // done
 		}
-		slog.Debug(fmt.Sprintf("service %q: adding mongodb host port %d", svccfg.Name, port))
+		slog.Debug("adding mongodb host port", "service", svccfg.Name, "port", port)
 		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	} else {
 		fixupIngressPorts(svccfg)
@@ -339,7 +339,7 @@ func fixupRedisService(svccfg *composeTypes.ServiceConfig, provider client.Provi
 				// continue; last one wins
 			}
 		}
-		slog.Debug(fmt.Sprintf("service %q: adding redis host port %d", svccfg.Name, port))
+		slog.Debug("adding redis host port", "service", svccfg.Name, "port", port)
 		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	} else {
 		fixupIngressPorts(svccfg)
@@ -350,7 +350,7 @@ func fixupRedisService(svccfg *composeTypes.ServiceConfig, provider client.Provi
 func fixupIngressPorts(svccfg *composeTypes.ServiceConfig) {
 	for i, port := range svccfg.Ports {
 		if port.Mode == Mode_INGRESS || port.Mode == "" {
-			slog.Debug(fmt.Sprintf("service %q: changing port %d to host mode", svccfg.Name, port.Target))
+			slog.Debug("changing port to host mode", "service", svccfg.Name, "port", port.Target)
 			svccfg.Ports[i].Mode = Mode_HOST
 		}
 	}
@@ -551,7 +551,7 @@ func fixupPort(port composeTypes.ServicePortConfig) composeTypes.ServicePortConf
 			port.Mode = Mode_HOST
 		} else {
 			if port.Published != "" {
-				slog.Debug(fmt.Sprintf("port %d: ignoring 'published: %s' in 'ingress' mode", port.Target, port.Published))
+				slog.Debug("ignoring 'published' in 'ingress' mode", "port", port.Target, "published", port.Published)
 			}
 			if port.AppProtocol == "" {
 				// TCP ingress is not supported; assuming HTTP (add 'app_protocol: http' to silence)"

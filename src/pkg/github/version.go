@@ -35,12 +35,12 @@ func GetLatestReleaseTag(ctx context.Context) (string, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		slog.Debug(fmt.Sprintf("%v", resp.Header))
+		slog.Debug("unexpected status", "header", resp.Header)
 		// The primary rate limit for unauthenticated requests is 60 requests per hour, per IP.
 		// The API returns a 403 status code when the rate limit is exceeded.
 		githubError := githubError{Message: resp.Status}
 		if err := json.NewDecoder(resp.Body).Decode(&githubError); err != nil {
-			slog.Debug(fmt.Sprintf("Failed to decode GitHub response: %v", err))
+			slog.Debug("Failed to decode GitHub response", "error", err)
 		}
 		return "", fmt.Errorf("error fetching release info from GitHub: %s", githubError.Message)
 	}

@@ -19,7 +19,7 @@ func WaitForCdTaskExit(ctx context.Context, provider client.Provider) error {
 		select {
 		case <-ticker.C:
 			done, err := provider.GetDeploymentStatus(ctx)
-			// slog.Debug(fmt.Sprintf("Polled CD task status: done=%v, err=%v", done, err))
+			// slog.Debug("Polled CD task status", "done", done, "err", err)
 			if err != nil {
 				// End condition: EOF indicates that the task has completed successfully
 				if errors.Is(err, io.EOF) {

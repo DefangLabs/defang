@@ -66,7 +66,7 @@ func CdCommand(ctx context.Context, projectName string, provider client.Provider
 			StatesUrl:   statesUrl,
 		})
 		if err != nil {
-			slog.Debug(fmt.Sprintf("Failed to record deployment: %v", err))
+			slog.Debug("Failed to record deployment", "err", err)
 			slog.WarnContext(ctx, "Unable to update deployment history; deployment will proceed anyway.")
 		}
 	}

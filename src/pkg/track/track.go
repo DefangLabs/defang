@@ -1,7 +1,6 @@
 package track
 
 import (
-	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
@@ -41,10 +40,10 @@ func Evt(name string, props ...Property) {
 	}
 	tracker := Tracker
 	if tracker == nil {
-		slog.Debug(fmt.Sprintf("untracked event %q: %v", name, props))
+		slog.Debug("untracked event", "name", name, "props", props)
 		return
 	}
-	slog.Debug(fmt.Sprintf("tracking event %q: %v", name, props))
+	slog.Debug("tracking event", "name", name, "props", props)
 	trackWG.Add(1)
 	go func() {
 		defer trackWG.Done()

@@ -90,7 +90,7 @@ func (d *DoApp) SetUpBucket(ctx context.Context) error {
 }
 
 func getImageSourceSpec(cdImagePath string) (*godo.ImageSourceSpec, error) {
-	slog.Debug(fmt.Sprintf("Using CD image: %q", cdImagePath))
+	slog.Debug("Using CD image", "cdImagePath", cdImagePath)
 	image, err := dockerhub.ParseImage(cdImagePath)
 	if err != nil {
 		return nil, err
@@ -146,7 +146,7 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cdIma
 
 	appList, _, err := client.Apps.List(ctx, &godo.ListOptions{})
 	if err != nil {
-		slog.Debug(fmt.Sprintf("Error listing apps: %s", err))
+		slog.Debug("Error listing apps", "error", err)
 	}
 
 	for _, app := range appList {

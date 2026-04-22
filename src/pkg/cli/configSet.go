@@ -28,7 +28,7 @@ type ConfigManager interface {
 }
 
 func ConfigSet(ctx context.Context, projectName string, provider ConfigManager, name string, value string, options ConfigSetOptions) (bool, error) {
-	slog.Debug(fmt.Sprintf("Setting config %q in project %q", name, projectName))
+	slog.Debug("Setting config", "name", name, "project", projectName)
 
 	if !pkg.IsValidSecretName(name) {
 		return false, ErrInvalidConfigName{Name: name}

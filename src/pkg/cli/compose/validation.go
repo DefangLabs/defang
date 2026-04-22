@@ -59,16 +59,16 @@ func ValidateProject(project *composeTypes.Project, mode modes.Mode) error {
 
 func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, mode modes.Mode) error {
 	if svccfg.ReadOnly {
-		slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: read_only", svccfg.Name))
+		slog.Debug("service: unsupported compose directive: read_only", "service", svccfg.Name)
 	}
 	if svccfg.Restart == "" {
 		// This was a warning, but we don't really care and want to reduce the noise
-		slog.Debug(fmt.Sprintf("service %q: missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)", svccfg.Name))
+		slog.Debug("service: missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)", "service", svccfg.Name)
 	} else if svccfg.Restart != "always" && svccfg.Restart != "unless-stopped" {
-		slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)", svccfg.Name))
+		slog.Debug("service: unsupported compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)", "service", svccfg.Name)
 	}
 	if svccfg.ContainerName != "" {
-		slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: container_name", svccfg.Name))
+		slog.Debug("service: unsupported compose directive: container_name", "service", svccfg.Name)
 	}
 	if svccfg.Hostname != "" {
 		return fmt.Errorf("service %q: unsupported compose directive: hostname; consider using 'domainname' instead", svccfg.Name)
@@ -77,7 +77,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		return fmt.Errorf("service %q: unsupported compose directive: dns_search", svccfg.Name)
 	}
 	if len(svccfg.DNSOpts) != 0 {
-		slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: dns_opt", svccfg.Name))
+		slog.Debug("service: unsupported compose directive: dns_opt", "service", svccfg.Name)
 	}
 	if len(svccfg.DNS) != 0 {
 		return fmt.Errorf("service %q: unsupported compose directive: dns", svccfg.Name)
@@ -95,30 +95,30 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		return fmt.Errorf("service %q: unsupported compose directive: group_add", svccfg.Name)
 	}
 	if len(svccfg.Ipc) > 0 {
-		slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: ipc", svccfg.Name))
+		slog.Debug("service: unsupported compose directive: ipc", "service", svccfg.Name)
 	}
 	if len(svccfg.Uts) > 0 {
-		slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: uts", svccfg.Name))
+		slog.Debug("service: unsupported compose directive: uts", "service", svccfg.Name)
 	}
 	if svccfg.Isolation != "" {
-		slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: isolation", svccfg.Name))
+		slog.Debug("service: unsupported compose directive: isolation", "service", svccfg.Name)
 	}
 	if svccfg.MacAddress != "" {
-		slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: mac_address", svccfg.Name))
+		slog.Debug("service: unsupported compose directive: mac_address", "service", svccfg.Name)
 	}
 	if len(svccfg.Labels) > 0 {
-		slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: labels", svccfg.Name)) // TODO: add support for labels
+		slog.Debug("service: unsupported compose directive: labels", "service", svccfg.Name) // TODO: add support for labels
 	}
 	if len(svccfg.Links) > 0 {
-		slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: links", svccfg.Name))
+		slog.Debug("service: unsupported compose directive: links", "service", svccfg.Name)
 	}
 	if svccfg.Logging != nil {
-		slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: logging", svccfg.Name))
+		slog.Debug("service: unsupported compose directive: logging", "service", svccfg.Name)
 	}
 	for name := range svccfg.Networks {
 		if _, ok := project.Networks[name]; !ok {
 			// This was a warning, but we don't really care and want to reduce the noise
-			slog.Debug(fmt.Sprintf("service %q: network %q is not defined in the top-level networks section", svccfg.Name, name))
+			slog.Debug("service: network is not defined in the top-level networks section", "service", svccfg.Name, "network", name)
 		}
 	}
 	if len(svccfg.Volumes) > 0 {
@@ -144,22 +144,22 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			return fmt.Errorf("service %q: unsupported compose directive: build ssh", svccfg.Name)
 		}
 		if len(svccfg.Build.Labels) != 0 {
-			slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: build labels", svccfg.Name)) // TODO: add support for Kaniko --label
+			slog.Debug("service: unsupported compose directive: build labels", "service", svccfg.Name) // TODO: add support for Kaniko --label
 		}
 		if len(svccfg.Build.CacheFrom) != 0 {
-			slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: build cache_from", svccfg.Name))
+			slog.Debug("service: unsupported compose directive: build cache_from", "service", svccfg.Name)
 		}
 		if len(svccfg.Build.CacheTo) != 0 {
-			slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: build cache_to", svccfg.Name))
+			slog.Debug("service: unsupported compose directive: build cache_to", "service", svccfg.Name)
 		}
 		if svccfg.Build.NoCache {
-			slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: build no_cache", svccfg.Name))
+			slog.Debug("service: unsupported compose directive: build no_cache", "service", svccfg.Name)
 		}
 		if len(svccfg.Build.ExtraHosts) != 0 {
 			return fmt.Errorf("service %q: unsupported compose directive: build extra_hosts", svccfg.Name)
 		}
 		if svccfg.Build.Isolation != "" {
-			slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: build isolation", svccfg.Name))
+			slog.Debug("service: unsupported compose directive: build isolation", "service", svccfg.Name)
 		}
 		if svccfg.Build.Network != "" {
 			return fmt.Errorf("service %q: unsupported compose directive: build network", svccfg.Name)
@@ -193,7 +193,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		// secret.Target will always be automatically constructed by compose-go to "/run/secrets/<source>"
 		if s, ok := project.Secrets[secret.Source]; !ok {
 			// This was a warning, but we don't really care and want to reduce the noise
-			slog.Debug(fmt.Sprintf("secret %q is not defined in the top-level secrets section", secret.Source))
+			slog.Debug("secret is not defined in the top-level secrets section", "secret", secret.Source)
 		} else if s.Name != "" && s.Name != secret.Source {
 			return fmt.Errorf("unsupported secret %q: cannot override name %q", secret.Source, s.Name) // TODO: support custom secret names
 		} else if !s.External {
@@ -213,7 +213,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			// show warning if sensitive information is detected
 			if isSecret {
 				slog.Warn(fmt.Sprintf("service %q: environment %q may contain sensitive information; consider using 'defang config set %s' to securely store this value", svccfg.Name, key, key))
-				slog.Debug(fmt.Sprintf("service %q: environment %q may contain detected secrets of type: %v", svccfg.Name, key, ds))
+				slog.Debug("service: environment may contain detected secrets", "service", svccfg.Name, "key", key, "types", ds)
 			}
 		}
 	}
@@ -250,10 +250,10 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			return fmt.Errorf("service %q: healthcheck timeout %fs must be positive and smaller than the interval %fs", svccfg.Name, timeout, interval)
 		}
 		if svccfg.HealthCheck.StartPeriod != nil {
-			slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: healthcheck start_period", svccfg.Name))
+			slog.Debug("service: unsupported compose directive: healthcheck start_period", "service", svccfg.Name)
 		}
 		if svccfg.HealthCheck.StartInterval != nil {
-			slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: healthcheck start_interval", svccfg.Name))
+			slog.Debug("service: unsupported compose directive: healthcheck start_interval", "service", svccfg.Name)
 		}
 	}
 	var replicas int
@@ -275,17 +275,17 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			return fmt.Errorf("service %q: unsupported compose directive: deploy endpoint_mode", svccfg.Name)
 		}
 		if svccfg.Deploy.Resources.Limits != nil && svccfg.Deploy.Resources.Reservations == nil {
-			slog.Debug(fmt.Sprintf("service %q: no reservations specified; using limits as reservations", svccfg.Name))
+			slog.Debug("service: no reservations specified; using limits as reservations", "service", svccfg.Name)
 		}
 		reservations = getResourceReservations(svccfg.Deploy.Resources)
 		if reservations != nil && reservations.NanoCPUs < 0 { // "0" just means "as small as possible"
 			return fmt.Errorf("service %q: invalid value for cpus: %v", svccfg.Name, reservations.NanoCPUs)
 		}
 		if len(svccfg.Deploy.Labels) > 0 {
-			slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: deploy labels", svccfg.Name))
+			slog.Debug("service: unsupported compose directive: deploy labels", "service", svccfg.Name)
 		}
 		if len(svccfg.Deploy.Placement.Constraints) != 0 || len(svccfg.Deploy.Placement.Preferences) != 0 || svccfg.Deploy.Placement.MaxReplicas != 0 {
-			slog.Debug(fmt.Sprintf("service %q: unsupported compose directive: deploy placement", svccfg.Name))
+			slog.Debug("service: unsupported compose directive: deploy placement", "service", svccfg.Name)
 		}
 		if svccfg.Deploy.Replicas != nil {
 			replicas = *svccfg.Deploy.Replicas

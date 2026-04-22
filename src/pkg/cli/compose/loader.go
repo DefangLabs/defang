@@ -180,14 +180,14 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 						if inEnv && !suppressWarn {
 							slog.Warn(fmt.Sprintf("Environment variable %q is ignored; add it to `.env` if needed", key))
 						} else {
-							slog.Debug(fmt.Sprintf("Unresolved environment variable %q", key))
+							slog.Debug("Unresolved environment variable", "key", key)
 						}
 						return "", false
 					}
 					if inEnv && !suppressWarn {
 						slog.Warn(fmt.Sprintf("Environment variable %q is ignored; add it to `.env` or it may be resolved from config during deployment", key))
 					} else {
-						slog.Debug(fmt.Sprintf("Environment variable %q was not resolved locally. It may be resolved from config during deployment", key))
+						slog.Debug("Environment variable was not resolved locally. It may be resolved from config during deployment", "key", key)
 					}
 					// Leave unresolved variables as-is for resolution later by CD
 					return "${" + key + "}", true

@@ -35,7 +35,7 @@ func (e *DockerfileValidationError) Unwrap() error {
 
 // ValidateDockerfile validates the syntax and basic structure of a Dockerfile
 func ValidateDockerfile(dockerfilePath string, serviceName string) error {
-	slog.Debug(fmt.Sprintf("Validating Dockerfile: %s for service %q", dockerfilePath, serviceName))
+	slog.Debug("Validating Dockerfile for service", "dockerfile", dockerfilePath, "service", serviceName)
 
 	// Read the Dockerfile
 	content, err := os.ReadFile(dockerfilePath)
@@ -161,7 +161,7 @@ func ValidateServiceDockerfiles(project *Project) error {
 			if os.IsNotExist(err) {
 				// This might be handled later by Railpack or may be a remote context
 				// Only validate if the file exists
-				slog.Debug(fmt.Sprintf("Skipping validation for service %q: Dockerfile %q does not exist", service.Name, dockerfilePath))
+				slog.Debug("Skipping validation for service: Dockerfile does not exist", "service", service.Name, "dockerfile", dockerfilePath)
 				continue
 			}
 			errors = append(errors, &DockerfileValidationError{

@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -14,7 +13,7 @@ import (
 )
 
 func ComposeDown(ctx context.Context, projectName string, fabric client.FabricClient, provider client.Provider) (types.ETag, error) {
-	slog.Debug(fmt.Sprintf("Destroying project %q", projectName))
+	slog.Debug("Destroying project", "project", projectName)
 
 	// If no names are provided, destroy the entire project
 	return CdCommand(ctx, projectName, provider, fabric, client.CdCommandDestroy)

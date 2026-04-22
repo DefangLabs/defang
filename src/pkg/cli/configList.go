@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -15,7 +14,7 @@ type PrintConfig struct {
 }
 
 func ConfigList(ctx context.Context, projectName string, provider client.Provider) error {
-	slog.Debug(fmt.Sprintf("Listing config in project %q", projectName))
+	slog.Debug("Listing config", "project", projectName)
 
 	config, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: projectName})
 	if err != nil {

@@ -15,7 +15,7 @@ import (
 // Connect builds a client carrying the requested tenant (name or ID).
 func Connect(fabricAddr string, requestedTenant types.TenantNameOrID) *client.GrpcClient {
 	host := client.NormalizeHost(fabricAddr)
-	slog.Debug(fmt.Sprintf("Using tenant %q for cluster %q", requestedTenant, host))
+	slog.Debug("Using tenant for cluster", "tenant", requestedTenant, "cluster", host)
 
 	accessToken := client.GetExistingToken(host)
 	return client.NewGrpcClient(host, accessToken, requestedTenant)
@@ -36,7 +36,7 @@ func ConnectWithTenant(ctx context.Context, fabricAddr string, requestedTenant t
 
 func NewProvider(ctx context.Context, providerID client.ProviderID, fabricClient client.FabricClient, stack string) client.Provider {
 	var provider client.Provider
-	slog.Debug(fmt.Sprintf("Creating %s provider", providerID))
+	slog.Debug("Creating provider", "provider", providerID)
 	switch providerID {
 	case client.ProviderAWS:
 		provider = aws.NewByocProvider(ctx, fabricClient.GetTenantName(), stack)

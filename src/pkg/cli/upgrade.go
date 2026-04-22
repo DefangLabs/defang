@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -20,13 +19,13 @@ func Upgrade(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	slog.Debug(fmt.Sprintf(" - Executable: %s\n", ex))
+	slog.Debug("Executable path", "path", ex)
 
 	ex, err = filepath.EvalSymlinks(ex)
 	if err != nil {
 		return err
 	}
-	slog.Debug(fmt.Sprintf(" - Evaluated: %s\n", ex))
+	slog.Debug("Evaluated executable path", "path", ex)
 
 	if strings.HasPrefix(ex, "/nix/store/") {
 		// Detect whether the user has used Flakes or nix-env

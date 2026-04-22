@@ -57,7 +57,7 @@ func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployPa
 	}
 
 	// Deploy the services
-	slog.Debug(fmt.Sprintf("Deploying services for project %s...", project.Name))
+	slog.Debug("Deploying services for project", "project", project.Name)
 
 	slog.Debug("Function invoked: cli.ComposeUp")
 	// Use ComposeUp to deploy the services

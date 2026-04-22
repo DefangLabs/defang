@@ -38,7 +38,7 @@ func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string, versioning
 		return "", fmt.Errorf("failed to get bucket with prefix %q: %w", prefix, err)
 	}
 	if existing != "" {
-		slog.Debug(fmt.Sprintf("Bucket %q already exists\n", existing))
+		slog.Debug("Bucket already exists", "bucket", existing)
 		err := gcp.UpdateBucketVersioning(ctx, existing, versioning)
 		if err != nil {
 			return "", fmt.Errorf("failed to ensure versioning is enabled on existing bucket %q: %w", existing, err)

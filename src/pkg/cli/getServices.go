@@ -52,7 +52,7 @@ func PrintLongServices(ctx context.Context, projectName string, provider client.
 }
 
 func GetServices(ctx context.Context, projectName string, provider client.Provider) ([]ServiceLineItem, error) {
-	slog.Debug(fmt.Sprintf("Listing services in project %q", projectName))
+	slog.Debug("Listing services in project", "project", projectName)
 
 	servicesResponse, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: projectName})
 	if err != nil {
@@ -113,7 +113,7 @@ func GetHealthcheckResults(ctx context.Context, serviceInfos []*defangv1.Service
 				defer wg.Done()
 				result, err := RunHealthcheck(ctx, serviceInfo.Service.Name, "https://"+endpoint, serviceInfo.HealthcheckPath)
 				if err != nil {
-					slog.Debug(fmt.Sprintf("Healthcheck error for service %q at endpoint %q: %s", serviceInfo.Service.Name, endpoint, err.Error()))
+					slog.Debug("Healthcheck error", "service", serviceInfo.Service.Name, "endpoint", endpoint, "err", err)
 					result = "error"
 				}
 				*results[serviceInfo.Service.Name] = result
@@ -136,17 +136,17 @@ func RunHealthcheck(ctx context.Context, name, endpoint, path string) (string, e
 	if err != nil {
 		return "", err
 	}
-	slog.Debug(fmt.Sprintf("[%s] checking health at %s", name, url))
+	slog.Debug("checking health", "service", name, "url", url)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
-		slog.Debug(fmt.Sprintf("[%s] ✔ healthy", name))
+		slog.Debug("healthy", "service", name)
 		return "healthy", nil
 	} else {
-		slog.Debug(fmt.Sprintf("[%s] ✘ unhealthy (%s)", name, resp.Status))
+		slog.Debug("unhealthy", "service", name, "status", resp.Status)
 		return "unhealthy (" + resp.Status + ")", nil
 	}
 }

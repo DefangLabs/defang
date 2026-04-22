@@ -25,7 +25,7 @@ func WaitServiceState(
 	etag types.ETag,
 	services []string,
 ) (ServiceStates, error) {
-	slog.Debug(fmt.Sprintf("waiting for services %v to reach state %s\n", services, targetState)) // TODO: don't print in Go-routine
+	slog.Debug("waiting for services to reach state", "services", services, "state", targetState) // TODO: don't print in Go-routine
 
 	if len(services) == 0 {
 		return nil, ErrNothingToMonitor
@@ -60,7 +60,7 @@ func WaitServiceState(
 				if connect.CodeOf(err) == connect.CodeResourceExhausted {
 					slog.WarnContext(ctx, fmt.Sprintf("quota exceeded; will retry subscribe stream after backoff: %v", err))
 				} else {
-					slog.Debug(fmt.Sprintf("WaitServiceState: transient error, reconnecting subscribe stream: %v", err))
+					slog.Debug("WaitServiceState: transient error, reconnecting subscribe stream", "err", err)
 				}
 				if err := provider.DelayBeforeRetry(ctx); err != nil {
 					return serviceStates, err
@@ -89,10 +89,10 @@ func WaitServiceState(
 			continue
 		}
 
-		slog.Debug(fmt.Sprintf("Service update: %s: state=%s and status=%s\n", msg.Name, msg.State, msg.Status)) // TODO: don't print in Go-routine
+		slog.Debug("Service update", "name", msg.Name, "state", msg.State, "status", msg.Status) // TODO: don't print in Go-routine
 
 		if _, ok := serviceStates[msg.Name]; !ok {
-			slog.Debug(fmt.Sprintf("unexpected service %s update", msg.Name)) // TODO: don't print in Go-routine
+			slog.Debug("unexpected service update", "name", msg.Name) // TODO: don't print in Go-routine
 			continue
 		}
 		if msg.State == defangv1.ServiceState_NOT_SPECIFIED {

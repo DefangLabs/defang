@@ -456,7 +456,7 @@ func (b *ByocDo) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter
 
 		logType := logs.LogType(req.LogType)
 
-		slog.Debug(fmt.Sprintf("Deployment phase: %s", deploymentInfo.GetPhase()))
+		slog.Debug("Deployment phase", "phase", deploymentInfo.GetPhase())
 		switch deploymentInfo.GetPhase() {
 		case godo.DeploymentPhase_PendingBuild, godo.DeploymentPhase_PendingDeploy, godo.DeploymentPhase_Deploying:
 			// Do nothing; check again in 10 seconds

@@ -71,7 +71,7 @@ func (s *ServerStream[T]) Follow(start time.Time) (iter.Seq2[*T, error], error) 
 	}
 	query := s.query.GetQuery()
 	shouldList := !start.IsZero() && start.Unix() > 0 && time.Since(start) > 10*time.Millisecond
-	slog.Debug(fmt.Sprintf("Query and tail logs since %v with query: \n%v", start, query))
+	slog.Debug("Query and tail logs", "since", start, "query", query)
 	return func(yield func(*T, error) bool) {
 		defer tailer.Close()
 		// Only query older logs if start time is more than 10ms ago
@@ -126,7 +126,7 @@ func (s *ServerStream[T]) Follow(start time.Time) (iter.Seq2[*T, error], error) 
 // Head returns an iterator that queries logs in ascending order.
 func (s *ServerStream[T]) Head(limit int32) iter.Seq2[*T, error] {
 	query := s.query.GetQuery()
-	slog.Debug(fmt.Sprintf("Query logs with query: \n%v", query))
+	slog.Debug("Query logs", "query", query)
 	return func(yield func(*T, error) bool) {
 		lister, err := s.gcpLogsClient.ListLogEntries(s.ctx, query, gcp.OrderAscending)
 		if err != nil {
@@ -140,7 +140,7 @@ func (s *ServerStream[T]) Head(limit int32) iter.Seq2[*T, error] {
 // Tail returns an iterator that queries logs in descending order, reversing if a limit is set.
 func (s *ServerStream[T]) Tail(limit int32) iter.Seq2[*T, error] {
 	query := s.query.GetQuery()
-	slog.Debug(fmt.Sprintf("Query logs with query: \n%v", query))
+	slog.Debug("Query logs", "query", query)
 	return func(yield func(*T, error) bool) {
 		lister, err := s.gcpLogsClient.ListLogEntries(s.ctx, query, gcp.OrderDescending)
 		if err != nil {
@@ -622,7 +622,7 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 			rootTriggerId := entry.GetLabels()["compute.googleapis.com/root_trigger_id"]
 			serviceName, ok := computeEngineRootTriggers[rootTriggerId]
 			if !ok {
-				slog.Debug(fmt.Sprintf("ignored root trigger id %v for instance group insert", rootTriggerId))
+				slog.Debug("ignored root trigger id for instance group insert", "rootTriggerId", rootTriggerId)
 				return nil, nil
 			}
 			response := auditLog.GetResponse()

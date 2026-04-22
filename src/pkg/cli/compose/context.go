@@ -231,7 +231,7 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 	case UploadModeDefault, UploadModeDigest:
 		// Calculate the digest of the tarball and pass it to the fabric controller (to avoid building the same image twice)
 		digest = calcDigest(buffer.Bytes())
-		slog.Debug(fmt.Sprintf("Digest for %q: %s", service, digest))
+		slog.Debug("Digest for service", "service", service, "digest", digest)
 	case UploadModePreview:
 		// For preview, we invoke the CD "preview" command, which will want a valid (S3) URL for diff, even though it won't be used
 		digest = calcDigest(buffer.Bytes())

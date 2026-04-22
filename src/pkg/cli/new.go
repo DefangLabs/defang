@@ -36,7 +36,7 @@ func FetchSamples(ctx context.Context) ([]Sample, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	slog.Debug(fmt.Sprintf("%v", resp.Header))
+	slog.Debug("Response header", "header", resp.Header)
 	reader := resp.Body
 	if resp.Header.Get("Content-Encoding") == "gzip" {
 		reader, err = gzip.NewReader(resp.Body)
@@ -69,7 +69,7 @@ func copyFromSamples(ctx context.Context, dir string, names []string, skipExisti
 		return err
 	}
 	defer resp.Body.Close()
-	slog.Debug(fmt.Sprintf("%v", resp.Header))
+	slog.Debug("Response header", "header", resp.Header)
 	tarball, err := gzip.NewReader(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read tarball: %w", err)

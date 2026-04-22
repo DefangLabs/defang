@@ -21,7 +21,7 @@ var knowledgeBaseFilenames = [...]string{"knowledge_base.json", "samples_example
 
 func SetupKnowledgeBase() error {
 	slog.Debug("Setting up knowledge base")
-	slog.Debug(fmt.Sprintf("Attempting to download knowledge base files: %v", knowledgeBaseFilenames))
+	slog.Debug("Attempting to download knowledge base files", "files", knowledgeBaseFilenames)
 
 	// Create knowledge base directory if it doesn't exist
 	slog.Debug("Creating knowledge base directory: " + KnowledgeBaseDir)

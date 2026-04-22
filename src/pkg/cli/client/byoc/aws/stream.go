@@ -2,7 +2,6 @@ package aws
 
 import (
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"regexp"
 	"slices"
@@ -124,7 +123,7 @@ func (p *logEventParser) parseEvents(events []cw.LogEvent) *defangv1.TailRespons
 		} else if parseECSEventRecords {
 			evt, err := ecs.ParseECSEvent([]byte(*event.Message))
 			if err != nil {
-				slog.Debug(fmt.Sprintf("error parsing ECS event, output raw event log: %v", err))
+				slog.Debug("error parsing ECS event, output raw event log", "err", err)
 			} else {
 				entry.Service = evt.Service()
 				entry.Etag = evt.Etag()

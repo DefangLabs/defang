@@ -86,7 +86,7 @@ func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string)
 				return io.ReadAll(getObjectOutput.Body)
 			})
 			if err != nil {
-				slog.Debug(fmt.Sprintf("Skipping %q in bucket %s: %v", *obj.Key, bucketName, AnnotateAwsError(err)))
+				slog.Debug("Skipping object in bucket", "key", *obj.Key, "bucket", bucketName, "err", AnnotateAwsError(err))
 				continue
 			}
 			if state != nil {
@@ -128,7 +128,7 @@ func (b *ByocAws) listPulumiStacksAllRegions(ctx context.Context, s3client S3Cli
 				Bucket: bucket.Name,
 			})
 			if err != nil {
-				slog.Debug(fmt.Sprintf("Skipping bucket %s: failed to get location: %v", *bucket.Name, AnnotateAwsError(err)))
+				slog.Debug("Skipping bucket: failed to get location", "bucket", *bucket.Name, "err", AnnotateAwsError(err))
 				continue
 			}
 

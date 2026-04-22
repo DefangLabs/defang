@@ -57,7 +57,7 @@ func afterGenerate(ctx context.Context, result setup.SetupResult) {
 	cmdd := exec.Command(editor, result.Folder)
 	err := cmdd.Start()
 	if err != nil {
-		slog.Debug(fmt.Sprintf("unable to launch editor %q: %v", editor, err))
+		slog.Debug("unable to launch editor", "editor", editor, "err", err)
 	}
 
 	cd := ""
@@ -69,7 +69,7 @@ func afterGenerate(ctx context.Context, result setup.SetupResult) {
 	loader := compose.NewLoader(compose.WithPath(filepath.Join(result.Folder, "compose.yaml")))
 	project, err := loader.LoadProject(ctx)
 	if err != nil {
-		slog.Debug(fmt.Sprintf("unable to load new project: %v", err))
+		slog.Debug("unable to load new project", "err", err)
 	}
 
 	var envInstructions []string

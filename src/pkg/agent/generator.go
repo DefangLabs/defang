@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 
 	"github.com/firebase/genkit/go/ai"
@@ -74,7 +73,7 @@ func (g *Generator) HandleMessage(ctx context.Context, prompt string, maxTurns i
 			if errors.Is(err, context.Canceled) {
 				return err
 			}
-			slog.Debug(fmt.Sprintf("error: %v", err))
+			slog.Debug("generate error", "err", err)
 			continue
 		}
 

@@ -22,7 +22,7 @@ import (
 )
 
 func RunEstimate(ctx context.Context, project *compose.Project, client client.FabricClient, previewProvider client.Provider, estimateProviderID client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
-	slog.Debug(fmt.Sprintf("Running estimate for project %s in region %s with mode %s", project.Name, region, mode))
+	slog.Debug("Running estimate for project", "project", project.Name, "region", region, "mode", mode)
 	preview, err := GeneratePreview(ctx, project, client, previewProvider, estimateProviderID, mode, region)
 	if err != nil {
 		return nil, err

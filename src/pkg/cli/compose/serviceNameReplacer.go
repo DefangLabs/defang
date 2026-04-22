@@ -30,7 +30,7 @@ type ServiceNameReplacer struct {
 func NewServiceNameReplacer(ctx context.Context, dnsResolver client.DNSResolver, project *composeTypes.Project) ServiceNameReplacer {
 	var skipPublicReplacement bool
 	if err := dnsResolver.UpdateShardDomain(ctx); err != nil {
-		slog.Debug(fmt.Sprintf("failed to update shard domain: %v", err))
+		slog.Debug("failed to update shard domain", "error", err)
 		skipPublicReplacement = true
 	}
 	// Create a regexp to detect private service names in environment variable and build arg values
@@ -89,9 +89,9 @@ func (s *ServiceNameReplacer) ReplaceServiceNameWithDNS(serviceName string, key,
 	val := s.replaceServiceNameWithDNS(value)
 
 	if val != value {
-		slog.Debug(fmt.Sprintf("service %q: service name was adjusted: %s %q assigned value %q", serviceName, fixupTarget, key, val))
+		slog.Debug("service name was adjusted", "service", serviceName, "fixupTarget", fixupTarget, "key", key, "value", val)
 	} else if s.publicServiceNames != nil && s.publicServiceNames.MatchString(value) {
-		slog.Debug(fmt.Sprintf("service %q: service name in the %s %q was not adjusted; only references to other services with port mode set to 'host' will be fixed-up", serviceName, fixupTarget, key))
+		slog.Debug("service name was not adjusted; only references to other services with port mode set to 'host' will be fixed-up", "service", serviceName, "fixupTarget", fixupTarget, "key", key)
 	}
 
 	return val

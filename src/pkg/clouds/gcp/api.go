@@ -27,7 +27,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 	projectName := "projects/" + gcp.ProjectId
 
 	for i := range maxAttempts {
-		slog.Debug(fmt.Sprintf("Enabling services: %v\n", apis))
+		slog.Debug("Enabling services", "apis", apis)
 		req := &serviceusage.BatchEnableServicesRequest{
 			ServiceIds: apis,
 		}
@@ -41,7 +41,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 			}
 			slog.ErrorContext(ctx, fmt.Sprintf("Error: %+v (%T)", err, err))
 			if i < maxAttempts-1 {
-				slog.Debug(fmt.Sprintf("Failed to enable services, will retry in %v: %v\n", retryInterval, err))
+				slog.Debug("Failed to enable services, will retry", "retryInterval", retryInterval, "error", err)
 				if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
 					return err
 				}
@@ -58,7 +58,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 			} else if op.Done { // Check if the operation is done
 				if op.Error != nil {
 					if i < maxAttempts-1 {
-						slog.Debug(fmt.Sprintf("Failed to enable services operation, will retry in %v: %v\n", retryInterval, op.Error))
+						slog.Debug("Failed to enable services operation, will retry", "retryInterval", retryInterval, "error", op.Error)
 						if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
 							return err
 						}

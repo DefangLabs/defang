@@ -70,7 +70,7 @@ var (
 			ExpectContinueTimeout: 1 * time.Second,
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			slog.Debug(fmt.Sprintf("Redirecting from %v to %v", via[len(via)-1].URL, req.URL))
+			slog.Debug("Redirecting", "from", via[len(via)-1].URL, "to", req.URL)
 			return nil
 		},
 	}
@@ -78,7 +78,7 @@ var (
 )
 
 func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, client client.FabricClient, provider client.Provider) error {
-	slog.Debug(fmt.Sprintf("Generating TLS cert for project %q", project.Name))
+	slog.Debug("Generating TLS cert for project", "project", project.Name)
 
 	services, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: project.Name})
 	if err != nil {
@@ -104,7 +104,7 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 			if defaultNetwork := service.Networks["default"]; defaultNetwork != nil {
 				domains = append(domains, defaultNetwork.Aliases...)
 			}
-			slog.Debug(fmt.Sprintf("Found service %v with domains %v and targets %v", service.Name, domains, targets))
+			slog.Debug("Found service with domains and targets", "service", service.Name, "domains", domains, "targets", targets)
 			for _, domain := range domains {
 				generateCert(ctx, domain, targets, client)
 			}
@@ -177,7 +177,7 @@ func triggerCertGeneration(ctx context.Context, domain string) error {
 	// Our own retry logic uses the root resolver to prevent cached DNS and retry on all non-200 errors
 	if err := getWithRetries(ctx, fmt.Sprintf("http://%v", domain), 5); err != nil { // Retry incase of DNS error
 		// Ignore possible tls error as cert attachment may take time
-		slog.Debug(fmt.Sprintf("Error triggering cert generation: %v", err))
+		slog.Debug("Error triggering cert generation", "err", err)
 		return err
 	}
 	return nil
@@ -206,7 +206,7 @@ func waitForTLS(ctx context.Context, domain string) error {
 			if err := cert.CheckTLSCert(timeout, domain); err == nil {
 				return nil
 			} else {
-				slog.Debug(fmt.Sprintf("Error checking TLS cert for %v: %v", domain, err))
+				slog.Debug("Error checking TLS cert", "domain", domain, "err", err)
 			}
 		}
 	}
@@ -235,13 +235,13 @@ func waitForCNAME(ctx context.Context, domain string, targets []string, client c
 	verifyDNS := func() error {
 		if !serverSideVerified && serverVerifyRpcFailure < 3 {
 			if err := client.VerifyDNSSetup(ctx, &defangv1.VerifyDNSSetupRequest{Domain: domain, Targets: targets}); err == nil {
-				slog.Debug(fmt.Sprintf("Server side DNS verification for %v successful", domain))
+				slog.Debug("Server side DNS verification successful", "domain", domain)
 				serverSideVerified = true
 			} else {
 				if cerr := new(connect.Error); errors.As(err, &cerr) && cerr.Code() == connect.CodeFailedPrecondition {
-					slog.Debug(fmt.Sprintf("Server side DNS verification negative result: %v", cerr.Message()))
+					slog.Debug("Server side DNS verification negative result", "message", cerr.Message())
 				} else {
-					slog.Debug(fmt.Sprintf("Server side DNS verification request for %v failed: %v", domain, err))
+					slog.Debug("Server side DNS verification request failed", "domain", domain, "error", err)
 					serverVerifyRpcFailure++
 				}
 			}
@@ -296,18 +296,18 @@ func getWithRetries(ctx context.Context, url string, tries int) error {
 				return nil
 			}
 			if resp != nil && resp.Request != nil && resp.Request.URL.Scheme == "https" {
-				slog.Debug(fmt.Sprintf("cert gen request success, received redirect to %v", resp.Request.URL))
+				slog.Debug("cert gen request success, received redirect", "url", resp.Request.URL)
 				return nil // redirect to https indicate a successful cert generation
 			}
 			if err == nil {
 				err = fmt.Errorf("HTTP: %v", resp.StatusCode)
 			}
 		} else if cve := new(tls.CertificateVerificationError); errors.As(err, &cve) {
-			slog.Debug(fmt.Sprintf("cert gen request success, received tls error: %v", cve))
+			slog.Debug("cert gen request success, received tls error", "err", cve)
 			return nil // tls error indicate a successful cert gen trigger, as it has to be redirected to https
 		}
 
-		slog.Debug(fmt.Sprintf("Error fetching %v: %v, tries left %v", url, err, tries-i-1))
+		slog.Debug("Error fetching url", "url", url, "err", err, "triesLeft", tries-i-1)
 		errs = append(errs, err)
 
 		delay := httpRetryDelayBase << i // Simple exponential backoff

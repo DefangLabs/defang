@@ -117,7 +117,7 @@ func Poll(ctx context.Context, key string) ([]byte, error) {
 			}
 			var unexpectedError ErrUnexpectedStatus
 			if errors.As(err, &unexpectedError) && unexpectedError.StatusCode >= 500 {
-				slog.Debug(fmt.Sprintf("received server error: %s, retrying in %v...", unexpectedError.Status, retryDelay))
+				slog.Debug("received server error, retrying", "status", unexpectedError.Status, "retryDelay", retryDelay)
 				select {
 				case <-ctx.Done():
 					return nil, ctx.Err()
@@ -162,7 +162,7 @@ func ExchangeCodeForToken(ctx context.Context, code AuthCodeFlow, ss ...scope.Sc
 		scopes = append(scopes, s.String())
 	}
 
-	slog.Debug(fmt.Sprintf("Generating access token with scopes %v", scopes))
+	slog.Debug("Generating access token", "scopes", scopes)
 
 	token, err := OpenAuthClient.Exchange(code.code, code.redirectUri, code.verifier) // TODO: scope
 	if err != nil {

@@ -93,7 +93,7 @@ func makeStackNewCmd() *cobra.Command {
 				return fmt.Errorf("stack with name %q already exists in project %q", params.Name, projectName)
 			}
 
-			slog.Debug(fmt.Sprintf("Creating stack with parameters: %+v\n", params))
+			slog.Debug("Creating stack with parameters", "params", params)
 
 			_, err = stacks.CreateInDirectory(".", params)
 			if err != nil {

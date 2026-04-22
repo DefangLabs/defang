@@ -38,7 +38,7 @@ func Token(ctx context.Context, client client.FabricClient, tenant types.TenantN
 		scopes = []string{string(s)}
 	}
 
-	slog.Debug(fmt.Sprintf("Generating token for tenant %q with scopes %v", tenant, scopes))
+	slog.Debug("Generating token for tenant", "tenant", tenant, "scopes", scopes)
 
 	resp, err := client.Token(ctx, &defangv1.TokenRequest{
 		Assertion: at,

@@ -1,7 +1,6 @@
 package aws
 
 import (
-	"fmt"
 	"iter"
 	"log/slog"
 	"slices"
@@ -55,7 +54,7 @@ func parseSubscribeEvent(evt cw.LogEvent, etag types.ETag, services []string) *d
 func parseECSSubscribeEvent(evt cw.LogEvent, etag types.ETag, services []string) *defangv1.SubscribeResponse {
 	ecsEvt, err := ecs.ParseECSEvent([]byte(*evt.Message))
 	if err != nil {
-		slog.Debug(fmt.Sprintf("error parsing ECS event: %v", err))
+		slog.Debug("error parsing ECS event", "err", err)
 		return nil
 	}
 

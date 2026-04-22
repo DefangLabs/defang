@@ -111,12 +111,12 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 	// 1. Try the default application credentials or from the "GOOGLE_APPLICATION_CREDENTIALS" env var if set
 	//    - if the user has login with glcoud cli with application default credentials
 	//    - if the user has set GOOGLE_APPLICATION_CREDENTIALS to a service account key file with required permissions
-	slog.Debug(fmt.Sprintf("checking if application default credentials are available and has permission, GOOGLE_APPLICATION_CREDENTIALS=%q...", os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")))
+	slog.Debug("checking if application default credentials are available and has permission...", "GOOGLE_APPLICATION_CREDENTIALS", os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
 	if err := testTokenProjectPermissions(ctx, gcp.ProjectId, requiredPerms, nil); err != nil {
 		if ctx.Err() != nil { // Fast fail if context is done, no need to try other credential sources
 			return ctx.Err()
 		}
-		slog.Debug(fmt.Sprintf("the application default credentials are missing permissions: %v", err))
+		slog.Debug("the application default credentials are missing permissions", "error", err)
 	} else {
 		slog.Debug("found valid application default credentials with required permissions")
 		// No need to pass down ADC token source via options since ADC is automatically used by gcp sdk
@@ -230,16 +230,16 @@ func (gcp *Gcp) findStoredCredentials(ctx context.Context) (oauth2.TokenSource, 
 			slog.WarnContext(ctx, fmt.Sprintf("failed to parse previously saved auth token %q: %v", name, err))
 			continue
 		}
-		slog.Debug(fmt.Sprintf("Testing token %q from store for required permissions...", name))
+		slog.Debug("Testing token from store for required permissions...", "name", name)
 		tokenSource := config.TokenSource(ctx, &token)
 		if err := testTokenProjectPermissions(ctx, gcp.ProjectId, requiredPerms, tokenSource); err == nil {
-			slog.Debug(fmt.Sprintf("Token %q is valid and has required permissions\n", name))
+			slog.Debug("Token is valid and has required permissions", "name", name)
 			currentToken, err := tokenSource.Token()
 			if err != nil {
 				return nil, fmt.Errorf("failed to retrieve current token from token source: %w", err)
 			}
 			if currentToken.AccessToken != token.AccessToken || currentToken.Expiry != token.Expiry || currentToken.RefreshToken != token.RefreshToken {
-				slog.Debug(fmt.Sprintf("Token %q has been updated, persisting updated token...\n", name))
+				slog.Debug("Token has been updated, persisting updated token...", "name", name)
 				bytes, err := json.Marshal(currentToken)
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal updated token: %w", err)
@@ -255,7 +255,7 @@ func (gcp *Gcp) findStoredCredentials(ctx context.Context) (oauth2.TokenSource, 
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
 			}
-			slog.Debug(fmt.Sprintf("Token %q is missing required permissions: %v\n", name, err))
+			slog.Debug("Token is missing required permissions", "name", name, "error", err)
 			continue
 		}
 	}
@@ -266,7 +266,7 @@ func findGithubCredentials(ctx context.Context) (oauth2.TokenSource, string, err
 	// If both ACTIONS_ID_TOKEN_REQUEST_URL and GOOGLE_WORKLOAD_IDENTITY_PROVIDER are set, we're doing "Workload Identity Federation" with GCP using github id token
 	githubTokenReqUrl := os.Getenv("ACTIONS_ID_TOKEN_REQUEST_URL")
 	gcpProvider := os.Getenv("GOOGLE_WORKLOAD_IDENTITY_PROVIDER")
-	slog.Debug(fmt.Sprintf("ACTIONS_ID_TOKEN_REQUEST_URL=%q, GOOGLE_WORKLOAD_IDENTITY_PROVIDER=%q", githubTokenReqUrl, gcpProvider))
+	slog.Debug("GitHub Actions environment variables", "ACTIONS_ID_TOKEN_REQUEST_URL", githubTokenReqUrl, "GOOGLE_WORKLOAD_IDENTITY_PROVIDER", gcpProvider)
 	if githubTokenReqUrl == "" || gcpProvider == "" {
 		return nil, "", nil
 	}

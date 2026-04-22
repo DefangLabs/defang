@@ -30,7 +30,7 @@ type ToolTracker struct {
 func (t *ToolTracker) TrackTool(name string, handler server.ToolHandlerFunc) server.ToolHandlerFunc {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		name := request.Params.Name
-		slog.Debug("MCP Tool Called: " + name + " with params: " + fmt.Sprintf("%+v", request.Params))
+		slog.Debug("MCP Tool Called", "name", name, "params", request.Params)
 		track.Evt("MCP Tool Called", track.P("tool", name), track.P("client", t.client), track.P("cluster", t.fabricAddr), track.P("provider", *t.providerId))
 		resp, err := handler(ctx, request)
 		if err != nil {

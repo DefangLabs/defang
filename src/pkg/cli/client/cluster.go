@@ -1,7 +1,6 @@
 package client
 
 import (
-	"fmt"
 	"log/slog"
 	"net"
 	"os"
@@ -48,7 +47,7 @@ func GetExistingToken(fabricAddr string) string {
 		var err error
 		accessToken, err = TokenStore.Load(TokenStorageName(fabricAddr))
 		if err != nil {
-			slog.Debug(fmt.Sprintf("failed to load access token for %v: %v", fabricAddr, err))
+			slog.Debug("failed to load access token", "fabricAddr", fabricAddr, "err", err)
 		}
 
 		// Check if we wrote an IDToken file during login, if AWS_WEB_IDENTITY_TOKEN_FILE is empty,

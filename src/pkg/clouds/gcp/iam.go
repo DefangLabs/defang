@@ -36,7 +36,7 @@ func (gcp Gcp) EnsureRoleExists(ctx context.Context, roleId, title, description 
 			role.GetTitle() == title &&
 			role.GetDescription() == description &&
 			role.Stage == iamadmpb.Role_GA {
-			slog.Debug(fmt.Sprintf("Role %s already exists", roleId))
+			slog.Debug("Role already exists", "roleId", roleId)
 			return role.Name, nil
 		}
 
@@ -68,7 +68,7 @@ func (gcp Gcp) EnsureRoleExists(ctx context.Context, roleId, title, description 
 		if err != nil {
 			return "", fmt.Errorf("failed to create role: %w", err)
 		}
-		slog.Debug(fmt.Sprintf("Role %s created successfully.", roleId))
+		slog.Debug("Role created successfully", "roleId", roleId)
 	}
 
 	// Wait for the role to be created or updated
@@ -102,7 +102,7 @@ func (gcp Gcp) EnsureServiceAccountExists(ctx context.Context, serviceAccountId,
 	if err == nil {
 		if account.GetDisplayName() == displayName &&
 			account.GetDescription() == description {
-			slog.Debug(fmt.Sprintf("Service account %s already exists", serviceAccountId))
+			slog.Debug("Service account already exists", "serviceAccountId", serviceAccountId)
 			return account.Name, nil
 		}
 
@@ -130,7 +130,7 @@ func (gcp Gcp) EnsureServiceAccountExists(ctx context.Context, serviceAccountId,
 			return "", fmt.Errorf("failed to create service account: %w", err)
 		}
 
-		slog.Debug(fmt.Sprintf("Service account %s created successfully.", serviceAccountId))
+		slog.Debug("Service account created successfully", "serviceAccountId", serviceAccountId)
 		accountName := account.Name
 		for start := time.Now(); time.Since(start) < 5*time.Minute; {
 			account, err = client.GetServiceAccount(ctx, &iamadmpb.GetServiceAccountRequest{Name: accountName})
@@ -188,7 +188,7 @@ func (gcp Gcp) EnsurePrincipalHasBucketRoles(ctx context.Context, bucketName, pr
 	}
 
 	if !needUpdate {
-		slog.Debug(fmt.Sprintf("Principal %s already has roles %v on bucket %s", principal, roles, bucketName))
+		slog.Debug("Principal already has roles on bucket", "principal", principal, "roles", roles, "bucket", bucketName)
 		return nil
 	}
 
@@ -345,7 +345,7 @@ func ensurePrincipalHasRolesWithResource(ctx context.Context, client resourceWit
 	}
 
 	if !bindingNeedsUpdate && len(rolesNotFound) == 0 {
-		slog.Debug(fmt.Sprintf("%s already has roles %v on resource %s", principal, roles, resource))
+		slog.Debug("Principal already has roles on resource", "principal", principal, "roles", roles, "resource", resource)
 		return nil
 	}
 	slog.InfoContext(ctx, "Updating IAM policy for resource "+resource)
@@ -353,7 +353,7 @@ func ensurePrincipalHasRolesWithResource(ctx context.Context, client resourceWit
 	for i := range maxAttempts { // Service account might not be visible for a few seconds after creation for policy attachment
 		if _, err := client.SetIamPolicy(ctx, &iampb.SetIamPolicyRequest{Resource: resource, Policy: policy}); err != nil {
 			if i < maxAttempts-1 {
-				slog.Debug(fmt.Sprintf("Failed to set IAM policy for resource %s, will retry in %v: %v\n", resource, retryInterval, err))
+				slog.Debug("Failed to set IAM policy for resource, will retry", "resource", resource, "retryInterval", retryInterval, "error", err)
 				if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
 					return err
 				}

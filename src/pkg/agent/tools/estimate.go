@@ -56,7 +56,7 @@ func HandleEstimateTool(ctx context.Context, loader client.Loader, params Estima
 	if err != nil {
 		return "", fmt.Errorf("failed to run estimate: %w", err)
 	}
-	slog.Debug(fmt.Sprintf("Estimate: %+v", estimate))
+	slog.Debug("Estimate", "estimate", estimate)
 
 	estimateText := cli.PrintEstimate(deploymentMode, estimate)
 

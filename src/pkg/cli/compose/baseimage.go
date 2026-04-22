@@ -25,7 +25,7 @@ func FindAllBaseImages(project *composeTypes.Project) ([]string, error) {
 			images, err := extractDockerfileBaseImages(dockerfileFullPath)
 			if err != nil {
 				if os.IsNotExist(err) {
-					slog.Debug(fmt.Sprintf("service %q: dockerfile %q does not exist; skipping", service.Name, dockerfileFullPath))
+					slog.Debug("service: dockerfile does not exist; skipping", "service", service.Name, "dockerfile", dockerfileFullPath)
 					continue
 				}
 				return nil, err
