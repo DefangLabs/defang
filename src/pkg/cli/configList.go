@@ -24,7 +24,7 @@ func ConfigList(ctx context.Context, projectName string, provider client.Provide
 
 	numConfigs := len(config.Names)
 	if numConfigs == 0 {
-		slog.Warn("No configs found")
+		slog.WarnContext(ctx, "No configs found")
 		return nil
 	}
 

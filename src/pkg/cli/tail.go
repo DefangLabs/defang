@@ -162,11 +162,11 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 			if _, err := provider.GetService(ctx, &defangv1.GetRequest{Project: projectName, Name: service}); err != nil {
 				switch connect.CodeOf(err) {
 				case connect.CodeNotFound:
-					slog.Warn(fmt.Sprintf("Service does not exist (yet): %q", service))
+					slog.WarnContext(ctx, fmt.Sprintf("Service does not exist (yet): %q", service))
 				case connect.CodeUnknown:
 					// Ignore unknown (nil) errors
 				default:
-					slog.Warn(fmt.Sprintf("%v", err)) // TODO: use client.PrettyError(…)
+					slog.WarnContext(ctx, fmt.Sprintf("%v", err)) // TODO: use client.PrettyError(…)
 				}
 			}
 		}
@@ -269,7 +269,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 			if oldState, err := term.MakeUnbuf(int(os.Stdin.Fd())); err == nil {
 				defer term.Restore(int(os.Stdin.Fd()), oldState)
 
-				slog.Info("Showing only build logs and runtime errors. Press V to toggle verbose mode.")
+				slog.InfoContext(ctx, "Showing only build logs and runtime errors. Press V to toggle verbose mode.")
 				input := term.NewNonBlockingStdin()
 				defer input.Close() // abort the read loop
 				go func() {
@@ -291,7 +291,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 							if debug {
 								debugStr = "ON"
 							}
-							slog.Info(fmt.Sprintln("Debug mode", debugStr))
+							slog.InfoContext(ctx, fmt.Sprintln("Debug mode", debugStr))
 							track.Evt("Debug Toggled", P("debug", debug))
 						case 'v', 'V':
 							verbose := !options.Verbose
@@ -303,7 +303,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 							if toggleCount++; toggleCount == 4 && !verbose {
 								modeStr += ". I like the way you work it, no verbosity."
 							}
-							slog.Info(fmt.Sprintln("Verbose mode", modeStr))
+							slog.InfoContext(ctx, fmt.Sprintln("Verbose mode", modeStr))
 							track.Evt("Verbose Toggled", P("verbose", verbose), P("toggleCount", toggleCount))
 						}
 					}
@@ -380,7 +380,7 @@ func receiveLogs(ctx context.Context, provider client.Provider, projectName stri
 				slog.Debug(fmt.Sprintln("Disconnected:", err))
 				var spaces int
 				if !options.Raw {
-					slog.Warn("Reconnecting...\r")
+					slog.WarnContext(ctx, "Reconnecting...\r")
 					spaces = len(" ! Reconnecting...\r") // warnPrefix + message, used to clear the line
 				}
 				if err := provider.DelayBeforeRetry(ctx); err != nil {

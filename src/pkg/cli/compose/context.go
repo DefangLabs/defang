@@ -220,7 +220,7 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 		return fmt.Sprintf("s3://cd-preview/%s%s", service, archiveType.Extension), nil
 	}
 
-	slog.Info(fmt.Sprintln("Packaging the project files for", service, "at", root))
+	slog.InfoContext(ctx, fmt.Sprintln("Packaging the project files for", service, "at", root))
 	buffer, err := createArchive(ctx, build.Context, build.Dockerfile, archiveType)
 	if err != nil {
 		return "", err
@@ -242,7 +242,7 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 		panic("unexpected UploadMode value")
 	}
 
-	slog.Info(fmt.Sprintln("Uploading the project files for", service))
+	slog.InfoContext(ctx, fmt.Sprintln("Uploading the project files for", service))
 	return uploadArchive(ctx, provider, projectName, buffer, archiveType, digest)
 }
 
@@ -475,7 +475,7 @@ func createArchive(ctx context.Context, root string, dockerfile string, contentT
 
 		fileCount++
 		if fileCount == ContextFileLimit+1 {
-			slog.Warn(fmt.Sprintf("the build context contains more than %d files; use --debug or create .dockerignore to exclude caches and build artifacts", ContextFileLimit))
+			slog.WarnContext(ctx, fmt.Sprintf("the build context contains more than %d files; use --debug or create .dockerignore to exclude caches and build artifacts", ContextFileLimit))
 		}
 
 		bufLen := buf.Len()
@@ -484,7 +484,7 @@ func createArchive(ctx context.Context, root string, dockerfile string, contentT
 			return fmt.Errorf("the build context is limited to %s; consider downloading large files in the Dockerfile or set the DEFANG_BUILD_CONTEXT_LIMIT environment variable", units.BytesSize(float64(ContextSizeHardLimit)))
 		}
 		if bufLen <= ContextSizeSoftLimit && buf.Len() > ContextSizeSoftLimit {
-			slog.Warn(fmt.Sprintf("the build context is larger than %s; use --debug or create .dockerignore to exclude caches and build artifacts", units.BytesSize(float64(buf.Len()))))
+			slog.WarnContext(ctx, fmt.Sprintf("the build context is larger than %s; use --debug or create .dockerignore to exclude caches and build artifacts", units.BytesSize(float64(buf.Len()))))
 		}
 		return err
 	})

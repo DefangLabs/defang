@@ -58,7 +58,7 @@ func WaitServiceState(
 			// a minute and DelayBeforeRetry backs off exponentially up to 1 minute).
 			if isTransientError(err) {
 				if connect.CodeOf(err) == connect.CodeResourceExhausted {
-					slog.Warn(fmt.Sprintf("quota exceeded; will retry subscribe stream after backoff: %v", err))
+					slog.WarnContext(ctx, fmt.Sprintf("quota exceeded; will retry subscribe stream after backoff: %v", err))
 				} else {
 					slog.Debug(fmt.Sprintf("WaitServiceState: transient error, reconnecting subscribe stream: %v", err))
 				}
@@ -83,7 +83,7 @@ func WaitServiceState(
 			}
 		}
 
-		slog.Info(fmt.Sprintf("Waiting for services to finish deploying: %q\n", pendingServices)) // TODO: don't print in Go-routine
+		slog.InfoContext(ctx, fmt.Sprintf("Waiting for services to finish deploying: %q\n", pendingServices)) // TODO: don't print in Go-routine
 
 		if msg == nil {
 			continue

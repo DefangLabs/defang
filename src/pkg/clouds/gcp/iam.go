@@ -45,7 +45,7 @@ func (gcp Gcp) EnsureRoleExists(ctx context.Context, roleId, title, description 
 		role.Title = title
 		role.Description = description
 		role.Stage = iamadmpb.Role_GA
-		slog.Info("Updating role " + roleId)
+		slog.InfoContext(ctx, "Updating role "+roleId)
 		if _, err := client.UpdateRole(ctx, &iamadmpb.UpdateRoleRequest{Name: roleName, Role: role}); err != nil {
 			return "", fmt.Errorf("failed to update role: %w", err)
 		}
@@ -63,7 +63,7 @@ func (gcp Gcp) EnsureRoleExists(ctx context.Context, roleId, title, description 
 				Stage:               iamadmpb.Role_GA, // TODO: investigate stage
 			},
 		}
-		slog.Info("Creating role " + roleId)
+		slog.InfoContext(ctx, "Creating role "+roleId)
 		role, err = client.CreateRole(ctx, req)
 		if err != nil {
 			return "", fmt.Errorf("failed to create role: %w", err)
@@ -108,7 +108,7 @@ func (gcp Gcp) EnsureServiceAccountExists(ctx context.Context, serviceAccountId,
 
 		account.DisplayName = displayName
 		account.Description = description
-		slog.Info("Updating service account " + serviceAccountId)
+		slog.InfoContext(ctx, "Updating service account "+serviceAccountId)
 		if _, err := client.UpdateServiceAccount(ctx, &iamadmpb.ServiceAccount{Name: account.Name, DisplayName: displayName, Description: description}); err != nil {
 			return "", fmt.Errorf("failed to update service account: %w", err)
 		}
@@ -124,7 +124,7 @@ func (gcp Gcp) EnsureServiceAccountExists(ctx context.Context, serviceAccountId,
 			},
 			Name: "projects/" + gcp.ProjectId,
 		}
-		slog.Info("Creating service account " + serviceAccountId)
+		slog.InfoContext(ctx, "Creating service account "+serviceAccountId)
 		account, err := client.CreateServiceAccount(ctx, req)
 		if err != nil {
 			return "", fmt.Errorf("failed to create service account: %w", err)
@@ -192,11 +192,11 @@ func (gcp Gcp) EnsurePrincipalHasBucketRoles(ctx context.Context, bucketName, pr
 		return nil
 	}
 
-	slog.Info(fmt.Sprintf("Updating IAM policy for principal %s on bucket %s", principal, bucketName))
+	slog.InfoContext(ctx, fmt.Sprintf("Updating IAM policy for principal %s on bucket %s", principal, bucketName))
 	for i := range maxAttempts { // Service account might not be visible for a few seconds after creation for policy attachment
 		if err := bucket.IAM().SetPolicy(ctx, policy); err != nil {
 			if i < maxAttempts-1 {
-				slog.Info(fmt.Sprintf("Failed to set IAM policy, will retry in %v: %v\n", retryInterval, err))
+				slog.InfoContext(ctx, fmt.Sprintf("Failed to set IAM policy, will retry in %v: %v\n", retryInterval, err))
 				if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
 					return err
 				}
@@ -269,14 +269,14 @@ func (gcp Gcp) EnsurePrincipalHasServiceAccountRoles(ctx context.Context, princi
 		return nil
 	}
 
-	slog.Info(fmt.Sprintf("Updating IAM policy for %s on service account %s", principal, serviceAccount))
+	slog.InfoContext(ctx, fmt.Sprintf("Updating IAM policy for %s on service account %s", principal, serviceAccount))
 	for i := range maxAttempts { // Service account might not be visible for a few seconds after creation for policy attachment
 		if _, err := client.SetIamPolicy(ctx, &iamadm.SetIamPolicyRequest{
 			Resource: resource,
 			Policy:   policy,
 		}); err != nil {
 			if i < maxAttempts-1 {
-				slog.Info(fmt.Sprintf("Failed to set IAM policy for service account %s, will retry in %v: %v\n", serviceAccount, retryInterval, err))
+				slog.InfoContext(ctx, fmt.Sprintf("Failed to set IAM policy for service account %s, will retry in %v: %v\n", serviceAccount, retryInterval, err))
 				if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
 					return err
 				}
@@ -348,7 +348,7 @@ func ensurePrincipalHasRolesWithResource(ctx context.Context, client resourceWit
 		slog.Debug(fmt.Sprintf("%s already has roles %v on resource %s", principal, roles, resource))
 		return nil
 	}
-	slog.Info("Updating IAM policy for resource " + resource)
+	slog.InfoContext(ctx, "Updating IAM policy for resource "+resource)
 
 	for i := range maxAttempts { // Service account might not be visible for a few seconds after creation for policy attachment
 		if _, err := client.SetIamPolicy(ctx, &iampb.SetIamPolicyRequest{Resource: resource, Policy: policy}); err != nil {

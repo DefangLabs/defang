@@ -53,7 +53,7 @@ func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string, versioning
 	defer client.Close()
 
 	newBucketName := fmt.Sprintf("%s-%s", prefix, pkg.RandomID())
-	slog.Info(fmt.Sprintf("Creating defang cd bucket %q", newBucketName))
+	slog.InfoContext(ctx, fmt.Sprintf("Creating defang cd bucket %q", newBucketName))
 
 	bucket := client.Bucket(newBucketName)
 	if err := bucket.Create(ctx, gcp.ProjectId, &storage.BucketAttrs{

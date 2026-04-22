@@ -486,13 +486,13 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 		}
 
 		if entry.GetProtoPayload().GetTypeUrl() != "type.googleapis.com/google.cloud.audit.AuditLog" {
-			slog.Warn(fmt.Sprintf("unexpected log entry type : %v", entry.GetProtoPayload().GetTypeUrl()))
+			slog.WarnContext(ctx, fmt.Sprintf("unexpected log entry type : %v", entry.GetProtoPayload().GetTypeUrl()))
 			return nil, nil
 		}
 
 		auditLog := new(auditpb.AuditLog)
 		if err := entry.GetProtoPayload().UnmarshalTo(auditLog); err != nil {
-			slog.Warn(fmt.Sprintf("failed to unmarshal audit log : %v", err))
+			slog.WarnContext(ctx, fmt.Sprintf("failed to unmarshal audit log : %v", err))
 			return nil, nil
 		}
 
@@ -528,7 +528,7 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 					Status: status.GetMessage(),
 				}}, nil
 			} else {
-				slog.Warn(fmt.Sprintf("missing request and response in audit log for service %v", path.Base(auditLog.GetResourceName())))
+				slog.WarnContext(ctx, fmt.Sprintf("missing request and response in audit log for service %v", path.Base(auditLog.GetResourceName())))
 				return nil, nil
 			}
 
@@ -551,7 +551,7 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 				serviceName := GetValueInStruct(response, "spec.template.metadata.labels.defang-service")
 				status := auditLog.GetStatus()
 				if status == nil {
-					slog.Warn(fmt.Sprintf("missing status in audit log for job %v", path.Base(auditLog.GetResourceName())))
+					slog.WarnContext(ctx, fmt.Sprintf("missing status in audit log for job %v", path.Base(auditLog.GetResourceName())))
 					return nil, nil
 				}
 				var state defangv1.ServiceState
@@ -579,7 +579,7 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 				// Report all ready services when CD is successful, prevents cli deploy stop before cd is done
 				return getReadyServicesCompletedResps(auditLog.GetStatus().GetMessage()), nil // Ignore success cd status when we are waiting for service status
 			} else {
-				slog.Warn(fmt.Sprintf("unexpected execution name in audit log : %v", executionName))
+				slog.WarnContext(ctx, fmt.Sprintf("unexpected execution name in audit log : %v", executionName))
 				return nil, nil
 			}
 		case "gce_instance_group_manager": // Compute engine update start
@@ -591,24 +591,24 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 			managerName := entry.Resource.Labels["instance_group_manager_name"]
 			labels, err := gcpLogsClient.GetInstanceGroupManagerLabels(ctx, project, region, managerName)
 			if err != nil {
-				slog.Warn(fmt.Sprintf("failed to get instance group manager labels for %v: %v", managerName, err))
+				slog.WarnContext(ctx, fmt.Sprintf("failed to get instance group manager labels for %v: %v", managerName, err))
 				return nil, nil
 			}
 			serviceName := labels["defang-service"]
 			if serviceName == "" {
-				slog.Warn(fmt.Sprintf("missing defang-service label in instance group manager %v", managerName))
+				slog.WarnContext(ctx, fmt.Sprintf("missing defang-service label in instance group manager %v", managerName))
 				return nil, nil
 			}
 			if etag != "" {
 				labelEtag := labels["defang-etag"]
 				if labelEtag != etag {
-					slog.Warn(fmt.Sprintf("skipping instance group manager %v: etag mismatch (got %q, want %q)", managerName, labelEtag, etag))
+					slog.WarnContext(ctx, fmt.Sprintf("skipping instance group manager %v: etag mismatch (got %q, want %q)", managerName, labelEtag, etag))
 					return nil, nil
 				}
 			}
 			rootTriggerId := entry.GetLabels()["compute.googleapis.com/root_trigger_id"]
 			if rootTriggerId == "" {
-				slog.Warn(fmt.Sprintf("missing root_trigger_id in audit log for instance group manager %v", path.Base(auditLog.GetResourceName())))
+				slog.WarnContext(ctx, fmt.Sprintf("missing root_trigger_id in audit log for instance group manager %v", path.Base(auditLog.GetResourceName())))
 			} else {
 				computeEngineRootTriggers[rootTriggerId] = serviceName
 			}
@@ -627,7 +627,7 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 			}
 			response := auditLog.GetResponse()
 			if response == nil {
-				slog.Warn(fmt.Sprintf("missing response in audit log for instance group %v", path.Base(auditLog.GetResourceName())))
+				slog.WarnContext(ctx, fmt.Sprintf("missing response in audit log for instance group %v", path.Base(auditLog.GetResourceName())))
 				return nil, nil
 			}
 			status := response.GetFields()["status"].GetStringValue()
@@ -653,7 +653,7 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 			}
 			bt, err := gcpLogsClient.GetBuildInfo(ctx, buildId) // TODO: Cache the build IDs?
 			if err != nil {
-				slog.Warn(fmt.Sprintf("failed to get build tag for build %v: %v", buildId, err))
+				slog.WarnContext(ctx, fmt.Sprintf("failed to get build tag for build %v: %v", buildId, err))
 				return nil, nil
 			}
 
@@ -707,7 +707,7 @@ func getActivityParser(ctx context.Context, gcpLogsClient GcpLogsClient, waitFor
 				}}, nil
 			}
 		default:
-			slog.Warn(fmt.Sprintf("unexpected resource type : %v", entry.Resource.Type))
+			slog.WarnContext(ctx, fmt.Sprintf("unexpected resource type : %v", entry.Resource.Type))
 			return nil, nil
 		}
 	}

@@ -447,7 +447,7 @@ func (b *ByocDo) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter
 		return nil, errors.New("no deployments found")
 	}
 
-	slog.Info("Waiting for CD command to finish gathering logs")
+	slog.InfoContext(ctx, "Waiting for CD command to finish gathering logs")
 	for {
 		deploymentInfo, _, err := b.client.Apps.GetDeployment(ctx, appID, deploymentID)
 		if err != nil {
@@ -497,7 +497,7 @@ func (b *ByocDo) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter
 }
 
 func (b *ByocDo) TearDownCD(ctx context.Context) error {
-	slog.Warn("Deleting the Defang CD app; currently existing stacks or configs will not be deleted, but they will be orphaned and they will need to be cleaned up manually")
+	slog.WarnContext(ctx, "Deleting the Defang CD app; currently existing stacks or configs will not be deleted, but they will be orphaned and they will need to be cleaned up manually")
 	app, err := b.getAppByName(ctx, appPlatform.CdName)
 	if err != nil {
 		return err

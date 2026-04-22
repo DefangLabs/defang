@@ -136,7 +136,7 @@ func makeStackListCmd() *cobra.Command {
 			}
 
 			if len(stacks) == 0 {
-				slog.Info("No Defang stacks found in the current directory.")
+				slog.InfoContext(ctx, "No Defang stacks found in the current directory.")
 				return nil
 			}
 
@@ -174,7 +174,7 @@ func makeStackDefaultCmd() *cobra.Command {
 				return err
 			}
 
-			slog.Info(fmt.Sprintf("Stack %q is now the default stack for project %q\n", name, projectName))
+			slog.InfoContext(ctx, fmt.Sprintf("Stack %q is now the default stack for project %q\n", name, projectName))
 			return nil
 		},
 	}

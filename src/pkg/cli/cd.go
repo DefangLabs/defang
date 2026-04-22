@@ -22,9 +22,9 @@ import (
 
 func CdCommand(ctx context.Context, projectName string, provider client.Provider, fabric client.FabricClient, command client.CdCommand) (types.ETag, error) {
 	if projectName == "" { // projectName is empty for "list --remote"
-		slog.Info(fmt.Sprintf("Running CD command %q", command))
+		slog.InfoContext(ctx, fmt.Sprintf("Running CD command %q", command))
 	} else {
-		slog.Info(fmt.Sprintf("Running CD command %q in project %q", command, projectName))
+		slog.InfoContext(ctx, fmt.Sprintf("Running CD command %q in project %q", command, projectName))
 	}
 	if dryrun.DoDryRun {
 		return "", dryrun.ErrDryRun
@@ -49,7 +49,7 @@ func CdCommand(ctx context.Context, projectName string, provider client.Provider
 	case client.CdCommandDown, client.CdCommandDestroy:
 		err := deleteSubdomain(ctx, projectName, provider, fabric)
 		if err != nil {
-			slog.Warn("Unable to update deployment history; deployment will proceed anyway.")
+			slog.WarnContext(ctx, "Unable to update deployment history; deployment will proceed anyway.")
 			break
 		}
 		// Update deployment table to mark deployment as destroyed only after successful deletion of the subdomain
@@ -67,7 +67,7 @@ func CdCommand(ctx context.Context, projectName string, provider client.Provider
 		})
 		if err != nil {
 			slog.Debug(fmt.Sprintf("Failed to record deployment: %v", err))
-			slog.Warn("Unable to update deployment history; deployment will proceed anyway.")
+			slog.WarnContext(ctx, "Unable to update deployment history; deployment will proceed anyway.")
 		}
 	}
 	return cd.ETag, nil
@@ -83,7 +83,7 @@ func deleteSubdomain(ctx context.Context, projectName string, provider client.Pr
 		// This can fail when the project was deployed from a different workspace than the current one
 		slog.Debug(fmt.Sprintln("DeleteSubdomainZone failed:", err))
 		if connect.CodeOf(err) == connect.CodeNotFound {
-			slog.Warn("Subdomain not found; did you mean to destroy a different project or stack?")
+			slog.WarnContext(ctx, "Subdomain not found; did you mean to destroy a different project or stack?")
 		}
 		return err
 	}
@@ -157,7 +157,7 @@ func CdListFromStorage(ctx context.Context, provider client.Provider, allRegions
 		if allRegions {
 			accountInfo.Region = ""
 		}
-		slog.Info(fmt.Sprintf("No projects found in %v", accountInfo))
+		slog.InfoContext(ctx, fmt.Sprintf("No projects found in %v", accountInfo))
 	}
 
 	return term.Table(stacks, "Project", "Stack", "Workspace", "CdRegion")

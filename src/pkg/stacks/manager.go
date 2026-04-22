@@ -108,7 +108,7 @@ func (sm *manager) ListRemote(ctx context.Context) ([]ListItem, error) {
 		bytes := stack.GetStackFile()
 		params, err := NewParametersFromContent(name, bytes)
 		if err != nil {
-			slog.Warn(fmt.Sprintf("Skipping invalid remote stack %s: %v\n", name, err))
+			slog.WarnContext(ctx, fmt.Sprintf("Skipping invalid remote stack %s: %v\n", name, err))
 			continue
 		}
 		// fill in missing fields from remote stack info
@@ -150,7 +150,7 @@ func (sm *manager) Load(ctx context.Context, name string) (*Parameters, error) {
 	params, err := sm.LoadLocal(name)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			slog.Info(fmt.Sprintf("stack file not found, attempting to import from previous deployments: %v", err))
+			slog.InfoContext(ctx, fmt.Sprintf("stack file not found, attempting to import from previous deployments: %v", err))
 			return sm.GetRemote(ctx, name)
 		}
 		return nil, err
@@ -283,7 +283,7 @@ func (sm *manager) getSpecifiedStack(ctx context.Context, name string) (*Paramet
 		return nil, "", fmt.Errorf("failed to save imported stack %q to local directory: %w", name, err)
 	}
 	if stackFilename != "" {
-		slog.Info(fmt.Sprintf("Stack %q loaded and saved to %q. Add this file to source control.", name, stackFilename))
+		slog.InfoContext(ctx, fmt.Sprintf("Stack %q loaded and saved to %q. Add this file to source control.", name, stackFilename))
 	}
 	return stack, whence + " and previous deployment", nil
 }
@@ -324,7 +324,7 @@ func (sm *manager) getDefaultStack(ctx context.Context) (*Parameters, string, er
 		return nil, whence, fmt.Errorf("using default stack %q for project %q, but the stack specifies COMPOSE_PROJECT_NAME=%q", res.Stack.Name, sm.projectName, pn)
 	}
 	if cf, ok := params.Variables["COMPOSE_FILE"]; ok {
-		slog.Warn(fmt.Sprintf("Using default stack %q for project %q, but the stack specifies COMPOSE_FILE=%q", res.Stack.Name, sm.projectName, cf))
+		slog.WarnContext(ctx, fmt.Sprintf("Using default stack %q for project %q, but the stack specifies COMPOSE_FILE=%q", res.Stack.Name, sm.projectName, cf))
 	}
 	return params, whence, nil
 }

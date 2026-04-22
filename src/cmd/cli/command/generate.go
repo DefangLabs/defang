@@ -52,7 +52,7 @@ var generateCmd = &cobra.Command{
 }
 
 func afterGenerate(ctx context.Context, result setup.SetupResult) {
-	slog.Info(fmt.Sprintln("Code generated successfully in folder", result.Folder))
+	slog.InfoContext(ctx, fmt.Sprintln("Code generated successfully in folder", result.Folder))
 	editor := pkg.Getenv("DEFANG_EDITOR", "code") // TODO: should we use EDITOR env var instead? But won't handle terminal editors like vim
 	cmdd := exec.Command(editor, result.Folder)
 	err := cmdd.Start()

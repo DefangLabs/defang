@@ -167,7 +167,7 @@ func handleInvalidComposeFileErr(ctx context.Context, loadErr error) error {
 		return loadErr
 	}
 
-	slog.Error(fmt.Sprintln("Cannot load project:", loadErr))
+	slog.ErrorContext(ctx, fmt.Sprintln("Cannot load project:", loadErr))
 	project, err := compose.NewLoader().CreateProjectForDebug()
 	if err != nil {
 		return fmt.Errorf("%w; original error: %w", err, loadErr)

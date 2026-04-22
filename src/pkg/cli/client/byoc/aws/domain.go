@@ -43,7 +43,7 @@ func prepareDomainDelegation(ctx context.Context, projectDomain, projectName, st
 		// but this is acceptable because the next time the zone is deployed, we'll get the existing delegation set from the zone.
 		delegationSet, err = findUsableDelegationSet(ctx, projectDomain, r53Client, resolverAt)
 		if err != nil {
-			slog.Warn(fmt.Sprintf("Failed to find existing usable delegation set: %v, creating a new one", err))
+			slog.WarnContext(ctx, fmt.Sprintf("Failed to find existing usable delegation set: %v, creating a new one", err))
 		}
 		if delegationSet != nil {
 			slog.Debug(fmt.Sprintln("Reusing existing usable Route53 delegation set:", *delegationSet.Id))

@@ -30,7 +30,7 @@ type HerokuApplicationInfo struct {
 func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterface, appName string) (HerokuApplicationInfo, error) {
 	var applicationInfo HerokuApplicationInfo
 
-	slog.Info("Identifying deployed dynos")
+	slog.InfoContext(ctx, "Identifying deployed dynos")
 	dynos, err := client.ListDynos(ctx, appName)
 	if err != nil {
 		return HerokuApplicationInfo{}, fmt.Errorf("failed to list dynos: %w", err)
@@ -59,7 +59,7 @@ func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterf
 	applicationInfo.ReleaseTasks = releaseTasks
 	slog.Debug(fmt.Sprintf("Release tasks for the selected application: %+v\n", releaseTasks))
 
-	slog.Info("Identifying configured addons")
+	slog.InfoContext(ctx, "Identifying configured addons")
 	addons, err := client.ListAddons(ctx, appName)
 	if err != nil {
 		return HerokuApplicationInfo{}, fmt.Errorf("failed to list Heroku addons: %w", err)

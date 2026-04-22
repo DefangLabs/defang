@@ -73,13 +73,13 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 				ctx := context.Background()
 				code, err := pollForAuthCode(ctx, ar.state)
 				if err != nil {
-					slog.Error(fmt.Sprintf("failed to poll for auth code: %v", err))
+					slog.ErrorContext(ctx, fmt.Sprintf("failed to poll for auth code: %v", err))
 					return
 				}
 
 				token, err := ExchangeCodeForToken(ctx, AuthCodeFlow{code: code, redirectUri: redirectUri, verifier: ar.verifier})
 				if err != nil {
-					slog.Error(fmt.Sprintf("failed to exchange code for token: %v", err))
+					slog.ErrorContext(ctx, fmt.Sprintf("failed to exchange code for token: %v", err))
 					return
 				}
 

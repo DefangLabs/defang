@@ -24,7 +24,7 @@ type GenerateArgs struct {
 
 func GenerateWithAI(ctx context.Context, client client.FabricClient, args GenerateArgs) ([]string, error) {
 	if dryrun.DoDryRun {
-		slog.Warn("Dry run, no project files will be generated")
+		slog.WarnContext(ctx, "Dry run, no project files will be generated")
 		return nil, dryrun.ErrDryRun
 	}
 
@@ -50,7 +50,7 @@ func GenerateWithAI(ctx context.Context, client client.FabricClient, args Genera
 	}
 
 	// Write each file to disk
-	slog.Info("Writing files to disk...")
+	slog.InfoContext(ctx, "Writing files to disk...")
 	if err := os.MkdirAll(args.Folder, 0755); err != nil {
 		return nil, err
 	}

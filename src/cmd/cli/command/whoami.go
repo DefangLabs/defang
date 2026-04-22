@@ -27,7 +27,7 @@ var whoamiCmd = &cobra.Command{
 			CheckAccountInfo: false, // because we do it inside cli.Whoami
 		})
 		if err != nil {
-			slog.Warn(fmt.Sprintf("Provider account information not available: %v", err))
+			slog.WarnContext(ctx, fmt.Sprintf("Provider account information not available: %v", err))
 		} else {
 			provider = session.Provider
 		}
@@ -40,7 +40,7 @@ var whoamiCmd = &cobra.Command{
 			userInfo, err = auth.FetchUserInfo(ctx, token)
 			if err != nil {
 				// Either the auth service is down, or we're using a Fabric JWT: skip workspace information
-				slog.Warn(fmt.Sprintln("Workspace information unavailable:", err))
+				slog.WarnContext(ctx, fmt.Sprintln("Workspace information unavailable:", err))
 			}
 		}
 

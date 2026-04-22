@@ -86,7 +86,7 @@ func (p *awsOAuthCredentialsProvider) Retrieve(ctx context.Context) (awssdk.Cred
 			return awssdk.Credentials{}, fmt.Errorf("marshaling refreshed token: %w", err)
 		}
 		if err := p.tokenStore.Save(p.storeKey, string(tokenBytes)); err != nil {
-			slog.Warn(fmt.Sprintf("failed to persist refreshed AWS OAuth token: %v", err))
+			slog.WarnContext(ctx, fmt.Sprintf("failed to persist refreshed AWS OAuth token: %v", err))
 		} else {
 			slog.Debug(fmt.Sprintf("persisted refreshed AWS OAuth token for %q", p.storeKey))
 		}
@@ -154,7 +154,7 @@ func (a *Aws) Authenticate(ctx context.Context, interactive bool) error {
 	if !interactive {
 		return errors.New("no valid AWS credentials found") // TODO: Better error message with possible doc link
 	}
-	slog.Info("no valid credentials found, starting interactive login...")
+	slog.InfoContext(ctx, "no valid credentials found, starting interactive login...")
 	creds, err := a.tryInteractiveLogin(ctx, 3)
 	if err != nil {
 		return err
@@ -180,7 +180,7 @@ func (a *Aws) tryInteractiveLogin(ctx context.Context, n int) (awssdk.Credential
 			sum := sha256.Sum256([]byte(cached.LoginSession))
 			storeKey = fmt.Sprintf("%s%x", tokenStoreKeyPrefix, sum)
 			if err := a.TokenStore.Save(storeKey, string(tokenBytes)); err != nil {
-				slog.Warn(fmt.Sprintf("failed to save AWS OAuth token: %v", err))
+				slog.WarnContext(ctx, fmt.Sprintf("failed to save AWS OAuth token: %v", err))
 			}
 		}
 
@@ -188,7 +188,7 @@ func (a *Aws) tryInteractiveLogin(ctx context.Context, n int) (awssdk.Credential
 
 		creds, err := a.testCredentialsWithProfile(ctx, storeKey, provider)
 		if err != nil {
-			slog.Warn(fmt.Sprintf("Cannot use login credentials: %v, please try again.", err))
+			slog.WarnContext(ctx, fmt.Sprintf("Cannot use login credentials: %v, please try again.", err))
 			continue
 		}
 		return creds, nil
@@ -257,13 +257,13 @@ func (a *Aws) testCredentialsWithProfile(ctx context.Context, name string, creds
 	// If the stack/env specifies an AWS_PROFILE with role, try assume the role
 	roleArn, profile, err := a.GetStackAwsProfileRoleArn(ctx)
 	if err != nil {
-		slog.Warn(fmt.Sprintf("failed to get AWS_PROFILE role ARN: %v", err))
+		slog.WarnContext(ctx, fmt.Sprintf("failed to get AWS_PROFILE role ARN: %v", err))
 	} else if profile == "" {
-		slog.Warn("AWS_PROFILE environment variable is not set, skipping AWS_PROFILE role validation")
+		slog.WarnContext(ctx, "AWS_PROFILE environment variable is not set, skipping AWS_PROFILE role validation")
 	} else if roleArn != "" {
 		same, err := sameRole(*identity.Arn, roleArn)
 		if err != nil {
-			slog.Warn(fmt.Sprintf("failed to compare token identity with AWS_PROFILE role: %v", err))
+			slog.WarnContext(ctx, fmt.Sprintf("failed to compare token identity with AWS_PROFILE role: %v", err))
 		} else if same {
 			slog.Debug(fmt.Sprintf("token %q identity %q matches AWS_PROFILE role %q", name, *identity.Arn, roleArn))
 			return creds, nil
@@ -289,7 +289,7 @@ func (a *Aws) testCredentialsWithProfile(ctx context.Context, name string, creds
 				return nil, fmt.Errorf("login successful, but does not have access to role %q in used by stack aws profile %q; token account %v does not match stack aws profile account %v", roleArn, profile, *identity.Account, parsedArn.AccountID)
 			}
 			// If cannot assume but it's the same account, we assume its a valid token
-			slog.Warn(fmt.Sprintf("login successful for AWS account %v which is same as the account specified by stack aws profile %q, assume its valid", *identity.Account, profile))
+			slog.WarnContext(ctx, fmt.Sprintf("login successful for AWS account %v which is same as the account specified by stack aws profile %q, assume its valid", *identity.Account, profile))
 			return creds, nil
 		}
 		// If able to assume the profile role, use the assumed role credentials
@@ -339,7 +339,7 @@ func (a *Aws) InteractiveLogin(ctx context.Context) (*awsTokenCache, error) {
 			port := "8080" // default port if parsing fails
 			parsed, err := url.Parse(redirectURL)
 			if err != nil {
-				slog.Warn(fmt.Sprintf("failed to parse redirect URL %q, assume port 8080: %v", redirectURL, err))
+				slog.WarnContext(ctx, fmt.Sprintf("failed to parse redirect URL %q, assume port 8080: %v", redirectURL, err))
 			} else {
 				port = parsed.Port()
 			}

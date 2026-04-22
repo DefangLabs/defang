@@ -145,7 +145,7 @@ func (s *SetupClient) AIGenerate(ctx context.Context) (SetupResult, error) {
 
 	track.Evt(GenerateStartedEvt, P("language", prompt.Language), P("description", prompt.Description), P("folder", folder), P("model", prompt.ModelID))
 	beforeGenerate(folder)
-	slog.Info("Working on it. This may take 1 or 2 minutes...")
+	slog.InfoContext(ctx, "Working on it. This may take 1 or 2 minutes...")
 	args := cli.GenerateArgs{
 		Description: prompt.Description,
 		Folder:      folder,
@@ -181,7 +181,7 @@ func (s *SetupClient) CloneSample(ctx context.Context, sample string) (SetupResu
 	}
 	track.Evt(GenerateStartedEvt, P("sample", sample), P("folder", folder))
 	beforeGenerate(folder)
-	slog.Info("Fetching sample from the Defang repository...")
+	slog.InfoContext(ctx, "Fetching sample from the Defang repository...")
 	err = cli.InitFromSamples(ctx, folder, []string{sample})
 	if err != nil {
 		return SetupResult{}, err
@@ -232,7 +232,7 @@ func (s *SetupClient) MigrateFromHeroku(ctx context.Context) (SetupResult, error
 		return SetupResult{}, err
 	}
 
-	slog.Info("Ok, let's create a compose file for your existing deployment.")
+	slog.InfoContext(ctx, "Ok, let's create a compose file for your existing deployment.")
 	heroku := migrate.NewHerokuClient()
 	composeFileContents, err := migrate.InteractiveSetup(ctx, s.Fabric, s.Surveyor, heroku, migrate.SourcePlatformHeroku)
 	if err != nil {
@@ -244,9 +244,9 @@ func (s *SetupClient) MigrateFromHeroku(ctx context.Context) (SetupResult, error
 		return SetupResult{}, fmt.Errorf("failed to write compose file: %w", err)
 	}
 
-	slog.Info(fmt.Sprintln("Compose file written to", composeFilePath))
-	slog.Info("Your application is now ready to deploy with Defang.")
-	slog.Info("For next steps, visit https://s.defang.io/from-heroku")
+	slog.InfoContext(ctx, fmt.Sprintln("Compose file written to", composeFilePath))
+	slog.InfoContext(ctx, "Your application is now ready to deploy with Defang.")
+	slog.InfoContext(ctx, "For next steps, visit https://s.defang.io/from-heroku")
 
 	return SetupResult{Folder: "."}, nil
 }

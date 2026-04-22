@@ -35,6 +35,6 @@ func InteractiveComposeDown(ctx context.Context, projectName string, fabric clie
 		return "", ErrDoNotComposeDown
 	}
 
-	slog.Info("Deactivating project " + projectName)
+	slog.InfoContext(ctx, "Deactivating project "+projectName)
 	return ComposeDown(ctx, projectName, fabric, provider)
 }

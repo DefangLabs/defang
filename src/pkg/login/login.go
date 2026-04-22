@@ -61,7 +61,7 @@ func interactiveLogin(ctx context.Context, fabricAddr string, flow LoginFlow, mc
 	}
 
 	if err := client.SaveAccessToken(fabricAddr, token); err != nil {
-		slog.Warn(fmt.Sprintf("%v", err))
+		slog.WarnContext(ctx, fmt.Sprintf("%v", err))
 		var pathError *os.PathError
 		if errors.As(err, &pathError) {
 			term.Printf("\nTo fix file permissions, run:\n\n  sudo chown -R $(whoami) %q\n", pathError.Path)
@@ -131,7 +131,7 @@ func InteractiveRequireLoginAndToS(ctx context.Context, fabric client.FabricClie
 		// Login interactively now; only do this for authorization-related errors
 		if connect.CodeOf(err) == connect.CodeUnauthenticated {
 			slog.Debug(fmt.Sprintln("Server error:", err))
-			slog.Warn("Please log in to continue.")
+			slog.WarnContext(ctx, "Please log in to continue.")
 			term.ResetWarnings() // clear any previous warnings so we don't show them again
 
 			defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
@@ -154,7 +154,7 @@ func InteractiveRequireLoginAndToS(ctx context.Context, fabric client.FabricClie
 
 		// Check if the user has agreed to the terms of service and show a prompt if needed
 		if connect.CodeOf(err) == connect.CodeFailedPrecondition {
-			slog.Warn(fmt.Sprintf("%v", client.PrettyError(err)))
+			slog.WarnContext(ctx, fmt.Sprintf("%v", client.PrettyError(err)))
 
 			defer func() { track.Cmd(nil, "Terms", P("reason", err)) }()
 			if err = InteractiveAgreeToS(ctx, fabric); err != nil {

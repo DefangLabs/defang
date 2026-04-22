@@ -76,7 +76,7 @@ func copyFromSamples(ctx context.Context, dir string, names []string, skipExisti
 	}
 	defer tarball.Close()
 	tarReader := tar.NewReader(tarball)
-	slog.Info("Copying files to disk...")
+	slog.InfoContext(ctx, "Copying files to disk...")
 
 	sampleFound := false
 
@@ -114,7 +114,7 @@ func copyFromSamples(ctx context.Context, dir string, names []string, skipExisti
 					if !skipExisting || !os.IsExist(err) {
 						return err
 					}
-					slog.Warn(fmt.Sprintf("File already exists, skipping: %q", path))
+					slog.WarnContext(ctx, fmt.Sprintf("File already exists, skipping: %q", path))
 				}
 			}
 		}

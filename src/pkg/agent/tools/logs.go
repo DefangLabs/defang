@@ -86,7 +86,7 @@ func HandleLogsTool(ctx context.Context, loader client.Loader, params LogsParams
 	})
 
 	if err != nil {
-		slog.Error(fmt.Sprintln("Failed to fetch logs", "error", err))
+		slog.ErrorContext(ctx, fmt.Sprintln("Failed to fetch logs", "error", err))
 		return "", fmt.Errorf("failed to fetch logs: %w", err)
 	}
 

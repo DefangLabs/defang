@@ -50,7 +50,7 @@ func Execute(ctx context.Context) error {
 
 	if err := RootCmd.ExecuteContext(ctx); err != nil {
 		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			slog.Error(fmt.Sprintln("Error:", client.PrettyError(err)))
+			slog.ErrorContext(ctx, fmt.Sprintln("Error:", client.PrettyError(err)))
 			track.Evt("CLI Error", P("err", err))
 		}
 
@@ -419,7 +419,7 @@ var RootCmd = &cobra.Command{
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
 			slog.Debug(fmt.Sprintln("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin))
 			if global.HasTty && isNewer(version, v.CliMin) && !isUpgradeCommand(cmd) {
-				slog.Warn("Your CLI version is outdated. Please upgrade to the latest version by running:\n\n  defang upgrade\n")
+				slog.WarnContext(ctx, "Your CLI version is outdated. Please upgrade to the latest version by running:\n\n  defang upgrade\n")
 				global.HideUpdate = true // hide the upgrade hint at the end
 			}
 		}

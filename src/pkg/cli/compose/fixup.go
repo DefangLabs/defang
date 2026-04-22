@@ -83,7 +83,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 
 		// Ignore "build" config if we have "image", unless in --build or --force mode
 		if svccfg.Image != "" && svccfg.Build != nil && upload != UploadModeDigest && upload != UploadModeForce {
-			slog.Warn(fmt.Sprintf("service %q: using published image instead of rebuilding; pass --build to build and publish a new image", svccfg.Name))
+			slog.WarnContext(ctx, fmt.Sprintf("service %q: using published image instead of rebuilding; pass --build to build and publish a new image", svccfg.Name))
 			svccfg.Build = nil
 		}
 
@@ -155,14 +155,14 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 			}
 
 			if len(removedArgs) > 0 {
-				slog.Warn(fmt.Sprintf("service %q: skipping unset build argument %q", svccfg.Name, removedArgs))
+				slog.WarnContext(ctx, fmt.Sprintf("service %q: skipping unset build argument %q", svccfg.Name, removedArgs))
 			}
 		}
 
 		// Fixup secret references; secrets are supposed to be files, not env, but it's kept for backward compatibility
 		for i, secret := range svccfg.Secrets {
 			if i == 0 { // only warn once
-				slog.Warn(fmt.Sprintf("service %q: secrets will be exposed as environment variables, not files (use 'environment' instead)", svccfg.Name))
+				slog.WarnContext(ctx, fmt.Sprintf("service %q: secrets will be exposed as environment variables, not files (use 'environment' instead)", svccfg.Name))
 			}
 			svccfg.Environment[secret.Source] = nil
 		}
@@ -176,7 +176,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 			// A bug in Compose-go env file parsing can cause empty keys
 			if key == "" {
 				if !shownOnce {
-					slog.Warn(fmt.Sprintf("service %q: skipping unset environment variable key", svccfg.Name))
+					slog.WarnContext(ctx, fmt.Sprintf("service %q: skipping unset environment variable key", svccfg.Name))
 					shownOnce = true
 				}
 				delete(svccfg.Environment, key) // remove the empty key; this is safe
@@ -204,17 +204,17 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 		}
 
 		if len(notAdjusted) > 0 {
-			slog.Warn(fmt.Sprintf("service %q: environment variable(s) %q will use the `defang config` value instead of adjusted service name", svccfg.Name, notAdjusted))
+			slog.WarnContext(ctx, fmt.Sprintf("service %q: environment variable(s) %q will use the `defang config` value instead of adjusted service name", svccfg.Name, notAdjusted))
 		}
 
 		if len(overridden) > 0 {
-			slog.Warn(fmt.Sprintf("service %q: environment variable(s) %q overridden by config", svccfg.Name, overridden))
+			slog.WarnContext(ctx, fmt.Sprintf("service %q: environment variable(s) %q overridden by config", svccfg.Name, overridden))
 		}
 
 		_, scaling := svccfg.Extensions["x-defang-autoscaling"]
 		if scaling {
 			if _, ok := provider.(*client.PlaygroundProvider); ok {
-				slog.Warn(fmt.Sprintf("service %q: auto-scaling is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name))
+				slog.WarnContext(ctx, fmt.Sprintf("service %q: auto-scaling is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name))
 			}
 		}
 

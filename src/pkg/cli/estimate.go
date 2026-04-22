@@ -28,7 +28,7 @@ func RunEstimate(ctx context.Context, project *compose.Project, client client.Fa
 		return nil, err
 	}
 
-	slog.Info("Preparing estimate")
+	slog.InfoContext(ctx, "Preparing estimate")
 
 	estimate, err := client.Estimate(ctx, &defangv1.EstimateRequest{
 		Provider:      estimateProviderID.Value(),
@@ -68,7 +68,7 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 		return "", err
 	}
 
-	slog.Info("Generating deployment preview, this may take a few minutes...")
+	slog.InfoContext(ctx, "Generating deployment preview, this may take a few minutes...")
 	var pulumiPreviewLogLines []string
 	tailOptions := TailOptions{
 		Deployment: resp.Etag,

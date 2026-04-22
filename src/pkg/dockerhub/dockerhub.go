@@ -79,7 +79,7 @@ func GenerateNewPublicOnlyPAT(ctx context.Context, label string) (string, string
 		}
 		pat, err = docHubClient.CreatePAT(ctx, label, []string{"repo:public_read"})
 		if err != nil {
-			slog.Info(fmt.Sprintf("Failed to create Docker Hub PAT, fallback to existing docker credentials: %v", err))
+			slog.InfoContext(ctx, fmt.Sprintf("Failed to create Docker Hub PAT, fallback to existing docker credentials: %v", err))
 			// Fallback to use the password as PAT
 			pat = password
 		}

@@ -210,7 +210,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 	})
 	if err != nil {
 		slog.Debug(fmt.Sprintln("Failed to record deployment:", err))
-		slog.Warn("Unable to update deployment history; deployment will proceed anyway.")
+		slog.WarnContext(ctx, "Unable to update deployment history; deployment will proceed anyway.")
 	}
 
 	if term.DoDebug() {

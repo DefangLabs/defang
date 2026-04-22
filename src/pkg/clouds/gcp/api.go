@@ -39,7 +39,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 			if errors.As(err, &apiErr) && (apiErr.Code == 403 || apiErr.Code == 401) {
 				return fmt.Errorf("permission denied when enabling services: %w", err)
 			}
-			slog.Error(fmt.Sprintf("Error: %+v (%T)", err, err))
+			slog.ErrorContext(ctx, fmt.Sprintf("Error: %+v (%T)", err, err))
 			if i < maxAttempts-1 {
 				slog.Debug(fmt.Sprintf("Failed to enable services, will retry in %v: %v\n", retryInterval, err))
 				if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
@@ -54,7 +54,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 		for {
 			op, err := opService.Get(operation.Name).Context(ctx).Do()
 			if err != nil {
-				slog.Warn(fmt.Sprintf("Failed to get operation status: %v\n", err))
+				slog.WarnContext(ctx, fmt.Sprintf("Failed to get operation status: %v\n", err))
 			} else if op.Done { // Check if the operation is done
 				if op.Error != nil {
 					if i < maxAttempts-1 {

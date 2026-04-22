@@ -62,6 +62,6 @@ func nonInteractiveAgreeToS(ctx context.Context, fabric client.FabricClient) err
 	if err := fabric.AgreeToS(ctx); err != nil {
 		return err
 	}
-	slog.Info("You have agreed to the Defang terms of service")
+	slog.InfoContext(ctx, "You have agreed to the Defang terms of service")
 	return nil
 }

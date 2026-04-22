@@ -49,9 +49,9 @@ func DeploymentsList(ctx context.Context, client client.FabricClient, params Lis
 			active = " active"
 		}
 		if params.ProjectName == "" {
-			slog.Warn(fmt.Sprintf("No%s deployments found; use --workspace to specify a different workspace", active))
+			slog.WarnContext(ctx, fmt.Sprintf("No%s deployments found; use --workspace to specify a different workspace", active))
 		} else {
-			slog.Warn(fmt.Sprintf("No%s deployments found for project %q", active, params.ProjectName))
+			slog.WarnContext(ctx, fmt.Sprintf("No%s deployments found for project %q", active, params.ProjectName))
 		}
 		return nil
 	}

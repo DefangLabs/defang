@@ -128,11 +128,11 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 		if ctx.Err() != nil { // Fast fail if context is done, no need to try other credential sources
 			return ctx.Err()
 		}
-		slog.Warn(fmt.Sprintf("failed to get GitHub Actions OIDC token source: %v", err))
+		slog.WarnContext(ctx, fmt.Sprintf("failed to get GitHub Actions OIDC token source: %v", err))
 	} else if tokenSource != nil {
 		slog.Debug("found GitHub Actions OIDC token source, testing permissions...")
 		if err := testTokenProjectPermissions(ctx, gcp.ProjectId, requiredPerms, tokenSource); err != nil {
-			slog.Warn(fmt.Sprintf("GitHub Actions OIDC token is missing required permissions on project %q: %v\nPlease ensure your workload identity provider and github actions permissions are set up correctly: https://docs.defang.com/defang-byoc/gcp/github-actions\n", gcp.ProjectId, err))
+			slog.WarnContext(ctx, fmt.Sprintf("GitHub Actions OIDC token is missing required permissions on project %q: %v\nPlease ensure your workload identity provider and github actions permissions are set up correctly: https://docs.defang.com/defang-byoc/gcp/github-actions\n", gcp.ProjectId, err))
 		} else {
 			slog.Debug("GitHub Actions OIDC token has required permissions")
 			gcp.Options = append(gcp.Options, option.WithTokenSource(tokenSource))
@@ -147,7 +147,7 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 		if ctx.Err() != nil { // Fast fail if context is done, no need to try other credential sources
 			return ctx.Err()
 		}
-		slog.Warn(fmt.Sprintf("failed to load stored credentials: %v", err))
+		slog.WarnContext(ctx, fmt.Sprintf("failed to load stored credentials: %v", err))
 	} else if tokenSource != nil {
 		slog.Debug("found valid stored credentials with required permissions")
 		gcp.Options = append(gcp.Options, option.WithTokenSource(tokenSource))
@@ -171,11 +171,11 @@ func (gcp *Gcp) tryInteractiveLogin(ctx context.Context, n int) error {
 		}
 		if err := testTokenProjectPermissions(ctx, gcp.ProjectId, requiredPerms, tokenSource); err != nil {
 			if errors.As(err, &ErrorMissingPermissions{}) {
-				slog.Warn(fmt.Sprintf("Token from interactive login is missing required permissions on project %q: %v\nPlease ensure your user has the following permissions: %v\n", gcp.ProjectId, err, requiredPerms))
+				slog.WarnContext(ctx, fmt.Sprintf("Token from interactive login is missing required permissions on project %q: %v\nPlease ensure your user has the following permissions: %v\n", gcp.ProjectId, err, requiredPerms))
 			} else {
-				slog.Warn(fmt.Sprintf("Failed to validate token from interactive login on project %q: %v\n", gcp.ProjectId, err))
+				slog.WarnContext(ctx, fmt.Sprintf("Failed to validate token from interactive login on project %q: %v\n", gcp.ProjectId, err))
 			}
-			slog.Warn("Please try logging in again with an account that has the required permissions.")
+			slog.WarnContext(ctx, "Please try logging in again with an account that has the required permissions.")
 			continue
 		}
 		gcp.Options = append(gcp.Options, option.WithTokenSource(tokenSource))
@@ -193,7 +193,7 @@ func (gcp *Gcp) tryInteractiveLogin(ctx context.Context, n int) error {
 			return fmt.Errorf("failed to marshal token: %w", err)
 		}
 		if gcp.TokenStore == nil {
-			slog.Warn("No token store configured, skipping persisting token")
+			slog.WarnContext(ctx, "No token store configured, skipping persisting token")
 			return nil
 		}
 		if err := gcp.TokenStore.Save(tokenName, string(bytes)); err != nil {
@@ -222,12 +222,12 @@ func (gcp *Gcp) findStoredCredentials(ctx context.Context) (oauth2.TokenSource, 
 	for _, name := range oauthTokenNames {
 		tokenJson, err := gcp.TokenStore.Load(name)
 		if err != nil {
-			slog.Warn(fmt.Sprintf("failed to load previously saved auth token %q: %v", name, err))
+			slog.WarnContext(ctx, fmt.Sprintf("failed to load previously saved auth token %q: %v", name, err))
 			continue
 		}
 		var token oauth2.Token
 		if err = json.Unmarshal([]byte(tokenJson), &token); err != nil {
-			slog.Warn(fmt.Sprintf("failed to parse previously saved auth token %q: %v", name, err))
+			slog.WarnContext(ctx, fmt.Sprintf("failed to parse previously saved auth token %q: %v", name, err))
 			continue
 		}
 		slog.Debug(fmt.Sprintf("Testing token %q from store for required permissions...", name))

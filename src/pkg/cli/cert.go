@@ -96,7 +96,7 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 		}
 		if service, ok := project.Services[serviceInfo.Service.Name]; ok {
 			if service.DomainName != serviceInfo.Domainname {
-				slog.Warn(fmt.Sprintf("service %q: domainname %q in compose file does not match deployed value %q", service.Name, service.DomainName, serviceInfo.Domainname))
+				slog.WarnContext(ctx, fmt.Sprintf("service %q: domainname %q in compose file does not match deployed value %q", service.Name, service.DomainName, serviceInfo.Domainname))
 			}
 			cnt++
 			targets := getDomainTargets(serviceInfo, service)
@@ -111,7 +111,7 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 		}
 	}
 	if cnt == 0 {
-		slog.Info("No `domainname` found in compose file; no HTTPS cert generation needed")
+		slog.InfoContext(ctx, "No `domainname` found in compose file; no HTTPS cert generation needed")
 	}
 
 	return nil
@@ -133,35 +133,35 @@ func getDomainTargets(serviceInfo *defangv1.ServiceInfo, service compose.Service
 }
 
 func generateCert(ctx context.Context, domain string, targets []string, client client.FabricClient) {
-	slog.Info(fmt.Sprintf("Checking DNS setup for %v", domain))
+	slog.InfoContext(ctx, fmt.Sprintf("Checking DNS setup for %v", domain))
 	if err := waitForCNAME(ctx, domain, targets, client); err != nil {
-		slog.Error(fmt.Sprintf("Error waiting for CNAME: %v", err))
+		slog.ErrorContext(ctx, fmt.Sprintf("Error waiting for CNAME: %v", err))
 		return
 	}
 
-	slog.Info(fmt.Sprintf("%v DNS is properly configured!", domain))
+	slog.InfoContext(ctx, fmt.Sprintf("%v DNS is properly configured!", domain))
 	if err := cert.CheckTLSCert(ctx, domain); err == nil {
-		slog.Info(fmt.Sprintf("TLS cert for %v is already ready", domain))
+		slog.InfoContext(ctx, fmt.Sprintf("TLS cert for %v is already ready", domain))
 		return
 	}
 	if err := pkg.SleepWithContext(ctx, 5*time.Second); err != nil { // slight delay to ensure DNS to propagate
-		slog.Error(fmt.Sprintf("Error waiting for DNS propagation: %v", err))
+		slog.ErrorContext(ctx, fmt.Sprintf("Error waiting for DNS propagation: %v", err))
 		return
 	}
-	slog.Info(fmt.Sprintf("Triggering cert generation for %v", domain))
+	slog.InfoContext(ctx, fmt.Sprintf("Triggering cert generation for %v", domain))
 	if err := triggerCertGeneration(ctx, domain); err != nil {
-		slog.Error("Error triggering cert generation, please try again", "domain", domain, "err", err)
+		slog.ErrorContext(ctx, "Error triggering cert generation, please try again", "domain", domain, "err", err)
 		return
 	}
 
-	slog.Info(fmt.Sprintf("Waiting for TLS cert to be online for %v, this could take a few minutes", domain))
+	slog.InfoContext(ctx, fmt.Sprintf("Waiting for TLS cert to be online for %v, this could take a few minutes", domain))
 	if err := waitForTLS(ctx, domain); err != nil {
-		slog.Error(fmt.Sprintf("Error waiting for TLS to be online: %v", err))
+		slog.ErrorContext(ctx, fmt.Sprintf("Error waiting for TLS to be online: %v", err))
 		// FIXME: Add more info on how to debug, possibly provided by the server side to avoid client type detection here
 		return
 	}
 
-	slog.Info(fmt.Sprintf("TLS cert for %v is ready\n", domain))
+	slog.InfoContext(ctx, fmt.Sprintf("TLS cert for %v is ready\n", domain))
 }
 
 func triggerCertGeneration(ctx context.Context, domain string) error {
@@ -246,13 +246,13 @@ func waitForCNAME(ctx context.Context, domain string, targets []string, client c
 				}
 			}
 			if serverVerifyRpcFailure >= 3 {
-				slog.Warn(fmt.Sprintf("Server side DNS verification for %v failed multiple times, skipping server side DNS verification.", domain))
+				slog.WarnContext(ctx, fmt.Sprintf("Server side DNS verification for %v failed multiple times, skipping server side DNS verification.", domain))
 			}
 		}
 		if serverSideVerified || serverVerifyRpcFailure >= 3 {
 			locallyVerified := dns.CheckDomainDNSReady(ctx, domain, targets)
 			if serverSideVerified && !locallyVerified {
-				slog.Warn(fmt.Sprintf("DNS settings for %v are verified, but changes may take a few minutes to propagate due to caching.", domain))
+				slog.WarnContext(ctx, fmt.Sprintf("DNS settings for %v are verified, but changes may take a few minutes to propagate due to caching.", domain))
 				return nil
 			}
 			if locallyVerified {
@@ -265,9 +265,9 @@ func waitForCNAME(ctx context.Context, domain string, targets []string, client c
 	if err := verifyDNS(); err == nil {
 		return nil
 	}
-	slog.Info(fmt.Sprintf("Configure a CNAME or ALIAS record for the domain name: %v", domain))
+	slog.InfoContext(ctx, fmt.Sprintf("Configure a CNAME or ALIAS record for the domain name: %v", domain))
 	term.Printf("  %v  -> %v\n", domain, strings.Join(targets, " or "))
-	slog.Info("Awaiting DNS record setup and propagation... This may take a while.")
+	slog.InfoContext(ctx, "Awaiting DNS record setup and propagation... This may take a while.")
 
 	for {
 		select {

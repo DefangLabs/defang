@@ -68,7 +68,7 @@ func setupFromHeroku(ctx context.Context, fabric client.FabricClient, surveyor s
 		return "", fmt.Errorf("failed to select source application: %w", err)
 	}
 
-	slog.Info(fmt.Sprintf("Collecting information about %q...", sourceApp))
+	slog.InfoContext(ctx, fmt.Sprintf("Collecting information about %q...", sourceApp))
 
 	applicationInfo, err := collectHerokuApplicationInfo(ctx, herokuClient, sourceApp)
 	if err != nil {
@@ -84,7 +84,7 @@ func setupFromHeroku(ctx context.Context, fabric client.FabricClient, surveyor s
 
 	slog.Debug(fmt.Sprintf("Sanitized application info: %+v\n", sanitizedApplicationInfo))
 
-	slog.Info("Generating compose file...")
+	slog.InfoContext(ctx, "Generating compose file...")
 
 	composeFileContents, err := generateComposeFile(ctx, fabric, defangv1.SourcePlatform_SOURCE_PLATFORM_HEROKU, sourceApp, sanitizedApplicationInfo)
 	if err != nil {

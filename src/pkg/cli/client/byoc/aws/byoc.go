@@ -121,11 +121,11 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 		AWSSecretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
 		switch {
 		case AWSAccessKeyID != "" && AWSSecretAccessKey != "":
-			slog.Warn(fmt.Sprintf("Both AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY and AWS_PROFILE (%q) are set; access keys take precedence and AWS_PROFILE will be ignored", awsProfileName))
+			slog.WarnContext(ctx, fmt.Sprintf("Both AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY and AWS_PROFILE (%q) are set; access keys take precedence and AWS_PROFILE will be ignored", awsProfileName))
 		case AWSAccessKeyID != "" && AWSSecretAccessKey == "":
-			slog.Warn(fmt.Sprintf("Partial credentials found in env, missing: AWS_SECRET_ACCESS_KEY; using AWS_PROFILE (%q) instead", awsProfileName))
+			slog.WarnContext(ctx, fmt.Sprintf("Partial credentials found in env, missing: AWS_SECRET_ACCESS_KEY; using AWS_PROFILE (%q) instead", awsProfileName))
 		case AWSAccessKeyID == "" && AWSSecretAccessKey != "":
-			slog.Warn(fmt.Sprintf("Partial credentials found in env, missing: AWS_ACCESS_KEY_ID; using AWS_PROFILE (%q) instead", awsProfileName))
+			slog.WarnContext(ctx, fmt.Sprintf("Partial credentials found in env, missing: AWS_ACCESS_KEY_ID; using AWS_PROFILE (%q) instead", awsProfileName))
 		}
 	}
 
@@ -271,7 +271,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		dockerHubUser, dockerHubPass, err := dockerhub.GetDockerHubCredentials(ctx)
 		if err != nil {
 			slog.Debug(fmt.Sprintf("Could not retrieve Docker Hub credentials: %v", err))
-			slog.Warn("Docker Hub credentials are required to avoid pull throttling. Please run `docker login` or set the DOCKERHUB_USERNAME and DOCKERHUB_TOKEN environment variables. Without valid credentials, image pulls may be rate-limited or fail.")
+			slog.WarnContext(ctx, "Docker Hub credentials are required to avoid pull throttling. Please run `docker login` or set the DOCKERHUB_USERNAME and DOCKERHUB_TOKEN environment variables. Without valid credentials, image pulls may be rate-limited or fail.")
 		} else {
 			slog.Debug(fmt.Sprintf("Using Docker Hub credentials with user %v", dockerHubUser))
 			cdCmd.dockerHubUsername = dockerHubUser
@@ -289,7 +289,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 
 	for _, si := range serviceInfos {
 		if si.UseAcmeCert {
-			slog.Info(fmt.Sprintf("To activate TLS certificate for %v, run 'defang cert gen'", si.Domainname))
+			slog.InfoContext(ctx, fmt.Sprintf("To activate TLS certificate for %v, run 'defang cert gen'", si.Domainname))
 		}
 	}
 
@@ -412,7 +412,7 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 			return "", err
 		}
 		if len(zones) > 1 {
-			slog.Warn(fmt.Sprintf("Multiple hosted zones found for domain %q, using the first one: %v", domain, zones[0].Id))
+			slog.WarnContext(ctx, fmt.Sprintf("Multiple hosted zones found for domain %q, using the first one: %v", domain, zones[0].Id))
 		}
 		return *zones[0].Id, nil
 	}
@@ -552,7 +552,7 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild
 	if cmd.dockerHubUsername != "" && cmd.dockerHubAccessToken != "" {
 		arn, err := b.putDockerHubSecret(ctx, cmd.project, cmd.dockerHubUsername, cmd.dockerHubAccessToken)
 		if err != nil {
-			slog.Warn(fmt.Sprintf("Could not store Docker Hub credentials in Secrets Manager, images from dockerhub may be throttled during build: %v", err))
+			slog.WarnContext(ctx, fmt.Sprintf("Could not store Docker Hub credentials in Secrets Manager, images from dockerhub may be throttled during build: %v", err))
 		} else {
 			env["CI_REGISTRY_CREDENTIALS_ARN"] = arn
 			slog.Debug("Stored Docker Hub credentials in Secrets Manager: " + arn)
@@ -697,7 +697,7 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 	// if the cloud formation stack has been destroyed, we can still query
 	// logs for builds and services
 	if err := b.driver.FillOutputs(ctx); err != nil {
-		slog.Warn(fmt.Sprintf("Unable to show CD logs: %v", err)) // TODO: could skip this warning if the user wasn't asking for CD logs
+		slog.WarnContext(ctx, fmt.Sprintf("Unable to show CD logs: %v", err)) // TODO: could skip this warning if the user wasn't asking for CD logs
 	}
 
 	cfg, err := b.driver.LoadConfig(ctx)
@@ -903,7 +903,7 @@ func (b *ByocAws) UpdateServiceInfo(ctx context.Context, si *defangv1.ServiceInf
 }
 
 func (b *ByocAws) TearDownCD(ctx context.Context) error {
-	slog.Warn("Deleting the Defang CD cluster; currently existing stacks or configs will not be deleted, but they will be orphaned and they will need to be cleaned up manually")
+	slog.WarnContext(ctx, "Deleting the Defang CD cluster; currently existing stacks or configs will not be deleted, but they will be orphaned and they will need to be cleaned up manually")
 	return b.driver.TearDown(ctx)
 }
 
@@ -963,7 +963,7 @@ func (b *ByocAws) CdList(ctx context.Context, allRegions bool) (iter.Seq[state.I
 
 func (b *ByocAws) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {
 	if err := b.driver.FillOutputs(ctx); err != nil {
-		slog.Warn(fmt.Sprintf("Unable to get log group ARNs: %v", err))
+		slog.WarnContext(ctx, fmt.Sprintf("Unable to get log group ARNs: %v", err))
 	}
 
 	cfg, err := b.driver.LoadConfig(ctx)

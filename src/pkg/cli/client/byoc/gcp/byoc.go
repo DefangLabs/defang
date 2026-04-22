@@ -175,7 +175,7 @@ func (b *ByocGcp) SetUpCD(ctx context.Context, force bool) error {
 	}
 	// TODO: Handle project creation flow
 
-	slog.Info(fmt.Sprintf("Setting up defang CD in GCP project %s, this could take a few minutes", b.driver.GetProjectID()))
+	slog.InfoContext(ctx, fmt.Sprintf("Setting up defang CD in GCP project %s, this could take a few minutes", b.driver.GetProjectID()))
 	// 1. Enable required APIs
 	// TODO: enable minimum APIs needed for bootstrap the cd image, let CD enable the rest of the APIs
 	apis := []string{
