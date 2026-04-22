@@ -848,7 +848,11 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 		term.Debugf("Failed to get project bucket object from bucket %q at path %q with service account %q: %v", bucketName, path, uploadSA, err)
 		// Handle the case where the object does not exist, or where we do not have permission to view the object, ie.
 		// "Permission 'iam.serviceAccounts.getAccessToken' denied on resource (or it may not exist)."  #2051
-		if errors.Is(err, gcp.ErrObjectNotExist) || strings.Contains(err.Error(), "(or it may not exist)") {
+		// Also handle the case where the upload service account itself does not exist yet (first deployment
+		// before SetUpCD has run), which surfaces as an impersonate 404 "Gaia id not found for email ...".
+		if errors.Is(err, gcp.ErrObjectNotExist) ||
+			strings.Contains(err.Error(), "(or it may not exist)") ||
+			strings.Contains(err.Error(), "Gaia id not found for email") {
 			return nil, client.ErrNotExist // first deployment, no services yet
 		}
 		return nil, annotateGcpError(err)
