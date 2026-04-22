@@ -65,7 +65,7 @@ func Test_BadGCPprojectnameErrorWrap(t *testing.T) {
 	wrappedErr := annotateGcpError(gcpErr)
 	assert.Equal(t, `double check the GCP project ID and make sure your Application Default Credentials have permission to access the project: `+gcpErr.Message, wrappedErr.Error())
 
-	// Test the error is wrapper correctly
+	// Test the error is wrapped correctly
 	var unwrappedErr *googleapi.Error
 	assert.True(t, errors.As(wrappedErr, &unwrappedErr))
 	assert.Equal(t, gcpErr, unwrappedErr)

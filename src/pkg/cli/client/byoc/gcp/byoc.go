@@ -282,7 +282,6 @@ func (b *ByocGcp) SetUpCD(ctx context.Context, force bool) error {
 		}
 	}
 
-	// 5. Setup Cloud Run Job
 	term.Debugf("Using CD image: %q", b.CDImage)
 
 	b.SetupDone = true
@@ -848,10 +847,12 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 	pbBytes, err := b.driver.GetBucketObjectWithServiceAccount(ctx, bucketName, path, uploadSA)
 	if err != nil {
 		term.Debugf("Failed to get project bucket object from bucket %q at path %q with service account %q: %v", bucketName, path, uploadSA, err)
-		if errors.Is(err, gcp.ErrObjectNotExist) {
-			return nil, client.ErrNotExist // no services yet
+		// Handle the case where the object does not exist, or where we do not have permission to view the object, ie.
+		// "Permission 'iam.serviceAccounts.getAccessToken' denied on resource (or it may not exist)."  #2051
+		if errors.Is(err, gcp.ErrObjectNotExist) || strings.Contains(err.Error(), "(or it may not exist)") {
+			return nil, client.ErrNotExist // first deployment, no services yet
 		}
-		return nil, err
+		return nil, annotateGcpError(err)
 	}
 
 	var projUpdate defangv1.ProjectUpdate

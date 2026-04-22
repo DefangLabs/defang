@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 
+	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -67,8 +68,7 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 			return err
 		}
 
-		// TODO: should we always update the stack and upload the stack file?
-		if err := fabric.PutStack(ctx, &defangv1.PutStackRequest{
+		err = fabric.PutStack(ctx, &defangv1.PutStackRequest{
 			Stack: &defangv1.Stack{
 				Name:              provider.GetStackName(),
 				Project:           req.ProjectName,
@@ -79,8 +79,13 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 				LastDeployedAt:    now,
 				StackFile:         []byte(stackFile),
 			},
-		}); err != nil {
-			return err
+		})
+		if err != nil {
+			if connect.CodeOf(err) == connect.CodeAlreadyExists {
+				term.Debugf("Stack %q already exists; proceeding to track deployment: %v", provider.GetStackName(), err)
+			} else {
+				return err
+			}
 		}
 	}
 

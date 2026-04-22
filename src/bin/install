@@ -286,9 +286,11 @@ _install_completion_script() {
     esac
 }
 
-_install_completion_script "$SHELL" || true
-CURRENT_SHELL=${0#-}
-[ "$CURRENT_SHELL" != "$SHELL" ] && _install_completion_script "$CURRENT_SHELL" || true
+if [ "$CI" != "1" ]; then
+    _install_completion_script "$SHELL" || true
+    CURRENT_SHELL=${0#-}
+    [ "$CURRENT_SHELL" != "$SHELL" ] && _install_completion_script "$CURRENT_SHELL" || true
+fi
 
 # Cleanup: Remove the temporary directory
 echo "Cleaning up..."
