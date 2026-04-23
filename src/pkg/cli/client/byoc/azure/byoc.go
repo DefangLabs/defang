@@ -322,9 +322,14 @@ func (b *ByocAzure) buildCdEnv(projectName string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	// AZURE_RESOURCE_GROUP and AZURE_KEY_VAULT_NAME are intentionally omitted:
+	// the Pulumi Azure provider now derives both deterministically from
+	// {project, stack, location, subscription} using the same formulas the
+	// CLI uses (projectResourceGroupName, keyvault.VaultName), so passing
+	// them as env vars would just be another spot for the two sides to
+	// drift out of sync.
 	env := map[string]string{
 		"AZURE_LOCATION":             b.driver.Location.String(),
-		"AZURE_RESOURCE_GROUP":       b.projectResourceGroupName(projectName),
 		"AZURE_SUBSCRIPTION_ID":      b.driver.SubscriptionID,
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"),
 		"DEFANG_JSON":                os.Getenv("DEFANG_JSON"),
@@ -340,9 +345,6 @@ func (b *ByocAzure) buildCdEnv(projectName string) (map[string]string, error) {
 		"PULUMI_SKIP_UPDATE_CHECK":   "true",
 		"STACK":                      b.PulumiStack,
 		"USER":                       "root",
-	}
-	if b.kv != nil && b.kv.VaultName != "" {
-		env["AZURE_KEY_VAULT_NAME"] = b.kv.VaultName
 	}
 	if !term.StdoutCanColor() {
 		env["NO_COLOR"] = "1"

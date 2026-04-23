@@ -427,8 +427,13 @@ func TestBuildCdEnv(t *testing.T) {
 	if got := env["AZURE_SUBSCRIPTION_ID"]; got != "sub-1" {
 		t.Errorf("AZURE_SUBSCRIPTION_ID = %q", got)
 	}
-	if got := env["AZURE_RESOURCE_GROUP"]; got != "defang-myproj-test-stack-westus2" {
-		t.Errorf("AZURE_RESOURCE_GROUP = %q", got)
+	// AZURE_RESOURCE_GROUP / AZURE_KEY_VAULT_NAME should NOT be passed — the
+	// Pulumi provider derives them deterministically from the same inputs.
+	if _, ok := env["AZURE_RESOURCE_GROUP"]; ok {
+		t.Errorf("AZURE_RESOURCE_GROUP should not be passed to CD; provider derives it")
+	}
+	if _, ok := env["AZURE_KEY_VAULT_NAME"]; ok {
+		t.Errorf("AZURE_KEY_VAULT_NAME should not be passed to CD; provider derives it")
 	}
 	if got := env["STACK"]; got != "test-stack" {
 		t.Errorf("STACK = %q", got)
