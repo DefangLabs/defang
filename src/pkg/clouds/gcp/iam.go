@@ -100,18 +100,11 @@ func (gcp Gcp) EnsureServiceAccountExists(ctx context.Context, serviceAccountId,
 	serviceAccountPath := fmt.Sprintf("projects/%s/serviceAccounts/%s", gcp.ProjectId, serviceAccountEmail)
 	// The IAM API may have only just been enabled; retry while the enable is still propagating.
 	var account *iamadmpb.ServiceAccount
-	for i := range maxAttempts {
-		account, err = client.GetServiceAccount(ctx, &iamadmpb.GetServiceAccountRequest{Name: serviceAccountPath})
-		if err == nil || !IsAccessNotEnabled(err) {
-			break
-		}
-		if i < maxAttempts-1 {
-			term.Debugf("IAM API not yet usable, will retry in %v: %v\n", retryInterval, err)
-			if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
-				return "", err
-			}
-		}
-	}
+	err = RetryOnAccessNotEnabled(ctx, maxAttempts, retryInterval, func() error {
+		var getErr error
+		account, getErr = client.GetServiceAccount(ctx, &iamadmpb.GetServiceAccountRequest{Name: serviceAccountPath})
+		return getErr
+	})
 	if err == nil {
 		if account.GetDisplayName() == displayName &&
 			account.GetDescription() == description {

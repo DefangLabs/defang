@@ -1,10 +1,14 @@
 package gcp
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"strings"
+	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/googleapis/gax-go/v2/apierror"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/grpc/codes"
@@ -44,4 +48,24 @@ func IsAccessNotEnabled(err error) bool {
 		}
 	}
 	return false
+}
+
+// RetryOnAccessNotEnabled retries op up to attempts times, sleeping interval between attempts, while
+// op returns an IsAccessNotEnabled error. Used after EnsureAPIsEnabled to tolerate the delay between
+// an API enablement being returned as successful and the API actually being usable on subsequent calls.
+func RetryOnAccessNotEnabled(ctx context.Context, attempts int, interval time.Duration, op func() error) error {
+	var err error
+	for i := range attempts {
+		err = op()
+		if err == nil || !IsAccessNotEnabled(err) {
+			return err
+		}
+		if i < attempts-1 {
+			term.Debugf("API not yet usable, will retry in %v: %v\n", interval, err)
+			if sleepErr := pkg.SleepWithContext(ctx, interval); sleepErr != nil {
+				return sleepErr
+			}
+		}
+	}
+	return err
 }

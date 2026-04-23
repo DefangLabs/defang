@@ -1,7 +1,10 @@
 package gcp
 
 import (
+	"context"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/googleapis/gax-go/v2/apierror"
 	"google.golang.org/api/googleapi"
@@ -102,4 +105,89 @@ func TestServiceDisabled(t *testing.T) {
 	if !IsAccessNotEnabled(apierr) {
 		t.Errorf("expected IsAccessNotEnabled to return true, got false")
 	}
+}
+
+func TestRetryOnAccessNotEnabled(t *testing.T) {
+	accessNotEnabledErr := &googleapi.Error{
+		Code: 403,
+		Errors: []googleapi.ErrorItem{
+			{Reason: "accessNotConfigured"},
+		},
+	}
+
+	t.Run("returns nil on success without retry", func(t *testing.T) {
+		calls := 0
+		err := RetryOnAccessNotEnabled(t.Context(), 3, time.Millisecond, func() error {
+			calls++
+			return nil
+		})
+		if err != nil {
+			t.Errorf("expected nil, got %v", err)
+		}
+		if calls != 1 {
+			t.Errorf("expected 1 call, got %d", calls)
+		}
+	})
+
+	t.Run("returns non-access-not-enabled error without retry", func(t *testing.T) {
+		calls := 0
+		other := errors.New("some other error")
+		err := RetryOnAccessNotEnabled(t.Context(), 3, time.Millisecond, func() error {
+			calls++
+			return other
+		})
+		if !errors.Is(err, other) {
+			t.Errorf("expected %v, got %v", other, err)
+		}
+		if calls != 1 {
+			t.Errorf("expected 1 call, got %d", calls)
+		}
+	})
+
+	t.Run("retries on access-not-enabled then succeeds", func(t *testing.T) {
+		calls := 0
+		err := RetryOnAccessNotEnabled(t.Context(), 5, time.Millisecond, func() error {
+			calls++
+			if calls < 3 {
+				return accessNotEnabledErr
+			}
+			return nil
+		})
+		if err != nil {
+			t.Errorf("expected nil, got %v", err)
+		}
+		if calls != 3 {
+			t.Errorf("expected 3 calls, got %d", calls)
+		}
+	})
+
+	t.Run("returns last error after exhausting attempts", func(t *testing.T) {
+		calls := 0
+		err := RetryOnAccessNotEnabled(t.Context(), 3, time.Millisecond, func() error {
+			calls++
+			return accessNotEnabledErr
+		})
+		if !errors.Is(err, accessNotEnabledErr) {
+			t.Errorf("expected access-not-enabled error, got %v", err)
+		}
+		if calls != 3 {
+			t.Errorf("expected 3 calls, got %d", calls)
+		}
+	})
+
+	t.Run("returns context error when cancelled mid-retry", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		calls := 0
+		err := RetryOnAccessNotEnabled(ctx, 5, 50*time.Millisecond, func() error {
+			calls++
+			cancel()
+			return accessNotEnabledErr
+		})
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("expected context.Canceled, got %v", err)
+		}
+		if calls != 1 {
+			t.Errorf("expected 1 call, got %d", calls)
+		}
+	})
 }
