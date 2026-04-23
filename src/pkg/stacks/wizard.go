@@ -46,7 +46,7 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 
 	if params.Provider == client.ProviderAuto || params.Provider == "" {
 		var providerNames []string
-		for _, p := range client.AllProviders() {
+		for _, p := range client.ByocProviders() {
 			providerNames = append(providerNames, p.Name())
 		}
 		providerName, err := w.ec.RequestEnum(
