@@ -3,6 +3,7 @@ package dns
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -109,7 +110,7 @@ func TestFabricResolverLookupNS(t *testing.T) {
 func TestUseFabricResolver(t *testing.T) {
 	t.Cleanup(func() {
 		fabricClient = nil
-		ResolverAt = DirectResolverAt
+		resolverAt = DirectResolverAt
 	})
 
 	m := &mockFabricClient{ipResp: &defangv1.ResolveIPAddrResponse{IpAddrs: []string{"9.9.9.9"}}}
@@ -129,4 +130,39 @@ func TestUseFabricResolver(t *testing.T) {
 	if fr, ok := r.(FabricResolver); !ok || fr.NSServer != "ns1.example.com" {
 		t.Errorf("ResolverAt did not return FabricResolver: %T %+v", r, r)
 	}
+}
+
+// TestResolverAtConcurrentWithUseFabricResolver exercises the synchronization
+// between UseFabricResolver (which swaps resolverAt) and ResolverAt callers.
+// Run with `go test -race` — prior to the mutex-guarded ResolverAt, concurrent
+// writes and reads on the package-level variable were a data race.
+func TestResolverAtConcurrentWithUseFabricResolver(t *testing.T) {
+	t.Cleanup(func() {
+		fabricClient = nil
+		resolverAt = DirectResolverAt
+	})
+
+	m := &mockFabricClient{nsResp: &defangv1.ResolveNSResponse{Hosts: []string{"ns1.example.com."}}}
+
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+	for range 4 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+					_ = ResolverAt("ns.example.com")
+				}
+			}
+		}()
+	}
+	for range 200 {
+		UseFabricResolver(m)
+	}
+	close(stop)
+	wg.Wait()
 }
