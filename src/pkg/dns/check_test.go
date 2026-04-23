@@ -13,7 +13,7 @@ var notFound = errors.New("not found")
 
 func TestGetCNAMEInSync(t *testing.T) {
 	t.Cleanup(func() {
-		ResolverAt = DirectResolverAt
+		resolverAt = DirectResolverAt
 	})
 
 	notFoundResolver := MockResolver{Records: map[DNSRequest]DNSResponse{
@@ -27,7 +27,7 @@ func TestGetCNAMEInSync(t *testing.T) {
 
 	// Test when the domain is not found
 	t.Run("domain not found", func(t *testing.T) {
-		ResolverAt = func(_ string) Resolver { return notFoundResolver }
+		resolverAt = func(_ string) Resolver { return notFoundResolver }
 		_, err := getCNAMEInSync(t.Context(), "web.test.com")
 		if err != notFound {
 			t.Errorf("Expected NotFound error, got %v", err)
@@ -36,7 +36,7 @@ func TestGetCNAMEInSync(t *testing.T) {
 
 	// Test when the domain is found but the DNS servers are not in sync
 	t.Run("DNS servers not in sync", func(t *testing.T) {
-		ResolverAt = func(nsServer string) Resolver {
+		resolverAt = func(nsServer string) Resolver {
 			if nsServer == "ns1.example.com" {
 				return foundResolver
 			} else {
@@ -51,7 +51,7 @@ func TestGetCNAMEInSync(t *testing.T) {
 
 	// Test when the domain is found and the DNS servers are in sync
 	t.Run("DNS servers in sync", func(t *testing.T) {
-		ResolverAt = func(_ string) Resolver { return foundResolver }
+		resolverAt = func(_ string) Resolver { return foundResolver }
 		cname, err := getCNAMEInSync(t.Context(), "web.test.com")
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
@@ -65,7 +65,7 @@ func TestGetCNAMEInSync(t *testing.T) {
 
 func TestGetIPInSync(t *testing.T) {
 	t.Cleanup(func() {
-		ResolverAt = DirectResolverAt
+		resolverAt = DirectResolverAt
 	})
 
 	notFoundResolver := MockResolver{Records: map[DNSRequest]DNSResponse{
@@ -83,7 +83,7 @@ func TestGetIPInSync(t *testing.T) {
 
 	// Test when the domain is not found
 	t.Run("domain not found", func(t *testing.T) {
-		ResolverAt = func(_ string) Resolver { return notFoundResolver }
+		resolverAt = func(_ string) Resolver { return notFoundResolver }
 		_, err := getIPInSync(t.Context(), "test.com")
 		if err != notFound {
 			t.Errorf("Expected NotFound error, got %v", err)
@@ -92,7 +92,7 @@ func TestGetIPInSync(t *testing.T) {
 
 	// Test when the domain is found but the DNS servers are not in sync
 	t.Run("DNS servers not in sync", func(t *testing.T) {
-		ResolverAt = func(nsServer string) Resolver {
+		resolverAt = func(nsServer string) Resolver {
 			if nsServer == "ns1.example.com" {
 				return foundResolver
 			} else {
@@ -107,7 +107,7 @@ func TestGetIPInSync(t *testing.T) {
 
 	// 2nd not in sync scenario
 	t.Run("DNS servers not in sync with partial results", func(t *testing.T) {
-		ResolverAt = func(nsServer string) Resolver {
+		resolverAt = func(nsServer string) Resolver {
 			if nsServer == "ns1.example.com" {
 				return partialFoundResolver
 			} else {
@@ -122,7 +122,7 @@ func TestGetIPInSync(t *testing.T) {
 
 	// Test when the domain is found and the DNS servers are in sync
 	t.Run("DNS servers in sync", func(t *testing.T) {
-		ResolverAt = func(_ string) Resolver { return foundResolver }
+		resolverAt = func(_ string) Resolver { return foundResolver }
 		ips, err := getIPInSync(t.Context(), "test.com")
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
@@ -153,42 +153,42 @@ func TestCheckDomainDNSReady(t *testing.T) {
 	}}
 	resolver = hasARecordResolver
 
-	oldResolver, oldDebug := ResolverAt, term.DoDebug()
+	oldResolver, oldDebug := resolverAt, term.DoDebug()
 	t.Cleanup(func() {
-		ResolverAt = oldResolver
+		resolverAt = oldResolver
 		term.SetDebug(oldDebug)
 	})
 	term.SetDebug(true)
 
 	t.Run("CNAME and A records not found", func(t *testing.T) {
-		ResolverAt = func(_ string) Resolver { return emptyResolver }
+		resolverAt = func(_ string) Resolver { return emptyResolver }
 		if CheckDomainDNSReady(t.Context(), "api.test.com", []string{"some-alb.domain.com"}) != false {
 			t.Errorf("Expected false when both CNAME and A records are missing, got true")
 		}
 	})
 
 	t.Run("CNAME setup correctly", func(t *testing.T) {
-		ResolverAt = func(_ string) Resolver { return hasCNAMEResolver }
+		resolverAt = func(_ string) Resolver { return hasCNAMEResolver }
 		if CheckDomainDNSReady(t.Context(), "api.test.com", []string{"some-alb.domain.com"}) != true {
 			t.Errorf("Expected true when CNAME is setup correctly, got false")
 		}
 	})
 
 	t.Run("CNAME setup incorrectly", func(t *testing.T) {
-		ResolverAt = func(_ string) Resolver { return hasCNAMEResolver }
+		resolverAt = func(_ string) Resolver { return hasCNAMEResolver }
 		if CheckDomainDNSReady(t.Context(), "api.test.com", []string{"some-other-alb.domain.com"}) != false {
 			t.Errorf("Expected false when CNAME is setup incorrectly, got true")
 		}
 	})
 
 	t.Run("A record setup correctly", func(t *testing.T) {
-		ResolverAt = func(_ string) Resolver { return hasARecordResolver }
+		resolverAt = func(_ string) Resolver { return hasARecordResolver }
 		if CheckDomainDNSReady(t.Context(), "api.test.com", []string{"some-alb.domain.com"}) != true {
 			t.Errorf("Expected true when A record is setup correctly, got false")
 		}
 	})
 	t.Run("A record setup incorrectly", func(t *testing.T) {
-		ResolverAt = func(_ string) Resolver { return hasWrongARecordResolver }
+		resolverAt = func(_ string) Resolver { return hasWrongARecordResolver }
 		if CheckDomainDNSReady(t.Context(), "api.test.com", []string{"some-alb.domain.com"}) != false {
 			t.Errorf("Expected false when A record is setup incorrectly, got true")
 		}

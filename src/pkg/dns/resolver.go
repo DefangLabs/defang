@@ -28,8 +28,7 @@ type FabricResolverClient interface {
 	ResolveNS(context.Context, *defangv1.ResolveNSRequest) (*defangv1.ResolveNSResponse, error)
 }
 
-// fabricMu guards concurrent access to fabricClient and the ResolverAt
-// assignment inside UseFabricResolver.
+// fabricMu guards concurrent access to fabricClient and resolverAt.
 var fabricMu sync.RWMutex
 
 // fabricClient is set by UseFabricResolver. When non-nil, RootResolver and
@@ -43,7 +42,7 @@ func UseFabricResolver(c FabricResolverClient) {
 	fabricMu.Lock()
 	defer fabricMu.Unlock()
 	fabricClient = c
-	ResolverAt = func(nsServer string) Resolver {
+	resolverAt = func(nsServer string) Resolver {
 		return FabricResolver{Client: c, NSServer: nsServer}
 	}
 }
@@ -195,7 +194,20 @@ func DirectResolverAt(nsServer string) Resolver {
 	return DirectResolver{NSServer: nsServer}
 }
 
-var ResolverAt = DirectResolverAt
+// resolverAt is the package-private function that produces a Resolver bound to
+// a given nameserver. It is swapped out by UseFabricResolver. All reads must go
+// through ResolverAt so they're synchronized with that write.
+var resolverAt = DirectResolverAt
+
+// ResolverAt returns a Resolver bound to nsServer. When UseFabricResolver has
+// wired in a fabric client, the returned Resolver issues remote RPCs;
+// otherwise it performs direct UDP DNS queries.
+func ResolverAt(nsServer string) Resolver {
+	fabricMu.RLock()
+	fn := resolverAt
+	fabricMu.RUnlock()
+	return fn(nsServer)
+}
 
 var ErrNoSuchHost = &net.DNSError{Err: "no such host", IsNotFound: true}
 
