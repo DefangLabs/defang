@@ -855,6 +855,7 @@ type Stack struct {
 	Mode              DeploymentMode         `protobuf:"varint,8,opt,name=mode,proto3,enum=io.defang.v1.DeploymentMode" json:"mode,omitempty"`
 	IsDefault         bool                   `protobuf:"varint,9,opt,name=is_default,json=isDefault,proto3" json:"is_default,omitempty"`
 	Status            StackStatus            `protobuf:"varint,10,opt,name=status,proto3,enum=io.defang.v1.StackStatus" json:"status,omitempty"`
+	LastDeploymentId  string                 `protobuf:"bytes,11,opt,name=last_deployment_id,json=lastDeploymentId,proto3" json:"last_deployment_id,omitempty"` // aka etag
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -957,6 +958,13 @@ func (x *Stack) GetStatus() StackStatus {
 		return x.Status
 	}
 	return StackStatus_STACK_STATUS_UNSPECIFIED
+}
+
+func (x *Stack) GetLastDeploymentId() string {
+	if x != nil {
+		return x.LastDeploymentId
+	}
+	return ""
 }
 
 type PutStackRequest struct {
@@ -6086,7 +6094,7 @@ var File_io_defang_v1_fabric_proto protoreflect.FileDescriptor
 
 const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\n" +
-	"\x19io/defang/v1/fabric.proto\x12\fio.defang.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/type/money.proto\"\x9a\x03\n" +
+	"\x19io/defang/v1/fabric.proto\x12\fio.defang.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/type/money.proto\"\xc8\x03\n" +
 	"\x05Stack\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\aproject\x18\x02 \x01(\tR\aproject\x12\x1d\n" +
@@ -6100,7 +6108,8 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\n" +
 	"is_default\x18\t \x01(\bR\tisDefault\x121\n" +
 	"\x06status\x18\n" +
-	" \x01(\x0e2\x19.io.defang.v1.StackStatusR\x06status\"<\n" +
+	" \x01(\x0e2\x19.io.defang.v1.StackStatusR\x06status\x12,\n" +
+	"\x12last_deployment_id\x18\v \x01(\tR\x10lastDeploymentId\"<\n" +
 	"\x0fPutStackRequest\x12)\n" +
 	"\x05stack\x18\x01 \x01(\v2\x13.io.defang.v1.StackR\x05stack\"A\n" +
 	"\x0fGetStackRequest\x12\x18\n" +
