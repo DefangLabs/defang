@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
@@ -30,6 +31,7 @@ import (
 	awssts "github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/pkg/browser"
 )
 
 const (
@@ -353,6 +355,29 @@ func (a *Aws) InteractiveLogin(ctx context.Context) (*awsTokenCache, error) {
 	return RetrieveToken(ctx, tokenURL, clientIDSameDevice, code, pkce.Verifier, redirectURI)
 }
 
+// collectAuthCode prompts the user for an authorization code, opening the browser
+// on the first empty submission. askFn is called repeatedly until a non-empty
+// trimmed value is returned; openBrowser is called at most once.
+func collectAuthCode(askFn func() (string, error), openBrowser func(string) error, authURL string) (string, error) {
+	browserOpened := false
+	for {
+		raw, err := askFn()
+		if err != nil {
+			return "", fmt.Errorf("reading authorization code: %w", err)
+		}
+		code := strings.TrimSpace(raw)
+		if code != "" {
+			return code, nil
+		}
+		if !browserOpened {
+			if err := openBrowser(authURL); err != nil {
+				term.Warn("failed to open browser automatically, please open the URL above manually")
+			}
+			browserOpened = true
+		}
+	}
+}
+
 // CrossDeviceLogin runs the cross-device flow for remote/SSH sessions where the
 // browser runs on a different machine. It prints the auth URL and prompts the user
 // to paste the base64-encoded verification code displayed in their browser.
@@ -368,18 +393,21 @@ func (a *Aws) CrossDeviceLogin(ctx context.Context) (*awsTokenCache, error) {
 	term.Println("Please visit the following URL to log in to AWS: (Right click the URL or press ENTER to open browser)")
 	term.Printf("  %s\n", authURL)
 	term.Print("Enter the authorization code displayed in your browser: ")
-	ctx, inputCh, done := term.OpenBrowserWithInputOnEnter(ctx, authURL)
-	defer done()
-
-	var input string
-	select {
-	case input = <-inputCh:
-		input = strings.TrimSpace(input)
-	case <-ctx.Done():
-		return nil, ctx.Err()
+	askFn := func() (string, error) {
+		var code string
+		err := survey.AskOne(
+			&survey.Input{Message: "Code"},
+			&code,
+			survey.WithStdio(term.DefaultTerm.Stdio()),
+		)
+		return code, err
+	}
+	code, err := collectAuthCode(askFn, browser.OpenURL, authURL)
+	if err != nil {
+		return nil, err
 	}
 
-	authCode, gotState, err := parseVerificationCode(input)
+	authCode, gotState, err := parseVerificationCode(code)
 	if err != nil {
 		return nil, err
 	}
