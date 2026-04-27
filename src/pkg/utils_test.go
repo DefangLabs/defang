@@ -214,8 +214,7 @@ func unsetAll(t *testing.T, keys ...string) {
 }
 
 func TestAzureInEnv(t *testing.T) {
-	keys := []string{"AZURE_SUBSCRIPTION_ID", "AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET"}
-	unsetAll(t, keys...)
+	unsetAll(t, "AZURE_SUBSCRIPTION_ID", "AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET")
 	if got := AzureInEnv(); got != "" {
 		t.Errorf("AzureInEnv() with no vars set = %q, want empty", got)
 	}
@@ -230,8 +229,7 @@ func TestAzureInEnv(t *testing.T) {
 }
 
 func TestAwsInEnv(t *testing.T) {
-	keys := []string{"AWS_PROFILE", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_ROLE_ARN"}
-	unsetAll(t, keys...)
+	unsetAll(t, "AWS_PROFILE", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_ROLE_ARN")
 	if got := AwsInEnv(); got != "" {
 		t.Errorf("AwsInEnv() with no vars set = %q, want empty", got)
 	}
