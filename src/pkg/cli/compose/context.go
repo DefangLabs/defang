@@ -270,7 +270,7 @@ func uploadArchive(ctx context.Context, provider client.Provider, projectName st
 		return "", fmt.Errorf("HTTP PUT failed with status code %v", resp.Status)
 	}
 
-	url := res.Url //http.RemoveQueryParam(res.Url) // remove any access signature
+	url := http.RemoveQueryParam(res.Url) // remove any access signature
 
 	const gcpPrefix = "https://storage.googleapis.com/" // HACK: move to GCP provider
 	url = strings.Replace(url, gcpPrefix, "gs://", 1)
