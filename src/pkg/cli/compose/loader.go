@@ -68,6 +68,10 @@ func NewLoader(opts ...LoaderOption) *Loader {
 		}
 	}
 
+	return NewLoaderFromOptions(options)
+}
+
+func NewLoaderFromOptions(options LoaderOptions) *Loader {
 	return &Loader{options: options}
 }
 

@@ -26,13 +26,8 @@ type Session struct {
 	Provider client.Provider
 }
 
-type LoaderOptions struct {
-	ProjectName      string
-	ComposeFilePaths []string
-}
-
 type SessionLoaderOptions struct {
-	LoaderOptions
+	compose.LoaderOptions
 	stacks.GetStackOpts
 }
 
@@ -59,7 +54,7 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 	provider := cli.NewProvider(ctx, stack.Provider, sl.client, stack.Name)
 	session := &Session{
 		Stack:    stack,
-		Loader:   sl.newLoader(),
+		Loader:   compose.NewLoaderFromOptions(sl.opts.LoaderOptions),
 		Provider: provider,
 	}
 
@@ -92,13 +87,6 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, str
 		return nil, whence, fmt.Errorf("failed to load stack env: %w", err)
 	}
 	return stack, whence, nil
-}
-
-func (sl *SessionLoader) newLoader() client.Loader {
-	return compose.NewLoader(
-		compose.WithProjectName(sl.opts.ProjectName),
-		compose.WithPath(sl.opts.ComposeFilePaths...),
-	)
 }
 
 func printProviderMismatchWarnings(ctx context.Context, provider client.ProviderID) {

@@ -522,7 +522,7 @@ func makeComposeConfigCmd() *cobra.Command {
 			if err != nil {
 				term.Warn("unable to load stack:", err, "- some information may not be up-to-date")
 				sessionx = &session.Session{
-					Loader:   configureLoaderForCommand(cmd),
+					Loader:   newLoaderForCommand(cmd),
 					Provider: client.NewPlaygroundProvider(global.Client, stacks.DefaultBeta),
 					Stack:    &stacks.Parameters{Name: stacks.DefaultBeta, Provider: client.ProviderDefang},
 				}
