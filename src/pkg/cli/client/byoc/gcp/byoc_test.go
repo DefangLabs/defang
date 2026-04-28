@@ -384,4 +384,22 @@ func TestGetServices(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, res.Services)
 	})
+
+	t.Run("upload service account not yet created = no services", func(t *testing.T) {
+		b.driver = &mockGcpDriver{
+			bucketName: "bucket-a",
+			getBucketObjectWithServiceAccountError: errors.New(`failed to get bucket object ("projects/project1/stack1/project.pb") reader: Get "https://storage.googleapis.com/defang-cd-xyz/projects%2Fproject1%2Fstack1%2Fproject.pb": impersonate: status code 404: {
+  "error": {
+    "code": 404,
+    "message": "Not found; Gaia id not found for email defang-upload@example.iam.gserviceaccount.com",
+    "status": "NOT_FOUND"
+  }
+}`),
+		}
+		res, err := b.GetServices(t.Context(), &defangv1.GetServicesRequest{
+			Project: "project1",
+		})
+		require.NoError(t, err)
+		assert.Empty(t, res.Services)
+	})
 }

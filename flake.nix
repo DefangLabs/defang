@@ -21,6 +21,7 @@
               actionlint
               bashInteractive # full bash with readline/completion so prompts render correctly
               crane
+              gh
               git
               gnumake
               gnused # force Linux `sed` everywhere
@@ -31,7 +32,7 @@
               goreleaser
               less
               nixfmt-rfc-style
-              nodejs_24 # for Pulumi, must match values in package.json
+              nodejs_24 # for Pulumi, must match values in package.json and npm-build/action.yml
               openssh
               protobuf # protoc
               protoc-gen-connect-go

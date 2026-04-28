@@ -1,0 +1,44 @@
+name: Build npm package
+description: Install Node, build, and optionally test the npm package
+
+inputs:
+  working-directory:
+    description: Path to the npm package directory
+    default: "./pkgs/npm"
+  node-version:
+    description: Node.js version to install
+    default: "24" # same as the version in flake.nix
+  registry-url:
+    description: npm registry URL (set when publishing)
+    default: ""
+  version:
+    description: Package version to set (e.g. from a git tag). Skipped if empty.
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Install node
+      uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+      with:
+        node-version: ${{ inputs.node-version }}
+        registry-url: ${{ inputs.registry-url }}
+
+    - name: Set package version
+      if: inputs.version != ''
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+      run: |
+        VERSION="${INPUT_VERSION#v}"
+        npm version "$VERSION" --no-git-tag-version
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: npm ci --ignore-scripts
+
+    - name: Build
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: npm run build
