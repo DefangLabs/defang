@@ -41,7 +41,7 @@ func NewProvider(ctx context.Context, providerID client.ProviderID, fabricClient
 	term.Debugf("Creating %s provider", providerID)
 	switch providerID {
 	case client.ProviderAWS:
-		provider = aws.NewByocProvider(ctx, fabricClient.GetTenantName(), stack)
+		provider = aws.NewByocProvider(ctx, fabricClient.GetTenantName(), stack, fabricClient)
 	case client.ProviderDO:
 		provider = do.NewByocProvider(ctx, fabricClient.GetTenantName(), stack)
 	case client.ProviderGCP:
