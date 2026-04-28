@@ -23,9 +23,7 @@ func cdCommand(cmd *cobra.Command, command client.CdCommand, args []string, fabr
 	ctx := cmd.Context()
 	allowUpgrade, _ := cmd.Flags().GetBool("allow-upgrade")
 
-	session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
-		CheckAccountInfo: true,
-	})
+	session, err := newCommandSession(cmd)
 	if err != nil {
 		return err
 	}
@@ -102,9 +100,7 @@ var cdTearDownCmd = &cobra.Command{
 		ctx := cmd.Context()
 		force, _ := cmd.Flags().GetBool("force")
 
-		session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
-			CheckAccountInfo: true,
-		})
+		session, err := newCommandSession(cmd)
 		if err != nil {
 			return err
 		}
@@ -123,12 +119,11 @@ var cdListCmd = &cobra.Command{
 	Aliases: []string{"list"},
 	Short:   "List all the projects and stacks in the CD cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
 		remote, _ := cmd.Flags().GetBool("remote")
 		all, _ := cmd.Flags().GetBool("all")
 
-		session, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
-			CheckAccountInfo: true,
-		})
+		session, err := newCommandSession(cmd)
 		if err != nil {
 			return err
 		}
@@ -138,15 +133,15 @@ var cdListCmd = &cobra.Command{
 				return errors.New("--all cannot be used with --remote")
 			}
 
-			err = canIUseProvider(cmd.Context(), session.Provider, "", 0, true) // safe to use latest CD image
+			err = canIUseProvider(ctx, session.Provider, "", 0, true) // safe to use latest CD image
 			if err != nil {
 				return err
 			}
 
 			// FIXME: this needs auth because it spawns the CD task
-			return cli.CdCommandAndTail(cmd.Context(), session.Provider, "", global.Verbose, client.CdCommandList, global.Client)
+			return cli.CdCommandAndTail(ctx, session.Provider, "", global.Verbose, client.CdCommandList, global.Client)
 		} else {
-			return cli.CdListFromStorage(cmd.Context(), session.Provider, all || global.Verbose)
+			return cli.CdListFromStorage(ctx, session.Provider, all || global.Verbose)
 		}
 	},
 }
@@ -158,6 +153,7 @@ var cdPreviewCmd = &cobra.Command{
 	Short:       "Preview the changes that will be made by the CD task",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
+
 		session, err := newCommandSession(cmd)
 		if err != nil {
 			return err
@@ -190,6 +186,7 @@ var cdInstallCmd = &cobra.Command{
 	Hidden:      true, // users shouldn't have to run this manually, because it's done on deploy
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
+
 		session, err := newCommandSession(cmd)
 		if err != nil {
 			return err
