@@ -249,7 +249,10 @@ func waitForCNAME(ctx context.Context, domain string, targets []string, client c
 			}
 		}
 		if serverSideVerified || serverVerifyRpcFailure >= 3 {
-			locallyVerified := dns.CheckDomainDNSReady(ctx, domain, targets)
+			fabricResolverAt := func(nsServer string) dns.Resolver {
+				return dns.FabricResolver{Client: client, NSServer: nsServer}
+			}
+			locallyVerified := dns.CheckDomainDNSReady(ctx, domain, targets, fabricResolverAt)
 			if serverSideVerified && !locallyVerified {
 				term.Warnf("DNS settings for %v are verified, but changes may take a few minutes to propagate due to caching.", domain)
 				return nil

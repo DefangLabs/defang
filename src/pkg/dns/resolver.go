@@ -162,20 +162,20 @@ func (r RootResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS, e
 }
 
 func (r RootResolver) getResolver(ctx context.Context, domain string) Resolver {
-	ns, err := FindNSServers(ctx, domain)
+	ns, err := FindNSServers(ctx, domain, ResolverAt)
 	if err != nil {
 		return DirectResolver{}
 	}
 	return DirectResolver{NSServer: ns[pkg.RandomIndex(len(ns))].Host}
 }
 
-func FindNSServers(ctx context.Context, domain string) ([]*net.NS, error) {
+func FindNSServers(ctx context.Context, domain string, resolverAt func(string) Resolver) ([]*net.NS, error) {
 	nsServers := rootServers
 	retries := 3
 	for {
 		index := pkg.RandomIndex(len(nsServers))
 		nsServer := nsServers[index].Host
-		ns, err := ResolverAt(nsServer).LookupNS(ctx, domain)
+		ns, err := resolverAt(nsServer).LookupNS(ctx, domain)
 		sort.Slice(ns, func(i, j int) bool { return ns[i].Host < ns[j].Host })
 		if err != nil {
 			if retries--; retries > 0 {
