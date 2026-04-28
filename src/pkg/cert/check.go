@@ -9,8 +9,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/dns"
 )
 
-func CheckTLSCert(ctx context.Context, domain string) error {
-	resolver := dns.RootResolver{}
+func CheckTLSCert(ctx context.Context, domain string, resolver dns.Resolver) error {
 	ips, err := resolver.LookupIPAddr(ctx, domain)
 	if err != nil {
 		return err

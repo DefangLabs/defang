@@ -139,8 +139,6 @@ func TestCheckDomainDNSReady(t *testing.T) {
 		{Type: "A", Domain: "some-alb.domain.com"}: {Records: []string{"1.2.3.4", "5,6,7,8"}, Error: nil},
 		{Type: "CNAME", Domain: "api.test.com"}:    {Records: []string{"some-alb.domain.com"}, Error: nil},
 	}}
-	resolver = hasARecordResolver
-
 	oldDebug := term.DoDebug()
 	t.Cleanup(func() {
 		term.SetDebug(oldDebug)

@@ -169,6 +169,9 @@ func FindNSServers(ctx context.Context, domain string, resolverAt func(string) R
 }
 
 func DirectResolverAt(nsServer string) Resolver {
+	if nsServer == "" {
+		return RootResolver{}
+	}
 	return DirectResolver{NSServer: nsServer}
 }
 

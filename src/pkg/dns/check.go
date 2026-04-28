@@ -17,8 +17,7 @@ type logger interface {
 }
 
 var (
-	Logger   logger   = term.DefaultTerm
-	resolver Resolver = RootResolver{}
+	Logger logger = term.DefaultTerm
 
 	errDNSNotInSync = errors.New("DNS not in sync")
 )
@@ -42,7 +41,7 @@ func CheckDomainDNSReady(ctx context.Context, domain string, validCNAMEs []strin
 		return true
 	}
 
-	albIPAddrs, err := resolver.LookupIPAddr(ctx, validCNAMEs[0])
+	albIPAddrs, err := resolverAt("").LookupIPAddr(ctx, validCNAMEs[0])
 	if err != nil {
 		Logger.Debugf("Could not resolve A/AAAA record for load balancer %v: %v", validCNAMEs[0], err)
 		return false
@@ -52,7 +51,7 @@ func CheckDomainDNSReady(ctx context.Context, domain string, validCNAMEs []strin
 	// In sync CNAME may be pointing to the same IP addresses of the load balancer, considered as valid
 	Logger.Debugf("Checking CNAME %v", cname)
 	if cname != "" {
-		cnameIPAddrs, err := resolver.LookupIPAddr(ctx, cname)
+		cnameIPAddrs, err := resolverAt("").LookupIPAddr(ctx, cname)
 		if err != nil {
 			Logger.Debugf("Could not resolve A/AAAA record for %v: %v", cname, err)
 		} else {
