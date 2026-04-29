@@ -3,12 +3,11 @@ package tokenstore
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
-
-	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 type TokenStore interface {
@@ -33,7 +32,7 @@ func (s *LocalDirTokenStore) Save(key string, token string) error {
 		return err
 	}
 
-	term.Debug("Saving access token to", tokenFile)
+	slog.Debug(fmt.Sprint("Saving access token to", tokenFile))
 	dir, _ := filepath.Split(tokenFile)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return fmt.Errorf("failed to create token directory: %w", err)
@@ -51,12 +50,20 @@ func (s *LocalDirTokenStore) Load(key string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	term.Debug("Reading access token from file", tokenFile)
+	slog.Debug(fmt.Sprint("Reading access token from file", tokenFile))
 	all, err := os.ReadFile(tokenFile)
 	if err != nil {
 		return "", fmt.Errorf("failed to read token: %w", err)
 	}
 	return string(all), nil
+}
+
+func isWithinBase(baseDir, target string) bool {
+	rel, err := filepath.Rel(baseDir, target)
+	if err != nil {
+		return false
+	}
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) && !filepath.IsAbs(rel))
 }
 
 func (s *LocalDirTokenStore) List(prefix string) ([]string, error) {
@@ -79,8 +86,8 @@ func (s *LocalDirTokenStore) List(prefix string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve token store directory: %w", err)
 	}
-	if !strings.HasPrefix(dir, baseDir) {
-		term.Warnf("Invalid token prefix %q: resolved directory %q is outside of token store base directory %q", prefix, dir, baseDir)
+	if !isWithinBase(baseDir, dir) {
+		slog.Warn(fmt.Sprintf("Invalid token prefix %q: resolved directory %q is outside of token store base directory %q", prefix, dir, baseDir))
 		return nil, errors.New("invalid token prefix")
 	}
 
@@ -110,7 +117,7 @@ func (s *LocalDirTokenStore) Delete(key string) error {
 	if err := os.Remove(tokenFile); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("failed to delete token: %w", err)
 	}
-	term.Debug("Removed token file:", tokenFile)
+	slog.Debug("Removed token file: " + tokenFile)
 	return nil
 }
 
@@ -130,7 +137,7 @@ func (s *LocalDirTokenStore) getTokenFile(key string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve token store directory: %w", err)
 	}
-	if !strings.HasPrefix(absTokenFilePath, absDir) {
+	if !isWithinBase(absDir, absTokenFilePath) {
 		return "", errors.New("invalid token key")
 	}
 	return absTokenFilePath, nil

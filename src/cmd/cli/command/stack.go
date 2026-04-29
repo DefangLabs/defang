@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -93,7 +94,7 @@ func makeStackNewCmd() *cobra.Command {
 				return fmt.Errorf("stack with name %q already exists in project %q", params.Name, projectName)
 			}
 
-			term.Debugf("Creating stack with parameters: %+v\n", params)
+			slog.Debug("Creating stack with parameters", "params", params)
 
 			_, err = stacks.CreateInDirectory(".", params)
 			if err != nil {
@@ -137,8 +138,8 @@ func makeStackListCmd() *cobra.Command {
 			}
 
 			if len(stacks) == 0 {
-				_, err = term.Infof("No Defang stacks found in the current directory.\n")
-				return err
+				slog.InfoContext(ctx, "No Defang stacks found in the current directory.")
+				return nil
 			}
 
 			columns := []string{"Name", "Default", "Provider", "Region", "Account", "Mode", "DeployedAt"}
@@ -176,7 +177,7 @@ func makeStackDefaultCmd() *cobra.Command {
 				return err
 			}
 
-			term.Info(fmt.Sprintf("Stack %q is now the default stack for project %q\n", name, projectName))
+			slog.InfoContext(ctx, fmt.Sprintf("Stack %q is now the default stack for project %q\n", name, projectName))
 			return nil
 		},
 	}

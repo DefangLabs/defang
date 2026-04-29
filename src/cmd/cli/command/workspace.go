@@ -2,6 +2,7 @@ package command
 
 import (
 	"errors"
+	"log/slog"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/auth"
@@ -28,7 +29,7 @@ func ListWorkspaces(cmd *cobra.Command, args []string) error {
 	rows := cli.WorkspaceRows(info, currentWorkspace)
 
 	if len(rows) == 0 {
-		term.Info("No workspaces found for this account.")
+		slog.Info("No workspaces found for this account.")
 		return nil
 	}
 

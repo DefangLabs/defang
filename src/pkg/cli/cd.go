@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"slices"
 	"strings"
@@ -21,9 +22,9 @@ import (
 
 func CdCommand(ctx context.Context, projectName string, provider client.Provider, fabric client.FabricClient, command client.CdCommand) (types.ETag, error) {
 	if projectName == "" { // projectName is empty for "list --remote"
-		term.Infof("Running CD command %q", command)
+		slog.InfoContext(ctx, fmt.Sprintf("Running CD command %q", command))
 	} else {
-		term.Infof("Running CD command %q in project %q", command, projectName)
+		slog.InfoContext(ctx, fmt.Sprintf("Running CD command %q in project %q", command, projectName))
 	}
 	if dryrun.DoDryRun {
 		return "", dryrun.ErrDryRun
@@ -48,7 +49,7 @@ func CdCommand(ctx context.Context, projectName string, provider client.Provider
 	case client.CdCommandDown, client.CdCommandDestroy:
 		err := deleteSubdomain(ctx, projectName, provider, fabric)
 		if err != nil {
-			term.Warn("Unable to update deployment history; deployment will proceed anyway.")
+			slog.WarnContext(ctx, "Unable to update deployment history; deployment will proceed anyway.")
 			break
 		}
 		// Update deployment table to mark deployment as destroyed only after successful deletion of the subdomain
@@ -65,8 +66,8 @@ func CdCommand(ctx context.Context, projectName string, provider client.Provider
 			StatesUrl:   statesUrl,
 		})
 		if err != nil {
-			term.Debug("Failed to record deployment:", err)
-			term.Warn("Unable to update deployment history; deployment will proceed anyway.")
+			slog.Debug("Failed to record deployment", "err", err)
+			slog.WarnContext(ctx, "Unable to update deployment history; deployment will proceed anyway.")
 		}
 	}
 	return cd.ETag, nil
@@ -80,9 +81,9 @@ func deleteSubdomain(ctx context.Context, projectName string, provider client.Pr
 	})
 	if err != nil {
 		// This can fail when the project was deployed from a different workspace than the current one
-		term.Debug("DeleteSubdomainZone failed:", err)
+		slog.Debug(fmt.Sprint("DeleteSubdomainZone failed:", err))
 		if connect.CodeOf(err) == connect.CodeNotFound {
-			term.Warn("Subdomain not found; did you mean to destroy a different project or stack?")
+			slog.WarnContext(ctx, "Subdomain not found; did you mean to destroy a different project or stack?")
 		}
 		return err
 	}
@@ -121,7 +122,7 @@ func TailAndWaitForCD(ctx context.Context, provider client.Provider, projectName
 	// blocking call to tail
 	var tailErr error
 	if err := streamLogs(ctx, provider, projectName, tailOptions, logEntryPrintHandler); err != nil {
-		term.Debug("Tail stopped with", err, errors.Unwrap(err))
+		slog.Debug(fmt.Sprint("Tail stopped with", err, errors.Unwrap(err)))
 		if !errors.Is(err, context.Canceled) {
 			tailErr = err
 		}
@@ -136,7 +137,7 @@ func SplitProjectStack(name string) (projectName string, stackName string) {
 }
 
 func CdListFromStorage(ctx context.Context, provider client.Provider, allRegions bool) error {
-	term.Debug("Running CD list")
+	slog.Debug("Running CD list")
 	if dryrun.DoDryRun {
 		return dryrun.ErrDryRun
 	}
@@ -156,7 +157,7 @@ func CdListFromStorage(ctx context.Context, provider client.Provider, allRegions
 		if allRegions {
 			accountInfo.Region = ""
 		}
-		term.Printf("No projects found in %v\n", accountInfo)
+		slog.InfoContext(ctx, fmt.Sprintf("No projects found in %v", accountInfo))
 	}
 
 	return term.Table(stacks, "Project", "Stack", "Workspace", "CdRegion")

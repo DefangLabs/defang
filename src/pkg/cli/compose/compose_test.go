@@ -2,9 +2,11 @@ package compose
 
 import (
 	"bytes"
+	"log/slog"
 	"os"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
@@ -189,6 +191,7 @@ func TestComposeGoNoDoubleWarningLog(t *testing.T) {
 
 	var warnings bytes.Buffer
 	term.DefaultTerm = term.NewTerm(os.Stdin, &warnings, &warnings)
+	slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 
 	loader := NewLoader(WithPath("../../../testdata/compose-go-warn/compose.yaml"))
 	_, err := loader.LoadProject(t.Context())

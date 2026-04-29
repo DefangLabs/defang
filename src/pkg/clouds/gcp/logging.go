@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 
 	logging "cloud.google.com/go/logging/apiv2"
 	"cloud.google.com/go/logging/apiv2/loggingpb"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"google.golang.org/api/iterator"
 )
 
@@ -75,9 +75,9 @@ func (t *gcpLoggingTailer) Next(ctx context.Context) (*loggingpb.LogEntry, error
 
 func (t *gcpLoggingTailer) Close() error {
 	// TODO: find out how to properly close the client
-	term.Debugf("Closing log tailer")
+	slog.Debug("Closing log tailer")
 	e1 := t.tleClient.CloseSend()
-	term.Debugf("Closing log tailer client")
+	slog.Debug("Closing log tailer client")
 	e2 := t.client.Close()
 	return errors.Join(e1, e2)
 }
@@ -116,7 +116,7 @@ func (gcp Gcp) ListLogEntries(ctx context.Context, query string, order Order) (L
 func (l *gcpLoggingLister) Next() (*loggingpb.LogEntry, error) {
 	entry, err := l.it.Next()
 	if err == iterator.Done {
-		term.Debugf("Closing log lister client")
+		slog.Debug("Closing log lister client")
 		if err := l.client.Close(); err != nil {
 			return nil, err
 		}

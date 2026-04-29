@@ -2,6 +2,8 @@ package cli
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
@@ -46,13 +48,12 @@ func DeploymentsList(ctx context.Context, client client.FabricClient, params Lis
 		if params.ListType == defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE {
 			active = " active"
 		}
-		var err error
 		if params.ProjectName == "" {
-			_, err = term.Warnf("No%s deployments found; use --workspace to specify a different workspace", active)
+			slog.WarnContext(ctx, fmt.Sprintf("No%s deployments found; use --workspace to specify a different workspace", active))
 		} else {
-			_, err = term.Warnf("No%s deployments found for project %q", active, params.ProjectName)
+			slog.WarnContext(ctx, fmt.Sprintf("No%s deployments found for project %q", active, params.ProjectName))
 		}
-		return err
+		return nil
 	}
 
 	// map to Deployment struct

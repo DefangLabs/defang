@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"sort"
 	"strconv"
@@ -21,13 +22,13 @@ import (
 )
 
 func RunEstimate(ctx context.Context, project *compose.Project, client client.FabricClient, previewProvider client.Provider, estimateProviderID client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
-	term.Debugf("Running estimate for project %s in region %s with mode %s", project.Name, region, mode)
+	slog.Debug("Running estimate for project", "project", project.Name, "region", region, "mode", mode)
 	preview, err := GeneratePreview(ctx, project, client, previewProvider, estimateProviderID, mode, region)
 	if err != nil {
 		return nil, err
 	}
 
-	term.Info("Preparing estimate")
+	slog.InfoContext(ctx, "Preparing estimate")
 
 	estimate, err := client.Estimate(ctx, &defangv1.EstimateRequest{
 		Provider:      estimateProviderID.Value(),
@@ -54,7 +55,7 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 		return "", fmt.Errorf("failed to marshal compose project: %w", err)
 	}
 
-	term.Debugf("Fixedup project: %s", string(composeData))
+	slog.Debug("Fixedup project: " + string(composeData))
 
 	resp, err := client.Preview(ctx, &defangv1.PreviewRequest{
 		Provider:    estimateProviderID.Value(),
@@ -67,7 +68,7 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 		return "", err
 	}
 
-	term.Info("Generating deployment preview, this may take a few minutes...")
+	slog.InfoContext(ctx, "Generating deployment preview, this may take a few minutes...")
 	var pulumiPreviewLogLines []string
 	tailOptions := TailOptions{
 		Deployment: resp.Etag,

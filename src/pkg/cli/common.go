@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"os"
 
 	"connectrpc.com/connect"
@@ -96,7 +97,7 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 		if err != nil {
 			return err
 		}
-		term.Debugf("Deployment origin metadata: %s", string(originMetadataBytes))
+		slog.Debug("Deployment origin metadata: " + string(originMetadataBytes))
 	}
 
 	return fabric.PutDeployment(ctx, &defangv1.PutDeploymentRequest{

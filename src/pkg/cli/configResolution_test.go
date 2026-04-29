@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -8,12 +9,16 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 func TestPrintConfigResolutionSummary(t *testing.T) {
 	testAllConfigResolutionFiles(t, "testdata/config-resolution", func(t *testing.T, name, path string) {
 		stdout, _ := term.SetupTestTerm(t)
+		prevLogger := slog.Default()
+		t.Cleanup(func() { slog.SetDefault(prevLogger) })
+		slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 
 		loader := compose.NewLoader(compose.WithPath(path))
 		proj, err := loader.LoadProject(t.Context())
@@ -53,6 +58,9 @@ func TestPrintConfigResolutionSummary(t *testing.T) {
 func TestPrintRedactedConfigResolutionSummary(t *testing.T) {
 	testAllConfigResolutionFiles(t, "testdata/redact-config", func(t *testing.T, name, path string) {
 		stdout, _ := term.SetupTestTerm(t)
+		prevLogger := slog.Default()
+		t.Cleanup(func() { slog.SetDefault(prevLogger) })
+		slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 
 		loader := compose.NewLoader(compose.WithPath(path))
 		proj, err := loader.LoadProject(t.Context())

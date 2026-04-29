@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strconv"
 	"strings"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	awscodebuild "github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfnTypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/smithy-go"
@@ -94,7 +94,7 @@ func (a *AwsCfn) updateStackAndWait(ctx context.Context, templateBody string, fo
 		return err // might call createStackAndWait depending on the error
 	}
 
-	term.Info("Waiting for CloudFormation stack", a.stackName, "to be updated...") // TODO: verbose only
+	slog.InfoContext(ctx, fmt.Sprint("Waiting for CloudFormation stack", a.stackName, "to be updated...")) // TODO: verbose only
 	dso, err := cloudformation.NewStackUpdateCompleteWaiter(cfn, update1s).WaitForOutput(ctx, &cloudformation.DescribeStacksInput{
 		StackName: uso.StackId,
 	}, stackTimeout)
@@ -131,7 +131,7 @@ func (a *AwsCfn) createStackAndWait(ctx context.Context, templateBody string, pa
 		}
 	}
 
-	term.Info("Waiting for CloudFormation stack", a.stackName, "to be created...") // TODO: verbose only
+	slog.InfoContext(ctx, fmt.Sprint("Waiting for CloudFormation stack", a.stackName, "to be created...")) // TODO: verbose only
 	dso, err := cloudformation.NewStackCreateCompleteWaiter(cfn, create1s).WaitForOutput(ctx, &cloudformation.DescribeStacksInput{
 		StackName: ptr.String(a.stackName),
 	}, stackTimeout)
@@ -252,7 +252,7 @@ func (a *AwsCfn) TearDown(ctx context.Context) error {
 		StackName:                   ptr.String(a.stackName),
 		EnableTerminationProtection: ptr.Bool(false),
 	}); err != nil {
-		term.Warnf("Failed to disable termination protection for CloudFormation stack %s: %v\n", a.stackName, err)
+		slog.WarnContext(ctx, fmt.Sprintf("Failed to disable termination protection for CloudFormation stack %s: %v\n", a.stackName, err))
 	}
 	_, err = cfn.DeleteStack(ctx, &cloudformation.DeleteStackInput{
 		StackName: ptr.String(a.stackName),
@@ -262,7 +262,7 @@ func (a *AwsCfn) TearDown(ctx context.Context) error {
 		return err
 	}
 
-	term.Info("Waiting for CloudFormation stack", a.stackName, "to be deleted...") // TODO: verbose only
+	slog.InfoContext(ctx, fmt.Sprint("Waiting for CloudFormation stack", a.stackName, "to be deleted...")) // TODO: verbose only
 	return cloudformation.NewStackDeleteCompleteWaiter(cfn, delete1s).Wait(ctx, &cloudformation.DescribeStacksInput{
 		StackName: ptr.String(a.stackName),
 	}, stackTimeout)

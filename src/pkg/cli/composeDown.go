@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"log/slog"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -12,7 +13,7 @@ import (
 )
 
 func ComposeDown(ctx context.Context, projectName string, fabric client.FabricClient, provider client.Provider) (types.ETag, error) {
-	term.Debugf("Destroying project %q", projectName)
+	slog.Debug("Destroying project", "project", projectName)
 
 	// If no names are provided, destroy the entire project
 	return CdCommand(ctx, projectName, provider, fabric, client.CdCommandDestroy)
@@ -33,6 +34,6 @@ func InteractiveComposeDown(ctx context.Context, projectName string, fabric clie
 		return "", ErrDoNotComposeDown
 	}
 
-	term.Info("Deactivating project " + projectName)
+	slog.InfoContext(ctx, "Deactivating project "+projectName)
 	return ComposeDown(ctx, projectName, fabric, provider)
 }

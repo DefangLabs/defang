@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
@@ -54,7 +55,7 @@ func makeEstimateCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("failed to run estimate: %w", err)
 			}
-			term.Debugf("Estimate: %+v", estimate)
+			slog.Debug("Estimate", "estimate", estimate)
 
 			cli.PrintEstimate(global.Stack.Mode, estimate, term.DefaultTerm)
 

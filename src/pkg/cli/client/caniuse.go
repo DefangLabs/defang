@@ -3,9 +3,10 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
 	"os"
 
-	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
@@ -65,24 +66,24 @@ type versionLabel string
 // resolveVersion picks the version to use: env override > force upgrade > allow upgrade > pin to previous > latest.
 func resolveVersion(fromEnv, fromFabric, previous string, label versionLabel, allowUpgrade bool, forcedReason string) string {
 	if fromEnv != "" {
-		term.Debugf("Using %s from env: %s", label, fromEnv)
+		slog.Debug("Using version from env", "label", label, "version", fromEnv)
 		return fromEnv
 	}
 	if previous == "" || fromFabric == previous {
-		term.Debugf("Using %s: %s", label, fromFabric)
+		slog.Debug("Using version from fabric", "label", label, "version", fromFabric)
 		return fromFabric
 	}
 	if forcedReason != "" {
-		term.Debugf("Using %s from fabric: %s", label, fromFabric)
-		term.Warnf("Overriding %s: %s", label, forcedReason)
+		slog.Debug("Using version from fabric (forced)", "label", label, "version", fromFabric)
+		slog.Warn(fmt.Sprintf("Overriding %s: %s", label, forcedReason))
 		return fromFabric
 	}
 	if allowUpgrade {
-		term.Debugf("Using latest %s: %s", label, fromFabric)
-		term.Infof("Upgrading %s to latest", label)
+		slog.Debug("Using latest version from fabric", "label", label, "version", fromFabric)
+		slog.Info(fmt.Sprintf("Upgrading %s to latest", label))
 		return fromFabric
 	}
-	term.Debugf("Using previous %s: %s", label, previous)
-	term.Warnf("A newer %s is available; using previously deployed version. To upgrade, re-run with --allow-upgrade or set DEFANG_ALLOW_UPGRADE=1", label)
+	slog.Debug("Using previous version", "label", label, "version", previous)
+	slog.Warn(fmt.Sprintf("A newer %s is available; using previously deployed version. To upgrade, re-run with --allow-upgrade or set DEFANG_ALLOW_UPGRADE=1", label))
 	return previous
 }

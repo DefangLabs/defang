@@ -1,12 +1,12 @@
 package track
 
 import (
+	"log/slog"
 	"strings"
 	"sync"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -40,10 +40,10 @@ func Evt(name string, props ...Property) {
 	}
 	tracker := Tracker
 	if tracker == nil {
-		term.Debugf("untracked event %q: %v", name, props)
+		slog.Debug("untracked event", "name", name, "props", props)
 		return
 	}
-	term.Debugf("tracking event %q: %v", name, props)
+	slog.Debug("tracking event", "name", name, "props", props)
 	trackWG.Add(1)
 	go func() {
 		defer trackWG.Done()

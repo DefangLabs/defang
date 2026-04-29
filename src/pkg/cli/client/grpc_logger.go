@@ -3,11 +3,12 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"net/http"
 
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 const maxPayloadLength = 1024
@@ -38,7 +39,7 @@ func (g grpcLogger) logRequest(header http.Header, reqType, payload string) {
 	requestId := pkg.RandomID()
 	header.Set("X-Request-Id", requestId)
 
-	term.Debug(g.prefix, requestId, reqType, payload)
+	slog.Debug(fmt.Sprint(g.prefix, requestId, reqType, payload))
 }
 
 func (g grpcLogger) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {

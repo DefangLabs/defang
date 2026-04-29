@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -123,7 +124,7 @@ func (l *Loader) loadProject(ctx context.Context, suppressWarn bool) (*Project, 
 
 	if term.DoDebug() {
 		b, _ := yaml.Marshal(project)
-		term.Println(string(b))
+		fmt.Println(string(b))
 	}
 
 	l.cached = project
@@ -180,16 +181,16 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 					if hasSubstitution(templ, key) {
 						// We don't (yet) support substitution patterns during deployment
 						if inEnv && !suppressWarn {
-							term.Warnf("Environment variable %q is ignored; add it to `.env` if needed", key)
+							slog.Warn(fmt.Sprintf("Environment variable %q is ignored; add it to `.env` if needed", key))
 						} else {
-							term.Debugf("Unresolved environment variable %q", key)
+							slog.Debug("Unresolved environment variable", "key", key)
 						}
 						return "", false
 					}
 					if inEnv && !suppressWarn {
-						term.Warnf("Environment variable %q is ignored; add it to `.env` or it may be resolved from config during deployment", key)
+						slog.Warn(fmt.Sprintf("Environment variable %q is ignored; add it to `.env` or it may be resolved from config during deployment", key))
 					} else {
-						term.Debugf("Environment variable %q was not resolved locally. It may be resolved from config during deployment", key)
+						slog.Debug("Environment variable was not resolved locally. It may be resolved from config during deployment", "key", key)
 					}
 					// Leave unresolved variables as-is for resolution later by CD
 					return "${" + key + "}", true

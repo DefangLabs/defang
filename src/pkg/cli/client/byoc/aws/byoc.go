@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -91,7 +92,7 @@ func AnnotateAwsError(err error) error {
 	if err == nil {
 		return nil
 	}
-	term.Debug("AWS error:", err)
+	slog.Debug(fmt.Sprint("AWS error:", err))
 	if strings.Contains(err.Error(), "missing AWS region:") {
 		return ErrMissingAwsRegion{err}
 	}
@@ -120,11 +121,11 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 		AWSSecretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
 		switch {
 		case AWSAccessKeyID != "" && AWSSecretAccessKey != "":
-			term.Warnf("Both AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY and AWS_PROFILE (%q) are set; access keys take precedence and AWS_PROFILE will be ignored", awsProfileName)
+			slog.WarnContext(ctx, fmt.Sprintf("Both AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY and AWS_PROFILE (%q) are set; access keys take precedence and AWS_PROFILE will be ignored", awsProfileName))
 		case AWSAccessKeyID != "" && AWSSecretAccessKey == "":
-			term.Warnf("Partial credentials found in env, missing: AWS_SECRET_ACCESS_KEY; using AWS_PROFILE (%q) instead", awsProfileName)
+			slog.WarnContext(ctx, fmt.Sprintf("Partial credentials found in env, missing: AWS_SECRET_ACCESS_KEY; using AWS_PROFILE (%q) instead", awsProfileName))
 		case AWSAccessKeyID == "" && AWSSecretAccessKey != "":
-			term.Warnf("Partial credentials found in env, missing: AWS_ACCESS_KEY_ID; using AWS_PROFILE (%q) instead", awsProfileName)
+			slog.WarnContext(ctx, fmt.Sprintf("Partial credentials found in env, missing: AWS_ACCESS_KEY_ID; using AWS_PROFILE (%q) instead", awsProfileName))
 		}
 	}
 
@@ -154,7 +155,7 @@ func (b *ByocAws) SetUpCD(ctx context.Context, force bool) error {
 		return nil
 	}
 
-	term.Debugf("Using CD image: %q", b.CDImage)
+	slog.Debug("Using CD image", "image", b.CDImage)
 
 	_, err := b.driver.SetUp(ctx, force)
 	if err != nil {
@@ -266,13 +267,13 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 	}
 
 	if b.needDockerHubCreds {
-		term.Debugf("Docker Hub credentials are needed for image pulls")
+		slog.Debug("Docker Hub credentials are needed for image pulls")
 		dockerHubUser, dockerHubPass, err := dockerhub.GetDockerHubCredentials(ctx)
 		if err != nil {
-			term.Debugf("Could not retrieve Docker Hub credentials: %v", err)
-			term.Warnf("Docker Hub credentials are required to avoid pull throttling. Please run `docker login` or set the DOCKERHUB_USERNAME and DOCKERHUB_TOKEN environment variables. Without valid credentials, image pulls may be rate-limited or fail.")
+			slog.Debug("Could not retrieve Docker Hub credentials", "err", err)
+			slog.WarnContext(ctx, "Docker Hub credentials are required to avoid pull throttling. Please run `docker login` or set the DOCKERHUB_USERNAME and DOCKERHUB_TOKEN environment variables. Without valid credentials, image pulls may be rate-limited or fail.")
 		} else {
-			term.Debugf("Using Docker Hub credentials with user %v", dockerHubUser)
+			slog.Debug("Using Docker Hub credentials", "user", dockerHubUser)
 			cdCmd.dockerHubUsername = dockerHubUser
 			cdCmd.dockerHubAccessToken = dockerHubPass
 		}
@@ -288,7 +289,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 
 	for _, si := range serviceInfos {
 		if si.UseAcmeCert {
-			term.Infof("To activate TLS certificate for %v, run 'defang cert gen'", si.Domainname)
+			slog.InfoContext(ctx, fmt.Sprintf("To activate TLS certificate for %v, run 'defang cert gen'", si.Domainname))
 		}
 	}
 
@@ -364,7 +365,7 @@ func (b *ByocAws) checkRequiresDockerHubToken(ctx context.Context, project *comp
 
 		found, err := b.driver.CheckImageExistOnPublicECR(ctx, ecrRepo, tag)
 		if err != nil {
-			term.Debugf("Error checking image %q on Public ECR: %v, assuming credentials needed", image, err)
+			slog.Debug("Error checking image on Public ECR, assuming credentials needed", "image", image, "err", err)
 			found = false
 		}
 		if !found {
@@ -378,7 +379,7 @@ func (b *ByocAws) checkRequiresDockerHubToken(ctx context.Context, project *comp
 	}
 	if len(missingDockerhubImages) > 0 {
 		b.needDockerHubCreds = true
-		term.Debugf("Docker Hub images not found on Public ECR: %v", missingDockerhubImages)
+		slog.Debug("Docker Hub images not found on Public ECR", "images", missingDockerhubImages)
 		track.Evt("NeedsDockerHubCreds", track.P("images", strings.Join(missingDockerhubImages, ",")))
 	}
 	return nil
@@ -411,7 +412,7 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 			return "", err
 		}
 		if len(zones) > 1 {
-			term.Warnf("Multiple hosted zones found for domain %q, using the first one: %v", domain, zones[0].Id)
+			slog.WarnContext(ctx, fmt.Sprintf("Multiple hosted zones found for domain %q, using the first one: %v", domain, zones[0].Id))
 		}
 		return *zones[0].Id, nil
 	}
@@ -551,10 +552,10 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild
 	if cmd.dockerHubUsername != "" && cmd.dockerHubAccessToken != "" {
 		arn, err := b.putDockerHubSecret(ctx, cmd.project, cmd.dockerHubUsername, cmd.dockerHubAccessToken)
 		if err != nil {
-			term.Warnf("Could not store Docker Hub credentials in Secrets Manager, images from dockerhub may be throttled during build: %v", err)
+			slog.WarnContext(ctx, fmt.Sprintf("Could not store Docker Hub credentials in Secrets Manager, images from dockerhub may be throttled during build: %v", err))
 		} else {
 			env["CI_REGISTRY_CREDENTIALS_ARN"] = arn
-			term.Debugf("Stored Docker Hub credentials in Secrets Manager: %s", arn)
+			slog.Debug("Stored Docker Hub credentials in Secrets Manager: " + arn)
 		}
 	}
 
@@ -595,7 +596,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 			// FillOutputs might fail if the stack is not created yet; return ErrNotExist (no bucket = no services yet)
 			var cfnErr *cfn.ErrStackNotFoundException
 			if errors.As(err, &cfnErr) {
-				term.Debugf("FillOutputs: %v", err)
+				slog.Debug("FillOutputs", "err", err)
 				return nil, client.ErrNotExist // no bucket = no services yet
 			}
 			return nil, AnnotateAwsError(err)
@@ -611,14 +612,14 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 	s3Client := aws.NewS3FromConfig(cfg)
 	path := b.GetProjectUpdatePath(projectName)
 
-	term.Debug("Getting services from bucket:", bucketName, path)
+	slog.Debug(fmt.Sprint("Getting services from bucket:", bucketName, path))
 	getObjectOutput, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: &bucketName,
 		Key:    &path,
 	})
 	if err != nil {
 		if aws.IsS3NoSuchKeyError(err) {
-			term.Debug("s3.GetObject:", err)
+			slog.Debug(fmt.Sprint("s3.GetObject:", err))
 			return nil, client.ErrNotExist // no services yet
 		}
 		return nil, AnnotateAwsError(err)
@@ -658,14 +659,14 @@ func (b *ByocAws) getSecretID(projectName, name string) string {
 
 func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.PutConfigRequest) error {
 	fqn := b.getSecretID(secret.Project, secret.Name)
-	term.Debugf("Putting parameter %q", fqn)
+	slog.Debug("Putting parameter", "fqn", fqn)
 	err := b.driver.PutSecret(ctx, fqn, secret.Value)
 	return AnnotateAwsError(err)
 }
 
 func (b *ByocAws) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
 	prefix := b.getSecretID(req.Project, "")
-	term.Debugf("Listing parameters with prefix %q", prefix)
+	slog.Debug("Listing parameters with prefix", "prefix", prefix)
 	awsSecrets, err := b.driver.ListSecretsByPrefix(ctx, prefix)
 	if err != nil {
 		return nil, err
@@ -696,7 +697,7 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 	// if the cloud formation stack has been destroyed, we can still query
 	// logs for builds and services
 	if err := b.driver.FillOutputs(ctx); err != nil {
-		term.Warnf("Unable to show CD logs: %v", err) // TODO: could skip this warning if the user wasn't asking for CD logs
+		slog.WarnContext(ctx, fmt.Sprintf("Unable to show CD logs: %v", err)) // TODO: could skip this warning if the user wasn't asking for CD logs
 	}
 
 	cfg, err := b.driver.LoadConfig(ctx)
@@ -739,7 +740,7 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ite
 				// Ignore ResourceNotFoundException errors which can only happen if a log stream is missing during Query
 				var resourceNotFound *cwTypes.ResourceNotFoundException
 				if errors.As(err, &resourceNotFound) {
-					term.Debugf("Log stream not found while tailing, skipping: %v", err)
+					slog.Debug("Log stream not found while tailing, skipping", "err", err)
 					continue
 				}
 				if !yield(nil, AnnotateAwsError(err)) {
@@ -817,7 +818,7 @@ func (b *ByocAws) queryOrTailLogs(ctx context.Context, cwClient cw.LogsClient, r
 		if len(req.Services) == 0 {
 			albIter, err := b.fetchAndStreamAlbLogs(ctx, req.Project, start, end, req.Pattern)
 			if err != nil {
-				term.Debugf("Failed to fetch ALB logs: %v", err)
+				slog.Debug("Failed to fetch ALB logs", "err", err)
 			} else {
 				logSeq = cw.MergeLogEvents(logSeq, albIter)
 				if req.Limit > 0 {
@@ -850,7 +851,7 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 	// Tail CD and builds
 	if logType.Has(logs.LogTypeCD) {
 		if b.driver.LogGroupARN == "" {
-			term.Debug("CD stack LogGroupARN is not set; skipping CD logs")
+			slog.Debug("CD stack LogGroupARN is not set; skipping CD logs")
 		} else {
 			cdTail := cw.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern}
 			// If we know the CD task ARN, only tail the logstream for that CD task; FIXME: store the task ID in the project's ProjectUpdate in S3 and use that
@@ -858,15 +859,15 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 				cdTail.LogStreamNames = []string{awscodebuild.GetLogStreamForBuildID(b.cdBuildId)}
 			}
 			groups = append(groups, cdTail)
-			term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames, filter)
+			slog.Debug(fmt.Sprint("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames, filter))
 		}
 	}
 	if logType.Has(logs.LogTypeBuild) && projectName != "" {
 		buildsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "builds")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service
-		term.Debug("Query builds logs", buildsTail.LogGroupARN, filter)
+		slog.Debug(fmt.Sprint("Query builds logs", buildsTail.LogGroupARN, filter))
 		groups = append(groups, buildsTail)
 		ecsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "ecs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
-		term.Debug("Query ecs events logs", ecsTail.LogGroupARN, filter)
+		slog.Debug(fmt.Sprint("Query ecs events logs", ecsTail.LogGroupARN, filter))
 		groups = append(groups, ecsTail)
 	}
 	// Tail services
@@ -875,7 +876,7 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 		if service != "" && etag != "" {
 			servicesTail.LogStreamNamePrefix = service + "/" + service + "_" + etag
 		}
-		term.Debug("Query services logs", servicesTail.LogGroupARN, servicesTail.LogStreamNamePrefix, pattern)
+		slog.Debug(fmt.Sprint("Query services logs", servicesTail.LogGroupARN, servicesTail.LogStreamNamePrefix, pattern))
 		groups = append(groups, servicesTail)
 	}
 	return groups
@@ -902,7 +903,7 @@ func (b *ByocAws) UpdateServiceInfo(ctx context.Context, si *defangv1.ServiceInf
 }
 
 func (b *ByocAws) TearDownCD(ctx context.Context) error {
-	term.Warn("Deleting the Defang CD cluster; currently existing stacks or configs will not be deleted, but they will be orphaned and they will need to be cleaned up manually")
+	slog.WarnContext(ctx, "Deleting the Defang CD cluster; currently existing stacks or configs will not be deleted, but they will be orphaned and they will need to be cleaned up manually")
 	return b.driver.TearDown(ctx)
 }
 
@@ -933,7 +934,7 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	for i, name := range secrets.Names {
 		ids[i] = b.getSecretID(secrets.Project, name)
 	}
-	term.Debug("Deleting parameters", ids)
+	slog.Debug(fmt.Sprint("Deleting parameters", ids))
 	if err := b.driver.DeleteSecrets(ctx, ids...); err != nil {
 		return AnnotateAwsError(err)
 	}
@@ -962,7 +963,7 @@ func (b *ByocAws) CdList(ctx context.Context, allRegions bool) (iter.Seq[state.I
 
 func (b *ByocAws) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {
 	if err := b.driver.FillOutputs(ctx); err != nil {
-		term.Warnf("Unable to get log group ARNs: %v", err)
+		slog.WarnContext(ctx, fmt.Sprintf("Unable to get log group ARNs: %v", err))
 	}
 
 	cfg, err := b.driver.LoadConfig(ctx)

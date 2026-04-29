@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"path"
 	"strings"
@@ -57,7 +58,7 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 	// Create a shortened authorize URL by only including the variable parts (state and code_challenge)
 	authorizeUrl := GetAuthorizeUrl("cli", ar.state, ar.challenge)
 
-	term.Println("Please visit the following URL to log in: (Right click the URL or press ENTER to open browser)")
+	fmt.Println("Please visit the following URL to log in: (Right click the URL or press ENTER to open browser)")
 	n, _ := term.Printf("  %s", authorizeUrl)
 	defer term.Print("\r", strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
 
@@ -72,13 +73,13 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow, saveToken func(st
 				ctx := context.Background()
 				code, err := pollForAuthCode(ctx, ar.state)
 				if err != nil {
-					term.Errorf("failed to poll for auth code: %v", err)
+					slog.ErrorContext(ctx, fmt.Sprintf("failed to poll for auth code: %v", err))
 					return
 				}
 
 				token, err := ExchangeCodeForToken(ctx, AuthCodeFlow{code: code, redirectUri: redirectUri, verifier: ar.verifier})
 				if err != nil {
-					term.Errorf("failed to exchange code for token: %v", err)
+					slog.ErrorContext(ctx, fmt.Sprintf("failed to exchange code for token: %v", err))
 					return
 				}
 
@@ -111,12 +112,12 @@ func Poll(ctx context.Context, key string) ([]byte, error) {
 		result, err := OpenAuthClient.Poll(ctx, key)
 		if err != nil {
 			if errors.Is(err, ErrPollTimeout) {
-				term.Debug("poll timed out, retrying...")
+				slog.Debug("poll timed out, retrying...")
 				continue
 			}
 			var unexpectedError ErrUnexpectedStatus
 			if errors.As(err, &unexpectedError) && unexpectedError.StatusCode >= 500 {
-				term.Debugf("received server error: %s, retrying in %v...", unexpectedError.Status, retryDelay)
+				slog.Debug("received server error, retrying", "status", unexpectedError.Status, "retryDelay", retryDelay)
 				select {
 				case <-ctx.Done():
 					return nil, ctx.Err()
@@ -161,7 +162,7 @@ func ExchangeCodeForToken(ctx context.Context, code AuthCodeFlow, ss ...scope.Sc
 		scopes = append(scopes, s.String())
 	}
 
-	term.Debugf("Generating access token with scopes %v", scopes)
+	slog.Debug("Generating access token", "scopes", scopes)
 
 	token, err := OpenAuthClient.Exchange(code.code, code.redirectUri, code.verifier) // TODO: scope
 	if err != nil {

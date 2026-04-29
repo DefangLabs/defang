@@ -2,12 +2,14 @@ package cli
 
 import (
 	"context"
+	"log/slog"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -53,6 +55,9 @@ func TestConfigList(t *testing.T) {
 
 	t.Run("no configs", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
+		prevLogger := slog.Default()
+		t.Cleanup(func() { slog.SetDefault(prevLogger) })
+		slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 
 		err := ConfigList(ctx, "emptyconfigs", &provider)
 		if err != nil {
@@ -69,6 +74,9 @@ func TestConfigList(t *testing.T) {
 
 	t.Run("some configs", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
+		prevLogger := slog.Default()
+		t.Cleanup(func() { slog.SetDefault(prevLogger) })
+		slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 
 		err := ConfigList(ctx, "test", &provider)
 		if err != nil {

@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -14,7 +16,6 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	ourHttp "github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/surveyor"
-	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 type HerokuApplicationInfo struct {
@@ -29,14 +30,14 @@ type HerokuApplicationInfo struct {
 func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterface, appName string) (HerokuApplicationInfo, error) {
 	var applicationInfo HerokuApplicationInfo
 
-	term.Info("Identifying deployed dynos")
+	slog.InfoContext(ctx, "Identifying deployed dynos")
 	dynos, err := client.ListDynos(ctx, appName)
 	if err != nil {
 		return HerokuApplicationInfo{}, fmt.Errorf("failed to list dynos: %w", err)
 	}
 
 	applicationInfo.Dynos = dynos
-	term.Debugf("Dynos for the selected application: %+v\n", dynos)
+	slog.Debug("Dynos for the selected application", "dynos", dynos)
 
 	dynoSizes := make(map[string]HerokuDynoSize)
 	for _, dyno := range dynos {
@@ -48,7 +49,7 @@ func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterf
 	}
 
 	applicationInfo.DynoSizes = dynoSizes
-	term.Debugf("Dyno sizes for the selected application: %+v\n", dynoSizes)
+	slog.Debug("Dyno sizes for the selected application", "dynoSizes", dynoSizes)
 
 	releaseTasks, err := client.GetReleaseTasks(ctx, appName)
 	if err != nil {
@@ -56,15 +57,15 @@ func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterf
 	}
 
 	applicationInfo.ReleaseTasks = releaseTasks
-	term.Debugf("Release tasks for the selected application: %+v\n", releaseTasks)
+	slog.Debug("Release tasks for the selected application", "releaseTasks", releaseTasks)
 
-	term.Info("Identifying configured addons")
+	slog.InfoContext(ctx, "Identifying configured addons")
 	addons, err := client.ListAddons(ctx, appName)
 	if err != nil {
 		return HerokuApplicationInfo{}, fmt.Errorf("failed to list Heroku addons: %w", err)
 	}
 	applicationInfo.Addons = addons
-	term.Debugf("Addons for the selected application: %+v\n", addons)
+	slog.Debug("Addons for the selected application", "addons", addons)
 
 	for _, addon := range addons {
 		if addon.AddonService.Name == "heroku-postgresql" {
@@ -76,7 +77,7 @@ func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterf
 		}
 	}
 
-	term.Debugf("Postgres info for the selected application: %+v\n", applicationInfo.PGInfo)
+	slog.Debug("Postgres info for the selected application", "pgInfo", applicationInfo.PGInfo)
 
 	configVars, err := client.ListConfigVars(ctx, appName)
 	if err != nil {
@@ -101,7 +102,7 @@ func selectSourceApplication(surveyor surveyor.Surveyor, appNames []string) (str
 		if selectedApp != "" {
 			break
 		}
-		term.Warn("No application selected. Please select an application.")
+		slog.Warn("No application selected. Please select an application.")
 	}
 
 	return selectedApp, nil
@@ -319,14 +320,14 @@ func authenticateHerokuCLI() error {
 		return nil
 	}
 
-	term.Info("You need to authenticate with the Heroku CLI.")
-	term.Info("If a browser window does not open, run `heroku login` in a separate shell and try again.")
+	slog.Info("You need to authenticate with the Heroku CLI.")
+	slog.Info("If a browser window does not open, run `heroku login` in a separate shell and try again.")
 	cmd = exec.Command("heroku", "login")
 	// cmd needs to receive any keypress on stdin in order to open a browser
 	cmd.Stdin = bytes.NewBuffer([]byte{'\n'})
 	_, err = cmd.Output()
 	if err != nil {
-		term.Debugf("Failed to run `heroku login`: %v", err)
+		slog.Debug("Failed to run `heroku login`", "err", err)
 		return err
 	}
 
@@ -345,22 +346,22 @@ func getHerokuAuthTokenFromCLI() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("Heroku CLI is not installed: %w", err)
 	}
-	term.Info("The Heroku CLI is installed, we'll use it to generate a short-lived authorization token")
+	slog.Info("The Heroku CLI is installed, we'll use it to generate a short-lived authorization token")
 	err = authenticateHerokuCLI()
 	if err != nil {
-		term.Debugf("Failed to authenticate Heroku CLI: %v", err)
+		slog.Debug("Failed to authenticate Heroku CLI", "err", err)
 		return "", err
 	}
-	term.Debug("Successfully authenticated with Heroku")
+	slog.Debug("Successfully authenticated with Heroku")
 
 	cmd := exec.Command("heroku", "authorizations:create", "--expires-in=300", "--json")
 	output, err := cmd.Output()
 	if err != nil {
-		term.Debugf("Failed to run `heroku authorizations:create`: %v", err)
+		slog.Debug("Failed to run `heroku authorizations:create`", "err", err)
 		return "", err
 	}
 
-	term.Debugf("received output from heroku cli: %s", output)
+	slog.Debug("Received output from heroku CLI authorization command")
 
 	var result struct {
 		AccessToken struct {
@@ -368,25 +369,29 @@ func getHerokuAuthTokenFromCLI() (string, error) {
 		} `json:"access_token"`
 	}
 	err = json.Unmarshal(output, &result)
-	if err != nil || result.AccessToken.Token == "" {
-		term.Debugf("Failed to parse Heroku CLI output: %v", err)
+	if err != nil {
+		slog.Debug("Failed to parse Heroku CLI output", "err", err)
 		return "", err
 	}
+	if result.AccessToken.Token == "" {
+		slog.Debug("Heroku CLI output did not include an access token")
+		return "", errors.New("heroku CLI returned an empty access token")
+	}
 
-	term.Debug("Successfully obtained Heroku token via CLI")
+	slog.Debug("Successfully obtained Heroku token via CLI")
 	return result.AccessToken.Token, nil
 }
 
 func getHerokuAuthToken() (string, error) {
 	token := os.Getenv("HEROKU_API_KEY")
 	if token != "" {
-		term.Debug("Using HEROKU_API_KEY environment variable")
+		slog.Debug("Using HEROKU_API_KEY environment variable")
 		return token, nil
 	}
 
 	token = os.Getenv("HEROKU_AUTH_TOKEN")
 	if token != "" {
-		term.Debug("Using HEROKU_AUTH_TOKEN environment variable")
+		slog.Debug("Using HEROKU_AUTH_TOKEN environment variable")
 		return token, nil
 	}
 
@@ -395,7 +400,7 @@ func getHerokuAuthToken() (string, error) {
 		return token, nil
 	}
 
-	term.Debug("Prompting for Heroku auth token")
+	slog.Debug("Prompting for Heroku auth token")
 
 	for {
 		err := survey.AskOne(&survey.Password{

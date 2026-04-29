@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -13,7 +14,7 @@ type PrintConfig struct {
 }
 
 func ConfigList(ctx context.Context, projectName string, provider client.Provider) error {
-	term.Debugf("Listing config in project %q", projectName)
+	slog.Debug("Listing config", "project", projectName)
 
 	config, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: projectName})
 	if err != nil {
@@ -22,8 +23,8 @@ func ConfigList(ctx context.Context, projectName string, provider client.Provide
 
 	numConfigs := len(config.Names)
 	if numConfigs == 0 {
-		_, err := term.Warn("No configs found")
-		return err
+		slog.WarnContext(ctx, "No configs found")
+		return nil
 	}
 
 	configNames := make([]PrintConfig, numConfigs)

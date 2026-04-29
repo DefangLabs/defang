@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"regexp"
 	"strings"
@@ -48,7 +49,7 @@ func Execute(ctx context.Context) error {
 
 	if err := RootCmd.ExecuteContext(ctx); err != nil {
 		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			term.Error("Error:", client.PrettyError(err))
+			slog.ErrorContext(ctx, fmt.Sprint("Error:", client.PrettyError(err)))
 			track.Evt("CLI Error", P("err", err))
 		}
 
@@ -100,15 +101,15 @@ func Execute(ctx context.Context) error {
 	}
 
 	if global.HasTty && term.HadWarnings() {
-		term.Println("For help with warnings, check our FAQ at https://s.defang.io/warnings")
+		fmt.Println("For help with warnings, check our FAQ at https://s.defang.io/warnings")
 	}
 
 	if global.HasTty && !global.HideUpdate && pkg.RandomIndex(10) == 0 {
 		if latest, err := github.GetLatestReleaseTag(ctx); err == nil && isNewer(GetCurrentVersion(), latest) {
-			term.Debug("Latest Version:", latest, "Current Version:", GetCurrentVersion())
-			term.Println("A newer version of the CLI is available at https://github.com/DefangLabs/defang/releases/latest")
+			slog.Debug("Newer version", "github", latest, "current", GetCurrentVersion())
+			fmt.Println("A newer version of the CLI is available at https://github.com/DefangLabs/defang/releases/latest")
 			if pkg.RandomIndex(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
-				term.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
+				fmt.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
 			}
 		}
 	}
@@ -408,16 +409,16 @@ var RootCmd = &cobra.Command{
 			if connect.CodeOf(err) != connect.CodeUnauthenticated {
 				return err
 			}
-			term.Debug("Using existing token failed; continuing to allow login/ToS flow:", err)
+			slog.Debug(fmt.Sprint("Using existing token failed; continuing to allow login/ToS flow:", err))
 		}
 
 		track.Tracker = global.Client // update tracker with the real client
 
 		if v, err := global.Client.GetVersions(ctx); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
-			term.Debug("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
+			slog.Debug(fmt.Sprint("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin))
 			if global.HasTty && isNewer(version, v.CliMin) && !isUpgradeCommand(cmd) {
-				term.Warn("Your CLI version is outdated. Please upgrade to the latest version by running:\n\n  defang upgrade\n")
+				slog.WarnContext(ctx, "Your CLI version is outdated. Please upgrade to the latest version by running:\n\n  defang upgrade\n")
 				global.HideUpdate = true // hide the upgrade hint at the end
 			}
 		}

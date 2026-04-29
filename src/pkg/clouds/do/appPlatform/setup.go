@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"regexp"
@@ -13,7 +14,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
 	"github.com/DefangLabs/defang/src/pkg/dockerhub"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -90,7 +90,7 @@ func (d *DoApp) SetUpBucket(ctx context.Context) error {
 }
 
 func getImageSourceSpec(cdImagePath string) (*godo.ImageSourceSpec, error) {
-	term.Debugf("Using CD image: %q", cdImagePath)
+	slog.Debug("Using CD image", "cdImagePath", cdImagePath)
 	image, err := dockerhub.ParseImage(cdImagePath)
 	if err != nil {
 		return nil, err
@@ -146,7 +146,7 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cdIma
 
 	appList, _, err := client.Apps.List(ctx, &godo.ListOptions{})
 	if err != nil {
-		term.Debugf("Error listing apps: %s", err)
+		slog.Debug("Error listing apps", "error", err)
 	}
 
 	for _, app := range appList {
@@ -157,7 +157,7 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cdIma
 
 	//Update current CD app if it exists
 	if currentCd.Spec != nil && currentCd.Spec.Name != "" {
-		term.Debugf("Updating existing CD app")
+		slog.Debug("Updating existing CD app")
 		currentCd, _, err = client.Apps.Update(ctx, currentCd.ID, &godo.AppUpdateRequest{
 			Spec:                    appJobSpec,
 			UpdateAllSourceVersions: true, // force update of the CD image
@@ -167,7 +167,7 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cdIma
 			return nil, err
 		}
 	} else {
-		term.Debugf("Creating new CD app")
+		slog.Debug("Creating new CD app")
 		project, _, err := client.Projects.Create(ctx, &godo.CreateProjectRequest{
 			Name:    CdName,
 			Purpose: "Infrastructure for running Defang commands",

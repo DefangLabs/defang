@@ -2,15 +2,15 @@ package cli
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 func ConfigDelete(ctx context.Context, projectName string, provider client.Provider, names ...string) error {
-	term.Debugf("Deleting config %v in project %q", names, projectName)
+	slog.Debug("Deleting config in project", "names", names, "project", projectName)
 
 	if dryrun.DoDryRun {
 		return dryrun.ErrDryRun

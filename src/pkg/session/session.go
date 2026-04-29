@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -11,7 +12,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
-	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 type StacksManager interface {
@@ -62,7 +62,7 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 	if stack.Provider == client.ProviderDefang {
 		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
 	}
-	term.Infof("Using the %q stack on %s from %s%s", stack.Name, stack.Provider, whence, extraMsg)
+	slog.InfoContext(ctx, fmt.Sprintf("Using the %q stack on %s from %s%s", stack.Name, stack.Provider, whence, extraMsg))
 
 	printProviderMismatchWarnings(ctx, stack.Provider)
 	return session, nil
@@ -94,28 +94,28 @@ func printProviderMismatchWarnings(ctx context.Context, provider client.Provider
 		// Ignore any env vars when explicitly using the Defang playground provider
 		// Defaults to defang provider in non-interactive mode
 		if env := pkg.AwsInEnv(); env != "" {
-			term.Warnf("AWS environment variables were detected (%v); did you forget --provider=aws or DEFANG_PROVIDER=aws?", env)
+			slog.WarnContext(ctx, fmt.Sprintf("AWS environment variables were detected (%v); did you forget --provider=aws or DEFANG_PROVIDER=aws?", env))
 		}
 		if env := pkg.DoInEnv(); env != "" {
-			term.Warnf("DigitalOcean environment variable was detected (%v); did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?", env)
+			slog.WarnContext(ctx, fmt.Sprintf("DigitalOcean environment variable was detected (%v); did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?", env))
 		}
 		if env := pkg.GcpInEnv(); env != "" {
-			term.Warnf("GCP project environment variable was detected (%v); did you forget --provider=gcp or DEFANG_PROVIDER=gcp?", env)
+			slog.WarnContext(ctx, fmt.Sprintf("GCP project environment variable was detected (%v); did you forget --provider=gcp or DEFANG_PROVIDER=gcp?", env))
 		}
 	}
 
 	switch provider {
 	case client.ProviderAWS:
 		if !awsInConfig(ctx) {
-			term.Warn("AWS provider was selected, but AWS environment is not set")
+			slog.WarnContext(ctx, "AWS provider was selected, but AWS environment is not set")
 		}
 	case client.ProviderDO:
 		if env := pkg.DoInEnv(); env == "" {
-			term.Warn("DigitalOcean provider was selected, but DIGITALOCEAN_TOKEN environment variable is not set")
+			slog.WarnContext(ctx, "DigitalOcean provider was selected, but DIGITALOCEAN_TOKEN environment variable is not set")
 		}
 	case client.ProviderGCP:
 		if env := pkg.GcpInEnv(); env == "" {
-			term.Warnf("GCP provider was selected, but no GCP project environment variable is set (%v)", pkg.GCPProjectEnvVars)
+			slog.WarnContext(ctx, fmt.Sprintf("GCP provider was selected, but no GCP project environment variable is set (%v)", pkg.GCPProjectEnvVars))
 		}
 	}
 }

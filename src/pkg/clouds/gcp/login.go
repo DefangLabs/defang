@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"slices"
@@ -110,14 +111,14 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 	// 1. Try the default application credentials or from the "GOOGLE_APPLICATION_CREDENTIALS" env var if set
 	//    - if the user has login with glcoud cli with application default credentials
 	//    - if the user has set GOOGLE_APPLICATION_CREDENTIALS to a service account key file with required permissions
-	term.Debugf("checking if application default credentials are available and has permission, GOOGLE_APPLICATION_CREDENTIALS=%q...", os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
+	slog.Debug("checking if application default credentials are available and has permission...", "GOOGLE_APPLICATION_CREDENTIALS", os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
 	if err := testTokenProjectPermissions(ctx, gcp.ProjectId, requiredPerms, nil); err != nil {
 		if ctx.Err() != nil { // Fast fail if context is done, no need to try other credential sources
 			return ctx.Err()
 		}
-		term.Debugf("the application default credentials are missing permissions: %v", err)
+		slog.Debug("the application default credentials are missing permissions", "error", err)
 	} else {
-		term.Debug("found valid application default credentials with required permissions")
+		slog.Debug("found valid application default credentials with required permissions")
 		// No need to pass down ADC token source via options since ADC is automatically used by gcp sdk
 		return nil
 	}
@@ -127,13 +128,13 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 		if ctx.Err() != nil { // Fast fail if context is done, no need to try other credential sources
 			return ctx.Err()
 		}
-		term.Warnf("failed to get GitHub Actions OIDC token source: %v", err)
+		slog.WarnContext(ctx, fmt.Sprintf("failed to get GitHub Actions OIDC token source: %v", err))
 	} else if tokenSource != nil {
-		term.Debug("found GitHub Actions OIDC token source, testing permissions...")
+		slog.Debug("found GitHub Actions OIDC token source, testing permissions...")
 		if err := testTokenProjectPermissions(ctx, gcp.ProjectId, requiredPerms, tokenSource); err != nil {
-			term.Warnf("GitHub Actions OIDC token is missing required permissions on project %q: %v\nPlease ensure your workload identity provider and github actions permissions are set up correctly: https://docs.defang.com/defang-byoc/gcp/github-actions\n", gcp.ProjectId, err)
+			slog.WarnContext(ctx, fmt.Sprintf("GitHub Actions OIDC token is missing required permissions on project %q: %v\nPlease ensure your workload identity provider and github actions permissions are set up correctly: https://docs.defang.com/defang-byoc/gcp/github-actions\n", gcp.ProjectId, err))
 		} else {
-			term.Debug("GitHub Actions OIDC token has required permissions")
+			slog.Debug("GitHub Actions OIDC token has required permissions")
 			gcp.Options = append(gcp.Options, option.WithTokenSource(tokenSource))
 			gcp.TokenSource = tokenSource
 			gcp.Principal = principal
@@ -146,9 +147,9 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 		if ctx.Err() != nil { // Fast fail if context is done, no need to try other credential sources
 			return ctx.Err()
 		}
-		term.Warnf("failed to load stored credentials: %v", err)
+		slog.WarnContext(ctx, fmt.Sprintf("failed to load stored credentials: %v", err))
 	} else if tokenSource != nil {
-		term.Debug("found valid stored credentials with required permissions")
+		slog.Debug("found valid stored credentials with required permissions")
 		gcp.Options = append(gcp.Options, option.WithTokenSource(tokenSource))
 		gcp.TokenSource = tokenSource
 		return nil
@@ -158,7 +159,7 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 	if !interactive {
 		return errors.New("No valid gcloud credentials found") // TODO: Better error message with possible doc link
 	}
-	term.Debug("no valid tokens found in token store, starting interactive login flow...")
+	slog.Debug("no valid tokens found in token store, starting interactive login flow...")
 	return gcp.tryInteractiveLogin(ctx, 3)
 }
 
@@ -170,11 +171,11 @@ func (gcp *Gcp) tryInteractiveLogin(ctx context.Context, n int) error {
 		}
 		if err := testTokenProjectPermissions(ctx, gcp.ProjectId, requiredPerms, tokenSource); err != nil {
 			if errors.As(err, &ErrorMissingPermissions{}) {
-				term.Warnf("Token from interactive login is missing required permissions on project %q: %v\nPlease ensure your user has the following permissions: %v\n", gcp.ProjectId, err, requiredPerms)
+				slog.WarnContext(ctx, fmt.Sprintf("Token from interactive login is missing required permissions on project %q: %v\nPlease ensure your user has the following permissions: %v\n", gcp.ProjectId, err, requiredPerms))
 			} else {
-				term.Warnf("Failed to validate token from interactive login on project %q: %v\n", gcp.ProjectId, err)
+				slog.WarnContext(ctx, fmt.Sprintf("Failed to validate token from interactive login on project %q: %v\n", gcp.ProjectId, err))
 			}
-			term.Warn("Please try logging in again with an account that has the required permissions.")
+			slog.WarnContext(ctx, "Please try logging in again with an account that has the required permissions.")
 			continue
 		}
 		gcp.Options = append(gcp.Options, option.WithTokenSource(tokenSource))
@@ -192,7 +193,7 @@ func (gcp *Gcp) tryInteractiveLogin(ctx context.Context, n int) error {
 			return fmt.Errorf("failed to marshal token: %w", err)
 		}
 		if gcp.TokenStore == nil {
-			term.Warn("No token store configured, skipping persisting token")
+			slog.WarnContext(ctx, "No token store configured, skipping persisting token")
 			return nil
 		}
 		if err := gcp.TokenStore.Save(tokenName, string(bytes)); err != nil {
@@ -221,24 +222,24 @@ func (gcp *Gcp) findStoredCredentials(ctx context.Context) (oauth2.TokenSource, 
 	for _, name := range oauthTokenNames {
 		tokenJson, err := gcp.TokenStore.Load(name)
 		if err != nil {
-			term.Warnf("failed to load previously saved auth token %q: %v", name, err)
+			slog.WarnContext(ctx, fmt.Sprintf("failed to load previously saved auth token %q: %v", name, err))
 			continue
 		}
 		var token oauth2.Token
 		if err = json.Unmarshal([]byte(tokenJson), &token); err != nil {
-			term.Warnf("failed to parse previously saved auth token %q: %v", name, err)
+			slog.WarnContext(ctx, fmt.Sprintf("failed to parse previously saved auth token %q: %v", name, err))
 			continue
 		}
-		term.Debugf("Testing token %q from store for required permissions...", name)
+		slog.Debug("Testing token from store for required permissions...", "name", name)
 		tokenSource := config.TokenSource(ctx, &token)
 		if err := testTokenProjectPermissions(ctx, gcp.ProjectId, requiredPerms, tokenSource); err == nil {
-			term.Debugf("Token %q is valid and has required permissions\n", name)
+			slog.Debug("Token is valid and has required permissions", "name", name)
 			currentToken, err := tokenSource.Token()
 			if err != nil {
 				return nil, fmt.Errorf("failed to retrieve current token from token source: %w", err)
 			}
 			if currentToken.AccessToken != token.AccessToken || currentToken.Expiry != token.Expiry || currentToken.RefreshToken != token.RefreshToken {
-				term.Debugf("Token %q has been updated, persisting updated token...\n", name)
+				slog.Debug("Token has been updated, persisting updated token...", "name", name)
 				bytes, err := json.Marshal(currentToken)
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal updated token: %w", err)
@@ -254,7 +255,7 @@ func (gcp *Gcp) findStoredCredentials(ctx context.Context) (oauth2.TokenSource, 
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
 			}
-			term.Debugf("Token %q is missing required permissions: %v\n", name, err)
+			slog.Debug("Token is missing required permissions", "name", name, "error", err)
 			continue
 		}
 	}
@@ -265,7 +266,7 @@ func findGithubCredentials(ctx context.Context) (oauth2.TokenSource, string, err
 	// If both ACTIONS_ID_TOKEN_REQUEST_URL and GOOGLE_WORKLOAD_IDENTITY_PROVIDER are set, we're doing "Workload Identity Federation" with GCP using github id token
 	githubTokenReqUrl := os.Getenv("ACTIONS_ID_TOKEN_REQUEST_URL")
 	gcpProvider := os.Getenv("GOOGLE_WORKLOAD_IDENTITY_PROVIDER")
-	term.Debugf("ACTIONS_ID_TOKEN_REQUEST_URL=%q, GOOGLE_WORKLOAD_IDENTITY_PROVIDER=%q", githubTokenReqUrl, gcpProvider)
+	slog.Debug("GitHub Actions environment variables", "ACTIONS_ID_TOKEN_REQUEST_URL", githubTokenReqUrl, "GOOGLE_WORKLOAD_IDENTITY_PROVIDER", gcpProvider)
 	if githubTokenReqUrl == "" || gcpProvider == "" {
 		return nil, "", nil
 	}
@@ -326,7 +327,7 @@ func (gcp *Gcp) InteractiveLogin(ctx context.Context) (oauth2.TokenSource, error
 	publicKeyBase64 := base64.URLEncoding.EncodeToString(pubKey[:])
 	authorizeURL := auth.GetAuthorizeUrl("gcp", publicKeyBase64)
 
-	term.Println("Please visit the following URL to log in to Google Cloud Platform: (Right click the URL or press ENTER to open browser)")
+	fmt.Println("Please visit the following URL to log in to Google Cloud Platform: (Right click the URL or press ENTER to open browser)")
 	term.Printf("  %s\n", authorizeURL)
 
 	ctx, done := term.OpenBrowserOnEnter(ctx, authorizeURL)

@@ -3,11 +3,13 @@ package compose
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"os"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/dns"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
@@ -121,6 +123,7 @@ func TestServiceNameReplacer(t *testing.T) {
 		prevTerm := term.DefaultTerm
 		var out, err bytes.Buffer
 		term.DefaultTerm = term.NewTerm(os.Stdin, &out, &err)
+		slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 		t.Cleanup(func() {
 			term.DefaultTerm = prevTerm
 		})

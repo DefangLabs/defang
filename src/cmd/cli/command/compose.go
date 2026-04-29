@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"slices"
 	"strings"
 	"time"
@@ -35,9 +36,9 @@ const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
 func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
 	// We can only show services deployed to the prod1 defang SaaS environment.
 	if global.Stack.Provider == client.ProviderDefang && global.FabricAddr == client.DefaultFabricAddr {
-		term.Info("Monitor your services' status in the defang portal")
+		slog.Info("Monitor your services' status in the defang portal")
 		for _, serviceInfo := range serviceInfos {
-			term.Println("   -", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
+			fmt.Println("   -", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
 		}
 	}
 }
@@ -94,9 +95,9 @@ func makeComposeUpCmd() *cobra.Command {
 				Type:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
 				Stack:   session.Stack.Name,
 			}); err != nil {
-				term.Debugf("ListDeployments failed: %v", err)
+				slog.Debug("ListDeployments failed", "err", err)
 			} else if accountInfo, err := session.Provider.AccountInfo(ctx); err != nil {
-				term.Debugf("AccountInfo failed: %v", err)
+				slog.Debug("AccountInfo failed", "err", err)
 			} else if len(resp.Deployments) > 0 {
 				workingDir, _ := session.Loader.ProjectWorkingDir(ctx)
 				confirmed, err := confirmDeployment(workingDir, resp.Deployments, accountInfo, session.Provider.GetStackName())
@@ -115,7 +116,7 @@ func makeComposeUpCmd() *cobra.Command {
 					Mode:     session.Stack.Mode,
 				})
 				if err != nil {
-					term.Debug("Failed to create stack:", err)
+					slog.Debug(fmt.Sprint("Failed to create stack:", err))
 				}
 			}
 
@@ -127,7 +128,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 			}
 			if len(managedServices) > 0 {
-				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
+				slog.WarnContext(ctx, fmt.Sprintf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices))
 			}
 
 			deploy, project, err := cli.ComposeUp(ctx, global.Client, session.Provider, session.Stack, cli.ComposeUpParams{
@@ -151,7 +152,7 @@ func makeComposeUpCmd() *cobra.Command {
 			printPlaygroundPortalServiceURLs(deploy.Services)
 
 			if detach {
-				term.Info("Detached.")
+				slog.InfoContext(ctx, "Detached.")
 				return nil
 			}
 
@@ -160,7 +161,7 @@ func makeComposeUpCmd() *cobra.Command {
 			if deploy.Etag != "" {
 				tailSource = "deployment ID " + deploy.Etag
 			}
-			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
+			slog.InfoContext(ctx, fmt.Sprint("Tailing logs for", tailSource, "; press Ctrl+C to detach:"))
 
 			tailOptions := newTailOptionsForDeploy(session.Stack.Name, deploy.Etag, since, global.Verbose)
 			serviceStates, err := cli.TailAndMonitor(ctx, project, session.Provider, time.Duration(waitTimeout)*time.Second, tailOptions)
@@ -168,7 +169,7 @@ func makeComposeUpCmd() *cobra.Command {
 				deploymentErr := err
 				debugger, err := debug.NewDebugger(ctx, global.FabricAddr, session.Stack)
 				if err != nil {
-					term.Warn("Failed to initialize debugger:", err)
+					slog.WarnContext(ctx, fmt.Sprint("Failed to initialize debugger:", err))
 					return deploymentErr
 				}
 				handleTailAndMonitorErr(ctx, deploymentErr, debugger, debug.DebugConfig{
@@ -197,7 +198,7 @@ func makeComposeUpCmd() *cobra.Command {
 				return err
 			}
 
-			term.Info("Done.")
+			slog.InfoContext(ctx, "Done.")
 			flushWarnings()
 			return nil
 		},
@@ -246,7 +247,7 @@ func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.D
 			Mode:     global.Stack.Mode,
 		})
 		if err != nil {
-			term.Debugf("Failed to create stack %v", err)
+			slog.Debug("Failed to create stack", "err", err)
 		} else {
 			stacks.PrintCreateMessage(stackName)
 		}
@@ -255,7 +256,7 @@ func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.D
 }
 
 func printExistingDeployments(existingDeployments []*defangv1.Deployment) {
-	term.Info("This project was previously deployed to the following locations:")
+	fmt.Println("This project was previously deployed to the following locations:")
 	deploymentStrings := make([]string, 0, len(existingDeployments))
 	for _, dep := range existingDeployments {
 		var providerId client.ProviderID
@@ -283,7 +284,7 @@ func confirmDeploymentToNewLocation() (bool, error) {
 
 func promptToCreateStack(ctx context.Context, targetDirectory string, params stacks.Parameters) error {
 	if global.NonInteractive {
-		term.Info("Consider creating a stack to manage your deployments.")
+		fmt.Println("Consider creating a stack to manage your deployments.")
 		printDefangHint("To create a stack, do:", "stack new --name="+params.Name)
 		return nil
 	}
@@ -310,7 +311,7 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 	}
 
 	if connect.CodeOf(originalErr) == connect.CodeResourceExhausted && strings.Contains(originalErr.Error(), "maximum number of projects") {
-		term.Error("Error:", client.PrettyError(originalErr))
+		slog.ErrorContext(ctx, fmt.Sprint("Error:", client.PrettyError(originalErr)))
 		err := handleTooManyProjectsError(ctx, provider, originalErr)
 		if err != nil {
 			return originalErr
@@ -322,7 +323,7 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 		return originalErr
 	}
 
-	term.Error("Error:", client.PrettyError(originalErr))
+	slog.ErrorContext(ctx, fmt.Sprint("Error:", client.PrettyError(originalErr)))
 	return debugger.DebugDeploymentError(ctx, debug.DebugConfig{
 		Project: project,
 	}, originalErr)
@@ -331,7 +332,7 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 func handleTooManyProjectsError(ctx context.Context, provider client.Provider, originalErr error) error {
 	projectName, err := provider.RemoteProjectName(ctx)
 	if err != nil {
-		term.Warn("failed to get remote project name:", err)
+		slog.WarnContext(ctx, fmt.Sprint("failed to get remote project name:", err))
 		return originalErr
 	}
 
@@ -343,7 +344,7 @@ func handleTooManyProjectsError(ctx context.Context, provider client.Provider, o
 
 	_, err = cli.InteractiveComposeDown(ctx, projectName, global.Client, provider)
 	if err != nil {
-		term.Warn("ComposeDown failed:", err)
+		slog.WarnContext(ctx, fmt.Sprint("ComposeDown failed:", err))
 		printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
 		return originalErr
 	} else {
@@ -358,7 +359,7 @@ func handleTailAndMonitorErr(ctx context.Context, err error, debugger *debug.Deb
 	var errDeploymentFailed client.ErrDeploymentFailed
 	if errors.As(err, &errDeploymentFailed) {
 		// Tail got canceled because of deployment failure: prompt to show the debugger
-		term.Warn(errDeploymentFailed)
+		slog.WarnContext(ctx, fmt.Sprintf("%v", errDeploymentFailed))
 		if errDeploymentFailed.Service != "" {
 			debugConfig.FailedServices = []string{errDeploymentFailed.Service}
 		}
@@ -437,21 +438,21 @@ func makeComposeDownCmd() *cobra.Command {
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
-					term.Warn(client.PrettyError(err))
+					slog.Warn(fmt.Sprintf("%v", client.PrettyError(err)))
 					return nil
 				}
 				return err
 			}
 
-			term.Info("Deleted services, deployment ID", deployment)
+			slog.Info(fmt.Sprint("Deleted services, deployment ID", deployment))
 
 			listConfigs, err := session.Provider.ListConfig(cmd.Context(), &defangv1.ListConfigsRequest{Project: projectName})
 			if err == nil {
 				if len(listConfigs.Names) > 0 {
-					term.Warn("Stored project configs are not deleted.")
+					slog.Warn("Stored project configs are not deleted.")
 				}
 			} else {
-				term.Debugf("ListConfigs failed: %v", err)
+				slog.Debug("ListConfigs failed", "err", err)
 			}
 
 			if detach {
@@ -468,12 +469,12 @@ func makeComposeDownCmd() *cobra.Command {
 					// different than `up`, which will wait for the deployment to finish, but we don't have an
 					// ECS event subscription for `down` so we can't wait for the deployment to finish.
 					// Instead, we'll just show a warning and detach.
-					term.Warn("Unable to tail logs. Detaching.")
+					slog.Warn("Unable to tail logs. Detaching.")
 					return nil
 				}
 				return err
 			}
-			term.Info("Done.")
+			slog.Info("Done.")
 			if len(listConfigs.Names) > 0 {
 				printDefangHint("To delete stored project configs, run:", "config rm --project-name="+projectName+" "+strings.Join(listConfigs.Names, " "))
 			}
@@ -520,7 +521,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				CheckAccountInfo: false,
 			})
 			if err != nil {
-				term.Warn("unable to load stack:", err, "- some information may not be up-to-date")
+				slog.WarnContext(ctx, fmt.Sprint("unable to load stack:", err, "- some information may not be up-to-date"))
 				sessionx = &session.Session{
 					Loader:   newLoaderForCommand(cmd),
 					Provider: client.NewPlaygroundProvider(global.Client, stacks.DefaultBeta),
@@ -530,7 +531,7 @@ func makeComposeConfigCmd() *cobra.Command {
 
 			_, err = sessionx.Provider.AccountInfo(ctx)
 			if err != nil {
-				term.Warn("unable to connect to cloud provider:", err, "- some information may not be up-to-date")
+				slog.WarnContext(ctx, fmt.Sprint("unable to connect to cloud provider:", err, "- some information may not be up-to-date"))
 			}
 
 			project, loadErr := sessionx.Loader.LoadProject(ctx)
@@ -580,7 +581,7 @@ func makeComposePsCmd() *cobra.Command {
 					return err
 				}
 
-				term.Warn(err)
+				slog.Warn(fmt.Sprintf("%v", err))
 				printDefangHint("To start a new project, do:", "new")
 				return nil
 			}
@@ -676,7 +677,7 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 	if pkg.IsValidTime(untilTs) {
 		rangeStr += " until " + untilTs.Format(time.RFC3339Nano)
 	}
-	term.Infof("Showing logs%s; press Ctrl+C to stop:", rangeStr)
+	fmt.Printf("Showing logs%s; press Ctrl+C to stop:\n", rangeStr)
 
 	services := args
 	if len(name) > 0 {

@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 )
@@ -124,7 +124,7 @@ func (t *ToolManager) EqualPrevious(toolRequests []*ai.ToolRequest) bool {
 	for _, req := range toolRequests {
 		inputs, err := json.Marshal(req.Input)
 		if err != nil {
-			term.Debugf("error marshaling tool request input: %v", err)
+			slog.Debug("error marshaling tool request input", "err", err)
 			continue
 		}
 		currJSON := fmt.Sprintf("%s:%s", req.Name, inputs)

@@ -3,6 +3,8 @@ package command
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
 	"os/exec"
 	"path/filepath"
 
@@ -11,7 +13,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/setup"
 	"github.com/DefangLabs/defang/src/pkg/surveyor"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/cobra"
 )
 
@@ -51,12 +52,12 @@ var generateCmd = &cobra.Command{
 }
 
 func afterGenerate(ctx context.Context, result setup.SetupResult) {
-	term.Info("Code generated successfully in folder", result.Folder)
+	slog.InfoContext(ctx, fmt.Sprint("Code generated successfully in folder", result.Folder))
 	editor := pkg.Getenv("DEFANG_EDITOR", "code") // TODO: should we use EDITOR env var instead? But won't handle terminal editors like vim
 	cmdd := exec.Command(editor, result.Folder)
 	err := cmdd.Start()
 	if err != nil {
-		term.Debugf("unable to launch editor %q: %v", editor, err)
+		slog.Debug("unable to launch editor", "editor", editor, "err", err)
 	}
 
 	cd := ""
@@ -68,7 +69,7 @@ func afterGenerate(ctx context.Context, result setup.SetupResult) {
 	loader := compose.NewLoader(compose.WithPath(filepath.Join(result.Folder, "compose.yaml")))
 	project, err := loader.LoadProject(ctx)
 	if err != nil {
-		term.Debugf("unable to load new project: %v", err)
+		slog.Debug("unable to load new project", "err", err)
 	}
 
 	var envInstructions []string

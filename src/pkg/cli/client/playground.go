@@ -3,14 +3,15 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"iter"
+	"log/slog"
 	"os"
 
 	"connectrpc.com/connect"
 	byocState "github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/dns"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -183,7 +184,7 @@ func (g *PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, err
 	if resp.Project == "" {
 		return "", errors.New("no Playground projects found")
 	}
-	term.Debug("Using default Playground project: ", resp.Project)
+	slog.Debug(fmt.Sprint("Using default Playground project: ", resp.Project))
 	return resp.Project, nil
 }
 

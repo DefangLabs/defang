@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
@@ -14,7 +15,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
-	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 type DeployParams struct {
@@ -22,7 +22,7 @@ type DeployParams struct {
 }
 
 func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
-	term.Debug("Function invoked: loader.LoadProject")
+	slog.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
 		err = fmt.Errorf("failed to parse compose file: %w", err)
@@ -30,7 +30,7 @@ func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployPa
 		return "", fmt.Errorf("local deployment failed: %v. Please provide a valid compose file path.", err)
 	}
 
-	term.Debug("Function invoked: cli.Connect")
+	slog.Debug("Function invoked: cli.Connect")
 	client, err := GetClientWithRetry(ctx, cli, sc)
 	if err != nil {
 		var noBrowserErr auth.ErrNoBrowser
@@ -57,9 +57,9 @@ func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployPa
 	}
 
 	// Deploy the services
-	term.Debugf("Deploying services for project %s...", project.Name)
+	slog.Debug("Deploying services for project", "project", project.Name)
 
-	term.Debug("Function invoked: cli.ComposeUp")
+	slog.Debug("Function invoked: cli.ComposeUp")
 	// Use ComposeUp to deploy the services
 	deployResp, project, err := cli.ComposeUp(ctx, client, provider, sc.Stack, cliTypes.ComposeUpParams{
 		Project:    project,

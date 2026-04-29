@@ -3,11 +3,11 @@ package tools
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
-	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 const CreateNewStack = "Create new stack"
@@ -48,7 +48,7 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.Par
 		}
 	}
 
-	term.Debug("Function invoked: cli.NewProvider")
+	slog.Debug("Function invoked: cli.NewProvider")
 	provider := pp.pc.NewProvider(ctx, stack.Provider, pp.fc, stack.Name)
 	providerID := stack.Provider
 	return &providerID, provider, nil

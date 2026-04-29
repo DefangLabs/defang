@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	"cloud.google.com/go/iam/credentials/apiv1/credentialspb"
 	"cloud.google.com/go/storage"
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/google/uuid"
 
 	"google.golang.org/api/impersonate"
@@ -38,7 +38,7 @@ func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string, versioning
 		return "", fmt.Errorf("failed to get bucket with prefix %q: %w", prefix, err)
 	}
 	if existing != "" {
-		term.Debugf("Bucket %q already exists\n", existing)
+		slog.Debug("Bucket already exists", "bucket", existing)
 		err := gcp.UpdateBucketVersioning(ctx, existing, versioning)
 		if err != nil {
 			return "", fmt.Errorf("failed to ensure versioning is enabled on existing bucket %q: %w", existing, err)
@@ -53,7 +53,7 @@ func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string, versioning
 	defer client.Close()
 
 	newBucketName := fmt.Sprintf("%s-%s", prefix, pkg.RandomID())
-	term.Infof("Creating defang cd bucket %q", newBucketName)
+	slog.InfoContext(ctx, fmt.Sprintf("Creating defang cd bucket %q", newBucketName))
 
 	bucket := client.Bucket(newBucketName)
 	if err := bucket.Create(ctx, gcp.ProjectId, &storage.BucketAttrs{

@@ -3,7 +3,9 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -11,7 +13,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
@@ -56,7 +57,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 			// When CD fails, stop WaitServiceState
 			cancelSvcStatus(cdErr)
 		} else {
-			term.Info("Deployment complete. Waiting for services to be healthy...")
+			slog.InfoContext(ctx, "Deployment complete. Waiting for services to be healthy...")
 		}
 	}()
 
@@ -72,10 +73,10 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 	// blocking call to tail
 	var tailErr error
 	if err := Tail(tailCtx, provider, project.Name, tailOptions); err != nil {
-		term.Debug("Tail while monitoring stopped with", err, errors.Unwrap(err))
+		slog.Debug(fmt.Sprint("Tail while monitoring stopped with", err, errors.Unwrap(err)))
 
 		if connect.CodeOf(err) == connect.CodePermissionDenied {
-			term.Warn("Unable to tail logs. Waiting for the deployment to finish.")
+			slog.WarnContext(ctx, "Unable to tail logs. Waiting for the deployment to finish.")
 			// If tail fails because of missing permission, we wait for the deployment to finish
 			<-tailCtx.Done()
 			// Get the actual error from the context so we won't print "Error: missing tail permission"
@@ -87,14 +88,14 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 			break // an end condition was detected; cdErr and/or svcErr might be nil
 
 		case errors.Is(context.Cause(ctx), context.Canceled):
-			term.Warn("Deployment is not finished. Service(s) might not be running.")
+			slog.WarnContext(ctx, "Deployment is not finished. Service(s) might not be running.")
 
 		case errors.Is(context.Cause(tailCtx), errMonitoringDone):
 			break // the monitoring stopped the tail; cdErr and/or svcErr will have been set
 
 		case errors.Is(context.Cause(ctx), context.DeadlineExceeded):
 			// Tail was canceled when wait-timeout is reached; show a warning and exit with an error
-			term.Warn("Wait-timeout exceeded, detaching from logs. Deployment still in progress.")
+			slog.WarnContext(ctx, "Wait-timeout exceeded, detaching from logs. Deployment still in progress.")
 			fallthrough
 
 		default:

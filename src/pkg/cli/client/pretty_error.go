@@ -3,17 +3,17 @@ package client
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"connectrpc.com/connect"
-	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 func PrettyError(err error) error {
 	// To avoid printing the internal gRPC error code
 	var cerr *connect.Error
 	if errors.As(err, &cerr) {
-		term.Debug("Server error:", cerr)
+		slog.Debug(fmt.Sprint("Server error:", cerr))
 		err = errors.Unwrap(cerr)
 	}
 	if IsNetworkError(err) {

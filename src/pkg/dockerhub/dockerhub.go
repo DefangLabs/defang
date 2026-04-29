@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"path"
 	"slices"
@@ -15,7 +16,6 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/docker/cli/cli/config"
 )
 
@@ -79,7 +79,7 @@ func GenerateNewPublicOnlyPAT(ctx context.Context, label string) (string, string
 		}
 		pat, err = docHubClient.CreatePAT(ctx, label, []string{"repo:public_read"})
 		if err != nil {
-			term.Infof("Failed to create Docker Hub PAT, fallback to existing docker credentials: %v", err)
+			slog.InfoContext(ctx, fmt.Sprintf("Failed to create Docker Hub PAT, fallback to existing docker credentials: %v", err))
 			// Fallback to use the password as PAT
 			pat = password
 		}

@@ -2,12 +2,14 @@ package cli
 
 import (
 	"context"
+	"log/slog"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	connect "connectrpc.com/connect"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -62,6 +64,9 @@ func TestDeploymentsList(t *testing.T) {
 
 	t.Run("no deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
+		prevLogger := slog.Default()
+		t.Cleanup(func() { slog.SetDefault(prevLogger) })
+		slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 		err := DeploymentsList(ctx, grpcClient, ListDeploymentsParams{
 			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY,
 			ProjectName: "empty",
@@ -81,6 +86,9 @@ func TestDeploymentsList(t *testing.T) {
 
 	t.Run("some deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
+		prevLogger := slog.Default()
+		t.Cleanup(func() { slog.SetDefault(prevLogger) })
+		slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 		err := DeploymentsList(ctx, grpcClient, ListDeploymentsParams{
 			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY,
 			ProjectName: "test",
@@ -133,6 +141,9 @@ func TestActiveDeployments(t *testing.T) {
 	t.Run("no active deployments", func(t *testing.T) {
 		fabricServer.testDeploymentsData = nil
 		stdout, _ := term.SetupTestTerm(t)
+		prevLogger := slog.Default()
+		t.Cleanup(func() { slog.SetDefault(prevLogger) })
+		slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 
 		err := DeploymentsList(ctx, grpcClient, ListDeploymentsParams{
 			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
@@ -169,6 +180,9 @@ func TestActiveDeployments(t *testing.T) {
 		fabricServer.testDeploymentsData = activeDeployments
 
 		stdout, _ := term.SetupTestTerm(t)
+		prevLogger := slog.Default()
+		t.Cleanup(func() { slog.SetDefault(prevLogger) })
+		slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 		err := DeploymentsList(ctx, grpcClient, ListDeploymentsParams{
 			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
 			ProjectName: "",

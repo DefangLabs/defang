@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/serviceusage/v1"
 )
@@ -27,7 +27,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 	projectName := "projects/" + gcp.ProjectId
 
 	for i := range maxAttempts {
-		term.Debugf("Enabling services: %v\n", apis)
+		slog.Debug("Enabling services", "apis", apis)
 		req := &serviceusage.BatchEnableServicesRequest{
 			ServiceIds: apis,
 		}
@@ -39,9 +39,9 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 			if errors.As(err, &apiErr) && (apiErr.Code == 403 || apiErr.Code == 401) {
 				return fmt.Errorf("permission denied when enabling services: %w", err)
 			}
-			term.Printf("Error: %+v (%T)\n", err, err)
+			slog.ErrorContext(ctx, fmt.Sprintf("Error: %+v (%T)", err, err))
 			if i < maxAttempts-1 {
-				term.Debugf("Failed to enable services, will retry in %v: %v\n", retryInterval, err)
+				slog.Debug("Failed to enable services, will retry", "retryInterval", retryInterval, "error", err)
 				if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
 					return err
 				}
@@ -54,11 +54,11 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 		for {
 			op, err := opService.Get(operation.Name).Context(ctx).Do()
 			if err != nil {
-				term.Warnf("Failed to get operation status: %v\n", err)
+				slog.WarnContext(ctx, fmt.Sprintf("Failed to get operation status: %v\n", err))
 			} else if op.Done { // Check if the operation is done
 				if op.Error != nil {
 					if i < maxAttempts-1 {
-						term.Debugf("Failed to enable services operation, will retry in %v: %v\n", retryInterval, op.Error)
+						slog.Debug("Failed to enable services operation, will retry", "retryInterval", retryInterval, "error", op.Error)
 						if err := pkg.SleepWithContext(ctx, retryInterval); err != nil {
 							return err
 						}

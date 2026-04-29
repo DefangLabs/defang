@@ -2,6 +2,8 @@ package cli
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/auth"
@@ -19,7 +21,7 @@ func Token(ctx context.Context, client client.FabricClient, tenant types.TenantN
 	}
 
 	code, err := auth.StartAuthCodeFlow(ctx, false, func(token string) {
-		term.Debug("Getting access token for scope:", s)
+		slog.Debug(fmt.Sprint("Getting access token for scope:", s))
 	}, "token-cli")
 	if err != nil {
 		return err
@@ -36,7 +38,7 @@ func Token(ctx context.Context, client client.FabricClient, tenant types.TenantN
 		scopes = []string{string(s)}
 	}
 
-	term.Debugf("Generating token for tenant %q with scopes %v", tenant, scopes)
+	slog.Debug("Generating token for tenant", "tenant", tenant, "scopes", scopes)
 
 	resp, err := client.Token(ctx, &defangv1.TokenRequest{
 		Assertion: at,

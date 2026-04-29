@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"log/slog"
 	"slices"
 	"strings"
 
@@ -112,7 +113,7 @@ func printConfigResolutionSummary(project *types.Project, defangConfig []string,
 
 	projectEnvVars = slices.Compact(projectEnvVars)
 
-	term.Info("Service environment variables resolution summary:")
+	slog.Info("Service environment variables resolution summary:")
 
 	return term.Table(projectEnvVars, "Service", "Environment", "Source", "Value")
 }

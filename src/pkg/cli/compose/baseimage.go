@@ -2,12 +2,12 @@ package compose
 
 import (
 	"fmt"
+	"log/slog"
 	"maps"
 	"os"
 	"path/filepath"
 	"slices"
 
-	"github.com/DefangLabs/defang/src/pkg/term"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
@@ -25,7 +25,7 @@ func FindAllBaseImages(project *composeTypes.Project) ([]string, error) {
 			images, err := extractDockerfileBaseImages(dockerfileFullPath)
 			if err != nil {
 				if os.IsNotExist(err) {
-					term.Debugf("service %q: dockerfile %q does not exist; skipping", service.Name, dockerfileFullPath)
+					slog.Debug("service: dockerfile does not exist; skipping", "service", service.Name, "dockerfile", dockerfileFullPath)
 					continue
 				}
 				return nil, err

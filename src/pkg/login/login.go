@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -27,7 +28,7 @@ type AuthService interface {
 type OpenAuthService struct{}
 
 func (OpenAuthService) login(ctx context.Context, fabricAddr string, flow LoginFlow, mcpClient string) (string, error) {
-	term.Debug("Logging in to", fabricAddr)
+	slog.Debug(fmt.Sprint("Logging in to", fabricAddr))
 
 	code, err := auth.StartAuthCodeFlow(ctx, flow, func(token string) {
 		client.SaveAccessToken(fabricAddr, token)
@@ -60,7 +61,7 @@ func interactiveLogin(ctx context.Context, fabricAddr string, flow LoginFlow, mc
 	}
 
 	if err := client.SaveAccessToken(fabricAddr, token); err != nil {
-		term.Warn(err)
+		slog.WarnContext(ctx, fmt.Sprintf("%v", err))
 		var pathError *os.PathError
 		if errors.As(err, &pathError) {
 			term.Printf("\nTo fix file permissions, run:\n\n  sudo chown -R $(whoami) %q\n", pathError.Path)
@@ -72,12 +73,12 @@ func interactiveLogin(ctx context.Context, fabricAddr string, flow LoginFlow, mc
 }
 
 func NonInteractiveGitHubLogin(ctx context.Context, fabric client.FabricClient, fabricAddr string) error {
-	term.Debug("Non-interactive login using GitHub Actions id-token")
+	slog.Debug("Non-interactive login using GitHub Actions id-token")
 	idToken, err := github.GetIdToken(ctx, "") // default audience (ie. https://github.com/ORG)
 	if err != nil {
 		return fmt.Errorf("non-interactive login failed: %w", err)
 	}
-	term.Debug("Got GitHub Actions id-token")
+	slog.Debug("Got GitHub Actions id-token")
 
 	// Create a Fabric token using the GitHub token as an assertion
 	resp, err := fabric.Token(ctx, &defangv1.TokenRequest{
@@ -103,7 +104,7 @@ func NonInteractiveGitHubLogin(ctx context.Context, fabric client.FabricClient, 
 		os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath)
 		os.Setenv("AWS_ROLE_SESSION_NAME", "defang-cli") // TODO: from WhoAmI
 	} else {
-		term.Debugf("AWS_WEB_IDENTITY_TOKEN_FILE is already set; not writing token to a new file")
+		slog.Debug("AWS_WEB_IDENTITY_TOKEN_FILE is already set; not writing token to a new file")
 	}
 
 	return err
@@ -111,7 +112,7 @@ func NonInteractiveGitHubLogin(ctx context.Context, fabric client.FabricClient, 
 
 func writeWebIdentityToken(fabricAddr, token string) (string, error) {
 	jwtPath, _ := client.GetWebIdentityTokenFile(fabricAddr)
-	term.Debugf("writing web identity token to %s", jwtPath)
+	slog.Debug("writing web identity token to " + jwtPath)
 	dir, _ := filepath.Split(jwtPath)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return "", fmt.Errorf("failed to create web identity token directory: %w", err)
@@ -129,8 +130,8 @@ func InteractiveRequireLoginAndToS(ctx context.Context, fabric client.FabricClie
 	if err = fabric.CheckLoginAndToS(ctx); err != nil {
 		// Login interactively now; only do this for authorization-related errors
 		if connect.CodeOf(err) == connect.CodeUnauthenticated {
-			term.Debug("Server error:", err)
-			term.Warn("Please log in to continue.")
+			slog.Debug(fmt.Sprint("Server error:", err))
+			slog.WarnContext(ctx, "Please log in to continue.")
 			term.ResetWarnings() // clear any previous warnings so we don't show them again
 
 			defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
@@ -153,7 +154,7 @@ func InteractiveRequireLoginAndToS(ctx context.Context, fabric client.FabricClie
 
 		// Check if the user has agreed to the terms of service and show a prompt if needed
 		if connect.CodeOf(err) == connect.CodeFailedPrecondition {
-			term.Warn(client.PrettyError(err))
+			slog.WarnContext(ctx, fmt.Sprintf("%v", client.PrettyError(err)))
 
 			defer func() { track.Cmd(nil, "Terms", P("reason", err)) }()
 			if err = InteractiveAgreeToS(ctx, fabric); err != nil {

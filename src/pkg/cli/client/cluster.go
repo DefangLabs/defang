@@ -1,13 +1,13 @@
 package client
 
 import (
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 )
 
@@ -42,18 +42,18 @@ func GetExistingToken(fabricAddr string) string {
 	var accessToken = os.Getenv("DEFANG_ACCESS_TOKEN")
 
 	if accessToken != "" {
-		term.Debug("Using access token from env DEFANG_ACCESS_TOKEN")
+		slog.Debug("Using access token from env DEFANG_ACCESS_TOKEN")
 	} else {
 		var err error
 		accessToken, err = TokenStore.Load(TokenStorageName(fabricAddr))
 		if err != nil {
-			term.Debugf("failed to load access token for %v: %v", fabricAddr, err)
+			slog.Debug("failed to load access token", "fabricAddr", fabricAddr, "err", err)
 		}
 
 		// Check if we wrote an IDToken file during login, if AWS_WEB_IDENTITY_TOKEN_FILE is empty,
 		if os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") == "" {
 			if jwtPath, err := GetWebIdentityTokenFile(fabricAddr); err == nil {
-				term.Debugf("using web identity token from %s", jwtPath)
+				slog.Debug("using web identity token from " + jwtPath)
 				// Set AWS env vars for this CLI invocation
 				os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath)
 				os.Setenv("AWS_ROLE_SESSION_NAME", "defang-cli") // TODO: from WhoAmI

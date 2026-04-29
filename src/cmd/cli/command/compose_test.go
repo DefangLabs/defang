@@ -3,11 +3,13 @@ package command
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"os"
 	"testing"
 
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -25,12 +27,23 @@ func TestInitializeTailCmd(t *testing.T) {
 
 func TestPrintPlaygroundPortalServiceURLs(t *testing.T) {
 	defaultTerm := term.DefaultTerm
+	oldStdout := os.Stdout
 	t.Cleanup(func() {
 		term.DefaultTerm = defaultTerm
+		os.Stdout = oldStdout
 	})
 
-	var stdout, stderr bytes.Buffer
-	term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
+	// Capture slog output via term logger
+	var termBuf, stderr bytes.Buffer
+	term.DefaultTerm = term.NewTerm(os.Stdin, &termBuf, &stderr)
+	slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
+
+	// Capture fmt.Println output via os.Pipe
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = w
 
 	global.Stack.Provider = client.ProviderDefang
 	global.FabricAddr = client.DefaultFabricAddr
@@ -38,11 +51,18 @@ func TestPrintPlaygroundPortalServiceURLs(t *testing.T) {
 		{
 			Service: &defangv1.Service{Name: "service1"},
 		}})
-	const want = ` * Monitor your services' status in the defang portal
-   - https://portal.defang.io/service/service1
-`
-	if got := stdout.String(); got != want {
-		t.Errorf("got %q, want %q", got, want)
+
+	w.Close()
+	var stdoutBuf bytes.Buffer
+	stdoutBuf.ReadFrom(r)
+
+	const wantSlog = " * Monitor your services' status in the defang portal\n"
+	if got := termBuf.String(); got != wantSlog {
+		t.Errorf("slog output: got %q, want %q", got, wantSlog)
+	}
+	const wantStdout = "   - https://portal.defang.io/service/service1\n"
+	if got := stdoutBuf.String(); got != wantStdout {
+		t.Errorf("stdout output: got %q, want %q", got, wantStdout)
 	}
 }
 

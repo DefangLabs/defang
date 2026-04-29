@@ -3,10 +3,10 @@ package common
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 var MCPDevelopmentClient = "" // set by NewDefangMCPServer
@@ -42,23 +42,23 @@ func ConfigureAgentLoader(params LoaderParams) (*compose.Loader, error) {
 
 	projectName := params.ProjectName
 	if projectName != "" {
-		term.Debugf("Project name provided: %s", projectName)
-		term.Debug("Function invoked: compose.NewLoader")
+		slog.Debug("Project name provided: " + projectName)
+		slog.Debug("Function invoked: compose.NewLoader")
 		return compose.NewLoader(compose.WithProjectName(projectName)), nil
 	}
 	composeFilePaths := params.ComposeFilePaths
 	if len(composeFilePaths) > 0 {
-		term.Debugf("Compose file paths provided: %s", composeFilePaths)
-		term.Debug("Function invoked: compose.NewLoader")
+		slog.Debug("Compose file paths provided", "paths", composeFilePaths)
+		slog.Debug("Function invoked: compose.NewLoader")
 		return compose.NewLoader(compose.WithPath(composeFilePaths...)), nil
 	}
 
 	//TODO: Talk about using both project name and compose file paths
 	// if projectNameOK && composeFilePathOK {
-	// 	term.Infof("Compose file paths and project name provided: %s, %s", composeFilePaths, projectName)
+	// 	slog.Info(fmt.Sprintf("Compose file paths and project name provided: %s, %s", composeFilePaths, projectName))
 	// 	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(composeFilePaths...)), nil
 	// }
 
-	term.Debug("Function invoked: compose.NewLoader")
+	slog.Debug("Function invoked: compose.NewLoader")
 	return compose.NewLoader(), nil
 }

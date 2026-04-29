@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	agentTools "github.com/DefangLabs/defang/src/pkg/agent/tools"
@@ -10,7 +11,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -30,13 +30,13 @@ type ToolTracker struct {
 func (t *ToolTracker) TrackTool(name string, handler server.ToolHandlerFunc) server.ToolHandlerFunc {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		name := request.Params.Name
-		term.Debug("MCP Tool Called: " + name + " with params: " + fmt.Sprintf("%+v", request.Params))
+		slog.Debug("MCP Tool Called", "name", name, "params", request.Params)
 		track.Evt("MCP Tool Called", track.P("tool", name), track.P("client", t.client), track.P("cluster", t.fabricAddr), track.P("provider", *t.providerId))
 		resp, err := handler(ctx, request)
 		if err != nil {
-			term.Error("MCP Tool Failed: "+name, "error", err)
+			slog.ErrorContext(ctx, fmt.Sprint("MCP Tool Failed: "+name, "error", err))
 		} else {
-			term.Debug("MCP Tool Succeeded: " + name)
+			slog.Debug("MCP Tool Succeeded: " + name)
 		}
 		track.Evt("MCP Tool Done", track.P("tool", name), track.P("client", t.client), track.P("cluster", t.fabricAddr), track.P("provider", *t.providerId), track.P("error", err))
 		return resp, err

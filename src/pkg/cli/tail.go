@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"log/slog"
 	"net"
 	"os"
 	"regexp"
@@ -146,7 +147,7 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 		options.LogType = logs.LogTypeAll
 	}
 
-	term.Debugf("Tailing %s logs in project %q", options.LogType, projectName)
+	slog.Debug("Tailing logs in project", "logType", options.LogType, "project", projectName)
 
 	if options.Deployment != "" {
 		_, err := types.ParseEtag(options.Deployment)
@@ -161,11 +162,11 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 			if _, err := provider.GetService(ctx, &defangv1.GetRequest{Project: projectName, Name: service}); err != nil {
 				switch connect.CodeOf(err) {
 				case connect.CodeNotFound:
-					term.Warnf("Service does not exist (yet): %q", service)
+					slog.WarnContext(ctx, fmt.Sprintf("Service does not exist (yet): %q", service))
 				case connect.CodeUnknown:
 					// Ignore unknown (nil) errors
 				default:
-					term.Warn(err) // TODO: use client.PrettyError(…)
+					slog.WarnContext(ctx, fmt.Sprintf("%v", err)) // TODO: use client.PrettyError(…)
 				}
 			}
 		}
@@ -241,7 +242,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 		Limit:    options.Limit,
 	}
 
-	term.Debug("Tail request:", tailRequest)
+	slog.Debug(fmt.Sprint("Tail request:", tailRequest))
 
 	logSeq, err := provider.QueryLogs(ctx, tailRequest)
 	if err != nil {
@@ -268,7 +269,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 			if oldState, err := term.MakeUnbuf(int(os.Stdin.Fd())); err == nil {
 				defer term.Restore(int(os.Stdin.Fd()), oldState)
 
-				term.Info("Showing only build logs and runtime errors. Press V to toggle verbose mode.")
+				slog.InfoContext(ctx, "Showing only build logs and runtime errors. Press V to toggle verbose mode.")
 				input := term.NewNonBlockingStdin()
 				defer input.Close() // abort the read loop
 				go func() {
@@ -290,7 +291,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 							if debug {
 								debugStr = "ON"
 							}
-							term.Info("Debug mode", debugStr)
+							slog.InfoContext(ctx, fmt.Sprint("Debug mode", debugStr))
 							track.Evt("Debug Toggled", P("debug", debug))
 						case 'v', 'V':
 							verbose := !options.Verbose
@@ -302,7 +303,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 							if toggleCount++; toggleCount == 4 && !verbose {
 								modeStr += ". I like the way you work it, no verbosity."
 							}
-							term.Info("Verbose mode", modeStr)
+							slog.InfoContext(ctx, fmt.Sprint("Verbose mode", modeStr))
 							track.Evt("Verbose Toggled", P("verbose", verbose), P("toggleCount", toggleCount))
 						}
 					}
@@ -328,7 +329,7 @@ func makeHeadBookendOptions(options *TailOptions, firstLogTime time.Time) *TailO
 func printHeadBookend(options *TailOptions, firstLogTime time.Time) {
 	newOptions := makeHeadBookendOptions(options, firstLogTime)
 	if !newOptions.Until.IsZero() {
-		term.Info("To view older logs, run: `defang logs" + newOptions.String() + "`")
+		slog.Info("To view older logs, run: `defang logs" + newOptions.String() + "`")
 	}
 }
 
@@ -346,7 +347,7 @@ func makeTailBookendOptions(options *TailOptions, lastLogTime time.Time) *TailOp
 func printTailBookend(options *TailOptions, lastLogTime time.Time) {
 	newOptions := makeTailBookendOptions(options, lastLogTime)
 	if !newOptions.Since.IsZero() {
-		term.Info("To view more recent logs, run: `defang logs" + newOptions.String() + "`")
+		slog.Info("To view more recent logs, run: `defang logs" + newOptions.String() + "`")
 	}
 }
 
@@ -376,10 +377,11 @@ func receiveLogs(ctx context.Context, provider client.Provider, projectName stri
 
 			// Reconnect on transient errors
 			if isTransientError(err) {
-				term.Debug("Disconnected:", err)
+				slog.Debug(fmt.Sprint("Disconnected:", err))
 				var spaces int
 				if !options.Raw {
-					spaces, _ = term.Warnf("Reconnecting...\r") // overwritten below
+					slog.WarnContext(ctx, "Reconnecting...\r")
+					spaces = len(" ! Reconnecting...\r") // warnPrefix + message, used to clear the line
 				}
 				if err := provider.DelayBeforeRetry(ctx); err != nil {
 					return err
@@ -388,7 +390,7 @@ func receiveLogs(ctx context.Context, provider client.Provider, projectName stri
 				stop() // stop the old iterator
 				newLogSeq, err := provider.QueryLogs(ctx, tailRequest)
 				if err != nil {
-					term.Debug("Reconnect failed:", err)
+					slog.Debug(fmt.Sprint("Reconnect failed:", err))
 					return err
 				}
 				next, stop = iter.Pull2(newLogSeq)
@@ -443,7 +445,7 @@ func handleLogEntryMsgs(msg *defangv1.TailResponse, doSpinner bool, skipDuplicat
 
 		err := handler(e, options, term.DefaultTerm)
 		if err != nil {
-			term.Debug("Ending tail loop", err)
+			slog.Debug(fmt.Sprint("Ending tail loop", err))
 			return err
 		}
 
@@ -469,7 +471,7 @@ func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions, t *term.Te
 
 	if options.Raw {
 		if e.Stderr {
-			term.Error(e.Message)
+			slog.Error(e.Message)
 		} else {
 			term.Println(e.Message)
 		}

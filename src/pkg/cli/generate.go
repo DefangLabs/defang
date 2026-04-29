@@ -2,6 +2,8 @@ package cli
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -22,7 +24,7 @@ type GenerateArgs struct {
 
 func GenerateWithAI(ctx context.Context, client client.FabricClient, args GenerateArgs) ([]string, error) {
 	if dryrun.DoDryRun {
-		term.Warn("Dry run, no project files will be generated")
+		slog.WarnContext(ctx, "Dry run, no project files will be generated")
 		return nil, dryrun.ErrDryRun
 	}
 
@@ -42,19 +44,19 @@ func GenerateWithAI(ctx context.Context, client client.FabricClient, args Genera
 			term.Printc(term.DebugColor, file.Name+"\n```")
 			term.Printc(term.DebugColor, file.Content)
 			term.Printc(term.DebugColor, "```")
-			term.Println("")
-			term.Println("")
+			fmt.Println("")
+			fmt.Println("")
 		}
 	}
 
 	// Write each file to disk
-	term.Info("Writing files to disk...")
+	slog.InfoContext(ctx, "Writing files to disk...")
 	if err := os.MkdirAll(args.Folder, 0755); err != nil {
 		return nil, err
 	}
 	for _, file := range response.Files {
 		// Print the files that were generated
-		term.Println("   -", file.Name)
+		fmt.Println("   -", file.Name)
 		// TODO: this will overwrite existing files
 		if err = os.WriteFile(filepath.Join(args.Folder, file.Name), []byte(file.Content), 0644); err != nil {
 			return nil, err

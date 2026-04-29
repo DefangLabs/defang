@@ -2,10 +2,10 @@ package migrate
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/surveyor"
-	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 type SourcePlatform string
@@ -70,6 +70,6 @@ func selectSourcePlatform(surveyor surveyor.Surveyor) (error, SourcePlatform) {
 			return nil, sourcePlatform
 		}
 
-		term.Warnf("Invalid source platform selected: %s. Please try again.", selectedOption)
+		slog.Warn(fmt.Sprintf("Invalid source platform selected: %s. Please try again.", selectedOption))
 	}
 }

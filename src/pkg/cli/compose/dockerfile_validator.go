@@ -3,11 +3,11 @@ package compose
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 )
 
@@ -35,7 +35,7 @@ func (e *DockerfileValidationError) Unwrap() error {
 
 // ValidateDockerfile validates the syntax and basic structure of a Dockerfile
 func ValidateDockerfile(dockerfilePath string, serviceName string) error {
-	term.Debugf("Validating Dockerfile: %s for service %q", dockerfilePath, serviceName)
+	slog.Debug("Validating Dockerfile for service", "dockerfile", dockerfilePath, "service", serviceName)
 
 	// Read the Dockerfile
 	content, err := os.ReadFile(dockerfilePath)
@@ -124,7 +124,7 @@ func ValidateDockerfile(dockerfilePath string, serviceName string) error {
 			}
 		}
 		// Log warnings but don't fail validation
-		term.Warnf("service %q: Dockerfile %q has warnings:\n  %s", serviceName, dockerfilePath, strings.Join(warnings, "\n  "))
+		slog.Warn(fmt.Sprintf("service %q: Dockerfile %q has warnings:\n  %s", serviceName, dockerfilePath, strings.Join(warnings, "\n  ")))
 	}
 
 	return nil
@@ -161,7 +161,7 @@ func ValidateServiceDockerfiles(project *Project) error {
 			if os.IsNotExist(err) {
 				// This might be handled later by Railpack or may be a remote context
 				// Only validate if the file exists
-				term.Debugf("Skipping validation for service %q: Dockerfile %q does not exist", service.Name, dockerfilePath)
+				slog.Debug("Skipping validation for service: Dockerfile does not exist", "service", service.Name, "dockerfile", dockerfilePath)
 				continue
 			}
 			errors = append(errors, &DockerfileValidationError{

@@ -8,12 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/http"
-	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 var ErrSampleNotFound = errors.New("sample not found")
@@ -36,7 +36,7 @@ func FetchSamples(ctx context.Context) ([]Sample, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	term.Debug(resp.Header)
+	slog.Debug("Response header", "header", resp.Header)
 	reader := resp.Body
 	if resp.Header.Get("Content-Encoding") == "gzip" {
 		reader, err = gzip.NewReader(resp.Body)
@@ -69,14 +69,14 @@ func copyFromSamples(ctx context.Context, dir string, names []string, skipExisti
 		return err
 	}
 	defer resp.Body.Close()
-	term.Debug(resp.Header)
+	slog.Debug("Response header", "header", resp.Header)
 	tarball, err := gzip.NewReader(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read tarball: %w", err)
 	}
 	defer tarball.Close()
 	tarReader := tar.NewReader(tarball)
-	term.Info("Copying files to disk...")
+	slog.InfoContext(ctx, "Copying files to disk...")
 
 	sampleFound := false
 
@@ -101,7 +101,7 @@ func copyFromSamples(ctx context.Context, dir string, names []string, skipExisti
 			prefix := fmt.Sprintf("%s-%s/samples/%s/", repo, branch, name)
 			if base, ok := strings.CutPrefix(h.Name, prefix); ok && len(base) > 0 {
 				sampleFound = true
-				term.Println("   -", base)
+				fmt.Println("   -", base)
 				path := filepath.Join(dir, subdir, base)
 				if h.FileInfo().IsDir() {
 					if err := os.MkdirAll(path, 0755); err != nil {
@@ -114,7 +114,7 @@ func copyFromSamples(ctx context.Context, dir string, names []string, skipExisti
 					if !skipExisting || !os.IsExist(err) {
 						return err
 					}
-					term.Warnf("File already exists, skipping: %q", path)
+					slog.WarnContext(ctx, fmt.Sprintf("File already exists, skipping: %q", path))
 				}
 			}
 		}
