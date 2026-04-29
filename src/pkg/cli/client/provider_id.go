@@ -27,8 +27,8 @@ var allProviders = []ProviderID{
 	// ProviderAzure,
 }
 
-func AllProviders() []ProviderID {
-	return allProviders[1:] // skip "auto"
+func ByocProviders() []ProviderID {
+	return allProviders[2:] // skip "auto" and "defang"
 }
 
 func (p ProviderID) String() string {

@@ -183,7 +183,7 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return(CreateNewStack, nil)
 
 	// Mock wizard parameter collection - provider selection
-	providerOptions := []string{"Defang Playground", "AWS", "DigitalOcean", "Google Cloud Platform"}
+	providerOptions := []string{"AWS", "DigitalOcean", "Google Cloud Platform"}
 	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("AWS", nil)
 
 	// Mock wizard parameter collection - region selection (default is us-west-2 for AWS)
@@ -259,7 +259,7 @@ func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
 	mockSM.On("List", ctx).Return([]ListItem{}, nil)
 
 	// Mock wizard parameter collection - provider selection
-	providerOptions := []string{"Defang Playground", "AWS", "DigitalOcean", "Google Cloud Platform"}
+	providerOptions := []string{"AWS", "DigitalOcean", "Google Cloud Platform"}
 	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("AWS", nil)
 
 	// Mock wizard parameter collection - region selection
@@ -418,7 +418,7 @@ func TestStackSelector_SelectStack_WizardError(t *testing.T) {
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return(CreateNewStack, nil)
 
 	// Mock wizard parameter collection - provider selection fails
-	providerOptions := []string{"Defang Playground", "AWS", "DigitalOcean", "Google Cloud Platform"}
+	providerOptions := []string{"AWS", "DigitalOcean", "Google Cloud Platform"}
 	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("", errors.New("user cancelled wizard"))
 
 	selector := NewSelector(mockEC, mockSM)
@@ -455,7 +455,7 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return(CreateNewStack, nil)
 
 	// Mock wizard parameter collection - provider selection
-	providerOptions := []string{"Defang Playground", "AWS", "DigitalOcean", "Google Cloud Platform"}
+	providerOptions := []string{"AWS", "DigitalOcean", "Google Cloud Platform"}
 	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("AWS", nil)
 
 	// Mock wizard parameter collection - region selection

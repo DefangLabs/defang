@@ -148,10 +148,10 @@ func SetupCommands(version string) {
 	RootCmd.PersistentFlags().StringVar(&global.FabricAddr, "cluster", global.FabricAddr, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster") // only for Defang use
 	RootCmd.PersistentFlags().Var(&global.Tenant, "workspace", "workspace to use")
-	RootCmd.PersistentFlags().VarP(&global.Stack.Provider, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, client.AllProviders()))
+	RootCmd.PersistentFlags().VarP(&global.Stack.Provider, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, client.ByocProviders()))
 	RootCmd.RegisterFlagCompletionFunc("provider", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var completions []cobra.Completion
-		for _, provider := range client.AllProviders() {
+		for _, provider := range client.ByocProviders() {
 			completions = append(completions, provider.String())
 		}
 		return completions, cobra.ShellCompDirectiveNoFileComp
