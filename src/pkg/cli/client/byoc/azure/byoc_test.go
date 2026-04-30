@@ -86,7 +86,7 @@ func TestProjectResourceGroupName(t *testing.T) {
 		t.Fatalf("setUpLocation: %v", err)
 	}
 	got := b.projectResourceGroupName("myapp")
-	want := "defang-myapp-test-stack-westus2"
+	want := "defang-myapp-test-stack"
 	if got != want {
 		t.Errorf("projectResourceGroupName = %q, want %q", got, want)
 	}
