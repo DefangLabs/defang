@@ -215,14 +215,18 @@ func (b *ByocAzure) setUpLocation() error {
 // Format: defang-{project}-{stack}-{location}, e.g. "defang-myapp-test-westus2".
 // This group is owned by one project+stack and is separate from the shared CD resource group.
 func (b *ByocAzure) projectResourceGroupName(projectName string) string {
-	return "defang-" + projectName + "-" + b.PulumiStack + "-" + b.driver.Location.String()
+	return "defang-" + projectName + "-" + b.PulumiStack + "-" + b.driver.Location.String() // FIXME: Remove location from the resource group name
 }
 
-// findForConfig is a read-only variant of setUpForConfig. It resolves
-// location/subscription and binds to a pre-existing Key Vault without
-// creating anything. Returns (true, nil) when the vault exists,
-// (false, nil) when it or its resource group doesn't — which callers like
-// ListConfig / DeleteConfig treat as "nothing configured yet".
+// findForConfig binds to a pre-existing project Key Vault without creating
+// anything new. Returns (true, nil) when the vault exists, (false, nil) when
+// it or its resource group doesn't — which callers like ListConfig /
+// DeleteConfig treat as "nothing configured yet".
+//
+// On a successful Find we also self-grant "Key Vault Secrets Officer" to the
+// current caller (idempotent — RoleAssignmentExists is a no-op). This
+// onboards new teammates onto a shared stack whose vault was created by
+// someone else; without it, the read paths would 403 forever for them.
 func (b *ByocAzure) findForConfig(ctx context.Context, projectName string) (bool, error) {
 	if err := b.setUpLocation(); err != nil {
 		return false, err
@@ -238,6 +242,9 @@ func (b *ByocAzure) findForConfig(ctx context.Context, projectName string) (bool
 	}
 	if !found {
 		return false, nil
+	}
+	if err := kv.EnsureSecretsOfficer(ctx); err != nil {
+		return false, err
 	}
 	b.kv = kv
 	return true, nil

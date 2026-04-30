@@ -158,24 +158,55 @@ func (kv *KeyVault) SetUp(ctx context.Context) error {
 	// manage secrets. The vault uses RBAC, so even the creator needs an
 	// explicit role assignment.
 	if err := kv.assignSecretsOfficerRole(ctx, cred, *result.ID); err != nil {
-		oid := kv.currentUserOID(ctx, cred)
-		if oid == "" {
-			oid = "<your-object-id>"
-		}
-		return fmt.Errorf(
-			"assigning Key Vault Secrets Officer role failed: %w\n\n"+
-				"Your current Azure identity (oid=%s) cannot write role assignments at subscription %s. Possible reasons:\n\n"+
-				"  1. Your RBAC role on this subscription is Contributor — which does NOT include Microsoft.Authorization/roleAssignments/write. You need Owner or User Access Administrator. Check with:\n"+
-				"       az role assignment list --assignee %s --subscription %s -o table\n\n"+
-				"  2. You hold an Azure AD / Entra ID directory role (e.g. Global Admin) but haven't elevated to Azure RBAC. Go to Entra ID → Properties → 'Access management for Azure resources' → Yes, then sign in again.\n\n"+
-				"  3. Your Owner / UAA role is eligible under Privileged Identity Management (PIM) and must be activated for this session before running defang.\n\n"+
-				"  4. You're a guest user in this tenant. Guests typically cannot create role assignments.\n\n"+
-				"Workaround (run once as a subscription Owner):\n"+
-				"  az role assignment create --role 'Key Vault Secrets Officer' --assignee %s --scope %s",
-			err, oid, kv.SubscriptionID, oid, kv.SubscriptionID, oid, *result.ID)
+		return kv.wrapRoleAssignmentError(ctx, cred, *result.ID, err)
 	}
 
 	return nil
+}
+
+// EnsureSecretsOfficer assigns "Key Vault Secrets Officer" to the current
+// caller on the bound vault, idempotently. Required after Find for shared
+// stacks where the vault was created by another user (whose SetUp granted
+// the role only to themselves). RoleAssignmentExists is treated as success,
+// so this is safe to call on every config-list and incurs only one ARM PUT
+// per CLI invocation (because callers cache the bound KeyVault).
+func (kv *KeyVault) EnsureSecretsOfficer(ctx context.Context) error {
+	if kv.vaultURL == "" {
+		return errors.New("Key Vault not bound; call Find or SetUp first")
+	}
+	cred, err := kv.NewCreds()
+	if err != nil {
+		return err
+	}
+	vaultResourceID := fmt.Sprintf(
+		"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.KeyVault/vaults/%s",
+		kv.SubscriptionID, kv.resourceGroupName, kv.VaultName,
+	)
+	if err := kv.assignSecretsOfficerRole(ctx, cred, vaultResourceID); err != nil {
+		return kv.wrapRoleAssignmentError(ctx, cred, vaultResourceID, err)
+	}
+	return nil
+}
+
+// wrapRoleAssignmentError augments an assignSecretsOfficerRole failure with
+// remediation guidance. Shared by SetUp (vault creation) and
+// EnsureSecretsOfficer (existing-vault onboarding).
+func (kv *KeyVault) wrapRoleAssignmentError(ctx context.Context, cred azcore.TokenCredential, vaultResourceID string, err error) error {
+	oid := kv.currentUserOID(ctx, cred)
+	if oid == "" {
+		oid = "<your-object-id>"
+	}
+	return fmt.Errorf(
+		"assigning Key Vault Secrets Officer role failed: %w\n\n"+
+			"Your current Azure identity (oid=%s) cannot write role assignments at subscription %s. Possible reasons:\n\n"+
+			"  1. Your RBAC role on this subscription is Contributor — which does NOT include Microsoft.Authorization/roleAssignments/write. You need Owner or User Access Administrator. Check with:\n"+
+			"       az role assignment list --assignee %s --subscription %s -o table\n\n"+
+			"  2. You hold an Azure AD / Entra ID directory role (e.g. Global Admin) but haven't elevated to Azure RBAC. Go to Entra ID → Properties → 'Access management for Azure resources' → Yes, then sign in again.\n\n"+
+			"  3. Your Owner / UAA role is eligible under Privileged Identity Management (PIM) and must be activated for this session before running defang.\n\n"+
+			"  4. You're a guest user in this tenant. Guests typically cannot create role assignments.\n\n"+
+			"Workaround (run once as a subscription Owner):\n"+
+			"  az role assignment create --role 'Key Vault Secrets Officer' --assignee %s --scope %s",
+		err, oid, kv.SubscriptionID, oid, kv.SubscriptionID, oid, vaultResourceID)
 }
 
 // currentUserOID returns the object ID of the caller behind cred, extracted
@@ -326,14 +357,16 @@ func (kv *KeyVault) DeleteSecret(ctx context.Context, name string) error {
 	if err != nil {
 		return err
 	}
-	_, err = client.DeleteSecret(ctx, name, nil)
-	if err != nil {
-		var respErr *azcore.ResponseError
-		if errors.As(err, &respErr) && respErr.StatusCode == 404 {
-			return nil
+	return retryOnForbiddenByRbac(ctx, func(ctx context.Context) error {
+		_, err := client.DeleteSecret(ctx, name, nil)
+		if err != nil {
+			var respErr *azcore.ResponseError
+			if errors.As(err, &respErr) && respErr.StatusCode == 404 {
+				return nil
+			}
 		}
-	}
-	return err
+		return err
+	})
 }
 
 // SecretEntry holds a secret's metadata returned by ListSecrets.
@@ -350,29 +383,36 @@ func (kv *KeyVault) ListSecrets(ctx context.Context, prefix string) ([]SecretEnt
 		return nil, err
 	}
 
-	pager := client.NewListSecretPropertiesPager(nil)
 	var entries []SecretEntry
-	for pager.More() {
-		page, err := pager.NextPage(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list secrets: %w", err)
-		}
-		for _, props := range page.Value {
-			if props.ID == nil {
-				continue
+	err = retryOnForbiddenByRbac(ctx, func(ctx context.Context) error {
+		entries = entries[:0]
+		pager := client.NewListSecretPropertiesPager(nil)
+		for pager.More() {
+			page, err := pager.NextPage(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to list secrets: %w", err)
 			}
-			name := props.ID.Name()
-			if !strings.HasPrefix(name, prefix) {
-				continue
-			}
-			entry := SecretEntry{Name: name}
-			if props.Tags != nil {
-				if orig, ok := props.Tags["original-key"]; ok && orig != nil {
-					entry.OriginalKey = *orig
+			for _, props := range page.Value {
+				if props.ID == nil {
+					continue
 				}
+				name := props.ID.Name()
+				if !strings.HasPrefix(name, prefix) {
+					continue
+				}
+				entry := SecretEntry{Name: name}
+				if props.Tags != nil {
+					if orig, ok := props.Tags["original-key"]; ok && orig != nil {
+						entry.OriginalKey = *orig
+					}
+				}
+				entries = append(entries, entry)
 			}
-			entries = append(entries, entry)
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return entries, nil
 }
