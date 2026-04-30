@@ -34,9 +34,17 @@ func newCommandSession(cmd *cobra.Command) (*session.Session, error) {
 func newCommandSessionWithOpts(cmd *cobra.Command, opts commandSessionOpts) (*session.Session, error) {
 	ctx := cmd.Context()
 
-	options := newSessionLoaderOptionsForCommand(cmd)
-	options.AllowStackCreation = opts.AllowStackCreation
-	sm, err := newStackManagerForLoader(ctx, configureLoader(options.LoaderOptions))
+	options := session.SessionLoaderOptions{
+		LoaderOptions: loaderOptionsForCommand(cmd),
+		GetStackOpts: stacks.GetStackOpts{
+			Interactive: !global.NonInteractive,
+			Default:     global.Stack,
+			SelectStackOptions: stacks.SelectStackOptions{
+				AllowStackCreation: opts.AllowStackCreation,
+			},
+		},
+	}
+	sm, err := newStackManagerForLoader(ctx, compose.NewLoaderFromOptions(options.LoaderOptions))
 	if err != nil {
 		if !errors.Is(err, types.ErrComposeFileNotFound) {
 			return nil, err
@@ -60,7 +68,7 @@ func newCommandSessionWithOpts(cmd *cobra.Command, opts commandSessionOpts) (*se
 	return session, nil
 }
 
-func newSessionLoaderOptionsForCommand(cmd *cobra.Command) session.SessionLoaderOptions {
+func loaderOptionsForCommand(cmd *cobra.Command) compose.LoaderOptions {
 	configPaths, _ := cmd.Flags().GetStringArray("file")
 	projectName, _ := cmd.Flags().GetString("project-name")
 
@@ -81,15 +89,9 @@ func newSessionLoaderOptionsForCommand(cmd *cobra.Command) session.SessionLoader
 			doubleCheckProjectName(projectName)
 		}
 	}
-	return session.SessionLoaderOptions{
-		LoaderOptions: session.LoaderOptions{
-			ComposeFilePaths: configPaths,
-			ProjectName:      projectName,
-		},
-		GetStackOpts: stacks.GetStackOpts{
-			Interactive: !global.NonInteractive,
-			Default:     global.Stack,
-		},
+	return compose.LoaderOptions{
+		ConfigPaths: configPaths,
+		ProjectName: projectName,
 	}
 }
 

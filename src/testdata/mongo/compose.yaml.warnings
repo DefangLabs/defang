@@ -15,5 +15,6 @@
  ! service "mongo-unmanaged": stateful service will lose data on restart; use a managed service instead
  ! service "mongo-wrong-image": managed MongoDB service should use a mongo image
  ! service "mongo-wrong-image": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "mongo-wrong-image": service name is longer than 16 characters, you may run into issues with resource name length
  ! service "short-ports": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "short-ports": stateful service will lose data on restart; use a managed service instead

@@ -274,6 +274,9 @@ func PrintCreateMessage(stackName string) {
 }
 
 func ValidateStackName(val string) error {
+	if len(val) > 16 {
+		term.Warnf("stack name %q is longer than 16 characters, you may run into issues with resource name length", val)
+	}
 	if !stackNamePattern.MatchString(val) {
 		return errors.New("Value must be alphanumeric and start with a letter")
 	}

@@ -32,10 +32,11 @@ func makeStackCmd() *cobra.Command {
 
 func makeStackNewCmd() *cobra.Command {
 	var stackNewCmd = &cobra.Command{
-		Use:     "new [STACK_NAME]",
-		Aliases: []string{"init", "create"},
-		Args:    cobra.MaximumNArgs(1),
-		Short:   "Create a new Defang deployment stack",
+		Use:         "new [STACK_NAME]",
+		Aliases:     []string{"init", "create"},
+		Annotations: authNeededAlways, // stack tracked remotely
+		Args:        cobra.MaximumNArgs(1),
+		Short:       "Create a new Defang deployment stack",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 
@@ -47,7 +48,7 @@ func makeStackNewCmd() *cobra.Command {
 				}
 			}
 
-			loader := configureLoaderForCommand(cmd)
+			loader := newLoaderForCommand(cmd)
 			projectName, _, err := loader.LoadProjectName(ctx)
 			if err != nil {
 				return err
@@ -111,13 +112,14 @@ func makeStackNewCmd() *cobra.Command {
 
 func makeStackListCmd() *cobra.Command {
 	stackListCmd := &cobra.Command{
-		Use:     "list",
-		Aliases: []string{"ls"},
-		Args:    cobra.NoArgs,
-		Short:   "List existing Defang deployment stacks",
+		Use:         "list",
+		Aliases:     []string{"ls"},
+		Annotations: authNeededAlways, // stack tracked remotely
+		Args:        cobra.NoArgs,
+		Short:       "List existing Defang deployment stacks",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-			loader := configureLoaderForCommand(cmd)
+			loader := newLoaderForCommand(cmd)
 			projectName, _, err := loader.LoadProjectName(ctx)
 			if err != nil {
 				return err
@@ -149,14 +151,15 @@ func makeStackListCmd() *cobra.Command {
 
 func makeStackDefaultCmd() *cobra.Command {
 	var stackDefaultCmd = &cobra.Command{
-		Use:     "default STACK_NAME",
-		Aliases: []string{"set-default", "select", "use"},
-		Args:    cobra.ExactArgs(1),
-		Short:   "Set the default Defang deployment stack for the current directory",
+		Use:         "default STACK_NAME",
+		Aliases:     []string{"set-default", "select", "use"},
+		Annotations: authNeededAlways, // default stack tracked remotely
+		Args:        cobra.ExactArgs(1),
+		Short:       "Set the default Defang deployment stack for the current directory",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 			name := args[0]
-			loader := configureLoaderForCommand(cmd)
+			loader := newLoaderForCommand(cmd)
 			projectName, _, err := loader.LoadProjectName(ctx)
 			if err != nil {
 				return err
@@ -183,14 +186,15 @@ func makeStackDefaultCmd() *cobra.Command {
 func makeStackRemoveCmd() *cobra.Command {
 	var force bool
 	var stackRemoveCmd = &cobra.Command{
-		Use:     "remove STACK_NAME",
-		Aliases: []string{"rm"},
-		Args:    cobra.ExactArgs(1),
-		Short:   "Remove an existing Defang deployment stack",
+		Use:         "remove STACK_NAME",
+		Aliases:     []string{"rm"},
+		Annotations: authNeededAlways, // stack tracked remotely
+		Args:        cobra.ExactArgs(1),
+		Short:       "Remove an existing Defang deployment stack",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 			name := args[0]
-			loader := configureLoaderForCommand(cmd)
+			loader := newLoaderForCommand(cmd)
 			sm, err := newStackManagerForLoader(ctx, loader)
 			if err != nil {
 				return err

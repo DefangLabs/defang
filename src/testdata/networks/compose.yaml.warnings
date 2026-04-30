@@ -5,3 +5,4 @@
  ! service "service-private": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "service-public": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "service-public-list": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "service-public-list": service name is longer than 16 characters, you may run into issues with resource name length

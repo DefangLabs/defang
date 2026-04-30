@@ -25,7 +25,7 @@ func makeDeploymentsCmd(use string) *cobra.Command {
 				listType = defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE
 			}
 
-			loader := configureLoaderForCommand(cmd)
+			loader := newLoaderForCommand(cmd)
 			projectName, _, err := loader.LoadProjectName(cmd.Context())
 			if err != nil {
 				if listType == defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY {
