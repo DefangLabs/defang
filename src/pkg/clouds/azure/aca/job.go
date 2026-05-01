@@ -32,6 +32,13 @@ const (
 	// jobAPIVersion is required for job getAuthToken / executions/replicas which
 	// are not yet exposed in the stable SDK or the 2023-05-01 API version.
 	jobAPIVersion = "2024-02-02-preview"
+	// cdJobCPU and cdJobMemory size the CD container so Pulumi has enough room to
+	// run. The Consumption profile (the only profile available in the default
+	// environment we provision) caps a single replica at 2 vCPU / 4 GiB, so this
+	// is the largest supported pair. The default (0.25 vCPU / 0.5 GiB) was far
+	// too small for Pulumi previews and noticeably slowed CD runs.
+	cdJobCPU    = 2.0
+	cdJobMemory = "4Gi"
 )
 
 // logAnalyticsEndpoint is the base URL for the Log Analytics query API, overridable for tests.
@@ -373,6 +380,10 @@ func (j *Job) SetUpJob(ctx context.Context, image string, envMap map[string]stri
 						Name:  to.Ptr(cdJobName),
 						Image: to.Ptr(image),
 						Env:   envVars,
+						Resources: &armappcontainersv3.ContainerResources{
+							CPU:    to.Ptr(cdJobCPU),
+							Memory: to.Ptr(cdJobMemory),
+						},
 						VolumeMounts: []*armappcontainersv3.VolumeMount{
 							{
 								VolumeName: to.Ptr(tmpVolumeName),
