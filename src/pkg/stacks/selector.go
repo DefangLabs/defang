@@ -10,6 +10,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 const CreateNewStack = "Create new stack"
@@ -54,10 +55,18 @@ func (ss *stackSelector) SelectStack(ctx context.Context, opts SelectStackOption
 			return nil, errors.New("no stacks available to select in this workspace")
 		}
 	}
-	labelMap := MakeStackSelectorLabels(stackList)
-	stackLabels := make([]string, 0, len(stackList)+1)
-	stackNames := make([]string, 0, len(stackList))
+
+	filteredStackList := make([]ListItem, 0, len(stackList))
 	for _, stack := range stackList {
+		if stack.Status == defangv1.StackStatus_STACK_STATUS_DOWN {
+			continue
+		}
+		filteredStackList = append(filteredStackList, stack)
+	}
+	labelMap := MakeStackSelectorLabels(filteredStackList)
+	stackLabels := make([]string, 0, len(filteredStackList)+1)
+	stackNames := make([]string, 0, len(filteredStackList))
+	for _, stack := range filteredStackList {
 		for label, name := range labelMap {
 			if name == stack.Name {
 				stackLabels = append(stackLabels, label)

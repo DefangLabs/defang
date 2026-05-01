@@ -12,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/joho/godotenv"
 )
 
@@ -159,6 +160,7 @@ type ListItem struct {
 	Account    string
 	Default    bool
 	DeployedAt time.Time
+	Status     defangv1.StackStatus
 }
 
 func List() ([]ListItem, error) {
@@ -192,6 +194,7 @@ func ListInDirectory(workingDirectory string) ([]ListItem, error) {
 		stacks = append(stacks, ListItem{
 			Parameters: *params,
 			Account:    params.Account(),
+			Status:     defangv1.StackStatus_STACK_STATUS_UNSPECIFIED, // we don't know the status until we call the API, so we'll set it to UNKNOWN for now
 		})
 	}
 
