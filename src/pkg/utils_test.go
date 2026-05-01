@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -321,6 +322,29 @@ func TestGetFirstEnv(t *testing.T) {
 			}
 			if gotKey != tt.expectedKey {
 				t.Errorf("GetFirstEnv(%v) returned key %v, want %v", tt.keys, gotKey, tt.expectedKey)
+			}
+		})
+	}
+}
+
+func TestSubscriptionTierToString(t *testing.T) {
+	tests := []struct {
+		name string
+		tier defangv1.SubscriptionTier
+		want string
+	}{
+		{"unspecified maps to Starter", defangv1.SubscriptionTier_SUBSCRIPTION_TIER_UNSPECIFIED, "Starter"},
+		{"hobby maps to Starter", defangv1.SubscriptionTier_HOBBY, "Starter"},
+		{"personal maps to Starter", defangv1.SubscriptionTier_PERSONAL, "Starter"},
+		{"pro maps to Pro", defangv1.SubscriptionTier_PRO, "Pro"},
+		{"team maps to Enterprise", defangv1.SubscriptionTier_TEAM, "Enterprise"},
+		{"expired maps to Unknown", defangv1.SubscriptionTier_EXPIRED, "Unknown"},
+		{"unknown value maps to Unknown", defangv1.SubscriptionTier(99), "Unknown"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := SubscriptionTierToString(tt.tier); got != tt.want {
+				t.Errorf("SubscriptionTierToString(%v) = %q, want %q", tt.tier, got, tt.want)
 			}
 		})
 	}

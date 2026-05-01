@@ -134,13 +134,13 @@ func SubscriptionTierToString(tier defangv1.SubscriptionTier) string {
 	case defangv1.SubscriptionTier_SUBSCRIPTION_TIER_UNSPECIFIED:
 		fallthrough // free tier
 	case defangv1.SubscriptionTier_HOBBY:
-		return "Hobby"
+		return "Starter"
 	case defangv1.SubscriptionTier_PERSONAL:
-		return "Personal"
+		return "Starter" // Personal tier eliminated in v5; maps to Starter
 	case defangv1.SubscriptionTier_PRO:
 		return "Pro"
 	case defangv1.SubscriptionTier_TEAM:
-		return "Team"
+		return "Enterprise"
 	default:
 		return "Unknown"
 	}
