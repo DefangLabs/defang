@@ -51,12 +51,6 @@ func (d *Driver) newBlobContainerClient(ctx context.Context, containerName strin
 	return container.NewClientWithSharedKeyCredential(containerURL, keyCred, nil)
 }
 
-// IterateBlobs returns an iterator over blobs in the default uploads container
-// whose names start with prefix.
-func (d *Driver) IterateBlobs(ctx context.Context, prefix string) (iter.Seq2[BlobItem, error], error) {
-	return d.IterateBlobsInContainer(ctx, d.BlobContainerName, prefix)
-}
-
 // IterateBlobsInContainer is the container-explicit variant of IterateBlobs.
 func (d *Driver) IterateBlobsInContainer(ctx context.Context, containerName, prefix string) (iter.Seq2[BlobItem, error], error) {
 	client, err := d.newBlobContainerClient(ctx, containerName)
@@ -87,11 +81,6 @@ func (d *Driver) IterateBlobsInContainer(ctx context.Context, containerName, pre
 			}
 		}
 	}, nil
-}
-
-// DownloadBlob fetches a blob from the default uploads container.
-func (d *Driver) DownloadBlob(ctx context.Context, blobName string) ([]byte, error) {
-	return d.DownloadBlobFromContainer(ctx, d.BlobContainerName, blobName)
 }
 
 // DownloadBlobFromContainer is the container-explicit variant of DownloadBlob.
