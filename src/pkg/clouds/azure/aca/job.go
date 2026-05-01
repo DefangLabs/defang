@@ -469,10 +469,18 @@ func (j *Job) StartJobExecution(ctx context.Context, req JobRequest) (string, er
 		cmd = []*string{to.Ptr(req.Command[0])}
 	}
 
+	// Resources must be repeated here: ACA replaces matching containers from the
+	// execution override rather than merging field-by-field, so omitting Resources
+	// silently falls back to the platform default (0.25 vCPU / 0.5 GiB) regardless
+	// of what the job template says.
 	execContainer := &armappcontainersv3.JobExecutionContainer{
 		Name:  to.Ptr(cdJobName),
 		Image: to.Ptr(req.Image),
 		Env:   envVars,
+		Resources: &armappcontainersv3.ContainerResources{
+			CPU:    to.Ptr(cdJobCPU),
+			Memory: to.Ptr(cdJobMemory),
+		},
 	}
 	if len(cmd) > 0 {
 		execContainer.Command = cmd
