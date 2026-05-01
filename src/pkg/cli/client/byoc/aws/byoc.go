@@ -52,7 +52,8 @@ type Config = awssdk.Config
 type ByocAws struct {
 	*byoc.ByocBaseClient
 
-	driver *cfn.AwsCfn // TODO: ecs is stateful, contains the output of the cd cfn stack after SetUpCD
+	driver       *cfn.AwsCfn // TODO: ecs is stateful, contains the output of the cd cfn stack after SetUpCD
+	fabricClient dns.FabricResolverClient
 
 	cdEtag    types.ETag
 	cdStart   time.Time
@@ -114,7 +115,7 @@ func AnnotateAwsError(err error) error {
 	return err
 }
 
-func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string) *ByocAws {
+func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string, fabricClient dns.FabricResolverClient) *ByocAws {
 	if awsProfileName := os.Getenv("AWS_PROFILE"); awsProfileName != "" {
 		AWSAccessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
 		AWSSecretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
@@ -129,7 +130,8 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 	}
 
 	b := &ByocAws{
-		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
+		driver:       cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
+		fabricClient: fabricClient,
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
 
@@ -425,7 +427,10 @@ func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 	r53Client := route53.NewFromConfig(cfg)
 
 	projectDomain := req.DelegateDomain
-	nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, req.Project, b.PulumiStack, r53Client, dns.ResolverAt)
+	resolverAt := func(nsServer string) dns.Resolver {
+		return dns.FabricResolver{Client: b.fabricClient, NSServer: nsServer}
+	}
+	nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, req.Project, b.PulumiStack, r53Client, resolverAt)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}

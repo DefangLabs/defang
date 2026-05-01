@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/miekg/dns"
 )
 
@@ -18,7 +19,84 @@ type Resolver interface {
 	LookupNS(ctx context.Context, domain string) ([]*net.NS, error)
 }
 
-type RootResolver struct{}
+// FabricResolverClient is the subset of the fabric gRPC API used to resolve DNS
+// records remotely.
+type FabricResolverClient interface {
+	ResolveIPAddr(context.Context, *defangv1.ResolveIPAddrRequest) (*defangv1.ResolveIPAddrResponse, error)
+	ResolveCNAME(context.Context, *defangv1.ResolveCNAMERequest) (*defangv1.ResolveCNAMEResponse, error)
+	ResolveNS(context.Context, *defangv1.ResolveNSRequest) (*defangv1.ResolveNSResponse, error)
+}
+
+// FabricResolver performs DNS lookups via the fabric gRPC API. An empty
+// NSServer lets the server perform recursive resolution from the root.
+type FabricResolver struct {
+	Client   FabricResolverClient
+	NSServer string
+}
+
+func (r FabricResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
+	resp, err := r.Client.ResolveIPAddr(ctx, &defangv1.ResolveIPAddrRequest{
+		Domain:   domain,
+		NsServer: r.NSServer,
+	})
+	if err != nil {
+		return nil, err
+	}
+	ips := make([]net.IPAddr, 0, len(resp.IpAddrs))
+	for _, s := range resp.IpAddrs {
+		if ip := net.ParseIP(s); ip != nil {
+			ips = append(ips, net.IPAddr{IP: ip})
+		}
+	}
+	if len(ips) == 0 {
+		return nil, ErrNoSuchHost
+	}
+	return ips, nil
+}
+
+func (r FabricResolver) LookupCNAME(ctx context.Context, domain string) (string, error) {
+	resp, err := r.Client.ResolveCNAME(ctx, &defangv1.ResolveCNAMERequest{
+		Domain:   domain,
+		NsServer: r.NSServer,
+	})
+	if err != nil {
+		return "", err
+	}
+	if resp.Cname == "" {
+		return "", ErrNoSuchHost
+	}
+	return resp.Cname, nil
+}
+
+func (r FabricResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS, error) {
+	resp, err := r.Client.ResolveNS(ctx, &defangv1.ResolveNSRequest{
+		Domain:   domain,
+		NsServer: r.NSServer,
+	})
+	if err != nil {
+		return nil, err
+	}
+	nss := make([]*net.NS, 0, len(resp.Hosts))
+	for _, h := range resp.Hosts {
+		nss = append(nss, &net.NS{Host: h})
+	}
+	return nss, nil
+}
+
+// RootResolver performs recursive DNS resolution starting from the root
+// nameservers. Set ResolverAt to override how individual nameservers are
+// queried (e.g. to route through the Fabric gRPC API). A nil ResolverAt
+// falls back to DirectResolverAt.
+type RootResolver struct {
+	ResolverAt func(string) Resolver
+}
+
+func (r RootResolver) resolverFn() func(string) Resolver {
+	if r.ResolverAt != nil {
+		return r.ResolverAt
+	}
+	return DirectResolverAt
+}
 
 // https://en.wikipedia.org/wiki/Root_name_server
 var rootServers = []*net.NS{
@@ -62,20 +140,20 @@ func (r RootResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS, e
 }
 
 func (r RootResolver) getResolver(ctx context.Context, domain string) Resolver {
-	ns, err := FindNSServers(ctx, domain)
+	ns, err := FindNSServers(ctx, domain, r.resolverFn())
 	if err != nil {
 		return DirectResolver{}
 	}
 	return DirectResolver{NSServer: ns[pkg.RandomIndex(len(ns))].Host}
 }
 
-func FindNSServers(ctx context.Context, domain string) ([]*net.NS, error) {
+func FindNSServers(ctx context.Context, domain string, resolverAt func(string) Resolver) ([]*net.NS, error) {
 	nsServers := rootServers
 	retries := 3
 	for {
 		index := pkg.RandomIndex(len(nsServers))
 		nsServer := nsServers[index].Host
-		ns, err := ResolverAt(nsServer).LookupNS(ctx, domain)
+		ns, err := resolverAt(nsServer).LookupNS(ctx, domain)
 		sort.Slice(ns, func(i, j int) bool { return ns[i].Host < ns[j].Host })
 		if err != nil {
 			if retries--; retries > 0 {
@@ -91,10 +169,11 @@ func FindNSServers(ctx context.Context, domain string) ([]*net.NS, error) {
 }
 
 func DirectResolverAt(nsServer string) Resolver {
+	if nsServer == "" {
+		return RootResolver{}
+	}
 	return DirectResolver{NSServer: nsServer}
 }
-
-var ResolverAt = DirectResolverAt
 
 var ErrNoSuchHost = &net.DNSError{Err: "no such host", IsNotFound: true}
 
