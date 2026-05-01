@@ -17,7 +17,12 @@ import (
 
 // cliTimeout overrides the default 10s timeout for CLI-based credentials.
 // The Azure CLI can be slow to start, especially when installed via Nix.
-const cliTimeout = 30 * time.Second
+// cliTimeout overrides the SDK's default 10s budget for AzureCLICredential.
+// `az account get-access-token` can exceed 30s when several pollers refresh
+// concurrently after token expiry, when `az` cold-starts (Python interpreter +
+// module imports), or when AAD round-trips for refresh. 90s gives enough
+// headroom for these compounded delays without making startup feel hung.
+const cliTimeout = 90 * time.Second
 
 type Azure struct {
 	Location       Location
