@@ -107,7 +107,7 @@ func (b *ByocAzure) CdList(ctx context.Context, _ bool) (iter.Seq[state.Info], e
 		return nil, err
 	}
 
-	blobs, err := b.driver.IterateBlobs(ctx, ".pulumi/stacks/")
+	blobs, err := b.driver.IterateBlobsInContainer(ctx, cd.PulumiContainerName, ".pulumi/stacks/")
 	if err != nil {
 		return nil, err
 	}
@@ -118,8 +118,8 @@ func (b *ByocAzure) CdList(ctx context.Context, _ bool) (iter.Seq[state.Info], e
 				term.Debugf("Error iterating blobs: %v", err)
 				return
 			}
-			st, err := state.ParsePulumiStateFile(ctx, item, b.driver.BlobContainerName, func(ctx context.Context, _, blobName string) ([]byte, error) {
-				return b.driver.DownloadBlob(ctx, blobName)
+			st, err := state.ParsePulumiStateFile(ctx, item, cd.PulumiContainerName, func(ctx context.Context, container, blobName string) ([]byte, error) {
+				return b.driver.DownloadBlobFromContainer(ctx, container, blobName)
 			})
 			if err != nil {
 				term.Debugf("Skipping %q: %v", item.Name(), err)
