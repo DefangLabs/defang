@@ -456,7 +456,11 @@ func (b *ByocAzure) GetDeploymentStatus(ctx context.Context) (bool, error) {
 	}
 	status, err := b.job.GetJobExecutionStatus(ctx, b.cdRunID)
 	if err != nil {
-		return false, client.ErrDeploymentFailed{Message: err.Error()}
+		// Return the raw error so WaitForCdTaskExit's isTransientError can
+		// retry on flaky failures (e.g. AzureCLICredential subprocess timeouts).
+		// Wrapping as ErrDeploymentFailed here would mask transient errors as
+		// permanent deployment failures.
+		return false, err
 	}
 	if !status.IsTerminal() {
 		return false, nil
