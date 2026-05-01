@@ -379,7 +379,7 @@ aws_secret_access_key = wJalrXUtnFEMI/KDEFANG/bPxRfiCYEXAMPLEKEY
 			ctx := t.Context()
 
 			// Create ByocAws instance - warning is printed here in NewByocProvider
-			b := NewByocProvider(ctx, "tenant1", "exampleStack")
+			b := NewByocProvider(ctx, "tenant1", "exampleStack", nil)
 			_, err := b.AccountInfo(ctx)
 
 			if tt.expectedError {

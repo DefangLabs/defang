@@ -59,10 +59,7 @@ func TestGetWithRetries(t *testing.T) {
 		tc := &testClient{tries: []tryResult{
 			{result: &http.Response{StatusCode: 200, Body: mockBody("")}, err: nil},
 		}}
-		originalClient := httpClient
-		t.Cleanup(func() { httpClient = originalClient })
-		httpClient = tc
-		err := getWithRetries(t.Context(), "http://example.com", 3)
+		err := getWithRetries(t.Context(), "http://example.com", 3, tc)
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
@@ -76,10 +73,7 @@ func TestGetWithRetries(t *testing.T) {
 			{result: nil, err: errors.New("error")},
 			{result: &http.Response{StatusCode: 200, Body: mockBody("")}, err: nil},
 		}}
-		originalClient := httpClient
-		t.Cleanup(func() { httpClient = originalClient })
-		httpClient = tc
-		err := getWithRetries(t.Context(), "http://example.com", 3)
+		err := getWithRetries(t.Context(), "http://example.com", 3, tc)
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
@@ -93,10 +87,7 @@ func TestGetWithRetries(t *testing.T) {
 			{result: &http.Response{StatusCode: 503, Body: mockBody("Random Error")}, err: nil},
 			{result: nil, err: errors.New("error")},
 		}}
-		originalClient := httpClient
-		t.Cleanup(func() { httpClient = originalClient })
-		httpClient = tc
-		err := getWithRetries(t.Context(), "http://example.com", 3)
+		err := getWithRetries(t.Context(), "http://example.com", 3, tc)
 		if err == nil {
 			t.Errorf("Expected error, got %v", err)
 		} else if !strings.Contains(err.Error(), "HTTP: 503") {
@@ -111,10 +102,7 @@ func TestGetWithRetries(t *testing.T) {
 		tc := &testClient{tries: []tryResult{
 			{result: &http.Response{StatusCode: 503, Request: &http.Request{URL: redirectURL}, Body: mockBody("Random Error")}, err: nil},
 		}}
-		originalClient := httpClient
-		t.Cleanup(func() { httpClient = originalClient })
-		httpClient = tc
-		err := getWithRetries(t.Context(), "http://example.com", 3)
+		err := getWithRetries(t.Context(), "http://example.com", 3, tc)
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
@@ -126,10 +114,7 @@ func TestGetWithRetries(t *testing.T) {
 		tc := &testClient{tries: []tryResult{
 			{result: nil, err: &tls.CertificateVerificationError{Err: errors.New("error")}},
 		}}
-		originalClient := httpClient
-		t.Cleanup(func() { httpClient = originalClient })
-		httpClient = tc
-		err := getWithRetries(t.Context(), "http://example.com", 3)
+		err := getWithRetries(t.Context(), "http://example.com", 3, tc)
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
@@ -143,10 +128,7 @@ func TestGetWithRetries(t *testing.T) {
 			{result: &http.Response{StatusCode: 502, Body: mockBody("Random Error")}, err: nil},
 			{result: &http.Response{StatusCode: 503, Body: mockBody("Random Error")}, err: nil},
 		}}
-		originalClient := httpClient
-		t.Cleanup(func() { httpClient = originalClient })
-		httpClient = tc
-		err := getWithRetries(t.Context(), "http://example.com", 3)
+		err := getWithRetries(t.Context(), "http://example.com", 3, tc)
 		if err == nil {
 			t.Errorf("Expected error, got %v", err)
 		} else if !strings.Contains(err.Error(), "HTTP: 404") || !strings.Contains(err.Error(), "HTTP: 502") || !strings.Contains(err.Error(), "HTTP: 503") {
@@ -162,10 +144,7 @@ func TestGetWithRetries(t *testing.T) {
 			{result: &http.Response{StatusCode: 502, Body: mockBody("Random Error")}, err: nil},
 			{result: &http.Response{StatusCode: 503, Body: mockBody("Random Error")}, err: nil},
 		}}
-		originalClient := httpClient
-		t.Cleanup(func() { httpClient = originalClient })
-		httpClient = tc
-		err := getWithRetries(t.Context(), "http://example.com", 1)
+		err := getWithRetries(t.Context(), "http://example.com", 1, tc)
 		if err == nil {
 			t.Errorf("Expected error, got %v", err)
 		}
@@ -198,8 +177,9 @@ func TestHttpClient(t *testing.T) {
 	}))
 	defer ts.Close()
 	var mr MockResolver
-	resolver = &mr
 	dnsCacheDuration = 50 * time.Millisecond
+
+	tc := newCertHTTPClient(&mr)
 
 	tsu, err := url.Parse(ts.URL)
 	if err != nil {
@@ -214,7 +194,7 @@ func TestHttpClient(t *testing.T) {
 		t.Fatalf("failed to create request: %v", err)
 	}
 
-	resp, err := httpClient.Do(req)
+	resp, err := tc.Do(req)
 	if err != nil {
 		t.Fatalf("failed to make http call: %v", err)
 	}
@@ -224,7 +204,7 @@ func TestHttpClient(t *testing.T) {
 		t.Fatalf("expected 1 dns lookup, but got %v", mr.calls)
 	}
 
-	resp, err = httpClient.Do(req)
+	resp, err = tc.Do(req)
 	if err != nil {
 		t.Fatalf("failed to make http call: %v", err)
 	}
@@ -234,7 +214,7 @@ func TestHttpClient(t *testing.T) {
 	}
 
 	time.Sleep(80 * time.Millisecond)
-	resp, err = httpClient.Do(req)
+	resp, err = tc.Do(req)
 	if err != nil {
 		t.Fatalf("failed to make http call: %v", err)
 	}

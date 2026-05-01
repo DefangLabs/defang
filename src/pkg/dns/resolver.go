@@ -7,7 +7,6 @@ import (
 	"net"
 	"slices"
 	"sort"
-	"sync"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -26,31 +25,6 @@ type FabricResolverClient interface {
 	ResolveIPAddr(context.Context, *defangv1.ResolveIPAddrRequest) (*defangv1.ResolveIPAddrResponse, error)
 	ResolveCNAME(context.Context, *defangv1.ResolveCNAMERequest) (*defangv1.ResolveCNAMEResponse, error)
 	ResolveNS(context.Context, *defangv1.ResolveNSRequest) (*defangv1.ResolveNSResponse, error)
-}
-
-// fabricMu guards concurrent access to fabricClient and resolverAt.
-var fabricMu sync.RWMutex
-
-// fabricClient is set by UseFabricResolver. When non-nil, RootResolver and
-// ResolverAt route DNS lookups through the fabric gRPC API.
-var fabricClient FabricResolverClient
-
-// UseFabricResolver wires DNS lookups through the fabric gRPC API. After it is
-// called, RootResolver{} and ResolverAt(nsServer) both issue remote RPCs
-// instead of performing direct UDP DNS queries.
-func UseFabricResolver(c FabricResolverClient) {
-	fabricMu.Lock()
-	defer fabricMu.Unlock()
-	fabricClient = c
-	resolverAt = func(nsServer string) Resolver {
-		return FabricResolver{Client: c, NSServer: nsServer}
-	}
-}
-
-func getFabricClient() FabricResolverClient {
-	fabricMu.RLock()
-	defer fabricMu.RUnlock()
-	return fabricClient
 }
 
 // FabricResolver performs DNS lookups via the fabric gRPC API. An empty
@@ -109,7 +83,20 @@ func (r FabricResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS,
 	return nss, nil
 }
 
-type RootResolver struct{}
+// RootResolver performs recursive DNS resolution starting from the root
+// nameservers. Set ResolverAt to override how individual nameservers are
+// queried (e.g. to route through the Fabric gRPC API). A nil ResolverAt
+// falls back to DirectResolverAt.
+type RootResolver struct {
+	ResolverAt func(string) Resolver
+}
+
+func (r RootResolver) resolverFn() func(string) Resolver {
+	if r.ResolverAt != nil {
+		return r.ResolverAt
+	}
+	return DirectResolverAt
+}
 
 // https://en.wikipedia.org/wiki/Root_name_server
 var rootServers = []*net.NS{
@@ -129,9 +116,6 @@ var rootServers = []*net.NS{
 }
 
 func (r RootResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
-	if c := getFabricClient(); c != nil {
-		return FabricResolver{Client: c}.LookupIPAddr(ctx, domain)
-	}
 	for range 10 {
 		ips, err := r.getResolver(ctx, domain).LookupIPAddr(ctx, domain)
 		if err != nil {
@@ -148,34 +132,28 @@ func (r RootResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IP
 }
 
 func (r RootResolver) LookupCNAME(ctx context.Context, domain string) (string, error) {
-	if c := getFabricClient(); c != nil {
-		return FabricResolver{Client: c}.LookupCNAME(ctx, domain)
-	}
 	return r.getResolver(ctx, domain).LookupCNAME(ctx, domain)
 }
 
 func (r RootResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS, error) {
-	if c := getFabricClient(); c != nil {
-		return FabricResolver{Client: c}.LookupNS(ctx, domain)
-	}
 	return r.getResolver(ctx, domain).LookupNS(ctx, domain)
 }
 
 func (r RootResolver) getResolver(ctx context.Context, domain string) Resolver {
-	ns, err := FindNSServers(ctx, domain)
+	ns, err := FindNSServers(ctx, domain, r.resolverFn())
 	if err != nil {
 		return DirectResolver{}
 	}
 	return DirectResolver{NSServer: ns[pkg.RandomIndex(len(ns))].Host}
 }
 
-func FindNSServers(ctx context.Context, domain string) ([]*net.NS, error) {
+func FindNSServers(ctx context.Context, domain string, resolverAt func(string) Resolver) ([]*net.NS, error) {
 	nsServers := rootServers
 	retries := 3
 	for {
 		index := pkg.RandomIndex(len(nsServers))
 		nsServer := nsServers[index].Host
-		ns, err := ResolverAt(nsServer).LookupNS(ctx, domain)
+		ns, err := resolverAt(nsServer).LookupNS(ctx, domain)
 		sort.Slice(ns, func(i, j int) bool { return ns[i].Host < ns[j].Host })
 		if err != nil {
 			if retries--; retries > 0 {
@@ -191,22 +169,10 @@ func FindNSServers(ctx context.Context, domain string) ([]*net.NS, error) {
 }
 
 func DirectResolverAt(nsServer string) Resolver {
+	if nsServer == "" {
+		return RootResolver{}
+	}
 	return DirectResolver{NSServer: nsServer}
-}
-
-// resolverAt is the package-private function that produces a Resolver bound to
-// a given nameserver. It is swapped out by UseFabricResolver. All reads must go
-// through ResolverAt so they're synchronized with that write.
-var resolverAt = DirectResolverAt
-
-// ResolverAt returns a Resolver bound to nsServer. When UseFabricResolver has
-// wired in a fabric client, the returned Resolver issues remote RPCs;
-// otherwise it performs direct UDP DNS queries.
-func ResolverAt(nsServer string) Resolver {
-	fabricMu.RLock()
-	fn := resolverAt
-	fabricMu.RUnlock()
-	return fn(nsServer)
 }
 
 var ErrNoSuchHost = &net.DNSError{Err: "no such host", IsNotFound: true}

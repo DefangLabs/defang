@@ -3,7 +3,6 @@ package dns
 import (
 	"context"
 	"errors"
-	"sync"
 	"testing"
 
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -105,64 +104,4 @@ func TestFabricResolverLookupNS(t *testing.T) {
 	if len(ns) != 2 || ns[0].Host != "ns1.example.com." {
 		t.Errorf("unexpected NS result: %+v", ns)
 	}
-}
-
-func TestUseFabricResolver(t *testing.T) {
-	t.Cleanup(func() {
-		fabricClient = nil
-		resolverAt = DirectResolverAt
-	})
-
-	m := &mockFabricClient{ipResp: &defangv1.ResolveIPAddrResponse{IpAddrs: []string{"9.9.9.9"}}}
-	UseFabricResolver(m)
-
-	// RootResolver should now delegate to FabricResolver.
-	ips, err := RootResolver{}.LookupIPAddr(t.Context(), "example.com")
-	if err != nil {
-		t.Fatalf("RootResolver.LookupIPAddr: %v", err)
-	}
-	if len(ips) != 1 || ips[0].IP.String() != "9.9.9.9" {
-		t.Errorf("unexpected IPs: %v", ips)
-	}
-
-	// ResolverAt should return a FabricResolver bound to the NS.
-	r := ResolverAt("ns1.example.com")
-	if fr, ok := r.(FabricResolver); !ok || fr.NSServer != "ns1.example.com" {
-		t.Errorf("ResolverAt did not return FabricResolver: %T %+v", r, r)
-	}
-}
-
-// TestResolverAtConcurrentWithUseFabricResolver exercises the synchronization
-// between UseFabricResolver (which swaps resolverAt) and ResolverAt callers.
-// Run with `go test -race` — prior to the mutex-guarded ResolverAt, concurrent
-// writes and reads on the package-level variable were a data race.
-func TestResolverAtConcurrentWithUseFabricResolver(t *testing.T) {
-	t.Cleanup(func() {
-		fabricClient = nil
-		resolverAt = DirectResolverAt
-	})
-
-	m := &mockFabricClient{nsResp: &defangv1.ResolveNSResponse{Hosts: []string{"ns1.example.com."}}}
-
-	var wg sync.WaitGroup
-	stop := make(chan struct{})
-	for range 4 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for {
-				select {
-				case <-stop:
-					return
-				default:
-					_ = ResolverAt("ns.example.com")
-				}
-			}
-		}()
-	}
-	for range 200 {
-		UseFabricResolver(m)
-	}
-	close(stop)
-	wg.Wait()
 }

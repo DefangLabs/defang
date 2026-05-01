@@ -7,7 +7,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/do"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
-	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 )
@@ -18,9 +17,7 @@ func Connect(fabricAddr string, requestedTenant types.TenantNameOrID) *client.Gr
 	term.Debugf("Using tenant %q for cluster %q", requestedTenant, host)
 
 	accessToken := client.GetExistingToken(host)
-	grpcClient := client.NewGrpcClient(host, accessToken, requestedTenant)
-	dns.UseFabricResolver(grpcClient)
-	return grpcClient
+	return client.NewGrpcClient(host, accessToken, requestedTenant)
 }
 
 func ConnectWithTenant(ctx context.Context, fabricAddr string, requestedTenant types.TenantNameOrID) (*client.GrpcClient, error) {
@@ -41,7 +38,7 @@ func NewProvider(ctx context.Context, providerID client.ProviderID, fabricClient
 	term.Debugf("Creating %s provider", providerID)
 	switch providerID {
 	case client.ProviderAWS:
-		provider = aws.NewByocProvider(ctx, fabricClient.GetTenantName(), stack)
+		provider = aws.NewByocProvider(ctx, fabricClient.GetTenantName(), stack, fabricClient)
 	case client.ProviderDO:
 		provider = do.NewByocProvider(ctx, fabricClient.GetTenantName(), stack)
 	case client.ProviderGCP:
