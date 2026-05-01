@@ -19,7 +19,7 @@ import (
 	armappcontainersv3 "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appcontainers/armappcontainers/v3"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/operationalinsights/armoperationalinsights"
-	cloudazure "github.com/DefangLabs/defang/src/pkg/clouds/azure"
+	"github.com/DefangLabs/defang/src/pkg/clouds/azure"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/google/uuid"
 )
@@ -84,7 +84,7 @@ func (s *JobStatus) IsSuccess() bool {
 // It owns the CD job lifecycle: creating the environment, setting up the job,
 // running executions, streaming logs, and assigning the job's managed identity roles.
 type Job struct {
-	cloudazure.Azure
+	azure.Azure
 	ResourceGroup     string
 	EnvironmentID     string
 	SystemPrincipalID string
@@ -155,7 +155,7 @@ func (j *Job) setUpLogWorkspace(ctx context.Context) (customerID, sharedKey stri
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create log analytics workspace: %w", err)
 	}
-	wsResult, err := wsPoller.PollUntilDone(ctx, nil)
+	wsResult, err := wsPoller.PollUntilDone(ctx, azure.PollOptions)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to poll workspace creation: %w", err)
 	}
@@ -223,7 +223,7 @@ func (j *Job) SetUpEnvironment(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to update container apps environment: %w", err)
 		}
-		result, err := updatePoller.PollUntilDone(ctx, nil)
+		result, err := updatePoller.PollUntilDone(ctx, azure.PollOptions)
 		if err != nil {
 			return fmt.Errorf("failed to poll environment update: %w", err)
 		}
@@ -242,7 +242,7 @@ func (j *Job) SetUpEnvironment(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create container apps environment: %w", err)
 	}
-	result, err := poller.PollUntilDone(ctx, nil)
+	result, err := poller.PollUntilDone(ctx, azure.PollOptions)
 	if err != nil {
 		return fmt.Errorf("failed to poll environment creation: %w", err)
 	}
@@ -399,7 +399,7 @@ func (j *Job) SetUpJob(ctx context.Context, image string, envMap map[string]stri
 		return fmt.Errorf("failed to create/update CD job: %w", err)
 	}
 
-	result, err := poller.PollUntilDone(ctx, nil)
+	result, err := poller.PollUntilDone(ctx, azure.PollOptions)
 	if err != nil {
 		return fmt.Errorf("failed to poll CD job creation: %w", err)
 	}
@@ -454,7 +454,7 @@ func (j *Job) StartJobExecution(ctx context.Context, req JobRequest) (string, er
 		if err != nil {
 			return "", fmt.Errorf("failed to update job secrets: %w", err)
 		}
-		if _, err := secretsPoller.PollUntilDone(ctx, nil); err != nil {
+		if _, err := secretsPoller.PollUntilDone(ctx, azure.PollOptions); err != nil {
 			return "", fmt.Errorf("failed to poll job secrets update: %w", err)
 		}
 	}
@@ -488,7 +488,7 @@ func (j *Job) StartJobExecution(ctx context.Context, req JobRequest) (string, er
 		return "", fmt.Errorf("failed to start job execution: %w", err)
 	}
 
-	result, err := poller.PollUntilDone(ctx, nil)
+	result, err := poller.PollUntilDone(ctx, azure.PollOptions)
 	if err != nil {
 		return "", fmt.Errorf("failed to poll job start: %w", err)
 	}
@@ -642,7 +642,7 @@ func (j *Job) getCDContainerLogStreamURL(ctx context.Context, executionName stri
 
 	url := fmt.Sprintf(
 		"%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.App/jobs/%s/executions/%s/replicas?api-version=%s",
-		cloudazure.ManagementEndpoint, j.SubscriptionID, j.ResourceGroup, cdJobName, executionName, jobAPIVersion,
+		azure.ManagementEndpoint, j.SubscriptionID, j.ResourceGroup, cdJobName, executionName, jobAPIVersion,
 	)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

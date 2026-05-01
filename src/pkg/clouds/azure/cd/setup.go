@@ -12,6 +12,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage/v2"
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/clouds/azure"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
@@ -62,7 +63,7 @@ func (d *Driver) TearDown(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to delete resource group: %w", err)
 	}
-	_, err = deletePoller.PollUntilDone(ctx, nil)
+	_, err = deletePoller.PollUntilDone(ctx, azure.PollOptions)
 	return err
 }
 
@@ -149,7 +150,7 @@ func (d *Driver) SetUpStorageAccount(ctx context.Context) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to create storage account: %w", err)
 		}
-		_, err = createPoller.PollUntilDone(ctx, nil)
+		_, err = createPoller.PollUntilDone(ctx, azure.PollOptions)
 		if err != nil {
 			return "", fmt.Errorf("failed to poll storage account creation: %w", err)
 		}

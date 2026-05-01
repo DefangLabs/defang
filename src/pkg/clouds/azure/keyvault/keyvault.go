@@ -149,7 +149,7 @@ func (kv *KeyVault) SetUp(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create Key Vault: %w", err)
 	}
-	result, err := poller.PollUntilDone(ctx, nil)
+	result, err := poller.PollUntilDone(ctx, azure.PollOptions)
 	if err != nil {
 		return fmt.Errorf("failed to poll Key Vault creation: %w", err)
 	}

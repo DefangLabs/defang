@@ -10,10 +10,13 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage/v2"
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 )
+
+var PollOptions = &runtime.PollUntilDoneOptions{Frequency: 5 * time.Second}
 
 // cliTimeout overrides the default 10s timeout for CLI-based credentials.
 // The Azure CLI can be slow to start, especially when installed via Nix.
