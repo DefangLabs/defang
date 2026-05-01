@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerregistry/armcontainerregistry"
@@ -35,7 +36,15 @@ type BuildLogWatcher struct {
 func (w *BuildLogWatcher) WatchBuildLogs(ctx context.Context) <-chan BuildLogEntry {
 	out := make(chan BuildLogEntry)
 	go func() {
-		defer close(out)
+		// senders tracks the per-run streaming goroutines started by poll().
+		// We must wait for all of them to finish before closing `out`, otherwise
+		// a `case out <- …` racing with our close panics with
+		// "send on closed channel".
+		var senders sync.WaitGroup
+		defer func() {
+			senders.Wait()
+			close(out)
+		}()
 		watchStart := time.Now().Add(-2 * time.Minute) // catch builds that started up to 2 min before tailing
 
 		cred, err := w.NewCreds()
@@ -124,7 +133,11 @@ func (w *BuildLogWatcher) WatchBuildLogs(ctx context.Context) <-chan BuildLogEnt
 						service = runID
 					}
 					term.Debugf("WatchBuildLogs: streaming run %s (service %s)", runID, service)
-					go w.streamRunLog(ctx, runsClient, w.ResourceGroup, registryName, runID, service, out)
+					senders.Add(1)
+					go func() {
+						defer senders.Done()
+						w.streamRunLog(ctx, runsClient, w.ResourceGroup, registryName, runID, service, out)
+					}()
 				}
 			}
 		}

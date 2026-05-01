@@ -29,15 +29,26 @@ type ServiceLogEntry struct {
 func (c *ContainerApp) WatchLogs(ctx context.Context) <-chan ServiceLogEntry {
 	out := make(chan ServiceLogEntry)
 	go func() {
-		defer close(out)
 		// streaming tracks apps that currently have a live tail goroutine. An
 		// app is re-added to the map on the next poll once its goroutine exits
 		// (so replicas that roll or streams that drop mid-run are retried).
 		var mu sync.Mutex
 		streaming := map[string]struct{}{}
 
+		// senders tracks inner goroutines that send on `out` (per-app tailers
+		// and pollErr). We must wait for all of them before closing `out`,
+		// otherwise a `case out <- …` racing with our close panics with
+		// "send on closed channel".
+		var senders sync.WaitGroup
+		defer func() {
+			senders.Wait()
+			close(out)
+		}()
+
 		startTailing := func(appName string) {
+			senders.Add(1)
 			go func() {
+				defer senders.Done()
 				defer func() {
 					mu.Lock()
 					delete(streaming, appName)
