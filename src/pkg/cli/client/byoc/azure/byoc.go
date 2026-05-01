@@ -342,16 +342,23 @@ func (b *ByocAzure) buildCdEnv(projectName string) (map[string]string, error) {
 		"DEFANG_JSON":                os.Getenv("DEFANG_JSON"),
 		"DEFANG_ORG":                 string(b.TenantLabel),
 		"DEFANG_PREFIX":              b.Prefix,
+		"DEFANG_PULUMI_DEBUG":        os.Getenv("DEFANG_PULUMI_DEBUG"),
+		"DEFANG_PULUMI_DIFF":         os.Getenv("DEFANG_PULUMI_DIFF"),
 		"DEFANG_STATE_URL":           defangStateUrl,
-		"HOME":                       "/root",
+		"HOME":                       "/root", // TODO: should be in Dockerfile
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
 		"PROJECT":                    projectName,
-		pulumiBackendKey:             pulumiBackendValue,          // TODO: make secret
-		"PULUMI_CONFIG_PASSPHRASE":   byoc.PulumiConfigPassphrase, // TODO: make secret
-		"PULUMI_COPILOT":             "false",
-		"PULUMI_SKIP_UPDATE_CHECK":   "true",
-		"STACK":                      b.PulumiStack,
-		"USER":                       "root",
+		pulumiBackendKey:             pulumiBackendValue, // TODO: make secret
+		"PULUMI_AUTOMATION_API_SKIP_VERSION_CHECK": "true",
+		"PULUMI_CONFIG_PASSPHRASE":                 byoc.PulumiConfigPassphrase, // TODO: make secret
+		"PULUMI_COPILOT":                           "false",
+		// "PULUMI_DIY_BACKEND_DISABLE_CHECKPOINT_BACKUPS": "true", TODO: use versioned bucket
+		"PULUMI_SKIP_UPDATE_CHECK": "true",
+		"STACK":                    b.PulumiStack,
+		"USER":                     "root", // TODO: should be in Dockerfile
+	}
+	if targets := os.Getenv("DEFANG_PULUMI_TARGETS"); targets != "" {
+		env["DEFANG_PULUMI_TARGETS"] = targets
 	}
 	if !term.StdoutCanColor() {
 		env["NO_COLOR"] = "1"
