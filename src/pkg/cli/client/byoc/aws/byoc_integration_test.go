@@ -7,13 +7,13 @@ import (
 	"strings"
 	"testing"
 
+	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild/cfn"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"connectrpc.com/connect"
 )
 
 func TestDeploy(t *testing.T) {

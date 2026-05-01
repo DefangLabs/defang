@@ -704,7 +704,8 @@ message GetRequest { // was ServiceID
 }
 
 message Service {
-  option deprecated = true; // still used by pulumi-defang provider in state files
+  option deprecated =
+      true; // still used by pulumi-defang provider in state files
   string name = 1;
   reserved 2; // was: string image
   reserved 3; // was: Platform platform
