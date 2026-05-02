@@ -28,7 +28,7 @@ func ListWorkspaces(cmd *cobra.Command, args []string) error {
 	rows := cli.WorkspaceRows(info, currentWorkspace)
 
 	if len(rows) == 0 {
-		term.Info("No workspaces found for this account.")
+		term.Warn("No workspaces found for this account.")
 		return nil
 	}
 
