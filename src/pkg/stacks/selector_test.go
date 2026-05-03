@@ -100,8 +100,8 @@ func TestStackSelector_SelectStack_ExistingStack(t *testing.T) {
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock user selecting existing stack
-	expectedOptions := []string{"production (us-west-2)", "development (us-east-1)"}
-	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("production (us-west-2)", nil)
+	expectedOptions := []string{"production [us-west-2]", "development [us-east-1]"}
+	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("production [us-west-2]", nil)
 
 	// Expected params based on ToParameters() conversion
 	expectedParams := &Parameters{
@@ -139,8 +139,8 @@ func TestStackSelector_SelectOrCreateStack_ExistingStack(t *testing.T) {
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock user selecting existing stack
-	expectedOptions := []string{"production (us-west-2)", "development (us-east-1)", CreateNewStack}
-	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("production (us-west-2)", nil)
+	expectedOptions := []string{"production [us-west-2]", "development [us-east-1]", CreateNewStack}
+	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("production [us-west-2]", nil)
 
 	// Expected params based on ToParameters() conversion
 	expectedParams := &Parameters{
@@ -179,7 +179,7 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock user selecting to create new stack
-	expectedOptions := []string{"production (aws, us-west-2)", CreateNewStack}
+	expectedOptions := []string{"production [aws us-west-2]", CreateNewStack}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return(CreateNewStack, nil)
 
 	// Mock wizard parameter collection - provider selection
@@ -383,7 +383,7 @@ func TestStackSelector_SelectStack_ElicitationError(t *testing.T) {
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock error during elicitation
-	expectedOptions := []string{"production (aws, us-west-2)"}
+	expectedOptions := []string{"production [aws us-west-2]"}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("", errors.New("user cancelled selection"))
 
 	selector := NewSelector(mockEC, mockSM)
@@ -414,7 +414,7 @@ func TestStackSelector_SelectStack_WizardError(t *testing.T) {
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock user selecting to create new stack
-	expectedOptions := []string{"production (aws, us-west-2)", CreateNewStack}
+	expectedOptions := []string{"production [aws us-west-2]", CreateNewStack}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return(CreateNewStack, nil)
 
 	// Mock wizard parameter collection - provider selection fails
@@ -451,7 +451,7 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock user selecting to create new stack
-	expectedOptions := []string{"production (aws, us-west-2)", CreateNewStack}
+	expectedOptions := []string{"production [aws us-west-2]", CreateNewStack}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return(CreateNewStack, nil)
 
 	// Mock wizard parameter collection - provider selection
@@ -528,20 +528,19 @@ func TestStackSelector_SelectStack_ShowsAccountInLabel(t *testing.T) {
 	mockEC.On("IsSupported").Return(true)
 
 	existingStacks := []ListItem{
-		{Parameters: Parameters{Name: "prod", Provider: "aws", Region: "us-west-2", Variables: map[string]string{"AWS_PROFILE": "prod-account"}}},
-		{Parameters: Parameters{Name: "dev", Provider: "aws", Region: "us-west-2", Variables: map[string]string{"AWS_PROFILE": "dev-account"}}},
+		{Parameters: Parameters{Name: "prod", Provider: "aws", Region: "us-west-2"}, Account: "prod-account"},
+		{Parameters: Parameters{Name: "dev", Provider: "aws", Region: "us-west-2"}, Account: "dev-account"},
 	}
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// provider and region are redundant; only account differs
-	expectedOptions := []string{"prod (prod-account)", "dev (dev-account)"}
-	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("prod (prod-account)", nil)
+	expectedOptions := []string{"prod [prod-account]", "dev [dev-account]"}
+	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("prod [prod-account]", nil)
 
 	expectedParams := &Parameters{
-		Name:      "prod",
-		Provider:  client.ProviderAWS,
-		Region:    "us-west-2",
-		Variables: map[string]string{"AWS_PROFILE": "prod-account"},
+		Name:     "prod",
+		Provider: client.ProviderAWS,
+		Region:   "us-west-2",
 	}
 
 	selector := NewSelector(mockEC, mockSM)
@@ -570,14 +569,14 @@ func TestMakeStackSelectorLabels(t *testing.T) {
 			stacks: []ListItem{
 				{Parameters: Parameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
 			},
-			wantLabels: []string{"production (aws, us-west-2)"},
+			wantLabels: []string{"production [aws us-west-2]"},
 		},
 		{
 			name: "one stack with AWS profile",
 			stacks: []ListItem{
-				{Parameters: Parameters{Name: "production", Provider: "aws", Region: "us-west-2", Variables: map[string]string{"AWS_PROFILE": "my-profile"}}},
+				{Parameters: Parameters{Name: "production", Provider: "aws", Region: "us-west-2"}, Account: "my-profile"},
 			},
-			wantLabels: []string{"production (aws, us-west-2, my-profile)"},
+			wantLabels: []string{"production [aws my-profile us-west-2]"},
 		},
 		{
 			name: "hide redundant provider",
@@ -586,8 +585,8 @@ func TestMakeStackSelectorLabels(t *testing.T) {
 				{Parameters: Parameters{Name: "development", Provider: "aws", Region: "us-east-1"}},
 			},
 			wantLabels: []string{
-				"production (us-west-2)",
-				"development (us-east-1)",
+				"production [us-west-2]",
+				"development [us-east-1]",
 			},
 		},
 		{
@@ -609,48 +608,48 @@ func TestMakeStackSelectorLabels(t *testing.T) {
 				{Parameters: Parameters{Name: "gcp-stack", Provider: "gcp", Region: "us-central1"}},
 			},
 			wantLabels: []string{
-				"prod-us-west-2 (aws, us-west-2)",
-				"dev-us-east-1 (aws, us-east-1)",
-				"gcp-stack (gcp, us-central1)",
+				"prod-us-west-2 [aws us-west-2]",
+				"dev-us-east-1 [aws us-east-1]",
+				"gcp-stack [gcp us-central1]",
 			},
 		},
 		{
 			name: "show different AWS profiles",
 			stacks: []ListItem{
-				{Parameters: Parameters{Name: "prod", Provider: "aws", Region: "us-west-2", Variables: map[string]string{"AWS_PROFILE": "prod-account"}}},
-				{Parameters: Parameters{Name: "dev", Provider: "aws", Region: "us-west-2", Variables: map[string]string{"AWS_PROFILE": "dev-account"}}},
+				{Parameters: Parameters{Name: "prod", Provider: "aws", Region: "us-west-2"}, Account: "prod-account"},
+				{Parameters: Parameters{Name: "dev", Provider: "aws", Region: "us-west-2"}, Account: "dev-account"},
 			},
 			wantLabels: []string{
-				"prod (prod-account)",
-				"dev (dev-account)",
+				"prod [prod-account]",
+				"dev [dev-account]",
 			},
 		},
 		{
 			name: "hide redundant AWS profile",
 			stacks: []ListItem{
-				{Parameters: Parameters{Name: "prod", Provider: "aws", Region: "us-west-2", Variables: map[string]string{"AWS_PROFILE": "shared"}}},
-				{Parameters: Parameters{Name: "dev", Provider: "aws", Region: "us-east-1", Variables: map[string]string{"AWS_PROFILE": "shared"}}},
+				{Parameters: Parameters{Name: "prod", Provider: "aws", Region: "us-west-2"}, Account: "shared"},
+				{Parameters: Parameters{Name: "dev", Provider: "aws", Region: "us-east-1"}, Account: "shared"},
 			},
 			wantLabels: []string{
-				"prod (us-west-2)",
-				"dev (us-east-1)",
+				"prod [us-west-2]",
+				"dev [us-east-1]",
 			},
 		},
 		{
 			name: "show different GCP project IDs",
 			stacks: []ListItem{
-				{Parameters: Parameters{Name: "prod", Provider: "gcp", Region: "us-central1", Variables: map[string]string{"GCP_PROJECT_ID": "my-prod-project"}}},
-				{Parameters: Parameters{Name: "dev", Provider: "gcp", Region: "us-central1", Variables: map[string]string{"GCP_PROJECT_ID": "my-dev-project"}}},
+				{Parameters: Parameters{Name: "prod", Provider: "gcp", Region: "us-central1"}, Account: "my-prod-project"},
+				{Parameters: Parameters{Name: "dev", Provider: "gcp", Region: "us-central1"}, Account: "my-dev-project"},
 			},
 			wantLabels: []string{
-				"prod (my-prod-project)",
-				"dev (my-dev-project)",
+				"prod [my-prod-project]",
+				"dev [my-dev-project]",
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			labels := MakeStackSelectorLabels(tt.stacks)
+			labels := makeStackSelectorLabels(tt.stacks)
 
 			// Extract labels into a slice for easier comparison
 			var gotLabels []string

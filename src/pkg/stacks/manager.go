@@ -121,9 +121,13 @@ func (sm *manager) ListRemote(ctx context.Context) ([]ListItem, error) {
 		if params.Provider == "" {
 			params.Provider.SetValue(stack.GetProvider())
 		}
+		account := params.Account()
+		if account == "" {
+			account = stack.GetProviderAccountId()
+		}
 		stackParams = append(stackParams, ListItem{
 			Parameters: *params,
-			Account:    params.Account(),
+			Account:    account,
 			DeployedAt: timeutils.AsTime(stack.GetLastDeployedAt(), time.Time{}).Local(),
 			Default:    stack.GetIsDefault(),
 		})

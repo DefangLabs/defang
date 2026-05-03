@@ -93,7 +93,7 @@ func TestStackListCmd(t *testing.T) {
 		{
 			name:         "no stacks present",
 			stacks:       []stacks.Parameters{},
-			expectOutput: " * No Defang stacks found in the current directory.\n",
+			expectOutput: " ! No Defang stacks found in the current directory.\n",
 		},
 		{
 			name: "multiple stacks present",
