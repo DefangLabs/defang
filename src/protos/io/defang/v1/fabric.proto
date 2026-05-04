@@ -173,6 +173,12 @@ enum Provider {
   AZURE = 5;
 }
 
+enum StackStatus {
+  STACK_STATUS_UNSPECIFIED = 0;
+  STACK_STATUS_UP = 1;
+  STACK_STATUS_DOWN = 2;
+}
+
 message Stack {
   string name = 1;
   string project = 2;
@@ -183,6 +189,8 @@ message Stack {
   string region = 7;
   DeploymentMode mode = 8;
   bool is_default = 9;
+  StackStatus status = 10;
+  string last_deployment_id = 11; // aka etag
 }
 
 message PutStackRequest {

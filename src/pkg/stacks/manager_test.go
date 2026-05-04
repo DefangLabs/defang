@@ -294,6 +294,7 @@ DEFANG_PROVIDER=aws
 AWS_REGION=us-east-1
 `),
 				LastDeployedAt: timestamppb.New(deployedAt),
+				Status:         defangv1.StackStatus_STACK_STATUS_UP,
 			},
 			{
 				Name: "remotestack2",
@@ -302,6 +303,7 @@ DEFANG_PROVIDER=gcp
 GOOGLE_REGION=us-central1
 `),
 				LastDeployedAt: timestamppb.New(deployedAt),
+				Status:         defangv1.StackStatus_STACK_STATUS_DOWN,
 			},
 		},
 	}
@@ -319,11 +321,13 @@ GOOGLE_REGION=us-central1
 	assert.Equal(t, client.ProviderAWS, remoteStacks[0].Provider, "Expected provider aws for remotestack1")
 	assert.Equal(t, "us-east-1", remoteStacks[0].Region, "Expected region us-east-1 for remotestack1")
 	assert.NotZero(t, remoteStacks[0].DeployedAt, "Expected DeployedAt to be set for remotestack1")
+	assert.Equal(t, defangv1.StackStatus_STACK_STATUS_UP, remoteStacks[0].Status, "Expected status UP for remotestack1")
 
 	assert.Equal(t, "remotestack2", remoteStacks[1].Name, "Expected stack name remotestack2")
 	assert.Equal(t, client.ProviderGCP, remoteStacks[1].Provider, "Expected provider gcp for remotestack2")
 	assert.Equal(t, "us-central1", remoteStacks[1].Region, "Expected region us-central1 for remotestack2")
 	assert.NotZero(t, remoteStacks[1].DeployedAt, "Expected DeployedAt to be set for remotestack2")
+	assert.Equal(t, defangv1.StackStatus_STACK_STATUS_DOWN, remoteStacks[1].Status, "Expected status DOWN for remotestack2")
 }
 
 func TestManager_ListRemoteError(t *testing.T) {

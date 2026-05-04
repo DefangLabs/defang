@@ -9,6 +9,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -117,6 +118,63 @@ func TestStackSelector_SelectStack_ExistingStack(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, expectedParams, result)
+
+	mockEC.AssertExpectations(t)
+	mockSM.AssertExpectations(t)
+}
+
+func TestStackSelector_SelectStack_FiltersDownStacks(t *testing.T) {
+	ctx := t.Context()
+
+	mockEC := &MockElicitationsController{}
+	mockSM := &MockStacksManager{}
+
+	mockEC.On("IsSupported").Return(true)
+
+	// Mix of up, down, and unspecified stacks
+	stackList := []ListItem{
+		{Parameters: Parameters{Name: "upstack", Provider: "aws", Region: "us-east-1"}, Status: defangv1.StackStatus_STACK_STATUS_UP},
+		{Parameters: Parameters{Name: "downstack", Provider: "aws", Region: "us-east-1"}, Status: defangv1.StackStatus_STACK_STATUS_DOWN},
+		{Parameters: Parameters{Name: "unspecifiedstack", Provider: "aws", Region: "us-west-2"}, Status: defangv1.StackStatus_STACK_STATUS_UNSPECIFIED},
+	}
+	mockSM.On("List", ctx).Return(stackList, nil)
+
+	// downstack should not appear in options
+	expectedOptions := []string{"upstack (us-east-1)", "unspecifiedstack (us-west-2)"}
+	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("upstack (us-east-1)", nil)
+
+	selector := NewSelector(mockEC, mockSM)
+	result, err := selector.SelectStack(ctx, SelectStackOptions{})
+
+	assert.NoError(t, err)
+	assert.Equal(t, "upstack", result.Name)
+
+	mockEC.AssertExpectations(t)
+	mockSM.AssertExpectations(t)
+}
+
+func TestStackSelector_SelectStack_AllStacksDown(t *testing.T) {
+	ctx := t.Context()
+
+	mockEC := &MockElicitationsController{}
+	mockSM := &MockStacksManager{}
+
+	mockEC.On("IsSupported").Return(true)
+
+	stackList := []ListItem{
+		{Parameters: Parameters{Name: "downstack1", Provider: "aws", Region: "us-east-1"}, Status: defangv1.StackStatus_STACK_STATUS_DOWN},
+		{Parameters: Parameters{Name: "downstack2", Provider: "aws", Region: "us-west-2"}, Status: defangv1.StackStatus_STACK_STATUS_DOWN},
+	}
+	mockSM.On("List", ctx).Return(stackList, nil)
+
+	// All stacks filtered out — RequestEnum is called with no selectable options
+	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", []string{}).Return("", errors.New("no options available"))
+
+	selector := NewSelector(mockEC, mockSM)
+	result, err := selector.SelectStack(ctx, SelectStackOptions{})
+
+	assert.Error(t, err)
+	assert.Nil(t, result)
 
 	mockEC.AssertExpectations(t)
 	mockSM.AssertExpectations(t)

@@ -64,7 +64,7 @@ func TestStackListCmd(t *testing.T) {
 		global.Client = origClient
 	})
 
-	// Set up a mock client
+	// Set up a mock client (shared, but stacksToList is updated per subtest)
 	mockClient := client.GrpcClient{}
 	mockCtrl := &MockFabricControllerClient{
 		canIUseResponse: defangv1.CanIUseResponse{},
@@ -72,32 +72,27 @@ func TestStackListCmd(t *testing.T) {
 	mockClient.SetFabricClient(mockCtrl)
 	global.Client = &mockClient
 
-	// Set up a fake RootCmd with required flags
-	RootCmd = &cobra.Command{Use: "defang"}
-	RootCmd.PersistentFlags().StringVarP(&global.Stack.Name, "stack", "s", global.Stack.Name, "stack name")
-	RootCmd.PersistentFlags().VarP(&global.Stack.Provider, "provider", "P", "provider")
-	RootCmd.PersistentFlags().StringP("project-name", "p", "", "project name")
-	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, "compose file path(s)")
-
-	// Create stackListCmd with manual RunE to avoid configureLoader call during test
-	var stackListCmd = makeStackListCmd()
-
-	// Add stackListCmd as a child of RootCmd
-	RootCmd.AddCommand(stackListCmd)
+	downStackFile := []byte("DEFANG_PROVIDER=aws\nAWS_REGION=us-test-1\nDEFANG_MODE=affordable")
+	upStackFile := []byte("DEFANG_PROVIDER=gcp\nGOOGLE_REGION=us-central1\nDEFANG_MODE=balanced")
 
 	tests := []struct {
 		name         string
-		stacks       []stacks.Parameters
+		localStacks  []stacks.Parameters
+		remoteStacks []*defangv1.Stack
+		cmdArgs      []string
 		expectOutput string
+		containsAll  []string
+		containsNone []string
 	}{
 		{
 			name:         "no stacks present",
-			stacks:       []stacks.Parameters{},
+			localStacks:  []stacks.Parameters{},
+			cmdArgs:      []string{"list"},
 			expectOutput: " * No Defang stacks found in the current directory.\n",
 		},
 		{
 			name: "multiple stacks present",
-			stacks: []stacks.Parameters{
+			localStacks: []stacks.Parameters{
 				{
 					Name:     "teststack1",
 					Provider: client.ProviderAWS,
@@ -111,13 +106,57 @@ func TestStackListCmd(t *testing.T) {
 					Mode:     modes.ModeBalanced,
 				},
 			},
+			cmdArgs: []string{"list"},
 			expectOutput: "NAME        DEFAULT  PROVIDER  REGION       ACCOUNT  MODE        DEPLOYEDAT\n" +
 				"teststack1           aws       us-test-2             AFFORDABLE    \n" +
 				"teststack2           gcp       us-central1           BALANCED      \n",
 		},
+		{
+			name: "down stack hidden by default",
+			remoteStacks: []*defangv1.Stack{
+				{Name: "downstack", Status: defangv1.StackStatus_STACK_STATUS_DOWN, StackFile: downStackFile},
+			},
+			cmdArgs:      []string{"list"},
+			expectOutput: " * All stacks in the current directory are down.\n",
+		},
+		{
+			name: "down stack shown with --all",
+			remoteStacks: []*defangv1.Stack{
+				{Name: "downstack", Status: defangv1.StackStatus_STACK_STATUS_DOWN, StackFile: downStackFile},
+			},
+			cmdArgs:     []string{"list", "--all"},
+			containsAll: []string{"downstack"},
+		},
+		{
+			name: "mixed stacks, down hidden without --all",
+			remoteStacks: []*defangv1.Stack{
+				{Name: "upstack", Status: defangv1.StackStatus_STACK_STATUS_UP, StackFile: upStackFile},
+				{Name: "downstack", Status: defangv1.StackStatus_STACK_STATUS_DOWN, StackFile: downStackFile},
+			},
+			cmdArgs:      []string{"list"},
+			containsAll:  []string{"upstack"},
+			containsNone: []string{"downstack"},
+		},
+		{
+			name: "mixed stacks, all shown with --all",
+			remoteStacks: []*defangv1.Stack{
+				{Name: "upstack", Status: defangv1.StackStatus_STACK_STATUS_UP, StackFile: upStackFile},
+				{Name: "downstack", Status: defangv1.StackStatus_STACK_STATUS_DOWN, StackFile: downStackFile},
+			},
+			cmdArgs:     []string{"list", "--all"},
+			containsAll: []string{"upstack", "downstack"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Recreate RootCmd and stackListCmd per subtest so flag state is fresh
+			RootCmd = &cobra.Command{Use: "defang"}
+			RootCmd.PersistentFlags().StringVarP(&global.Stack.Name, "stack", "s", global.Stack.Name, "stack name")
+			RootCmd.PersistentFlags().VarP(&global.Stack.Provider, "provider", "P", "provider")
+			RootCmd.PersistentFlags().StringP("project-name", "p", "", "project name")
+			RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, "compose file path(s)")
+			RootCmd.AddCommand(makeStackListCmd())
+
 			// Setup stacks
 			t.Chdir(t.TempDir())
 			// create a compose file so stackListCmd doesn't error out
@@ -128,18 +167,27 @@ func TestStackListCmd(t *testing.T) {
     image: nginx`),
 				os.FileMode(0644),
 			)
-			for _, stack := range tt.stacks {
+			for _, stack := range tt.localStacks {
 				stacks.CreateInDirectory(".", stack)
 			}
+			mockCtrl.stacksToList = tt.remoteStacks
 
 			buffer := new(bytes.Buffer)
 			mockStdin := bytes.NewReader([]byte{})
 			MockTerm(t, buffer, mockStdin)
 
-			RootCmd.SetArgs([]string{"list"})
+			RootCmd.SetArgs(tt.cmdArgs)
 			err := RootCmd.Execute()
 			assert.NoError(t, err)
-			assert.Equal(t, tt.expectOutput, buffer.String())
+			if tt.expectOutput != "" {
+				assert.Equal(t, tt.expectOutput, buffer.String())
+			}
+			for _, s := range tt.containsAll {
+				assert.Contains(t, buffer.String(), s)
+			}
+			for _, s := range tt.containsNone {
+				assert.NotContains(t, buffer.String(), s)
+			}
 		})
 	}
 }

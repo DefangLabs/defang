@@ -208,6 +208,7 @@ type MockFabricControllerClient struct {
 	defangv1connect.FabricControllerClient
 	canIUseResponse defangv1.CanIUseResponse
 	savedProvider   map[string]defangv1.Provider
+	stacksToList    []*defangv1.Stack
 }
 
 func (m *MockFabricControllerClient) CanIUse(context.Context, *connect.Request[defangv1.CanIUseRequest]) (*connect.Response[defangv1.CanIUseResponse], error) {
@@ -240,7 +241,7 @@ func (m *MockFabricControllerClient) ListDeployments(ctx context.Context, req *c
 
 func (m *MockFabricControllerClient) ListStacks(ctx context.Context, req *connect.Request[defangv1.ListStacksRequest]) (*connect.Response[defangv1.ListStacksResponse], error) {
 	return connect.NewResponse(&defangv1.ListStacksResponse{
-		Stacks: []*defangv1.Stack{},
+		Stacks: m.stacksToList,
 	}), nil
 }
 

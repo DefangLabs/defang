@@ -126,6 +126,7 @@ func (sm *manager) ListRemote(ctx context.Context) ([]ListItem, error) {
 			Account:    params.Account(),
 			DeployedAt: timeutils.AsTime(stack.GetLastDeployedAt(), time.Time{}).Local(),
 			Default:    stack.GetIsDefault(),
+			Status:     stack.Status,
 		})
 	}
 
