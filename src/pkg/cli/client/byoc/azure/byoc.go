@@ -215,7 +215,7 @@ func (b *ByocAzure) setUpLocation() error {
 // Format: defang-{project}-{stack}-{location}, e.g. "defang-myapp-test-westus2".
 // This group is owned by one project+stack and is separate from the shared CD resource group.
 func (b *ByocAzure) projectResourceGroupName(projectName string) string {
-	return "defang-" + projectName + "-" + b.PulumiStack
+	return b.Prefix + "-" + projectName + "-" + b.PulumiStack
 }
 
 // findForConfig binds to a pre-existing project Key Vault without creating
