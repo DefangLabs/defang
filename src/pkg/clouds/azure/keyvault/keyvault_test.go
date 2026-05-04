@@ -3,6 +3,9 @@ package keyvault
 import (
 	"context"
 	"encoding/base64"
+	"errors"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -154,6 +157,119 @@ func TestPutDeleteListSecretNotSetUp(t *testing.T) {
 	if _, err := kv.ListSecrets(context.Background(), "prefix"); err == nil {
 		t.Error("ListSecrets should fail when vault not set up")
 	}
+}
+
+// makeResponseError builds an *azcore.ResponseError whose Error() message
+// embeds the given response body. retryOnForbiddenByRbac inspects err.Error()
+// to detect ForbiddenByRbac in the inner-error JSON, so the body must be set.
+func makeResponseError(t *testing.T, status int, body string) *azcore.ResponseError {
+	t.Helper()
+	return &azcore.ResponseError{
+		ErrorCode:  "Forbidden",
+		StatusCode: status,
+		RawResponse: &http.Response{
+			StatusCode: status,
+			Status:     http.StatusText(status),
+			Body:       io.NopCloser(strings.NewReader(body)),
+		},
+	}
+}
+
+func TestRetryOnForbiddenByRbac(t *testing.T) {
+	const forbiddenBody = `{"error":{"code":"Forbidden","innererror":{"code":"ForbiddenByRbac"}}}`
+	const otherForbiddenBody = `{"error":{"code":"Forbidden","message":"some other reason"}}`
+
+	t.Run("success on first try", func(t *testing.T) {
+		calls := 0
+		err := retryOnForbiddenByRbac(t.Context(), func(context.Context) error {
+			calls++
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if calls != 1 {
+			t.Errorf("calls = %d, want 1", calls)
+		}
+	})
+
+	t.Run("non-azcore error returned as-is, no retry", func(t *testing.T) {
+		want := errors.New("plain error")
+		calls := 0
+		err := retryOnForbiddenByRbac(t.Context(), func(context.Context) error {
+			calls++
+			return want
+		})
+		if !errors.Is(err, want) {
+			t.Errorf("err = %v, want %v", err, want)
+		}
+		if calls != 1 {
+			t.Errorf("calls = %d, want 1 (should not retry)", calls)
+		}
+	})
+
+	t.Run("non-403 ResponseError returned as-is, no retry", func(t *testing.T) {
+		respErr := makeResponseError(t, 500, forbiddenBody) // body says ForbiddenByRbac, but status is 500
+		calls := 0
+		err := retryOnForbiddenByRbac(t.Context(), func(context.Context) error {
+			calls++
+			return respErr
+		})
+		if !errors.Is(err, respErr) {
+			t.Errorf("err = %v, want %v", err, respErr)
+		}
+		if calls != 1 {
+			t.Errorf("calls = %d, want 1 (non-403 should not retry)", calls)
+		}
+	})
+
+	t.Run("403 without ForbiddenByRbac returned as-is, no retry", func(t *testing.T) {
+		respErr := makeResponseError(t, 403, otherForbiddenBody)
+		calls := 0
+		err := retryOnForbiddenByRbac(t.Context(), func(context.Context) error {
+			calls++
+			return respErr
+		})
+		if !errors.Is(err, respErr) {
+			t.Errorf("err = %v, want %v", err, respErr)
+		}
+		if calls != 1 {
+			t.Errorf("calls = %d, want 1 (403 without ForbiddenByRbac should not retry)", calls)
+		}
+	})
+
+	t.Run("retries 403 ForbiddenByRbac then succeeds", func(t *testing.T) {
+		calls := 0
+		err := retryOnForbiddenByRbac(t.Context(), func(context.Context) error {
+			calls++
+			if calls == 1 {
+				return makeResponseError(t, 403, forbiddenBody)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if calls != 2 {
+			t.Errorf("calls = %d, want 2 (one failure then success)", calls)
+		}
+	})
+
+	t.Run("context cancellation aborts retry", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		calls := 0
+		err := retryOnForbiddenByRbac(ctx, func(context.Context) error {
+			calls++
+			cancel() // cancel before the function sleeps
+			return makeResponseError(t, 403, forbiddenBody)
+		})
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("err = %v, want context.Canceled", err)
+		}
+		if calls != 1 {
+			t.Errorf("calls = %d, want 1 (cancel should stop retries)", calls)
+		}
+	})
 }
 
 func TestObjectIDFromJWT(t *testing.T) {
