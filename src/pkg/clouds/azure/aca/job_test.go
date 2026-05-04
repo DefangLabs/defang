@@ -82,7 +82,7 @@ func TestJobStatusIsSuccess(t *testing.T) {
 }
 
 func TestForwardStream(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ch := make(chan LogEntry, 3)
 	ch <- LogEntry{Message: "a"}
 	ch <- LogEntry{Message: "b"}
@@ -109,7 +109,7 @@ func TestForwardStream(t *testing.T) {
 }
 
 func TestForwardStreamEmpty(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ch := make(chan LogEntry)
 	close(ch)
 	gotLines, keepGoing := forwardStream(ctx, ch, func(string, error) bool { return true })
@@ -122,7 +122,7 @@ func TestForwardStreamEmpty(t *testing.T) {
 }
 
 func TestForwardStreamErrorEntry(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ch := make(chan LogEntry, 2)
 	ch <- LogEntry{Err: context.Canceled}
 	ch <- LogEntry{Message: "after err"}
@@ -153,7 +153,7 @@ func TestForwardStreamErrorEntry(t *testing.T) {
 }
 
 func TestForwardStreamEarlyExit(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ch := make(chan LogEntry, 3)
 	ch <- LogEntry{Message: "a"}
 	ch <- LogEntry{Message: "b"}
@@ -174,7 +174,7 @@ func TestForwardStreamEarlyExit(t *testing.T) {
 }
 
 func TestForwardStreamCancelledContext(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	ch := make(chan LogEntry, 1)
@@ -210,7 +210,7 @@ func TestGetJobAuthToken(t *testing.T) {
 	useTestEndpoints(t, srv.URL, "")
 
 	j := newTestJob()
-	tok, err := j.getJobAuthToken(context.Background())
+	tok, err := j.getJobAuthToken(t.Context())
 	if err != nil {
 		t.Fatalf("getJobAuthToken: %v", err)
 	}
@@ -236,7 +236,7 @@ func TestGetCDContainerLogStreamURLRunning(t *testing.T) {
 	useTestEndpoints(t, srv.URL, "")
 
 	j := newTestJob()
-	url, err := j.getCDContainerLogStreamURL(context.Background(), "exec-1")
+	url, err := j.getCDContainerLogStreamURL(t.Context(), "exec-1")
 	if err != nil {
 		t.Fatalf("getCDContainerLogStreamURL: %v", err)
 	}
@@ -259,7 +259,7 @@ func TestGetCDContainerLogStreamURLWaiting(t *testing.T) {
 	useTestEndpoints(t, srv.URL, "")
 
 	j := newTestJob()
-	url, err := j.getCDContainerLogStreamURL(context.Background(), "exec-1")
+	url, err := j.getCDContainerLogStreamURL(t.Context(), "exec-1")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -279,7 +279,7 @@ func TestGetCDContainerLogStreamURLMissingContainer(t *testing.T) {
 	useTestEndpoints(t, srv.URL, "")
 
 	j := newTestJob()
-	url, err := j.getCDContainerLogStreamURL(context.Background(), "exec-1")
+	url, err := j.getCDContainerLogStreamURL(t.Context(), "exec-1")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -298,7 +298,7 @@ func TestGetCDContainerLogStreamURLHTTPError(t *testing.T) {
 	useTestEndpoints(t, srv.URL, "")
 
 	j := newTestJob()
-	if _, err := j.getCDContainerLogStreamURL(context.Background(), "exec-1"); err == nil {
+	if _, err := j.getCDContainerLogStreamURL(t.Context(), "exec-1"); err == nil {
 		t.Error("expected error for 401")
 	}
 }
@@ -315,7 +315,7 @@ func TestStreamJobExecutionLogsNoReplica(t *testing.T) {
 	useTestEndpoints(t, srv.URL, "")
 
 	j := newTestJob()
-	if _, err := j.streamJobExecutionLogs(context.Background(), "exec-1", 0); err == nil {
+	if _, err := j.streamJobExecutionLogs(t.Context(), "exec-1", 0); err == nil {
 		t.Error("expected error when no replica")
 	}
 }
@@ -354,7 +354,7 @@ func TestStreamJobExecutionLogs(t *testing.T) {
 	useTestEndpoints(t, mgmtSrv.URL, "")
 
 	j := newTestJob()
-	ch, err := j.streamJobExecutionLogs(context.Background(), "exec-1", 0)
+	ch, err := j.streamJobExecutionLogs(t.Context(), "exec-1", 0)
 	if err != nil {
 		t.Fatalf("streamJobExecutionLogs: %v", err)
 	}
@@ -397,7 +397,7 @@ func TestStreamJobExecutionLogsBackfill(t *testing.T) {
 	useTestEndpoints(t, mgmtSrv.URL, "")
 
 	j := newTestJob()
-	ch, err := j.streamJobExecutionLogs(context.Background(), "exec-1", 250)
+	ch, err := j.streamJobExecutionLogs(t.Context(), "exec-1", 250)
 	if err != nil {
 		t.Fatalf("streamJobExecutionLogs: %v", err)
 	}
@@ -431,7 +431,7 @@ func TestStreamJobExecutionLogsHTTPFailure(t *testing.T) {
 	useTestEndpoints(t, mgmtSrv.URL, "")
 
 	j := newTestJob()
-	if _, err := j.streamJobExecutionLogs(context.Background(), "exec-1", 0); err == nil {
+	if _, err := j.streamJobExecutionLogs(t.Context(), "exec-1", 0); err == nil {
 		t.Error("expected error for 403 from stream endpoint")
 	}
 }
@@ -450,7 +450,7 @@ func TestStreamJobExecutionLogsCredError(t *testing.T) {
 
 	j := newTestJob()
 	// First call (replicas list) goes through ArmToken → fails.
-	if _, err := j.streamJobExecutionLogs(context.Background(), "exec-1", 0); err == nil {
+	if _, err := j.streamJobExecutionLogs(t.Context(), "exec-1", 0); err == nil {
 		t.Error("expected credential error")
 	}
 }
@@ -484,7 +484,7 @@ func TestReadJobLogs(t *testing.T) {
 
 	j := newTestJob()
 	// Call the low-level fetch function directly to avoid the SDK workspace lookup.
-	got, err := j.fetchLogsByWorkspaceID(context.Background(), "workspace-guid", "exec-1")
+	got, err := j.fetchLogsByWorkspaceID(t.Context(), "workspace-guid", "exec-1")
 	if err != nil {
 		t.Fatalf("fetchLogsByWorkspaceID: %v", err)
 	}
@@ -496,7 +496,7 @@ func TestReadJobLogs(t *testing.T) {
 func TestReadJobLogsTokenError(t *testing.T) {
 	useFakeCred(t, "", errors.New("token denied"))
 	j := newTestJob()
-	if _, err := j.fetchLogsByWorkspaceID(context.Background(), "ws", "exec"); err == nil {
+	if _, err := j.fetchLogsByWorkspaceID(t.Context(), "ws", "exec"); err == nil {
 		t.Error("expected token error")
 	}
 }
@@ -511,7 +511,7 @@ func TestReadJobLogsHTTPError(t *testing.T) {
 	useTestEndpoints(t, "http://unused", laSrv.URL)
 
 	j := newTestJob()
-	if _, err := j.fetchLogsByWorkspaceID(context.Background(), "ws", "exec"); err == nil {
+	if _, err := j.fetchLogsByWorkspaceID(t.Context(), "ws", "exec"); err == nil {
 		t.Error("expected error for 500")
 	}
 }
@@ -526,7 +526,7 @@ func TestReadJobLogsBadJSON(t *testing.T) {
 	useTestEndpoints(t, "http://unused", laSrv.URL)
 
 	j := newTestJob()
-	if _, err := j.fetchLogsByWorkspaceID(context.Background(), "ws", "exec"); err == nil {
+	if _, err := j.fetchLogsByWorkspaceID(t.Context(), "ws", "exec"); err == nil {
 		t.Error("expected decode error")
 	}
 }
@@ -549,27 +549,27 @@ func TestSetUpManagedIdentityPreconditions(t *testing.T) {
 	useFakeCred(t, "tok", nil)
 	j := &Job{Azure: cloudazure.Azure{SubscriptionID: "sub"}, ResourceGroup: "rg"}
 	// SystemPrincipalID is not set.
-	if err := j.SetUpManagedIdentity(context.Background(), "acct"); err == nil {
+	if err := j.SetUpManagedIdentity(t.Context(), "acct"); err == nil {
 		t.Error("expected error when SystemPrincipalID is empty")
 	}
 
 	// idempotent when identitySetUp is true.
 	j.identitySetUp = true
-	if err := j.SetUpManagedIdentity(context.Background(), "acct"); err != nil {
+	if err := j.SetUpManagedIdentity(t.Context(), "acct"); err != nil {
 		t.Errorf("identity already set up should short-circuit, got %v", err)
 	}
 }
 
 func TestSetUpEnvironmentShortCircuit(t *testing.T) {
 	j := &Job{Azure: cloudazure.Azure{SubscriptionID: "sub"}, ResourceGroup: "rg", EnvironmentID: "/already"}
-	if err := j.SetUpEnvironment(context.Background()); err != nil {
+	if err := j.SetUpEnvironment(t.Context()); err != nil {
 		t.Errorf("SetUpEnvironment should short-circuit when EnvironmentID is set, got %v", err)
 	}
 }
 
 func TestSetUpJobMissingEnvironment(t *testing.T) {
 	j := &Job{Azure: cloudazure.Azure{SubscriptionID: "sub"}, ResourceGroup: "rg"}
-	if err := j.SetUpJob(context.Background(), "image", nil); err == nil {
+	if err := j.SetUpJob(t.Context(), "image", nil); err == nil {
 		t.Error("SetUpJob should fail when EnvironmentID is empty")
 	}
 }
@@ -577,7 +577,7 @@ func TestSetUpJobMissingEnvironment(t *testing.T) {
 func TestStartJobExecutionCredError(t *testing.T) {
 	useFakeCred(t, "", errors.New("denied"))
 	j := &Job{Azure: cloudazure.Azure{SubscriptionID: "sub"}, ResourceGroup: "rg"}
-	if _, err := j.StartJobExecution(context.Background(), JobRequest{
+	if _, err := j.StartJobExecution(t.Context(), JobRequest{
 		Image:   "img",
 		Command: []string{"/bin/true"},
 	}); err == nil {
@@ -588,7 +588,7 @@ func TestStartJobExecutionCredError(t *testing.T) {
 func TestTailJobLogsCancelled(t *testing.T) {
 	useFakeCred(t, "", errors.New("denied"))
 	j := &Job{Azure: cloudazure.Azure{SubscriptionID: "sub"}, ResourceGroup: "rg"}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // cancel immediately
 
 	seq, err := j.TailJobLogs(ctx, "exec-1")
@@ -603,7 +603,7 @@ func TestTailJobLogsCancelled(t *testing.T) {
 func TestGetJobExecutionStatusCredError(t *testing.T) {
 	useFakeCred(t, "", errors.New("denied"))
 	j := &Job{Azure: cloudazure.Azure{SubscriptionID: "sub"}, ResourceGroup: "rg"}
-	if _, err := j.GetJobExecutionStatus(context.Background(), "exec"); err == nil {
+	if _, err := j.GetJobExecutionStatus(t.Context(), "exec"); err == nil {
 		t.Error("expected cred error")
 	}
 }
@@ -611,7 +611,7 @@ func TestGetJobExecutionStatusCredError(t *testing.T) {
 func TestReadJobLogsCredError(t *testing.T) {
 	useFakeCred(t, "", errors.New("denied"))
 	j := &Job{Azure: cloudazure.Azure{SubscriptionID: "sub"}, ResourceGroup: "rg"}
-	if _, err := j.ReadJobLogs(context.Background(), "exec"); err == nil {
+	if _, err := j.ReadJobLogs(t.Context(), "exec"); err == nil {
 		t.Error("expected cred error")
 	}
 }
@@ -619,7 +619,7 @@ func TestReadJobLogsCredError(t *testing.T) {
 func TestGetLogAnalyticsTokenCredError(t *testing.T) {
 	useFakeCred(t, "", errors.New("denied"))
 	j := &Job{Azure: cloudazure.Azure{SubscriptionID: "sub"}, ResourceGroup: "rg"}
-	if _, err := j.getLogAnalyticsToken(context.Background()); err == nil {
+	if _, err := j.getLogAnalyticsToken(t.Context()); err == nil {
 		t.Error("expected cred error")
 	}
 }
@@ -627,7 +627,7 @@ func TestGetLogAnalyticsTokenCredError(t *testing.T) {
 func TestGetLogWorkspaceCustomerIDCredError(t *testing.T) {
 	useFakeCred(t, "", errors.New("denied"))
 	j := &Job{Azure: cloudazure.Azure{SubscriptionID: "sub"}, ResourceGroup: "rg"}
-	if _, err := j.getLogWorkspaceCustomerID(context.Background()); err == nil {
+	if _, err := j.getLogWorkspaceCustomerID(t.Context()); err == nil {
 		t.Error("expected cred error")
 	}
 }
@@ -635,7 +635,7 @@ func TestGetLogWorkspaceCustomerIDCredError(t *testing.T) {
 func TestSetUpLogWorkspaceCredError(t *testing.T) {
 	useFakeCred(t, "", errors.New("denied"))
 	j := &Job{Azure: cloudazure.Azure{SubscriptionID: "sub"}, ResourceGroup: "rg"}
-	if _, _, err := j.setUpLogWorkspace(context.Background()); err == nil {
+	if _, _, err := j.setUpLogWorkspace(t.Context()); err == nil {
 		t.Error("expected cred error")
 	}
 }
@@ -645,7 +645,7 @@ func TestFetchLogsFromWorkspaceSDKError(t *testing.T) {
 	j := &Job{Azure: cloudazure.Azure{SubscriptionID: "sub"}, ResourceGroup: "rg"}
 	// fetchLogsFromWorkspace first calls getLogWorkspaceCustomerID which uses
 	// the SDK (will fail), then bails.
-	if _, err := j.fetchLogsFromWorkspace(context.Background(), "exec"); err == nil {
+	if _, err := j.fetchLogsFromWorkspace(t.Context(), "exec"); err == nil {
 		t.Error("expected error from fetchLogsFromWorkspace")
 	}
 }
@@ -655,7 +655,7 @@ func TestFetchLogsFromWorkspaceViaTailJobLogs(t *testing.T) {
 	// terminal status and no logs.
 	useFakeCred(t, "", errors.New("denied"))
 	j := &Job{Azure: cloudazure.Azure{SubscriptionID: "sub"}, ResourceGroup: "rg"}
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
 	defer cancel()
 	seq, err := j.TailJobLogs(ctx, "exec")
 	if err != nil {
