@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"connectrpc.com/connect"
@@ -30,6 +29,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -114,47 +114,53 @@ func (b *ByocAzure) CdList(ctx context.Context, _ bool) (iter.Seq[state.Info], e
 		defer cancel()
 		stackCh := make(chan state.Info)
 
-		var wg sync.WaitGroup
-		for item, err := range blobs {
-			if err != nil {
-				term.Debugf("Error iterating blobs: %v", err)
-				return
-			}
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				st, err := state.ParsePulumiStateFile(ctx, item, func(ctx context.Context, blobName string) ([]byte, error) {
-					return b.driver.DownloadBlob(ctx, blobName) // slow
-				})
-				if err != nil {
-					term.Debugf("Skipping %q: %v", item.Name(), err)
-					return
-				}
-				if st == nil {
-					return
-				}
-				stateInfo := state.Info{
-					Project:   st.Project,
-					Stack:     st.Name,
-					Workspace: string(st.Workspace),
-					CdRegion:  b.driver.Location.String(),
-				}
-				select {
-				case <-ctx.Done():
-					return
-				case stackCh <- stateInfo:
-				}
-			}()
-		}
-
+		// Spawn one download+parse goroutine per blob, capped by SetLimit.
+		// Run from a goroutine so the consumer loop can drain stackCh
+		// concurrently — otherwise workers block sending to the unbuffered
+		// stackCh and g.Go blocks at the limit.
+		const maxDownloaders = 4 // not CPU bound so unrelated to runtime.GOMAXPROCS
+		g, gctx := errgroup.WithContext(ctx)
+		g.SetLimit(maxDownloaders)
 		go func() {
-			wg.Wait()
-			close(stackCh) // Close channel when all goroutines are done, which stops the iteration below
+			defer close(stackCh)
+			for item, err := range blobs {
+				if err != nil {
+					term.Debugf("Error iterating blobs: %v", err)
+					break
+				}
+				if gctx.Err() != nil {
+					break
+				}
+				g.Go(func() error {
+					st, err := state.ParsePulumiStateFile(gctx, item, func(ctx context.Context, blobName string) ([]byte, error) {
+						return b.driver.DownloadBlob(ctx, blobName) // slow
+					})
+					if err != nil {
+						term.Debugf("Skipping %q: %v", item.Name(), err)
+						return nil
+					}
+					if st == nil {
+						return nil
+					}
+					select {
+					case <-gctx.Done():
+						return gctx.Err()
+					case stackCh <- state.Info{
+						Project:   st.Project,
+						Stack:     st.Name,
+						Workspace: string(st.Workspace),
+						CdRegion:  b.driver.Location.String(),
+					}:
+					}
+					return nil
+				})
+			}
+			g.Wait()
 		}()
 
 		for stack := range stackCh {
 			if !yield(stack) {
-				break
+				return // deferred cancel() unblocks workers and producer
 			}
 		}
 	}, nil
