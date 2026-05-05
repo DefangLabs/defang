@@ -19,7 +19,7 @@ var generateCmd = &cobra.Command{
 	Use:     "generate",
 	Args:    cobra.MaximumNArgs(1),
 	Aliases: []string{"gen"},
-	Short:   "Generate a sample Defang project",
+	Short:   "Generate a sample Defang project (Starter: limited generations/month, Pro: unlimited)",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
