@@ -201,8 +201,7 @@ func (j *Job) SetUpManagedEnvironment(ctx context.Context) error {
 	term.Debugf("SetUpManagedEnvironment: checking if %q exists in %q", cdEnvironmentName, j.ResourceGroup)
 	if resp, err := envClient.Get(ctx, j.ResourceGroup, cdEnvironmentName, nil); err == nil && resp.Properties != nil {
 		// Environment exists. Ensure its AppLogsConfiguration points to our workspace
-		lc := *resp.Properties.AppLogsConfiguration
-		if lc.Destination != nil && *lc.Destination == destination &&
+		if lc := resp.Properties.AppLogsConfiguration; lc != nil && lc.Destination != nil && *lc.Destination == destination &&
 			lc.LogAnalyticsConfiguration != nil &&
 			lc.LogAnalyticsConfiguration.CustomerID != nil && customerID == *lc.LogAnalyticsConfiguration.CustomerID {
 			term.Debugf("SetUpManagedEnvironment: environment %s already configured with Log Analytics", *resp.ID)
