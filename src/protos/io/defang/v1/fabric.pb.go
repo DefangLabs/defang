@@ -538,7 +538,7 @@ const (
 	CdType_CD_TYPE_AWS_CODEBUILD_BUILDID       CdType = 1
 	CdType_CD_TYPE_GCP_CLOUDBUILD_BUILDID      CdType = 2
 	CdType_CD_TYPE_DO_APPPLATFORM_DEPLOYMENTID CdType = 3
-	CdType_CD_TYPE_AZURE_ACI_JOBID             CdType = 4
+	CdType_CD_TYPE_AZURE_ACA_JOBID             CdType = 4
 )
 
 // Enum value maps for CdType.
@@ -548,14 +548,14 @@ var (
 		1: "CD_TYPE_AWS_CODEBUILD_BUILDID",
 		2: "CD_TYPE_GCP_CLOUDBUILD_BUILDID",
 		3: "CD_TYPE_DO_APPPLATFORM_DEPLOYMENTID",
-		4: "CD_TYPE_AZURE_ACI_JOBID",
+		4: "CD_TYPE_AZURE_ACA_JOBID",
 	}
 	CdType_value = map[string]int32{
 		"CD_TYPE_UNSPECIFIED":                 0,
 		"CD_TYPE_AWS_CODEBUILD_BUILDID":       1,
 		"CD_TYPE_GCP_CLOUDBUILD_BUILDID":      2,
 		"CD_TYPE_DO_APPPLATFORM_DEPLOYMENTID": 3,
-		"CD_TYPE_AZURE_ACI_JOBID":             4,
+		"CD_TYPE_AZURE_ACA_JOBID":             4,
 	}
 )
 
@@ -6515,7 +6515,7 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x1dCD_TYPE_AWS_CODEBUILD_BUILDID\x10\x01\x12\"\n" +
 	"\x1eCD_TYPE_GCP_CLOUDBUILD_BUILDID\x10\x02\x12'\n" +
 	"#CD_TYPE_DO_APPPLATFORM_DEPLOYMENTID\x10\x03\x12\x1b\n" +
-	"\x17CD_TYPE_AZURE_ACI_JOBID\x10\x04*\x95\x01\n" +
+	"\x17CD_TYPE_AZURE_ACA_JOBID\x10\x04*\x95\x01\n" +
 	"\x10DeploymentStatus\x12!\n" +
 	"\x1dDEPLOYMENT_STATUS_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dDEPLOYMENT_STATUS_IN_PROGRESS\x10\x01\x12\x1d\n" +

@@ -137,7 +137,7 @@ func makeStackListCmd() *cobra.Command {
 			}
 
 			if len(stacks) == 0 {
-				_, err = term.Infof("No Defang stacks found in the current directory.\n")
+				_, err = term.Warnf("No Defang stacks found in the current directory.\n")
 				return err
 			}
 

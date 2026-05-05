@@ -560,6 +560,14 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild
 		}
 	}
 
+	if cmd.statesUrl != "" {
+		env["DEFANG_STATES_UPLOAD_URL"] = cmd.statesUrl
+	}
+
+	if cmd.eventsUrl != "" {
+		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
+	}
+
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging
 		debugEnv := []string{"AWS_REGION=" + string(b.driver.Region)}
@@ -572,14 +580,6 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild
 		if err := byoc.DebugPulumiNodeJS(ctx, debugEnv, cmd.command...); err != nil {
 			return nil, err
 		}
-	}
-
-	if cmd.statesUrl != "" {
-		env["DEFANG_STATES_UPLOAD_URL"] = cmd.statesUrl
-	}
-
-	if cmd.eventsUrl != "" {
-		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
 	}
 
 	// Prepend the entrypoint; CodeBuild runs buildspec commands in a shell, not via Docker ENTRYPOINT

@@ -41,15 +41,16 @@ func (ps PulumiState) String() string {
 	return fmt.Sprintf("%s/%s%s%s", ps.Project, ps.Name, org, pending.String())
 }
 
-func ParsePulumiStateFile(ctx context.Context, obj BucketObj, bucket string, objLoader func(ctx context.Context, bucket, object string) ([]byte, error)) (*PulumiState, error) {
+func ParsePulumiStateFile(ctx context.Context, obj BucketObj, objLoader func(ctx context.Context, object string) ([]byte, error)) (*PulumiState, error) {
 	// The JSON file for an empty stack is ~600 bytes; we add a margin of 100 bytes to account for the length of the stack/project names
 	stackFile, isJson := strings.CutSuffix(obj.Name(), ".json")
 	if !isJson || obj.Size() < 700 {
 		return nil, nil
 	}
 
+	term.Debugf("loading Pulumi state from %q (size %d bytes)", obj.Name(), obj.Size())
 	// Also check the contents of the JSON file, because the size is not a reliable indicator of a valid stack
-	data, err := objLoader(ctx, bucket, obj.Name())
+	data, err := objLoader(ctx, obj.Name())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Pulumi state object %q: %w", obj.Name(), err)
 	}

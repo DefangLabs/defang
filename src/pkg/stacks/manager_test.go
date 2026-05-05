@@ -783,7 +783,7 @@ func TestGetStack(t *testing.T) {
 				},
 			},
 			interactiveResponses: map[string]string{
-				"stack": "existingstack (gcp)",
+				"stack": "existingstack [gcp]",
 			},
 			expectedStack: &Parameters{
 				Name:     "existingstack",

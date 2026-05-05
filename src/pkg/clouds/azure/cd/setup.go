@@ -21,25 +21,22 @@ const storageAccountPrefix = "defangcd"
 // Container names used in the CD storage account. Keep them DNS-safe:
 // 3–63 chars, lowercase alphanumeric + hyphens (no leading/trailing hyphen).
 const (
-	// UploadsContainerName holds per-deploy payloads (etag blobs) and source tarballs.
-	UploadsContainerName = "uploads"
-	// PulumiContainerName is the dedicated Pulumi state backend container.
-	PulumiContainerName = "pulumi"
-	// ProjectsContainerName holds {project}/{stack}/project.pb audit blobs
-	// written by the CD task before each deploy.
-	ProjectsContainerName = "projects"
-
-	// blobContainerName is kept for backward compatibility with existing
-	// callers that default to the uploads container.
-	blobContainerName = UploadsContainerName
+	// pulumiContainerName is the dedicated Pulumi state backend container.
+	pulumiContainerName = "pulumi"
+	// projectsContainerName holds {project}/{stack}/project.pb audit blobs
+	// written by the CD task after each deploy.
+	projectsContainerName = "projects"
 )
 
 // CreateResourceGroup creates or updates an Azure resource group with the given name.
 func (d *Driver) CreateResourceGroup(ctx context.Context, name string) error {
+	defer term.Timing()()
+	term.Debugf("Creating or updating resource group %q in %q", name, d.Location)
 	rgClient, err := d.newResourceGroupClient()
 	if err != nil {
 		return err
 	}
+
 	_, err = rgClient.CreateOrUpdate(ctx, name, armresources.ResourceGroup{
 		Location: d.Location.Ptr(),
 	}, nil)
@@ -51,10 +48,12 @@ func (d *Driver) CreateResourceGroup(ctx context.Context, name string) error {
 
 // SetUpResourceGroup creates or updates the shared CD resource group (defang-cd-{location}).
 func (d *Driver) SetUpResourceGroup(ctx context.Context) error {
+	defer term.Timing()()
 	return d.CreateResourceGroup(ctx, d.resourceGroupName)
 }
 
 func (d *Driver) TearDown(ctx context.Context) error {
+	defer term.Timing()()
 	rgClient, err := d.newResourceGroupClient()
 	if err != nil {
 		return err
@@ -68,6 +67,7 @@ func (d *Driver) TearDown(ctx context.Context) error {
 }
 
 func (d *Driver) getStorageAccount(ctx context.Context, accountsClient *armstorage.AccountsClient) (string, error) {
+	defer term.Timing()()
 	if d.StorageAccount != "" {
 		return d.StorageAccount, nil
 	}
@@ -76,6 +76,7 @@ func (d *Driver) getStorageAccount(ctx context.Context, accountsClient *armstora
 		return sa, nil
 	}
 
+	term.Debugf("getStorageAccount from resource group %q", d.resourceGroupName)
 	for pager := accountsClient.NewListByResourceGroupPager(d.resourceGroupName, nil); pager.More(); {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
@@ -90,13 +91,48 @@ func (d *Driver) getStorageAccount(ctx context.Context, accountsClient *armstora
 	return "", nil
 }
 
+// resolveBlobContainer picks the blob container in use on the given storage
+// account. It prefers the legacy `pulumi` container if it exists (carry-over
+// from older installs where Pulumi state lived in its own container);
+// otherwise it returns the canonical `projects` container, which now holds
+// both Pulumi state and project.pb audit blobs. When create is true, the
+// `projects` container is created if missing (idempotent — "already exists"
+// is treated as success).
+func (d *Driver) resolveBlobContainer(ctx context.Context, storageAccount string, create bool) (string, error) {
+	containerClient, err := d.NewBlobContainersClient()
+	if err != nil {
+		return "", err
+	}
+	name := pulumiContainerName
+	if _, err := containerClient.Get(ctx, d.resourceGroupName, storageAccount, name, nil); err != nil {
+		var respErr *azcore.ResponseError
+		if !errors.As(err, &respErr) || respErr.StatusCode != 404 {
+			return "", fmt.Errorf("failed to look up blob container %q: %w", name, err)
+		}
+		name = projectsContainerName
+		if create {
+			term.Debugf("Create blob container %q", name)
+			if _, err := containerClient.Create(ctx, d.resourceGroupName, storageAccount, name, armstorage.BlobContainer{}, nil); err != nil {
+				var respErr *azcore.ResponseError
+				if !errors.As(err, &respErr) || respErr.ErrorCode != "ContainerAlreadyExists" {
+					return "", fmt.Errorf("failed to create blob container %q: %w", name, err)
+				}
+			}
+		}
+	}
+	return name, nil
+}
+
 // FindStorageAccount is a read-only variant of SetUpStorageAccount: it locates
 // the defang CD storage account (and remembers its container) without
-// creating anything. Returns ("", nil) when the storage account or blob
-// container doesn't exist yet — typical for a subscription where defang has
-// never been deployed. On success, d.StorageAccount and d.BlobContainerName
-// are populated for subsequent DownloadBlob / IterateBlobs calls.
+// creating anything. Returns ("", nil) when the storage account doesn't exist
+// yet — typical for a subscription where defang has never been deployed. On
+// success, d.StorageAccount and d.BlobContainerName are populated for
+// subsequent DownloadBlob / IterateBlobs calls. The `projects` container is
+// not verified — downstream blob ops will return 404 if it hasn't been
+// created yet, which callers already handle.
 func (d *Driver) FindStorageAccount(ctx context.Context) (string, error) {
+	defer term.Timing()()
 	if d.StorageAccount != "" && d.BlobContainerName != "" {
 		return d.StorageAccount, nil
 	}
@@ -115,12 +151,12 @@ func (d *Driver) FindStorageAccount(ctx context.Context) (string, error) {
 	if storageAccount == "" {
 		return "", nil
 	}
+	name, err := d.resolveBlobContainer(ctx, storageAccount, false)
+	if err != nil {
+		return "", err
+	}
 	d.StorageAccount = storageAccount
-	// The blob container is always created with the well-known name; its
-	// existence is implied by the storage account being present on a
-	// defang-managed subscription. We don't verify it here — DownloadBlob /
-	// IterateBlobs will return 404 if it doesn't exist yet.
-	d.BlobContainerName = blobContainerName
+	d.BlobContainerName = name
 	return storageAccount, nil
 }
 
@@ -157,21 +193,13 @@ func (d *Driver) SetUpStorageAccount(ctx context.Context) (string, error) {
 	}
 	d.StorageAccount = storageAccount
 
-	containerClient, err := d.NewBlobContainersClient()
+	name, err := d.resolveBlobContainer(ctx, storageAccount, true)
 	if err != nil {
-		return "", fmt.Errorf("failed to create blob containers client: %w", err)
+		return "", err
 	}
-	for _, name := range []string{UploadsContainerName, PulumiContainerName, ProjectsContainerName} {
-		if _, err := containerClient.Create(ctx, d.resourceGroupName, storageAccount, name, armstorage.BlobContainer{}, nil); err != nil {
-			var respErr *azcore.ResponseError
-			if !errors.As(err, &respErr) || respErr.ErrorCode != "ContainerAlreadyExists" {
-				return "", fmt.Errorf("failed to create blob container %q: %w", name, err)
-			}
-		}
-	}
-	d.BlobContainerName = UploadsContainerName
+	d.BlobContainerName = name
 
-	term.Infof("Using storage account %s (containers: %s, %s, %s)", storageAccount, UploadsContainerName, PulumiContainerName, ProjectsContainerName)
+	term.Infof("Using storage account %s container %s", storageAccount, name)
 
 	return storageAccount, nil
 }

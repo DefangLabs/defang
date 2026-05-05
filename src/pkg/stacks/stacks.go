@@ -148,6 +148,8 @@ func (p *Parameters) Account() string {
 		return p.Variables["AWS_PROFILE"]
 	case client.ProviderGCP:
 		return p.Variables["GCP_PROJECT_ID"]
+	case client.ProviderAzure:
+		return p.Variables["AZURE_SUBSCRIPTION_ID"]
 	default:
 		return ""
 	}
