@@ -5,7 +5,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
 )
 
@@ -49,9 +48,6 @@ var whoamiCmd = &cobra.Command{
 		if !global.Verbose {
 			data.Tenant = ""
 			data.TenantID = ""
-			if data.SubscriberTier == defangv1.SubscriptionTier_SUBSCRIPTION_TIER_UNSPECIFIED {
-				data.SubscriberTier = defangv1.SubscriptionTier_HOBBY // don't show "SUBSCRIPTION_TIER_UNSPECIFIED"
-			}
 		}
 
 		cols := []string{
