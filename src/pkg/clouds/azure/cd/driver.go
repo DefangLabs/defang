@@ -2,6 +2,7 @@ package cd
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources/v2"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure"
@@ -11,6 +12,7 @@ type Driver struct {
 	azure.Azure
 	resourceGroupPrefix string
 	resourceGroupName   string
+	storageKeyMu        sync.Mutex // guards storageKey
 	storageKey          string
 	StorageAccount      string
 	BlobContainerName   string

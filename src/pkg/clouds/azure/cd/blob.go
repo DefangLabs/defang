@@ -24,6 +24,11 @@ func (b BlobItem) Name() string { return b.name }
 func (b BlobItem) Size() int64  { return b.size }
 
 func (d *Driver) newSharedKeyCredential(ctx context.Context) (*azblob.SharedKeyCredential, error) {
+	// Lazy init of storageKey can be racy when callers (e.g. CdList's worker
+	// pool) call this concurrently. Hold the mutex across the ListKeys call so
+	// only one goroutine fetches the key.
+	d.storageKeyMu.Lock()
+	defer d.storageKeyMu.Unlock()
 	if d.storageKey == "" {
 		d.storageKey = os.Getenv("AZURE_STORAGE_KEY")
 	}
