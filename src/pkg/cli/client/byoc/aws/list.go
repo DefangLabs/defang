@@ -82,6 +82,7 @@ func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string)
 				if err != nil {
 					return nil, err
 				}
+				defer getObjectOutput.Body.Close()
 				return io.ReadAll(getObjectOutput.Body)
 			})
 			if err != nil {
