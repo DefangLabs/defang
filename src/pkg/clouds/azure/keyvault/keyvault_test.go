@@ -38,8 +38,8 @@ func useFakeCred(t *testing.T, tok string, gerr error) {
 
 func TestVaultName(t *testing.T) {
 	name := VaultName("my-rg", "sub-id")
-	if !strings.HasPrefix(name, "defang-config-") {
-		t.Errorf("VaultName = %q, want defang-config- prefix", name)
+	if !strings.HasPrefix(name, "config-") {
+		t.Errorf("VaultName = %q, want config- prefix", name)
 	}
 	if len(name) > 24 {
 		t.Errorf("VaultName %q exceeds 24 chars", name)

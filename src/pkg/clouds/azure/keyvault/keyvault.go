@@ -32,7 +32,7 @@ const keyVaultSecretsOfficerRoleID = "b86a8fe4-44ce-4948-aee5-eccb2c155cd7" // n
 func VaultName(resourceGroupName, subscriptionID string) string {
 	h := sha256.Sum256([]byte(subscriptionID + "|" + resourceGroupName))
 	suffix := hex.EncodeToString(h[:])[:vaultNameSuffixLen]
-	name := "defang-config-" + suffix
+	name := "config-" + suffix
 	return name
 }
 
