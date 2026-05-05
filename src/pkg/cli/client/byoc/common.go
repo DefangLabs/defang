@@ -77,6 +77,39 @@ func DebugPulumiNodeJS(ctx context.Context, env []string, cmd ...string) error {
 	return ErrLocalPulumiStopped
 }
 
+// DebugPulumiCD runs the multi-cloud cd binary (pulumi-defang/cd) locally
+// instead of starting it as a cloud task. Gated on DEFANG_PULUMI_DIR pointing
+// at the pulumi-defang repo root. Used to iterate on cd code without
+// rebuilding/pushing the cd container image.
+func DebugPulumiCD(ctx context.Context, env []string, cmd ...string) error {
+	localCmd := append([]string{"go", "run", "."}, cmd...)
+	term.Debug(strings.Join(append(env, localCmd...), " "))
+
+	dir := os.Getenv("DEFANG_PULUMI_DIR")
+	if dir == "" {
+		return nil
+	}
+
+	gopath, err := exec.Command("go", "env", "GOPATH").Output()
+	if err != nil {
+		return err
+	}
+
+	// Append host-side vars LAST so they override anything in env that's
+	// container-specific (HOME=/root from buildCdEnv would break go's build
+	// cache; PATH from the container image isn't on the host).
+	env = append(env,
+		"PATH="+os.Getenv("PATH"),
+		"HOME="+os.Getenv("HOME"),
+		"USER="+pkg.GetCurrentUser(),
+		"GOPATH="+strings.TrimSpace(string(gopath)),
+	)
+	if err := runLocalCommand(ctx, filepath.Join(dir, "cd"), env, localCmd...); err != nil {
+		return err
+	}
+	return ErrLocalPulumiStopped
+}
+
 func DebugPulumiGolang(ctx context.Context, env []string, cmd ...string) error {
 	localCmd := append([]string{"go", "run", "./..."}, cmd...)
 	term.Debug(strings.Join(append(env, localCmd...), " "))

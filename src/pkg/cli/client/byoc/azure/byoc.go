@@ -69,7 +69,7 @@ func (b *ByocAzure) CdCommand(ctx context.Context, req client.CdCommandRequest) 
 
 	etag := types.NewEtag()
 	execName, err := b.runCdCommand(ctx, cdCommand{
-		command:   []string{"/app/cd", string(req.Command)},
+		command:   []string{string(req.Command)},
 		etag:      etag,
 		project:   req.Project,
 		statesUrl: req.StatesUrl,
@@ -429,15 +429,35 @@ func (b *ByocAzure) runCdCommand(ctx context.Context, cmd cdCommand) (string, er
 		env["ETAG"] = cmd.etag
 	}
 	env["DEFANG_MODE"] = strings.ToLower(cmd.mode.String())
+
 	if cmd.statesUrl != "" {
 		env["DEFANG_STATES_UPLOAD_URL"] = cmd.statesUrl
 	}
+
 	if cmd.eventsUrl != "" {
 		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
 	}
+
+	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
+		// Run the cd binary locally from $DEFANG_PULUMI_DIR/cd instead of
+		// starting it as a Container Apps Job. Useful for iterating on cd
+		// code without rebuilding/pushing the cd image. Authentication uses
+		// the host's az login chain (DefaultAzureCredential).
+		debugEnv := []string{
+			"AZURE_LOCATION=" + b.driver.Location.String(),
+			"AZURE_SUBSCRIPTION_ID=" + b.driver.SubscriptionID,
+		}
+		for k, v := range env {
+			debugEnv = append(debugEnv, k+"="+v)
+		}
+		if err := byoc.DebugPulumiCD(ctx, debugEnv, cmd.command...); err != nil {
+			return "", err
+		}
+	}
+
 	return b.job.StartJobExecution(ctx, aca.JobRequest{
 		Image:   b.CDImage,
-		Command: cmd.command,
+		Command: append([]string{"/app/cd"}, cmd.command...),
 		Envs:    env,
 		Timeout: 30 * time.Minute,
 	})
@@ -500,7 +520,7 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 	}
 
 	execName, err := b.runCdCommand(ctx, cdCommand{
-		command:   []string{"/app/cd", verb, payload},
+		command:   []string{verb, payload},
 		etag:      etag,
 		mode:      req.Mode,
 		project:   project.Name,
