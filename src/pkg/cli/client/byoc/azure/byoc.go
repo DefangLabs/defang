@@ -82,7 +82,7 @@ func (b *ByocAzure) CdCommand(ctx context.Context, req client.CdCommandRequest) 
 	b.cdEtag = etag
 	return &client.CdCommandResponse{
 		CdId:   execName,
-		CdType: defangv1.CdType_CD_TYPE_AZURE_ACI_JOBID,
+		CdType: defangv1.CdType_CD_TYPE_AZURE_ACA_JOBID,
 		ETag:   etag,
 	}, nil
 }
@@ -534,7 +534,7 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 	b.cdEtag = etag
 	return &client.DeployResponse{
 		CdId:   execName,
-		CdType: defangv1.CdType_CD_TYPE_AZURE_ACI_JOBID,
+		CdType: defangv1.CdType_CD_TYPE_AZURE_ACA_JOBID,
 		DeployResponse: &defangv1.DeployResponse{
 			Etag: etag, Services: serviceInfos,
 		},
