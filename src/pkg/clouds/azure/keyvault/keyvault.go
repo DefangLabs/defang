@@ -328,9 +328,16 @@ func (kv *KeyVault) PutSecret(ctx context.Context, name, value, originalKey stri
 
 // retryOnForbiddenByRbac retries op with exponential backoff while it fails
 // with 403 ForbiddenByRbac — the canonical signature of a freshly-assigned
-// Key Vault role that hasn't propagated yet. Gives up after ~60s total.
+// Key Vault role that hasn't propagated to the data plane yet. Gives up
+// after ~120s total.
+//
+// Detection: Key Vault returns top-level error.code="Forbidden" with
+// error.innererror.code="ForbiddenByRbac". azcore extracts the *top-level*
+// code into ResponseError.ErrorCode, so we can't rely on that field — the
+// actionable signal is in the response body, which lands in err.Error().
 func retryOnForbiddenByRbac(ctx context.Context, op func(context.Context) error) error {
-	const maxAttempts = 6
+	const maxAttempts = 8
+	const maxDelay = 30 * time.Second
 	delay := 2 * time.Second
 	for attempt := 0; ; attempt++ {
 		err := op(ctx)
@@ -338,7 +345,10 @@ func retryOnForbiddenByRbac(ctx context.Context, op func(context.Context) error)
 			return nil
 		}
 		var respErr *azcore.ResponseError
-		if !errors.As(err, &respErr) || respErr.ErrorCode != "ForbiddenByRbac" || attempt >= maxAttempts-1 {
+		retryable := errors.As(err, &respErr) &&
+			respErr.StatusCode == 403 &&
+			strings.Contains(err.Error(), "ForbiddenByRbac")
+		if !retryable || attempt >= maxAttempts-1 {
 			return err
 		}
 		term.Debugf("Key Vault returned ForbiddenByRbac (likely RBAC propagation), retrying in %s (attempt %d/%d)", delay, attempt+1, maxAttempts)
@@ -348,6 +358,9 @@ func retryOnForbiddenByRbac(ctx context.Context, op func(context.Context) error)
 		case <-time.After(delay):
 		}
 		delay *= 2
+		if delay > maxDelay {
+			delay = maxDelay
+		}
 	}
 }
 

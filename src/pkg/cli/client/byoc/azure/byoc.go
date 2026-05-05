@@ -408,6 +408,7 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 	if err != nil {
 		return nil, err
 	}
+	envMap["DEFANG_ETAG"] = etag // matches aws/byoc.go:549 — CD reads this for tags/revision suffix
 	if err := b.setUpJob(ctx, envMap); err != nil {
 		return nil, err
 	}
@@ -432,6 +433,23 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 			return nil, fmt.Errorf("unexpected status code during upload: %s", resp.Status)
 		}
 		payload = defanghttp.RemoveQueryParam(uploadURL) // managed identity provides blob read access
+	}
+
+	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
+		// Run the cd binary locally from $DEFANG_PULUMI_DIR/cd instead of
+		// starting it as a Container Apps Job. Useful for iterating on cd
+		// code without rebuilding/pushing the cd image. Authentication uses
+		// the host's az login chain (DefaultAzureCredential).
+		debugEnv := []string{
+			"AZURE_LOCATION=" + b.driver.Location.String(),
+			"AZURE_SUBSCRIPTION_ID=" + b.driver.SubscriptionID,
+		}
+		for k, v := range envMap {
+			debugEnv = append(debugEnv, k+"="+v)
+		}
+		if err := byoc.DebugPulumiCD(ctx, debugEnv, verb, payload); err != nil {
+			return nil, err
+		}
 	}
 
 	execName, err := b.job.StartJobExecution(ctx, aca.JobRequest{

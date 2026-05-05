@@ -1,6 +1,7 @@
 package byoc
 
 import (
+	"errors"
 	"os"
 	"testing"
 )
@@ -79,6 +80,29 @@ func TestGetPulumiBackend(t *testing.T) {
 				t.Errorf("GetPulumiBackend() value = %v, want %v", v, tt.wantValue)
 			}
 		})
+	}
+}
+
+func TestDebugPulumiCDNoDir(t *testing.T) {
+	t.Setenv("DEFANG_PULUMI_DIR", "")
+	if err := DebugPulumiCD(t.Context(), nil, "up", "payload"); err != nil {
+		t.Errorf("DebugPulumiCD with empty DEFANG_PULUMI_DIR should return nil, got %v", err)
+	}
+}
+
+func TestDebugPulumiCDBadDir(t *testing.T) {
+	// Point at a path that exists but isn't a Go module — `go run .` will fail
+	// and the returned error should propagate. The key invariant: when
+	// DEFANG_PULUMI_DIR is set, DebugPulumiCD always returns a non-nil error
+	// (either ErrLocalPulumiStopped on success or the runLocalCommand error).
+	dir := t.TempDir()
+	t.Setenv("DEFANG_PULUMI_DIR", dir)
+	err := DebugPulumiCD(t.Context(), []string{"FOO=bar"}, "up", "payload")
+	if err == nil {
+		t.Fatal("DebugPulumiCD should return an error when go run fails")
+	}
+	if errors.Is(err, ErrLocalPulumiStopped) {
+		t.Errorf("DebugPulumiCD should not signal success for a bogus dir, got %v", err)
 	}
 }
 
