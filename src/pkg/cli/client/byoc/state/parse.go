@@ -55,7 +55,6 @@ func ParsePulumiStateFile(ctx context.Context, obj BucketObj, objLoader func(ctx
 		return nil, fmt.Errorf("failed to get Pulumi state object %q: %w", obj.Name(), err)
 	}
 
-	term.Debug("decoding Pulumi state file", obj.Name())
 	var state struct {
 		Version    int `json:"version"`
 		Checkpoint struct {
