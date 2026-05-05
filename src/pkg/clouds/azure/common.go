@@ -16,7 +16,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 )
 
-var PollOptions = &runtime.PollUntilDoneOptions{Frequency: 5 * time.Second}
+var PollOptions = &runtime.PollUntilDoneOptions{Frequency: 2 * time.Second}
 
 // cliTimeout overrides the default 10s timeout for CLI-based credentials.
 // The Azure CLI can be slow to start, especially when installed via Nix.

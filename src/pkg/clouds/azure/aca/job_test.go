@@ -562,8 +562,8 @@ func TestSetUpManagedIdentityPreconditions(t *testing.T) {
 
 func TestSetUpEnvironmentShortCircuit(t *testing.T) {
 	j := &Job{Azure: cloudazure.Azure{SubscriptionID: "sub"}, ResourceGroup: "rg", EnvironmentID: "/already"}
-	if err := j.SetUpEnvironment(t.Context()); err != nil {
-		t.Errorf("SetUpEnvironment should short-circuit when EnvironmentID is set, got %v", err)
+	if err := j.SetUpManagedEnvironment(t.Context()); err != nil {
+		t.Errorf("SetUpManagedEnvironment should short-circuit when EnvironmentID is set, got %v", err)
 	}
 }
 
@@ -628,14 +628,6 @@ func TestGetLogWorkspaceCustomerIDCredError(t *testing.T) {
 	useFakeCred(t, "", errors.New("denied"))
 	j := &Job{Azure: cloudazure.Azure{SubscriptionID: "sub"}, ResourceGroup: "rg"}
 	if _, err := j.getLogWorkspaceCustomerID(t.Context()); err == nil {
-		t.Error("expected cred error")
-	}
-}
-
-func TestSetUpLogWorkspaceCredError(t *testing.T) {
-	useFakeCred(t, "", errors.New("denied"))
-	j := &Job{Azure: cloudazure.Azure{SubscriptionID: "sub"}, ResourceGroup: "rg"}
-	if _, _, err := j.setUpLogWorkspace(t.Context()); err == nil {
 		t.Error("expected cred error")
 	}
 }

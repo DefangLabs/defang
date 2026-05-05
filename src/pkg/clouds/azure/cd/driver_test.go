@@ -286,7 +286,7 @@ func TestIterateBlobsCredError(t *testing.T) {
 	d.SubscriptionID = "sub"
 	d.StorageAccount = "acct"
 	d.BlobContainerName = "uploads"
-	if _, err := d.IterateBlobsInContainer(t.Context(), "uploads", ".pulumi/stacks/"); err == nil {
+	if _, err := d.iterateBlobsInContainer(t.Context(), "uploads", ".pulumi/stacks/"); err == nil {
 		t.Error("IterateBlobs should fail without key")
 	}
 }
@@ -297,7 +297,7 @@ func TestDownloadBlobCredError(t *testing.T) {
 	d.SubscriptionID = "sub"
 	d.StorageAccount = "acct"
 	d.BlobContainerName = "uploads"
-	if _, err := d.DownloadBlobFromContainer(t.Context(), "uploads", "blob"); err == nil {
+	if _, err := d.downloadBlobFromContainer(t.Context(), "uploads", "blob"); err == nil {
 		t.Error("DownloadBlob should fail without key")
 	}
 }

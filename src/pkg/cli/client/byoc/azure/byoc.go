@@ -11,11 +11,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"connectrpc.com/connect"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
@@ -37,12 +37,11 @@ import (
 type ByocAzure struct {
 	*byoc.ByocBaseClient
 
-	driver    *cd.Driver
-	job       *aca.Job
-	kv        *keyvault.KeyVault
-	cdRunID   string
-	cdEtag    string
-	setUpDone bool // true once full setUp has completed; prevents redundant API calls
+	driver  *cd.Driver
+	job     *aca.Job
+	kv      *keyvault.KeyVault
+	cdRunID string
+	cdEtag  string
 }
 
 var _ client.Provider = (*ByocAzure)(nil)
@@ -61,33 +60,20 @@ func (b *ByocAzure) Driver() string {
 	return "azure"
 }
 
-// SetUpCD implements client.Provider.
-func (b *ByocAzure) SetUpCD(context.Context, bool) error {
-	term.Debugf("SetUpCD: no-op for Azure; CD environment will be set up on demand during Deploy")
-	return nil
-}
-
 // CdCommand implements byoc.ProjectBackend.
 func (b *ByocAzure) CdCommand(ctx context.Context, req client.CdCommandRequest) (*client.CdCommandResponse, error) {
-	if err := b.setUpForConfig(ctx, req.Project); err != nil {
+	defer term.Timing()()
+	if err := b.setUpJob(ctx); err != nil {
 		return nil, err
 	}
-	if err := b.setUp(ctx); err != nil {
-		return nil, err
-	}
-	envMap, err := b.buildCdEnv(req.Project)
-	if err != nil {
-		return nil, err
-	}
-	if err := b.setUpJob(ctx, envMap); err != nil {
-		return nil, err
-	}
-	etag := pkg.RandomID()
-	execName, err := b.job.StartJobExecution(ctx, aca.JobRequest{
-		Image:   b.CDImage,
-		Command: []string{"/app/cd", string(req.Command)},
-		Envs:    envMap,
-		Timeout: 30 * time.Minute,
+
+	etag := types.NewEtag()
+	execName, err := b.runCdCommand(ctx, cdCommand{
+		command:   []string{"/app/cd", string(req.Command)},
+		etag:      etag,
+		project:   req.Project,
+		statesUrl: req.StatesUrl,
+		eventsUrl: req.EventsUrl,
 	})
 	if err != nil {
 		return nil, err
@@ -101,40 +87,74 @@ func (b *ByocAzure) CdCommand(ctx context.Context, req client.CdCommandRequest) 
 	}, nil
 }
 
-// CdList implements byoc.ProjectBackend.
+// CdList implements byoc.ProjectBackend. Read-only: when the CD storage
+// account hasn't been provisioned yet (fresh subscription), returns an empty
+// iterator instead of bootstrapping the resource group / storage account.
 func (b *ByocAzure) CdList(ctx context.Context, _ bool) (iter.Seq[state.Info], error) {
-	if err := b.setUp(ctx); err != nil {
+	defer term.Timing()()
+	if err := b.setUpLocation(); err != nil {
 		return nil, err
 	}
+	storageAccount, err := b.driver.FindStorageAccount(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if storageAccount == "" {
+		return func(yield func(state.Info) bool) {}, nil
+	}
 
-	blobs, err := b.driver.IterateBlobsInContainer(ctx, cd.PulumiContainerName, ".pulumi/stacks/")
+	blobs, err := b.driver.IterateBlobs(ctx, ".pulumi/stacks/")
 	if err != nil {
 		return nil, err
 	}
 
+	term.Debug("Iterating blobs in container to find Pulumi state files")
 	return func(yield func(state.Info) bool) {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		stackCh := make(chan state.Info)
+
+		var wg sync.WaitGroup
 		for item, err := range blobs {
 			if err != nil {
 				term.Debugf("Error iterating blobs: %v", err)
 				return
 			}
-			st, err := state.ParsePulumiStateFile(ctx, item, cd.PulumiContainerName, func(ctx context.Context, container, blobName string) ([]byte, error) {
-				return b.driver.DownloadBlobFromContainer(ctx, container, blobName)
-			})
-			if err != nil {
-				term.Debugf("Skipping %q: %v", item.Name(), err)
-				continue
-			}
-			if st == nil {
-				continue
-			}
-			if !yield(state.Info{
-				Project:   st.Project,
-				Stack:     st.Name,
-				Workspace: string(st.Workspace),
-				CdRegion:  b.driver.Location.String(),
-			}) {
-				return
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				st, err := state.ParsePulumiStateFile(ctx, item, func(ctx context.Context, blobName string) ([]byte, error) {
+					return b.driver.DownloadBlob(ctx, blobName) // slow
+				})
+				if err != nil {
+					term.Debugf("Skipping %q: %v", item.Name(), err)
+					return
+				}
+				if st == nil {
+					return
+				}
+				stateInfo := state.Info{
+					Project:   st.Project,
+					Stack:     st.Name,
+					Workspace: string(st.Workspace),
+					CdRegion:  b.driver.Location.String(),
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case stackCh <- stateInfo:
+				}
+			}()
+		}
+
+		go func() {
+			wg.Wait()
+			close(stackCh) // Close channel when all goroutines are done, which stops the iteration below
+		}()
+
+		for stack := range stackCh {
+			if !yield(stack) {
+				break
 			}
 		}
 	}, nil
@@ -151,7 +171,8 @@ func (b *ByocAzure) AccountInfo(context.Context) (*client.AccountInfo, error) {
 
 // CreateUploadURL implements client.Provider.
 func (b *ByocAzure) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	if err := b.setUp(ctx); err != nil {
+	defer term.Timing()()
+	if err := b.SetUpCD(ctx, false); err != nil {
 		return nil, err
 	}
 
@@ -167,6 +188,7 @@ func (b *ByocAzure) CreateUploadURL(ctx context.Context, req *defangv1.UploadURL
 
 // Delete implements client.Provider.
 func (b *ByocAzure) Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
+	defer term.Timing()()
 	return nil, fmt.Errorf("Delete: %w", errors.ErrUnsupported)
 }
 
@@ -174,6 +196,7 @@ func (b *ByocAzure) Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.
 // Key Vault doesn't exist yet, there's nothing to delete — return success
 // instead of provisioning it just to tear down.
 func (b *ByocAzure) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
+	defer term.Timing()()
 	found, err := b.findForConfig(ctx, secrets.Project)
 	if err != nil {
 		return err
@@ -195,6 +218,7 @@ func (b *ByocAzure) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets)
 // setUpLocation lazily resolves AZURE_LOCATION and AZURE_SUBSCRIPTION_ID from the environment
 // and syncs the values to the job. It makes no API calls.
 func (b *ByocAzure) setUpLocation() error {
+	term.Debug("setUpLocation: resolving AZURE_LOCATION and AZURE_SUBSCRIPTION_ID")
 	if b.driver.Location == "" {
 		loc := cloudazure.Location(os.Getenv("AZURE_LOCATION"))
 		if loc == "" {
@@ -228,6 +252,7 @@ func (b *ByocAzure) projectResourceGroupName(projectName string) string {
 // onboards new teammates onto a shared stack whose vault was created by
 // someone else; without it, the read paths would 403 forever for them.
 func (b *ByocAzure) findForConfig(ctx context.Context, projectName string) (bool, error) {
+	defer term.Timing()()
 	if err := b.setUpLocation(); err != nil {
 		return false, err
 	}
@@ -255,6 +280,7 @@ func (b *ByocAzure) findForConfig(ctx context.Context, projectName string) (bool
 // successful SetUp, so a failed attempt doesn't mask the root cause for
 // subsequent config operations within the same process.
 func (b *ByocAzure) setUpForConfig(ctx context.Context, projectName string) error {
+	defer term.Timing()()
 	if err := b.setUpLocation(); err != nil {
 		return err
 	}
@@ -272,16 +298,17 @@ func (b *ByocAzure) setUpForConfig(ctx context.Context, projectName string) erro
 	return nil
 }
 
-// setUp sets up the shared CD infrastructure: resource group, blob storage, the Container
+// SetUpCD sets up the shared CD infrastructure: resource group, blob storage, the Container
 // Apps environment, and the job's managed identity. It does NOT create the CD job itself
 // (SetUpJob must be called separately with env vars baked in) and does NOT set up
 // project-specific resources (use setUpForConfig for App Configuration).
-func (b *ByocAzure) setUp(ctx context.Context) error {
+func (b *ByocAzure) SetUpCD(ctx context.Context, force bool) error {
+	defer term.Timing()()
 	if err := b.setUpLocation(); err != nil {
 		return err
 	}
 
-	if b.setUpDone {
+	if b.SetupDone && !force {
 		return nil
 	}
 
@@ -294,23 +321,27 @@ func (b *ByocAzure) setUp(ctx context.Context) error {
 		return fmt.Errorf("failed to set up storage account: %w", err)
 	}
 
-	if err := b.job.SetUpEnvironment(ctx); err != nil {
-		return fmt.Errorf("failed to set up container apps environment: %w", err)
-	}
-
-	b.setUpDone = true
+	b.SetupDone = true
 	return nil
 }
 
 // setUpJob creates/updates the CD job with the given env vars baked into its template,
 // and grants the job's managed identity read access to the CD storage account. The job
-// must already have SetUpEnvironment called on it (via setUp). The CD image is pulled
+// must already have SetUpManagedEnvironment called on it (via setUp). The CD image is pulled
 // anonymously — its registry must allow anonymous pull.
-func (b *ByocAzure) setUpJob(ctx context.Context, envMap map[string]string) error {
+func (b *ByocAzure) setUpJob(ctx context.Context) error {
+	defer term.Timing()()
+	if err := b.job.SetUpManagedEnvironment(ctx); err != nil {
+		return fmt.Errorf("failed to set up container apps environment: %w", err)
+	}
+
+	if err := b.SetUpCD(ctx, false); err != nil {
+		return err
+	}
 	if b.CDImage == "" {
 		return errors.New("CD image is not set; please set the DEFANG_CD_IMAGE environment variable")
 	}
-	if err := b.job.SetUpJob(ctx, b.CDImage, envMap); err != nil {
+	if err := b.job.SetUpJob(ctx, b.CDImage, nil); err != nil {
 		return fmt.Errorf("failed to set up CD job: %w", err)
 	}
 	if err := b.job.SetUpManagedIdentity(ctx, b.driver.StorageAccount); err != nil {
@@ -319,12 +350,12 @@ func (b *ByocAzure) setUpJob(ctx context.Context, envMap map[string]string) erro
 	return nil
 }
 
-// buildCdEnv returns the environment map that every CD container run needs.
-func (b *ByocAzure) buildCdEnv(projectName string) (map[string]string, error) {
+// environment returns the environment map that every CD container run needs.
+func (b *ByocAzure) environment(projectName string) (map[string]string, error) {
 	// Pulumi state lives in its own container (`pulumi`), separate from the
 	// `uploads` container (etag payloads, tarballs) and the `projects`
 	// container (project.pb audit blobs written by the CD task).
-	defangStateUrl := fmt.Sprintf(`azblob://%s?storage_account=%s`, cd.PulumiContainerName, b.driver.StorageAccount)
+	defangStateUrl := fmt.Sprintf(`azblob://%s?storage_account=%s`, b.driver.BlobContainerName, b.driver.StorageAccount)
 	pulumiBackendKey, pulumiBackendValue, err := byoc.GetPulumiBackend(defangStateUrl)
 	if err != nil {
 		return nil, err
@@ -368,10 +399,46 @@ func (b *ByocAzure) buildCdEnv(projectName string) (map[string]string, error) {
 
 // Deploy implements client.Provider.
 func (b *ByocAzure) Deploy(ctx context.Context, req *client.DeployRequest) (*client.DeployResponse, error) {
+	defer term.Timing()()
 	return b.deploy(ctx, req, "up")
 }
 
+type cdCommand struct {
+	command   []string
+	etag      types.ETag
+	mode      defangv1.DeploymentMode
+	project   string
+	statesUrl string
+	eventsUrl string
+}
+
+func (b *ByocAzure) runCdCommand(ctx context.Context, cmd cdCommand) (string, error) {
+	defer term.Timing()()
+	// Setup the deployment environment
+	env, err := b.environment(cmd.project)
+	if err != nil {
+		return "", err
+	}
+	if cmd.etag != "" {
+		env["ETAG"] = cmd.etag
+	}
+	env["DEFANG_MODE"] = strings.ToLower(cmd.mode.String())
+	if cmd.statesUrl != "" {
+		env["DEFANG_STATES_UPLOAD_URL"] = cmd.statesUrl
+	}
+	if cmd.eventsUrl != "" {
+		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
+	}
+	return b.job.StartJobExecution(ctx, aca.JobRequest{
+		Image:   b.CDImage,
+		Command: cmd.command,
+		Envs:    env,
+		Timeout: 30 * time.Minute,
+	})
+}
+
 func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb string) (*client.DeployResponse, error) {
+	defer term.Timing()()
 	if b.CDImage == "" {
 		return nil, errors.New("CD image is not set; please set the DEFANG_CD_IMAGE environment variable")
 	}
@@ -382,33 +449,25 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 		return nil, err
 	}
 
-	if err := b.setUpForConfig(ctx, project.Name); err != nil {
-		return nil, err
-	}
-	if err := b.setUp(ctx); err != nil {
-		return nil, err
-	}
-
-	etag := pkg.RandomID()
+	etag := types.NewEtag()
 	serviceInfos, err := b.GetServiceInfos(ctx, project.Name, req.DelegateDomain, etag, project.Services)
 	if err != nil {
 		return nil, err
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
-		CdVersion: b.CDImage,
-		Compose:   req.Compose,
-		Services:  serviceInfos,
+		CdVersion:     b.CDImage,
+		Compose:       req.Compose,
+		Etag:          etag,
+		Mode:          req.Mode,
+		PulumiVersion: b.PulumiVersion,
+		Services:      serviceInfos,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	envMap, err := b.buildCdEnv(project.Name)
-	if err != nil {
-		return nil, err
-	}
-	if err := b.setUpJob(ctx, envMap); err != nil {
+	if err := b.setUpJob(ctx); err != nil {
 		return nil, err
 	}
 
@@ -434,11 +493,13 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 		payload = defanghttp.RemoveQueryParam(uploadURL) // managed identity provides blob read access
 	}
 
-	execName, err := b.job.StartJobExecution(ctx, aca.JobRequest{
-		Image:   b.CDImage,
-		Command: []string{"/app/cd", verb, payload},
-		Envs:    envMap,
-		Timeout: 30 * time.Minute,
+	execName, err := b.runCdCommand(ctx, cdCommand{
+		command:   []string{"/app/cd", verb, payload},
+		etag:      etag,
+		mode:      req.Mode,
+		project:   project.Name,
+		statesUrl: req.StatesUrl,
+		eventsUrl: req.EventsUrl,
 	})
 	if err != nil {
 		return nil, err
@@ -496,6 +557,7 @@ func (b *ByocAzure) GetPrivateDomain(projectName string) string {
 // The blob lives in the dedicated `projects` container (populated by the CD
 // task before each deploy) at key `{project}/{stack}/project.pb`.
 func (b *ByocAzure) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
+	defer term.Timing()()
 	if projectName == "" {
 		return nil, client.ErrNotExist
 	}
@@ -511,12 +573,9 @@ func (b *ByocAzure) GetProjectUpdate(ctx context.Context, projectName string) (*
 		return nil, client.ErrNotExist
 	}
 
-	// GetProjectUpdatePath returns "projects/{project}/{stack}/project.pb".
-	// The `projects` container already provides the top-level namespace, so
-	// strip the leading "projects/" when addressing the blob.
-	key := strings.TrimPrefix(b.GetProjectUpdatePath(projectName), "projects/")
-	term.Debug("Getting project update from blob:", cd.ProjectsContainerName, key)
-	pbBytes, err := b.driver.DownloadBlobFromContainer(ctx, cd.ProjectsContainerName, key)
+	key := b.GetProjectUpdatePath(projectName)
+	term.Debug("Getting project update from blob:", b.driver.BlobContainerName, key)
+	pbBytes, err := b.driver.DownloadBlob(ctx, key)
 	if err != nil {
 		var respErr *azcore.ResponseError
 		if errors.As(err, &respErr) && (respErr.StatusCode == 404 || respErr.ErrorCode == "ContainerNotFound" || respErr.ErrorCode == "BlobNotFound") {
@@ -535,6 +594,7 @@ func (b *ByocAzure) GetProjectUpdate(ctx context.Context, projectName string) (*
 // GetService implements client.Provider by fetching GetServices and filtering
 // to the requested name — same pattern as the AWS and GCP providers.
 func (b *ByocAzure) GetService(ctx context.Context, req *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
+	defer term.Timing()()
 	all, err := b.GetServices(ctx, &defangv1.GetServicesRequest{Project: req.Project})
 	if err != nil {
 		return nil, err
@@ -551,6 +611,7 @@ func (b *ByocAzure) GetService(ctx context.Context, req *defangv1.GetRequest) (*
 // that the CD task uploads during Deploy — same pattern as the AWS and GCP
 // providers.
 func (b *ByocAzure) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
+	defer term.Timing()()
 	projUpdate, err := b.GetProjectUpdate(ctx, req.Project)
 	if err != nil {
 		if errors.Is(err, client.ErrNotExist) {
@@ -568,6 +629,7 @@ func (b *ByocAzure) GetServices(ctx context.Context, req *defangv1.GetServicesRe
 // App Configuration store or Key Vault hasn't been provisioned yet, returns
 // an empty list instead of creating them.
 func (b *ByocAzure) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
+	defer term.Timing()()
 	found, err := b.findForConfig(ctx, req.Project)
 	if err != nil {
 		return nil, err
@@ -599,11 +661,13 @@ func (b *ByocAzure) PrepareDomainDelegation(context.Context, client.PrepareDomai
 
 // Preview implements client.Provider.
 func (b *ByocAzure) Preview(ctx context.Context, req *client.DeployRequest) (*client.DeployResponse, error) {
+	defer term.Timing()()
 	return b.deploy(ctx, req, "preview")
 }
 
 // PutConfig implements client.Provider.
 func (b *ByocAzure) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
+	defer term.Timing()()
 	if err := b.setUpForConfig(ctx, req.Project); err != nil {
 		return err
 	}
@@ -770,12 +834,14 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 // RemoteProjectName implements client.Provider.
 // Subtle: this method shadows the method (*ByocBaseClient).RemoteProjectName of ByocAzure.ByocBaseClient.
 func (b *ByocAzure) RemoteProjectName(context.Context) (string, error) {
+	defer term.Timing()()
 	return "", fmt.Errorf("RemoteProjectName: %w", errors.ErrUnsupported)
 }
 
 // ServiceDNS implements client.Provider.
 // Subtle: this method shadows the method (*ByocBaseClient).ServiceDNS of ByocAzure.ByocBaseClient.
 func (b *ByocAzure) ServiceDNS(host string) string {
+	defer term.Timing()()
 	return host
 }
 
@@ -788,11 +854,13 @@ func (b *ByocAzure) Subscribe(context.Context, *defangv1.SubscribeRequest) (iter
 
 // TearDown implements client.Provider.
 func (b *ByocAzure) TearDown(ctx context.Context) error {
+	defer term.Timing()()
 	return b.driver.TearDown(ctx)
 }
 
 // TearDownCD implements client.Provider.
 func (b *ByocAzure) TearDownCD(context.Context) error {
+	defer term.Timing()()
 	return fmt.Errorf("TearDownCD: %w", errors.ErrUnsupported)
 }
 

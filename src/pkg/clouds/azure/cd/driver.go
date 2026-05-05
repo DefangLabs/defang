@@ -11,6 +11,7 @@ type Driver struct {
 	azure.Azure
 	resourceGroupPrefix string
 	resourceGroupName   string
+	storageKey          string
 	StorageAccount      string
 	BlobContainerName   string
 }
