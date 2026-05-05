@@ -138,7 +138,8 @@ func (j *Job) setUpLogWorkspace(ctx context.Context, cred azcore.TokenCredential
 	}
 
 	term.Debugf("setUpLogWorkspace: get existing workspace %q in %q", cdLogWorkspaceName, j.ResourceGroup)
-	if resp, err := wsClient.Get(ctx, j.ResourceGroup, cdLogWorkspaceName, nil); err == nil {
+	if resp, err := wsClient.Get(ctx, j.ResourceGroup, cdLogWorkspaceName, nil); err == nil &&
+		resp.Properties != nil && resp.Properties.CustomerID != nil {
 		term.Debugf("setUpLogWorkspace: workspace already exists, customer ID %q", *resp.Properties.CustomerID)
 		customerID = *resp.Properties.CustomerID
 	} else {
