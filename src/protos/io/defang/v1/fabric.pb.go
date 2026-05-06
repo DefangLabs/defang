@@ -2194,6 +2194,7 @@ type CanIUseRequest struct {
 	PreferCdVersion     string                 `protobuf:"bytes,7,opt,name=prefer_cd_version,json=preferCdVersion,proto3" json:"prefer_cd_version,omitempty"`             // currently deployed CD image; empty for new projects or when --allow-upgrade is set
 	PreferPulumiVersion string                 `protobuf:"bytes,8,opt,name=prefer_pulumi_version,json=preferPulumiVersion,proto3" json:"prefer_pulumi_version,omitempty"` // currently deployed Pulumi version; empty for new projects or when --allow-upgrade is set
 	Driver              string                 `protobuf:"bytes,9,opt,name=driver,proto3" json:"driver,omitempty"`
+	CliVersion          string                 `protobuf:"bytes,10,opt,name=cli_version,json=cliVersion,proto3" json:"cli_version,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -2287,6 +2288,13 @@ func (x *CanIUseRequest) GetPreferPulumiVersion() string {
 func (x *CanIUseRequest) GetDriver() string {
 	if x != nil {
 		return x.Driver
+	}
+	return ""
+}
+
+func (x *CanIUseRequest) GetCliVersion() string {
+	if x != nil {
+		return x.CliVersion
 	}
 	return ""
 }
@@ -6123,7 +6131,7 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x04arch\x18\x05 \x01(\tR\x04arch\x1a=\n" +
 	"\x0fPropertiesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd9\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xfa\x02\n" +
 	"\x0eCanIUseRequest\x12\x18\n" +
 	"\aproject\x18\x01 \x01(\tR\aproject\x122\n" +
 	"\bprovider\x18\x02 \x01(\x0e2\x16.io.defang.v1.ProviderR\bprovider\x12#\n" +
@@ -6133,7 +6141,10 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x13provider_account_id\x18\x06 \x01(\tR\x11providerAccountId\x12*\n" +
 	"\x11prefer_cd_version\x18\a \x01(\tR\x0fpreferCdVersion\x122\n" +
 	"\x15prefer_pulumi_version\x18\b \x01(\tR\x13preferPulumiVersion\x12\x16\n" +
-	"\x06driver\x18\t \x01(\tR\x06driver\"\xfa\x01\n" +
+	"\x06driver\x18\t \x01(\tR\x06driver\x12\x1f\n" +
+	"\vcli_version\x18\n" +
+	" \x01(\tR\n" +
+	"cliVersion\"\xfa\x01\n" +
 	"\x0fCanIUseResponse\x12\x19\n" +
 	"\bcd_image\x18\x02 \x01(\tR\acdImage\x12\x10\n" +
 	"\x03gpu\x18\x03 \x01(\bR\x03gpu\x12#\n" +
