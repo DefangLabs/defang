@@ -41,13 +41,12 @@ func VaultURL(vaultName string) string {
 	return "https://" + vaultName + ".vault.azure.net"
 }
 
-// ToSecretName converts a config key path (e.g. "/Defang/myapp/test/POSTGRES_PASSWORD")
-// to a Key Vault-safe secret name. Slashes become "--", underscores become "-".
+// ToSecretName converts a config key (e.g. "POSTGRES_PASSWORD") to a Key
+// Vault-safe secret name. The vault is per-project-stack, so no prefix is
+// added; only underscores need to be replaced (Key Vault names allow only
+// alphanumeric characters and dashes).
 func ToSecretName(key string) string {
-	key = strings.TrimPrefix(key, "/")
-	key = strings.ReplaceAll(key, "/", "--")
-	key = strings.ReplaceAll(key, "_", "-")
-	return key
+	return strings.ReplaceAll(key, "_", "-")
 }
 
 // KeyVault wraps an Azure Key Vault for storing project config secrets.

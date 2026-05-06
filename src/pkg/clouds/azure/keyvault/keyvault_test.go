@@ -71,10 +71,9 @@ func TestToSecretName(t *testing.T) {
 	}{
 		{"", ""},
 		{"FOO", "FOO"},
-		{"/Defang", "Defang"},
-		{"/Defang/myapp/test/POSTGRES_PASSWORD", "Defang--myapp--test--POSTGRES-PASSWORD"},
+		{"POSTGRES_PASSWORD", "POSTGRES-PASSWORD"},
+		{"DB_USER_PASSWORD", "DB-USER-PASSWORD"},
 		{"foo_bar", "foo-bar"},
-		{"foo/bar", "foo--bar"},
 	}
 	for _, tt := range tests {
 		if got := ToSecretName(tt.in); got != tt.want {
