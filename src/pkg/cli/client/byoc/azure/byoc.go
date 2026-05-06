@@ -211,8 +211,7 @@ func (b *ByocAzure) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets)
 		return nil // nothing configured yet, nothing to delete
 	}
 	for _, name := range secrets.Names {
-		key := b.StackDir(secrets.Project, name)
-		secretName := keyvault.ToSecretName(key)
+		secretName := keyvault.ToSecretName(name)
 		term.Debugf("Deleting Key Vault secret %q", secretName)
 		if err := b.kv.DeleteSecret(ctx, secretName); err != nil {
 			return fmt.Errorf("failed to delete Key Vault secret %q: %w", name, err)
@@ -652,8 +651,9 @@ func (b *ByocAzure) GetServices(ctx context.Context, req *defangv1.GetServicesRe
 }
 
 // ListConfig implements client.Provider. Read-only: when the project's
-// App Configuration store or Key Vault hasn't been provisioned yet, returns
-// an empty list instead of creating them.
+// Key Vault hasn't been provisioned yet, returns an empty list instead of
+// creating it. The vault is per-project-stack, so every secret in it belongs
+// to this project — no prefix filtering is needed.
 func (b *ByocAzure) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
 	defer term.Timing()()
 	found, err := b.findForConfig(ctx, req.Project)
@@ -663,19 +663,19 @@ func (b *ByocAzure) ListConfig(ctx context.Context, req *defangv1.ListConfigsReq
 	if !found {
 		return &defangv1.Secrets{}, nil // nothing configured yet
 	}
-	prefix := b.StackDir(req.Project, "")
-	secretPrefix := keyvault.ToSecretName(prefix)
-	term.Debugf("Listing Key Vault secrets with prefix %q (sanitized: %q)", prefix, secretPrefix)
-	entries, err := b.kv.ListSecrets(ctx, secretPrefix)
+	entries, err := b.kv.ListSecrets(ctx, "")
 	if err != nil {
 		return nil, err
 	}
 	names := make([]string, 0, len(entries))
 	for _, e := range entries {
-		if e.OriginalKey == "" || !strings.HasPrefix(e.OriginalKey, prefix) {
-			continue
+		// Prefer the original-key tag (preserves underscores) but fall back to
+		// the secret name if the tag is missing for any reason.
+		if e.OriginalKey != "" {
+			names = append(names, e.OriginalKey)
+		} else {
+			names = append(names, e.Name)
 		}
-		names = append(names, strings.TrimPrefix(e.OriginalKey, prefix))
 	}
 	return &defangv1.Secrets{Names: names}, nil
 }
@@ -697,10 +697,9 @@ func (b *ByocAzure) PutConfig(ctx context.Context, req *defangv1.PutConfigReques
 	if err := b.setUpForConfig(ctx, req.Project); err != nil {
 		return err
 	}
-	key := b.StackDir(req.Project, req.Name)
-	secretName := keyvault.ToSecretName(key)
-	term.Debugf("Putting Key Vault secret %q (original key %q)", secretName, key)
-	if err := b.kv.PutSecret(ctx, secretName, req.Value, key); err != nil {
+	secretName := keyvault.ToSecretName(req.Name)
+	term.Debugf("Putting Key Vault secret %q (original key %q)", secretName, req.Name)
+	if err := b.kv.PutSecret(ctx, secretName, req.Value, req.Name); err != nil {
 		return fmt.Errorf("failed to put Key Vault secret: %w", err)
 	}
 	return nil
