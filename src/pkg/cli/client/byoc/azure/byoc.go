@@ -669,8 +669,8 @@ func (b *ByocAzure) ListConfig(ctx context.Context, req *defangv1.ListConfigsReq
 	}
 	names := make([]string, 0, len(entries))
 	for _, e := range entries {
-		// Prefer the original-key tag (preserves underscores) but fall back to
-		// the secret name if the tag is missing for any reason.
+		// Prefer the defang-config tag (preserves underscores) but fall
+		// back to the secret name if the tag is missing for any reason.
 		if e.OriginalKey != "" {
 			names = append(names, e.OriginalKey)
 		} else {
