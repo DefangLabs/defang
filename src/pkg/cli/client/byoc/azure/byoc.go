@@ -29,6 +29,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -892,4 +893,18 @@ func (b *ByocAzure) TearDownCD(context.Context) error {
 // UpdateShardDomain implements client.DNSResolver.
 func (b *ByocAzure) UpdateShardDomain(context.Context) error {
 	return fmt.Errorf("UpdateShardDomain: %w", errors.ErrUnsupported)
+}
+
+// UpdateServiceInfo implements byoc.ServiceInfoUpdater. When a service has a
+// `domainname` set in compose, mark it for managed-cert issuance so
+// `defang cert generate` picks it up via the CertIssuer path. Azure Container
+// Apps managed certs are free, auto-renewing, and validated via CNAME — no
+// hosted-zone presence required (unlike AWS, where ZoneId triggers a different
+// path).
+func (b *ByocAzure) UpdateServiceInfo(_ context.Context, si *defangv1.ServiceInfo, _, _ string, service composeTypes.ServiceConfig) error {
+	if service.DomainName == "" {
+		return nil
+	}
+	si.UseAcmeCert = true
+	return nil
 }
