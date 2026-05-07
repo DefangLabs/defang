@@ -93,7 +93,7 @@ func LookupTXT(ctx context.Context, domain string) ([]string, error) {
 // not-found should branch on it directly.
 func LookupTXTContains(ctx context.Context, name, expected string) (bool, error) {
 	txts, err := LookupTXT(ctx, name)
-	term.Debugf("TXT records for %v: %v, err: %v", name, txts, err)
+	Logger.Debugf("TXT records for %v: %v, err: %v", name, txts, err)
 	if err != nil {
 		return false, err
 	}

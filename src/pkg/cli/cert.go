@@ -99,6 +99,7 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 
 	issuer, _ := provider.(CertIssuer)
 
+	var issueErrs []error
 	cnt := 0
 	for _, serviceInfo := range services.Services {
 		if !serviceInfo.UseAcmeCert {
@@ -119,6 +120,7 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 				for _, domain := range domains {
 					if err := issuer.IssueCert(ctx, project.Name, service.Name, domain); err != nil {
 						term.Errorf("Cert issuance for %v failed: %v", domain, err)
+						issueErrs = append(issueErrs, fmt.Errorf("%v: %w", domain, err))
 					}
 				}
 				continue
@@ -135,7 +137,7 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 		term.Infof("No `domainname` found in compose file; no HTTPS cert generation needed")
 	}
 
-	return nil
+	return errors.Join(issueErrs...)
 }
 
 func getDomainTargets(serviceInfo *defangv1.ServiceInfo, service compose.ServiceConfig) []string {

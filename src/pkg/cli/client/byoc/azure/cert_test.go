@@ -182,6 +182,20 @@ func TestManagedCertName(t *testing.T) {
 			hostname: "Defang.Study",
 			want:     "mc-defang-cd-defang-study",
 		},
+		{
+			// Truncation must not leave a trailing hyphen, or the joined
+			// name would contain "--" which ARM rejects.
+			name:     "envName trailing hyphen after truncation is trimmed",
+			envName:  "abcdefghijklmn-rest",
+			hostname: "x.example.com",
+			want:     "mc-abcdefghijklmn-x-example-com",
+		},
+		{
+			name:     "hostname trailing hyphen after truncation is trimmed",
+			envName:  "defang-cd",
+			hostname: "abcdefghijklmnopqrstuvwxyz1234-rest.example.com",
+			want:     "mc-defang-cd-abcdefghijklmnopqrstuvwxyz1234",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -154,19 +154,24 @@ func waitForBYODdns(ctx context.Context, hostname, expectedCname, expectedTxt st
 // addHostnameDisabled PATCHes the ContainerApp to add (or no-op) a customDomain
 // entry with bindingType: Disabled. Disabled doesn't require a cert, but does
 // validate asuid TXT — that's why we wait for DNS first.
+//
+// Azure ARM uses JSON Merge Patch (RFC 7396) which replaces arrays wholesale,
+// so we must include every existing CustomDomain entry in the body or they
+// will be wiped out by the update.
 func addHostnameDisabled(ctx context.Context, client *armappcontainers.ContainerAppsClient, rg, appName, hostname string, current *armappcontainers.ContainerApp) error {
 	if hasCustomDomain(current, hostname) {
 		term.Debugf("Hostname %s already registered on %s", hostname, appName)
 		return nil
 	}
+	domains := append(existingCustomDomains(current), &armappcontainers.CustomDomain{
+		Name:        to.Ptr(hostname),
+		BindingType: to.Ptr(armappcontainers.BindingTypeDisabled),
+	})
 	body := armappcontainers.ContainerApp{
 		Properties: &armappcontainers.ContainerAppProperties{
 			Configuration: &armappcontainers.Configuration{
 				Ingress: &armappcontainers.Ingress{
-					CustomDomains: []*armappcontainers.CustomDomain{{
-						Name:        to.Ptr(hostname),
-						BindingType: to.Ptr(armappcontainers.BindingTypeDisabled),
-					}},
+					CustomDomains: domains,
 				},
 			},
 		},
@@ -179,6 +184,17 @@ func addHostnameDisabled(ctx context.Context, client *armappcontainers.Container
 		return fmt.Errorf("registering hostname %s: %w", hostname, err)
 	}
 	return nil
+}
+
+// existingCustomDomains returns the current CustomDomains slice from a
+// ContainerApp, navigating the optional pointer chain safely.
+func existingCustomDomains(app *armappcontainers.ContainerApp) []*armappcontainers.CustomDomain {
+	if app == nil || app.Properties == nil ||
+		app.Properties.Configuration == nil ||
+		app.Properties.Configuration.Ingress == nil {
+		return nil
+	}
+	return app.Properties.Configuration.Ingress.CustomDomains
 }
 
 func hasCustomDomain(app *armappcontainers.ContainerApp, hostname string) bool {
@@ -309,18 +325,40 @@ func isInvalidValidationMethod(err error) bool {
 	return strings.Contains(err.Error(), "InvalidValidationMethod")
 }
 
-// bindHostnameSniEnabled PATCHes customDomain entry to bindingType: SniEnabled
-// with the issued cert ID. After this, https://<hostname>/ serves the cert.
+// bindHostnameSniEnabled PATCHes the customDomain entry to bindingType:
+// SniEnabled with the issued cert ID. After this, https://<hostname>/ serves
+// the cert.
+//
+// Azure ARM uses JSON Merge Patch (RFC 7396) which replaces arrays wholesale,
+// so we fetch the current state, update the matching entry in place, and send
+// the full CustomDomains array back. Otherwise every other custom domain on
+// the app would be dropped by the PATCH.
 func bindHostnameSniEnabled(ctx context.Context, client *armappcontainers.ContainerAppsClient, rg, appName, hostname, certID string) error {
+	cur, err := client.Get(ctx, rg, appName, nil)
+	if err != nil {
+		return fmt.Errorf("fetching app %s before cert bind: %w", appName, err)
+	}
+	domains := existingCustomDomains(&cur.ContainerApp)
+	updated := false
+	for _, cd := range domains {
+		if cd != nil && cd.Name != nil && *cd.Name == hostname {
+			cd.BindingType = to.Ptr(armappcontainers.BindingTypeSniEnabled)
+			cd.CertificateID = to.Ptr(certID)
+			updated = true
+		}
+	}
+	if !updated {
+		domains = append(domains, &armappcontainers.CustomDomain{
+			Name:          to.Ptr(hostname),
+			BindingType:   to.Ptr(armappcontainers.BindingTypeSniEnabled),
+			CertificateID: to.Ptr(certID),
+		})
+	}
 	body := armappcontainers.ContainerApp{
 		Properties: &armappcontainers.ContainerAppProperties{
 			Configuration: &armappcontainers.Configuration{
 				Ingress: &armappcontainers.Ingress{
-					CustomDomains: []*armappcontainers.CustomDomain{{
-						Name:          to.Ptr(hostname),
-						BindingType:   to.Ptr(armappcontainers.BindingTypeSniEnabled),
-						CertificateID: to.Ptr(certID),
-					}},
+					CustomDomains: domains,
 				},
 			},
 		},
@@ -353,14 +391,17 @@ func waitForTLS(ctx context.Context, hostname string) error {
 
 // managedCertName builds an ARM-safe managed-certificate resource name.
 // ARM allows alphanumeric + hyphens, max 64 chars; we keep it well under that.
+//
+// We trim trailing hyphens after truncation so the joined name never produces
+// a "--" run, which ARM rejects.
 func managedCertName(envName, hostname string) string {
 	env := sanitize(envName)
 	if len(env) > 15 {
-		env = env[:15]
+		env = strings.TrimRight(env[:15], "-")
 	}
 	host := sanitize(hostname)
 	if len(host) > 30 {
-		host = host[:30]
+		host = strings.TrimRight(host[:30], "-")
 	}
 	return fmt.Sprintf("mc-%s-%s", env, host)
 }
