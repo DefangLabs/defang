@@ -87,6 +87,12 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 				return HandleCreateAWSStackTool(ctx.Context, params, sc)
 			},
 		),
+		ai.NewTool("create_azure_stack",
+			"Create a defang stack file to deploy to Azure",
+			func(ctx *ai.ToolContext, params CreateAzureStackParams) (string, error) {
+				return HandleCreateAzureStackTool(ctx.Context, params, sc)
+			},
+		),
 		ai.NewTool("create_gcp_stack",
 			"Create a defang stack file to deploy to GCP",
 			func(ctx *ai.ToolContext, params CreateGCPStackParams) (string, error) {
