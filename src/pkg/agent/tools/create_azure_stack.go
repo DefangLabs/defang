@@ -18,9 +18,6 @@ type CreateAzureStackParams struct {
 }
 
 func HandleCreateAzureStackTool(ctx context.Context, params CreateAzureStackParams, sc StackConfig) (string, error) {
-	if params.Mode == "" {
-		params.Mode = modes.ModeAffordable.String()
-	}
 	mode, err := modes.Parse(params.Mode)
 	if err != nil {
 		return "Invalid mode provided", err
