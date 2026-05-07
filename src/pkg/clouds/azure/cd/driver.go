@@ -10,33 +10,43 @@ import (
 
 type Driver struct {
 	azure.Azure
-	resourceGroupPrefix string
-	resourceGroupName   string
-	storageKeyMu        sync.Mutex // guards storageKey
-	storageKey          string
-	StorageAccount      string
-	BlobContainerName   string
+	// resourceGroupName is the shared CD resource group (no location suffix).
+	// One per subscription holds the CD task and Pulumi state for every
+	// deployment regardless of target region.
+	resourceGroupName string
+	// cdLocation is the Azure region the CD resource group itself lives in
+	// (the "primary" CD region — first-deploy-wins). It's resolved by
+	// SetUpResourceGroup, either by reading an existing RG's location or by
+	// creating a new RG using Location. Distinct from Location, which is the
+	// per-call deploy target passed through to the CD task as AZURE_LOCATION.
+	cdLocation        azure.Location
+	storageKeyMu      sync.Mutex // guards storageKey
+	storageKey        string
+	StorageAccount    string
+	BlobContainerName string
 }
 
-func New(resourceGroupPrefix string, location azure.Location) *Driver {
-	d := &Driver{
-		Azure: azure.Azure{
-			Location: location,
-		},
-		resourceGroupPrefix: resourceGroupPrefix,
+func New(resourceGroupName string, location azure.Location) *Driver {
+	return &Driver{
+		Azure:             azure.Azure{Location: location},
+		resourceGroupName: resourceGroupName,
 	}
-	d.resourceGroupName = resourceGroupPrefix + "-" + location.String()
-	return d
 }
 
 func (d *Driver) ResourceGroupName() string {
 	return d.resourceGroupName
 }
 
-// SetLocation updates the location and recomputes the resource group name.
+// CdLocation returns the resolved primary CD region (set by SetUpResourceGroup).
+// Returns empty until the RG has been resolved.
+func (d *Driver) CdLocation() azure.Location {
+	return d.cdLocation
+}
+
+// SetLocation updates the deploy-target location. CD infra location
+// (resourceGroupName, cdLocation) is independent and resolved separately.
 func (d *Driver) SetLocation(loc azure.Location) {
 	d.Location = loc
-	d.resourceGroupName = d.resourceGroupPrefix + "-" + loc.String()
 }
 
 func (d *Driver) newResourceGroupClient() (*armresources.ResourceGroupsClient, error) {

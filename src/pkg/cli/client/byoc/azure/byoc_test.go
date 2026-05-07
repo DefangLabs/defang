@@ -112,8 +112,8 @@ func TestSetUpLocationFromEnv(t *testing.T) {
 	if b.driver.SubscriptionID != "sub-id" {
 		t.Errorf("driver.SubscriptionID = %q", b.driver.SubscriptionID)
 	}
-	if b.job.ResourceGroup != "defang-cd-westus3" {
-		t.Errorf("job.ResourceGroup = %q", b.job.ResourceGroup)
+	if b.job.ResourceGroup != "defang-cd" {
+		t.Errorf("job.ResourceGroup = %q, want defang-cd", b.job.ResourceGroup)
 	}
 }
 

@@ -46,10 +46,42 @@ func (d *Driver) CreateResourceGroup(ctx context.Context, name string) error {
 	return nil
 }
 
-// SetUpResourceGroup creates or updates the shared CD resource group (defang-cd-{location}).
+// SetUpResourceGroup ensures the shared CD resource group ("defang-cd")
+// exists and resolves d.cdLocation (the primary CD region).
+//
+// First-deploy-wins: if the RG already exists, its location becomes
+// d.cdLocation regardless of the current Location. If it doesn't, the RG
+// is created in d.Location and d.cdLocation = d.Location.
+//
+// d.cdLocation is set on success. d.Location (deploy target) is never
+// modified here.
 func (d *Driver) SetUpResourceGroup(ctx context.Context) error {
 	defer term.Timing()()
-	return d.CreateResourceGroup(ctx, d.resourceGroupName)
+	rgClient, err := d.newResourceGroupClient()
+	if err != nil {
+		return err
+	}
+	resp, err := rgClient.Get(ctx, d.resourceGroupName, nil)
+	if err == nil {
+		if resp.Location == nil {
+			return fmt.Errorf("resource group %q has no location", d.resourceGroupName)
+		}
+		d.cdLocation = azure.Location(*resp.Location)
+		term.Debugf("Found existing CD resource group %q in %q", d.resourceGroupName, d.cdLocation)
+		return nil
+	}
+	var respErr *azcore.ResponseError
+	if !errors.As(err, &respErr) || respErr.StatusCode != 404 {
+		return fmt.Errorf("looking up resource group %q: %w", d.resourceGroupName, err)
+	}
+	term.Debugf("Creating shared CD resource group %q in %q (first deploy)", d.resourceGroupName, d.Location)
+	if _, err := rgClient.CreateOrUpdate(ctx, d.resourceGroupName, armresources.ResourceGroup{
+		Location: d.Location.Ptr(),
+	}, nil); err != nil {
+		return fmt.Errorf("failed to create resource group %q: %w", d.resourceGroupName, err)
+	}
+	d.cdLocation = d.Location
+	return nil
 }
 
 func (d *Driver) TearDown(ctx context.Context) error {
@@ -83,7 +115,10 @@ func (d *Driver) getStorageAccount(ctx context.Context, accountsClient *armstora
 			return "", fmt.Errorf("failed to list storage accounts: %w", err)
 		}
 		for _, account := range page.Value {
-			if strings.HasPrefix(*account.Name, storageAccountPrefix) && *account.Location == d.Location.String() {
+			// Single CD storage account per subscription, so we don't filter
+			// by location — the account lives in d.cdLocation, but callers
+			// from other deploy targets need to find it too.
+			if strings.HasPrefix(*account.Name, storageAccountPrefix) {
 				return *account.Name, nil
 			}
 		}
@@ -177,10 +212,13 @@ func (d *Driver) SetUpStorageAccount(ctx context.Context) (string, error) {
 	}
 
 	if storageAccount == "" {
+		if d.cdLocation == "" {
+			return "", errors.New("CD location not resolved; call SetUpResourceGroup first")
+		}
 		storageAccount = storageAccountPrefix + pkg.RandomID()
 		createPoller, err := accountsClient.BeginCreate(ctx, d.resourceGroupName, storageAccount, armstorage.AccountCreateParameters{
 			Kind:     to.Ptr(armstorage.KindStorageV2),
-			Location: d.Location.Ptr(),
+			Location: d.cdLocation.Ptr(),
 			SKU:      &armstorage.SKU{Name: to.Ptr(armstorage.SKUNameStandardLRS)},
 		}, nil)
 		if err != nil {

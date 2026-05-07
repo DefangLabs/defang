@@ -41,11 +41,11 @@ func TestNew(t *testing.T) {
 	if d.Location != azure.LocationWestUS2 {
 		t.Errorf("Location = %q, want westus2", d.Location)
 	}
-	if d.resourceGroupPrefix != "defang-cd" {
-		t.Errorf("resourceGroupPrefix = %q", d.resourceGroupPrefix)
+	if got := d.ResourceGroupName(); got != "defang-cd" {
+		t.Errorf("ResourceGroupName() = %q, want defang-cd", got)
 	}
-	if got := d.ResourceGroupName(); got != "defang-cd-westus2" {
-		t.Errorf("ResourceGroupName() = %q, want defang-cd-westus2", got)
+	if d.CdLocation() != "" {
+		t.Errorf("CdLocation() = %q, want empty before SetUpResourceGroup", d.CdLocation())
 	}
 }
 
@@ -54,22 +54,24 @@ func TestNewEmptyLocation(t *testing.T) {
 	if d == nil {
 		t.Fatal("New returned nil")
 	}
-	if got := d.ResourceGroupName(); got != "defang-cd-" {
-		t.Errorf("ResourceGroupName() = %q, want defang-cd-", got)
+	if got := d.ResourceGroupName(); got != "defang-cd" {
+		t.Errorf("ResourceGroupName() = %q, want defang-cd", got)
 	}
 }
 
+// TestSetLocation verifies SetLocation only changes the deploy target.
+// resourceGroupName (the shared CD RG) is location-independent.
 func TestSetLocation(t *testing.T) {
 	d := New("defang-cd", azure.LocationEastUS)
-	if got := d.ResourceGroupName(); got != "defang-cd-eastus" {
-		t.Errorf("initial ResourceGroupName = %q", got)
+	if got := d.ResourceGroupName(); got != "defang-cd" {
+		t.Errorf("initial ResourceGroupName = %q, want defang-cd", got)
 	}
 	d.SetLocation(azure.LocationWestUS3)
 	if d.Location != azure.LocationWestUS3 {
 		t.Errorf("Location not updated: %q", d.Location)
 	}
-	if got := d.ResourceGroupName(); got != "defang-cd-westus3" {
-		t.Errorf("ResourceGroupName after SetLocation = %q, want defang-cd-westus3", got)
+	if got := d.ResourceGroupName(); got != "defang-cd" {
+		t.Errorf("ResourceGroupName after SetLocation = %q, want defang-cd (unchanged)", got)
 	}
 }
 
