@@ -5,8 +5,8 @@ package io.defang.v1;
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
-import "google/type/money.proto";
 
+import "google/type/money.proto";
 option go_package = "github.com/DefangLabs/defang/src/protos/io/defang/v1;defangv1";
 
 service FabricController {
@@ -327,6 +327,7 @@ message CanIUseRequest {
   string prefer_cd_version = 7; // currently deployed CD image; empty for new projects or when --allow-upgrade is set
   string prefer_pulumi_version = 8; // currently deployed Pulumi version; empty for new projects or when --allow-upgrade is set
   string driver = 9;
+  string cli_version = 10;
 }
 
 message CanIUseResponse {
