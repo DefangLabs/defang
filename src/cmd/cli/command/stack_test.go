@@ -389,7 +389,7 @@ func TestStackExists(t *testing.T) {
 				expectedProject: tt.expectedProject,
 			}
 
-			got, err := stackExists(t.Context(), "testproject", tt.stackName)
+			got, err := remoteStackExists(t.Context(), "testproject", tt.stackName)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("stackExists() error = %v, wantErr %v", err, tt.wantErr)
 			}
