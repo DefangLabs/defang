@@ -271,6 +271,65 @@ func TestRetryOnForbiddenByRbac(t *testing.T) {
 	})
 }
 
+func TestCurrentUserOID(t *testing.T) {
+	kv := New("rg", azure.Azure{Location: azure.LocationWestUS2, SubscriptionID: "sub"})
+
+	t.Run("token error returns empty", func(t *testing.T) {
+		cred := fakeCred{err: errors.New("denied")}
+		if got := kv.currentUserOID(t.Context(), cred); got != "" {
+			t.Errorf("currentUserOID = %q, want empty on token error", got)
+		}
+	})
+
+	t.Run("valid token returns oid", func(t *testing.T) {
+		payload := base64.RawURLEncoding.EncodeToString([]byte(`{"oid":"caller-oid"}`))
+		cred := fakeCred{tok: "h." + payload + ".s"}
+		if got := kv.currentUserOID(t.Context(), cred); got != "caller-oid" {
+			t.Errorf("currentUserOID = %q, want caller-oid", got)
+		}
+	})
+
+	t.Run("token without oid returns empty", func(t *testing.T) {
+		payload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"x"}`))
+		cred := fakeCred{tok: "h." + payload + ".s"}
+		if got := kv.currentUserOID(t.Context(), cred); got != "" {
+			t.Errorf("currentUserOID = %q, want empty when oid claim missing", got)
+		}
+	})
+}
+
+func TestWrapRoleAssignmentError(t *testing.T) {
+	kv := New("rg", azure.Azure{Location: azure.LocationWestUS2, SubscriptionID: "sub-id"})
+	inner := errors.New("forbidden")
+	vaultID := "/subscriptions/sub-id/resourceGroups/rg/providers/Microsoft.KeyVault/vaults/v"
+
+	t.Run("with oid from token", func(t *testing.T) {
+		payload := base64.RawURLEncoding.EncodeToString([]byte(`{"oid":"caller-oid"}`))
+		cred := fakeCred{tok: "h." + payload + ".s"}
+		err := kv.wrapRoleAssignmentError(t.Context(), cred, vaultID, inner)
+		if !errors.Is(err, inner) {
+			t.Errorf("wrapped error should preserve inner: got %v", err)
+		}
+		if !strings.Contains(err.Error(), "caller-oid") {
+			t.Errorf("error should embed oid; got: %s", err.Error())
+		}
+		if !strings.Contains(err.Error(), "sub-id") {
+			t.Errorf("error should embed subscription ID; got: %s", err.Error())
+		}
+		if !strings.Contains(err.Error(), vaultID) {
+			t.Errorf("error should embed vault resource ID; got: %s", err.Error())
+		}
+	})
+
+	t.Run("falls back to placeholder when oid unavailable", func(t *testing.T) {
+		cred := fakeCred{err: errors.New("denied")}
+		err := kv.wrapRoleAssignmentError(t.Context(), cred, vaultID, inner)
+		if !strings.Contains(err.Error(), "<your-object-id>") {
+			t.Errorf("error should use placeholder when oid unavailable; got: %s", err.Error())
+		}
+	})
+}
+
 func TestObjectIDFromJWT(t *testing.T) {
 	// Build a fake JWT with {"oid":"test-oid-value"} payload.
 	payload := `{"sub":"x","oid":"test-oid-value","aud":"y"}`
