@@ -24,9 +24,7 @@ import (
 const (
 	// managementScope is the OAuth2 scope for ARM (management plane) calls.
 	managementScope = "https://management.azure.com/.default"
-	// defangCLIClientID is Microsoft's public client ID for Azure CLI. Using
-	// it means the user sees the same consent prompt they would from
-	// `az login --use-device-code`, and we don't need to register our own app.
+	// defangCLIClientID is defang's public client ID for Azure CLI.
 	defangCLIClientID = "e6b89a2c-82c7-4072-85e5-9ee7e838d5cf"
 	// defaultTenant routes through Microsoft's "organizations" tenant so any
 	// work/school account can authenticate when we can't discover the
