@@ -64,7 +64,18 @@ func (r RootResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS, e
 }
 
 func (r RootResolver) LookupTXT(ctx context.Context, domain string) ([]string, error) {
-	return r.getResolver(ctx, domain).LookupTXT(ctx, domain)
+	for range 10 {
+		txts, err := r.getResolver(ctx, domain).LookupTXT(ctx, domain)
+		if err != nil {
+			if cnameErr, ok := err.(ErrCNAMEFound); ok {
+				domain = cnameErr.CNAME()
+				continue
+			}
+			return nil, err
+		}
+		return txts, nil
+	}
+	return nil, errors.New("too many CNAME lookups")
 }
 
 func (r RootResolver) getResolver(ctx context.Context, domain string) Resolver {
@@ -189,6 +200,7 @@ func (r DirectResolver) LookupTXT(ctx context.Context, domain string) ([]string,
 	}
 
 	var result []string
+	var cname string
 	// A single TXT response can be split into multiple "strings" on the wire
 	// (each ≤255 bytes); the convention is to concatenate them. miekg/dns
 	// already returns each record's strings as a []string in TXT.Txt, so we
@@ -196,9 +208,16 @@ func (r DirectResolver) LookupTXT(ctx context.Context, domain string) ([]string,
 	for _, rr := range res.Answer {
 		if t, ok := rr.(*dns.TXT); ok {
 			result = append(result, strings.Join(t.Txt, ""))
+		} else if cn, ok := rr.(*dns.CNAME); ok {
+			cname = cn.Target
 		}
 	}
 	if len(result) == 0 {
+		// No TXT record but a CNAME — surface it so RootResolver can
+		// follow the alias, matching LookupIPAddr's behavior.
+		if cname != "" {
+			return nil, ErrCNAMEFound(cname)
+		}
 		return nil, ErrNoSuchHost
 	}
 	return result, nil

@@ -57,7 +57,7 @@ func makeStackNewCmd() *cobra.Command {
 			if stackName != "" && global.Interactive() {
 				// Avoid prompting for stack parameters (interactive mode), if the stack name is provided, but the
 				// given stack name already exists in the project. The PutStack gRPC call would fail.
-				exists, err := stackExists(ctx, projectName, stackName)
+				exists, err := remoteStackExists(ctx, projectName, stackName)
 				if err != nil {
 					return err
 				}
@@ -85,7 +85,7 @@ func makeStackNewCmd() *cobra.Command {
 				return err
 			}
 
-			exists, err := stackExists(ctx, projectName, params.Name)
+			exists, err := remoteStackExists(ctx, projectName, params.Name)
 			if err != nil {
 				return err
 			}
@@ -228,7 +228,7 @@ func PromptForStackParameters(ctx context.Context, params *stacks.Parameters) er
 	return nil
 }
 
-func stackExists(ctx context.Context, project string, stack string) (bool, error) {
+func remoteStackExists(ctx context.Context, project string, stack string) (bool, error) {
 	if stack == "" {
 		return false, nil
 	}

@@ -145,6 +145,9 @@ const (
 	// FabricControllerResolveNSProcedure is the fully-qualified name of the FabricController's
 	// ResolveNS RPC.
 	FabricControllerResolveNSProcedure = "/io.defang.v1.FabricController/ResolveNS"
+	// FabricControllerResolveTXTProcedure is the fully-qualified name of the FabricController's
+	// ResolveTXT RPC.
+	FabricControllerResolveTXTProcedure = "/io.defang.v1.FabricController/ResolveTXT"
 	// FabricControllerGetSelectedProviderProcedure is the fully-qualified name of the
 	// FabricController's GetSelectedProvider RPC.
 	FabricControllerGetSelectedProviderProcedure = "/io.defang.v1.FabricController/GetSelectedProvider"
@@ -228,6 +231,7 @@ type FabricControllerClient interface {
 	ResolveIPAddr(context.Context, *connect.Request[v1.ResolveIPAddrRequest]) (*connect.Response[v1.ResolveIPAddrResponse], error)
 	ResolveCNAME(context.Context, *connect.Request[v1.ResolveCNAMERequest]) (*connect.Response[v1.ResolveCNAMEResponse], error)
 	ResolveNS(context.Context, *connect.Request[v1.ResolveNSRequest]) (*connect.Response[v1.ResolveNSResponse], error)
+	ResolveTXT(context.Context, *connect.Request[v1.ResolveTXTRequest]) (*connect.Response[v1.ResolveTXTResponse], error)
 	// Deprecated: do not use.
 	GetSelectedProvider(context.Context, *connect.Request[v1.GetSelectedProviderRequest]) (*connect.Response[v1.GetSelectedProviderResponse], error)
 	// Deprecated: do not use.
@@ -515,6 +519,13 @@ func NewFabricControllerClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
+		resolveTXT: connect.NewClient[v1.ResolveTXTRequest, v1.ResolveTXTResponse](
+			httpClient,
+			baseURL+FabricControllerResolveTXTProcedure,
+			connect.WithSchema(fabricControllerMethods.ByName("ResolveTXT")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
 		getSelectedProvider: connect.NewClient[v1.GetSelectedProviderRequest, v1.GetSelectedProviderResponse](
 			httpClient,
 			baseURL+FabricControllerGetSelectedProviderProcedure,
@@ -635,6 +646,7 @@ type fabricControllerClient struct {
 	resolveIPAddr              *connect.Client[v1.ResolveIPAddrRequest, v1.ResolveIPAddrResponse]
 	resolveCNAME               *connect.Client[v1.ResolveCNAMERequest, v1.ResolveCNAMEResponse]
 	resolveNS                  *connect.Client[v1.ResolveNSRequest, v1.ResolveNSResponse]
+	resolveTXT                 *connect.Client[v1.ResolveTXTRequest, v1.ResolveTXTResponse]
 	getSelectedProvider        *connect.Client[v1.GetSelectedProviderRequest, v1.GetSelectedProviderResponse]
 	setSelectedProvider        *connect.Client[v1.SetSelectedProviderRequest, emptypb.Empty]
 	canIUse                    *connect.Client[v1.CanIUseRequest, v1.CanIUseResponse]
@@ -851,6 +863,11 @@ func (c *fabricControllerClient) ResolveNS(ctx context.Context, req *connect.Req
 	return c.resolveNS.CallUnary(ctx, req)
 }
 
+// ResolveTXT calls io.defang.v1.FabricController.ResolveTXT.
+func (c *fabricControllerClient) ResolveTXT(ctx context.Context, req *connect.Request[v1.ResolveTXTRequest]) (*connect.Response[v1.ResolveTXTResponse], error) {
+	return c.resolveTXT.CallUnary(ctx, req)
+}
+
 // GetSelectedProvider calls io.defang.v1.FabricController.GetSelectedProvider.
 //
 // Deprecated: do not use.
@@ -958,6 +975,7 @@ type FabricControllerHandler interface {
 	ResolveIPAddr(context.Context, *connect.Request[v1.ResolveIPAddrRequest]) (*connect.Response[v1.ResolveIPAddrResponse], error)
 	ResolveCNAME(context.Context, *connect.Request[v1.ResolveCNAMERequest]) (*connect.Response[v1.ResolveCNAMEResponse], error)
 	ResolveNS(context.Context, *connect.Request[v1.ResolveNSRequest]) (*connect.Response[v1.ResolveNSResponse], error)
+	ResolveTXT(context.Context, *connect.Request[v1.ResolveTXTRequest]) (*connect.Response[v1.ResolveTXTResponse], error)
 	// Deprecated: do not use.
 	GetSelectedProvider(context.Context, *connect.Request[v1.GetSelectedProviderRequest]) (*connect.Response[v1.GetSelectedProviderResponse], error)
 	// Deprecated: do not use.
@@ -1241,6 +1259,13 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect.Han
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
+	fabricControllerResolveTXTHandler := connect.NewUnaryHandler(
+		FabricControllerResolveTXTProcedure,
+		svc.ResolveTXT,
+		connect.WithSchema(fabricControllerMethods.ByName("ResolveTXT")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
 	fabricControllerGetSelectedProviderHandler := connect.NewUnaryHandler(
 		FabricControllerGetSelectedProviderProcedure,
 		svc.GetSelectedProvider,
@@ -1397,6 +1422,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect.Han
 			fabricControllerResolveCNAMEHandler.ServeHTTP(w, r)
 		case FabricControllerResolveNSProcedure:
 			fabricControllerResolveNSHandler.ServeHTTP(w, r)
+		case FabricControllerResolveTXTProcedure:
+			fabricControllerResolveTXTHandler.ServeHTTP(w, r)
 		case FabricControllerGetSelectedProviderProcedure:
 			fabricControllerGetSelectedProviderHandler.ServeHTTP(w, r)
 		case FabricControllerSetSelectedProviderProcedure:
@@ -1582,6 +1609,10 @@ func (UnimplementedFabricControllerHandler) ResolveCNAME(context.Context, *conne
 
 func (UnimplementedFabricControllerHandler) ResolveNS(context.Context, *connect.Request[v1.ResolveNSRequest]) (*connect.Response[v1.ResolveNSResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.ResolveNS is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) ResolveTXT(context.Context, *connect.Request[v1.ResolveTXTRequest]) (*connect.Response[v1.ResolveTXTResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.ResolveTXT is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) GetSelectedProvider(context.Context, *connect.Request[v1.GetSelectedProviderRequest]) (*connect.Response[v1.GetSelectedProviderResponse], error) {

@@ -52,6 +52,12 @@ func TestMode_Set(t *testing.T) {
 			want:    Mode(defangv1.DeploymentMode_PRODUCTION),
 			wantErr: false,
 		},
+		{
+			name:    "unspecified",
+			input:   "",
+			want:    Mode(defangv1.DeploymentMode_MODE_UNSPECIFIED),
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

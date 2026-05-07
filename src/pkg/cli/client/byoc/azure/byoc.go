@@ -221,8 +221,11 @@ func (b *ByocAzure) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets)
 	return nil
 }
 
-// setUpLocation lazily resolves AZURE_LOCATION and AZURE_SUBSCRIPTION_ID from the environment
-// and syncs the values to the job. It makes no API calls.
+// setUpLocation lazily resolves AZURE_LOCATION (deploy target) and
+// AZURE_SUBSCRIPTION_ID from the environment and syncs the values to the
+// job. It makes no API calls. Job.Location is set tentatively to the deploy
+// target; SetUpCD overrides it to the CD primary region (cdLocation) once
+// the shared RG has been resolved.
 func (b *ByocAzure) setUpLocation() error {
 	term.Debug("setUpLocation: resolving AZURE_LOCATION and AZURE_SUBSCRIPTION_ID")
 	if b.driver.Location == "" {
@@ -238,6 +241,16 @@ func (b *ByocAzure) setUpLocation() error {
 	b.job.Azure = b.driver.Azure
 	b.job.ResourceGroup = b.driver.ResourceGroupName()
 	return nil
+}
+
+// syncJobToCdLocation overrides Job.Location with the resolved CD primary
+// region. Must be called after b.driver.SetUpResourceGroup so cdLocation is
+// populated; otherwise a no-op. The Job's RG, log workspace, managed env,
+// and CD container all live in cdLocation, not the deploy target.
+func (b *ByocAzure) syncJobToCdLocation() {
+	if cd := b.driver.CdLocation(); cd != "" {
+		b.job.Location = cd
+	}
 }
 
 // projectResourceGroupName returns the resource group name for project-specific resources
@@ -318,10 +331,15 @@ func (b *ByocAzure) SetUpCD(ctx context.Context, force bool) error {
 		return nil
 	}
 
-	// Create the shared CD resource group (defang-cd-{location}).
+	// Create or adopt the shared CD resource group ("defang-cd"). On first
+	// deploy this creates the RG in b.driver.Location; on later deploys to
+	// any region it adopts the existing RG and resolves cdLocation from it.
 	if err := b.driver.SetUpResourceGroup(ctx); err != nil {
 		return err
 	}
+	// Now that cdLocation is known, the Job's resources (workspace, env,
+	// container) belong in the CD region, not the per-deploy target.
+	b.syncJobToCdLocation()
 
 	if _, err := b.driver.SetUpStorageAccount(ctx); err != nil {
 		return fmt.Errorf("failed to set up storage account: %w", err)
@@ -332,17 +350,18 @@ func (b *ByocAzure) SetUpCD(ctx context.Context, force bool) error {
 }
 
 // setUpJob creates/updates the CD job with the given env vars baked into its template,
-// and grants the job's managed identity read access to the CD storage account. The job
-// must already have SetUpManagedEnvironment called on it (via setUp). The CD image is pulled
-// anonymously — its registry must allow anonymous pull.
+// and grants the job's managed identity read access to the CD storage account. SetUpCD
+// runs first so the shared CD region (cdLocation) is resolved before any per-region
+// resources (workspace, environment, job) are created — those must live in cdLocation,
+// not the deploy target. The CD image is pulled anonymously — its registry must allow
+// anonymous pull.
 func (b *ByocAzure) setUpJob(ctx context.Context) error {
 	defer term.Timing()()
-	if err := b.job.SetUpManagedEnvironment(ctx); err != nil {
-		return fmt.Errorf("failed to set up container apps environment: %w", err)
-	}
-
 	if err := b.SetUpCD(ctx, false); err != nil {
 		return err
+	}
+	if err := b.job.SetUpManagedEnvironment(ctx); err != nil {
+		return fmt.Errorf("failed to set up container apps environment: %w", err)
 	}
 	if b.CDImage == "" {
 		return errors.New("CD image is not set; please set the DEFANG_CD_IMAGE environment variable")

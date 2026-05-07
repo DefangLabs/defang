@@ -49,6 +49,8 @@ func Parse(str string) (Mode, error) {
 	mode, ok := defangv1.DeploymentMode_value[upper]
 	if !ok {
 		switch upper {
+		case "":
+			mode = int32(defangv1.DeploymentMode_MODE_UNSPECIFIED)
 		case "AFFORDABLE", "CHEAP":
 			mode = int32(defangv1.DeploymentMode_DEVELOPMENT)
 		case "BALANCED":
