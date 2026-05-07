@@ -248,6 +248,12 @@ func (r *CallbackMockResolver) LookupCNAME(ctx context.Context, domain string) (
 	}
 	return r.MockResolver.LookupCNAME(ctx, domain)
 }
+func (r *CallbackMockResolver) LookupTXT(ctx context.Context, domain string) ([]string, error) {
+	if r.Callback != nil {
+		r.Callback(domain)
+	}
+	return r.MockResolver.LookupTXT(ctx, domain)
+}
 
 func TestPrepareDomainDelegation(t *testing.T) {
 	ctx := t.Context()
