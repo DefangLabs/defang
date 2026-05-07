@@ -299,6 +299,9 @@ func submitManagedCertTXT(ctx context.Context, client *armappcontainers.ManagedC
 // isn't a valid validation method. Detected via ARM's ErrorCode field
 // (top-level), with a string fallback for safety.
 func isInvalidValidationMethod(err error) bool {
+	if err == nil {
+		return false
+	}
 	var respErr *azcore.ResponseError
 	if errors.As(err, &respErr) && respErr.ErrorCode == "InvalidValidationMethod" {
 		return true
