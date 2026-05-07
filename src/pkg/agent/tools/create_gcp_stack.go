@@ -18,9 +18,6 @@ type CreateGCPStackParams struct {
 }
 
 func HandleCreateGCPStackTool(ctx context.Context, params CreateGCPStackParams, sc StackConfig) (string, error) {
-	if params.Mode == "" {
-		params.Mode = modes.ModeAffordable.String()
-	}
 	mode, err := modes.Parse(params.Mode)
 	if err != nil {
 		return "Invalid mode provided", err
