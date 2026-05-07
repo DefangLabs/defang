@@ -137,7 +137,10 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 		term.Infof("No `domainname` found in compose file; no HTTPS cert generation needed")
 	}
 
-	return errors.Join(issueErrs...)
+	if len(issueErrs) > 0 {
+		return fmt.Errorf("certificate issuance failed for one or more domains; verify DNS records and retry `defang cert generate`: %w", errors.Join(issueErrs...))
+	}
+	return nil
 }
 
 func getDomainTargets(serviceInfo *defangv1.ServiceInfo, service compose.ServiceConfig) []string {
