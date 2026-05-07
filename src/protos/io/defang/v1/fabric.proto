@@ -123,6 +123,9 @@ service FabricController {
   rpc ResolveNS(ResolveNSRequest) returns (ResolveNSResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
+  rpc ResolveTXT(ResolveTXTRequest) returns (ResolveTXTResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
 
   rpc GetSelectedProvider(GetSelectedProviderRequest) returns (GetSelectedProviderResponse) {
     option deprecated = true; // deprecated in favor of stacks; kept for old CLI clients
@@ -261,6 +264,15 @@ message ResolveNSRequest {
 
 message ResolveNSResponse {
   repeated string hosts = 1;
+}
+
+message ResolveTXTRequest {
+  string domain = 1;
+  string ns_server = 2; // optional; if empty, resolve from root
+}
+
+message ResolveTXTResponse {
+  repeated string txts = 1;
 }
 
 message DestroyRequest {
