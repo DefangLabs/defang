@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	armappcontainers "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appcontainers/armappcontainers/v3"
 
@@ -86,7 +86,7 @@ func (b *ByocAzure) IssueCert(ctx context.Context, projectName, serviceName, hos
 
 	certName := managedCertName(envName, hostname)
 	term.Infof("Issuing managed certificate %s (this may take up to ~5 minutes)", certName)
-	issued, err := issueManagedCertificate(ctx, certsClient, rg, envName, certName, hostname)
+	issued, err := issueManagedCertificate(ctx, certsClient, rg, envName, certName, hostname, derefString(app.Location))
 	if err != nil {
 		return err
 	}
@@ -130,7 +130,7 @@ func waitForBYODdns(ctx context.Context, hostname, expectedCname, expectedTxt st
 
 	for {
 		cnameOK := dns.CheckDomainDNSReady(ctx, hostname, []string{expectedCname})
-		txtOK, _ := lookupTXTContains(ctx, asuid, expectedTxt) // FIXME: DNS resolver should be able to lookup TXT records
+		txtOK, _ := dns.LookupTXTContains(ctx, asuid, expectedTxt)
 		if cnameOK && txtOK {
 			term.Infof("DNS records for %s verified", hostname)
 			return nil
@@ -149,19 +149,6 @@ func waitForBYODdns(ctx context.Context, hostname, expectedCname, expectedTxt st
 			return err
 		}
 	}
-}
-
-func lookupTXTContains(ctx context.Context, name, expected string) (bool, error) {
-	txts, err := net.DefaultResolver.LookupTXT(ctx, name)
-	if err != nil {
-		return false, err
-	}
-	for _, t := range txts {
-		if t == expected {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 // addHostnameDisabled PATCHes the ContainerApp to add (or no-op) a customDomain
@@ -211,24 +198,112 @@ func hasCustomDomain(app *armappcontainers.ContainerApp, hostname string) bool {
 // issueManagedCertificate creates the managed cert via CNAME validation. ARM
 // requires the hostname to already be registered as a customDomain on some app
 // in the env; that's why addHostnameDisabled runs first.
-func issueManagedCertificate(ctx context.Context, client *armappcontainers.ManagedCertificatesClient, rg, envName, certName, hostname string) (*armappcontainers.ManagedCertificate, error) {
+// issueManagedCertificate creates the managed cert. CNAME validation is the
+// default and works for any hostname that has a CNAME (subdomains pointing at
+// the Container Apps FQDN). Apex domains can't have a CNAME (RFC 1034) and
+// Azure rejects CNAME validation with InvalidValidationMethod; in that case
+// we fall back to TXT validation, which requires the user to add a
+// _dnsauth.<hostname> TXT record with the validationToken Azure returns.
+func issueManagedCertificate(ctx context.Context, client *armappcontainers.ManagedCertificatesClient, rg, envName, certName, hostname, location string) (*armappcontainers.ManagedCertificate, error) {
+	resp, err := submitManagedCert(ctx, client, rg, envName, certName, hostname, location, armappcontainers.ManagedCertificateDomainControlValidationCNAME)
+	if err == nil {
+		return resp, nil
+	}
+	if !isInvalidValidationMethod(err) {
+		return nil, fmt.Errorf("issuing managed certificate %s: %w", certName, err)
+	}
+	term.Infof("CNAME validation rejected for %s (apex domain); falling back to TXT validation", hostname)
+	return submitManagedCertTXT(ctx, client, rg, envName, certName, hostname, location)
+}
+
+// submitManagedCert creates the cert with the given validation method and
+// waits for the poller to complete. CNAME validation completes synchronously
+// once Azure verifies the existing CNAME record on the hostname.
+func submitManagedCert(ctx context.Context, client *armappcontainers.ManagedCertificatesClient, rg, envName, certName, hostname, location string, method armappcontainers.ManagedCertificateDomainControlValidation) (*armappcontainers.ManagedCertificate, error) {
 	envelope := armappcontainers.ManagedCertificate{
+		// Required by ARM — must match the managed environment's region or
+		// BeginCreateOrUpdate fails with "LocationRequired".
+		Location: to.Ptr(location),
 		Properties: &armappcontainers.ManagedCertificateProperties{
 			SubjectName:             to.Ptr(hostname),
-			DomainControlValidation: to.Ptr(armappcontainers.ManagedCertificateDomainControlValidationCNAME),
+			DomainControlValidation: to.Ptr(method),
 		},
 	}
 	poller, err := client.BeginCreateOrUpdate(ctx, rg, envName, certName, &armappcontainers.ManagedCertificatesClientBeginCreateOrUpdateOptions{
 		ManagedCertificateEnvelope: &envelope,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("issuing managed certificate %s: %w", certName, err)
+		return nil, err
 	}
-	resp, err := poller.PollUntilDone(ctx, nil)
+	pollResp, err := poller.PollUntilDone(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("issuing managed certificate %s: %w", certName, err)
+		return nil, err
 	}
-	return &resp.ManagedCertificate, nil
+	return &pollResp.ManagedCertificate, nil
+}
+
+// submitManagedCertTXT creates the cert with TXT validation and walks the
+// user through the dnsauth.<hostname> DNS record dance. Unlike CNAME, the
+// initial PUT response includes a validationToken that we must surface
+// before Azure can complete validation; we GET the cert in a loop until the
+// token is populated, prompt once, then wait for ProvisioningState=Succeeded.
+func submitManagedCertTXT(ctx context.Context, client *armappcontainers.ManagedCertificatesClient, rg, envName, certName, hostname, location string) (*armappcontainers.ManagedCertificate, error) {
+	envelope := armappcontainers.ManagedCertificate{
+		Location: to.Ptr(location),
+		Properties: &armappcontainers.ManagedCertificateProperties{
+			SubjectName:             to.Ptr(hostname),
+			DomainControlValidation: to.Ptr(armappcontainers.ManagedCertificateDomainControlValidationTXT),
+		},
+	}
+	poller, err := client.BeginCreateOrUpdate(ctx, rg, envName, certName, &armappcontainers.ManagedCertificatesClientBeginCreateOrUpdateOptions{
+		ManagedCertificateEnvelope: &envelope,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("issuing managed certificate %s (TXT): %w", certName, err)
+	}
+
+	// Poll GETs in parallel with the long-running PUT to fetch the token as
+	// soon as Azure populates it. Azure typically sets ValidationToken within
+	// the first few seconds after the PUT; the long-running operation only
+	// completes once the user adds the matching dnsauth TXT record.
+	tokenDeadline := time.Now().Add(5 * time.Minute)
+	var token string
+	for token == "" {
+		got, getErr := client.Get(ctx, rg, envName, certName, nil)
+		if getErr == nil && got.Properties != nil && got.Properties.ValidationToken != nil {
+			token = *got.Properties.ValidationToken
+			break
+		}
+		if time.Now().After(tokenDeadline) {
+			return nil, fmt.Errorf("timed out waiting for Azure to issue validationToken for %s", hostname)
+		}
+		if err := pkg.SleepWithContext(ctx, 5*time.Second); err != nil {
+			return nil, err
+		}
+	}
+
+	dnsauth := "_dnsauth." + hostname
+	term.Printf("Add TXT record for managed cert validation:\n")
+	term.Printf("  TXT  %s  ->  %s\n", dnsauth, token)
+	term.Infof("Waiting for %s and cert provisioning to finish (timeout ~5m)...", dnsauth)
+
+	pollResp, err := poller.PollUntilDone(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("issuing managed certificate %s (TXT): %w", certName, err)
+	}
+	return &pollResp.ManagedCertificate, nil
+}
+
+// isInvalidValidationMethod returns true when Azure rejected the requested
+// validation method — this is what happens for apex domains where CNAME
+// isn't a valid validation method. Detected via ARM's ErrorCode field
+// (top-level), with a string fallback for safety.
+func isInvalidValidationMethod(err error) bool {
+	var respErr *azcore.ResponseError
+	if errors.As(err, &respErr) && respErr.ErrorCode == "InvalidValidationMethod" {
+		return true
+	}
+	return strings.Contains(err.Error(), "InvalidValidationMethod")
 }
 
 // bindHostnameSniEnabled PATCHes customDomain entry to bindingType: SniEnabled

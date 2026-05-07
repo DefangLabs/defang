@@ -191,6 +191,10 @@ func (mr *MockResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS,
 	mr.calls++
 	return []*net.NS{{Host: ""}}, nil
 }
+func (mr *MockResolver) LookupTXT(ctx context.Context, domain string) ([]string, error) {
+	mr.calls++
+	return nil, nil
+}
 
 func TestHttpClient(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
