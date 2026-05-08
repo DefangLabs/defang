@@ -15,10 +15,13 @@ type mockFabricClient struct {
 	cnameErr  error
 	nsResp    *defangv1.ResolveNSResponse
 	nsErr     error
+	txtResp   *defangv1.ResolveTXTResponse
+	txtErr    error
 
 	lastIPReq    *defangv1.ResolveIPAddrRequest
 	lastCNAMEReq *defangv1.ResolveCNAMERequest
 	lastNSReq    *defangv1.ResolveNSRequest
+	lastTXTReq   *defangv1.ResolveTXTRequest
 }
 
 func (m *mockFabricClient) ResolveIPAddr(_ context.Context, req *defangv1.ResolveIPAddrRequest) (*defangv1.ResolveIPAddrResponse, error) {
@@ -34,6 +37,11 @@ func (m *mockFabricClient) ResolveCNAME(_ context.Context, req *defangv1.Resolve
 func (m *mockFabricClient) ResolveNS(_ context.Context, req *defangv1.ResolveNSRequest) (*defangv1.ResolveNSResponse, error) {
 	m.lastNSReq = req
 	return m.nsResp, m.nsErr
+}
+
+func (m *mockFabricClient) ResolveTXT(_ context.Context, req *defangv1.ResolveTXTRequest) (*defangv1.ResolveTXTResponse, error) {
+	m.lastTXTReq = req
+	return m.txtResp, m.txtErr
 }
 
 func TestFabricResolverLookupIPAddr(t *testing.T) {
@@ -104,4 +112,40 @@ func TestFabricResolverLookupNS(t *testing.T) {
 	if len(ns) != 2 || ns[0].Host != "ns1.example.com." {
 		t.Errorf("unexpected NS result: %+v", ns)
 	}
+}
+
+func TestFabricResolverLookupTXT(t *testing.T) {
+	t.Run("returns txts and forwards NSServer", func(t *testing.T) {
+		m := &mockFabricClient{
+			txtResp: &defangv1.ResolveTXTResponse{Txts: []string{"v=spf1 -all", "abc123"}},
+		}
+		r := FabricResolver{Client: m, NSServer: "ns.example.com"}
+		txts, err := r.LookupTXT(t.Context(), "example.com")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(txts) != 2 || txts[0] != "v=spf1 -all" {
+			t.Errorf("unexpected TXT result: %+v", txts)
+		}
+		if m.lastTXTReq.Domain != "example.com" || m.lastTXTReq.NsServer != "ns.example.com" {
+			t.Errorf("request mismatch: %+v", m.lastTXTReq)
+		}
+	})
+
+	t.Run("empty Txts returns ErrNoSuchHost", func(t *testing.T) {
+		m := &mockFabricClient{txtResp: &defangv1.ResolveTXTResponse{}}
+		r := FabricResolver{Client: m}
+		if _, err := r.LookupTXT(t.Context(), "nx.example.com"); !errors.Is(err, ErrNoSuchHost) {
+			t.Errorf("expected ErrNoSuchHost, got %v", err)
+		}
+	})
+
+	t.Run("propagates RPC error", func(t *testing.T) {
+		boom := errors.New("rpc boom")
+		m := &mockFabricClient{txtErr: boom}
+		r := FabricResolver{Client: m}
+		if _, err := r.LookupTXT(t.Context(), "example.com"); err != boom {
+			t.Errorf("expected rpc error, got %v", err)
+		}
+	})
 }

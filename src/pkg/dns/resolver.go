@@ -27,6 +27,7 @@ type FabricResolverClient interface {
 	ResolveIPAddr(context.Context, *defangv1.ResolveIPAddrRequest) (*defangv1.ResolveIPAddrResponse, error)
 	ResolveCNAME(context.Context, *defangv1.ResolveCNAMERequest) (*defangv1.ResolveCNAMEResponse, error)
 	ResolveNS(context.Context, *defangv1.ResolveNSRequest) (*defangv1.ResolveNSResponse, error)
+	ResolveTXT(context.Context, *defangv1.ResolveTXTRequest) (*defangv1.ResolveTXTResponse, error)
 }
 
 // FabricResolver performs DNS lookups via the fabric gRPC API. An empty
@@ -83,6 +84,20 @@ func (r FabricResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS,
 		nss = append(nss, &net.NS{Host: h})
 	}
 	return nss, nil
+}
+
+func (r FabricResolver) LookupTXT(ctx context.Context, domain string) ([]string, error) {
+	resp, err := r.Client.ResolveTXT(ctx, &defangv1.ResolveTXTRequest{
+		Domain:   domain,
+		NsServer: r.NSServer,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(resp.Txts) == 0 {
+		return nil, ErrNoSuchHost
+	}
+	return resp.Txts, nil
 }
 
 // RootResolver performs recursive DNS resolution starting from the root

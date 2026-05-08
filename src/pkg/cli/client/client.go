@@ -37,6 +37,7 @@ type FabricClient interface {
 	ResolveCNAME(context.Context, *defangv1.ResolveCNAMERequest) (*defangv1.ResolveCNAMEResponse, error)
 	ResolveIPAddr(context.Context, *defangv1.ResolveIPAddrRequest) (*defangv1.ResolveIPAddrResponse, error)
 	ResolveNS(context.Context, *defangv1.ResolveNSRequest) (*defangv1.ResolveNSResponse, error)
+	ResolveTXT(context.Context, *defangv1.ResolveTXTRequest) (*defangv1.ResolveTXTResponse, error)
 	RevokeToken(context.Context) error
 	SetOptions(context.Context, *defangv1.SetOptionsRequest) error
 	Token(context.Context, *defangv1.TokenRequest) (*defangv1.TokenResponse, error)

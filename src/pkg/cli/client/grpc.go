@@ -218,3 +218,7 @@ func (g GrpcClient) ResolveCNAME(ctx context.Context, req *defangv1.ResolveCNAME
 func (g GrpcClient) ResolveNS(ctx context.Context, req *defangv1.ResolveNSRequest) (*defangv1.ResolveNSResponse, error) {
 	return getMsg(g.client.ResolveNS(ctx, connect.NewRequest(req)))
 }
+
+func (g GrpcClient) ResolveTXT(ctx context.Context, req *defangv1.ResolveTXTRequest) (*defangv1.ResolveTXTResponse, error) {
+	return getMsg(g.client.ResolveTXT(ctx, connect.NewRequest(req)))
+}

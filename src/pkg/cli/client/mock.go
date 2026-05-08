@@ -288,6 +288,10 @@ func (m MockFabricClient) ResolveNS(_ context.Context, _ *defangv1.ResolveNSRequ
 	return &defangv1.ResolveNSResponse{}, nil
 }
 
+func (m MockFabricClient) ResolveTXT(_ context.Context, _ *defangv1.ResolveTXTRequest) (*defangv1.ResolveTXTResponse, error) {
+	return &defangv1.ResolveTXTResponse{}, nil
+}
+
 type MockLoader struct {
 	Project composeTypes.Project
 	Error   error
