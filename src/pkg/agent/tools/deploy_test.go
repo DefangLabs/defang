@@ -51,9 +51,9 @@ func (m *MockDeployCLI) Connect(ctx context.Context, fabricAddr string) (*client
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient, stack string) client.Provider {
+func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabric client.FabricClient, stack string) client.Provider {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
-	return nil
+	return client.MockProvider{}
 }
 
 func (m *MockDeployCLI) InteractiveLoginMCP(ctx context.Context, fabricAddr string, mcpClient string) error {

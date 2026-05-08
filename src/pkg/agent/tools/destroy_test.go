@@ -39,7 +39,7 @@ func (m *MockDestroyCLI) Connect(ctx context.Context, fabricAddr string) (*clien
 
 func (m *MockDestroyCLI) NewProvider(ctx context.Context, providerId client.ProviderID, grpcClient client.FabricClient, stack string) client.Provider {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
-	return nil
+	return client.MockProvider{}
 }
 
 func (m *MockDestroyCLI) ComposeDown(ctx context.Context, projectName string, grpcClient *client.GrpcClient, provider client.Provider) (string, error) {

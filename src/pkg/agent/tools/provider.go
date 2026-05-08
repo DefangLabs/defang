@@ -50,6 +50,9 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.Par
 
 	term.Debug("Function invoked: cli.NewProvider")
 	provider := pp.pc.NewProvider(ctx, stack.Provider, pp.fc, stack.Name)
+	if err := provider.Authenticate(ctx, pp.ec.IsSupported()); err != nil {
+		return nil, nil, fmt.Errorf("failed to authenticate with provider %q: %w", stack.Provider, err)
+	}
 	providerID := stack.Provider
 	return &providerID, provider, nil
 }
