@@ -28,7 +28,7 @@ func HandleEstimateTool(ctx context.Context, loader client.Loader, params Estima
 	}
 
 	term.Debug("Function invoked: cli.Connect")
-	fabric, err := GetClientWithRetry(ctx, cli, sc)
+	fabric, err := GetClientWithRetry(ctx, cli, sc.FabricAddr)
 	if err != nil {
 		var noBrowserErr auth.ErrNoBrowser
 		if errors.As(err, &noBrowserErr) {

@@ -21,7 +21,7 @@ type ListConfigParams struct {
 // HandleListConfigTool handles the list config tool logic
 func HandleListConfigTool(ctx context.Context, loader client.Loader, params ListConfigParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
-	client, err := GetClientWithRetry(ctx, cli, sc)
+	client, err := GetClientWithRetry(ctx, cli, sc.FabricAddr)
 	if err != nil {
 		var noBrowserErr auth.ErrNoBrowser
 		if errors.As(err, &noBrowserErr) {
@@ -56,11 +56,11 @@ func HandleListConfigTool(ctx context.Context, loader client.Loader, params List
 
 	numConfigs := len(config.Names)
 	if numConfigs == 0 {
-		return fmt.Sprintf("No config variables found for the project %q.", projectName), nil
+		return fmt.Sprintf("No config variables found for the project %q in stack %q.", projectName, sc.Stack.Name), nil
 	}
 
 	configNames := make([]string, numConfigs)
 	copy(configNames, config.Names)
 
-	return fmt.Sprintf("Here is the list of config variables for the project %q: %v", projectName, strings.Join(configNames, ", ")), nil
+	return fmt.Sprintf("Here is the list of config variables for the project %q in stack %q: %v", projectName, sc.Stack.Name, strings.Join(configNames, ", ")), nil
 }

@@ -67,6 +67,10 @@ func (MockProvider) AccountInfo(context.Context) (*AccountInfo, error) {
 	return &AccountInfo{}, nil
 }
 
+func (MockProvider) Authenticate(context.Context, bool) error {
+	return nil
+}
+
 func (MockProvider) GetStackName() string {
 	return "test"
 }
