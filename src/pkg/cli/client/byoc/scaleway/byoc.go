@@ -12,16 +12,19 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	pkg "github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/scaleway"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type ByocScaleway struct {
@@ -41,6 +44,9 @@ type ByocScaleway struct {
 	// CD run tracking
 	cdRunID string
 	cdEtag  types.ETag
+
+	// Cockpit token for Loki log queries
+	cockpitToken string
 }
 
 var _ client.Provider = (*ByocScaleway)(nil)
@@ -578,13 +584,250 @@ func (b *ByocScaleway) GetDeploymentStatus(ctx context.Context) (bool, error) {
 }
 
 func (b *ByocScaleway) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
-	return nil, client.ErrNotImplemented("Scaleway PrepareDomainDelegation")
+	term.Debugf("Preparing domain delegation for %s", req.DelegateDomain)
+
+	domain, subdomain := splitDelegateDomain(req.DelegateDomain)
+	zone, err := b.client.CreateDNSZone(ctx, domain, subdomain, b.projectID)
+	if err != nil {
+		if !scaleway.IsConflict(err) {
+			return nil, err
+		}
+		// Zone already exists; look it up
+		zone, err = b.client.GetDNSZone(ctx, req.DelegateDomain)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if len(zone.NS) == 0 {
+		return nil, fmt.Errorf("DNS zone for %q has no nameservers", req.DelegateDomain)
+	}
+
+	term.Debugf("DNS zone for %q has nameservers: %v", req.DelegateDomain, zone.NS)
+	return &client.PrepareDomainDelegationResponse{
+		NameServers: zone.NS,
+	}, nil
 }
 
-func (b *ByocScaleway) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
-	return nil, client.ErrNotImplemented("Scaleway QueryLogs")
+// splitDelegateDomain splits a FQDN into its base domain and subdomain parts.
+// For example, "myapp.example.com" returns ("example.com", "myapp").
+func splitDelegateDomain(fqdn string) (domain, subdomain string) {
+	fqdn = strings.TrimSuffix(fqdn, ".")
+	parts := strings.Split(fqdn, ".")
+	if len(parts) <= 2 {
+		return fqdn, ""
+	}
+	domain = strings.Join(parts[len(parts)-2:], ".")
+	subdomain = strings.Join(parts[:len(parts)-2], ".")
+	return
 }
 
 func (b *ByocScaleway) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {
-	return nil, client.ErrNotImplemented("Scaleway Subscribe")
+	if b.cdRunID == "" || (req.Etag != "" && req.Etag != b.cdEtag) {
+		return nil, errors.ErrUnsupported
+	}
+
+	runID := b.cdRunID
+	return func(yield func(*defangv1.SubscribeResponse, error) bool) {
+		var lastState string
+		for {
+			run, err := b.client.GetJobRun(ctx, runID)
+			if err != nil {
+				yield(nil, scaleway.AnnotateScalewayError(err, "polling job run status"))
+				return
+			}
+
+			if run.State != lastState {
+				lastState = run.State
+				state := jobRunStateToServiceState(run.State)
+				if !yield(&defangv1.SubscribeResponse{
+					Name:   "cd",
+					Status: run.State,
+					State:  state,
+				}, nil) {
+					return
+				}
+
+				// Stop on terminal states
+				if state == defangv1.ServiceState_DEPLOYMENT_COMPLETED ||
+					state == defangv1.ServiceState_DEPLOYMENT_FAILED {
+					return
+				}
+			}
+
+			if err := pkg.SleepWithContext(ctx, 2*time.Second); err != nil {
+				yield(nil, err)
+				return
+			}
+		}
+	}, nil
+}
+
+func jobRunStateToServiceState(state string) defangv1.ServiceState {
+	switch state {
+	case "queued":
+		return defangv1.ServiceState_UPDATE_QUEUED
+	case "running":
+		return defangv1.ServiceState_DEPLOYMENT_PENDING
+	case "succeeded":
+		return defangv1.ServiceState_DEPLOYMENT_COMPLETED
+	case "failed", "canceled":
+		return defangv1.ServiceState_DEPLOYMENT_FAILED
+	default:
+		return defangv1.ServiceState_NOT_SPECIFIED
+	}
+}
+
+func (b *ByocScaleway) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
+	if err := b.ensureCockpitToken(ctx); err != nil {
+		return nil, err
+	}
+
+	query := b.buildLogQuery(req)
+	etag := req.Etag
+	if etag == "" {
+		etag = b.cdEtag
+	}
+
+	if req.Follow {
+		return b.followLogs(ctx, query, etag, req), nil
+	}
+
+	// Non-follow: single query
+	var start, end time.Time
+	if req.Since.IsValid() {
+		start = req.Since.AsTime()
+	}
+	if req.Until.IsValid() {
+		end = req.Until.AsTime()
+	}
+
+	limit := int(req.Limit)
+	if limit == 0 {
+		limit = 100
+	}
+
+	entries, err := scaleway.QueryLoki(ctx, b.cockpitToken, b.region, query, start, end, limit)
+	if err != nil {
+		return nil, fmt.Errorf("querying logs: %w", err)
+	}
+
+	return func(yield func(*defangv1.TailResponse, error) bool) {
+		for _, entry := range entries {
+			if !yield(lokiEntryToTailResponse(entry, etag), nil) {
+				return
+			}
+		}
+	}, nil
+}
+
+// ensureCockpitToken lazily creates a Cockpit token for Loki queries.
+func (b *ByocScaleway) ensureCockpitToken(ctx context.Context) error {
+	if b.cockpitToken != "" {
+		return nil
+	}
+
+	const tokenName = "defang-cd-logs"
+
+	token, err := b.client.CreateCockpitToken(ctx, tokenName, b.projectID)
+	if err != nil {
+		if !scaleway.IsConflict(err) {
+			return fmt.Errorf("creating Cockpit token: %w", err)
+		}
+		// Token exists but we need the secret key; delete and recreate
+		tokens, listErr := b.client.ListCockpitTokens(ctx, b.projectID)
+		if listErr != nil {
+			return fmt.Errorf("listing Cockpit tokens: %w", listErr)
+		}
+		for _, t := range tokens {
+			if t.Name == tokenName {
+				if delErr := b.client.DeleteCockpitToken(ctx, t.ID); delErr != nil {
+					return fmt.Errorf("deleting existing Cockpit token: %w", delErr)
+				}
+				break
+			}
+		}
+		// Recreate to obtain the secret key
+		token, err = b.client.CreateCockpitToken(ctx, tokenName, b.projectID)
+		if err != nil {
+			return fmt.Errorf("recreating Cockpit token: %w", err)
+		}
+	}
+
+	b.cockpitToken = token.SecretKey
+	return nil
+}
+
+// buildLogQuery constructs a LogQL query for Scaleway Cockpit Loki.
+func (b *ByocScaleway) buildLogQuery(req *defangv1.TailRequest) string {
+	logType := logs.LogType(req.LogType)
+
+	if logType.Has(logs.LogTypeCD) || logType == logs.LogTypeUnspecified {
+		return fmt.Sprintf(`{resource_name=%q}`, byoc.CdTaskPrefix)
+	}
+
+	if len(req.Services) > 0 {
+		if len(req.Services) == 1 {
+			return fmt.Sprintf(`{resource_name=%q}`, req.Services[0])
+		}
+		return fmt.Sprintf(`{resource_name=~"%s"}`, strings.Join(req.Services, "|"))
+	}
+
+	return fmt.Sprintf(`{resource_name=~"%s.*"}`, byoc.CdTaskPrefix)
+}
+
+// followLogs polls Loki for new log entries in a loop.
+func (b *ByocScaleway) followLogs(ctx context.Context, query, etag string, req *defangv1.TailRequest) iter.Seq2[*defangv1.TailResponse, error] {
+	return func(yield func(*defangv1.TailResponse, error) bool) {
+		start := time.Now()
+		if req.Since.IsValid() {
+			start = req.Since.AsTime()
+		}
+
+		for {
+			entries, err := scaleway.QueryLoki(ctx, b.cockpitToken, b.region, query, start, time.Time{}, 100)
+			if err != nil {
+				if !yield(nil, err) {
+					return
+				}
+			}
+
+			for _, entry := range entries {
+				if !entry.Timestamp.After(start) {
+					continue // skip already-seen entries
+				}
+				if !yield(lokiEntryToTailResponse(entry, etag), nil) {
+					return
+				}
+				start = entry.Timestamp
+			}
+
+			if err := pkg.SleepWithContext(ctx, 2*time.Second); err != nil {
+				yield(nil, err)
+				return
+			}
+		}
+	}
+}
+
+func lokiEntryToTailResponse(entry scaleway.LokiEntry, etag string) *defangv1.TailResponse {
+	service := entry.Labels["resource_name"]
+	if service == "" {
+		service = "cd"
+	}
+	host := entry.Labels["resource_id"]
+	stderr := strings.Contains(strings.ToLower(entry.Line), "error")
+
+	return &defangv1.TailResponse{
+		Service: service,
+		Etag:    etag,
+		Entries: []*defangv1.LogEntry{{
+			Message:   entry.Line,
+			Timestamp: timestamppb.New(entry.Timestamp),
+			Service:   service,
+			Etag:      etag,
+			Host:      host,
+			Stderr:    stderr,
+		}},
+	}
 }
