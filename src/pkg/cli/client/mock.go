@@ -75,6 +75,10 @@ func (MockProvider) GetStackName() string {
 	return "test"
 }
 
+func (MockProvider) HasDelegatedSubdomain() bool {
+	return true
+}
+
 func (MockProvider) GetStackNameForDomain() string {
 	return ""
 }
