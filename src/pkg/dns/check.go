@@ -23,8 +23,13 @@ var (
 )
 
 // The DNS is considered ready if the CNAME of the domain is pointing to the ALB domain and in sync
-// OR if the A record of the domain is pointing to the same IP addresses of the ALB domain and in sync
+// OR if the A record of the domain is pointing to the same IP addresses of the ALB domain and in sync.
+// A nil resolverAt falls back to DirectResolverAt so the function never panics
+// on a missing resolver — matches RootResolver.resolverFn().
 func CheckDomainDNSReady(ctx context.Context, domain string, validCNAMEs []string, resolverAt func(string) Resolver) bool {
+	if resolverAt == nil {
+		resolverAt = DirectResolverAt
+	}
 	for i, validCNAME := range validCNAMEs {
 		validCNAMEs[i] = Normalize(validCNAME)
 	}

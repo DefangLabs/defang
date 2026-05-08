@@ -172,11 +172,16 @@ func (r RootResolver) LookupTXT(ctx context.Context, domain string) ([]string, e
 }
 
 func (r RootResolver) getResolver(ctx context.Context, domain string) Resolver {
-	ns, err := FindNSServers(ctx, domain, r.resolverFn())
+	resolverAt := r.resolverFn()
+	ns, err := FindNSServers(ctx, domain, resolverAt)
 	if err != nil {
 		return DirectResolver{}
 	}
-	return DirectResolver{NSServer: ns[pkg.RandomIndex(len(ns))].Host}
+	// Use the injected resolverAt for the authoritative lookup too, not just
+	// NS discovery — otherwise FabricResolver-injected callers would fall
+	// back to raw UDP for the actual A/CNAME/NS/TXT query, defeating the
+	// whole point of injection.
+	return resolverAt(ns[pkg.RandomIndex(len(ns))].Host)
 }
 
 func FindNSServers(ctx context.Context, domain string, resolverAt func(string) Resolver) ([]*net.NS, error) {
