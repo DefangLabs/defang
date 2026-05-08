@@ -255,3 +255,115 @@ func TestSameIPs(t *testing.T) {
 		}
 	}
 }
+
+// withResolver swaps the package-level resolver for the duration of a test
+// and restores the original on cleanup. The dns package's LookupTXT /
+// LookupTXTContains use this var directly, so tests need to inject a mock
+// here rather than via ResolverAt.
+func withResolver(t *testing.T, r Resolver) {
+	t.Helper()
+	orig := resolver
+	resolver = r
+	t.Cleanup(func() { resolver = orig })
+}
+
+func TestLookupTXT(t *testing.T) {
+	tests := []struct {
+		name    string
+		records DNSResponse
+		want    []string
+		wantErr error
+	}{
+		{
+			name:    "single record",
+			records: DNSResponse{Records: []string{"v=spf1 -all"}},
+			want:    []string{"v=spf1 -all"},
+		},
+		{
+			name:    "multiple records",
+			records: DNSResponse{Records: []string{"a", "b", "c"}},
+			want:    []string{"a", "b", "c"},
+		},
+		{
+			name:    "lookup error propagated",
+			records: DNSResponse{Error: ErrNoSuchHost},
+			wantErr: ErrNoSuchHost,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			withResolver(t, MockResolver{Records: map[DNSRequest]DNSResponse{
+				{Type: "TXT", Domain: "example.com"}: tt.records,
+			}})
+			got, err := LookupTXT(t.Context(), "example.com")
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("err = %v, want %v", err, tt.wantErr)
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLookupTXTContains(t *testing.T) {
+	tests := []struct {
+		name     string
+		records  DNSResponse
+		expected string
+		want     bool
+		wantErr  error
+	}{
+		{
+			name:     "exact match",
+			records:  DNSResponse{Records: []string{"abc123"}},
+			expected: "abc123",
+			want:     true,
+		},
+		{
+			name:     "match among many",
+			records:  DNSResponse{Records: []string{"first", "abc123", "third"}},
+			expected: "abc123",
+			want:     true,
+		},
+		{
+			name:     "no match",
+			records:  DNSResponse{Records: []string{"other"}},
+			expected: "abc123",
+			want:     false,
+		},
+		{
+			name:     "empty record set",
+			records:  DNSResponse{Records: nil},
+			expected: "abc123",
+			want:     false,
+		},
+		{
+			name:     "case-sensitive (no implicit fold)",
+			records:  DNSResponse{Records: []string{"ABC123"}},
+			expected: "abc123",
+			want:     false,
+		},
+		{
+			name:     "lookup error propagates with false",
+			records:  DNSResponse{Error: ErrNoSuchHost},
+			expected: "abc123",
+			want:     false,
+			wantErr:  ErrNoSuchHost,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			withResolver(t, MockResolver{Records: map[DNSRequest]DNSResponse{
+				{Type: "TXT", Domain: "asuid.example.com"}: tt.records,
+			}})
+			got, err := LookupTXTContains(t.Context(), "asuid.example.com", tt.expected)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("err = %v, want %v", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
