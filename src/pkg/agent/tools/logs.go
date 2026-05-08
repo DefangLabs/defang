@@ -42,7 +42,7 @@ func HandleLogsTool(ctx context.Context, loader client.Loader, params LogsParams
 	}
 
 	term.Debug("Function invoked: cli.Connect")
-	client, err := GetClientWithRetry(ctx, cli, sc)
+	client, err := GetClientWithRetry(ctx, cli, sc.FabricAddr)
 	if err != nil {
 		var noBrowserErr auth.ErrNoBrowser
 		if errors.As(err, &noBrowserErr) {
