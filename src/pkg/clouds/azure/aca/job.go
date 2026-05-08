@@ -528,7 +528,6 @@ func (j *Job) StartJobExecution(ctx context.Context, req JobRequest) (string, er
 // GetJobExecutionStatus returns the current status of a job execution by listing executions
 // and finding the one with the given name.
 func (j *Job) GetJobExecutionStatus(ctx context.Context, executionName string) (*JobStatus, error) {
-	defer term.Timing()()
 	execClient, err := j.newJobsExecutionsClient()
 	if err != nil {
 		return nil, err
