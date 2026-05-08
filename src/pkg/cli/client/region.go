@@ -8,7 +8,8 @@ const (
 	RegionDefaultAWS   = "us-west-2"
 	RegionDefaultAzure = "westus" // Default region for Azure
 	RegionDefaultDO    = "nyc3"
-	RegionDefaultGCP   = "us-central1" // Defaults to us-central1 for lower price
+	RegionDefaultGCP      = "us-central1" // Defaults to us-central1 for lower price
+	RegionDefaultScaleway = "fr-par"
 )
 
 func GetRegion(provider ProviderID) string {
@@ -22,6 +23,8 @@ func GetRegion(provider ProviderID) string {
 		defaultRegion = RegionDefaultGCP
 	case ProviderDO:
 		defaultRegion = RegionDefaultDO
+	case ProviderScaleway:
+		defaultRegion = RegionDefaultScaleway
 	case ProviderDefang, ProviderAuto:
 		return ""
 	default:
@@ -47,6 +50,8 @@ func GetRegionVarName(provider ProviderID) string {
 		return GCPRegionEnvVar
 	case ProviderDO:
 		return "REGION"
+	case ProviderScaleway:
+		return "SCW_DEFAULT_REGION"
 	case ProviderDefang, ProviderAuto:
 		return ""
 	default:

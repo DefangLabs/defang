@@ -8,6 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/azure"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/do"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/scaleway"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 )
@@ -46,6 +47,8 @@ func NewProvider(ctx context.Context, providerID client.ProviderID, fabricClient
 		provider = gcp.NewByocProvider(ctx, fabricClient.GetTenantName(), stack)
 	case client.ProviderAzure:
 		provider = azure.NewByocProvider(ctx, fabricClient.GetTenantName(), stack)
+	case client.ProviderScaleway:
+		provider = scaleway.NewByocProvider(ctx, fabricClient.GetTenantName(), stack)
 	default:
 		provider = client.NewPlaygroundProvider(fabricClient, stack)
 	}
