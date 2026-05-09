@@ -446,6 +446,9 @@ func (b *ByocScaleway) SetUpCD(ctx context.Context, force bool) error {
 		return nil
 	}
 
+	if b.CDImage == "" {
+		return errors.New("CD image is not set; please set the DEFANG_CD_IMAGE environment variable")
+	}
 	term.Debugf("Using CD image: %q", b.CDImage)
 
 	bucket := b.bucketName()

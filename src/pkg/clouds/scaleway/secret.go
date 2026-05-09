@@ -3,8 +3,10 @@ package scaleway
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 )
 
 // Secret represents a Scaleway Secret Manager secret.
@@ -43,6 +45,9 @@ type listSecretVersionsResponse struct {
 }
 
 // CreateSecret creates a new secret in Scaleway Secret Manager.
+// Returns the secret and a nil error on success. If the secret already exists
+// (Scaleway returns 400 with "cannot have same secret name"), the error wraps
+// an APIError with status 409 so callers can use IsConflict.
 func (c *Client) CreateSecret(ctx context.Context, name, projectID string) (*Secret, error) {
 	if projectID == "" {
 		projectID = c.ProjectID
@@ -54,6 +59,12 @@ func (c *Client) CreateSecret(ctx context.Context, name, projectID string) (*Sec
 	}
 	var secret Secret
 	if err := c.doRequestJSON(ctx, "POST", url, body, &secret); err != nil {
+		// Scaleway returns 400 (not 409) for duplicate secret names; normalize to 409
+		var apiErr *APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == 400 && strings.Contains(apiErr.RawBody, "same secret name") {
+			apiErr.StatusCode = 409
+			return nil, apiErr
+		}
 		return nil, AnnotateScalewayError(err, fmt.Sprintf("creating secret %q", name))
 	}
 	return &secret, nil

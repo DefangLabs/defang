@@ -13,6 +13,7 @@ type APIError struct {
 	StatusCode int    `json:"-"`
 	Message    string `json:"message"`
 	Type       string `json:"type"`
+	RawBody    string `json:"-"` // full response body for detailed error matching
 }
 
 func (e *APIError) Error() string {
@@ -26,7 +27,7 @@ func parseAPIError(resp *http.Response) error {
 		return fmt.Errorf("scaleway: HTTP %d (failed to read body: %w)", resp.StatusCode, err)
 	}
 
-	apiErr := &APIError{StatusCode: resp.StatusCode}
+	apiErr := &APIError{StatusCode: resp.StatusCode, RawBody: string(body)}
 	if err := json.Unmarshal(body, apiErr); err != nil || apiErr.Message == "" {
 		apiErr.Message = string(body)
 	}
