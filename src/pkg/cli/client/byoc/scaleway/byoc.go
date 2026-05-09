@@ -179,8 +179,26 @@ func (b *ByocScaleway) runCdCommand(ctx context.Context, cmd cdCommand) (string,
 		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
 	}
 
-	// Build the command as entrypoint + args
-	args := append([]string{"node", "lib/index.js"}, cmd.command...)
+	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
+		// Run the cd binary locally from $DEFANG_PULUMI_DIR/cd instead of
+		// starting it as a Scaleway Serverless Job. Useful for iterating on cd
+		// code without rebuilding/pushing the cd image.
+		debugEnv := []string{
+			"SCW_ACCESS_KEY=" + b.client.AccessKey,
+			"SCW_SECRET_KEY=" + b.client.SecretKey,
+			"SCW_DEFAULT_PROJECT_ID=" + b.projectID,
+			"SCW_DEFAULT_REGION=" + b.region,
+		}
+		for k, v := range env {
+			debugEnv = append(debugEnv, k+"="+v)
+		}
+		if err := byoc.DebugPulumiCD(ctx, debugEnv, cmd.command...); err != nil {
+			return "", err
+		}
+	}
+
+	// Build the command as entrypoint + args for the Go CD binary
+	args := append([]string{"/app/cd"}, cmd.command...)
 	env["DEFANG_CD_CMD"] = strings.Join(args, " ")
 
 	run, err := b.client.RunJob(ctx, b.jobDefID, env)
