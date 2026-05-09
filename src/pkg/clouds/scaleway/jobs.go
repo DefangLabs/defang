@@ -60,10 +60,14 @@ func (c *Client) CreateJobDefinition(ctx context.Context, name, image string, en
 	return &def, nil
 }
 
-// RunJob starts a new run of a job definition with optional environment overrides.
-func (c *Client) RunJob(ctx context.Context, definitionID string, envOverrides map[string]string) (*JobRun, error) {
+// RunJob starts a new run of a job definition with optional command and environment overrides.
+// The command string is whitespace-split by the Scaleway API into an exec array.
+func (c *Client) RunJob(ctx context.Context, definitionID string, command string, envOverrides map[string]string) (*JobRun, error) {
 	endpoint := c.regionURL("serverless-jobs", "v1alpha1") + "/job-definitions/" + definitionID + "/start"
 	body := map[string]any{}
+	if command != "" {
+		body["command"] = command
+	}
 	if len(envOverrides) > 0 {
 		body["environment_variables"] = envOverrides
 	}

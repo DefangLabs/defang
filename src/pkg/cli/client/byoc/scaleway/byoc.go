@@ -202,11 +202,11 @@ func (b *ByocScaleway) runCdCommand(ctx context.Context, cmd cdCommand) (string,
 		return "local-debug", nil
 	}
 
-	// Build the command as entrypoint + args for the Go CD binary
-	args := append([]string{"/app/cd"}, cmd.command...)
-	env["DEFANG_CD_CMD"] = strings.Join(args, " ")
+	// Build the command for the Go CD binary. The Scaleway API whitespace-splits
+	// this string into an exec array: "/app/cd up s3://..." → ["/app/cd", "up", "s3://..."]
+	cdCmd := strings.Join(append([]string{"/app/cd"}, cmd.command...), " ")
 
-	run, err := b.client.RunJob(ctx, b.jobDefID, env)
+	run, err := b.client.RunJob(ctx, b.jobDefID, cdCmd, env)
 	if err != nil {
 		return "", scaleway.AnnotateScalewayError(err, "running CD command")
 	}
