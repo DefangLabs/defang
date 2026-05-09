@@ -137,7 +137,7 @@ All 5 blockers addressed:
 - Updated `TestBuildProjectRejectsBuildOnlyServices` → `TestBuildProjectCreatesBuildResourceForBuildOnlyServices`
 - Added mock for `defang-scaleway:index:Build` resource type
 
-### Session 4 (current - 2026-05-09)
+### Session 4 (2026-05-09)
 
 **Blocker 6 (S3 context URL format for Kaniko) - FIXED**
 - Kaniko expects `s3://bucket/key` format for S3 build contexts
@@ -147,7 +147,60 @@ All 5 blockers addressed:
 - Similar to the existing GCS conversion (`https://storage.googleapis.com/` → `gs://`)
 - Added `TestConvertScalewayS3URL` test with 5 cases
 
-**POSTGRES_SSL analysis:**
+**Blocker 7 (S3_ENDPOINT missing in CD environment) - FIXED**
+- The CD task's `fetchS3()` in `cd/fetch.go` uses `S3_ENDPOINT` env var for custom endpoints
+- Scaleway BYOC client wasn't passing this env var to the CD task
+- Added `"S3_ENDPOINT": scaleway.S3Endpoint(b.region)` to the CD env map in `byoc.go`
+- Note: `S3Endpoint()` already returns full URL with `https://` prefix
+
+**Blocker 8 (Config/secrets not found - POSTGRES_PASSWORD) - FIXED**
+- Root cause: Scaleway provider used `PulumiConfigProvider` which reads from Pulumi stack config
+- Secrets are in Scaleway Secret Manager, not in Pulumi config
+- AWS/GCP/Azure each have cloud-native ConfigProviders; Scaleway was missing one
+- Created `provider/defangscaleway/scaleway/parameters.go` with Scaleway ConfigProvider
+- Uses direct REST API calls to Scaleway Secret Manager (not Pulumi SDK invokes)
+  because `disable-default-providers` blocks the Scaleway provider for data source invokes too
+- Bulk-fetches all secrets with prefix `Defang_<project>_<stack>_<KEY>`, caches results
+- Base64-decodes secret data from API response
+- Updated `project.go` to use `NewConfigProvider(projectName)` instead of `PulumiConfigProvider`
+
+**Blocker 9 (Default provider for 'scaleway' disabled) - FIXED**
+- CD task's `projectConfig()` disables all default providers including `scaleway`
+- All other providers (AWS/GCP/Azure) create explicit providers in their `deploy*` functions
+- Added explicit `scaleway.NewProvider` in `cd/program/scaleway.go`
+- Passes via `pulumi.Providers(scwProvider)` to `NewProject`
+- Added `github.com/pulumiverse/pulumi-scaleway` dependency to `cd/go.mod`
+
+**Blocker 10 (Kaniko build job shell quoting) - IN PROGRESS**
+- The Scaleway Serverless Jobs API `command` field splits strings by whitespace into exec arrays
+- Neither `command` (string) nor `startup_command` (array) wraps in a shell automatically
+
+**Key findings from extensive testing:**
+1. `command` (string, deprecated) → splits by whitespace, overrides Docker ENTRYPOINT+CMD
+2. `startup_command` (array) → sets Docker CMD only, does NOT override ENTRYPOINT
+3. Kaniko debug image has ENTRYPOINT `/kaniko/executor` — startup_command args become executor args
+4. Shell operators (&&, >, etc.) in `command` string are NOT interpreted — they're literal args
+
+**Solution found:**
+- Use BOTH fields together: `command: "sh"` (overrides ENTRYPOINT to shell) + `startup_command: ["-c", "script"]` (sets CMD)
+- Container runs: `sh -c "full script with && operators"` — properly shell-interpreted
+- Verified working with both Alpine and Kaniko debug images
+
+**Also fixed:**
+- Removed `--compressed-caching=false` from Kaniko flags (not valid in current Kaniko version)
+- The old `sh -c '...'` wrapper caused "unterminated quoted string" error
+- The bare command (no wrapper) caused "mkdir: unrecognized option" because all args went to mkdir
+
+**Current status:**
+- Deployment starts, Pulumi creates resources (namespace, private network, DB)
+- DB was provisioned successfully (status: ready, PostgreSQL-16)
+- Build job definition is created but deployment stalls — need to investigate
+- Possible issue: Pulumi state has accumulated "pending operations" from previous killed deployments
+- May need to do a `pulumi refresh` or manually clear pending operations before next attempt
+
+---
+
+## POSTGRES_SSL analysis:
 - The sample has `POSTGRES_SSL: null` (config value resolved at deploy time)
 - Scaleway managed Postgres requires SSL (`sslmode=require` in connection URL)
 - Users need to run `defang config set POSTGRES_SSL true` before deploying
@@ -179,3 +232,23 @@ All 5 blockers addressed:
 - Azure: ACR Tasks (Azure Container Registry build tasks)
 - Scaleway: **No native build service** — needs alternative approach
 - Options: Kaniko in CD task, or add Docker-in-Docker capability
+
+### Scaleway Serverless Jobs API Behavior
+- `command` (string, deprecated): splits by whitespace, replaces ENTRYPOINT+CMD as exec array
+- `startup_command` (array): replaces CMD only, appended to ENTRYPOINT
+- To run shell scripts: use `command: "sh"` + `startup_command: ["-c", "script"]`
+- Error messages truncated to 2048 chars (tail of stderr)
+- Job definitions must be explicitly deleted (no auto-cleanup)
+
+### Authentication
+- CLI uses `DEFANG_ACCESS_TOKEN` env var (NOT `DEFANG_TOKEN`)
+- Token stored via `TokenStore.Save()` to `~/.local/state/defang/`
+- Pulumi uses `PULUMI_BACKEND_URL` with S3-compatible Scaleway storage
+- Pulumi locks stored in S3 — must cancel stale locks manually after killed deployments
+
+### Next Steps
+1. Clear Pulumi pending operations (may need `pulumi refresh` or state surgery)
+2. Re-run deployment and verify Kaniko build completes
+3. If build succeeds, verify container deployment and database connectivity
+4. Commit and push all changes
+5. Add unit tests for ConfigProvider

@@ -101,7 +101,10 @@ func (b *ByocScaleway) bucketName() string {
 }
 
 func (b *ByocScaleway) getSecretName(projectName, name string) string {
-	return b.StackDir(projectName, name)
+	// Scaleway secret names must match ^[_a-zA-Z0-9]([-_.a-zA-Z0-9]*[_a-zA-Z0-9])?$
+	// Replace path separators from StackDir (e.g., "/Defang/project/stack/KEY") with underscores.
+	s := strings.TrimLeft(b.StackDir(projectName, name), "/")
+	return strings.ReplaceAll(s, "/", "_")
 }
 
 func (b *ByocScaleway) environment(projectName string) (map[string]string, error) {
@@ -134,6 +137,7 @@ func (b *ByocScaleway) environment(projectName string) (map[string]string, error
 		"SCW_SECRET_KEY":             b.client.SecretKey,
 		"SCW_DEFAULT_PROJECT_ID":     b.projectID,
 		"SCW_DEFAULT_REGION":         b.region,
+		"S3_ENDPOINT":               scaleway.S3Endpoint(b.region),
 		"STACK":                      b.PulumiStack,
 		pulumiBackendKey:             pulumiBackendValue,
 	}
@@ -195,6 +199,7 @@ func (b *ByocScaleway) runCdCommand(ctx context.Context, cmd cdCommand) (string,
 		if err := byoc.DebugPulumiCD(ctx, debugEnv, cmd.command...); err != nil {
 			return "", err
 		}
+		return "local-debug", nil
 	}
 
 	// Build the command as entrypoint + args for the Go CD binary
@@ -374,19 +379,24 @@ func (b *ByocScaleway) PutConfig(ctx context.Context, req *defangv1.PutConfigReq
 
 // ListConfig lists secrets from Scaleway Secret Manager.
 func (b *ByocScaleway) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
+	// getSecretName with empty name gives us the prefix (e.g., "Defang_project_stack_")
 	prefix := b.getSecretName(req.Project, "")
 	term.Debugf("Listing configs with prefix %q", prefix)
 
-	secrets, err := b.client.ListSecrets(ctx, b.projectID, prefix)
+	// Scaleway's name filter does exact matching, not prefix matching.
+	// List all secrets in the project and filter client-side.
+	secrets, err := b.client.ListSecrets(ctx, b.projectID, "")
 	if err != nil {
 		return nil, scaleway.AnnotateScalewayError(err, "listing secrets")
 	}
 
 	names := make([]string, 0, len(secrets))
 	for _, secret := range secrets {
-		name := strings.TrimPrefix(secret.Name, prefix)
-		if name != "" {
-			names = append(names, name)
+		if strings.HasPrefix(secret.Name, prefix) {
+			name := secret.Name[len(prefix):]
+			if name != "" {
+				names = append(names, name)
+			}
 		}
 	}
 	return &defangv1.Secrets{Names: names}, nil
@@ -455,26 +465,28 @@ func (b *ByocScaleway) SetUpCD(ctx context.Context, force bool) error {
 	}
 	b.registryEndpoint = ns.Endpoint
 
-	// 3. Create Serverless Job definition for CD tasks
-	jobName := byoc.CdTaskPrefix
-	env, err := b.environment("")
-	if err != nil {
-		return err
-	}
-	jobDef, err := b.client.CreateJobDefinition(ctx, jobName, b.CDImage, env, scaleway.JobResources{
-		CPULimit:    2000,  // 2 vCPU
-		MemoryLimit: 4096,  // 4 GB
-	})
-	if err != nil {
-		if scaleway.IsConflict(err) {
-			// Job definition already exists; find it
-			// List and find by name is not directly supported, so we store the ID
-			term.Debug("CD job definition already exists")
-		} else {
-			return scaleway.AnnotateScalewayError(err, "creating CD job definition")
+	// 3. Create Serverless Job definition for CD tasks (skip in local debug mode)
+	if os.Getenv("DEFANG_PULUMI_DIR") == "" {
+		jobName := byoc.CdTaskPrefix
+		env, err := b.environment("")
+		if err != nil {
+			return err
 		}
-	} else {
-		b.jobDefID = jobDef.ID
+		jobDef, err := b.client.CreateJobDefinition(ctx, jobName, b.CDImage, env, scaleway.JobResources{
+			CPULimit:    2000, // 2 vCPU
+			MemoryLimit: 4096, // 4 GB
+		})
+		if err != nil {
+			if scaleway.IsConflict(err) {
+				// Job definition already exists; find it
+				// List and find by name is not directly supported, so we store the ID
+				term.Debug("CD job definition already exists")
+			} else {
+				return scaleway.AnnotateScalewayError(err, "creating CD job definition")
+			}
+		} else {
+			b.jobDefID = jobDef.ID
+		}
 	}
 
 	b.SetupDone = true
@@ -608,7 +620,10 @@ func (b *ByocScaleway) PrepareDomainDelegation(ctx context.Context, req client.P
 	zone, err := b.client.CreateDNSZone(ctx, domain, subdomain, b.projectID)
 	if err != nil {
 		if !scaleway.IsConflict(err) {
-			return nil, err
+			// Domain not owned by this Scaleway project — skip delegation
+			// (services will use Scaleway's auto-generated container URLs)
+			term.Debugf("Skipping domain delegation: %v", err)
+			return nil, nil
 		}
 		// Zone already exists; look it up
 		zone, err = b.client.GetDNSZone(ctx, req.DelegateDomain)
