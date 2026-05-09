@@ -137,6 +137,22 @@ All 5 blockers addressed:
 - Updated `TestBuildProjectRejectsBuildOnlyServices` → `TestBuildProjectCreatesBuildResourceForBuildOnlyServices`
 - Added mock for `defang-scaleway:index:Build` resource type
 
+### Session 4 (current - 2026-05-09)
+
+**Blocker 6 (S3 context URL format for Kaniko) - FIXED**
+- Kaniko expects `s3://bucket/key` format for S3 build contexts
+- The CLI's `uploadArchive()` returns HTTPS presigned URLs (with query params stripped)
+- Scaleway S3 path-style URLs look like `https://s3.fr-par.scw.cloud/bucket/key`
+- Added `convertScalewayS3URL()` in `cli/compose/context.go` to convert to `s3://bucket/key`
+- Similar to the existing GCS conversion (`https://storage.googleapis.com/` → `gs://`)
+- Added `TestConvertScalewayS3URL` test with 5 cases
+
+**POSTGRES_SSL analysis:**
+- The sample has `POSTGRES_SSL: null` (config value resolved at deploy time)
+- Scaleway managed Postgres requires SSL (`sslmode=require` in connection URL)
+- Users need to run `defang config set POSTGRES_SSL true` before deploying
+- No code change needed — handled by existing config mechanism
+
 ---
 
 ## Research Notes

@@ -436,3 +436,23 @@ func TestGetDockerIgnorePatterns(t *testing.T) {
 		})
 	}
 }
+
+func TestConvertScalewayS3URL(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"https://s3.fr-par.scw.cloud/my-bucket/uploads/digest.tar.gz", "s3://my-bucket/uploads/digest.tar.gz"},
+		{"https://s3.nl-ams.scw.cloud/bucket/key", "s3://bucket/key"},
+		{"https://storage.googleapis.com/bucket/key", "https://storage.googleapis.com/bucket/key"}, // not Scaleway
+		{"s3://already-s3/key", "s3://already-s3/key"},                                             // already s3://
+		{"https://example.com/path", "https://example.com/path"},                                   // unrelated URL
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			if got := convertScalewayS3URL(tt.input); got != tt.want {
+				t.Errorf("convertScalewayS3URL(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}

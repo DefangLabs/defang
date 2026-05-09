@@ -275,7 +275,20 @@ func uploadArchive(ctx context.Context, provider client.Provider, projectName st
 	const gcpPrefix = "https://storage.googleapis.com/" // HACK: move to GCP provider
 	url = strings.Replace(url, gcpPrefix, "gs://", 1)
 
+	// Convert Scaleway S3 path-style URLs to s3:// URIs for Kaniko
+	url = convertScalewayS3URL(url)
+
 	return url, nil
+}
+
+// convertScalewayS3URL converts a Scaleway S3 path-style HTTPS URL to an s3:// URI.
+// e.g., "https://s3.fr-par.scw.cloud/bucket/key" → "s3://bucket/key"
+func convertScalewayS3URL(url string) string {
+	const scwS3Suffix = ".scw.cloud/"
+	if i := strings.Index(url, scwS3Suffix); i > 0 && strings.HasPrefix(url, "https://s3.") {
+		return "s3://" + url[i+len(scwS3Suffix):]
+	}
+	return url
 }
 
 type contextAwareReader struct {
