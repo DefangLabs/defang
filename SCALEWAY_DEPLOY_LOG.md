@@ -205,11 +205,57 @@ All 5 blockers addressed:
 - `runJob()` now correctly parses `{"job_runs": [...]}` response from start endpoint
 - Removed `--compressed-caching=false` from Kaniko flags (not valid in current Kaniko version)
 
-**Current status:**
-- Deployment starts, Pulumi creates resources (namespace, private network, DB)
-- DB was provisioned successfully (status: ready, PostgreSQL-16)
-- Build job command execution is now fixed — awaiting full deployment test
-- Pulumi state has pending operations from previous killed deployments
+### Session 5 (2026-05-09)
+
+**Blocker 11 (AWS SDK v2 credential loading in Kaniko) - FIXED**
+- AWS SDK v2 in Kaniko fell through to IMDS despite `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` being present
+- Error: "no EC2 IMDS role found" — SDK reaches IMDS as last resort
+- Fix: Added `AWS_EC2_METADATA_DISABLED=true` to Kaniko environment to prevent IMDS fallback
+- Verified with Scaleway experiment: job succeeded with IMDS disabled
+
+**Blocker 12 (Kaniko chown fails in sandbox - CAP_CHOWN) - FIXED**
+- Error: `chown /etc/gshadow: operation not permitted` during base image rootfs extraction
+- `--force` flag only bypasses container detection, NOT chown during layer extraction
+- Fix: Built a **patched Kaniko binary** that ignores `EPERM` on `os.Chown()` in:
+  - `setFilePermissions()` — file layer extraction
+  - `mkdirAndChown()` — directory creation during extraction
+  - `resetFileOwnership()` — ownership reset
+  - `CopyOwnership()` — cross-stage file copying
+- Patched Kaniko image pushed to `rg.fr-par.scw.cloud/defang-cd/kaniko-executor:patched`
+- Used `crane append` to overlay patched binary on `gcr.io/kaniko-project/executor:debug`
+
+**Blocker 13 (Kaniko local_storage exceeded) - FIXED**
+- Default Scaleway Serverless Jobs local storage is 1 GB — not enough for node builds
+- API field is `local_storage_capacity` (not `local_storage_limit`)
+- Set to 10000 MB (10 GB) in job definition
+
+**Blocker 14 (Kaniko staging directory permissions) - FIXED**
+- Error: `mkdir /kaniko/0/app: permission denied` — multi-stage file saving failed
+- Root cause: Kaniko uses `os.MkdirAll(dstDir, 0644)` for staging dirs — mode 0644 lacks execute bit
+- Fix 1: Set `KANIKO_DIR=/workspace` to use writable directory
+- Fix 2: Patched `MkdirAll` to use `0755` instead of `0644` in build.go
+
+**Blocker 15 (apt-get setgroups/seteuid in sandbox) - FIXED**
+- Error: `setgroups 65534 failed - Operation not permitted` in apt-get
+- Sandbox lacks CAP_SETGID/CAP_SETUID — apt-get can't drop privileges
+- Fix: Patched Kaniko to inject sandbox fixups after each rootfs extraction:
+  - `APT::Sandbox::User "root"` in `/etc/apt/apt.conf.d/99nosandbox`
+  - Stub `adduser`/`addgroup`/`groupadd`/`useradd` with `#!/bin/sh\nexit 0`
+
+**Blocker 16 (Health check missing required fields) - FIXED**
+- Error: `health_check.0.failure_threshold is required`
+- Scaleway requires `failure_threshold` and `interval` in health check config
+- Fix: Added defaults (failure_threshold=3, interval=10s) when not specified
+
+**DEPLOYMENT SUCCEEDED!**
+- Build: 117s (2nd run with cache), container created: 38s
+- Endpoint: `https://nextjspostgres8a2ca06a-app.functions.fnc.fr-par.scw.cloud`
+- Database: `172.16.0.2:5432` (Scaleway managed PostgreSQL)
+- App responds with HTTP 404 (may need time to connect to DB)
+
+**Experiments run (session 5):**
+11. Kaniko S3 with AWS_EC2_METADATA_DISABLED=true → succeeded (job exited 0)
+12. Scaleway API `local_storage_capacity` field testing → confirmed field name
 
 ---
 
@@ -264,9 +310,26 @@ All 5 blockers addressed:
 - Pulumi uses `PULUMI_BACKEND_URL` with S3-compatible Scaleway storage
 - Pulumi locks stored in S3 — must cancel stale locks manually after killed deployments
 
+### Scaleway Sandbox Limitations (Serverless Jobs/Containers)
+- No `CAP_CHOWN` — cannot change file ownership
+- No `CAP_SETGID`/`CAP_SETUID` — cannot switch users/groups
+- No `setgroups` syscall — apt-get privilege dropping fails
+- No `setegid`/`seteuid` — process credential changes fail
+- `local_storage_capacity` defaults to 1 GB, max tested: 10 GB
+- Job definitions accept but silently ignore unknown fields
+
+### Patched Kaniko Image
+- Source: `gcr.io/kaniko-project/executor:debug` (v1.24.0)
+- Location: `rg.<region>.scw.cloud/defang-cd/kaniko-executor:patched`
+- Patches applied:
+  1. Ignore `EPERM` on all `os.Chown()` calls in `pkg/util/fs_util.go`
+  2. Fix `os.MkdirAll` from `0644` to `0755` in `pkg/executor/build.go`
+  3. After rootfs extraction, inject apt sandbox config and stub user mgmt commands
+- Built with `crane append` — adds a single layer replacing `/kaniko/executor`
+
 ### Next Steps
-1. Clear Pulumi pending operations (may need `pulumi refresh` or state surgery)
-2. Re-run deployment and verify Kaniko build completes
-3. If build succeeds, verify container deployment and database connectivity
-4. Commit and push all changes
-5. Add unit tests for ConfigProvider
+1. Verify app connectivity to managed PostgreSQL
+2. Run unit tests for Scaleway provider changes
+3. Add unit tests for ConfigProvider
+4. Clean up `--verbosity=debug` from Kaniko flags
+5. Consider making patched Kaniko image build automated (CI/CD)
