@@ -171,32 +171,45 @@ All 5 blockers addressed:
 - Passes via `pulumi.Providers(scwProvider)` to `NewProject`
 - Added `github.com/pulumiverse/pulumi-scaleway` dependency to `cd/go.mod`
 
-**Blocker 10 (Kaniko build job shell quoting) - IN PROGRESS**
+**Blocker 10 (Kaniko build job shell quoting) - FIXED**
 - The Scaleway Serverless Jobs API `command` field splits strings by whitespace into exec arrays
 - Neither `command` (string) nor `startup_command` (array) wraps in a shell automatically
 
-**Key findings from extensive testing:**
-1. `command` (string, deprecated) → splits by whitespace, overrides Docker ENTRYPOINT+CMD
-2. `startup_command` (array) → sets Docker CMD only, does NOT override ENTRYPOINT
-3. Kaniko debug image has ENTRYPOINT `/kaniko/executor` — startup_command args become executor args
-4. Shell operators (&&, >, etc.) in `command` string are NOT interpreted — they're literal args
+**Key findings from extensive testing (sessions 4-5):**
+1. `command` (string): splits by whitespace, overrides Docker ENTRYPOINT+CMD, IS inherited by job runs
+2. `startup_command` (array): sets Docker CMD only, NOT inherited by job runs
+3. `args` (array): passes args to command, NOT inherited by job runs
+4. Only `command` and `environment_variables` are reliably inherited by job runs
+5. Shell operators (&&, >, etc.) in `command` string are NOT interpreted — they're literal exec args
+6. The start endpoint returns `{"job_runs": [...]}` not a flat object
 
-**Solution found:**
-- Use BOTH fields together: `command: "sh"` (overrides ENTRYPOINT to shell) + `startup_command: ["-c", "script"]` (sets CMD)
-- Container runs: `sh -c "full script with && operators"` — properly shell-interpreted
-- Verified working with both Alpine and Kaniko debug images
+**Failed approaches (session 4):**
+- `sh -c 'script'` → "unterminated quoted string" (API splits on whitespace, quotes are literal)
+- `startup_command: ["sh", "-c", "script"]` → kaniko help text (appends to ENTRYPOINT, doesn't override)
+- `command: "sh"` + `startup_command: ["-c", "script"]` → sh exits 0 immediately (startup_command NOT inherited)
+- `command: "sh"` + `args: ["-c", "script"]` → sh exits 0 immediately (args NOT inherited)
+
+**Solution found (session 5): `eval$IFS$KANIKO_SCRIPT` env var bootstrap**
+- Store the full build script in `KANIKO_SCRIPT` environment variable (inherited by runs)
+- Set `command: "sh -c eval$IFS$KANIKO_SCRIPT"`
+- API whitespace-splits to exec array: `["sh", "-c", "eval$IFS$KANIKO_SCRIPT"]`
+- sh receives script text `eval$IFS$KANIKO_SCRIPT`:
+  - `$IFS` expands to space/tab/newline (no literal whitespace in the token for API splitting)
+  - `$KANIKO_SCRIPT` expands to the full build script content
+  - `eval` re-parses the expansion as shell code (enabling &&, >, pipes, etc.)
+- **Verified working** with Scaleway Serverless Jobs experiments:
+  - Experiment 1: Simple multi-command script with mkdir, echo, cat → succeeded
+  - Experiment 2: JSON env var with quotes (mimicking Docker config) → succeeded
 
 **Also fixed:**
+- `runJob()` now correctly parses `{"job_runs": [...]}` response from start endpoint
 - Removed `--compressed-caching=false` from Kaniko flags (not valid in current Kaniko version)
-- The old `sh -c '...'` wrapper caused "unterminated quoted string" error
-- The bare command (no wrapper) caused "mkdir: unrecognized option" because all args went to mkdir
 
 **Current status:**
 - Deployment starts, Pulumi creates resources (namespace, private network, DB)
 - DB was provisioned successfully (status: ready, PostgreSQL-16)
-- Build job definition is created but deployment stalls — need to investigate
-- Possible issue: Pulumi state has accumulated "pending operations" from previous killed deployments
-- May need to do a `pulumi refresh` or manually clear pending operations before next attempt
+- Build job command execution is now fixed — awaiting full deployment test
+- Pulumi state has pending operations from previous killed deployments
 
 ---
 
@@ -234,11 +247,16 @@ All 5 blockers addressed:
 - Options: Kaniko in CD task, or add Docker-in-Docker capability
 
 ### Scaleway Serverless Jobs API Behavior
-- `command` (string, deprecated): splits by whitespace, replaces ENTRYPOINT+CMD as exec array
-- `startup_command` (array): replaces CMD only, appended to ENTRYPOINT
-- To run shell scripts: use `command: "sh"` + `startup_command: ["-c", "script"]`
+- `command` (string): splits by whitespace into exec array, overrides ENTRYPOINT+CMD, **inherited by job runs**
+- `startup_command` (array): overrides CMD only, appended to ENTRYPOINT, **NOT inherited by job runs**
+- `args` (array): passes args to command, **NOT inherited by job runs**
+- `environment_variables` (map): **inherited by job runs**
+- Start endpoint accepts `command` override (optional) and `environment_variables` override
+- Start endpoint returns `{"job_runs": [...]}` (array), NOT a flat object
+- To run shell scripts: use `command: "sh -c eval$IFS$SCRIPT_ENV_VAR"` with script in env var
 - Error messages truncated to 2048 chars (tail of stderr)
 - Job definitions must be explicitly deleted (no auto-cleanup)
+- Official Go SDK (`scaleway-sdk-go`) has NO `args`/`startup_command` fields — they may be undocumented
 
 ### Authentication
 - CLI uses `DEFANG_ACCESS_TOKEN` env var (NOT `DEFANG_TOKEN`)
