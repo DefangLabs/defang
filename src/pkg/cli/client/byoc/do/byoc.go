@@ -592,6 +592,13 @@ func (b *ByocDo) PrepareDomainDelegation(ctx context.Context, req client.Prepare
 	return nil, nil // TODO: implement domain delegation for DO
 }
 
+// HasDelegatedSubdomain implements client.Provider. DO does not yet implement
+// domain delegation, so there is no subdomain zone to delete on destroy. Flip
+// to true (or remove the override) once PrepareDomainDelegation is wired up.
+func (*ByocDo) HasDelegatedSubdomain() bool {
+	return false
+}
+
 type cdCommand struct {
 	command        []string
 	etag           types.ETag

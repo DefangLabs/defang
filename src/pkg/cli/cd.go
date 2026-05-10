@@ -46,10 +46,12 @@ func CdCommand(ctx context.Context, projectName string, provider client.Provider
 	action := defangv1.DeploymentAction_DEPLOYMENT_ACTION_REFRESH
 	switch command {
 	case client.CdCommandDown, client.CdCommandDestroy:
-		err := deleteSubdomain(ctx, projectName, provider, fabric)
-		if err != nil {
-			term.Warn("Unable to update deployment history; deployment will proceed anyway.")
-			break
+		// Skip subdomain cleanup for providers that did not delegate one on the way up.
+		if provider.HasDelegatedSubdomain() {
+			if err := deleteSubdomain(ctx, projectName, provider, fabric); err != nil {
+				term.Warn("Failed to delete delegated subdomain; the destroy will proceed anyway.")
+				break
+			}
 		}
 		// Update deployment table to mark deployment as destroyed only after successful deletion of the subdomain
 		action = defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN
@@ -66,7 +68,7 @@ func CdCommand(ctx context.Context, projectName string, provider client.Provider
 		})
 		if err != nil {
 			term.Debug("Failed to record deployment:", err)
-			term.Warn("Unable to update deployment history; deployment will proceed anyway.")
+			term.Warnf("Unable to update deployment history; %s will proceed anyway.", command)
 		}
 	}
 	return cd.ETag, nil
