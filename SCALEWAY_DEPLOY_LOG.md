@@ -363,7 +363,21 @@ All 5 blockers addressed:
   cached layers from previous builds (where adduser was a no-op)
 - Fix: Deleted all cache tags from Scaleway Container Registry before redeploying
 
+**FULL CYCLE VERIFIED!**
+- Config → Up → Verify → Down all working
+- Container status: `ready` (not `error`)
+- Endpoint: `https://nextjspostgresc1cb211c-app.functions.fnc.fr-par.scw.cloud` (HTTP 200)
+- App renders "Recent IP Responses stored in Postgres database managed by Defang"
+- Postgres data reads/writes confirmed (visitor entries with timestamps)
+- Clean teardown: 0 container namespaces remain after destroy
+
 **Experiments run (session 7):**
 13. Local Kaniko test with functional adduser stubs → /etc/passwd populated correctly
 14. Multi-stage Dockerfile test → fixups injected for all stages with RUN commands
 15. Verified symlink bug: addgroup→adduser symlink caused os.WriteFile to overwrite adduser
+16. Full cycle test: config set → compose up → curl endpoint → compose down → verify cleanup
+
+**Known issue (not blocking):**
+- Log tailing fails because `fr-par.logs.cockpit.scaleway.com` doesn't resolve from this environment
+- The CLI exits with an error after the CD job is dispatched, but the deployment completes successfully
+- This is a DNS/network issue in the devcontainer, not a Scaleway or CLI bug
