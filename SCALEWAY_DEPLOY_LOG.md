@@ -324,8 +324,10 @@ All 5 blockers addressed:
 - Patches applied:
   1. Ignore `EPERM` on all `os.Chown()` calls in `pkg/util/fs_util.go`
   2. Fix `os.MkdirAll` from `0644` to `0755` in `pkg/executor/build.go`
-  3. After rootfs extraction, inject apt sandbox config and stub user mgmt commands
+  3. After rootfs extraction, inject apt sandbox config and **functional** user mgmt stubs
+- Functional stubs write actual `/etc/passwd` and `/etc/group` entries (not just `exit 0`)
 - Built with `crane append` — adds a single layer replacing `/kaniko/executor`
+- Build from source: clone `kaniko v1.24.0`, apply patches in `sandbox_fixups.go` + `fs_util.go` + `build.go`
 
 ### Next Steps
 1. Verify app connectivity to managed PostgreSQL
@@ -333,3 +335,35 @@ All 5 blockers addressed:
 3. Add unit tests for ConfigProvider
 4. Clean up `--verbosity=debug` from Kaniko flags
 5. Consider making patched Kaniko image build automated (CI/CD)
+
+---
+
+## Session 7: Fix adduser/Kaniko stubs and end-to-end deployment (2026-05-09/10)
+
+**Blocker 17 (Container fails: USER appuser not in /etc/passwd) - FIXED**
+- Error: `unable to find user appuser: no matching entries in passwd file`
+- Root cause: Patched Kaniko's adduser/addgroup stubs were `#!/bin/sh\nexit 0` — they didn't
+  actually create entries in `/etc/passwd` or `/etc/group`
+- The `USER appuser` Dockerfile directive was preserved in the image config but the user
+  didn't exist, so the container runtime failed on startup
+- Fix: Rebuilt patched Kaniko with **functional stubs** in `pkg/executor/sandbox_fixups.go`:
+  - `adduser`/`useradd` stubs parse flags and append to `/etc/passwd`
+  - `addgroup`/`groupadd` stubs parse flags and append to `/etc/group`
+  - Stubs handle `--system`, `--ingroup`, `--uid`, `--gid`, `--shell`, `--home` flags
+
+**Blocker 18 (addgroup symlink overwrites adduser) - FIXED**
+- In Debian-based images, `/usr/sbin/addgroup` is a **symlink** to `/usr/sbin/adduser`
+- When writing the addgroup stub via `os.WriteFile`, it followed the symlink and
+  overwrote the adduser script with the addgroup content
+- Result: `adduser` became the addgroup stub, which only creates groups, not users
+- Fix: Call `os.Remove()` on all stub paths before writing to break symlinks
+
+**Blocker 19 (Kaniko cache reuses old broken layers) - FIXED**
+- Even after pushing new patched Kaniko, the `--cache=true` flag caused Kaniko to reuse
+  cached layers from previous builds (where adduser was a no-op)
+- Fix: Deleted all cache tags from Scaleway Container Registry before redeploying
+
+**Experiments run (session 7):**
+13. Local Kaniko test with functional adduser stubs → /etc/passwd populated correctly
+14. Multi-stage Dockerfile test → fixups injected for all stages with RUN commands
+15. Verified symlink bug: addgroup→adduser symlink caused os.WriteFile to overwrite adduser
