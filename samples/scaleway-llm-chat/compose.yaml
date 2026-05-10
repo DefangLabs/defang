@@ -1,4 +1,4 @@
-name: scaleway-llm-chat
+name: scw-llm-chat
 services:
   app:
     build:
@@ -9,9 +9,9 @@ services:
         mode: ingress
     restart: unless-stopped
     environment:
-      - LLM_URL=http://llm:4000/v1/
-      - LLM_MODEL=chat-default
-      - OPENAI_API_KEY=FAKE_TOKEN
+      - LLM_URL=https://api.scaleway.ai/v1/
+      - LLM_MODEL=llama-3.3-70b-instruct
+      - OPENAI_API_KEY=${SCW_SECRET_KEY}
     healthcheck:
       test:
         - CMD
@@ -23,21 +23,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
-    depends_on:
-      - llm
-    deploy:
-      resources:
-        reservations:
-          cpus: "0.5"
-          memory: 512M
-  llm:
-    provider:
-      type: model
-      options:
-        model: chat-default
-    x-defang-llm: true
-    environment:
-      - SCW_SECRET_KEY
     deploy:
       resources:
         reservations:

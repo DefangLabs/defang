@@ -132,6 +132,7 @@ func (b *ByocScaleway) environment(projectName string) (map[string]string, error
 		"PROJECT":                    projectName,
 		"PULUMI_CONFIG_PASSPHRASE":   byoc.PulumiConfigPassphrase,
 		"PULUMI_COPILOT":             "false",
+		"PULUMI_HOME":               "/home/.pulumi",
 		"PULUMI_SKIP_UPDATE_CHECK":   "true",
 		"SCW_ACCESS_KEY":             b.client.AccessKey,
 		"SCW_SECRET_KEY":             b.client.SecretKey,
