@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scaleway LLM Chat - Deployed with Defang</title>
+    <link rel="stylesheet" href="./static/style.css">
+</head>
+<body>
+    <h1>Chat with Scaleway AI</h1>
+    <p class="subtitle">Deployed with Defang &middot; Powered by Scaleway Managed Inference</p>
+    <div id="chat-container">
+        <div id="messages"></div>
+        <form id="chatForm" onsubmit="event.preventDefault(); sendMessage();">
+            <textarea id="prompt" name="prompt" rows="3" placeholder="Type your message..."
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
+            <button type="submit" id="sendBtn">Send</button>
+        </form>
+    </div>
+    <script>
+        async function sendMessage() {
+            const input = document.getElementById('prompt');
+            const prompt = input.value.trim();
+            if (!prompt) return;
+
+            const messages = document.getElementById('messages');
+            const sendBtn = document.getElementById('sendBtn');
+
+            // Show user message
+            const userMsg = document.createElement('div');
+            userMsg.className = 'message user';
+            userMsg.textContent = prompt;
+            messages.appendChild(userMsg);
+
+            input.value = '';
+            sendBtn.disabled = true;
+            sendBtn.textContent = 'Thinking...';
+
+            // Show loading
+            const loadingMsg = document.createElement('div');
+            loadingMsg.className = 'message assistant loading';
+            loadingMsg.textContent = '...';
+            messages.appendChild(loadingMsg);
+            messages.scrollTop = messages.scrollHeight;
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({ prompt })
+                });
+                const data = await response.json();
+                loadingMsg.textContent = data.reply || 'No reply.';
+                loadingMsg.classList.remove('loading');
+            } catch (err) {
+                loadingMsg.textContent = 'Error: Could not reach the server.';
+                loadingMsg.classList.remove('loading');
+                loadingMsg.classList.add('error');
+            }
+
+            sendBtn.disabled = false;
+            sendBtn.textContent = 'Send';
+            messages.scrollTop = messages.scrollHeight;
+        }
+    </script>
+</body>
+</html>

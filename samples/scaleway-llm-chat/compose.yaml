@@ -1,0 +1,45 @@
+name: scaleway-llm-chat
+services:
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    ports:
+      - target: 8000
+        mode: ingress
+    restart: unless-stopped
+    environment:
+      - LLM_URL=http://llm:4000/v1/
+      - LLM_MODEL=chat-default
+      - OPENAI_API_KEY=FAKE_TOKEN
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - import sys, urllib.request; urllib.request.urlopen(sys.argv[1]).read()
+        - http://localhost:8000/health
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      - llm
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+  llm:
+    provider:
+      type: model
+      options:
+        model: chat-default
+    x-defang-llm: true
+    environment:
+      - SCW_SECRET_KEY
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.5"
+          memory: 512M

@@ -381,3 +381,77 @@ All 5 blockers addressed:
 - Log tailing fails because `fr-par.logs.cockpit.scaleway.com` doesn't resolve from this environment
 - The CLI exits with an error after the CD job is dispatched, but the deployment completes successfully
 - This is a DNS/network issue in the devcontainer, not a Scaleway or CLI bug
+
+---
+
+## Session 8: LLM / Managed Inference Support (2026-05-10)
+
+**Goal:** Add Scaleway Managed Inference (Generative APIs) support to match the LLM access
+gateway pattern used by AWS (Bedrock) and GCP (Vertex AI).
+
+### Research Findings
+
+1. **Scaleway Generative APIs** — OpenAI-compatible at `https://api.scaleway.ai/v1`
+   - Auth: `Authorization: Bearer $SCW_SECRET_KEY`
+   - Supports chat completions, embeddings, streaming, structured outputs, tool calling
+   - As of May 2026, rebranded from "Managed Inference" to "Generative APIs - Dedicated Deployment"
+
+2. **LiteLLM has native Scaleway support** — model prefix `scaleway/`, env var `SCW_SECRET_KEY`
+   - Example: `scaleway/llama-3.3-70b-instruct`
+   - All Scaleway Generative API models supported
+   - Streaming, structured outputs, tool calling all work
+
+3. **Available models (serverless):**
+   - Chat: `llama-3.3-70b-instruct`, `qwen3-235b-a22b-instruct-2507`, `mistral-small-3.2-24b-instruct-2506`, `deepseek-r1-distill-llama-70b`, `gemma-3-27b-instruct`, etc.
+   - Embedding: `bge-multilingual-gemma2`, `qwen3-embedding-8b`
+   - Audio: `whisper-large-v3`
+   - Vision: `pixtral-12b-2409`
+
+### Changes Made
+
+**CLI compose fixup (`src/pkg/cli/compose/fixup.go`):**
+- Added `ProviderScaleway` case to `configureAccessGateway`
+- Default chat model: `llama-3.3-70b-instruct` (widely available, good quality)
+- Default embedding model: `bge-multilingual-gemma2`
+- Uses LiteLLM's `scaleway/` prefix — LiteLLM handles Scaleway auth via `SCW_SECRET_KEY`
+- No extra env vars needed in fixup (unlike AWS `AWS_REGION` or GCP `VERTEXAI_PROJECT`) — LiteLLM resolves Scaleway endpoint from the prefix
+
+**Tests (`src/pkg/cli/compose/fixup_test.go`):**
+- Added `TestMakeAccessGatewayServiceScaleway` with 3 subtests:
+  - `chat-default` → `scaleway/llama-3.3-70b-instruct`
+  - `embedding-default` → `scaleway/bge-multilingual-gemma2`
+  - Custom model gets `scaleway/` prefix
+
+**Sample app (`samples/scaleway-llm-chat/`):**
+- FastAPI chat app with a conversation UI
+- Uses `provider: type: model` compose pattern (matches `managed-llm-provider` sample)
+- LLM service uses `x-defang-llm: true` and `provider: type: model`
+- `SCW_SECRET_KEY` passed to LLM service as a secret (set via `defang config set`)
+- Chat UI with send/receive, loading states, error handling
+
+### Architecture
+
+```
+User → [app (FastAPI)] → [llm (LiteLLM)] → Scaleway Generative APIs
+         :8000               :4000            api.scaleway.ai/v1
+```
+
+The `provider: type: model` pattern in the compose file triggers the CLI fixup to:
+1. Replace the `llm` service with a LiteLLM container
+2. Resolve `chat-default` to `scaleway/llama-3.3-70b-instruct` for the Scaleway provider
+3. Inject `LLM_URL`, `LLM_MODEL`, `OPENAI_API_KEY` into the `app` service
+4. Put both services on a private network
+
+### Deployment Steps (to test)
+
+```bash
+cd samples/scaleway-llm-chat
+defang config set SCW_SECRET_KEY   # Scaleway API key
+defang compose up                   # Deploy to Scaleway
+```
+
+### Status
+- [ ] CLI fixup code: DONE
+- [ ] Unit tests: DONE (need CI to verify)
+- [ ] Sample app: DONE
+- [ ] End-to-end deployment: PENDING (need CLI built from this branch + Scaleway credentials)

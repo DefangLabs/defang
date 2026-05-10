@@ -120,6 +120,38 @@ func TestMakeAccessGatewayServiceGCP(t *testing.T) {
 	})
 }
 
+func TestMakeAccessGatewayServiceScaleway(t *testing.T) {
+	info := &client.AccountInfo{
+		Provider:  client.ProviderScaleway,
+		Region:    "fr-par",
+		AccountID: "scw-project-id",
+	}
+
+	t.Run("chat-default model", func(t *testing.T) {
+		proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
+		svccfg := newLLMService()
+		makeAccessGatewayService(&svccfg, proj, "chat-default", info)
+
+		require.Equal(t, []string{"--drop_params", "--model", "scaleway/llama-3.3-70b-instruct", "--alias", "chat-default"}, []string(svccfg.Command))
+	})
+
+	t.Run("embedding-default model", func(t *testing.T) {
+		proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
+		svccfg := newLLMService()
+		makeAccessGatewayService(&svccfg, proj, "embedding-default", info)
+
+		require.Equal(t, []string{"--drop_params", "--model", "scaleway/bge-multilingual-gemma2", "--alias", "embedding-default"}, []string(svccfg.Command))
+	})
+
+	t.Run("custom model gets scaleway prefix", func(t *testing.T) {
+		proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
+		svccfg := newLLMService()
+		makeAccessGatewayService(&svccfg, proj, "llama-3.3-70b-instruct", info)
+
+		require.Equal(t, []string{"--drop_params", "--model", "scaleway/llama-3.3-70b-instruct", "--alias", "llama-3.3-70b-instruct"}, []string(svccfg.Command))
+	})
+}
+
 func TestMakeAccessGatewayServiceLiteLLMMasterKey(t *testing.T) {
 	info := &client.AccountInfo{}
 

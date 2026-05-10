@@ -431,6 +431,14 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 		if info.Region != "" {
 			svccfg.Environment["VERTEXAI_LOCATION"] = &info.Region
 		}
+	case client.ProviderScaleway:
+		switch model {
+		case "chat-default":
+			model = "llama-3.3-70b-instruct"
+		case "embedding-default":
+			model = "bge-multilingual-gemma2"
+		}
+		model = modelWithProvider(model, "scaleway")
 	}
 
 	// svccfg.HealthCheck = &composeTypes.ServiceHealthCheckConfig{} TODO: add healthcheck
