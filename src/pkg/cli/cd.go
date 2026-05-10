@@ -68,12 +68,7 @@ func CdCommand(ctx context.Context, projectName string, provider client.Provider
 		})
 		if err != nil {
 			term.Debug("Failed to record deployment:", err)
-			switch command {
-			case client.CdCommandDown, client.CdCommandDestroy:
-				term.Warn("Unable to update deployment history; the destroy will proceed anyway.")
-			default:
-				term.Warn("Unable to update deployment history; the refresh will proceed anyway.")
-			}
+			term.Warnf("Unable to update deployment history; %s will proceed anyway.", command)
 		}
 	}
 	return cd.ETag, nil
