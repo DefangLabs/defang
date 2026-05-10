@@ -280,6 +280,22 @@ func (m MockFabricClient) GetDefaultStack(context.Context, *defangv1.GetDefaultS
 	}, nil
 }
 
+func (m MockFabricClient) ResolveIPAddr(_ context.Context, _ *defangv1.ResolveIPAddrRequest) (*defangv1.ResolveIPAddrResponse, error) {
+	return &defangv1.ResolveIPAddrResponse{}, nil
+}
+
+func (m MockFabricClient) ResolveCNAME(_ context.Context, _ *defangv1.ResolveCNAMERequest) (*defangv1.ResolveCNAMEResponse, error) {
+	return &defangv1.ResolveCNAMEResponse{}, nil
+}
+
+func (m MockFabricClient) ResolveNS(_ context.Context, _ *defangv1.ResolveNSRequest) (*defangv1.ResolveNSResponse, error) {
+	return &defangv1.ResolveNSResponse{}, nil
+}
+
+func (m MockFabricClient) ResolveTXT(_ context.Context, _ *defangv1.ResolveTXTRequest) (*defangv1.ResolveTXTResponse, error) {
+	return &defangv1.ResolveTXTResponse{}, nil
+}
+
 type MockLoader struct {
 	Project composeTypes.Project
 	Error   error
