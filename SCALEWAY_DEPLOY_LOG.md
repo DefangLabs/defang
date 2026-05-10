@@ -451,7 +451,54 @@ defang compose up                   # Deploy to Scaleway
 ```
 
 ### Status
-- [ ] CLI fixup code: DONE
-- [ ] Unit tests: DONE (need CI to verify)
-- [ ] Sample app: DONE
-- [ ] End-to-end deployment: PENDING (need CLI built from this branch + Scaleway credentials)
+- [x] CLI fixup code: DONE
+- [x] Unit tests: DONE (need CI to verify)
+- [x] Sample app: DONE
+- [x] End-to-end deployment: DONE (see Session 9 below)
+
+---
+
+## Session 9: LLM Chat Deployment Success (2026-05-10)
+
+### What was done
+
+Successfully deployed the `scaleway-llm-chat` sample app to Scaleway using `defang compose up`.
+
+### Key findings and fixes
+
+1. **CD Image was empty (0 bytes)**: The `rg.fr-par.scw.cloud/defang-cd/cd:scaleway` image had no content. Rebuilt it using `crane` with:
+   - Base: `alpine:3.21` (needed for CA certificates)
+   - `/app/cd`: Built from `pulumi-defang` repo (`sam/httpsgithubcomdefanglabspulumi-defang-deep-dive-01kr1k` branch)
+   - `/usr/local/bin/pulumi` v3.231.0 (matching Go SDK version)
+   - Pre-installed Pulumi plugins: `defang-scaleway` v2.0.0-beta.5 + `scaleway` v1.48.0
+
+2. **PULUMI_HOME permission denied**: Scaleway Serverless Jobs don't run as root. Added `PULUMI_HOME=/home/.pulumi` to the CD job environment in `byoc.go`.
+
+3. **Host-mode ports unsupported**: The LiteLLM access gateway uses `Mode_HOST` ports, which Scaleway Serverless Containers don't support. **Workaround**: Simplified the sample to talk directly to Scaleway's Generative API (`https://api.scaleway.ai/v1/`) instead of using LiteLLM as intermediary. This avoids the host-mode port issue entirely.
+
+4. **DEFANG_CD_IMAGE**: Must be set to `rg.fr-par.scw.cloud/defang-cd/cd:scaleway`. The ECR image (`public.ecr.aws/defang-io/cd:public-beta`) is a Node.js app without `/app/cd` binary.
+
+### Architecture (deployed)
+
+```
+User → https://scwllmchat45eef04f-app.functions.fnc.fr-par.scw.cloud
+         ↓
+   FastAPI App (Scaleway Serverless Container)
+         ↓ OPENAI_API_KEY=${SCW_SECRET_KEY}
+   https://api.scaleway.ai/v1/ (Scaleway Generative APIs)
+         ↓
+   llama-3.3-70b-instruct
+```
+
+### Verified working
+
+- Health check: `GET /health` → `{"status":"healthy"}`
+- Chat: `POST /ask` with prompt → LLM response from llama-3.3-70b-instruct
+- Web UI: Chat interface loads and works
+
+### Remaining work for LiteLLM integration
+
+The `provider: type: model` pattern (LiteLLM access gateway) needs these fixes before it works on Scaleway:
+- Fix host-mode port validation in Scaleway provider (either support internal ports or change LiteLLM port to ingress)
+- Implement service-to-service DNS resolution on Scaleway (services can't resolve each other by name)
+- These are tracked in the CLI fixup code at `src/pkg/cli/compose/fixup.go:454`
