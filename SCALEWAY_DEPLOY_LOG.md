@@ -285,12 +285,15 @@ All 5 blockers addressed:
 - Cockpit/Loki (logging)
 - DNS zones (domain delegation)
 
-### Image Building Gap
+### Image Building
 - AWS: CodeBuild (downloads context from S3, builds, pushes to ECR)
 - GCP: Cloud Build (similar flow)
 - Azure: ACR Tasks (Azure Container Registry build tasks)
-- Scaleway: **No native build service** — needs alternative approach
-- Options: Kaniko in CD task, or add Docker-in-Docker capability
+- Scaleway: No native build service — **solved via Kaniko in Scaleway Serverless Jobs**
+  - Patched Kaniko image for gVisor sandbox (chown, setgroups, apt sandbox)
+  - Source context from Scaleway Object Storage (S3-compatible)
+  - Built images pushed to Scaleway Container Registry
+  - See `provider/defangscaleway/build.go` in pulumi-defang repo
 
 ### Scaleway Serverless Jobs API Behavior
 - `command` (string): splits by whitespace into exec array, overrides ENTRYPOINT+CMD, **inherited by job runs**
@@ -496,9 +499,6 @@ User → https://scwllmchat45eef04f-app.functions.fnc.fr-par.scw.cloud
 - Chat: `POST /ask` with prompt → LLM response from llama-3.3-70b-instruct
 - Web UI: Chat interface loads and works
 
-### Remaining work for LiteLLM integration
+### LLM approach (final)
 
-The `provider: type: model` pattern (LiteLLM access gateway) needs these fixes before it works on Scaleway:
-- Fix host-mode port validation in Scaleway provider (either support internal ports or change LiteLLM port to ingress)
-- Implement service-to-service DNS resolution on Scaleway (services can't resolve each other by name)
-- These are tracked in the CLI fixup code at `src/pkg/cli/compose/fixup.go:454`
+The initial LiteLLM sidecar approach (session 8) was superseded. Scaleway LLM now uses **direct Generative API access** via CLI compose fixup — no sidecar container is deployed. The CLI strips `provider: type: model` services and injects `CHAT_URL`, `CHAT_MODEL`, `EMBEDDING_URL`, `EMBEDDING_MODEL`, and `OPENAI_API_KEY` env vars pointing to `https://api.scaleway.ai/v1/`. This avoids the host-mode port and service-to-service DNS issues that blocked the LiteLLM sidecar approach. Validated end-to-end with the `mastra-extended` sample (2026-05-10).
