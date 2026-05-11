@@ -14,6 +14,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	cloudscaleway "github.com/DefangLabs/defang/src/pkg/clouds/scaleway"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
@@ -56,6 +57,20 @@ func TestCdLogQueryUsesScopedJobName(t *testing.T) {
 	query := client.buildLogQuery(&defangv1.TailRequest{})
 
 	assert.Equal(t, `{job_definition_name="defang-cd-tenant-project-prod"}`, query)
+}
+
+func TestServiceLogQueryUsesServerlessContainerNames(t *testing.T) {
+	t.Parallel()
+
+	client := &ByocScaleway{}
+	client.ByocBaseClient = byoc.NewByocBaseClient("", client, "tenant/project/prod")
+
+	query := client.buildLogQuery(&defangv1.TailRequest{
+		LogType:  uint32(logs.LogTypeAll),
+		Services: []string{"app", "api.v1"},
+	})
+
+	assert.Equal(t, `{resource_type="serverless_container",resource_name=~".*-(app|api\.v1)"}`, query)
 }
 
 func TestEnvironmentIncludesPulumiAndScalewayContext(t *testing.T) {
@@ -235,6 +250,24 @@ func TestLokiEntryToTailResponseParsesScalewayJSONPayload(t *testing.T) {
 	assert.Equal(t, "run-id", resp.Entries[0].Host)
 	assert.Equal(t, "error: kaniko build failed", resp.Entries[0].Message)
 	assert.True(t, resp.Entries[0].Stderr)
+}
+
+func TestLokiEntryToTailResponseParsesScalewayRuntimePayload(t *testing.T) {
+	t.Parallel()
+
+	resp := lokiEntryToTailResponse(cloudscaleway.LokiEntry{
+		Line: `{"resource_instance":"deployment-pod","message":"defang-log-smoke request path=/test-logs","stream":"stdout"}`,
+		Labels: map[string]string{
+			"resource_name": "scalewaylogsmokef9df5e7b-app",
+			"resource_type": "serverless_container",
+		},
+	}, "etag")
+
+	require.Len(t, resp.Entries, 1)
+	assert.Equal(t, "scalewaylogsmokef9df5e7b-app", resp.Service)
+	assert.Equal(t, "deployment-pod", resp.Entries[0].Host)
+	assert.Equal(t, "defang-log-smoke request path=/test-logs", resp.Entries[0].Message)
+	assert.False(t, resp.Entries[0].Stderr)
 }
 
 func TestLokiEntryToTailResponseSkipsScalewayMetadataPayload(t *testing.T) {

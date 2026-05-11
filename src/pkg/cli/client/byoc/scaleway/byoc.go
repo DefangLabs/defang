@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"iter"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -1006,15 +1007,19 @@ func (b *ByocScaleway) ensureCockpitToken(ctx context.Context) error {
 func (b *ByocScaleway) buildLogQuery(req *defangv1.TailRequest) string {
 	logType := logs.LogType(req.LogType)
 
-	if logType.Has(logs.LogTypeCD) || logType == logs.LogTypeUnspecified {
-		return fmt.Sprintf(`{job_definition_name=%q}`, b.cdJobName())
-	}
-
 	if len(req.Services) > 0 {
 		if len(req.Services) == 1 {
-			return fmt.Sprintf(`{resource_name=%q}`, req.Services[0])
+			return fmt.Sprintf(`{resource_type="serverless_container",resource_name=~".*-%s"}`, regexp.QuoteMeta(req.Services[0]))
 		}
-		return fmt.Sprintf(`{resource_name=~"%s"}`, strings.Join(req.Services, "|"))
+		services := make([]string, len(req.Services))
+		for i, service := range req.Services {
+			services[i] = regexp.QuoteMeta(service)
+		}
+		return fmt.Sprintf(`{resource_type="serverless_container",resource_name=~".*-(%s)"}`, strings.Join(services, "|"))
+	}
+
+	if logType.Has(logs.LogTypeCD) || logType == logs.LogTypeUnspecified {
+		return fmt.Sprintf(`{job_definition_name=%q}`, b.cdJobName())
 	}
 
 	return fmt.Sprintf(`{job_definition_name=~"%s.*"}`, byoc.CdTaskPrefix)
@@ -1073,6 +1078,7 @@ type scalewayLogPayload struct {
 	JobDefinitionName string `json:"job_definition_name"`
 	Message           string `json:"message"`
 	ResourceID        string `json:"resource_id"`
+	ResourceInstance  string `json:"resource_instance"`
 	ResourceName      string `json:"resource_name"`
 	Stream            string `json:"stream"`
 }
@@ -1097,6 +1103,9 @@ func parseScalewayLogEntry(entry scaleway.LokiEntry) (scaleway.LokiEntry, string
 	if payload.ResourceID != "" {
 		entry.Labels["resource_id"] = payload.ResourceID
 	}
+	if payload.ResourceInstance != "" {
+		entry.Labels["resource_instance"] = payload.ResourceInstance
+	}
 	if payload.Stream != "" {
 		entry.Labels["stream"] = payload.Stream
 	}
@@ -1115,7 +1124,10 @@ func lokiEntryToTailResponse(entry scaleway.LokiEntry, etag string) *defangv1.Ta
 	if service == "" {
 		service = "cd"
 	}
-	host := entry.Labels["resource_id"]
+	host := entry.Labels["resource_instance"]
+	if host == "" {
+		host = entry.Labels["resource_id"]
+	}
 	stderr := entry.Labels["stream"] == "stderr" || strings.Contains(strings.ToLower(message), "error")
 
 	return &defangv1.TailResponse{
