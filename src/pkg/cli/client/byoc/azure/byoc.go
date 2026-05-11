@@ -705,6 +705,14 @@ func (b *ByocAzure) PrepareDomainDelegation(context.Context, client.PrepareDomai
 	return nil, nil // TODO: implement domain delegation for Azure
 }
 
+// HasDelegatedSubdomain implements client.Provider. Azure does not yet
+// implement domain delegation, so there is no subdomain zone to delete on
+// destroy. Flip to true (or remove the override) once PrepareDomainDelegation
+// is wired up.
+func (*ByocAzure) HasDelegatedSubdomain() bool {
+	return false
+}
+
 // Preview implements client.Provider.
 func (b *ByocAzure) Preview(ctx context.Context, req *client.DeployRequest) (*client.DeployResponse, error) {
 	defer term.Timing()()
