@@ -252,7 +252,7 @@ direnv allow
 
 ### Adding cloud support
 
-At a high-level, support for a specific cloud lives in two repositories:
+At a high-level, support for a specific cloud lives in three repositories:
 
 - In [this CLI repository](https://github.com/DefangLabs/defang)
   - an implementation of the [client.Provider](src/pkg/cli/client/byoc) interface under the [`byoc` package](src/pkg/cli/client/byoc)
@@ -270,3 +270,5 @@ At a high-level, support for a specific cloud lives in two repositories:
     - `Redis` component
   - a Pulumi **custom** resource for `Build`
   - an implementation of the `ConfigProvider` interface to read config (secrets/parameters) at deploy time
+- In the [Defang Docs repository](https://github.com/DefangLabs/defang-docs)
+  - under the [`providers` section](https://docs.defang.io/docs/providers), documentation for how to set up credentials and permissions for the cloud, and any cloud-specific features
