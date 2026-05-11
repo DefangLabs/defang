@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"iter"
@@ -1002,7 +1003,7 @@ func (b *ByocScaleway) buildLogQuery(req *defangv1.TailRequest) string {
 	logType := logs.LogType(req.LogType)
 
 	if logType.Has(logs.LogTypeCD) || logType == logs.LogTypeUnspecified {
-		return fmt.Sprintf(`{resource_name=%q}`, b.cdJobName())
+		return fmt.Sprintf(`{job_definition_name=%q}`, b.cdJobName())
 	}
 
 	if len(req.Services) > 0 {
@@ -1012,7 +1013,7 @@ func (b *ByocScaleway) buildLogQuery(req *defangv1.TailRequest) string {
 		return fmt.Sprintf(`{resource_name=~"%s"}`, strings.Join(req.Services, "|"))
 	}
 
-	return fmt.Sprintf(`{resource_name=~"%s.*"}`, byoc.CdTaskPrefix)
+	return fmt.Sprintf(`{job_definition_name=~"%s.*"}`, byoc.CdTaskPrefix)
 }
 
 // followLogs polls Loki for new log entries in a loop.
@@ -1059,20 +1060,57 @@ func (b *ByocScaleway) followLogs(ctx context.Context, query, etag string, req *
 	}
 }
 
+type scalewayLogPayload struct {
+	JobDefinitionName string `json:"job_definition_name"`
+	Message           string `json:"message"`
+	ResourceID        string `json:"resource_id"`
+	ResourceName      string `json:"resource_name"`
+	Stream            string `json:"stream"`
+}
+
+func parseScalewayLogEntry(entry scaleway.LokiEntry) (scaleway.LokiEntry, string) {
+	var payload scalewayLogPayload
+	if err := json.Unmarshal([]byte(entry.Line), &payload); err != nil {
+		return entry, entry.Line
+	}
+	if entry.Labels == nil {
+		entry.Labels = map[string]string{}
+	}
+	if payload.Message != "" {
+		entry.Line = payload.Message
+	}
+	if payload.ResourceName != "" {
+		entry.Labels["resource_name"] = payload.ResourceName
+	}
+	if payload.JobDefinitionName != "" {
+		entry.Labels["job_definition_name"] = payload.JobDefinitionName
+	}
+	if payload.ResourceID != "" {
+		entry.Labels["resource_id"] = payload.ResourceID
+	}
+	if payload.Stream != "" {
+		entry.Labels["stream"] = payload.Stream
+	}
+	return entry, entry.Line
+}
+
 func lokiEntryToTailResponse(entry scaleway.LokiEntry, etag string) *defangv1.TailResponse {
+	entry, message := parseScalewayLogEntry(entry)
 	service := entry.Labels["resource_name"]
+	if service == "" {
+		service = entry.Labels["job_definition_name"]
+	}
 	if service == "" {
 		service = "cd"
 	}
 	host := entry.Labels["resource_id"]
-	// TODO: Scaleway Loki doesn't provide stream labels to distinguish stdout/stderr; using string matching as a heuristic
-	stderr := strings.Contains(strings.ToLower(entry.Line), "error")
+	stderr := entry.Labels["stream"] == "stderr" || strings.Contains(strings.ToLower(message), "error")
 
 	return &defangv1.TailResponse{
 		Service: service,
 		Etag:    etag,
 		Entries: []*defangv1.LogEntry{{
-			Message:   entry.Line,
+			Message:   message,
 			Timestamp: timestamppb.New(entry.Timestamp),
 			Service:   service,
 			Etag:      etag,

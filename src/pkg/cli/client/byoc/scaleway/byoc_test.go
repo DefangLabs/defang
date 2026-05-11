@@ -55,7 +55,7 @@ func TestCdLogQueryUsesScopedJobName(t *testing.T) {
 
 	query := client.buildLogQuery(&defangv1.TailRequest{})
 
-	assert.Equal(t, `{resource_name="defang-cd-tenant-project-prod"}`, query)
+	assert.Equal(t, `{job_definition_name="defang-cd-tenant-project-prod"}`, query)
 }
 
 func TestEnvironmentIncludesPulumiAndScalewayContext(t *testing.T) {
@@ -216,6 +216,25 @@ func TestLokiEntryToTailResponse(t *testing.T) {
 	fallback := lokiEntryToTailResponse(cloudscaleway.LokiEntry{Line: "ok"}, "etag")
 	assert.Equal(t, "cd", fallback.Service)
 	assert.False(t, fallback.Entries[0].Stderr)
+}
+
+func TestLokiEntryToTailResponseParsesScalewayJSONPayload(t *testing.T) {
+	t.Parallel()
+
+	ts := time.Date(2026, 5, 11, 18, 40, 0, 0, time.UTC)
+	resp := lokiEntryToTailResponse(cloudscaleway.LokiEntry{
+		Timestamp: ts,
+		Line:      `{"resource_type":"serverless_job","stream":"stderr","job_definition_name":"defang-cd-logsval","resource_id":"run-id","message":"error: kaniko build failed"}`,
+		Labels: map[string]string{
+			"resource_type": "serverless_job",
+		},
+	}, "etag")
+
+	require.Len(t, resp.Entries, 1)
+	assert.Equal(t, "defang-cd-logsval", resp.Service)
+	assert.Equal(t, "run-id", resp.Entries[0].Host)
+	assert.Equal(t, "error: kaniko build failed", resp.Entries[0].Message)
+	assert.True(t, resp.Entries[0].Stderr)
 }
 
 func TestSubscribeRejectsMissingOrMismatchedRun(t *testing.T) {
