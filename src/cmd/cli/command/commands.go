@@ -175,6 +175,7 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(cdCmd)
 	cdCmd.PersistentFlags().StringVar(&byoc.DefangPulumiBackend, "pulumi-backend", "", `specify an alternate Pulumi backend URL or "pulumi-cloud"`)
 	cdCmd.PersistentFlags().Bool("allow-upgrade", pkg.GetenvBool("DEFANG_ALLOW_UPGRADE"), "allow upgrading the CD image and Pulumi version to the latest available")
+	cdCmd.PersistentFlags().BoolP("detach", "d", false, "run in detached mode")
 	cdCmd.AddCommand(cdDestroyCmd)
 	cdCmd.AddCommand(cdDownCmd)
 	cdCmd.AddCommand(cdRefreshCmd)
