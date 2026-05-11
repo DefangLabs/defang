@@ -978,7 +978,9 @@ func (b *ByocScaleway) ensureCockpitToken(ctx context.Context) error {
 		for _, t := range tokens {
 			if t.Name == tokenName {
 				if delErr := b.client.DeleteCockpitToken(ctx, t.ID); delErr != nil {
-					return fmt.Errorf("deleting existing Cockpit token: %w", delErr)
+					if !scaleway.IsNotFound(delErr) {
+						return fmt.Errorf("deleting existing Cockpit token: %w", delErr)
+					}
 				}
 				break
 			}

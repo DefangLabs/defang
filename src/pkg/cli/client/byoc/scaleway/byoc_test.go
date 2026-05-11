@@ -280,6 +280,37 @@ func TestLokiEntryToTailResponseSkipsScalewayMetadataPayload(t *testing.T) {
 	assert.Nil(t, resp)
 }
 
+func TestEnsureCockpitTokenIgnoresConcurrentDelete(t *testing.T) {
+	t.Parallel()
+
+	provider := newTestProvider("prod")
+	createAttempts := 0
+	provider.client.HTTPClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		switch {
+		case req.Method == http.MethodPost && req.URL.Path == "/cockpit/v1/regions/fr-par/tokens":
+			createAttempts++
+			if createAttempts == 1 {
+				return statusResponse(http.StatusConflict, `{"message":"token already exists"}`), nil
+			}
+			return jsonResponse(`{"id":"new-token","name":"defang-cd-logs","secret_key":"secret"}`), nil
+		case req.Method == http.MethodGet && req.URL.Path == "/cockpit/v1/regions/fr-par/tokens":
+			return jsonResponse(`{"tokens":[{"id":"old-token","name":"defang-cd-logs"}]}`), nil
+		case req.Method == http.MethodDelete && req.URL.Path == "/cockpit/v1/regions/fr-par/tokens/old-token":
+			return statusResponse(http.StatusNotFound, `{"message":"token was already deleted"}`), nil
+		case req.Method == http.MethodGet && req.URL.Path == "/cockpit/v1/regions/fr-par/data-sources":
+			return jsonResponse(`{"data_sources":[{"type":"logs","url":"https://logs.example"}]}`), nil
+		default:
+			t.Fatalf("unexpected request: %s %s", req.Method, req.URL.String())
+			return nil, nil
+		}
+	})}
+
+	err := provider.ensureCockpitToken(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "secret", provider.cockpitToken)
+	assert.Equal(t, "https://logs.example", provider.cockpitLogsEndpoint)
+}
+
 func TestSubscribeRejectsMissingOrMismatchedRun(t *testing.T) {
 	t.Parallel()
 
@@ -451,8 +482,12 @@ func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func jsonResponse(body string) *http.Response {
+	return statusResponse(http.StatusOK, body)
+}
+
+func statusResponse(status int, body string) *http.Response {
 	return &http.Response{
-		StatusCode: http.StatusOK,
+		StatusCode: status,
 		Body:       io.NopCloser(strings.NewReader(body)),
 		Header:     http.Header{"Content-Type": []string{"application/json"}},
 	}
