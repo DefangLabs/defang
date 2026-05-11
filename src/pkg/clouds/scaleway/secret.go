@@ -96,6 +96,8 @@ func (c *Client) GetSecretVersion(ctx context.Context, secretID, revision string
 }
 
 // ListSecrets lists secrets in a project, optionally filtered by name prefix.
+// Note: The Scaleway API's name parameter does exact matching, so we perform
+// client-side prefix filtering when a prefix is provided.
 func (c *Client) ListSecrets(ctx context.Context, projectID, prefix string) ([]Secret, error) {
 	if projectID == "" {
 		projectID = c.ProjectID
@@ -104,6 +106,7 @@ func (c *Client) ListSecrets(ctx context.Context, projectID, prefix string) ([]S
 	params := url.Values{
 		"project_id": {projectID},
 	}
+	// Try exact match first via the API; if prefix is provided we'll filter client-side
 	if prefix != "" {
 		params.Set("name", prefix)
 	}
@@ -113,7 +116,27 @@ func (c *Client) ListSecrets(ctx context.Context, projectID, prefix string) ([]S
 	if err := c.doRequestJSON(ctx, "GET", fullURL, nil, &resp); err != nil {
 		return nil, AnnotateScalewayError(err, "listing secrets")
 	}
-	return resp.Secrets, nil
+
+	// If exact match returned results or no prefix was given, return as-is
+	if len(resp.Secrets) > 0 || prefix == "" {
+		return resp.Secrets, nil
+	}
+
+	// Scaleway API does exact matching, not prefix matching.
+	// Fall back to listing all secrets and filtering client-side by prefix.
+	allURL := endpoint + "?" + url.Values{"project_id": {projectID}}.Encode()
+	var allResp listSecretsResponse
+	if err := c.doRequestJSON(ctx, "GET", allURL, nil, &allResp); err != nil {
+		return nil, AnnotateScalewayError(err, "listing secrets")
+	}
+
+	filtered := make([]Secret, 0, len(allResp.Secrets))
+	for _, s := range allResp.Secrets {
+		if strings.HasPrefix(s.Name, prefix) {
+			filtered = append(filtered, s)
+		}
+	}
+	return filtered, nil
 }
 
 // DeleteSecret permanently deletes a secret and all its versions.
