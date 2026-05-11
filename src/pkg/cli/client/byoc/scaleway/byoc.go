@@ -160,6 +160,15 @@ func (b *ByocScaleway) cdSecretName(envName string) string {
 	return strings.Trim(name, "-")
 }
 
+func (b *ByocScaleway) cdJobName() string {
+	name := fmt.Sprintf("%s-%s", byoc.CdTaskPrefix, b.PulumiStack)
+	name = strings.NewReplacer("/", "-", "_", "-").Replace(name)
+	if len(name) > 255 {
+		name = name[:255]
+	}
+	return strings.Trim(name, "-")
+}
+
 func cdSecretEnv(env map[string]string) map[string]string {
 	keys := []string{
 		"AWS_SECRET_ACCESS_KEY",
@@ -581,7 +590,7 @@ func (b *ByocScaleway) SetUpCD(ctx context.Context, force bool) error {
 
 	// 3. Create Serverless Job definition for CD tasks (skip in local debug mode)
 	if os.Getenv("DEFANG_PULUMI_DIR") == "" {
-		jobName := byoc.CdTaskPrefix
+		jobName := b.cdJobName()
 		env, err := b.environment("")
 		if err != nil {
 			return err
@@ -993,7 +1002,7 @@ func (b *ByocScaleway) buildLogQuery(req *defangv1.TailRequest) string {
 	logType := logs.LogType(req.LogType)
 
 	if logType.Has(logs.LogTypeCD) || logType == logs.LogTypeUnspecified {
-		return fmt.Sprintf(`{resource_name=%q}`, byoc.CdTaskPrefix)
+		return fmt.Sprintf(`{resource_name=%q}`, b.cdJobName())
 	}
 
 	if len(req.Services) > 0 {
