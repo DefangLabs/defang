@@ -6,12 +6,8 @@ import (
 )
 
 func TestFindNSServer(t *testing.T) {
-	t.Cleanup(func() {
-		ResolverAt = DirectResolverAt
-	})
-
 	t.Run("NS server not exist on domain", func(t *testing.T) {
-		ResolverAt = func(nsServer string) Resolver {
+		resolverAt := func(nsServer string) Resolver {
 			if strings.Contains(nsServer, "root-servers.net") {
 				return MockResolver{Records: map[DNSRequest]DNSResponse{
 					{Type: "NS", Domain: "a.b.c.d"}: {Records: []string{"1.tld-servers.com", "2.tld-servers.com"}, Error: nil},
@@ -29,7 +25,7 @@ func TestFindNSServer(t *testing.T) {
 			return nil
 		}
 
-		ns, err := FindNSServers(t.Context(), "a.b.c.d")
+		ns, err := FindNSServers(t.Context(), "a.b.c.d", resolverAt)
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
@@ -42,7 +38,7 @@ func TestFindNSServer(t *testing.T) {
 	})
 
 	t.Run("NS server exist on domain (delegarted apex domain)", func(t *testing.T) {
-		ResolverAt = func(nsServer string) Resolver {
+		resolverAt := func(nsServer string) Resolver {
 			if strings.Contains(nsServer, "root-servers.net") {
 				return MockResolver{Records: map[DNSRequest]DNSResponse{
 					{Type: "NS", Domain: "a.b.c.d"}: {Records: []string{"1.tld-servers.com", "2.tld-servers.com"}, Error: nil},
@@ -64,7 +60,7 @@ func TestFindNSServer(t *testing.T) {
 			return nil
 		}
 
-		ns, err := FindNSServers(t.Context(), "a.b.c.d")
+		ns, err := FindNSServers(t.Context(), "a.b.c.d", resolverAt)
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
