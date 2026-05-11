@@ -276,7 +276,9 @@ func uploadArchive(ctx context.Context, provider client.Provider, projectName st
 	url = strings.Replace(url, gcpPrefix, "gs://", 1)
 
 	// Convert Scaleway S3 path-style URLs to s3:// URIs for Kaniko
-	url = convertScalewayS3URL(url)
+	if strings.Contains(url, ".scw.cloud/") {
+		url = convertScalewayS3URL(url)
+	}
 
 	return url, nil
 }
