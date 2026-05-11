@@ -236,17 +236,6 @@ func TestSameIPs(t *testing.T) {
 	}
 }
 
-// withResolver swaps the package-level resolver for the duration of a test
-// and restores the original on cleanup. The dns package's LookupTXT /
-// LookupTXTContains use this var directly, so tests need to inject a mock
-// here rather than via ResolverAt.
-func withResolver(t *testing.T, r Resolver) {
-	t.Helper()
-	orig := resolver
-	resolver = r
-	t.Cleanup(func() { resolver = orig })
-}
-
 func TestLookupTXT(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -272,10 +261,10 @@ func TestLookupTXT(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			withResolver(t, MockResolver{Records: map[DNSRequest]DNSResponse{
+			r := MockResolver{Records: map[DNSRequest]DNSResponse{
 				{Type: "TXT", Domain: "example.com"}: tt.records,
-			}})
-			got, err := LookupTXT(t.Context(), "example.com")
+			}}
+			got, err := LookupTXT(t.Context(), "example.com", r)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
 			}
@@ -334,10 +323,10 @@ func TestLookupTXTContains(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			withResolver(t, MockResolver{Records: map[DNSRequest]DNSResponse{
+			r := MockResolver{Records: map[DNSRequest]DNSResponse{
 				{Type: "TXT", Domain: "asuid.example.com"}: tt.records,
-			}})
-			got, err := LookupTXTContains(t.Context(), "asuid.example.com", tt.expected)
+			}}
+			got, err := LookupTXTContains(t.Context(), "asuid.example.com", tt.expected, r)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
 			}

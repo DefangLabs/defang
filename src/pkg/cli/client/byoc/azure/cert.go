@@ -42,7 +42,7 @@ const (
 //
 // Each ARM step is idempotent: re-running after a partial failure picks up
 // where it left off.
-func (b *ByocAzure) IssueCert(ctx context.Context, projectName, serviceName, hostname string) error {
+func (b *ByocAzure) IssueCert(ctx context.Context, projectName, serviceName, hostname string, resolverAt func(string) dns.Resolver) error {
 	cred, err := b.driver.NewCreds()
 	if err != nil {
 		return err
@@ -75,7 +75,7 @@ func (b *ByocAzure) IssueCert(ctx context.Context, projectName, serviceName, hos
 	envID := *app.Properties.ManagedEnvironmentID
 	envName := envID[strings.LastIndex(envID, "/")+1:]
 
-	if err := waitForBYODdns(ctx, hostname, appFqdn, vid); err != nil {
+	if err := waitForBYODdns(ctx, hostname, appFqdn, vid, resolverAt); err != nil {
 		return err
 	}
 
@@ -97,7 +97,7 @@ func (b *ByocAzure) IssueCert(ctx context.Context, projectName, serviceName, hos
 	}
 
 	term.Infof("Waiting for TLS to come online on https://%s/", hostname)
-	return waitForTLS(ctx, hostname)
+	return waitForTLS(ctx, hostname, resolverAt(""))
 }
 
 // findContainerAppByService lists ContainerApps in rg and returns the one
@@ -123,14 +123,14 @@ func findContainerAppByService(ctx context.Context, client *armappcontainers.Con
 
 // waitForBYODdns blocks until both the CNAME and asuid TXT records resolve
 // correctly, prompting the user once with the values to add.
-func waitForBYODdns(ctx context.Context, hostname, expectedCname, expectedTxt string) error {
+func waitForBYODdns(ctx context.Context, hostname, expectedCname, expectedTxt string, resolverAt func(string) dns.Resolver) error {
 	asuid := "asuid." + hostname
 	deadline := time.Now().Add(dnsWaitTimeout)
 	promptShown := false
 
 	for {
-		cnameOK := dns.CheckDomainDNSReady(ctx, hostname, []string{expectedCname})
-		txtOK, _ := dns.LookupTXTContains(ctx, asuid, expectedTxt)
+		cnameOK := dns.CheckDomainDNSReady(ctx, hostname, []string{expectedCname}, resolverAt)
+		txtOK, _ := dns.LookupTXTContains(ctx, asuid, expectedTxt, resolverAt(""))
 		if cnameOK && txtOK {
 			term.Infof("DNS records for %s verified", hostname)
 			return nil
@@ -373,10 +373,10 @@ func bindHostnameSniEnabled(ctx context.Context, client *armappcontainers.Contai
 	return nil
 }
 
-func waitForTLS(ctx context.Context, hostname string) error {
+func waitForTLS(ctx context.Context, hostname string, resolver dns.Resolver) error {
 	deadline := time.Now().Add(tlsWaitTimeout)
 	for {
-		if err := cert.CheckTLSCert(ctx, hostname); err == nil {
+		if err := cert.CheckTLSCert(ctx, hostname, resolver); err == nil {
 			term.Infof("TLS cert for %s is online", hostname)
 			return nil
 		}

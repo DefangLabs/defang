@@ -18,6 +18,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/dns"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composetypes "github.com/compose-spec/compose-go/v2/types"
 )
@@ -258,7 +259,7 @@ type mockCertIssuerProvider struct {
 	issueCall []string
 }
 
-func (m *mockCertIssuerProvider) IssueCert(_ context.Context, projectName, serviceName, hostname string) error {
+func (m *mockCertIssuerProvider) IssueCert(_ context.Context, projectName, serviceName, hostname string, _ func(string) dns.Resolver) error {
 	m.issueCall = append(m.issueCall, fmt.Sprintf("%s/%s/%s", projectName, serviceName, hostname))
 	return m.issueErr
 }
