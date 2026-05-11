@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 // S3Endpoint returns the S3-compatible endpoint for a Scaleway region.
@@ -104,4 +105,36 @@ func ListObjectKeys(ctx context.Context, client *s3.Client, bucket, prefix strin
 		}
 	}
 	return keys, nil
+}
+
+func EmptyAndDeleteBucket(ctx context.Context, client *s3.Client, bucket string) error {
+	keys, err := ListObjectKeys(ctx, client, bucket, "")
+	if err != nil {
+		return err
+	}
+	for len(keys) > 0 {
+		batch := keys
+		if len(batch) > 1000 {
+			batch = keys[:1000]
+		}
+		objects := make([]types.ObjectIdentifier, 0, len(batch))
+		for _, key := range batch {
+			objects = append(objects, types.ObjectIdentifier{Key: aws.String(key)})
+		}
+		_, err := client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+			Bucket: aws.String(bucket),
+			Delete: &types.Delete{
+				Objects: objects,
+				Quiet:   aws.Bool(true),
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("deleting objects from bucket %q: %w", bucket, err)
+		}
+		keys = keys[len(batch):]
+	}
+	if _, err := client.DeleteBucket(ctx, &s3.DeleteBucketInput{Bucket: aws.String(bucket)}); err != nil {
+		return fmt.Errorf("deleting bucket %q: %w", bucket, err)
+	}
+	return nil
 }

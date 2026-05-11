@@ -74,14 +74,47 @@ func (c *Client) CreateSecret(ctx context.Context, name, projectID string) (*Sec
 // The data is base64-encoded before sending.
 func (c *Client) CreateSecretVersion(ctx context.Context, secretID string, data []byte) (*SecretVersion, error) {
 	url := c.regionURL("secret-manager", "v1beta1") + fmt.Sprintf("/secrets/%s/versions", secretID)
-	body := map[string]string{
-		"data": base64.StdEncoding.EncodeToString(data),
+	body := map[string]any{
+		"data":             base64.StdEncoding.EncodeToString(data),
+		"disable_previous": true,
 	}
 	var version SecretVersion
 	if err := c.doRequestJSON(ctx, "POST", url, body, &version); err != nil {
 		return nil, AnnotateScalewayError(err, fmt.Sprintf("creating secret version for %q", secretID))
 	}
 	return &version, nil
+}
+
+// EnsureSecretValue creates a secret if necessary, then writes a latest enabled version.
+func (c *Client) EnsureSecretValue(ctx context.Context, name, projectID string, data []byte) (*Secret, *SecretVersion, error) {
+	if projectID == "" {
+		projectID = c.ProjectID
+	}
+	secret, err := c.CreateSecret(ctx, name, projectID)
+	if err != nil {
+		if !IsConflict(err) {
+			return nil, nil, err
+		}
+		secrets, listErr := c.ListSecrets(ctx, projectID, name)
+		if listErr != nil {
+			return nil, nil, listErr
+		}
+		for i := range secrets {
+			if secrets[i].Name == name {
+				secret = &secrets[i]
+				break
+			}
+		}
+		if secret == nil {
+			return nil, nil, fmt.Errorf("secret %q exists but could not be found", name)
+		}
+	}
+
+	version, err := c.CreateSecretVersion(ctx, secret.ID, data)
+	if err != nil {
+		return nil, nil, err
+	}
+	return secret, version, nil
 }
 
 // GetSecretVersion retrieves a specific version of a secret.

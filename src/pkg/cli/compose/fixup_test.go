@@ -154,7 +154,7 @@ func TestMakeAccessGatewayServiceScaleway(t *testing.T) {
 		app := proj.Services["app"]
 		assert.Equal(t, "https://api.scaleway.ai/v1/", *app.Environment["LLM_URL"])
 		assert.Equal(t, "llama-3.3-70b-instruct", *app.Environment["LLM_MODEL"])
-		// OPENAI_API_KEY is nil (user must set via defang config set)
+		// OPENAI_API_KEY is nil so the provider reads it from Defang config
 		val, ok := app.Environment["OPENAI_API_KEY"]
 		assert.True(t, ok, "OPENAI_API_KEY should be set")
 		assert.Nil(t, val, "OPENAI_API_KEY should be nil (config value)")

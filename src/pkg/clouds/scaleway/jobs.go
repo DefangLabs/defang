@@ -20,6 +20,8 @@ type JobDefinition struct {
 	CPULimit        int               `json:"cpu_limit"`
 	MemoryLimit     int               `json:"memory_limit"`
 	ImageURI        string            `json:"image_uri"`
+	StartupCommand  []string          `json:"startup_command,omitempty"`
+	Args            []string          `json:"args,omitempty"`
 	EnvironmentVars map[string]string `json:"environment_variables"`
 	Region          string            `json:"region"`
 	CreatedAt       string            `json:"created_at"`
@@ -30,6 +32,7 @@ type JobRun struct {
 	ID              string `json:"id"`
 	JobDefinitionID string `json:"job_definition_id"`
 	State           string `json:"state"`
+	Reason          string `json:"reason,omitempty"`
 	CreatedAt       string `json:"created_at"`
 	StartedAt       string `json:"started_at,omitempty"`
 	TerminatedAt    string `json:"terminated_at,omitempty"`
@@ -42,16 +45,26 @@ type listJobRunsResponse struct {
 	TotalCount int      `json:"total_count"`
 }
 
+type startJobDefinitionResponse struct {
+	JobRuns []JobRun `json:"job_runs"`
+}
+
+type JobSecretRef struct {
+	SecretManagerID      string
+	SecretManagerVersion string
+	EnvVarName           string
+}
+
 // CreateJobDefinition creates a new serverless job definition.
 func (c *Client) CreateJobDefinition(ctx context.Context, name, image string, env map[string]string, resources JobResources) (*JobDefinition, error) {
-	url := c.regionURL("serverless-jobs", "v1alpha1") + "/job-definitions"
+	url := c.regionURL("serverless-jobs", "v1alpha2") + "/job-definitions"
 	body := map[string]any{
-		"name":                    name,
-		"project_id":             c.ProjectID,
-		"cpu_limit":              resources.CPULimit,
-		"memory_limit":           resources.MemoryLimit,
-		"image_uri":              image,
-		"environment_variables":  env,
+		"name":                  name,
+		"project_id":            c.ProjectID,
+		"cpu_limit":             resources.CPULimit,
+		"memory_limit":          resources.MemoryLimit,
+		"image_uri":             image,
+		"environment_variables": env,
 	}
 	var def JobDefinition
 	if err := c.doRequestJSON(ctx, "POST", url, body, &def); err != nil {
@@ -60,27 +73,56 @@ func (c *Client) CreateJobDefinition(ctx context.Context, name, image string, en
 	return &def, nil
 }
 
+// CreateJobSecrets attaches Secret Manager secrets to a Serverless Job definition.
+func (c *Client) CreateJobSecrets(ctx context.Context, definitionID string, refs []JobSecretRef) error {
+	if len(refs) == 0 {
+		return nil
+	}
+	endpoint := c.regionURL("serverless-jobs", "v1alpha2") + "/secrets"
+	secrets := make([]map[string]string, 0, len(refs))
+	for _, ref := range refs {
+		secrets = append(secrets, map[string]string{
+			"secret_manager_id":      ref.SecretManagerID,
+			"secret_manager_version": ref.SecretManagerVersion,
+			"env_var_name":           ref.EnvVarName,
+		})
+	}
+	body := map[string]any{
+		"job_definition_id": definitionID,
+		"secrets":           secrets,
+	}
+	if err := c.doRequestJSON(ctx, "POST", endpoint, body, nil); err != nil {
+		return AnnotateScalewayError(err, fmt.Sprintf("creating secret references for job %q", definitionID))
+	}
+	return nil
+}
+
 // RunJob starts a new run of a job definition with optional command and environment overrides.
-// The command string is whitespace-split by the Scaleway API into an exec array.
-func (c *Client) RunJob(ctx context.Context, definitionID string, command string, envOverrides map[string]string) (*JobRun, error) {
-	endpoint := c.regionURL("serverless-jobs", "v1alpha1") + "/job-definitions/" + definitionID + "/start"
+func (c *Client) RunJob(ctx context.Context, definitionID string, command []string, args []string, envOverrides map[string]string) (*JobRun, error) {
+	endpoint := c.regionURL("serverless-jobs", "v1alpha2") + "/job-definitions/" + definitionID + "/start"
 	body := map[string]any{}
-	if command != "" {
-		body["command"] = command
+	if len(command) > 0 {
+		body["startup_command"] = command
+	}
+	if len(args) > 0 {
+		body["args"] = args
 	}
 	if len(envOverrides) > 0 {
 		body["environment_variables"] = envOverrides
 	}
-	var run JobRun
-	if err := c.doRequestJSON(ctx, "POST", endpoint, body, &run); err != nil {
+	var resp startJobDefinitionResponse
+	if err := c.doRequestJSON(ctx, "POST", endpoint, body, &resp); err != nil {
 		return nil, AnnotateScalewayError(err, fmt.Sprintf("running job %q", definitionID))
 	}
-	return &run, nil
+	if len(resp.JobRuns) == 0 {
+		return nil, fmt.Errorf("running job %q: no job runs returned", definitionID)
+	}
+	return &resp.JobRuns[0], nil
 }
 
 // GetJobRun retrieves the status of a specific job run.
 func (c *Client) GetJobRun(ctx context.Context, runID string) (*JobRun, error) {
-	endpoint := c.regionURL("serverless-jobs", "v1alpha1") + "/job-runs/" + runID
+	endpoint := c.regionURL("serverless-jobs", "v1alpha2") + "/job-runs/" + runID
 	var run JobRun
 	if err := c.doRequestJSON(ctx, "GET", endpoint, nil, &run); err != nil {
 		return nil, AnnotateScalewayError(err, fmt.Sprintf("getting job run %q", runID))
@@ -90,7 +132,7 @@ func (c *Client) GetJobRun(ctx context.Context, runID string) (*JobRun, error) {
 
 // ListJobRuns lists runs for a given job definition.
 func (c *Client) ListJobRuns(ctx context.Context, definitionID string) ([]JobRun, error) {
-	endpoint := c.regionURL("serverless-jobs", "v1alpha1") + "/job-runs"
+	endpoint := c.regionURL("serverless-jobs", "v1alpha2") + "/job-runs"
 	params := url.Values{
 		"job_definition_id": {definitionID},
 	}
@@ -110,7 +152,7 @@ type listJobDefinitionsResponse struct {
 
 // ListJobDefinitions lists job definitions in the project, optionally filtered by name.
 func (c *Client) ListJobDefinitions(ctx context.Context, name string) ([]JobDefinition, error) {
-	endpoint := c.regionURL("serverless-jobs", "v1alpha1") + "/job-definitions"
+	endpoint := c.regionURL("serverless-jobs", "v1alpha2") + "/job-definitions"
 	params := url.Values{
 		"project_id": {c.ProjectID},
 	}
@@ -128,7 +170,7 @@ func (c *Client) ListJobDefinitions(ctx context.Context, name string) ([]JobDefi
 
 // DeleteJobDefinition deletes a job definition.
 func (c *Client) DeleteJobDefinition(ctx context.Context, definitionID string) error {
-	endpoint := c.regionURL("serverless-jobs", "v1alpha1") + "/job-definitions/" + definitionID
+	endpoint := c.regionURL("serverless-jobs", "v1alpha2") + "/job-definitions/" + definitionID
 	if err := c.doRequestJSON(ctx, "DELETE", endpoint, nil, nil); err != nil {
 		return AnnotateScalewayError(err, fmt.Sprintf("deleting job definition %q", definitionID))
 	}

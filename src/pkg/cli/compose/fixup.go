@@ -416,7 +416,8 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 		// no LiteLLM sidecar is needed. Point dependent services directly at the API.
 		resolvedModel := resolveScalewayModel(model)
 		urlVal := "https://api.scaleway.ai/v1/"
-		// OPENAI_API_KEY must be set by the user via `defang config set`
+		// OPENAI_API_KEY is wired as a config reference. The Scaleway BYOC
+		// client creates it from the Scaleway API key when it is missing.
 		wireScalewayDependentServices(project, svccfg.Name, urlVal, resolvedModel, endpointEnvVar, modelEnvVar)
 		// Remove the model service — nothing to deploy
 		delete(project.Services, svccfg.Name)
@@ -590,7 +591,7 @@ func resolveScalewayModel(model string) string {
 // wireScalewayDependentServices injects URL, model, and API-key env vars into
 // services that depend on the model service. Unlike wireDependentServices, it
 // does NOT add the model-provider network (no sidecar container) and sets
-// OPENAI_API_KEY to nil (user must set via `defang config set`).
+// OPENAI_API_KEY to nil so the provider reads it from Defang config.
 // TODO: Extract shared logic with wireDependentServices into a helper, parameterizing
 // the differences (no network wiring, nil OPENAI_API_KEY, dependency removal).
 func wireScalewayDependentServices(project *composeTypes.Project, svcName, urlVal, model, endpointEnvVar, modelEnvVar string) {
@@ -608,7 +609,7 @@ func wireScalewayDependentServices(project *composeTypes.Project, svcName, urlVa
 				dependency.Environment[modelEnvVar] = &model
 			}
 			if _, ok := dependency.Environment["OPENAI_API_KEY"]; !ok {
-				dependency.Environment["OPENAI_API_KEY"] = nil // user sets via defang config set
+				dependency.Environment["OPENAI_API_KEY"] = nil
 			}
 			// Remove dependency on the model service since it won't be deployed
 			delete(dependency.DependsOn, svcName)

@@ -37,8 +37,8 @@ type ByocScaleway struct {
 	projectID string
 
 	// CD infrastructure
-	bucket       string
-	jobDefID     string
+	bucket           string
+	jobDefID         string
 	registryEndpoint string
 
 	// CD run tracking
@@ -116,29 +116,29 @@ func (b *ByocScaleway) environment(projectName string) (map[string]string, error
 		return nil, err
 	}
 	env := map[string]string{
-		"AWS_ACCESS_KEY_ID":          b.client.AccessKey,  // S3-compatible credentials
-		"AWS_SECRET_ACCESS_KEY":      b.client.SecretKey,  // S3-compatible credentials
-		"AWS_REGION":                 b.region,            // needed for S3 client
-		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"),
-		"DEFANG_JSON":                os.Getenv("DEFANG_JSON"),
-		"DEFANG_ORG":                 string(b.TenantLabel),
-		"DEFANG_PREFIX":              b.Prefix,
-		"DEFANG_PULUMI_DEBUG":        os.Getenv("DEFANG_PULUMI_DEBUG"),
-		"DEFANG_PULUMI_DIFF":         os.Getenv("DEFANG_PULUMI_DIFF"),
-		"DEFANG_STATE_URL":           defangStateUrl,
-		"PRIVATE_DOMAIN":             b.GetPrivateDomain(projectName),
-		"PROJECT":                    projectName,
-		"PULUMI_CONFIG_PASSPHRASE":   byoc.PulumiConfigPassphrase,
-		"PULUMI_COPILOT":             "false",
-		"PULUMI_HOME":               "/home/.pulumi",
-		"PULUMI_SKIP_UPDATE_CHECK":   "true",
-		"SCW_ACCESS_KEY":             b.client.AccessKey,
-		"SCW_SECRET_KEY":             b.client.SecretKey,
-		"SCW_DEFAULT_PROJECT_ID":     b.projectID,
-		"SCW_DEFAULT_REGION":         b.region,
-		"S3_ENDPOINT":               scaleway.S3Endpoint(b.region),
-		"STACK":                      b.PulumiStack,
-		pulumiBackendKey:             pulumiBackendValue,
+		"AWS_ACCESS_KEY_ID":        b.client.AccessKey, // S3-compatible credentials
+		"AWS_SECRET_ACCESS_KEY":    b.client.SecretKey, // S3-compatible credentials
+		"AWS_REGION":               b.region,           // needed for S3 client
+		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"),
+		"DEFANG_JSON":              os.Getenv("DEFANG_JSON"),
+		"DEFANG_ORG":               string(b.TenantLabel),
+		"DEFANG_PREFIX":            b.Prefix,
+		"DEFANG_PULUMI_DEBUG":      os.Getenv("DEFANG_PULUMI_DEBUG"),
+		"DEFANG_PULUMI_DIFF":       os.Getenv("DEFANG_PULUMI_DIFF"),
+		"DEFANG_STATE_URL":         defangStateUrl,
+		"PRIVATE_DOMAIN":           b.GetPrivateDomain(projectName),
+		"PROJECT":                  projectName,
+		"PULUMI_CONFIG_PASSPHRASE": byoc.PulumiConfigPassphrase,
+		"PULUMI_COPILOT":           "false",
+		"PULUMI_HOME":              "/home/.pulumi",
+		"PULUMI_SKIP_UPDATE_CHECK": "true",
+		"SCW_ACCESS_KEY":           b.client.AccessKey,
+		"SCW_SECRET_KEY":           b.client.SecretKey,
+		"SCW_DEFAULT_PROJECT_ID":   b.projectID,
+		"SCW_DEFAULT_REGION":       b.region,
+		"S3_ENDPOINT":              scaleway.S3Endpoint(b.region),
+		"STACK":                    b.PulumiStack,
+		pulumiBackendKey:           pulumiBackendValue,
 	}
 
 	if targets := os.Getenv("DEFANG_PULUMI_TARGETS"); targets != "" {
@@ -148,6 +148,111 @@ func (b *ByocScaleway) environment(projectName string) (map[string]string, error
 		env["NO_COLOR"] = "1"
 	}
 	return env, nil
+}
+
+func (b *ByocScaleway) cdSecretName(envName string) string {
+	name := fmt.Sprintf("%s-%s-%s", byoc.CdTaskPrefix, b.PulumiStack, envName)
+	name = strings.NewReplacer("/", "-", "_", "-").Replace(name)
+	if len(name) > 255 {
+		name = name[:255]
+	}
+	return strings.Trim(name, "-")
+}
+
+func cdSecretEnv(env map[string]string) map[string]string {
+	keys := []string{
+		"AWS_SECRET_ACCESS_KEY",
+		"PULUMI_CONFIG_PASSPHRASE",
+		"SCW_SECRET_KEY",
+	}
+	secrets := make(map[string]string, len(keys))
+	for _, key := range keys {
+		if val, ok := env[key]; ok {
+			secrets[key] = val
+		}
+	}
+	return secrets
+}
+
+func withoutSecretEnv(env map[string]string) map[string]string {
+	secrets := cdSecretEnv(env)
+	if len(secrets) == 0 {
+		return env
+	}
+	clean := make(map[string]string, len(env)-len(secrets))
+	for key, val := range env {
+		if _, ok := secrets[key]; !ok {
+			clean[key] = val
+		}
+	}
+	return clean
+}
+
+func usesScalewayLLM(project *compose.Project) bool {
+	for _, service := range project.Services {
+		hasScalewayEndpoint := false
+		needsOpenAIKey := false
+		for key, val := range service.Environment {
+			if val == nil && key == "OPENAI_API_KEY" {
+				needsOpenAIKey = true
+				continue
+			}
+			if val != nil && *val == "https://api.scaleway.ai/v1/" {
+				hasScalewayEndpoint = true
+			}
+		}
+		if hasScalewayEndpoint && needsOpenAIKey {
+			return true
+		}
+	}
+	return false
+}
+
+func (b *ByocScaleway) ensureScalewayLLMAuth(ctx context.Context, project *compose.Project) error {
+	if !usesScalewayLLM(project) {
+		return nil
+	}
+
+	configs, err := b.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
+	if err != nil {
+		return err
+	}
+	for _, name := range configs.Names {
+		if name == "OPENAI_API_KEY" {
+			return nil
+		}
+	}
+
+	term.Infof("Using the Scaleway API key for Managed Inference auth")
+	return b.PutConfig(ctx, &defangv1.PutConfigRequest{
+		Project: project.Name,
+		Name:    "OPENAI_API_KEY",
+		Value:   b.client.SecretKey,
+	})
+}
+
+func (b *ByocScaleway) createCDSecretReferences(ctx context.Context, jobDefID string, env map[string]string) error {
+	secretEnv := cdSecretEnv(env)
+	if len(secretEnv) == 0 {
+		return nil
+	}
+	refs := make([]scaleway.JobSecretRef, 0, len(secretEnv))
+	for _, key := range []string{"AWS_SECRET_ACCESS_KEY", "PULUMI_CONFIG_PASSPHRASE", "SCW_SECRET_KEY"} {
+		value, ok := secretEnv[key]
+		if !ok {
+			continue
+		}
+		secret, version, err := b.client.EnsureSecretValue(ctx, b.cdSecretName(key), b.projectID, []byte(value))
+		if err != nil {
+			return scaleway.AnnotateScalewayError(err, fmt.Sprintf("creating CD secret %q", key))
+		}
+		refs = append(refs, scaleway.JobSecretRef{
+			SecretManagerID:      secret.ID,
+			SecretManagerVersion: fmt.Sprint(version.Revision),
+			EnvVarName:           key,
+		})
+	}
+	return b.client.CreateJobSecrets(ctx, jobDefID, refs)
 }
 
 type cdCommand struct {
@@ -201,11 +306,7 @@ func (b *ByocScaleway) runCdCommand(ctx context.Context, cmd cdCommand) (string,
 		return "local-debug", nil
 	}
 
-	// Build the command for the Go CD binary. The Scaleway API whitespace-splits
-	// this string into an exec array: "/app/cd up s3://..." → ["/app/cd", "up", "s3://..."]
-	cdCmd := strings.Join(append([]string{"/app/cd"}, cmd.command...), " ")
-
-	run, err := b.client.RunJob(ctx, b.jobDefID, cdCmd, env)
+	run, err := b.client.RunJob(ctx, b.jobDefID, []string{"/app/cd"}, cmd.command, withoutSecretEnv(env))
 	if err != nil {
 		return "", scaleway.AnnotateScalewayError(err, "running CD command")
 	}
@@ -225,6 +326,10 @@ func (b *ByocScaleway) Preview(ctx context.Context, req *client.DeployRequest) (
 func (b *ByocScaleway) deploy(ctx context.Context, req *client.DeployRequest, cmd string) (*client.DeployResponse, error) {
 	project, err := compose.LoadFromContent(ctx, req.Compose, "")
 	if err != nil {
+		return nil, err
+	}
+
+	if err := b.ensureScalewayLLMAuth(ctx, project); err != nil {
 		return nil, err
 	}
 
@@ -479,32 +584,43 @@ func (b *ByocScaleway) SetUpCD(ctx context.Context, force bool) error {
 		if err != nil {
 			return err
 		}
-		jobDef, err := b.client.CreateJobDefinition(ctx, jobName, b.CDImage, env, scaleway.JobResources{
+		jobDef, err := b.client.CreateJobDefinition(ctx, jobName, b.CDImage, withoutSecretEnv(env), scaleway.JobResources{
 			CPULimit:    2000, // 2 vCPU
 			MemoryLimit: 4096, // 4 GB
 		})
 		if err != nil {
 			if scaleway.IsConflict(err) {
-				// Job definition already exists; retrieve its ID
-				term.Debug("CD job definition already exists, looking up ID")
+				// Recreate the CD job so image, env, and secret references match
+				// the current CLI inputs instead of silently reusing stale state.
+				term.Debug("CD job definition already exists, recreating it")
 				defs, listErr := b.client.ListJobDefinitions(ctx, jobName)
 				if listErr != nil {
 					return scaleway.AnnotateScalewayError(listErr, "listing job definitions")
 				}
 				for i := range defs {
 					if defs[i].Name == jobName {
-						b.jobDefID = defs[i].ID
+						if err := b.client.DeleteJobDefinition(ctx, defs[i].ID); err != nil {
+							return scaleway.AnnotateScalewayError(err, "deleting stale CD job definition")
+						}
 						break
 					}
 				}
-				if b.jobDefID == "" {
-					return fmt.Errorf("CD job definition %q exists but could not be found", jobName)
+				jobDef, err = b.client.CreateJobDefinition(ctx, jobName, b.CDImage, withoutSecretEnv(env), scaleway.JobResources{
+					CPULimit:    2000,
+					MemoryLimit: 4096,
+				})
+				if err != nil {
+					return scaleway.AnnotateScalewayError(err, "creating CD job definition")
 				}
+				b.jobDefID = jobDef.ID
 			} else {
 				return scaleway.AnnotateScalewayError(err, "creating CD job definition")
 			}
 		} else {
 			b.jobDefID = jobDef.ID
+		}
+		if err := b.createCDSecretReferences(ctx, b.jobDefID, env); err != nil {
+			return err
 		}
 	}
 
@@ -514,13 +630,73 @@ func (b *ByocScaleway) SetUpCD(ctx context.Context, force bool) error {
 
 // TearDownCD removes CD infrastructure.
 func (b *ByocScaleway) TearDownCD(ctx context.Context) error {
-	// TODO: implement full teardown (delete job definition, registry namespace, bucket)
 	term.Warn("Deleting the Defang CD infrastructure; existing stacks or configs will not be deleted and will need to be cleaned up manually")
 
+	var errs []error
 	if b.jobDefID != "" {
 		if err := b.client.DeleteJobDefinition(ctx, b.jobDefID); err != nil {
-			term.Warnf("Failed to delete CD job definition: %v", err)
+			errs = append(errs, err)
 		}
+	}
+	defs, err := b.client.ListJobDefinitions(ctx, byoc.CdTaskPrefix)
+	if err != nil {
+		errs = append(errs, err)
+	} else {
+		for _, def := range defs {
+			if def.Name == byoc.CdTaskPrefix {
+				if err := b.client.DeleteJobDefinition(ctx, def.ID); err != nil {
+					errs = append(errs, err)
+				}
+			}
+		}
+	}
+
+	secretPrefix := b.cdSecretName("")
+	secrets, err := b.client.ListSecrets(ctx, b.projectID, secretPrefix)
+	if err != nil {
+		errs = append(errs, err)
+	} else {
+		for _, secret := range secrets {
+			if strings.HasPrefix(secret.Name, secretPrefix) {
+				if err := b.client.DeleteSecret(ctx, secret.ID); err != nil {
+					errs = append(errs, err)
+				}
+			}
+		}
+	}
+
+	namespaces, err := b.client.ListRegistryNamespaces(ctx, b.projectID, byoc.CdTaskPrefix)
+	if err != nil {
+		errs = append(errs, err)
+	} else {
+		for _, ns := range namespaces {
+			if ns.Name != byoc.CdTaskPrefix {
+				continue
+			}
+			images, err := b.client.ListImages(ctx, ns.ID)
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+			for _, image := range images {
+				if err := b.client.DeleteImage(ctx, image.ID); err != nil {
+					errs = append(errs, err)
+				}
+			}
+			if err := b.client.DeleteRegistryNamespace(ctx, ns.ID); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+
+	if err := scaleway.EmptyAndDeleteBucket(ctx, b.s3Client, b.bucketName()); err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		for _, err := range errs {
+			term.Warnf("Failed to delete Scaleway CD resource: %v", err)
+		}
+		return errors.Join(errs...)
 	}
 	return nil
 }
@@ -623,8 +799,11 @@ func (b *ByocScaleway) GetDeploymentStatus(ctx context.Context) (bool, error) {
 	switch run.State {
 	case "succeeded":
 		return true, nil
-	case "failed", "canceled":
+	case "failed", "interrupted":
 		msg := fmt.Sprintf("CD job %s: %s", run.State, run.ErrorMessage)
+		if run.ErrorMessage == "" {
+			msg = fmt.Sprintf("CD job %s: %s", run.State, run.Reason)
+		}
 		return true, client.ErrDeploymentFailed{Message: msg}
 	default:
 		// still running: queued, running, etc.
@@ -717,13 +896,13 @@ func (b *ByocScaleway) Subscribe(ctx context.Context, req *defangv1.SubscribeReq
 
 func jobRunStateToServiceState(state string) defangv1.ServiceState {
 	switch state {
-	case "queued":
+	case "initialized", "validated", "queued", "retrying":
 		return defangv1.ServiceState_UPDATE_QUEUED
 	case "running":
 		return defangv1.ServiceState_DEPLOYMENT_PENDING
 	case "succeeded":
 		return defangv1.ServiceState_DEPLOYMENT_COMPLETED
-	case "failed", "canceled":
+	case "failed", "interrupted":
 		return defangv1.ServiceState_DEPLOYMENT_FAILED
 	default:
 		return defangv1.ServiceState_NOT_SPECIFIED
