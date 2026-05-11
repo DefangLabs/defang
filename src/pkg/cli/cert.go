@@ -79,6 +79,15 @@ func newCertHTTPClient(r dns.Resolver) HTTPClient {
 	}
 }
 
+// CertIssuer is implemented by providers that issue and bind TLS certificates
+// directly against their cloud's API rather than going through the
+// CNAME→fabric→ACME redirect dance used on AWS BYOD / Playground. Azure
+// implements this so `defang cert generate` can drive the Container Apps
+// hostname-add + managed-cert + SniEnabled-bind sequence end-to-end.
+type CertIssuer interface {
+	IssueCert(ctx context.Context, projectName, serviceName, hostname string, resolverAt func(string) dns.Resolver) error
+}
+
 func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, client client.FabricClient, provider client.Provider) error {
 	term.Debugf("Generating TLS cert for project %q", project.Name)
 
@@ -91,6 +100,9 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 		return fmt.Errorf("no services found for project %q; deployment may not be finished yet", project.Name)
 	}
 
+	issuer, _ := provider.(CertIssuer)
+
+	var issueErrs []error
 	cnt := 0
 	for _, serviceInfo := range services.Services {
 		if !serviceInfo.UseAcmeCert {
@@ -101,11 +113,23 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 				term.Warnf("service %q: domainname %q in compose file does not match deployed value %q", service.Name, service.DomainName, serviceInfo.Domainname)
 			}
 			cnt++
-			targets := getDomainTargets(serviceInfo, service)
 			domains := []string{service.DomainName}
 			if defaultNetwork := service.Networks["default"]; defaultNetwork != nil {
 				domains = append(domains, defaultNetwork.Aliases...)
 			}
+
+			if issuer != nil {
+				term.Debugf("Issuing certs for service %v with domains %v via provider", service.Name, domains)
+				for _, domain := range domains {
+					if err := issuer.IssueCert(ctx, project.Name, service.Name, domain, dns.NewFabricResolverAt(client)); err != nil {
+						term.Errorf("Cert issuance for %v failed: %v", domain, err)
+						issueErrs = append(issueErrs, fmt.Errorf("%v: %w", domain, err))
+					}
+				}
+				continue
+			}
+
+			targets := getDomainTargets(serviceInfo, service)
 			term.Debugf("Found service %v with domains %v and targets %v", service.Name, domains, targets)
 			for _, domain := range domains {
 				generateCert(ctx, domain, targets, client, dns.FabricResolver{Client: client})
@@ -116,6 +140,9 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 		term.Infof("No `domainname` found in compose file; no HTTPS cert generation needed")
 	}
 
+	if len(issueErrs) > 0 {
+		return fmt.Errorf("certificate issuance failed for one or more domains; verify DNS records and retry `defang cert generate`: %w", errors.Join(issueErrs...))
+	}
 	return nil
 }
 
@@ -252,10 +279,7 @@ func waitForCNAME(ctx context.Context, domain string, targets []string, client c
 			}
 		}
 		if serverSideVerified || serverVerifyRpcFailure >= 3 {
-			fabricResolverAt := func(nsServer string) dns.Resolver {
-				return dns.FabricResolver{Client: client, NSServer: nsServer}
-			}
-			locallyVerified := dns.CheckDomainDNSReady(ctx, domain, targets, fabricResolverAt)
+			locallyVerified := dns.CheckDomainDNSReady(ctx, domain, targets, dns.NewFabricResolverAt(client))
 			if serverSideVerified && !locallyVerified {
 				term.Warnf("DNS settings for %v are verified, but changes may take a few minutes to propagate due to caching.", domain)
 				return nil

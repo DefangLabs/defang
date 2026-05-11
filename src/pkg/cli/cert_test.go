@@ -18,6 +18,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/dns"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composetypes "github.com/compose-spec/compose-go/v2/types"
 )
@@ -248,6 +249,21 @@ func (m *mockCertFabricClient) VerifyDNSSetup(ctx context.Context, req *defangv1
 	return nil // DNS verified successfully
 }
 
+// mockCertIssuerProvider extends mockCertProvider with the CertIssuer
+// interface so GenerateLetsEncryptCert's `provider.(CertIssuer)` succeeds.
+// Captures every (project, service, hostname) tuple the SUT calls IssueCert
+// with, and lets the test inject an error per call.
+type mockCertIssuerProvider struct {
+	mockCertProvider
+	issueErr  error
+	issueCall []string
+}
+
+func (m *mockCertIssuerProvider) IssueCert(_ context.Context, projectName, serviceName, hostname string, _ func(string) dns.Resolver) error {
+	m.issueCall = append(m.issueCall, fmt.Sprintf("%s/%s/%s", projectName, serviceName, hostname))
+	return m.issueErr
+}
+
 func TestGenerateLetsEncryptCert(t *testing.T) {
 	t.Run("error when no services", func(t *testing.T) {
 		provider := &mockCertProvider{
@@ -357,6 +373,88 @@ func TestGenerateLetsEncryptCert(t *testing.T) {
 		}
 		if fabricClient.verifyDNSCalls == 0 {
 			t.Error("expected VerifyDNSSetup to be called (generateCert was reached)")
+		}
+	})
+
+	// CertIssuer dispatch: when the provider implements CertIssuer, the legacy
+	// fabric/ACME path (VerifyDNSSetup + generateCert) is bypassed entirely and
+	// IssueCert is invoked once per domain (the service domainname plus any
+	// default-network aliases).
+	t.Run("dispatches to CertIssuer when provider implements it", func(t *testing.T) {
+		fabricClient := &mockCertFabricClient{}
+		provider := &mockCertIssuerProvider{
+			mockCertProvider: mockCertProvider{
+				services: &defangv1.GetServicesResponse{
+					Services: []*defangv1.ServiceInfo{
+						{
+							Service:     &defangv1.Service{Name: "web"},
+							UseAcmeCert: true,
+							Domainname:  "example.com",
+						},
+					},
+				},
+			},
+		}
+		project := &compose.Project{
+			Name: "myproj",
+			Services: compose.Services{
+				"web": {
+					Name:       "web",
+					DomainName: "example.com",
+					Networks: map[string]*composetypes.ServiceNetworkConfig{
+						"default": {Aliases: []string{"alias.example.com"}},
+					},
+				},
+			},
+		}
+		err := GenerateLetsEncryptCert(t.Context(), project, fabricClient, provider)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		want := []string{"myproj/web/example.com", "myproj/web/alias.example.com"}
+		if !slices.Equal(provider.issueCall, want) {
+			t.Errorf("IssueCert calls = %v, want %v", provider.issueCall, want)
+		}
+		// Issuer path is short-circuited — the legacy generateCert codepath
+		// (which calls VerifyDNSSetup) must not run.
+		if fabricClient.verifyDNSCalls != 0 {
+			t.Errorf("VerifyDNSSetup should not be called when CertIssuer is used (got %d calls)", fabricClient.verifyDNSCalls)
+		}
+	})
+
+	// IssueCert errors must surface — they used to be silently swallowed.
+	// Each failure is collected and joined into the returned error so the
+	// CLI exit code reflects the issuance outcome.
+	t.Run("aggregates IssueCert errors", func(t *testing.T) {
+		provider := &mockCertIssuerProvider{
+			mockCertProvider: mockCertProvider{
+				services: &defangv1.GetServicesResponse{
+					Services: []*defangv1.ServiceInfo{
+						{
+							Service:     &defangv1.Service{Name: "web"},
+							UseAcmeCert: true,
+							Domainname:  "example.com",
+						},
+					},
+				},
+			},
+			issueErr: errors.New("dns timeout"),
+		}
+		project := &compose.Project{
+			Name: "myproj",
+			Services: compose.Services{
+				"web": {Name: "web", DomainName: "example.com"},
+			},
+		}
+		err := GenerateLetsEncryptCert(t.Context(), project, &mockCertFabricClient{}, provider)
+		if err == nil {
+			t.Fatal("expected error when IssueCert fails")
+		}
+		if !strings.Contains(err.Error(), "dns timeout") {
+			t.Errorf("error %q should mention the underlying IssueCert error", err)
+		}
+		if !strings.Contains(err.Error(), "example.com") {
+			t.Errorf("error %q should name the failing domain", err)
 		}
 	})
 }

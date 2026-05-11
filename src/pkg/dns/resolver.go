@@ -37,6 +37,12 @@ type FabricResolver struct {
 	NSServer string
 }
 
+func NewFabricResolverAt(client FabricResolverClient) func(string) Resolver {
+	return func(nsServer string) Resolver {
+		return &FabricResolver{Client: client, NSServer: nsServer}
+	}
+}
+
 func (r FabricResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
 	resp, err := r.Client.ResolveIPAddr(ctx, &defangv1.ResolveIPAddrRequest{
 		Domain:   domain,

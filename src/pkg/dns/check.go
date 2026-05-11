@@ -82,6 +82,28 @@ func CheckDomainDNSReady(ctx context.Context, domain string, validCNAMEs []strin
 	return false
 }
 
+// LookupTXT queries the authoritative name servers directly (via the
+// package's resolver, default RootResolver) instead of going through
+// /etc/resolv.conf and any cached/forwarded resolvers in front of it.
+// Required for cert-validation flows where a stale upstream cache (e.g. a
+// home router still holding NXDOMAIN) would otherwise stall the loop while
+// the public DNS already serves the new record.
+func LookupTXT(ctx context.Context, domain string, resolver Resolver) ([]string, error) {
+	return resolver.LookupTXT(ctx, domain)
+}
+
+// LookupTXTContains reports whether any TXT record on name has the exact
+// value expected. Returns the lookup error verbatim — callers handling DNS
+// not-found should branch on it directly.
+func LookupTXTContains(ctx context.Context, name, expected string, resolver Resolver) (bool, error) {
+	txts, err := LookupTXT(ctx, name, resolver)
+	Logger.Debugf("TXT records for %v: %v, err: %v", name, txts, err)
+	if err != nil {
+		return false, err
+	}
+	return slices.Contains(txts, expected), nil
+}
+
 func getCNAMEInSync(ctx context.Context, domain string, resolverAt func(string) Resolver) (string, error) {
 	ns, err := FindNSServers(ctx, domain, resolverAt)
 	if err != nil {
