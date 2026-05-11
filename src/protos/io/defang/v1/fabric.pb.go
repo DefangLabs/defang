@@ -6551,7 +6551,7 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x04data\x18\x02 \x01(\fR\x04data\x12%\n" +
 	"\x0eprevious_error\x18\x03 \x01(\tR\rpreviousError\"3\n" +
 	"\x17GenerateComposeResponse\x12\x18\n" +
-	"\acompose\x18\x01 \x01(\fR\acompose*_\n" +
+	"\acompose\x18\x01 \x01(\fR\acompose*m\n" +
 	"\bProvider\x12\x18\n" +
 	"\x14PROVIDER_UNSPECIFIED\x10\x00\x12\n" +
 	"\n" +
@@ -6559,7 +6559,8 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x03AWS\x10\x02\x12\x10\n" +
 	"\fDIGITALOCEAN\x10\x03\x12\a\n" +
 	"\x03GCP\x10\x04\x12\t\n" +
-	"\x05AZURE\x10\x05*T\n" +
+	"\x05AZURE\x10\x05\x12\f\n" +
+	"\bSCALEWAY\x10\x06*T\n" +
 	"\x0eDeploymentMode\x12\x14\n" +
 	"\x10MODE_UNSPECIFIED\x10\x00\x12\x0f\n" +
 	"\vDEVELOPMENT\x10\x01\x12\v\n" +
