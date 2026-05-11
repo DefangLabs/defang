@@ -249,3 +249,24 @@ To get started quickly, install Nix and DirEnv, then create a `.envrc` file to a
 echo use flake >> .envrc
 direnv allow
 ```
+
+### Adding cloud support
+
+At a high-level, support for a specific cloud lives in two repositories:
+
+- In [this CLI repository](https://github.com/DefangLabs/defang)
+  - an implementation of the [client.Provider](src/pkg/cli/client/byoc) interface under the [`byoc` package](src/pkg/cli/client/byoc)
+  - low-level cloud helpers ("driver") under the [`clouds` package](src/pkg/clouds)
+    - authenticate with the cloud
+    - start a CD container (task/job)
+    - monitor the CD container's status and logs
+    - stream/query logs from deployed services
+    - set/list config (secrets/parameters)
+- In the [Defang Pulumi Provider repository](https://github.com/DefangLabs/pulumi-defang)
+  - Pulumi **component** resources under the `provider` folder
+    - `Project` component
+    - `Service` component
+    - `Postgres` component
+    - `Redis` component
+  - a Pulumi **custom** resource for `Build`
+  - an implementation of the `ConfigProvider` interface to read config (secrets/parameters) at deploy time
