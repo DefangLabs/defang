@@ -40,6 +40,10 @@ func cdCommand(cmd *cobra.Command, command client.CdCommand, args []string, fabr
 		}
 		projectName := parts[0]
 		stackName := parts[1]
+		if projectName == "" || stackName == "" {
+			errs = append(errs, errors.New("invalid argument: "+arg+", project and stack name cannot be empty"))
+			continue
+		}
 		provider := cli.NewProvider(ctx, providerID, fabric, stackName)
 		err := canIUseProvider(ctx, provider, projectName, 0, allowUpgrade)
 		if err != nil {
