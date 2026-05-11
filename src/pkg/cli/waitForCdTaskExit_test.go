@@ -27,6 +27,9 @@ func (m *mockCdWaiter) GetDeploymentStatus(ctx context.Context) (bool, error) {
 }
 
 func TestWaitForCdTaskExit(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping: relies on pollDuration ticker (~10s)")
+	}
 	t.Run("CodeBuild failure", func(t *testing.T) {
 		waiter := &mockCdWaiter{
 			getDeploymentStatusErr: awscodebuild.BuildFailure{},
