@@ -169,6 +169,9 @@ func (b *ByocAzure) CdList(ctx context.Context, _ bool) (iter.Seq[state.Info], e
 
 // AccountInfo implements client.Provider.
 func (b *ByocAzure) AccountInfo(context.Context) (*client.AccountInfo, error) {
+	if err := b.setUpLocation(); err != nil {
+		return nil, fmt.Errorf("AccountInfo: %w", err)
+	}
 	return &client.AccountInfo{
 		AccountID: b.driver.SubscriptionID,
 		Provider:  client.ProviderAzure,
