@@ -945,7 +945,11 @@ func (b *ByocScaleway) QueryLogs(ctx context.Context, req *defangv1.TailRequest)
 
 	return func(yield func(*defangv1.TailResponse, error) bool) {
 		for _, entry := range entries {
-			if !yield(lokiEntryToTailResponse(entry, etag), nil) {
+			resp := lokiEntryToTailResponse(entry, etag)
+			if resp == nil {
+				continue
+			}
+			if !yield(resp, nil) {
 				return
 			}
 		}
@@ -1046,7 +1050,12 @@ func (b *ByocScaleway) followLogs(ctx context.Context, query, etag string, req *
 				if !entry.Timestamp.After(start) {
 					continue // skip already-seen entries
 				}
-				if !yield(lokiEntryToTailResponse(entry, etag), nil) {
+				resp := lokiEntryToTailResponse(entry, etag)
+				if resp == nil {
+					start = entry.Timestamp
+					continue
+				}
+				if !yield(resp, nil) {
 					return
 				}
 				start = entry.Timestamp
@@ -1091,11 +1100,14 @@ func parseScalewayLogEntry(entry scaleway.LokiEntry) (scaleway.LokiEntry, string
 	if payload.Stream != "" {
 		entry.Labels["stream"] = payload.Stream
 	}
-	return entry, entry.Line
+	return entry, payload.Message
 }
 
 func lokiEntryToTailResponse(entry scaleway.LokiEntry, etag string) *defangv1.TailResponse {
 	entry, message := parseScalewayLogEntry(entry)
+	if message == "" {
+		return nil
+	}
 	service := entry.Labels["resource_name"]
 	if service == "" {
 		service = entry.Labels["job_definition_name"]

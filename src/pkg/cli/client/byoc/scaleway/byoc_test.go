@@ -237,6 +237,16 @@ func TestLokiEntryToTailResponseParsesScalewayJSONPayload(t *testing.T) {
 	assert.True(t, resp.Entries[0].Stderr)
 }
 
+func TestLokiEntryToTailResponseSkipsScalewayMetadataPayload(t *testing.T) {
+	t.Parallel()
+
+	resp := lokiEntryToTailResponse(cloudscaleway.LokiEntry{
+		Line: `{"resource_type":"serverless_job","stream":"stdout","job_definition_name":"defang-cd-logsval","resource_id":"run-id"}`,
+	}, "etag")
+
+	assert.Nil(t, resp)
+}
+
 func TestSubscribeRejectsMissingOrMismatchedRun(t *testing.T) {
 	t.Parallel()
 
