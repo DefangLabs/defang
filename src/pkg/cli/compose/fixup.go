@@ -591,6 +591,8 @@ func resolveScalewayModel(model string) string {
 // services that depend on the model service. Unlike wireDependentServices, it
 // does NOT add the model-provider network (no sidecar container) and sets
 // OPENAI_API_KEY to nil (user must set via `defang config set`).
+// TODO: Extract shared logic with wireDependentServices into a helper, parameterizing
+// the differences (no network wiring, nil OPENAI_API_KEY, dependency removal).
 func wireScalewayDependentServices(project *composeTypes.Project, svcName, urlVal, model, endpointEnvVar, modelEnvVar string) {
 	for name, dependency := range project.Services {
 		changed := false
