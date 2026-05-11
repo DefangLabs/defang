@@ -2,6 +2,7 @@ package command
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -42,7 +43,8 @@ func cdCommand(cmd *cobra.Command, command client.CdCommand, args []string, fabr
 		provider := cli.NewProvider(ctx, providerID, fabric, stackName)
 		err := canIUseProvider(ctx, provider, projectName, 0, allowUpgrade)
 		if err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("validating provider for %q: %w", arg, err))
+			continue
 		}
 		errs = append(errs, cli.CdCommandAndTail(ctx, provider, projectName, global.Verbose, command, fabric))
 	}
