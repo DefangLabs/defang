@@ -126,8 +126,6 @@ func (b *ByocScaleway) environment(projectName string) (map[string]string, error
 		"DEFANG_PULUMI_DEBUG":        os.Getenv("DEFANG_PULUMI_DEBUG"),
 		"DEFANG_PULUMI_DIFF":         os.Getenv("DEFANG_PULUMI_DIFF"),
 		"DEFANG_STATE_URL":           defangStateUrl,
-		"NODE_NO_WARNINGS":           "1",
-		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
 		"PRIVATE_DOMAIN":             b.GetPrivateDomain(projectName),
 		"PROJECT":                    projectName,
 		"PULUMI_CONFIG_PASSPHRASE":   byoc.PulumiConfigPassphrase,
@@ -414,13 +412,18 @@ func (b *ByocScaleway) DeleteConfig(ctx context.Context, secrets *defangv1.Secre
 		if err != nil {
 			return scaleway.AnnotateScalewayError(err, fmt.Sprintf("listing secrets for %q", secretName))
 		}
+		found := false
 		for _, s := range scwSecrets {
 			if s.Name == secretName {
 				if err := b.client.DeleteSecret(ctx, s.ID); err != nil {
 					return scaleway.AnnotateScalewayError(err, fmt.Sprintf("deleting secret %q", secretName))
 				}
+				found = true
 				break
 			}
+		}
+		if !found {
+			return fmt.Errorf("config not found: %s", name)
 		}
 	}
 	return nil
@@ -482,9 +485,21 @@ func (b *ByocScaleway) SetUpCD(ctx context.Context, force bool) error {
 		})
 		if err != nil {
 			if scaleway.IsConflict(err) {
-				// Job definition already exists; find it
-				// List and find by name is not directly supported, so we store the ID
-				term.Debug("CD job definition already exists")
+				// Job definition already exists; retrieve its ID
+				term.Debug("CD job definition already exists, looking up ID")
+				defs, listErr := b.client.ListJobDefinitions(ctx, jobName)
+				if listErr != nil {
+					return scaleway.AnnotateScalewayError(listErr, "listing job definitions")
+				}
+				for i := range defs {
+					if defs[i].Name == jobName {
+						b.jobDefID = defs[i].ID
+						break
+					}
+				}
+				if b.jobDefID == "" {
+					return fmt.Errorf("CD job definition %q exists but could not be found", jobName)
+				}
 			} else {
 				return scaleway.AnnotateScalewayError(err, "creating CD job definition")
 			}
@@ -821,12 +836,22 @@ func (b *ByocScaleway) followLogs(ctx context.Context, query, etag string, req *
 			start = req.Since.AsTime()
 		}
 
+		const maxConsecutiveErrors = 5
+		consecutiveErrors := 0
+
 		for {
 			entries, err := scaleway.QueryLoki(ctx, b.cockpitToken, b.region, query, start, time.Time{}, 100)
 			if err != nil {
+				consecutiveErrors++
+				if consecutiveErrors >= maxConsecutiveErrors {
+					yield(nil, fmt.Errorf("giving up after %d consecutive log query failures: %w", maxConsecutiveErrors, err))
+					return
+				}
 				if !yield(nil, err) {
 					return
 				}
+			} else {
+				consecutiveErrors = 0
 			}
 
 			for _, entry := range entries {
@@ -853,6 +878,7 @@ func lokiEntryToTailResponse(entry scaleway.LokiEntry, etag string) *defangv1.Ta
 		service = "cd"
 	}
 	host := entry.Labels["resource_id"]
+	// TODO: Scaleway Loki doesn't provide stream labels to distinguish stdout/stderr; using string matching as a heuristic
 	stderr := strings.Contains(strings.ToLower(entry.Line), "error")
 
 	return &defangv1.TailResponse{

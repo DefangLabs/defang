@@ -103,6 +103,29 @@ func (c *Client) ListJobRuns(ctx context.Context, definitionID string) ([]JobRun
 	return resp.JobRuns, nil
 }
 
+type listJobDefinitionsResponse struct {
+	JobDefinitions []JobDefinition `json:"job_definitions"`
+	TotalCount     int             `json:"total_count"`
+}
+
+// ListJobDefinitions lists job definitions in the project, optionally filtered by name.
+func (c *Client) ListJobDefinitions(ctx context.Context, name string) ([]JobDefinition, error) {
+	endpoint := c.regionURL("serverless-jobs", "v1alpha1") + "/job-definitions"
+	params := url.Values{
+		"project_id": {c.ProjectID},
+	}
+	if name != "" {
+		params.Set("name", name)
+	}
+	fullURL := endpoint + "?" + params.Encode()
+
+	var resp listJobDefinitionsResponse
+	if err := c.doRequestJSON(ctx, "GET", fullURL, nil, &resp); err != nil {
+		return nil, AnnotateScalewayError(err, "listing job definitions")
+	}
+	return resp.JobDefinitions, nil
+}
+
 // DeleteJobDefinition deletes a job definition.
 func (c *Client) DeleteJobDefinition(ctx context.Context, definitionID string) error {
 	endpoint := c.regionURL("serverless-jobs", "v1alpha1") + "/job-definitions/" + definitionID
