@@ -8,8 +8,9 @@ import (
 
 // JobResources defines the CPU and memory for a serverless job.
 type JobResources struct {
-	CPULimit    int `json:"cpu_limit"`
-	MemoryLimit int `json:"memory_limit"`
+	CPULimit             int `json:"cpu_limit"`
+	MemoryLimit          int `json:"memory_limit"`
+	LocalStorageCapacity int `json:"local_storage_capacity"`
 }
 
 // JobDefinition represents a Scaleway Serverless Jobs definition.
@@ -59,12 +60,13 @@ type JobSecretRef struct {
 func (c *Client) CreateJobDefinition(ctx context.Context, name, image string, env map[string]string, resources JobResources) (*JobDefinition, error) {
 	url := c.regionURL("serverless-jobs", "v1alpha2") + "/job-definitions"
 	body := map[string]any{
-		"name":                  name,
-		"project_id":            c.ProjectID,
-		"cpu_limit":             resources.CPULimit,
-		"memory_limit":          resources.MemoryLimit,
-		"image_uri":             image,
-		"environment_variables": env,
+		"name":                   name,
+		"project_id":             c.ProjectID,
+		"cpu_limit":              resources.CPULimit,
+		"memory_limit":           resources.MemoryLimit,
+		"local_storage_capacity": resources.LocalStorageCapacity,
+		"image_uri":              image,
+		"environment_variables":  env,
 	}
 	var def JobDefinition
 	if err := c.doRequestJSON(ctx, "POST", url, body, &def); err != nil {

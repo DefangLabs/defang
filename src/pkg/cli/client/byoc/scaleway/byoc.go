@@ -46,7 +46,8 @@ type ByocScaleway struct {
 	cdEtag  types.ETag
 
 	// Cockpit token for Loki log queries
-	cockpitToken string
+	cockpitToken        string
+	cockpitLogsEndpoint string
 }
 
 var _ client.Provider = (*ByocScaleway)(nil)
@@ -130,7 +131,7 @@ func (b *ByocScaleway) environment(projectName string) (map[string]string, error
 		"PROJECT":                  projectName,
 		"PULUMI_CONFIG_PASSPHRASE": byoc.PulumiConfigPassphrase,
 		"PULUMI_COPILOT":           "false",
-		"PULUMI_HOME":              "/home/.pulumi",
+		"PULUMI_HOME":              "/root/.pulumi",
 		"PULUMI_SKIP_UPDATE_CHECK": "true",
 		"SCW_ACCESS_KEY":           b.client.AccessKey,
 		"SCW_SECRET_KEY":           b.client.SecretKey,
@@ -405,7 +406,7 @@ func (b *ByocScaleway) GetProjectUpdate(ctx context.Context, projectName string)
 	term.Debug("Getting services from bucket:", bucket, path)
 	pbBytes, err := scaleway.GetObject(ctx, b.s3Client, bucket, path)
 	if err != nil {
-		if scaleway.IsNotFound(err) || strings.Contains(err.Error(), "NoSuchKey") {
+		if scaleway.IsNotFound(err) || strings.Contains(err.Error(), "NoSuchKey") || strings.Contains(err.Error(), "NoSuchBucket") {
 			term.Debug("GetObject:", err)
 			return nil, client.ErrNotExist
 		}
@@ -414,7 +415,8 @@ func (b *ByocScaleway) GetProjectUpdate(ctx context.Context, projectName string)
 
 	var projUpdate defangv1.ProjectUpdate
 	if err := proto.Unmarshal(pbBytes, &projUpdate); err != nil {
-		return nil, err
+		term.Debug("Invalid project update:", err)
+		return nil, client.ErrNotExist
 	}
 	return &projUpdate, nil
 }
@@ -584,41 +586,29 @@ func (b *ByocScaleway) SetUpCD(ctx context.Context, force bool) error {
 		if err != nil {
 			return err
 		}
+		// Scaleway currently permits duplicate job definitions with the same
+		// name. Keep CD setup deterministic by removing every previous Defang
+		// CD definition before creating the one this CLI invocation will run.
+		defs, err := b.client.ListJobDefinitions(ctx, jobName)
+		if err != nil {
+			return scaleway.AnnotateScalewayError(err, "listing job definitions")
+		}
+		for i := range defs {
+			if defs[i].Name == jobName {
+				if err := b.client.DeleteJobDefinition(ctx, defs[i].ID); err != nil {
+					return scaleway.AnnotateScalewayError(err, "deleting stale CD job definition")
+				}
+			}
+		}
 		jobDef, err := b.client.CreateJobDefinition(ctx, jobName, b.CDImage, withoutSecretEnv(env), scaleway.JobResources{
-			CPULimit:    2000, // 2 vCPU
-			MemoryLimit: 4096, // 4 GB
+			CPULimit:             2000,  // 2 vCPU
+			MemoryLimit:          4096,  // 4 GB
+			LocalStorageCapacity: 10000, // 10 GB
 		})
 		if err != nil {
-			if scaleway.IsConflict(err) {
-				// Recreate the CD job so image, env, and secret references match
-				// the current CLI inputs instead of silently reusing stale state.
-				term.Debug("CD job definition already exists, recreating it")
-				defs, listErr := b.client.ListJobDefinitions(ctx, jobName)
-				if listErr != nil {
-					return scaleway.AnnotateScalewayError(listErr, "listing job definitions")
-				}
-				for i := range defs {
-					if defs[i].Name == jobName {
-						if err := b.client.DeleteJobDefinition(ctx, defs[i].ID); err != nil {
-							return scaleway.AnnotateScalewayError(err, "deleting stale CD job definition")
-						}
-						break
-					}
-				}
-				jobDef, err = b.client.CreateJobDefinition(ctx, jobName, b.CDImage, withoutSecretEnv(env), scaleway.JobResources{
-					CPULimit:    2000,
-					MemoryLimit: 4096,
-				})
-				if err != nil {
-					return scaleway.AnnotateScalewayError(err, "creating CD job definition")
-				}
-				b.jobDefID = jobDef.ID
-			} else {
-				return scaleway.AnnotateScalewayError(err, "creating CD job definition")
-			}
-		} else {
-			b.jobDefID = jobDef.ID
+			return scaleway.AnnotateScalewayError(err, "creating CD job definition")
 		}
+		b.jobDefID = jobDef.ID
 		if err := b.createCDSecretReferences(ctx, b.jobDefID, env); err != nil {
 			return err
 		}
@@ -938,7 +928,7 @@ func (b *ByocScaleway) QueryLogs(ctx context.Context, req *defangv1.TailRequest)
 		limit = 100
 	}
 
-	entries, err := scaleway.QueryLoki(ctx, b.cockpitToken, b.region, query, start, end, limit)
+	entries, err := scaleway.QueryLoki(ctx, b.cockpitToken, b.cockpitLogsEndpoint, query, start, end, limit)
 	if err != nil {
 		return nil, fmt.Errorf("querying logs: %w", err)
 	}
@@ -954,7 +944,7 @@ func (b *ByocScaleway) QueryLogs(ctx context.Context, req *defangv1.TailRequest)
 
 // ensureCockpitToken lazily creates a Cockpit token for Loki queries.
 func (b *ByocScaleway) ensureCockpitToken(ctx context.Context) error {
-	if b.cockpitToken != "" {
+	if b.cockpitToken != "" && b.cockpitLogsEndpoint != "" {
 		return nil
 	}
 
@@ -985,7 +975,16 @@ func (b *ByocScaleway) ensureCockpitToken(ctx context.Context) error {
 		}
 	}
 
-	b.cockpitToken = token.SecretKey
+	if b.cockpitToken == "" {
+		b.cockpitToken = token.SecretKey
+	}
+	if b.cockpitLogsEndpoint == "" {
+		endpoint, err := b.client.GetCockpitLogsEndpoint(ctx, b.projectID)
+		if err != nil {
+			return err
+		}
+		b.cockpitLogsEndpoint = endpoint
+	}
 	return nil
 }
 
@@ -1019,7 +1018,7 @@ func (b *ByocScaleway) followLogs(ctx context.Context, query, etag string, req *
 		consecutiveErrors := 0
 
 		for {
-			entries, err := scaleway.QueryLoki(ctx, b.cockpitToken, b.region, query, start, time.Time{}, 100)
+			entries, err := scaleway.QueryLoki(ctx, b.cockpitToken, b.cockpitLogsEndpoint, query, start, time.Time{}, 100)
 			if err != nil {
 				consecutiveErrors++
 				if consecutiveErrors >= maxConsecutiveErrors {

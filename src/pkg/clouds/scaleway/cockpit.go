@@ -12,16 +12,32 @@ import (
 
 // CockpitToken represents a Scaleway Cockpit token for querying observability data.
 type CockpitToken struct {
-	AccessKey string `json:"access_key"`
-	SecretKey string `json:"secret_key"`
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	ProjectID string `json:"project_id"`
+	AccessKey string   `json:"access_key"`
+	SecretKey string   `json:"secret_key"`
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	ProjectID string   `json:"project_id"`
+	Scopes    []string `json:"scopes"`
 }
 
 type listCockpitTokensResponse struct {
 	Tokens     []CockpitToken `json:"tokens"`
 	TotalCount int            `json:"total_count"`
+}
+
+type CockpitDataSource struct {
+	ID        string `json:"id"`
+	ProjectID string `json:"project_id"`
+	Name      string `json:"name"`
+	URL       string `json:"url"`
+	Type      string `json:"type"`
+	Origin    string `json:"origin"`
+	Region    string `json:"region"`
+}
+
+type listCockpitDataSourcesResponse struct {
+	DataSources []CockpitDataSource `json:"data_sources"`
+	TotalCount  int                 `json:"total_count"`
 }
 
 // CreateCockpitToken creates a Cockpit token with log-query permissions.
@@ -31,16 +47,9 @@ func (c *Client) CreateCockpitToken(ctx context.Context, name, projectID string)
 	}
 	endpoint := fmt.Sprintf("%s/cockpit/v1/regions/%s/tokens", apiBaseURL, c.Region)
 	body := map[string]any{
-		"name":       name,
-		"project_id": projectID,
-		"scopes": map[string]bool{
-			"query_logs":    true,
-			"query_metrics": false,
-			"query_traces":  false,
-			"write_logs":    false,
-			"write_metrics": false,
-			"write_traces":  false,
-		},
+		"name":         name,
+		"project_id":   projectID,
+		"token_scopes": []string{"read_only_logs"},
 	}
 	var token CockpitToken
 	if err := c.doRequestJSON(ctx, "POST", endpoint, body, &token); err != nil {
@@ -71,6 +80,23 @@ func (c *Client) DeleteCockpitToken(ctx context.Context, tokenID string) error {
 	return nil
 }
 
+func (c *Client) GetCockpitLogsEndpoint(ctx context.Context, projectID string) (string, error) {
+	if projectID == "" {
+		projectID = c.ProjectID
+	}
+	endpoint := fmt.Sprintf("%s/cockpit/v1/regions/%s/data-sources?project_id=%s", apiBaseURL, c.Region, url.QueryEscape(projectID))
+	var resp listCockpitDataSourcesResponse
+	if err := c.doRequestJSON(ctx, "GET", endpoint, nil, &resp); err != nil {
+		return "", AnnotateScalewayError(err, "listing Cockpit data sources")
+	}
+	for _, dataSource := range resp.DataSources {
+		if dataSource.Type == "logs" && dataSource.URL != "" {
+			return dataSource.URL, nil
+		}
+	}
+	return "", fmt.Errorf("no Scaleway Cockpit logs data source found in project %s", projectID)
+}
+
 // LokiEntry represents a single log entry from a Loki query.
 type LokiEntry struct {
 	Timestamp time.Time
@@ -91,12 +117,11 @@ type lokiQueryRangeResponse struct {
 
 // CockpitLogsEndpoint returns the Loki-compatible logs endpoint for a Scaleway region.
 func CockpitLogsEndpoint(region string) string {
-	return fmt.Sprintf("https://%s.logs.cockpit.scaleway.com", region)
+	return fmt.Sprintf("https://logs.cockpit.%s.scw.cloud", region)
 }
 
 // QueryLoki queries the Cockpit Loki API for log entries using query_range.
-func QueryLoki(ctx context.Context, cockpitSecretKey, region, query string, start, end time.Time, limit int) ([]LokiEntry, error) {
-	endpoint := CockpitLogsEndpoint(region)
+func QueryLoki(ctx context.Context, cockpitSecretKey, endpoint, query string, start, end time.Time, limit int) ([]LokiEntry, error) {
 	params := url.Values{
 		"query":     {query},
 		"direction": {"forward"},
