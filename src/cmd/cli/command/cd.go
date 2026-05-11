@@ -2,6 +2,7 @@ package command
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -23,26 +24,27 @@ func cdCommand(cmd *cobra.Command, command client.CdCommand, args []string, fabr
 	ctx := cmd.Context()
 	allowUpgrade, _ := cmd.Flags().GetBool("allow-upgrade")
 
-	session, err := newCommandSession(cmd)
-	if err != nil {
-		return err
-	}
-
-	if len(args) == 0 {
-		projectName, err := client.LoadProjectNameWithFallback(ctx, session.Loader, session.Provider)
-		if err != nil {
-			return err
-		}
-		args = []string{projectName}
+	providerID := global.Stack.Provider
+	if providerID == client.ProviderDefang || providerID == client.ProviderAuto {
+		return errors.New("cannot run CD commands with the Defang Playground provider; please specify a different provider with --provider")
 	}
 
 	var errs []error
-	for _, projectName := range args {
-		err := canIUseProvider(ctx, session.Provider, projectName, 0, allowUpgrade)
+	for _, arg := range args {
+		// split arg by "/" to get project and stack name
+		parts := strings.Split(arg, "/")
+		if len(parts) != 2 {
+			errs = append(errs, errors.New("invalid argument: "+arg+", expected format: <project>/<stack>"))
+			continue
+		}
+		projectName := parts[0]
+		stackName := parts[1]
+		provider := cli.NewProvider(ctx, providerID, fabric, stackName)
+		err := canIUseProvider(ctx, provider, projectName, 0, allowUpgrade)
 		if err != nil {
 			return err
 		}
-		errs = append(errs, cli.CdCommandAndTail(ctx, session.Provider, projectName, global.Verbose, command, fabric))
+		errs = append(errs, cli.CdCommandAndTail(ctx, provider, projectName, global.Verbose, command, fabric))
 	}
 	return errors.Join(errs...)
 }
@@ -51,6 +53,7 @@ var cdDestroyCmd = &cobra.Command{
 	Use:         "destroy [PROJECT...]",
 	Annotations: authNeededAlways, // need subscription
 	Short:       "Destroy the service stack",
+	Args:        cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cdCommand(cmd, client.CdCommandDestroy, args, global.Client)
 	},
@@ -60,6 +63,7 @@ var cdDownCmd = &cobra.Command{
 	Use:         "down [PROJECT...]",
 	Annotations: authNeededAlways, // need subscription
 	Short:       "Refresh and then destroy the service stack",
+	Args:        cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cdCommand(cmd, client.CdCommandDown, args, global.Client)
 	},
@@ -78,6 +82,7 @@ var cdCancelCmd = &cobra.Command{
 	Use:         "cancel [PROJECT...]",
 	Annotations: authNeededAlways, // need subscription
 	Short:       "Cancel the current CD operation",
+	Args:        cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cdCommand(cmd, client.CdCommandCancel, args, global.Client)
 	},
@@ -87,6 +92,7 @@ var cdOutputsCmd = &cobra.Command{
 	Use:         "outputs [PROJECT...]",
 	Annotations: authNeededAlways, // need subscription
 	Short:       "Get the outputs of the service stack",
+	Args:        cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cdCommand(cmd, client.CdCommandOutputs, args, global.Client)
 	},
@@ -123,25 +129,26 @@ var cdListCmd = &cobra.Command{
 		remote, _ := cmd.Flags().GetBool("remote")
 		all, _ := cmd.Flags().GetBool("all")
 
-		session, err := newCommandSession(cmd)
-		if err != nil {
-			return err
+		providerID := global.Stack.Provider
+		if providerID == client.ProviderDefang || providerID == client.ProviderAuto {
+			return errors.New("cannot list projects with the Defang Playground provider; please specify a different provider with --provider")
 		}
+		provider := cli.NewProvider(ctx, providerID, global.Client, "") // stack name is not needed for listing projects
 
 		if remote {
 			if all {
 				return errors.New("--all cannot be used with --remote")
 			}
 
-			err = canIUseProvider(ctx, session.Provider, "", 0, true) // safe to use latest CD image
+			err := canIUseProvider(ctx, provider, "", 0, true) // safe to use latest CD image
 			if err != nil {
 				return err
 			}
 
 			// FIXME: this needs auth because it spawns the CD task
-			return cli.CdCommandAndTail(ctx, session.Provider, "", global.Verbose, client.CdCommandList, global.Client)
+			return cli.CdCommandAndTail(ctx, provider, "", global.Verbose, client.CdCommandList, global.Client)
 		} else {
-			return cli.CdListFromStorage(ctx, session.Provider, all || global.Verbose)
+			return cli.CdListFromStorage(ctx, provider, all || global.Verbose)
 		}
 	},
 }
