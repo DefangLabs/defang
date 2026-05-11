@@ -8,7 +8,7 @@ const (
 	RegionDefaultAWS   = "us-west-2"
 	RegionDefaultAzure = "westus" // Default region for Azure
 	RegionDefaultDO    = "nyc3"
-	RegionDefaultGCP      = "us-central1" // Defaults to us-central1 for lower price
+	RegionDefaultGCP   = "us-central1" // Defaults to us-central1 for lower price
 	RegionDefaultScaleway = "fr-par"
 )
 
