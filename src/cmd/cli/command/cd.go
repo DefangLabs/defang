@@ -56,7 +56,7 @@ func cdCommand(cmd *cobra.Command, command client.CdCommand, args []string, fabr
 }
 
 var cdDestroyCmd = &cobra.Command{
-	Use:         "destroy [PROJECT...]",
+	Use:         "destroy [PROJECT/STACK...]",
 	Annotations: authNeededAlways, // need subscription
 	Short:       "Destroy the service stack",
 	Args:        cobra.MinimumNArgs(1),
@@ -66,7 +66,7 @@ var cdDestroyCmd = &cobra.Command{
 }
 
 var cdDownCmd = &cobra.Command{
-	Use:         "down [PROJECT...]",
+	Use:         "down [PROJECT/STACK...]",
 	Annotations: authNeededAlways, // need subscription
 	Short:       "Refresh and then destroy the service stack",
 	Args:        cobra.MinimumNArgs(1),
@@ -76,7 +76,7 @@ var cdDownCmd = &cobra.Command{
 }
 
 var cdRefreshCmd = &cobra.Command{
-	Use:         "refresh [PROJECT...]",
+	Use:         "refresh [PROJECT/STACK...]",
 	Annotations: authNeededAlways, // need subscription
 	Short:       "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -85,7 +85,7 @@ var cdRefreshCmd = &cobra.Command{
 }
 
 var cdCancelCmd = &cobra.Command{
-	Use:         "cancel [PROJECT...]",
+	Use:         "cancel [PROJECT/STACK...]",
 	Annotations: authNeededAlways, // need subscription
 	Short:       "Cancel the current CD operation",
 	Args:        cobra.MinimumNArgs(1),
@@ -95,7 +95,7 @@ var cdCancelCmd = &cobra.Command{
 }
 
 var cdOutputsCmd = &cobra.Command{
-	Use:         "outputs [PROJECT...]",
+	Use:         "outputs [PROJECT/STACK...]",
 	Annotations: authNeededAlways, // need subscription
 	Short:       "Get the outputs of the service stack",
 	Args:        cobra.MinimumNArgs(1),
