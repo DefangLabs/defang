@@ -188,18 +188,11 @@ func TestPrepareDomainDelegationNil(t *testing.T) {
 	}
 }
 
-func TestSubscribe(t *testing.T) {
+func TestSubscribeNoActiveDeployment(t *testing.T) {
 	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
-	seq, err := b.Subscribe(t.Context(), &defangv1.SubscribeRequest{})
-	if err != nil {
-		t.Fatalf("Subscribe err: %v", err)
-	}
-	if seq == nil {
-		t.Fatal("Subscribe returned nil seq")
-	}
-	// The TODO stub simply yields nothing — iterating should finish immediately.
-	for range seq {
-		t.Error("Subscribe iterator yielded unexpectedly")
+	_, err := b.Subscribe(t.Context(), &defangv1.SubscribeRequest{})
+	if err == nil {
+		t.Fatal("Subscribe should error when no Deploy / CdCommand has run yet")
 	}
 }
 

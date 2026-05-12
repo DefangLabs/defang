@@ -42,6 +42,7 @@ type ByocAzure struct {
 	kv      *keyvault.KeyVault
 	cdRunID string
 	cdEtag  string
+	cdStart time.Time
 }
 
 var _ client.Provider = (*ByocAzure)(nil)
@@ -68,6 +69,7 @@ func (b *ByocAzure) CdCommand(ctx context.Context, req client.CdCommandRequest) 
 	}
 
 	etag := types.NewEtag()
+	cdStart := time.Now()
 	execName, err := b.runCdCommand(ctx, cdCommand{
 		command:   []string{string(req.Command)},
 		etag:      etag,
@@ -80,6 +82,7 @@ func (b *ByocAzure) CdCommand(ctx context.Context, req client.CdCommandRequest) 
 	}
 	b.cdRunID = execName
 	b.cdEtag = etag
+	b.cdStart = cdStart
 	return &client.CdCommandResponse{
 		CdId:   execName,
 		CdType: defangv1.CdType_CD_TYPE_AZURE_ACA_JOBID,
@@ -537,6 +540,7 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 		payload = defanghttp.RemoveQueryParam(uploadURL) // managed identity provides blob read access
 	}
 
+	cdStart := time.Now()
 	execName, err := b.runCdCommand(ctx, cdCommand{
 		command:   []string{verb, payload},
 		etag:      etag,
@@ -550,6 +554,7 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 	}
 	b.cdRunID = execName
 	b.cdEtag = etag
+	b.cdStart = cdStart
 	return &client.DeployResponse{
 		CdId:   execName,
 		CdType: defangv1.CdType_CD_TYPE_AZURE_ACA_JOBID,
@@ -887,13 +892,6 @@ func (b *ByocAzure) RemoteProjectName(context.Context) (string, error) {
 func (b *ByocAzure) ServiceDNS(host string) string {
 	defer term.Timing()()
 	return host
-}
-
-// Subscribe implements client.Provider.
-func (b *ByocAzure) Subscribe(context.Context, *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {
-	return func(yield func(*defangv1.SubscribeResponse, error) bool) {
-		// TODO: Implement subscription to deployment events for Azure
-	}, nil
 }
 
 // TearDown implements client.Provider.
