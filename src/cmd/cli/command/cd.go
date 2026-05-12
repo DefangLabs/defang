@@ -24,6 +24,7 @@ var cdCmd = &cobra.Command{
 func cdCommand(cmd *cobra.Command, command client.CdCommand, args []string, fabric client.FabricClient) error {
 	ctx := cmd.Context()
 	allowUpgrade, _ := cmd.Flags().GetBool("allow-upgrade")
+	detach, _ := cmd.Flags().GetBool("detach")
 
 	providerID := global.Stack.Provider
 	if providerID == client.ProviderDefang || providerID == client.ProviderAuto {
@@ -50,7 +51,12 @@ func cdCommand(cmd *cobra.Command, command client.CdCommand, args []string, fabr
 			errs = append(errs, fmt.Errorf("validating provider for %q: %w", arg, err))
 			continue
 		}
-		errs = append(errs, cli.CdCommandAndTail(ctx, provider, projectName, global.Verbose, command, fabric))
+		if detach {
+			_, err = cli.CdCommand(ctx, projectName, provider, fabric, command)
+			errs = append(errs, err)
+		} else {
+			errs = append(errs, cli.CdCommandAndTail(ctx, provider, projectName, global.Verbose, command, fabric))
+		}
 	}
 	return errors.Join(errs...)
 }
