@@ -3888,6 +3888,7 @@ type Deployment struct {
 	Services          []*ServiceInfo         `protobuf:"bytes,18,rep,name=services,proto3" json:"services,omitempty"`
 	CdType            CdType                 `protobuf:"varint,19,opt,name=cd_type,json=cdType,proto3,enum=io.defang.v1.CdType" json:"cd_type,omitempty"`
 	CdId              string                 `protobuf:"bytes,20,opt,name=cd_id,json=cdId,proto3" json:"cd_id,omitempty"`
+	Compose           []byte                 `protobuf:"bytes,21,opt,name=compose,proto3" json:"compose,omitempty"` // yaml
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -4061,6 +4062,13 @@ func (x *Deployment) GetCdId() string {
 		return x.CdId
 	}
 	return ""
+}
+
+func (x *Deployment) GetCompose() []byte {
+	if x != nil {
+		return x.Compose
+	}
+	return nil
 }
 
 type PutDeploymentRequest struct {
@@ -6350,7 +6358,7 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x12ListConfigsRequest\x12\x18\n" +
 	"\aproject\x18\x01 \x01(\tR\aproject\"H\n" +
 	"\x13ListConfigsResponse\x121\n" +
-	"\aconfigs\x18\x01 \x03(\v2\x17.io.defang.v1.ConfigKeyR\aconfigs\"\xbb\a\n" +
+	"\aconfigs\x18\x01 \x03(\v2\x17.io.defang.v1.ConfigKeyR\aconfigs\"\xd5\a\n" +
 	"\n" +
 	"Deployment\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
@@ -6375,7 +6383,8 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x0forigin_metadata\x18\x11 \x03(\v2,.io.defang.v1.Deployment.OriginMetadataEntryR\x0eoriginMetadata\x125\n" +
 	"\bservices\x18\x12 \x03(\v2\x19.io.defang.v1.ServiceInfoR\bservices\x12-\n" +
 	"\acd_type\x18\x13 \x01(\x0e2\x14.io.defang.v1.CdTypeR\x06cdType\x12\x13\n" +
-	"\x05cd_id\x18\x14 \x01(\tR\x04cdId\x1aA\n" +
+	"\x05cd_id\x18\x14 \x01(\tR\x04cdId\x12\x18\n" +
+	"\acompose\x18\x15 \x01(\fR\acompose\x1aA\n" +
 	"\x13OriginMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"P\n" +

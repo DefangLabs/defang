@@ -5,8 +5,8 @@ package io.defang.v1;
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
-
 import "google/type/money.proto";
+
 option go_package = "github.com/DefangLabs/defang/src/protos/io/defang/v1;defangv1";
 
 service FabricController {
@@ -594,6 +594,7 @@ message Deployment {
   repeated ServiceInfo services = 18;
   CdType cd_type = 19;
   string cd_id = 20;
+  bytes compose = 21; // yaml
 }
 
 enum CdType {
