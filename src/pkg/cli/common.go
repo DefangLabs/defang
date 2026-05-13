@@ -52,6 +52,7 @@ type putDeploymentParams struct {
 	ServiceInfos []*defangv1.ServiceInfo
 	CdType       defangv1.CdType
 	CdId         string
+	Compose      []byte
 }
 
 func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric client.FabricClient, stack *stacks.Parameters, req putDeploymentParams) error {
@@ -119,6 +120,7 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 			Services:          req.ServiceInfos,
 			CdId:              req.CdId,
 			CdType:            req.CdType,
+			Compose:           req.Compose,
 		},
 	})
 }

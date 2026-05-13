@@ -104,13 +104,13 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		return nil, project, &ComposeError{err}
 	}
 
-	bytes, err := compose.MarshalYAML(fixedProject)
+	composeYaml, err := compose.MarshalYAML(fixedProject)
 	if err != nil {
 		return nil, project, err
 	}
 
 	if upload == compose.UploadModeIgnore {
-		term.Println(string(bytes))
+		term.Println(string(composeYaml))
 		return nil, project, dryrun.ErrDryRun
 	}
 
@@ -142,7 +142,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		DeployRequest: defangv1.DeployRequest{
 			Mode:           mode.Value(),
 			Project:        project.Name,
-			Compose:        bytes,
+			Compose:        composeYaml,
 			DelegateDomain: delegateDomain.Zone,
 		},
 	}
@@ -206,6 +206,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		ServiceInfos: resp.Services,
 		CdType:       resp.CdType,
 		CdId:         resp.CdId,
+		Compose:      composeYaml,
 	})
 	if err != nil {
 		term.Debug("Failed to record deployment:", err)
