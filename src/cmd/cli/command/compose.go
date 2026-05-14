@@ -290,7 +290,7 @@ func promptToCreateStack(ctx context.Context, targetDirectory string, params sta
 		return nil
 	}
 
-	err := PromptForStackParameters(ctx, &params)
+	err := promptForStackParameters(ctx, &params)
 	if err != nil {
 		return err
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 )
 
@@ -27,6 +28,7 @@ func makeStackCmd() *cobra.Command {
 	stackRemoveCmd := makeStackRemoveCmd()
 	stackRemoveCmd.Hidden = true
 	stackCmd.AddCommand(stackRemoveCmd)
+	stackCmd.AddCommand(makeStackShowCmd())
 	return stackCmd
 }
 
@@ -80,7 +82,7 @@ func makeStackNewCmd() *cobra.Command {
 				return err
 			}
 
-			err = PromptForStackParameters(ctx, &params)
+			err = promptForStackParameters(ctx, &params)
 			if err != nil {
 				return err
 			}
@@ -216,7 +218,40 @@ func makeStackRemoveCmd() *cobra.Command {
 	return stackRemoveCmd
 }
 
-func PromptForStackParameters(ctx context.Context, params *stacks.Parameters) error {
+func makeStackShowCmd() *cobra.Command {
+	var stackShowCmd = &cobra.Command{
+		Use:         "show STACK_NAME",
+		Aliases:     []string{"get", "view", "describe"},
+		Annotations: authNeededAlways, // stack tracked remotely
+		Args:        cobra.ExactArgs(1),
+		Short:       "Show details of a Defang deployment stack",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			name := args[0]
+			loader := newLoaderForCommand(cmd)
+			sm, err := newStackManagerForLoader(ctx, loader)
+			if err != nil {
+				return err
+			}
+
+			stack, err := sm.Load(ctx, name)
+			if err != nil {
+				return fmt.Errorf("could not load stack parameters: %w", err)
+			}
+
+			// TODO: should keep the stack file as-is not (de)ser'ed
+			env, err := godotenv.Marshal(stack.ToMap())
+			if err != nil {
+				return fmt.Errorf("could not marshal: %w", err)
+			}
+			_, err = term.Println(env)
+			return err
+		},
+	}
+	return stackShowCmd
+}
+
+func promptForStackParameters(ctx context.Context, params *stacks.Parameters) error {
 	wizard := stacks.NewWizard(ec)
 	newParams, err := wizard.CollectRemainingParameters(ctx, params)
 	if err != nil {
