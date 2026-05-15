@@ -32,7 +32,7 @@ func TestSubscriptionTierToString(t *testing.T) {
 	}{
 		{"unspecified", defangv1.SubscriptionTier_SUBSCRIPTION_TIER_UNSPECIFIED, "Starter"},
 		{"hobby", defangv1.SubscriptionTier_HOBBY, "Starter"},
-		{"personal", defangv1.SubscriptionTier_PERSONAL, "Starter (Legacy)"},
+		{"personal", defangv1.SubscriptionTier_PERSONAL, "Personal (Legacy)"},
 		{"pro", defangv1.SubscriptionTier_PRO, "Pro"},
 		{"team", defangv1.SubscriptionTier_TEAM, "Enterprise"},
 		{"expired", defangv1.SubscriptionTier_EXPIRED, "Expired"},

@@ -136,7 +136,7 @@ func SubscriptionTierToString(tier defangv1.SubscriptionTier) string {
 	case defangv1.SubscriptionTier_HOBBY:
 		return "Starter"
 	case defangv1.SubscriptionTier_PERSONAL:
-		return "Starter (Legacy)"
+		return "Personal (Legacy)"
 	case defangv1.SubscriptionTier_PRO:
 		return "Pro"
 	case defangv1.SubscriptionTier_TEAM:
