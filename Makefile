@@ -1,9 +1,6 @@
 .PHONY: install-git-hooks
 install-git-hooks:
-	printf "#!/bin/sh\nmake pre-commit" > .git/hooks/pre-commit
-	chmod +x .git/hooks/pre-commit
-	printf "#!/bin/sh\nmake pre-push" > .git/hooks/pre-push
-	chmod +x .git/hooks/pre-push
+	git config core.hooksPath scripts
 
 .PHONY: pre-commit
 pre-commit:
