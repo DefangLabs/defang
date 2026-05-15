@@ -13,7 +13,7 @@ var debugCmd = &cobra.Command{
 	Use:         "debug [SERVICE...]",
 	Annotations: authNeededAlways,
 	Hidden:      true,
-	Short:       "Debug a build, deployment, or service failure (Pro subscription required for full debugging)",
+	Short:       "Debug a build, deployment, or service failure",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 		etag, _ := cmd.Flags().GetString("etag")
