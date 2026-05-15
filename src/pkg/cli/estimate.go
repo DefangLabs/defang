@@ -95,6 +95,7 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 }
 
 var affordableModeEstimateSummary = `
+Available on all tiers.
 This mode is optimized for low cost and rapid iteration. Your application
 will be deployed with spot instances. Databases will be provisioned using
 resources optimized for burstable memory. Deployments are replaced entirely on
@@ -103,12 +104,14 @@ Services will be exposed directly to the public internet for easy debugging.
 This mode emphasizes affordability over availability.`
 
 var balancedModeEstimateSummary = `
+Requires Pro tier.
 This mode strikes a balance between cost and availability. Your application
 will be deployed with spot instances. Databases will be provisioned using
 resources optimized for production. Services in the "internal" network will
 be deployed to a private subnet with a NAT gateway for outbound internet access.`
 
 var highAvailabilityModeEstimateSummary = `
+Requires Enterprise tier.
 This mode prioritizes availability. Your application
 will be deployed with on-demand instances in multiple availability zones.
 Databases will be provisioned using resources optimized for production.
