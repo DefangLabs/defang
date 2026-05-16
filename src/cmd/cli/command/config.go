@@ -101,7 +101,7 @@ var configSetCmd = &cobra.Command{
 			// 1c. Handle --random flag: generate random values for specified configs
 			envMap = make(map[string]string)
 			for _, name := range args {
-				envMap[name] = cli.CreateRandomConfigValue()
+				envMap[name] = cli.CreateRandomConfigValue(session.Stack.Provider)
 			}
 		} else if envFile != "" {
 			// 1d. Handle --env-file flag: read all or specified configs from the file

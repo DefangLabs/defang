@@ -132,7 +132,7 @@ func TestHandleEstimateTool(t *testing.T) {
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
 			},
-			expectedError: "invalid provider: \"invalid-provider\", not one of [auto defang aws digitalocean gcp azure]",
+			expectedError: "invalid provider: \"invalid-provider\", not one of [auto defang aws digitalocean gcp azure scaleway]",
 		},
 		{
 			name: "run_estimate_error",

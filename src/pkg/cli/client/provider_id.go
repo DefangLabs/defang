@@ -16,6 +16,7 @@ const (
 	ProviderDefang ProviderID = "defang"
 	ProviderDO     ProviderID = "digitalocean"
 	ProviderGCP    ProviderID = "gcp"
+	ProviderScaleway ProviderID = "scaleway"
 )
 
 var allProviders = []ProviderID{
@@ -25,6 +26,7 @@ var allProviders = []ProviderID{
 	ProviderDO,
 	ProviderGCP,
 	ProviderAzure,
+	ProviderScaleway,
 }
 
 func AllProviders() []ProviderID {
@@ -49,6 +51,8 @@ func (p ProviderID) Name() string {
 		return "DigitalOcean"
 	case ProviderGCP:
 		return "Google Cloud Platform"
+	case ProviderScaleway:
+		return "Scaleway"
 	default:
 		return p.String()
 	}
@@ -66,6 +70,8 @@ func (p ProviderID) Value() defangv1.Provider {
 		return defangv1.Provider_DIGITALOCEAN
 	case ProviderGCP:
 		return defangv1.Provider_GCP
+	case ProviderScaleway:
+		return defangv1.Provider_SCALEWAY
 	default:
 		return defangv1.Provider_PROVIDER_UNSPECIFIED
 	}
@@ -94,6 +100,8 @@ func (p *ProviderID) SetValue(val defangv1.Provider) {
 		*p = ProviderDO
 	case defangv1.Provider_GCP:
 		*p = ProviderGCP
+	case defangv1.Provider_SCALEWAY:
+		*p = ProviderScaleway
 	default:
 		*p = ProviderAuto
 	}

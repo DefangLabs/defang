@@ -1,0 +1,61 @@
+name: scaleway-log-smoke
+services:
+  app:
+    image: python:3.12-alpine
+    command:
+      - python
+      - -u
+      - -c
+      - |
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        from datetime import datetime, timezone
+        import sys
+        import threading
+        import time
+
+        def stamp():
+            return datetime.now(timezone.utc).isoformat()
+
+        def log(message):
+            print(f"defang-log-smoke {stamp()} {message}", flush=True)
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                log(f"request path={self.path}")
+                body = b"defang log smoke ok\n"
+                self.send_response(200)
+                self.send_header("content-type", "text/plain")
+                self.send_header("content-length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, format, *args):
+                sys.stderr.write(f"defang-log-smoke-access {stamp()} {format % args}\n")
+                sys.stderr.flush()
+
+        def heartbeat():
+            while True:
+                log("heartbeat")
+                time.sleep(5)
+
+        log("starting server port=8080")
+        threading.Thread(target=heartbeat, daemon=True).start()
+        HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+    ports:
+      - mode: ingress
+        target: 8080
+        published: 8080
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health').read()"
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 5s
+    deploy:
+      resources:
+        reservations:
+          memory: 256M

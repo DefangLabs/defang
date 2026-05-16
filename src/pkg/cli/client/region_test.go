@@ -85,6 +85,18 @@ func TestGetRegion(t *testing.T) {
 			envVars:  map[string]string{"REGION": "sfo3"},
 			expected: "sfo3",
 		},
+		{
+			name:     "Scaleway with default",
+			provider: ProviderScaleway,
+			envVars:  map[string]string{},
+			expected: "fr-par",
+		},
+		{
+			name:     "Scaleway with SCW_DEFAULT_REGION",
+			provider: ProviderScaleway,
+			envVars:  map[string]string{"SCW_DEFAULT_REGION": "nl-ams"},
+			expected: "nl-ams",
+		},
 	}
 
 	for _, tt := range tests {

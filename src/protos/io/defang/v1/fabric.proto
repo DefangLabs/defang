@@ -178,6 +178,7 @@ enum Provider {
   DIGITALOCEAN = 3;
   GCP = 4;
   AZURE = 5;
+  SCALEWAY = 6;
 }
 
 message Stack {

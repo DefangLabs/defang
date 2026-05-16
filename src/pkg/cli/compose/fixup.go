@@ -56,6 +56,15 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 			if err := fixupRedisService(&svccfg, provider, upload); err != nil {
 				return fmt.Errorf("service %q: %w", svccfg.Name, err)
 			}
+			// Scaleway Managed Redis requires a password; inject as config value if not set
+			if managedRedis && accountInfo.Provider == client.ProviderScaleway {
+				if svccfg.Environment == nil {
+					svccfg.Environment = make(composeTypes.MappingWithEquals)
+				}
+				if _, ok := svccfg.Environment["REDIS_PASSWORD"]; !ok {
+					svccfg.Environment["REDIS_PASSWORD"] = nil // user sets via defang config set
+				}
+			}
 		}
 
 		_, managedPostgres := svccfg.Extensions["x-defang-postgres"]
@@ -78,6 +87,10 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 
 		if svccfg.Provider != nil && svccfg.Provider.Type == "model" && svccfg.Image == "" && svccfg.Build == nil {
 			fixupModelProvider(&svccfg, project, accountInfo)
+			if _, stillExists := project.Services[svccfg.Name]; !stillExists {
+				// Service was removed (e.g. Scaleway doesn't need a sidecar)
+				continue
+			}
 		}
 
 		if _, llm := svccfg.Extensions["x-defang-llm"]; llm {
@@ -102,7 +115,9 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 	for name, model := range project.Models {
 		model.Name = name // ensure the model has a name
 		svccfg := fixupModel(model, project, accountInfo)
-		project.Services[svccfg.Name] = *svccfg
+		if svccfg != nil {
+			project.Services[svccfg.Name] = *svccfg
+		}
 	}
 
 	svcNameReplacer := NewServiceNameReplacer(ctx, provider, project)
@@ -367,12 +382,18 @@ func fixupIngressPorts(svccfg *composeTypes.ServiceConfig) {
 // Declare a private network for the model provider
 const modelProviderNetwork = "model_provider_private"
 
+// fixupModel converts a top-level model declaration into a service config.
+// Returns nil for providers that don't need a sidecar container (e.g. Scaleway).
 func fixupModel(model composeTypes.ModelConfig, project *composeTypes.Project, info *client.AccountInfo) *composeTypes.ServiceConfig {
 	svccfg := &composeTypes.ServiceConfig{
 		Name:       model.Name,
 		Extensions: model.Extensions,
 	}
 	makeAccessGatewayService(svccfg, project, model.Model, info) // TODO: pass other model options too
+	// For Scaleway, the model service was removed from the project and shouldn't be re-added
+	if info.Provider == client.ProviderScaleway {
+		return nil
+	}
 	return svccfg
 }
 
@@ -388,9 +409,23 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 	// Local Docker sets [SERVICE]_URL and [SERVICE]_MODEL environment variables on the dependent services
 	envName := strings.ToUpper(svccfg.Name) // TODO: handle characters that are not allowed in env vars, like '-'
 	endpointEnvVar := envName + "_URL"
-	urlVal := "http://" + svccfg.Name + ":" + strconv.FormatUint(uint64(liteLLMPort), 10) + "/v1/"
 	modelEnvVar := envName + "_MODEL"
 
+	if info.Provider == client.ProviderScaleway {
+		// Scaleway Generative APIs are OpenAI-compatible at a public endpoint;
+		// no LiteLLM sidecar is needed. Point dependent services directly at the API.
+		resolvedModel := resolveScalewayModel(model)
+		urlVal := "https://api.scaleway.ai/v1/"
+		// OPENAI_API_KEY is wired as a config reference. The Scaleway BYOC
+		// client creates it from the Scaleway API key when it is missing.
+		wireScalewayDependentServices(project, svccfg.Name, urlVal, resolvedModel, endpointEnvVar, modelEnvVar)
+		// Remove the model service — nothing to deploy
+		delete(project.Services, svccfg.Name)
+		svccfg.Provider = nil
+		return
+	}
+
+	urlVal := "http://" + svccfg.Name + ":" + strconv.FormatUint(uint64(liteLLMPort), 10) + "/v1/"
 	resolvedModel, masterKey := configureAccessGateway(svccfg, project, model, info)
 	wireDependentServices(project, svccfg.Name, urlVal, resolvedModel, masterKey, endpointEnvVar, modelEnvVar)
 }
@@ -540,6 +575,75 @@ func modelWithProvider(model, prefix string) string {
 		return model // already has a provider prefix
 	}
 	return prefix + "/" + model
+}
+
+func resolveScalewayModel(model string) string {
+	switch model {
+	case "chat-default":
+		return "llama-3.3-70b-instruct"
+	case "embedding-default":
+		return "bge-multilingual-gemma2"
+	default:
+		return model
+	}
+}
+
+// wireScalewayDependentServices injects URL, model, and API-key env vars into
+// services that depend on the model service. Unlike wireDependentServices, it
+// does NOT add the model-provider network (no sidecar container) and sets
+// OPENAI_API_KEY to nil so the provider reads it from Defang config.
+// TODO: Extract shared logic with wireDependentServices into a helper, parameterizing
+// the differences (no network wiring, nil OPENAI_API_KEY, dependency removal).
+func wireScalewayDependentServices(project *composeTypes.Project, svcName, urlVal, model, endpointEnvVar, modelEnvVar string) {
+	for name, dependency := range project.Services {
+		changed := false
+
+		if _, ok := dependency.DependsOn[svcName]; ok {
+			if dependency.Environment == nil {
+				dependency.Environment = make(composeTypes.MappingWithEquals)
+			}
+			if _, ok := dependency.Environment[endpointEnvVar]; !ok {
+				dependency.Environment[endpointEnvVar] = &urlVal
+			}
+			if _, ok := dependency.Environment[modelEnvVar]; !ok && model != "" {
+				dependency.Environment[modelEnvVar] = &model
+			}
+			if _, ok := dependency.Environment["OPENAI_API_KEY"]; !ok {
+				dependency.Environment["OPENAI_API_KEY"] = nil
+			}
+			// Remove dependency on the model service since it won't be deployed
+			delete(dependency.DependsOn, svcName)
+			changed = true
+		}
+
+		if modelDep, ok := dependency.Models[svcName]; ok {
+			endpointVar := endpointEnvVar
+			if modelDep != nil && modelDep.EndpointVariable != "" {
+				endpointVar = modelDep.EndpointVariable
+			}
+			modelVar := modelEnvVar
+			if modelDep != nil && modelDep.ModelVariable != "" {
+				modelVar = modelDep.ModelVariable
+			}
+			if dependency.Environment == nil {
+				dependency.Environment = make(composeTypes.MappingWithEquals)
+			}
+			if _, ok := dependency.Environment[endpointVar]; !ok {
+				dependency.Environment[endpointVar] = &urlVal
+			}
+			if _, ok := dependency.Environment[modelVar]; !ok && model != "" {
+				dependency.Environment[modelVar] = &model
+			}
+			if _, ok := dependency.Environment["OPENAI_API_KEY"]; !ok {
+				dependency.Environment["OPENAI_API_KEY"] = nil
+			}
+			changed = true
+		}
+
+		if changed {
+			project.Services[name] = dependency
+		}
+	}
 }
 
 func GetImageRepo(image string) string {
