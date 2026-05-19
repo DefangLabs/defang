@@ -1,9 +1,9 @@
 {
-  buildGo124Module,
+  buildGo125Module,
   installShellFiles,
   lib,
 }:
-buildGo124Module {
+buildGo125Module {
   pname = "defang-cli";
   version = "git";
   src = lib.cleanSource ../../src;
