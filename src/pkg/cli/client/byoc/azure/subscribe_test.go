@@ -3,6 +3,7 @@ package azure
 import (
 	"context"
 	"errors"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -14,6 +15,15 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/acr"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
+
+// TestMain dials subscribePollInterval down for the entire test binary so
+// the pollers tick fast. The write happens once on the main goroutine
+// before any test runs, so it happens-before every poller's read — no
+// per-test mutation, no race.
+func TestMain(m *testing.M) {
+	subscribePollInterval = time.Millisecond
+	os.Exit(m.Run())
+}
 
 type fakeRevisionsClient struct {
 	mu     sync.Mutex
@@ -79,15 +89,6 @@ func (f *fakeJobClient) GetJobExecutionStatus(_ context.Context, _ string) (*aca
 	return f.statuses[idx], nil
 }
 
-// withFastPoll forces subscribePollInterval down to a millisecond for tests
-// and restores it on cleanup.
-func withFastPoll(t *testing.T) {
-	t.Helper()
-	orig := subscribePollInterval
-	subscribePollInterval = time.Millisecond
-	t.Cleanup(func() { subscribePollInterval = orig })
-}
-
 // drain collects all SubscribeResponses (and any error) from the iterator.
 // Stops at the first error or when the iterator is exhausted.
 func drain(t *testing.T, ctx context.Context, in subscribeInputs) ([]*defangv1.SubscribeResponse, error) {
@@ -108,8 +109,6 @@ func drain(t *testing.T, ctx context.Context, in subscribeInputs) ([]*defangv1.S
 }
 
 func TestSubscribe_AllHealthyAfterCdSuccess(t *testing.T) {
-	withFastPoll(t)
-
 	etag := "abc123"
 	services := []string{"web", "worker"}
 	rev := &fakeRevisionsClient{
@@ -152,8 +151,6 @@ func TestSubscribe_AllHealthyAfterCdSuccess(t *testing.T) {
 }
 
 func TestSubscribe_CdFailurePropagates(t *testing.T) {
-	withFastPoll(t)
-
 	rev := &fakeRevisionsClient{}
 	job := &fakeJobClient{
 		statuses: []*aca.JobStatus{
@@ -179,8 +176,6 @@ func TestSubscribe_CdFailurePropagates(t *testing.T) {
 }
 
 func TestSubscribe_RevisionFailedTerminates(t *testing.T) {
-	withFastPoll(t)
-
 	etag := "fail123"
 	rev := &fakeRevisionsClient{
 		states: map[string][]*aca.RevisionState{
@@ -214,8 +209,6 @@ func TestSubscribe_RevisionFailedTerminates(t *testing.T) {
 }
 
 func TestSubscribe_BuildStateEmitted(t *testing.T) {
-	withFastPoll(t)
-
 	etag := "b1"
 	rev := &fakeRevisionsClient{
 		states: map[string][]*aca.RevisionState{
