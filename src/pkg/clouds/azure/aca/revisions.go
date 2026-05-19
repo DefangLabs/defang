@@ -23,7 +23,7 @@ type RevisionState struct {
 func (c *ContainerApp) newRevisionsClient() (*armappcontainersv3.ContainerAppsRevisionsClient, error) {
 	cred, err := c.NewCreds()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get Azure credentials: %w", err)
 	}
 	return armappcontainersv3.NewContainerAppsRevisionsClient(c.SubscriptionID, cred, nil)
 }
@@ -34,7 +34,7 @@ func (c *ContainerApp) newRevisionsClient() (*armappcontainersv3.ContainerAppsRe
 func (c *ContainerApp) GetRevisionState(ctx context.Context, appName, revisionName string) (*RevisionState, error) {
 	client, err := c.newRevisionsClient()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create revisions client: %w", err)
 	}
 	resp, err := client.GetRevision(ctx, c.ResourceGroup, appName, revisionName, nil)
 	if err != nil {

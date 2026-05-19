@@ -137,10 +137,12 @@ func subscribe(ctx context.Context, in subscribeInputs) iter.Seq2[*defangv1.Subs
 
 		for ev := range eventCh {
 			if ev.err != nil {
-				if !yield(nil, ev.err) {
-					return
-				}
-				continue
+				// Errors come from a terminal CD failure; further state
+				// events from the build/revision pollers are no longer
+				// meaningful. Treat as terminal so consumers that don't
+				// break on error don't hang.
+				yield(nil, ev.err)
+				return
 			}
 
 			if resp := ev.resp; resp != nil {

@@ -227,7 +227,7 @@ func TestSubscribe_BuildStateEmitted(t *testing.T) {
 			{Status: armappcontainersv3.JobExecutionRunningStateSucceeded},
 		},
 	}
-	got, _ := drain(t, t.Context(), subscribeInputs{
+	got, err := drain(t, t.Context(), subscribeInputs{
 		etag:      etag,
 		services:  []string{"web"},
 		since:     time.Now(),
@@ -236,6 +236,9 @@ func TestSubscribe_BuildStateEmitted(t *testing.T) {
 		job:       job,
 		cdRunID:   "cd-run",
 	})
+	if err != nil {
+		t.Fatalf("drain err: %v", err)
+	}
 	var sawBuild bool
 	for _, r := range got {
 		if r.Name == "web" && (r.State == defangv1.ServiceState_BUILD_RUNNING || r.State == defangv1.ServiceState_BUILD_STOPPING) {

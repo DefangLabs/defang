@@ -37,7 +37,7 @@ func (r *RunsLister) ensureClients() error {
 	}
 	cred, err := r.NewCreds()
 	if err != nil {
-		return err
+		return fmt.Errorf("get Azure credentials: %w", err)
 	}
 	regClient, err := armcontainerregistry.NewRegistriesClient(r.SubscriptionID, cred, nil)
 	if err != nil {
@@ -59,7 +59,7 @@ func (r *RunsLister) findRegistry(ctx context.Context) (string, error) {
 		return r.registryName, nil
 	}
 	if err := r.ensureClients(); err != nil {
-		return "", err
+		return "", fmt.Errorf("findRegistry: %w", err)
 	}
 	pager := r.regClient.NewListByResourceGroupPager(r.ResourceGroup, nil)
 	for pager.More() {
@@ -81,11 +81,11 @@ func (r *RunsLister) findRegistry(ctx context.Context) (string, error) {
 // or after `since`. Returns nil with no error when no registry exists yet.
 func (r *RunsLister) ListRunsSince(ctx context.Context, since time.Time) ([]RunInfo, error) {
 	if err := r.ensureClients(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ListRunsSince: %w", err)
 	}
 	registry, err := r.findRegistry(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ListRunsSince: %w", err)
 	}
 	if registry == "" {
 		return nil, nil
@@ -106,10 +106,14 @@ func (r *RunsLister) ListRunsSince(ctx context.Context, since time.Time) ([]RunI
 			if run == nil || run.Properties == nil || run.Properties.RunID == nil {
 				continue
 			}
-			create := time.Time{}
-			if run.Properties.CreateTime != nil {
-				create = *run.Properties.CreateTime
+			if run.Properties.CreateTime == nil {
+				// Missing timestamp: skip this run but keep scanning, since
+				// using a zero create time would otherwise terminate the
+				// page early as `Before(since)` is true for any non-zero
+				// since.
+				continue
 			}
+			create := *run.Properties.CreateTime
 			if !since.IsZero() && create.Before(since) {
 				// Runs come back in descending create-time order, so once we
 				// hit one older than `since` we can stop scanning this page.
