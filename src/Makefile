@@ -217,3 +217,7 @@ snapshot:
 	  --snapshot \
 	  --clean \
 	  --skip=publish,announce,sign,notarize,validate
+
+.PHONY: ensure
+ensure: ## Run go mod tidy
+	find . -name 'go.mod' -execdir go mod tidy \;

@@ -1,8 +1,6 @@
 module github.com/DefangLabs/defang/src
 
-go 1.24.1
-
-toolchain go1.24.5
+go 1.25
 
 replace (
 	github.com/spf13/cobra v1.8.0 => github.com/DefangLabs/cobra v1.8.0-defang
