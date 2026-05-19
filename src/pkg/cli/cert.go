@@ -32,10 +32,14 @@ type DNSResult struct {
 }
 
 var (
-	resolver         dns.Resolver = dns.RootResolver{}
-	dnsCache                      = make(map[string]DNSResult)
-	dnsCacheDuration              = 1 * time.Minute
-	httpClient       HTTPClient   = &http.Client{
+	dnsCache         = make(map[string]DNSResult)
+	dnsCacheDuration = 1 * time.Minute
+
+	httpRetryDelayBase = 5 * time.Second
+)
+
+func newCertHTTPClient(r dns.Resolver) HTTPClient {
+	return &http.Client{
 		// Based on the default transport: https://pkg.go.dev/net/http#RoundTripper
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
@@ -49,7 +53,7 @@ var (
 				if ok && cached.Expiry.After(time.Now()) {
 					ips = cached.IPs
 				} else {
-					ips, err = resolver.LookupIPAddr(ctx, host)
+					ips, err = r.LookupIPAddr(ctx, host)
 					if err != nil {
 						return nil, err
 					}
@@ -73,8 +77,16 @@ var (
 			return nil
 		},
 	}
-	httpRetryDelayBase = 5 * time.Second
-)
+}
+
+// CertIssuer is implemented by providers that issue and bind TLS certificates
+// directly against their cloud's API rather than going through the
+// CNAME→fabric→ACME redirect dance used on AWS BYOD / Playground. Azure
+// implements this so `defang cert generate` can drive the Container Apps
+// hostname-add + managed-cert + SniEnabled-bind sequence end-to-end.
+type CertIssuer interface {
+	IssueCert(ctx context.Context, projectName, serviceName, hostname string, resolverAt func(string) dns.Resolver) error
+}
 
 func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, client client.FabricClient, provider client.Provider) error {
 	term.Debugf("Generating TLS cert for project %q", project.Name)
@@ -88,6 +100,9 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 		return fmt.Errorf("no services found for project %q; deployment may not be finished yet", project.Name)
 	}
 
+	issuer, _ := provider.(CertIssuer)
+
+	var issueErrs []error
 	cnt := 0
 	for _, serviceInfo := range services.Services {
 		if !serviceInfo.UseAcmeCert {
@@ -98,14 +113,26 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 				term.Warnf("service %q: domainname %q in compose file does not match deployed value %q", service.Name, service.DomainName, serviceInfo.Domainname)
 			}
 			cnt++
-			targets := getDomainTargets(serviceInfo, service)
 			domains := []string{service.DomainName}
 			if defaultNetwork := service.Networks["default"]; defaultNetwork != nil {
 				domains = append(domains, defaultNetwork.Aliases...)
 			}
+
+			if issuer != nil {
+				term.Debugf("Issuing certs for service %v with domains %v via provider", service.Name, domains)
+				for _, domain := range domains {
+					if err := issuer.IssueCert(ctx, project.Name, service.Name, domain, dns.NewFabricResolverAt(client)); err != nil {
+						term.Errorf("Cert issuance for %v failed: %v", domain, err)
+						issueErrs = append(issueErrs, fmt.Errorf("%v: %w", domain, err))
+					}
+				}
+				continue
+			}
+
+			targets := getDomainTargets(serviceInfo, service)
 			term.Debugf("Found service %v with domains %v and targets %v", service.Name, domains, targets)
 			for _, domain := range domains {
-				generateCert(ctx, domain, targets, client)
+				generateCert(ctx, domain, targets, client, dns.FabricResolver{Client: client})
 			}
 		}
 	}
@@ -113,6 +140,9 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 		term.Infof("No `domainname` found in compose file; no HTTPS cert generation needed")
 	}
 
+	if len(issueErrs) > 0 {
+		return fmt.Errorf("certificate issuance failed for one or more domains; verify DNS records and retry `defang cert generate`: %w", errors.Join(issueErrs...))
+	}
 	return nil
 }
 
@@ -131,7 +161,7 @@ func getDomainTargets(serviceInfo *defangv1.ServiceInfo, service compose.Service
 	}
 }
 
-func generateCert(ctx context.Context, domain string, targets []string, client client.FabricClient) {
+func generateCert(ctx context.Context, domain string, targets []string, client client.FabricClient, r dns.Resolver) {
 	term.Infof("Checking DNS setup for %v", domain)
 	if err := waitForCNAME(ctx, domain, targets, client); err != nil {
 		term.Errorf("Error waiting for CNAME: %v", err)
@@ -139,7 +169,7 @@ func generateCert(ctx context.Context, domain string, targets []string, client c
 	}
 
 	term.Infof("%v DNS is properly configured!", domain)
-	if err := cert.CheckTLSCert(ctx, domain); err == nil {
+	if err := cert.CheckTLSCert(ctx, domain, r); err == nil {
 		term.Infof("TLS cert for %v is already ready", domain)
 		return
 	}
@@ -148,13 +178,13 @@ func generateCert(ctx context.Context, domain string, targets []string, client c
 		return
 	}
 	term.Infof("Triggering cert generation for %v", domain)
-	if err := triggerCertGeneration(ctx, domain); err != nil {
+	if err := triggerCertGeneration(ctx, domain, r); err != nil {
 		term.Errorf("Error triggering cert generation, please try again")
 		return
 	}
 
 	term.Infof("Waiting for TLS cert to be online for %v, this could take a few minutes", domain)
-	if err := waitForTLS(ctx, domain); err != nil {
+	if err := waitForTLS(ctx, domain, r); err != nil {
 		term.Errorf("Error waiting for TLS to be online: %v", err)
 		// FIXME: Add more info on how to debug, possibly provided by the server side to avoid client type detection here
 		return
@@ -163,7 +193,7 @@ func generateCert(ctx context.Context, domain string, targets []string, client c
 	term.Infof("TLS cert for %v is ready\n", domain)
 }
 
-func triggerCertGeneration(ctx context.Context, domain string) error {
+func triggerCertGeneration(ctx context.Context, domain string, r dns.Resolver) error {
 	doSpinner := term.StdoutCanColor() && term.IsTerminal()
 	if doSpinner {
 		term.HideCursor()
@@ -174,7 +204,7 @@ func triggerCertGeneration(ctx context.Context, domain string) error {
 		defer cancelSpinner()
 	}
 	// Our own retry logic uses the root resolver to prevent cached DNS and retry on all non-200 errors
-	if err := getWithRetries(ctx, fmt.Sprintf("http://%v", domain), 5); err != nil { // Retry incase of DNS error
+	if err := getWithRetries(ctx, fmt.Sprintf("http://%v", domain), 5, newCertHTTPClient(r)); err != nil { // Retry incase of DNS error
 		// Ignore possible tls error as cert attachment may take time
 		term.Debugf("Error triggering cert generation: %v", err)
 		return err
@@ -182,7 +212,7 @@ func triggerCertGeneration(ctx context.Context, domain string) error {
 	return nil
 }
 
-func waitForTLS(ctx context.Context, domain string) error {
+func waitForTLS(ctx context.Context, domain string, r dns.Resolver) error {
 	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 	timeout, cancel := context.WithTimeout(ctx, 10*time.Minute)
@@ -202,7 +232,7 @@ func waitForTLS(ctx context.Context, domain string) error {
 		case <-timeout.Done():
 			return timeout.Err()
 		case <-ticker.C:
-			if err := cert.CheckTLSCert(timeout, domain); err == nil {
+			if err := cert.CheckTLSCert(timeout, domain, r); err == nil {
 				return nil
 			} else {
 				term.Debugf("Error checking TLS cert for %v: %v", domain, err)
@@ -249,7 +279,7 @@ func waitForCNAME(ctx context.Context, domain string, targets []string, client c
 			}
 		}
 		if serverSideVerified || serverVerifyRpcFailure >= 3 {
-			locallyVerified := dns.CheckDomainDNSReady(ctx, domain, targets)
+			locallyVerified := dns.CheckDomainDNSReady(ctx, domain, targets, dns.NewFabricResolverAt(client))
 			if serverSideVerified && !locallyVerified {
 				term.Warnf("DNS settings for %v are verified, but changes may take a few minutes to propagate due to caching.", domain)
 				return nil
@@ -280,14 +310,14 @@ func waitForCNAME(ctx context.Context, domain string, targets []string, client c
 	}
 }
 
-func getWithRetries(ctx context.Context, url string, tries int) error {
+func getWithRetries(ctx context.Context, url string, tries int, c HTTPClient) error {
 	var errs []error
 	for i := range make([]struct{}, tries) {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
 			return err // No point retrying if we can't even create the request
 		}
-		resp, err := httpClient.Do(req)
+		resp, err := c.Do(req)
 		if err == nil {
 			defer resp.Body.Close()
 			_, err = io.ReadAll(resp.Body) // Read the body to ensure the request is not swallowed by alb

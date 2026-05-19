@@ -56,8 +56,6 @@ const (
 	// FabricControllerGetPlaygroundProjectDomainProcedure is the fully-qualified name of the
 	// FabricController's GetPlaygroundProjectDomain RPC.
 	FabricControllerGetPlaygroundProjectDomainProcedure = "/io.defang.v1.FabricController/GetPlaygroundProjectDomain"
-	// FabricControllerDeleteProcedure is the fully-qualified name of the FabricController's Delete RPC.
-	FabricControllerDeleteProcedure = "/io.defang.v1.FabricController/Delete"
 	// FabricControllerDestroyProcedure is the fully-qualified name of the FabricController's Destroy
 	// RPC.
 	FabricControllerDestroyProcedure = "/io.defang.v1.FabricController/Destroy"
@@ -70,12 +68,6 @@ const (
 	// FabricControllerGenerateFilesProcedure is the fully-qualified name of the FabricController's
 	// GenerateFiles RPC.
 	FabricControllerGenerateFilesProcedure = "/io.defang.v1.FabricController/GenerateFiles"
-	// FabricControllerStartGenerateProcedure is the fully-qualified name of the FabricController's
-	// StartGenerate RPC.
-	FabricControllerStartGenerateProcedure = "/io.defang.v1.FabricController/StartGenerate"
-	// FabricControllerGenerateStatusProcedure is the fully-qualified name of the FabricController's
-	// GenerateStatus RPC.
-	FabricControllerGenerateStatusProcedure = "/io.defang.v1.FabricController/GenerateStatus"
 	// FabricControllerDebugProcedure is the fully-qualified name of the FabricController's Debug RPC.
 	FabricControllerDebugProcedure = "/io.defang.v1.FabricController/Debug"
 	// FabricControllerSignEULAProcedure is the fully-qualified name of the FabricController's SignEULA
@@ -111,6 +103,9 @@ const (
 	// FabricControllerListDeploymentsProcedure is the fully-qualified name of the FabricController's
 	// ListDeployments RPC.
 	FabricControllerListDeploymentsProcedure = "/io.defang.v1.FabricController/ListDeployments"
+	// FabricControllerGetDeploymentProcedure is the fully-qualified name of the FabricController's
+	// GetDeployment RPC.
+	FabricControllerGetDeploymentProcedure = "/io.defang.v1.FabricController/GetDeployment"
 	// FabricControllerCreateUploadURLProcedure is the fully-qualified name of the FabricController's
 	// CreateUploadURL RPC.
 	FabricControllerCreateUploadURLProcedure = "/io.defang.v1.FabricController/CreateUploadURL"
@@ -191,33 +186,37 @@ type FabricControllerClient interface {
 	RevokeToken(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[emptypb.Empty], error)
 	Tail(context.Context, *connect.Request[v1.TailRequest]) (*connect.ServerStreamForClient[v1.TailResponse], error)
 	Deploy(context.Context, *connect.Request[v1.DeployRequest]) (*connect.Response[v1.DeployResponse], error)
+	// Deprecated: do not use.
 	Get(context.Context, *connect.Request[v1.GetRequest]) (*connect.Response[v1.ServiceInfo], error)
+	// Deprecated: do not use.
 	GetPlaygroundProjectDomain(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[v1.GetPlaygroundProjectDomainResponse], error)
 	// Deprecated: do not use.
-	Delete(context.Context, *connect.Request[v1.DeleteRequest]) (*connect.Response[v1.DeleteResponse], error)
 	Destroy(context.Context, *connect.Request[v1.DestroyRequest]) (*connect.Response[v1.DestroyResponse], error)
+	// Deprecated: do not use.
 	Subscribe(context.Context, *connect.Request[v1.SubscribeRequest]) (*connect.ServerStreamForClient[v1.SubscribeResponse], error)
+	// Deprecated: do not use.
 	GetServices(context.Context, *connect.Request[v1.GetServicesRequest]) (*connect.Response[v1.GetServicesResponse], error)
 	GenerateFiles(context.Context, *connect.Request[v1.GenerateFilesRequest]) (*connect.Response[v1.GenerateFilesResponse], error)
-	StartGenerate(context.Context, *connect.Request[v1.GenerateFilesRequest]) (*connect.Response[v1.StartGenerateResponse], error)
-	GenerateStatus(context.Context, *connect.Request[v1.GenerateStatusRequest]) (*connect.Response[v1.GenerateFilesResponse], error)
 	Debug(context.Context, *connect.Request[v1.DebugRequest]) (*connect.Response[v1.DebugResponse], error)
 	SignEULA(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[emptypb.Empty], error)
 	CheckToS(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[emptypb.Empty], error)
-	// deprecate - change to use *Config functions
-	//
 	// Deprecated: do not use.
 	PutSecret(context.Context, *connect.Request[v1.PutConfigRequest]) (*connect.Response[emptypb.Empty], error)
 	// Deprecated: do not use.
 	DeleteSecrets(context.Context, *connect.Request[v1.Secrets]) (*connect.Response[emptypb.Empty], error)
 	// Deprecated: do not use.
 	ListSecrets(context.Context, *connect.Request[v1.ListConfigsRequest]) (*connect.Response[v1.Secrets], error)
+	// Deprecated: do not use.
 	GetConfigs(context.Context, *connect.Request[v1.GetConfigsRequest]) (*connect.Response[v1.GetConfigsResponse], error)
+	// Deprecated: do not use.
 	PutConfig(context.Context, *connect.Request[v1.PutConfigRequest]) (*connect.Response[emptypb.Empty], error)
+	// Deprecated: do not use.
 	DeleteConfigs(context.Context, *connect.Request[v1.DeleteConfigsRequest]) (*connect.Response[emptypb.Empty], error)
+	// Deprecated: do not use.
 	ListConfigs(context.Context, *connect.Request[v1.ListConfigsRequest]) (*connect.Response[v1.ListConfigsResponse], error)
 	PutDeployment(context.Context, *connect.Request[v1.PutDeploymentRequest]) (*connect.Response[emptypb.Empty], error)
 	ListDeployments(context.Context, *connect.Request[v1.ListDeploymentsRequest]) (*connect.Response[v1.ListDeploymentsResponse], error)
+	GetDeployment(context.Context, *connect.Request[v1.GetDeploymentRequest]) (*connect.Response[v1.GetDeploymentResponse], error)
 	CreateUploadURL(context.Context, *connect.Request[v1.UploadURLRequest]) (*connect.Response[v1.UploadURLResponse], error)
 	DelegateSubdomainZone(context.Context, *connect.Request[v1.DelegateSubdomainZoneRequest]) (*connect.Response[v1.DelegateSubdomainZoneResponse], error)
 	DeleteSubdomainZone(context.Context, *connect.Request[v1.DeleteSubdomainZoneRequest]) (*connect.Response[emptypb.Empty], error)
@@ -310,12 +309,6 @@ func NewFabricControllerClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
-		delete: connect.NewClient[v1.DeleteRequest, v1.DeleteResponse](
-			httpClient,
-			baseURL+FabricControllerDeleteProcedure,
-			connect.WithSchema(fabricControllerMethods.ByName("Delete")),
-			connect.WithClientOptions(opts...),
-		),
 		destroy: connect.NewClient[v1.DestroyRequest, v1.DestroyResponse](
 			httpClient,
 			baseURL+FabricControllerDestroyProcedure,
@@ -340,19 +333,6 @@ func NewFabricControllerClient(httpClient connect.HTTPClient, baseURL string, op
 			httpClient,
 			baseURL+FabricControllerGenerateFilesProcedure,
 			connect.WithSchema(fabricControllerMethods.ByName("GenerateFiles")),
-			connect.WithClientOptions(opts...),
-		),
-		startGenerate: connect.NewClient[v1.GenerateFilesRequest, v1.StartGenerateResponse](
-			httpClient,
-			baseURL+FabricControllerStartGenerateProcedure,
-			connect.WithSchema(fabricControllerMethods.ByName("StartGenerate")),
-			connect.WithClientOptions(opts...),
-		),
-		generateStatus: connect.NewClient[v1.GenerateStatusRequest, v1.GenerateFilesResponse](
-			httpClient,
-			baseURL+FabricControllerGenerateStatusProcedure,
-			connect.WithSchema(fabricControllerMethods.ByName("GenerateStatus")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
 		debug: connect.NewClient[v1.DebugRequest, v1.DebugResponse](
@@ -435,6 +415,13 @@ func NewFabricControllerClient(httpClient connect.HTTPClient, baseURL string, op
 			httpClient,
 			baseURL+FabricControllerListDeploymentsProcedure,
 			connect.WithSchema(fabricControllerMethods.ByName("ListDeployments")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		getDeployment: connect.NewClient[v1.GetDeploymentRequest, v1.GetDeploymentResponse](
+			httpClient,
+			baseURL+FabricControllerGetDeploymentProcedure,
+			connect.WithSchema(fabricControllerMethods.ByName("GetDeployment")),
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
@@ -615,13 +602,10 @@ type fabricControllerClient struct {
 	deploy                     *connect.Client[v1.DeployRequest, v1.DeployResponse]
 	get                        *connect.Client[v1.GetRequest, v1.ServiceInfo]
 	getPlaygroundProjectDomain *connect.Client[emptypb.Empty, v1.GetPlaygroundProjectDomainResponse]
-	delete                     *connect.Client[v1.DeleteRequest, v1.DeleteResponse]
 	destroy                    *connect.Client[v1.DestroyRequest, v1.DestroyResponse]
 	subscribe                  *connect.Client[v1.SubscribeRequest, v1.SubscribeResponse]
 	getServices                *connect.Client[v1.GetServicesRequest, v1.GetServicesResponse]
 	generateFiles              *connect.Client[v1.GenerateFilesRequest, v1.GenerateFilesResponse]
-	startGenerate              *connect.Client[v1.GenerateFilesRequest, v1.StartGenerateResponse]
-	generateStatus             *connect.Client[v1.GenerateStatusRequest, v1.GenerateFilesResponse]
 	debug                      *connect.Client[v1.DebugRequest, v1.DebugResponse]
 	signEULA                   *connect.Client[emptypb.Empty, emptypb.Empty]
 	checkToS                   *connect.Client[emptypb.Empty, emptypb.Empty]
@@ -634,6 +618,7 @@ type fabricControllerClient struct {
 	listConfigs                *connect.Client[v1.ListConfigsRequest, v1.ListConfigsResponse]
 	putDeployment              *connect.Client[v1.PutDeploymentRequest, emptypb.Empty]
 	listDeployments            *connect.Client[v1.ListDeploymentsRequest, v1.ListDeploymentsResponse]
+	getDeployment              *connect.Client[v1.GetDeploymentRequest, v1.GetDeploymentResponse]
 	createUploadURL            *connect.Client[v1.UploadURLRequest, v1.UploadURLResponse]
 	delegateSubdomainZone      *connect.Client[v1.DelegateSubdomainZoneRequest, v1.DelegateSubdomainZoneResponse]
 	deleteSubdomainZone        *connect.Client[v1.DeleteSubdomainZoneRequest, emptypb.Empty]
@@ -691,33 +676,36 @@ func (c *fabricControllerClient) Deploy(ctx context.Context, req *connect.Reques
 }
 
 // Get calls io.defang.v1.FabricController.Get.
+//
+// Deprecated: do not use.
 func (c *fabricControllerClient) Get(ctx context.Context, req *connect.Request[v1.GetRequest]) (*connect.Response[v1.ServiceInfo], error) {
 	return c.get.CallUnary(ctx, req)
 }
 
 // GetPlaygroundProjectDomain calls io.defang.v1.FabricController.GetPlaygroundProjectDomain.
+//
+// Deprecated: do not use.
 func (c *fabricControllerClient) GetPlaygroundProjectDomain(ctx context.Context, req *connect.Request[emptypb.Empty]) (*connect.Response[v1.GetPlaygroundProjectDomainResponse], error) {
 	return c.getPlaygroundProjectDomain.CallUnary(ctx, req)
 }
 
-// Delete calls io.defang.v1.FabricController.Delete.
+// Destroy calls io.defang.v1.FabricController.Destroy.
 //
 // Deprecated: do not use.
-func (c *fabricControllerClient) Delete(ctx context.Context, req *connect.Request[v1.DeleteRequest]) (*connect.Response[v1.DeleteResponse], error) {
-	return c.delete.CallUnary(ctx, req)
-}
-
-// Destroy calls io.defang.v1.FabricController.Destroy.
 func (c *fabricControllerClient) Destroy(ctx context.Context, req *connect.Request[v1.DestroyRequest]) (*connect.Response[v1.DestroyResponse], error) {
 	return c.destroy.CallUnary(ctx, req)
 }
 
 // Subscribe calls io.defang.v1.FabricController.Subscribe.
+//
+// Deprecated: do not use.
 func (c *fabricControllerClient) Subscribe(ctx context.Context, req *connect.Request[v1.SubscribeRequest]) (*connect.ServerStreamForClient[v1.SubscribeResponse], error) {
 	return c.subscribe.CallServerStream(ctx, req)
 }
 
 // GetServices calls io.defang.v1.FabricController.GetServices.
+//
+// Deprecated: do not use.
 func (c *fabricControllerClient) GetServices(ctx context.Context, req *connect.Request[v1.GetServicesRequest]) (*connect.Response[v1.GetServicesResponse], error) {
 	return c.getServices.CallUnary(ctx, req)
 }
@@ -725,16 +713,6 @@ func (c *fabricControllerClient) GetServices(ctx context.Context, req *connect.R
 // GenerateFiles calls io.defang.v1.FabricController.GenerateFiles.
 func (c *fabricControllerClient) GenerateFiles(ctx context.Context, req *connect.Request[v1.GenerateFilesRequest]) (*connect.Response[v1.GenerateFilesResponse], error) {
 	return c.generateFiles.CallUnary(ctx, req)
-}
-
-// StartGenerate calls io.defang.v1.FabricController.StartGenerate.
-func (c *fabricControllerClient) StartGenerate(ctx context.Context, req *connect.Request[v1.GenerateFilesRequest]) (*connect.Response[v1.StartGenerateResponse], error) {
-	return c.startGenerate.CallUnary(ctx, req)
-}
-
-// GenerateStatus calls io.defang.v1.FabricController.GenerateStatus.
-func (c *fabricControllerClient) GenerateStatus(ctx context.Context, req *connect.Request[v1.GenerateStatusRequest]) (*connect.Response[v1.GenerateFilesResponse], error) {
-	return c.generateStatus.CallUnary(ctx, req)
 }
 
 // Debug calls io.defang.v1.FabricController.Debug.
@@ -774,21 +752,29 @@ func (c *fabricControllerClient) ListSecrets(ctx context.Context, req *connect.R
 }
 
 // GetConfigs calls io.defang.v1.FabricController.GetConfigs.
+//
+// Deprecated: do not use.
 func (c *fabricControllerClient) GetConfigs(ctx context.Context, req *connect.Request[v1.GetConfigsRequest]) (*connect.Response[v1.GetConfigsResponse], error) {
 	return c.getConfigs.CallUnary(ctx, req)
 }
 
 // PutConfig calls io.defang.v1.FabricController.PutConfig.
+//
+// Deprecated: do not use.
 func (c *fabricControllerClient) PutConfig(ctx context.Context, req *connect.Request[v1.PutConfigRequest]) (*connect.Response[emptypb.Empty], error) {
 	return c.putConfig.CallUnary(ctx, req)
 }
 
 // DeleteConfigs calls io.defang.v1.FabricController.DeleteConfigs.
+//
+// Deprecated: do not use.
 func (c *fabricControllerClient) DeleteConfigs(ctx context.Context, req *connect.Request[v1.DeleteConfigsRequest]) (*connect.Response[emptypb.Empty], error) {
 	return c.deleteConfigs.CallUnary(ctx, req)
 }
 
 // ListConfigs calls io.defang.v1.FabricController.ListConfigs.
+//
+// Deprecated: do not use.
 func (c *fabricControllerClient) ListConfigs(ctx context.Context, req *connect.Request[v1.ListConfigsRequest]) (*connect.Response[v1.ListConfigsResponse], error) {
 	return c.listConfigs.CallUnary(ctx, req)
 }
@@ -801,6 +787,11 @@ func (c *fabricControllerClient) PutDeployment(ctx context.Context, req *connect
 // ListDeployments calls io.defang.v1.FabricController.ListDeployments.
 func (c *fabricControllerClient) ListDeployments(ctx context.Context, req *connect.Request[v1.ListDeploymentsRequest]) (*connect.Response[v1.ListDeploymentsResponse], error) {
 	return c.listDeployments.CallUnary(ctx, req)
+}
+
+// GetDeployment calls io.defang.v1.FabricController.GetDeployment.
+func (c *fabricControllerClient) GetDeployment(ctx context.Context, req *connect.Request[v1.GetDeploymentRequest]) (*connect.Response[v1.GetDeploymentResponse], error) {
+	return c.getDeployment.CallUnary(ctx, req)
 }
 
 // CreateUploadURL calls io.defang.v1.FabricController.CreateUploadURL.
@@ -935,33 +926,37 @@ type FabricControllerHandler interface {
 	RevokeToken(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[emptypb.Empty], error)
 	Tail(context.Context, *connect.Request[v1.TailRequest], *connect.ServerStream[v1.TailResponse]) error
 	Deploy(context.Context, *connect.Request[v1.DeployRequest]) (*connect.Response[v1.DeployResponse], error)
+	// Deprecated: do not use.
 	Get(context.Context, *connect.Request[v1.GetRequest]) (*connect.Response[v1.ServiceInfo], error)
+	// Deprecated: do not use.
 	GetPlaygroundProjectDomain(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[v1.GetPlaygroundProjectDomainResponse], error)
 	// Deprecated: do not use.
-	Delete(context.Context, *connect.Request[v1.DeleteRequest]) (*connect.Response[v1.DeleteResponse], error)
 	Destroy(context.Context, *connect.Request[v1.DestroyRequest]) (*connect.Response[v1.DestroyResponse], error)
+	// Deprecated: do not use.
 	Subscribe(context.Context, *connect.Request[v1.SubscribeRequest], *connect.ServerStream[v1.SubscribeResponse]) error
+	// Deprecated: do not use.
 	GetServices(context.Context, *connect.Request[v1.GetServicesRequest]) (*connect.Response[v1.GetServicesResponse], error)
 	GenerateFiles(context.Context, *connect.Request[v1.GenerateFilesRequest]) (*connect.Response[v1.GenerateFilesResponse], error)
-	StartGenerate(context.Context, *connect.Request[v1.GenerateFilesRequest]) (*connect.Response[v1.StartGenerateResponse], error)
-	GenerateStatus(context.Context, *connect.Request[v1.GenerateStatusRequest]) (*connect.Response[v1.GenerateFilesResponse], error)
 	Debug(context.Context, *connect.Request[v1.DebugRequest]) (*connect.Response[v1.DebugResponse], error)
 	SignEULA(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[emptypb.Empty], error)
 	CheckToS(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[emptypb.Empty], error)
-	// deprecate - change to use *Config functions
-	//
 	// Deprecated: do not use.
 	PutSecret(context.Context, *connect.Request[v1.PutConfigRequest]) (*connect.Response[emptypb.Empty], error)
 	// Deprecated: do not use.
 	DeleteSecrets(context.Context, *connect.Request[v1.Secrets]) (*connect.Response[emptypb.Empty], error)
 	// Deprecated: do not use.
 	ListSecrets(context.Context, *connect.Request[v1.ListConfigsRequest]) (*connect.Response[v1.Secrets], error)
+	// Deprecated: do not use.
 	GetConfigs(context.Context, *connect.Request[v1.GetConfigsRequest]) (*connect.Response[v1.GetConfigsResponse], error)
+	// Deprecated: do not use.
 	PutConfig(context.Context, *connect.Request[v1.PutConfigRequest]) (*connect.Response[emptypb.Empty], error)
+	// Deprecated: do not use.
 	DeleteConfigs(context.Context, *connect.Request[v1.DeleteConfigsRequest]) (*connect.Response[emptypb.Empty], error)
+	// Deprecated: do not use.
 	ListConfigs(context.Context, *connect.Request[v1.ListConfigsRequest]) (*connect.Response[v1.ListConfigsResponse], error)
 	PutDeployment(context.Context, *connect.Request[v1.PutDeploymentRequest]) (*connect.Response[emptypb.Empty], error)
 	ListDeployments(context.Context, *connect.Request[v1.ListDeploymentsRequest]) (*connect.Response[v1.ListDeploymentsResponse], error)
+	GetDeployment(context.Context, *connect.Request[v1.GetDeploymentRequest]) (*connect.Response[v1.GetDeploymentResponse], error)
 	CreateUploadURL(context.Context, *connect.Request[v1.UploadURLRequest]) (*connect.Response[v1.UploadURLResponse], error)
 	DelegateSubdomainZone(context.Context, *connect.Request[v1.DelegateSubdomainZoneRequest]) (*connect.Response[v1.DelegateSubdomainZoneResponse], error)
 	DeleteSubdomainZone(context.Context, *connect.Request[v1.DeleteSubdomainZoneRequest]) (*connect.Response[emptypb.Empty], error)
@@ -1050,12 +1045,6 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect.Han
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
-	fabricControllerDeleteHandler := connect.NewUnaryHandler(
-		FabricControllerDeleteProcedure,
-		svc.Delete,
-		connect.WithSchema(fabricControllerMethods.ByName("Delete")),
-		connect.WithHandlerOptions(opts...),
-	)
 	fabricControllerDestroyHandler := connect.NewUnaryHandler(
 		FabricControllerDestroyProcedure,
 		svc.Destroy,
@@ -1080,19 +1069,6 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect.Han
 		FabricControllerGenerateFilesProcedure,
 		svc.GenerateFiles,
 		connect.WithSchema(fabricControllerMethods.ByName("GenerateFiles")),
-		connect.WithHandlerOptions(opts...),
-	)
-	fabricControllerStartGenerateHandler := connect.NewUnaryHandler(
-		FabricControllerStartGenerateProcedure,
-		svc.StartGenerate,
-		connect.WithSchema(fabricControllerMethods.ByName("StartGenerate")),
-		connect.WithHandlerOptions(opts...),
-	)
-	fabricControllerGenerateStatusHandler := connect.NewUnaryHandler(
-		FabricControllerGenerateStatusProcedure,
-		svc.GenerateStatus,
-		connect.WithSchema(fabricControllerMethods.ByName("GenerateStatus")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
 	fabricControllerDebugHandler := connect.NewUnaryHandler(
@@ -1175,6 +1151,13 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect.Han
 		FabricControllerListDeploymentsProcedure,
 		svc.ListDeployments,
 		connect.WithSchema(fabricControllerMethods.ByName("ListDeployments")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	fabricControllerGetDeploymentHandler := connect.NewUnaryHandler(
+		FabricControllerGetDeploymentProcedure,
+		svc.GetDeployment,
+		connect.WithSchema(fabricControllerMethods.ByName("GetDeployment")),
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
@@ -1360,8 +1343,6 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect.Han
 			fabricControllerGetHandler.ServeHTTP(w, r)
 		case FabricControllerGetPlaygroundProjectDomainProcedure:
 			fabricControllerGetPlaygroundProjectDomainHandler.ServeHTTP(w, r)
-		case FabricControllerDeleteProcedure:
-			fabricControllerDeleteHandler.ServeHTTP(w, r)
 		case FabricControllerDestroyProcedure:
 			fabricControllerDestroyHandler.ServeHTTP(w, r)
 		case FabricControllerSubscribeProcedure:
@@ -1370,10 +1351,6 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect.Han
 			fabricControllerGetServicesHandler.ServeHTTP(w, r)
 		case FabricControllerGenerateFilesProcedure:
 			fabricControllerGenerateFilesHandler.ServeHTTP(w, r)
-		case FabricControllerStartGenerateProcedure:
-			fabricControllerStartGenerateHandler.ServeHTTP(w, r)
-		case FabricControllerGenerateStatusProcedure:
-			fabricControllerGenerateStatusHandler.ServeHTTP(w, r)
 		case FabricControllerDebugProcedure:
 			fabricControllerDebugHandler.ServeHTTP(w, r)
 		case FabricControllerSignEULAProcedure:
@@ -1398,6 +1375,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect.Han
 			fabricControllerPutDeploymentHandler.ServeHTTP(w, r)
 		case FabricControllerListDeploymentsProcedure:
 			fabricControllerListDeploymentsHandler.ServeHTTP(w, r)
+		case FabricControllerGetDeploymentProcedure:
+			fabricControllerGetDeploymentHandler.ServeHTTP(w, r)
 		case FabricControllerCreateUploadURLProcedure:
 			fabricControllerCreateUploadURLHandler.ServeHTTP(w, r)
 		case FabricControllerDelegateSubdomainZoneProcedure:
@@ -1487,10 +1466,6 @@ func (UnimplementedFabricControllerHandler) GetPlaygroundProjectDomain(context.C
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetPlaygroundProjectDomain is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) Delete(context.Context, *connect.Request[v1.DeleteRequest]) (*connect.Response[v1.DeleteResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Delete is not implemented"))
-}
-
 func (UnimplementedFabricControllerHandler) Destroy(context.Context, *connect.Request[v1.DestroyRequest]) (*connect.Response[v1.DestroyResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Destroy is not implemented"))
 }
@@ -1505,14 +1480,6 @@ func (UnimplementedFabricControllerHandler) GetServices(context.Context, *connec
 
 func (UnimplementedFabricControllerHandler) GenerateFiles(context.Context, *connect.Request[v1.GenerateFilesRequest]) (*connect.Response[v1.GenerateFilesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GenerateFiles is not implemented"))
-}
-
-func (UnimplementedFabricControllerHandler) StartGenerate(context.Context, *connect.Request[v1.GenerateFilesRequest]) (*connect.Response[v1.StartGenerateResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.StartGenerate is not implemented"))
-}
-
-func (UnimplementedFabricControllerHandler) GenerateStatus(context.Context, *connect.Request[v1.GenerateStatusRequest]) (*connect.Response[v1.GenerateFilesResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GenerateStatus is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) Debug(context.Context, *connect.Request[v1.DebugRequest]) (*connect.Response[v1.DebugResponse], error) {
@@ -1561,6 +1528,10 @@ func (UnimplementedFabricControllerHandler) PutDeployment(context.Context, *conn
 
 func (UnimplementedFabricControllerHandler) ListDeployments(context.Context, *connect.Request[v1.ListDeploymentsRequest]) (*connect.Response[v1.ListDeploymentsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.ListDeployments is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) GetDeployment(context.Context, *connect.Request[v1.GetDeploymentRequest]) (*connect.Response[v1.GetDeploymentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetDeployment is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) CreateUploadURL(context.Context, *connect.Request[v1.UploadURLRequest]) (*connect.Response[v1.UploadURLResponse], error) {

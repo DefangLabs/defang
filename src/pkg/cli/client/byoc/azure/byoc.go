@@ -29,6 +29,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -171,6 +172,9 @@ func (b *ByocAzure) CdList(ctx context.Context, _ bool) (iter.Seq[state.Info], e
 
 // AccountInfo implements client.Provider.
 func (b *ByocAzure) AccountInfo(context.Context) (*client.AccountInfo, error) {
+	if err := b.setUpLocation(); err != nil {
+		return nil, fmt.Errorf("AccountInfo: %w", err)
+	}
 	return &client.AccountInfo{
 		AccountID: b.driver.SubscriptionID,
 		Provider:  client.ProviderAzure,
@@ -709,6 +713,14 @@ func (b *ByocAzure) PrepareDomainDelegation(context.Context, client.PrepareDomai
 	return nil, nil // TODO: implement domain delegation for Azure
 }
 
+// HasDelegatedSubdomain implements client.Provider. Azure does not yet
+// implement domain delegation, so there is no subdomain zone to delete on
+// destroy. Flip to true (or remove the override) once PrepareDomainDelegation
+// is wired up.
+func (*ByocAzure) HasDelegatedSubdomain() bool {
+	return false
+}
+
 // Preview implements client.Provider.
 func (b *ByocAzure) Preview(ctx context.Context, req *client.DeployRequest) (*client.DeployResponse, error) {
 	defer term.Timing()()
@@ -909,4 +921,18 @@ func (b *ByocAzure) TearDownCD(context.Context) error {
 // UpdateShardDomain implements client.DNSResolver.
 func (b *ByocAzure) UpdateShardDomain(context.Context) error {
 	return fmt.Errorf("UpdateShardDomain: %w", errors.ErrUnsupported)
+}
+
+// UpdateServiceInfo implements byoc.ServiceInfoUpdater. When a service has a
+// `domainname` set in compose, mark it for managed-cert issuance so
+// `defang cert generate` picks it up via the CertIssuer path. Azure Container
+// Apps managed certs are free, auto-renewing, and validated via CNAME — no
+// hosted-zone presence required (unlike AWS, where ZoneId triggers a different
+// path).
+func (b *ByocAzure) UpdateServiceInfo(_ context.Context, si *defangv1.ServiceInfo, _, _ string, service composeTypes.ServiceConfig) error {
+	if service.DomainName == "" {
+		return nil
+	}
+	si.UseAcmeCert = true
+	return nil
 }

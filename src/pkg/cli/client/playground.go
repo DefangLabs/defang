@@ -55,6 +55,10 @@ func (*PlaygroundProvider) Driver() string {
 	return "playground"
 }
 
+func (*PlaygroundProvider) HasDelegatedSubdomain() bool {
+	return true
+}
+
 func (g *PlaygroundProvider) Preview(ctx context.Context, req *DeployRequest) (*DeployResponse, error) {
 	req.Preview = true
 	return g.Deploy(ctx, req)

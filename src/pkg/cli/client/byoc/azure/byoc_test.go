@@ -11,6 +11,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cloudazure "github.com/DefangLabs/defang/src/pkg/clouds/azure"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 type fakeCred struct {
@@ -430,5 +431,36 @@ func TestBuildCdEnv(t *testing.T) {
 	}
 	if _, ok := env["PULUMI_CONFIG_PASSPHRASE"]; !ok {
 		t.Error("PULUMI_CONFIG_PASSPHRASE missing")
+	}
+}
+
+// TestUpdateServiceInfo verifies the byoc.ServiceInfoUpdater contract:
+// services with a non-empty `domainname` get UseAcmeCert flipped on so the
+// downstream cert-gen flow picks them up; services without one are left
+// untouched.
+func TestUpdateServiceInfo(t *testing.T) {
+	tests := []struct {
+		name           string
+		domainName     string
+		initialUseAcme bool
+		wantUseAcme    bool
+	}{
+		{name: "with domainname enables acme", domainName: "x.example.com", wantUseAcme: true},
+		{name: "without domainname is no-op", domainName: "", wantUseAcme: false},
+		{name: "without domainname preserves prior true", domainName: "", initialUseAcme: true, wantUseAcme: true},
+		{name: "with domainname keeps already-true", domainName: "x.example.com", initialUseAcme: true, wantUseAcme: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newTestProvider(t, cloudazure.LocationWestUS3, "sub-id")
+			si := &defangv1.ServiceInfo{UseAcmeCert: tt.initialUseAcme}
+			svc := composeTypes.ServiceConfig{DomainName: tt.domainName}
+			if err := b.UpdateServiceInfo(t.Context(), si, "proj", "etag", svc); err != nil {
+				t.Fatalf("UpdateServiceInfo: %v", err)
+			}
+			if si.UseAcmeCert != tt.wantUseAcme {
+				t.Errorf("UseAcmeCert = %v, want %v", si.UseAcmeCert, tt.wantUseAcme)
+			}
+		})
 	}
 }

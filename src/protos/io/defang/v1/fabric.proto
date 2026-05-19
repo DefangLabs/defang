@@ -5,8 +5,8 @@ package io.defang.v1;
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
-
 import "google/type/money.proto";
+
 option go_package = "github.com/DefangLabs/defang/src/protos/io/defang/v1;defangv1";
 
 service FabricController {
@@ -23,27 +23,26 @@ service FabricController {
   rpc Tail(TailRequest) returns (stream TailResponse);
   rpc Deploy(DeployRequest) returns (DeployResponse);
   rpc Get(GetRequest) returns (ServiceInfo) {
+    option deprecated = true; // Playground only
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc GetPlaygroundProjectDomain(google.protobuf.Empty) returns (GetPlaygroundProjectDomainResponse) {
+    option deprecated = true; // Playground only
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-  rpc Delete(DeleteRequest) returns (DeleteResponse) {
-    option deprecated = true;
-  }
   rpc Destroy(DestroyRequest) returns (DestroyResponse) {
+    option deprecated = true; // Playground only
     option idempotency_level = IDEMPOTENT;
   }
-  rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
+  rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse) {
+    option deprecated = true; // Playground only
+  }
   rpc GetServices(GetServicesRequest) returns (GetServicesResponse) {
+    option deprecated = true; // Playground only
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
   rpc GenerateFiles(GenerateFilesRequest) returns (GenerateFilesResponse);
-  rpc StartGenerate(GenerateFilesRequest) returns (StartGenerateResponse);
-  rpc GenerateStatus(GenerateStatusRequest) returns (GenerateFilesResponse) {
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
   rpc Debug(DebugRequest) returns (DebugResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
@@ -53,38 +52,43 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  // deprecate - change to use *Config functions
   rpc PutSecret(PutConfigRequest) returns (google.protobuf.Empty) {
-    option deprecated = true;
+    option deprecated = true; // Playground only
     option idempotency_level = IDEMPOTENT;
   }
   rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty) {
-    option deprecated = true;
+    option deprecated = true; // Playground only
     option idempotency_level = IDEMPOTENT;
   }
   rpc ListSecrets(ListConfigsRequest) returns (Secrets) {
+    option deprecated = true; // Playground only
     option idempotency_level = NO_SIDE_EFFECTS;
-    option deprecated = true;
   } // no values
 
   rpc GetConfigs(GetConfigsRequest) returns (GetConfigsResponse) {
+    option deprecated = true; // Playground only
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc PutConfig(PutConfigRequest) returns (google.protobuf.Empty) {
+    option deprecated = true; // Playground only
     option idempotency_level = IDEMPOTENT;
   }
   rpc DeleteConfigs(DeleteConfigsRequest) returns (google.protobuf.Empty) {
+    option deprecated = true; // Playground only
     option idempotency_level = IDEMPOTENT;
   }
   rpc ListConfigs(ListConfigsRequest) returns (ListConfigsResponse) {
+    option deprecated = true; // Playground only
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
   rpc PutDeployment(PutDeploymentRequest) returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
   }
-
   rpc ListDeployments(ListDeploymentsRequest) returns (ListDeploymentsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc GetDeployment(GetDeploymentRequest) returns (GetDeploymentResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
@@ -594,6 +598,7 @@ message Deployment {
   repeated ServiceInfo services = 18;
   CdType cd_type = 19;
   string cd_id = 20;
+  bytes compose = 21; // yaml
 }
 
 enum CdType {
@@ -625,6 +630,16 @@ message ListDeploymentsRequest {
 
 message ListDeploymentsResponse {
   repeated Deployment deployments = 1;
+}
+
+message GetDeploymentRequest {
+  string project = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  string etag = 3; // aka deployment ID
+}
+
+message GetDeploymentResponse {
+  Deployment deployment = 1;
 }
 
 message TokenRequest {
