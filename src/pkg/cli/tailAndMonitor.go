@@ -23,6 +23,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 		panic("tailOptions.Deployment must be a valid deployment ID")
 	}
 	if waitTimeout > 0 {
+		term.Infof("Tailing with a wait-timeout of %v", waitTimeout)
 		var cancelTimeout context.CancelFunc
 		ctx, cancelTimeout = context.WithTimeout(ctx, waitTimeout)
 		defer cancelTimeout()
