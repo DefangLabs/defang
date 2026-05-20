@@ -12,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
@@ -23,7 +24,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 		panic("tailOptions.Deployment must be a valid deployment ID")
 	}
 	if waitTimeout > 0 {
-		term.Infof("Tailing with timeout: %v", waitTimeout)
+		track.Evt("TailAndMonitor WaitTimeout", track.P("wait_timeout", waitTimeout))
 		var cancelTimeout context.CancelFunc
 		ctx, cancelTimeout = context.WithTimeout(ctx, waitTimeout)
 		defer cancelTimeout()

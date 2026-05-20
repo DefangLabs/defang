@@ -15,6 +15,7 @@ on:
 permissions:
   contents: read
   id-token: write # for GitHub id-token auth
+  actions: read # to query workflow runs for coverage baseline
 
 jobs:
   go-test:
@@ -53,15 +54,31 @@ jobs:
           path: src/coverage.txt
           overwrite: true
 
-      - name: Download main branch coverage
+      - name: Find merge-base run ID
         if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v')
+        id: merge-base-run
+        continue-on-error: true # no baseline yet on first run
+        run: |
+          git fetch origin main --depth=50
+          MERGE_BASE=$(git merge-base HEAD origin/main)
+          echo "Merge base: $MERGE_BASE"
+          RUN_ID=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/go.yml/runs" \
+            -X GET -f branch=main -f per_page=100 \
+            --jq ".workflow_runs[] | select(.head_sha == \"$MERGE_BASE\" and .conclusion == \"success\") | .id" \
+            | head -1)
+          echo "run_id=${RUN_ID}" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download merge-base coverage
+        if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v') && steps.merge-base-run.outputs.run_id != ''
         uses: dawidd6/action-download-artifact@8305c0f1062bb0d184d09ef4493ecb9288447732 # v20
         with:
           workflow: go.yml
-          branch: main
+          run_id: ${{ steps.merge-base-run.outputs.run_id }}
           name: coverage-main
           path: coverage-main
-        continue-on-error: true # no baseline yet on first run
+        continue-on-error: true # artifact may have expired
 
       - name: Verify Go modules
         working-directory: src
@@ -94,7 +111,7 @@ jobs:
         working-directory: src
 
       - name: Check coverage regression
-        if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v')
+        if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v') && github.actor != 'dependabot[bot]'
         run: |
           if [ ! -f coverage-main/coverage.txt ]; then
             echo "No main coverage baseline found, skipping comparison"

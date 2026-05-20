@@ -857,15 +857,24 @@ func (j *Job) fetchLogsByWorkspaceID(ctx context.Context, workspaceID, execution
 		return "", err
 	}
 
-	// Filter by pod name (ContainerGroupName_s), which has the form
-	// "{executionName}-{randomsuffix}" — ContainerJobName_s is always just the job name
-	// ("defang-cd") so it can't disambiguate executions. Execution names are Azure-generated
-	// alphanumeric + hyphens, so no quoting hazard inlining them into the query.
+	// Union over both legacy Classic CustomLog (ContainerAppConsoleLogs_CL) and
+	// modern DCR-based (ContainerAppConsoleLogs) tables. ACA envs created with
+	// AppLogsConfiguration.Destination=log-analytics write to _CL; envs using
+	// destination=azure-monitor + a DiagnosticSetting write to the modern table.
+	// isfuzzy=true silently drops a missing table from the union so workspaces
+	// with only one of them still resolve. Column rename in the Classic branch
+	// matches the modern schema for the shared filter+projection below.
+	// Filter is on pod name ({executionName}-{randomsuffix}) — ContainerJobName_s
+	// / JobName is just "defang-cd" and can't disambiguate executions. Execution
+	// names are Azure-generated alphanumeric+hyphens — safe to inline.
 	query := fmt.Sprintf(
-		`ContainerAppConsoleLogs_CL `+
-			`| where ContainerName_s == "%s" and ContainerGroupName_s startswith "%s-" `+
+		`union isfuzzy=true `+
+			`(ContainerAppConsoleLogs_CL `+
+			`   | extend ContainerName = ContainerName_s, ContainerGroupName = ContainerGroupName_s, Log = Log_s), `+
+			`(ContainerAppConsoleLogs) `+
+			`| where ContainerName == "%[1]s" and ContainerGroupName startswith "%[2]s-" `+
 			`| order by TimeGenerated asc `+
-			`| project TimeGenerated, Log_s`,
+			`| project TimeGenerated, Log`,
 		cdJobName, executionName,
 	)
 	body, err := json.Marshal(map[string]string{"query": query})
