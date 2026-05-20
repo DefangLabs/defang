@@ -15,6 +15,7 @@ const CreateNewStack = "Create new stack"
 
 type Manager interface {
 	List(ctx context.Context) ([]ListItem, error)
+	Load(ctx context.Context, name string) (*Parameters, error)
 	Create(params Parameters) (string, error)
 }
 
@@ -88,13 +89,11 @@ func (ss *stackSelector) SelectStack(ctx context.Context, opts SelectStackOption
 	}
 
 	// find the stack with the selected name in the list of stacks
-	for _, stack := range stackList {
-		if stack.Name == selectedName {
-			return &stack.Parameters, nil
-		}
+	stack, err := ss.sm.Load(ctx, selectedName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load stack %q: %w", selectedName, err)
 	}
-
-	return nil, fmt.Errorf("selected stack %q not found", selectedName)
+	return stack, nil
 }
 
 func (ss *stackSelector) createStack(ctx context.Context) (*Parameters, error) {
