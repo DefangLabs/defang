@@ -101,6 +101,8 @@ func TestIsTransientTokenError(t *testing.T) {
 		{"nil", nil, false},
 		{"context deadline", context.DeadlineExceeded, true},
 		{"wrapped context deadline", &url.Error{Op: "Post", URL: "https://x", Err: context.DeadlineExceeded}, true},
+		{"context canceled", context.Canceled, false},
+		{"wrapped context canceled", &url.Error{Op: "Post", URL: "https://x", Err: context.Canceled}, false},
 		{"net op error", &net.OpError{Op: "dial", Err: errors.New("connection refused")}, true},
 		{"url error wrapping plain", &url.Error{Op: "Post", URL: "https://x", Err: errors.New("EOF")}, true},
 		{"permanent oauth", errors.New("invalid_grant"), false},
