@@ -12,7 +12,11 @@ import (
 	cloudbuild "cloud.google.com/go/cloudbuild/apiv1/v2"
 	cloudbuildpb "cloud.google.com/go/cloudbuild/apiv1/v2/cloudbuildpb"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/term"
+	gax "github.com/googleapis/gax-go/v2"
 	"go.yaml.in/yaml/v4"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -192,7 +196,7 @@ func (gcp Gcp) GetBuildStatus(ctx context.Context, startBuildOpName string) (boo
 	defer svc.Close()
 
 	op := svc.CreateBuildOperation(startBuildOpName)
-	build, err := op.Poll(ctx)
+	build, err := pollBuildWithRetry(ctx, op.Poll)
 	if err != nil {
 		return false, fmt.Errorf("failed to poll build operation: %w", err)
 	}
@@ -203,6 +207,60 @@ func (gcp Gcp) GetBuildStatus(ctx context.Context, startBuildOpName string) (boo
 		return true, client.ErrDeploymentFailed{Message: fmt.Sprintf("build failed with status: %v", build.Status)}
 	}
 	return false, nil
+}
+
+const pollBuildMaxAttempts = 3
+
+// pollBuildInitialWaitForTest is the initial backoff between poll retries.
+// Declared as a var so tests can shorten it.
+var pollBuildInitialWaitForTest = 500 * time.Millisecond
+
+type buildPoller func(ctx context.Context, opts ...gax.CallOption) (*cloudbuildpb.Build, error)
+
+// pollBuildWithRetry retries poll on transient gRPC errors. The longrunning
+// client applies a 10s gax timeout per GetOperation call and only retries on
+// Unavailable, so a slow cloudbuild API response surfaces as DeadlineExceeded
+// to callers; we absorb those (and other transient codes) here so a single
+// flake doesn't abort an in-flight deploy.
+func pollBuildWithRetry(ctx context.Context, poll buildPoller) (*cloudbuildpb.Build, error) {
+	wait := pollBuildInitialWaitForTest
+	var lastErr error
+	for attempt := range pollBuildMaxAttempts {
+		if attempt > 0 {
+			term.Debugf("retrying cloudbuild poll (attempt %d/%d) after transient error: %v", attempt+1, pollBuildMaxAttempts, lastErr)
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(wait):
+			}
+			wait *= 2
+		}
+		build, err := poll(ctx)
+		if err == nil {
+			return build, nil
+		}
+		// Caller's context done — surface that, not the downstream error.
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if !isTransientPollError(err) {
+			return nil, err
+		}
+		lastErr = err
+	}
+	return nil, lastErr
+}
+
+func isTransientPollError(err error) bool {
+	st, ok := status.FromError(err)
+	if !ok {
+		return false
+	}
+	switch st.Code() {
+	case codes.DeadlineExceeded, codes.Unavailable, codes.Internal, codes.ResourceExhausted:
+		return true
+	}
+	return false
 }
 
 func GetMachineType(machineType *string) MachineType {
