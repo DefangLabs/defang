@@ -20,8 +20,9 @@ import (
 )
 
 type Lister interface {
-	ListStacks(ctx context.Context, req *defangv1.ListStacksRequest) (*defangv1.ListStacksResponse, error)
 	GetDefaultStack(ctx context.Context, req *defangv1.GetDefaultStackRequest) (*defangv1.GetStackResponse, error)
+	GetStack(ctx context.Context, req *defangv1.GetStackRequest) (*defangv1.GetStackResponse, error)
+	ListStacks(ctx context.Context, req *defangv1.ListStacksRequest) (*defangv1.ListStacksResponse, error)
 }
 
 type manager struct {
@@ -101,34 +102,26 @@ func (sm *manager) ListRemote(ctx context.Context) ([]ListItem, error) {
 	}
 	stackParams := make([]ListItem, 0, len(resp.GetStacks()))
 	for _, stack := range resp.GetStacks() {
-		name := stack.GetName()
-		if name == "" {
-			name = DefaultBeta
-		}
-		bytes := stack.GetStackFile()
-		params, err := NewParametersFromContent(name, bytes)
+		params, err := newParametersFromPB(stack)
 		if err != nil {
-			term.Warnf("Skipping invalid remote stack %s: %v\n", name, err)
+			term.Warnf("Skipping invalid remote stack %s: %v\n", stack.GetName(), err)
 			continue
-		}
-		// fill in missing fields from remote stack info
-		if params.Mode == modes.ModeUnspecified {
-			params.Mode = modes.Mode(stack.GetMode())
-		}
-		if params.Region == "" {
-			params.Region = stack.GetRegion()
-		}
-		if params.Provider == "" {
-			params.Provider.SetValue(stack.GetProvider())
 		}
 		account := params.Account()
 		if account == "" {
 			account = stack.GetProviderAccountId()
 		}
+		deployedAt := timeutils.AsTime(stack.GetLastDeployedAt(), time.Time{})
+		if !deployedAt.IsZero() {
+			deployedAt = deployedAt.Local()
+		}
 		stackParams = append(stackParams, ListItem{
-			Parameters: *params,
+			Name:       params.Name,
+			Provider:   params.Provider,
+			Mode:       params.Mode,
+			Region:     params.Region,
 			Account:    account,
-			DeployedAt: timeutils.AsTime(stack.GetLastDeployedAt(), time.Time{}).Local(),
+			DeployedAt: deployedAt,
 			Default:    stack.GetIsDefault(),
 		})
 	}
@@ -138,6 +131,29 @@ func (sm *manager) ListRemote(ctx context.Context) ([]ListItem, error) {
 		return b.DeployedAt.Compare(a.DeployedAt)
 	})
 	return stackParams, nil
+}
+
+func newParametersFromPB(stack *defangv1.Stack) (*Parameters, error) {
+	name := stack.GetName()
+	if name == "" {
+		name = DefaultBeta
+	}
+	bytes := stack.GetStackFile()
+	params, err := NewParametersFromContent(name, bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse remote stack content: %w", err)
+	}
+	// fill in missing fields from remote stack info
+	if params.Mode == modes.ModeUnspecified {
+		params.Mode = modes.Mode(stack.GetMode())
+	}
+	if params.Region == "" {
+		params.Region = stack.GetRegion()
+	}
+	if params.Provider == "" {
+		params.Provider.SetValue(stack.GetProvider())
+	}
+	return params, nil
 }
 
 type ErrOutside struct {
@@ -171,22 +187,24 @@ func (sm *manager) LoadLocal(name string) (*Parameters, error) {
 }
 
 func (sm *manager) GetRemote(ctx context.Context, name string) (*Parameters, error) {
-	remoteStacks, err := sm.ListRemote(ctx)
+	if sm.projectName == "" {
+		return nil, errors.New("project name is required to gett remote stack")
+	}
+	if name == "" {
+		return nil, errors.New("stack name is required to get remote stack")
+	}
+	remoteStack, err := sm.fabric.GetStack(ctx, &defangv1.GetStackRequest{
+		Project: sm.projectName,
+		Stack:   name,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list remote stacks: %w", err)
-	}
-	var remoteStack *ListItem
-	for i := range remoteStacks {
-		if remoteStacks[i].Name == name {
-			remoteStack = &remoteStacks[i]
-			break
+		if connect.CodeOf(err) == connect.CodeNotFound {
+			return nil, &ErrNotExist{ProjectName: sm.projectName, StackName: name}
 		}
-	}
-	if remoteStack == nil {
-		return nil, &ErrNotExist{ProjectName: sm.projectName, StackName: name}
+		return nil, fmt.Errorf("failed to get remote stack: %w", err)
 	}
 
-	return &remoteStack.Parameters, nil
+	return newParametersFromPB(remoteStack.GetStack())
 }
 
 func (sm *manager) Create(params Parameters) (string, error) {
@@ -319,7 +337,7 @@ func (sm *manager) getDefaultStack(ctx context.Context) (*Parameters, string, er
 	}
 
 	whence := "default stack from server"
-	params, err := NewParametersFromContent(res.Stack.Name, res.Stack.StackFile)
+	params, err := newParametersFromPB(res.Stack)
 	if err != nil {
 		return nil, whence, err
 	}
