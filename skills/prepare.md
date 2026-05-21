@@ -63,7 +63,7 @@ The following compose directives cause deployment errors and must be removed or 
 Volumes are **not supported** by Defang. For each volume found:
 
 1. **Database/cache volumes** — Replace the entire service with a managed service:
-   - Postgres: add `x-defang-postgres: true` to the service, use a `postgres` image, set `ports: [{mode: host, target: 5432}]`, and declare `POSTGRES_PASSWORD` with no value (so it's set via `defang config set`)
+   - Postgres: add `x-defang-postgres: true` to the service, use a `postgres` image, set `ports: [{mode: host, target: 5432}]`, and declare `POSTGRES_PASSWORD=${POSTGRES_PASSWORD}` (so it's set via `defang config set`)
    - Redis: add `x-defang-redis: true`, use a `redis` or `valkey` image, set `ports: [{mode: host, target: 6379}]`
    - MongoDB: add `x-defang-mongodb: true`, use a `mongo` image, set `ports: [{mode: host, target: 27017}]`
 
@@ -116,13 +116,15 @@ Remove `host_ip` if present — it is not supported.
 ## Step 5: Fix environment variables and secrets
 
 ### Sensitive values (passwords, API keys, tokens)
-Declare them with **no value** so they are set securely via `defang config set`:
+Declare them using `${VAR}` interpolation so they are set securely via `defang config set`:
 ```yaml
 environment:
-  - DATABASE_PASSWORD
-  - API_KEY
+  - DATABASE_PASSWORD=${DATABASE_PASSWORD}  # Set with: defang config set DATABASE_PASSWORD
+  - API_KEY=${API_KEY}                      # Set with: defang config set API_KEY
 ```
-Do NOT hardcode sensitive values in the compose file. Do NOT use `.env` files for secrets that should be kept out of source control.
+This explicit `${VAR}` syntax makes it clear to developers that the value comes from Defang config. Do NOT hardcode sensitive values in the compose file. Do NOT use `.env` files for secrets that should be kept out of source control.
+
+When generating or modifying compose files, always add a YAML comment beside each config-managed variable showing the `defang config set` command needed. If the project uses multiple stacks, include `--stack <name>` in the comment.
 
 ### Service discovery references
 When one service needs to connect to another, reference it by compose service name:
@@ -135,14 +137,14 @@ environment:
 Here `db`, `cache`, and `backend` are compose service names. Defang automatically resolves these to the correct internal DNS. This only works for services that have `mode: host` ports.
 
 ### Variable interpolation
-- `${VAR}` is supported — Defang resolves it from `defang config` at deploy time
+- `${VAR}` in **environment variables** is supported — Defang resolves it from `defang config` at deploy time
 - `${VAR:-default}` is **NOT supported** at deploy time — replace with a plain default value or remove the default and set via `defang config`
 
 ### Shell environment pass-through
 Defang does **not** pass the host shell's environment variables into containers (except `COMPOSE_*` variables for compose loading). If the compose file relies on shell variables being present, convert them to explicit values or `defang config` entries.
 
 ### Build args
-Build args with empty or nil values will be skipped with a warning. Ensure all build args have explicit values:
+**Build args are NOT resolved from `defang config`.** They are evaluated at build time, not deploy time, so `${VAR}` references will not be resolved from config. Any build arg without an explicit literal value will be silently dropped during the build. Always provide concrete values:
 ```yaml
 build:
   context: .
@@ -257,14 +259,14 @@ After making all changes, review the final compose file and present a summary to
    - Stateful images without managed extensions (data loss on restart)
    - Services without memory reservations (using provider defaults)
    - `depends_on` with managed services (does not wait for provisioning)
-3. **Config values needed** — list all environment variables declared without values that must be set via `defang config set` before deployment
+3. **Config values needed** — list all environment variables using `${VAR}` interpolation that must be set via `defang config set` before deployment
 4. **Incompatibilities removed** — summarize what was removed and any alternatives suggested
 
 If the project uses GitHub Actions for deployment, remind the user:
 - Use `DefangLabs/defang-github-action@v1`
 - Pass secrets via `config-env-vars`, not hardcoded in the workflow
 - Never include `AWS_PROFILE` in `.defang/<stack>` files — it breaks CI
-- Set `id-token: write` permission for OIDC auth
+- OIDC auth (`id-token: write` + `AWS_ROLE_ARN`) requires the user to first connect their cloud account via Portal's OIDC configuration or by running `defang cd setup`. Without this, use static cloud credentials (e.g., `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`) as GitHub Actions secrets instead
 
 ```yaml
 # Example GitHub Actions step
