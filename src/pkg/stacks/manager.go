@@ -188,7 +188,7 @@ func (sm *manager) LoadLocal(name string) (*Parameters, error) {
 
 func (sm *manager) GetRemote(ctx context.Context, name string) (*Parameters, error) {
 	if sm.projectName == "" {
-		return nil, errors.New("project name is required to gett remote stack")
+		return nil, errors.New("project name is required to get remote stack")
 	}
 	if name == "" {
 		return nil, errors.New("stack name is required to get remote stack")
