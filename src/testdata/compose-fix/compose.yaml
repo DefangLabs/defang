@@ -1,0 +1,12 @@
+name: compose-fix
+services:
+  web:
+    image: nginx
+    ports:
+      - target: 8080
+    dns:
+      - 1.1.1.1
+  db:
+    image: postgres:16
+    ports:
+      - target: 5432

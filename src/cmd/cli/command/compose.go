@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"time"
@@ -554,7 +555,8 @@ func makeComposeConfigCmd() *cobra.Command {
 }
 
 func makeComposeLintCmd() *cobra.Command {
-	return &cobra.Command{
+	var fix bool
+	cmd := &cobra.Command{
 		Use:   "lint",
 		Args:  cobra.NoArgs,
 		Short: "Validate a Compose file without deploying",
@@ -564,6 +566,16 @@ func makeComposeLintCmd() *cobra.Command {
 			project, loadErr := loader.LoadProject(cmd.Context())
 			if loadErr != nil {
 				return handleInvalidComposeFileErr(cmd.Context(), loadErr)
+			}
+
+			if fix {
+				fixes := compose.FixProject(project)
+				printFixResults(fixes)
+				if len(fixes) > 0 {
+					if err := writeFixedCompose(project); err != nil {
+						return err
+					}
+				}
 			}
 
 			var errs []error
@@ -587,6 +599,56 @@ func makeComposeLintCmd() *cobra.Command {
 			}
 			return nil
 		},
+	}
+	cmd.Flags().BoolVar(&fix, "fix", false, "apply safe mechanical fixes to the Compose file")
+	return cmd
+}
+
+func writeFixedCompose(project *compose.Project) error {
+	if len(project.ComposeFiles) == 0 {
+		return fmt.Errorf("no compose file to write to")
+	}
+	data, err := compose.MarshalYAML(project)
+	if err != nil {
+		return err
+	}
+	path := project.ComposeFiles[0]
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("writing %s: %w", path, err)
+	}
+	term.Info("Updated", path)
+	return nil
+}
+
+func printFixResults(fixes []compose.FixResult) {
+	if len(fixes) == 0 {
+		term.Info("No fixes needed.")
+		return
+	}
+	term.Println("Fixes applied:")
+	for _, fix := range fixes {
+		term.Printf("  service %q: %s\n", fix.Service, describeFixResult(fix))
+	}
+	term.Printf("\n%d fix(es) applied.\n", len(fixes))
+}
+
+func describeFixResult(fix compose.FixResult) string {
+	switch fix.Action {
+	case "removed":
+		return fmt.Sprintf("removed unsupported directive: %s (%s)", fix.Field, fix.Reason)
+	case "changed":
+		if fix.Before != "" {
+			return fmt.Sprintf("changed %s from %q to %q (%s)", fix.Field, fix.Before, fix.After, fix.Reason)
+		}
+		return fmt.Sprintf("changed %s to %q (%s)", fix.Field, fix.After, fix.Reason)
+	default:
+		if fix.Field == "mode" {
+			return fmt.Sprintf("added mode: %s to %s", fix.After, fix.Reason)
+		}
+		if fix.Reason != "" {
+			return fmt.Sprintf("added %s: %s (%s)", fix.Field, fix.After, fix.Reason)
+		}
+		return fmt.Sprintf("added %s: %s", fix.Field, fix.After)
 	}
 }
 
