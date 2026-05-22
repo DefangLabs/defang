@@ -553,6 +553,84 @@ func makeComposeConfigCmd() *cobra.Command {
 	}
 }
 
+func makeComposeFixCmd() *cobra.Command {
+	var dryRun bool
+	cmd := &cobra.Command{
+		Use:   "fix",
+		Args:  cobra.NoArgs,
+		Short: "Reads a Compose file and applies safe mechanical fixes",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+
+			sessionx, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
+				CheckAccountInfo: false,
+			})
+			if err != nil {
+				term.Warn("unable to load stack:", err, "- using local compose configuration")
+				sessionx = &session.Session{
+					Loader: newLoaderForCommand(cmd),
+				}
+			}
+
+			project, loadErr := sessionx.Loader.LoadProject(ctx)
+			if loadErr != nil {
+				return handleInvalidComposeFileErr(ctx, loadErr)
+			}
+
+			fixes := compose.FixProject(project)
+			printFixResults(fixes)
+			if dryRun {
+				return nil
+			}
+
+			data, err := compose.MarshalYAML(project)
+			if err != nil {
+				return err
+			}
+			term.Println()
+			_, err = term.Print(string(data))
+			return err
+		},
+	}
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show fixes without outputting YAML")
+	return cmd
+}
+
+func printFixResults(fixes []compose.FixResult) {
+	term.Println("Fixes applied:")
+	for _, fix := range fixes {
+		term.Printf("  service %q: %s\n", fix.Service, describeFixResult(fix))
+	}
+	term.Println()
+	term.Printf("%d fixes applied.\n", len(fixes))
+}
+
+func describeFixResult(fix compose.FixResult) string {
+	switch fix.Action {
+	case "removed":
+		return fmt.Sprintf("removed unsupported directive: %s", fix.Field)
+	case "changed":
+		if fix.Field == "domainname" {
+			return fmt.Sprintf("moved hostname %q to domainname", fix.After)
+		}
+		if fix.Before != "" {
+			return fmt.Sprintf("changed %s: %s to %s (%s)", fix.Field, fix.Before, fix.After, fix.Reason)
+		}
+		return fmt.Sprintf("changed %s: %s (%s)", fix.Field, fix.After, fix.Reason)
+	default:
+		if fix.Field == "mode" {
+			return fmt.Sprintf("added mode: %s to %s", fix.After, fix.Reason)
+		}
+		if fix.Field == "healthcheck" {
+			return fmt.Sprintf("added healthcheck for %s", fix.Reason)
+		}
+		if fix.Reason != "" {
+			return fmt.Sprintf("added %s: %s (%s)", fix.Field, fix.After, fix.Reason)
+		}
+		return fmt.Sprintf("added %s: %s", fix.Field, fix.After)
+	}
+}
+
 func makeComposePsCmd() *cobra.Command {
 	getServicesCmd := &cobra.Command{
 		Use:         "ps",
@@ -763,6 +841,7 @@ services:
 	composeCmd.PersistentFlags().StringVar(&byoc.DefangPulumiBackend, "pulumi-backend", "", `specify an alternate Pulumi backend URL or "pulumi-cloud"`)
 	composeCmd.AddCommand(makeComposeUpCmd())
 	composeCmd.AddCommand(makeComposeConfigCmd())
+	composeCmd.AddCommand(makeComposeFixCmd())
 	composeCmd.AddCommand(makeComposeDownCmd())
 	composeCmd.AddCommand(makeComposePsCmd())
 	composeCmd.AddCommand(makeLogsCmd())
