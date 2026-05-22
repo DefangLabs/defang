@@ -558,28 +558,18 @@ func makeComposeFixCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "fix",
 		Args:  cobra.NoArgs,
-		Short: "Reads a Compose file and applies safe mechanical fixes",
+		Short: "Apply safe mechanical fixes to a Compose file",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := cmd.Context()
+			loader := newLoaderForCommand(cmd)
 
-			sessionx, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
-				CheckAccountInfo: false,
-			})
-			if err != nil {
-				term.Warn("unable to load stack:", err, "- using local compose configuration")
-				sessionx = &session.Session{
-					Loader: newLoaderForCommand(cmd),
-				}
-			}
-
-			project, loadErr := sessionx.Loader.LoadProject(ctx)
+			project, loadErr := loader.LoadProject(cmd.Context())
 			if loadErr != nil {
-				return handleInvalidComposeFileErr(ctx, loadErr)
+				return handleInvalidComposeFileErr(cmd.Context(), loadErr)
 			}
 
 			fixes := compose.FixProject(project)
 			printFixResults(fixes)
-			if dryRun {
+			if dryRun || len(fixes) == 0 {
 				return nil
 			}
 
@@ -597,32 +587,29 @@ func makeComposeFixCmd() *cobra.Command {
 }
 
 func printFixResults(fixes []compose.FixResult) {
+	if len(fixes) == 0 {
+		term.Info("No fixes needed.")
+		return
+	}
 	term.Println("Fixes applied:")
 	for _, fix := range fixes {
 		term.Printf("  service %q: %s\n", fix.Service, describeFixResult(fix))
 	}
-	term.Println()
-	term.Printf("%d fixes applied.\n", len(fixes))
+	term.Printf("\n%d fix(es) applied.\n", len(fixes))
 }
 
 func describeFixResult(fix compose.FixResult) string {
 	switch fix.Action {
 	case "removed":
-		return fmt.Sprintf("removed unsupported directive: %s", fix.Field)
+		return fmt.Sprintf("removed unsupported directive: %s (%s)", fix.Field, fix.Reason)
 	case "changed":
-		if fix.Field == "domainname" {
-			return fmt.Sprintf("moved hostname %q to domainname", fix.After)
-		}
 		if fix.Before != "" {
-			return fmt.Sprintf("changed %s: %s to %s (%s)", fix.Field, fix.Before, fix.After, fix.Reason)
+			return fmt.Sprintf("changed %s from %q to %q (%s)", fix.Field, fix.Before, fix.After, fix.Reason)
 		}
-		return fmt.Sprintf("changed %s: %s (%s)", fix.Field, fix.After, fix.Reason)
+		return fmt.Sprintf("changed %s to %q (%s)", fix.Field, fix.After, fix.Reason)
 	default:
 		if fix.Field == "mode" {
 			return fmt.Sprintf("added mode: %s to %s", fix.After, fix.Reason)
-		}
-		if fix.Field == "healthcheck" {
-			return fmt.Sprintf("added healthcheck for %s", fix.Reason)
 		}
 		if fix.Reason != "" {
 			return fmt.Sprintf("added %s: %s (%s)", fix.Field, fix.After, fix.Reason)

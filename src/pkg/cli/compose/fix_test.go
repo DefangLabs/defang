@@ -16,7 +16,7 @@ func TestFixProject(t *testing.T) {
 		check   func(*testing.T, *Project)
 	}{
 		{
-			name: "web service defaults",
+			name: "web service port mode and restart",
 			project: &Project{Services: Services{
 				"web": {
 					Name:  "web",
@@ -26,25 +26,20 @@ func TestFixProject(t *testing.T) {
 			}},
 			want: []FixResult{
 				{Service: "web", Field: "mode", Action: "added", After: Mode_INGRESS, Reason: "port 8080"},
-				{Service: "web", Field: "deploy.resources.reservations.memory", Action: "added", After: "512M", Reason: "missing memory reservation"},
 				{Service: "web", Field: "restart", Action: "added", After: defaultRestartPolicy, Reason: "missing restart policy"},
-				{Service: "web", Field: "healthcheck", Action: "added", After: "CMD curl -f http://localhost:8080/", Reason: "ingress port 8080"},
 			},
 			check: func(t *testing.T, project *Project) {
 				service := project.Services["web"]
 				if service.Ports[0].Mode != Mode_INGRESS {
 					t.Fatalf("port mode = %q, want %q", service.Ports[0].Mode, Mode_INGRESS)
 				}
-				if service.HealthCheck == nil {
-					t.Fatal("healthcheck was not added")
-				}
-				if service.Deploy.Resources.Reservations.MemoryBytes != 512*MiB {
-					t.Fatalf("memory = %d, want %d", service.Deploy.Resources.Reservations.MemoryBytes, 512*MiB)
+				if service.Restart != defaultRestartPolicy {
+					t.Fatalf("restart = %q, want %q", service.Restart, defaultRestartPolicy)
 				}
 			},
 		},
 		{
-			name: "managed postgres defaults to host",
+			name: "managed postgres defaults to host mode",
 			project: &Project{Services: Services{
 				"db": {
 					Name:  "db",
@@ -54,17 +49,12 @@ func TestFixProject(t *testing.T) {
 			}},
 			want: []FixResult{
 				{Service: "db", Field: "mode", Action: "added", After: Mode_HOST, Reason: "port 5432 (database image)"},
-				{Service: "db", Field: "x-defang-postgres", Action: "added", After: "true", Reason: "postgres image detected"},
-				{Service: "db", Field: "deploy.resources.reservations.memory", Action: "added", After: "512M", Reason: "missing memory reservation"},
 				{Service: "db", Field: "restart", Action: "added", After: defaultRestartPolicy, Reason: "missing restart policy"},
 			},
 			check: func(t *testing.T, project *Project) {
 				service := project.Services["db"]
 				if service.Ports[0].Mode != Mode_HOST {
 					t.Fatalf("port mode = %q, want %q", service.Ports[0].Mode, Mode_HOST)
-				}
-				if service.Extensions["x-defang-postgres"] != true {
-					t.Fatal("x-defang-postgres was not added")
 				}
 			},
 		},
@@ -81,7 +71,7 @@ func TestFixProject(t *testing.T) {
 				},
 			}},
 			want: []FixResult{
-				{Service: "api", Field: "deploy.resources.reservations", Action: "added", After: "deploy.resources.limits", Reason: "limits used as reservations"},
+				{Service: "api", Field: "deploy.resources.reservations", Action: "added", After: "copied from deploy.resources.limits", Reason: "Defang uses reservations for scheduling, not limits"},
 			},
 			check: func(t *testing.T, project *Project) {
 				service := project.Services["api"]
@@ -108,7 +98,6 @@ func TestFixProject(t *testing.T) {
 				},
 			}},
 			want: []FixResult{
-				{Service: "worker", Field: "deploy.resources.reservations.memory", Action: "added", After: "512M", Reason: "missing memory reservation"},
 				{Service: "worker", Field: "dns", Action: "removed", Before: "present", Reason: "unsupported directive"},
 				{Service: "worker", Field: "dns_search", Action: "removed", Before: "present", Reason: "unsupported directive"},
 				{Service: "worker", Field: "devices", Action: "removed", Before: "present", Reason: "unsupported directive"},
@@ -123,26 +112,23 @@ func TestFixProject(t *testing.T) {
 			},
 		},
 		{
-			name: "hostname and deploy restart policy",
+			name: "deploy restart policy converted to service restart",
 			project: &Project{Services: Services{
 				"api": {
-					Name:     "api",
-					Image:    "api",
-					Hostname: "api.example.com",
+					Name:  "api",
+					Image: "api",
 					Deploy: &composeTypes.DeployConfig{
 						RestartPolicy: &composeTypes.RestartPolicy{Condition: "any"},
 					},
 				},
 			}},
 			want: []FixResult{
-				{Service: "api", Field: "deploy.resources.reservations.memory", Action: "added", After: "512M", Reason: "missing memory reservation"},
-				{Service: "api", Field: "restart", Action: "added", After: "always", Reason: "deploy.restart_policy is unsupported"},
-				{Service: "api", Field: "domainname", Action: "changed", Before: "api.example.com", After: "api.example.com", Reason: "hostname is unsupported"},
+				{Service: "api", Field: "restart", Action: "added", Before: "", After: "always", Reason: "deploy.restart_policy is unsupported; converted to service-level restart"},
 			},
 			check: func(t *testing.T, project *Project) {
 				service := project.Services["api"]
-				if service.Hostname != "" || service.DomainName != "api.example.com" {
-					t.Fatalf("hostname/domainname = %q/%q", service.Hostname, service.DomainName)
+				if service.Restart != "always" {
+					t.Fatalf("restart = %q, want %q", service.Restart, "always")
 				}
 				if service.Deploy.RestartPolicy != nil {
 					t.Fatal("deploy.restart_policy was not removed")
@@ -150,24 +136,37 @@ func TestFixProject(t *testing.T) {
 			},
 		},
 		{
-			name: "static files memory default",
+			name: "udp port defaults to host mode",
 			project: &Project{Services: Services{
-				"cdn": {
-					Name:       "cdn",
-					Image:      "nginx",
-					Restart:    defaultRestartPolicy,
-					Extensions: composeTypes.Extensions{"x-defang-static-files": "./public"},
+				"dns": {
+					Name:    "dns",
+					Image:   "coredns",
+					Restart: "always",
+					Ports:   []composeTypes.ServicePortConfig{{Target: 53, Protocol: Protocol_UDP}},
 				},
 			}},
 			want: []FixResult{
-				{Service: "cdn", Field: "deploy.resources.reservations.memory", Action: "added", After: "256M", Reason: "missing memory reservation"},
+				{Service: "dns", Field: "mode", Action: "added", After: Mode_HOST, Reason: "port 53 (UDP port)"},
 			},
 			check: func(t *testing.T, project *Project) {
-				service := project.Services["cdn"]
-				if service.Deploy.Resources.Reservations.MemoryBytes != 256*MiB {
-					t.Fatalf("memory = %d, want %d", service.Deploy.Resources.Reservations.MemoryBytes, 256*MiB)
+				service := project.Services["dns"]
+				if service.Ports[0].Mode != Mode_HOST {
+					t.Fatalf("port mode = %q, want %q", service.Ports[0].Mode, Mode_HOST)
 				}
 			},
+		},
+		{
+			name: "no fixes needed",
+			project: &Project{Services: Services{
+				"app": {
+					Name:    "app",
+					Image:   "myapp",
+					Restart: "always",
+					Ports:   []composeTypes.ServicePortConfig{{Target: 80, Mode: Mode_INGRESS}},
+				},
+			}},
+			want: nil,
+			check: func(t *testing.T, project *Project) {},
 		},
 	}
 

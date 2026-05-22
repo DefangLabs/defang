@@ -3,7 +3,6 @@ package compose
 import (
 	"fmt"
 	"sort"
-	"strings"
 
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
@@ -48,12 +47,9 @@ func fixService(service *composeTypes.ServiceConfig) []FixResult {
 	isManagedStoreImage := IsPostgresRepo(repo) || IsRedisRepo(repo) || IsMongoRepo(repo)
 
 	results = append(results, fixPorts(service, isManagedStoreImage)...)
-	results = append(results, fixManagedServiceExtensions(service, repo)...)
-	results = append(results, fixResources(service)...)
+	results = append(results, fixLimitsToReservations(service)...)
 	results = append(results, fixRestart(service)...)
-	results = append(results, fixHostname(service)...)
 	results = append(results, fixUnsupportedDirectives(service)...)
-	results = append(results, fixIngressHealthcheck(service)...)
 
 	return results
 }
@@ -94,72 +90,22 @@ func portReason(target uint32, reason string) string {
 	return fmt.Sprintf("port %d (%s)", target, reason)
 }
 
-func fixManagedServiceExtensions(service *composeTypes.ServiceConfig, repo string) []FixResult {
-	switch {
-	case IsPostgresRepo(repo):
-		return addManagedServiceExtension(service, "x-defang-postgres", "postgres image detected")
-	case IsRedisRepo(repo):
-		return addManagedServiceExtension(service, "x-defang-redis", "redis image detected")
-	case IsMongoRepo(repo):
-		return addManagedServiceExtension(service, "x-defang-mongodb", "mongo image detected")
-	default:
+func fixLimitsToReservations(service *composeTypes.ServiceConfig) []FixResult {
+	if service.Deploy == nil {
 		return nil
 	}
-}
-
-func addManagedServiceExtension(service *composeTypes.ServiceConfig, key, reason string) []FixResult {
-	if service.Extensions == nil {
-		service.Extensions = composeTypes.Extensions{}
-	}
-	if _, ok := service.Extensions[key]; ok {
+	if service.Deploy.Resources.Limits == nil || service.Deploy.Resources.Reservations != nil {
 		return nil
 	}
-	service.Extensions[key] = true
+	limits := *service.Deploy.Resources.Limits
+	service.Deploy.Resources.Reservations = &limits
 	return []FixResult{{
 		Service: service.Name,
-		Field:   key,
+		Field:   "deploy.resources.reservations",
 		Action:  "added",
-		After:   "true",
-		Reason:  reason,
+		After:   "copied from deploy.resources.limits",
+		Reason:  "Defang uses reservations for scheduling, not limits",
 	}}
-}
-
-func fixResources(service *composeTypes.ServiceConfig) []FixResult {
-	var results []FixResult
-	if service.Deploy == nil {
-		service.Deploy = &composeTypes.DeployConfig{}
-	}
-	if service.Deploy.Resources.Limits != nil && service.Deploy.Resources.Reservations == nil {
-		limits := *service.Deploy.Resources.Limits
-		service.Deploy.Resources.Reservations = &limits
-		results = append(results, FixResult{
-			Service: service.Name,
-			Field:   "deploy.resources.reservations",
-			Action:  "added",
-			After:   "deploy.resources.limits",
-			Reason:  "limits used as reservations",
-		})
-	}
-	if service.Deploy.Resources.Reservations == nil {
-		service.Deploy.Resources.Reservations = &composeTypes.Resource{}
-	}
-	if service.Deploy.Resources.Reservations.MemoryBytes == 0 {
-		memory := composeTypes.UnitBytes(512 * MiB)
-		after := "512M"
-		if service.Extensions["x-defang-static-files"] != nil {
-			memory = composeTypes.UnitBytes(256 * MiB)
-			after = "256M"
-		}
-		service.Deploy.Resources.Reservations.MemoryBytes = memory
-		results = append(results, FixResult{
-			Service: service.Name,
-			Field:   "deploy.resources.reservations.memory",
-			Action:  "added",
-			After:   after,
-			Reason:  "missing memory reservation",
-		})
-	}
-	return results
 }
 
 func fixRestart(service *composeTypes.ServiceConfig) []FixResult {
@@ -176,13 +122,10 @@ func fixRestart(service *composeTypes.ServiceConfig) []FixResult {
 
 	reason := "unsupported restart policy"
 	if service.Deploy != nil && service.Deploy.RestartPolicy != nil {
-		reason = "deploy.restart_policy is unsupported"
+		reason = "deploy.restart_policy is unsupported; converted to service-level restart"
+		service.Deploy.RestartPolicy = nil
 	} else if before == "" {
 		reason = "missing restart policy"
-	}
-
-	if service.Deploy != nil && service.Deploy.RestartPolicy != nil {
-		service.Deploy.RestartPolicy = nil
 	}
 
 	action := "changed"
@@ -213,23 +156,6 @@ func restartFromDeployPolicy(service *composeTypes.ServiceConfig) string {
 
 func isSupportedRestart(restart string) bool {
 	return restart == "always" || restart == defaultRestartPolicy
-}
-
-func fixHostname(service *composeTypes.ServiceConfig) []FixResult {
-	if service.Hostname == "" {
-		return nil
-	}
-	before := service.Hostname
-	service.DomainName = service.Hostname
-	service.Hostname = ""
-	return []FixResult{{
-		Service: service.Name,
-		Field:   "domainname",
-		Action:  "changed",
-		Before:  before,
-		After:   service.DomainName,
-		Reason:  "hostname is unsupported",
-	}}
 }
 
 func fixUnsupportedDirectives(service *composeTypes.ServiceConfig) []FixResult {
@@ -265,27 +191,4 @@ func removedDirective(service, field string) FixResult {
 		Before:  "present",
 		Reason:  "unsupported directive",
 	}
-}
-
-func fixIngressHealthcheck(service *composeTypes.ServiceConfig) []FixResult {
-	if service.HealthCheck != nil && !service.HealthCheck.Disable {
-		return nil
-	}
-	for _, port := range service.Ports {
-		if port.Mode != Mode_INGRESS {
-			continue
-		}
-		url := fmt.Sprintf("http://localhost:%d/", port.Target)
-		service.HealthCheck = &composeTypes.HealthCheckConfig{
-			Test: composeTypes.HealthCheckTest{"CMD", "curl", "-f", url},
-		}
-		return []FixResult{{
-			Service: service.Name,
-			Field:   "healthcheck",
-			Action:  "added",
-			After:   strings.Join(service.HealthCheck.Test, " "),
-			Reason:  fmt.Sprintf("ingress port %d", port.Target),
-		}}
-	}
-	return nil
 }
