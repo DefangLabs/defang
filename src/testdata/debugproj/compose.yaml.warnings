@@ -1,2 +1,2 @@
- ! service "failing": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
- ! service "ok": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "failing": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors; suggest deploy.resources.reservations.memory: 512M
+ ! service "ok": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors; suggest deploy.resources.reservations.memory: 512M

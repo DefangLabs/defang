@@ -553,6 +553,53 @@ func makeComposeConfigCmd() *cobra.Command {
 	}
 }
 
+func makeComposeLintCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "lint",
+		Args:  cobra.NoArgs,
+		Short: "Validate a Compose file without deploying",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+
+			sessionx, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
+				CheckAccountInfo: false,
+			})
+			if err != nil {
+				term.Warn("unable to load stack:", err, "- using offline validation")
+				sessionx = &session.Session{
+					Loader:   newLoaderForCommand(cmd),
+					Provider: client.NewPlaygroundProvider(global.Client, stacks.DefaultBeta),
+					Stack:    &stacks.Parameters{Name: stacks.DefaultBeta, Provider: client.ProviderDefang},
+				}
+			}
+
+			project, loadErr := sessionx.Loader.LoadProject(ctx)
+			if loadErr != nil {
+				return handleInvalidComposeFileErr(ctx, loadErr)
+			}
+
+			if err := compose.ValidateServiceDockerfiles(project); err != nil {
+				return fmt.Errorf("compose file has errors:\n%w", err)
+			}
+
+			if err := compose.FixupServices(ctx, sessionx.Provider, project, compose.UploadModeIgnore); err != nil {
+				return fmt.Errorf("compose file has errors:\n%w", err)
+			}
+
+			if err := compose.ValidateProject(project, modes.ModeUnspecified); err != nil {
+				return fmt.Errorf("compose file has errors:\n%w", err)
+			}
+
+			if term.HadWarnings() {
+				term.Info("Compose file is valid with warnings")
+			} else {
+				term.Info("Compose file is valid")
+			}
+			return nil
+		},
+	}
+}
+
 func makeComposePsCmd() *cobra.Command {
 	getServicesCmd := &cobra.Command{
 		Use:         "ps",
@@ -763,6 +810,7 @@ services:
 	composeCmd.PersistentFlags().StringVar(&byoc.DefangPulumiBackend, "pulumi-backend", "", `specify an alternate Pulumi backend URL or "pulumi-cloud"`)
 	composeCmd.AddCommand(makeComposeUpCmd())
 	composeCmd.AddCommand(makeComposeConfigCmd())
+	composeCmd.AddCommand(makeComposeLintCmd())
 	composeCmd.AddCommand(makeComposeDownCmd())
 	composeCmd.AddCommand(makeComposePsCmd())
 	composeCmd.AddCommand(makeLogsCmd())

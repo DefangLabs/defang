@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -76,6 +77,51 @@ func TestComposeConfig(t *testing.T) {
 		err := cmd.Execute()
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
+		}
+	})
+}
+
+func TestComposeLint(t *testing.T) {
+	global.Client = unauthedMockFabricClient{}
+	t.Cleanup(func() {
+		global.Client = nil
+	})
+
+	defaultTerm := term.DefaultTerm
+	t.Cleanup(func() {
+		term.DefaultTerm = defaultTerm
+	})
+
+	t.Run("Valid", func(t *testing.T) {
+		t.Chdir("testdata/without-stack")
+		var stdout, stderr bytes.Buffer
+		term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
+
+		cmd := makeComposeLintCmd()
+		err := cmd.Execute()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if !strings.Contains(stdout.String(), "Compose file is valid") {
+			t.Fatalf("expected valid lint output, got stdout %q stderr %q", stdout.String(), stderr.String())
+		}
+	})
+
+	t.Run("Invalid", func(t *testing.T) {
+		t.Chdir("testdata/lint-invalid")
+		var stdout, stderr bytes.Buffer
+		term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
+
+		cmd := makeComposeLintCmd()
+		err := cmd.Execute()
+		if err == nil {
+			t.Fatal("expected lint error")
+		}
+		if !strings.Contains(err.Error(), "compose file has errors:") {
+			t.Fatalf("expected error heading, got error %q stdout %q stderr %q", err.Error(), stdout.String(), stderr.String())
+		}
+		if !strings.Contains(err.Error(), "unsupported compose directive: hostname; use 'domainname' instead") {
+			t.Fatalf("expected remediation hint, got error %q", err.Error())
 		}
 	})
 }

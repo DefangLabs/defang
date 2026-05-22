@@ -71,7 +71,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		term.Debugf("service %q: unsupported compose directive: container_name", svccfg.Name)
 	}
 	if svccfg.Hostname != "" {
-		return fmt.Errorf("service %q: unsupported compose directive: hostname; consider using 'domainname' instead", svccfg.Name)
+		return fmt.Errorf("service %q: unsupported compose directive: hostname; use 'domainname' instead", svccfg.Name)
 	}
 	if len(svccfg.DNSSearch) != 0 {
 		return fmt.Errorf("service %q: unsupported compose directive: dns_search", svccfg.Name)
@@ -89,7 +89,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		return fmt.Errorf("service %q: unsupported compose directive: device_cgroup_rules", svccfg.Name)
 	}
 	if len(svccfg.Entrypoint) > 0 {
-		return fmt.Errorf("service %q: unsupported compose directive: entrypoint", svccfg.Name)
+		return fmt.Errorf("service %q: unsupported compose directive: entrypoint; move logic to Dockerfile ENTRYPOINT or use 'command'", svccfg.Name)
 	}
 	if len(svccfg.GroupAdd) > 0 {
 		return fmt.Errorf("service %q: unsupported compose directive: group_add", svccfg.Name)
@@ -122,7 +122,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		}
 	}
 	if len(svccfg.Volumes) > 0 {
-		term.Warnf("service %q: unsupported compose directive: volumes", svccfg.Name) // TODO: add support for volumes
+		term.Warnf("service %q: unsupported compose directive: volumes; for databases, consider x-defang-postgres/redis/mongodb for managed storage", svccfg.Name) // TODO: add support for volumes
 	}
 	if len(svccfg.VolumesFrom) > 0 {
 		term.Warnf("service %q: unsupported compose directive: volumes_from", svccfg.Name) // TODO: add support for volumes_from
@@ -177,7 +177,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			return fmt.Errorf("service %q: unsupported compose directive: build privileged", svccfg.Name)
 		}
 		if svccfg.Build.DockerfileInline != "" {
-			return fmt.Errorf("service %q: unsupported compose directive: build dockerfile_inline", svccfg.Name)
+			return fmt.Errorf("service %q: unsupported compose directive: build dockerfile_inline; move inline content to a Dockerfile", svccfg.Name)
 		}
 		if svccfg.Build.AdditionalContexts != nil {
 			return fmt.Errorf("service %q: unsupported compose directive: build additional_contexts", svccfg.Name)
@@ -226,7 +226,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		// Show a warning when we have ingress ports but no explicit healthcheck
 		for _, port := range svccfg.Ports {
 			if port.Mode == Mode_INGRESS {
-				term.Warnf("service %q: ingress port %d without healthcheck; defaults to GET / HTTP/1.1", svccfg.Name, port.Target)
+				term.Warnf("service %q: ingress port %d without healthcheck; defaults to GET / HTTP/1.1; add a healthcheck such as: test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:%d/\"]", svccfg.Name, port.Target, port.Target)
 				break
 			}
 		}
@@ -269,7 +269,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			return fmt.Errorf("service %q: unsupported compose directive: deploy rollback_config", svccfg.Name)
 		}
 		if svccfg.Deploy.RestartPolicy != nil {
-			return fmt.Errorf("service %q: unsupported compose directive: deploy restart_policy", svccfg.Name)
+			return fmt.Errorf("service %q: unsupported compose directive: deploy restart_policy; use service-level 'restart' field instead", svccfg.Name)
 		}
 		if svccfg.Deploy.EndpointMode != "" {
 			return fmt.Errorf("service %q: unsupported compose directive: deploy endpoint_mode", svccfg.Name)
@@ -297,7 +297,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 	if reservations == nil || reservations.MemoryBytes == 0 {
 		// Don't show this warning for managed pseudo-services like CDN
 		if svccfg.Extensions["x-defang-static-files"] == nil {
-			term.Warnf("service %q: missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors", svccfg.Name)
+			term.Warnf("service %q: missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors; suggest deploy.resources.reservations.memory: 512M", svccfg.Name)
 		}
 	}
 
@@ -351,7 +351,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 	}
 
 	if !managedRedis && !managedPostgres && !managedMongodb && isStatefulImage(svccfg.Image) {
-		term.Warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
+		term.Warnf("service %q: stateful service will lose data on restart; use a managed service instead; consider x-defang-postgres/redis/mongodb: true", svccfg.Name)
 	}
 
 	for k := range svccfg.Extensions {
