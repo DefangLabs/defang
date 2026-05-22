@@ -1,1 +1,1 @@
- ! service "intel2": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors; suggest deploy.resources.reservations.memory: 512M
+ ! service "intel2": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors

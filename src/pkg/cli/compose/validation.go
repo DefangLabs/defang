@@ -226,7 +226,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		// Show a warning when we have ingress ports but no explicit healthcheck
 		for _, port := range svccfg.Ports {
 			if port.Mode == Mode_INGRESS {
-				term.Warnf("service %q: ingress port %d without healthcheck; defaults to GET / HTTP/1.1; add a healthcheck such as: test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:%d/\"]", svccfg.Name, port.Target, port.Target)
+				term.Warnf("service %q: ingress port %d without healthcheck; defaults to GET / HTTP/1.1", svccfg.Name, port.Target)
 				break
 			}
 		}
@@ -297,7 +297,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 	if reservations == nil || reservations.MemoryBytes == 0 {
 		// Don't show this warning for managed pseudo-services like CDN
 		if svccfg.Extensions["x-defang-static-files"] == nil {
-			term.Warnf("service %q: missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors; suggest deploy.resources.reservations.memory: 512M", svccfg.Name)
+			term.Warnf("service %q: missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors", svccfg.Name)
 		}
 	}
 

@@ -82,11 +82,6 @@ func TestComposeConfig(t *testing.T) {
 }
 
 func TestComposeLint(t *testing.T) {
-	global.Client = unauthedMockFabricClient{}
-	t.Cleanup(func() {
-		global.Client = nil
-	})
-
 	defaultTerm := term.DefaultTerm
 	t.Cleanup(func() {
 		term.DefaultTerm = defaultTerm

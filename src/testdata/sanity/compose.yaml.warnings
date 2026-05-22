@@ -1,1 +1,1 @@
- ! service "nginx": ingress port 80 without healthcheck; defaults to GET / HTTP/1.1; add a healthcheck such as: test: ["CMD", "curl", "-f", "http://localhost:80/"]
+ ! service "nginx": ingress port 80 without healthcheck; defaults to GET / HTTP/1.1

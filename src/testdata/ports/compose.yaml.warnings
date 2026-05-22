@@ -3,16 +3,16 @@
  ! port 84: UDP ports default to 'host' mode (add 'mode: host' to silence)
  ! port 85: 'published' should be equal to 'target'; ignoring 'published: 8085'
  ! port 85: UDP ports default to 'host' mode (add 'mode: host' to silence)
- ! service "grpc": ingress port 9000 without healthcheck; defaults to GET / HTTP/1.1; add a healthcheck such as: test: ["CMD", "curl", "-f", "http://localhost:9000/"]
- ! service "grpc": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors; suggest deploy.resources.reservations.memory: 512M
- ! service "long": ingress port 82 without healthcheck; defaults to GET / HTTP/1.1; add a healthcheck such as: test: ["CMD", "curl", "-f", "http://localhost:82/"]
- ! service "long": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors; suggest deploy.resources.reservations.memory: 512M
- ! service "long-published": ingress port 83 without healthcheck; defaults to GET / HTTP/1.1; add a healthcheck such as: test: ["CMD", "curl", "-f", "http://localhost:83/"]
- ! service "long-published": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors; suggest deploy.resources.reservations.memory: 512M
- ! service "short": ingress port 80 without healthcheck; defaults to GET / HTTP/1.1; add a healthcheck such as: test: ["CMD", "curl", "-f", "http://localhost:80/"]
- ! service "short": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors; suggest deploy.resources.reservations.memory: 512M
- ! service "short-published": ingress port 81 without healthcheck; defaults to GET / HTTP/1.1; add a healthcheck such as: test: ["CMD", "curl", "-f", "http://localhost:81/"]
- ! service "short-published": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors; suggest deploy.resources.reservations.memory: 512M
- ! service "short-udp": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors; suggest deploy.resources.reservations.memory: 512M
- ! service "short-udp-published": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors; suggest deploy.resources.reservations.memory: 512M
+ ! service "grpc": ingress port 9000 without healthcheck; defaults to GET / HTTP/1.1
+ ! service "grpc": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "long": ingress port 82 without healthcheck; defaults to GET / HTTP/1.1
+ ! service "long": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "long-published": ingress port 83 without healthcheck; defaults to GET / HTTP/1.1
+ ! service "long-published": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "short": ingress port 80 without healthcheck; defaults to GET / HTTP/1.1
+ ! service "short": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "short-published": ingress port 81 without healthcheck; defaults to GET / HTTP/1.1
+ ! service "short-published": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "short-udp": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "short-udp-published": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "short-udp-published": service name is longer than 16 characters, you may run into issues with resource name length

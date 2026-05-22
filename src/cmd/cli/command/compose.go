@@ -559,35 +559,25 @@ func makeComposeLintCmd() *cobra.Command {
 		Args:  cobra.NoArgs,
 		Short: "Validate a Compose file without deploying",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := cmd.Context()
+			loader := newLoaderForCommand(cmd)
 
-			sessionx, err := newCommandSessionWithOpts(cmd, commandSessionOpts{
-				CheckAccountInfo: false,
-			})
-			if err != nil {
-				term.Warn("unable to load stack:", err, "- using offline validation")
-				sessionx = &session.Session{
-					Loader:   newLoaderForCommand(cmd),
-					Provider: client.NewPlaygroundProvider(global.Client, stacks.DefaultBeta),
-					Stack:    &stacks.Parameters{Name: stacks.DefaultBeta, Provider: client.ProviderDefang},
-				}
-			}
-
-			project, loadErr := sessionx.Loader.LoadProject(ctx)
+			project, loadErr := loader.LoadProject(cmd.Context())
 			if loadErr != nil {
-				return handleInvalidComposeFileErr(ctx, loadErr)
+				return handleInvalidComposeFileErr(cmd.Context(), loadErr)
 			}
+
+			var errs []error
 
 			if err := compose.ValidateServiceDockerfiles(project); err != nil {
-				return fmt.Errorf("compose file has errors:\n%w", err)
-			}
-
-			if err := compose.FixupServices(ctx, sessionx.Provider, project, compose.UploadModeIgnore); err != nil {
-				return fmt.Errorf("compose file has errors:\n%w", err)
+				errs = append(errs, err)
 			}
 
 			if err := compose.ValidateProject(project, modes.ModeUnspecified); err != nil {
-				return fmt.Errorf("compose file has errors:\n%w", err)
+				errs = append(errs, err)
+			}
+
+			if len(errs) > 0 {
+				return fmt.Errorf("compose file has errors:\n%w", errors.Join(errs...))
 			}
 
 			if term.HadWarnings() {
