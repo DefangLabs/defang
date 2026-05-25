@@ -182,11 +182,22 @@ func makeComposeUpCmd() *cobra.Command {
 				return deploymentErr
 			}
 
-			for _, service := range deploy.Services {
+			// Fetch updated service infos from the provider — for Azure, defang.app
+			// DNS delegation is not yet implemented, so the CD task writes the actual
+			// azurecontainerapps.io endpoints into project.pb after Pulumi finishes.
+			// Reading back here ensures we display the real URLs instead of the
+			// pre-deploy defang.app placeholders. Remove this once Azure delegate
+			// domains are supported.
+			updatedServices := deploy.Services
+			if resp, err := session.Provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: project.Name}); err == nil && len(resp.Services) > 0 {
+				updatedServices = resp.Services
+			}
+
+			for _, service := range updatedServices {
 				service.State = serviceStates[service.Service.Name]
 			}
 
-			services, err := cli.NewServiceFromServiceInfo(deploy.Services)
+			services, err := cli.NewServiceFromServiceInfo(updatedServices)
 			if err != nil {
 				return err
 			}
