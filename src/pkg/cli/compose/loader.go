@@ -206,6 +206,11 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 	)
 }
 
+// withEnvFiles wraps compose-go's WithEnvFiles and appends any additional env
+// files (e.g., .env.<stackname>) that reside in the project working directory.
+// Stack env files are appended AFTER the default .env, giving them higher
+// precedence — compose-go's dotenv parser processes files in order with later
+// files overriding earlier ones (same key in a later file wins).
 func (l *Loader) withEnvFiles() cli.ProjectOptionsFn {
 	return func(o *cli.ProjectOptions) error {
 		if err := cli.WithEnvFiles()(o); err != nil {
@@ -221,7 +226,16 @@ func (l *Loader) withEnvFiles() cli.ProjectOptionsFn {
 			if err != nil {
 				return err
 			}
-			if filepath.Dir(absEnvFile) == wd {
+			// Only include env files that reside in the project working directory;
+			// this prevents stack env files resolved from cwd leaking into a project
+			// discovered via COMPOSE_FILE or directory walking.
+			if filepath.Dir(absEnvFile) != wd {
+				term.Debugf("Skipping env file %s: not in working directory %s", envFile, wd)
+				continue
+			}
+			// Guard against double-append since this function is called twice
+			// in newProjectOptions (before and after config path discovery).
+			if !slices.Contains(o.EnvFiles, envFile) {
 				o.EnvFiles = append(o.EnvFiles, envFile)
 			}
 		}

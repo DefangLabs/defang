@@ -73,22 +73,32 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 	return session, nil
 }
 
+// stackEnvFiles discovers a .env.<stackName> file in the project directory.
+// It returns the file path if found, enabling per-stack env variable overrides.
 func (sl *SessionLoader) stackEnvFiles(stackName string) []string {
 	if stackName == "" {
 		return nil
 	}
 
-	project, err := compose.NewLoaderFromOptions(sl.opts.LoaderOptions).CreateProjectForDebug()
-	if err != nil {
-		term.Debugf("Could not determine project working directory for stack env file: %v", err)
-		return nil
+	// Resolve the project directory from config paths or fall back to cwd.
+	// We avoid instantiating a full Loader here since we only need the directory.
+	var dir string
+	if len(sl.opts.LoaderOptions.ConfigPaths) > 0 {
+		dir = filepath.Dir(sl.opts.LoaderOptions.ConfigPaths[0])
+	} else {
+		var err error
+		dir, err = os.Getwd()
+		if err != nil {
+			return nil
+		}
 	}
 
-	path := filepath.Join(project.WorkingDir, ".env."+stackName)
+	path := filepath.Join(dir, ".env."+stackName)
 	info, err := os.Stat(path)
 	if err != nil || info.IsDir() {
 		return nil
 	}
+	term.Infof("Loading stack environment from %s", filepath.Base(path))
 	return []string{path}
 }
 
