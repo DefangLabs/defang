@@ -1,0 +1,3 @@
+[submodule "pkgs/homebrew-defang"]
+	path = pkgs/homebrew-defang
+	url = https://github.com/DefangLabs/homebrew-defang
