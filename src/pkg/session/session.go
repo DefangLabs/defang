@@ -3,6 +3,8 @@ package session
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -52,9 +54,12 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 	}
 	// load provider with selected stack
 	provider := cli.NewProvider(ctx, stack.Provider, sl.client, stack.Name)
+	loaderOptions := sl.opts.LoaderOptions
+	loaderOptions.EnvFiles = append([]string{}, loaderOptions.EnvFiles...)
+	loaderOptions.EnvFiles = append(loaderOptions.EnvFiles, sl.stackEnvFiles(stack.Name)...)
 	session := &Session{
 		Stack:    stack,
-		Loader:   compose.NewLoaderFromOptions(sl.opts.LoaderOptions),
+		Loader:   compose.NewLoaderFromOptions(loaderOptions),
 		Provider: provider,
 	}
 
@@ -66,6 +71,25 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 
 	printProviderMismatchWarnings(ctx, stack.Provider)
 	return session, nil
+}
+
+func (sl *SessionLoader) stackEnvFiles(stackName string) []string {
+	if stackName == "" {
+		return nil
+	}
+
+	project, err := compose.NewLoaderFromOptions(sl.opts.LoaderOptions).CreateProjectForDebug()
+	if err != nil {
+		term.Debugf("Could not determine project working directory for stack env file: %v", err)
+		return nil
+	}
+
+	path := filepath.Join(project.WorkingDir, ".env."+stackName)
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return nil
+	}
+	return []string{path}
 }
 
 func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, string, error) {

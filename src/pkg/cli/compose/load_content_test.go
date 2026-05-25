@@ -1,10 +1,13 @@
 package compose
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRoundTrip(t *testing.T) {
@@ -116,4 +119,82 @@ func TestLoadFromContent(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLoadProjectWithEnvFiles(t *testing.T) {
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	stackEnvPath := filepath.Join(dir, ".env.mystack")
+
+	require.NoError(t, os.WriteFile(composePath, []byte(`name: envfiles
+services:
+  app:
+    image: ${IMAGE}
+    environment:
+      SHARED: ${SHARED}
+      STACK_VALUE: ${STACK_VALUE}
+      UNRESOLVED: ${UNRESOLVED}
+      INTERPOLATED: ${INTERPOLATED}
+`), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env"), []byte("IMAGE=nginx\nSHARED=base\nBASE=basevalue\n"), 0o600))
+	require.NoError(t, os.WriteFile(stackEnvPath, []byte("SHARED=stack\nSTACK_VALUE=fromstack\nINTERPOLATED=${BASE}-stack\nUNUSED=unused\n"), 0o600))
+
+	project, err := NewLoader(WithPath(composePath), WithEnvFiles(stackEnvPath)).LoadProject(t.Context())
+	require.NoError(t, err)
+
+	service := project.Services["app"]
+	assert.Equal(t, "nginx", service.Image)
+	assert.Equal(t, "stack", *service.Environment["SHARED"])
+	assert.Equal(t, "fromstack", *service.Environment["STACK_VALUE"])
+	assert.Equal(t, "${UNRESOLVED}", *service.Environment["UNRESOLVED"])
+	assert.Equal(t, "basevalue-stack", *service.Environment["INTERPOLATED"])
+}
+
+func TestLoadProjectWithOnlyStackEnvFile(t *testing.T) {
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	stackEnvPath := filepath.Join(dir, ".env.mystack")
+
+	require.NoError(t, os.WriteFile(composePath, []byte(`name: envfiles
+services:
+  app:
+    image: ${IMAGE}
+`), 0o600))
+	require.NoError(t, os.WriteFile(stackEnvPath, []byte("IMAGE=busybox\nUNUSED=unused\n"), 0o600))
+
+	project, err := NewLoader(WithPath(composePath), WithEnvFiles(stackEnvPath)).LoadProject(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, "busybox", project.Services["app"].Image)
+}
+
+func TestLoadProjectWithEmptyEnvFile(t *testing.T) {
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	stackEnvPath := filepath.Join(dir, ".env.mystack")
+
+	require.NoError(t, os.WriteFile(composePath, []byte(`name: envfiles
+services:
+  app:
+    image: ${IMAGE}
+`), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env"), []byte("IMAGE=nginx\n"), 0o600))
+	require.NoError(t, os.WriteFile(stackEnvPath, nil, 0o600))
+
+	project, err := NewLoader(WithPath(composePath), WithEnvFiles(stackEnvPath)).LoadProject(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, "nginx", project.Services["app"].Image)
+}
+
+func TestLoadProjectWithEnvStackFixture(t *testing.T) {
+	project, err := NewLoader(
+		WithPath("testdata/env-stack/compose.yaml"),
+		WithEnvFiles("testdata/env-stack/.env.teststackname"),
+	).LoadProject(t.Context())
+	require.NoError(t, err)
+
+	service := project.Services["app"]
+	assert.Equal(t, "nginx", service.Image)
+	assert.Equal(t, "stack", *service.Environment["SHARED"])
+	assert.Equal(t, "fromstack", *service.Environment["STACK_ONLY"])
+	assert.Equal(t, "${UNRESOLVED}", *service.Environment["UNRESOLVED"])
 }

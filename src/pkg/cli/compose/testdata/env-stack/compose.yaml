@@ -1,0 +1,8 @@
+name: envstackfixture
+services:
+  app:
+    image: ${IMAGE}
+    environment:
+      SHARED: ${SHARED}
+      STACK_ONLY: ${STACK_ONLY}
+      UNRESOLVED: ${UNRESOLVED}

@@ -32,6 +32,7 @@ type BuildConfig = composeTypes.BuildConfig
 
 type LoaderOptions struct {
 	ConfigPaths []string
+	EnvFiles    []string
 	ProjectName string
 }
 
@@ -45,6 +46,12 @@ type LoaderOption func(*LoaderOptions)
 func WithPath(paths ...string) LoaderOption {
 	return func(o *LoaderOptions) {
 		o.ConfigPaths = paths
+	}
+}
+
+func WithEnvFiles(paths ...string) LoaderOption {
+	return func(o *LoaderOptions) {
+		o.EnvFiles = paths
 	}
 }
 
@@ -146,7 +153,7 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 		// -- DISABLED FOR DEFANG -- cli.WithOsEnv,
 		cli.WithEnv(onlyComposeEnv),
 		// Load PWD/.env if present and no explicit --env-file has been set
-		cli.WithEnvFiles(), // TODO: Support --env-file to be added as param to this call
+		l.withEnvFiles(),
 		// read dot env file to populate project environment
 		cli.WithDotEnv,
 		// get compose file path set by COMPOSE_FILE
@@ -155,7 +162,7 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 		cli.WithDefaultConfigPath,
 		// Calling the 2 functions below the 2nd time as the loaded env in first call modifies the behavior of the 2nd call:
 		// .. and then, a project directory != PWD maybe has been set so let's load .env file
-		cli.WithEnvFiles(), // TODO: Support --env-file to be added as param to this call
+		l.withEnvFiles(),
 		cli.WithDotEnv,
 		// eventually COMPOSE_PROFILES should have been set
 		// cli.WithDefaultProfiles(c.Profiles...), TODO: Support --profile to be added as param to this call
@@ -199,6 +206,29 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 	)
 }
 
+func (l *Loader) withEnvFiles() cli.ProjectOptionsFn {
+	return func(o *cli.ProjectOptions) error {
+		if err := cli.WithEnvFiles()(o); err != nil {
+			return err
+		}
+
+		wd, err := o.GetWorkingDir()
+		if err != nil {
+			return err
+		}
+		for _, envFile := range l.options.EnvFiles {
+			absEnvFile, err := filepath.Abs(envFile)
+			if err != nil {
+				return err
+			}
+			if filepath.Dir(absEnvFile) == wd {
+				o.EnvFiles = append(o.EnvFiles, envFile)
+			}
+		}
+		return nil
+	}
+}
+
 func hasSubstitution(s, key string) bool {
 	// Check in the original `templ` string if the variable uses any substitution patterns like - :- + :+ ? :?
 	pattern := regexp.MustCompile(`(^|[^$])\$\{` + regexp.QuoteMeta(key) + `:?[-+?]`)
@@ -211,18 +241,18 @@ func (l *Loader) CreateProjectForDebug() (*Project, error) {
 		return nil, err
 	}
 
+	workingDir, err := projOpts.GetWorkingDir()
+	if err != nil {
+		return nil, err
+	}
+
 	// get the project name
 	if projOpts.Name == "" {
-		dir, err := os.Getwd()
-		if err != nil {
-			return nil, err
-		}
-
-		projOpts.Name = filepath.Base(dir)
+		projOpts.Name = filepath.Base(workingDir)
 	}
 	project := &Project{
 		Name:         projOpts.Name,
-		WorkingDir:   projOpts.WorkingDir,
+		WorkingDir:   workingDir,
 		Environment:  projOpts.Environment,
 		ComposeFiles: projOpts.ConfigPaths,
 	}

@@ -3,11 +3,13 @@ package session
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/stretchr/testify/assert"
@@ -237,6 +239,69 @@ func TestLoadSession(t *testing.T) {
 			}
 
 			// Verify all mock expectations were met
+			sm.AssertExpectations(t)
+		})
+	}
+}
+
+func TestLoadSessionStackEnvFile(t *testing.T) {
+	tests := []struct {
+		name           string
+		createStackEnv bool
+		stackEnv       string
+		expectedImage  string
+	}{
+		{
+			name:           "uses stack env file when it exists",
+			createStackEnv: true,
+			stackEnv:       "IMAGE=stack\n",
+			expectedImage:  "stack",
+		},
+		{
+			name:          "ignores missing stack env file",
+			expectedImage: "base",
+		},
+		{
+			name:           "allows empty stack env file",
+			createStackEnv: true,
+			stackEnv:       "",
+			expectedImage:  "base",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			composePath := filepath.Join(dir, "compose.yaml")
+			require.NoError(t, os.WriteFile(composePath, []byte(`name: envfiles
+services:
+  app:
+    image: ${IMAGE}
+`), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, ".env"), []byte("IMAGE=base\n"), 0o600))
+			if tt.createStackEnv {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, ".env.existingstack"), []byte(tt.stackEnv), 0o600))
+			}
+
+			ctx := t.Context()
+			sm := &mockStacksManager{}
+			sm.On("GetStack", ctx, mock.Anything).Return(&stacks.Parameters{
+				Name:     "existingstack",
+				Provider: client.ProviderDefang,
+			}, "local", nil)
+
+			loader := NewSessionLoader(client.MockFabricClient{}, sm, SessionLoaderOptions{
+				LoaderOptions: compose.LoaderOptions{ConfigPaths: []string{composePath}},
+				GetStackOpts: stacks.GetStackOpts{
+					Default: stacks.Parameters{Name: "existingstack"},
+				},
+			})
+			session, err := loader.LoadSession(ctx)
+			require.NoError(t, err)
+
+			project, err := session.Loader.LoadProject(ctx)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedImage, project.Services["app"].Image)
 			sm.AssertExpectations(t)
 		})
 	}
