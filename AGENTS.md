@@ -50,4 +50,5 @@ Keep this file short. It is loaded at startup by coding agents, so it should con
 ## Nested Guidance
 
 - When changing Go code under `src/`, read `src/AGENTS.md` before editing.
+- Codex uses nested `AGENTS.md` files for narrower package guidance; check for one in the subtree you are editing.
 - Claude Code also has path-scoped rules in `.claude/rules/` that load for matching files.
