@@ -173,7 +173,7 @@ service FabricController {
   rpc GetRecipe(GetRecipeRequest) returns (GetRecipeResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-  rpc ListRecipes(google.protobuf.Empty) returns (ListRecipesResponse) {
+  rpc ListRecipes(ListRecipesRequest) returns (ListRecipesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 }
@@ -181,7 +181,7 @@ service FabricController {
 message Recipe {
   string name = 1;
   Provider provider = 2;
-  bytes pulumi_config = 3;
+  bytes pulumi_config = 3; // YAML or JSON object
   bool active = 4;
 }
 
@@ -197,6 +197,8 @@ message GetRecipeRequest {
 message GetRecipeResponse {
   Recipe recipe = 1;
 }
+
+message ListRecipesRequest {}
 
 message ListRecipesResponse {
   repeated Recipe recipes = 1;

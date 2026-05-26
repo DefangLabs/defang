@@ -235,7 +235,7 @@ type FabricControllerClient interface {
 	GetDefaultStack(context.Context, *connect.Request[v1.GetDefaultStackRequest]) (*connect.Response[v1.GetStackResponse], error)
 	PutRecipe(context.Context, *connect.Request[v1.PutRecipeRequest]) (*connect.Response[emptypb.Empty], error)
 	GetRecipe(context.Context, *connect.Request[v1.GetRecipeRequest]) (*connect.Response[v1.GetRecipeResponse], error)
-	ListRecipes(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[v1.ListRecipesResponse], error)
+	ListRecipes(context.Context, *connect.Request[v1.ListRecipesRequest]) (*connect.Response[v1.ListRecipesResponse], error)
 }
 
 // NewFabricControllerClient constructs a client for the io.defang.v1.FabricController service. By
@@ -567,7 +567,7 @@ func NewFabricControllerClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
-		listRecipes: connect.NewClient[emptypb.Empty, v1.ListRecipesResponse](
+		listRecipes: connect.NewClient[v1.ListRecipesRequest, v1.ListRecipesResponse](
 			httpClient,
 			baseURL+FabricControllerListRecipesProcedure,
 			connect.WithSchema(fabricControllerMethods.ByName("ListRecipes")),
@@ -626,7 +626,7 @@ type fabricControllerClient struct {
 	getDefaultStack            *connect.Client[v1.GetDefaultStackRequest, v1.GetStackResponse]
 	putRecipe                  *connect.Client[v1.PutRecipeRequest, emptypb.Empty]
 	getRecipe                  *connect.Client[v1.GetRecipeRequest, v1.GetRecipeResponse]
-	listRecipes                *connect.Client[emptypb.Empty, v1.ListRecipesResponse]
+	listRecipes                *connect.Client[v1.ListRecipesRequest, v1.ListRecipesResponse]
 }
 
 // GetStatus calls io.defang.v1.FabricController.GetStatus.
@@ -885,7 +885,7 @@ func (c *fabricControllerClient) GetRecipe(ctx context.Context, req *connect.Req
 }
 
 // ListRecipes calls io.defang.v1.FabricController.ListRecipes.
-func (c *fabricControllerClient) ListRecipes(ctx context.Context, req *connect.Request[emptypb.Empty]) (*connect.Response[v1.ListRecipesResponse], error) {
+func (c *fabricControllerClient) ListRecipes(ctx context.Context, req *connect.Request[v1.ListRecipesRequest]) (*connect.Response[v1.ListRecipesResponse], error) {
 	return c.listRecipes.CallUnary(ctx, req)
 }
 
@@ -949,7 +949,7 @@ type FabricControllerHandler interface {
 	GetDefaultStack(context.Context, *connect.Request[v1.GetDefaultStackRequest]) (*connect.Response[v1.GetStackResponse], error)
 	PutRecipe(context.Context, *connect.Request[v1.PutRecipeRequest]) (*connect.Response[emptypb.Empty], error)
 	GetRecipe(context.Context, *connect.Request[v1.GetRecipeRequest]) (*connect.Response[v1.GetRecipeResponse], error)
-	ListRecipes(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[v1.ListRecipesResponse], error)
+	ListRecipes(context.Context, *connect.Request[v1.ListRecipesRequest]) (*connect.Response[v1.ListRecipesResponse], error)
 }
 
 // NewFabricControllerHandler builds an HTTP handler from the service implementation. It returns the
@@ -1579,6 +1579,6 @@ func (UnimplementedFabricControllerHandler) GetRecipe(context.Context, *connect.
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetRecipe is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) ListRecipes(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[v1.ListRecipesResponse], error) {
+func (UnimplementedFabricControllerHandler) ListRecipes(context.Context, *connect.Request[v1.ListRecipesRequest]) (*connect.Response[v1.ListRecipesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.ListRecipes is not implemented"))
 }
