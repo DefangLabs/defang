@@ -632,6 +632,7 @@ message Deployment {
   CdType cd_type = 19;
   string cd_id = 20;
   bytes compose = 21; // yaml
+  bytes pulumi_config = 22; // YAML or JSON object
 }
 
 enum CdType {
@@ -753,11 +754,11 @@ message ProjectUpdate {
   uint32 project_outputs_version = 8;
   bytes project_outputs = 9; // JSON serialization of pulumi outputs. schema versioned using project_outputs_version
   bytes stack_file = 10; // Defang stack file
-  string gcp_execution_id = 11;
-  string aws_ecs_task_id = 12;
+  reserved 11; // was: string gcp_execution_id
+  reserved 12; // was: string aws_ecs_task_id
   string etag = 13; // aka deployment ID
   string pulumi_version = 14;
-  bytes pulumi_config = 15;
+  bytes pulumi_config = 15; // YAML or JSON object
 }
 
 message GetRequest { // was ServiceID

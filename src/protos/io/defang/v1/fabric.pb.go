@@ -4176,7 +4176,8 @@ type Deployment struct {
 	Services          []*ServiceInfo         `protobuf:"bytes,18,rep,name=services,proto3" json:"services,omitempty"`
 	CdType            CdType                 `protobuf:"varint,19,opt,name=cd_type,json=cdType,proto3,enum=io.defang.v1.CdType" json:"cd_type,omitempty"`
 	CdId              string                 `protobuf:"bytes,20,opt,name=cd_id,json=cdId,proto3" json:"cd_id,omitempty"`
-	Compose           []byte                 `protobuf:"bytes,21,opt,name=compose,proto3" json:"compose,omitempty"` // yaml
+	Compose           []byte                 `protobuf:"bytes,21,opt,name=compose,proto3" json:"compose,omitempty"`                               // yaml
+	PulumiConfig      []byte                 `protobuf:"bytes,22,opt,name=pulumi_config,json=pulumiConfig,proto3" json:"pulumi_config,omitempty"` // YAML or JSON object
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -4355,6 +4356,13 @@ func (x *Deployment) GetCdId() string {
 func (x *Deployment) GetCompose() []byte {
 	if x != nil {
 		return x.Compose
+	}
+	return nil
+}
+
+func (x *Deployment) GetPulumiConfig() []byte {
+	if x != nil {
+		return x.PulumiConfig
 	}
 	return nil
 }
@@ -5209,11 +5217,9 @@ type ProjectUpdate struct {
 	ProjectOutputsVersion uint32         `protobuf:"varint,8,opt,name=project_outputs_version,json=projectOutputsVersion,proto3" json:"project_outputs_version,omitempty"`
 	ProjectOutputs        []byte         `protobuf:"bytes,9,opt,name=project_outputs,json=projectOutputs,proto3" json:"project_outputs,omitempty"` // JSON serialization of pulumi outputs. schema versioned using project_outputs_version
 	StackFile             []byte         `protobuf:"bytes,10,opt,name=stack_file,json=stackFile,proto3" json:"stack_file,omitempty"`               // Defang stack file
-	GcpExecutionId        string         `protobuf:"bytes,11,opt,name=gcp_execution_id,json=gcpExecutionId,proto3" json:"gcp_execution_id,omitempty"`
-	AwsEcsTaskId          string         `protobuf:"bytes,12,opt,name=aws_ecs_task_id,json=awsEcsTaskId,proto3" json:"aws_ecs_task_id,omitempty"`
-	Etag                  string         `protobuf:"bytes,13,opt,name=etag,proto3" json:"etag,omitempty"` // aka deployment ID
+	Etag                  string         `protobuf:"bytes,13,opt,name=etag,proto3" json:"etag,omitempty"`                                          // aka deployment ID
 	PulumiVersion         string         `protobuf:"bytes,14,opt,name=pulumi_version,json=pulumiVersion,proto3" json:"pulumi_version,omitempty"`
-	PulumiConfig          []byte         `protobuf:"bytes,15,opt,name=pulumi_config,json=pulumiConfig,proto3" json:"pulumi_config,omitempty"`
+	PulumiConfig          []byte         `protobuf:"bytes,15,opt,name=pulumi_config,json=pulumiConfig,proto3" json:"pulumi_config,omitempty"` // YAML or JSON object
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -5318,20 +5324,6 @@ func (x *ProjectUpdate) GetStackFile() []byte {
 		return x.StackFile
 	}
 	return nil
-}
-
-func (x *ProjectUpdate) GetGcpExecutionId() string {
-	if x != nil {
-		return x.GcpExecutionId
-	}
-	return ""
-}
-
-func (x *ProjectUpdate) GetAwsEcsTaskId() string {
-	if x != nil {
-		return x.AwsEcsTaskId
-	}
-	return ""
 }
 
 func (x *ProjectUpdate) GetEtag() string {
@@ -6775,7 +6767,7 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x12ListConfigsRequest\x12\x18\n" +
 	"\aproject\x18\x01 \x01(\tR\aproject\"H\n" +
 	"\x13ListConfigsResponse\x121\n" +
-	"\aconfigs\x18\x01 \x03(\v2\x17.io.defang.v1.ConfigKeyR\aconfigs\"\xd5\a\n" +
+	"\aconfigs\x18\x01 \x03(\v2\x17.io.defang.v1.ConfigKeyR\aconfigs\"\xfa\a\n" +
 	"\n" +
 	"Deployment\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
@@ -6801,7 +6793,8 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\bservices\x18\x12 \x03(\v2\x19.io.defang.v1.ServiceInfoR\bservices\x12-\n" +
 	"\acd_type\x18\x13 \x01(\x0e2\x14.io.defang.v1.CdTypeR\x06cdType\x12\x13\n" +
 	"\x05cd_id\x18\x14 \x01(\tR\x04cdId\x12\x18\n" +
-	"\acompose\x18\x15 \x01(\fR\acompose\x1aA\n" +
+	"\acompose\x18\x15 \x01(\fR\acompose\x12#\n" +
+	"\rpulumi_config\x18\x16 \x01(\fR\fpulumiConfig\x1aA\n" +
 	"\x13OriginMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"P\n" +
@@ -6875,7 +6868,7 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\bservices\x18\x01 \x03(\v2\x19.io.defang.v1.ServiceInfoR\bservices\x12\x18\n" +
 	"\aproject\x18\x02 \x01(\tR\aproject\x129\n" +
 	"\n" +
-	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\xd1\x04\n" +
+	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\x8c\x04\n" +
 	"\rProjectUpdate\x125\n" +
 	"\bservices\x18\x01 \x03(\v2\x19.io.defang.v1.ServiceInfoR\bservices\x12\x17\n" +
 	"\aalb_arn\x18\x02 \x01(\tR\x06albArn\x12\x1c\n" +
@@ -6889,12 +6882,10 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x0fproject_outputs\x18\t \x01(\fR\x0eprojectOutputs\x12\x1d\n" +
 	"\n" +
 	"stack_file\x18\n" +
-	" \x01(\fR\tstackFile\x12(\n" +
-	"\x10gcp_execution_id\x18\v \x01(\tR\x0egcpExecutionId\x12%\n" +
-	"\x0faws_ecs_task_id\x18\f \x01(\tR\fawsEcsTaskId\x12\x12\n" +
+	" \x01(\fR\tstackFile\x12\x12\n" +
 	"\x04etag\x18\r \x01(\tR\x04etag\x12%\n" +
 	"\x0epulumi_version\x18\x0e \x01(\tR\rpulumiVersion\x12#\n" +
-	"\rpulumi_config\x18\x0f \x01(\fR\fpulumiConfig\":\n" +
+	"\rpulumi_config\x18\x0f \x01(\fR\fpulumiConfigJ\x04\b\v\x10\fJ\x04\b\f\x10\r\":\n" +
 	"\n" +
 	"GetRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
