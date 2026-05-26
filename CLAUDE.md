@@ -114,6 +114,25 @@ Handles loading and parsing Docker Compose projects. The `compose` package (`pkg
 
 ## Code Conventions
 
+### Go Change Quality
+
+Optimize Go changes for the style Lio tends to approve: small, direct, and placed at the package boundary that already owns the concept.
+
+- Prefer the smallest coherent change that fixes the root problem. Do not add general-purpose API surface for a one-case feature.
+- Put behavior where the owner already has the concept: stack/session code selects stacks, compose code loads compose projects, command code orchestrates and prints.
+- Avoid splitting one invariant across packages unless that boundary already exists. Passing a narrow option into the owning package is usually better than duplicating path discovery or state reconstruction in a caller.
+- Reuse existing Defang abstractions and standard library helpers before adding new helpers.
+- Keep CLI commands thin: parse flags, construct existing managers, call domain logic, print results.
+- Avoid exported functions, options, or struct fields unless there is an external caller or stable cross-package need.
+- Name functions honestly. If a function loads remote state, starts a goroutine, mutates environment, or touches disk/network, the name should make that visible.
+- Treat zero values intentionally. Avoid pointers for optional strings unless three distinct states matter.
+- Do not silently swallow real errors. Ignore missing optional files only when missing is the documented contract; return other filesystem, parsing, network, and provider errors with context.
+- Avoid action at a distance. File-existence behavior must be deterministic and resolved at the layer with the correct working directory/project context.
+- Keep provider-generic code generic. Provider-specific behavior belongs behind provider-specific implementations or explicit parameters.
+- Comments explain why, not what. Remove stale TODOs and comments after moving code.
+
+Before finalizing a Go change, ask whether a reviewer would tell you to rename it, remove an abstraction, move it to the owning package, or use an existing helper.
+
 ### Error Handling
 
 - Wrap errors with context: `fmt.Errorf("doing X: %w", err)`
@@ -158,6 +177,9 @@ chore(deps): bump github.com/docker/cli
 
 - Run with `-short` flag to skip integration tests
 - Table-driven tests are preferred
+- Tests should target behavior boundaries, not implementation mechanics.
+- Prefer small inline fixtures and helpers over fixture sprawl. When fixtures are useful, name fixture directories after the behavior under test, not after an implementation detail or extra indirection.
+- Cover the failure modes reviewers usually flag: missing returns, indefinite blocking, duplicate adds, not-found vs. other errors, stale comments, unused code, provider mismatches, and optional-file handling.
 - Use `MockProvider` and `MockFabricClient` (in `client/mock.go`) for testing CLI logic
 - Test fixtures in `src/testdata/` (compose files for various scenarios)
 - Command-level tests in `cmd/cli/command/` with `_test.go` files
