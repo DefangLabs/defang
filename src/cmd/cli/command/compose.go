@@ -189,7 +189,10 @@ func makeComposeUpCmd() *cobra.Command {
 			// pre-deploy defang.app placeholders. Remove this once Azure delegate
 			// domains are supported.
 			updatedServices := deploy.Services
-			if resp, err := session.Provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: project.Name}); err == nil && len(resp.Services) > 0 {
+			resp, err := session.Provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: project.Name})
+			if err != nil || resp == nil || len(resp.Services) == 0 {
+				term.Debugf("GetServices failed after deployment: %v", err)
+			} else {
 				updatedServices = resp.Services
 			}
 
