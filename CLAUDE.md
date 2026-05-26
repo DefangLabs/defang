@@ -84,6 +84,10 @@ cd src && make protos         # Requires protoc, protoc-gen-go, protoc-gen-conne
 cd src && make install        # Installs to ~/.local/bin/
 ```
 
+### Agent Enforcement
+
+Agents working on Go code MUST run `cd src && make lint` before committing, use `cd src && make lint-fix` when lint fails, and MUST NOT use `--no-verify` on git commits. Run `cd src && make test` before pushing Go changes.
+
 ---
 
 ## Key Abstractions
