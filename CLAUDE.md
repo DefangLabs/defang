@@ -120,7 +120,7 @@ Handles loading and parsing Docker Compose projects. The `compose` package (`pkg
 
 ### Go Change Quality
 
-Optimize Go changes for the style Lio tends to approve: small, direct, and placed at the package boundary that already owns the concept.
+Optimize Go changes to be small, direct, and placed at the package boundary that already owns the concept.
 
 - Prefer the smallest coherent change that fixes the root problem. Do not add general-purpose API surface for a one-case feature.
 - Put behavior where the owner already has the concept: stack/session code selects stacks, compose code loads compose projects, command code orchestrates and prints.
