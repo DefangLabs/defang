@@ -121,7 +121,7 @@ func TestLoadFromContent(t *testing.T) {
 	}
 }
 
-func TestLoadProjectWithEnvFiles(t *testing.T) {
+func TestLoadProjectWithStackEnvFile(t *testing.T) {
 	dir := t.TempDir()
 	composePath := filepath.Join(dir, "compose.yaml")
 	stackEnvPath := filepath.Join(dir, ".env.mystack")
@@ -139,7 +139,7 @@ services:
 	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env"), []byte("IMAGE=nginx\nSHARED=base\nBASE=basevalue\n"), 0o600))
 	require.NoError(t, os.WriteFile(stackEnvPath, []byte("SHARED=stack\nSTACK_VALUE=fromstack\nINTERPOLATED=${BASE}-stack\nUNUSED=unused\n"), 0o600))
 
-	project, err := NewLoader(WithPath(composePath), WithEnvFiles(stackEnvPath)).LoadProject(t.Context())
+	project, err := NewLoader(WithPath(composePath), WithStackName("mystack")).LoadProject(t.Context())
 	require.NoError(t, err)
 
 	service := project.Services["app"]
@@ -162,12 +162,30 @@ services:
 `), 0o600))
 	require.NoError(t, os.WriteFile(stackEnvPath, []byte("IMAGE=busybox\nUNUSED=unused\n"), 0o600))
 
-	project, err := NewLoader(WithPath(composePath), WithEnvFiles(stackEnvPath)).LoadProject(t.Context())
+	project, err := NewLoader(WithPath(composePath), WithStackName("mystack")).LoadProject(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, "busybox", project.Services["app"].Image)
 }
 
-func TestLoadProjectWithEmptyEnvFile(t *testing.T) {
+func TestLoadProjectWithStackEnvFileFromDiscoveredProjectDir(t *testing.T) {
+	dir := t.TempDir()
+	childDir := filepath.Join(dir, "child")
+	require.NoError(t, os.Mkdir(childDir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "compose.yaml"), []byte(`name: envfiles
+services:
+  app:
+    image: ${IMAGE}
+`), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env"), []byte("IMAGE=base\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env.mystack"), []byte("IMAGE=stack\n"), 0o600))
+
+	t.Chdir(childDir)
+	project, err := NewLoader(WithStackName("mystack")).LoadProject(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, "stack", project.Services["app"].Image)
+}
+
+func TestLoadProjectWithEmptyStackEnvFile(t *testing.T) {
 	dir := t.TempDir()
 	composePath := filepath.Join(dir, "compose.yaml")
 	stackEnvPath := filepath.Join(dir, ".env.mystack")
@@ -180,15 +198,29 @@ services:
 	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env"), []byte("IMAGE=nginx\n"), 0o600))
 	require.NoError(t, os.WriteFile(stackEnvPath, nil, 0o600))
 
-	project, err := NewLoader(WithPath(composePath), WithEnvFiles(stackEnvPath)).LoadProject(t.Context())
+	project, err := NewLoader(WithPath(composePath), WithStackName("mystack")).LoadProject(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, "nginx", project.Services["app"].Image)
 }
 
+func TestLoadProjectWithStackEnvDirectory(t *testing.T) {
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	require.NoError(t, os.WriteFile(composePath, []byte(`name: envfiles
+services:
+  app:
+    image: nginx
+`), 0o600))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, ".env.mystack"), 0o700))
+
+	_, err := NewLoader(WithPath(composePath), WithStackName("mystack")).LoadProject(t.Context())
+	require.ErrorContains(t, err, "is a directory")
+}
+
 func TestLoadProjectWithEnvStackFixture(t *testing.T) {
 	project, err := NewLoader(
-		WithPath("testdata/env-stack/compose.yaml"),
-		WithEnvFiles("testdata/env-stack/.env.teststackname"),
+		WithPath("testdata/envstackfixture/compose.yaml"),
+		WithStackName("teststackname"),
 	).LoadProject(t.Context())
 	require.NoError(t, err)
 

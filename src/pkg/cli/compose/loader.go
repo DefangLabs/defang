@@ -14,6 +14,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/dotenv"
 	"github.com/compose-spec/compose-go/v2/errdefs"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/template"
@@ -32,8 +33,8 @@ type BuildConfig = composeTypes.BuildConfig
 
 type LoaderOptions struct {
 	ConfigPaths []string
-	EnvFiles    []string
 	ProjectName string
+	StackName   string
 }
 
 type Loader struct {
@@ -49,9 +50,9 @@ func WithPath(paths ...string) LoaderOption {
 	}
 }
 
-func WithEnvFiles(paths ...string) LoaderOption {
+func WithStackName(name string) LoaderOption {
 	return func(o *LoaderOptions) {
-		o.EnvFiles = paths
+		o.StackName = name
 	}
 }
 
@@ -153,17 +154,17 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 		// -- DISABLED FOR DEFANG -- cli.WithOsEnv,
 		cli.WithEnv(onlyComposeEnv),
 		// Load PWD/.env if present and no explicit --env-file has been set
-		l.withEnvFiles(),
+		cli.WithEnvFiles(),
 		// read dot env file to populate project environment
 		cli.WithDotEnv,
 		// get compose file path set by COMPOSE_FILE
 		cli.WithConfigFileEnv,
 		// if none was selected, get default compose.yaml file from current dir or parent folder
 		cli.WithDefaultConfigPath,
-		// Calling the 2 functions below the 2nd time as the loaded env in first call modifies the behavior of the 2nd call:
-		// .. and then, a project directory != PWD maybe has been set so let's load .env file
-		l.withEnvFiles(),
+		// Load project-directory .env after COMPOSE_FILE/default discovery, then apply stack-specific overrides.
+		cli.WithEnvFiles(),
 		cli.WithDotEnv,
+		l.withStackEnvFile,
 		// eventually COMPOSE_PROFILES should have been set
 		// cli.WithDefaultProfiles(c.Profiles...), TODO: Support --profile to be added as param to this call
 		cli.WithName(l.options.ProjectName),
@@ -206,41 +207,38 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 	)
 }
 
-// withEnvFiles wraps compose-go's WithEnvFiles and appends any additional env
-// files (e.g., .env.<stackname>) that reside in the project working directory.
-// Stack env files are appended AFTER the default .env, giving them higher
-// precedence — compose-go's dotenv parser processes files in order with later
-// files overriding earlier ones (same key in a later file wins).
-func (l *Loader) withEnvFiles() cli.ProjectOptionsFn {
-	return func(o *cli.ProjectOptions) error {
-		if err := cli.WithEnvFiles()(o); err != nil {
-			return err
-		}
-
-		wd, err := o.GetWorkingDir()
-		if err != nil {
-			return err
-		}
-		for _, envFile := range l.options.EnvFiles {
-			absEnvFile, err := filepath.Abs(envFile)
-			if err != nil {
-				return err
-			}
-			// Only include env files that reside in the project working directory;
-			// this prevents stack env files resolved from cwd leaking into a project
-			// discovered via COMPOSE_FILE or directory walking.
-			if filepath.Dir(absEnvFile) != wd {
-				term.Debugf("Skipping env file %s: not in working directory %s", envFile, wd)
-				continue
-			}
-			// Guard against double-append since this function is called twice
-			// in newProjectOptions (before and after config path discovery).
-			if !slices.Contains(o.EnvFiles, envFile) {
-				o.EnvFiles = append(o.EnvFiles, envFile)
-			}
-		}
+// withStackEnvFile loads .env.<stack> from the project working directory after
+// .env has populated the compose environment. compose-go treats existing keys as
+// higher precedence, so stack values are merged explicitly to override defaults.
+func (l *Loader) withStackEnvFile(o *cli.ProjectOptions) error {
+	if l.options.StackName == "" || len(o.ConfigPaths) == 0 {
 		return nil
 	}
+	wd, err := o.GetWorkingDir()
+	if err != nil {
+		return err
+	}
+	envFile := filepath.Join(wd, ".env."+l.options.StackName)
+	info, err := os.Stat(envFile)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed to inspect stack env file %s: %w", envFile, err)
+	}
+	if info.IsDir() {
+		return fmt.Errorf("stack env file %s is a directory", envFile)
+	}
+
+	env, err := dotenv.GetEnvFromFile(o.Environment, []string{envFile})
+	if err != nil {
+		return fmt.Errorf("failed to load stack env file %s: %w", envFile, err)
+	}
+	term.Infof("Loading stack environment from %s", filepath.Base(envFile))
+	for key, value := range env {
+		o.Environment[key] = value
+	}
+	return nil
 }
 
 func hasSubstitution(s, key string) bool {

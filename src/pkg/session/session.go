@@ -3,8 +3,6 @@ package session
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -55,8 +53,7 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 	// load provider with selected stack
 	provider := cli.NewProvider(ctx, stack.Provider, sl.client, stack.Name)
 	loaderOptions := sl.opts.LoaderOptions
-	loaderOptions.EnvFiles = append([]string{}, loaderOptions.EnvFiles...)
-	loaderOptions.EnvFiles = append(loaderOptions.EnvFiles, sl.stackEnvFiles(stack.Name)...)
+	loaderOptions.StackName = stack.Name
 	session := &Session{
 		Stack:    stack,
 		Loader:   compose.NewLoaderFromOptions(loaderOptions),
@@ -71,35 +68,6 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 
 	printProviderMismatchWarnings(ctx, stack.Provider)
 	return session, nil
-}
-
-// stackEnvFiles discovers a .env.<stackName> file in the project directory.
-// It returns the file path if found, enabling per-stack env variable overrides.
-func (sl *SessionLoader) stackEnvFiles(stackName string) []string {
-	if stackName == "" {
-		return nil
-	}
-
-	// Resolve the project directory from config paths or fall back to cwd.
-	// We avoid instantiating a full Loader here since we only need the directory.
-	var dir string
-	if len(sl.opts.LoaderOptions.ConfigPaths) > 0 {
-		dir = filepath.Dir(sl.opts.LoaderOptions.ConfigPaths[0])
-	} else {
-		var err error
-		dir, err = os.Getwd()
-		if err != nil {
-			return nil
-		}
-	}
-
-	path := filepath.Join(dir, ".env."+stackName)
-	info, err := os.Stat(path)
-	if err != nil || info.IsDir() {
-		return nil
-	}
-	term.Infof("Loading stack environment from %s", filepath.Base(path))
-	return []string{path}
 }
 
 func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, string, error) {
