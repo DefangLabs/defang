@@ -1,10 +1,11 @@
+---
+paths:
+  - "src/**/*.go"
+---
+
 # Linting Rules
 
-Before committing Go code changes:
-
-1. Run `cd src && make lint` to check for lint errors
-2. Run `cd src && make lint-fix` to auto-fix issues
-3. Do NOT use `--no-verify` to skip pre-commit hooks
-4. Do NOT commit code that fails `golangci-lint`
-
-The PostToolUse hook auto-runs golangci-lint on edited Go files, but always verify with a full lint pass before committing.
+- Before committing Go code changes, run `cd src && make lint`.
+- When lint fails, run `cd src && make lint-fix`, then rerun lint.
+- Do not use `--no-verify` to skip pre-commit hooks.
+- Do not commit code that fails `golangci-lint`.
