@@ -15,7 +15,7 @@ import (
 type EstimateParams struct {
 	common.LoaderParams
 	DeploymentMode string `json:"deployment_mode,omitempty" jsonschema:"default=affordable,enum=affordable,enum=balanced,enum=high_availability,description=The deployment mode for which to estimate costs (e.g., AFFORDABLE, BALANCED, HIGH_AVAILABILITY)."`
-	Provider       string `json:"provider" jsonschema:"required,enum=aws,enum=gcp description=The cloud provider for which to estimate costs."`
+	Provider       string `json:"provider" jsonschema:"required,enum=aws,enum=gcp,enum=scaleway description=The cloud provider for which to estimate costs."`
 	Region         string `json:"region,omitempty" jsonschema:"description=The region in which to estimate costs."`
 }
 

@@ -120,6 +120,92 @@ func TestMakeAccessGatewayServiceGCP(t *testing.T) {
 	})
 }
 
+func TestMakeAccessGatewayServiceScaleway(t *testing.T) {
+	info := &client.AccountInfo{
+		Provider:  client.ProviderScaleway,
+		Region:    "fr-par",
+		AccountID: "scw-project-id",
+	}
+
+	t.Run("chat-default model removes service and injects Scaleway URL", func(t *testing.T) {
+		proj := &composeTypes.Project{
+			Networks: map[string]composeTypes.NetworkConfig{},
+			Services: composeTypes.Services{
+				"app": {
+					Name:        "app",
+					Image:       "myapp",
+					DependsOn:   map[string]composeTypes.ServiceDependency{"llm": {Condition: composeTypes.ServiceConditionStarted, Required: true}},
+					Environment: composeTypes.MappingWithEquals{},
+					Networks:    map[string]*composeTypes.ServiceNetworkConfig{},
+				},
+			},
+		}
+		svccfg := newLLMService()
+		proj.Services["llm"] = svccfg
+		makeAccessGatewayService(&svccfg, proj, "chat-default", info)
+
+		// Model service should be removed
+		_, exists := proj.Services["llm"]
+		assert.False(t, exists, "model service should be removed from project")
+		// No LiteLLM image or command
+		assert.Empty(t, svccfg.Image)
+		assert.Empty(t, svccfg.Command)
+		// Dependent service gets Scaleway URL and resolved model
+		app := proj.Services["app"]
+		assert.Equal(t, "https://api.scaleway.ai/v1/", *app.Environment["LLM_URL"])
+		assert.Equal(t, "llama-3.3-70b-instruct", *app.Environment["LLM_MODEL"])
+		// OPENAI_API_KEY is nil so the provider reads it from Defang config
+		val, ok := app.Environment["OPENAI_API_KEY"]
+		assert.True(t, ok, "OPENAI_API_KEY should be set")
+		assert.Nil(t, val, "OPENAI_API_KEY should be nil (config value)")
+		// Dependency on model service should be removed
+		_, hasDep := app.DependsOn["llm"]
+		assert.False(t, hasDep, "dependency on model service should be removed")
+	})
+
+	t.Run("embedding-default model resolves correctly", func(t *testing.T) {
+		proj := &composeTypes.Project{
+			Networks: map[string]composeTypes.NetworkConfig{},
+			Services: composeTypes.Services{
+				"app": {
+					Name:        "app",
+					Image:       "myapp",
+					DependsOn:   map[string]composeTypes.ServiceDependency{"llm": {Condition: composeTypes.ServiceConditionStarted, Required: true}},
+					Environment: composeTypes.MappingWithEquals{},
+					Networks:    map[string]*composeTypes.ServiceNetworkConfig{},
+				},
+			},
+		}
+		svccfg := newLLMService()
+		proj.Services["llm"] = svccfg
+		makeAccessGatewayService(&svccfg, proj, "embedding-default", info)
+
+		app := proj.Services["app"]
+		assert.Equal(t, "bge-multilingual-gemma2", *app.Environment["LLM_MODEL"])
+	})
+
+	t.Run("custom model passed through without prefix", func(t *testing.T) {
+		proj := &composeTypes.Project{
+			Networks: map[string]composeTypes.NetworkConfig{},
+			Services: composeTypes.Services{
+				"app": {
+					Name:        "app",
+					Image:       "myapp",
+					DependsOn:   map[string]composeTypes.ServiceDependency{"llm": {Condition: composeTypes.ServiceConditionStarted, Required: true}},
+					Environment: composeTypes.MappingWithEquals{},
+					Networks:    map[string]*composeTypes.ServiceNetworkConfig{},
+				},
+			},
+		}
+		svccfg := newLLMService()
+		proj.Services["llm"] = svccfg
+		makeAccessGatewayService(&svccfg, proj, "llama-3.3-70b-instruct", info)
+
+		app := proj.Services["app"]
+		assert.Equal(t, "llama-3.3-70b-instruct", *app.Environment["LLM_MODEL"])
+	})
+}
+
 func TestMakeAccessGatewayServiceLiteLLMMasterKey(t *testing.T) {
 	info := &client.AccountInfo{}
 
