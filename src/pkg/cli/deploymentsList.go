@@ -19,7 +19,7 @@ type DeploymentLineItem struct {
 	Stack       string
 	Provider    string
 	Region      string
-	Mode        string
+	Mode        string // aka recipe name
 }
 
 type ListDeploymentsParams struct {
@@ -59,6 +59,10 @@ func DeploymentsList(ctx context.Context, client client.FabricClient, params Lis
 	deployments := make([]DeploymentLineItem, numDeployments)
 	for i, d := range response.Deployments {
 		deployedAt := d.Timestamp.AsTime().Local().Format(time.RFC3339)
+		recipeName := d.Recipe.GetName()
+		if recipeName == "" {
+			recipeName = d.Mode.String() // legacy fallback
+		}
 		deployments[i] = DeploymentLineItem{
 			AccountId:   d.ProviderAccountId,
 			DeployedAt:  deployedAt,
@@ -67,7 +71,7 @@ func DeploymentsList(ctx context.Context, client client.FabricClient, params Lis
 			Stack:       d.Stack,
 			Provider:    strings.ToLower(d.Provider.String()),
 			Region:      d.Region,
-			Mode:        d.Mode.String(),
+			Mode:        recipeName,
 		}
 	}
 

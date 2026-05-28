@@ -902,7 +902,6 @@ func (x *PutRecipeRequest) GetRecipe() *Recipe {
 type GetRecipeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Provider      Provider               `protobuf:"varint,2,opt,name=provider,proto3,enum=io.defang.v1.Provider" json:"provider,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -942,13 +941,6 @@ func (x *GetRecipeRequest) GetName() string {
 		return x.Name
 	}
 	return ""
-}
-
-func (x *GetRecipeRequest) GetProvider() Provider {
-	if x != nil {
-		return x.Provider
-	}
-	return Provider_PROVIDER_UNSPECIFIED
 }
 
 type GetRecipeResponse struct {
@@ -6556,10 +6548,9 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\rpulumi_config\x18\x03 \x01(\tR\fpulumiConfig\x12\x16\n" +
 	"\x06active\x18\x04 \x01(\bR\x06activeJ\x04\b\x02\x10\x03\"@\n" +
 	"\x10PutRecipeRequest\x12,\n" +
-	"\x06recipe\x18\x01 \x01(\v2\x14.io.defang.v1.RecipeR\x06recipe\"Z\n" +
+	"\x06recipe\x18\x01 \x01(\v2\x14.io.defang.v1.RecipeR\x06recipe\",\n" +
 	"\x10GetRecipeRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x122\n" +
-	"\bprovider\x18\x02 \x01(\x0e2\x16.io.defang.v1.ProviderR\bprovider\"A\n" +
+	"\x04name\x18\x01 \x01(\tR\x04nameJ\x04\b\x02\x10\x03\"A\n" +
 	"\x11GetRecipeResponse\x12,\n" +
 	"\x06recipe\x18\x01 \x01(\v2\x14.io.defang.v1.RecipeR\x06recipe\"\x14\n" +
 	"\x12ListRecipesRequest\"E\n" +
@@ -7269,184 +7260,183 @@ var file_io_defang_v1_fabric_proto_goTypes = []any{
 }
 var file_io_defang_v1_fabric_proto_depIdxs = []int32{
 	13,  // 0: io.defang.v1.PutRecipeRequest.recipe:type_name -> io.defang.v1.Recipe
-	0,   // 1: io.defang.v1.GetRecipeRequest.provider:type_name -> io.defang.v1.Provider
-	13,  // 2: io.defang.v1.GetRecipeResponse.recipe:type_name -> io.defang.v1.Recipe
-	13,  // 3: io.defang.v1.ListRecipesResponse.recipes:type_name -> io.defang.v1.Recipe
-	0,   // 4: io.defang.v1.Stack.provider:type_name -> io.defang.v1.Provider
-	107, // 5: io.defang.v1.Stack.last_deployed_at:type_name -> google.protobuf.Timestamp
-	1,   // 6: io.defang.v1.Stack.mode:type_name -> io.defang.v1.DeploymentMode
-	13,  // 7: io.defang.v1.Stack.recipe:type_name -> io.defang.v1.Recipe
-	19,  // 8: io.defang.v1.PutStackRequest.stack:type_name -> io.defang.v1.Stack
-	19,  // 9: io.defang.v1.GetStackResponse.stack:type_name -> io.defang.v1.Stack
-	19,  // 10: io.defang.v1.ListStacksResponse.stacks:type_name -> io.defang.v1.Stack
-	0,   // 11: io.defang.v1.GetSelectedProviderResponse.provider:type_name -> io.defang.v1.Provider
-	0,   // 12: io.defang.v1.SetSelectedProviderRequest.provider:type_name -> io.defang.v1.Provider
-	53,  // 13: io.defang.v1.DebugRequest.files:type_name -> io.defang.v1.File
-	107, // 14: io.defang.v1.DebugRequest.since:type_name -> google.protobuf.Timestamp
-	107, // 15: io.defang.v1.DebugRequest.until:type_name -> google.protobuf.Timestamp
-	43,  // 16: io.defang.v1.DebugResponse.issues:type_name -> io.defang.v1.Issue
-	44,  // 17: io.defang.v1.Issue.code_changes:type_name -> io.defang.v1.CodeChange
-	105, // 18: io.defang.v1.TrackRequest.properties:type_name -> io.defang.v1.TrackRequest.PropertiesEntry
-	0,   // 19: io.defang.v1.CanIUseRequest.provider:type_name -> io.defang.v1.Provider
-	1,   // 20: io.defang.v1.DeployRequest.mode:type_name -> io.defang.v1.DeploymentMode
-	0,   // 21: io.defang.v1.DeployRequest.provider:type_name -> io.defang.v1.Provider
-	59,  // 22: io.defang.v1.DeployResponse.services:type_name -> io.defang.v1.ServiceInfo
-	53,  // 23: io.defang.v1.GenerateFilesResponse.files:type_name -> io.defang.v1.File
-	87,  // 24: io.defang.v1.ServiceInfo.service:type_name -> io.defang.v1.Service
-	107, // 25: io.defang.v1.ServiceInfo.created_at:type_name -> google.protobuf.Timestamp
-	107, // 26: io.defang.v1.ServiceInfo.updated_at:type_name -> google.protobuf.Timestamp
-	2,   // 27: io.defang.v1.ServiceInfo.state:type_name -> io.defang.v1.ServiceState
-	3,   // 28: io.defang.v1.ServiceInfo.type:type_name -> io.defang.v1.ResourceType
-	4,   // 29: io.defang.v1.Config.type:type_name -> io.defang.v1.ConfigType
-	4,   // 30: io.defang.v1.PutConfigRequest.type:type_name -> io.defang.v1.ConfigType
-	63,  // 31: io.defang.v1.GetConfigsRequest.configs:type_name -> io.defang.v1.ConfigKey
-	62,  // 32: io.defang.v1.GetConfigsResponse.configs:type_name -> io.defang.v1.Config
-	63,  // 33: io.defang.v1.DeleteConfigsRequest.configs:type_name -> io.defang.v1.ConfigKey
-	63,  // 34: io.defang.v1.ListConfigsResponse.configs:type_name -> io.defang.v1.ConfigKey
-	107, // 35: io.defang.v1.Deployment.timestamp:type_name -> google.protobuf.Timestamp
-	6,   // 36: io.defang.v1.Deployment.action:type_name -> io.defang.v1.DeploymentAction
-	0,   // 37: io.defang.v1.Deployment.provider:type_name -> io.defang.v1.Provider
-	1,   // 38: io.defang.v1.Deployment.mode:type_name -> io.defang.v1.DeploymentMode
-	107, // 39: io.defang.v1.Deployment.completed:type_name -> google.protobuf.Timestamp
-	9,   // 40: io.defang.v1.Deployment.status:type_name -> io.defang.v1.DeploymentStatus
-	7,   // 41: io.defang.v1.Deployment.origin:type_name -> io.defang.v1.DeploymentOrigin
-	106, // 42: io.defang.v1.Deployment.origin_metadata:type_name -> io.defang.v1.Deployment.OriginMetadataEntry
-	59,  // 43: io.defang.v1.Deployment.services:type_name -> io.defang.v1.ServiceInfo
-	8,   // 44: io.defang.v1.Deployment.cd_type:type_name -> io.defang.v1.CdType
-	13,  // 45: io.defang.v1.Deployment.recipe:type_name -> io.defang.v1.Recipe
-	71,  // 46: io.defang.v1.PutDeploymentRequest.deployment:type_name -> io.defang.v1.Deployment
-	5,   // 47: io.defang.v1.ListDeploymentsRequest.type:type_name -> io.defang.v1.DeploymentType
-	107, // 48: io.defang.v1.ListDeploymentsRequest.until:type_name -> google.protobuf.Timestamp
-	71,  // 49: io.defang.v1.ListDeploymentsResponse.deployments:type_name -> io.defang.v1.Deployment
-	107, // 50: io.defang.v1.GetDeploymentRequest.timestamp:type_name -> google.protobuf.Timestamp
-	71,  // 51: io.defang.v1.GetDeploymentResponse.deployment:type_name -> io.defang.v1.Deployment
-	107, // 52: io.defang.v1.TailRequest.since:type_name -> google.protobuf.Timestamp
-	107, // 53: io.defang.v1.TailRequest.until:type_name -> google.protobuf.Timestamp
-	107, // 54: io.defang.v1.LogEntry.timestamp:type_name -> google.protobuf.Timestamp
-	82,  // 55: io.defang.v1.TailResponse.entries:type_name -> io.defang.v1.LogEntry
-	59,  // 56: io.defang.v1.GetServicesResponse.services:type_name -> io.defang.v1.ServiceInfo
-	107, // 57: io.defang.v1.GetServicesResponse.expires_at:type_name -> google.protobuf.Timestamp
-	59,  // 58: io.defang.v1.ProjectUpdate.services:type_name -> io.defang.v1.ServiceInfo
-	1,   // 59: io.defang.v1.ProjectUpdate.mode:type_name -> io.defang.v1.DeploymentMode
-	0,   // 60: io.defang.v1.ProjectUpdate.provider:type_name -> io.defang.v1.Provider
-	13,  // 61: io.defang.v1.ProjectUpdate.recipe:type_name -> io.defang.v1.Recipe
-	1,   // 62: io.defang.v1.DeployEvent.mode:type_name -> io.defang.v1.DeploymentMode
-	107, // 63: io.defang.v1.DeployEvent.time:type_name -> google.protobuf.Timestamp
-	59,  // 64: io.defang.v1.SubscribeResponse.service:type_name -> io.defang.v1.ServiceInfo
-	2,   // 65: io.defang.v1.SubscribeResponse.state:type_name -> io.defang.v1.ServiceState
-	10,  // 66: io.defang.v1.WhoAmIResponse.tier:type_name -> io.defang.v1.SubscriptionTier
-	107, // 67: io.defang.v1.WhoAmIResponse.paid_until:type_name -> google.protobuf.Timestamp
-	107, // 68: io.defang.v1.WhoAmIResponse.trial_until:type_name -> google.protobuf.Timestamp
-	0,   // 69: io.defang.v1.EstimateRequest.provider:type_name -> io.defang.v1.Provider
-	108, // 70: io.defang.v1.EstimateLineItem.cost:type_name -> google.type.Money
-	0,   // 71: io.defang.v1.EstimateResponse.provider:type_name -> io.defang.v1.Provider
-	108, // 72: io.defang.v1.EstimateResponse.subtotal:type_name -> google.type.Money
-	99,  // 73: io.defang.v1.EstimateResponse.line_items:type_name -> io.defang.v1.EstimateLineItem
-	0,   // 74: io.defang.v1.PreviewRequest.provider:type_name -> io.defang.v1.Provider
-	1,   // 75: io.defang.v1.PreviewRequest.mode:type_name -> io.defang.v1.DeploymentMode
-	13,  // 76: io.defang.v1.PreviewRequest.recipe:type_name -> io.defang.v1.Recipe
-	11,  // 77: io.defang.v1.GenerateComposeRequest.platform:type_name -> io.defang.v1.SourcePlatform
-	109, // 78: io.defang.v1.FabricController.GetStatus:input_type -> google.protobuf.Empty
-	109, // 79: io.defang.v1.FabricController.GetVersion:input_type -> google.protobuf.Empty
-	77,  // 80: io.defang.v1.FabricController.Token:input_type -> io.defang.v1.TokenRequest
-	109, // 81: io.defang.v1.FabricController.RevokeToken:input_type -> google.protobuf.Empty
-	52,  // 82: io.defang.v1.FabricController.GenerateFiles:input_type -> io.defang.v1.GenerateFilesRequest
-	41,  // 83: io.defang.v1.FabricController.Debug:input_type -> io.defang.v1.DebugRequest
-	109, // 84: io.defang.v1.FabricController.SignEULA:input_type -> google.protobuf.Empty
-	109, // 85: io.defang.v1.FabricController.CheckToS:input_type -> google.protobuf.Empty
-	96,  // 86: io.defang.v1.FabricController.SetOptions:input_type -> io.defang.v1.SetOptionsRequest
-	109, // 87: io.defang.v1.FabricController.WhoAmI:input_type -> google.protobuf.Empty
-	45,  // 88: io.defang.v1.FabricController.Track:input_type -> io.defang.v1.TrackRequest
-	109, // 89: io.defang.v1.FabricController.DeleteMe:input_type -> google.protobuf.Empty
-	57,  // 90: io.defang.v1.FabricController.CreateUploadURL:input_type -> io.defang.v1.UploadURLRequest
-	46,  // 91: io.defang.v1.FabricController.CanIUse:input_type -> io.defang.v1.CanIUseRequest
-	98,  // 92: io.defang.v1.FabricController.Estimate:input_type -> io.defang.v1.EstimateRequest
-	101, // 93: io.defang.v1.FabricController.Preview:input_type -> io.defang.v1.PreviewRequest
-	103, // 94: io.defang.v1.FabricController.GenerateCompose:input_type -> io.defang.v1.GenerateComposeRequest
-	81,  // 95: io.defang.v1.FabricController.Tail:input_type -> io.defang.v1.TailRequest
-	48,  // 96: io.defang.v1.FabricController.Deploy:input_type -> io.defang.v1.DeployRequest
-	86,  // 97: io.defang.v1.FabricController.Get:input_type -> io.defang.v1.GetRequest
-	109, // 98: io.defang.v1.FabricController.GetPlaygroundProjectDomain:input_type -> google.protobuf.Empty
-	39,  // 99: io.defang.v1.FabricController.Destroy:input_type -> io.defang.v1.DestroyRequest
-	89,  // 100: io.defang.v1.FabricController.Subscribe:input_type -> io.defang.v1.SubscribeRequest
-	91,  // 101: io.defang.v1.FabricController.GetServices:input_type -> io.defang.v1.GetServicesRequest
-	64,  // 102: io.defang.v1.FabricController.PutSecret:input_type -> io.defang.v1.PutConfigRequest
-	60,  // 103: io.defang.v1.FabricController.DeleteSecrets:input_type -> io.defang.v1.Secrets
-	69,  // 104: io.defang.v1.FabricController.ListSecrets:input_type -> io.defang.v1.ListConfigsRequest
-	72,  // 105: io.defang.v1.FabricController.PutDeployment:input_type -> io.defang.v1.PutDeploymentRequest
-	73,  // 106: io.defang.v1.FabricController.ListDeployments:input_type -> io.defang.v1.ListDeploymentsRequest
-	75,  // 107: io.defang.v1.FabricController.GetDeployment:input_type -> io.defang.v1.GetDeploymentRequest
-	92,  // 108: io.defang.v1.FabricController.DelegateSubdomainZone:input_type -> io.defang.v1.DelegateSubdomainZoneRequest
-	94,  // 109: io.defang.v1.FabricController.DeleteSubdomainZone:input_type -> io.defang.v1.DeleteSubdomainZoneRequest
-	95,  // 110: io.defang.v1.FabricController.GetDelegateSubdomainZone:input_type -> io.defang.v1.GetDelegateSubdomainZoneRequest
-	30,  // 111: io.defang.v1.FabricController.VerifyDNSSetup:input_type -> io.defang.v1.VerifyDNSSetupRequest
-	31,  // 112: io.defang.v1.FabricController.ResolveIPAddr:input_type -> io.defang.v1.ResolveIPAddrRequest
-	33,  // 113: io.defang.v1.FabricController.ResolveCNAME:input_type -> io.defang.v1.ResolveCNAMERequest
-	35,  // 114: io.defang.v1.FabricController.ResolveNS:input_type -> io.defang.v1.ResolveNSRequest
-	37,  // 115: io.defang.v1.FabricController.ResolveTXT:input_type -> io.defang.v1.ResolveTXTRequest
-	27,  // 116: io.defang.v1.FabricController.GetSelectedProvider:input_type -> io.defang.v1.GetSelectedProviderRequest
-	29,  // 117: io.defang.v1.FabricController.SetSelectedProvider:input_type -> io.defang.v1.SetSelectedProviderRequest
-	20,  // 118: io.defang.v1.FabricController.PutStack:input_type -> io.defang.v1.PutStackRequest
-	21,  // 119: io.defang.v1.FabricController.GetStack:input_type -> io.defang.v1.GetStackRequest
-	24,  // 120: io.defang.v1.FabricController.ListStacks:input_type -> io.defang.v1.ListStacksRequest
-	26,  // 121: io.defang.v1.FabricController.DeleteStack:input_type -> io.defang.v1.DeleteStackRequest
-	22,  // 122: io.defang.v1.FabricController.GetDefaultStack:input_type -> io.defang.v1.GetDefaultStackRequest
-	14,  // 123: io.defang.v1.FabricController.PutRecipe:input_type -> io.defang.v1.PutRecipeRequest
-	15,  // 124: io.defang.v1.FabricController.GetRecipe:input_type -> io.defang.v1.GetRecipeRequest
-	17,  // 125: io.defang.v1.FabricController.ListRecipes:input_type -> io.defang.v1.ListRecipesRequest
-	79,  // 126: io.defang.v1.FabricController.GetStatus:output_type -> io.defang.v1.Status
-	80,  // 127: io.defang.v1.FabricController.GetVersion:output_type -> io.defang.v1.Version
-	78,  // 128: io.defang.v1.FabricController.Token:output_type -> io.defang.v1.TokenResponse
-	109, // 129: io.defang.v1.FabricController.RevokeToken:output_type -> google.protobuf.Empty
-	54,  // 130: io.defang.v1.FabricController.GenerateFiles:output_type -> io.defang.v1.GenerateFilesResponse
-	42,  // 131: io.defang.v1.FabricController.Debug:output_type -> io.defang.v1.DebugResponse
-	109, // 132: io.defang.v1.FabricController.SignEULA:output_type -> google.protobuf.Empty
-	109, // 133: io.defang.v1.FabricController.CheckToS:output_type -> google.protobuf.Empty
-	109, // 134: io.defang.v1.FabricController.SetOptions:output_type -> google.protobuf.Empty
-	97,  // 135: io.defang.v1.FabricController.WhoAmI:output_type -> io.defang.v1.WhoAmIResponse
-	109, // 136: io.defang.v1.FabricController.Track:output_type -> google.protobuf.Empty
-	109, // 137: io.defang.v1.FabricController.DeleteMe:output_type -> google.protobuf.Empty
-	58,  // 138: io.defang.v1.FabricController.CreateUploadURL:output_type -> io.defang.v1.UploadURLResponse
-	47,  // 139: io.defang.v1.FabricController.CanIUse:output_type -> io.defang.v1.CanIUseResponse
-	100, // 140: io.defang.v1.FabricController.Estimate:output_type -> io.defang.v1.EstimateResponse
-	102, // 141: io.defang.v1.FabricController.Preview:output_type -> io.defang.v1.PreviewResponse
-	104, // 142: io.defang.v1.FabricController.GenerateCompose:output_type -> io.defang.v1.GenerateComposeResponse
-	83,  // 143: io.defang.v1.FabricController.Tail:output_type -> io.defang.v1.TailResponse
-	49,  // 144: io.defang.v1.FabricController.Deploy:output_type -> io.defang.v1.DeployResponse
-	59,  // 145: io.defang.v1.FabricController.Get:output_type -> io.defang.v1.ServiceInfo
-	67,  // 146: io.defang.v1.FabricController.GetPlaygroundProjectDomain:output_type -> io.defang.v1.GetPlaygroundProjectDomainResponse
-	40,  // 147: io.defang.v1.FabricController.Destroy:output_type -> io.defang.v1.DestroyResponse
-	90,  // 148: io.defang.v1.FabricController.Subscribe:output_type -> io.defang.v1.SubscribeResponse
-	84,  // 149: io.defang.v1.FabricController.GetServices:output_type -> io.defang.v1.GetServicesResponse
-	109, // 150: io.defang.v1.FabricController.PutSecret:output_type -> google.protobuf.Empty
-	109, // 151: io.defang.v1.FabricController.DeleteSecrets:output_type -> google.protobuf.Empty
-	60,  // 152: io.defang.v1.FabricController.ListSecrets:output_type -> io.defang.v1.Secrets
-	109, // 153: io.defang.v1.FabricController.PutDeployment:output_type -> google.protobuf.Empty
-	74,  // 154: io.defang.v1.FabricController.ListDeployments:output_type -> io.defang.v1.ListDeploymentsResponse
-	76,  // 155: io.defang.v1.FabricController.GetDeployment:output_type -> io.defang.v1.GetDeploymentResponse
-	93,  // 156: io.defang.v1.FabricController.DelegateSubdomainZone:output_type -> io.defang.v1.DelegateSubdomainZoneResponse
-	109, // 157: io.defang.v1.FabricController.DeleteSubdomainZone:output_type -> google.protobuf.Empty
-	93,  // 158: io.defang.v1.FabricController.GetDelegateSubdomainZone:output_type -> io.defang.v1.DelegateSubdomainZoneResponse
-	109, // 159: io.defang.v1.FabricController.VerifyDNSSetup:output_type -> google.protobuf.Empty
-	32,  // 160: io.defang.v1.FabricController.ResolveIPAddr:output_type -> io.defang.v1.ResolveIPAddrResponse
-	34,  // 161: io.defang.v1.FabricController.ResolveCNAME:output_type -> io.defang.v1.ResolveCNAMEResponse
-	36,  // 162: io.defang.v1.FabricController.ResolveNS:output_type -> io.defang.v1.ResolveNSResponse
-	38,  // 163: io.defang.v1.FabricController.ResolveTXT:output_type -> io.defang.v1.ResolveTXTResponse
-	28,  // 164: io.defang.v1.FabricController.GetSelectedProvider:output_type -> io.defang.v1.GetSelectedProviderResponse
-	109, // 165: io.defang.v1.FabricController.SetSelectedProvider:output_type -> google.protobuf.Empty
-	109, // 166: io.defang.v1.FabricController.PutStack:output_type -> google.protobuf.Empty
-	23,  // 167: io.defang.v1.FabricController.GetStack:output_type -> io.defang.v1.GetStackResponse
-	25,  // 168: io.defang.v1.FabricController.ListStacks:output_type -> io.defang.v1.ListStacksResponse
-	109, // 169: io.defang.v1.FabricController.DeleteStack:output_type -> google.protobuf.Empty
-	23,  // 170: io.defang.v1.FabricController.GetDefaultStack:output_type -> io.defang.v1.GetStackResponse
-	109, // 171: io.defang.v1.FabricController.PutRecipe:output_type -> google.protobuf.Empty
-	16,  // 172: io.defang.v1.FabricController.GetRecipe:output_type -> io.defang.v1.GetRecipeResponse
-	18,  // 173: io.defang.v1.FabricController.ListRecipes:output_type -> io.defang.v1.ListRecipesResponse
-	126, // [126:174] is the sub-list for method output_type
-	78,  // [78:126] is the sub-list for method input_type
-	78,  // [78:78] is the sub-list for extension type_name
-	78,  // [78:78] is the sub-list for extension extendee
-	0,   // [0:78] is the sub-list for field type_name
+	13,  // 1: io.defang.v1.GetRecipeResponse.recipe:type_name -> io.defang.v1.Recipe
+	13,  // 2: io.defang.v1.ListRecipesResponse.recipes:type_name -> io.defang.v1.Recipe
+	0,   // 3: io.defang.v1.Stack.provider:type_name -> io.defang.v1.Provider
+	107, // 4: io.defang.v1.Stack.last_deployed_at:type_name -> google.protobuf.Timestamp
+	1,   // 5: io.defang.v1.Stack.mode:type_name -> io.defang.v1.DeploymentMode
+	13,  // 6: io.defang.v1.Stack.recipe:type_name -> io.defang.v1.Recipe
+	19,  // 7: io.defang.v1.PutStackRequest.stack:type_name -> io.defang.v1.Stack
+	19,  // 8: io.defang.v1.GetStackResponse.stack:type_name -> io.defang.v1.Stack
+	19,  // 9: io.defang.v1.ListStacksResponse.stacks:type_name -> io.defang.v1.Stack
+	0,   // 10: io.defang.v1.GetSelectedProviderResponse.provider:type_name -> io.defang.v1.Provider
+	0,   // 11: io.defang.v1.SetSelectedProviderRequest.provider:type_name -> io.defang.v1.Provider
+	53,  // 12: io.defang.v1.DebugRequest.files:type_name -> io.defang.v1.File
+	107, // 13: io.defang.v1.DebugRequest.since:type_name -> google.protobuf.Timestamp
+	107, // 14: io.defang.v1.DebugRequest.until:type_name -> google.protobuf.Timestamp
+	43,  // 15: io.defang.v1.DebugResponse.issues:type_name -> io.defang.v1.Issue
+	44,  // 16: io.defang.v1.Issue.code_changes:type_name -> io.defang.v1.CodeChange
+	105, // 17: io.defang.v1.TrackRequest.properties:type_name -> io.defang.v1.TrackRequest.PropertiesEntry
+	0,   // 18: io.defang.v1.CanIUseRequest.provider:type_name -> io.defang.v1.Provider
+	1,   // 19: io.defang.v1.DeployRequest.mode:type_name -> io.defang.v1.DeploymentMode
+	0,   // 20: io.defang.v1.DeployRequest.provider:type_name -> io.defang.v1.Provider
+	59,  // 21: io.defang.v1.DeployResponse.services:type_name -> io.defang.v1.ServiceInfo
+	53,  // 22: io.defang.v1.GenerateFilesResponse.files:type_name -> io.defang.v1.File
+	87,  // 23: io.defang.v1.ServiceInfo.service:type_name -> io.defang.v1.Service
+	107, // 24: io.defang.v1.ServiceInfo.created_at:type_name -> google.protobuf.Timestamp
+	107, // 25: io.defang.v1.ServiceInfo.updated_at:type_name -> google.protobuf.Timestamp
+	2,   // 26: io.defang.v1.ServiceInfo.state:type_name -> io.defang.v1.ServiceState
+	3,   // 27: io.defang.v1.ServiceInfo.type:type_name -> io.defang.v1.ResourceType
+	4,   // 28: io.defang.v1.Config.type:type_name -> io.defang.v1.ConfigType
+	4,   // 29: io.defang.v1.PutConfigRequest.type:type_name -> io.defang.v1.ConfigType
+	63,  // 30: io.defang.v1.GetConfigsRequest.configs:type_name -> io.defang.v1.ConfigKey
+	62,  // 31: io.defang.v1.GetConfigsResponse.configs:type_name -> io.defang.v1.Config
+	63,  // 32: io.defang.v1.DeleteConfigsRequest.configs:type_name -> io.defang.v1.ConfigKey
+	63,  // 33: io.defang.v1.ListConfigsResponse.configs:type_name -> io.defang.v1.ConfigKey
+	107, // 34: io.defang.v1.Deployment.timestamp:type_name -> google.protobuf.Timestamp
+	6,   // 35: io.defang.v1.Deployment.action:type_name -> io.defang.v1.DeploymentAction
+	0,   // 36: io.defang.v1.Deployment.provider:type_name -> io.defang.v1.Provider
+	1,   // 37: io.defang.v1.Deployment.mode:type_name -> io.defang.v1.DeploymentMode
+	107, // 38: io.defang.v1.Deployment.completed:type_name -> google.protobuf.Timestamp
+	9,   // 39: io.defang.v1.Deployment.status:type_name -> io.defang.v1.DeploymentStatus
+	7,   // 40: io.defang.v1.Deployment.origin:type_name -> io.defang.v1.DeploymentOrigin
+	106, // 41: io.defang.v1.Deployment.origin_metadata:type_name -> io.defang.v1.Deployment.OriginMetadataEntry
+	59,  // 42: io.defang.v1.Deployment.services:type_name -> io.defang.v1.ServiceInfo
+	8,   // 43: io.defang.v1.Deployment.cd_type:type_name -> io.defang.v1.CdType
+	13,  // 44: io.defang.v1.Deployment.recipe:type_name -> io.defang.v1.Recipe
+	71,  // 45: io.defang.v1.PutDeploymentRequest.deployment:type_name -> io.defang.v1.Deployment
+	5,   // 46: io.defang.v1.ListDeploymentsRequest.type:type_name -> io.defang.v1.DeploymentType
+	107, // 47: io.defang.v1.ListDeploymentsRequest.until:type_name -> google.protobuf.Timestamp
+	71,  // 48: io.defang.v1.ListDeploymentsResponse.deployments:type_name -> io.defang.v1.Deployment
+	107, // 49: io.defang.v1.GetDeploymentRequest.timestamp:type_name -> google.protobuf.Timestamp
+	71,  // 50: io.defang.v1.GetDeploymentResponse.deployment:type_name -> io.defang.v1.Deployment
+	107, // 51: io.defang.v1.TailRequest.since:type_name -> google.protobuf.Timestamp
+	107, // 52: io.defang.v1.TailRequest.until:type_name -> google.protobuf.Timestamp
+	107, // 53: io.defang.v1.LogEntry.timestamp:type_name -> google.protobuf.Timestamp
+	82,  // 54: io.defang.v1.TailResponse.entries:type_name -> io.defang.v1.LogEntry
+	59,  // 55: io.defang.v1.GetServicesResponse.services:type_name -> io.defang.v1.ServiceInfo
+	107, // 56: io.defang.v1.GetServicesResponse.expires_at:type_name -> google.protobuf.Timestamp
+	59,  // 57: io.defang.v1.ProjectUpdate.services:type_name -> io.defang.v1.ServiceInfo
+	1,   // 58: io.defang.v1.ProjectUpdate.mode:type_name -> io.defang.v1.DeploymentMode
+	0,   // 59: io.defang.v1.ProjectUpdate.provider:type_name -> io.defang.v1.Provider
+	13,  // 60: io.defang.v1.ProjectUpdate.recipe:type_name -> io.defang.v1.Recipe
+	1,   // 61: io.defang.v1.DeployEvent.mode:type_name -> io.defang.v1.DeploymentMode
+	107, // 62: io.defang.v1.DeployEvent.time:type_name -> google.protobuf.Timestamp
+	59,  // 63: io.defang.v1.SubscribeResponse.service:type_name -> io.defang.v1.ServiceInfo
+	2,   // 64: io.defang.v1.SubscribeResponse.state:type_name -> io.defang.v1.ServiceState
+	10,  // 65: io.defang.v1.WhoAmIResponse.tier:type_name -> io.defang.v1.SubscriptionTier
+	107, // 66: io.defang.v1.WhoAmIResponse.paid_until:type_name -> google.protobuf.Timestamp
+	107, // 67: io.defang.v1.WhoAmIResponse.trial_until:type_name -> google.protobuf.Timestamp
+	0,   // 68: io.defang.v1.EstimateRequest.provider:type_name -> io.defang.v1.Provider
+	108, // 69: io.defang.v1.EstimateLineItem.cost:type_name -> google.type.Money
+	0,   // 70: io.defang.v1.EstimateResponse.provider:type_name -> io.defang.v1.Provider
+	108, // 71: io.defang.v1.EstimateResponse.subtotal:type_name -> google.type.Money
+	99,  // 72: io.defang.v1.EstimateResponse.line_items:type_name -> io.defang.v1.EstimateLineItem
+	0,   // 73: io.defang.v1.PreviewRequest.provider:type_name -> io.defang.v1.Provider
+	1,   // 74: io.defang.v1.PreviewRequest.mode:type_name -> io.defang.v1.DeploymentMode
+	13,  // 75: io.defang.v1.PreviewRequest.recipe:type_name -> io.defang.v1.Recipe
+	11,  // 76: io.defang.v1.GenerateComposeRequest.platform:type_name -> io.defang.v1.SourcePlatform
+	109, // 77: io.defang.v1.FabricController.GetStatus:input_type -> google.protobuf.Empty
+	109, // 78: io.defang.v1.FabricController.GetVersion:input_type -> google.protobuf.Empty
+	77,  // 79: io.defang.v1.FabricController.Token:input_type -> io.defang.v1.TokenRequest
+	109, // 80: io.defang.v1.FabricController.RevokeToken:input_type -> google.protobuf.Empty
+	52,  // 81: io.defang.v1.FabricController.GenerateFiles:input_type -> io.defang.v1.GenerateFilesRequest
+	41,  // 82: io.defang.v1.FabricController.Debug:input_type -> io.defang.v1.DebugRequest
+	109, // 83: io.defang.v1.FabricController.SignEULA:input_type -> google.protobuf.Empty
+	109, // 84: io.defang.v1.FabricController.CheckToS:input_type -> google.protobuf.Empty
+	96,  // 85: io.defang.v1.FabricController.SetOptions:input_type -> io.defang.v1.SetOptionsRequest
+	109, // 86: io.defang.v1.FabricController.WhoAmI:input_type -> google.protobuf.Empty
+	45,  // 87: io.defang.v1.FabricController.Track:input_type -> io.defang.v1.TrackRequest
+	109, // 88: io.defang.v1.FabricController.DeleteMe:input_type -> google.protobuf.Empty
+	57,  // 89: io.defang.v1.FabricController.CreateUploadURL:input_type -> io.defang.v1.UploadURLRequest
+	46,  // 90: io.defang.v1.FabricController.CanIUse:input_type -> io.defang.v1.CanIUseRequest
+	98,  // 91: io.defang.v1.FabricController.Estimate:input_type -> io.defang.v1.EstimateRequest
+	101, // 92: io.defang.v1.FabricController.Preview:input_type -> io.defang.v1.PreviewRequest
+	103, // 93: io.defang.v1.FabricController.GenerateCompose:input_type -> io.defang.v1.GenerateComposeRequest
+	81,  // 94: io.defang.v1.FabricController.Tail:input_type -> io.defang.v1.TailRequest
+	48,  // 95: io.defang.v1.FabricController.Deploy:input_type -> io.defang.v1.DeployRequest
+	86,  // 96: io.defang.v1.FabricController.Get:input_type -> io.defang.v1.GetRequest
+	109, // 97: io.defang.v1.FabricController.GetPlaygroundProjectDomain:input_type -> google.protobuf.Empty
+	39,  // 98: io.defang.v1.FabricController.Destroy:input_type -> io.defang.v1.DestroyRequest
+	89,  // 99: io.defang.v1.FabricController.Subscribe:input_type -> io.defang.v1.SubscribeRequest
+	91,  // 100: io.defang.v1.FabricController.GetServices:input_type -> io.defang.v1.GetServicesRequest
+	64,  // 101: io.defang.v1.FabricController.PutSecret:input_type -> io.defang.v1.PutConfigRequest
+	60,  // 102: io.defang.v1.FabricController.DeleteSecrets:input_type -> io.defang.v1.Secrets
+	69,  // 103: io.defang.v1.FabricController.ListSecrets:input_type -> io.defang.v1.ListConfigsRequest
+	72,  // 104: io.defang.v1.FabricController.PutDeployment:input_type -> io.defang.v1.PutDeploymentRequest
+	73,  // 105: io.defang.v1.FabricController.ListDeployments:input_type -> io.defang.v1.ListDeploymentsRequest
+	75,  // 106: io.defang.v1.FabricController.GetDeployment:input_type -> io.defang.v1.GetDeploymentRequest
+	92,  // 107: io.defang.v1.FabricController.DelegateSubdomainZone:input_type -> io.defang.v1.DelegateSubdomainZoneRequest
+	94,  // 108: io.defang.v1.FabricController.DeleteSubdomainZone:input_type -> io.defang.v1.DeleteSubdomainZoneRequest
+	95,  // 109: io.defang.v1.FabricController.GetDelegateSubdomainZone:input_type -> io.defang.v1.GetDelegateSubdomainZoneRequest
+	30,  // 110: io.defang.v1.FabricController.VerifyDNSSetup:input_type -> io.defang.v1.VerifyDNSSetupRequest
+	31,  // 111: io.defang.v1.FabricController.ResolveIPAddr:input_type -> io.defang.v1.ResolveIPAddrRequest
+	33,  // 112: io.defang.v1.FabricController.ResolveCNAME:input_type -> io.defang.v1.ResolveCNAMERequest
+	35,  // 113: io.defang.v1.FabricController.ResolveNS:input_type -> io.defang.v1.ResolveNSRequest
+	37,  // 114: io.defang.v1.FabricController.ResolveTXT:input_type -> io.defang.v1.ResolveTXTRequest
+	27,  // 115: io.defang.v1.FabricController.GetSelectedProvider:input_type -> io.defang.v1.GetSelectedProviderRequest
+	29,  // 116: io.defang.v1.FabricController.SetSelectedProvider:input_type -> io.defang.v1.SetSelectedProviderRequest
+	20,  // 117: io.defang.v1.FabricController.PutStack:input_type -> io.defang.v1.PutStackRequest
+	21,  // 118: io.defang.v1.FabricController.GetStack:input_type -> io.defang.v1.GetStackRequest
+	24,  // 119: io.defang.v1.FabricController.ListStacks:input_type -> io.defang.v1.ListStacksRequest
+	26,  // 120: io.defang.v1.FabricController.DeleteStack:input_type -> io.defang.v1.DeleteStackRequest
+	22,  // 121: io.defang.v1.FabricController.GetDefaultStack:input_type -> io.defang.v1.GetDefaultStackRequest
+	14,  // 122: io.defang.v1.FabricController.PutRecipe:input_type -> io.defang.v1.PutRecipeRequest
+	15,  // 123: io.defang.v1.FabricController.GetRecipe:input_type -> io.defang.v1.GetRecipeRequest
+	17,  // 124: io.defang.v1.FabricController.ListRecipes:input_type -> io.defang.v1.ListRecipesRequest
+	79,  // 125: io.defang.v1.FabricController.GetStatus:output_type -> io.defang.v1.Status
+	80,  // 126: io.defang.v1.FabricController.GetVersion:output_type -> io.defang.v1.Version
+	78,  // 127: io.defang.v1.FabricController.Token:output_type -> io.defang.v1.TokenResponse
+	109, // 128: io.defang.v1.FabricController.RevokeToken:output_type -> google.protobuf.Empty
+	54,  // 129: io.defang.v1.FabricController.GenerateFiles:output_type -> io.defang.v1.GenerateFilesResponse
+	42,  // 130: io.defang.v1.FabricController.Debug:output_type -> io.defang.v1.DebugResponse
+	109, // 131: io.defang.v1.FabricController.SignEULA:output_type -> google.protobuf.Empty
+	109, // 132: io.defang.v1.FabricController.CheckToS:output_type -> google.protobuf.Empty
+	109, // 133: io.defang.v1.FabricController.SetOptions:output_type -> google.protobuf.Empty
+	97,  // 134: io.defang.v1.FabricController.WhoAmI:output_type -> io.defang.v1.WhoAmIResponse
+	109, // 135: io.defang.v1.FabricController.Track:output_type -> google.protobuf.Empty
+	109, // 136: io.defang.v1.FabricController.DeleteMe:output_type -> google.protobuf.Empty
+	58,  // 137: io.defang.v1.FabricController.CreateUploadURL:output_type -> io.defang.v1.UploadURLResponse
+	47,  // 138: io.defang.v1.FabricController.CanIUse:output_type -> io.defang.v1.CanIUseResponse
+	100, // 139: io.defang.v1.FabricController.Estimate:output_type -> io.defang.v1.EstimateResponse
+	102, // 140: io.defang.v1.FabricController.Preview:output_type -> io.defang.v1.PreviewResponse
+	104, // 141: io.defang.v1.FabricController.GenerateCompose:output_type -> io.defang.v1.GenerateComposeResponse
+	83,  // 142: io.defang.v1.FabricController.Tail:output_type -> io.defang.v1.TailResponse
+	49,  // 143: io.defang.v1.FabricController.Deploy:output_type -> io.defang.v1.DeployResponse
+	59,  // 144: io.defang.v1.FabricController.Get:output_type -> io.defang.v1.ServiceInfo
+	67,  // 145: io.defang.v1.FabricController.GetPlaygroundProjectDomain:output_type -> io.defang.v1.GetPlaygroundProjectDomainResponse
+	40,  // 146: io.defang.v1.FabricController.Destroy:output_type -> io.defang.v1.DestroyResponse
+	90,  // 147: io.defang.v1.FabricController.Subscribe:output_type -> io.defang.v1.SubscribeResponse
+	84,  // 148: io.defang.v1.FabricController.GetServices:output_type -> io.defang.v1.GetServicesResponse
+	109, // 149: io.defang.v1.FabricController.PutSecret:output_type -> google.protobuf.Empty
+	109, // 150: io.defang.v1.FabricController.DeleteSecrets:output_type -> google.protobuf.Empty
+	60,  // 151: io.defang.v1.FabricController.ListSecrets:output_type -> io.defang.v1.Secrets
+	109, // 152: io.defang.v1.FabricController.PutDeployment:output_type -> google.protobuf.Empty
+	74,  // 153: io.defang.v1.FabricController.ListDeployments:output_type -> io.defang.v1.ListDeploymentsResponse
+	76,  // 154: io.defang.v1.FabricController.GetDeployment:output_type -> io.defang.v1.GetDeploymentResponse
+	93,  // 155: io.defang.v1.FabricController.DelegateSubdomainZone:output_type -> io.defang.v1.DelegateSubdomainZoneResponse
+	109, // 156: io.defang.v1.FabricController.DeleteSubdomainZone:output_type -> google.protobuf.Empty
+	93,  // 157: io.defang.v1.FabricController.GetDelegateSubdomainZone:output_type -> io.defang.v1.DelegateSubdomainZoneResponse
+	109, // 158: io.defang.v1.FabricController.VerifyDNSSetup:output_type -> google.protobuf.Empty
+	32,  // 159: io.defang.v1.FabricController.ResolveIPAddr:output_type -> io.defang.v1.ResolveIPAddrResponse
+	34,  // 160: io.defang.v1.FabricController.ResolveCNAME:output_type -> io.defang.v1.ResolveCNAMEResponse
+	36,  // 161: io.defang.v1.FabricController.ResolveNS:output_type -> io.defang.v1.ResolveNSResponse
+	38,  // 162: io.defang.v1.FabricController.ResolveTXT:output_type -> io.defang.v1.ResolveTXTResponse
+	28,  // 163: io.defang.v1.FabricController.GetSelectedProvider:output_type -> io.defang.v1.GetSelectedProviderResponse
+	109, // 164: io.defang.v1.FabricController.SetSelectedProvider:output_type -> google.protobuf.Empty
+	109, // 165: io.defang.v1.FabricController.PutStack:output_type -> google.protobuf.Empty
+	23,  // 166: io.defang.v1.FabricController.GetStack:output_type -> io.defang.v1.GetStackResponse
+	25,  // 167: io.defang.v1.FabricController.ListStacks:output_type -> io.defang.v1.ListStacksResponse
+	109, // 168: io.defang.v1.FabricController.DeleteStack:output_type -> google.protobuf.Empty
+	23,  // 169: io.defang.v1.FabricController.GetDefaultStack:output_type -> io.defang.v1.GetStackResponse
+	109, // 170: io.defang.v1.FabricController.PutRecipe:output_type -> google.protobuf.Empty
+	16,  // 171: io.defang.v1.FabricController.GetRecipe:output_type -> io.defang.v1.GetRecipeResponse
+	18,  // 172: io.defang.v1.FabricController.ListRecipes:output_type -> io.defang.v1.ListRecipesResponse
+	125, // [125:173] is the sub-list for method output_type
+	77,  // [77:125] is the sub-list for method input_type
+	77,  // [77:77] is the sub-list for extension type_name
+	77,  // [77:77] is the sub-list for extension extendee
+	0,   // [0:77] is the sub-list for field type_name
 }
 
 func init() { file_io_defang_v1_fabric_proto_init() }

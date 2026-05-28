@@ -191,7 +191,7 @@ message PutRecipeRequest {
 
 message GetRecipeRequest {
   string name = 1;
-  Provider provider = 2;
+  reserved 2; // was: Provider provider (recipes are provider-agnostic)
 }
 
 message GetRecipeResponse {
@@ -361,7 +361,7 @@ message TrackRequest {
 }
 
 enum DeploymentMode {
-  option deprecated = true; // deprecated in favor of pulumi_config
+  option deprecated = true; // deprecated in favor of recipe
   MODE_UNSPECIFIED = 0;
   DEVELOPMENT = 1;
   STAGING = 2;
