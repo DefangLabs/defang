@@ -36,7 +36,6 @@ func (mockListDeploymentsHandler) ListDeployments(ctx context.Context, req *conn
 				Project:           "test",
 				Provider:          defangv1.Provider_DEFANG,
 				ProviderAccountId: "1234567890",
-				ProviderString:    "playground",
 				Region:            "us-test-2",
 				Timestamp:         timestamppb.New(time.Time{}),
 				Mode:              defangv1.DeploymentMode_MODE_UNSPECIFIED,

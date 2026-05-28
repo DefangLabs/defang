@@ -65,7 +65,7 @@ func DeploymentsList(ctx context.Context, client client.FabricClient, params Lis
 			Deployment:  d.Id,
 			ProjectName: d.Project,
 			Stack:       d.Stack,
-			Provider:    getProvider(d.Provider, d.ProviderString),
+			Provider:    strings.ToLower(d.Provider.String()),
 			Region:      d.Region,
 			Mode:        d.Mode.String(),
 		}
@@ -82,11 +82,4 @@ func DeploymentsList(ctx context.Context, client client.FabricClient, params Lis
 	})
 
 	return term.Table(deployments, "ProjectName", "Stack", "Provider", "AccountId", "Region", "Deployment", "Mode", "DeployedAt")
-}
-
-func getProvider(provider defangv1.Provider, providerString string) string {
-	if provider == defangv1.Provider_PROVIDER_UNSPECIFIED {
-		return providerString
-	}
-	return strings.ToLower(provider.String())
 }

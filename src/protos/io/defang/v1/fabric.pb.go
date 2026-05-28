@@ -84,6 +84,7 @@ func (Provider) EnumDescriptor() ([]byte, []int) {
 	return file_io_defang_v1_fabric_proto_rawDescGZIP(), []int{0}
 }
 
+// Deprecated: Marked as deprecated in io/defang/v1/fabric.proto.
 type DeploymentMode int32
 
 const (
@@ -797,8 +798,7 @@ func (TailRequest_LogType) EnumDescriptor() ([]byte, []int) {
 type Recipe struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Provider      Provider               `protobuf:"varint,2,opt,name=provider,proto3,enum=io.defang.v1.Provider" json:"provider,omitempty"`
-	PulumiConfig  []byte                 `protobuf:"bytes,3,opt,name=pulumi_config,json=pulumiConfig,proto3" json:"pulumi_config,omitempty"` // YAML or JSON object
+	PulumiConfig  string                 `protobuf:"bytes,3,opt,name=pulumi_config,json=pulumiConfig,proto3" json:"pulumi_config,omitempty"` // YAML or JSON object
 	Active        bool                   `protobuf:"varint,4,opt,name=active,proto3" json:"active,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -841,18 +841,11 @@ func (x *Recipe) GetName() string {
 	return ""
 }
 
-func (x *Recipe) GetProvider() Provider {
-	if x != nil {
-		return x.Provider
-	}
-	return Provider_PROVIDER_UNSPECIFIED
-}
-
-func (x *Recipe) GetPulumiConfig() []byte {
+func (x *Recipe) GetPulumiConfig() string {
 	if x != nil {
 		return x.PulumiConfig
 	}
-	return nil
+	return ""
 }
 
 func (x *Recipe) GetActive() bool {
@@ -1091,10 +1084,12 @@ type Stack struct {
 	LastDeployedAt    *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=last_deployed_at,json=lastDeployedAt,proto3" json:"last_deployed_at,omitempty"`
 	ProviderAccountId string                 `protobuf:"bytes,6,opt,name=provider_account_id,json=providerAccountId,proto3" json:"provider_account_id,omitempty"`
 	Region            string                 `protobuf:"bytes,7,opt,name=region,proto3" json:"region,omitempty"`
-	Mode              DeploymentMode         `protobuf:"varint,8,opt,name=mode,proto3,enum=io.defang.v1.DeploymentMode" json:"mode,omitempty"`
-	IsDefault         bool                   `protobuf:"varint,9,opt,name=is_default,json=isDefault,proto3" json:"is_default,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// Deprecated: Marked as deprecated in io/defang/v1/fabric.proto.
+	Mode          DeploymentMode `protobuf:"varint,8,opt,name=mode,proto3,enum=io.defang.v1.DeploymentMode" json:"mode,omitempty"` // deprecated; use recipe
+	IsDefault     bool           `protobuf:"varint,9,opt,name=is_default,json=isDefault,proto3" json:"is_default,omitempty"`
+	Recipe        *Recipe        `protobuf:"bytes,10,opt,name=recipe,proto3" json:"recipe,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Stack) Reset() {
@@ -1176,6 +1171,7 @@ func (x *Stack) GetRegion() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in io/defang/v1/fabric.proto.
 func (x *Stack) GetMode() DeploymentMode {
 	if x != nil {
 		return x.Mode
@@ -1188,6 +1184,13 @@ func (x *Stack) GetIsDefault() bool {
 		return x.IsDefault
 	}
 	return false
+}
+
+func (x *Stack) GetRecipe() *Recipe {
+	if x != nil {
+		return x.Recipe
+	}
+	return nil
 }
 
 type PutStackRequest struct {
@@ -2784,8 +2787,9 @@ type DeployRequest struct {
 	DelegateDomain  string         `protobuf:"bytes,5,opt,name=delegate_domain,json=delegateDomain,proto3" json:"delegate_domain,omitempty"`
 	DelegationSetId string         `protobuf:"bytes,6,opt,name=delegation_set_id,json=delegationSetId,proto3" json:"delegation_set_id,omitempty"`
 	// Deprecated: Marked as deprecated in io/defang/v1/fabric.proto.
-	Preview       bool     `protobuf:"varint,7,opt,name=preview,proto3" json:"preview,omitempty"`
+	Preview       bool     `protobuf:"varint,7,opt,name=preview,proto3" json:"preview,omitempty"` // use PreviewRequest
 	Provider      Provider `protobuf:"varint,8,opt,name=provider,proto3,enum=io.defang.v1.Provider" json:"provider,omitempty"`
+	RecipeName    string   `protobuf:"bytes,9,opt,name=recipe_name,json=recipeName,proto3" json:"recipe_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2869,6 +2873,13 @@ func (x *DeployRequest) GetProvider() Provider {
 		return x.Provider
 	}
 	return Provider_PROVIDER_UNSPECIFIED
+}
+
+func (x *DeployRequest) GetRecipeName() string {
+	if x != nil {
+		return x.RecipeName
+	}
+	return ""
 }
 
 type DeployResponse struct {
@@ -4154,11 +4165,9 @@ func (x *ListConfigsResponse) GetConfigs() []*ConfigKey {
 }
 
 type Deployment struct {
-	state   protoimpl.MessageState `protogen:"open.v1"`
-	Id      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"` // deployment ID aka etag
-	Project string                 `protobuf:"bytes,2,opt,name=project,proto3" json:"project,omitempty"`
-	// Deprecated: Marked as deprecated in io/defang/v1/fabric.proto.
-	ProviderString    string                 `protobuf:"bytes,3,opt,name=provider_string,json=providerString,proto3" json:"provider_string,omitempty"` // was: provider
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"` // deployment ID aka etag
+	Project           string                 `protobuf:"bytes,2,opt,name=project,proto3" json:"project,omitempty"`
 	ProviderAccountId string                 `protobuf:"bytes,4,opt,name=provider_account_id,json=providerAccountId,proto3" json:"provider_account_id,omitempty"`
 	Timestamp         *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	Action            DeploymentAction       `protobuf:"varint,6,opt,name=action,proto3,enum=io.defang.v1.DeploymentAction" json:"action,omitempty"`
@@ -4166,20 +4175,21 @@ type Deployment struct {
 	Provider          Provider               `protobuf:"varint,8,opt,name=provider,proto3,enum=io.defang.v1.Provider" json:"provider,omitempty"`
 	ServiceCount      int32                  `protobuf:"varint,9,opt,name=service_count,json=serviceCount,proto3" json:"service_count,omitempty"`
 	Stack             string                 `protobuf:"bytes,10,opt,name=stack,proto3" json:"stack,omitempty"`
-	Mode              DeploymentMode         `protobuf:"varint,11,opt,name=mode,proto3,enum=io.defang.v1.DeploymentMode" json:"mode,omitempty"`
-	Completed         *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=completed,proto3" json:"completed,omitempty"`
-	Status            DeploymentStatus       `protobuf:"varint,13,opt,name=status,proto3,enum=io.defang.v1.DeploymentStatus" json:"status,omitempty"`
-	StatesUrl         string                 `protobuf:"bytes,14,opt,name=states_url,json=statesUrl,proto3" json:"states_url,omitempty"`
-	EventsUrl         string                 `protobuf:"bytes,15,opt,name=events_url,json=eventsUrl,proto3" json:"events_url,omitempty"`
-	Origin            DeploymentOrigin       `protobuf:"varint,16,opt,name=origin,proto3,enum=io.defang.v1.DeploymentOrigin" json:"origin,omitempty"`
-	OriginMetadata    map[string]string      `protobuf:"bytes,17,rep,name=origin_metadata,json=originMetadata,proto3" json:"origin_metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Services          []*ServiceInfo         `protobuf:"bytes,18,rep,name=services,proto3" json:"services,omitempty"`
-	CdType            CdType                 `protobuf:"varint,19,opt,name=cd_type,json=cdType,proto3,enum=io.defang.v1.CdType" json:"cd_type,omitempty"`
-	CdId              string                 `protobuf:"bytes,20,opt,name=cd_id,json=cdId,proto3" json:"cd_id,omitempty"`
-	Compose           []byte                 `protobuf:"bytes,21,opt,name=compose,proto3" json:"compose,omitempty"`                               // yaml
-	PulumiConfig      []byte                 `protobuf:"bytes,22,opt,name=pulumi_config,json=pulumiConfig,proto3" json:"pulumi_config,omitempty"` // YAML or JSON object
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// Deprecated: Marked as deprecated in io/defang/v1/fabric.proto.
+	Mode           DeploymentMode         `protobuf:"varint,11,opt,name=mode,proto3,enum=io.defang.v1.DeploymentMode" json:"mode,omitempty"` // deprecated; use recipe
+	Completed      *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=completed,proto3" json:"completed,omitempty"`
+	Status         DeploymentStatus       `protobuf:"varint,13,opt,name=status,proto3,enum=io.defang.v1.DeploymentStatus" json:"status,omitempty"`
+	StatesUrl      string                 `protobuf:"bytes,14,opt,name=states_url,json=statesUrl,proto3" json:"states_url,omitempty"`
+	EventsUrl      string                 `protobuf:"bytes,15,opt,name=events_url,json=eventsUrl,proto3" json:"events_url,omitempty"`
+	Origin         DeploymentOrigin       `protobuf:"varint,16,opt,name=origin,proto3,enum=io.defang.v1.DeploymentOrigin" json:"origin,omitempty"`
+	OriginMetadata map[string]string      `protobuf:"bytes,17,rep,name=origin_metadata,json=originMetadata,proto3" json:"origin_metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Services       []*ServiceInfo         `protobuf:"bytes,18,rep,name=services,proto3" json:"services,omitempty"`
+	CdType         CdType                 `protobuf:"varint,19,opt,name=cd_type,json=cdType,proto3,enum=io.defang.v1.CdType" json:"cd_type,omitempty"`
+	CdId           string                 `protobuf:"bytes,20,opt,name=cd_id,json=cdId,proto3" json:"cd_id,omitempty"`
+	Compose        []byte                 `protobuf:"bytes,21,opt,name=compose,proto3" json:"compose,omitempty"` // yaml
+	Recipe         *Recipe                `protobuf:"bytes,22,opt,name=recipe,proto3" json:"recipe,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Deployment) Reset() {
@@ -4222,14 +4232,6 @@ func (x *Deployment) GetId() string {
 func (x *Deployment) GetProject() string {
 	if x != nil {
 		return x.Project
-	}
-	return ""
-}
-
-// Deprecated: Marked as deprecated in io/defang/v1/fabric.proto.
-func (x *Deployment) GetProviderString() string {
-	if x != nil {
-		return x.ProviderString
 	}
 	return ""
 }
@@ -4283,6 +4285,7 @@ func (x *Deployment) GetStack() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in io/defang/v1/fabric.proto.
 func (x *Deployment) GetMode() DeploymentMode {
 	if x != nil {
 		return x.Mode
@@ -4360,9 +4363,9 @@ func (x *Deployment) GetCompose() []byte {
 	return nil
 }
 
-func (x *Deployment) GetPulumiConfig() []byte {
+func (x *Deployment) GetRecipe() *Recipe {
 	if x != nil {
-		return x.PulumiConfig
+		return x.Recipe
 	}
 	return nil
 }
@@ -5212,14 +5215,14 @@ type ProjectUpdate struct {
 	Compose   []byte `protobuf:"bytes,4,opt,name=compose,proto3" json:"compose,omitempty"`
 	CdVersion string `protobuf:"bytes,5,opt,name=cd_version,json=cdVersion,proto3" json:"cd_version,omitempty"`
 	// Deprecated: Marked as deprecated in io/defang/v1/fabric.proto.
-	Mode                  DeploymentMode `protobuf:"varint,6,opt,name=mode,proto3,enum=io.defang.v1.DeploymentMode" json:"mode,omitempty"` // deprecated; use pulumi_config
+	Mode                  DeploymentMode `protobuf:"varint,6,opt,name=mode,proto3,enum=io.defang.v1.DeploymentMode" json:"mode,omitempty"` // deprecated; use recipe
 	Provider              Provider       `protobuf:"varint,7,opt,name=provider,proto3,enum=io.defang.v1.Provider" json:"provider,omitempty"`
 	ProjectOutputsVersion uint32         `protobuf:"varint,8,opt,name=project_outputs_version,json=projectOutputsVersion,proto3" json:"project_outputs_version,omitempty"`
 	ProjectOutputs        []byte         `protobuf:"bytes,9,opt,name=project_outputs,json=projectOutputs,proto3" json:"project_outputs,omitempty"` // JSON serialization of pulumi outputs. schema versioned using project_outputs_version
 	StackFile             []byte         `protobuf:"bytes,10,opt,name=stack_file,json=stackFile,proto3" json:"stack_file,omitempty"`               // Defang stack file
 	Etag                  string         `protobuf:"bytes,13,opt,name=etag,proto3" json:"etag,omitempty"`                                          // aka deployment ID
 	PulumiVersion         string         `protobuf:"bytes,14,opt,name=pulumi_version,json=pulumiVersion,proto3" json:"pulumi_version,omitempty"`
-	PulumiConfig          []byte         `protobuf:"bytes,15,opt,name=pulumi_config,json=pulumiConfig,proto3" json:"pulumi_config,omitempty"` // YAML or JSON object
+	Recipe                *Recipe        `protobuf:"bytes,15,opt,name=recipe,proto3" json:"recipe,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -5340,9 +5343,9 @@ func (x *ProjectUpdate) GetPulumiVersion() string {
 	return ""
 }
 
-func (x *ProjectUpdate) GetPulumiConfig() []byte {
+func (x *ProjectUpdate) GetRecipe() *Recipe {
 	if x != nil {
-		return x.PulumiConfig
+		return x.Recipe
 	}
 	return nil
 }
@@ -5445,6 +5448,8 @@ func (x *Service) GetName() string {
 }
 
 // TODO: internal message; move to a separate proto file in fabric repo
+//
+// Deprecated: Marked as deprecated in io/defang/v1/fabric.proto.
 type DeployEvent struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Mode            DeploymentMode         `protobuf:"varint,1,opt,name=mode,proto3,enum=io.defang.v1.DeploymentMode" json:"mode,omitempty"`
@@ -6300,13 +6305,15 @@ func (x *EstimateResponse) GetLineItems() []*EstimateLineItem {
 }
 
 type PreviewRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Provider      Provider               `protobuf:"varint,1,opt,name=provider,proto3,enum=io.defang.v1.Provider" json:"provider,omitempty"`
-	Region        string                 `protobuf:"bytes,2,opt,name=region,proto3" json:"region,omitempty"`
-	Mode          DeploymentMode         `protobuf:"varint,3,opt,name=mode,proto3,enum=io.defang.v1.DeploymentMode" json:"mode,omitempty"`
-	Etag          string                 `protobuf:"bytes,4,opt,name=etag,proto3" json:"etag,omitempty"`       // aka deployment ID
-	Compose       []byte                 `protobuf:"bytes,5,opt,name=compose,proto3" json:"compose,omitempty"` // yaml (or json)
-	ProjectName   string                 `protobuf:"bytes,6,opt,name=project_name,json=projectName,proto3" json:"project_name,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Provider Provider               `protobuf:"varint,1,opt,name=provider,proto3,enum=io.defang.v1.Provider" json:"provider,omitempty"`
+	Region   string                 `protobuf:"bytes,2,opt,name=region,proto3" json:"region,omitempty"`
+	// Deprecated: Marked as deprecated in io/defang/v1/fabric.proto.
+	Mode          DeploymentMode `protobuf:"varint,3,opt,name=mode,proto3,enum=io.defang.v1.DeploymentMode" json:"mode,omitempty"` // deprecated; use recipe
+	Etag          string         `protobuf:"bytes,4,opt,name=etag,proto3" json:"etag,omitempty"`                                   // aka deployment ID
+	Compose       []byte         `protobuf:"bytes,5,opt,name=compose,proto3" json:"compose,omitempty"`                             // yaml (or json)
+	ProjectName   string         `protobuf:"bytes,6,opt,name=project_name,json=projectName,proto3" json:"project_name,omitempty"`
+	Recipe        *Recipe        `protobuf:"bytes,7,opt,name=recipe,proto3" json:"recipe,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6355,6 +6362,7 @@ func (x *PreviewRequest) GetRegion() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in io/defang/v1/fabric.proto.
 func (x *PreviewRequest) GetMode() DeploymentMode {
 	if x != nil {
 		return x.Mode
@@ -6381,6 +6389,13 @@ func (x *PreviewRequest) GetProjectName() string {
 		return x.ProjectName
 	}
 	return ""
+}
+
+func (x *PreviewRequest) GetRecipe() *Recipe {
+	if x != nil {
+		return x.Recipe
+	}
+	return nil
 }
 
 type PreviewResponse struct {
@@ -6535,12 +6550,11 @@ var File_io_defang_v1_fabric_proto protoreflect.FileDescriptor
 
 const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\n" +
-	"\x19io/defang/v1/fabric.proto\x12\fio.defang.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/type/money.proto\"\x8d\x01\n" +
+	"\x19io/defang/v1/fabric.proto\x12\fio.defang.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/type/money.proto\"_\n" +
 	"\x06Recipe\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x122\n" +
-	"\bprovider\x18\x02 \x01(\x0e2\x16.io.defang.v1.ProviderR\bprovider\x12#\n" +
-	"\rpulumi_config\x18\x03 \x01(\fR\fpulumiConfig\x12\x16\n" +
-	"\x06active\x18\x04 \x01(\bR\x06active\"@\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12#\n" +
+	"\rpulumi_config\x18\x03 \x01(\tR\fpulumiConfig\x12\x16\n" +
+	"\x06active\x18\x04 \x01(\bR\x06activeJ\x04\b\x02\x10\x03\"@\n" +
 	"\x10PutRecipeRequest\x12,\n" +
 	"\x06recipe\x18\x01 \x01(\v2\x14.io.defang.v1.RecipeR\x06recipe\"Z\n" +
 	"\x10GetRecipeRequest\x12\x12\n" +
@@ -6550,7 +6564,7 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x06recipe\x18\x01 \x01(\v2\x14.io.defang.v1.RecipeR\x06recipe\"\x14\n" +
 	"\x12ListRecipesRequest\"E\n" +
 	"\x13ListRecipesResponse\x12.\n" +
-	"\arecipes\x18\x01 \x03(\v2\x14.io.defang.v1.RecipeR\arecipes\"\xe7\x02\n" +
+	"\arecipes\x18\x01 \x03(\v2\x14.io.defang.v1.RecipeR\arecipes\"\x99\x03\n" +
 	"\x05Stack\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\aproject\x18\x02 \x01(\tR\aproject\x12\x1d\n" +
@@ -6559,10 +6573,12 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\bprovider\x18\x04 \x01(\x0e2\x16.io.defang.v1.ProviderR\bprovider\x12D\n" +
 	"\x10last_deployed_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\x0elastDeployedAt\x12.\n" +
 	"\x13provider_account_id\x18\x06 \x01(\tR\x11providerAccountId\x12\x16\n" +
-	"\x06region\x18\a \x01(\tR\x06region\x120\n" +
-	"\x04mode\x18\b \x01(\x0e2\x1c.io.defang.v1.DeploymentModeR\x04mode\x12\x1d\n" +
+	"\x06region\x18\a \x01(\tR\x06region\x124\n" +
+	"\x04mode\x18\b \x01(\x0e2\x1c.io.defang.v1.DeploymentModeB\x02\x18\x01R\x04mode\x12\x1d\n" +
 	"\n" +
-	"is_default\x18\t \x01(\bR\tisDefault\"<\n" +
+	"is_default\x18\t \x01(\bR\tisDefault\x12,\n" +
+	"\x06recipe\x18\n" +
+	" \x01(\v2\x14.io.defang.v1.RecipeR\x06recipe\"<\n" +
 	"\x0fPutStackRequest\x12)\n" +
 	"\x05stack\x18\x01 \x01(\v2\x13.io.defang.v1.StackR\x05stack\"A\n" +
 	"\x0fGetStackRequest\x12\x18\n" +
@@ -6670,7 +6686,7 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x0epulumi_version\x18\x05 \x01(\tR\rpulumiVersion\x12\x1c\n" +
 	"\tsignature\x18\x06 \x01(\fR\tsignature\x12%\n" +
 	"\x0eforced_version\x18\a \x01(\bR\rforcedVersion\x12#\n" +
-	"\rforced_reason\x18\b \x01(\tR\fforcedReasonJ\x04\b\x01\x10\x02\"\xa6\x02\n" +
+	"\rforced_reason\x18\b \x01(\tR\fforcedReasonJ\x04\b\x01\x10\x02\"\xc7\x02\n" +
 	"\rDeployRequest\x12\x1c\n" +
 	"\aproject\x18\x02 \x01(\tB\x02\x18\x01R\aproject\x120\n" +
 	"\x04mode\x18\x03 \x01(\x0e2\x1c.io.defang.v1.DeploymentModeR\x04mode\x12\x18\n" +
@@ -6678,7 +6694,9 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x0fdelegate_domain\x18\x05 \x01(\tR\x0edelegateDomain\x12*\n" +
 	"\x11delegation_set_id\x18\x06 \x01(\tR\x0fdelegationSetId\x12\x1c\n" +
 	"\apreview\x18\a \x01(\bB\x02\x18\x01R\apreview\x122\n" +
-	"\bprovider\x18\b \x01(\x0e2\x16.io.defang.v1.ProviderR\bproviderJ\x04\b\x01\x10\x02\"[\n" +
+	"\bprovider\x18\b \x01(\x0e2\x16.io.defang.v1.ProviderR\bprovider\x12\x1f\n" +
+	"\vrecipe_name\x18\t \x01(\tR\n" +
+	"recipeNameJ\x04\b\x01\x10\x02\"[\n" +
 	"\x0eDeployResponse\x125\n" +
 	"\bservices\x18\x01 \x03(\v2\x19.io.defang.v1.ServiceInfoR\bservices\x12\x12\n" +
 	"\x04etag\x18\x02 \x01(\tR\x04etag\"h\n" +
@@ -6767,12 +6785,11 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x12ListConfigsRequest\x12\x18\n" +
 	"\aproject\x18\x01 \x01(\tR\aproject\"H\n" +
 	"\x13ListConfigsResponse\x121\n" +
-	"\aconfigs\x18\x01 \x03(\v2\x17.io.defang.v1.ConfigKeyR\aconfigs\"\xfa\a\n" +
+	"\aconfigs\x18\x01 \x03(\v2\x17.io.defang.v1.ConfigKeyR\aconfigs\"\xe0\a\n" +
 	"\n" +
 	"Deployment\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
-	"\aproject\x18\x02 \x01(\tR\aproject\x12+\n" +
-	"\x0fprovider_string\x18\x03 \x01(\tB\x02\x18\x01R\x0eproviderString\x12.\n" +
+	"\aproject\x18\x02 \x01(\tR\aproject\x12.\n" +
 	"\x13provider_account_id\x18\x04 \x01(\tR\x11providerAccountId\x128\n" +
 	"\ttimestamp\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x126\n" +
 	"\x06action\x18\x06 \x01(\x0e2\x1e.io.defang.v1.DeploymentActionR\x06action\x12\x16\n" +
@@ -6780,8 +6797,8 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\bprovider\x18\b \x01(\x0e2\x16.io.defang.v1.ProviderR\bprovider\x12#\n" +
 	"\rservice_count\x18\t \x01(\x05R\fserviceCount\x12\x14\n" +
 	"\x05stack\x18\n" +
-	" \x01(\tR\x05stack\x120\n" +
-	"\x04mode\x18\v \x01(\x0e2\x1c.io.defang.v1.DeploymentModeR\x04mode\x128\n" +
+	" \x01(\tR\x05stack\x124\n" +
+	"\x04mode\x18\v \x01(\x0e2\x1c.io.defang.v1.DeploymentModeB\x02\x18\x01R\x04mode\x128\n" +
 	"\tcompleted\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tcompleted\x126\n" +
 	"\x06status\x18\r \x01(\x0e2\x1e.io.defang.v1.DeploymentStatusR\x06status\x12\x1d\n" +
 	"\n" +
@@ -6793,11 +6810,11 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\bservices\x18\x12 \x03(\v2\x19.io.defang.v1.ServiceInfoR\bservices\x12-\n" +
 	"\acd_type\x18\x13 \x01(\x0e2\x14.io.defang.v1.CdTypeR\x06cdType\x12\x13\n" +
 	"\x05cd_id\x18\x14 \x01(\tR\x04cdId\x12\x18\n" +
-	"\acompose\x18\x15 \x01(\fR\acompose\x12#\n" +
-	"\rpulumi_config\x18\x16 \x01(\fR\fpulumiConfig\x1aA\n" +
+	"\acompose\x18\x15 \x01(\fR\acompose\x12,\n" +
+	"\x06recipe\x18\x16 \x01(\v2\x14.io.defang.v1.RecipeR\x06recipe\x1aA\n" +
 	"\x13OriginMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"P\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01J\x04\b\x03\x10\x04\"P\n" +
 	"\x14PutDeploymentRequest\x128\n" +
 	"\n" +
 	"deployment\x18\x01 \x01(\v2\x18.io.defang.v1.DeploymentR\n" +
@@ -6868,7 +6885,7 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\bservices\x18\x01 \x03(\v2\x19.io.defang.v1.ServiceInfoR\bservices\x12\x18\n" +
 	"\aproject\x18\x02 \x01(\tR\aproject\x129\n" +
 	"\n" +
-	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\x8c\x04\n" +
+	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\x95\x04\n" +
 	"\rProjectUpdate\x125\n" +
 	"\bservices\x18\x01 \x03(\v2\x19.io.defang.v1.ServiceInfoR\bservices\x12\x17\n" +
 	"\aalb_arn\x18\x02 \x01(\tR\x06albArn\x12\x1c\n" +
@@ -6884,8 +6901,8 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"stack_file\x18\n" +
 	" \x01(\fR\tstackFile\x12\x12\n" +
 	"\x04etag\x18\r \x01(\tR\x04etag\x12%\n" +
-	"\x0epulumi_version\x18\x0e \x01(\tR\rpulumiVersion\x12#\n" +
-	"\rpulumi_config\x18\x0f \x01(\fR\fpulumiConfigJ\x04\b\v\x10\fJ\x04\b\f\x10\r\":\n" +
+	"\x0epulumi_version\x18\x0e \x01(\tR\rpulumiVersion\x12,\n" +
+	"\x06recipe\x18\x0f \x01(\v2\x14.io.defang.v1.RecipeR\x06recipeJ\x04\b\v\x10\fJ\x04\b\f\x10\r\":\n" +
 	"\n" +
 	"GetRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
@@ -6893,7 +6910,7 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\aService\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name:\x02\x18\x01J\x04\b\x02\x10\x03J\x04\b\x03\x10\x04J\x04\b\x04\x10\x05J\x04\b\x05\x10\x06J\x04\b\x06\x10\aJ\x04\b\a\x10\bJ\x04\b\b\x10\tJ\x04\b\t\x10\n" +
 	"J\x04\b\n" +
-	"\x10\vJ\x04\b\v\x10\fJ\x04\b\f\x10\rJ\x04\b\r\x10\x0eJ\x04\b\x0e\x10\x0fJ\x04\b\x0f\x10\x10J\x04\b\x10\x10\x11J\x04\b\x11\x10\x12J\x04\b\x12\x10\x13J\x04\b\x14\x10\x15\"\xa3\x02\n" +
+	"\x10\vJ\x04\b\v\x10\fJ\x04\b\f\x10\rJ\x04\b\r\x10\x0eJ\x04\b\x0e\x10\x0fJ\x04\b\x0f\x10\x10J\x04\b\x10\x10\x11J\x04\b\x11\x10\x12J\x04\b\x12\x10\x13J\x04\b\x14\x10\x15\"\xa7\x02\n" +
 	"\vDeployEvent\x120\n" +
 	"\x04mode\x18\x01 \x01(\x0e2\x1c.io.defang.v1.DeploymentModeR\x04mode\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12\x16\n" +
@@ -6905,7 +6922,7 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"dataschema\x12\x18\n" +
 	"\asubject\x18\a \x01(\tR\asubject\x12.\n" +
 	"\x04time\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x04time\x12\x12\n" +
-	"\x04data\x18\t \x01(\fR\x04data\"\\\n" +
+	"\x04data\x18\t \x01(\fR\x04data:\x02\x18\x01\"\\\n" +
 	"\x10SubscribeRequest\x12\x1a\n" +
 	"\bservices\x18\x01 \x03(\tR\bservices\x12\x12\n" +
 	"\x04etag\x18\x02 \x01(\tR\x04etag\x12\x18\n" +
@@ -6959,14 +6976,15 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x06region\x18\x02 \x01(\tR\x06region\x12.\n" +
 	"\bsubtotal\x18\x03 \x01(\v2\x12.google.type.MoneyR\bsubtotal\x12=\n" +
 	"\n" +
-	"line_items\x18\x04 \x03(\v2\x1e.io.defang.v1.EstimateLineItemR\tlineItems\"\xdf\x01\n" +
+	"line_items\x18\x04 \x03(\v2\x1e.io.defang.v1.EstimateLineItemR\tlineItems\"\x91\x02\n" +
 	"\x0ePreviewRequest\x122\n" +
 	"\bprovider\x18\x01 \x01(\x0e2\x16.io.defang.v1.ProviderR\bprovider\x12\x16\n" +
-	"\x06region\x18\x02 \x01(\tR\x06region\x120\n" +
-	"\x04mode\x18\x03 \x01(\x0e2\x1c.io.defang.v1.DeploymentModeR\x04mode\x12\x12\n" +
+	"\x06region\x18\x02 \x01(\tR\x06region\x124\n" +
+	"\x04mode\x18\x03 \x01(\x0e2\x1c.io.defang.v1.DeploymentModeB\x02\x18\x01R\x04mode\x12\x12\n" +
 	"\x04etag\x18\x04 \x01(\tR\x04etag\x12\x18\n" +
 	"\acompose\x18\x05 \x01(\fR\acompose\x12!\n" +
-	"\fproject_name\x18\x06 \x01(\tR\vprojectName\"%\n" +
+	"\fproject_name\x18\x06 \x01(\tR\vprojectName\x12,\n" +
+	"\x06recipe\x18\a \x01(\v2\x14.io.defang.v1.RecipeR\x06recipe\"%\n" +
 	"\x0fPreviewResponse\x12\x12\n" +
 	"\x04etag\x18\x01 \x01(\tR\x04etag\"\x8d\x01\n" +
 	"\x16GenerateComposeRequest\x128\n" +
@@ -6982,13 +7000,13 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x03AWS\x10\x02\x12\x10\n" +
 	"\fDIGITALOCEAN\x10\x03\x12\a\n" +
 	"\x03GCP\x10\x04\x12\t\n" +
-	"\x05AZURE\x10\x05*T\n" +
+	"\x05AZURE\x10\x05*X\n" +
 	"\x0eDeploymentMode\x12\x14\n" +
 	"\x10MODE_UNSPECIFIED\x10\x00\x12\x0f\n" +
 	"\vDEVELOPMENT\x10\x01\x12\v\n" +
 	"\aSTAGING\x10\x02\x12\x0e\n" +
 	"\n" +
-	"PRODUCTION\x10\x03*\xa3\x02\n" +
+	"PRODUCTION\x10\x03\x1a\x02\x18\x01*\xa3\x02\n" +
 	"\fServiceState\x12\x11\n" +
 	"\rNOT_SPECIFIED\x10\x00\x12\x10\n" +
 	"\fBUILD_QUEUED\x10\x01\x12\x16\n" +
@@ -7250,14 +7268,14 @@ var file_io_defang_v1_fabric_proto_goTypes = []any{
 	(*emptypb.Empty)(nil),                      // 109: google.protobuf.Empty
 }
 var file_io_defang_v1_fabric_proto_depIdxs = []int32{
-	0,   // 0: io.defang.v1.Recipe.provider:type_name -> io.defang.v1.Provider
-	13,  // 1: io.defang.v1.PutRecipeRequest.recipe:type_name -> io.defang.v1.Recipe
-	0,   // 2: io.defang.v1.GetRecipeRequest.provider:type_name -> io.defang.v1.Provider
-	13,  // 3: io.defang.v1.GetRecipeResponse.recipe:type_name -> io.defang.v1.Recipe
-	13,  // 4: io.defang.v1.ListRecipesResponse.recipes:type_name -> io.defang.v1.Recipe
-	0,   // 5: io.defang.v1.Stack.provider:type_name -> io.defang.v1.Provider
-	107, // 6: io.defang.v1.Stack.last_deployed_at:type_name -> google.protobuf.Timestamp
-	1,   // 7: io.defang.v1.Stack.mode:type_name -> io.defang.v1.DeploymentMode
+	13,  // 0: io.defang.v1.PutRecipeRequest.recipe:type_name -> io.defang.v1.Recipe
+	0,   // 1: io.defang.v1.GetRecipeRequest.provider:type_name -> io.defang.v1.Provider
+	13,  // 2: io.defang.v1.GetRecipeResponse.recipe:type_name -> io.defang.v1.Recipe
+	13,  // 3: io.defang.v1.ListRecipesResponse.recipes:type_name -> io.defang.v1.Recipe
+	0,   // 4: io.defang.v1.Stack.provider:type_name -> io.defang.v1.Provider
+	107, // 5: io.defang.v1.Stack.last_deployed_at:type_name -> google.protobuf.Timestamp
+	1,   // 6: io.defang.v1.Stack.mode:type_name -> io.defang.v1.DeploymentMode
+	13,  // 7: io.defang.v1.Stack.recipe:type_name -> io.defang.v1.Recipe
 	19,  // 8: io.defang.v1.PutStackRequest.stack:type_name -> io.defang.v1.Stack
 	19,  // 9: io.defang.v1.GetStackResponse.stack:type_name -> io.defang.v1.Stack
 	19,  // 10: io.defang.v1.ListStacksResponse.stacks:type_name -> io.defang.v1.Stack
@@ -7295,137 +7313,140 @@ var file_io_defang_v1_fabric_proto_depIdxs = []int32{
 	106, // 42: io.defang.v1.Deployment.origin_metadata:type_name -> io.defang.v1.Deployment.OriginMetadataEntry
 	59,  // 43: io.defang.v1.Deployment.services:type_name -> io.defang.v1.ServiceInfo
 	8,   // 44: io.defang.v1.Deployment.cd_type:type_name -> io.defang.v1.CdType
-	71,  // 45: io.defang.v1.PutDeploymentRequest.deployment:type_name -> io.defang.v1.Deployment
-	5,   // 46: io.defang.v1.ListDeploymentsRequest.type:type_name -> io.defang.v1.DeploymentType
-	107, // 47: io.defang.v1.ListDeploymentsRequest.until:type_name -> google.protobuf.Timestamp
-	71,  // 48: io.defang.v1.ListDeploymentsResponse.deployments:type_name -> io.defang.v1.Deployment
-	107, // 49: io.defang.v1.GetDeploymentRequest.timestamp:type_name -> google.protobuf.Timestamp
-	71,  // 50: io.defang.v1.GetDeploymentResponse.deployment:type_name -> io.defang.v1.Deployment
-	107, // 51: io.defang.v1.TailRequest.since:type_name -> google.protobuf.Timestamp
-	107, // 52: io.defang.v1.TailRequest.until:type_name -> google.protobuf.Timestamp
-	107, // 53: io.defang.v1.LogEntry.timestamp:type_name -> google.protobuf.Timestamp
-	82,  // 54: io.defang.v1.TailResponse.entries:type_name -> io.defang.v1.LogEntry
-	59,  // 55: io.defang.v1.GetServicesResponse.services:type_name -> io.defang.v1.ServiceInfo
-	107, // 56: io.defang.v1.GetServicesResponse.expires_at:type_name -> google.protobuf.Timestamp
-	59,  // 57: io.defang.v1.ProjectUpdate.services:type_name -> io.defang.v1.ServiceInfo
-	1,   // 58: io.defang.v1.ProjectUpdate.mode:type_name -> io.defang.v1.DeploymentMode
-	0,   // 59: io.defang.v1.ProjectUpdate.provider:type_name -> io.defang.v1.Provider
-	1,   // 60: io.defang.v1.DeployEvent.mode:type_name -> io.defang.v1.DeploymentMode
-	107, // 61: io.defang.v1.DeployEvent.time:type_name -> google.protobuf.Timestamp
-	59,  // 62: io.defang.v1.SubscribeResponse.service:type_name -> io.defang.v1.ServiceInfo
-	2,   // 63: io.defang.v1.SubscribeResponse.state:type_name -> io.defang.v1.ServiceState
-	10,  // 64: io.defang.v1.WhoAmIResponse.tier:type_name -> io.defang.v1.SubscriptionTier
-	107, // 65: io.defang.v1.WhoAmIResponse.paid_until:type_name -> google.protobuf.Timestamp
-	107, // 66: io.defang.v1.WhoAmIResponse.trial_until:type_name -> google.protobuf.Timestamp
-	0,   // 67: io.defang.v1.EstimateRequest.provider:type_name -> io.defang.v1.Provider
-	108, // 68: io.defang.v1.EstimateLineItem.cost:type_name -> google.type.Money
-	0,   // 69: io.defang.v1.EstimateResponse.provider:type_name -> io.defang.v1.Provider
-	108, // 70: io.defang.v1.EstimateResponse.subtotal:type_name -> google.type.Money
-	99,  // 71: io.defang.v1.EstimateResponse.line_items:type_name -> io.defang.v1.EstimateLineItem
-	0,   // 72: io.defang.v1.PreviewRequest.provider:type_name -> io.defang.v1.Provider
-	1,   // 73: io.defang.v1.PreviewRequest.mode:type_name -> io.defang.v1.DeploymentMode
-	11,  // 74: io.defang.v1.GenerateComposeRequest.platform:type_name -> io.defang.v1.SourcePlatform
-	109, // 75: io.defang.v1.FabricController.GetStatus:input_type -> google.protobuf.Empty
-	109, // 76: io.defang.v1.FabricController.GetVersion:input_type -> google.protobuf.Empty
-	77,  // 77: io.defang.v1.FabricController.Token:input_type -> io.defang.v1.TokenRequest
-	109, // 78: io.defang.v1.FabricController.RevokeToken:input_type -> google.protobuf.Empty
-	52,  // 79: io.defang.v1.FabricController.GenerateFiles:input_type -> io.defang.v1.GenerateFilesRequest
-	41,  // 80: io.defang.v1.FabricController.Debug:input_type -> io.defang.v1.DebugRequest
-	109, // 81: io.defang.v1.FabricController.SignEULA:input_type -> google.protobuf.Empty
-	109, // 82: io.defang.v1.FabricController.CheckToS:input_type -> google.protobuf.Empty
-	96,  // 83: io.defang.v1.FabricController.SetOptions:input_type -> io.defang.v1.SetOptionsRequest
-	109, // 84: io.defang.v1.FabricController.WhoAmI:input_type -> google.protobuf.Empty
-	45,  // 85: io.defang.v1.FabricController.Track:input_type -> io.defang.v1.TrackRequest
-	109, // 86: io.defang.v1.FabricController.DeleteMe:input_type -> google.protobuf.Empty
-	57,  // 87: io.defang.v1.FabricController.CreateUploadURL:input_type -> io.defang.v1.UploadURLRequest
-	46,  // 88: io.defang.v1.FabricController.CanIUse:input_type -> io.defang.v1.CanIUseRequest
-	98,  // 89: io.defang.v1.FabricController.Estimate:input_type -> io.defang.v1.EstimateRequest
-	101, // 90: io.defang.v1.FabricController.Preview:input_type -> io.defang.v1.PreviewRequest
-	103, // 91: io.defang.v1.FabricController.GenerateCompose:input_type -> io.defang.v1.GenerateComposeRequest
-	81,  // 92: io.defang.v1.FabricController.Tail:input_type -> io.defang.v1.TailRequest
-	48,  // 93: io.defang.v1.FabricController.Deploy:input_type -> io.defang.v1.DeployRequest
-	86,  // 94: io.defang.v1.FabricController.Get:input_type -> io.defang.v1.GetRequest
-	109, // 95: io.defang.v1.FabricController.GetPlaygroundProjectDomain:input_type -> google.protobuf.Empty
-	39,  // 96: io.defang.v1.FabricController.Destroy:input_type -> io.defang.v1.DestroyRequest
-	89,  // 97: io.defang.v1.FabricController.Subscribe:input_type -> io.defang.v1.SubscribeRequest
-	91,  // 98: io.defang.v1.FabricController.GetServices:input_type -> io.defang.v1.GetServicesRequest
-	64,  // 99: io.defang.v1.FabricController.PutSecret:input_type -> io.defang.v1.PutConfigRequest
-	60,  // 100: io.defang.v1.FabricController.DeleteSecrets:input_type -> io.defang.v1.Secrets
-	69,  // 101: io.defang.v1.FabricController.ListSecrets:input_type -> io.defang.v1.ListConfigsRequest
-	72,  // 102: io.defang.v1.FabricController.PutDeployment:input_type -> io.defang.v1.PutDeploymentRequest
-	73,  // 103: io.defang.v1.FabricController.ListDeployments:input_type -> io.defang.v1.ListDeploymentsRequest
-	75,  // 104: io.defang.v1.FabricController.GetDeployment:input_type -> io.defang.v1.GetDeploymentRequest
-	92,  // 105: io.defang.v1.FabricController.DelegateSubdomainZone:input_type -> io.defang.v1.DelegateSubdomainZoneRequest
-	94,  // 106: io.defang.v1.FabricController.DeleteSubdomainZone:input_type -> io.defang.v1.DeleteSubdomainZoneRequest
-	95,  // 107: io.defang.v1.FabricController.GetDelegateSubdomainZone:input_type -> io.defang.v1.GetDelegateSubdomainZoneRequest
-	30,  // 108: io.defang.v1.FabricController.VerifyDNSSetup:input_type -> io.defang.v1.VerifyDNSSetupRequest
-	31,  // 109: io.defang.v1.FabricController.ResolveIPAddr:input_type -> io.defang.v1.ResolveIPAddrRequest
-	33,  // 110: io.defang.v1.FabricController.ResolveCNAME:input_type -> io.defang.v1.ResolveCNAMERequest
-	35,  // 111: io.defang.v1.FabricController.ResolveNS:input_type -> io.defang.v1.ResolveNSRequest
-	37,  // 112: io.defang.v1.FabricController.ResolveTXT:input_type -> io.defang.v1.ResolveTXTRequest
-	27,  // 113: io.defang.v1.FabricController.GetSelectedProvider:input_type -> io.defang.v1.GetSelectedProviderRequest
-	29,  // 114: io.defang.v1.FabricController.SetSelectedProvider:input_type -> io.defang.v1.SetSelectedProviderRequest
-	20,  // 115: io.defang.v1.FabricController.PutStack:input_type -> io.defang.v1.PutStackRequest
-	21,  // 116: io.defang.v1.FabricController.GetStack:input_type -> io.defang.v1.GetStackRequest
-	24,  // 117: io.defang.v1.FabricController.ListStacks:input_type -> io.defang.v1.ListStacksRequest
-	26,  // 118: io.defang.v1.FabricController.DeleteStack:input_type -> io.defang.v1.DeleteStackRequest
-	22,  // 119: io.defang.v1.FabricController.GetDefaultStack:input_type -> io.defang.v1.GetDefaultStackRequest
-	14,  // 120: io.defang.v1.FabricController.PutRecipe:input_type -> io.defang.v1.PutRecipeRequest
-	15,  // 121: io.defang.v1.FabricController.GetRecipe:input_type -> io.defang.v1.GetRecipeRequest
-	17,  // 122: io.defang.v1.FabricController.ListRecipes:input_type -> io.defang.v1.ListRecipesRequest
-	79,  // 123: io.defang.v1.FabricController.GetStatus:output_type -> io.defang.v1.Status
-	80,  // 124: io.defang.v1.FabricController.GetVersion:output_type -> io.defang.v1.Version
-	78,  // 125: io.defang.v1.FabricController.Token:output_type -> io.defang.v1.TokenResponse
-	109, // 126: io.defang.v1.FabricController.RevokeToken:output_type -> google.protobuf.Empty
-	54,  // 127: io.defang.v1.FabricController.GenerateFiles:output_type -> io.defang.v1.GenerateFilesResponse
-	42,  // 128: io.defang.v1.FabricController.Debug:output_type -> io.defang.v1.DebugResponse
-	109, // 129: io.defang.v1.FabricController.SignEULA:output_type -> google.protobuf.Empty
-	109, // 130: io.defang.v1.FabricController.CheckToS:output_type -> google.protobuf.Empty
-	109, // 131: io.defang.v1.FabricController.SetOptions:output_type -> google.protobuf.Empty
-	97,  // 132: io.defang.v1.FabricController.WhoAmI:output_type -> io.defang.v1.WhoAmIResponse
-	109, // 133: io.defang.v1.FabricController.Track:output_type -> google.protobuf.Empty
-	109, // 134: io.defang.v1.FabricController.DeleteMe:output_type -> google.protobuf.Empty
-	58,  // 135: io.defang.v1.FabricController.CreateUploadURL:output_type -> io.defang.v1.UploadURLResponse
-	47,  // 136: io.defang.v1.FabricController.CanIUse:output_type -> io.defang.v1.CanIUseResponse
-	100, // 137: io.defang.v1.FabricController.Estimate:output_type -> io.defang.v1.EstimateResponse
-	102, // 138: io.defang.v1.FabricController.Preview:output_type -> io.defang.v1.PreviewResponse
-	104, // 139: io.defang.v1.FabricController.GenerateCompose:output_type -> io.defang.v1.GenerateComposeResponse
-	83,  // 140: io.defang.v1.FabricController.Tail:output_type -> io.defang.v1.TailResponse
-	49,  // 141: io.defang.v1.FabricController.Deploy:output_type -> io.defang.v1.DeployResponse
-	59,  // 142: io.defang.v1.FabricController.Get:output_type -> io.defang.v1.ServiceInfo
-	67,  // 143: io.defang.v1.FabricController.GetPlaygroundProjectDomain:output_type -> io.defang.v1.GetPlaygroundProjectDomainResponse
-	40,  // 144: io.defang.v1.FabricController.Destroy:output_type -> io.defang.v1.DestroyResponse
-	90,  // 145: io.defang.v1.FabricController.Subscribe:output_type -> io.defang.v1.SubscribeResponse
-	84,  // 146: io.defang.v1.FabricController.GetServices:output_type -> io.defang.v1.GetServicesResponse
-	109, // 147: io.defang.v1.FabricController.PutSecret:output_type -> google.protobuf.Empty
-	109, // 148: io.defang.v1.FabricController.DeleteSecrets:output_type -> google.protobuf.Empty
-	60,  // 149: io.defang.v1.FabricController.ListSecrets:output_type -> io.defang.v1.Secrets
-	109, // 150: io.defang.v1.FabricController.PutDeployment:output_type -> google.protobuf.Empty
-	74,  // 151: io.defang.v1.FabricController.ListDeployments:output_type -> io.defang.v1.ListDeploymentsResponse
-	76,  // 152: io.defang.v1.FabricController.GetDeployment:output_type -> io.defang.v1.GetDeploymentResponse
-	93,  // 153: io.defang.v1.FabricController.DelegateSubdomainZone:output_type -> io.defang.v1.DelegateSubdomainZoneResponse
-	109, // 154: io.defang.v1.FabricController.DeleteSubdomainZone:output_type -> google.protobuf.Empty
-	93,  // 155: io.defang.v1.FabricController.GetDelegateSubdomainZone:output_type -> io.defang.v1.DelegateSubdomainZoneResponse
-	109, // 156: io.defang.v1.FabricController.VerifyDNSSetup:output_type -> google.protobuf.Empty
-	32,  // 157: io.defang.v1.FabricController.ResolveIPAddr:output_type -> io.defang.v1.ResolveIPAddrResponse
-	34,  // 158: io.defang.v1.FabricController.ResolveCNAME:output_type -> io.defang.v1.ResolveCNAMEResponse
-	36,  // 159: io.defang.v1.FabricController.ResolveNS:output_type -> io.defang.v1.ResolveNSResponse
-	38,  // 160: io.defang.v1.FabricController.ResolveTXT:output_type -> io.defang.v1.ResolveTXTResponse
-	28,  // 161: io.defang.v1.FabricController.GetSelectedProvider:output_type -> io.defang.v1.GetSelectedProviderResponse
-	109, // 162: io.defang.v1.FabricController.SetSelectedProvider:output_type -> google.protobuf.Empty
-	109, // 163: io.defang.v1.FabricController.PutStack:output_type -> google.protobuf.Empty
-	23,  // 164: io.defang.v1.FabricController.GetStack:output_type -> io.defang.v1.GetStackResponse
-	25,  // 165: io.defang.v1.FabricController.ListStacks:output_type -> io.defang.v1.ListStacksResponse
-	109, // 166: io.defang.v1.FabricController.DeleteStack:output_type -> google.protobuf.Empty
-	23,  // 167: io.defang.v1.FabricController.GetDefaultStack:output_type -> io.defang.v1.GetStackResponse
-	109, // 168: io.defang.v1.FabricController.PutRecipe:output_type -> google.protobuf.Empty
-	16,  // 169: io.defang.v1.FabricController.GetRecipe:output_type -> io.defang.v1.GetRecipeResponse
-	18,  // 170: io.defang.v1.FabricController.ListRecipes:output_type -> io.defang.v1.ListRecipesResponse
-	123, // [123:171] is the sub-list for method output_type
-	75,  // [75:123] is the sub-list for method input_type
-	75,  // [75:75] is the sub-list for extension type_name
-	75,  // [75:75] is the sub-list for extension extendee
-	0,   // [0:75] is the sub-list for field type_name
+	13,  // 45: io.defang.v1.Deployment.recipe:type_name -> io.defang.v1.Recipe
+	71,  // 46: io.defang.v1.PutDeploymentRequest.deployment:type_name -> io.defang.v1.Deployment
+	5,   // 47: io.defang.v1.ListDeploymentsRequest.type:type_name -> io.defang.v1.DeploymentType
+	107, // 48: io.defang.v1.ListDeploymentsRequest.until:type_name -> google.protobuf.Timestamp
+	71,  // 49: io.defang.v1.ListDeploymentsResponse.deployments:type_name -> io.defang.v1.Deployment
+	107, // 50: io.defang.v1.GetDeploymentRequest.timestamp:type_name -> google.protobuf.Timestamp
+	71,  // 51: io.defang.v1.GetDeploymentResponse.deployment:type_name -> io.defang.v1.Deployment
+	107, // 52: io.defang.v1.TailRequest.since:type_name -> google.protobuf.Timestamp
+	107, // 53: io.defang.v1.TailRequest.until:type_name -> google.protobuf.Timestamp
+	107, // 54: io.defang.v1.LogEntry.timestamp:type_name -> google.protobuf.Timestamp
+	82,  // 55: io.defang.v1.TailResponse.entries:type_name -> io.defang.v1.LogEntry
+	59,  // 56: io.defang.v1.GetServicesResponse.services:type_name -> io.defang.v1.ServiceInfo
+	107, // 57: io.defang.v1.GetServicesResponse.expires_at:type_name -> google.protobuf.Timestamp
+	59,  // 58: io.defang.v1.ProjectUpdate.services:type_name -> io.defang.v1.ServiceInfo
+	1,   // 59: io.defang.v1.ProjectUpdate.mode:type_name -> io.defang.v1.DeploymentMode
+	0,   // 60: io.defang.v1.ProjectUpdate.provider:type_name -> io.defang.v1.Provider
+	13,  // 61: io.defang.v1.ProjectUpdate.recipe:type_name -> io.defang.v1.Recipe
+	1,   // 62: io.defang.v1.DeployEvent.mode:type_name -> io.defang.v1.DeploymentMode
+	107, // 63: io.defang.v1.DeployEvent.time:type_name -> google.protobuf.Timestamp
+	59,  // 64: io.defang.v1.SubscribeResponse.service:type_name -> io.defang.v1.ServiceInfo
+	2,   // 65: io.defang.v1.SubscribeResponse.state:type_name -> io.defang.v1.ServiceState
+	10,  // 66: io.defang.v1.WhoAmIResponse.tier:type_name -> io.defang.v1.SubscriptionTier
+	107, // 67: io.defang.v1.WhoAmIResponse.paid_until:type_name -> google.protobuf.Timestamp
+	107, // 68: io.defang.v1.WhoAmIResponse.trial_until:type_name -> google.protobuf.Timestamp
+	0,   // 69: io.defang.v1.EstimateRequest.provider:type_name -> io.defang.v1.Provider
+	108, // 70: io.defang.v1.EstimateLineItem.cost:type_name -> google.type.Money
+	0,   // 71: io.defang.v1.EstimateResponse.provider:type_name -> io.defang.v1.Provider
+	108, // 72: io.defang.v1.EstimateResponse.subtotal:type_name -> google.type.Money
+	99,  // 73: io.defang.v1.EstimateResponse.line_items:type_name -> io.defang.v1.EstimateLineItem
+	0,   // 74: io.defang.v1.PreviewRequest.provider:type_name -> io.defang.v1.Provider
+	1,   // 75: io.defang.v1.PreviewRequest.mode:type_name -> io.defang.v1.DeploymentMode
+	13,  // 76: io.defang.v1.PreviewRequest.recipe:type_name -> io.defang.v1.Recipe
+	11,  // 77: io.defang.v1.GenerateComposeRequest.platform:type_name -> io.defang.v1.SourcePlatform
+	109, // 78: io.defang.v1.FabricController.GetStatus:input_type -> google.protobuf.Empty
+	109, // 79: io.defang.v1.FabricController.GetVersion:input_type -> google.protobuf.Empty
+	77,  // 80: io.defang.v1.FabricController.Token:input_type -> io.defang.v1.TokenRequest
+	109, // 81: io.defang.v1.FabricController.RevokeToken:input_type -> google.protobuf.Empty
+	52,  // 82: io.defang.v1.FabricController.GenerateFiles:input_type -> io.defang.v1.GenerateFilesRequest
+	41,  // 83: io.defang.v1.FabricController.Debug:input_type -> io.defang.v1.DebugRequest
+	109, // 84: io.defang.v1.FabricController.SignEULA:input_type -> google.protobuf.Empty
+	109, // 85: io.defang.v1.FabricController.CheckToS:input_type -> google.protobuf.Empty
+	96,  // 86: io.defang.v1.FabricController.SetOptions:input_type -> io.defang.v1.SetOptionsRequest
+	109, // 87: io.defang.v1.FabricController.WhoAmI:input_type -> google.protobuf.Empty
+	45,  // 88: io.defang.v1.FabricController.Track:input_type -> io.defang.v1.TrackRequest
+	109, // 89: io.defang.v1.FabricController.DeleteMe:input_type -> google.protobuf.Empty
+	57,  // 90: io.defang.v1.FabricController.CreateUploadURL:input_type -> io.defang.v1.UploadURLRequest
+	46,  // 91: io.defang.v1.FabricController.CanIUse:input_type -> io.defang.v1.CanIUseRequest
+	98,  // 92: io.defang.v1.FabricController.Estimate:input_type -> io.defang.v1.EstimateRequest
+	101, // 93: io.defang.v1.FabricController.Preview:input_type -> io.defang.v1.PreviewRequest
+	103, // 94: io.defang.v1.FabricController.GenerateCompose:input_type -> io.defang.v1.GenerateComposeRequest
+	81,  // 95: io.defang.v1.FabricController.Tail:input_type -> io.defang.v1.TailRequest
+	48,  // 96: io.defang.v1.FabricController.Deploy:input_type -> io.defang.v1.DeployRequest
+	86,  // 97: io.defang.v1.FabricController.Get:input_type -> io.defang.v1.GetRequest
+	109, // 98: io.defang.v1.FabricController.GetPlaygroundProjectDomain:input_type -> google.protobuf.Empty
+	39,  // 99: io.defang.v1.FabricController.Destroy:input_type -> io.defang.v1.DestroyRequest
+	89,  // 100: io.defang.v1.FabricController.Subscribe:input_type -> io.defang.v1.SubscribeRequest
+	91,  // 101: io.defang.v1.FabricController.GetServices:input_type -> io.defang.v1.GetServicesRequest
+	64,  // 102: io.defang.v1.FabricController.PutSecret:input_type -> io.defang.v1.PutConfigRequest
+	60,  // 103: io.defang.v1.FabricController.DeleteSecrets:input_type -> io.defang.v1.Secrets
+	69,  // 104: io.defang.v1.FabricController.ListSecrets:input_type -> io.defang.v1.ListConfigsRequest
+	72,  // 105: io.defang.v1.FabricController.PutDeployment:input_type -> io.defang.v1.PutDeploymentRequest
+	73,  // 106: io.defang.v1.FabricController.ListDeployments:input_type -> io.defang.v1.ListDeploymentsRequest
+	75,  // 107: io.defang.v1.FabricController.GetDeployment:input_type -> io.defang.v1.GetDeploymentRequest
+	92,  // 108: io.defang.v1.FabricController.DelegateSubdomainZone:input_type -> io.defang.v1.DelegateSubdomainZoneRequest
+	94,  // 109: io.defang.v1.FabricController.DeleteSubdomainZone:input_type -> io.defang.v1.DeleteSubdomainZoneRequest
+	95,  // 110: io.defang.v1.FabricController.GetDelegateSubdomainZone:input_type -> io.defang.v1.GetDelegateSubdomainZoneRequest
+	30,  // 111: io.defang.v1.FabricController.VerifyDNSSetup:input_type -> io.defang.v1.VerifyDNSSetupRequest
+	31,  // 112: io.defang.v1.FabricController.ResolveIPAddr:input_type -> io.defang.v1.ResolveIPAddrRequest
+	33,  // 113: io.defang.v1.FabricController.ResolveCNAME:input_type -> io.defang.v1.ResolveCNAMERequest
+	35,  // 114: io.defang.v1.FabricController.ResolveNS:input_type -> io.defang.v1.ResolveNSRequest
+	37,  // 115: io.defang.v1.FabricController.ResolveTXT:input_type -> io.defang.v1.ResolveTXTRequest
+	27,  // 116: io.defang.v1.FabricController.GetSelectedProvider:input_type -> io.defang.v1.GetSelectedProviderRequest
+	29,  // 117: io.defang.v1.FabricController.SetSelectedProvider:input_type -> io.defang.v1.SetSelectedProviderRequest
+	20,  // 118: io.defang.v1.FabricController.PutStack:input_type -> io.defang.v1.PutStackRequest
+	21,  // 119: io.defang.v1.FabricController.GetStack:input_type -> io.defang.v1.GetStackRequest
+	24,  // 120: io.defang.v1.FabricController.ListStacks:input_type -> io.defang.v1.ListStacksRequest
+	26,  // 121: io.defang.v1.FabricController.DeleteStack:input_type -> io.defang.v1.DeleteStackRequest
+	22,  // 122: io.defang.v1.FabricController.GetDefaultStack:input_type -> io.defang.v1.GetDefaultStackRequest
+	14,  // 123: io.defang.v1.FabricController.PutRecipe:input_type -> io.defang.v1.PutRecipeRequest
+	15,  // 124: io.defang.v1.FabricController.GetRecipe:input_type -> io.defang.v1.GetRecipeRequest
+	17,  // 125: io.defang.v1.FabricController.ListRecipes:input_type -> io.defang.v1.ListRecipesRequest
+	79,  // 126: io.defang.v1.FabricController.GetStatus:output_type -> io.defang.v1.Status
+	80,  // 127: io.defang.v1.FabricController.GetVersion:output_type -> io.defang.v1.Version
+	78,  // 128: io.defang.v1.FabricController.Token:output_type -> io.defang.v1.TokenResponse
+	109, // 129: io.defang.v1.FabricController.RevokeToken:output_type -> google.protobuf.Empty
+	54,  // 130: io.defang.v1.FabricController.GenerateFiles:output_type -> io.defang.v1.GenerateFilesResponse
+	42,  // 131: io.defang.v1.FabricController.Debug:output_type -> io.defang.v1.DebugResponse
+	109, // 132: io.defang.v1.FabricController.SignEULA:output_type -> google.protobuf.Empty
+	109, // 133: io.defang.v1.FabricController.CheckToS:output_type -> google.protobuf.Empty
+	109, // 134: io.defang.v1.FabricController.SetOptions:output_type -> google.protobuf.Empty
+	97,  // 135: io.defang.v1.FabricController.WhoAmI:output_type -> io.defang.v1.WhoAmIResponse
+	109, // 136: io.defang.v1.FabricController.Track:output_type -> google.protobuf.Empty
+	109, // 137: io.defang.v1.FabricController.DeleteMe:output_type -> google.protobuf.Empty
+	58,  // 138: io.defang.v1.FabricController.CreateUploadURL:output_type -> io.defang.v1.UploadURLResponse
+	47,  // 139: io.defang.v1.FabricController.CanIUse:output_type -> io.defang.v1.CanIUseResponse
+	100, // 140: io.defang.v1.FabricController.Estimate:output_type -> io.defang.v1.EstimateResponse
+	102, // 141: io.defang.v1.FabricController.Preview:output_type -> io.defang.v1.PreviewResponse
+	104, // 142: io.defang.v1.FabricController.GenerateCompose:output_type -> io.defang.v1.GenerateComposeResponse
+	83,  // 143: io.defang.v1.FabricController.Tail:output_type -> io.defang.v1.TailResponse
+	49,  // 144: io.defang.v1.FabricController.Deploy:output_type -> io.defang.v1.DeployResponse
+	59,  // 145: io.defang.v1.FabricController.Get:output_type -> io.defang.v1.ServiceInfo
+	67,  // 146: io.defang.v1.FabricController.GetPlaygroundProjectDomain:output_type -> io.defang.v1.GetPlaygroundProjectDomainResponse
+	40,  // 147: io.defang.v1.FabricController.Destroy:output_type -> io.defang.v1.DestroyResponse
+	90,  // 148: io.defang.v1.FabricController.Subscribe:output_type -> io.defang.v1.SubscribeResponse
+	84,  // 149: io.defang.v1.FabricController.GetServices:output_type -> io.defang.v1.GetServicesResponse
+	109, // 150: io.defang.v1.FabricController.PutSecret:output_type -> google.protobuf.Empty
+	109, // 151: io.defang.v1.FabricController.DeleteSecrets:output_type -> google.protobuf.Empty
+	60,  // 152: io.defang.v1.FabricController.ListSecrets:output_type -> io.defang.v1.Secrets
+	109, // 153: io.defang.v1.FabricController.PutDeployment:output_type -> google.protobuf.Empty
+	74,  // 154: io.defang.v1.FabricController.ListDeployments:output_type -> io.defang.v1.ListDeploymentsResponse
+	76,  // 155: io.defang.v1.FabricController.GetDeployment:output_type -> io.defang.v1.GetDeploymentResponse
+	93,  // 156: io.defang.v1.FabricController.DelegateSubdomainZone:output_type -> io.defang.v1.DelegateSubdomainZoneResponse
+	109, // 157: io.defang.v1.FabricController.DeleteSubdomainZone:output_type -> google.protobuf.Empty
+	93,  // 158: io.defang.v1.FabricController.GetDelegateSubdomainZone:output_type -> io.defang.v1.DelegateSubdomainZoneResponse
+	109, // 159: io.defang.v1.FabricController.VerifyDNSSetup:output_type -> google.protobuf.Empty
+	32,  // 160: io.defang.v1.FabricController.ResolveIPAddr:output_type -> io.defang.v1.ResolveIPAddrResponse
+	34,  // 161: io.defang.v1.FabricController.ResolveCNAME:output_type -> io.defang.v1.ResolveCNAMEResponse
+	36,  // 162: io.defang.v1.FabricController.ResolveNS:output_type -> io.defang.v1.ResolveNSResponse
+	38,  // 163: io.defang.v1.FabricController.ResolveTXT:output_type -> io.defang.v1.ResolveTXTResponse
+	28,  // 164: io.defang.v1.FabricController.GetSelectedProvider:output_type -> io.defang.v1.GetSelectedProviderResponse
+	109, // 165: io.defang.v1.FabricController.SetSelectedProvider:output_type -> google.protobuf.Empty
+	109, // 166: io.defang.v1.FabricController.PutStack:output_type -> google.protobuf.Empty
+	23,  // 167: io.defang.v1.FabricController.GetStack:output_type -> io.defang.v1.GetStackResponse
+	25,  // 168: io.defang.v1.FabricController.ListStacks:output_type -> io.defang.v1.ListStacksResponse
+	109, // 169: io.defang.v1.FabricController.DeleteStack:output_type -> google.protobuf.Empty
+	23,  // 170: io.defang.v1.FabricController.GetDefaultStack:output_type -> io.defang.v1.GetStackResponse
+	109, // 171: io.defang.v1.FabricController.PutRecipe:output_type -> google.protobuf.Empty
+	16,  // 172: io.defang.v1.FabricController.GetRecipe:output_type -> io.defang.v1.GetRecipeResponse
+	18,  // 173: io.defang.v1.FabricController.ListRecipes:output_type -> io.defang.v1.ListRecipesResponse
+	126, // [126:174] is the sub-list for method output_type
+	78,  // [78:126] is the sub-list for method input_type
+	78,  // [78:78] is the sub-list for extension type_name
+	78,  // [78:78] is the sub-list for extension extendee
+	0,   // [0:78] is the sub-list for field type_name
 }
 
 func init() { file_io_defang_v1_fabric_proto_init() }
