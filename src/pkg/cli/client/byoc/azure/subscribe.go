@@ -96,7 +96,7 @@ func subscribe(ctx context.Context, in subscribeInputs) iter.Seq2[*defangv1.Subs
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		eventCh := make(chan *defangv1.SubscribeResponse, 16)
+		eventCh := make(chan *defangv1.SubscribeResponse)
 		var wg sync.WaitGroup
 
 		wg.Add(1)
