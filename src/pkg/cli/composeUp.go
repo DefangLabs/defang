@@ -138,6 +138,11 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		}
 	}
 
+	rresp, err := fabric.GetRecipe(ctx, &defangv1.GetRecipeRequest{Name: mode.String()})
+	if err != nil {
+		return nil, project, fmt.Errorf("failed to get recipe for deployment mode %q: %w", mode, err)
+	}
+
 	deployRequest := &client.DeployRequest{
 		DeployRequest: defangv1.DeployRequest{
 			Mode:           mode.Value(),
@@ -145,6 +150,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 			Compose:        composeYaml,
 			DelegateDomain: delegateDomain.Zone,
 		},
+		Recipe: rresp.Recipe,
 	}
 
 	delegation, err := provider.PrepareDomainDelegation(ctx, client.PrepareDomainDelegationRequest{
@@ -207,6 +213,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		CdType:       resp.CdType,
 		CdId:         resp.CdId,
 		Compose:      composeYaml,
+		Recipe:       deployRequest.Recipe,
 	})
 	if err != nil {
 		term.Debug("Failed to record deployment:", err)

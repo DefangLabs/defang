@@ -259,7 +259,6 @@ func promptForStackParameters(ctx context.Context, params *stacks.Parameters) er
 	}
 
 	*params = *newParams
-
 	return nil
 }
 

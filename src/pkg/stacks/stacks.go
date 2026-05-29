@@ -18,7 +18,7 @@ import (
 type Parameters struct {
 	Name      string
 	Provider  client.ProviderID
-	Mode      modes.Mode
+	Mode      modes.Mode // aka recipe name
 	Region    string
 	Variables map[string]string
 }

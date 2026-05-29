@@ -53,6 +53,7 @@ type putDeploymentParams struct {
 	CdType       defangv1.CdType
 	CdId         string
 	Compose      []byte
+	Recipe       *defangv1.Recipe
 }
 
 func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric client.FabricClient, stack *stacks.Parameters, req putDeploymentParams) error {
