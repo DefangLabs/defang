@@ -2,7 +2,6 @@ package azure
 
 import (
 	"context"
-	"errors"
 	"os"
 	"sync"
 	"testing"
@@ -10,7 +9,6 @@ import (
 
 	armappcontainersv3 "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appcontainers/armappcontainers/v3"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerregistry/armcontainerregistry"
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/aca"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/acr"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -69,46 +67,28 @@ func (f *fakeRunsClient) ListRunsSince(_ context.Context, _ time.Time) ([]acr.Ru
 	return f.updates[idx], nil
 }
 
-type fakeJobClient struct {
-	mu       sync.Mutex
-	statuses []*aca.JobStatus // returned on successive calls
-	calls    int
-}
-
-func (f *fakeJobClient) GetJobExecutionStatus(_ context.Context, _ string) (*aca.JobStatus, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	idx := f.calls
-	f.calls++
-	if idx >= len(f.statuses) {
-		idx = len(f.statuses) - 1
-	}
-	if idx < 0 {
-		return nil, errors.New("no status")
-	}
-	return f.statuses[idx], nil
-}
-
-// drain collects all SubscribeResponses (and any error) from the iterator.
-// Stops at the first error or when the iterator is exhausted.
-func drain(t *testing.T, ctx context.Context, in subscribeInputs) ([]*defangv1.SubscribeResponse, error) {
+// drain collects SubscribeResponses with a short deadline. The producer
+// no longer self-terminates (CD tracking and the allServicesTerminal exit
+// were removed; cleanup happens via parent-ctx cancellation in the
+// TailAndMonitor flow), so tests rely on the timeout to stop pollBuilds.
+// 100ms at a 1ms poll interval is ~100 ticks per poller — far more than
+// needed for state transitions to drain.
+func drain(t *testing.T, ctx context.Context, in subscribeInputs) []*defangv1.SubscribeResponse {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
 	defer cancel()
 
 	var got []*defangv1.SubscribeResponse
-	var firstErr error
 	for resp, err := range subscribe(ctx, in) {
 		if err != nil {
-			firstErr = err
-			break
+			t.Fatalf("drain err: %v", err)
 		}
 		got = append(got, resp)
 	}
-	return got, firstErr
+	return got
 }
 
-func TestSubscribe_AllHealthyAfterCdSuccess(t *testing.T) {
+func TestSubscribe_AllRevisionsHealthy(t *testing.T) {
 	etag := "abc123"
 	services := []string{"web", "worker"}
 	rev := &fakeRevisionsClient{
@@ -123,55 +103,19 @@ func TestSubscribe_AllHealthyAfterCdSuccess(t *testing.T) {
 			},
 		},
 	}
-	job := &fakeJobClient{
-		statuses: []*aca.JobStatus{
-			{Status: armappcontainersv3.JobExecutionRunningStateRunning},
-			{Status: armappcontainersv3.JobExecutionRunningStateSucceeded},
-		},
-	}
-	got, err := drain(t, t.Context(), subscribeInputs{
+	got := drain(t, t.Context(), subscribeInputs{
 		etag:      etag,
 		services:  services,
 		since:     time.Now(),
 		revisions: rev,
 		runs:      &fakeRunsClient{},
-		job:       job,
-		cdRunID:   "cd-run",
 	})
-	if err != nil {
-		t.Fatalf("drain err: %v", err)
-	}
 
 	finals := finalStates(got, services)
 	for _, svc := range services {
 		if finals[svc] != defangv1.ServiceState_DEPLOYMENT_COMPLETED {
 			t.Errorf("service %q final state = %v, want DEPLOYMENT_COMPLETED (got events: %+v)", svc, finals[svc], got)
 		}
-	}
-}
-
-func TestSubscribe_CdFailurePropagates(t *testing.T) {
-	rev := &fakeRevisionsClient{}
-	job := &fakeJobClient{
-		statuses: []*aca.JobStatus{
-			{Status: armappcontainersv3.JobExecutionRunningStateFailed, ErrorMessage: "pulumi crashed"},
-		},
-	}
-	_, err := drain(t, t.Context(), subscribeInputs{
-		etag:      "e",
-		services:  []string{"web"},
-		since:     time.Now(),
-		revisions: rev,
-		runs:      &fakeRunsClient{},
-		job:       job,
-		cdRunID:   "cd-run",
-	})
-	if err == nil {
-		t.Fatal("expected error from CD failure, got nil")
-	}
-	var dfe client.ErrDeploymentFailed
-	if !errors.As(err, &dfe) {
-		t.Fatalf("err = %v, want ErrDeploymentFailed", err)
 	}
 }
 
@@ -187,21 +131,13 @@ func TestSubscribe_RevisionFailedTerminates(t *testing.T) {
 			},
 		},
 	}
-	job := &fakeJobClient{
-		statuses: []*aca.JobStatus{{Status: armappcontainersv3.JobExecutionRunningStateRunning}},
-	}
-	got, err := drain(t, t.Context(), subscribeInputs{
+	got := drain(t, t.Context(), subscribeInputs{
 		etag:      etag,
 		services:  []string{"web"},
 		since:     time.Now(),
 		revisions: rev,
 		runs:      &fakeRunsClient{},
-		job:       job,
-		cdRunID:   "cd-run",
 	})
-	if err != nil {
-		t.Fatalf("drain err: %v", err)
-	}
 	finals := finalStates(got, []string{"web"})
 	if finals["web"] != defangv1.ServiceState_DEPLOYMENT_FAILED {
 		t.Errorf("web final state = %v, want DEPLOYMENT_FAILED", finals["web"])
@@ -221,24 +157,13 @@ func TestSubscribe_BuildStateEmitted(t *testing.T) {
 			{{RunID: "r1", Task: "web", Status: armcontainerregistry.RunStatusSucceeded}},
 		},
 	}
-	job := &fakeJobClient{
-		statuses: []*aca.JobStatus{
-			{Status: armappcontainersv3.JobExecutionRunningStateRunning},
-			{Status: armappcontainersv3.JobExecutionRunningStateSucceeded},
-		},
-	}
-	got, err := drain(t, t.Context(), subscribeInputs{
+	got := drain(t, t.Context(), subscribeInputs{
 		etag:      etag,
 		services:  []string{"web"},
 		since:     time.Now(),
 		revisions: rev,
 		runs:      runs,
-		job:       job,
-		cdRunID:   "cd-run",
 	})
-	if err != nil {
-		t.Fatalf("drain err: %v", err)
-	}
 	var sawBuild bool
 	for _, r := range got {
 		if r.Name == "web" && (r.State == defangv1.ServiceState_BUILD_RUNNING || r.State == defangv1.ServiceState_BUILD_STOPPING) {

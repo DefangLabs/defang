@@ -10,7 +10,6 @@ import (
 
 	armappcontainersv3 "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appcontainers/armappcontainers/v3"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerregistry/armcontainerregistry"
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/aca"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/acr"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -21,12 +20,6 @@ import (
 // 30–90s; 5s is the same cadence BuildLogWatcher uses for ACR runs. Exposed
 // as a var (not const) so tests can dial it down to a millisecond.
 var subscribePollInterval = 5 * time.Second
-
-// subscribeDeadline caps how long Subscribe waits for any single service to
-// reach a terminal state after the CD job has finished. ACA revisions
-// normally hit Healthy in 30–90s, so 5 min is generous; treat anything
-// beyond that as a stuck-provisioning failure.
-const subscribeDeadline = 5 * time.Minute
 
 // subscribeRevisionsClient and subscribeRunsClient narrow the surface the
 // orchestrator uses to one method each so tests can stub them without
@@ -39,14 +32,24 @@ type subscribeRunsClient interface {
 	ListRunsSince(ctx context.Context, since time.Time) ([]acr.RunInfo, error)
 }
 
-type subscribeJobClient interface {
-	GetJobExecutionStatus(ctx context.Context, executionName string) (*aca.JobStatus, error)
-}
-
-// Subscribe implements client.Provider. It polls three Azure event sources
-// (ACR Task runs for builds, Container Apps Revisions for deployment, and
-// the CD Job execution for the overall infra run) and multiplexes their
-// state transitions into a SubscribeResponse stream.
+// Subscribe implements client.Provider. It polls two Azure event sources
+// (ACR Task runs for builds, Container Apps Revisions for deployment) and
+// multiplexes their state transitions into a SubscribeResponse stream.
+//
+// CD-job state is intentionally NOT polled here. The CLI's TailAndMonitor
+// (pkg/cli/tailAndMonitor.go) runs WaitForCdTaskExit in parallel, which
+// polls ByocAzure.GetDeploymentStatus and surfaces CD success/failure
+// independently. Tracking it in both places would mean reporting the same
+// failure twice and gating revision-completed events on a CD success that
+// the caller already observes via a separate goroutine.
+//
+// As a consequence this producer does not self-terminate: pollBuilds has
+// no intrinsic exit condition (no transitions for a tick ≠ no more builds
+// coming), so the aggregator only exits when the consumer cancels the
+// parent ctx or stops the iterator. In the TailAndMonitor flow the parent
+// ctx is cancelled when the cobra command's ctx is — the transient cost
+// between WaitServiceState returning and command exit is a few extra ACR
+// list calls.
 func (b *ByocAzure) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {
 	if b.cdRunID == "" {
 		return nil, errors.New("Subscribe: no active deployment (CdCommand or Deploy must be called first)")
@@ -77,8 +80,6 @@ func (b *ByocAzure) Subscribe(ctx context.Context, req *defangv1.SubscribeReques
 		since:     since,
 		revisions: revisions,
 		runs:      runs,
-		job:       b.job,
-		cdRunID:   b.cdRunID,
 	}), nil
 }
 
@@ -88,8 +89,6 @@ type subscribeInputs struct {
 	since     time.Time
 	revisions subscribeRevisionsClient
 	runs      subscribeRunsClient
-	job       subscribeJobClient
-	cdRunID   string
 }
 
 func subscribe(ctx context.Context, in subscribeInputs) iter.Seq2[*defangv1.SubscribeResponse, error] {
@@ -97,22 +96,15 @@ func subscribe(ctx context.Context, in subscribeInputs) iter.Seq2[*defangv1.Subs
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		eventCh := make(chan subscribeEvent, 16)
+		eventCh := make(chan *defangv1.SubscribeResponse, 16)
 		var wg sync.WaitGroup
-
-		// cdState is shared between the CD-job poller (writer) and the
-		// aggregator below (reader). We use a mutex; the volume is tiny.
-		cdState := &cdGate{}
-
-		wg.Add(1)
-		go pollCD(ctx, in.job, in.cdRunID, cdState, eventCh, &wg)
 
 		wg.Add(1)
 		go pollBuilds(ctx, in.runs, in.services, in.since, eventCh, &wg)
 
 		for _, service := range in.services {
 			wg.Add(1)
-			go pollRevision(ctx, in.revisions, service, in.etag, cdState, eventCh, &wg)
+			go pollRevision(ctx, in.revisions, service, in.etag, eventCh, &wg)
 		}
 
 		go func() {
@@ -120,132 +112,15 @@ func subscribe(ctx context.Context, in subscribeInputs) iter.Seq2[*defangv1.Subs
 			close(eventCh)
 		}()
 
-		// Aggregator. We hold off on emitting DEPLOYMENT_COMPLETED for any
-		// service until the CD job has also succeeded — matches GCP's
-		// cdSuccess gate (stream.go:516). If the CD job fails, all
-		// outstanding services are reported as DEPLOYMENT_FAILED so the
-		// CLI's WaitServiceState exits with ErrDeploymentFailed.
-		serviceFinal := make(map[string]defangv1.ServiceState, len(in.services))
-		pendingReady := make(map[string]string) // service → last status
-
-		emit := func(resp *defangv1.SubscribeResponse) bool {
-			if resp.Name != "" && isTerminalServiceState(resp.State) {
-				serviceFinal[resp.Name] = resp.State
-			}
-			return yield(resp, nil)
-		}
-
-		for ev := range eventCh {
-			if ev.err != nil {
-				// Errors come from a terminal CD failure; further state
-				// events from the build/revision pollers are no longer
-				// meaningful. Treat as terminal so consumers that don't
-				// break on error don't hang.
-				yield(nil, ev.err)
-				return
-			}
-
-			if resp := ev.resp; resp != nil {
-				// Ready-but-CD-pending: stash and re-emit once CD succeeds.
-				if resp.State == defangv1.ServiceState_DEPLOYMENT_COMPLETED && !cdState.success() {
-					pendingReady[resp.Name] = resp.Status
-					// Report as still pending so the CLI keeps waiting.
-					if !emit(&defangv1.SubscribeResponse{
-						Name:   resp.Name,
-						Status: resp.Status,
-						State:  defangv1.ServiceState_DEPLOYMENT_PENDING,
-					}) {
-						return
-					}
-				} else if !emit(resp) {
-					return
-				}
-			}
-
-			// On CD success: flush any services that were waiting on it.
-			if ev.cdSucceeded {
-				for name, status := range pendingReady {
-					if !emit(&defangv1.SubscribeResponse{
-						Name:   name,
-						Status: status,
-						State:  defangv1.ServiceState_DEPLOYMENT_COMPLETED,
-					}) {
-						return
-					}
-				}
-				pendingReady = nil
-			}
-
-			if allServicesTerminal(in.services, serviceFinal) {
+		for resp := range eventCh {
+			if !yield(resp, nil) {
 				return
 			}
 		}
 	}
 }
 
-type subscribeEvent struct {
-	resp        *defangv1.SubscribeResponse
-	err         error
-	cdSucceeded bool
-}
-
-// cdGate carries the CD-job success bit across goroutines. Revisions
-// reaching `Healthy` before CD finishes are held back until cdGate.success()
-// returns true (matches GCP's cdSuccess flag).
-type cdGate struct {
-	mu        sync.Mutex
-	succeeded bool
-}
-
-func (g *cdGate) success() bool {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	return g.succeeded
-}
-
-func (g *cdGate) markSuccess() {
-	g.mu.Lock()
-	g.succeeded = true
-	g.mu.Unlock()
-}
-
-func pollCD(ctx context.Context, job subscribeJobClient, cdRunID string, gate *cdGate, out chan<- subscribeEvent, wg *sync.WaitGroup) {
-	defer wg.Done()
-	ticker := time.NewTicker(subscribePollInterval)
-	defer ticker.Stop()
-	for {
-		status, err := job.GetJobExecutionStatus(ctx, cdRunID)
-		if err != nil {
-			// Transient errors are common during job startup; log and retry.
-			term.Debugf("Subscribe: CD job status error: %v", err)
-		} else if status != nil && status.IsTerminal() {
-			if status.IsSuccess() {
-				gate.markSuccess()
-				select {
-				case out <- subscribeEvent{cdSucceeded: true}:
-				case <-ctx.Done():
-				}
-			} else {
-				msg := string(status.Status)
-				if status.ErrorMessage != "" {
-					msg += ": " + status.ErrorMessage
-				}
-				select {
-				case out <- subscribeEvent{err: client.ErrDeploymentFailed{Message: fmt.Sprintf("CD job %s: %s", cdRunID, msg)}}:
-				case <-ctx.Done():
-				}
-			}
-			return
-		}
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-		}
-	}
-}
-
-func pollRevision(ctx context.Context, c subscribeRevisionsClient, service, etag string, gate *cdGate, out chan<- subscribeEvent, wg *sync.WaitGroup) {
+func pollRevision(ctx context.Context, c subscribeRevisionsClient, service, etag string, out chan<- *defangv1.SubscribeResponse, wg *sync.WaitGroup) {
 	defer wg.Done()
 	revisionName := service + "--" + etag
 
@@ -254,7 +129,6 @@ func pollRevision(ctx context.Context, c subscribeRevisionsClient, service, etag
 
 	var lastState defangv1.ServiceState
 	var lastStatus string
-	deadline := time.Time{} // armed only after CD has succeeded
 
 	emit := func(state defangv1.ServiceState, status string) bool {
 		if state == lastState && status == lastStatus {
@@ -263,11 +137,11 @@ func pollRevision(ctx context.Context, c subscribeRevisionsClient, service, etag
 		lastState = state
 		lastStatus = status
 		select {
-		case out <- subscribeEvent{resp: &defangv1.SubscribeResponse{
+		case out <- &defangv1.SubscribeResponse{
 			Name:   service,
 			Status: status,
 			State:  state,
-		}}:
+		}:
 			return true
 		case <-ctx.Done():
 			return false
@@ -275,11 +149,6 @@ func pollRevision(ctx context.Context, c subscribeRevisionsClient, service, etag
 	}
 
 	for {
-		// Arm the post-CD deadline once and only once.
-		if deadline.IsZero() && gate.success() {
-			deadline = time.Now().Add(subscribeDeadline)
-		}
-
 		state, err := c.GetRevisionState(ctx, service, revisionName)
 		if err != nil {
 			if ctx.Err() != nil {
@@ -294,18 +163,6 @@ func pollRevision(ctx context.Context, c subscribeRevisionsClient, service, etag
 			if terminal {
 				return
 			}
-		}
-
-		if !deadline.IsZero() && time.Now().After(deadline) {
-			select {
-			case out <- subscribeEvent{resp: &defangv1.SubscribeResponse{
-				Name:   service,
-				Status: fmt.Sprintf("revision %s did not become healthy within %s", revisionName, subscribeDeadline),
-				State:  defangv1.ServiceState_DEPLOYMENT_FAILED,
-			}}:
-			case <-ctx.Done():
-			}
-			return
 		}
 
 		select {
@@ -363,7 +220,7 @@ func mapRevisionState(s *aca.RevisionState) (defangv1.ServiceState, string, bool
 	return defangv1.ServiceState_DEPLOYMENT_COMPLETED, "running", true
 }
 
-func pollBuilds(ctx context.Context, runs subscribeRunsClient, services []string, since time.Time, out chan<- subscribeEvent, wg *sync.WaitGroup) {
+func pollBuilds(ctx context.Context, runs subscribeRunsClient, services []string, since time.Time, out chan<- *defangv1.SubscribeResponse, wg *sync.WaitGroup) {
 	defer wg.Done()
 	serviceSet := make(map[string]struct{}, len(services))
 	for _, s := range services {
@@ -400,11 +257,11 @@ func pollBuilds(ctx context.Context, runs subscribeRunsClient, services []string
 				continue
 			}
 			select {
-			case out <- subscribeEvent{resp: &defangv1.SubscribeResponse{
+			case out <- &defangv1.SubscribeResponse{
 				Name:   info.Task,
 				Status: status,
 				State:  state,
-			}}:
+			}:
 			case <-ctx.Done():
 				return
 			}
@@ -434,30 +291,4 @@ func mapRunStatus(s armcontainerregistry.RunStatus) (defangv1.ServiceState, stri
 		return defangv1.ServiceState_BUILD_FAILED, "build " + string(s)
 	}
 	return defangv1.ServiceState_NOT_SPECIFIED, ""
-}
-
-func isTerminalServiceState(s defangv1.ServiceState) bool {
-	switch s {
-	case defangv1.ServiceState_DEPLOYMENT_COMPLETED,
-		defangv1.ServiceState_DEPLOYMENT_FAILED,
-		defangv1.ServiceState_BUILD_FAILED:
-		return true
-	}
-	return false
-}
-
-func allServicesTerminal(services []string, final map[string]defangv1.ServiceState) bool {
-	if len(final) < len(services) {
-		return false
-	}
-	for _, s := range services {
-		state, ok := final[s]
-		if !ok {
-			return false
-		}
-		if !isTerminalServiceState(state) {
-			return false
-		}
-	}
-	return true
 }
