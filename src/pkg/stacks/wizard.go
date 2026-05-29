@@ -13,6 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 )
 
 type Wizard struct {
@@ -79,6 +80,16 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 			return nil, fmt.Errorf("failed to elicit region choice: %w", err)
 		}
 		params.Region = region
+	}
+
+	if params.Mode == modes.ModeUnspecified && params.Provider != client.ProviderDefang {
+		modeName, err := w.ec.RequestEnum(ctx, "Which recipe (deployment mode) do you want to deploy with?", "mode",
+			modes.AllDeploymentModes(),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to elicit deployment mode: %w", err)
+		}
+		params.Mode = modes.Parse(modeName)
 	}
 
 	if params.Name == "" {
