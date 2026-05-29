@@ -69,6 +69,7 @@ func makeEstimateCmd() *cobra.Command {
 
 var providerDescription = map[client.ProviderID]string{
 	client.ProviderDefang: "The Defang Playground is a free platform intended for testing purposes only.",
+	client.ProviderAzure:  "Deploy to Azure using the AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_CLIENT_SECRET environment variables or the Azure CLI configuration.",
 	client.ProviderAWS:    "Deploy to AWS using the AWS_* environment variables or the AWS CLI configuration.",
 	client.ProviderDO:     "Deploy to DigitalOcean using the DIGITALOCEAN_TOKEN, SPACES_ACCESS_KEY_ID, and SPACES_SECRET_ACCESS_KEY environment variables.",
 	client.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
@@ -94,6 +95,8 @@ func interactiveSelectProvider(providers []client.ProviderID) (client.ProviderID
 		defaultOption = client.ProviderDO.String()
 	case pkg.GcpInEnv() != "":
 		defaultOption = client.ProviderGCP.String()
+	case pkg.AzureInEnv() != "":
+		defaultOption = client.ProviderAzure.String()
 	}
 
 	var optionValue string

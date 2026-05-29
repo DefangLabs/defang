@@ -1,84 +1,65 @@
 package modes
 
 import (
-	"fmt"
-	"maps"
-	"slices"
 	"strings"
 
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-type Mode defangv1.DeploymentMode
+type Mode string
 
 const (
-	ModeUnspecified      Mode = Mode(defangv1.DeploymentMode_MODE_UNSPECIFIED)
-	ModeAffordable       Mode = Mode(defangv1.DeploymentMode_DEVELOPMENT)
-	ModeBalanced         Mode = Mode(defangv1.DeploymentMode_STAGING)
-	ModeHighAvailability Mode = Mode(defangv1.DeploymentMode_PRODUCTION)
+	ModeUnspecified      Mode = Mode("")
+	ModeAffordable       Mode = Mode("AFFORDABLE")
+	ModeBalanced         Mode = Mode("BALANCED")
+	ModeHighAvailability Mode = Mode("HIGH_AVAILABILITY")
 )
 
-func (b Mode) String() string {
-	if b == 0 {
-		return ""
-	}
-
-	switch b {
-	case ModeAffordable:
-		return "AFFORDABLE"
-	case ModeBalanced:
-		return "BALANCED"
-	case ModeHighAvailability:
-		return "HIGH_AVAILABILITY"
-	default:
-		return fmt.Sprintf("UNKNOWN(%d)", b)
-	}
+func (m Mode) String() string {
+	return string(m)
 }
 
-func (b *Mode) Set(s string) error {
-	mode, err := Parse(s)
-	if err != nil {
-		return err
-	}
-	*b = mode
+func (m *Mode) Set(s string) error {
+	*m = Parse(s)
 	return nil
 }
 
-func Parse(str string) (Mode, error) {
+func Parse(str string) Mode {
 	upper := strings.ToUpper(str)
-	mode, ok := defangv1.DeploymentMode_value[upper]
-	if !ok {
-		switch upper {
-		case "":
-			mode = int32(defangv1.DeploymentMode_MODE_UNSPECIFIED)
-		case "AFFORDABLE", "CHEAP":
-			mode = int32(defangv1.DeploymentMode_DEVELOPMENT)
-		case "BALANCED":
-			mode = int32(defangv1.DeploymentMode_STAGING)
-		case "HA", "HIGH_AVAILABILITY", "HIGH-AVAILABILITY":
-			mode = int32(defangv1.DeploymentMode_PRODUCTION)
-		default:
-			return 0, fmt.Errorf("invalid mode: %q, not one of %v", str, AllDeploymentModes())
-		}
+	// Handle legacy aliases
+	switch upper {
+	case "CHEAP", "DEVELOPMENT":
+		return ModeAffordable
+	case "STAGING":
+		return ModeBalanced
+	case "HA", "HIGH-AVAILABILITY", "PRODUCTION":
+		return ModeHighAvailability
 	}
-	return Mode(mode), nil
+	return Mode(upper)
 }
 
-func (b Mode) Type() string {
+func (Mode) Type() string {
 	return "mode"
 }
 
-func (b Mode) Value() defangv1.DeploymentMode {
-	return defangv1.DeploymentMode(b)
+func (m Mode) Value() defangv1.DeploymentMode {
+	switch m {
+	case ModeAffordable:
+		return defangv1.DeploymentMode_DEVELOPMENT
+	case ModeBalanced:
+		return defangv1.DeploymentMode_STAGING
+	case ModeHighAvailability:
+		return defangv1.DeploymentMode_PRODUCTION
+	default:
+		return defangv1.DeploymentMode_MODE_UNSPECIFIED
+	}
 }
 
+// Deprecated: replaced by free-form recipe names, ListRecipes gRPC method
 func AllDeploymentModes() []string {
-	var modes []string
-	for _, i := range slices.Sorted(maps.Keys(defangv1.DeploymentMode_name)) {
-		if i == 0 {
-			continue
-		}
-		modes = append(modes, Mode(i).String())
+	return []string{
+		ModeAffordable.String(),
+		ModeBalanced.String(),
+		ModeHighAvailability.String(),
 	}
-	return modes
 }

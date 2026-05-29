@@ -319,6 +319,8 @@ func SetupCommands(version string) {
 	// TODO: Add list, renew etc.
 	certCmd.AddCommand(certGenerateCmd)
 	RootCmd.AddCommand(certCmd)
+	recipeCmd := makeRecipeCmd()
+	RootCmd.AddCommand(recipeCmd)
 
 	stackCmd := makeStackCmd()
 	RootCmd.AddCommand(stackCmd)
