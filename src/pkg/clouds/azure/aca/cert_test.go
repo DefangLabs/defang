@@ -1,6 +1,8 @@
 package aca
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"strings"
@@ -152,11 +154,22 @@ func TestSanitize(t *testing.T) {
 }
 
 func TestManagedCertName(t *testing.T) {
+	// expectedSuffix mirrors managedCertName's hashing so tests describe the
+	// contract rather than hardcoding opaque hex strings — drift between the
+	// function and the test would show up as the test computing one suffix
+	// while the function computes another.
+	expectedSuffix := func(hostname string) string {
+		sum := sha256.Sum256([]byte(strings.ToLower(hostname)))
+		return hex.EncodeToString(sum[:4])
+	}
+
 	tests := []struct {
 		name     string
 		envName  string
 		hostname string
-		want     string
+		// want is the prefix-plus-truncated-segments portion of the name;
+		// the per-hostname sha1 suffix is appended automatically.
+		want string
 	}{
 		{
 			name:     "short inputs pass through",
@@ -168,13 +181,13 @@ func TestManagedCertName(t *testing.T) {
 			name:     "envName truncated to 15",
 			envName:  "Defang-html-css-js-certsub-352bab6",
 			hostname: "azurebyod.defang.study",
-			want:     "mc-defang-html-css-azurebyod-defang-study",
+			want:     "mc-defang-html-css-azurebyod-defang-stud",
 		},
 		{
-			name:     "hostname truncated to 30",
+			name:     "hostname truncated to 21",
 			envName:  "defang-cd",
 			hostname: "very-long-hostname-with-many-labels.example.com.test.invalid",
-			want:     "mc-defang-cd-very-long-hostname-with-many-l",
+			want:     "mc-defang-cd-very-long-hostname-wi",
 		},
 		{
 			name:     "uppercase + dots normalized",
@@ -194,14 +207,15 @@ func TestManagedCertName(t *testing.T) {
 			name:     "hostname trailing hyphen after truncation is trimmed",
 			envName:  "defang-cd",
 			hostname: "abcdefghijklmnopqrstuvwxyz1234-rest.example.com",
-			want:     "mc-defang-cd-abcdefghijklmnopqrstuvwxyz1234",
+			want:     "mc-defang-cd-abcdefghijklmnopqrstu",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			full := tt.want + "-" + expectedSuffix(tt.hostname)
 			got := managedCertName(tt.envName, tt.hostname)
-			if got != tt.want {
-				t.Errorf("managedCertName(%q, %q) = %q, want %q", tt.envName, tt.hostname, got, tt.want)
+			if got != full {
+				t.Errorf("managedCertName(%q, %q) = %q, want %q", tt.envName, tt.hostname, got, full)
 			}
 			// ARM cap is 64; the function targets well below.
 			if len(got) > 64 {
@@ -210,7 +224,22 @@ func TestManagedCertName(t *testing.T) {
 			if !strings.HasPrefix(got, "mc-") {
 				t.Errorf("name %q missing mc- prefix", got)
 			}
+			if strings.Contains(got, "--") {
+				t.Errorf("name %q contains forbidden double-hyphen run", got)
+			}
 		})
+	}
+}
+
+// TestManagedCertName_DistinguishesLongHostnames guards the cert-name
+// collision risk raised on PR #2136: two different hostnames that share the
+// same first 21 sanitized characters used to resolve to the same cert resource
+// name. The sha1 suffix must keep them distinct within an env.
+func TestManagedCertName_DistinguishesLongHostnames(t *testing.T) {
+	a := managedCertName("defang-cd", "abcdefghijklmnopqrstuvwxyz-aaaa.example.com")
+	b := managedCertName("defang-cd", "abcdefghijklmnopqrstuvwxyz-bbbb.example.com")
+	if a == b {
+		t.Errorf("expected distinct cert names for hostnames differing past the 21-char truncation, got %q == %q", a, b)
 	}
 }
 

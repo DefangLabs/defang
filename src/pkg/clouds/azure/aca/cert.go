@@ -8,6 +8,8 @@ package aca
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -95,7 +97,7 @@ func IssueCert(ctx context.Context, cred azcore.TokenCredential, subscriptionID,
 	}
 
 	term.Infof("Registering custom hostname %s on container app %s", hostname, appName)
-	if err := addHostnameDisabled(ctx, appsClient, resourceGroup, appName, hostname, app); err != nil {
+	if err := addHostnameDisabled(ctx, appsClient, resourceGroup, appName, hostname); err != nil {
 		return err
 	}
 
@@ -171,8 +173,16 @@ func waitForBYODdns(ctx context.Context, hostname, expectedCname, expectedTxt st
 //
 // Azure ARM uses JSON Merge Patch (RFC 7396) which replaces arrays wholesale,
 // so we must include every existing CustomDomain entry in the body or they
-// will be wiped out by the update.
-func addHostnameDisabled(ctx context.Context, client *armappcontainers.ContainerAppsClient, rg, appName, hostname string, current *armappcontainers.ContainerApp) error {
+// will be wiped out by the update. We re-Get the CA right before the PATCH
+// rather than reusing a snapshot from the caller: waitForBYODdns can block
+// for up to 30 minutes, during which another deploy could have added its own
+// customDomain entry, and a stale slice would silently drop that.
+func addHostnameDisabled(ctx context.Context, client *armappcontainers.ContainerAppsClient, rg, appName, hostname string) error {
+	cur, err := client.Get(ctx, rg, appName, nil)
+	if err != nil {
+		return fmt.Errorf("fetching app %s before hostname registration: %w", appName, err)
+	}
+	current := &cur.ContainerApp
 	if hasCustomDomain(current, hostname) {
 		term.Debugf("Hostname %s already registered on %s", hostname, appName)
 		return nil
@@ -336,6 +346,15 @@ func submitManagedCertTXT(ctx context.Context, client *armappcontainers.ManagedC
 			token = *got.Properties.ValidationToken
 			break
 		}
+		// Only swallow the "not yet there" case (404 while Azure is still
+		// settling). Permission / auth / transient provider errors should
+		// surface immediately instead of dragging out to the deadline.
+		if getErr != nil {
+			var respErr *azcore.ResponseError
+			if !errors.As(getErr, &respErr) || respErr.StatusCode != 404 {
+				return nil, fmt.Errorf("fetching managed certificate %s for validation token: %w", certName, getErr)
+			}
+		}
 		if time.Now().After(tokenDeadline) {
 			return nil, fmt.Errorf("timed out waiting for Azure to issue validationToken for %s", hostname)
 		}
@@ -439,17 +458,24 @@ func waitForTLS(ctx context.Context, hostname string, resolver dns.Resolver) err
 // ARM allows alphanumeric + hyphens, max 64 chars; we keep it well under that.
 //
 // We trim trailing hyphens after truncation so the joined name never produces
-// a "--" run, which ARM rejects.
+// a "--" run, which ARM rejects. A short hash of the original hostname is
+// appended to the sanitized/truncated host so two long hostnames that share
+// the same first ~21 sanitized characters don't collide on the same managed
+// cert resource within an env (which would let the second issuance overwrite
+// the first). sha256 is used as a non-cryptographic hash here — we only need
+// determinism and a low collision rate over the inputs we'll see.
 func managedCertName(envName, hostname string) string {
 	env := sanitize(envName)
 	if len(env) > 15 {
 		env = strings.TrimRight(env[:15], "-")
 	}
 	host := sanitize(hostname)
-	if len(host) > 30 {
-		host = strings.TrimRight(host[:30], "-")
+	if len(host) > 21 {
+		host = strings.TrimRight(host[:21], "-")
 	}
-	return fmt.Sprintf("mc-%s-%s", env, host)
+	sum := sha256.Sum256([]byte(strings.ToLower(hostname)))
+	suffix := hex.EncodeToString(sum[:4])
+	return fmt.Sprintf("mc-%s-%s-%s", env, host, suffix)
 }
 
 func sanitize(s string) string {

@@ -78,8 +78,11 @@ func (d *DNS) EnsureZoneExists(ctx context.Context, domain string) ([]string, er
 }
 
 func nameServers(zone armdns.Zone) []string {
+	// Consistent zero value: callers can rely on a non-nil empty slice when
+	// there are no name servers, regardless of whether Properties was unset
+	// or just empty.
 	if zone.Properties == nil {
-		return nil
+		return []string{}
 	}
 	servers := make([]string, 0, len(zone.Properties.NameServers))
 	for _, ns := range zone.Properties.NameServers {

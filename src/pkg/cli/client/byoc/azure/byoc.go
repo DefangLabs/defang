@@ -47,7 +47,12 @@ type ByocAzure struct {
 	cdStart time.Time
 
 	// delegateDomainZone records the delegate domain whose public DNS zone
-	// PrepareDomainDelegation created, mirroring the GCP provider.
+	// PrepareDomainDelegation created, mirroring the GCP provider's
+	// ByocGcp.delegateDomainZone field. Currently informational only — set on
+	// success, not yet read elsewhere. The GCP provider follows the same
+	// pattern: the destroy path relies on the project resource group teardown
+	// to remove the zone rather than tracking it explicitly. Kept here as a
+	// hook for a future cleanup path that needs to know which zone to delete.
 	delegateDomainZone string
 }
 
