@@ -25,7 +25,7 @@ func (e ComposeError) Unwrap() error {
 type ComposeUpParams struct {
 	Project    *compose.Project
 	UploadMode compose.UploadMode
-	Mode       modes.Mode
+	Mode       modes.Recipe
 }
 
 func checkDeploymentMode(prevMode, newMode modes.Mode) (modes.Mode, error) {
@@ -68,7 +68,7 @@ func checkDeploymentMode(prevMode, newMode modes.Mode) (modes.Mode, error) {
 func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.Provider, stack *stacks.Parameters, params ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	upload := params.UploadMode
 	project := params.Project
-	mode := params.Mode
+	recipe := params.Mode
 
 	if dryrun.DoDryRun {
 		upload = compose.UploadModeIgnore
@@ -100,7 +100,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		return nil, project, err
 	}
 
-	if err := compose.ValidateProject(fixedProject, mode); err != nil {
+	if err := compose.ValidateProject(fixedProject, recipe); err != nil {
 		return nil, project, &ComposeError{err}
 	}
 
@@ -130,22 +130,24 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		}
 		// New project, no previous deployment mode to check
 	} else {
-		prevMode := modes.Mode(prevUpdate.Mode)
-		mode, err = checkDeploymentMode(prevMode, mode)
+		newMode, err := checkDeploymentMode(modes.Mode(prevUpdate.Mode), recipe.Mode())
 		// Ignore mode compatibility errors in estimation mode
 		if err != nil && upload != compose.UploadModeEstimate {
 			return nil, project, err
 		}
+		if newMode != modes.ModeUnspecified {
+			recipe = modes.FromMode(newMode.Value())
+		}
 	}
 
-	rresp, err := fabric.GetRecipe(ctx, &defangv1.GetRecipeRequest{Name: mode.String()})
+	rresp, err := fabric.GetRecipe(ctx, &defangv1.GetRecipeRequest{Name: recipe.String()})
 	if err != nil {
-		return nil, project, fmt.Errorf("failed to get recipe for deployment mode %q: %w", mode, err)
+		return nil, project, fmt.Errorf("failed to get recipe for deployment mode %q: %w", recipe, err)
 	}
 
 	deployRequest := &client.DeployRequest{
 		DeployRequest: defangv1.DeployRequest{
-			Mode:           mode.Value(),
+			Mode:           recipe.Mode().Value(),
 			Project:        project.Name,
 			Compose:        composeYaml,
 			DelegateDomain: delegateDomain.Zone,
@@ -205,7 +207,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 	err = putDeploymentAndStack(ctx, provider, fabric, stack, putDeploymentParams{
 		Action:       action,
 		ETag:         resp.Etag,
-		Mode:         mode.Value(),
+		Mode:         recipe.Mode().Value(),
 		ProjectName:  project.Name,
 		StatesUrl:    statesUrl,
 		EventsUrl:    eventsUrl,

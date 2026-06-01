@@ -23,7 +23,7 @@ func TestHandleCurrentStackTool(t *testing.T) {
 					Name:     "test-stack",
 					Provider: client.ProviderAWS,
 					Region:   "us-test-2",
-					Mode:     modes.ModeAffordable,
+					Mode:     modes.RecipeAffordable,
 					Variables: map[string]string{
 						"AWS_PROFILE": "default",
 					},

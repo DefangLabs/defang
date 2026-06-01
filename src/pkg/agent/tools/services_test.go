@@ -102,11 +102,11 @@ func (m *MockCLI) LoadProject(ctx context.Context, loader client.Loader) (*compo
 	return nil, nil
 }
 
-func (m *MockCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string {
+func (m *MockCLI) PrintEstimate(mode modes.Recipe, estimate *defangv1.EstimateResponse) string {
 	return ""
 }
 
-func (m *MockCLI) RunEstimate(ctx context.Context, project *compose.Project, fabric *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
+func (m *MockCLI) RunEstimate(ctx context.Context, project *compose.Project, fabric *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Recipe) (*defangv1.EstimateResponse, error) {
 	return nil, nil
 }
 

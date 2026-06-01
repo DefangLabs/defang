@@ -22,7 +22,7 @@ func HandleCreateAzureStackTool(ctx context.Context, params CreateAzureStackPara
 		Name:     params.Name,
 		Region:   params.Location,
 		Provider: client.ProviderAzure,
-		Mode:     modes.Parse(params.Mode),
+		Mode:     modes.Recipe(params.Mode),
 		Variables: map[string]string{
 			"AZURE_SUBSCRIPTION_ID": params.AzureSubscriptionID,
 		},

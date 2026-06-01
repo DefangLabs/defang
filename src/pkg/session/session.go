@@ -79,7 +79,7 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, str
 	}
 
 	// The only stack property that can be overridden via env/flag is Mode
-	if newMode := sl.opts.Default.Mode; newMode != modes.ModeUnspecified {
+	if newMode := sl.opts.Default.Mode; newMode != modes.RecipeUnspecified {
 		stack.Mode = newMode
 	}
 

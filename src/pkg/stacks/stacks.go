@@ -18,7 +18,7 @@ import (
 type Parameters struct {
 	Name      string
 	Provider  client.ProviderID
-	Mode      modes.Mode // aka recipe name
+	Mode      modes.Recipe
 	Region    string
 	Variables map[string]string
 }
@@ -49,7 +49,7 @@ func (sp Parameters) ToMap() map[string]string {
 			vars[regionVarName] = sp.Region
 		}
 	}
-	if sp.Mode != modes.ModeUnspecified {
+	if sp.Mode != modes.RecipeUnspecified {
 		vars["DEFANG_MODE"] = strings.ToLower(sp.Mode.String())
 	}
 	return vars
@@ -69,18 +69,15 @@ func paramsFromMap(variables map[string]string) (*Parameters, error) {
 		regionVarName := client.GetRegionVarName(provider) // FIXME: GCP supports 5 different region vars
 		region = variables[regionVarName]
 	}
-	var mode modes.Mode
+	var recipe modes.Recipe
 	if val, ok := variables["DEFANG_MODE"]; ok {
-		err := mode.Set(val)
-		if err != nil {
-			return nil, fmt.Errorf("invalid DEFANG_MODE value: %w", err)
-		}
+		recipe = modes.ParseRecipe(val)
 	}
 	return &Parameters{
 		Variables: variables,
 		Provider:  provider,
 		Region:    region,
-		Mode:      mode,
+		Mode:      recipe,
 	}, nil
 }
 
@@ -159,7 +156,7 @@ func (p *Parameters) Account() string {
 type ListItem struct {
 	Name       string
 	Provider   client.ProviderID
-	Mode       modes.Mode
+	Mode       modes.Recipe
 	Region     string
 	Account    string
 	Default    bool

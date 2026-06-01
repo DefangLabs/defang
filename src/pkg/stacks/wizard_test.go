@@ -134,6 +134,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
 				"RequestString:region",
+				"RequestEnum:mode",
 				"RequestString:stack_name",
 				"RequestString:aws_profile",
 			},
@@ -162,6 +163,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
 				"RequestString:region",
+				"RequestEnum:mode",
 				"RequestString:stack_name",
 				"RequestEnum:aws_profile",
 			},
@@ -192,6 +194,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
 				"RequestString:region",
+				"RequestEnum:mode",
 				"RequestString:stack_name",
 				"RequestString:gcp_project_id",
 			},
@@ -220,6 +223,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
 				"RequestString:region",
+				"RequestEnum:mode",
 				"RequestString:stack_name",
 				"RequestString:gcp_project_id",
 			},
@@ -261,6 +265,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
 				"RequestString:region",
+				"RequestEnum:mode",
 				"RequestString:stack_name",
 			},
 		},
@@ -315,6 +320,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
 				"RequestString:region",
+				"RequestEnum:mode",
 				"RequestString:stack_name",
 			},
 		},
@@ -337,6 +343,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
 				"RequestString:region",
+				"RequestEnum:mode",
 				"RequestString:stack_name",
 				"RequestEnum:aws_profile",
 			},
@@ -358,6 +365,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
 				"RequestString:region",
+				"RequestEnum:mode",
 				"RequestString:stack_name",
 				"RequestString:gcp_project_id",
 			},
@@ -371,6 +379,9 @@ func TestWizardCollectParameters(t *testing.T) {
 			t.Cleanup(tt.cleanupEnv)
 
 			mockController := newMockElicitationsController()
+			// The wizard now prompts for a deployment mode (recipe) on non-Defang
+			// providers; provide a default answer that cases may override.
+			mockController.enumResponses["mode"] = "BALANCED"
 			tt.setupMock(mockController)
 
 			var profileLister AWSProfileLister
@@ -770,6 +781,9 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			t.Cleanup(tt.cleanupEnv)
 
 			mockController := newMockElicitationsController()
+			// The wizard now prompts for a deployment mode (recipe) on non-Defang
+			// providers; provide a default answer that cases may override.
+			mockController.enumResponses["mode"] = "BALANCED"
 			tt.setupMock(mockController)
 
 			wizard := NewWizard(mockController)

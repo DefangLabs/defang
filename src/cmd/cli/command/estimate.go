@@ -43,8 +43,8 @@ func makeEstimateCmd() *cobra.Command {
 			var previewProvider client.Provider = &client.PlaygroundProvider{FabricClient: global.Client}
 
 			// default to development mode if not specified; TODO: when mode is not specified, show an interactive prompt
-			if global.Stack.Mode == modes.ModeUnspecified {
-				global.Stack.Mode = modes.ModeAffordable
+			if global.Stack.Mode == modes.RecipeUnspecified {
+				global.Stack.Mode = modes.RecipeAffordable
 			}
 			if region == "" {
 				region = client.GetRegion(global.Stack.Provider) // This sets the default region based on the provider

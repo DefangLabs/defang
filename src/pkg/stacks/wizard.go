@@ -82,14 +82,14 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 		params.Region = region
 	}
 
-	if params.Mode == modes.ModeUnspecified && params.Provider != client.ProviderDefang {
+	if params.Mode == modes.RecipeUnspecified && params.Provider != client.ProviderDefang {
 		modeName, err := w.ec.RequestEnum(ctx, "Which recipe (deployment mode) do you want to deploy with?", "mode",
 			modes.AllDeploymentModes(),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to elicit deployment mode: %w", err)
 		}
-		params.Mode = modes.Parse(modeName)
+		params.Mode = modes.ParseRecipe(modeName)
 	}
 
 	if params.Name == "" {
