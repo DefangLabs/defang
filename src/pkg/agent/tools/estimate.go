@@ -45,7 +45,7 @@ func HandleEstimateTool(ctx context.Context, loader client.Loader, params Estima
 		return "", err
 	}
 
-	recipe := modes.Recipe(params.DeploymentMode)
+	recipe := modes.ParseRecipe(params.DeploymentMode)
 
 	term.Debug("Function invoked: cli.RunEstimate")
 	estimate, err := cli.RunEstimate(ctx, project, fabric, defangProvider, providerID, params.Region, recipe)
