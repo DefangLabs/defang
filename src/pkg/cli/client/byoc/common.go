@@ -104,16 +104,6 @@ func DebugPulumiCD(ctx context.Context, env []string, cmd ...string) error {
 		"USER="+pkg.GetCurrentUser(),
 		"GOPATH="+strings.TrimSpace(string(gopath)),
 	)
-	// Forward Azure auth env vars when set on the host so Pulumi's azblob
-	// state backend can authenticate directly instead of going through
-	// DefaultAzureCredential's AzureCLI subprocess (which times out under
-	// nix's slow `az` startup). Only impacts DEFANG_PULUMI_DIR local mode;
-	// the ACA-job path uses managed identity for the same job.
-	for _, k := range []string{"AZURE_STORAGE_KEY", "AZURE_STORAGE_ACCOUNT", "AZURE_STORAGE_SAS_TOKEN", "AZURE_TENANT_ID"} {
-		if v := os.Getenv(k); v != "" {
-			env = append(env, k+"="+v)
-		}
-	}
 	if err := runLocalCommand(ctx, filepath.Join(dir, "cd"), env, localCmd...); err != nil {
 		return err
 	}

@@ -194,12 +194,6 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 			return nil, project, err
 		}
 		action = defangv1.DeploymentAction_DEPLOYMENT_ACTION_UP
-
-		// Cert provisioning for delegate-domain services is owned by the
-		// CD task, not the CLI — see cd/program/azure.go. Keeping it there
-		// means it survives the CLI being interrupted: the CD job runs in
-		// the user's cloud and finishes the cert + binding regardless of
-		// the CLI staying connected.
 	}
 
 	err = putDeploymentAndStack(ctx, provider, fabric, stack, putDeploymentParams{
