@@ -571,7 +571,7 @@ func makeComposeConfigCmd() *cobra.Command {
 			_, _, err = cli.ComposeUp(ctx, global.Client, sessionx.Provider, sessionx.Stack, cli.ComposeUpParams{
 				Project:    project,
 				UploadMode: compose.UploadModeIgnore,
-				Mode:       modes.ModeUnspecified,
+				Mode:       modes.RecipeUnspecified,
 			})
 			if !errors.Is(err, dryrun.ErrDryRun) {
 				return err

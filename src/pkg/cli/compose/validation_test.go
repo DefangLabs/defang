@@ -65,9 +65,9 @@ func TestValidationAndConvert(t *testing.T) {
 			logs.WriteString("Error: " + err.Error() + "\n")
 		}
 
-		mode := modes.ModeAffordable
+		mode := modes.RecipeAffordable
 		if strings.Contains(path, "replicas") {
-			mode = modes.ModeHighAvailability
+			mode = modes.RecipeHighAvailability
 		}
 		if err := ValidateProject(project, mode); err != nil {
 			t.Logf("Project validation failed: %v", err)

@@ -102,13 +102,13 @@ func TestStackListCmd(t *testing.T) {
 					Name:     "teststack1",
 					Provider: client.ProviderAWS,
 					Region:   "us-test-2",
-					Mode:     modes.ModeAffordable,
+					Mode:     modes.RecipeAffordable,
 				},
 				{
 					Name:     "teststack2",
 					Provider: client.ProviderGCP,
 					Region:   "us-central1",
-					Mode:     modes.ModeBalanced,
+					Mode:     modes.RecipeBalanced,
 				},
 			},
 			expectOutput: "NAME        DEFAULT  PROVIDER  REGION       ACCOUNT  MODE        DEPLOYEDAT\n" +
@@ -165,7 +165,7 @@ func TestStackNewCmd(t *testing.T) {
 				Name:     "teststack",
 				Provider: client.ProviderAWS,
 				Region:   "us-test-2",
-				Mode:     modes.ModeAffordable,
+				Mode:     modes.RecipeAffordable,
 			},
 			existingStacks: []*defangv1.Stack{},
 		},
@@ -175,7 +175,7 @@ func TestStackNewCmd(t *testing.T) {
 				Name:     "",
 				Provider: client.ProviderAWS,
 				Region:   "us-test-2",
-				Mode:     modes.ModeAffordable,
+				Mode:     modes.RecipeAffordable,
 			},
 			existingStacks: []*defangv1.Stack{},
 			expectErr:      "invalid stack name",
@@ -186,7 +186,7 @@ func TestStackNewCmd(t *testing.T) {
 				Name:     "existingstack",
 				Provider: client.ProviderAWS,
 				Region:   "us-test-2",
-				Mode:     modes.ModeAffordable,
+				Mode:     modes.RecipeAffordable,
 			},
 			existingStacks: []*defangv1.Stack{{Name: "existingstack", Project: ""}},
 		},
@@ -197,7 +197,7 @@ func TestStackNewCmd(t *testing.T) {
 				Name:     "existingstack",
 				Provider: client.ProviderAWS,
 				Region:   "us-test-2",
-				Mode:     modes.ModeAffordable,
+				Mode:     modes.RecipeAffordable,
 			},
 			existingStacks: []*defangv1.Stack{{Name: "existingstack", Project: ""}},
 			expectErr:      "already exists",
@@ -238,7 +238,7 @@ func TestLoadStackEnv(t *testing.T) {
 			parameters: stacks.Parameters{
 				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
-				Mode:     modes.ModeAffordable,
+				Mode:     modes.RecipeAffordable,
 				Variables: map[string]string{
 					"AWS_PROFILE": "default",
 				},
@@ -255,7 +255,7 @@ func TestLoadStackEnv(t *testing.T) {
 			parameters: stacks.Parameters{
 				Provider: client.ProviderGCP,
 				Region:   "us-central1",
-				Mode:     modes.ModeBalanced,
+				Mode:     modes.RecipeBalanced,
 				Variables: map[string]string{
 					"GCP_PROJECT_ID": "my-gcp-project",
 					"DEFANG_PREFIX":  "test",
@@ -276,7 +276,7 @@ func TestLoadStackEnv(t *testing.T) {
 			parameters: stacks.Parameters{
 				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
-				Mode:     modes.ModeAffordable,
+				Mode:     modes.RecipeAffordable,
 				Variables: map[string]string{
 					"AWS_PROFILE":   "default",
 					"DEFANG_PREFIX": "test",

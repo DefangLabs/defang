@@ -152,19 +152,19 @@ func TestLoadSession(t *testing.T) {
 				GetStackOpts: stacks.GetStackOpts{
 					Default: stacks.Parameters{
 						Name: "existingstack",
-						Mode: modes.ModeAffordable,
+						Mode: modes.RecipeAffordable,
 					},
 				},
 			},
 			existingStack: &stacks.Parameters{
 				Name:     "existingstack",
 				Provider: client.ProviderAWS,
-				Mode:     modes.ModeBalanced,
+				Mode:     modes.RecipeBalanced,
 			},
 			expectedStack: &stacks.Parameters{
 				Name:     "existingstack",
 				Provider: client.ProviderAWS,
-				Mode:     modes.ModeAffordable,
+				Mode:     modes.RecipeAffordable,
 				Variables: map[string]string{
 					"DEFANG_PROVIDER": "aws",
 					"DEFANG_MODE":     "affordable",

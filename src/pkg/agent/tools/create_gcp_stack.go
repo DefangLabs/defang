@@ -22,7 +22,7 @@ func HandleCreateGCPStackTool(ctx context.Context, params CreateGCPStackParams, 
 		Name:     params.Name,
 		Region:   params.Region,
 		Provider: client.ProviderGCP,
-		Mode:     modes.Parse(params.Mode),
+		Mode:     modes.Recipe(params.Mode),
 		Variables: map[string]string{
 			"GCP_PROJECT_ID": params.GCPProjectID,
 		},

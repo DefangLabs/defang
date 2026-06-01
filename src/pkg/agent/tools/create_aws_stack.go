@@ -22,7 +22,7 @@ func HandleCreateAWSStackTool(ctx context.Context, params CreateAWSStackParams, 
 		Name:     params.Name,
 		Region:   params.Region,
 		Provider: client.ProviderAWS,
-		Mode:     modes.Parse(params.Mode),
+		Mode:     modes.Recipe(params.Mode),
 		Variables: map[string]string{
 			"AWS_PROFILE": params.AWS_Profile,
 		},

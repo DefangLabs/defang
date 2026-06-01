@@ -144,8 +144,8 @@ func newParametersFromPB(stack *defangv1.Stack) (*Parameters, error) {
 		return nil, fmt.Errorf("failed to parse remote stack content: %w", err)
 	}
 	// fill in missing fields from remote stack info
-	if params.Mode == modes.ModeUnspecified {
-		params.Mode = modes.Mode(stack.GetMode())
+	if params.Mode == modes.RecipeUnspecified {
+		params.Mode = modes.FromMode(stack.GetMode())
 	}
 	if params.Region == "" {
 		params.Region = stack.GetRegion()

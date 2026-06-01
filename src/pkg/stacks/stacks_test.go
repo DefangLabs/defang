@@ -48,7 +48,7 @@ func TestCreate(t *testing.T) {
 				Name:     "teststack",
 				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
-				Mode:     modes.ModeAffordable,
+				Mode:     modes.RecipeAffordable,
 			},
 			expectErr:        false,
 			expectedFilename: ".defang/teststack",
@@ -59,7 +59,7 @@ func TestCreate(t *testing.T) {
 				Name:     "",
 				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
-				Mode:     modes.ModeAffordable,
+				Mode:     modes.RecipeAffordable,
 			},
 			expectErr: true,
 		},
@@ -69,7 +69,7 @@ func TestCreate(t *testing.T) {
 				Name:     "invalid stack",
 				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
-				Mode:     modes.ModeAffordable,
+				Mode:     modes.RecipeAffordable,
 			},
 			expectErr: true,
 		},
@@ -79,7 +79,7 @@ func TestCreate(t *testing.T) {
 				Name:     "a",
 				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
-				Mode:     modes.ModeAffordable,
+				Mode:     modes.RecipeAffordable,
 			},
 			expectErr:        false,
 			expectedFilename: ".defang/a",
@@ -90,7 +90,7 @@ func TestCreate(t *testing.T) {
 				Name:     "invalid-name",
 				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
-				Mode:     modes.ModeAffordable,
+				Mode:     modes.RecipeAffordable,
 			},
 			expectErr: true,
 		},
@@ -124,7 +124,7 @@ func TestRepeatCreate(t *testing.T) {
 		Name:     "repeattest",
 		Provider: client.ProviderGCP,
 		Region:   "us-central1",
-		Mode:     modes.ModeBalanced,
+		Mode:     modes.RecipeBalanced,
 	}
 
 	_, err := CreateInDirectory(".", params)
@@ -182,7 +182,7 @@ func TestRemove(t *testing.T) {
 			Name:     stackName,
 			Provider: client.ProviderAWS,
 			Region:   "us-west-2",
-			Mode:     modes.ModeAffordable,
+			Mode:     modes.RecipeAffordable,
 		}
 		stackFile, err := CreateInDirectory(".", params)
 		if err != nil {
@@ -218,7 +218,7 @@ func TestMarshal(t *testing.T) {
 				Name:     "teststack",
 				Provider: client.ProviderGCP,
 				Region:   "us-central1",
-				Mode:     modes.ModeBalanced,
+				Mode:     modes.RecipeBalanced,
 			},
 			expectedContent: "DEFANG_MODE=\"balanced\"\nDEFANG_PROVIDER=\"gcp\"\nGOOGLE_REGION=\"us-central1\"",
 		},
@@ -228,7 +228,7 @@ func TestMarshal(t *testing.T) {
 				Name:     "awsstack",
 				Provider: client.ProviderAWS,
 				Region:   "us-east-1",
-				Mode:     modes.ModeAffordable,
+				Mode:     modes.RecipeAffordable,
 			},
 			expectedContent: "AWS_REGION=\"us-east-1\"\nDEFANG_MODE=\"affordable\"\nDEFANG_PROVIDER=\"aws\"",
 		},
@@ -238,7 +238,7 @@ func TestMarshal(t *testing.T) {
 				Name:     "nomodestack",
 				Provider: client.ProviderAWS,
 				Region:   "us-west-1",
-				Mode:     modes.ModeUnspecified,
+				Mode:     modes.RecipeUnspecified,
 			},
 			expectedContent: "AWS_REGION=\"us-west-1\"\nDEFANG_PROVIDER=\"aws\"",
 		},
@@ -248,7 +248,7 @@ func TestMarshal(t *testing.T) {
 				Name:     "noregionstack",
 				Provider: client.ProviderGCP,
 				Region:   "",
-				Mode:     modes.ModeAffordable,
+				Mode:     modes.RecipeAffordable,
 			},
 			expectedContent: "DEFANG_MODE=\"affordable\"\nDEFANG_PROVIDER=\"gcp\"",
 		},
@@ -280,7 +280,7 @@ DEFANG_MODE=BALANCED
 			expectedParams: Parameters{
 				Provider: client.ProviderGCP,
 				Region:   "us-central1",
-				Mode:     modes.ModeBalanced,
+				Mode:     modes.RecipeBalanced,
 			},
 		},
 		{
@@ -292,7 +292,7 @@ DEFANG_MODE=AFFORDABLE
 			expectedParams: Parameters{
 				Provider: client.ProviderAWS,
 				Region:   "us-east-1",
-				Mode:     modes.ModeAffordable,
+				Mode:     modes.RecipeAffordable,
 			},
 		},
 	}
@@ -321,7 +321,7 @@ func TestReadInDirectory(t *testing.T) {
 			Name:     stackName,
 			Provider: client.ProviderAWS,
 			Region:   "us-west-2",
-			Mode:     modes.ModeAffordable,
+			Mode:     modes.RecipeAffordable,
 		}
 		_, err := CreateInDirectory(".", expectedParams)
 		if err != nil {
@@ -355,7 +355,7 @@ func TestParamsToMap(t *testing.T) {
 				Variables: map[string]string{
 					"AWS_PROFILE": "default",
 				},
-				Mode: modes.ModeAffordable,
+				Mode: modes.RecipeAffordable,
 			},
 			expectedMap: map[string]string{
 				"DEFANG_PROVIDER": "aws",
@@ -373,7 +373,7 @@ func TestParamsToMap(t *testing.T) {
 				Variables: map[string]string{
 					"GCP_PROJECT_ID": "gcp-project-123",
 				},
-				Mode: modes.ModeBalanced,
+				Mode: modes.RecipeBalanced,
 			},
 			expectedMap: map[string]string{
 				"DEFANG_PROVIDER": "gcp",
@@ -415,7 +415,7 @@ func TestParamsFromMap(t *testing.T) {
 			expectedParams: Parameters{
 				Provider: client.ProviderGCP,
 				Region:   "us-central1",
-				Mode:     modes.ModeBalanced,
+				Mode:     modes.RecipeBalanced,
 			},
 		},
 		{
@@ -432,7 +432,7 @@ func TestParamsFromMap(t *testing.T) {
 				Variables: map[string]string{
 					"AWS_PROFILE": "default",
 				},
-				Mode: modes.ModeAffordable,
+				Mode: modes.RecipeAffordable,
 			},
 		},
 	}
