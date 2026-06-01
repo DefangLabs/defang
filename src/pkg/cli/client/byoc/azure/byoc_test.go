@@ -178,14 +178,40 @@ func TestGetServiceEmptyProjectNotFound(t *testing.T) {
 	}
 }
 
-func TestPrepareDomainDelegationNil(t *testing.T) {
+func TestPrepareDomainDelegationEmptyDomain(t *testing.T) {
+	// No delegate domain means nothing to delegate: return (nil, nil) without
+	// touching Azure, so callers treat the deployment as having no delegation.
 	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
 	resp, err := b.PrepareDomainDelegation(t.Context(), client.PrepareDomainDelegationRequest{})
 	if err != nil {
 		t.Errorf("PrepareDomainDelegation err: %v", err)
 	}
 	if resp != nil {
-		t.Errorf("PrepareDomainDelegation response = %v, want nil (TODO)", resp)
+		t.Errorf("PrepareDomainDelegation response = %v, want nil for empty domain", resp)
+	}
+}
+
+func TestPrepareDomainDelegationCredError(t *testing.T) {
+	// A non-empty delegate domain drives real ARM calls (resource group +
+	// DNS zone); a failing credential must surface as an error rather than a
+	// silent success.
+	useFakeCred(t, "", errors.New("denied"))
+	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	_, err := b.PrepareDomainDelegation(ctx, client.PrepareDomainDelegationRequest{
+		Project:        "proj",
+		DelegateDomain: "proj-test-stack.tenant.example.com",
+	})
+	if err == nil {
+		t.Error("PrepareDomainDelegation should surface ARM error")
+	}
+}
+
+func TestHasDelegatedSubdomain(t *testing.T) {
+	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
+	if !b.HasDelegatedSubdomain() {
+		t.Error("HasDelegatedSubdomain() = false, want true now that Azure delegates a subdomain zone")
 	}
 }
 
