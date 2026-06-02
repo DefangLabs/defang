@@ -144,6 +144,10 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 	if err != nil {
 		return nil, project, fmt.Errorf("failed to get recipe for deployment mode %q: %w", recipe, err)
 	}
+	// Allow estimate/preview with an inactive recipe so teams can evaluate it before activating.
+	if upload != compose.UploadModeEstimate && upload != compose.UploadModePreview && !rresp.Recipe.GetActive() {
+		return nil, project, fmt.Errorf("recipe %q is not active", recipe)
+	}
 
 	deployRequest := &client.DeployRequest{
 		DeployRequest: defangv1.DeployRequest{
