@@ -20,6 +20,47 @@ service FabricController {
 
   rpc RevokeToken(google.protobuf.Empty) returns (google.protobuf.Empty);
 
+  rpc GenerateFiles(GenerateFilesRequest) returns (GenerateFilesResponse);
+  rpc Debug(DebugRequest) returns (DebugResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  rpc SignEULA(google.protobuf.Empty) returns (google.protobuf.Empty); // AgreeToS
+  rpc CheckToS(google.protobuf.Empty) returns (google.protobuf.Empty) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  rpc SetOptions(SetOptionsRequest) returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  rpc WhoAmI(google.protobuf.Empty) returns (WhoAmIResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc Track(TrackRequest) returns (google.protobuf.Empty);
+
+  // Endpoint for GDPR compliance
+  rpc DeleteMe(google.protobuf.Empty) returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
+
+  rpc CanIUse(CanIUseRequest) returns (CanIUseResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  rpc Estimate(EstimateRequest) returns (EstimateResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  rpc Preview(PreviewRequest) returns (PreviewResponse);
+
+  rpc GenerateCompose(GenerateComposeRequest) returns (GenerateComposeResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // Playground
+
   rpc Tail(TailRequest) returns (stream TailResponse);
   rpc Deploy(DeployRequest) returns (DeployResponse);
   rpc Get(GetRequest) returns (ServiceInfo) {
@@ -42,16 +83,6 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  rpc GenerateFiles(GenerateFilesRequest) returns (GenerateFilesResponse);
-  rpc Debug(DebugRequest) returns (DebugResponse) {
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-
-  rpc SignEULA(google.protobuf.Empty) returns (google.protobuf.Empty); // AgreeToS
-  rpc CheckToS(google.protobuf.Empty) returns (google.protobuf.Empty) {
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-
   rpc PutSecret(PutConfigRequest) returns (google.protobuf.Empty) {
     option deprecated = true; // Playground only
     option idempotency_level = IDEMPOTENT;
@@ -65,22 +96,7 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   } // no values
 
-  rpc GetConfigs(GetConfigsRequest) returns (GetConfigsResponse) {
-    option deprecated = true; // Playground only
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-  rpc PutConfig(PutConfigRequest) returns (google.protobuf.Empty) {
-    option deprecated = true; // Playground only
-    option idempotency_level = IDEMPOTENT;
-  }
-  rpc DeleteConfigs(DeleteConfigsRequest) returns (google.protobuf.Empty) {
-    option deprecated = true; // Playground only
-    option idempotency_level = IDEMPOTENT;
-  }
-  rpc ListConfigs(ListConfigsRequest) returns (ListConfigsResponse) {
-    option deprecated = true; // Playground only
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
+  // Deployment CRUD
 
   rpc PutDeployment(PutDeploymentRequest) returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
@@ -92,7 +108,7 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
+  // Domain delegation
 
   rpc DelegateSubdomainZone(DelegateSubdomainZoneRequest) returns (DelegateSubdomainZoneResponse);
   rpc DeleteSubdomainZone(DeleteSubdomainZoneRequest) returns (google.protobuf.Empty) {
@@ -101,23 +117,12 @@ service FabricController {
   rpc GetDelegateSubdomainZone(GetDelegateSubdomainZoneRequest) returns (DelegateSubdomainZoneResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-  rpc SetOptions(SetOptionsRequest) returns (google.protobuf.Empty) {
-    option idempotency_level = IDEMPOTENT;
-  }
-  rpc WhoAmI(google.protobuf.Empty) returns (WhoAmIResponse) {
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-  rpc Track(TrackRequest) returns (google.protobuf.Empty);
 
-  // Endpoint for GDPR compliance
-  rpc DeleteMe(google.protobuf.Empty) returns (google.protobuf.Empty) {
-    option idempotency_level = IDEMPOTENT;
-  }
+  // Remote DNS utilities
 
   rpc VerifyDNSSetup(VerifyDNSSetupRequest) returns (google.protobuf.Empty) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-
   rpc ResolveIPAddr(ResolveIPAddrRequest) returns (ResolveIPAddrResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
@@ -131,6 +136,8 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
+  // Obsolete
+
   rpc GetSelectedProvider(GetSelectedProviderRequest) returns (GetSelectedProviderResponse) {
     option deprecated = true; // deprecated in favor of stacks; kept for old CLI clients
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -140,19 +147,7 @@ service FabricController {
     option idempotency_level = IDEMPOTENT;
   }
 
-  rpc CanIUse(CanIUseRequest) returns (CanIUseResponse) {
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-
-  rpc Estimate(EstimateRequest) returns (EstimateResponse) {
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-
-  rpc Preview(PreviewRequest) returns (PreviewResponse);
-
-  rpc GenerateCompose(GenerateComposeRequest) returns (GenerateComposeResponse) {
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
+  // Stack CRUD
 
   rpc PutStack(PutStackRequest) returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
@@ -169,6 +164,44 @@ service FabricController {
   rpc GetDefaultStack(GetDefaultStackRequest) returns (GetStackResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
+
+  // Recipe CRUD
+
+  rpc PutRecipe(PutRecipeRequest) returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  rpc GetRecipe(GetRecipeRequest) returns (GetRecipeResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ListRecipes(ListRecipesRequest) returns (ListRecipesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+message Recipe {
+  string name = 1;
+  reserved 2;
+  string pulumi_config = 3; // YAML or JSON object
+  bool active = 4;
+}
+
+message PutRecipeRequest {
+  Recipe recipe = 1;
+}
+
+message GetRecipeRequest {
+  string name = 1;
+  reserved 2; // was: Provider provider (recipes are provider-agnostic)
+}
+
+message GetRecipeResponse {
+  Recipe recipe = 1;
+}
+
+message ListRecipesRequest {}
+
+message ListRecipesResponse {
+  repeated Recipe recipes = 1;
 }
 
 enum Provider {
@@ -188,8 +221,9 @@ message Stack {
   google.protobuf.Timestamp last_deployed_at = 5;
   string provider_account_id = 6;
   string region = 7;
-  DeploymentMode mode = 8;
+  DeploymentMode mode = 8 [deprecated = true]; // deprecated; use recipe
   bool is_default = 9;
+  Recipe recipe = 10;
 }
 
 message PutStackRequest {
@@ -327,6 +361,7 @@ message TrackRequest {
 }
 
 enum DeploymentMode {
+  option deprecated = true; // deprecated in favor of recipe
   MODE_UNSPECIFIED = 0;
   DEVELOPMENT = 1;
   STAGING = 2;
@@ -364,8 +399,9 @@ message DeployRequest {
   bytes compose = 4; // yaml (or json)
   string delegate_domain = 5;
   string delegation_set_id = 6;
-  bool preview = 7 [deprecated = true];
+  bool preview = 7 [deprecated = true]; // use PreviewRequest
   Provider provider = 8;
+  string recipe_name = 9;
 }
 
 message DeployResponse {
@@ -580,7 +616,7 @@ enum DeploymentOrigin {
 message Deployment {
   string id = 1; // deployment ID aka etag
   string project = 2;
-  string provider_string = 3 [deprecated = true]; // was: provider
+  reserved 3; // was: string provider
   string provider_account_id = 4;
   google.protobuf.Timestamp timestamp = 5;
   DeploymentAction action = 6;
@@ -588,7 +624,7 @@ message Deployment {
   Provider provider = 8;
   int32 service_count = 9;
   string stack = 10;
-  DeploymentMode mode = 11;
+  DeploymentMode mode = 11 [deprecated = true]; // deprecated; use recipe
   google.protobuf.Timestamp completed = 12;
   DeploymentStatus status = 13;
   string states_url = 14;
@@ -599,6 +635,7 @@ message Deployment {
   CdType cd_type = 19;
   string cd_id = 20;
   bytes compose = 21; // yaml
+  Recipe recipe = 22;
 }
 
 enum CdType {
@@ -715,15 +752,16 @@ message ProjectUpdate {
   string project = 3 [deprecated = true]; // deprecated; use compose.name
   bytes compose = 4;
   string cd_version = 5;
-  DeploymentMode mode = 6;
+  DeploymentMode mode = 6 [deprecated = true]; // deprecated; use recipe
   Provider provider = 7;
   uint32 project_outputs_version = 8;
   bytes project_outputs = 9; // JSON serialization of pulumi outputs. schema versioned using project_outputs_version
   bytes stack_file = 10; // Defang stack file
-  string gcp_execution_id = 11;
-  string aws_ecs_task_id = 12;
+  reserved 11; // was: string gcp_execution_id
+  reserved 12; // was: string aws_ecs_task_id
   string etag = 13; // aka deployment ID
   string pulumi_version = 14;
+  Recipe recipe = 15;
 }
 
 message GetRequest { // was ServiceID
@@ -757,6 +795,7 @@ message Service {
 
 // TODO: internal message; move to a separate proto file in fabric repo
 message DeployEvent {
+  option deprecated = true; // Playground only
   DeploymentMode mode = 1;
   string type = 2; // required
   string source = 3;
@@ -855,10 +894,11 @@ message EstimateResponse {
 message PreviewRequest {
   Provider provider = 1;
   string region = 2;
-  DeploymentMode mode = 3;
+  DeploymentMode mode = 3 [deprecated = true]; // deprecated; use recipe
   string etag = 4; // aka deployment ID
   bytes compose = 5; // yaml (or json)
   string project_name = 6;
+  Recipe recipe = 7;
 }
 
 message PreviewResponse {

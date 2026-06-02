@@ -23,6 +23,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/aca"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/acr"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/cd"
+	azuredns "github.com/DefangLabs/defang/src/pkg/clouds/azure/dns"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/keyvault"
 	defanghttp "github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -43,6 +44,16 @@ type ByocAzure struct {
 	kv      *keyvault.KeyVault
 	cdRunID string
 	cdEtag  string
+	cdStart time.Time
+
+	// delegateDomainZone contains the delegate domain whose public DNS zone
+	// PrepareDomainDelegation created, mirroring the GCP provider's
+	// ByocGcp.delegateDomainZone field. Currently informational only — set on
+	// success, not yet read elsewhere. The GCP provider follows the same
+	// pattern: the destroy path relies on the project resource group teardown
+	// to remove the zone rather than tracking it explicitly. Kept here as a
+	// hook for a future cleanup path that needs to know which zone to delete.
+	delegateDomainZone string
 }
 
 var _ client.Provider = (*ByocAzure)(nil)
@@ -69,6 +80,7 @@ func (b *ByocAzure) CdCommand(ctx context.Context, req client.CdCommandRequest) 
 	}
 
 	etag := types.NewEtag()
+	cdStart := time.Now()
 	execName, err := b.runCdCommand(ctx, cdCommand{
 		command:   []string{string(req.Command)},
 		etag:      etag,
@@ -81,6 +93,7 @@ func (b *ByocAzure) CdCommand(ctx context.Context, req client.CdCommandRequest) 
 	}
 	b.cdRunID = execName
 	b.cdEtag = etag
+	b.cdStart = cdStart
 	return &client.CdCommandResponse{
 		CdId:   execName,
 		CdType: defangv1.CdType_CD_TYPE_AZURE_ACA_JOBID,
@@ -432,12 +445,13 @@ func (b *ByocAzure) Deploy(ctx context.Context, req *client.DeployRequest) (*cli
 }
 
 type cdCommand struct {
-	command   []string
-	etag      types.ETag
-	mode      defangv1.DeploymentMode
-	project   string
-	statesUrl string
-	eventsUrl string
+	command        []string
+	etag           types.ETag
+	mode           defangv1.DeploymentMode
+	project        string
+	statesUrl      string
+	eventsUrl      string
+	delegateDomain string // forwarded to CD as DOMAIN; empty when deploying without delegation
 }
 
 func (b *ByocAzure) runCdCommand(ctx context.Context, cmd cdCommand) (string, error) {
@@ -458,6 +472,14 @@ func (b *ByocAzure) runCdCommand(ctx context.Context, cmd cdCommand) (string, er
 
 	if cmd.eventsUrl != "" {
 		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
+	}
+
+	// DOMAIN is the project delegate domain (e.g. "myproj-stack.tenant.defang.app");
+	// the CD program reads it and sets defang:domain Pulumi config, which the
+	// Azure inline program forwards to ProjectInputs.Domain so per-service
+	// DNS records and managed certs land in the right zone. Mirrors AWS.
+	if cmd.delegateDomain != "" {
+		env["DOMAIN"] = cmd.delegateDomain
 	}
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
@@ -541,19 +563,22 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 		payload = defanghttp.RemoveQueryParam(uploadURL) // managed identity provides blob read access
 	}
 
+	cdStart := time.Now()
 	execName, err := b.runCdCommand(ctx, cdCommand{
-		command:   []string{verb, payload},
-		etag:      etag,
-		mode:      req.Mode,
-		project:   project.Name,
-		statesUrl: req.StatesUrl,
-		eventsUrl: req.EventsUrl,
+		command:        []string{verb, payload},
+		etag:           etag,
+		mode:           req.Mode,
+		project:        project.Name,
+		statesUrl:      req.StatesUrl,
+		eventsUrl:      req.EventsUrl,
+		delegateDomain: req.DelegateDomain,
 	})
 	if err != nil {
 		return nil, err
 	}
 	b.cdRunID = execName
 	b.cdEtag = etag
+	b.cdStart = cdStart
 	return &client.DeployResponse{
 		CdId:   execName,
 		CdType: defangv1.CdType_CD_TYPE_AZURE_ACA_JOBID,
@@ -703,17 +728,48 @@ func (b *ByocAzure) ListConfig(ctx context.Context, req *defangv1.ListConfigsReq
 	return &defangv1.Secrets{Names: names}, nil
 }
 
-// PrepareDomainDelegation implements client.Provider.
-func (b *ByocAzure) PrepareDomainDelegation(context.Context, client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
-	return nil, nil // TODO: implement domain delegation for Azure
+// PrepareDomainDelegation implements client.Provider. It creates a public
+// Azure DNS zone for the delegate domain and returns the zone's authoritative
+// name servers so Fabric can point NS records at it, mirroring the GCP
+// provider. The zone lives in the per-project-stack resource group so it is
+// owned by this deployment and torn down with it. Azure has no equivalent of
+// Route53's reusable delegation sets, so DelegationSetId is left empty (as
+// with GCP).
+func (b *ByocAzure) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
+	defer term.Timing()()
+	if req.DelegateDomain == "" {
+		return nil, nil // no delegate domain configured; nothing to delegate
+	}
+	if err := b.setUpLocation(); err != nil {
+		return nil, err
+	}
+	term.Debugf("Preparing domain delegation for %s", req.DelegateDomain)
+
+	// The zone needs a home before it can be created. On a fresh deploy Pulumi
+	// has not created the project resource group yet, so ensure it exists
+	// (idempotent CreateOrUpdate) the same way config setup does.
+	rgName := b.projectResourceGroupName(req.Project)
+	if err := b.driver.CreateResourceGroup(ctx, rgName); err != nil {
+		return nil, err
+	}
+
+	nameServers, err := azuredns.New(rgName, b.driver.Azure).EnsureZoneExists(ctx, req.DelegateDomain)
+	if err != nil {
+		return nil, err
+	}
+	b.delegateDomainZone = req.DelegateDomain
+	term.Debugf("Zone %s ready with nameservers %v", req.DelegateDomain, nameServers)
+	return &client.PrepareDomainDelegationResponse{
+		NameServers: nameServers,
+	}, nil
 }
 
-// HasDelegatedSubdomain implements client.Provider. Azure does not yet
-// implement domain delegation, so there is no subdomain zone to delete on
-// destroy. Flip to true (or remove the override) once PrepareDomainDelegation
-// is wired up.
+// HasDelegatedSubdomain implements client.Provider. Azure delegates a
+// subdomain zone during deploy (PrepareDomainDelegation +
+// CreateDelegateSubdomainZone), so the matching DeleteSubdomainZone must run
+// on destroy.
 func (*ByocAzure) HasDelegatedSubdomain() bool {
-	return false
+	return true
 }
 
 // Preview implements client.Provider.
@@ -899,13 +955,6 @@ func (b *ByocAzure) RemoteProjectName(context.Context) (string, error) {
 func (b *ByocAzure) ServiceDNS(host string) string {
 	defer term.Timing()()
 	return host
-}
-
-// Subscribe implements client.Provider.
-func (b *ByocAzure) Subscribe(context.Context, *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {
-	return func(yield func(*defangv1.SubscribeResponse, error) bool) {
-		// TODO: Implement subscription to deployment events for Azure
-	}, nil
 }
 
 // TearDown implements client.Provider.
