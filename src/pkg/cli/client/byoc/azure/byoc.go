@@ -46,7 +46,7 @@ type ByocAzure struct {
 	cdEtag  string
 	cdStart time.Time
 
-	// delegateDomainZone records the delegate domain whose public DNS zone
+	// delegateDomainZone contains the delegate domain whose public DNS zone
 	// PrepareDomainDelegation created, mirroring the GCP provider's
 	// ByocGcp.delegateDomainZone field. Currently informational only — set on
 	// success, not yet read elsewhere. The GCP provider follows the same
