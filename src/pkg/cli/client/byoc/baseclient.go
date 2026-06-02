@@ -74,7 +74,7 @@ func (b *ByocBaseClient) GetStackName() string {
 }
 
 // HasDelegatedSubdomain returns true by default; providers that do not yet
-// implement domain delegation (Azure, DO) override this to return false.
+// implement domain delegation (DO) override this to return false.
 func (b *ByocBaseClient) HasDelegatedSubdomain() bool {
 	return true
 }
