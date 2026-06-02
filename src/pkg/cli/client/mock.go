@@ -195,6 +195,7 @@ func ServerStreamIterCtx[T any](ctx context.Context, stream ServerStream[T]) ite
 type MockFabricClient struct {
 	FabricClient
 	DelegateDomain string
+	Recipe         *defangv1.Recipe // returned by GetRecipe; defaults to an active recipe when nil
 }
 
 func (m MockFabricClient) GetFabricClient() defangv1connect.FabricControllerClient {
@@ -238,7 +239,10 @@ func (m MockFabricClient) PutDeployment(ctx context.Context, req *defangv1.PutDe
 }
 
 func (m MockFabricClient) GetRecipe(ctx context.Context, req *defangv1.GetRecipeRequest) (*defangv1.GetRecipeResponse, error) {
-	return &defangv1.GetRecipeResponse{Recipe: &defangv1.Recipe{Name: req.GetName()}}, nil
+	if m.Recipe != nil {
+		return &defangv1.GetRecipeResponse{Recipe: m.Recipe}, nil
+	}
+	return &defangv1.GetRecipeResponse{Recipe: &defangv1.Recipe{Name: req.GetName(), Active: true}}, nil
 }
 
 func (m MockFabricClient) ListDeployments(ctx context.Context, req *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error) {
