@@ -110,10 +110,14 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 		}
 		if service, ok := project.Services[serviceInfo.Service.Name]; ok {
 			if service.DomainName != serviceInfo.Domainname {
-				term.Warnf("service %q: domainname %q in compose file does not match deployed value %q", service.Name, service.DomainName, serviceInfo.Domainname)
+				term.Warnf("service %q: domainname %q in compose file does not match deployed value %q, will use the deployed value", service.Name, service.DomainName, serviceInfo.Domainname)
 			}
 			cnt++
-			domains := []string{service.DomainName}
+			if serviceInfo.Domainname == "" {
+				term.Warnf("service %q: `domainname` is deployed without a domainname, skipping cert generation", service.Name)
+				continue
+			}
+			domains := []string{serviceInfo.Domainname}
 			if defaultNetwork := service.Networks["default"]; defaultNetwork != nil {
 				domains = append(domains, defaultNetwork.Aliases...)
 			}
