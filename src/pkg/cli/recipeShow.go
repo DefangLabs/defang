@@ -15,6 +15,6 @@ func RecipeShow(ctx context.Context, fabric client.FabricClient, recipeName stri
 		return fmt.Errorf("failed to get recipe: %w", err)
 	}
 
-	_, err = term.Println(resp.Recipe.PulumiConfig)
+	_, err = term.Println(resp.Recipe.GetPulumiConfig())
 	return err
 }

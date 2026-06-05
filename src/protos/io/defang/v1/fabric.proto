@@ -396,7 +396,7 @@ message CanIUseResponse {
 message DeployRequest {
   reserved 1; // was: services
   string project = 2 [deprecated = true]; // deprecated; use compose.name
-  DeploymentMode mode = 3;
+  DeploymentMode mode = 3 [deprecated = true]; // deprecated; use recipe
   bytes compose = 4; // yaml (or json)
   string delegate_domain = 5;
   string delegation_set_id = 6;

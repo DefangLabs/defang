@@ -8,20 +8,20 @@ import (
 )
 
 func makeRecipeCmd() *cobra.Command {
-	var stackCmd = &cobra.Command{
+	var recipeCmd = &cobra.Command{
 		Use:     "recipe",
 		Aliases: []string{"recipes", "modes", "mode"},
 		Short:   "Manage workspace recipes (deployment modes)",
 	}
 	recipeListCmd := makeRecipeListCmd()
-	stackCmd.AddCommand(recipeListCmd)
+	recipeCmd.AddCommand(recipeListCmd)
 	recipeShowCmd := makeRecipeShowCmd()
-	stackCmd.AddCommand(recipeShowCmd)
+	recipeCmd.AddCommand(recipeShowCmd)
 	recipeDeactivateCmd := makeRecipeDeactivateCmd()
-	stackCmd.AddCommand(recipeDeactivateCmd)
+	recipeCmd.AddCommand(recipeDeactivateCmd)
 	recipeActivateCmd := makeRecipeActivateCmd()
-	stackCmd.AddCommand(recipeActivateCmd)
-	return stackCmd
+	recipeCmd.AddCommand(recipeActivateCmd)
+	return recipeCmd
 }
 
 func makeRecipeShowCmd() *cobra.Command {

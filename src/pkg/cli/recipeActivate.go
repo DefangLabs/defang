@@ -15,19 +15,19 @@ func RecipeActivate(ctx context.Context, fabric client.FabricClient, name string
 		return fmt.Errorf("failed to get recipe: %w", err)
 	}
 
+	recipe := resp.GetRecipe()
+	recipe.Active = active
 	err = fabric.PutRecipe(ctx, &defangv1.PutRecipeRequest{
-		Recipe: &defangv1.Recipe{
-			Name:         resp.Recipe.Name,
-			PulumiConfig: resp.Recipe.PulumiConfig,
-			Active:       active,
-		},
+		Recipe: recipe,
 	})
-	if err == nil {
-		state := "active"
-		if !active {
-			state = "inactive"
-		}
-		term.Info(fmt.Sprintf("Recipe %q is now %s.", name, state))
+	if err != nil {
+		return err
 	}
-	return err
+
+	state := "active"
+	if !recipe.Active {
+		state = "inactive"
+	}
+	term.Info(fmt.Sprintf("Recipe %q is now %s.", recipe.Name, state))
+	return nil
 }

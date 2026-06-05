@@ -2781,9 +2781,10 @@ func (x *CanIUseResponse) GetAwsApnId() string {
 type DeployRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Deprecated: Marked as deprecated in io/defang/v1/fabric.proto.
-	Project         string         `protobuf:"bytes,2,opt,name=project,proto3" json:"project,omitempty"` // deprecated; use compose.name
-	Mode            DeploymentMode `protobuf:"varint,3,opt,name=mode,proto3,enum=io.defang.v1.DeploymentMode" json:"mode,omitempty"`
-	Compose         []byte         `protobuf:"bytes,4,opt,name=compose,proto3" json:"compose,omitempty"` // yaml (or json)
+	Project string `protobuf:"bytes,2,opt,name=project,proto3" json:"project,omitempty"` // deprecated; use compose.name
+	// Deprecated: Marked as deprecated in io/defang/v1/fabric.proto.
+	Mode            DeploymentMode `protobuf:"varint,3,opt,name=mode,proto3,enum=io.defang.v1.DeploymentMode" json:"mode,omitempty"` // deprecated; use recipe
+	Compose         []byte         `protobuf:"bytes,4,opt,name=compose,proto3" json:"compose,omitempty"`                             // yaml (or json)
 	DelegateDomain  string         `protobuf:"bytes,5,opt,name=delegate_domain,json=delegateDomain,proto3" json:"delegate_domain,omitempty"`
 	DelegationSetId string         `protobuf:"bytes,6,opt,name=delegation_set_id,json=delegationSetId,proto3" json:"delegation_set_id,omitempty"`
 	// Deprecated: Marked as deprecated in io/defang/v1/fabric.proto.
@@ -2832,6 +2833,7 @@ func (x *DeployRequest) GetProject() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in io/defang/v1/fabric.proto.
 func (x *DeployRequest) GetMode() DeploymentMode {
 	if x != nil {
 		return x.Mode
@@ -6687,10 +6689,10 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x0eforced_version\x18\a \x01(\bR\rforcedVersion\x12#\n" +
 	"\rforced_reason\x18\b \x01(\tR\fforcedReason\x12\x1c\n" +
 	"\n" +
-	"aws_apn_id\x18\t \x01(\tR\bawsApnIdJ\x04\b\x01\x10\x02\"\xc7\x02\n" +
+	"aws_apn_id\x18\t \x01(\tR\bawsApnIdJ\x04\b\x01\x10\x02\"\xcb\x02\n" +
 	"\rDeployRequest\x12\x1c\n" +
-	"\aproject\x18\x02 \x01(\tB\x02\x18\x01R\aproject\x120\n" +
-	"\x04mode\x18\x03 \x01(\x0e2\x1c.io.defang.v1.DeploymentModeR\x04mode\x12\x18\n" +
+	"\aproject\x18\x02 \x01(\tB\x02\x18\x01R\aproject\x124\n" +
+	"\x04mode\x18\x03 \x01(\x0e2\x1c.io.defang.v1.DeploymentModeB\x02\x18\x01R\x04mode\x12\x18\n" +
 	"\acompose\x18\x04 \x01(\fR\acompose\x12'\n" +
 	"\x0fdelegate_domain\x18\x05 \x01(\tR\x0edelegateDomain\x12*\n" +
 	"\x11delegation_set_id\x18\x06 \x01(\tR\x0fdelegationSetId\x12\x1c\n" +
