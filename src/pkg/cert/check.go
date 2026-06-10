@@ -2,6 +2,7 @@ package cert
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -20,7 +21,13 @@ var perAttemptTimeout = 10 * time.Second
 func CheckTLSCert(ctx context.Context, domain string, resolver dns.Resolver) error {
 	ips, err := resolver.LookupIPAddr(ctx, domain)
 	if err != nil {
-		return err
+		return fmt.Errorf("lookup A records for %q: %w", domain, err)
+	}
+	// An empty A-record set is not "TLS ready" — every caller treats nil as
+	// success and would short-circuit their polling loop. Surface it as an
+	// error so the caller keeps waiting for DNS to populate.
+	if len(ips) == 0 {
+		return fmt.Errorf("no A records found for %q", domain)
 	}
 	for _, ip := range ips {
 		if err := checkOne(ctx, domain, ip.String()); err != nil {
@@ -36,7 +43,7 @@ func checkOne(ctx context.Context, domain, ip string) error {
 
 	req, err := http.NewRequestWithContext(attemptCtx, http.MethodGet, "https://"+domain, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("build TLS probe request for %q via %s: %w", domain, ip, err)
 	}
 	httpClient := &http.Client{
 		Transport: getFixedIPTransport(ip),
@@ -44,7 +51,7 @@ func checkOne(ctx context.Context, domain, ip string) error {
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("TLS probe failed for %q via %s: %w", domain, ip, err)
 	}
 	defer resp.Body.Close()
 	// Drain so the connection can be reused; cap the read so a chatty server

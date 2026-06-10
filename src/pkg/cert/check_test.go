@@ -2,6 +2,7 @@ package cert
 
 import (
 	"context"
+	"errors"
 	"net"
 	"strings"
 	"sync"
@@ -109,17 +110,32 @@ func TestCheckTLSCert_ResolverErrorPropagates(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected resolver error, got nil")
 	}
+	// CheckTLSCert wraps the resolver error with domain context so callers
+	// (whose debug log might not otherwise mention the lookup stage) can tell
+	// what failed.
+	if !errors.Is(err, wantErr) {
+		t.Errorf("wrapped error should still unwrap to the resolver error; got %v", err)
+	}
+	if !strings.Contains(err.Error(), "missing.example") {
+		t.Errorf("error %q should name the domain", err)
+	}
 }
 
-func TestCheckTLSCert_NoIPsReturnsNil(t *testing.T) {
-	// Defensive: if the resolver returns no A records we should not loop,
-	// not error, and not panic. The cert command will retry on its 3s
-	// ticker and pick up the records once they propagate.
+func TestCheckTLSCert_NoIPsReturnsError(t *testing.T) {
+	// An empty A-record set is not TLS-ready. Every CheckTLSCert caller
+	// (waitForTLS in pkg/cli/cert.go, and the Azure cert flow) treats nil
+	// as "cert is online" and exits its polling loop — so returning nil
+	// for zero probes would prematurely declare success. Surface an error
+	// so callers keep waiting for DNS to populate.
 	resolver := dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
 		{Type: "A", Domain: "empty.example"}: {Records: nil},
 	}}
-	if err := CheckTLSCert(context.Background(), "empty.example", resolver); err != nil {
-		t.Fatalf("expected nil for empty IP list, got %v", err)
+	err := CheckTLSCert(context.Background(), "empty.example", resolver)
+	if err == nil {
+		t.Fatal("expected error for empty IP list, got nil")
+	}
+	if !strings.Contains(err.Error(), "empty.example") {
+		t.Errorf("error %q should name the domain", err)
 	}
 }
 
