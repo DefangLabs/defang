@@ -231,6 +231,90 @@ func TestHttpClient(t *testing.T) {
 	}
 }
 
+// concurrentResolver is a thread-safe MockResolver replacement for the
+// dnsCache race test: each goroutine's transport calls LookupIPAddr, so the
+// resolver itself must not race either.
+type concurrentResolver struct {
+	mu    sync.Mutex
+	calls int
+}
+
+func (r *concurrentResolver) LookupIPAddr(_ context.Context, _ string) ([]net.IPAddr, error) {
+	r.mu.Lock()
+	r.calls++
+	r.mu.Unlock()
+	return []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}}, nil
+}
+func (r *concurrentResolver) LookupCNAME(context.Context, string) (string, error) {
+	return "", nil
+}
+func (r *concurrentResolver) LookupNS(context.Context, string) ([]*net.NS, error) {
+	return nil, nil
+}
+func (r *concurrentResolver) LookupTXT(context.Context, string) ([]string, error) {
+	return nil, nil
+}
+
+// TestCertHTTPClient_DNSCacheConcurrent guards the parallel-cert-gen change:
+// newCertHTTPClient's DialContext closure reads/writes the package-level
+// dnsCache, and the orchestrator now drives multiple workers through
+// triggerCertGen concurrently. Without the mutex around dnsCache this test
+// fails under `-race` (concurrent map writes); with it, it passes cleanly.
+func TestCertHTTPClient_DNSCacheConcurrent(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "ok")
+	}))
+	defer ts.Close()
+
+	_, port, err := net.SplitHostPort(strings.TrimPrefix(ts.URL, "http://"))
+	if err != nil {
+		t.Fatalf("split server addr: %v", err)
+	}
+
+	// Reset the package cache so this test sees its own writes, and restore
+	// it on exit so we don't leak state into TestHttpClient.
+	dnsCacheMu.Lock()
+	saved := dnsCache
+	dnsCache = make(map[string]DNSResult)
+	dnsCacheMu.Unlock()
+	t.Cleanup(func() {
+		dnsCacheMu.Lock()
+		dnsCache = saved
+		dnsCacheMu.Unlock()
+	})
+
+	// Use distinct hosts per goroutine so the DialContext does a cache miss
+	// → LookupIPAddr → cache write on every call, maximizing chances of
+	// catching a race on writes.
+	const N = 16
+	resolver := &concurrentResolver{}
+	tc := newCertHTTPClient(resolver)
+
+	var wg sync.WaitGroup
+	errs := make([]error, N)
+	for i := range N {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			url := fmt.Sprintf("http://host-%d.test:%s/", i, port)
+			req, _ := http.NewRequest("GET", url, nil)
+			resp, err := tc.Do(req)
+			if err != nil {
+				errs[i] = err
+				return
+			}
+			resp.Body.Close()
+		}(i)
+	}
+	wg.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Errorf("goroutine %d: %v", i, err)
+		}
+	}
+}
+
 type mockCertProvider struct {
 	client.MockProvider
 	services *defangv1.GetServicesResponse

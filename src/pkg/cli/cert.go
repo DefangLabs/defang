@@ -33,6 +33,10 @@ type DNSResult struct {
 }
 
 var (
+	// dnsCacheMu guards dnsCache. Workers now run in parallel (see
+	// runACMEJobs), so newCertHTTPClient's DialContext closure — captured by
+	// every worker's HTTP client — can race on this map without it.
+	dnsCacheMu       sync.RWMutex
 	dnsCache         = make(map[string]DNSResult)
 	dnsCacheDuration = 1 * time.Minute
 
@@ -54,7 +58,9 @@ func newCertHTTPClient(r dns.Resolver) HTTPClient {
 				if err != nil {
 					return nil, err
 				}
+				dnsCacheMu.RLock()
 				cached, ok := dnsCache[host]
+				dnsCacheMu.RUnlock()
 				var ips []net.IPAddr
 				if ok && cached.Expiry.After(time.Now()) {
 					ips = cached.IPs
@@ -63,9 +69,13 @@ func newCertHTTPClient(r dns.Resolver) HTTPClient {
 					if err != nil {
 						return nil, err
 					}
-					// Keep 1min of dns cache to avoid spamming root dns servers
+					// Keep 1min of dns cache to avoid spamming root dns servers.
+					// A racing concurrent lookup may overwrite this entry with
+					// fresh data — that's fine; both writes are valid.
 					expiry := time.Now().Add(dnsCacheDuration)
+					dnsCacheMu.Lock()
 					dnsCache[host] = DNSResult{ips, expiry}
+					dnsCacheMu.Unlock()
 				}
 
 				dialer := &net.Dialer{}
