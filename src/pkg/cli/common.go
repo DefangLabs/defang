@@ -80,6 +80,7 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 				ProviderAccountId: accountInfo.AccountID,
 				LastDeployedAt:    now,
 				StackFile:         []byte(stackFile),
+				Recipe:            req.Recipe,
 			},
 		})
 		if err != nil {
@@ -121,6 +122,7 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 			CdId:              req.CdId,
 			CdType:            req.CdType,
 			Compose:           req.Compose,
+			Recipe:            req.Recipe,
 		},
 	})
 }
