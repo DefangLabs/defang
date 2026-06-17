@@ -169,11 +169,17 @@ func (e *ErrOutside) Error() string {
 func (sm *manager) Load(ctx context.Context, name string) (*Parameters, error) {
 	params, err := sm.LoadLocal(name)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			term.Infof("stack file not found, attempting to import from previous deployments: %v", err)
-			return sm.GetRemote(ctx, name)
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
 		}
-		return nil, err
+		// Local stack file not found, attempting import from previous deployment
+		var err2 error
+		params, err2 = sm.GetRemote(ctx, name)
+		if err2 != nil {
+			// Error: could not load stack parameters: stack "beta" does not exist for project "foobar"; open .defang/beta: no such file or directory
+			return nil, fmt.Errorf("%w; %w", err2, err)
+		}
+		term.Info("Stack file imported from previous deployment")
 	}
 	return params, nil
 }
