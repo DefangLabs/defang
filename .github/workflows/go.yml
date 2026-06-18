@@ -35,7 +35,8 @@ jobs:
           "$GITHUB_OUTPUT"
 
       - name: Run Go unit tests
-        run: go test -race -test.short -v -coverprofile=coverage.out -covermode=atomic
+        run:
+          go test -race -test.short -v -coverprofile=coverage.out -covermode=atomic
           ./...
         working-directory: src
         env:
@@ -249,26 +250,32 @@ jobs:
 
       - name: Add dummy config
         id: add-dummy-config
-        run: echo blah | go run -race ./cmd/cli -C testdata/sanity config set
-          --provider=defang -n dummy --debug
+        run: echo blah | go run -race ./cmd/cli -C testdata/sanity config set -n
+          dummy --provider=defang --debug
         working-directory: src
 
       - name: Run sanity tests UP
         continue-on-error: true # until we have multi-project support in playground
-        run: go run -race ./cmd/cli -C testdata/sanity compose up --provider=defang
-          --debug
+        run: go run -race ./cmd/cli -C testdata/sanity compose up
+          --provider=defang --debug
         working-directory: src
 
       - name: Run sanity tests DOWN
         continue-on-error: true # until we have multi-project support in playground
-        run: go run -race ./cmd/cli -C testdata/sanity compose down --provider=defang
-          --detach --debug
+        run: go run -race ./cmd/cli -C testdata/sanity compose down --detach
+          --provider=defang --debug
         working-directory: src
 
       - name: Remove dummy config
         if: steps.add-dummy-config.conclusion == 'success' # only clean up if the config was added
-        run: go run -race ./cmd/cli -C testdata/sanity config rm --provider=defang -n
-          dummy --debug
+        run: go run -race ./cmd/cli -C testdata/sanity config rm -n dummy
+          --provider=defang --debug
+        working-directory: src
+
+      - name: Delete stack
+        if: steps.add-dummy-config.conclusion == 'success' # only clean up if the config was added
+        run: go run -race ./cmd/cli -C testdata/sanity stack rm beta
+          --provider=defang --debug
         working-directory: src
 
   build-and-sign:
@@ -304,7 +311,8 @@ jobs:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
       - name: Run GoReleaser (Linux)
-        run: goreleaser release --split ${{ !startsWith(github.ref, 'refs/tags/v') &&
+        run:
+          goreleaser release --split ${{ !startsWith(github.ref, 'refs/tags/v') &&
           '--snapshot' || '' }} ${{ github.event_name == 'schedule' &&
           '--nightly' || ''}}
         working-directory: src
@@ -313,7 +321,8 @@ jobs:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
       - name: Run GoReleaser (Windows)
-        run: goreleaser release --split ${{ !startsWith(github.ref, 'refs/tags/v') &&
+        run:
+          goreleaser release --split ${{ !startsWith(github.ref, 'refs/tags/v') &&
           '--snapshot' || '' }} ${{ github.event_name == 'schedule' &&
           '--nightly' || ''}}
         working-directory: src
@@ -396,7 +405,8 @@ jobs:
         with:
           distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
-          args: release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot'
+          args:
+            release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot'
             || '' }} ${{ github.event_name == 'schedule' && '--nightly' || ''}}
           workdir: src
         env:
@@ -507,7 +517,7 @@ jobs:
           token: ${{ secrets.DOCS_ACTION_TRIGGER_TOKEN }}
           repository: DefangLabs/defang-docs
           event-type: cli-autodoc
-          client-payload: "{\"version\": \"${{ github.ref_name }}\"}"
+          client-payload: '{"version": "${{ github.ref_name }}"}'
 
       - name: Trigger Homebrew Formula Update
         uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4
@@ -515,7 +525,7 @@ jobs:
           token: ${{ secrets.HOMEBREW_ACTION_TRIGGER_TOKEN }}
           repository: DefangLabs/homebrew-defang
           event-type: update-homebrew-formula
-          client-payload: "{\"version\": \"${{ github.ref_name }}\"}"
+          client-payload: '{"version": "${{ github.ref_name }}"}'
 
       - name: Checkout tag
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -536,7 +546,7 @@ jobs:
     runs-on: ubuntu-latest
     if: failure() && (github.ref == 'refs/heads/main' || startsWith(github.ref,
       'refs/tags/v'))
-    needs: [ go-release, post-release, nix-shell-test, push-docker ]
+    needs: [go-release, post-release, nix-shell-test, push-docker]
     steps:
       - name: Slack Notification
         uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
