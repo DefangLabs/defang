@@ -447,3 +447,42 @@ func TestNewProvider(t *testing.T) {
 		}
 	})
 }
+
+func TestErrIfStackAndProvider(t *testing.T) {
+	// RootCmd is wired up by TestMain via SetupCommands, so exercise its real flags.
+	stackFlag := RootCmd.Flags().Lookup("stack")
+	providerFlag := RootCmd.Flags().Lookup("provider")
+	if stackFlag == nil || providerFlag == nil {
+		t.Fatal("expected --stack and --provider to be registered on RootCmd")
+	}
+	origStack, origProvider := global.Stack.Name, global.Stack.Provider
+	t.Cleanup(func() {
+		global.Stack.Name, global.Stack.Provider = origStack, origProvider
+		stackFlag.Changed, providerFlag.Changed = false, false
+	})
+
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr bool
+	}{
+		{name: "neither flag", args: []string{}},
+		{name: "only stack", args: []string{"--stack", "prod"}},
+		{name: "only provider", args: []string{"--provider", "aws"}},
+		{name: "stack and provider", args: []string{"--stack", "prod", "--provider", "aws"}, wantErr: true},
+		{name: "short flags", args: []string{"-s", "prod", "-P", "aws"}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stackFlag.Changed, providerFlag.Changed = false, false
+			if err := RootCmd.ParseFlags(tt.args); err != nil {
+				t.Fatalf("ParseFlags() failed: %v", err)
+			}
+
+			err := errIfStackAndProvider(RootCmd)
+			if tt.wantErr != (err != nil) {
+				t.Errorf("errIfStackAndProvider() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

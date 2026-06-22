@@ -350,6 +350,16 @@ func getCwd(args []string) string {
 	return ""
 }
 
+// errIfStackAndProvider rejects combining the (deprecated) --provider flag with
+// --stack: a stack determines its own provider, so --provider would be silently
+// ignored otherwise.
+func errIfStackAndProvider(cmd *cobra.Command) error {
+	if cmd.Flags().Changed("stack") && cmd.Flags().Changed("provider") {
+		return errors.New("cannot combine -s/--stack with -P/--provider; the stack determines the provider")
+	}
+	return nil
+}
+
 var RootCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -366,6 +376,11 @@ var RootCmd = &cobra.Command{
 			}
 			return nil
 		}
+
+		if err := errIfStackAndProvider(cmd); err != nil {
+			return err
+		}
+
 		var utc, _ = cmd.Flags().GetBool("utc")
 		var json, _ = cmd.Flags().GetBool("json")
 
