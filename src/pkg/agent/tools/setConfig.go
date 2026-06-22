@@ -24,7 +24,7 @@ type SetConfigParams struct {
 
 func HandleSetConfig(ctx context.Context, loader client.Loader, params SetConfigParams, cliInterface CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
-	client, err := GetClientWithRetry(ctx, cliInterface, sc)
+	client, err := GetClientWithRetry(ctx, cliInterface, sc.FabricAddr)
 	if err != nil {
 		var noBrowserErr auth.ErrNoBrowser
 		if errors.As(err, &noBrowserErr) {
@@ -71,5 +71,5 @@ func HandleSetConfig(ctx context.Context, loader client.Loader, params SetConfig
 		return "", fmt.Errorf("failed to set config: %w", err)
 	}
 
-	return fmt.Sprintf("Successfully set the config variable %q for project %q", params.Name, params.ProjectName), nil
+	return fmt.Sprintf("Successfully set the config variable %q for project %q in stack %q", params.Name, params.ProjectName, sc.Stack.Name), nil
 }

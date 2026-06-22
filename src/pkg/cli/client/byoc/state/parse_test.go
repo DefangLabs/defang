@@ -49,8 +49,8 @@ func TestParsePulumiStateFile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			state, err := ParsePulumiStateFile(t.Context(), tt.obj, ".", func(ctx context.Context, bucket, object string) ([]byte, error) {
-				return os.ReadFile(filepath.Join(bucket, object))
+			state, err := ParsePulumiStateFile(t.Context(), tt.obj, func(ctx context.Context, object string) ([]byte, error) {
+				return os.ReadFile(filepath.Join(".", object))
 			})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)

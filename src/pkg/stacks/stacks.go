@@ -148,6 +148,8 @@ func (p *Parameters) Account() string {
 		return p.Variables["AWS_PROFILE"]
 	case client.ProviderGCP:
 		return p.Variables["GCP_PROJECT_ID"]
+	case client.ProviderAzure:
+		return p.Variables["AZURE_SUBSCRIPTION_ID"]
 	default:
 		return ""
 	}
@@ -155,7 +157,10 @@ func (p *Parameters) Account() string {
 
 // for shell printing for converting to string format of StackParameters
 type ListItem struct {
-	Parameters
+	Name       string
+	Provider   client.ProviderID
+	Mode       modes.Mode
+	Region     string
 	Account    string
 	Default    bool
 	DeployedAt time.Time
@@ -190,8 +195,11 @@ func ListInDirectory(workingDirectory string) ([]ListItem, error) {
 			continue
 		}
 		stacks = append(stacks, ListItem{
-			Parameters: *params,
-			Account:    params.Account(),
+			Name:     params.Name,
+			Provider: params.Provider,
+			Mode:     params.Mode,
+			Region:   params.Region,
+			Account:  params.Account(),
 		})
 	}
 

@@ -19,5 +19,19 @@
       "Bash(tail:*)",
       "Bash(xxd:*)"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FILE=$(jq -r '.tool_input.file_path // empty' 2>/dev/null); if [ -n \"$FILE\" ] && echo \"$FILE\" | grep -qE '/src/.*\\.go$'; then PKG=$(dirname \"$FILE\" | sed 's|.*/src/||'); cd src && golangci-lint run --fix \"./$PKG/...\" 2>/dev/null || true; fi",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
   }
 }

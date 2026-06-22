@@ -7,16 +7,16 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 )
 
-func GetClientWithRetry(ctx context.Context, cli CLIInterface, config StackConfig) (*client.GrpcClient, error) {
-	client, err := cli.Connect(ctx, config.FabricAddr)
+func GetClientWithRetry(ctx context.Context, cli CLIInterface, fabricAddr string) (*client.GrpcClient, error) {
+	client, err := cli.Connect(ctx, fabricAddr)
 	if err != nil {
-		err = cli.InteractiveLoginMCP(ctx, config.FabricAddr, common.MCPDevelopmentClient)
+		err = cli.InteractiveLoginMCP(ctx, fabricAddr, common.MCPDevelopmentClient)
 		if err != nil {
 			return nil, err
 		}
 
 		// Reconnect with the new token
-		client, err = cli.Connect(ctx, config.FabricAddr)
+		client, err = cli.Connect(ctx, fabricAddr)
 		if err != nil {
 			return nil, err
 		}

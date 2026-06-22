@@ -17,19 +17,23 @@ type logger interface {
 }
 
 var (
-	Logger   logger   = term.DefaultTerm
-	resolver Resolver = RootResolver{}
+	Logger logger = term.DefaultTerm
 
 	errDNSNotInSync = errors.New("DNS not in sync")
 )
 
 // The DNS is considered ready if the CNAME of the domain is pointing to the ALB domain and in sync
-// OR if the A record of the domain is pointing to the same IP addresses of the ALB domain and in sync
-func CheckDomainDNSReady(ctx context.Context, domain string, validCNAMEs []string) bool {
+// OR if the A record of the domain is pointing to the same IP addresses of the ALB domain and in sync.
+// A nil resolverAt falls back to DirectResolverAt so the function never panics
+// on a missing resolver — matches RootResolver.resolverFn().
+func CheckDomainDNSReady(ctx context.Context, domain string, validCNAMEs []string, resolverAt func(string) Resolver) bool {
+	if resolverAt == nil {
+		resolverAt = DirectResolverAt
+	}
 	for i, validCNAME := range validCNAMEs {
 		validCNAMEs[i] = Normalize(validCNAME)
 	}
-	cname, err := getCNAMEInSync(ctx, domain)
+	cname, err := getCNAMEInSync(ctx, domain, resolverAt)
 	Logger.Debugf("CNAME for %v is: '%v', err: %v", domain, cname, err)
 	// Ignore other types of DNS errors
 	if err == errDNSNotInSync {
@@ -42,7 +46,7 @@ func CheckDomainDNSReady(ctx context.Context, domain string, validCNAMEs []strin
 		return true
 	}
 
-	albIPAddrs, err := resolver.LookupIPAddr(ctx, validCNAMEs[0])
+	albIPAddrs, err := resolverAt("").LookupIPAddr(ctx, validCNAMEs[0])
 	if err != nil {
 		Logger.Debugf("Could not resolve A/AAAA record for load balancer %v: %v", validCNAMEs[0], err)
 		return false
@@ -52,7 +56,7 @@ func CheckDomainDNSReady(ctx context.Context, domain string, validCNAMEs []strin
 	// In sync CNAME may be pointing to the same IP addresses of the load balancer, considered as valid
 	Logger.Debugf("Checking CNAME %v", cname)
 	if cname != "" {
-		cnameIPAddrs, err := resolver.LookupIPAddr(ctx, cname)
+		cnameIPAddrs, err := resolverAt("").LookupIPAddr(ctx, cname)
 		if err != nil {
 			Logger.Debugf("Could not resolve A/AAAA record for %v: %v", cname, err)
 		} else {
@@ -66,7 +70,7 @@ func CheckDomainDNSReady(ctx context.Context, domain string, validCNAMEs []strin
 	}
 
 	// Check if an valid A record has been set
-	ips, err := getIPInSync(ctx, domain)
+	ips, err := getIPInSync(ctx, domain, resolverAt)
 	if err != nil {
 		Logger.Debugf("IP for %v not in sync: %v", domain, err)
 		return false
@@ -78,8 +82,30 @@ func CheckDomainDNSReady(ctx context.Context, domain string, validCNAMEs []strin
 	return false
 }
 
-func getCNAMEInSync(ctx context.Context, domain string) (string, error) {
-	ns, err := FindNSServers(ctx, domain)
+// LookupTXT queries the authoritative name servers directly (via the
+// package's resolver, default RootResolver) instead of going through
+// /etc/resolv.conf and any cached/forwarded resolvers in front of it.
+// Required for cert-validation flows where a stale upstream cache (e.g. a
+// home router still holding NXDOMAIN) would otherwise stall the loop while
+// the public DNS already serves the new record.
+func LookupTXT(ctx context.Context, domain string, resolver Resolver) ([]string, error) {
+	return resolver.LookupTXT(ctx, domain)
+}
+
+// LookupTXTContains reports whether any TXT record on name has the exact
+// value expected. Returns the lookup error verbatim — callers handling DNS
+// not-found should branch on it directly.
+func LookupTXTContains(ctx context.Context, name, expected string, resolver Resolver) (bool, error) {
+	txts, err := LookupTXT(ctx, name, resolver)
+	Logger.Debugf("TXT records for %v: %v, err: %v", name, txts, err)
+	if err != nil {
+		return false, err
+	}
+	return slices.Contains(txts, expected), nil
+}
+
+func getCNAMEInSync(ctx context.Context, domain string, resolverAt func(string) Resolver) (string, error) {
+	ns, err := FindNSServers(ctx, domain, resolverAt)
 	if err != nil {
 		return "", err
 	}
@@ -88,7 +114,7 @@ func getCNAMEInSync(ctx context.Context, domain string) (string, error) {
 	var cname string
 	var lookupErr error
 	for _, n := range ns {
-		cname, err = ResolverAt(n.Host).LookupCNAME(ctx, domain)
+		cname, err = resolverAt(n.Host).LookupCNAME(ctx, domain)
 		if err != nil {
 			Logger.Debugf("Error looking up CNAME for %v at %v: %v", domain, n, err)
 			lookupErr = err
@@ -102,8 +128,8 @@ func getCNAMEInSync(ctx context.Context, domain string) (string, error) {
 	return cname, lookupErr
 }
 
-func getIPInSync(ctx context.Context, domain string) ([]net.IP, error) {
-	ns, err := FindNSServers(ctx, domain)
+func getIPInSync(ctx context.Context, domain string, resolverAt func(string) Resolver) ([]net.IP, error) {
+	ns, err := FindNSServers(ctx, domain, resolverAt)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +138,7 @@ func getIPInSync(ctx context.Context, domain string) ([]net.IP, error) {
 	var lookupErr error
 	for i, n := range ns {
 		var ipAddrs []net.IPAddr
-		ipAddrs, err = ResolverAt(n.Host).LookupIPAddr(ctx, domain)
+		ipAddrs, err = resolverAt(n.Host).LookupIPAddr(ctx, domain)
 		if err != nil {
 			Logger.Debugf("Error looking up IP for %v at %v: %v", domain, n, err)
 			lookupErr = err

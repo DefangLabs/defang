@@ -17,6 +17,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/cache"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/public"
+	"github.com/DefangLabs/defang/src/pkg/github"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 )
@@ -24,10 +25,8 @@ import (
 const (
 	// managementScope is the OAuth2 scope for ARM (management plane) calls.
 	managementScope = "https://management.azure.com/.default"
-	// azureCLIClientID is Microsoft's public client ID for Azure CLI. Using
-	// it means the user sees the same consent prompt they would from
-	// `az login --use-device-code`, and we don't need to register our own app.
-	azureCLIClientID = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"
+	// defangCLIClientID is defang's public client ID for Azure CLI.
+	defangCLIClientID = "e6b89a2c-82c7-4072-85e5-9ee7e838d5cf"
 	// defaultTenant routes through Microsoft's "organizations" tenant so any
 	// work/school account can authenticate when we can't discover the
 	// subscription's specific tenant.
@@ -35,6 +34,11 @@ const (
 	// msalCacheKey is the TokenStore key holding MSAL's serialized cache blob
 	// (one blob per defang installation covers all accounts MSAL tracks).
 	msalCacheKey = "azure-msal-cache"
+	// githubFederationAudience is the audience Entra requires on a GitHub
+	// Actions OIDC token to honor a federated identity credential. The FIC
+	// provisioned by the Defang portal's Azure wizard explicitly trusts this
+	// audience; matches the value the `azure/login@v2` GitHub Action uses.
+	githubFederationAudience = "api://AzureADTokenExchange"
 )
 
 // defangMSALCache adapts defang's file-based TokenStore to MSAL's
@@ -110,6 +114,10 @@ func (c *msalCred) GetToken(ctx context.Context, opts policy.TokenRequestOptions
 }
 
 // Authenticate sets up Azure credentials for the session in order of preference:
+//  0. GitHub Actions OIDC — when ACTIONS_ID_TOKEN_REQUEST_URL is set and the
+//     stack file's AZURE_CLIENT_ID + AZURE_TENANT_ID identify a federated
+//     UAMI, exchange the GitHub OIDC token for an ARM token. Mirrors the GCP
+//     path in pkg/clouds/gcp/login.go::findGithubCredentials.
 //  1. Existing default Azure credentials — env vars (AZURE_TENANT_ID/CLIENT_ID/
 //     CLIENT_SECRET), managed identity, workload identity, an `az login`
 //     session picked up via AzureCLICredential, etc.
@@ -120,15 +128,28 @@ func (c *msalCred) GetToken(ctx context.Context, opts policy.TokenRequestOptions
 //     On success the refresh token is written to the cache so step 2 works
 //     on the next invocation.
 //
-// On success a.Cred is populated with an msalCred (for path 2/3) or a
-// DefaultAzureCredential wrapper (path 1). Both honor per-scope GetToken
-// requests from the Azure SDK.
+// On success a.Cred is populated with an msalCred (for path 2/3), a
+// ClientAssertionCredential (path 0), or a DefaultAzureCredential wrapper
+// (path 1). All honor per-scope GetToken requests from the Azure SDK.
 func (a *Azure) Authenticate(ctx context.Context, interactive bool) error {
 	if a.SubscriptionID == "" {
 		a.SubscriptionID = os.Getenv("AZURE_SUBSCRIPTION_ID")
 	}
 	if a.SubscriptionID == "" {
 		return errors.New("AZURE_SUBSCRIPTION_ID is required for Azure login")
+	}
+
+	// 0. GitHub Actions OIDC (federated identity credential).
+	term.Debug("checking GitHub Actions OIDC credentials...")
+	if cred, err := a.tryGithubOIDC(ctx); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		term.Debugf("GitHub OIDC credential invalid: %v", err)
+	} else if cred != nil {
+		term.Debug("authenticated via GitHub Actions OIDC")
+		a.Cred = cred
+		return nil
 	}
 
 	// 1. DefaultAzureCredential (az cli session, env vars, managed identity, …).
@@ -158,7 +179,7 @@ func (a *Azure) Authenticate(ctx context.Context, interactive bool) error {
 		}
 	}
 
-	client, err := public.New(azureCLIClientID,
+	client, err := public.New(defangCLIClientID,
 		public.WithAuthority("https://login.microsoftonline.com/"+tenant),
 		public.WithCache(&defangMSALCache{store: a.TokenStore, key: msalCacheKey}),
 	)
@@ -230,6 +251,41 @@ func (a *Azure) trySilentMSAL(ctx context.Context, client public.Client, tenant 
 		return cred, nil
 	}
 	return nil, nil
+}
+
+// tryGithubOIDC builds a credential that federates the GitHub Actions
+// workflow's OIDC token into an Azure ARM token. Equivalent to running an
+// `azure/login@v2` step, but driven entirely from env vars in the Defang
+// stack file (AZURE_CLIENT_ID, AZURE_TENANT_ID) plus the standard GitHub
+// Actions OIDC plumbing (ACTIONS_ID_TOKEN_REQUEST_URL / _TOKEN).
+//
+// Returns (nil, nil) silently when not running in GitHub Actions OIDC, or
+// when AZURE_CLIENT_ID / AZURE_TENANT_ID aren't set — so Authenticate falls
+// through to the next credential option. Returns an error only when env
+// vars are present but the resulting credential fails to mint an ARM token
+// (e.g., the FIC's repo:branch subject doesn't match the current run).
+func (a *Azure) tryGithubOIDC(ctx context.Context) (azcore.TokenCredential, error) {
+	if os.Getenv("ACTIONS_ID_TOKEN_REQUEST_URL") == "" {
+		return nil, nil
+	}
+	clientID := os.Getenv("AZURE_CLIENT_ID")
+	tenantID := os.Getenv("AZURE_TENANT_ID")
+	if clientID == "" || tenantID == "" {
+		return nil, nil
+	}
+	term.Debugf("AZURE_CLIENT_ID=%q AZURE_TENANT_ID=%q — attempting GitHub-OIDC federation", clientID, tenantID)
+
+	getAssertion := func(ctx context.Context) (string, error) {
+		return github.GetIdToken(ctx, githubFederationAudience)
+	}
+	cred, err := azidentity.NewClientAssertionCredential(tenantID, clientID, getAssertion, nil)
+	if err != nil {
+		return nil, fmt.Errorf("building GitHub-OIDC Azure credential: %w", err)
+	}
+	if err := testAzureCredential(ctx, a.SubscriptionID, cred); err != nil {
+		return nil, err
+	}
+	return cred, nil
 }
 
 // tryDefaultCredential constructs a DefaultAzureCredential and tests it

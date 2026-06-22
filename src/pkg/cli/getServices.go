@@ -102,21 +102,26 @@ func GetHealthcheckResults(ctx context.Context, serviceInfos []*defangv1.Service
 
 	for _, serviceInfo := range serviceInfos {
 		for _, endpoint := range serviceInfo.Endpoints {
-			if strings.Contains(endpoint, ":") {
+			if strings.HasPrefix(endpoint, "http://") || strings.HasPrefix(endpoint, "https://") {
+				// Endpoint already has a scheme, use as is
+			} else if endpoint != "" && !strings.Contains(endpoint, ":") {
+				// Bare URL or IP? Assume HTTPS and prepend scheme
+				endpoint = "https://" + endpoint
+			} else {
+				// Skip endpoints with ports or non-HTTP schemes
 				*results[serviceInfo.Service.Name] = "skipped"
-				// Skip endpoints with ports because they likely non-HTTP services
 				continue
 			}
 			wg.Add(1)
-			go func(serviceInfo *defangv1.ServiceInfo) {
+			go func(serviceInfo *defangv1.ServiceInfo, endpoint string) {
 				defer wg.Done()
-				result, err := RunHealthcheck(ctx, serviceInfo.Service.Name, "https://"+endpoint, serviceInfo.HealthcheckPath)
+				result, err := RunHealthcheck(ctx, serviceInfo.Service.Name, endpoint, serviceInfo.HealthcheckPath)
 				if err != nil {
 					term.Debugf("Healthcheck error for service %q at endpoint %q: %s", serviceInfo.Service.Name, endpoint, err.Error())
 					result = "error"
 				}
 				*results[serviceInfo.Service.Name] = result
-			}(serviceInfo)
+			}(serviceInfo, endpoint)
 		}
 	}
 

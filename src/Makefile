@@ -119,8 +119,8 @@ zips: defang_linux_amd64.zip defang_darwin.zip
 
 .PHONY: no-diff
 no-diff:
-	@# check that there are no uncommitted changes
-	git diff-index --quiet HEAD --
+	@# check that there are no uncommitted changes (staged or unstaged)
+	git diff --quiet HEAD --
 
 .PHONY: pull
 pull:
@@ -217,3 +217,7 @@ snapshot:
 	  --snapshot \
 	  --clean \
 	  --skip=publish,announce,sign,notarize,validate
+
+.PHONY: ensure
+ensure: ## Run go mod tidy
+	find . -name 'go.mod' -execdir go mod tidy \;

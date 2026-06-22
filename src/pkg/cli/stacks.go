@@ -5,12 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
@@ -76,7 +78,15 @@ func RemoveStack(ctx context.Context, client StacksRemover, provider client.Prov
 		return fmt.Errorf("failed to delete remote stack record: %w", err)
 	}
 
-	return stacks.RemoveInDirectory(".", name)
+	err := stacks.RemoveInDirectory(".", name)
+	if err != nil {
+		// If the file doesn't exist, consider it a success since the end state is the same (the stack file is gone)
+		if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		term.Warnf("local stack file could not be deleted: %s", err)
+	}
+	return nil
 }
 
 func stackHasActiveDeployment(ctx context.Context, provider client.Provider, projectName, name string) (bool, error) {

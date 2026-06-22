@@ -255,7 +255,7 @@ func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.D
 }
 
 func printExistingDeployments(existingDeployments []*defangv1.Deployment) {
-	term.Info("This project was previously deployed to the following locations:")
+	term.Warn("This project was previously deployed to the following locations:")
 	deploymentStrings := make([]string, 0, len(existingDeployments))
 	for _, dep := range existingDeployments {
 		var providerId client.ProviderID
@@ -265,7 +265,9 @@ func printExistingDeployments(existingDeployments []*defangv1.Deployment) {
 	// sort and remove duplicates
 	slices.Sort(deploymentStrings)
 	deploymentStrings = slices.Compact(deploymentStrings)
-	term.Println(strings.Join(deploymentStrings, "\n"))
+	for _, depStr := range deploymentStrings {
+		term.Println(depStr)
+	}
 }
 
 func confirmDeploymentToNewLocation() (bool, error) {
@@ -288,7 +290,7 @@ func promptToCreateStack(ctx context.Context, targetDirectory string, params sta
 		return nil
 	}
 
-	err := PromptForStackParameters(ctx, &params)
+	err := promptForStackParameters(ctx, &params)
 	if err != nil {
 		return err
 	}

@@ -36,9 +36,9 @@ func (m *MockRemoveConfigCLI) Connect(ctx context.Context, fabricAddr string) (*
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockRemoveConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient, stack string) client.Provider {
+func (m *MockRemoveConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabric client.FabricClient, stack string) client.Provider {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
-	return nil // Mock provider
+	return client.MockProvider{}
 }
 
 func (m *MockRemoveConfigCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
@@ -113,7 +113,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				m.ConfigDeleteError = errors.New("failed to delete config")
 			},
 			expectError:   true,
-			expectedError: "failed to remove config variable \"DATABASE_URL\" from project \"test-project\": failed to delete config",
+			expectedError: "failed to remove config variable \"DATABASE_URL\" from project \"test-project\" in stack \"test-stack\": failed to delete config",
 		},
 		{
 			name:       "successful_config_removal",
@@ -123,7 +123,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				// No errors, successful removal
 			},
 			expectError:          false,
-			expectedTextContains: "Successfully removed the config variable \"DATABASE_URL\" from project \"test-project\"",
+			expectedTextContains: "Successfully removed the config variable \"DATABASE_URL\" from project \"test-project\" in stack \"test-stack\"",
 		},
 	}
 

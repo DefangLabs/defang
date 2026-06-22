@@ -22,7 +22,7 @@ type RemoveConfigParams struct {
 // HandleRemoveConfigTool handles the remove config tool logic
 func HandleRemoveConfigTool(ctx context.Context, loader client.Loader, params RemoveConfigParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
-	client, err := GetClientWithRetry(ctx, cli, sc)
+	client, err := GetClientWithRetry(ctx, cli, sc.FabricAddr)
 	if err != nil {
 		var noBrowserErr auth.ErrNoBrowser
 		if errors.As(err, &noBrowserErr) {
@@ -49,10 +49,10 @@ func HandleRemoveConfigTool(ctx context.Context, loader client.Loader, params Re
 	if err := cli.ConfigDelete(ctx, projectName, provider, params.Name); err != nil {
 		// Show a warning (not an error) if the config was not found
 		if connect.CodeOf(err) == connect.CodeNotFound {
-			return fmt.Sprintf("Config variable %q not found in project %q", params.Name, projectName), nil
+			return fmt.Sprintf("Config variable %q not found in project %q in stack %q", params.Name, projectName, sc.Stack.Name), nil
 		}
-		return "", fmt.Errorf("failed to remove config variable %q from project %q: %w", params.Name, projectName, err)
+		return "", fmt.Errorf("failed to remove config variable %q from project %q in stack %q: %w", params.Name, projectName, sc.Stack.Name, err)
 	}
 
-	return fmt.Sprintf("Successfully removed the config variable %q from project %q", params.Name, projectName), nil
+	return fmt.Sprintf("Successfully removed the config variable %q from project %q in stack %q", params.Name, projectName, sc.Stack.Name), nil
 }

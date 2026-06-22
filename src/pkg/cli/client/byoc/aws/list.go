@@ -74,14 +74,15 @@ func ListPulumiStacks(ctx context.Context, s3client S3Client, bucketName string)
 			if obj.Key == nil || obj.Size == nil {
 				continue
 			}
-			state, err := state.ParsePulumiStateFile(ctx, s3Obj{obj}, bucketName, func(ctx context.Context, bucket, path string) ([]byte, error) {
+			state, err := state.ParsePulumiStateFile(ctx, s3Obj{obj}, func(ctx context.Context, path string) ([]byte, error) {
 				getObjectOutput, err := s3client.GetObject(ctx, &s3.GetObjectInput{
-					Bucket: &bucket,
+					Bucket: &bucketName,
 					Key:    &path,
 				})
 				if err != nil {
 					return nil, err
 				}
+				defer getObjectOutput.Body.Close()
 				return io.ReadAll(getObjectOutput.Body)
 			})
 			if err != nil {
@@ -140,15 +141,15 @@ func (b *ByocAws) listPulumiStacksAllRegions(ctx context.Context, s3client S3Cli
 			wg.Add(1)
 			go func(region aws.Region) {
 				defer wg.Done()
-				stacks, err := b.listPulumiStacksInBucket(ctx, region, *bucket.Name)
+				stateInfos, err := b.listPulumiStacksInBucket(ctx, region, *bucket.Name)
 				if err != nil {
 					return
 				}
-				for stack := range stacks {
+				for stateInfo := range stateInfos {
 					select {
 					case <-ctx.Done():
 						return
-					case stackCh <- stack:
+					case stackCh <- stateInfo:
 					}
 				}
 			}(bucketRegion)

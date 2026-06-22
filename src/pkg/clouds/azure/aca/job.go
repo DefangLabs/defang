@@ -88,7 +88,6 @@ type Job struct {
 	ResourceGroup     string
 	EnvironmentID     string
 	SystemPrincipalID string
-	cdJobImage        string
 	identitySetUp     bool
 }
 
@@ -131,66 +130,64 @@ func (j *Job) newJobsExecutionsClient() (*armappcontainersv3.JobsExecutionsClien
 // setUpLogWorkspace creates (or retrieves) a Log Analytics workspace and returns its
 // customer ID (workspace GUID) and primary shared key, which are needed to configure
 // ACA environment log streaming.
-func (j *Job) setUpLogWorkspace(ctx context.Context) (customerID, sharedKey string, err error) {
-	cred, err := j.NewCreds()
-	if err != nil {
-		return "", "", err
-	}
+func (j *Job) setUpLogWorkspace(ctx context.Context, cred azcore.TokenCredential) (customerID string, err error) {
+	defer term.Timing()()
 	wsClient, err := armoperationalinsights.NewWorkspacesClient(j.SubscriptionID, cred, nil)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to create log analytics workspaces client: %w", err)
+		return "", fmt.Errorf("failed to create log analytics workspaces client: %w", err)
 	}
 
-	// Create or update the workspace (idempotent).
-	term.Debugf("setUpLogWorkspace: creating/updating workspace %q in %q", cdLogWorkspaceName, j.ResourceGroup)
-	wsPoller, err := wsClient.BeginCreateOrUpdate(ctx, j.ResourceGroup, cdLogWorkspaceName, armoperationalinsights.Workspace{
-		Location: j.Location.Ptr(),
-		Properties: &armoperationalinsights.WorkspaceProperties{
-			SKU: &armoperationalinsights.WorkspaceSKU{
-				Name: to.Ptr(armoperationalinsights.WorkspaceSKUNameEnumPerGB2018),
+	term.Debugf("setUpLogWorkspace: get existing workspace %q in %q", cdLogWorkspaceName, j.ResourceGroup)
+	if resp, err := wsClient.Get(ctx, j.ResourceGroup, cdLogWorkspaceName, nil); err == nil &&
+		resp.Properties != nil && resp.Properties.CustomerID != nil {
+		term.Debugf("setUpLogWorkspace: workspace already exists, customer ID %q", *resp.Properties.CustomerID)
+		customerID = *resp.Properties.CustomerID
+	} else {
+		// Create or update the workspace (idempotent).
+		term.Debugf("setUpLogWorkspace: creating/updating workspace %q in %q", cdLogWorkspaceName, j.ResourceGroup)
+		wsPoller, err := wsClient.BeginCreateOrUpdate(ctx, j.ResourceGroup, cdLogWorkspaceName, armoperationalinsights.Workspace{
+			Location: j.Location.Ptr(),
+			Properties: &armoperationalinsights.WorkspaceProperties{
+				SKU: &armoperationalinsights.WorkspaceSKU{
+					Name: to.Ptr(armoperationalinsights.WorkspaceSKUNameEnumPerGB2018),
+				},
+				RetentionInDays: to.Ptr(int32(30)), // ≥30
 			},
-			RetentionInDays: to.Ptr(int32(30)),
-		},
-	}, nil)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to create log analytics workspace: %w", err)
+		}, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to create log analytics workspace: %w", err)
+		}
+		wsResult, err := wsPoller.PollUntilDone(ctx, azure.PollOptions)
+		if err != nil {
+			return "", fmt.Errorf("failed to poll workspace creation: %w", err)
+		}
+		if wsResult.Properties == nil || wsResult.Properties.CustomerID == nil {
+			return "", errors.New("log analytics workspace did not return a customer ID")
+		}
+		customerID = *wsResult.Properties.CustomerID
 	}
-	wsResult, err := wsPoller.PollUntilDone(ctx, azure.PollOptions)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to poll workspace creation: %w", err)
-	}
-	if wsResult.Properties == nil || wsResult.Properties.CustomerID == nil {
-		return "", "", errors.New("log analytics workspace did not return a customer ID")
-	}
-	customerID = *wsResult.Properties.CustomerID
 
-	// Fetch the shared key (not available on the workspace resource itself).
-	keysClient, err := armoperationalinsights.NewSharedKeysClient(j.SubscriptionID, cred, nil)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to create shared keys client: %w", err)
-	}
-	keysResp, err := keysClient.GetSharedKeys(ctx, j.ResourceGroup, cdLogWorkspaceName, nil)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to get workspace shared keys: %w", err)
-	}
-	if keysResp.PrimarySharedKey == nil {
-		return "", "", errors.New("log analytics workspace returned no primary shared key")
-	}
-	return customerID, *keysResp.PrimarySharedKey, nil
+	return customerID, nil
 }
 
-// SetUpEnvironment creates (or retrieves) the Container Apps Environment that hosts the CD job.
+// SetUpManagedEnvironment creates (or retrieves) the Container Apps Environment that hosts the CD job.
 // It also creates a Log Analytics workspace and configures the environment to stream logs
 // there so they're visible in the Azure portal and via Log Analytics queries.
 // The environment resource ID is stored in j.EnvironmentID.
-func (j *Job) SetUpEnvironment(ctx context.Context) error {
+func (j *Job) SetUpManagedEnvironment(ctx context.Context) error {
+	defer term.Timing()()
 	if j.EnvironmentID != "" {
-		term.Debugf("SetUpEnvironment: already set (%s)", j.EnvironmentID)
+		term.Debugf("SetUpManagedEnvironment: already set (%s)", j.EnvironmentID)
 		return nil
 	}
 
+	cred, err := j.NewCreds()
+	if err != nil {
+		return err
+	}
+
 	// Set up Log Analytics workspace first so we can wire it into the environment.
-	customerID, sharedKey, err := j.setUpLogWorkspace(ctx)
+	customerID, err := j.setUpLogWorkspace(ctx, cred)
 	if err != nil {
 		return err
 	}
@@ -200,43 +197,48 @@ func (j *Job) SetUpEnvironment(ctx context.Context) error {
 		return err
 	}
 
-	appLogsConfig := &armappcontainersv3.AppLogsConfiguration{
-		Destination: to.Ptr("log-analytics"),
-		LogAnalyticsConfiguration: &armappcontainersv3.LogAnalyticsConfiguration{
-			CustomerID: to.Ptr(customerID),
-			SharedKey:  to.Ptr(sharedKey),
-		},
-	}
+	const destination = "log-analytics"
 
-	term.Debugf("SetUpEnvironment: checking if %q exists in %q", cdEnvironmentName, j.ResourceGroup)
-	if resp, err := envClient.Get(ctx, j.ResourceGroup, cdEnvironmentName, nil); err == nil {
+	term.Debugf("SetUpManagedEnvironment: checking if %q exists in %q", cdEnvironmentName, j.ResourceGroup)
+	if resp, err := envClient.Get(ctx, j.ResourceGroup, cdEnvironmentName, nil); err == nil && resp.Properties != nil {
 		// Environment exists. Ensure its AppLogsConfiguration points to our workspace
+		if lc := resp.Properties.AppLogsConfiguration; lc != nil && lc.Destination != nil && *lc.Destination == destination &&
+			lc.LogAnalyticsConfiguration != nil &&
+			lc.LogAnalyticsConfiguration.CustomerID != nil && customerID == *lc.LogAnalyticsConfiguration.CustomerID {
+			term.Debugf("SetUpManagedEnvironment: environment %s already configured with Log Analytics", *resp.ID)
+			j.EnvironmentID = *resp.ID
+			return nil
+		}
 		// (idempotent update — safe to run on every call).
-		term.Debugf("SetUpEnvironment: updating existing environment %s to use Log Analytics", *resp.ID)
-		updatePoller, err := envClient.BeginCreateOrUpdate(ctx, j.ResourceGroup, cdEnvironmentName, armappcontainersv3.ManagedEnvironment{
-			Location: j.Location.Ptr(),
-			Properties: &armappcontainersv3.ManagedEnvironmentProperties{
-				ZoneRedundant:        to.Ptr(false),
-				AppLogsConfiguration: appLogsConfig,
-			},
-		}, nil)
-		if err != nil {
-			return fmt.Errorf("failed to update container apps environment: %w", err)
-		}
-		result, err := updatePoller.PollUntilDone(ctx, azure.PollOptions)
-		if err != nil {
-			return fmt.Errorf("failed to poll environment update: %w", err)
-		}
-		j.EnvironmentID = *result.ID
-		return nil
+		term.Debugf("SetUpManagedEnvironment: updating existing environment %s to use Log Analytics", *resp.ID)
+	} else {
+		term.Infof("Creating Container Apps environment %q in %q", cdEnvironmentName, j.ResourceGroup)
 	}
 
-	term.Infof("Creating Container Apps environment %q in %q", cdEnvironmentName, j.ResourceGroup)
+	// Fetch the shared key (not available on the workspace resource itself).
+	keysClient, err := armoperationalinsights.NewSharedKeysClient(j.SubscriptionID, cred, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create shared keys client: %w", err)
+	}
+	keysResp, err := keysClient.GetSharedKeys(ctx, j.ResourceGroup, cdLogWorkspaceName, nil)
+	if err != nil {
+		return fmt.Errorf("failed to get workspace shared keys: %w", err)
+	}
+	if keysResp.PrimarySharedKey == nil {
+		return errors.New("log analytics workspace returned no primary shared key")
+	}
+
 	poller, err := envClient.BeginCreateOrUpdate(ctx, j.ResourceGroup, cdEnvironmentName, armappcontainersv3.ManagedEnvironment{
 		Location: j.Location.Ptr(),
 		Properties: &armappcontainersv3.ManagedEnvironmentProperties{
-			ZoneRedundant:        to.Ptr(false),
-			AppLogsConfiguration: appLogsConfig,
+			ZoneRedundant: to.Ptr(false),
+			AppLogsConfiguration: &armappcontainersv3.AppLogsConfiguration{
+				Destination: to.Ptr(destination),
+				LogAnalyticsConfiguration: &armappcontainersv3.LogAnalyticsConfiguration{
+					CustomerID: to.Ptr(customerID),
+					SharedKey:  to.Ptr(*keysResp.PrimarySharedKey),
+				},
+			},
 		},
 	}, nil)
 	if err != nil {
@@ -247,7 +249,7 @@ func (j *Job) SetUpEnvironment(ctx context.Context) error {
 		return fmt.Errorf("failed to poll environment creation: %w", err)
 	}
 	j.EnvironmentID = *result.ID
-	term.Infof("Created Container Apps environment %s", j.EnvironmentID)
+	term.Infof("Created Container Apps environment %s", *result.Name)
 	return nil
 }
 
@@ -283,6 +285,7 @@ func assignRole(ctx context.Context, raClient *armauthorization.RoleAssignmentsC
 // identity so it can provision Azure resources and access Pulumi state in storageAccount.
 // SetUpJob must be called before this to populate SystemPrincipalID.
 func (j *Job) SetUpManagedIdentity(ctx context.Context, storageAccount string) error {
+	defer term.Timing()()
 	if j.identitySetUp {
 		return nil
 	}
@@ -334,17 +337,32 @@ func (j *Job) SetUpManagedIdentity(ctx context.Context, storageAccount string) e
 // The CD image is pulled anonymously; the image's registry must allow anonymous pull.
 // It enables a system-assigned managed identity on the job and stores the principal ID
 // in j.SystemPrincipalID for subsequent role assignments.
-// SetUpEnvironment must be called first.
+// SetUpManagedEnvironment must be called first.
 func (j *Job) SetUpJob(ctx context.Context, image string, envMap map[string]string) error {
+	defer term.Timing()()
 	if j.EnvironmentID == "" {
-		return errors.New("environment ID is not set; ensure SetUpEnvironment was called first")
+		return errors.New("environment ID is not set; ensure SetUpManagedEnvironment was called first")
 	}
 
-	term.Debugf("SetUpJob: creating/updating job %q with image %q (%d env vars)", cdJobName, image, len(envMap))
 	jobsClient, err := j.newJobsClient()
 	if err != nil {
 		return err
 	}
+
+	// Skip the upsert (which polls for ~30s even when nothing changed) when
+	// the job already exists with a populated system-assigned principal.
+	// Image and env vars on the template are placeholders — StartJobExecution
+	// overrides them per-run — so we don't need to compare them here.
+	if envMap == nil {
+		if resp, err := jobsClient.Get(ctx, j.ResourceGroup, cdJobName, nil); err == nil &&
+			resp.Identity != nil && resp.Identity.PrincipalID != nil && *resp.Identity.PrincipalID != "" {
+			j.SystemPrincipalID = *resp.Identity.PrincipalID
+			term.Debugf("SetUpJob: %q already exists; skipping upsert", cdJobName)
+			return nil
+		}
+	}
+
+	term.Debugf("SetUpJob: creating/updating job %q with image %q (%d env vars)", cdJobName, image, len(envMap))
 
 	var envVars []*armappcontainersv3.EnvironmentVar
 	for k, v := range envMap {
@@ -407,13 +425,13 @@ func (j *Job) SetUpJob(ctx context.Context, image string, envMap map[string]stri
 	if result.Identity != nil && result.Identity.PrincipalID != nil {
 		j.SystemPrincipalID = *result.Identity.PrincipalID
 	}
-	j.cdJobImage = image
 	return nil
 }
 
 // StartJobExecution starts a new execution of the CD job with the given image, command,
 // and environment variables. Returns the execution name.
 func (j *Job) StartJobExecution(ctx context.Context, req JobRequest) (string, error) {
+	defer term.Timing()()
 	jobsClient, err := j.newJobsClient()
 	if err != nil {
 		return "", err
@@ -634,6 +652,7 @@ func forwardStream(ctx context.Context, ch <-chan LogEntry, yield func(string, e
 // logStreamEndpoint. The token differs from the ARM token and is required even
 // though the URL is already scoped to the subscription.
 func (j *Job) getJobAuthToken(ctx context.Context) (string, error) {
+	defer term.Timing()()
 	return j.FetchLogStreamAuthToken(ctx, j.ResourceGroup, "Microsoft.App/jobs/"+cdJobName, jobAPIVersion)
 }
 
@@ -643,6 +662,7 @@ func (j *Job) getJobAuthToken(ctx context.Context) (string, error) {
 // (Running or Terminated — anything earlier returns a Kubernetes error).
 // Returns an empty string (no error) while the replica is still initialising.
 func (j *Job) getCDContainerLogStreamURL(ctx context.Context, executionName string) (string, error) {
+	defer term.Timing()()
 	armTok, err := j.ArmToken(ctx)
 	if err != nil {
 		return "", err
@@ -706,6 +726,7 @@ func (j *Job) getCDContainerLogStreamURL(ctx context.Context, executionName stri
 // first connect to capture output emitted during pod startup, and 0 on
 // reconnects so we don't re-print lines we already streamed.
 func (j *Job) streamJobExecutionLogs(ctx context.Context, executionName string, backfillLines int) (<-chan LogEntry, error) {
+	defer term.Timing()()
 	streamURL, err := j.getCDContainerLogStreamURL(ctx, executionName)
 	if err != nil {
 		return nil, err
@@ -772,11 +793,13 @@ func (j *Job) streamJobExecutionLogs(ctx context.Context, executionName string, 
 // ReadJobLogs returns all log output captured for a job execution from Log Analytics.
 // Subject to a short ingestion delay (seconds to a couple of minutes on cold workspaces).
 func (j *Job) ReadJobLogs(ctx context.Context, executionName string) (string, error) {
+	defer term.Timing()()
 	return j.fetchLogsFromWorkspace(ctx, executionName)
 }
 
 // getLogAnalyticsToken returns a Bearer token for the Log Analytics query API.
 func (j *Job) getLogAnalyticsToken(ctx context.Context) (string, error) {
+	defer term.Timing()()
 	cred, err := j.NewCreds()
 	if err != nil {
 		return "", err
@@ -793,6 +816,7 @@ func (j *Job) getLogAnalyticsToken(ctx context.Context) (string, error) {
 // getLogWorkspaceCustomerID returns the customer ID (GUID) of the CD Log Analytics
 // workspace. This is what the Log Analytics query API addresses workspaces by.
 func (j *Job) getLogWorkspaceCustomerID(ctx context.Context) (string, error) {
+	defer term.Timing()()
 	cred, err := j.NewCreds()
 	if err != nil {
 		return "", err
@@ -815,6 +839,7 @@ func (j *Job) getLogWorkspaceCustomerID(ctx context.Context) (string, error) {
 // the given job execution, ordered by time. Returns empty string when the workspace has
 // no rows yet (first-time workspaces can take 2–5 minutes to ingest data).
 func (j *Job) fetchLogsFromWorkspace(ctx context.Context, executionName string) (string, error) {
+	defer term.Timing()()
 	workspaceID, err := j.getLogWorkspaceCustomerID(ctx)
 	if err != nil {
 		return "", err
@@ -826,20 +851,30 @@ func (j *Job) fetchLogsFromWorkspace(ctx context.Context, executionName string) 
 // so tests can exercise it with a known workspace ID without needing the SDK
 // workspaces client to be mocked.
 func (j *Job) fetchLogsByWorkspaceID(ctx context.Context, workspaceID, executionName string) (string, error) {
+	defer term.Timing()()
 	token, err := j.getLogAnalyticsToken(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	// Filter by pod name (ContainerGroupName_s), which has the form
-	// "{executionName}-{randomsuffix}" — ContainerJobName_s is always just the job name
-	// ("defang-cd") so it can't disambiguate executions. Execution names are Azure-generated
-	// alphanumeric + hyphens, so no quoting hazard inlining them into the query.
+	// Union over both legacy Classic CustomLog (ContainerAppConsoleLogs_CL) and
+	// modern DCR-based (ContainerAppConsoleLogs) tables. ACA envs created with
+	// AppLogsConfiguration.Destination=log-analytics write to _CL; envs using
+	// destination=azure-monitor + a DiagnosticSetting write to the modern table.
+	// isfuzzy=true silently drops a missing table from the union so workspaces
+	// with only one of them still resolve. Column rename in the Classic branch
+	// matches the modern schema for the shared filter+projection below.
+	// Filter is on pod name ({executionName}-{randomsuffix}) — ContainerJobName_s
+	// / JobName is just "defang-cd" and can't disambiguate executions. Execution
+	// names are Azure-generated alphanumeric+hyphens — safe to inline.
 	query := fmt.Sprintf(
-		`ContainerAppConsoleLogs_CL `+
-			`| where ContainerName_s == "%s" and ContainerGroupName_s startswith "%s-" `+
+		`union isfuzzy=true `+
+			`(ContainerAppConsoleLogs_CL `+
+			`   | extend ContainerName = ContainerName_s, ContainerGroupName = ContainerGroupName_s, Log = Log_s), `+
+			`(ContainerAppConsoleLogs) `+
+			`| where ContainerName == "%[1]s" and ContainerGroupName startswith "%[2]s-" `+
 			`| order by TimeGenerated asc `+
-			`| project TimeGenerated, Log_s`,
+			`| project TimeGenerated, Log`,
 		cdJobName, executionName,
 	)
 	body, err := json.Marshal(map[string]string{"query": query})

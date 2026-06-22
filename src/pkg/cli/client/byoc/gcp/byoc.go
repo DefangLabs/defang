@@ -311,8 +311,8 @@ func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[state.
 
 	uploadSA := b.driver.GetServiceAccountEmail(DefangUploadServiceAccountName)
 	term.Debug("Getting services from pulumi stacks bucket:", bucketName, prefix, uploadSA)
-	objLoader := func(ctx context.Context, bucket, object string) ([]byte, error) {
-		return b.driver.GetBucketObjectWithServiceAccount(ctx, bucket, object, uploadSA)
+	objLoader := func(ctx context.Context, object string) ([]byte, error) {
+		return b.driver.GetBucketObjectWithServiceAccount(ctx, bucketName, object, uploadSA)
 	}
 	seq, err := b.driver.IterateBucketObjects(ctx, bucketName, prefix)
 	if err != nil {
@@ -324,7 +324,7 @@ func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[state.
 				term.Debugf("Error listing object in bucket %s: %v", bucketName, annotateGcpError(err))
 				continue
 			}
-			st, err := state.ParsePulumiStateFile(ctx, gcpObj{obj}, bucketName, objLoader)
+			st, err := state.ParsePulumiStateFile(ctx, gcpObj{obj}, objLoader)
 			if err != nil {
 				term.Debugf("Skipping %q in bucket %s: %v", obj.Name, bucketName, annotateGcpError(err))
 				continue

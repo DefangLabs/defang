@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -22,6 +23,17 @@ type mockFabricClient struct {
 	defaultStack *defangv1.Stack
 	stacks       []*defangv1.Stack
 	listErr      error
+}
+
+func (m *mockFabricClient) GetStack(ctx context.Context, req *defangv1.GetStackRequest) (*defangv1.GetStackResponse, error) {
+	for _, stack := range m.stacks {
+		if stack.GetName() == req.GetStack() {
+			return &defangv1.GetStackResponse{
+				Stack: stack,
+			}, nil
+		}
+	}
+	return nil, connect.NewError(connect.CodeNotFound, errors.New("not found"))
 }
 
 func (m *mockFabricClient) ListStacks(ctx context.Context, req *defangv1.ListStacksRequest) (*defangv1.ListStacksResponse, error) {
@@ -419,7 +431,7 @@ GOOGLE_REGION=us-central1
 	assert.Equal(t, "us-east-1", sharedStack.Region, "Expected shared stack to use remote region us-east-1")
 	assert.Equal(t, client.ProviderAWS, sharedStack.Provider, "Expected shared stack to use provider aws")
 	assert.Equal(t, modes.ModeUnspecified, sharedStack.Mode, "Expected shared stack to use mode UNSPECIFIED")
-	assert.Equal(t, "", sharedStack.Variables["AWS_PROFILE"], "Expected shared stack to have empty AWS_PROFILE variable")
+	assert.Equal(t, "", sharedStack.Account, "Expected shared stack to have empty AWS_PROFILE variable")
 	assert.Equal(t, deployedAt.Local().Format(time.RFC3339), sharedStack.DeployedAt.Local().Format(time.RFC3339), "Expected shared stack to have deployment time from remote")
 
 	// Check remote-only stack exists
@@ -783,7 +795,7 @@ func TestGetStack(t *testing.T) {
 				},
 			},
 			interactiveResponses: map[string]string{
-				"stack": "existingstack (gcp)",
+				"stack": "existingstack [gcp]",
 			},
 			expectedStack: &Parameters{
 				Name:     "existingstack",

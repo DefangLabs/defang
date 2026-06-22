@@ -73,6 +73,12 @@ func (b *ByocBaseClient) GetStackName() string {
 	return b.PulumiStack
 }
 
+// HasDelegatedSubdomain returns true by default; providers that do not yet
+// implement domain delegation (DO) override this to return false.
+func (b *ByocBaseClient) HasDelegatedSubdomain() bool {
+	return true
+}
+
 func (b *ByocBaseClient) SetCanIUseConfig(quotas *defangv1.CanIUseResponse) {
 	b.CanIUseConfig.AllowGPU = quotas.Gpu
 	b.CanIUseConfig.AllowScaling = quotas.AllowScaling

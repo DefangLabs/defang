@@ -18,6 +18,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/dns"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composetypes "github.com/compose-spec/compose-go/v2/types"
 )
@@ -59,10 +60,7 @@ func TestGetWithRetries(t *testing.T) {
 		tc := &testClient{tries: []tryResult{
 			{result: &http.Response{StatusCode: 200, Body: mockBody("")}, err: nil},
 		}}
-		originalClient := httpClient
-		t.Cleanup(func() { httpClient = originalClient })
-		httpClient = tc
-		err := getWithRetries(t.Context(), "http://example.com", 3)
+		err := getWithRetries(t.Context(), "http://example.com", 3, tc)
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
@@ -76,10 +74,7 @@ func TestGetWithRetries(t *testing.T) {
 			{result: nil, err: errors.New("error")},
 			{result: &http.Response{StatusCode: 200, Body: mockBody("")}, err: nil},
 		}}
-		originalClient := httpClient
-		t.Cleanup(func() { httpClient = originalClient })
-		httpClient = tc
-		err := getWithRetries(t.Context(), "http://example.com", 3)
+		err := getWithRetries(t.Context(), "http://example.com", 3, tc)
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
@@ -93,10 +88,7 @@ func TestGetWithRetries(t *testing.T) {
 			{result: &http.Response{StatusCode: 503, Body: mockBody("Random Error")}, err: nil},
 			{result: nil, err: errors.New("error")},
 		}}
-		originalClient := httpClient
-		t.Cleanup(func() { httpClient = originalClient })
-		httpClient = tc
-		err := getWithRetries(t.Context(), "http://example.com", 3)
+		err := getWithRetries(t.Context(), "http://example.com", 3, tc)
 		if err == nil {
 			t.Errorf("Expected error, got %v", err)
 		} else if !strings.Contains(err.Error(), "HTTP: 503") {
@@ -111,10 +103,7 @@ func TestGetWithRetries(t *testing.T) {
 		tc := &testClient{tries: []tryResult{
 			{result: &http.Response{StatusCode: 503, Request: &http.Request{URL: redirectURL}, Body: mockBody("Random Error")}, err: nil},
 		}}
-		originalClient := httpClient
-		t.Cleanup(func() { httpClient = originalClient })
-		httpClient = tc
-		err := getWithRetries(t.Context(), "http://example.com", 3)
+		err := getWithRetries(t.Context(), "http://example.com", 3, tc)
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
@@ -126,10 +115,7 @@ func TestGetWithRetries(t *testing.T) {
 		tc := &testClient{tries: []tryResult{
 			{result: nil, err: &tls.CertificateVerificationError{Err: errors.New("error")}},
 		}}
-		originalClient := httpClient
-		t.Cleanup(func() { httpClient = originalClient })
-		httpClient = tc
-		err := getWithRetries(t.Context(), "http://example.com", 3)
+		err := getWithRetries(t.Context(), "http://example.com", 3, tc)
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
@@ -143,10 +129,7 @@ func TestGetWithRetries(t *testing.T) {
 			{result: &http.Response{StatusCode: 502, Body: mockBody("Random Error")}, err: nil},
 			{result: &http.Response{StatusCode: 503, Body: mockBody("Random Error")}, err: nil},
 		}}
-		originalClient := httpClient
-		t.Cleanup(func() { httpClient = originalClient })
-		httpClient = tc
-		err := getWithRetries(t.Context(), "http://example.com", 3)
+		err := getWithRetries(t.Context(), "http://example.com", 3, tc)
 		if err == nil {
 			t.Errorf("Expected error, got %v", err)
 		} else if !strings.Contains(err.Error(), "HTTP: 404") || !strings.Contains(err.Error(), "HTTP: 502") || !strings.Contains(err.Error(), "HTTP: 503") {
@@ -162,10 +145,7 @@ func TestGetWithRetries(t *testing.T) {
 			{result: &http.Response{StatusCode: 502, Body: mockBody("Random Error")}, err: nil},
 			{result: &http.Response{StatusCode: 503, Body: mockBody("Random Error")}, err: nil},
 		}}
-		originalClient := httpClient
-		t.Cleanup(func() { httpClient = originalClient })
-		httpClient = tc
-		err := getWithRetries(t.Context(), "http://example.com", 1)
+		err := getWithRetries(t.Context(), "http://example.com", 1, tc)
 		if err == nil {
 			t.Errorf("Expected error, got %v", err)
 		}
@@ -191,6 +171,10 @@ func (mr *MockResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS,
 	mr.calls++
 	return []*net.NS{{Host: ""}}, nil
 }
+func (mr *MockResolver) LookupTXT(ctx context.Context, domain string) ([]string, error) {
+	mr.calls++
+	return nil, nil
+}
 
 func TestHttpClient(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -198,8 +182,9 @@ func TestHttpClient(t *testing.T) {
 	}))
 	defer ts.Close()
 	var mr MockResolver
-	resolver = &mr
 	dnsCacheDuration = 50 * time.Millisecond
+
+	tc := newCertHTTPClient(&mr)
 
 	tsu, err := url.Parse(ts.URL)
 	if err != nil {
@@ -214,7 +199,7 @@ func TestHttpClient(t *testing.T) {
 		t.Fatalf("failed to create request: %v", err)
 	}
 
-	resp, err := httpClient.Do(req)
+	resp, err := tc.Do(req)
 	if err != nil {
 		t.Fatalf("failed to make http call: %v", err)
 	}
@@ -224,7 +209,7 @@ func TestHttpClient(t *testing.T) {
 		t.Fatalf("expected 1 dns lookup, but got %v", mr.calls)
 	}
 
-	resp, err = httpClient.Do(req)
+	resp, err = tc.Do(req)
 	if err != nil {
 		t.Fatalf("failed to make http call: %v", err)
 	}
@@ -234,7 +219,7 @@ func TestHttpClient(t *testing.T) {
 	}
 
 	time.Sleep(80 * time.Millisecond)
-	resp, err = httpClient.Do(req)
+	resp, err = tc.Do(req)
 	if err != nil {
 		t.Fatalf("failed to make http call: %v", err)
 	}
@@ -262,6 +247,21 @@ type mockCertFabricClient struct {
 func (m *mockCertFabricClient) VerifyDNSSetup(ctx context.Context, req *defangv1.VerifyDNSSetupRequest) error {
 	m.verifyDNSCalls++
 	return nil // DNS verified successfully
+}
+
+// mockCertIssuerProvider extends mockCertProvider with the CertIssuer
+// interface so GenerateLetsEncryptCert's `provider.(CertIssuer)` succeeds.
+// Captures every (project, service, hostname) tuple the SUT calls IssueCert
+// with, and lets the test inject an error per call.
+type mockCertIssuerProvider struct {
+	mockCertProvider
+	issueErr  error
+	issueCall []string
+}
+
+func (m *mockCertIssuerProvider) IssueCert(_ context.Context, projectName, serviceName, hostname string, _ func(string) dns.Resolver) error {
+	m.issueCall = append(m.issueCall, fmt.Sprintf("%s/%s/%s", projectName, serviceName, hostname))
+	return m.issueErr
 }
 
 func TestGenerateLetsEncryptCert(t *testing.T) {
@@ -373,6 +373,88 @@ func TestGenerateLetsEncryptCert(t *testing.T) {
 		}
 		if fabricClient.verifyDNSCalls == 0 {
 			t.Error("expected VerifyDNSSetup to be called (generateCert was reached)")
+		}
+	})
+
+	// CertIssuer dispatch: when the provider implements CertIssuer, the legacy
+	// fabric/ACME path (VerifyDNSSetup + generateCert) is bypassed entirely and
+	// IssueCert is invoked once per domain (the service domainname plus any
+	// default-network aliases).
+	t.Run("dispatches to CertIssuer when provider implements it", func(t *testing.T) {
+		fabricClient := &mockCertFabricClient{}
+		provider := &mockCertIssuerProvider{
+			mockCertProvider: mockCertProvider{
+				services: &defangv1.GetServicesResponse{
+					Services: []*defangv1.ServiceInfo{
+						{
+							Service:     &defangv1.Service{Name: "web"},
+							UseAcmeCert: true,
+							Domainname:  "example.com",
+						},
+					},
+				},
+			},
+		}
+		project := &compose.Project{
+			Name: "myproj",
+			Services: compose.Services{
+				"web": {
+					Name:       "web",
+					DomainName: "example.com",
+					Networks: map[string]*composetypes.ServiceNetworkConfig{
+						"default": {Aliases: []string{"alias.example.com"}},
+					},
+				},
+			},
+		}
+		err := GenerateLetsEncryptCert(t.Context(), project, fabricClient, provider)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		want := []string{"myproj/web/example.com", "myproj/web/alias.example.com"}
+		if !slices.Equal(provider.issueCall, want) {
+			t.Errorf("IssueCert calls = %v, want %v", provider.issueCall, want)
+		}
+		// Issuer path is short-circuited — the legacy generateCert codepath
+		// (which calls VerifyDNSSetup) must not run.
+		if fabricClient.verifyDNSCalls != 0 {
+			t.Errorf("VerifyDNSSetup should not be called when CertIssuer is used (got %d calls)", fabricClient.verifyDNSCalls)
+		}
+	})
+
+	// IssueCert errors must surface — they used to be silently swallowed.
+	// Each failure is collected and joined into the returned error so the
+	// CLI exit code reflects the issuance outcome.
+	t.Run("aggregates IssueCert errors", func(t *testing.T) {
+		provider := &mockCertIssuerProvider{
+			mockCertProvider: mockCertProvider{
+				services: &defangv1.GetServicesResponse{
+					Services: []*defangv1.ServiceInfo{
+						{
+							Service:     &defangv1.Service{Name: "web"},
+							UseAcmeCert: true,
+							Domainname:  "example.com",
+						},
+					},
+				},
+			},
+			issueErr: errors.New("dns timeout"),
+		}
+		project := &compose.Project{
+			Name: "myproj",
+			Services: compose.Services{
+				"web": {Name: "web", DomainName: "example.com"},
+			},
+		}
+		err := GenerateLetsEncryptCert(t.Context(), project, &mockCertFabricClient{}, provider)
+		if err == nil {
+			t.Fatal("expected error when IssueCert fails")
+		}
+		if !strings.Contains(err.Error(), "dns timeout") {
+			t.Errorf("error %q should mention the underlying IssueCert error", err)
+		}
+		if !strings.Contains(err.Error(), "example.com") {
+			t.Errorf("error %q should name the failing domain", err)
 		}
 	})
 }

@@ -15,6 +15,8 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
+var ErrNoPlaygroundProject = errors.New("no Playground projects found")
+
 type PlaygroundProvider struct {
 	FabricClient
 	RetryDelayer
@@ -53,6 +55,10 @@ func (g *PlaygroundProvider) GetDeploymentStatus(ctx context.Context) (bool, err
 
 func (*PlaygroundProvider) Driver() string {
 	return "playground"
+}
+
+func (*PlaygroundProvider) HasDelegatedSubdomain() bool {
+	return true
 }
 
 func (g *PlaygroundProvider) Preview(ctx context.Context, req *DeployRequest) (*DeployResponse, error) {
@@ -153,8 +159,30 @@ func (g *PlaygroundProvider) SetUpCD(ctx context.Context, force bool) error {
 	return errors.New("this command is not valid for the Defang playground; did you forget --stack or --provider?")
 }
 
-func (g *PlaygroundProvider) CdList(context.Context, bool) (iter.Seq[byocState.Info], error) {
-	return nil, errors.New("this command is not valid for the Defang playground; did you forget --stack or --provider?")
+func (g *PlaygroundProvider) CdList(ctx context.Context, _ bool) (iter.Seq[byocState.Info], error) {
+	// CdList is used to check whether there are any active deployments for a stack.
+	// For Playground, we can just check if there are any services in the current project.
+	project, err := g.RemoteProjectName(ctx)
+	if err != nil {
+		// If there are no projects, return an empty list instead of an error
+		if !errors.Is(err, ErrNoPlaygroundProject) {
+			return nil, err
+		}
+	}
+	whoami, err := g.WhoAmI(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return func(yield func(byocState.Info) bool) {
+		if project != "" {
+			yield(byocState.Info{
+				Project:   project,
+				Stack:     g.GetStackName(),
+				Workspace: whoami.GetTenantId(),
+				CdRegion:  whoami.GetRegion(),
+			})
+		}
+	}, nil
 }
 
 func (g *PlaygroundProvider) ServicePrivateDNS(name string) string {
@@ -181,7 +209,7 @@ func (g *PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, err
 		return "", err
 	}
 	if resp.Project == "" {
-		return "", errors.New("no Playground projects found")
+		return "", ErrNoPlaygroundProject
 	}
 	term.Debug("Using default Playground project: ", resp.Project)
 	return resp.Project, nil

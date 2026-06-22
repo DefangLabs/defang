@@ -1,0 +1,5 @@
+#!/bin/sh
+# Pre-commit hook: lint changed Go files in src/
+if git diff --cached --name-only | grep -q '^src/'; then
+    make -C src lint
+fi

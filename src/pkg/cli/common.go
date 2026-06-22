@@ -52,6 +52,7 @@ type putDeploymentParams struct {
 	ServiceInfos []*defangv1.ServiceInfo
 	CdType       defangv1.CdType
 	CdId         string
+	Compose      []byte
 }
 
 func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric client.FabricClient, stack *stacks.Parameters, req putDeploymentParams) error {
@@ -106,7 +107,6 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 			Project:           req.ProjectName,
 			Provider:          accountInfo.Provider.Value(),
 			ProviderAccountId: accountInfo.AccountID,
-			ProviderString:    string(accountInfo.Provider),
 			Region:            accountInfo.Region,
 			ServiceCount:      int32(len(req.ServiceInfos)), // #nosec G115 - service count will not overflow int32
 			Stack:             provider.GetStackName(),
@@ -119,6 +119,7 @@ func putDeploymentAndStack(ctx context.Context, provider client.Provider, fabric
 			Services:          req.ServiceInfos,
 			CdId:              req.CdId,
 			CdType:            req.CdType,
+			Compose:           req.Compose,
 		},
 	})
 }

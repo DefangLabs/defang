@@ -10,7 +10,7 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 	return []ai.Tool{
 		ai.NewTool(
 			"services",
-			"List deployed services for the project in the current working directory",
+			"List deployed services for the selected project stack in the current working directory",
 			func(ctx *ai.ToolContext, params ServicesParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
@@ -21,7 +21,7 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 			},
 		),
 		ai.NewTool("deploy",
-			"Initiate deployment of the application defined in the docker-compose files in the current working directory",
+			"Initiate deployment of the application stack defined in the docker-compose files in the current working directory",
 			func(ctx *ai.ToolContext, params DeployParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
@@ -32,7 +32,7 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 			},
 		),
 		ai.NewTool("destroy",
-			"Destroy the deployed application defined in the docker-compose files in the current working directory",
+			"Destroy the deployed application in the selected stack, defined in the docker-compose files in the current working directory",
 			func(ctx *ai.ToolContext, params DestroyParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
@@ -43,7 +43,7 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 			},
 		),
 		ai.NewTool("logs",
-			"Fetch logs for the application in pages of up to 100 lines. You can use the 'since' and 'until' parameters to page through logs by time.",
+			"Fetch logs for the application in the selected stack, in pages of up to 100 lines. You can use the 'since' and 'until' parameters to page through logs by time.",
 			func(ctx *ai.ToolContext, params LogsParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
@@ -65,7 +65,7 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 			},
 		),
 		ai.NewTool("set_config",
-			"Set a config variable for the defang project",
+			"Set a config variable for the currently selected stack in the Defang project",
 			func(ctx *ai.ToolContext, params SetConfigParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
@@ -76,7 +76,7 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 			},
 		),
 		ai.NewTool("select_stack",
-			"Select the deployment stack for the defang project",
+			"Select the deployment stack for the Defang project",
 			func(ctx *ai.ToolContext, params SelectStackParams) (string, error) {
 				return HandleSelectStackTool(ctx.Context, params, sc)
 			},
@@ -85,6 +85,12 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 			"Create a defang stack file to deploy to AWS",
 			func(ctx *ai.ToolContext, params CreateAWSStackParams) (string, error) {
 				return HandleCreateAWSStackTool(ctx.Context, params, sc)
+			},
+		),
+		ai.NewTool("create_azure_stack",
+			"Create a defang stack file to deploy to Azure",
+			func(ctx *ai.ToolContext, params CreateAzureStackParams) (string, error) {
+				return HandleCreateAzureStackTool(ctx.Context, params, sc)
 			},
 		),
 		ai.NewTool("create_gcp_stack",
@@ -106,7 +112,7 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 			},
 		),
 		ai.NewTool("remove_config",
-			"Remove a config variable from the defang project",
+			"Remove a config variable from the currently selected stack in the Defang project",
 			func(ctx *ai.ToolContext, params RemoveConfigParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
@@ -117,7 +123,7 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 			},
 		),
 		ai.NewTool("list_configs",
-			"List config variables for the defang project",
+			"List config variables for the currently selected stack in the Defang project",
 			func(ctx *ai.ToolContext, params ListConfigParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
 				if err != nil {
@@ -125,6 +131,16 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 				}
 				cli := &DefaultToolCLI{}
 				return HandleListConfigTool(ctx.Context, loader, params, cli, ec, sc)
+			},
+		),
+		ai.NewTool("project_name",
+			"Get the current project name",
+			func(ctx *ai.ToolContext, params ProjectNameParams) (string, error) {
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
+				if err != nil {
+					return "Failed to configure loader", err
+				}
+				return HandleProjectNameTool(ctx, loader)
 			},
 		),
 	}

@@ -61,6 +61,9 @@ func (m *mockTailAndMonitorProvider) DelayBeforeRetry(ctx context.Context) error
 }
 
 func TestTailAndMonitor(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping: relies on 6s post-monitor sleep")
+	}
 	mockProvider := &mockTailAndMonitorProvider{
 		getDeploymentStatusErr: io.EOF, //client.ErrDeploymentFailed{}, // done
 		subs: map[types.ETag]*mockSubscribeData{

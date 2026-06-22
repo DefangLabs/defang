@@ -24,8 +24,15 @@ func (b BlobItem) Name() string { return b.name }
 func (b BlobItem) Size() int64  { return b.size }
 
 func (d *Driver) newSharedKeyCredential(ctx context.Context) (*azblob.SharedKeyCredential, error) {
-	storageKey := os.Getenv("AZURE_STORAGE_KEY")
-	if storageKey == "" {
+	// Lazy init of storageKey can be racy when callers (e.g. CdList's worker
+	// pool) call this concurrently. Hold the mutex across the ListKeys call so
+	// only one goroutine fetches the key.
+	d.storageKeyMu.Lock()
+	defer d.storageKeyMu.Unlock()
+	if d.storageKey == "" {
+		d.storageKey = os.Getenv("AZURE_STORAGE_KEY")
+	}
+	if d.storageKey == "" {
 		accountsClient, err := d.NewStorageAccountsClient()
 		if err != nil {
 			return nil, err
@@ -37,9 +44,9 @@ func (d *Driver) newSharedKeyCredential(ctx context.Context) (*azblob.SharedKeyC
 		if len(keys.Keys) == 0 || keys.Keys[0].Value == nil {
 			return nil, errors.New("no storage account keys returned")
 		}
-		storageKey = *keys.Keys[0].Value
+		d.storageKey = *keys.Keys[0].Value
 	}
-	return azblob.NewSharedKeyCredential(d.StorageAccount, storageKey)
+	return azblob.NewSharedKeyCredential(d.StorageAccount, d.storageKey)
 }
 
 func (d *Driver) newBlobContainerClient(ctx context.Context, containerName string) (*container.Client, error) {
@@ -51,8 +58,12 @@ func (d *Driver) newBlobContainerClient(ctx context.Context, containerName strin
 	return container.NewClientWithSharedKeyCredential(containerURL, keyCred, nil)
 }
 
-// IterateBlobsInContainer is the container-explicit variant of IterateBlobs.
-func (d *Driver) IterateBlobsInContainer(ctx context.Context, containerName, prefix string) (iter.Seq2[BlobItem, error], error) {
+func (d *Driver) IterateBlobs(ctx context.Context, prefix string) (iter.Seq2[BlobItem, error], error) {
+	return d.iterateBlobsInContainer(ctx, d.BlobContainerName, prefix)
+}
+
+// iterateBlobsInContainer is the container-explicit variant of IterateBlobs.
+func (d *Driver) iterateBlobsInContainer(ctx context.Context, containerName, prefix string) (iter.Seq2[BlobItem, error], error) {
 	client, err := d.newBlobContainerClient(ctx, containerName)
 	if err != nil {
 		return nil, err
@@ -83,8 +94,12 @@ func (d *Driver) IterateBlobsInContainer(ctx context.Context, containerName, pre
 	}, nil
 }
 
-// DownloadBlobFromContainer is the container-explicit variant of DownloadBlob.
-func (d *Driver) DownloadBlobFromContainer(ctx context.Context, containerName, blobName string) ([]byte, error) {
+func (d *Driver) DownloadBlob(ctx context.Context, blobName string) ([]byte, error) {
+	return d.downloadBlobFromContainer(ctx, d.BlobContainerName, blobName)
+}
+
+// downloadBlobFromContainer is the container-explicit variant of DownloadBlob.
+func (d *Driver) downloadBlobFromContainer(ctx context.Context, containerName, blobName string) ([]byte, error) {
 	client, err := d.newBlobContainerClient(ctx, containerName)
 	if err != nil {
 		return nil, err

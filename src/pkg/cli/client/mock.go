@@ -67,8 +67,16 @@ func (MockProvider) AccountInfo(context.Context) (*AccountInfo, error) {
 	return &AccountInfo{}, nil
 }
 
+func (MockProvider) Authenticate(context.Context, bool) error {
+	return nil
+}
+
 func (MockProvider) GetStackName() string {
 	return "test"
+}
+
+func (MockProvider) HasDelegatedSubdomain() bool {
+	return true
 }
 
 func (MockProvider) GetStackNameForDomain() string {
@@ -237,7 +245,6 @@ func (m MockFabricClient) ListDeployments(ctx context.Context, req *defangv1.Lis
 				Project:           "test",
 				Provider:          defangv1.Provider_AWS,
 				ProviderAccountId: "1234567890",
-				ProviderString:    "aws",
 				Region:            "us-test-2",
 				Timestamp:         timestamppb.Now(),
 			},
@@ -270,6 +277,22 @@ func (m MockFabricClient) GetDefaultStack(context.Context, *defangv1.GetDefaultS
 			Project: "default-project",
 		},
 	}, nil
+}
+
+func (m MockFabricClient) ResolveIPAddr(_ context.Context, _ *defangv1.ResolveIPAddrRequest) (*defangv1.ResolveIPAddrResponse, error) {
+	return &defangv1.ResolveIPAddrResponse{}, nil
+}
+
+func (m MockFabricClient) ResolveCNAME(_ context.Context, _ *defangv1.ResolveCNAMERequest) (*defangv1.ResolveCNAMEResponse, error) {
+	return &defangv1.ResolveCNAMEResponse{}, nil
+}
+
+func (m MockFabricClient) ResolveNS(_ context.Context, _ *defangv1.ResolveNSRequest) (*defangv1.ResolveNSResponse, error) {
+	return &defangv1.ResolveNSResponse{}, nil
+}
+
+func (m MockFabricClient) ResolveTXT(_ context.Context, _ *defangv1.ResolveTXTRequest) (*defangv1.ResolveTXTResponse, error) {
+	return &defangv1.ResolveTXTResponse{}, nil
 }
 
 type MockLoader struct {
