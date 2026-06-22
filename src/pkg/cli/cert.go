@@ -219,7 +219,9 @@ func runIssuerJobs(ctx context.Context, projectName string, jobs []domainJob, fa
 			return nil
 		})
 	}
-	_ = eg.Wait() // goroutines never return errors; collected via errs
+	if err := eg.Wait(); err != nil {
+		return err
+	}
 	if len(errs) > 0 {
 		return fmt.Errorf("certificate issuance failed for one or more domains; verify DNS records and retry `defang cert generate`: %w", errors.Join(errs...))
 	}
@@ -271,7 +273,9 @@ func runACMEJobs(ctx context.Context, jobs []domainJob, fab client.FabricClient)
 			return nil
 		})
 	}
-	_ = eg.Wait()
+	if err := eg.Wait(); err != nil {
+		return err
+	}
 	if len(errs) > 0 {
 		return fmt.Errorf("certificate issuance failed for one or more domains; verify DNS records and retry `defang cert generate`: %w", errors.Join(errs...))
 	}
@@ -285,12 +289,24 @@ func runACMEJobs(ctx context.Context, jobs []domainJob, fab client.FabricClient)
 // local DNS checks.
 func preflightDNS(ctx context.Context, jobs []domainJob, fab client.FabricClient) map[string]bool {
 	verified := make(map[string]bool, len(jobs))
+	var mu sync.Mutex
+	eg, gctx := errgroup.WithContext(ctx)
+	eg.SetLimit(maxCertWorkers)
 	for _, j := range jobs {
-		if err := fab.VerifyDNSSetup(ctx, &defangv1.VerifyDNSSetupRequest{Domain: j.domain, Targets: j.targets}); err == nil {
-			verified[j.domain] = true
-		} else {
-			term.Debugf("Pre-flight DNS verification for %v not yet ready: %v", j.domain, err)
-		}
+		job := j
+		eg.Go(func() error {
+			if err := fab.VerifyDNSSetup(gctx, &defangv1.VerifyDNSSetupRequest{Domain: job.domain, Targets: job.targets}); err == nil {
+				mu.Lock()
+				verified[job.domain] = true
+				mu.Unlock()
+			} else {
+				term.Debugf("Pre-flight DNS verification for %v not yet ready: %v", job.domain, err)
+			}
+			return nil
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return nil // ignore errors, this should never happen
 	}
 	return verified
 }
@@ -352,17 +368,21 @@ func waitForDNSVerified(ctx context.Context, domain string, targets []string, fa
 	propagationNoted := false
 
 	verify := func() bool {
-		if !serverSideVerified && serverVerifyRpcFailure < 3 {
+		if !serverSideVerified {
 			err := fab.VerifyDNSSetup(ctx, &defangv1.VerifyDNSSetupRequest{Domain: domain, Targets: targets})
 			switch {
 			case err == nil:
 				serverSideVerified = true
 			case isNegativeVerify(err):
-				// Server says "not yet" — don't count against the RPC budget.
+				// Server says "not yet" — it's authoritative, so keep polling it.
 				term.Debugf("Server side DNS verification for %v negative: %v", domain, err)
 			default:
+				// Transient RPC failure: keep re-probing the server on later
+				// ticks (a recovered fabric is picked up) but, once it has been
+				// unreachable enough times, fall back to local DNS below so a
+				// server outage doesn't block issuance indefinitely.
 				serverVerifyRpcFailure++
-				term.Debugf("Server side DNS verification request for %v failed (%d/3): %v", domain, serverVerifyRpcFailure, err)
+				term.Debugf("Server side DNS verification request for %v failed (%d): %v", domain, serverVerifyRpcFailure, err)
 			}
 		}
 		if serverSideVerified || serverVerifyRpcFailure >= 3 {
