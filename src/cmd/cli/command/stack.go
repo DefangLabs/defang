@@ -252,7 +252,7 @@ func makeStackShowCmd() *cobra.Command {
 }
 
 func promptForStackParameters(ctx context.Context, params *stacks.Parameters) error {
-	wizard := stacks.NewWizard(ec)
+	wizard := stacks.NewWizard(ec, global.Client)
 	newParams, err := wizard.CollectRemainingParameters(ctx, params)
 	if err != nil {
 		return err

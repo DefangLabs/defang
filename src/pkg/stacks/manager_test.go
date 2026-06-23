@@ -54,6 +54,10 @@ func (m *mockFabricClient) GetDefaultStack(ctx context.Context, req *defangv1.Ge
 	}, nil
 }
 
+func (m *mockFabricClient) ListRecipes(ctx context.Context) (*defangv1.ListRecipesResponse, error) {
+	return &defangv1.ListRecipesResponse{}, nil
+}
+
 func TestNewManager(t *testing.T) {
 	workingDir := "/tmp/test-dir"
 	mockClient := &mockFabricClient{}
