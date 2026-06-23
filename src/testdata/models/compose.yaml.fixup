@@ -114,5 +114,29 @@
       "default": null,
       "model_provider_private": null
     }
+  },
+  "withmodelvar": {
+    "command": null,
+    "depends_on": {
+      "ai_model": {
+        "condition": "service_started",
+        "required": true
+      }
+    },
+    "entrypoint": null,
+    "environment": {
+      "AI_MODEL_URL": "http://mock-ai-model:4000/v1/",
+      "MY_MODEL_NAME": "ai/model"
+    },
+    "image": "app",
+    "models": {
+      "ai_model": {
+        "model_var": "MY_MODEL_NAME"
+      }
+    },
+    "networks": {
+      "default": null,
+      "model_provider_private": null
+    }
   }
 }
