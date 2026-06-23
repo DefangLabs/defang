@@ -946,7 +946,9 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 					continue
 				}
 				if svc.Err != nil {
-					term.Debugf("Container Apps log error for %q: %v", svc.AppName, svc.Err)
+					// Non-fatal: warn (so the failure isn't silently swallowed) but keep
+					// reading the other sources rather than ending the whole tail.
+					term.Warnf("Could not read service logs for %q: %v", svc.AppName, svc.Err)
 					continue
 				}
 				if !yield(&defangv1.TailResponse{
@@ -967,7 +969,8 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 					continue
 				}
 				if build.Err != nil {
-					term.Debugf("ACR build log error for %q: %v", build.Service, build.Err)
+					// Non-fatal: warn but keep reading the other sources (see above).
+					term.Warnf("Could not read build logs for %q: %v", build.Service, build.Err)
 					continue
 				}
 				if !yield(&defangv1.TailResponse{
