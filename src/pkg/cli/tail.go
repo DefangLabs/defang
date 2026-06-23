@@ -156,12 +156,21 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 	}
 
 	if len(options.Services) > 0 {
+		checked := make(map[string]bool, len(options.Services))
 		for _, service := range options.Services {
+			// A "<service>-image" entry refers to the build logs of "<service>",
+			// not a separate service, so validate (and de-dupe on) the base name —
+			// otherwise requesting build logs warns about a non-existent service.
+			name := strings.TrimSuffix(service, logs.BuildServiceNameSuffix)
+			if checked[name] {
+				continue
+			}
+			checked[name] = true
 			// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
-			if _, err := provider.GetService(ctx, &defangv1.GetRequest{Project: projectName, Name: service}); err != nil {
+			if _, err := provider.GetService(ctx, &defangv1.GetRequest{Project: projectName, Name: name}); err != nil {
 				switch connect.CodeOf(err) {
 				case connect.CodeNotFound:
-					term.Warnf("Service does not exist (yet): %q", service)
+					term.Warnf("Service does not exist (yet): %q", name)
 				case connect.CodeUnknown:
 					// Ignore unknown (nil) errors
 				default:

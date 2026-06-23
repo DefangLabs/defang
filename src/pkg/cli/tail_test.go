@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	awscodebuild "github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
+	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -86,11 +88,24 @@ type mockTailProvider struct {
 	client.Provider
 	Iters []iter.Seq2[*defangv1.TailResponse, error]
 	Reqs  []*defangv1.TailRequest
+
+	// existingServices, when non-nil, makes GetService return the named services
+	// and NotFound for anything else; getServiceCalls records each requested name.
+	existingServices map[string]bool
+	getServiceCalls  []string
 }
 
 func (mockTailProvider) DelayBeforeRetry(ctx context.Context) error {
 	// No delay for mock
 	return ctx.Err()
+}
+
+func (m *mockTailProvider) GetService(_ context.Context, req *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
+	m.getServiceCalls = append(m.getServiceCalls, req.Name)
+	if m.existingServices[req.Name] {
+		return &defangv1.ServiceInfo{Service: &defangv1.Service{Name: req.Name}}, nil
+	}
+	return nil, connect.NewError(connect.CodeNotFound, errors.New("not found"))
 }
 
 func (m *mockTailProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
@@ -219,6 +234,47 @@ func TestTail(t *testing.T) {
 	}
 	if p.Reqs[1].Since == nil {
 		t.Errorf("Tail() sent request with since nil, want not nil")
+	}
+}
+
+func TestTailBuildImageServiceValidation(t *testing.T) {
+	stdout, _, cleanup := setupTestTerminal()
+	t.Cleanup(cleanup)
+
+	// Short-circuit Tail right after the service validation so we only exercise it.
+	dryrun.DoDryRun = true
+	t.Cleanup(func() { dryrun.DoDryRun = false })
+
+	p := &mockTailProvider{existingServices: map[string]bool{"web": true}}
+
+	// Build logs are requested as "<service>-image"; the deployed service is "web".
+	err := Tail(t.Context(), p, "project1", TailOptions{Services: []string{"web", "web-image"}})
+	if err != dryrun.ErrDryRun {
+		t.Fatalf("Tail() error = %v, want ErrDryRun", err)
+	}
+
+	// "web-image" must validate against the base service "web", and the duplicate
+	// base name must be checked only once.
+	if want := []string{"web"}; !slices.Equal(p.getServiceCalls, want) {
+		t.Errorf("GetService called with %v, want %v", p.getServiceCalls, want)
+	}
+	if s := term.StripAnsi(stdout.String()); strings.Contains(s, "does not exist") {
+		t.Errorf("unexpected does-not-exist warning for build logs: %q", s)
+	}
+}
+
+func TestTailMissingServiceWarns(t *testing.T) {
+	stdout, _, cleanup := setupTestTerminal()
+	t.Cleanup(cleanup)
+	dryrun.DoDryRun = true
+	t.Cleanup(func() { dryrun.DoDryRun = false })
+
+	p := &mockTailProvider{existingServices: map[string]bool{"web": true}}
+	if err := Tail(t.Context(), p, "project1", TailOptions{Services: []string{"nope"}}); err != dryrun.ErrDryRun {
+		t.Fatalf("Tail() error = %v, want ErrDryRun", err)
+	}
+	if s := term.StripAnsi(stdout.String()); !strings.Contains(s, `Service does not exist (yet): "nope"`) {
+		t.Errorf("expected does-not-exist warning, got %q", s)
 	}
 }
 

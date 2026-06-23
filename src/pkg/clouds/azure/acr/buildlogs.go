@@ -33,7 +33,10 @@ type BuildLogWatcher struct {
 // runs, and streams their build log output. The registry itself is created lazily by
 // Pulumi during the CD run, so registry discovery is retried on every poll until one
 // appears (or ctx is cancelled). The returned channel is closed when ctx is cancelled.
-func (w *BuildLogWatcher) WatchBuildLogs(ctx context.Context) <-chan BuildLogEntry {
+// WatchBuildLogs streams ACR build (task run) logs from the resource group. When follow
+// is true it keeps polling for new runs every buildPollInterval; when false it polls once
+// for recent runs, drains their logs, and closes the channel.
+func (w *BuildLogWatcher) WatchBuildLogs(ctx context.Context, follow bool) <-chan BuildLogEntry {
 	out := make(chan BuildLogEntry)
 	go func() {
 		// senders tracks the per-run streaming goroutines started by poll().
@@ -143,6 +146,12 @@ func (w *BuildLogWatcher) WatchBuildLogs(ctx context.Context) <-chan BuildLogEnt
 		}
 
 		poll()
+		if !follow {
+			// One-shot snapshot: the deferred senders.Wait()+close(out) runs once
+			// each discovered run's streamRunLog returns (it exits when the run is
+			// terminal, which is the case for any already-finished build).
+			return
+		}
 		ticker := time.NewTicker(buildPollInterval)
 		defer ticker.Stop()
 		for {

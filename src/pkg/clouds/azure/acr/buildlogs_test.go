@@ -128,7 +128,7 @@ func TestWatchBuildLogsCredError(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	ch := w.WatchBuildLogs(ctx)
+	ch := w.WatchBuildLogs(ctx, true)
 	// With good credential but a non-existent RG, the watcher retries indefinitely
 	// until ctx cancels. With bad credential (like here), clients may still be
 	// constructed but will error on each call; the goroutine should still exit
@@ -199,7 +199,7 @@ func TestWatchBuildLogsCancelled(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
-	ch := w.WatchBuildLogs(ctx)
+	ch := w.WatchBuildLogs(ctx, true)
 	for range ch {
 	}
 	// If we got here, the channel was closed — good.

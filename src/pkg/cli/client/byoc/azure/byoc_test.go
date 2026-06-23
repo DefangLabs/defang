@@ -86,6 +86,8 @@ func TestProjectResourceGroupName(t *testing.T) {
 	if err := b.setUpLocation(); err != nil {
 		t.Fatalf("setUpLocation: %v", err)
 	}
+	// The RG must match what Pulumi creates: {Prefix}-{project}-{stack}, using the bare
+	// project name (the stack is a separate axis, not baked into the project name).
 	got := b.projectResourceGroupName("myapp")
 	want := "Defang-myapp-test-stack"
 	if got != want {
@@ -256,23 +258,32 @@ func TestGetProjectUpdateCredError(t *testing.T) {
 	}
 }
 
-func TestQueryLogsUnknownEtag(t *testing.T) {
+func TestQueryLogsDiscoversRunByEtag(t *testing.T) {
+	// A standalone `defang logs` has no cached cdRunID, so QueryLogs must look the
+	// CD run up by etag. When that lookup can't reach Azure it surfaces the error
+	// (rather than the old "no matching CD deployment" rejection).
+	useFakeCred(t, "", errors.New("denied"))
 	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
-	// cdRunID is empty — QueryLogs should reject the request rather than panic.
-	_, err := b.QueryLogs(t.Context(), &defangv1.TailRequest{Etag: "some-etag"})
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	_, err := b.QueryLogs(ctx, &defangv1.TailRequest{Etag: "some-etag"})
 	if err == nil {
-		t.Error("QueryLogs should reject when cdRunID is empty")
+		t.Error("QueryLogs should surface the lookup error when the run can't be discovered")
 	}
-	var _ = errors.New // silence unused when build tag trims
 }
 
-func TestQueryLogsEtagMismatch(t *testing.T) {
+func TestQueryLogsEtagMismatchTriggersLookup(t *testing.T) {
+	// A request etag that differs from the cached run no longer rejects outright;
+	// it falls back to discovering the matching run by etag.
+	useFakeCred(t, "", errors.New("denied"))
 	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
 	b.cdRunID = "run-1"
 	b.cdEtag = "etag-A"
-	_, err := b.QueryLogs(t.Context(), &defangv1.TailRequest{Etag: "etag-B"})
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	_, err := b.QueryLogs(ctx, &defangv1.TailRequest{Etag: "etag-B"})
 	if err == nil {
-		t.Error("QueryLogs should reject etag mismatch")
+		t.Error("QueryLogs should look up the mismatched etag and surface the lookup error")
 	}
 }
 

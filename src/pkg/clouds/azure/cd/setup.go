@@ -46,6 +46,21 @@ func (d *Driver) CreateResourceGroup(ctx context.Context, name string) error {
 	return nil
 }
 
+// ResourceGroupExists reports whether the named resource group exists in the
+// subscription. Used to short-circuit read paths (e.g. log tailing) cleanly
+// when a project's resource group hasn't been deployed.
+func (d *Driver) ResourceGroupExists(ctx context.Context, name string) (bool, error) {
+	rgClient, err := d.newResourceGroupClient()
+	if err != nil {
+		return false, err
+	}
+	resp, err := rgClient.CheckExistence(ctx, name, nil)
+	if err != nil {
+		return false, fmt.Errorf("checking resource group %q: %w", name, err)
+	}
+	return resp.Success, nil
+}
+
 // SetUpResourceGroup ensures the shared CD resource group ("defang-cd")
 // exists and resolves d.cdLocation (the primary CD region).
 //

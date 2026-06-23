@@ -21,11 +21,32 @@ func TestWatchLogsCancelled(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
-	ch := c.WatchLogs(ctx)
+	ch := c.WatchLogs(ctx, true)
 	for range ch {
 		// drain
 	}
 	// If we got here, WatchLogs properly exits on ctx cancellation.
+}
+
+func TestWatchLogsNonFollowClosesChannel(t *testing.T) {
+	// In non-follow mode WatchLogs must poll once and close the channel rather than
+	// keep polling — otherwise a non-follow `defang logs` would block forever. Here
+	// the (fake) list-apps call fails, so no apps are tailed and the channel should
+	// close promptly even though the context has plenty of time left.
+	useFakeCred(t, "tok", nil)
+	c := &ContainerApp{
+		Azure:         cloudazure.Azure{SubscriptionID: "sub", Location: cloudazure.LocationWestUS2},
+		ResourceGroup: "rg",
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ch := c.WatchLogs(ctx, false)
+	for range ch {
+		// drain
+	}
+	if ctx.Err() != nil {
+		t.Error("non-follow WatchLogs should close the channel before the context expires")
+	}
 }
 
 func TestStreamLogsResolveFailure(t *testing.T) {
@@ -244,7 +265,7 @@ func TestWatchLogsNewClientOK(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
-	ch := c.WatchLogs(ctx)
+	ch := c.WatchLogs(ctx, true)
 	for range ch {
 	}
 }
