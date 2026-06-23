@@ -76,6 +76,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 			term.Warnf("service %q: service name is longer than 16 characters, you may run into issues with resource name length", svccfg.Name)
 		}
 
+		// beta docker compose model runner syntax
 		if svccfg.Provider != nil && svccfg.Provider.Type == "model" && svccfg.Image == "" && svccfg.Build == nil {
 			fixupModelProvider(&svccfg, project, accountInfo)
 		}
@@ -99,6 +100,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 		project.Services[svccfg.Name] = svccfg
 	}
 
+	// modern docker compose model runner syntax
 	for name, model := range project.Models {
 		model.Name = name // ensure the model has a name
 		svccfg := fixupModel(model, project, accountInfo)
@@ -368,15 +370,22 @@ func fixupIngressPorts(svccfg *composeTypes.ServiceConfig) {
 const modelProviderNetwork = "model_provider_private"
 
 func fixupModel(model composeTypes.ModelConfig, project *composeTypes.Project, info *client.AccountInfo) *composeTypes.ServiceConfig {
+	if model.ContextSize != 0 {
+		term.Warnf("model %q: context_size is a Docker Model Runner parameter and is not supported for cloud deployments", model.Name)
+	}
+	if len(model.RuntimeFlags) > 0 {
+		term.Warnf("model %q: runtime_flags is a Docker Model Runner parameter and is not supported for cloud deployments", model.Name)
+	}
 	svccfg := &composeTypes.ServiceConfig{
 		Name:       model.Name,
 		Extensions: model.Extensions,
 	}
-	makeAccessGatewayService(svccfg, project, model.Model, info) // TODO: pass other model options too
+	makeAccessGatewayService(svccfg, project, model.Model, info)
 	return svccfg
 }
 
 func fixupModelProvider(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, info *client.AccountInfo) {
+	term.Warnf("service %q: 'provider: type: model' is deprecated; use a top-level 'models:' entry instead", svccfg.Name)
 	var model string
 	if modelVals := svccfg.Provider.Options["model"]; len(modelVals) == 1 {
 		model = modelVals[0]
