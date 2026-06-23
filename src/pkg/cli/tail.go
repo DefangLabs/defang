@@ -156,26 +156,45 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 	}
 
 	if len(options.Services) > 0 {
+		// Cache lookups so "web" and its build alias "web-image" (which both resolve
+		// to "web") aren't queried or warned about twice. A non-NotFound error isn't
+		// proof of absence, so it's surfaced but treated as "present".
 		checked := make(map[string]bool, len(options.Services))
-		for _, service := range options.Services {
-			// A "<service>-image" entry refers to the build logs of "<service>",
-			// not a separate service, so validate (and de-dupe on) the base name —
-			// otherwise requesting build logs warns about a non-existent service.
-			name := strings.TrimSuffix(service, logs.BuildServiceNameSuffix)
-			if checked[name] {
-				continue
+		serviceExists := func(name string) bool {
+			if present, ok := checked[name]; ok {
+				return present
 			}
-			checked[name] = true
-			// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
+			present := true
 			if _, err := provider.GetService(ctx, &defangv1.GetRequest{Project: projectName, Name: name}); err != nil {
 				switch connect.CodeOf(err) {
 				case connect.CodeNotFound:
-					term.Warnf("Service does not exist (yet): %q", name)
+					present = false
 				case connect.CodeUnknown:
 					// Ignore unknown (nil) errors
 				default:
 					term.Warn(err) // TODO: use client.PrettyError(…)
 				}
+			}
+			checked[name] = present
+			return present
+		}
+		warned := make(map[string]bool)
+		for _, service := range options.Services {
+			// Validate the exact name first; only on a miss do we treat a
+			// "<service>-image" entry as the build logs of "<service>" and check the
+			// base name. Checking the literal name first avoids mis-warning when a
+			// real service happens to be named with the "-image" suffix.
+			if serviceExists(service) {
+				continue
+			}
+			name := strings.TrimSuffix(service, logs.BuildServiceNameSuffix)
+			if name != service && serviceExists(name) {
+				continue
+			}
+			// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
+			if !warned[name] {
+				warned[name] = true
+				term.Warnf("Service does not exist (yet): %q", name)
 			}
 		}
 	}

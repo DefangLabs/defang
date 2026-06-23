@@ -576,7 +576,7 @@ func (j *Job) FindExecutionByEtag(ctx context.Context, etag string) (string, err
 			return "", fmt.Errorf("failed to list job executions: %w", err)
 		}
 		for _, exec := range page.Value {
-			if exec.Name == nil || exec.Properties == nil || !templateHasEtag(exec.Properties.Template, etag) {
+			if exec == nil || exec.Name == nil || exec.Properties == nil || !templateHasEtag(exec.Properties.Template, etag) {
 				continue
 			}
 			// Retries reuse the etag, so prefer the most recently started run.
@@ -599,7 +599,13 @@ func templateHasEtag(tmpl *armappcontainersv3.JobExecutionTemplate, etag string)
 		return false
 	}
 	for _, c := range tmpl.Containers {
+		if c == nil {
+			continue
+		}
 		for _, e := range c.Env {
+			if e == nil {
+				continue
+			}
 			if e.Name != nil && *e.Name == EnvVarEtag && e.Value != nil && *e.Value == etag {
 				return true
 			}

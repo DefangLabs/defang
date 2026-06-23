@@ -253,13 +253,33 @@ func TestTailBuildImageServiceValidation(t *testing.T) {
 		t.Fatalf("Tail() error = %v, want ErrDryRun", err)
 	}
 
-	// "web-image" must validate against the base service "web", and the duplicate
-	// base name must be checked only once.
-	if want := []string{"web"}; !slices.Equal(p.getServiceCalls, want) {
+	// "web-image" is checked literally first (a miss), then falls back to the base
+	// "web" (cached from the earlier lookup) — so no spurious does-not-exist warning.
+	if want := []string{"web", "web-image"}; !slices.Equal(p.getServiceCalls, want) {
 		t.Errorf("GetService called with %v, want %v", p.getServiceCalls, want)
 	}
 	if s := term.StripAnsi(stdout.String()); strings.Contains(s, "does not exist") {
 		t.Errorf("unexpected does-not-exist warning for build logs: %q", s)
+	}
+}
+
+func TestTailRealImageSuffixServiceNotMisWarned(t *testing.T) {
+	stdout, _, cleanup := setupTestTerminal()
+	t.Cleanup(cleanup)
+	dryrun.DoDryRun = true
+	t.Cleanup(func() { dryrun.DoDryRun = false })
+
+	// A service genuinely named "foo-image" exists; the base "foo" does not. The
+	// literal name must validate so we don't mis-warn or strip it to "foo".
+	p := &mockTailProvider{existingServices: map[string]bool{"foo-image": true}}
+	if err := Tail(t.Context(), p, "project1", TailOptions{Services: []string{"foo-image"}}); err != dryrun.ErrDryRun {
+		t.Fatalf("Tail() error = %v, want ErrDryRun", err)
+	}
+	if want := []string{"foo-image"}; !slices.Equal(p.getServiceCalls, want) {
+		t.Errorf("GetService called with %v, want %v", p.getServiceCalls, want)
+	}
+	if s := term.StripAnsi(stdout.String()); strings.Contains(s, "does not exist") {
+		t.Errorf("unexpected does-not-exist warning for real -image service: %q", s)
 	}
 }
 

@@ -175,7 +175,7 @@ func TestStreamRunLogCancelled(t *testing.T) {
 	out := make(chan BuildLogEntry)
 	done := make(chan struct{})
 	go func() {
-		w.streamRunLog(ctx, runsClient, "rg", "registry", "run-id", "svc", out)
+		w.streamRunLog(ctx, runsClient, "rg", "registry", "run-id", "svc", true, out)
 		close(done)
 	}()
 	go func() {

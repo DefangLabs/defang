@@ -139,7 +139,7 @@ func (w *BuildLogWatcher) WatchBuildLogs(ctx context.Context, follow bool) <-cha
 					senders.Add(1)
 					go func() {
 						defer senders.Done()
-						w.streamRunLog(ctx, runsClient, w.ResourceGroup, registryName, runID, service, out)
+						w.streamRunLog(ctx, runsClient, w.ResourceGroup, registryName, runID, service, follow, out)
 					}()
 				}
 			}
@@ -147,9 +147,9 @@ func (w *BuildLogWatcher) WatchBuildLogs(ctx context.Context, follow bool) <-cha
 
 		poll()
 		if !follow {
-			// One-shot snapshot: the deferred senders.Wait()+close(out) runs once
-			// each discovered run's streamRunLog returns (it exits when the run is
-			// terminal, which is the case for any already-finished build).
+			// One-shot snapshot: each discovered run's streamRunLog emits its
+			// currently-available lines and returns (without waiting for the run to
+			// terminate), so the deferred senders.Wait()+close(out) runs promptly.
 			return
 		}
 		ticker := time.NewTicker(buildPollInterval)
@@ -167,10 +167,14 @@ func (w *BuildLogWatcher) WatchBuildLogs(ctx context.Context, follow bool) <-cha
 }
 
 // streamRunLog polls GetLogSasURL for a run and streams new log content as it grows.
+// When follow is false it emits whatever content is available once and returns, rather
+// than polling until the run reaches a terminal status — otherwise a snapshot query
+// would block until an in-progress build finishes.
 func (w *BuildLogWatcher) streamRunLog(
 	ctx context.Context,
 	runsClient *armcontainerregistry.RunsClient,
 	rgName, registryName, runID, service string,
+	follow bool,
 	out chan<- BuildLogEntry,
 ) {
 	var lastLen int
@@ -213,6 +217,12 @@ func (w *BuildLogWatcher) streamRunLog(
 					return
 				}
 			}
+		}
+
+		if !follow {
+			// Snapshot mode: emitted the currently-available lines, so stop here
+			// instead of waiting for the run to reach a terminal status.
+			return
 		}
 
 		// Check if run is still active.

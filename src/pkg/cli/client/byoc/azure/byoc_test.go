@@ -3,6 +3,7 @@ package azure
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -267,8 +268,8 @@ func TestQueryLogsDiscoversRunByEtag(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()
 	_, err := b.QueryLogs(ctx, &defangv1.TailRequest{Etag: "some-etag"})
-	if err == nil {
-		t.Error("QueryLogs should surface the lookup error when the run can't be discovered")
+	if err == nil || !strings.Contains(err.Error(), "failed to find CD deployment for etag") {
+		t.Errorf("expected etag-lookup failure, got: %v", err)
 	}
 }
 
@@ -282,8 +283,8 @@ func TestQueryLogsEtagMismatchTriggersLookup(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()
 	_, err := b.QueryLogs(ctx, &defangv1.TailRequest{Etag: "etag-B"})
-	if err == nil {
-		t.Error("QueryLogs should look up the mismatched etag and surface the lookup error")
+	if err == nil || !strings.Contains(err.Error(), "failed to find CD deployment for etag") {
+		t.Errorf("expected mismatched-etag lookup failure, got: %v", err)
 	}
 }
 
