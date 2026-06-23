@@ -245,6 +245,13 @@ func (m MockFabricClient) GetRecipe(ctx context.Context, req *defangv1.GetRecipe
 	return &defangv1.GetRecipeResponse{Recipe: &defangv1.Recipe{Name: req.GetName(), Active: true}}, nil
 }
 
+func (m MockFabricClient) ListRecipes(ctx context.Context) (*defangv1.ListRecipesResponse, error) {
+	if m.Recipe != nil {
+		return &defangv1.ListRecipesResponse{Recipes: []*defangv1.Recipe{m.Recipe}}, nil
+	}
+	return &defangv1.ListRecipesResponse{}, nil
+}
+
 func (m MockFabricClient) ListDeployments(ctx context.Context, req *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error) {
 	return &defangv1.ListDeploymentsResponse{
 		Deployments: []*defangv1.Deployment{

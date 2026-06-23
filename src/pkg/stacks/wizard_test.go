@@ -8,6 +8,8 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/modes"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,6 +21,7 @@ type mockElicitationsController struct {
 	errors           map[string]error
 	enumErrors       map[string]error
 	defaultErrors    map[string]error
+	enumOptions      map[string][]string
 	callOrder        []string
 	supported        bool
 }
@@ -31,6 +34,7 @@ func newMockElicitationsController() *mockElicitationsController {
 		errors:           make(map[string]error),
 		enumErrors:       make(map[string]error),
 		defaultErrors:    make(map[string]error),
+		enumOptions:      make(map[string][]string),
 		supported:        true,
 	}
 }
@@ -58,6 +62,9 @@ func (m *mockElicitationsController) RequestString(ctx context.Context, message,
 
 func (m *mockElicitationsController) RequestEnum(ctx context.Context, message, field string, options []string) (string, error) {
 	m.callOrder = append(m.callOrder, "RequestEnum:"+field)
+	if m.enumOptions != nil {
+		m.enumOptions[field] = options
+	}
 	if err, exists := m.enumErrors[field]; exists {
 		return "", err
 	}
@@ -87,7 +94,7 @@ func (m *mockElicitationsController) IsSupported() bool {
 
 func TestNewWizard(t *testing.T) {
 	mockController := newMockElicitationsController()
-	wizard := NewWizard(mockController)
+	wizard := NewWizard(mockController, nil)
 
 	if wizard == nil {
 		t.Fatal("NewWizard returned nil")
@@ -394,7 +401,7 @@ func TestWizardCollectParameters(t *testing.T) {
 				}
 			}
 
-			wizard := NewWizardWithProfileLister(mockController, profileLister)
+			wizard := NewWizardWithProfileLister(mockController, nil, profileLister)
 			ctx := t.Context()
 
 			// Execute
@@ -440,7 +447,7 @@ func TestWizardCollectParameters(t *testing.T) {
 
 func TestWizardSetSupported(t *testing.T) {
 	mockController := newMockElicitationsController()
-	wizard := NewWizard(mockController)
+	wizard := NewWizard(mockController, nil)
 
 	// Test initial state
 	if !mockController.IsSupported() {
@@ -786,7 +793,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			mockController.enumResponses["mode"] = "BALANCED"
 			tt.setupMock(mockController)
 
-			wizard := NewWizard(mockController)
+			wizard := NewWizard(mockController, nil)
 			ctx := t.Context()
 
 			// Execute
@@ -810,6 +817,77 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 				assert.Equal(t, tt.expectedResult.Name, result.Name, "Name mismatch")
 				assert.Equal(t, tt.expectedResult.Variables["AWS_PROFILE"], result.Variables["AWS_PROFILE"], "AWS_PROFILE mismatch")
 				assert.Equal(t, tt.expectedResult.Variables["GCP_PROJECT_ID"], result.Variables["GCP_PROJECT_ID"], "GCP_PROJECT_ID mismatch")
+			}
+		})
+	}
+}
+
+// mockRecipeLister is a mock implementation of RecipeLister.
+type mockRecipeLister struct {
+	resp *defangv1.ListRecipesResponse
+	err  error
+}
+
+func (m *mockRecipeLister) ListRecipes(ctx context.Context) (*defangv1.ListRecipesResponse, error) {
+	return m.resp, m.err
+}
+
+func TestWizardRecipeOptions(t *testing.T) {
+	tests := []struct {
+		name            string
+		recipeLister    RecipeLister
+		expectedOptions []string // nil means the recipe prompt should be skipped
+	}{
+		{
+			name: "active recipes from Fabric, sorted and filtered",
+			recipeLister: &mockRecipeLister{resp: &defangv1.ListRecipesResponse{Recipes: []*defangv1.Recipe{
+				{Name: "PRODUCTION", Active: true},
+				{Name: "LEGACY", Active: false},
+				{Name: "AFFORDABLE", Active: true},
+			}}},
+			expectedOptions: []string{"AFFORDABLE", "PRODUCTION"},
+		},
+		{
+			name:            "nil recipe lister falls back to built-in modes",
+			recipeLister:    nil,
+			expectedOptions: modes.AllDeploymentModes(),
+		},
+		{
+			name:            "Fabric error falls back to built-in modes",
+			recipeLister:    &mockRecipeLister{err: errors.New("fabric unreachable")},
+			expectedOptions: modes.AllDeploymentModes(),
+		},
+		{
+			name: "no active recipes skips the prompt",
+			recipeLister: &mockRecipeLister{resp: &defangv1.ListRecipesResponse{Recipes: []*defangv1.Recipe{
+				{Name: "LEGACY", Active: false},
+			}}},
+			expectedOptions: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockController := newMockElicitationsController()
+			mockController.enumResponses["provider"] = "AWS"
+			mockController.defaultResponses["region"] = "us-east-1"
+			mockController.defaultResponses["stack_name"] = "awsuseast1"
+			mockController.defaultResponses["aws_profile"] = "default"
+			mockController.enumResponses["aws_profile"] = "default"
+			if tt.expectedOptions != nil {
+				// Answer the recipe prompt with whatever the first offered option is.
+				mockController.enumResponses["mode"] = tt.expectedOptions[0]
+			}
+			t.Setenv("AWS_PROFILE", "default")
+
+			wizard := NewWizard(mockController, tt.recipeLister)
+			result, err := wizard.CollectParameters(t.Context())
+			assert.NoError(t, err)
+
+			assert.Equal(t, tt.expectedOptions, mockController.enumOptions["mode"], "recipe options mismatch")
+			if tt.expectedOptions == nil {
+				assert.NotContains(t, mockController.callOrder, "RequestEnum:mode", "recipe prompt should be skipped")
+				assert.Equal(t, modes.RecipeUnspecified, result.Mode, "mode should be left unspecified")
 			}
 		})
 	}

@@ -124,7 +124,7 @@ func TestStackSelector_SelectStack_ExistingStack(t *testing.T) {
 		Mode:     modes.RecipeUnspecified,
 	}
 
-	selector := NewSelector(mockEC, mockSM)
+	selector := NewSelector(mockEC, mockSM, nil)
 
 	result, err := selector.SelectStack(ctx, SelectStackOptions{})
 
@@ -168,7 +168,7 @@ func TestStackSelector_SelectOrCreateStack_ExistingStack(t *testing.T) {
 		Mode:     modes.RecipeUnspecified,
 	}
 
-	selector := NewSelector(mockEC, mockSM)
+	selector := NewSelector(mockEC, mockSM, nil)
 
 	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowStackCreation: true})
 
@@ -255,8 +255,8 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 	mockProfileLister := &MockAWSProfileLister{}
 	mockProfileLister.On("ListProfiles").Return([]string{"default"}, nil)
 
-	selector := NewSelector(mockEC, mockSM)
-	selector.wizard = NewWizardWithProfileLister(mockEC, mockProfileLister)
+	selector := NewSelector(mockEC, mockSM, nil)
+	selector.wizard = NewWizardWithProfileLister(mockEC, nil, mockProfileLister)
 
 	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowStackCreation: true})
 
@@ -335,8 +335,8 @@ func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
 	mockProfileLister := &MockAWSProfileLister{}
 	mockProfileLister.On("ListProfiles").Return([]string{"default"}, nil)
 
-	selector := NewSelector(mockEC, mockSM)
-	selector.wizard = NewWizardWithProfileLister(mockEC, mockProfileLister)
+	selector := NewSelector(mockEC, mockSM, nil)
+	selector.wizard = NewWizardWithProfileLister(mockEC, nil, mockProfileLister)
 
 	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowStackCreation: true})
 
@@ -357,7 +357,7 @@ func TestStackSelector_SelectStack_ElicitationsNotSupported(t *testing.T) {
 	// Mock that elicitations are not supported
 	mockEC.On("IsSupported").Return(false)
 
-	selector := NewSelector(mockEC, mockSM)
+	selector := NewSelector(mockEC, mockSM, nil)
 
 	result, err := selector.SelectStack(ctx, SelectStackOptions{})
 
@@ -381,7 +381,7 @@ func TestStackSelector_SelectStack_ListStacksError(t *testing.T) {
 	// Mock error when listing stacks
 	mockSM.On("List", ctx).Return([]ListItem{}, errors.New("failed to access stack storage"))
 
-	selector := NewSelector(mockEC, mockSM)
+	selector := NewSelector(mockEC, mockSM, nil)
 
 	result, err := selector.SelectStack(ctx, SelectStackOptions{})
 
@@ -412,7 +412,7 @@ func TestStackSelector_SelectStack_ElicitationError(t *testing.T) {
 	expectedOptions := []string{"production [aws us-west-2]"}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("", errors.New("user cancelled selection"))
 
-	selector := NewSelector(mockEC, mockSM)
+	selector := NewSelector(mockEC, mockSM, nil)
 
 	result, err := selector.SelectStack(ctx, SelectStackOptions{})
 
@@ -447,7 +447,7 @@ func TestStackSelector_SelectStack_WizardError(t *testing.T) {
 	providerOptions := []string{"Defang Playground", "AWS", "DigitalOcean", "Google Cloud Platform", "Azure"}
 	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("", errors.New("user cancelled wizard"))
 
-	selector := NewSelector(mockEC, mockSM)
+	selector := NewSelector(mockEC, mockSM, nil)
 	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowStackCreation: true})
 
 	assert.Error(t, err)
@@ -535,8 +535,8 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 	mockProfileLister := &MockAWSProfileLister{}
 	mockProfileLister.On("ListProfiles").Return([]string{"default"}, nil)
 
-	selector := NewSelector(mockEC, mockSM)
-	selector.wizard = NewWizardWithProfileLister(mockEC, mockProfileLister)
+	selector := NewSelector(mockEC, mockSM, nil)
+	selector.wizard = NewWizardWithProfileLister(mockEC, nil, mockProfileLister)
 	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowStackCreation: true})
 
 	assert.Error(t, err)
@@ -578,7 +578,7 @@ func TestStackSelector_SelectStack_ShowsAccountInLabel(t *testing.T) {
 		Region:   "us-west-2",
 	}
 
-	selector := NewSelector(mockEC, mockSM)
+	selector := NewSelector(mockEC, mockSM, nil)
 	result, err := selector.SelectStack(ctx, SelectStackOptions{})
 
 	assert.NoError(t, err)
