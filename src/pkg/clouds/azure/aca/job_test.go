@@ -303,6 +303,95 @@ func TestGetCDContainerLogStreamURLHTTPError(t *testing.T) {
 	}
 }
 
+func TestParseExitCode(t *testing.T) {
+	tests := []struct {
+		details  string
+		wantCode int
+		wantOK   bool
+	}{
+		{"Container 'defang-cd' was terminated with exit code '0'", 0, true},
+		{"Container 'defang-cd' was terminated with exit code '1'", 1, true},
+		{"terminated with exit code: 137", 137, true},
+		{"ExitCode 2", 0, false}, // missing space; not matched
+		{"Completed", 0, false},
+		{"", 0, false},
+	}
+	for _, tt := range tests {
+		code, ok := parseExitCode(tt.details)
+		if ok != tt.wantOK || (ok && code != tt.wantCode) {
+			t.Errorf("parseExitCode(%q) = (%d, %v), want (%d, %v)", tt.details, code, ok, tt.wantCode, tt.wantOK)
+		}
+	}
+}
+
+func TestCDReplicaStatus(t *testing.T) {
+	tests := []struct {
+		name        string
+		resp        string
+		wantNil     bool
+		wantSuccess bool
+		wantMsg     string
+	}{
+		{
+			name:    "still running yields no terminal status",
+			resp:    `{"value":[{"properties":{"containers":[{"name":"defang-cd","runningState":"Running"}]}}]}`,
+			wantNil: true,
+		},
+		{
+			name:        "terminated with exit code 0 is success",
+			resp:        `{"value":[{"properties":{"containers":[{"name":"defang-cd","runningState":"Terminated","runningStateDetails":"terminated with exit code '0'"}]}}]}`,
+			wantSuccess: true,
+		},
+		{
+			name:        "terminated with non-zero exit code is failure",
+			resp:        `{"value":[{"properties":{"containers":[{"name":"defang-cd","runningState":"Terminated","runningStateDetails":"terminated with exit code '1'"}]}}]}`,
+			wantSuccess: false,
+			wantMsg:     "terminated with exit code '1'",
+		},
+		{
+			name:        "terminated without a parseable exit code is treated as failure",
+			resp:        `{"value":[{"properties":{"containers":[{"name":"defang-cd","runningState":"Terminated","runningStateDetails":"OOMKilled"}]}}]}`,
+			wantSuccess: false,
+			wantMsg:     "OOMKilled",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(tt.resp))
+			}))
+			defer srv.Close()
+
+			useFakeCred(t, "arm", nil)
+			useTestEndpoints(t, srv.URL, "")
+
+			j := newTestJob()
+			status, err := j.cdReplicaStatus(t.Context(), "exec-1")
+			if err != nil {
+				t.Fatalf("cdReplicaStatus: %v", err)
+			}
+			if tt.wantNil {
+				if status != nil {
+					t.Fatalf("expected nil status, got %+v", status)
+				}
+				return
+			}
+			if status == nil {
+				t.Fatal("expected terminal status, got nil")
+			}
+			if !status.IsTerminal() {
+				t.Errorf("status %q should be terminal", status.Status)
+			}
+			if status.IsSuccess() != tt.wantSuccess {
+				t.Errorf("IsSuccess() = %v, want %v (status %q)", status.IsSuccess(), tt.wantSuccess, status.Status)
+			}
+			if status.ErrorMessage != tt.wantMsg {
+				t.Errorf("ErrorMessage = %q, want %q", status.ErrorMessage, tt.wantMsg)
+			}
+		})
+	}
+}
+
 func TestStreamJobExecutionLogsNoReplica(t *testing.T) {
 	// Empty replicas list — streamJobExecutionLogs should surface an error so
 	// the caller can retry.
