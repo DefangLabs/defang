@@ -42,6 +42,7 @@ func (m *MockSsmClient) DeleteParameters(ctx context.Context, params *ssm.Delete
 type mockFabricService struct {
 	defangv1connect.UnimplementedFabricControllerHandler
 	canIUseIsCalled bool
+	tenantId        string
 }
 
 func (m *mockFabricService) CanIUse(ctx context.Context, canUseReq *connect.Request[defangv1.CanIUseRequest]) (*connect.Response[defangv1.CanIUseResponse], error) {
@@ -62,7 +63,8 @@ func (m *mockFabricService) CheckToS(context.Context, *connect.Request[emptypb.E
 
 func (m *mockFabricService) WhoAmI(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.WhoAmIResponse], error) {
 	return connect.NewResponse(&defangv1.WhoAmIResponse{
-		Tenant:            "default",
+		Tenant:            m.tenantId,
+		TenantId:          m.tenantId,
 		ProviderAccountId: "default",
 		Region:            "us-test-2",
 		Tier:              defangv1.SubscriptionTier_HOBBY,

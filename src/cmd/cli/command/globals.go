@@ -63,19 +63,19 @@ Note: Ensure the flag name, environment variable name, and struct field name are
 and follow the established naming conventions.
 */
 type GlobalConfig struct {
-	Client         client.FabricClient
-	ColorMode      ColorMode
-	Debug          bool
-	FabricAddr     string
-	HasTty         bool
-	HideUpdate     bool
-	Json           bool
-	ModelID        string // only for debug/generate; Pro users
-	NonInteractive bool
-	Stack          stacks.Parameters
-	Tenant         types.TenantNameOrID // workspace
-	Utc            bool
-	Verbose        bool
+	Client          client.FabricClient
+	ColorMode       ColorMode
+	Debug           bool
+	FabricAddr      string
+	HasTty          bool
+	HideUpdate      bool
+	Json            bool
+	ModelID         string // only for debug/generate; Pro users
+	NonInteractive  bool
+	Stack           stacks.Parameters
+	TenantSelection types.TenantNameOrID // workspace
+	Utc             bool
+	Verbose         bool
 }
 
 func (global *GlobalConfig) Interactive() bool {
@@ -140,8 +140,8 @@ func NewGlobalConfig() *GlobalConfig {
 			Mode:     mode,
 			Region:   client.GetRegion(provider),
 		},
-		Verbose: pkg.GetenvBool("DEFANG_VERBOSE"),
-		Tenant:  tenant,
+		Verbose:         pkg.GetenvBool("DEFANG_VERBOSE"),
+		TenantSelection: tenant,
 	}
 }
 

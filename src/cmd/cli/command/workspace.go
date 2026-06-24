@@ -8,6 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +19,10 @@ func ListWorkspaces(cmd *cobra.Command, args []string) error {
 	}
 
 	// Determine current selection from flag/env/token, then reconcile with WhoAmI.
-	currentWorkspace := global.Tenant
+	currentWorkspace := global.TenantSelection
+	if resp, err := global.Client.WhoAmI(cmd.Context()); err == nil {
+		currentWorkspace = types.TenantNameOrID(resp.TenantId)
+	}
 
 	info, err := auth.FetchUserInfo(cmd.Context(), token)
 	if err != nil {

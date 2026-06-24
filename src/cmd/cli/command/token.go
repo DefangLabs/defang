@@ -15,6 +15,6 @@ var tokenCmd = &cobra.Command{
 		var s, _ = cmd.Flags().GetString("scope")
 		var expires, _ = cmd.Flags().GetDuration("expires")
 
-		return cli.Token(cmd.Context(), global.Client, global.Tenant, expires, scope.Scope(s))
+		return cli.Token(cmd.Context(), global.Client, global.TenantSelection, expires, scope.Scope(s))
 	},
 }

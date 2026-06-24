@@ -148,7 +148,7 @@ func SetupCommands(version string) {
 	})
 	RootCmd.PersistentFlags().StringVar(&global.FabricAddr, "cluster", global.FabricAddr, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster") // only for Defang use
-	RootCmd.PersistentFlags().Var(&global.Tenant, "workspace", "workspace to use")
+	RootCmd.PersistentFlags().Var(&global.TenantSelection, "workspace", "workspace to use")
 	RootCmd.PersistentFlags().VarP(&global.Stack.Provider, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, client.AllProviders()))
 	RootCmd.RegisterFlagCompletionFunc("provider", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var completions []cobra.Completion
@@ -393,7 +393,7 @@ var RootCmd = &cobra.Command{
 		ec.SetSupported(global.Interactive())
 
 		// Create a temporary gRPC client for tracking events before login
-		track.Tracker = cli.Connect(global.FabricAddr, global.Tenant)
+		track.Tracker = cli.Connect(global.FabricAddr, global.TenantSelection)
 
 		ctx := cmd.Context()
 		term.SetDebug(global.Debug)
@@ -420,7 +420,7 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		global.Client, err = cli.ConnectWithTenant(ctx, global.FabricAddr, global.Tenant)
+		global.Client, err = cli.ConnectWithTenant(ctx, global.FabricAddr, global.TenantSelection)
 		if err != nil {
 			if connect.CodeOf(err) != connect.CodeUnauthenticated {
 				return err

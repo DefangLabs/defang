@@ -17,15 +17,15 @@ func Test_configurationPrecedence(t *testing.T) {
 
 	// make a default config for comparison and copying
 	defaultConfig := GlobalConfig{
-		ColorMode:      ColorAuto,
-		Debug:          false,
-		HasTty:         true, // set to true just for test instead of term.IsTerminal() for consistency
-		HideUpdate:     false,
-		NonInteractive: false, // set to false just for test instead of !term.IsTerminal() for consistency
-		Verbose:        false,
-		Stack:          stacks.Parameters{Provider: client.ProviderAuto, Mode: modes.ModeUnspecified},
-		FabricAddr:     "",
-		Tenant:         "",
+		ColorMode:       ColorAuto,
+		Debug:           false,
+		HasTty:          true, // set to true just for test instead of term.IsTerminal() for consistency
+		HideUpdate:      false,
+		NonInteractive:  false, // set to false just for test instead of !term.IsTerminal() for consistency
+		Verbose:         false,
+		Stack:           stacks.Parameters{Provider: client.ProviderAuto, Mode: modes.ModeUnspecified},
+		FabricAddr:      "",
+		TenantSelection: "",
 	}
 
 	tests := []struct {
@@ -56,7 +56,7 @@ func Test_configurationPrecedence(t *testing.T) {
 			flags.StringVarP(&testConfig.Stack.Name, "stack", "s", testConfig.Stack.Name, "stack name (for BYOC providers)")
 			flags.Var(&testConfig.ColorMode, "color", "colorize output")
 			flags.StringVar(&testConfig.FabricAddr, "cluster", testConfig.FabricAddr, "Defang cluster to connect to")
-			flags.Var(&testConfig.Tenant, "workspace", "workspace name (tenant)")
+			flags.Var(&testConfig.TenantSelection, "workspace", "workspace name (tenant)")
 			flags.VarP(&testConfig.Stack.Provider, "provider", "P", "bring-your-own-cloud provider")
 			flags.BoolVarP(&testConfig.Verbose, "verbose", "v", testConfig.Verbose, "verbose logging")
 			flags.BoolVar(&testConfig.Debug, "debug", testConfig.Debug, "debug logging for troubleshooting the CLI")
@@ -115,8 +115,8 @@ func Test_configurationPrecedence(t *testing.T) {
 			if testConfig.FabricAddr != tt.expected.FabricAddr {
 				t.Errorf("expected FabricAddr to be '%s', got '%s'", tt.expected.FabricAddr, testConfig.FabricAddr)
 			}
-			if testConfig.Tenant != tt.expected.Tenant {
-				t.Errorf("expected Tenant to be '%s', got '%s'", tt.expected.Tenant, testConfig.Tenant)
+			if testConfig.TenantSelection != tt.expected.TenantSelection {
+				t.Errorf("expected Tenant to be '%s', got '%s'", tt.expected.TenantSelection, testConfig.TenantSelection)
 			}
 			if testConfig.ColorMode != tt.expected.ColorMode {
 				t.Errorf("expected ColorMode to be '%s', got '%s'", tt.expected.ColorMode, testConfig.ColorMode)
