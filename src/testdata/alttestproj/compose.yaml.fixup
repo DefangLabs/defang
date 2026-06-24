@@ -1,22 +1,14 @@
-{
-  "dfnx": {
-    "build": {
-      "context": ".",
-      "dockerfile": "Dockerfile"
-    },
-    "command": null,
-    "deploy": {
-      "resources": {
-        "limits": {
-          "memory": "268435456"
-        }
-      },
-      "placement": {}
-    },
-    "entrypoint": null,
-    "networks": {
-      "default": null
-    },
-    "restart": "unless-stopped"
-  }
-}
+dfnx:
+    build:
+        context: .
+        dockerfile: Dockerfile
+    command: null
+    deploy:
+        placement: {}
+        resources:
+            limits:
+                memory: "268435456"
+    entrypoint: null
+    networks:
+        default: null
+    restart: unless-stopped

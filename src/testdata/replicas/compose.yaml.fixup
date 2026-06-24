@@ -1,63 +1,44 @@
-{
-  "autoscaled": {
-    "command": null,
-    "entrypoint": null,
-    "image": "nginx:latest",
-    "networks": {
-      "default": null
-    }
-  },
-  "default": {
-    "command": null,
-    "entrypoint": null,
-    "image": "nginx:latest",
-    "networks": {
-      "default": null
-    }
-  },
-  "deploy": {
-    "command": null,
-    "deploy": {
-      "resources": {
-        "reservations": {
-          "cpus": 0.25,
-          "memory": "268435456"
-        }
-      },
-      "placement": {}
-    },
-    "entrypoint": null,
-    "image": "nginx:latest",
-    "networks": {
-      "default": null
-    }
-  },
-  "managed": {
-    "command": null,
-    "entrypoint": null,
-    "image": "redis:latest",
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "host",
-        "target": 6379,
-        "protocol": "tcp"
-      }
-    ]
-  },
-  "replicated": {
-    "command": null,
-    "deploy": {
-      "replicas": 3,
-      "resources": {},
-      "placement": {}
-    },
-    "entrypoint": null,
-    "image": "nginx:latest",
-    "networks": {
-      "default": null
-    }
-  }
-}
+autoscaled:
+    command: null
+    entrypoint: null
+    image: nginx:latest
+    networks:
+        default: null
+default:
+    command: null
+    entrypoint: null
+    image: nginx:latest
+    networks:
+        default: null
+deploy:
+    command: null
+    deploy:
+        placement: {}
+        resources:
+            reservations:
+                cpus: 0.25
+                memory: "268435456"
+    entrypoint: null
+    image: nginx:latest
+    networks:
+        default: null
+managed:
+    command: null
+    entrypoint: null
+    image: redis:latest
+    networks:
+        default: null
+    ports:
+        - mode: host
+          protocol: tcp
+          target: 6379
+replicated:
+    command: null
+    deploy:
+        placement: {}
+        replicas: 3
+        resources: {}
+    entrypoint: null
+    image: nginx:latest
+    networks:
+        default: null

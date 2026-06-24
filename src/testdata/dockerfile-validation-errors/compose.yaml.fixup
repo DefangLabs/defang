@@ -1,21 +1,13 @@
-{
-  "invalid-dockerfile": {
-    "build": {
-      "context": ".",
-      "dockerfile": "Dockerfile.invalid"
-    },
-    "command": null,
-    "entrypoint": null,
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "ingress",
-        "target": 8080,
-        "protocol": "tcp",
-        "app_protocol": "http"
-      }
-    ]
-  }
-}
+invalid-dockerfile:
+    build:
+        context: .
+        dockerfile: Dockerfile.invalid
+    command: null
+    entrypoint: null
+    networks:
+        default: null
+    ports:
+        - app_protocol: http
+          mode: ingress
+          protocol: tcp
+          target: 8080

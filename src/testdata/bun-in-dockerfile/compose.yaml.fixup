@@ -1,22 +1,15 @@
-{
-  "bun": {
-    "build": {
-      "context": "./app",
-      "dockerfile": "Dockerfile"
-    },
-    "command": null,
-    "entrypoint": null,
-    "networks": {
-      "default": null
-    },
-    "restart": "unless-stopped"
-  },
-  "server": {
-    "command": null,
-    "entrypoint": null,
-    "image": "alpine:latest",
-    "networks": {
-      "default": null
-    }
-  }
-}
+bun:
+    build:
+        context: ./app
+        dockerfile: Dockerfile
+    command: null
+    entrypoint: null
+    networks:
+        default: null
+    restart: unless-stopped
+server:
+    command: null
+    entrypoint: null
+    image: alpine:latest
+    networks:
+        default: null

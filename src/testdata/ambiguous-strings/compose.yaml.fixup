@@ -1,44 +1,32 @@
-{
-  "a": {
-    "build": {
-      "context": ".",
-      "dockerfile": "*Railpack",
-      "args": {
-        "GITSHA": "65e1234",
-        "INT": "1234",
-        "VERSION": "65e1234"
-      }
-    },
-    "command": null,
-    "entrypoint": null,
-    "environment": {
-      "GITSHA": "65e1234",
-      "INT": "1234",
-      "VERSION": "65e1234"
-    },
-    "networks": {
-      "default": null
-    }
-  },
-  "b": {
-    "build": {
-      "context": ".",
-      "dockerfile": "*Railpack",
-      "args": {
-        "GITSHA": "65e1234",
-        "INT": "1234",
-        "VERSION": "65e1234"
-      }
-    },
-    "command": null,
-    "entrypoint": null,
-    "environment": {
-      "GITSHA": "65e1234",
-      "INT": "1234",
-      "VERSION": "65e1234"
-    },
-    "networks": {
-      "default": null
-    }
-  }
-}
+a:
+    build:
+        args:
+            GITSHA: 65e1234
+            INT: "1234"
+            VERSION: 65e1234
+        context: .
+        dockerfile: '*Railpack'
+    command: null
+    entrypoint: null
+    environment:
+        GITSHA: 65e1234
+        INT: "1234"
+        VERSION: 65e1234
+    networks:
+        default: null
+b:
+    build:
+        args:
+            GITSHA: 65e1234
+            INT: "1234"
+            VERSION: 65e1234
+        context: .
+        dockerfile: '*Railpack'
+    command: null
+    entrypoint: null
+    environment:
+        GITSHA: 65e1234
+        INT: "1234"
+        VERSION: 65e1234
+    networks:
+        default: null

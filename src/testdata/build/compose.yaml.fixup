@@ -1,45 +1,32 @@
-{
-  "build1": {
-    "build": {
-      "context": ".",
-      "dockerfile": "Dockerfile",
-      "args": {
-        "BASE_IMAGE": "nginx"
-      },
-      "target": "test",
-      "shm_size": "2147483648"
-    },
-    "command": null,
-    "entrypoint": null,
-    "networks": {
-      "default": null
-    }
-  },
-  "build2": {
-    "build": {
-      "context": ".",
-      "dockerfile": "Dockerfile",
-      "args": {
-        "BASE_IMAGE": "alpine"
-      },
-      "target": "test",
-      "shm_size": "2147483648"
-    },
-    "command": null,
-    "entrypoint": null,
-    "networks": {
-      "default": null
-    }
-  },
-  "normalized": {
-    "build": {
-      "context": ".",
-      "dockerfile": "Dockerfile"
-    },
-    "command": null,
-    "entrypoint": null,
-    "networks": {
-      "default": null
-    }
-  }
-}
+build1:
+    build:
+        args:
+            BASE_IMAGE: nginx
+        context: .
+        dockerfile: Dockerfile
+        shm_size: "2147483648"
+        target: test
+    command: null
+    entrypoint: null
+    networks:
+        default: null
+build2:
+    build:
+        args:
+            BASE_IMAGE: alpine
+        context: .
+        dockerfile: Dockerfile
+        shm_size: "2147483648"
+        target: test
+    command: null
+    entrypoint: null
+    networks:
+        default: null
+normalized:
+    build:
+        context: .
+        dockerfile: Dockerfile
+    command: null
+    entrypoint: null
+    networks:
+        default: null

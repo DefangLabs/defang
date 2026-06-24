@@ -1,18 +1,11 @@
-{
-  "echo": {
-    "command": null,
-    "entrypoint": null,
-    "image": "ealen/echo-server",
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "ingress",
-        "target": 80,
-        "protocol": "tcp",
-        "app_protocol": "http"
-      }
-    ]
-  }
-}
+echo:
+    command: null
+    entrypoint: null
+    image: ealen/echo-server
+    networks:
+        default: null
+    ports:
+        - app_protocol: http
+          mode: ingress
+          protocol: tcp
+          target: 80

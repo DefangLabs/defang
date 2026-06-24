@@ -1,17 +1,11 @@
-{
-  "app": {
-    "build": {
-      "context": ".",
-      "dockerfile": "Dockerfile"
-    },
-    "command": null,
-    "entrypoint": null,
-    "environment": {
-      "dummy": null
-    },
-    "networks": {
-      "default": null
-    },
-    "restart": "unless-stopped"
-  }
-}
+app:
+    build:
+        context: .
+        dockerfile: Dockerfile
+    command: null
+    entrypoint: null
+    environment:
+        dummy: null
+    networks:
+        default: null
+    restart: unless-stopped

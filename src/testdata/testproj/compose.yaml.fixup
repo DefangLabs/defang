@@ -1,64 +1,44 @@
-{
-  "dfnx": {
-    "build": {
-      "context": ".",
-      "dockerfile": "Dockerfile",
-      "args": {
-        "DNS": "mock-dfnx"
-      },
-      "target": "testproj"
-    },
-    "command": null,
-    "deploy": {
-      "resources": {
-        "limits": {
-          "cpus": 2,
-          "memory": "536870912"
-        },
-        "reservations": {
-          "cpus": 0.25,
-          "memory": "268435456"
-        }
-      },
-      "placement": {}
-    },
-    "entrypoint": null,
-    "environment": {
-      "DOTENV": "enabled",
-      "DOT_ENV_INTERPOLATION": "enabled",
-      "FOO": "bar",
-      "dummy": null
-    },
-    "healthcheck": {
-      "test": [
-        "CMD",
-        "curl",
-        "-f",
-        "http://localhost/"
-      ]
-    },
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "ingress",
-        "target": 80,
-        "protocol": "tcp",
-        "app_protocol": "http"
-      },
-      {
-        "mode": "ingress",
-        "target": 1234,
-        "protocol": "tcp",
-        "app_protocol": "http"
-      },
-      {
-        "mode": "host",
-        "target": 4567,
-        "protocol": "udp"
-      }
-    ],
-    "restart": "unless-stopped"
-  }
-}
+dfnx:
+    build:
+        args:
+            DNS: mock-dfnx
+        context: .
+        dockerfile: Dockerfile
+        target: testproj
+    command: null
+    deploy:
+        placement: {}
+        resources:
+            limits:
+                cpus: 2
+                memory: "536870912"
+            reservations:
+                cpus: 0.25
+                memory: "268435456"
+    entrypoint: null
+    environment:
+        DOT_ENV_INTERPOLATION: enabled
+        DOTENV: enabled
+        FOO: bar
+        dummy: null
+    healthcheck:
+        test:
+            - CMD
+            - curl
+            - -f
+            - http://localhost/
+    networks:
+        default: null
+    ports:
+        - app_protocol: http
+          mode: ingress
+          protocol: tcp
+          target: 80
+        - app_protocol: http
+          mode: ingress
+          protocol: tcp
+          target: 1234
+        - mode: host
+          protocol: udp
+          target: 4567
+    restart: unless-stopped

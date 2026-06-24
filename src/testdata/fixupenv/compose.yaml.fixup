@@ -1,103 +1,71 @@
-{
-  "Mistral": {
-    "command": null,
-    "entrypoint": null,
-    "image": "mistral:latest",
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "host",
-        "target": 8000,
-        "protocol": "tcp"
-      }
-    ]
-  },
-  "fixup-args": {
-    "build": {
-      "context": ".",
-      "dockerfile": "Dockerfile",
-      "args": {
-        "API_URL": "http://mock-mistral:8000"
-      }
-    },
-    "command": null,
-    "entrypoint": null,
-    "networks": {
-      "default": null
-    }
-  },
-  "ingress-service": {
-    "command": null,
-    "entrypoint": null,
-    "image": "somedb:latest",
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "ingress",
-        "target": 5432,
-        "protocol": "tcp",
-        "app_protocol": "http"
-      }
-    ]
-  },
-  "refer-self-build-arg": {
-    "build": {
-      "context": ".",
-      "dockerfile": "Dockerfile",
-      "args": {
-        "CONFIG4": "refer-self-env.fixupenv.tenant2.defang.app"
-      }
-    },
-    "command": null,
-    "entrypoint": null,
-    "networks": {
-      "default": null
-    }
-  },
-  "refer-self-env": {
-    "command": null,
-    "entrypoint": null,
-    "environment": {
-      "CONFIG3": "refer-self-env.fixupenv.tenant2.defang.app"
-    },
-    "image": "service:latest",
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "ingress",
-        "target": 5678,
-        "protocol": "tcp",
-        "app_protocol": "http"
-      }
-    ]
-  },
-  "ui": {
-    "command": null,
-    "entrypoint": null,
-    "environment": {
-      "API_URL": "http://mock-mistral:8000",
-      "SENSITIVE_DATA": null
-    },
-    "image": "ui:latest",
-    "networks": {
-      "default": null
-    }
-  },
-  "use-ingress-service": {
-    "command": null,
-    "entrypoint": null,
-    "environment": {
-      "UI_URL": "ingress-service.fixupenv.tenant2.defang.app:5432"
-    },
-    "image": "service:latest",
-    "networks": {
-      "default": null
-    }
-  }
-}
+Mistral:
+    command: null
+    entrypoint: null
+    image: mistral:latest
+    networks:
+        default: null
+    ports:
+        - mode: host
+          protocol: tcp
+          target: 8000
+fixup-args:
+    build:
+        args:
+            API_URL: http://mock-mistral:8000
+        context: .
+        dockerfile: Dockerfile
+    command: null
+    entrypoint: null
+    networks:
+        default: null
+ingress-service:
+    command: null
+    entrypoint: null
+    image: somedb:latest
+    networks:
+        default: null
+    ports:
+        - app_protocol: http
+          mode: ingress
+          protocol: tcp
+          target: 5432
+refer-self-build-arg:
+    build:
+        args:
+            CONFIG4: refer-self-env.fixupenv.tenant2.defang.app
+        context: .
+        dockerfile: Dockerfile
+    command: null
+    entrypoint: null
+    networks:
+        default: null
+refer-self-env:
+    command: null
+    entrypoint: null
+    environment:
+        CONFIG3: refer-self-env.fixupenv.tenant2.defang.app
+    image: service:latest
+    networks:
+        default: null
+    ports:
+        - app_protocol: http
+          mode: ingress
+          protocol: tcp
+          target: 5678
+ui:
+    command: null
+    entrypoint: null
+    environment:
+        API_URL: http://mock-mistral:8000
+        SENSITIVE_DATA: null
+    image: ui:latest
+    networks:
+        default: null
+use-ingress-service:
+    command: null
+    entrypoint: null
+    environment:
+        UI_URL: ingress-service.fixupenv.tenant2.defang.app:5432
+    image: service:latest
+    networks:
+        default: null
