@@ -1,57 +1,34 @@
-{
-  "alt-repo": {
-    "command": null,
-    "entrypoint": null,
-    "image": "altrepo.com/litellm:latest",
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "host",
-        "target": 4000,
-        "protocol": "tcp"
-      }
-    ]
-  },
-  "gateway-with-ports": {
-    "command": null,
-    "entrypoint": null,
-    "image": "litellm/litellm:latest",
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "ingress",
-        "target": 5678,
-        "published": "5678",
-        "protocol": "tcp",
-        "app_protocol": "http"
-      }
-    ]
-  },
-  "gateway-without-ports": {
-    "command": null,
-    "entrypoint": null,
-    "image": "litellm/litellm:latest",
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "host",
-        "target": 4000,
-        "protocol": "tcp"
-      }
-    ]
-  },
-  "llm": {
-    "command": null,
-    "entrypoint": null,
-    "image": "llm:latest",
-    "networks": {
-      "default": null
-    }
-  }
-}
+alt-repo:
+    image: altrepo.com/litellm:latest
+    networks:
+        default: null
+    ports:
+        - mode: host
+          target: 4000
+          protocol: tcp
+    x-defang-llm: true
+gateway-with-ports:
+    image: litellm/litellm:latest
+    networks:
+        default: null
+    ports:
+        - mode: ingress
+          target: 5678
+          published: "5678"
+          protocol: tcp
+          app_protocol: http
+    x-defang-llm: true
+gateway-without-ports:
+    image: litellm/litellm:latest
+    networks:
+        default: null
+    ports:
+        - mode: host
+          target: 4000
+          protocol: tcp
+    x-defang-llm: true
+llm:
+    image: llm:latest
+    networks:
+        default: null
+    x-defang-llm: true

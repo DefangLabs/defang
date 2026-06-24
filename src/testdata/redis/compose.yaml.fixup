@@ -1,111 +1,67 @@
-{
-  "no-ext": {
-    "command": null,
-    "entrypoint": null,
-    "image": "redis",
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "host",
-        "target": 6379,
-        "protocol": "tcp"
-      }
-    ]
-  },
-  "no-ports": {
-    "command": null,
-    "entrypoint": null,
-    "image": "redis",
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "host",
-        "target": 6379,
-        "protocol": "tcp"
-      }
-    ]
-  },
-  "no-ports-override": {
-    "command": [
-      "--port",
-      "6380"
-    ],
-    "entrypoint": null,
-    "image": "redis",
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "host",
-        "target": 6380,
-        "protocol": "tcp"
-      }
-    ]
-  },
-  "short-ports": {
-    "command": null,
-    "entrypoint": null,
-    "image": "redis",
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "host",
-        "target": 6379,
-        "published": "6379",
-        "protocol": "tcp"
-      }
-    ]
-  },
-  "valkey-service": {
-    "command": null,
-    "entrypoint": null,
-    "image": "valkey/valkey:latest",
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "host",
-        "target": 6379,
-        "protocol": "tcp"
-      }
-    ]
-  },
-  "with-ext": {
-    "command": null,
-    "entrypoint": null,
-    "image": "redis",
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "host",
-        "target": 6379,
-        "protocol": "tcp"
-      }
-    ]
-  },
-  "wrong-image": {
-    "command": null,
-    "entrypoint": null,
-    "image": "example",
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "host",
-        "target": 6379,
-        "protocol": "tcp"
-      }
-    ]
-  }
-}
+no-ext:
+    image: redis
+    networks:
+        default: null
+    ports:
+        - mode: host
+          target: 6379
+          protocol: tcp
+no-ports:
+    image: redis
+    networks:
+        default: null
+    ports:
+        - mode: host
+          target: 6379
+          protocol: tcp
+    x-defang-redis: null
+no-ports-override:
+    command:
+        - --port
+        - "6380"
+    image: redis
+    networks:
+        default: null
+    ports:
+        - mode: host
+          target: 6380
+          protocol: tcp
+    x-defang-redis: null
+short-ports:
+    image: redis
+    networks:
+        default: null
+    ports:
+        - mode: host
+          target: 6379
+          published: "6379"
+          protocol: tcp
+    x-defang-redis: null
+valkey-service:
+    image: valkey/valkey:latest
+    networks:
+        default: null
+    ports:
+        - mode: host
+          target: 6379
+          protocol: tcp
+    x-defang-redis: true
+with-ext:
+    image: redis
+    networks:
+        default: null
+    ports:
+        - mode: host
+          target: 6379
+          protocol: tcp
+    x-defang-redis:
+        allow-downtime: true
+wrong-image:
+    image: example
+    networks:
+        default: null
+    ports:
+        - mode: host
+          target: 6379
+          protocol: tcp
+    x-defang-redis: null

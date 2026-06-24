@@ -1,7 +1,6 @@
 package compose
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -10,6 +9,7 @@ import (
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestFixup(t *testing.T) {
@@ -33,8 +33,7 @@ func TestFixup(t *testing.T) {
 			services[svc.Name] = svc
 		}
 
-		// Convert the protobuf services to pretty JSON for comparison (YAML would include all the zero values)
-		actual, err := json.MarshalIndent(services, "", "  ")
+		actual, err := yaml.Marshal(services)
 		if err != nil {
 			t.Fatal(err)
 		}

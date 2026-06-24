@@ -104,6 +104,10 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 	for name, model := range project.Models {
 		model.Name = name // ensure the model has a name
 		svccfg := fixupModel(model, project, accountInfo)
+		if svccfg.Extensions == nil {
+			svccfg.Extensions = make(map[string]interface{})
+		}
+		svccfg.Extensions["x-defang-llm"] = true
 		project.Services[svccfg.Name] = *svccfg
 	}
 
