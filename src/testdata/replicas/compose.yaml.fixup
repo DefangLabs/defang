@@ -1,44 +1,33 @@
 autoscaled:
-    command: null
-    entrypoint: null
     image: nginx:latest
     networks:
         default: null
+    x-defang-autoscaling: true
 default:
-    command: null
-    entrypoint: null
     image: nginx:latest
     networks:
         default: null
 deploy:
-    command: null
     deploy:
-        placement: {}
         resources:
             reservations:
                 cpus: 0.25
                 memory: "268435456"
-    entrypoint: null
     image: nginx:latest
     networks:
         default: null
 managed:
-    command: null
-    entrypoint: null
     image: redis:latest
     networks:
         default: null
     ports:
         - mode: host
-          protocol: tcp
           target: 6379
+          protocol: tcp
+    x-defang-redis: true
 replicated:
-    command: null
     deploy:
-        placement: {}
         replicas: 3
-        resources: {}
-    entrypoint: null
     image: nginx:latest
     networks:
         default: null

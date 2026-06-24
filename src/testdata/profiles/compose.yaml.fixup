@@ -1,14 +1,10 @@
 always:
-    command: null
-    entrypoint: null
     image: alpine
     networks:
         default: null
 defangonly:
-    command: null
-    entrypoint: null
+    profiles:
+        - defang
     image: alpine
     networks:
         default: null
-    profiles:
-        - defang

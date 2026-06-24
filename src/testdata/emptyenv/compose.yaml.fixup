@@ -1,11 +1,9 @@
 emptyenv:
     build:
-        args:
-            ARG2: ""
         context: .
         dockerfile: Dockerfile
-    command: null
-    entrypoint: null
+        args:
+            ARG2: ""
     environment:
         ENV1: null
         ENV2: ""

@@ -1,6 +1,4 @@
 intel2:
-    command: null
-    entrypoint: null
     image: busybox
     networks:
         default: null

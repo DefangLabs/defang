@@ -1,73 +1,67 @@
 no-ext:
-    command: null
-    entrypoint: null
     image: redis
     networks:
         default: null
     ports:
         - mode: host
-          protocol: tcp
           target: 6379
+          protocol: tcp
 no-ports:
-    command: null
-    entrypoint: null
     image: redis
     networks:
         default: null
     ports:
         - mode: host
-          protocol: tcp
           target: 6379
+          protocol: tcp
+    x-defang-redis: null
 no-ports-override:
     command:
         - --port
         - "6380"
-    entrypoint: null
     image: redis
     networks:
         default: null
     ports:
         - mode: host
-          protocol: tcp
           target: 6380
+          protocol: tcp
+    x-defang-redis: null
 short-ports:
-    command: null
-    entrypoint: null
     image: redis
     networks:
         default: null
     ports:
         - mode: host
-          protocol: tcp
-          published: "6379"
           target: 6379
+          published: "6379"
+          protocol: tcp
+    x-defang-redis: null
 valkey-service:
-    command: null
-    entrypoint: null
     image: valkey/valkey:latest
     networks:
         default: null
     ports:
         - mode: host
-          protocol: tcp
           target: 6379
+          protocol: tcp
+    x-defang-redis: true
 with-ext:
-    command: null
-    entrypoint: null
     image: redis
     networks:
         default: null
     ports:
         - mode: host
-          protocol: tcp
           target: 6379
+          protocol: tcp
+    x-defang-redis:
+        allow-downtime: true
 wrong-image:
-    command: null
-    entrypoint: null
     image: example
     networks:
         default: null
     ports:
         - mode: host
-          protocol: tcp
           target: 6379
+          protocol: tcp
+    x-defang-redis: null

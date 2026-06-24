@@ -1,12 +1,13 @@
 x:
-    command: null
-    entrypoint: null
     image: blah
     networks:
         default: null
+    x-defang-static-files: ./folder
 "y":
-    command: null
-    entrypoint: null
     image: blah
     networks:
         default: null
+    x-defang-static-files:
+        folder: ./folder
+        redirects: true - www.example.com
+    x-unsupported: asdf

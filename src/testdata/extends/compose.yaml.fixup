@@ -1,6 +1,4 @@
 array-override:
-    command: null
-    entrypoint: null
     environment:
         EMPTY_VALUE: bar
         NEW_VALUE: bar
@@ -10,14 +8,10 @@ array-override:
     networks:
         default: null
 array-reset:
-    command: null
-    entrypoint: null
     image: bogus
     networks:
         default: null
 array-set:
-    command: null
-    entrypoint: null
     environment:
         BASE_ONLY: foo
         EMPTY_VALUE: bar
@@ -28,8 +22,6 @@ array-set:
     networks:
         default: null
 array-unset:
-    command: null
-    entrypoint: null
     environment:
         BASE_ONLY: foo
         EMPTY_VALUE: null
@@ -40,8 +32,6 @@ array-unset:
     networks:
         default: null
 map-override:
-    command: null
-    entrypoint: null
     environment:
         EMPTY_VALUE: bar
         NEW_VALUE: bar
@@ -51,16 +41,12 @@ map-override:
     networks:
         default: null
 map-reset:
-    command: null
-    entrypoint: null
     environment:
         BASE_ONLY: foo
     image: bogus
     networks:
         default: null
 map-set:
-    command: null
-    entrypoint: null
     environment:
         BASE_ONLY: foo
         EMPTY_VALUE: bar
@@ -71,8 +57,6 @@ map-set:
     networks:
         default: null
 map-unset:
-    command: null
-    entrypoint: null
     environment:
         BASE_ONLY: foo
         EMPTY_VALUE: null

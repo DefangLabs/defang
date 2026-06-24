@@ -2,8 +2,6 @@ app:
     build:
         context: .
         dockerfile: Dockerfile
-    command: null
-    entrypoint: null
     environment:
         dummy: null
     networks:

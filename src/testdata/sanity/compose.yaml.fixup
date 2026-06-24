@@ -1,19 +1,16 @@
 nginx:
-    command: null
     deploy:
-        placement: {}
         resources:
             reservations:
                 memory: "268435456"
-    entrypoint: null
     environment:
         dummy: null
     image: nginx
     networks:
         default: null
     ports:
-        - app_protocol: http
-          mode: ingress
-          protocol: tcp
+        - mode: ingress
           target: 80
+          protocol: tcp
+          app_protocol: http
     restart: unless-stopped

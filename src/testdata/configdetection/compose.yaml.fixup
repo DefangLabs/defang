@@ -1,6 +1,4 @@
 configdetection:
-    command: null
-    entrypoint: null
     environment:
         API_KEY: 50m34p1k3y
         AWS_CLIENT_ID: AROA1234567890ABCDEF

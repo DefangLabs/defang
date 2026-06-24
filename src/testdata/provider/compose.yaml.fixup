@@ -5,7 +5,6 @@ ai_runner:
         - ai/smollm2
         - --alias
         - ai/smollm2
-    entrypoint: null
     environment:
         DEBUG: "true"
         LITELLM_MASTER_KEY: networkisalreadyprivate
@@ -14,15 +13,13 @@ ai_runner:
         model_provider_private: null
     ports:
         - mode: host
-          protocol: tcp
           target: 4000
+          protocol: tcp
 chat:
-    command: null
     depends_on:
         ai_runner:
             condition: service_started
             required: true
-    entrypoint: null
     environment:
         AI_RUNNER_MODEL: ai/smollm2
         AI_RUNNER_URL: http://mock-ai-runner:4000/v1/

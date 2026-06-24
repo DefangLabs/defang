@@ -4,7 +4,6 @@ railpack-long:
         dockerfile: '*Railpack'
     command:
         - exec node index.js
-    entrypoint: null
     networks:
         default: null
 railpack-short:
@@ -13,7 +12,6 @@ railpack-short:
         dockerfile: '*Railpack'
     command:
         - npm start
-    entrypoint: null
     networks:
         default: null
 railpackwithdockerfile:
@@ -22,6 +20,5 @@ railpackwithdockerfile:
         dockerfile: '*Railpack'
     command:
         - something "with space" "${PORT}"
-    entrypoint: null
     networks:
         default: null

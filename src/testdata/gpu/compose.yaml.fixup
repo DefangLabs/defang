@@ -1,7 +1,5 @@
 mistral:
-    command: null
     deploy:
-        placement: {}
         replicas: 1
         resources:
             reservations:
@@ -9,6 +7,5 @@ mistral:
                     - capabilities:
                         - gpu
                       count: -1
-    entrypoint: null
     networks:
         default: null

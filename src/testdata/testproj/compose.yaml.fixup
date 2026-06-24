@@ -1,13 +1,11 @@
 dfnx:
     build:
-        args:
-            DNS: mock-dfnx
         context: .
         dockerfile: Dockerfile
+        args:
+            DNS: mock-dfnx
         target: testproj
-    command: null
     deploy:
-        placement: {}
         resources:
             limits:
                 cpus: 2
@@ -15,7 +13,6 @@ dfnx:
             reservations:
                 cpus: 0.25
                 memory: "268435456"
-    entrypoint: null
     environment:
         DOT_ENV_INTERPOLATION: enabled
         DOTENV: enabled
@@ -30,15 +27,15 @@ dfnx:
     networks:
         default: null
     ports:
-        - app_protocol: http
-          mode: ingress
-          protocol: tcp
+        - mode: ingress
           target: 80
-        - app_protocol: http
-          mode: ingress
           protocol: tcp
+          app_protocol: http
+        - mode: ingress
           target: 1234
+          protocol: tcp
+          app_protocol: http
         - mode: host
-          protocol: udp
           target: 4567
+          protocol: udp
     restart: unless-stopped

@@ -1,6 +1,4 @@
 interpolate:
-    command: null
-    entrypoint: null
     environment:
         BRACED: interpolate
         DB: postgres://user:${POSTGRES_PASSWORD}@db:5432/db

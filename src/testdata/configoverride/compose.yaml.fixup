@@ -1,6 +1,4 @@
 service1:
-    command: null
-    entrypoint: null
     environment:
         VAR1: null
     image: alpine

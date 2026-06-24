@@ -1,5 +1,4 @@
 service1:
-    command: null
     depends_on:
         service2:
             condition: service_started
@@ -7,27 +6,22 @@ service1:
         service3:
             condition: service_started
             required: true
-    entrypoint: null
     image: alpine
     networks:
         default: null
 service2:
-    command: null
     depends_on:
         service3:
             condition: service_started
             required: true
-    entrypoint: null
     image: alpine
     networks:
         default: null
 service3:
-    command: null
     depends_on:
         service3:
             condition: service_started
             required: true
-    entrypoint: null
     image: alpine
     networks:
         default: null
