@@ -255,6 +255,7 @@ jobs:
         working-directory: src
 
       - name: Run sanity tests UP
+        id: sanity-up
         continue-on-error: true # until we have multi-project support in playground
         run: go run -race ./cmd/cli -C testdata/sanity compose up
           --provider=defang --debug
@@ -273,7 +274,7 @@ jobs:
         working-directory: src
 
       - name: Delete stack
-        if: steps.add-dummy-config.conclusion == 'success' # only clean up if the config was added
+        if: steps.sanity-up.conclusion == 'success' # only clean up if up was successful
         run: go run -race ./cmd/cli -C testdata/sanity stack rm beta
           --provider=defang --debug
         working-directory: src
