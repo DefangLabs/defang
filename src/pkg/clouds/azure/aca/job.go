@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"iter"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -545,6 +546,16 @@ func (j *Job) GetJobExecutionStatus(ctx context.Context, executionName string) (
 				if exec.Properties != nil && exec.Properties.Status != nil {
 					status.Status = *exec.Properties.Status
 				}
+				// The execution-level Status can lag the container indefinitely.
+				// When it has not reached a terminal state, fall back to the
+				// replica container, which reflects the real outcome in time.
+				if !status.IsTerminal() {
+					if replicaStatus, rerr := j.cdReplicaStatus(ctx, executionName); rerr != nil {
+						term.Debugf("could not derive CD status from replica for %q: %v", executionName, rerr)
+					} else if replicaStatus != nil {
+						return replicaStatus, nil
+					}
+				}
 				return status, nil
 			}
 		}
@@ -656,16 +667,22 @@ func (j *Job) getJobAuthToken(ctx context.Context) (string, error) {
 	return j.FetchLogStreamAuthToken(ctx, j.ResourceGroup, "Microsoft.App/jobs/"+cdJobName, jobAPIVersion)
 }
 
-// getCDContainerLogStreamURL lists the execution's replicas and returns the
-// logstream URL of the main cdJobName container, only once the container has
-// reached a runningState where the log endpoint actually serves output
-// (Running or Terminated — anything earlier returns a Kubernetes error).
-// Returns an empty string (no error) while the replica is still initialising.
-func (j *Job) getCDContainerLogStreamURL(ctx context.Context, executionName string) (string, error) {
-	defer term.Timing()()
+// cdReplicaContainer is the observed state of the cdJobName container within one
+// of the execution's replicas, read from the replicas API.
+type cdReplicaContainer struct {
+	RunningState        string
+	RunningStateDetails string
+	LogStreamEndpoint   string
+}
+
+// listCDReplicaContainers lists the execution's replicas and returns the
+// cdJobName container from each. The replica API reflects the true container
+// state (Running / Terminated) and its exit details, unlike the execution-level
+// Status which can lag behind the container indefinitely.
+func (j *Job) listCDReplicaContainers(ctx context.Context, executionName string) ([]cdReplicaContainer, error) {
 	armTok, err := j.ArmToken(ctx)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	url := fmt.Sprintf(
@@ -674,46 +691,118 @@ func (j *Job) getCDContainerLogStreamURL(ctx context.Context, executionName stri
 	)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+armTok)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("listReplicas: HTTP %s", resp.Status)
+		return nil, fmt.Errorf("listReplicas: HTTP %s", resp.Status)
 	}
 
 	var result struct {
 		Value []struct {
 			Properties struct {
 				Containers []struct {
-					Name              string `json:"name"`
-					RunningState      string `json:"runningState"`
-					LogStreamEndpoint string `json:"logStreamEndpoint"`
+					Name                string `json:"name"`
+					RunningState        string `json:"runningState"`
+					RunningStateDetails string `json:"runningStateDetails"`
+					LogStreamEndpoint   string `json:"logStreamEndpoint"`
 				} `json:"containers"`
 			} `json:"properties"`
 		} `json:"value"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("listReplicas: decode: %w", err)
+		return nil, fmt.Errorf("listReplicas: decode: %w", err)
 	}
 
+	var containers []cdReplicaContainer
 	for _, r := range result.Value {
 		for _, c := range r.Properties.Containers {
-			if c.Name != cdJobName || c.LogStreamEndpoint == "" {
+			if c.Name != cdJobName {
 				continue
 			}
-			switch c.RunningState {
-			case "Running", "Terminated":
-				return c.LogStreamEndpoint, nil
-			}
+			containers = append(containers, cdReplicaContainer{
+				RunningState:        c.RunningState,
+				RunningStateDetails: c.RunningStateDetails,
+				LogStreamEndpoint:   c.LogStreamEndpoint,
+			})
+		}
+	}
+	return containers, nil
+}
+
+// getCDContainerLogStreamURL returns the logstream URL of the main cdJobName
+// container, only once it has reached a runningState where the log endpoint
+// actually serves output (Running or Terminated — anything earlier returns a
+// Kubernetes error). Returns an empty string (no error) while the replica is
+// still initialising.
+func (j *Job) getCDContainerLogStreamURL(ctx context.Context, executionName string) (string, error) {
+	defer term.Timing()()
+	containers, err := j.listCDReplicaContainers(ctx, executionName)
+	if err != nil {
+		return "", err
+	}
+	for _, c := range containers {
+		if c.LogStreamEndpoint == "" {
+			continue
+		}
+		switch c.RunningState {
+		case "Running", "Terminated":
+			return c.LogStreamEndpoint, nil
 		}
 	}
 	return "", nil
+}
+
+// cdReplicaStatus derives a terminal JobStatus from the execution's replica
+// container when it has terminated, or returns nil when the container is still
+// running or not present yet. The execution-level Status (JobsExecutions list)
+// can lag the container indefinitely, leaving the CLI polling forever; the
+// container's own Terminated state plus its exit code is the timely signal.
+func (j *Job) cdReplicaStatus(ctx context.Context, executionName string) (*JobStatus, error) {
+	containers, err := j.listCDReplicaContainers(ctx, executionName)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range containers {
+		if c.RunningState != "Terminated" {
+			continue
+		}
+		status := &JobStatus{ExecutionName: executionName}
+		// Classify by the container's exit code. A clean success normally
+		// surfaces via the execution-level Status, so an exit code we cannot
+		// parse here is treated as a failure and surfaced with its details
+		// rather than being silently reported as success.
+		if code, ok := parseExitCode(c.RunningStateDetails); ok && code == 0 {
+			status.Status = armappcontainersv3.JobExecutionRunningStateSucceeded
+		} else {
+			status.Status = armappcontainersv3.JobExecutionRunningStateFailed
+			status.ErrorMessage = c.RunningStateDetails
+		}
+		return status, nil
+	}
+	return nil, nil
+}
+
+// exitCodeRe extracts the numeric exit code from a replica container's free-form
+// runningStateDetails (e.g. "Container 'defang-cd' was terminated with exit code '1'").
+var exitCodeRe = regexp.MustCompile(`(?i)exit code:?\s*'?(-?\d+)'?`)
+
+func parseExitCode(details string) (int, bool) {
+	m := exitCodeRe.FindStringSubmatch(details)
+	if m == nil {
+		return 0, false
+	}
+	code, err := strconv.Atoi(m[1])
+	if err != nil {
+		return 0, false
+	}
+	return code, true
 }
 
 // streamJobExecutionLogs opens the job container's logStreamEndpoint and
