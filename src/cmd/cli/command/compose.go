@@ -418,6 +418,11 @@ func makeComposeDownCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var detach, _ = cmd.Flags().GetBool("detach")
 			var allowUpgrade, _ = cmd.Flags().GetBool("allow-upgrade")
+			var remove, _ = cmd.Flags().GetBool("remove")
+
+			if remove && detach {
+				return errors.New("cannot use --remove with --detach: the stack can only be removed after the down completes")
+			}
 
 			session, err := newCommandSession(cmd)
 			if err != nil {
@@ -447,9 +452,13 @@ func makeComposeDownCmd() *cobra.Command {
 
 			term.Info("Deleted services, deployment ID", deployment)
 
+			// Captured here because err is reassigned below, leaving listConfigs unsafe to dereference later.
+			var configNames []string
 			listConfigs, err := session.Provider.ListConfig(cmd.Context(), &defangv1.ListConfigsRequest{Project: projectName})
 			if err == nil {
-				if len(listConfigs.Names) > 0 {
+				configNames = listConfigs.Names
+				if len(configNames) > 0 && !remove {
+					// With --remove these configs are deleted below, since they are stored per-stack.
 					term.Warn("Stored project configs are not deleted.")
 				}
 			} else {
@@ -476,9 +485,27 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 			term.Info("Done.")
-			if len(listConfigs.Names) > 0 {
-				printDefangHint("To delete stored project configs, run:", "config rm --project-name="+projectName+" "+strings.Join(listConfigs.Names, " "))
+
+			if len(configNames) > 0 {
+				if remove {
+					// Configs are stored per-stack, so they would be orphaned once the stack is gone: delete them first.
+					if err := cli.ConfigDelete(cmd.Context(), projectName, session.Provider, configNames...); err != nil {
+						return fmt.Errorf("failed to delete stored project configs: %w", err)
+					}
+					term.Info("Deleted stored project configs")
+				} else {
+					printDefangHint("To delete stored project configs, run:", "config rm --project-name="+projectName+" "+strings.Join(configNames, " "))
+				}
 			}
+
+			if remove {
+				// The down succeeded, so there is no active deployment left to confirm: remove without prompting.
+				if err := cli.RemoveStack(cmd.Context(), global.Client, session.Provider, ec, projectName, session.Stack.Name, true); err != nil {
+					return err
+				}
+				term.Infof("Removed stack %q", session.Stack.Name)
+			}
+
 			return nil
 		},
 	}
@@ -486,6 +513,7 @@ func makeComposeDownCmd() *cobra.Command {
 	composeDownCmd.Flags().Bool("tail", false, "tail the service logs after deleting") // no-op, but keep for backwards compatibility
 	_ = composeDownCmd.Flags().MarkHidden("tail")
 	composeDownCmd.Flags().Bool("allow-upgrade", pkg.GetenvBool("DEFANG_ALLOW_UPGRADE"), "allow upgrading the CD image and Pulumi version to the latest available")
+	composeDownCmd.Flags().Bool("remove", false, "delete the stack after a successful down")
 	return composeDownCmd
 }
 

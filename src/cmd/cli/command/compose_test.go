@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -11,6 +12,21 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
+
+func TestComposeDownRemoveDetachConflict(t *testing.T) {
+	cmd := makeComposeDownCmd()
+	cmd.SetArgs([]string{"--remove", "--detach"})
+	cmd.SilenceUsage = true
+	cmd.SilenceErrors = true
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when combining --remove and --detach, got nil")
+	}
+	if !strings.Contains(err.Error(), "cannot use --remove with --detach") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
 
 func TestInitializeTailCmd(t *testing.T) {
 	t.Run("", func(t *testing.T) {
