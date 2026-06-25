@@ -32,7 +32,7 @@ func TestHandleSelectStackTool(t *testing.T) {
 				Name:     "placeholder",
 				Provider: client.ProviderGCP,
 				Region:   "placeholder",
-				Mode:     modes.ModeAffordable,
+				Mode:     modes.RecipeAffordable,
 			},
 			expectedResult: "Stack \"test-stack\" selected.",
 			expectedError:  false,
@@ -49,7 +49,7 @@ func TestHandleSelectStackTool(t *testing.T) {
 				Name:     "old-stack",
 				Provider: client.ProviderGCP,
 				Region:   "us-central1",
-				Mode:     modes.ModeAffordable,
+				Mode:     modes.RecipeAffordable,
 				Variables: map[string]string{
 					"GCP_PROJECT_ID": "old-project",
 				},

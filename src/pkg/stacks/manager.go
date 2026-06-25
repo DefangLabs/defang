@@ -23,6 +23,7 @@ type Lister interface {
 	GetDefaultStack(ctx context.Context, req *defangv1.GetDefaultStackRequest) (*defangv1.GetStackResponse, error)
 	GetStack(ctx context.Context, req *defangv1.GetStackRequest) (*defangv1.GetStackResponse, error)
 	ListStacks(ctx context.Context, req *defangv1.ListStacksRequest) (*defangv1.ListStacksResponse, error)
+	ListRecipes(ctx context.Context) (*defangv1.ListRecipesResponse, error)
 }
 
 type manager struct {
@@ -144,8 +145,8 @@ func newParametersFromPB(stack *defangv1.Stack) (*Parameters, error) {
 		return nil, fmt.Errorf("failed to parse remote stack content: %w", err)
 	}
 	// fill in missing fields from remote stack info
-	if params.Mode == modes.ModeUnspecified {
-		params.Mode = modes.Mode(stack.GetMode())
+	if params.Mode == modes.RecipeUnspecified {
+		params.Mode = modes.FromMode(stack.GetMode())
 	}
 	if params.Region == "" {
 		params.Region = stack.GetRegion()
@@ -317,7 +318,7 @@ func (sm *manager) getSpecifiedStack(ctx context.Context, name string) (*Paramet
 }
 
 func (sm *manager) getStackInteractively(ctx context.Context, opts GetStackOpts) (*Parameters, string, error) {
-	stackSelector := NewSelector(sm.ec, sm)
+	stackSelector := NewSelector(sm.ec, sm, sm.fabric)
 	// TODO: pass fallback stack to selector wizard for pre-filling
 	stack, err := stackSelector.SelectStack(ctx, opts.SelectStackOptions)
 	if err != nil {

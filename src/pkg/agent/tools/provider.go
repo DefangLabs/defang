@@ -34,7 +34,7 @@ func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc clie
 
 func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.Parameters) (*client.ProviderID, client.Provider, error) {
 	if stack.Name == "" && pp.ec.IsSupported() {
-		selector := stacks.NewSelector(pp.ec, pp.sm)
+		selector := stacks.NewSelector(pp.ec, pp.sm, pp.fc)
 		newStack, err := selector.SelectStack(ctx, stacks.SelectStackOptions{
 			AllowStackCreation: true,
 		})

@@ -46,7 +46,7 @@ func (m *MockEstimateCLI) LoadProject(ctx context.Context, loader client.Loader)
 	return m.Project, nil
 }
 
-func (m *MockEstimateCLI) RunEstimate(ctx context.Context, project *compose.Project, grpcClient *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
+func (m *MockEstimateCLI) RunEstimate(ctx context.Context, project *compose.Project, grpcClient *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Recipe) (*defangv1.EstimateResponse, error) {
 	projectName := ""
 	if project != nil {
 		projectName = project.Name
@@ -63,7 +63,7 @@ func (m *MockEstimateCLI) CreatePlaygroundProvider(grpcClient *client.GrpcClient
 	return nil
 }
 
-func (m *MockEstimateCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string {
+func (m *MockEstimateCLI) PrintEstimate(mode modes.Recipe, estimate *defangv1.EstimateResponse) string {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("PrintEstimate(%s)", mode.String()))
 	return m.CapturedOutput
 }
@@ -85,7 +85,9 @@ func TestHandleEstimateTool(t *testing.T) {
 		expectedError        string
 	}{
 		{
-			name: "unknown_deployment_mode_fails",
+			// Deployment modes are now free-form recipe names, so an unrecognized
+			// value is accepted (uppercased) rather than rejected.
+			name: "free_form_deployment_mode_accepted",
 			arguments: map[string]interface{}{
 				"provider":        "aws",
 				"deployment_mode": "unknown-mode",
@@ -103,7 +105,7 @@ func TestHandleEstimateTool(t *testing.T) {
 				}
 				m.CapturedOutput = "Estimated cost: $15.00/month"
 			},
-			expectedError: "invalid mode: \"unknown-mode\", not one of [AFFORDABLE BALANCED HIGH_AVAILABILITY]",
+			expectedTextContains: "Successfully estimated the cost of the project to AWS",
 		},
 		{
 			name: "load_project_error",

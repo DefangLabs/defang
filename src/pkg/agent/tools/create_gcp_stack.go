@@ -18,16 +18,11 @@ type CreateGCPStackParams struct {
 }
 
 func HandleCreateGCPStackTool(ctx context.Context, params CreateGCPStackParams, sc StackConfig) (string, error) {
-	mode, err := modes.Parse(params.Mode)
-	if err != nil {
-		return "Invalid mode provided", err
-	}
-
 	newStack := stacks.Parameters{
 		Name:     params.Name,
 		Region:   params.Region,
 		Provider: client.ProviderGCP,
-		Mode:     mode,
+		Mode:     modes.ParseRecipe(params.Mode),
 		Variables: map[string]string{
 			"GCP_PROJECT_ID": params.GCPProjectID,
 		},

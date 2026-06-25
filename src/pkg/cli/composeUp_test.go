@@ -129,7 +129,7 @@ func TestComposeUp(t *testing.T) {
 
 	t.Run("happy path", func(t *testing.T) {
 		d, project, err := ComposeUp(t.Context(), mc, mp, stack, ComposeUpParams{
-			Mode:       modes.ModeAffordable,
+			Mode:       modes.RecipeAffordable,
 			Project:    proj,
 			UploadMode: compose.UploadModeDigest,
 		})
@@ -157,11 +157,49 @@ func TestComposeUp(t *testing.T) {
 			Mode: defangv1.DeploymentMode_PRODUCTION,
 		}
 		_, _, err = ComposeUp(t.Context(), mc, mp, stack, ComposeUpParams{
-			Mode:       modes.ModeAffordable,
+			Mode:       modes.RecipeAffordable,
 			Project:    proj,
 			UploadMode: compose.UploadModeDigest,
 		})
 		require.ErrorContains(t, err, "downgrade deployment mode from HIGH_AVAILABILITY to AFFORDABLE")
+	})
+
+	t.Run("inactive recipe", func(t *testing.T) {
+		inactiveClient := client.MockFabricClient{
+			DelegateDomain: "example.com",
+			Recipe:         &defangv1.Recipe{Name: "AFFORDABLE", Active: false},
+		}
+		newProvider := func() *mockDeployProvider {
+			return &mockDeployProvider{MockProvider: client.MockProvider{UploadUrl: server.URL + "/"}}
+		}
+
+		t.Run("cannot deploy", func(t *testing.T) {
+			_, _, err := ComposeUp(t.Context(), inactiveClient, newProvider(), stack, ComposeUpParams{
+				Mode:       modes.RecipeAffordable,
+				Project:    proj,
+				UploadMode: compose.UploadModeDigest,
+			})
+			require.ErrorContains(t, err, `recipe "AFFORDABLE" is not active`)
+		})
+
+		// Teams can estimate/preview an inactive recipe to decide whether to activate it.
+		allowed := []struct {
+			name string
+			mode compose.UploadMode
+		}{
+			{"estimate is allowed", compose.UploadModeEstimate},
+			{"preview is allowed", compose.UploadModePreview},
+		}
+		for _, tc := range allowed {
+			t.Run(tc.name, func(t *testing.T) {
+				_, _, err := ComposeUp(t.Context(), inactiveClient, newProvider(), stack, ComposeUpParams{
+					Mode:       modes.RecipeAffordable,
+					Project:    proj,
+					UploadMode: tc.mode,
+				})
+				require.NoError(t, err)
+			})
+		}
 	})
 }
 
@@ -334,7 +372,7 @@ func TestComposeUpStops(t *testing.T) {
 			}
 
 			resp, project, err := ComposeUp(ctx, fabric, provider, stack, ComposeUpParams{
-				Mode:       modes.ModeUnspecified,
+				Mode:       modes.RecipeUnspecified,
 				Project:    project,
 				UploadMode: compose.UploadModeDigest,
 			})
@@ -369,7 +407,7 @@ func TestComposeConfigWithoutLogin(t *testing.T) {
 	stack := &stacks.Parameters{}
 
 	_, _, err := ComposeUp(t.Context(), fabric, provider, stack, ComposeUpParams{
-		Mode:       modes.ModeUnspecified,
+		Mode:       modes.RecipeUnspecified,
 		Project:    project,
 		UploadMode: compose.UploadModeIgnore,
 	})

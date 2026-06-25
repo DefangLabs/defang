@@ -3,7 +3,6 @@ package modes
 import (
 	"testing"
 
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,45 +16,40 @@ func TestMode_Set(t *testing.T) {
 		{
 			name:  "affordable",
 			input: "AFFORDABLE",
-			want:  Mode(defangv1.DeploymentMode_DEVELOPMENT),
+			want:  ModeAffordable,
 		},
 		{
 			name:  "balanced",
 			input: "BALANCED",
-			want:  Mode(defangv1.DeploymentMode_STAGING),
+			want:  ModeBalanced,
 		},
 		{
 			name:  "high_availability",
 			input: "HIGH_AVAILABILITY",
-			want:  Mode(defangv1.DeploymentMode_PRODUCTION),
-		},
-		{
-			name:    "invalid",
-			input:   "INVALID",
-			wantErr: true,
+			want:  ModeHighAvailability,
 		},
 		{
 			name:    "development (deprecated)",
 			input:   "DEVELOPMENT",
-			want:    Mode(defangv1.DeploymentMode_DEVELOPMENT),
+			want:    ModeAffordable,
 			wantErr: false,
 		},
 		{
 			name:    "staging (deprecated)",
 			input:   "STAGING",
-			want:    Mode(defangv1.DeploymentMode_STAGING),
+			want:    ModeBalanced,
 			wantErr: false,
 		},
 		{
 			name:    "production (deprecated)",
 			input:   "PRODUCTION",
-			want:    Mode(defangv1.DeploymentMode_PRODUCTION),
+			want:    ModeHighAvailability,
 			wantErr: false,
 		},
 		{
 			name:    "unspecified",
 			input:   "",
-			want:    Mode(defangv1.DeploymentMode_MODE_UNSPECIFIED),
+			want:    ModeUnspecified,
 			wantErr: false,
 		},
 	}
@@ -82,17 +76,17 @@ func TestMode_String(t *testing.T) {
 	}{
 		{
 			name: "affordable",
-			mode: Mode(defangv1.DeploymentMode_DEVELOPMENT),
+			mode: ModeAffordable,
 			want: "AFFORDABLE",
 		},
 		{
 			name: "balanced",
-			mode: Mode(defangv1.DeploymentMode_STAGING),
+			mode: ModeBalanced,
 			want: "BALANCED",
 		},
 		{
 			name: "high_availability",
-			mode: Mode(defangv1.DeploymentMode_PRODUCTION),
+			mode: ModeHighAvailability,
 			want: "HIGH_AVAILABILITY",
 		},
 	}

@@ -557,6 +557,7 @@ func (b *ByocGcp) deploy(ctx context.Context, req *client.DeployRequest, command
 		Mode:          req.Mode,
 		PulumiVersion: b.PulumiVersion,
 		Services:      serviceInfos,
+		Recipe:        req.Recipe,
 	})
 	if err != nil {
 		return nil, err

@@ -18,16 +18,11 @@ type CreateAzureStackParams struct {
 }
 
 func HandleCreateAzureStackTool(ctx context.Context, params CreateAzureStackParams, sc StackConfig) (string, error) {
-	mode, err := modes.Parse(params.Mode)
-	if err != nil {
-		return "Invalid mode provided", err
-	}
-
 	newStack := stacks.Parameters{
 		Name:     params.Name,
 		Region:   params.Location,
 		Provider: client.ProviderAzure,
-		Mode:     mode,
+		Mode:     modes.ParseRecipe(params.Mode),
 		Variables: map[string]string{
 			"AZURE_SUBSCRIPTION_ID": params.AzureSubscriptionID,
 		},

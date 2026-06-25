@@ -13,23 +13,35 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
+	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
+
+// RecipeLister fetches the recipes available in the workspace. It is satisfied
+// by client.FabricClient and the stacks Lister.
+type RecipeLister interface {
+	ListRecipes(ctx context.Context) (*defangv1.ListRecipesResponse, error)
+}
 
 type Wizard struct {
 	ec            elicitations.Controller
+	recipeLister  RecipeLister
 	profileLister AWSProfileLister
 }
 
-func NewWizard(ec elicitations.Controller) *Wizard {
+func NewWizard(ec elicitations.Controller, recipeLister RecipeLister) *Wizard {
 	return &Wizard{
 		ec:            ec,
+		recipeLister:  recipeLister,
 		profileLister: &FileSystemAWSProfileLister{},
 	}
 }
 
-func NewWizardWithProfileLister(ec elicitations.Controller, profileLister AWSProfileLister) *Wizard {
+func NewWizardWithProfileLister(ec elicitations.Controller, recipeLister RecipeLister, profileLister AWSProfileLister) *Wizard {
 	return &Wizard{
 		ec:            ec,
+		recipeLister:  recipeLister,
 		profileLister: profileLister,
 	}
 }
@@ -79,6 +91,19 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 			return nil, fmt.Errorf("failed to elicit region choice: %w", err)
 		}
 		params.Region = region
+	}
+
+	if params.Mode == modes.RecipeUnspecified && params.Provider != client.ProviderDefang {
+		// Skip the prompt entirely when Fabric reports no active recipes.
+		if recipeNames := w.activeRecipeNames(ctx); len(recipeNames) > 0 {
+			recipeName, err := w.ec.RequestEnum(ctx, "Which recipe (deployment mode) do you want to deploy with?", "mode",
+				recipeNames,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to elicit deployment mode: %w", err)
+			}
+			params.Mode = modes.ParseRecipe(recipeName)
+		}
 	}
 
 	if params.Name == "" {
@@ -156,6 +181,30 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 	}
 
 	return params, nil
+}
+
+// activeRecipeNames returns the recipe names to offer in the wizard, fetched
+// from Fabric. When no recipe lister is configured or Fabric is unreachable it
+// falls back to the (non-empty) built-in deployment modes. When Fabric reports
+// zero active recipes it returns an empty slice, signalling the caller to skip
+// the recipe prompt.
+func (w *Wizard) activeRecipeNames(ctx context.Context) []string {
+	if w.recipeLister == nil {
+		return modes.AllDeploymentModes()
+	}
+	resp, err := w.recipeLister.ListRecipes(ctx)
+	if err != nil {
+		term.Debugf("could not list recipes, falling back to built-in modes: %v", err)
+		return modes.AllDeploymentModes()
+	}
+	var names []string
+	for _, recipe := range resp.GetRecipes() {
+		if recipe.GetActive() {
+			names = append(names, recipe.GetName())
+		}
+	}
+	sort.Strings(names)
+	return names
 }
 
 type AWSProfileLister interface {

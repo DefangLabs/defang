@@ -477,6 +477,9 @@ func fileToStringArray(t *testing.T, fileName string) []string {
 	for scanner.Scan() {
 		expectedLines = append(expectedLines, scanner.Text())
 	}
+	if err := scanner.Err(); err != nil {
+		t.Fatalf("Error scanning file: %v", err)
+	}
 	return expectedLines
 }
 

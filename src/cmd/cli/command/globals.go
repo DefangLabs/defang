@@ -107,7 +107,7 @@ func NewGlobalConfig() *GlobalConfig {
 		}
 	}
 
-	mode := modes.ModeUnspecified
+	mode := modes.RecipeUnspecified
 	if fromEnv, ok := os.LookupEnv("DEFANG_MODE"); ok {
 		err := mode.Set(fromEnv)
 		if err != nil {
@@ -158,7 +158,7 @@ func (global *GlobalConfig) ToMap() map[string]string {
 	if regionVarName != "" && global.Stack.Region != "" {
 		m[regionVarName] = global.Stack.Region
 	}
-	if global.Stack.Mode != modes.ModeUnspecified {
+	if global.Stack.Mode != modes.RecipeUnspecified {
 		m["DEFANG_MODE"] = global.Stack.Mode.String()
 	}
 	m["DEFANG_VERBOSE"] = strconv.FormatBool(global.Verbose)
