@@ -29,6 +29,9 @@ const (
 	cdJobName          = "defang-cd"
 	cdEnvironmentName  = "defang-cd"
 	cdLogWorkspaceName = "defang-cd"
+	// EnvVarEtag is the environment variable the CD execution is launched with so
+	// its run can later be matched back to a deployment etag (see FindExecutionByEtag).
+	EnvVarEtag         = "ETAG"
 	jobLogPollInterval = 3 * time.Second
 	// jobAPIVersion is required for job getAuthToken / executions/replicas which
 	// are not yet exposed in the stable SDK or the 2023-05-01 API version.
@@ -561,6 +564,65 @@ func (j *Job) GetJobExecutionStatus(ctx context.Context, executionName string) (
 		}
 	}
 	return nil, fmt.Errorf("execution %q not found", executionName)
+}
+
+// FindExecutionByEtag returns the name of the most recent CD job execution whose
+// EnvVarEtag environment variable matches the given etag, or "" (no error) when
+// none match. This lets a fresh process (e.g. a standalone `defang logs`) recover
+// the CD run without the in-memory run ID that only the deploying process holds.
+func (j *Job) FindExecutionByEtag(ctx context.Context, etag string) (string, error) {
+	execClient, err := j.newJobsExecutionsClient()
+	if err != nil {
+		return "", err
+	}
+
+	var (
+		bestName  string
+		bestStart time.Time
+	)
+	pager := execClient.NewListPager(j.ResourceGroup, cdJobName, nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return "", fmt.Errorf("failed to list job executions: %w", err)
+		}
+		for _, exec := range page.Value {
+			if exec == nil || exec.Name == nil || exec.Properties == nil || !templateHasEtag(exec.Properties.Template, etag) {
+				continue
+			}
+			// Retries reuse the etag, so prefer the most recently started run.
+			var start time.Time
+			if exec.Properties.StartTime != nil {
+				start = *exec.Properties.StartTime
+			}
+			if bestName == "" || start.After(bestStart) {
+				bestName, bestStart = *exec.Name, start
+			}
+		}
+	}
+	return bestName, nil
+}
+
+// templateHasEtag reports whether any container in the execution template was
+// launched with EnvVarEtag set to etag.
+func templateHasEtag(tmpl *armappcontainersv3.JobExecutionTemplate, etag string) bool {
+	if tmpl == nil {
+		return false
+	}
+	for _, c := range tmpl.Containers {
+		if c == nil {
+			continue
+		}
+		for _, e := range c.Env {
+			if e == nil {
+				continue
+			}
+			if e.Name != nil && *e.Name == EnvVarEtag && e.Value != nil && *e.Value == etag {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // TailJobLogs streams real-time container logs from the running job execution

@@ -11,6 +11,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	armappcontainersv3 "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appcontainers/armappcontainers/v3"
 	cloudazure "github.com/DefangLabs/defang/src/pkg/clouds/azure"
 )
@@ -728,6 +729,37 @@ func TestFetchLogsFromWorkspaceSDKError(t *testing.T) {
 	// the SDK (will fail), then bails.
 	if _, err := j.fetchLogsFromWorkspace(t.Context(), "exec"); err == nil {
 		t.Error("expected error from fetchLogsFromWorkspace")
+	}
+}
+
+func TestTemplateHasEtag(t *testing.T) {
+	tmplWith := func(envs ...*armappcontainersv3.EnvironmentVar) *armappcontainersv3.JobExecutionTemplate {
+		return &armappcontainersv3.JobExecutionTemplate{
+			Containers: []*armappcontainersv3.JobExecutionContainer{{Env: envs}},
+		}
+	}
+	etagVar := &armappcontainersv3.EnvironmentVar{Name: to.Ptr(EnvVarEtag), Value: to.Ptr("etag-A")}
+	otherVar := &armappcontainersv3.EnvironmentVar{Name: to.Ptr("DEFANG_MODE"), Value: to.Ptr("development")}
+	secretRef := &armappcontainersv3.EnvironmentVar{Name: to.Ptr(EnvVarEtag), SecretRef: to.Ptr("etag")}
+
+	tests := []struct {
+		name string
+		tmpl *armappcontainersv3.JobExecutionTemplate
+		etag string
+		want bool
+	}{
+		{"match", tmplWith(otherVar, etagVar), "etag-A", true},
+		{"different value", tmplWith(etagVar), "etag-B", false},
+		{"no etag var", tmplWith(otherVar), "etag-A", false},
+		{"nil template", nil, "etag-A", false},
+		{"value-less etag var", tmplWith(secretRef), "etag-A", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := templateHasEtag(tt.tmpl, tt.etag); got != tt.want {
+				t.Errorf("templateHasEtag() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 

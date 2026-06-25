@@ -120,6 +120,15 @@ func TestCreateResourceGroupCredError(t *testing.T) {
 	}
 }
 
+func TestResourceGroupExistsCredError(t *testing.T) {
+	useFakeCred(t, "", errors.New("denied"))
+	d := New("defang-cd", azure.LocationWestUS2)
+	d.SubscriptionID = "sub"
+	if _, err := d.ResourceGroupExists(t.Context(), "rg"); err == nil {
+		t.Error("ResourceGroupExists should surface credential error")
+	}
+}
+
 func TestTearDownCredError(t *testing.T) {
 	useFakeCred(t, "", errors.New("denied"))
 	d := New("defang-cd", azure.LocationWestUS2)

@@ -33,7 +33,10 @@ type BuildLogWatcher struct {
 // runs, and streams their build log output. The registry itself is created lazily by
 // Pulumi during the CD run, so registry discovery is retried on every poll until one
 // appears (or ctx is cancelled). The returned channel is closed when ctx is cancelled.
-func (w *BuildLogWatcher) WatchBuildLogs(ctx context.Context) <-chan BuildLogEntry {
+// WatchBuildLogs streams ACR build (task run) logs from the resource group. When follow
+// is true it keeps polling for new runs every buildPollInterval; when false it polls once
+// for recent runs, drains their logs, and closes the channel.
+func (w *BuildLogWatcher) WatchBuildLogs(ctx context.Context, follow bool) <-chan BuildLogEntry {
 	out := make(chan BuildLogEntry)
 	go func() {
 		// senders tracks the per-run streaming goroutines started by poll().
@@ -136,13 +139,19 @@ func (w *BuildLogWatcher) WatchBuildLogs(ctx context.Context) <-chan BuildLogEnt
 					senders.Add(1)
 					go func() {
 						defer senders.Done()
-						w.streamRunLog(ctx, runsClient, w.ResourceGroup, registryName, runID, service, out)
+						w.streamRunLog(ctx, runsClient, w.ResourceGroup, registryName, runID, service, follow, out)
 					}()
 				}
 			}
 		}
 
 		poll()
+		if !follow {
+			// One-shot snapshot: each discovered run's streamRunLog emits its
+			// currently-available lines and returns (without waiting for the run to
+			// terminate), so the deferred senders.Wait()+close(out) runs promptly.
+			return
+		}
 		ticker := time.NewTicker(buildPollInterval)
 		defer ticker.Stop()
 		for {
@@ -158,10 +167,14 @@ func (w *BuildLogWatcher) WatchBuildLogs(ctx context.Context) <-chan BuildLogEnt
 }
 
 // streamRunLog polls GetLogSasURL for a run and streams new log content as it grows.
+// When follow is false it emits whatever content is available once and returns, rather
+// than polling until the run reaches a terminal status — otherwise a snapshot query
+// would block until an in-progress build finishes.
 func (w *BuildLogWatcher) streamRunLog(
 	ctx context.Context,
 	runsClient *armcontainerregistry.RunsClient,
 	rgName, registryName, runID, service string,
+	follow bool,
 	out chan<- BuildLogEntry,
 ) {
 	var lastLen int
@@ -204,6 +217,12 @@ func (w *BuildLogWatcher) streamRunLog(
 					return
 				}
 			}
+		}
+
+		if !follow {
+			// Snapshot mode: emitted the currently-available lines, so stop here
+			// instead of waiting for the run to reach a terminal status.
+			return
 		}
 
 		// Check if run is still active.

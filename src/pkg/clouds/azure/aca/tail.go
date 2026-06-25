@@ -23,10 +23,11 @@ type ServiceLogEntry struct {
 	LogEntry
 }
 
-// WatchLogs polls the resource group for Container Apps every watchInterval and streams
-// logs from each one as soon as it is discovered. New apps that appear after the initial
-// poll are picked up automatically.
-func (c *ContainerApp) WatchLogs(ctx context.Context) <-chan ServiceLogEntry {
+// WatchLogs polls the resource group for Container Apps and streams logs from each one
+// as soon as it is discovered. When follow is true it keeps polling every watchInterval
+// (picking up apps that appear later) and tails each app's logs live; when false it polls
+// once, drains the currently-buffered logs from each app, and closes the channel.
+func (c *ContainerApp) WatchLogs(ctx context.Context, follow bool) <-chan ServiceLogEntry {
 	out := make(chan ServiceLogEntry)
 	go func() {
 		// streaming tracks apps that currently have a live tail goroutine. An
@@ -54,7 +55,7 @@ func (c *ContainerApp) WatchLogs(ctx context.Context) <-chan ServiceLogEntry {
 					delete(streaming, appName)
 					mu.Unlock()
 				}()
-				appCh, err := c.StreamLogs(ctx, appName, "", "", "", true)
+				appCh, err := c.StreamLogs(ctx, appName, "", "", "", follow)
 				if err != nil {
 					select {
 					case out <- ServiceLogEntry{AppName: appName, LogEntry: LogEntry{Err: err}}:
@@ -110,6 +111,11 @@ func (c *ContainerApp) WatchLogs(ctx context.Context) <-chan ServiceLogEntry {
 		}
 
 		poll()
+		if !follow {
+			// One-shot snapshot: the deferred senders.Wait()+close(out) runs once
+			// every per-app stream (opened with follow=false) drains.
+			return
+		}
 		ticker := time.NewTicker(watchInterval)
 		defer ticker.Stop()
 		for {

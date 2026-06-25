@@ -716,8 +716,8 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 		servicesWithBuild := make([]string, 0, len(services)*2)
 		for _, service := range services {
 			servicesWithBuild = append(servicesWithBuild, service)
-			if !strings.HasSuffix(service, "-image") {
-				servicesWithBuild = append(servicesWithBuild, service+"-image")
+			if !strings.HasSuffix(service, logs.BuildServiceNameSuffix) {
+				servicesWithBuild = append(servicesWithBuild, service+logs.BuildServiceNameSuffix)
 			}
 		}
 		services = servicesWithBuild

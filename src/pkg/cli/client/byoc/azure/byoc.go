@@ -270,9 +270,10 @@ func (b *ByocAzure) syncJobToCdLocation() {
 }
 
 // projectResourceGroupName returns the resource group name for project-specific resources
-// (App Configuration store and deployed services).
-// Format: defang-{project}-{stack}-{location}, e.g. "defang-myapp-test-westus2".
-// This group is owned by one project+stack and is separate from the shared CD resource group.
+// (Key Vault config store and deployed services). It must match what the Pulumi Azure
+// program creates: {Prefix}-{project}-{stack}, e.g. "Defang-portal-production" for the
+// bare project name "portal" on stack "production". This group is separate from the
+// shared CD resource group.
 func (b *ByocAzure) projectResourceGroupName(projectName string) string {
 	return b.Prefix + "-" + projectName + "-" + b.PulumiStack
 }
@@ -462,7 +463,7 @@ func (b *ByocAzure) runCdCommand(ctx context.Context, cmd cdCommand) (string, er
 		return "", err
 	}
 	if cmd.etag != "" {
-		env["ETAG"] = cmd.etag
+		env[aca.EnvVarEtag] = cmd.etag
 	}
 	env["DEFANG_MODE"] = strings.ToLower(cmd.mode.String())
 
@@ -792,154 +793,203 @@ func (b *ByocAzure) PutConfig(ctx context.Context, req *defangv1.PutConfigReques
 	return nil
 }
 
-// QueryLogs implements client.Provider.
-// Only CD container logs are supported; service logs are not yet implemented.
+// QueryLogs implements client.Provider. It merges three log sources for the project:
+// CD (deployment) logs from the Container Apps Job, service logs from the project's
+// Container Apps, and build logs from ACR. When req.Follow is set each source streams
+// live; otherwise each returns a one-shot snapshot and the iterator ends once all are
+// drained.
 func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
-	// Match the request etag to the stored CD etag so we tail the correct run.
-	if b.cdRunID == "" || (req.Etag != "" && req.Etag != b.cdEtag) {
-		return nil, fmt.Errorf("QueryLogs: no matching CD deployment for etag %q", req.Etag)
+	const cdServiceName = "defang-cd"
+
+	// setUpLocation resolves AZURE_LOCATION/AZURE_SUBSCRIPTION_ID onto the driver and
+	// job (no API calls). The service and build watchers below use b.driver.Azure, so
+	// this must run even when there's no etag to look up a CD run by.
+	if err := b.setUpLocation(); err != nil {
+		return nil, err
 	}
 
-	const cdServiceName = "defang-cd"
+	// Resolve the CD job execution for this request. The deploying process caches
+	// the run ID in memory; a standalone `defang logs` has none, so recover it by
+	// matching the request etag against each execution's recorded ETAG env var.
+	runID := b.cdRunID
 	etag := b.cdEtag
+	if req.Etag != "" && req.Etag != b.cdEtag {
+		runID, etag = "", req.Etag
+	}
+	if runID == "" && etag != "" {
+		found, err := b.job.FindExecutionByEtag(ctx, etag)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find CD deployment for etag %q: %w", etag, err)
+		}
+		runID = found
+	}
+	if runID == "" {
+		// Unknown or empty etag: no CD run to tail. Service and build logs are keyed
+		// by resource group rather than the CD execution, so still surface those.
+		term.Warnf("No CD logs found for etag %q; showing service and build logs only", req.Etag)
+	}
 
-	if req.Follow {
-		logIter, err := b.job.TailJobLogs(ctx, b.cdRunID)
+	// CD logs. cdCh stays nil when there's no CD run, which makes the select below skip
+	// it and treat the CD source as already drained. Follow streams line-by-line; the
+	// snapshot reads the whole buffered run content once.
+	type cdLogEntry struct {
+		line string
+		err  error
+	}
+	var cdCh chan cdLogEntry
+	if runID != "" {
+		cdCh = make(chan cdLogEntry)
+		if req.Follow {
+			logIter, err := b.job.TailJobLogs(ctx, runID)
+			if err != nil {
+				return nil, err
+			}
+			go func() {
+				defer close(cdCh)
+				for line, err := range logIter {
+					select {
+					case cdCh <- cdLogEntry{line: line, err: err}:
+					case <-ctx.Done():
+						return
+					}
+				}
+			}()
+		} else {
+			content, err := b.job.ReadJobLogs(ctx, runID)
+			if err != nil {
+				return nil, err
+			}
+			go func() {
+				defer close(cdCh)
+				if content == "" {
+					return
+				}
+				select {
+				case cdCh <- cdLogEntry{line: content}:
+				case <-ctx.Done():
+				}
+			}()
+		}
+	}
+
+	projectRG := b.projectResourceGroupName(req.Project)
+
+	// Service logs from the project's Container Apps and build logs from ACR both
+	// live in the PROJECT resource group (independent of the CD run). For a one-shot
+	// query, if that group doesn't exist the project isn't deployed under this
+	// name/stack — surface one clear message instead of letting both watchers fail
+	// with raw "ResourceGroupNotFound" errors. In follow mode we skip the check: the
+	// group may be created mid-session (deploy-then-tail), so the watchers poll for it.
+	var acaCh <-chan aca.ServiceLogEntry
+	var buildCh <-chan acr.BuildLogEntry
+	startWatchers := true
+	if !req.Follow {
+		exists, err := b.driver.ResourceGroupExists(ctx, projectRG)
 		if err != nil {
 			return nil, err
 		}
-
-		// Run ACR log iterator in a goroutine so we can select over it and ACA logs.
-		type cdLogEntry struct {
-			line string
-			err  error
+		if !exists {
+			term.Warnf("No deployed services found for project %q on stack %q (resource group %q not found)", req.Project, b.PulumiStack, projectRG)
+			startWatchers = false
 		}
-		cdCh := make(chan cdLogEntry)
-		go func() {
-			defer close(cdCh)
-			for line, err := range logIter {
-				select {
-				case cdCh <- cdLogEntry{line: line, err: err}:
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
-
-		projectRG := b.projectResourceGroupName(req.Project)
-
-		// Watch Container App logs from the PROJECT resource group.
+	}
+	if startWatchers {
 		acaClient := &aca.ContainerApp{
 			Azure:         b.driver.Azure,
 			ResourceGroup: projectRG,
 		}
-		acaCh := acaClient.WatchLogs(ctx)
+		acaCh = acaClient.WatchLogs(ctx, req.Follow)
 
-		// Watch ACR build logs from the PROJECT resource group.
 		buildWatcher := &acr.BuildLogWatcher{
 			Azure:         b.driver.Azure,
 			ResourceGroup: projectRG,
 		}
-		buildCh := buildWatcher.WatchBuildLogs(ctx)
-
-		return func(yield func(*defangv1.TailResponse, error) bool) {
-			for {
-				select {
-				case entry, ok := <-cdCh:
-					if !ok {
-						cdCh = nil
-						continue
-					}
-					if entry.err != nil {
-						if !yield(nil, entry.err) {
-							return
-						}
-						continue
-					}
-					if !yield(&defangv1.TailResponse{
-						Entries: []*defangv1.LogEntry{{
-							Message:   entry.line,
-							Service:   cdServiceName,
-							Etag:      etag,
-							Timestamp: timestamppb.Now(),
-						}},
-						Service: cdServiceName,
-						Etag:    etag,
-					}, nil) {
-						return
-					}
-				case svc, ok := <-acaCh:
-					if !ok {
-						acaCh = nil
-						continue
-					}
-					if svc.Err != nil {
-						term.Debugf("Container Apps log error for %q: %v", svc.AppName, svc.Err)
-						continue
-					}
-					if !yield(&defangv1.TailResponse{
-						Entries: []*defangv1.LogEntry{{
-							Message:   svc.Message,
-							Service:   svc.AppName,
-							Etag:      etag,
-							Timestamp: timestamppb.Now(),
-						}},
-						Service: svc.AppName,
-						Etag:    etag,
-					}, nil) {
-						return
-					}
-				case build, ok := <-buildCh:
-					if !ok {
-						buildCh = nil
-						continue
-					}
-					if build.Err != nil {
-						term.Debugf("ACR build log error for %q: %v", build.Service, build.Err)
-						continue
-					}
-					if !yield(&defangv1.TailResponse{
-						Entries: []*defangv1.LogEntry{{
-							Message:   build.Line,
-							Service:   build.Service + "-build",
-							Etag:      etag,
-							Stderr:    true, // show build logs even when not verbose
-							Timestamp: timestamppb.Now(),
-						}},
-						Service: build.Service + "-build",
-						Etag:    etag,
-					}, nil) {
-						return
-					}
-				case <-ctx.Done():
-					return
-				}
-				if cdCh == nil && acaCh == nil && buildCh == nil {
-					return
-				}
-			}
-		}, nil
+		buildCh = buildWatcher.WatchBuildLogs(ctx, req.Follow)
 	}
 
-	// Non-follow: return a snapshot of current log content.
-	content, err := b.job.ReadJobLogs(ctx, b.cdRunID)
-	if err != nil {
-		return nil, err
-	}
 	return func(yield func(*defangv1.TailResponse, error) bool) {
-		if content == "" {
-			return
+		for {
+			// Check for completion at the top: a closed source is set to nil below, and
+			// selecting over all-nil channels would block forever (the non-follow case
+			// where every source drains). In follow mode the channels stay open until
+			// ctx is cancelled.
+			if cdCh == nil && acaCh == nil && buildCh == nil {
+				return
+			}
+			select {
+			case entry, ok := <-cdCh:
+				if !ok {
+					cdCh = nil
+					continue
+				}
+				if entry.err != nil {
+					if !yield(nil, entry.err) {
+						return
+					}
+					continue
+				}
+				if !yield(&defangv1.TailResponse{
+					Entries: []*defangv1.LogEntry{{
+						Message:   entry.line,
+						Service:   cdServiceName,
+						Etag:      etag,
+						Timestamp: timestamppb.Now(),
+					}},
+					Service: cdServiceName,
+					Etag:    etag,
+				}, nil) {
+					return
+				}
+			case svc, ok := <-acaCh:
+				if !ok {
+					acaCh = nil
+					continue
+				}
+				if svc.Err != nil {
+					// Non-fatal: warn (so the failure isn't silently swallowed) but keep
+					// reading the other sources rather than ending the whole tail.
+					term.Warnf("Could not read service logs for %q: %v", svc.AppName, svc.Err)
+					continue
+				}
+				if !yield(&defangv1.TailResponse{
+					Entries: []*defangv1.LogEntry{{
+						Message:   svc.Message,
+						Service:   svc.AppName,
+						Etag:      etag,
+						Timestamp: timestamppb.Now(),
+					}},
+					Service: svc.AppName,
+					Etag:    etag,
+				}, nil) {
+					return
+				}
+			case build, ok := <-buildCh:
+				if !ok {
+					buildCh = nil
+					continue
+				}
+				if build.Err != nil {
+					// Non-fatal: warn but keep reading the other sources (see above).
+					term.Warnf("Could not read build logs for %q: %v", build.Service, build.Err)
+					continue
+				}
+				if !yield(&defangv1.TailResponse{
+					Entries: []*defangv1.LogEntry{{
+						Message:   build.Line,
+						Service:   build.Service + "-build",
+						Etag:      etag,
+						Stderr:    true, // show build logs even when not verbose
+						Timestamp: timestamppb.Now(),
+					}},
+					Service: build.Service + "-build",
+					Etag:    etag,
+				}, nil) {
+					return
+				}
+			case <-ctx.Done():
+				return
+			}
 		}
-		yield(&defangv1.TailResponse{
-			Entries: []*defangv1.LogEntry{{
-				Message:   content,
-				Service:   cdServiceName,
-				Etag:      etag,
-				Timestamp: timestamppb.Now(),
-			}},
-			Service: cdServiceName,
-			Etag:    etag,
-		}, nil)
 	}, nil
 }
 
