@@ -488,6 +488,7 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	env := map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
@@ -541,6 +542,11 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild
 	env, err := b.environment(cmd.project)
 	if err != nil {
 		return nil, err
+	}
+
+	// APN attribution is set by Fabric via CanIUse; allow a local env override for ISVs.
+	if awsApnId := pkg.Getenv("DEFANG_AWS_APN_ID", b.CanIUseConfig.AwsApnId); awsApnId != "" {
+		env["DEFANG_AWS_APN_ID"] = awsApnId
 	}
 	if cmd.delegationSetId != "" {
 		env["DELEGATION_SET_ID"] = cmd.delegationSetId
