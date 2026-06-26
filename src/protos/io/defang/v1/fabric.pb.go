@@ -2687,6 +2687,7 @@ type CanIUseResponse struct {
 	Signature     []byte                 `protobuf:"bytes,6,opt,name=signature,proto3" json:"signature,omitempty"`
 	ForcedVersion bool                   `protobuf:"varint,7,opt,name=forced_version,json=forcedVersion,proto3" json:"forced_version,omitempty"` // force use of the returned CD image and Pulumi version
 	ForcedReason  string                 `protobuf:"bytes,8,opt,name=forced_reason,json=forcedReason,proto3" json:"forced_reason,omitempty"`
+	AwsApnId      string                 `protobuf:"bytes,9,opt,name=aws_apn_id,json=awsApnId,proto3" json:"aws_apn_id,omitempty"` // optional; if set, must be used for AWS deployments
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2766,6 +2767,13 @@ func (x *CanIUseResponse) GetForcedVersion() bool {
 func (x *CanIUseResponse) GetForcedReason() string {
 	if x != nil {
 		return x.ForcedReason
+	}
+	return ""
+}
+
+func (x *CanIUseResponse) GetAwsApnId() string {
+	if x != nil {
+		return x.AwsApnId
 	}
 	return ""
 }
@@ -6669,7 +6677,7 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x06driver\x18\t \x01(\tR\x06driver\x12\x1f\n" +
 	"\vcli_version\x18\n" +
 	" \x01(\tR\n" +
-	"cliVersion\"\xfa\x01\n" +
+	"cliVersion\"\x98\x02\n" +
 	"\x0fCanIUseResponse\x12\x19\n" +
 	"\bcd_image\x18\x02 \x01(\tR\acdImage\x12\x10\n" +
 	"\x03gpu\x18\x03 \x01(\bR\x03gpu\x12#\n" +
@@ -6677,7 +6685,9 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x0epulumi_version\x18\x05 \x01(\tR\rpulumiVersion\x12\x1c\n" +
 	"\tsignature\x18\x06 \x01(\fR\tsignature\x12%\n" +
 	"\x0eforced_version\x18\a \x01(\bR\rforcedVersion\x12#\n" +
-	"\rforced_reason\x18\b \x01(\tR\fforcedReasonJ\x04\b\x01\x10\x02\"\xc7\x02\n" +
+	"\rforced_reason\x18\b \x01(\tR\fforcedReason\x12\x1c\n" +
+	"\n" +
+	"aws_apn_id\x18\t \x01(\tR\bawsApnIdJ\x04\b\x01\x10\x02\"\xc7\x02\n" +
 	"\rDeployRequest\x12\x1c\n" +
 	"\aproject\x18\x02 \x01(\tB\x02\x18\x01R\aproject\x120\n" +
 	"\x04mode\x18\x03 \x01(\x0e2\x1c.io.defang.v1.DeploymentModeR\x04mode\x12\x18\n" +

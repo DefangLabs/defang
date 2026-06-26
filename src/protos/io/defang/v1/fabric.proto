@@ -390,6 +390,7 @@ message CanIUseResponse {
   bytes signature = 6;
   bool forced_version = 7; // force use of the returned CD image and Pulumi version
   string forced_reason = 8;
+  string aws_apn_id = 9; // optional; if set, must be used for AWS deployments
 }
 
 message DeployRequest {
