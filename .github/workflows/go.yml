@@ -274,7 +274,7 @@ jobs:
         working-directory: src
 
       - name: Delete stack
-        if: steps.sanity-up.conclusion == 'success' # only clean up if up was successful
+        if: steps.sanity-up.outcome == 'success' # only clean up if up was successful (outcome, not conclusion, because continue-on-error masks failures as conclusion=success)
         run: go run -race ./cmd/cli -C testdata/sanity stack rm beta
           --provider=defang --debug
         working-directory: src
