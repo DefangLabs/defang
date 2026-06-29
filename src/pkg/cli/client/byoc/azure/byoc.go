@@ -1024,16 +1024,37 @@ func (b *ByocAzure) UpdateShardDomain(context.Context) error {
 	return fmt.Errorf("UpdateShardDomain: %w", errors.ErrUnsupported)
 }
 
-// UpdateServiceInfo implements byoc.ServiceInfoUpdater. When a service has a
-// `domainname` set in compose, mark it for managed-cert issuance so
-// `defang cert generate` picks it up via the CertIssuer path. Azure Container
-// Apps managed certs are free, auto-renewing, and validated via CNAME — no
-// hosted-zone presence required (unlike AWS, where ZoneId triggers a different
-// path).
-func (b *ByocAzure) UpdateServiceInfo(_ context.Context, si *defangv1.ServiceInfo, _, _ string, service composeTypes.ServiceConfig) error {
+// UpdateServiceInfo implements byoc.ServiceInfoUpdater. When a service sets a
+// `domainname` in compose, look for a public Azure DNS zone for that domain in
+// the current subscription (mirroring AWS's findZone). If one exists, record its
+// ARM resource ID in si.ZoneId so the CD/Pulumi program manages the records and
+// issues an Azure-managed cert directly in that zone. Otherwise fall back to
+// si.UseAcmeCert, where the ACA managed cert is validated via CNAME without
+// Defang owning the hosted zone.
+//
+// Any failure to look up zones (e.g. AZURE_SUBSCRIPTION_ID not yet known, or the
+// deploy identity lacking DNS read permission) falls back to the ACME path
+// rather than failing the whole deploy.
+func (b *ByocAzure) UpdateServiceInfo(ctx context.Context, si *defangv1.ServiceInfo, _, _ string, service composeTypes.ServiceConfig) error {
 	if service.DomainName == "" {
 		return nil
 	}
-	si.UseAcmeCert = true
+	if err := b.setUpLocation(); err != nil || b.driver.SubscriptionID == "" {
+		term.Debugf("BYOD %q: cannot resolve subscription for DNS lookup (%v); using ACME cert", service.DomainName, err)
+		si.UseAcmeCert = true
+		return nil
+	}
+	zoneID, err := azuredns.New("", b.driver.Azure).FindZone(ctx, service.DomainName)
+	if err != nil {
+		term.Debugf("BYOD %q: FindZone failed (%v); using ACME cert", service.DomainName, err)
+		si.UseAcmeCert = true
+		return nil
+	}
+	if zoneID == "" {
+		si.UseAcmeCert = true
+	} else {
+		// Set the ZoneId so CD can manage records + issue a managed cert for us.
+		si.ZoneId = zoneID
+	}
 	return nil
 }
