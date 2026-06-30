@@ -130,7 +130,7 @@ func (e ErrNoPermission) Error() string {
 func (b *ByocBaseClient) GetServiceInfos(ctx context.Context, projectName, delegateDomain, etag string, services map[string]composeTypes.ServiceConfig) ([]*defangv1.ServiceInfo, error) {
 	numGPUS := compose.GetNumOfGPUs(services)
 	if numGPUS > 0 && !b.AllowGPU {
-		return nil, ErrNoPermission("usage of GPUs. Please upgrade on https://s.defang.io/subscription")
+		return nil, ErrNoPermission("GPU access requires a Pro subscription. Upgrade at https://s.defang.io/subscription")
 	}
 
 	serviceInfoMap := make(map[string]*Node)
