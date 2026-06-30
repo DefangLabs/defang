@@ -29,11 +29,9 @@ type mockSurveyor struct {
 }
 
 func (s *mockSurveyor) AskOne(q survey.Prompt, response interface{}, opts ...survey.AskOpt) error {
-	b, ok := response.(*bool)
-	if !ok {
-		panic("response must be a *bool for this mock")
+	if boolptr, ok := response.(*bool); ok {
+		*boolptr = s.response
 	}
-	*b = s.response
 	return nil
 }
 
