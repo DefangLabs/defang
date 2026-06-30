@@ -128,7 +128,6 @@ func (b *ByocAws) DiscoverOrphans(ctx context.Context, projectName string) ([]cl
 		}
 	}
 
-
 	// Route53: records left in the project's hosted zones block those zones from being deleted.
 	// Both the public delegated subdomain zone and the private "<project>.internal" service-
 	// discovery zone are managed by Defang and need their leftover records removed.

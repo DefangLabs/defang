@@ -484,6 +484,7 @@ func makeComposeDownCmd() *cobra.Command {
 				}
 				// A failed destroy (e.g. CodeBuild exit status) is when resources get orphaned, so prompt
 				// the AI debugger just like `up` does; it can guide the user through cleanup.
+				// handleTailAndMonitorErr skips the prompt in non-interactive mode.
 				deploymentErr := err
 				debugger, dbgErr := debug.NewDebugger(cmd.Context(), global.FabricAddr, session.Stack)
 				if dbgErr != nil {

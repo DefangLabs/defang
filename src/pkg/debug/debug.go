@@ -74,9 +74,6 @@ type DebugAgent interface {
 type Debugger struct {
 	agent    DebugAgent
 	surveyor Surveyor
-	// defaultPermission is the default answer to the "debug with AI?" prompt. Paid accounts
-	// default to yes so they flow into the agent (and its cleanup tooling) seamlessly.
-	defaultPermission bool
 }
 
 func NewDebugger(ctx context.Context, fabricAddr string, stack *stacks.Parameters) (*Debugger, error) {
@@ -85,23 +82,9 @@ func NewDebugger(ctx context.Context, fabricAddr string, stack *stacks.Parameter
 		return nil, err
 	}
 	return &Debugger{
-		agent:             agent,
-		surveyor:          &surveyor{},
-		defaultPermission: isPaidAccount(ctx, fabricAddr),
+		agent:    agent,
+		surveyor: &surveyor{},
 	}, nil
-}
-
-// isPaidAccount reports whether the signed-in account is on a paid plan. Any error falls back to
-// false so the prompt stays opt-in.
-func isPaidAccount(ctx context.Context, fabricAddr string) bool {
-	host := client.NormalizeHost(fabricAddr)
-	fabricClient := client.NewGrpcClient(host, client.GetExistingToken(host), "")
-	resp, err := fabricClient.WhoAmI(ctx)
-	if err != nil {
-		term.Debug("Could not determine subscription tier for debug prompt default:", err)
-		return false
-	}
-	return pkg.IsPaidTier(resp.Tier)
 }
 
 func (d *Debugger) DebugDeployment(ctx context.Context, debugConfig DebugConfig) error {
@@ -159,7 +142,9 @@ func (d *Debugger) promptForPermission() (bool, error) {
 	var aiDebug bool
 	err := d.surveyor.AskOne(&survey.Confirm{
 		Message: "Would you like to debug this with the Defang AI Agent?",
-		Default: d.defaultPermission,
+		// Default to Yes for everyone; the server selects an appropriate model per account, so
+		// there is no need to gate the prompt client-side.
+		Default: true,
 		Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
 	}, &aiDebug, survey.WithStdio(term.DefaultTerm.Stdio()))
 	if err != nil {
