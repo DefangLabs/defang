@@ -46,6 +46,10 @@ func cdCommand(cmd *cobra.Command, command client.CdCommand, args []string, fabr
 			continue
 		}
 		provider := cli.NewProvider(ctx, providerID, fabric, stackName)
+		if err := authenticateProvider(ctx, provider); err != nil {
+			errs = append(errs, fmt.Errorf("authenticating provider for %q: %w", arg, err))
+			continue
+		}
 		err := canIUseProvider(ctx, provider, projectName, 0, allowUpgrade)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("validating provider for %q: %w", arg, err))
@@ -147,17 +151,20 @@ var cdListCmd = &cobra.Command{
 		}
 		provider := cli.NewProvider(ctx, providerID, global.Client, "") // stack name is not needed for listing projects
 
-		if remote {
-			if all {
-				return errors.New("--all cannot be used with --remote")
-			}
+		if remote && all {
+			return errors.New("--all cannot be used with --remote")
+		}
 
+		if err := authenticateProvider(ctx, provider); err != nil {
+			return err
+		}
+
+		if remote {
 			err := canIUseProvider(ctx, provider, "", 0, true) // safe to use latest CD image
 			if err != nil {
 				return err
 			}
 
-			// FIXME: this needs auth because it spawns the CD task
 			return cli.CdCommandAndTail(ctx, provider, "", global.Verbose, client.CdCommandList, global.Client)
 		} else {
 			return cli.CdListFromStorage(ctx, provider, all || global.Verbose)
