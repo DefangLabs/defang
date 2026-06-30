@@ -142,6 +142,9 @@ func (d *Debugger) promptForPermission() (bool, error) {
 	var aiDebug bool
 	err := d.surveyor.AskOne(&survey.Confirm{
 		Message: "Would you like to debug this with the Defang AI Agent?",
+		// Default to Yes for everyone; the server selects an appropriate model per account, so
+		// there is no need to gate the prompt client-side.
+		Default: true,
 		Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
 	}, &aiDebug, survey.WithStdio(term.DefaultTerm.Stdio()))
 	if err != nil {
