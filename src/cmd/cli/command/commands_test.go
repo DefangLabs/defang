@@ -450,6 +450,58 @@ func TestNewProvider(t *testing.T) {
 	})
 }
 
+type fakeAuthenticateProvider struct {
+	client.MockProvider
+	err            error
+	gotInteractive bool
+	calledInteract bool
+}
+
+func (f *fakeAuthenticateProvider) Authenticate(ctx context.Context, interactive bool) error {
+	f.calledInteract = true
+	f.gotInteractive = interactive
+	return f.err
+}
+
+func TestAuthenticateProvider(t *testing.T) {
+	oldNonInteractive := global.NonInteractive
+	t.Cleanup(func() { global.NonInteractive = oldNonInteractive })
+
+	t.Run("propagates non-interactive flag and succeeds", func(t *testing.T) {
+		global.NonInteractive = true
+		p := &fakeAuthenticateProvider{}
+		if err := authenticateProvider(t.Context(), p); err != nil {
+			t.Fatalf("authenticateProvider() failed: %v", err)
+		}
+		if !p.calledInteract {
+			t.Fatal("expected Authenticate to be called")
+		}
+		if p.gotInteractive {
+			t.Error("expected interactive=false when global.NonInteractive is true")
+		}
+	})
+
+	t.Run("propagates interactive flag", func(t *testing.T) {
+		global.NonInteractive = false
+		p := &fakeAuthenticateProvider{}
+		if err := authenticateProvider(t.Context(), p); err != nil {
+			t.Fatalf("authenticateProvider() failed: %v", err)
+		}
+		if !p.gotInteractive {
+			t.Error("expected interactive=true when global.NonInteractive is false")
+		}
+	})
+
+	t.Run("wraps the underlying error", func(t *testing.T) {
+		wantErr := errors.New("no valid credentials found")
+		p := &fakeAuthenticateProvider{err: wantErr}
+		err := authenticateProvider(t.Context(), p)
+		if !errors.Is(err, wantErr) {
+			t.Fatalf("authenticateProvider() error = %v, want wrapped %v", err, wantErr)
+		}
+	})
+}
+
 func TestErrIfStackAndProvider(t *testing.T) {
 	// RootCmd is wired up by TestMain via SetupCommands, so exercise its real flags.
 	stackFlag := RootCmd.Flags().Lookup("stack")

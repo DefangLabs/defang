@@ -494,3 +494,14 @@ func isUpgradeCommand(cmd *cobra.Command) bool {
 func canIUseProvider(ctx context.Context, provider client.Provider, projectName string, serviceCount int, allowUpgrade bool) error {
 	return client.CanIUseProvider(ctx, global.Client, provider, projectName, serviceCount, allowUpgrade)
 }
+
+// authenticateProvider must be called before any direct use of a provider that was
+// constructed outside of newCommandSession (e.g. via cli.NewProvider), so that
+// provider-specific login paths such as GitHub Actions OIDC federation run instead of
+// falling through to the plain default credential chain.
+func authenticateProvider(ctx context.Context, provider client.Provider) error {
+	if err := provider.Authenticate(ctx, !global.NonInteractive); err != nil {
+		return fmt.Errorf("failed to authenticate with provider: %w", err)
+	}
+	return nil
+}
