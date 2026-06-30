@@ -34,13 +34,15 @@ type orphanDetail struct {
 }
 
 // resourceBaseName returns the dash-joined {Prefix}-{project}-{stack} base that Defang/Pulumi use
-// to name ALBs, RDS instances and similar resources (see alb_logs.go).
+// to name resources (e.g. the ECS cluster "Defang-<project>-<stack>-cluster" and task-definition
+// families). Case is preserved; callers that match case-insensitive resources (ALB, RDS) lowercase
+// it themselves.
 func (b *ByocAws) resourceBaseName(projectName string) string {
 	base := projectName + "-" + b.PulumiStack
 	if b.Prefix != "" {
 		base = b.Prefix + "-" + base
 	}
-	return strings.ToLower(base)
+	return base
 }
 
 // projectZoneName returns the Defang-managed hosted zone for the project's public services
@@ -68,9 +70,10 @@ func (b *ByocAws) DiscoverOrphans(ctx context.Context, projectName string) ([]cl
 	}
 
 	base := b.resourceBaseName(projectName)
+	lowerBase := strings.ToLower(base) // ALB/RDS names are lowercased
 
 	// ALBs: any leftover load balancer is unblocked by disabling deletion protection (idempotent).
-	albPrefix := base
+	albPrefix := lowerBase
 	if len(albPrefix) > maxALBNameLen {
 		albPrefix = albPrefix[:maxALBNameLen]
 	}
@@ -89,7 +92,7 @@ func (b *ByocAws) DiscoverOrphans(ctx context.Context, projectName string) ([]cl
 
 	// RDS: same as ALBs; disabling deletion protection is idempotent.
 	rdsClient := rds.NewFromConfig(cfg)
-	if insts, err := aws.FindDBInstancesByPrefix(ctx, base, rdsClient); err != nil {
+	if insts, err := aws.FindDBInstancesByPrefix(ctx, lowerBase, rdsClient); err != nil {
 		term.Warnf("cleanup: could not list RDS instances: %v", err)
 	} else {
 		for _, inst := range insts {
@@ -125,32 +128,39 @@ func (b *ByocAws) DiscoverOrphans(ctx context.Context, projectName string) ([]cl
 		}
 	}
 
-	// Route53: records left in the project's hosted zone block the zone from being deleted.
+
+	// Route53: records left in the project's hosted zones block those zones from being deleted.
+	// Both the public delegated subdomain zone and the private "<project>.internal" service-
+	// discovery zone are managed by Defang and need their leftover records removed.
 	r53Client := route53.NewFromConfig(cfg)
-	zoneName := b.projectZoneName(projectName)
-	zones, err := aws.GetHostedZonesByName(ctx, zoneName, r53Client)
-	if err != nil && !errors.Is(err, aws.ErrZoneNotFound) {
-		term.Warnf("cleanup: could not look up hosted zone %q: %v", zoneName, err)
-	}
-	for _, zone := range zones {
-		records, err := aws.ListAllResourceRecordSets(ctx, *zone.Id, r53Client)
+	for _, zoneName := range []string{b.projectZoneName(projectName), b.GetPrivateDomain(projectName)} {
+		zones, err := aws.GetHostedZonesByName(ctx, zoneName, r53Client)
 		if err != nil {
-			term.Warnf("cleanup: could not list records in zone %s: %v", zoneName, err)
+			if !errors.Is(err, aws.ErrZoneNotFound) {
+				term.Warnf("cleanup: could not look up hosted zone %q: %v", zoneName, err)
+			}
 			continue
 		}
-		for _, rec := range records {
-			if isApexManagedRecord(rec, zoneName) {
-				continue // NS/SOA at the apex are removed automatically when the zone is deleted
+		for _, zone := range zones {
+			records, err := aws.ListAllResourceRecordSets(ctx, *zone.Id, r53Client)
+			if err != nil {
+				term.Warnf("cleanup: could not list records in zone %s: %v", zoneName, err)
+				continue
 			}
-			setID := ""
-			if rec.SetIdentifier != nil {
-				setID = *rec.SetIdentifier
+			for _, rec := range records {
+				if isApexManagedRecord(rec, zoneName) {
+					continue // NS/SOA at the apex are removed automatically when the zone is deleted
+				}
+				setID := ""
+				if rec.SetIdentifier != nil {
+					setID = *rec.SetIdentifier
+				}
+				add(fmt.Sprintf("dns:%s:%s:%s:%s", *zone.Id, *rec.Name, rec.Type, setID), client.OrphanResource{
+					Category: "dns",
+					Name:     fmt.Sprintf("%s %s (%s)", rec.Type, *rec.Name, zoneName),
+					Action:   "delete DNS record so 'defang down' can delete the hosted zone",
+				}, orphanDetail{category: "dns", zoneID: *zone.Id, record: rec})
 			}
-			add(fmt.Sprintf("dns:%s:%s:%s:%s", *zone.Id, *rec.Name, rec.Type, setID), client.OrphanResource{
-				Category: "dns",
-				Name:     fmt.Sprintf("%s %s", rec.Type, *rec.Name),
-				Action:   "delete DNS record so 'defang down' can delete the hosted zone",
-			}, orphanDetail{category: "dns", zoneID: *zone.Id, record: rec})
 		}
 	}
 
