@@ -137,7 +137,7 @@ func makeComposeUpCmd() *cobra.Command {
 			})
 			if err != nil {
 				composeErr := err
-				debugger, err := debug.NewDebugger(ctx, global.FabricAddr, session.Stack)
+				debugger, err := debug.NewDebugger(ctx, global.FabricAddr, session.Stack, !global.NonInteractive)
 				if err != nil {
 					return err
 				}
@@ -166,7 +166,7 @@ func makeComposeUpCmd() *cobra.Command {
 			serviceStates, err := cli.TailAndMonitor(ctx, project, session.Provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
 				deploymentErr := err
-				debugger, err := debug.NewDebugger(ctx, global.FabricAddr, session.Stack)
+				debugger, err := debug.NewDebugger(ctx, global.FabricAddr, session.Stack, !global.NonInteractive)
 				if err != nil {
 					term.Warn("Failed to initialize debugger:", err)
 					return deploymentErr
@@ -321,7 +321,11 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 		return nil
 	}
 
-	if global.NonInteractive || errors.Is(originalErr, byoc.ErrLocalPulumiStopped) {
+	if errors.Is(originalErr, byoc.ErrLocalPulumiStopped) {
+		return originalErr
+	}
+	// In CI only paid accounts auto-run the debugger; others just get the error.
+	if global.NonInteractive && !debugger.AutoApprove() {
 		return originalErr
 	}
 
@@ -366,7 +370,9 @@ func handleTailAndMonitorErr(ctx context.Context, err error, debugger *debug.Deb
 			debugConfig.FailedServices = []string{errDeploymentFailed.Service}
 		}
 
-		if global.NonInteractive {
+		// In CI there is no one to prompt, so only paid accounts (which auto-approve) run the
+		// debugger automatically; everyone else gets a hint to debug interactively.
+		if global.NonInteractive && !debugger.AutoApprove() {
 			printDefangHint("To debug the deployment, do:", debugConfig.String())
 			return
 		}
@@ -487,7 +493,7 @@ func makeComposeDownCmd() *cobra.Command {
 				// the AI debugger just like `up` does; it can guide the user through cleanup.
 				// handleTailAndMonitorErr skips the prompt in non-interactive mode.
 				deploymentErr := err
-				debugger, dbgErr := debug.NewDebugger(cmd.Context(), global.FabricAddr, session.Stack)
+				debugger, dbgErr := debug.NewDebugger(cmd.Context(), global.FabricAddr, session.Stack, !global.NonInteractive)
 				if dbgErr != nil {
 					term.Warn("Failed to initialize debugger:", dbgErr)
 					return deploymentErr

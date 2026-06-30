@@ -2,6 +2,7 @@ package elicitations
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
 
@@ -51,6 +52,11 @@ type Response struct {
 	Content map[string]any
 }
 
+// ErrNotSupported is returned by elicitation requests when the controller is marked unsupported
+// (e.g. non-interactive/CI). Callers that want to degrade gracefully should check IsSupported()
+// before requesting.
+var ErrNotSupported = errors.New("elicitation is not supported in this environment")
+
 func NewController(client Client) Controller {
 	return &controller{
 		client:    client,
@@ -82,6 +88,11 @@ func (c *controller) RequestEnum(ctx context.Context, message, field string, opt
 }
 
 func (c *controller) requestField(ctx context.Context, message, field string, schema map[string]any, validator Validator) (string, error) {
+	// Enforce the supported flag here so it is authoritative: a caller that doesn't first check
+	// IsSupported() fails fast instead of blocking on a transport that has no user to answer.
+	if !c.supported {
+		return "", ErrNotSupported
+	}
 	response, err := c.client.Request(ctx, Request{
 		Message: message,
 		Schema: map[string]any{
