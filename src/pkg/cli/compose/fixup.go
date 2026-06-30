@@ -563,7 +563,7 @@ func GetImageRepo(image string) string {
 func fixupPort(port composeTypes.ServicePortConfig) composeTypes.ServicePortConfig {
 	switch port.Mode {
 	case "":
-		term.Warnf("port %d: no 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)", port.Target)
+		term.Warnf("port %d: no 'mode' was specified; defaulting to 'ingress'; add 'mode: ingress' for public or 'mode: host' for internal", port.Target)
 		fallthrough
 	case Mode_INGRESS:
 		// This code is unnecessarily complex because compose-go silently converts short `ports:` syntax to ingress+tcp
