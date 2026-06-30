@@ -86,8 +86,9 @@ func TestDebugDeployment(t *testing.T) {
 			response: tt.permission,
 		}
 		debugger := &Debugger{
-			agent:    mockAgent,
-			surveyor: mockSurveyor,
+			agent:       mockAgent,
+			surveyor:    mockSurveyor,
+			interactive: true,
 		}
 		t.Run(tt.name, func(t *testing.T) {
 			mockAgent.ExpectedCalls = nil
@@ -142,8 +143,9 @@ func TestDebugComposeLoadError(t *testing.T) {
 			response: tt.permission,
 		}
 		debugger := &Debugger{
-			agent:    mockAgent,
-			surveyor: mockSurveyor,
+			agent:       mockAgent,
+			surveyor:    mockSurveyor,
+			interactive: true,
 		}
 		t.Run(tt.name, func(t *testing.T) {
 			mockAgent.ExpectedCalls = nil
@@ -175,6 +177,53 @@ func TestDebugComposeLoadError(t *testing.T) {
 			}
 
 			if tt.permission {
+				mockAgent.AssertCalled(t, "StartWithMessage", ctx, expectedPrompt)
+			} else {
+				mockAgent.AssertNotCalled(t, "StartWithMessage", mock.Anything, mock.Anything)
+			}
+		})
+	}
+}
+
+// failSurveyor fails the test if any prompt is attempted; used to prove the non-interactive path
+// never prompts.
+type failSurveyor struct{ t *testing.T }
+
+func (s failSurveyor) AskOne(survey.Prompt, interface{}, ...survey.AskOpt) error {
+	s.t.Fatal("non-interactive debugger must not prompt")
+	return nil
+}
+
+func TestDebugDeploymentNonInteractive(t *testing.T) {
+	ctx := t.Context()
+	const expectedPrompt = `An error occurred while deploying this project with Defang. Help troubleshoot and recommend a solution. Look at the logs to understand what happened. The deployment ID is "test-deployment".`
+
+	tests := []struct {
+		name        string
+		autoApprove bool
+		expectRun   bool
+	}{
+		{name: "paid account auto-runs without prompting", autoApprove: true, expectRun: true},
+		{name: "free account does not run", autoApprove: false, expectRun: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockAgent := &mockAgent{}
+			if tt.expectRun {
+				mockAgent.On("StartWithMessage", ctx, expectedPrompt).Return(nil)
+			}
+			debugger := &Debugger{
+				agent:             mockAgent,
+				surveyor:          failSurveyor{t}, // must never be called when non-interactive
+				defaultPermission: tt.autoApprove,
+				interactive:       false,
+			}
+
+			err := debugger.DebugDeployment(ctx, DebugConfig{Deployment: "test-deployment"})
+			assert.NoError(t, err)
+
+			if tt.expectRun {
 				mockAgent.AssertCalled(t, "StartWithMessage", ctx, expectedPrompt)
 			} else {
 				mockAgent.AssertNotCalled(t, "StartWithMessage", mock.Anything, mock.Anything)

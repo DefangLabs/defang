@@ -174,7 +174,7 @@ func handleInvalidComposeFileErr(ctx context.Context, loadErr error) error {
 		return fmt.Errorf("%w; original error: %w", err, loadErr)
 	}
 
-	debugger, err := debug.NewDebugger(ctx, global.FabricAddr, &stacks.Parameters{})
+	debugger, err := debug.NewDebugger(ctx, global.FabricAddr, &stacks.Parameters{}, !global.NonInteractive)
 	if err != nil {
 		return fmt.Errorf("%w; original error: %w", err, loadErr)
 	}

@@ -31,9 +31,31 @@ type Agent struct {
 	generator *Generator
 	printer   Printer
 	system    string
+	// interactive controls whether the agent runs a REPL and prompts for input/elicitations.
+	// When false (e.g. CI), the agent handles the initial message once and returns.
+	interactive bool
 }
 
-func New(ctx context.Context, fabricAddr string, stack *stacks.Parameters) (*Agent, error) {
+// Option configures an Agent created by New.
+type Option func(*agentConfig)
+
+type agentConfig struct {
+	interactive bool
+}
+
+// WithNonInteractive runs the agent in one-shot mode: it handles the initial message to
+// completion and returns, without a REPL, continue-prompts, or tool elicitations. Suitable for
+// non-interactive environments such as CI.
+func WithNonInteractive() Option {
+	return func(c *agentConfig) { c.interactive = false }
+}
+
+func New(ctx context.Context, fabricAddr string, stack *stacks.Parameters, opts ...Option) (*Agent, error) {
+	cfg := agentConfig{interactive: true}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
 	accessToken := client.GetExistingToken(fabricAddr)
 	aiProvider := "fabric"
 	var providerPlugin api.Plugin
@@ -62,8 +84,8 @@ func New(ctx context.Context, fabricAddr string, stack *stacks.Parameters) (*Age
 		genkit.WithPlugins(providerPlugin),
 	)
 
-	elicitationsClient := elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr)
-	ec := elicitations.NewController(elicitationsClient)
+	ec := elicitations.NewController(elicitations.NewSurveyClient(os.Stdin, os.Stdout, os.Stderr))
+	ec.SetSupported(cfg.interactive)
 
 	printer := printer{outStream: os.Stdout}
 	toolManager := NewToolManager(gk, printer)
@@ -87,9 +109,10 @@ func New(ctx context.Context, fabricAddr string, stack *stacks.Parameters) (*Age
 	}
 
 	a := &Agent{
-		printer:   printer,
-		generator: generator,
-		system:    preparedSystemPrompt,
+		printer:     printer,
+		generator:   generator,
+		system:      preparedSystemPrompt,
+		interactive: cfg.interactive,
 	}
 
 	return a, nil
@@ -108,12 +131,20 @@ func (a *Agent) StartWithMessage(ctx context.Context, msg string) error {
 func (a *Agent) startSession(ctx context.Context, initialMessage string) error {
 	signal.Reset(os.Interrupt) // unsubscribe the top-level signal handler
 
-	a.printer.Printf("Type '/exit' to quit.\n")
+	if a.interactive {
+		a.printer.Printf("Type '/exit' to quit.\n")
+	}
 
 	if initialMessage != "" {
 		if err := a.handleUserMessage(ctx, initialMessage); err != nil {
 			return fmt.Errorf("error handling initial message: %w", err)
 		}
+	}
+
+	// In non-interactive mode there is no one to prompt for further input: stop after the
+	// initial message has been handled to completion.
+	if !a.interactive {
+		return nil
 	}
 
 	for {
@@ -164,6 +195,11 @@ func (a *Agent) handleUserMessage(ctx context.Context, msg string) error {
 		}
 		if _, ok := err.(*maxTurnsReachedError); !ok {
 			return err
+		}
+
+		// Without a user to ask, stop at the turn limit instead of prompting to continue.
+		if !a.interactive {
+			return nil
 		}
 
 		var continueSession bool
