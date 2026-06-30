@@ -307,7 +307,7 @@ func promptToCreateStack(ctx context.Context, targetDirectory string, params sta
 
 func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *compose.Project, provider client.Provider, originalErr error) error {
 	if errors.Is(originalErr, types.ErrComposeFileNotFound) {
-		// TODO: generate a compose file based on the current project
+		// TODO: suggest to generate a compose file based on the current project
 		printDefangHint("To start a new project, do:", "new")
 	}
 
