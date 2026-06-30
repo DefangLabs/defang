@@ -129,12 +129,12 @@ func (d *Debugger) promptAndTrackDebugSession(fn func() error, eventName string,
 		return err
 	}
 
-	good, err := d.promptForFeedback()
+	feedback, err := d.promptForFeedback()
 	if err != nil {
 		track.Evt(eventName+" Feedback Prompt Failed", append([]track.Property{P("reason", err)}, eventProperty...)...)
 		return err
 	}
-	track.Evt(eventName+" Feedback Prompt Answered", append([]track.Property{P("feedback", good)}, eventProperty...)...)
+	track.Evt(eventName+" Feedback Prompt Answered", append([]track.Property{P("feedback", feedback)}, eventProperty...)...)
 	return nil
 }
 
@@ -142,6 +142,9 @@ func (d *Debugger) promptForPermission() (bool, error) {
 	var aiDebug bool
 	err := d.surveyor.AskOne(&survey.Confirm{
 		Message: "Would you like to debug this with the Defang AI Agent?",
+		// Default to Yes for everyone; the server selects an appropriate model per account, so
+		// there is no need to gate the prompt client-side.
+		Default: true,
 		Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
 	}, &aiDebug, survey.WithStdio(term.DefaultTerm.Stdio()))
 	if err != nil {
@@ -151,17 +154,17 @@ func (d *Debugger) promptForPermission() (bool, error) {
 	return aiDebug, err
 }
 
-func (d *Debugger) promptForFeedback() (bool, error) {
-	var good bool
-	err := d.surveyor.AskOne(&survey.Confirm{
+func (d *Debugger) promptForFeedback() (string, error) {
+	var feedback string
+	err := d.surveyor.AskOne(&survey.Input{
 		Message: "Was the debugging helpful?",
 		Help:    "Please provide feedback to help us improve the debugging experience.",
-	}, &good, survey.WithStdio(term.DefaultTerm.Stdio()))
+	}, &feedback, survey.WithStdio(term.DefaultTerm.Stdio()))
 	if err != nil {
-		return false, err
+		return "", err
 	}
 
-	return good, err
+	return feedback, err
 }
 
 func buildDeploymentDebugPrompt(debugConfig DebugConfig) string {

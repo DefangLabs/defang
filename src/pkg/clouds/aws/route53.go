@@ -30,6 +30,7 @@ type Route53API interface {
 	ListHostedZonesByName(ctx context.Context, params *route53.ListHostedZonesByNameInput, optFns ...func(*route53.Options)) (*route53.ListHostedZonesByNameOutput, error)
 	ListResourceRecordSets(ctx context.Context, params *route53.ListResourceRecordSetsInput, optFns ...func(*route53.Options)) (*route53.ListResourceRecordSetsOutput, error)
 	ListTagsForResource(ctx context.Context, params *route53.ListTagsForResourceInput, optFns ...func(*route53.Options)) (*route53.ListTagsForResourceOutput, error)
+	ChangeResourceRecordSets(ctx context.Context, params *route53.ChangeResourceRecordSetsInput, optFns ...func(*route53.Options)) (*route53.ChangeResourceRecordSetsOutput, error)
 }
 
 func CreateDelegationSet(ctx context.Context, zoneId *string, r53 Route53API) (*types.DelegationSet, error) {
@@ -180,6 +181,39 @@ func ListResourceRecords(ctx context.Context, zoneId, recordName string, recordT
 		values[i] = dns.Normalize(*record.Value)
 	}
 	return values, nil
+}
+
+// ListAllResourceRecordSets returns every record set in the hosted zone, paginating as needed.
+func ListAllResourceRecordSets(ctx context.Context, zoneId string, r53 Route53API) ([]types.ResourceRecordSet, error) {
+	var records []types.ResourceRecordSet
+	input := &route53.ListResourceRecordSetsInput{HostedZoneId: ptr.String(zoneId)}
+	for {
+		resp, err := r53.ListResourceRecordSets(ctx, input)
+		if err != nil {
+			return nil, err
+		}
+		records = append(records, resp.ResourceRecordSets...)
+		if !resp.IsTruncated {
+			return records, nil
+		}
+		input.StartRecordName = resp.NextRecordName
+		input.StartRecordType = resp.NextRecordType
+		input.StartRecordIdentifier = resp.NextRecordIdentifier
+	}
+}
+
+// DeleteResourceRecordSet removes a single record set from the hosted zone.
+func DeleteResourceRecordSet(ctx context.Context, zoneId string, record types.ResourceRecordSet, r53 Route53API) error {
+	_, err := r53.ChangeResourceRecordSets(ctx, &route53.ChangeResourceRecordSetsInput{
+		HostedZoneId: ptr.String(strings.TrimPrefix(zoneId, "/hostedzone/")),
+		ChangeBatch: &types.ChangeBatch{
+			Changes: []types.Change{{
+				Action:            types.ChangeActionDelete,
+				ResourceRecordSet: &record,
+			}},
+		},
+	})
+	return err
 }
 
 func GetHostedZoneTags(ctx context.Context, zoneId string, r53 Route53API) (map[string]string, error) {
