@@ -37,6 +37,11 @@ func (r r53Mock) DeleteReusableDelegationSet(ctx context.Context, params *route5
 	return nil, nil
 }
 
+func (r r53Mock) ChangeResourceRecordSets(ctx context.Context, params *route53.ChangeResourceRecordSetsInput, optFns ...func(*route53.Options)) (*route53.ChangeResourceRecordSetsOutput, error) {
+	// TODO: implement if needed
+	return nil, nil
+}
+
 func (r r53Mock) ListTagsForResource(ctx context.Context, params *route53.ListTagsForResourceInput, optFns ...func(*route53.Options)) (*route53.ListTagsForResourceOutput, error) {
 	switch params.ResourceType {
 	case types.TagResourceTypeHostedzone:
