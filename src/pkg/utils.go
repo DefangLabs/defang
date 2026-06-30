@@ -146,6 +146,16 @@ func SubscriptionTierToString(tier defangv1.SubscriptionTier) string {
 	}
 }
 
+// IsPaidTier reports whether the subscription tier is a paid plan (Personal, Pro, or Team).
+func IsPaidTier(tier defangv1.SubscriptionTier) bool {
+	switch tier {
+	case defangv1.SubscriptionTier_PERSONAL, defangv1.SubscriptionTier_PRO, defangv1.SubscriptionTier_TEAM:
+		return true
+	default:
+		return false
+	}
+}
+
 func Ensure(cond bool, msg string) {
 	if !cond {
 		panic(msg)
