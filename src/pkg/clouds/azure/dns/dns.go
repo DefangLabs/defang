@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
@@ -75,6 +76,54 @@ func (d *DNS) EnsureZoneExists(ctx context.Context, domain string) ([]string, er
 		return nil, fmt.Errorf("failed to create DNS zone %q: %w", domain, err)
 	}
 	return nameServers(created.Zone), nil
+}
+
+// FindZone returns the ARM resource ID of the public DNS zone in the current
+// subscription whose name is the longest DNS suffix of domain, or "" if no zone
+// matches. It mirrors AWS's findZone (byoc/aws/byoc.go): when a service brings
+// its own domain, the caller sets ServiceInfo.ZoneId so the CD/Pulumi program
+// manages records directly in that zone instead of the ACME fallback.
+//
+// The lookup is subscription-wide and applies no ownership/tag filter (per the
+// BYOD design): whichever existing zone is the closest parent of domain wins.
+// The resource group is irrelevant here, so a DNS value built with New("", az)
+// is fine. Azure has no cross-subscription equivalent of Route53's AssumeRole,
+// so only the current subscription is searched.
+func (d *DNS) FindZone(ctx context.Context, domain string) (string, error) {
+	client, err := d.newZonesClient()
+	if err != nil {
+		return "", err
+	}
+
+	domain = strings.ToLower(strings.TrimSuffix(domain, "."))
+	var bestID, bestName string
+	pager := client.NewListPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return "", fmt.Errorf("listing DNS zones: %w", err)
+		}
+		for _, z := range page.Value {
+			if z == nil || z.Name == nil || z.ID == nil {
+				continue
+			}
+			name := strings.ToLower(*z.Name)
+			// Match the domain itself or any parent zone (e.g. domain
+			// "api.example.com" matches a zone named "example.com").
+			if domain != name && !strings.HasSuffix(domain, "."+name) {
+				continue
+			}
+			if len(name) > len(bestName) {
+				bestName, bestID = name, *z.ID
+			}
+		}
+	}
+	if bestID == "" {
+		term.Debugf("no DNS zone in subscription matches %q", domain)
+		return "", nil
+	}
+	term.Debugf("DNS zone %q (%s) matches %q", bestName, bestID, domain)
+	return bestID, nil
 }
 
 func nameServers(zone armdns.Zone) []string {
