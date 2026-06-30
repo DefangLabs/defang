@@ -77,10 +77,17 @@ type Debugger struct {
 	// defaultPermission is the default answer to the "debug with AI?" prompt. Paid accounts
 	// default to yes so they flow into the agent (and its cleanup tooling) seamlessly.
 	defaultPermission bool
+	// interactive is false in environments without a user to prompt (e.g. CI). When false the
+	// debugger only runs if defaultPermission is true (paid), and does so without prompting.
+	interactive bool
 }
 
-func NewDebugger(ctx context.Context, fabricAddr string, stack *stacks.Parameters) (*Debugger, error) {
-	agent, err := agent.New(ctx, fabricAddr, stack)
+func NewDebugger(ctx context.Context, fabricAddr string, stack *stacks.Parameters, interactive bool) (*Debugger, error) {
+	var opts []agent.Option
+	if !interactive {
+		opts = append(opts, agent.WithNonInteractive())
+	}
+	agent, err := agent.New(ctx, fabricAddr, stack, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +95,15 @@ func NewDebugger(ctx context.Context, fabricAddr string, stack *stacks.Parameter
 		agent:             agent,
 		surveyor:          &surveyor{},
 		defaultPermission: isPaidAccount(ctx, fabricAddr),
+		interactive:       interactive,
 	}, nil
+}
+
+// AutoApprove reports whether the debugger will run without an interactive prompt. This is true
+// for paid accounts and lets callers decide whether to invoke the debugger in non-interactive
+// environments (CI) or just print a hint.
+func (d *Debugger) AutoApprove() bool {
+	return d.defaultPermission
 }
 
 // isPaidAccount reports whether the signed-in account is on a paid plan. Any error falls back to
@@ -146,16 +161,22 @@ func (d *Debugger) promptAndTrackDebugSession(fn func() error, eventName string,
 		return err
 	}
 
-	good, err := d.promptForFeedback()
-	if err != nil {
-		track.Evt(eventName+" Feedback Prompt Failed", append([]track.Property{P("reason", err)}, eventProperty...)...)
-		return err
+	if d.interactive {
+		good, err := d.promptForFeedback()
+		if err != nil {
+			track.Evt(eventName+" Feedback Prompt Failed", append([]track.Property{P("reason", err)}, eventProperty...)...)
+			return err
+		}
+		track.Evt(eventName+" Feedback Prompt Answered", append([]track.Property{P("feedback", good)}, eventProperty...)...)
 	}
-	track.Evt(eventName+" Feedback Prompt Answered", append([]track.Property{P("feedback", good)}, eventProperty...)...)
 	return nil
 }
 
 func (d *Debugger) promptForPermission() (bool, error) {
+	if !d.interactive {
+		// No user to prompt: proceed only if this account auto-approves (paid).
+		return d.defaultPermission, nil
+	}
 	var aiDebug bool
 	err := d.surveyor.AskOne(&survey.Confirm{
 		Message: "Would you like to debug this with the Defang AI Agent?",
