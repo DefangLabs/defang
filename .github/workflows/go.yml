@@ -21,7 +21,7 @@ jobs:
   go-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - name: Set up Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
@@ -137,7 +137,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - name: Install Nix
         uses: cachix/install-nix-action@616559265b40713947b9c190a8ff4b507b5df49b # v31
@@ -218,7 +218,7 @@ jobs:
   #         role-chaining: true
   #         role-to-assume: arn:aws:iam::426819183542:role/admin # adminUserRoleArn from defang-io/bootstrap stack
 
-  #     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+  #     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
   #     - name: Set up Go
   #       uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
@@ -236,7 +236,7 @@ jobs:
     env:
       COMPOSE_PROJECT_NAME: ${{ github.run_id }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - name: Set up Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
@@ -291,7 +291,7 @@ jobs:
       GOCACHE: "D:\\golang\\cache"
       GOMODCACHE: "D:\\golang\\modcache"
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - name: Set up Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
@@ -389,7 +389,7 @@ jobs:
     needs: go-test
     runs-on: macos-latest # for codesign and notarytool
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - name: Set up Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
@@ -439,7 +439,7 @@ jobs:
     permissions:
       contents: write # to upload archives as GitHub Releases
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
           fetch-depth: 0 # for release notes
 
@@ -489,7 +489,7 @@ jobs:
     needs:
       - go-release
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
@@ -529,7 +529,7 @@ jobs:
           client-payload: '{"version": "${{ github.ref_name }}"}'
 
       - name: Checkout tag
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - name: Build npm package
         uses: ./.github/actions/npm-build
