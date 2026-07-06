@@ -307,7 +307,7 @@ func promptToCreateStack(ctx context.Context, targetDirectory string, params sta
 
 func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *compose.Project, provider client.Provider, originalErr error) error {
 	if errors.Is(originalErr, types.ErrComposeFileNotFound) {
-		// TODO: generate a compose file based on the current project
+		// TODO: suggest to generate a compose file based on the current project
 		printDefangHint("To start a new project, do:", "new")
 	}
 
@@ -482,7 +482,23 @@ func makeComposeDownCmd() *cobra.Command {
 					term.Warn("Unable to tail logs. Detaching.")
 					return nil
 				}
-				return err
+				// A failed destroy (e.g. CodeBuild exit status) is when resources get orphaned, so prompt
+				// the AI debugger just like `up` does; it can guide the user through cleanup.
+				// handleTailAndMonitorErr skips the prompt in non-interactive mode.
+				deploymentErr := err
+				debugger, dbgErr := debug.NewDebugger(cmd.Context(), global.FabricAddr, session.Stack)
+				if dbgErr != nil {
+					term.Warn("Failed to initialize debugger:", dbgErr)
+					return deploymentErr
+				}
+				handleTailAndMonitorErr(cmd.Context(), deploymentErr, debugger, debug.DebugConfig{
+					Deployment: deployment,
+					ProviderID: &session.Stack.Provider,
+					Stack:      session.Stack.Name,
+					Since:      since,
+					Until:      time.Now(),
+				})
+				return deploymentErr
 			}
 			term.Info("Done.")
 
