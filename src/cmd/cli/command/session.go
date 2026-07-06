@@ -37,7 +37,7 @@ func newCommandSessionWithOpts(cmd *cobra.Command, opts commandSessionOpts) (*se
 	options := session.SessionLoaderOptions{
 		LoaderOptions: loaderOptionsForCommand(cmd),
 		GetStackOpts: stacks.GetStackOpts{
-			Interactive: !global.NonInteractive,
+			Interactive: global.Interactive(),
 			Default:     global.Stack,
 			SelectStackOptions: stacks.SelectStackOptions{
 				AllowStackCreation: opts.AllowStackCreation,
@@ -57,7 +57,7 @@ func newCommandSessionWithOpts(cmd *cobra.Command, opts commandSessionOpts) (*se
 		return nil, err
 	}
 	if opts.CheckAccountInfo {
-		if err := session.Provider.Authenticate(ctx, !global.NonInteractive); err != nil {
+		if err := session.Provider.Authenticate(ctx, global.Interactive()); err != nil {
 			return nil, fmt.Errorf("failed to authenticate with provider %q: %w", session.Stack.Provider, err)
 		}
 		_, err = session.Provider.AccountInfo(ctx)

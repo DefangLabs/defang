@@ -93,16 +93,16 @@ func (w *Wizard) CollectRemainingParameters(ctx context.Context, params *Paramet
 		params.Region = region
 	}
 
-	if params.Mode == modes.RecipeUnspecified && params.Provider != client.ProviderDefang {
+	if params.Recipe == modes.RecipeUnspecified && params.Provider != client.ProviderDefang {
 		// Skip the prompt entirely when Fabric reports no active recipes.
 		if recipeNames := w.activeRecipeNames(ctx); len(recipeNames) > 0 {
-			recipeName, err := w.ec.RequestEnum(ctx, "Which recipe (deployment mode) do you want to deploy with?", "mode",
+			recipeName, err := w.ec.RequestEnum(ctx, "Which recipe (deployment mode) do you want to deploy with?", "recipe",
 				recipeNames,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to elicit deployment mode: %w", err)
 			}
-			params.Mode = modes.ParseRecipe(recipeName)
+			params.Recipe = modes.ParseRecipe(recipeName)
 		}
 	}
 
@@ -244,6 +244,9 @@ func (f *FileSystemAWSProfileLister) ListProfiles() ([]string, error) {
 			}
 		}
 		f.Close()
+		if err := scanner.Err(); err != nil {
+			continue // skip files with read errors
+		}
 	}
 
 	result := make([]string, 0, len(profiles))

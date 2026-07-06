@@ -23,13 +23,13 @@ func TestHandleCurrentStackTool(t *testing.T) {
 					Name:     "test-stack",
 					Provider: client.ProviderAWS,
 					Region:   "us-test-2",
-					Mode:     modes.RecipeAffordable,
+					Recipe:   modes.RecipeAffordable,
 					Variables: map[string]string{
 						"AWS_PROFILE": "default",
 					},
 				},
 			},
-			expected:      "This currently selected stack is \"test-stack\": AWS_PROFILE=\"default\"\nAWS_REGION=\"us-test-2\"\nDEFANG_MODE=\"affordable\"\nDEFANG_PROVIDER=\"aws\"",
+			expected:      "This currently selected stack is \"test-stack\": AWS_PROFILE=\"default\"\nAWS_REGION=\"us-test-2\"\nDEFANG_RECIPE=\"affordable\"\nDEFANG_PROVIDER=\"aws\"",
 			expectedError: false,
 		},
 	}

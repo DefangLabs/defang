@@ -151,20 +151,20 @@ func TestLoadSession(t *testing.T) {
 			options: SessionLoaderOptions{
 				GetStackOpts: stacks.GetStackOpts{
 					Default: stacks.Parameters{
-						Name: "existingstack",
-						Mode: modes.RecipeAffordable,
+						Name:   "existingstack",
+						Recipe: modes.RecipeAffordable,
 					},
 				},
 			},
 			existingStack: &stacks.Parameters{
 				Name:     "existingstack",
 				Provider: client.ProviderAWS,
-				Mode:     modes.RecipeBalanced,
+				Recipe:   modes.RecipeBalanced,
 			},
 			expectedStack: &stacks.Parameters{
 				Name:     "existingstack",
 				Provider: client.ProviderAWS,
-				Mode:     modes.RecipeAffordable,
+				Recipe:   modes.RecipeAffordable,
 				Variables: map[string]string{
 					"DEFANG_PROVIDER": "aws",
 					"DEFANG_MODE":     "affordable",
@@ -226,7 +226,7 @@ func TestLoadSession(t *testing.T) {
 			require.NotNil(t, session.Stack)
 			assert.Equal(t, tt.expectedStack.Name, session.Stack.Name)
 			assert.Equal(t, tt.expectedStack.Provider, session.Stack.Provider)
-			assert.Equal(t, tt.expectedStack.Mode, session.Stack.Mode)
+			assert.Equal(t, tt.expectedStack.Recipe, session.Stack.Recipe)
 
 			// Verify environment variables
 			for key, expectedValue := range tt.expectedEnv {

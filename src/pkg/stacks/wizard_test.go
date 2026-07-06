@@ -141,7 +141,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
 				"RequestString:region",
-				"RequestEnum:mode",
+				"RequestEnum:recipe",
 				"RequestString:stack_name",
 				"RequestString:aws_profile",
 			},
@@ -170,7 +170,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
 				"RequestString:region",
-				"RequestEnum:mode",
+				"RequestEnum:recipe",
 				"RequestString:stack_name",
 				"RequestEnum:aws_profile",
 			},
@@ -201,7 +201,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
 				"RequestString:region",
-				"RequestEnum:mode",
+				"RequestEnum:recipe",
 				"RequestString:stack_name",
 				"RequestString:gcp_project_id",
 			},
@@ -230,7 +230,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
 				"RequestString:region",
-				"RequestEnum:mode",
+				"RequestEnum:recipe",
 				"RequestString:stack_name",
 				"RequestString:gcp_project_id",
 			},
@@ -272,7 +272,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
 				"RequestString:region",
-				"RequestEnum:mode",
+				"RequestEnum:recipe",
 				"RequestString:stack_name",
 			},
 		},
@@ -327,7 +327,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
 				"RequestString:region",
-				"RequestEnum:mode",
+				"RequestEnum:recipe",
 				"RequestString:stack_name",
 			},
 		},
@@ -350,7 +350,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
 				"RequestString:region",
-				"RequestEnum:mode",
+				"RequestEnum:recipe",
 				"RequestString:stack_name",
 				"RequestEnum:aws_profile",
 			},
@@ -372,7 +372,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			expectedCallOrder: []string{
 				"RequestEnum:provider",
 				"RequestString:region",
-				"RequestEnum:mode",
+				"RequestEnum:recipe",
 				"RequestString:stack_name",
 				"RequestString:gcp_project_id",
 			},
@@ -388,7 +388,7 @@ func TestWizardCollectParameters(t *testing.T) {
 			mockController := newMockElicitationsController()
 			// The wizard now prompts for a deployment mode (recipe) on non-Defang
 			// providers; provide a default answer that cases may override.
-			mockController.enumResponses["mode"] = "BALANCED"
+			mockController.enumResponses["recipe"] = "BALANCED"
 			tt.setupMock(mockController)
 
 			var profileLister AWSProfileLister
@@ -790,7 +790,7 @@ func TestWizardCollectRemainingParameters(t *testing.T) {
 			mockController := newMockElicitationsController()
 			// The wizard now prompts for a deployment mode (recipe) on non-Defang
 			// providers; provide a default answer that cases may override.
-			mockController.enumResponses["mode"] = "BALANCED"
+			mockController.enumResponses["recipe"] = "BALANCED"
 			tt.setupMock(mockController)
 
 			wizard := NewWizard(mockController, nil)
@@ -876,7 +876,7 @@ func TestWizardRecipeOptions(t *testing.T) {
 			mockController.enumResponses["aws_profile"] = "default"
 			if tt.expectedOptions != nil {
 				// Answer the recipe prompt with whatever the first offered option is.
-				mockController.enumResponses["mode"] = tt.expectedOptions[0]
+				mockController.enumResponses["recipe"] = tt.expectedOptions[0]
 			}
 			t.Setenv("AWS_PROFILE", "default")
 
@@ -884,10 +884,10 @@ func TestWizardRecipeOptions(t *testing.T) {
 			result, err := wizard.CollectParameters(t.Context())
 			assert.NoError(t, err)
 
-			assert.Equal(t, tt.expectedOptions, mockController.enumOptions["mode"], "recipe options mismatch")
+			assert.Equal(t, tt.expectedOptions, mockController.enumOptions["recipe"], "recipe options mismatch")
 			if tt.expectedOptions == nil {
 				assert.NotContains(t, mockController.callOrder, "RequestEnum:mode", "recipe prompt should be skipped")
-				assert.Equal(t, modes.RecipeUnspecified, result.Mode, "mode should be left unspecified")
+				assert.Equal(t, modes.RecipeUnspecified, result.Recipe, "mode should be left unspecified")
 			}
 		})
 	}

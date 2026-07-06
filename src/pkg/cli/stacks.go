@@ -46,9 +46,9 @@ func SetDefaultStack(ctx context.Context, stacksPutter StacksPutter, stacksLoade
 			Project:  projectName,
 			Provider: stack.Provider.Value(),
 			Region:   stack.Region,
-			Mode:     stack.Mode.Mode().Value(),
+			Mode:     stack.Recipe.Mode().Value(),
 			Recipe: &defangv1.Recipe{
-				Name: stack.Mode.String(),
+				Name: stack.Recipe.String(),
 			},
 			IsDefault: true,
 			StackFile: []byte(stackFile),

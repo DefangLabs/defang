@@ -43,26 +43,26 @@ func makeEstimateCmd() *cobra.Command {
 			var previewProvider client.Provider = &client.PlaygroundProvider{FabricClient: global.Client}
 
 			// default to development mode if not specified; TODO: when mode is not specified, show an interactive prompt
-			if global.Stack.Mode == modes.RecipeUnspecified {
-				global.Stack.Mode = modes.RecipeAffordable
+			if global.Stack.Recipe == modes.RecipeUnspecified {
+				global.Stack.Recipe = modes.RecipeAffordable
 			}
 			if region == "" {
 				region = client.GetRegion(global.Stack.Provider) // This sets the default region based on the provider
 			}
 
-			estimate, err := cli.RunEstimate(ctx, project, global.Client, previewProvider, global.Stack.Provider, region, global.Stack.Mode)
+			estimate, err := cli.RunEstimate(ctx, project, global.Client, previewProvider, global.Stack.Provider, region, global.Stack.Recipe)
 			if err != nil {
 				return fmt.Errorf("failed to run estimate: %w", err)
 			}
 			term.Debugf("Estimate: %+v", estimate)
 
-			cli.PrintEstimate(global.Stack.Mode, estimate, term.DefaultTerm)
+			cli.PrintEstimate(global.Stack.Recipe, estimate, term.DefaultTerm)
 
 			return nil
 		},
 	}
 
-	estimateCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
+	estimateCmd.Flags().VarP(&global.Stack.Recipe, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	estimateCmd.Flags().StringVarP(&global.Stack.Region, "region", "r", global.Stack.Region, "which cloud region to estimate")
 	return estimateCmd
 }

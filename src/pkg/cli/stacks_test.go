@@ -116,7 +116,7 @@ func TestSetDefaultStack(t *testing.T) {
 				Name:     "test-stack",
 				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
-				Mode:     modes.RecipeAffordable,
+				Recipe:   modes.RecipeAffordable,
 			},
 			loadErr:   nil,
 			putErr:    nil,
@@ -139,7 +139,7 @@ func TestSetDefaultStack(t *testing.T) {
 				Name:     "test-stack",
 				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
-				Mode:     modes.RecipeAffordable,
+				Recipe:   modes.RecipeAffordable,
 			},
 			loadErr:   nil,
 			putErr:    assert.AnError,
@@ -162,7 +162,7 @@ func TestSetDefaultStack(t *testing.T) {
 				Name:     "test-stack",
 				Provider: client.ProviderAWS,
 				Region:   "us-west-2",
-				Mode:     modes.RecipeAffordable,
+				Recipe:   modes.RecipeAffordable,
 			},
 			loadErr:   nil,
 			putErr:    nil,
@@ -214,7 +214,7 @@ func TestRemoveStack(t *testing.T) {
 
 	t.Run("no deployments deletes without confirmation", func(t *testing.T) {
 		t.Chdir(t.TempDir())
-		_, err := stacks.CreateInDirectory(".", stacks.Parameters{Name: "mystack", Provider: client.ProviderAWS, Region: "us-east-1", Mode: modes.RecipeAffordable})
+		_, err := stacks.CreateInDirectory(".", stacks.Parameters{Name: "mystack", Provider: client.ProviderAWS, Region: "us-east-1", Recipe: modes.RecipeAffordable})
 		assert.NoError(t, err)
 
 		remover := &mockStacksRemover{}
@@ -229,7 +229,7 @@ func TestRemoveStack(t *testing.T) {
 
 	t.Run("last deployment is down, deletes without confirmation", func(t *testing.T) {
 		t.Chdir(t.TempDir())
-		_, err := stacks.CreateInDirectory(".", stacks.Parameters{Name: "mystack", Provider: client.ProviderAWS, Region: "us-east-1", Mode: modes.RecipeAffordable})
+		_, err := stacks.CreateInDirectory(".", stacks.Parameters{Name: "mystack", Provider: client.ProviderAWS, Region: "us-east-1", Recipe: modes.RecipeAffordable})
 		assert.NoError(t, err)
 
 		remover := &mockStacksRemover{}
@@ -267,7 +267,7 @@ func TestRemoveStack(t *testing.T) {
 
 	t.Run("last deployment is up, user confirms", func(t *testing.T) {
 		t.Chdir(t.TempDir())
-		_, err := stacks.CreateInDirectory(".", stacks.Parameters{Name: "mystack", Provider: client.ProviderAWS, Region: "us-east-1", Mode: modes.RecipeAffordable})
+		_, err := stacks.CreateInDirectory(".", stacks.Parameters{Name: "mystack", Provider: client.ProviderAWS, Region: "us-east-1", Recipe: modes.RecipeAffordable})
 		assert.NoError(t, err)
 
 		remover := &mockStacksRemover{}
@@ -295,7 +295,7 @@ func TestRemoveStack(t *testing.T) {
 
 	t.Run("force with active deployment skips confirmation and deletes", func(t *testing.T) {
 		t.Chdir(t.TempDir())
-		_, err := stacks.CreateInDirectory(".", stacks.Parameters{Name: "mystack", Provider: client.ProviderAWS, Region: "us-east-1", Mode: modes.RecipeAffordable})
+		_, err := stacks.CreateInDirectory(".", stacks.Parameters{Name: "mystack", Provider: client.ProviderAWS, Region: "us-east-1", Recipe: modes.RecipeAffordable})
 		assert.NoError(t, err)
 
 		remover := &mockStacksRemover{}
@@ -321,7 +321,7 @@ func TestRemoveStack(t *testing.T) {
 
 	t.Run("passes correct project and stack to DeleteStack", func(t *testing.T) {
 		t.Chdir(t.TempDir())
-		_, err := stacks.CreateInDirectory(".", stacks.Parameters{Name: "beta", Provider: client.ProviderAWS, Region: "us-east-1", Mode: modes.RecipeAffordable})
+		_, err := stacks.CreateInDirectory(".", stacks.Parameters{Name: "beta", Provider: client.ProviderAWS, Region: "us-east-1", Recipe: modes.RecipeAffordable})
 		assert.NoError(t, err)
 
 		remover := &mockStacksRemover{}

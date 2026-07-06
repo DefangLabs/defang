@@ -2783,7 +2783,7 @@ type DeployRequest struct {
 	// Deprecated: Marked as deprecated in io/defang/v1/fabric.proto.
 	Project string `protobuf:"bytes,2,opt,name=project,proto3" json:"project,omitempty"` // deprecated; use compose.name
 	// Deprecated: Marked as deprecated in io/defang/v1/fabric.proto.
-	Mode            DeploymentMode `protobuf:"varint,3,opt,name=mode,proto3,enum=io.defang.v1.DeploymentMode" json:"mode,omitempty"` // deprecated; use recipe
+	Mode            DeploymentMode `protobuf:"varint,3,opt,name=mode,proto3,enum=io.defang.v1.DeploymentMode" json:"mode,omitempty"` // deprecated; use recipe_name
 	Compose         []byte         `protobuf:"bytes,4,opt,name=compose,proto3" json:"compose,omitempty"`                             // yaml (or json)
 	DelegateDomain  string         `protobuf:"bytes,5,opt,name=delegate_domain,json=delegateDomain,proto3" json:"delegate_domain,omitempty"`
 	DelegationSetId string         `protobuf:"bytes,6,opt,name=delegation_set_id,json=delegationSetId,proto3" json:"delegation_set_id,omitempty"`

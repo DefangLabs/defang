@@ -23,7 +23,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
-	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -186,8 +185,6 @@ func SetupCommands(version string) {
 	cdCmd.AddCommand(cdListCmd)
 	cdCmd.AddCommand(cdCancelCmd)
 	cdCmd.AddCommand(cdOutputsCmd)
-	cdPreviewCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
-	cdPreviewCmd.RegisterFlagCompletionFunc("mode", cobra.FixedCompletions(modes.AllDeploymentModes(), cobra.ShellCompDirectiveNoFileComp))
 	cdCmd.AddCommand(cdPreviewCmd)
 	cdInstallCmd.Flags().Bool("force", false, "force the installation of the CD resources into the cluster (allow downgrades)")
 	cdCmd.AddCommand(cdInstallCmd)
@@ -502,7 +499,7 @@ func canIUseProvider(ctx context.Context, provider client.Provider, projectName 
 // provider-specific login paths such as GitHub Actions OIDC federation run instead of
 // falling through to the plain default credential chain.
 func authenticateProvider(ctx context.Context, provider client.Provider) error {
-	if err := provider.Authenticate(ctx, !global.NonInteractive); err != nil {
+	if err := provider.Authenticate(ctx, global.Interactive()); err != nil {
 		return fmt.Errorf("failed to authenticate with provider: %w", err)
 	}
 	return nil

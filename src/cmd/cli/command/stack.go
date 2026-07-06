@@ -68,13 +68,17 @@ func makeStackNewCmd() *cobra.Command {
 				}
 			}
 
-			var region, _ = cmd.Flags().GetString("region")
-
 			params := stacks.Parameters{
 				Name:     stackName,
 				Provider: global.Stack.Provider, // default provider
-				Region:   region,
-				Mode:     global.Stack.Mode,
+				Region:   global.Stack.Region,
+				Recipe:   global.Stack.Recipe,
+			}
+
+			if params.Recipe != "" {
+				if err := validateRecipeName(ctx, params.Recipe); err != nil {
+					return err
+				}
 			}
 
 			if global.NonInteractive {
@@ -106,7 +110,8 @@ func makeStackNewCmd() *cobra.Command {
 			return nil
 		},
 	}
-	stackNewCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
+	stackNewCmd.Flags().VarP(&global.Stack.Recipe, "mode", "m", fmt.Sprintf("legacy deployment mode; one of %v", modes.AllDeploymentModes()))
+	stackNewCmd.Flags().Var(&global.Stack.Recipe, "recipe", "deployment mode/recipe for the new stack")
 	stackNewCmd.Flags().StringVarP(&global.Stack.Region, "region", "r", global.Stack.Region, "Cloud region for the stack deployment")
 
 	return stackNewCmd
@@ -277,4 +282,27 @@ func remoteStackExists(ctx context.Context, project string, stack string) (bool,
 		return false, err
 	}
 	return resp.GetStack() != nil, nil
+}
+
+func validateRecipeName(ctx context.Context, recipeName modes.Recipe) error {
+	// Validate the recipe name by fetching the list from the server.
+	resp, err := global.Client.ListRecipes(ctx)
+	if err != nil {
+		term.Warnf("unable to validate recipe %q: %v", recipeName, err)
+		return nil
+	}
+
+	var activeRecipes []string
+	for _, r := range resp.GetRecipes() {
+		if modes.ParseRecipe(r.GetName()) == recipeName {
+			if !r.GetActive() {
+				term.Warnf("recipe %q is currently deactivated", recipeName)
+			}
+			return nil
+		}
+		if r.GetActive() {
+			activeRecipes = append(activeRecipes, r.GetName())
+		}
+	}
+	return fmt.Errorf("invalid recipe %q; available recipes: %v", recipeName, activeRecipes)
 }

@@ -112,7 +112,7 @@ func makeComposeUpCmd() *cobra.Command {
 					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
 					Provider: accountInfo.Provider,
 					Region:   accountInfo.Region,
-					Mode:     session.Stack.Mode,
+					Recipe:   session.Stack.Recipe,
 				})
 				if err != nil {
 					term.Debug("Failed to create stack:", err)
@@ -133,7 +133,7 @@ func makeComposeUpCmd() *cobra.Command {
 			deploy, project, err := cli.ComposeUp(ctx, global.Client, session.Provider, session.Stack, cli.ComposeUpParams{
 				Project:    project,
 				UploadMode: upload,
-				Mode:       session.Stack.Mode,
+				Recipe:     session.Stack.Recipe,
 			})
 			if err != nil {
 				composeErr := err
@@ -206,7 +206,6 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed; implies --build")
 	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // no-op, but keep for backwards compatibility
 	_ = composeUpCmd.Flags().MarkHidden("tail")
-	composeUpCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	composeUpCmd.Flags().Bool("build", false, "build images before starting services") // docker-compose compatibility
 	composeUpCmd.Flags().Bool("wait", true, "wait for services to be running|healthy") // docker-compose compatibility
 	_ = composeUpCmd.Flags().MarkHidden("wait")
@@ -243,7 +242,7 @@ func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.D
 			Name:     stackName,
 			Provider: accountInfo.Provider,
 			Region:   accountInfo.Region,
-			Mode:     global.Stack.Mode,
+			Recipe:   global.Stack.Recipe,
 		})
 		if err != nil {
 			term.Debugf("Failed to create stack %v", err)
@@ -571,7 +570,7 @@ func makeComposeConfigCmd() *cobra.Command {
 			_, _, err = cli.ComposeUp(ctx, global.Client, sessionx.Provider, sessionx.Stack, cli.ComposeUpParams{
 				Project:    project,
 				UploadMode: compose.UploadModeIgnore,
-				Mode:       modes.RecipeUnspecified,
+				Recipe:     modes.RecipeUnspecified,
 			})
 			if !errors.Is(err, dryrun.ErrDryRun) {
 				return err

@@ -25,7 +25,7 @@ func (e ComposeError) Unwrap() error {
 type ComposeUpParams struct {
 	Project    *compose.Project
 	UploadMode compose.UploadMode
-	Mode       modes.Recipe
+	Recipe     modes.Recipe
 }
 
 func checkDeploymentMode(prevMode, newMode modes.Mode) (modes.Mode, error) {
@@ -68,7 +68,7 @@ func checkDeploymentMode(prevMode, newMode modes.Mode) (modes.Mode, error) {
 func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.Provider, stack *stacks.Parameters, params ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	upload := params.UploadMode
 	project := params.Project
-	recipe := params.Mode
+	recipe := params.Recipe
 
 	if dryrun.DoDryRun {
 		upload = compose.UploadModeIgnore

@@ -119,7 +119,7 @@ func (sm *manager) ListRemote(ctx context.Context) ([]ListItem, error) {
 		stackParams = append(stackParams, ListItem{
 			Name:       params.Name,
 			Provider:   params.Provider,
-			Mode:       params.Mode,
+			Mode:       params.Recipe,
 			Region:     params.Region,
 			Account:    account,
 			DeployedAt: deployedAt,
@@ -145,8 +145,8 @@ func newParametersFromPB(stack *defangv1.Stack) (*Parameters, error) {
 		return nil, fmt.Errorf("failed to parse remote stack content: %w", err)
 	}
 	// fill in missing fields from remote stack info
-	if params.Mode == modes.RecipeUnspecified {
-		params.Mode = modes.FromMode(stack.GetMode())
+	if params.Recipe == modes.RecipeUnspecified {
+		params.Recipe = modes.FromMode(stack.GetMode())
 	}
 	if params.Region == "" {
 		params.Region = stack.GetRegion()
@@ -235,6 +235,12 @@ func GetFallbackStack(defaults Parameters) (*Parameters, string, error) {
 			whence = "--provider flag"
 		}
 		defaults.Name = DefaultBeta
+		// When the provider is set via the -P flag, the region default in global.Stack
+		// was computed before the flag was parsed (provider was still Auto), so it may be
+		// empty. Resolve the provider's default region here so provider auth can proceed.
+		if defaults.Region == "" {
+			defaults.Region = client.GetRegion(defaults.Provider)
+		}
 		return &defaults, whence, nil
 	}
 	return nil, "", errors.New("no provider specified")

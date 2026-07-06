@@ -18,7 +18,7 @@ import (
 type Parameters struct {
 	Name      string
 	Provider  client.ProviderID
-	Mode      modes.Recipe
+	Recipe    modes.Recipe
 	Region    string
 	Variables map[string]string
 }
@@ -49,8 +49,8 @@ func (sp Parameters) ToMap() map[string]string {
 			vars[regionVarName] = sp.Region
 		}
 	}
-	if sp.Mode != modes.RecipeUnspecified {
-		vars["DEFANG_MODE"] = strings.ToLower(sp.Mode.String())
+	if sp.Recipe != modes.RecipeUnspecified {
+		vars["DEFANG_RECIPE"] = strings.ToLower(sp.Recipe.String())
 	}
 	return vars
 }
@@ -70,14 +70,16 @@ func paramsFromMap(variables map[string]string) (*Parameters, error) {
 		region = variables[regionVarName]
 	}
 	var recipe modes.Recipe
-	if val, ok := variables["DEFANG_MODE"]; ok {
+	if val, ok := variables["DEFANG_RECIPE"]; ok {
+		recipe = modes.ParseRecipe(val)
+	} else if val, ok := variables["DEFANG_MODE"]; ok {
 		recipe = modes.ParseRecipe(val)
 	}
 	return &Parameters{
 		Variables: variables,
 		Provider:  provider,
 		Region:    region,
-		Mode:      recipe,
+		Recipe:    recipe,
 	}, nil
 }
 
@@ -194,7 +196,7 @@ func ListInDirectory(workingDirectory string) ([]ListItem, error) {
 		stacks = append(stacks, ListItem{
 			Name:     params.Name,
 			Provider: params.Provider,
-			Mode:     params.Mode,
+			Mode:     params.Recipe,
 			Region:   params.Region,
 			Account:  params.Account(),
 		})

@@ -121,7 +121,7 @@ func TestStackSelector_SelectStack_ExistingStack(t *testing.T) {
 		Name:     "production",
 		Provider: client.ProviderAWS,
 		Region:   "us-west-2",
-		Mode:     modes.RecipeUnspecified,
+		Recipe:   modes.RecipeUnspecified,
 	}
 
 	selector := NewSelector(mockEC, mockSM, nil)
@@ -165,7 +165,7 @@ func TestStackSelector_SelectOrCreateStack_ExistingStack(t *testing.T) {
 		Name:     "production",
 		Provider: client.ProviderAWS,
 		Region:   "us-west-2",
-		Mode:     modes.RecipeUnspecified,
+		Recipe:   modes.RecipeUnspecified,
 	}
 
 	selector := NewSelector(mockEC, mockSM, nil)
@@ -236,14 +236,14 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 	})).Return("staging", nil).Maybe()
 
 	// Mock wizard parameter collection - deployment mode (recipe) selection
-	mockEC.On("RequestEnum", ctx, "Which recipe (deployment mode) do you want to deploy with?", "mode", modes.AllDeploymentModes()).Return("BALANCED", nil)
+	mockEC.On("RequestEnum", ctx, "Which recipe (deployment mode) do you want to deploy with?", "recipe", modes.AllDeploymentModes()).Return("BALANCED", nil)
 
 	// Mock wizard parameter collection
 	newStackParams := &Parameters{
 		Name:     "staging",
 		Provider: client.ProviderAWS,
 		Region:   "us-east-1",
-		Mode:     modes.RecipeBalanced,
+		Recipe:   modes.RecipeBalanced,
 		Variables: map[string]string{
 			"AWS_PROFILE": "staging",
 		},
@@ -316,14 +316,14 @@ func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
 	})).Return("default", nil).Maybe()
 
 	// Mock wizard parameter collection - deployment mode (recipe) selection
-	mockEC.On("RequestEnum", ctx, "Which recipe (deployment mode) do you want to deploy with?", "mode", modes.AllDeploymentModes()).Return("BALANCED", nil)
+	mockEC.On("RequestEnum", ctx, "Which recipe (deployment mode) do you want to deploy with?", "recipe", modes.AllDeploymentModes()).Return("BALANCED", nil)
 
 	// Mock wizard parameter collection
 	newStackParams := &Parameters{
 		Name:     "firststack",
 		Provider: client.ProviderAWS,
 		Region:   "us-west-2",
-		Mode:     modes.RecipeBalanced,
+		Recipe:   modes.RecipeBalanced,
 		Variables: map[string]string{
 			"AWS_PROFILE": "default",
 		},
@@ -516,14 +516,14 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 	})).Return("staging", nil).Maybe()
 
 	// Mock wizard parameter collection - deployment mode (recipe) selection
-	mockEC.On("RequestEnum", ctx, "Which recipe (deployment mode) do you want to deploy with?", "mode", modes.AllDeploymentModes()).Return("BALANCED", nil)
+	mockEC.On("RequestEnum", ctx, "Which recipe (deployment mode) do you want to deploy with?", "recipe", modes.AllDeploymentModes()).Return("BALANCED", nil)
 
 	// Mock wizard parameter collection
 	newStackParams := &Parameters{
 		Name:     "staging",
 		Provider: client.ProviderAWS,
 		Region:   "us-east-1",
-		Mode:     modes.RecipeBalanced,
+		Recipe:   modes.RecipeBalanced,
 		Variables: map[string]string{
 			"AWS_PROFILE": "staging",
 		},

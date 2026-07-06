@@ -14,7 +14,7 @@ type CreateAzureStackParams struct {
 	Name                string `json:"stack" jsonschema:"required,description=The name of the stack to use for all tool calls."`
 	Location            string `json:"location" jsonschema:"required,description=The Azure location to create the stack in."`
 	AzureSubscriptionID string `json:"azure_subscription_id" jsonschema:"required,description=The Azure subscription ID to use when creating the stack."`
-	Mode                string `json:"mode" jsonschema:"enum=affordable,enum=balanced,enum=high_availability,description=The deployment mode for the stack."`
+	Recipe              string `json:"recipe" jsonschema:"enum=affordable,enum=balanced,enum=high_availability,description=The deployment mode/recipe for the stack."`
 }
 
 func HandleCreateAzureStackTool(ctx context.Context, params CreateAzureStackParams, sc StackConfig) (string, error) {
@@ -22,7 +22,7 @@ func HandleCreateAzureStackTool(ctx context.Context, params CreateAzureStackPara
 		Name:     params.Name,
 		Region:   params.Location,
 		Provider: client.ProviderAzure,
-		Mode:     modes.ParseRecipe(params.Mode),
+		Recipe:   modes.ParseRecipe(params.Recipe),
 		Variables: map[string]string{
 			"AZURE_SUBSCRIPTION_ID": params.AzureSubscriptionID,
 		},

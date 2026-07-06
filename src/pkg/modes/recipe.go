@@ -28,6 +28,8 @@ func ParseRecipe(str string) Recipe {
 	upper := strings.ToUpper(str)
 	// Handle legacy aliases
 	switch upper {
+	case "MODE_UNSPECIFIED":
+		return RecipeUnspecified
 	case "CHEAP", "DEVELOPMENT":
 		return RecipeAffordable
 	case "STAGING":
@@ -42,6 +44,8 @@ func (Recipe) Type() string {
 	return "recipe"
 }
 
+// Mode converts a Recipe to a protobuf DeploymentMode; it is the inverse of FromMode.
+// Deprecated: for backwards compat; custom recipes have no corresponding DeploymentMode.
 func (r Recipe) Mode() Mode {
 	switch r {
 	case RecipeAffordable:
