@@ -52,7 +52,8 @@ type Config = awssdk.Config
 type ByocAws struct {
 	*byoc.ByocBaseClient
 
-	driver *cfn.AwsCfn // TODO: ecs is stateful, contains the output of the cd cfn stack after SetUpCD
+	driver       *cfn.AwsCfn // TODO: ecs is stateful, contains the output of the cd cfn stack after SetUpCD
+	fabricClient dns.FabricResolverClient
 
 	cdEtag    types.ETag
 	cdStart   time.Time
@@ -114,7 +115,7 @@ func AnnotateAwsError(err error) error {
 	return err
 }
 
-func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string) *ByocAws {
+func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string, fabricClient dns.FabricResolverClient) *ByocAws {
 	if awsProfileName := os.Getenv("AWS_PROFILE"); awsProfileName != "" {
 		AWSAccessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
 		AWSSecretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
@@ -129,7 +130,8 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 	}
 
 	b := &ByocAws{
-		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
+		driver:       cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
+		fabricClient: fabricClient,
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
 
@@ -226,6 +228,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		Mode:          req.Mode,
 		PulumiVersion: b.PulumiVersion,
 		Services:      serviceInfos,
+		Recipe:        req.Recipe,
 	})
 	if err != nil {
 		return nil, err
@@ -425,7 +428,10 @@ func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 	r53Client := route53.NewFromConfig(cfg)
 
 	projectDomain := req.DelegateDomain
-	nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, req.Project, b.PulumiStack, r53Client, dns.ResolverAt)
+	resolverAt := func(nsServer string) dns.Resolver {
+		return dns.FabricResolver{Client: b.fabricClient, NSServer: nsServer}
+	}
+	nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, req.Project, b.PulumiStack, r53Client, resolverAt)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
@@ -476,11 +482,14 @@ func (b *ByocAws) bucketName() string {
 
 func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
+
+	// From https://www.pulumi.com/docs/iac/concepts/state-and-backends/#aws-s3
 	defangStateUrl := fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.bucketName(), region)
 	pulumiBackendKey, pulumiBackendValue, err := byoc.GetPulumiBackend(defangStateUrl)
 	if err != nil {
 		return nil, err
 	}
+
 	env := map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
@@ -535,6 +544,11 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild
 	if err != nil {
 		return nil, err
 	}
+
+	// APN attribution is set by Fabric via CanIUse; allow a local env override for ISVs.
+	if awsApnId := pkg.Getenv("DEFANG_AWS_APN_ID", b.CanIUseConfig.AwsApnId); awsApnId != "" {
+		env["DEFANG_AWS_APN_ID"] = awsApnId
+	}
 	if cmd.delegationSetId != "" {
 		env["DELEGATION_SET_ID"] = cmd.delegationSetId
 	}
@@ -558,6 +572,14 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild
 		}
 	}
 
+	if cmd.statesUrl != "" {
+		env["DEFANG_STATES_UPLOAD_URL"] = cmd.statesUrl
+	}
+
+	if cmd.eventsUrl != "" {
+		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
+	}
+
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging
 		debugEnv := []string{"AWS_REGION=" + string(b.driver.Region)}
@@ -570,14 +592,6 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild
 		if err := byoc.DebugPulumiNodeJS(ctx, debugEnv, cmd.command...); err != nil {
 			return nil, err
 		}
-	}
-
-	if cmd.statesUrl != "" {
-		env["DEFANG_STATES_UPLOAD_URL"] = cmd.statesUrl
-	}
-
-	if cmd.eventsUrl != "" {
-		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
 	}
 
 	// Prepend the entrypoint; CodeBuild runs buildspec commands in a shell, not via Docker ENTRYPOINT

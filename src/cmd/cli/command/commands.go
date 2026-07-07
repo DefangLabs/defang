@@ -23,9 +23,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
-	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/scope"
-	"github.com/DefangLabs/defang/src/pkg/session"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -126,6 +124,7 @@ func SetupCommands(version string) {
 	cobra.EnableTraverseRunHooks = true // we always need to run the RootCmd's pre-run hook
 
 	RootCmd.Version = version
+	client.CliVersion = version
 	RootCmd.PersistentFlags().StringVarP(&global.Stack.Name, "stack", "s", global.Stack.Name, "stack name (for BYOC providers)")
 	RootCmd.RegisterFlagCompletionFunc("stack", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		stacks, err := stacks.List()
@@ -148,7 +147,7 @@ func SetupCommands(version string) {
 	})
 	RootCmd.PersistentFlags().StringVar(&global.FabricAddr, "cluster", global.FabricAddr, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster") // only for Defang use
-	RootCmd.PersistentFlags().Var(&global.Tenant, "workspace", "workspace to use")
+	RootCmd.PersistentFlags().Var(&global.TenantSelection, "workspace", "workspace to use")
 	RootCmd.PersistentFlags().VarP(&global.Stack.Provider, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, client.ByocProviders()))
 	RootCmd.RegisterFlagCompletionFunc("provider", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var completions []cobra.Completion
@@ -175,6 +174,7 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(cdCmd)
 	cdCmd.PersistentFlags().StringVar(&byoc.DefangPulumiBackend, "pulumi-backend", "", `specify an alternate Pulumi backend URL or "pulumi-cloud"`)
 	cdCmd.PersistentFlags().Bool("allow-upgrade", pkg.GetenvBool("DEFANG_ALLOW_UPGRADE"), "allow upgrading the CD image and Pulumi version to the latest available")
+	cdCmd.PersistentFlags().BoolP("detach", "d", false, "run in detached mode")
 	cdCmd.AddCommand(cdDestroyCmd)
 	cdCmd.AddCommand(cdDownCmd)
 	cdCmd.AddCommand(cdRefreshCmd)
@@ -185,8 +185,6 @@ func SetupCommands(version string) {
 	cdCmd.AddCommand(cdListCmd)
 	cdCmd.AddCommand(cdCancelCmd)
 	cdCmd.AddCommand(cdOutputsCmd)
-	cdPreviewCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
-	cdPreviewCmd.RegisterFlagCompletionFunc("mode", cobra.FixedCompletions(modes.AllDeploymentModes(), cobra.ShellCompDirectiveNoFileComp))
 	cdCmd.AddCommand(cdPreviewCmd)
 	cdInstallCmd.Flags().Bool("force", false, "force the installation of the CD resources into the cluster (allow downgrades)")
 	cdCmd.AddCommand(cdInstallCmd)
@@ -318,6 +316,8 @@ func SetupCommands(version string) {
 	// TODO: Add list, renew etc.
 	certCmd.AddCommand(certGenerateCmd)
 	RootCmd.AddCommand(certCmd)
+	recipeCmd := makeRecipeCmd()
+	RootCmd.AddCommand(recipeCmd)
 
 	stackCmd := makeStackCmd()
 	RootCmd.AddCommand(stackCmd)
@@ -349,6 +349,16 @@ func getCwd(args []string) string {
 	return ""
 }
 
+// errIfStackAndProvider rejects combining the (deprecated) --provider flag with
+// --stack: a stack determines its own provider, so --provider would be silently
+// ignored otherwise.
+func errIfStackAndProvider(cmd *cobra.Command) error {
+	if cmd.Flags().Changed("stack") && cmd.Flags().Changed("provider") {
+		return errors.New("cannot combine -s/--stack with -P/--provider; the stack determines the provider")
+	}
+	return nil
+}
+
 var RootCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -365,6 +375,11 @@ var RootCmd = &cobra.Command{
 			}
 			return nil
 		}
+
+		if err := errIfStackAndProvider(cmd); err != nil {
+			return err
+		}
+
 		var utc, _ = cmd.Flags().GetBool("utc")
 		var json, _ = cmd.Flags().GetBool("json")
 
@@ -377,7 +392,7 @@ var RootCmd = &cobra.Command{
 		ec.SetSupported(global.Interactive())
 
 		// Create a temporary gRPC client for tracking events before login
-		track.Tracker = cli.Connect(global.FabricAddr, global.Tenant)
+		track.Tracker = cli.Connect(global.FabricAddr, global.TenantSelection)
 
 		ctx := cmd.Context()
 		term.SetDebug(global.Debug)
@@ -404,7 +419,7 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		global.Client, err = cli.ConnectWithTenant(ctx, global.FabricAddr, global.Tenant)
+		global.Client, err = cli.ConnectWithTenant(ctx, global.FabricAddr, global.TenantSelection)
 		if err != nil {
 			if connect.CodeOf(err) != connect.CodeUnauthenticated {
 				return err
@@ -462,13 +477,9 @@ var RootCmd = &cobra.Command{
 	},
 }
 
-func configureLoaderForCommand(cmd *cobra.Command) *compose.Loader {
-	loaderFlags := newSessionLoaderOptionsForCommand(cmd)
-	return configureLoader(loaderFlags.LoaderOptions)
-}
-
-func configureLoader(loaderOptions session.LoaderOptions) *compose.Loader {
-	return compose.NewLoader(compose.WithProjectName(loaderOptions.ProjectName), compose.WithPath(loaderOptions.ComposeFilePaths...))
+func newLoaderForCommand(cmd *cobra.Command) *compose.Loader {
+	loaderOptions := loaderOptionsForCommand(cmd)
+	return compose.NewLoaderFromOptions(loaderOptions)
 }
 
 func isCompletionCommand(cmd *cobra.Command) bool {
@@ -481,4 +492,15 @@ func isUpgradeCommand(cmd *cobra.Command) bool {
 
 func canIUseProvider(ctx context.Context, provider client.Provider, projectName string, serviceCount int, allowUpgrade bool) error {
 	return client.CanIUseProvider(ctx, global.Client, provider, projectName, serviceCount, allowUpgrade)
+}
+
+// authenticateProvider must be called before any direct use of a provider that was
+// constructed outside of newCommandSession (e.g. via cli.NewProvider), so that
+// provider-specific login paths such as GitHub Actions OIDC federation run instead of
+// falling through to the plain default credential chain.
+func authenticateProvider(ctx context.Context, provider client.Provider) error {
+	if err := provider.Authenticate(ctx, global.Interactive()); err != nil {
+		return fmt.Errorf("failed to authenticate with provider: %w", err)
+	}
+	return nil
 }

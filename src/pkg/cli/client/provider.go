@@ -48,6 +48,7 @@ type DeployRequest struct {
 	defangv1.DeployRequest
 	EventsUrl string
 	StatesUrl string
+	Recipe    *defangv1.Recipe
 }
 
 type DeployResponse struct {
@@ -92,6 +93,11 @@ type Provider interface {
 	GetServices(context.Context, *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error)
 	GetStackName() string
 	GetStackNameForDomain() string
+	// HasDelegatedSubdomain reports whether the provider creates a delegated
+	// subdomain zone via PrepareDomainDelegation + CreateDelegateSubdomainZone
+	// during deploy. Providers that return false (currently Azure and DO) skip
+	// the matching DeleteSubdomainZone call on destroy.
+	HasDelegatedSubdomain() bool
 	ListConfig(context.Context, *defangv1.ListConfigsRequest) (*defangv1.Secrets, error)
 	PrepareDomainDelegation(context.Context, PrepareDomainDelegationRequest) (*PrepareDomainDelegationResponse, error)
 	Preview(context.Context, *DeployRequest) (*DeployResponse, error)

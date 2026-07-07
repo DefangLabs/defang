@@ -124,7 +124,7 @@ func TestPrintEstimate(t *testing.T) {
 	}
 
 	stdout, _ := term.SetupTestTerm(t)
-	cli.PrintEstimate(modes.ModeAffordable, estimate, term.DefaultTerm)
+	cli.PrintEstimate(modes.RecipeAffordable, estimate, term.DefaultTerm)
 
 	expectedOutput := `
 Estimate for Deployment Mode: AFFORDABLE

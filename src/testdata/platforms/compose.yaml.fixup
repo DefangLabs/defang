@@ -1,11 +1,5 @@
-{
-  "intel2": {
-    "command": null,
-    "entrypoint": null,
-    "image": "busybox",
-    "networks": {
-      "default": null
-    },
-    "platform": "LINUX/X86_64"
-  }
-}
+intel2:
+    image: busybox
+    networks:
+        default: null
+    platform: LINUX/X86_64

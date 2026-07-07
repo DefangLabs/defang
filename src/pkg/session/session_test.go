@@ -65,6 +65,55 @@ func (m *mockStacksManager) TargetDirectory() string {
 	return ""
 }
 
+func TestPrintProviderMismatchWarnings(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider client.ProviderID
+		env      map[string]string
+	}{
+		{"defang with no env", client.ProviderDefang, nil},
+		{"defang with AWS env", client.ProviderDefang, map[string]string{"AWS_PROFILE": "x"}},
+		{"defang with DO env", client.ProviderDefang, map[string]string{"DIGITALOCEAN_TOKEN": "x"}},
+		{"defang with Azure env", client.ProviderDefang, map[string]string{"AZURE_SUBSCRIPTION_ID": "x"}},
+		{"azure with no env", client.ProviderAzure, nil},
+		{"azure with env set", client.ProviderAzure, map[string]string{"AZURE_SUBSCRIPTION_ID": "sub"}},
+		{"do with no env", client.ProviderDO, nil},
+		{"do with env", client.ProviderDO, map[string]string{"DIGITALOCEAN_TOKEN": "t"}},
+		{"gcp with no env", client.ProviderGCP, nil},
+	}
+
+	// Unset all provider env vars to give the test deterministic state.
+	unset := []string{
+		"AWS_PROFILE", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_ROLE_ARN",
+		"DIGITALOCEAN_TOKEN", "DIGITALOCEAN_ACCESS_TOKEN",
+		"AZURE_SUBSCRIPTION_ID", "AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET",
+		"GOOGLE_CLOUD_PROJECT", "GCP_PROJECT_ID", "GCLOUD_PROJECT", "CLOUDSDK_CORE_PROJECT",
+	}
+	saved := map[string]string{}
+	for _, k := range unset {
+		if v, ok := os.LookupEnv(k); ok {
+			saved[k] = v
+			_ = os.Unsetenv(k)
+		}
+	}
+	t.Cleanup(func() {
+		for k, v := range saved {
+			_ = os.Setenv(k, v) //nolint:usetesting // t.Setenv registers another cleanup; restore via os.Setenv
+		}
+	})
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+			// Function writes warnings to term but has no return value; we just
+			// ensure it runs without panicking and exercises each branch.
+			printProviderMismatchWarnings(context.Background(), tt.provider)
+		})
+	}
+}
+
 func TestLoadSession(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -102,20 +151,20 @@ func TestLoadSession(t *testing.T) {
 			options: SessionLoaderOptions{
 				GetStackOpts: stacks.GetStackOpts{
 					Default: stacks.Parameters{
-						Name: "existingstack",
-						Mode: modes.ModeAffordable,
+						Name:   "existingstack",
+						Recipe: modes.RecipeAffordable,
 					},
 				},
 			},
 			existingStack: &stacks.Parameters{
 				Name:     "existingstack",
 				Provider: client.ProviderAWS,
-				Mode:     modes.ModeBalanced,
+				Recipe:   modes.RecipeBalanced,
 			},
 			expectedStack: &stacks.Parameters{
 				Name:     "existingstack",
 				Provider: client.ProviderAWS,
-				Mode:     modes.ModeAffordable,
+				Recipe:   modes.RecipeAffordable,
 				Variables: map[string]string{
 					"DEFANG_PROVIDER": "aws",
 					"DEFANG_MODE":     "affordable",
@@ -177,7 +226,7 @@ func TestLoadSession(t *testing.T) {
 			require.NotNil(t, session.Stack)
 			assert.Equal(t, tt.expectedStack.Name, session.Stack.Name)
 			assert.Equal(t, tt.expectedStack.Provider, session.Stack.Provider)
-			assert.Equal(t, tt.expectedStack.Mode, session.Stack.Mode)
+			assert.Equal(t, tt.expectedStack.Recipe, session.Stack.Recipe)
 
 			// Verify environment variables
 			for key, expectedValue := range tt.expectedEnv {

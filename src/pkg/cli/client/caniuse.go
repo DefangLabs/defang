@@ -9,6 +9,9 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
+// CliVersion is the CLI version, set by SetupCommands from the main package's ldflags-injected value.
+var CliVersion string
+
 func CanIUseProvider(ctx context.Context, client FabricClient, provider Provider, projectName string, serviceCount int, allowUpgrade bool) error {
 	info, err := provider.AccountInfo(ctx)
 	if err != nil {
@@ -33,6 +36,7 @@ func CanIUseProvider(ctx context.Context, client FabricClient, provider Provider
 	}
 
 	resp, err := client.CanIUse(ctx, &defangv1.CanIUseRequest{
+		CliVersion:          CliVersion,
 		Project:             projectName,
 		Provider:            info.Provider.Value(),
 		ProviderAccountId:   info.AccountID,

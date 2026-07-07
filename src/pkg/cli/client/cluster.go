@@ -49,15 +49,15 @@ func GetExistingToken(fabricAddr string) string {
 		if err != nil {
 			term.Debugf("failed to load access token for %v: %v", fabricAddr, err)
 		}
+	}
 
-		// Check if we wrote an IDToken file during login, if AWS_WEB_IDENTITY_TOKEN_FILE is empty,
-		if os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") == "" {
-			if jwtPath, err := GetWebIdentityTokenFile(fabricAddr); err == nil {
-				term.Debugf("using web identity token from %s", jwtPath)
-				// Set AWS env vars for this CLI invocation
-				os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath)
-				os.Setenv("AWS_ROLE_SESSION_NAME", "defang-cli") // TODO: from WhoAmI
-			}
+	// Check if we wrote an IDToken file during login, if AWS_WEB_IDENTITY_TOKEN_FILE is empty,
+	if os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") == "" {
+		if jwtPath, err := GetWebIdentityTokenFile(fabricAddr); err == nil {
+			term.Debugf("using web identity token from %s", jwtPath)
+			// Set AWS env vars for this CLI invocation
+			os.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", jwtPath)
+			os.Setenv("AWS_ROLE_SESSION_NAME", "defang-cli") // TODO: from WhoAmI
 		}
 	}
 

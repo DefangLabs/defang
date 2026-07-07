@@ -1,10 +1,4 @@
-{
-  "aVeryLongServiceNameThatIsDefinitelyTooLongThatWillCauseAnError": {
-    "command": null,
-    "entrypoint": null,
-    "image": "alpine",
-    "networks": {
-      "default": null
-    }
-  }
-}
+aVeryLongServiceNameThatIsDefinitelyTooLongThatWillCauseAnError:
+    image: alpine
+    networks:
+        default: null

@@ -17,7 +17,7 @@ const (
 func (t TenantNameOrID) String() string {
 	if t == TenantUnset {
 		// Provide a friendlier label for logs/UI; logic uses IsSet/string value directly.
-		return "personal tenant"
+		return "default tenant"
 	}
 	return string(t)
 }

@@ -41,6 +41,18 @@ type MockStacksManager struct {
 	mock.Mock
 }
 
+func (m *MockStacksManager) Load(ctx context.Context, name string) (*Parameters, error) {
+	args := m.Called(ctx, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	result, ok := args.Get(0).(*Parameters)
+	if !ok {
+		return nil, args.Error(1)
+	}
+	return result, args.Error(1)
+}
+
 func (m *MockStacksManager) List(ctx context.Context) ([]ListItem, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
@@ -83,35 +95,36 @@ func TestStackSelector_SelectStack_ExistingStack(t *testing.T) {
 	// Mock existing stacks list
 	existingStacks := []ListItem{
 		{
-			Parameters: Parameters{
-				Name:     "production",
-				Provider: "aws",
-				Region:   "us-west-2",
-			},
+			Name:     "production",
+			Provider: "aws",
+			Region:   "us-west-2",
 		},
 		{
-			Parameters: Parameters{
-				Name:     "development",
-				Provider: "aws",
-				Region:   "us-east-1",
-			},
+			Name:     "development",
+			Provider: "aws",
+			Region:   "us-east-1",
 		},
 	}
 	mockSM.On("List", ctx).Return(existingStacks, nil)
+	mockSM.On("Load", ctx, "production").Return(&Parameters{
+		Name:     "production",
+		Provider: "aws",
+		Region:   "us-west-2",
+	}, nil)
 
 	// Mock user selecting existing stack
-	expectedOptions := []string{"production (us-west-2)", "development (us-east-1)"}
-	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("production (us-west-2)", nil)
+	expectedOptions := []string{"production [us-west-2]", "development [us-east-1]"}
+	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("production [us-west-2]", nil)
 
 	// Expected params based on ToParameters() conversion
 	expectedParams := &Parameters{
 		Name:     "production",
 		Provider: client.ProviderAWS,
 		Region:   "us-west-2",
-		Mode:     modes.ModeUnspecified,
+		Recipe:   modes.RecipeUnspecified,
 	}
 
-	selector := NewSelector(mockEC, mockSM)
+	selector := NewSelector(mockEC, mockSM, nil)
 
 	result, err := selector.SelectStack(ctx, SelectStackOptions{})
 
@@ -133,24 +146,29 @@ func TestStackSelector_SelectOrCreateStack_ExistingStack(t *testing.T) {
 
 	// Mock existing stacks list
 	existingStacks := []ListItem{
-		{Parameters: Parameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
-		{Parameters: Parameters{Name: "development", Provider: "aws", Region: "us-east-1"}},
+		{Name: "production", Provider: "aws", Region: "us-west-2"},
+		{Name: "development", Provider: "aws", Region: "us-east-1"},
 	}
 	mockSM.On("List", ctx).Return(existingStacks, nil)
+	mockSM.On("Load", ctx, "production").Return(&Parameters{
+		Name:     "production",
+		Provider: "aws",
+		Region:   "us-west-2",
+	}, nil)
 
 	// Mock user selecting existing stack
-	expectedOptions := []string{"production (us-west-2)", "development (us-east-1)", CreateNewStack}
-	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("production (us-west-2)", nil)
+	expectedOptions := []string{"production [us-west-2]", "development [us-east-1]", CreateNewStack}
+	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("production [us-west-2]", nil)
 
 	// Expected params based on ToParameters() conversion
 	expectedParams := &Parameters{
 		Name:     "production",
 		Provider: client.ProviderAWS,
 		Region:   "us-west-2",
-		Mode:     modes.ModeUnspecified,
+		Recipe:   modes.RecipeUnspecified,
 	}
 
-	selector := NewSelector(mockEC, mockSM)
+	selector := NewSelector(mockEC, mockSM, nil)
 
 	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowStackCreation: true})
 
@@ -174,16 +192,16 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 
 	// Mock existing stacks list
 	existingStacks := []ListItem{
-		{Parameters: Parameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
+		{Name: "production", Provider: "aws", Region: "us-west-2"},
 	}
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock user selecting to create new stack
-	expectedOptions := []string{"production (aws, us-west-2)", CreateNewStack}
+	expectedOptions := []string{"production [aws us-west-2]", CreateNewStack}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return(CreateNewStack, nil)
 
 	// Mock wizard parameter collection - provider selection
-	providerOptions := []string{"AWS", "DigitalOcean", "Google Cloud Platform"}
+	providerOptions := []string{"AWS", "DigitalOcean", "Google Cloud Platform", "Azure"}
 	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("AWS", nil)
 
 	// Mock wizard parameter collection - region selection (default is us-west-2 for AWS)
@@ -217,11 +235,15 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 		return o.DefaultValue == "default"
 	})).Return("staging", nil).Maybe()
 
+	// Mock wizard parameter collection - deployment mode (recipe) selection
+	mockEC.On("RequestEnum", ctx, "Which recipe (deployment mode) do you want to deploy with?", "recipe", modes.AllDeploymentModes()).Return("BALANCED", nil)
+
 	// Mock wizard parameter collection
 	newStackParams := &Parameters{
 		Name:     "staging",
 		Provider: client.ProviderAWS,
 		Region:   "us-east-1",
+		Recipe:   modes.RecipeBalanced,
 		Variables: map[string]string{
 			"AWS_PROFILE": "staging",
 		},
@@ -233,8 +255,8 @@ func TestStackSelector_SelectStack_CreateNewStack(t *testing.T) {
 	mockProfileLister := &MockAWSProfileLister{}
 	mockProfileLister.On("ListProfiles").Return([]string{"default"}, nil)
 
-	selector := NewSelector(mockEC, mockSM)
-	selector.wizard = NewWizardWithProfileLister(mockEC, mockProfileLister)
+	selector := NewSelector(mockEC, mockSM, nil)
+	selector.wizard = NewWizardWithProfileLister(mockEC, nil, mockProfileLister)
 
 	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowStackCreation: true})
 
@@ -259,7 +281,7 @@ func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
 	mockSM.On("List", ctx).Return([]ListItem{}, nil)
 
 	// Mock wizard parameter collection - provider selection
-	providerOptions := []string{"AWS", "DigitalOcean", "Google Cloud Platform"}
+	providerOptions := []string{"AWS", "DigitalOcean", "Google Cloud Platform", "Azure"}
 	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("AWS", nil)
 
 	// Mock wizard parameter collection - region selection
@@ -293,11 +315,15 @@ func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
 		return o.DefaultValue == "default"
 	})).Return("default", nil).Maybe()
 
+	// Mock wizard parameter collection - deployment mode (recipe) selection
+	mockEC.On("RequestEnum", ctx, "Which recipe (deployment mode) do you want to deploy with?", "recipe", modes.AllDeploymentModes()).Return("BALANCED", nil)
+
 	// Mock wizard parameter collection
 	newStackParams := &Parameters{
 		Name:     "firststack",
 		Provider: client.ProviderAWS,
 		Region:   "us-west-2",
+		Recipe:   modes.RecipeBalanced,
 		Variables: map[string]string{
 			"AWS_PROFILE": "default",
 		},
@@ -309,8 +335,8 @@ func TestStackSelector_SelectStack_NoExistingStacks(t *testing.T) {
 	mockProfileLister := &MockAWSProfileLister{}
 	mockProfileLister.On("ListProfiles").Return([]string{"default"}, nil)
 
-	selector := NewSelector(mockEC, mockSM)
-	selector.wizard = NewWizardWithProfileLister(mockEC, mockProfileLister)
+	selector := NewSelector(mockEC, mockSM, nil)
+	selector.wizard = NewWizardWithProfileLister(mockEC, nil, mockProfileLister)
 
 	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowStackCreation: true})
 
@@ -331,7 +357,7 @@ func TestStackSelector_SelectStack_ElicitationsNotSupported(t *testing.T) {
 	// Mock that elicitations are not supported
 	mockEC.On("IsSupported").Return(false)
 
-	selector := NewSelector(mockEC, mockSM)
+	selector := NewSelector(mockEC, mockSM, nil)
 
 	result, err := selector.SelectStack(ctx, SelectStackOptions{})
 
@@ -355,7 +381,7 @@ func TestStackSelector_SelectStack_ListStacksError(t *testing.T) {
 	// Mock error when listing stacks
 	mockSM.On("List", ctx).Return([]ListItem{}, errors.New("failed to access stack storage"))
 
-	selector := NewSelector(mockEC, mockSM)
+	selector := NewSelector(mockEC, mockSM, nil)
 
 	result, err := selector.SelectStack(ctx, SelectStackOptions{})
 
@@ -378,15 +404,15 @@ func TestStackSelector_SelectStack_ElicitationError(t *testing.T) {
 
 	// Mock existing stacks list
 	existingStacks := []ListItem{
-		{Parameters: Parameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
+		{Name: "production", Provider: "aws", Region: "us-west-2"},
 	}
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock error during elicitation
-	expectedOptions := []string{"production (aws, us-west-2)"}
+	expectedOptions := []string{"production [aws us-west-2]"}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("", errors.New("user cancelled selection"))
 
-	selector := NewSelector(mockEC, mockSM)
+	selector := NewSelector(mockEC, mockSM, nil)
 
 	result, err := selector.SelectStack(ctx, SelectStackOptions{})
 
@@ -409,19 +435,19 @@ func TestStackSelector_SelectStack_WizardError(t *testing.T) {
 
 	// Mock existing stacks list
 	existingStacks := []ListItem{
-		{Parameters: Parameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
+		{Name: "production", Provider: "aws", Region: "us-west-2"},
 	}
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock user selecting to create new stack
-	expectedOptions := []string{"production (aws, us-west-2)", CreateNewStack}
+	expectedOptions := []string{"production [aws us-west-2]", CreateNewStack}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return(CreateNewStack, nil)
 
 	// Mock wizard parameter collection - provider selection fails
-	providerOptions := []string{"AWS", "DigitalOcean", "Google Cloud Platform"}
+	providerOptions := []string{"AWS", "DigitalOcean", "Google Cloud Platform", "Azure"}
 	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("", errors.New("user cancelled wizard"))
 
-	selector := NewSelector(mockEC, mockSM)
+	selector := NewSelector(mockEC, mockSM, nil)
 	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowStackCreation: true})
 
 	assert.Error(t, err)
@@ -446,16 +472,16 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 
 	// Mock existing stacks list
 	existingStacks := []ListItem{
-		{Parameters: Parameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
+		{Name: "production", Provider: "aws", Region: "us-west-2"},
 	}
 	mockSM.On("List", ctx).Return(existingStacks, nil)
 
 	// Mock user selecting to create new stack
-	expectedOptions := []string{"production (aws, us-west-2)", CreateNewStack}
+	expectedOptions := []string{"production [aws us-west-2]", CreateNewStack}
 	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return(CreateNewStack, nil)
 
 	// Mock wizard parameter collection - provider selection
-	providerOptions := []string{"AWS", "DigitalOcean", "Google Cloud Platform"}
+	providerOptions := []string{"AWS", "DigitalOcean", "Google Cloud Platform", "Azure"}
 	mockEC.On("RequestEnum", ctx, "Where do you want to deploy?", "provider", providerOptions).Return("AWS", nil)
 
 	// Mock wizard parameter collection - region selection
@@ -489,11 +515,15 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 		return o.DefaultValue == "default"
 	})).Return("staging", nil).Maybe()
 
+	// Mock wizard parameter collection - deployment mode (recipe) selection
+	mockEC.On("RequestEnum", ctx, "Which recipe (deployment mode) do you want to deploy with?", "recipe", modes.AllDeploymentModes()).Return("BALANCED", nil)
+
 	// Mock wizard parameter collection
 	newStackParams := &Parameters{
 		Name:     "staging",
 		Provider: client.ProviderAWS,
 		Region:   "us-east-1",
+		Recipe:   modes.RecipeBalanced,
 		Variables: map[string]string{
 			"AWS_PROFILE": "staging",
 		},
@@ -505,8 +535,8 @@ func TestStackSelector_SelectStack_CreateStackError(t *testing.T) {
 	mockProfileLister := &MockAWSProfileLister{}
 	mockProfileLister.On("ListProfiles").Return([]string{"default"}, nil)
 
-	selector := NewSelector(mockEC, mockSM)
-	selector.wizard = NewWizardWithProfileLister(mockEC, mockProfileLister)
+	selector := NewSelector(mockEC, mockSM, nil)
+	selector.wizard = NewWizardWithProfileLister(mockEC, nil, mockProfileLister)
 	result, err := selector.SelectStack(ctx, SelectStackOptions{AllowStackCreation: true})
 
 	assert.Error(t, err)
@@ -528,23 +558,27 @@ func TestStackSelector_SelectStack_ShowsAccountInLabel(t *testing.T) {
 	mockEC.On("IsSupported").Return(true)
 
 	existingStacks := []ListItem{
-		{Parameters: Parameters{Name: "prod", Provider: "aws", Region: "us-west-2", Variables: map[string]string{"AWS_PROFILE": "prod-account"}}},
-		{Parameters: Parameters{Name: "dev", Provider: "aws", Region: "us-west-2", Variables: map[string]string{"AWS_PROFILE": "dev-account"}}},
+		{Name: "prod", Provider: "aws", Region: "us-west-2", Account: "prod-account"},
+		{Name: "dev", Provider: "aws", Region: "us-west-2", Account: "dev-account"},
 	}
 	mockSM.On("List", ctx).Return(existingStacks, nil)
+	mockSM.On("Load", ctx, "prod").Return(&Parameters{
+		Name:     "prod",
+		Provider: "aws",
+		Region:   "us-west-2",
+	}, nil)
 
 	// provider and region are redundant; only account differs
-	expectedOptions := []string{"prod (prod-account)", "dev (dev-account)"}
-	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("prod (prod-account)", nil)
+	expectedOptions := []string{"prod [prod-account]", "dev [dev-account]"}
+	mockEC.On("RequestEnum", ctx, "Select a stack", "stack", expectedOptions).Return("prod [prod-account]", nil)
 
 	expectedParams := &Parameters{
-		Name:      "prod",
-		Provider:  client.ProviderAWS,
-		Region:    "us-west-2",
-		Variables: map[string]string{"AWS_PROFILE": "prod-account"},
+		Name:     "prod",
+		Provider: client.ProviderAWS,
+		Region:   "us-west-2",
 	}
 
-	selector := NewSelector(mockEC, mockSM)
+	selector := NewSelector(mockEC, mockSM, nil)
 	result, err := selector.SelectStack(ctx, SelectStackOptions{})
 
 	assert.NoError(t, err)
@@ -568,33 +602,33 @@ func TestMakeStackSelectorLabels(t *testing.T) {
 		{
 			name: "one stack - present all fields",
 			stacks: []ListItem{
-				{Parameters: Parameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
+				{Name: "production", Provider: "aws", Region: "us-west-2"},
 			},
-			wantLabels: []string{"production (aws, us-west-2)"},
+			wantLabels: []string{"production [aws us-west-2]"},
 		},
 		{
 			name: "one stack with AWS profile",
 			stacks: []ListItem{
-				{Parameters: Parameters{Name: "production", Provider: "aws", Region: "us-west-2", Variables: map[string]string{"AWS_PROFILE": "my-profile"}}},
+				{Name: "production", Provider: "aws", Region: "us-west-2", Account: "my-profile"},
 			},
-			wantLabels: []string{"production (aws, us-west-2, my-profile)"},
+			wantLabels: []string{"production [aws my-profile us-west-2]"},
 		},
 		{
 			name: "hide redundant provider",
 			stacks: []ListItem{
-				{Parameters: Parameters{Name: "production", Provider: "aws", Region: "us-west-2"}},
-				{Parameters: Parameters{Name: "development", Provider: "aws", Region: "us-east-1"}},
+				{Name: "production", Provider: "aws", Region: "us-west-2"},
+				{Name: "development", Provider: "aws", Region: "us-east-1"},
 			},
 			wantLabels: []string{
-				"production (us-west-2)",
-				"development (us-east-1)",
+				"production [us-west-2]",
+				"development [us-east-1]",
 			},
 		},
 		{
 			name: "hide redundant provider and region",
 			stacks: []ListItem{
-				{Parameters: Parameters{Name: "prod-us-west-2", Provider: "aws", Region: "us-west-2"}},
-				{Parameters: Parameters{Name: "dev-us-west-2", Provider: "aws", Region: "us-west-2"}},
+				{Name: "prod-us-west-2", Provider: "aws", Region: "us-west-2"},
+				{Name: "dev-us-west-2", Provider: "aws", Region: "us-west-2"},
 			},
 			wantLabels: []string{
 				"prod-us-west-2",
@@ -604,53 +638,53 @@ func TestMakeStackSelectorLabels(t *testing.T) {
 		{
 			name: "mixed redundancy",
 			stacks: []ListItem{
-				{Parameters: Parameters{Name: "prod-us-west-2", Provider: "aws", Region: "us-west-2"}},
-				{Parameters: Parameters{Name: "dev-us-east-1", Provider: "aws", Region: "us-east-1"}},
-				{Parameters: Parameters{Name: "gcp-stack", Provider: "gcp", Region: "us-central1"}},
+				{Name: "prod-us-west-2", Provider: "aws", Region: "us-west-2"},
+				{Name: "dev-us-east-1", Provider: "aws", Region: "us-east-1"},
+				{Name: "gcp-stack", Provider: "gcp", Region: "us-central1"},
 			},
 			wantLabels: []string{
-				"prod-us-west-2 (aws, us-west-2)",
-				"dev-us-east-1 (aws, us-east-1)",
-				"gcp-stack (gcp, us-central1)",
+				"prod-us-west-2 [aws us-west-2]",
+				"dev-us-east-1 [aws us-east-1]",
+				"gcp-stack [gcp us-central1]",
 			},
 		},
 		{
 			name: "show different AWS profiles",
 			stacks: []ListItem{
-				{Parameters: Parameters{Name: "prod", Provider: "aws", Region: "us-west-2", Variables: map[string]string{"AWS_PROFILE": "prod-account"}}},
-				{Parameters: Parameters{Name: "dev", Provider: "aws", Region: "us-west-2", Variables: map[string]string{"AWS_PROFILE": "dev-account"}}},
+				{Name: "prod", Provider: "aws", Region: "us-west-2", Account: "prod-account"},
+				{Name: "dev", Provider: "aws", Region: "us-west-2", Account: "dev-account"},
 			},
 			wantLabels: []string{
-				"prod (prod-account)",
-				"dev (dev-account)",
+				"prod [prod-account]",
+				"dev [dev-account]",
 			},
 		},
 		{
 			name: "hide redundant AWS profile",
 			stacks: []ListItem{
-				{Parameters: Parameters{Name: "prod", Provider: "aws", Region: "us-west-2", Variables: map[string]string{"AWS_PROFILE": "shared"}}},
-				{Parameters: Parameters{Name: "dev", Provider: "aws", Region: "us-east-1", Variables: map[string]string{"AWS_PROFILE": "shared"}}},
+				{Name: "prod", Provider: "aws", Region: "us-west-2", Account: "shared"},
+				{Name: "dev", Provider: "aws", Region: "us-east-1", Account: "shared"},
 			},
 			wantLabels: []string{
-				"prod (us-west-2)",
-				"dev (us-east-1)",
+				"prod [us-west-2]",
+				"dev [us-east-1]",
 			},
 		},
 		{
 			name: "show different GCP project IDs",
 			stacks: []ListItem{
-				{Parameters: Parameters{Name: "prod", Provider: "gcp", Region: "us-central1", Variables: map[string]string{"GCP_PROJECT_ID": "my-prod-project"}}},
-				{Parameters: Parameters{Name: "dev", Provider: "gcp", Region: "us-central1", Variables: map[string]string{"GCP_PROJECT_ID": "my-dev-project"}}},
+				{Name: "prod", Provider: "gcp", Region: "us-central1", Account: "my-prod-project"},
+				{Name: "dev", Provider: "gcp", Region: "us-central1", Account: "my-dev-project"},
 			},
 			wantLabels: []string{
-				"prod (my-prod-project)",
-				"dev (my-dev-project)",
+				"prod [my-prod-project]",
+				"dev [my-dev-project]",
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			labels := MakeStackSelectorLabels(tt.stacks)
+			labels := makeStackSelectorLabels(tt.stacks)
 
 			// Extract labels into a slice for easier comparison
 			var gotLabels []string

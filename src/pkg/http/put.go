@@ -18,10 +18,14 @@ import (
 // See the Client.Do method documentation for details on how redirects
 // are handled.
 func Put(ctx context.Context, url string, contentType string, body io.Reader) (*http.Response, error) {
+	return PutWithHeader(ctx, url, http.Header{"Content-Type": []string{contentType}}, body)
+}
+
+func PutWithHeader(ctx context.Context, url string, header http.Header, body io.Reader) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, body)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", contentType)
+	req.Header = header
 	return DefaultClient.Do(req)
 }

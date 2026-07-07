@@ -26,6 +26,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -311,8 +312,8 @@ func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[state.
 
 	uploadSA := b.driver.GetServiceAccountEmail(DefangUploadServiceAccountName)
 	term.Debug("Getting services from pulumi stacks bucket:", bucketName, prefix, uploadSA)
-	objLoader := func(ctx context.Context, bucket, object string) ([]byte, error) {
-		return b.driver.GetBucketObjectWithServiceAccount(ctx, bucket, object, uploadSA)
+	objLoader := func(ctx context.Context, object string) ([]byte, error) {
+		return b.driver.GetBucketObjectWithServiceAccount(ctx, bucketName, object, uploadSA)
 	}
 	seq, err := b.driver.IterateBucketObjects(ctx, bucketName, prefix)
 	if err != nil {
@@ -324,7 +325,7 @@ func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[state.
 				term.Debugf("Error listing object in bucket %s: %v", bucketName, annotateGcpError(err))
 				continue
 			}
-			st, err := state.ParsePulumiStateFile(ctx, gcpObj{obj}, bucketName, objLoader)
+			st, err := state.ParsePulumiStateFile(ctx, gcpObj{obj}, objLoader)
 			if err != nil {
 				term.Debugf("Skipping %q in bucket %s: %v", obj.Name, bucketName, annotateGcpError(err))
 				continue
@@ -398,7 +399,7 @@ type cdCommand struct {
 	command        []string
 	delegateDomain string
 	etag           types.ETag
-	mode           defangv1.DeploymentMode
+	recipe         modes.Recipe
 	project        string
 	statesUrl      string
 	eventsUrl      string
@@ -412,6 +413,7 @@ type CloudBuildStep struct {
 }
 
 func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, error) {
+	// From https://www.pulumi.com/docs/iac/concepts/state-and-backends/#google-cloud-storage
 	defangStateUrl := `gs://` + b.bucket
 	pulumiBackendKey, pulumiBackendValue, err := byoc.GetPulumiBackend(defangStateUrl)
 	if err != nil {
@@ -421,7 +423,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"DEFANG_CD_IMAGE":          b.CDImage,                 // used by down/destroy to schedule cleanup job with the same image
 		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_JSON":              os.Getenv("DEFANG_JSON"),
-		"DEFANG_MODE":              strings.ToLower(cmd.mode.String()),
+		"DEFANG_MODE":              strings.ToLower(cmd.recipe.Mode().String()),
 		"DEFANG_ORG":               string(b.TenantLabel),
 		"DEFANG_PREFIX":            b.Prefix,
 		"DEFANG_PULUMI_DEBUG":      os.Getenv("DEFANG_PULUMI_DEBUG"),
@@ -556,6 +558,7 @@ func (b *ByocGcp) deploy(ctx context.Context, req *client.DeployRequest, command
 		Mode:          req.Mode,
 		PulumiVersion: b.PulumiVersion,
 		Services:      serviceInfos,
+		Recipe:        req.Recipe,
 	})
 	if err != nil {
 		return nil, err
@@ -587,7 +590,7 @@ func (b *ByocGcp) deploy(ctx context.Context, req *client.DeployRequest, command
 		command:        []string{command, payload},
 		delegateDomain: req.DelegateDomain,
 		etag:           etag,
-		mode:           req.Mode,
+		recipe:         modes.Recipe(req.RecipeName),
 		project:        project.Name,
 		statesUrl:      req.StatesUrl,
 		eventsUrl:      req.EventsUrl,

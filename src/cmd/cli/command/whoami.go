@@ -41,7 +41,7 @@ var whoamiCmd = &cobra.Command{
 			}
 		}
 
-		data, err := cli.Whoami(ctx, global.Client, provider, userInfo, global.Tenant)
+		data, err := cli.Whoami(ctx, global.Client, provider, userInfo, global.TenantSelection)
 		if err != nil {
 			return err
 		}

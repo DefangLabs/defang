@@ -165,6 +165,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *client.DeployRequest, cmd stri
 		Mode:          req.Mode,
 		PulumiVersion: b.PulumiVersion,
 		Services:      serviceInfos,
+		Recipe:        req.Recipe,
 	})
 	if err != nil {
 		return nil, err
@@ -590,6 +591,13 @@ func phaseToState(phase godo.DeploymentPhase) defangv1.ServiceState {
 
 func (b *ByocDo) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
 	return nil, nil // TODO: implement domain delegation for DO
+}
+
+// HasDelegatedSubdomain implements client.Provider. DO does not yet implement
+// domain delegation, so there is no subdomain zone to delete on destroy. Flip
+// to true (or remove the override) once PrepareDomainDelegation is wired up.
+func (*ByocDo) HasDelegatedSubdomain() bool {
+	return false
 }
 
 type cdCommand struct {

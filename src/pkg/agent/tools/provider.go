@@ -34,7 +34,7 @@ func NewProviderPreparer(pc ProviderCreator, ec elicitations.Controller, fc clie
 
 func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.Parameters) (*client.ProviderID, client.Provider, error) {
 	if stack.Name == "" && pp.ec.IsSupported() {
-		selector := stacks.NewSelector(pp.ec, pp.sm)
+		selector := stacks.NewSelector(pp.ec, pp.sm, pp.fc)
 		newStack, err := selector.SelectStack(ctx, stacks.SelectStackOptions{
 			AllowStackCreation: true,
 		})
@@ -50,6 +50,9 @@ func (pp *providerPreparer) SetupProvider(ctx context.Context, stack *stacks.Par
 
 	term.Debug("Function invoked: cli.NewProvider")
 	provider := pp.pc.NewProvider(ctx, stack.Provider, pp.fc, stack.Name)
+	if err := provider.Authenticate(ctx, pp.ec.IsSupported()); err != nil {
+		return nil, nil, fmt.Errorf("failed to authenticate with provider %q: %w", stack.Provider, err)
+	}
 	providerID := stack.Provider
 	return &providerID, provider, nil
 }

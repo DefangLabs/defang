@@ -56,3 +56,6 @@ func (r MockResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS, e
 	ns, err := r.records(DNSRequest{Type: "NS", Domain: domain})
 	return convert(ns, func(n string) *net.NS { return &net.NS{Host: n} }), err
 }
+func (r MockResolver) LookupTXT(ctx context.Context, domain string) ([]string, error) {
+	return r.records(DNSRequest{Type: "TXT", Domain: domain})
+}

@@ -42,6 +42,7 @@ func (m *MockSsmClient) DeleteParameters(ctx context.Context, params *ssm.Delete
 type mockFabricService struct {
 	defangv1connect.UnimplementedFabricControllerHandler
 	canIUseIsCalled bool
+	tenantId        string
 }
 
 func (m *mockFabricService) CanIUse(ctx context.Context, canUseReq *connect.Request[defangv1.CanIUseRequest]) (*connect.Response[defangv1.CanIUseResponse], error) {
@@ -62,7 +63,8 @@ func (m *mockFabricService) CheckToS(context.Context, *connect.Request[emptypb.E
 
 func (m *mockFabricService) WhoAmI(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.WhoAmIResponse], error) {
 	return connect.NewResponse(&defangv1.WhoAmIResponse{
-		Tenant:            "default",
+		Tenant:            m.tenantId,
+		TenantId:          m.tenantId,
 		ProviderAccountId: "default",
 		Region:            "us-test-2",
 		Tier:              defangv1.SubscriptionTier_HOBBY,
@@ -446,4 +448,95 @@ func TestNewProvider(t *testing.T) {
 			}
 		}
 	})
+}
+
+type fakeAuthenticateProvider struct {
+	client.MockProvider
+	err            error
+	gotInteractive bool
+	calledInteract bool
+}
+
+func (f *fakeAuthenticateProvider) Authenticate(ctx context.Context, interactive bool) error {
+	f.calledInteract = true
+	f.gotInteractive = interactive
+	return f.err
+}
+
+func TestAuthenticateProvider(t *testing.T) {
+	oldNonInteractive := global.NonInteractive
+	t.Cleanup(func() { global.NonInteractive = oldNonInteractive })
+
+	t.Run("propagates non-interactive flag and succeeds", func(t *testing.T) {
+		global.NonInteractive = true
+		p := &fakeAuthenticateProvider{}
+		if err := authenticateProvider(t.Context(), p); err != nil {
+			t.Fatalf("authenticateProvider() failed: %v", err)
+		}
+		if !p.calledInteract {
+			t.Fatal("expected Authenticate to be called")
+		}
+		if p.gotInteractive {
+			t.Error("expected interactive=false when global.NonInteractive is true")
+		}
+	})
+
+	t.Run("propagates interactive flag", func(t *testing.T) {
+		global.NonInteractive = false
+		p := &fakeAuthenticateProvider{}
+		if err := authenticateProvider(t.Context(), p); err != nil {
+			t.Fatalf("authenticateProvider() failed: %v", err)
+		}
+		if !p.gotInteractive {
+			t.Error("expected interactive=true when global.NonInteractive is false")
+		}
+	})
+
+	t.Run("wraps the underlying error", func(t *testing.T) {
+		wantErr := errors.New("no valid credentials found")
+		p := &fakeAuthenticateProvider{err: wantErr}
+		err := authenticateProvider(t.Context(), p)
+		if !errors.Is(err, wantErr) {
+			t.Fatalf("authenticateProvider() error = %v, want wrapped %v", err, wantErr)
+		}
+	})
+}
+
+func TestErrIfStackAndProvider(t *testing.T) {
+	// RootCmd is wired up by TestMain via SetupCommands, so exercise its real flags.
+	stackFlag := RootCmd.Flags().Lookup("stack")
+	providerFlag := RootCmd.Flags().Lookup("provider")
+	if stackFlag == nil || providerFlag == nil {
+		t.Fatal("expected --stack and --provider to be registered on RootCmd")
+	}
+	origStack, origProvider := global.Stack.Name, global.Stack.Provider
+	t.Cleanup(func() {
+		global.Stack.Name, global.Stack.Provider = origStack, origProvider
+		stackFlag.Changed, providerFlag.Changed = false, false
+	})
+
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr bool
+	}{
+		{name: "neither flag", args: []string{}},
+		{name: "only stack", args: []string{"--stack", "prod"}},
+		{name: "only provider", args: []string{"--provider", "aws"}},
+		{name: "stack and provider", args: []string{"--stack", "prod", "--provider", "aws"}, wantErr: true},
+		{name: "short flags", args: []string{"-s", "prod", "-P", "aws"}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stackFlag.Changed, providerFlag.Changed = false, false
+			if err := RootCmd.ParseFlags(tt.args); err != nil {
+				t.Fatalf("ParseFlags() failed: %v", err)
+			}
+
+			err := errIfStackAndProvider(RootCmd)
+			if tt.wantErr != (err != nil) {
+				t.Errorf("errIfStackAndProvider() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }

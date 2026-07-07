@@ -59,8 +59,11 @@ func NewLoader(opts ...LoaderOption) *Loader {
 	for _, o := range opts {
 		o(&options)
 	}
+	return NewLoaderFromOptions(options)
+}
 
-	// if no --project-name is provided, try to get it from the environment
+func NewLoaderFromOptions(options LoaderOptions) *Loader {
+	// If no --project-name is provided, try to get it from the environment
 	// https://docs.docker.com/compose/project-name/#set-a-project-name
 	if options.ProjectName == "" {
 		if envProjName, ok := os.LookupEnv("COMPOSE_PROJECT_NAME"); ok {

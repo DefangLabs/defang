@@ -1,0 +1,1079 @@
+package aca
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"iter"
+	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	armappcontainersv3 "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appcontainers/armappcontainers/v3"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/operationalinsights/armoperationalinsights"
+	"github.com/DefangLabs/defang/src/pkg/clouds/azure"
+	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/google/uuid"
+)
+
+const (
+	cdJobName          = "defang-cd"
+	cdEnvironmentName  = "defang-cd"
+	cdLogWorkspaceName = "defang-cd"
+	// EnvVarEtag is the environment variable the CD execution is launched with so
+	// its run can later be matched back to a deployment etag (see FindExecutionByEtag).
+	EnvVarEtag         = "ETAG"
+	jobLogPollInterval = 3 * time.Second
+	// jobAPIVersion is required for job getAuthToken / executions/replicas which
+	// are not yet exposed in the stable SDK or the 2023-05-01 API version.
+	jobAPIVersion = "2024-02-02-preview"
+	// cdJobCPU and cdJobMemory size the CD container so Pulumi has enough room to
+	// run. The Consumption profile (the only profile available in the default
+	// environment we provision) caps a single replica at 2 vCPU / 4 GiB, so this
+	// is the largest supported pair. The default (0.25 vCPU / 0.5 GiB) was far
+	// too small for Pulumi previews and noticeably slowed CD runs.
+	cdJobCPU    = 2.0
+	cdJobMemory = "4Gi"
+)
+
+// logAnalyticsEndpoint is the base URL for the Log Analytics query API, overridable for tests.
+var logAnalyticsEndpoint = "https://api.loganalytics.io"
+
+// JobRequest contains parameters for starting a Container Apps Job execution.
+type JobRequest struct {
+	Image   string
+	Command []string
+	// Envs are plain-text environment variables.
+	Envs map[string]string
+	// SecretEnvs are environment variables that should be stored as secrets (not shown in plain text).
+	SecretEnvs map[string]string
+	// Timeout is the maximum execution duration.
+	Timeout time.Duration
+}
+
+// JobStatus represents the status of a Container Apps Job execution.
+type JobStatus struct {
+	ExecutionName string
+	Status        armappcontainersv3.JobExecutionRunningState
+	ErrorMessage  string
+}
+
+// IsTerminal returns true if the execution has reached a final state.
+func (s *JobStatus) IsTerminal() bool {
+	switch s.Status {
+	case armappcontainersv3.JobExecutionRunningStateSucceeded,
+		armappcontainersv3.JobExecutionRunningStateFailed,
+		armappcontainersv3.JobExecutionRunningStateStopped,
+		armappcontainersv3.JobExecutionRunningStateDegraded:
+		return true
+	}
+	return false
+}
+
+// IsSuccess returns true if the execution completed successfully.
+func (s *JobStatus) IsSuccess() bool {
+	return s.Status == armappcontainersv3.JobExecutionRunningStateSucceeded
+}
+
+// Job manages Container Apps Jobs and the environment they run in.
+// It owns the CD job lifecycle: creating the environment, setting up the job,
+// running executions, streaming logs, and assigning the job's managed identity roles.
+type Job struct {
+	azure.Azure
+	ResourceGroup     string
+	EnvironmentID     string
+	SystemPrincipalID string
+	identitySetUp     bool
+}
+
+func (j *Job) newManagedEnvironmentsClient() (*armappcontainersv3.ManagedEnvironmentsClient, error) {
+	cred, err := j.NewCreds()
+	if err != nil {
+		return nil, err
+	}
+	client, err := armappcontainersv3.NewManagedEnvironmentsClient(j.SubscriptionID, cred, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create managed environments client: %w", err)
+	}
+	return client, nil
+}
+
+func (j *Job) newJobsClient() (*armappcontainersv3.JobsClient, error) {
+	cred, err := j.NewCreds()
+	if err != nil {
+		return nil, err
+	}
+	client, err := armappcontainersv3.NewJobsClient(j.SubscriptionID, cred, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create jobs client: %w", err)
+	}
+	return client, nil
+}
+
+func (j *Job) newJobsExecutionsClient() (*armappcontainersv3.JobsExecutionsClient, error) {
+	cred, err := j.NewCreds()
+	if err != nil {
+		return nil, err
+	}
+	client, err := armappcontainersv3.NewJobsExecutionsClient(j.SubscriptionID, cred, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create jobs executions client: %w", err)
+	}
+	return client, nil
+}
+
+// setUpLogWorkspace creates (or retrieves) a Log Analytics workspace and returns its
+// customer ID (workspace GUID) and primary shared key, which are needed to configure
+// ACA environment log streaming.
+func (j *Job) setUpLogWorkspace(ctx context.Context, cred azcore.TokenCredential) (customerID string, err error) {
+	defer term.Timing()()
+	wsClient, err := armoperationalinsights.NewWorkspacesClient(j.SubscriptionID, cred, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create log analytics workspaces client: %w", err)
+	}
+
+	term.Debugf("setUpLogWorkspace: get existing workspace %q in %q", cdLogWorkspaceName, j.ResourceGroup)
+	if resp, err := wsClient.Get(ctx, j.ResourceGroup, cdLogWorkspaceName, nil); err == nil &&
+		resp.Properties != nil && resp.Properties.CustomerID != nil {
+		term.Debugf("setUpLogWorkspace: workspace already exists, customer ID %q", *resp.Properties.CustomerID)
+		customerID = *resp.Properties.CustomerID
+	} else {
+		// Create or update the workspace (idempotent).
+		term.Debugf("setUpLogWorkspace: creating/updating workspace %q in %q", cdLogWorkspaceName, j.ResourceGroup)
+		wsPoller, err := wsClient.BeginCreateOrUpdate(ctx, j.ResourceGroup, cdLogWorkspaceName, armoperationalinsights.Workspace{
+			Location: j.Location.Ptr(),
+			Properties: &armoperationalinsights.WorkspaceProperties{
+				SKU: &armoperationalinsights.WorkspaceSKU{
+					Name: to.Ptr(armoperationalinsights.WorkspaceSKUNameEnumPerGB2018),
+				},
+				RetentionInDays: to.Ptr(int32(30)), // ≥30
+			},
+		}, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to create log analytics workspace: %w", err)
+		}
+		wsResult, err := wsPoller.PollUntilDone(ctx, azure.PollOptions)
+		if err != nil {
+			return "", fmt.Errorf("failed to poll workspace creation: %w", err)
+		}
+		if wsResult.Properties == nil || wsResult.Properties.CustomerID == nil {
+			return "", errors.New("log analytics workspace did not return a customer ID")
+		}
+		customerID = *wsResult.Properties.CustomerID
+	}
+
+	return customerID, nil
+}
+
+// SetUpManagedEnvironment creates (or retrieves) the Container Apps Environment that hosts the CD job.
+// It also creates a Log Analytics workspace and configures the environment to stream logs
+// there so they're visible in the Azure portal and via Log Analytics queries.
+// The environment resource ID is stored in j.EnvironmentID.
+func (j *Job) SetUpManagedEnvironment(ctx context.Context) error {
+	defer term.Timing()()
+	if j.EnvironmentID != "" {
+		term.Debugf("SetUpManagedEnvironment: already set (%s)", j.EnvironmentID)
+		return nil
+	}
+
+	cred, err := j.NewCreds()
+	if err != nil {
+		return err
+	}
+
+	// Set up Log Analytics workspace first so we can wire it into the environment.
+	customerID, err := j.setUpLogWorkspace(ctx, cred)
+	if err != nil {
+		return err
+	}
+
+	envClient, err := j.newManagedEnvironmentsClient()
+	if err != nil {
+		return err
+	}
+
+	const destination = "log-analytics"
+
+	term.Debugf("SetUpManagedEnvironment: checking if %q exists in %q", cdEnvironmentName, j.ResourceGroup)
+	if resp, err := envClient.Get(ctx, j.ResourceGroup, cdEnvironmentName, nil); err == nil && resp.Properties != nil {
+		// Environment exists. Ensure its AppLogsConfiguration points to our workspace
+		if lc := resp.Properties.AppLogsConfiguration; lc != nil && lc.Destination != nil && *lc.Destination == destination &&
+			lc.LogAnalyticsConfiguration != nil &&
+			lc.LogAnalyticsConfiguration.CustomerID != nil && customerID == *lc.LogAnalyticsConfiguration.CustomerID {
+			term.Debugf("SetUpManagedEnvironment: environment %s already configured with Log Analytics", *resp.ID)
+			j.EnvironmentID = *resp.ID
+			return nil
+		}
+		// (idempotent update — safe to run on every call).
+		term.Debugf("SetUpManagedEnvironment: updating existing environment %s to use Log Analytics", *resp.ID)
+	} else {
+		term.Infof("Creating Container Apps environment %q in %q", cdEnvironmentName, j.ResourceGroup)
+	}
+
+	// Fetch the shared key (not available on the workspace resource itself).
+	keysClient, err := armoperationalinsights.NewSharedKeysClient(j.SubscriptionID, cred, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create shared keys client: %w", err)
+	}
+	keysResp, err := keysClient.GetSharedKeys(ctx, j.ResourceGroup, cdLogWorkspaceName, nil)
+	if err != nil {
+		return fmt.Errorf("failed to get workspace shared keys: %w", err)
+	}
+	if keysResp.PrimarySharedKey == nil {
+		return errors.New("log analytics workspace returned no primary shared key")
+	}
+
+	poller, err := envClient.BeginCreateOrUpdate(ctx, j.ResourceGroup, cdEnvironmentName, armappcontainersv3.ManagedEnvironment{
+		Location: j.Location.Ptr(),
+		Properties: &armappcontainersv3.ManagedEnvironmentProperties{
+			ZoneRedundant: to.Ptr(false),
+			AppLogsConfiguration: &armappcontainersv3.AppLogsConfiguration{
+				Destination: to.Ptr(destination),
+				LogAnalyticsConfiguration: &armappcontainersv3.LogAnalyticsConfiguration{
+					CustomerID: to.Ptr(customerID),
+					SharedKey:  to.Ptr(*keysResp.PrimarySharedKey),
+				},
+			},
+		},
+	}, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create container apps environment: %w", err)
+	}
+	result, err := poller.PollUntilDone(ctx, azure.PollOptions)
+	if err != nil {
+		return fmt.Errorf("failed to poll environment creation: %w", err)
+	}
+	j.EnvironmentID = *result.ID
+	term.Infof("Created Container Apps environment %s", *result.Name)
+	return nil
+}
+
+// Well-known Azure built-in role definition IDs.
+const (
+	storageBlobDataContributorRoleID = "ba92f5b4-2d11-453d-a403-e96b0029c9fe" // nolint:gosec
+	contributorRoleID                = "b24988ac-6180-42a0-ab88-20f7382dd24c" // nolint:gosec
+	userAccessAdministratorRoleID    = "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9" // nolint:gosec
+	keyVaultSecretsUserRoleID        = "4633458b-17de-408a-b874-0445c86b69e6" // nolint:gosec
+)
+
+// assignRole assigns a built-in role to the given principal at the given scope.
+// It silently ignores RoleAssignmentExists errors (idempotent).
+func assignRole(ctx context.Context, raClient *armauthorization.RoleAssignmentsClient, subscriptionID, scope, roleDefID, principalID string) error {
+	fullRoleDefID := fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", subscriptionID, roleDefID)
+	_, err := raClient.Create(ctx, scope, uuid.NewString(), armauthorization.RoleAssignmentCreateParameters{
+		Properties: &armauthorization.RoleAssignmentProperties{
+			PrincipalID:      to.Ptr(principalID),
+			RoleDefinitionID: to.Ptr(fullRoleDefID),
+			PrincipalType:    to.Ptr(armauthorization.PrincipalTypeServicePrincipal),
+		},
+	}, nil)
+	if err != nil {
+		var respErr *azcore.ResponseError
+		if !errors.As(err, &respErr) || respErr.ErrorCode != "RoleAssignmentExists" {
+			return err
+		}
+	}
+	return nil
+}
+
+// SetUpManagedIdentity assigns the necessary roles to the CD job's system-assigned managed
+// identity so it can provision Azure resources and access Pulumi state in storageAccount.
+// SetUpJob must be called before this to populate SystemPrincipalID.
+func (j *Job) SetUpManagedIdentity(ctx context.Context, storageAccount string) error {
+	defer term.Timing()()
+	if j.identitySetUp {
+		return nil
+	}
+	if j.SystemPrincipalID == "" {
+		return errors.New("CD job system-assigned identity principal ID is not set; ensure SetUpJob was called first")
+	}
+
+	cred, err := j.NewCreds()
+	if err != nil {
+		return err
+	}
+	raClient, err := armauthorization.NewRoleAssignmentsClient(j.SubscriptionID, cred, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create role assignments client: %w", err)
+	}
+
+	// Contributor + User Access Administrator on the subscription so Pulumi can provision any
+	// Azure resource and create role assignments (e.g. ACR pull role for Container Apps).
+	subscriptionScope := "/subscriptions/" + j.SubscriptionID
+	if err := assignRole(ctx, raClient, j.SubscriptionID, subscriptionScope, contributorRoleID, j.SystemPrincipalID); err != nil {
+		return fmt.Errorf("failed to assign Contributor role: %w", err)
+	}
+	if err := assignRole(ctx, raClient, j.SubscriptionID, subscriptionScope, userAccessAdministratorRoleID, j.SystemPrincipalID); err != nil {
+		return fmt.Errorf("failed to assign User Access Administrator role: %w", err)
+	}
+	// Key Vault Secrets User on the subscription so the CD container can read project
+	// secrets from the Key Vault (used both by the CD itself and by Pulumi).
+	if err := assignRole(ctx, raClient, j.SubscriptionID, subscriptionScope, keyVaultSecretsUserRoleID, j.SystemPrincipalID); err != nil {
+		return fmt.Errorf("failed to assign Key Vault Secrets User role: %w", err)
+	}
+
+	// Storage Blob Data Contributor on the storage account for Pulumi state and payload access.
+	storageScope := fmt.Sprintf(
+		"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s",
+		j.SubscriptionID, j.ResourceGroup, storageAccount,
+	)
+	if err := assignRole(ctx, raClient, j.SubscriptionID, storageScope, storageBlobDataContributorRoleID, j.SystemPrincipalID); err != nil {
+		return fmt.Errorf("failed to assign Storage Blob Data Contributor role: %w", err)
+	}
+
+	j.identitySetUp = true
+	return nil
+}
+
+// SetUpJob creates (or updates) the Container Apps Job used to run the CD container.
+// Environment variables are baked into the job template so they're available to every
+// execution (the execution-time override for env vars is unreliable — the job template is
+// the authoritative source).
+// The CD image is pulled anonymously; the image's registry must allow anonymous pull.
+// It enables a system-assigned managed identity on the job and stores the principal ID
+// in j.SystemPrincipalID for subsequent role assignments.
+// SetUpManagedEnvironment must be called first.
+func (j *Job) SetUpJob(ctx context.Context, image string, envMap map[string]string) error {
+	defer term.Timing()()
+	if j.EnvironmentID == "" {
+		return errors.New("environment ID is not set; ensure SetUpManagedEnvironment was called first")
+	}
+
+	jobsClient, err := j.newJobsClient()
+	if err != nil {
+		return err
+	}
+
+	// Skip the upsert (which polls for ~30s even when nothing changed) when
+	// the job already exists with a populated system-assigned principal.
+	// Image and env vars on the template are placeholders — StartJobExecution
+	// overrides them per-run — so we don't need to compare them here.
+	if envMap == nil {
+		if resp, err := jobsClient.Get(ctx, j.ResourceGroup, cdJobName, nil); err == nil &&
+			resp.Identity != nil && resp.Identity.PrincipalID != nil && *resp.Identity.PrincipalID != "" {
+			j.SystemPrincipalID = *resp.Identity.PrincipalID
+			term.Debugf("SetUpJob: %q already exists; skipping upsert", cdJobName)
+			return nil
+		}
+	}
+
+	term.Debugf("SetUpJob: creating/updating job %q with image %q (%d env vars)", cdJobName, image, len(envMap))
+
+	var envVars []*armappcontainersv3.EnvironmentVar
+	for k, v := range envMap {
+		envVars = append(envVars, &armappcontainersv3.EnvironmentVar{
+			Name:  to.Ptr(k),
+			Value: to.Ptr(v),
+		})
+	}
+
+	timeout := int32((30 * time.Minute).Seconds())
+	const tmpVolumeName = "tmp"
+	poller, err := jobsClient.BeginCreateOrUpdate(ctx, j.ResourceGroup, cdJobName, armappcontainersv3.Job{
+		Location: j.Location.Ptr(),
+		Identity: &armappcontainersv3.ManagedServiceIdentity{
+			Type: to.Ptr(armappcontainersv3.ManagedServiceIdentityTypeSystemAssigned),
+		},
+		Properties: &armappcontainersv3.JobProperties{
+			EnvironmentID: to.Ptr(j.EnvironmentID),
+			Configuration: &armappcontainersv3.JobConfiguration{
+				TriggerType:       to.Ptr(armappcontainersv3.TriggerTypeManual),
+				ReplicaTimeout:    to.Ptr(timeout),
+				ReplicaRetryLimit: to.Ptr(int32(0)),
+			},
+			Template: &armappcontainersv3.JobTemplate{
+				Volumes: []*armappcontainersv3.Volume{
+					{
+						Name:        to.Ptr(tmpVolumeName),
+						StorageType: to.Ptr(armappcontainersv3.StorageTypeEmptyDir),
+					},
+				},
+				Containers: []*armappcontainersv3.Container{
+					{
+						Name:  to.Ptr(cdJobName),
+						Image: to.Ptr(image),
+						Env:   envVars,
+						Resources: &armappcontainersv3.ContainerResources{
+							CPU:    to.Ptr(cdJobCPU),
+							Memory: to.Ptr(cdJobMemory),
+						},
+						VolumeMounts: []*armappcontainersv3.VolumeMount{
+							{
+								VolumeName: to.Ptr(tmpVolumeName),
+								MountPath:  to.Ptr("/tmp"),
+							},
+						},
+					},
+				},
+			},
+		},
+	}, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create/update CD job: %w", err)
+	}
+
+	result, err := poller.PollUntilDone(ctx, azure.PollOptions)
+	if err != nil {
+		return fmt.Errorf("failed to poll CD job creation: %w", err)
+	}
+
+	if result.Identity != nil && result.Identity.PrincipalID != nil {
+		j.SystemPrincipalID = *result.Identity.PrincipalID
+	}
+	return nil
+}
+
+// StartJobExecution starts a new execution of the CD job with the given image, command,
+// and environment variables. Returns the execution name.
+func (j *Job) StartJobExecution(ctx context.Context, req JobRequest) (string, error) {
+	defer term.Timing()()
+	jobsClient, err := j.newJobsClient()
+	if err != nil {
+		return "", err
+	}
+
+	// Build environment variable list. Secrets are stored on the job and referenced by name.
+	var envVars []*armappcontainersv3.EnvironmentVar
+	var secrets []*armappcontainersv3.Secret
+	for k, v := range req.Envs {
+		envVars = append(envVars, &armappcontainersv3.EnvironmentVar{
+			Name:  to.Ptr(k),
+			Value: to.Ptr(v),
+		})
+	}
+	for k, v := range req.SecretEnvs {
+		secretName := strings.ToLower(strings.ReplaceAll(k, "_", "-"))
+		secrets = append(secrets, &armappcontainersv3.Secret{
+			Name:  to.Ptr(secretName),
+			Value: to.Ptr(v),
+		})
+		envVars = append(envVars, &armappcontainersv3.EnvironmentVar{
+			Name:      to.Ptr(k),
+			SecretRef: to.Ptr(secretName),
+		})
+	}
+
+	// Update job secrets if any were added.
+	if len(secrets) > 0 {
+		secretsPoller, err := jobsClient.BeginUpdate(ctx, j.ResourceGroup, cdJobName, armappcontainersv3.JobPatchProperties{
+			Properties: &armappcontainersv3.JobPatchPropertiesProperties{
+				Configuration: &armappcontainersv3.JobConfiguration{
+					TriggerType:    to.Ptr(armappcontainersv3.TriggerTypeManual),
+					ReplicaTimeout: to.Ptr(int32((30 * time.Minute).Seconds())),
+					Secrets:        secrets,
+				},
+			},
+		}, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to update job secrets: %w", err)
+		}
+		if _, err := secretsPoller.PollUntilDone(ctx, azure.PollOptions); err != nil {
+			return "", fmt.Errorf("failed to poll job secrets update: %w", err)
+		}
+	}
+
+	// Build the command args list.
+	var args []*string
+	for _, a := range req.Command[1:] {
+		args = append(args, to.Ptr(a))
+	}
+	var cmd []*string
+	if len(req.Command) > 0 {
+		cmd = []*string{to.Ptr(req.Command[0])}
+	}
+
+	// Resources must be repeated here: ACA replaces matching containers from the
+	// execution override rather than merging field-by-field, so omitting Resources
+	// silently falls back to the platform default (0.25 vCPU / 0.5 GiB) regardless
+	// of what the job template says.
+	execContainer := &armappcontainersv3.JobExecutionContainer{
+		Name:  to.Ptr(cdJobName),
+		Image: to.Ptr(req.Image),
+		Env:   envVars,
+		Resources: &armappcontainersv3.ContainerResources{
+			CPU:    to.Ptr(cdJobCPU),
+			Memory: to.Ptr(cdJobMemory),
+		},
+	}
+	if len(cmd) > 0 {
+		execContainer.Command = cmd
+		execContainer.Args = args
+	}
+
+	poller, err := jobsClient.BeginStart(ctx, j.ResourceGroup, cdJobName, &armappcontainersv3.JobsClientBeginStartOptions{
+		Template: &armappcontainersv3.JobExecutionTemplate{
+			Containers: []*armappcontainersv3.JobExecutionContainer{execContainer},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to start job execution: %w", err)
+	}
+
+	result, err := poller.PollUntilDone(ctx, azure.PollOptions)
+	if err != nil {
+		return "", fmt.Errorf("failed to poll job start: %w", err)
+	}
+
+	if result.Name == nil {
+		return "", errors.New("job execution started but returned no name")
+	}
+	return *result.Name, nil
+}
+
+// GetJobExecutionStatus returns the current status of a job execution by listing executions
+// and finding the one with the given name.
+func (j *Job) GetJobExecutionStatus(ctx context.Context, executionName string) (*JobStatus, error) {
+	execClient, err := j.newJobsExecutionsClient()
+	if err != nil {
+		return nil, err
+	}
+
+	pager := execClient.NewListPager(j.ResourceGroup, cdJobName, nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list job executions: %w", err)
+		}
+		for _, exec := range page.Value {
+			if exec.Name != nil && *exec.Name == executionName {
+				status := &JobStatus{ExecutionName: executionName}
+				if exec.Properties != nil && exec.Properties.Status != nil {
+					status.Status = *exec.Properties.Status
+				}
+				// The execution-level Status can lag the container indefinitely.
+				// When it has not reached a terminal state, fall back to the
+				// replica container, which reflects the real outcome in time.
+				if !status.IsTerminal() {
+					if replicaStatus, rerr := j.cdReplicaStatus(ctx, executionName); rerr != nil {
+						term.Debugf("could not derive CD status from replica for %q: %v", executionName, rerr)
+					} else if replicaStatus != nil {
+						return replicaStatus, nil
+					}
+				}
+				return status, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("execution %q not found", executionName)
+}
+
+// FindExecutionByEtag returns the name of the most recent CD job execution whose
+// EnvVarEtag environment variable matches the given etag, or "" (no error) when
+// none match. This lets a fresh process (e.g. a standalone `defang logs`) recover
+// the CD run without the in-memory run ID that only the deploying process holds.
+func (j *Job) FindExecutionByEtag(ctx context.Context, etag string) (string, error) {
+	execClient, err := j.newJobsExecutionsClient()
+	if err != nil {
+		return "", err
+	}
+
+	var (
+		bestName  string
+		bestStart time.Time
+	)
+	pager := execClient.NewListPager(j.ResourceGroup, cdJobName, nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return "", fmt.Errorf("failed to list job executions: %w", err)
+		}
+		for _, exec := range page.Value {
+			if exec == nil || exec.Name == nil || exec.Properties == nil || !templateHasEtag(exec.Properties.Template, etag) {
+				continue
+			}
+			// Retries reuse the etag, so prefer the most recently started run.
+			var start time.Time
+			if exec.Properties.StartTime != nil {
+				start = *exec.Properties.StartTime
+			}
+			if bestName == "" || start.After(bestStart) {
+				bestName, bestStart = *exec.Name, start
+			}
+		}
+	}
+	return bestName, nil
+}
+
+// templateHasEtag reports whether any container in the execution template was
+// launched with EnvVarEtag set to etag.
+func templateHasEtag(tmpl *armappcontainersv3.JobExecutionTemplate, etag string) bool {
+	if tmpl == nil {
+		return false
+	}
+	for _, c := range tmpl.Containers {
+		if c == nil {
+			continue
+		}
+		for _, e := range c.Env {
+			if e == nil {
+				continue
+			}
+			if e.Name != nil && *e.Name == EnvVarEtag && e.Value != nil && *e.Value == etag {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// TailJobLogs streams real-time container logs from the running job execution
+// by opening the container's logStreamEndpoint (the same one the Azure portal
+// uses). This delivers output within seconds, unlike Log Analytics (ReadJobLogs)
+// which typically lags by minutes. If the execution fails, the iterator yields
+// a terminal error after the stream closes. For historical queries on older
+// executions, use ReadJobLogs.
+//
+// The stream can drop mid-execution (e.g. when the log endpoint reports a
+// transient "Kubernetes error" while the replica is starting), so we reconnect
+// until the job reaches a terminal state.
+func (j *Job) TailJobLogs(ctx context.Context, executionName string) (iter.Seq2[string, error], error) {
+	return func(yield func(string, error) bool) {
+		// 300 on the first successful connect catches output emitted during pod
+		// startup; 0 on reconnects avoids re-printing lines after a transient drop.
+		const initialBackfill = 300
+		connected := false
+
+		for {
+			if ctx.Err() != nil {
+				return
+			}
+
+			status, err := j.GetJobExecutionStatus(ctx, executionName)
+			if err == nil && status.IsTerminal() {
+				// Drain any remaining logs once more and then return. If we never
+				// successfully streamed anything, request backfill; otherwise just
+				// pick up trailing output we haven't seen.
+				backfill := 0
+				if !connected {
+					backfill = initialBackfill
+				}
+				if logCh, err := j.streamJobExecutionLogs(ctx, executionName, backfill); err == nil {
+					forwardStream(ctx, logCh, yield)
+				}
+				if !status.IsSuccess() {
+					msg := string(status.Status)
+					if status.ErrorMessage != "" {
+						msg += ": " + status.ErrorMessage
+					}
+					yield("", fmt.Errorf("CD job %s: %s", executionName, msg))
+				}
+				return
+			}
+
+			backfill := 0
+			if !connected {
+				backfill = initialBackfill
+			}
+			logCh, err := j.streamJobExecutionLogs(ctx, executionName, backfill)
+			if err != nil {
+				term.Debugf("TailJobLogs: waiting for replica: %v", err)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(jobLogPollInterval):
+				}
+				continue
+			}
+			gotLines, keepGoing := forwardStream(ctx, logCh, yield)
+			if !keepGoing {
+				return
+			}
+			// Only mark as connected after actually receiving a line. A stream
+			// that opens and closes immediately (e.g. transient Kubernetes error)
+			// shouldn't consume our one-shot backfill budget.
+			if gotLines {
+				connected = true
+			}
+			// Stream closed — loop back to reconnect or detect terminal state.
+		}
+	}, nil
+}
+
+// forwardStream forwards all log lines from ch to yield. Returns (gotLines, keepGoing):
+// gotLines is true when at least one message was forwarded, keepGoing is false
+// when yield signals an early exit (consumer stopped iterating).
+func forwardStream(ctx context.Context, ch <-chan LogEntry, yield func(string, error) bool) (bool, bool) {
+	gotLines := false
+	for entry := range ch {
+		if ctx.Err() != nil {
+			return gotLines, false
+		}
+		if entry.Err != nil {
+			if !yield("", entry.Err) {
+				return gotLines, false
+			}
+			continue
+		}
+		gotLines = true
+		if !yield(entry.Message, nil) {
+			return gotLines, false
+		}
+	}
+	return gotLines, true
+}
+
+// getJobAuthToken fetches a short-lived bearer token accepted by the job's
+// logStreamEndpoint. The token differs from the ARM token and is required even
+// though the URL is already scoped to the subscription.
+func (j *Job) getJobAuthToken(ctx context.Context) (string, error) {
+	defer term.Timing()()
+	return j.FetchLogStreamAuthToken(ctx, j.ResourceGroup, "Microsoft.App/jobs/"+cdJobName, jobAPIVersion)
+}
+
+// cdReplicaContainer is the observed state of the cdJobName container within one
+// of the execution's replicas, read from the replicas API.
+type cdReplicaContainer struct {
+	RunningState        string
+	RunningStateDetails string
+	LogStreamEndpoint   string
+}
+
+// listCDReplicaContainers lists the execution's replicas and returns the
+// cdJobName container from each. The replica API reflects the true container
+// state (Running / Terminated) and its exit details, unlike the execution-level
+// Status which can lag behind the container indefinitely.
+func (j *Job) listCDReplicaContainers(ctx context.Context, executionName string) ([]cdReplicaContainer, error) {
+	armTok, err := j.ArmToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf(
+		"%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.App/jobs/%s/executions/%s/replicas?api-version=%s",
+		azure.ManagementEndpoint, j.SubscriptionID, j.ResourceGroup, cdJobName, executionName, jobAPIVersion,
+	)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+armTok)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("listReplicas: HTTP %s", resp.Status)
+	}
+
+	var result struct {
+		Value []struct {
+			Properties struct {
+				Containers []struct {
+					Name                string `json:"name"`
+					RunningState        string `json:"runningState"`
+					RunningStateDetails string `json:"runningStateDetails"`
+					LogStreamEndpoint   string `json:"logStreamEndpoint"`
+				} `json:"containers"`
+			} `json:"properties"`
+		} `json:"value"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("listReplicas: decode: %w", err)
+	}
+
+	var containers []cdReplicaContainer
+	for _, r := range result.Value {
+		for _, c := range r.Properties.Containers {
+			if c.Name != cdJobName {
+				continue
+			}
+			containers = append(containers, cdReplicaContainer{
+				RunningState:        c.RunningState,
+				RunningStateDetails: c.RunningStateDetails,
+				LogStreamEndpoint:   c.LogStreamEndpoint,
+			})
+		}
+	}
+	return containers, nil
+}
+
+// getCDContainerLogStreamURL returns the logstream URL of the main cdJobName
+// container, only once it has reached a runningState where the log endpoint
+// actually serves output (Running or Terminated — anything earlier returns a
+// Kubernetes error). Returns an empty string (no error) while the replica is
+// still initialising.
+func (j *Job) getCDContainerLogStreamURL(ctx context.Context, executionName string) (string, error) {
+	defer term.Timing()()
+	containers, err := j.listCDReplicaContainers(ctx, executionName)
+	if err != nil {
+		return "", err
+	}
+	for _, c := range containers {
+		if c.LogStreamEndpoint == "" {
+			continue
+		}
+		switch c.RunningState {
+		case "Running", "Terminated":
+			return c.LogStreamEndpoint, nil
+		}
+	}
+	return "", nil
+}
+
+// cdReplicaStatus derives a terminal JobStatus from the execution's replica
+// container when it has terminated, or returns nil when the container is still
+// running or not present yet. The execution-level Status (JobsExecutions list)
+// can lag the container indefinitely, leaving the CLI polling forever; the
+// container's own Terminated state plus its exit code is the timely signal.
+func (j *Job) cdReplicaStatus(ctx context.Context, executionName string) (*JobStatus, error) {
+	containers, err := j.listCDReplicaContainers(ctx, executionName)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range containers {
+		if c.RunningState != "Terminated" {
+			continue
+		}
+		status := &JobStatus{ExecutionName: executionName}
+		// Classify by the container's exit code. A clean success normally
+		// surfaces via the execution-level Status, so an exit code we cannot
+		// parse here is treated as a failure and surfaced with its details
+		// rather than being silently reported as success.
+		if code, ok := parseExitCode(c.RunningStateDetails); ok && code == 0 {
+			status.Status = armappcontainersv3.JobExecutionRunningStateSucceeded
+		} else {
+			status.Status = armappcontainersv3.JobExecutionRunningStateFailed
+			status.ErrorMessage = c.RunningStateDetails
+		}
+		return status, nil
+	}
+	return nil, nil
+}
+
+// exitCodeRe extracts the numeric exit code from a replica container's free-form
+// runningStateDetails (e.g. "Container 'defang-cd' was terminated with exit code '1'").
+var exitCodeRe = regexp.MustCompile(`(?i)exit code:?\s*'?(-?\d+)'?`)
+
+func parseExitCode(details string) (int, bool) {
+	m := exitCodeRe.FindStringSubmatch(details)
+	if m == nil {
+		return 0, false
+	}
+	code, err := strconv.Atoi(m[1])
+	if err != nil {
+		return 0, false
+	}
+	return code, true
+}
+
+// streamJobExecutionLogs opens the job container's logStreamEndpoint and
+// returns a channel that emits log lines until the container exits or ctx is
+// cancelled. Returns an error when the replica is not yet available so the
+// caller can retry.
+//
+// backfillLines controls how much of the container's existing log buffer is
+// replayed on connect (capped at 300 by the API). Use a large value on the
+// first connect to capture output emitted during pod startup, and 0 on
+// reconnects so we don't re-print lines we already streamed.
+func (j *Job) streamJobExecutionLogs(ctx context.Context, executionName string, backfillLines int) (<-chan LogEntry, error) {
+	defer term.Timing()()
+	streamURL, err := j.getCDContainerLogStreamURL(ctx, executionName)
+	if err != nil {
+		return nil, err
+	}
+	if streamURL == "" {
+		return nil, errors.New("no replica container with logStreamEndpoint yet")
+	}
+
+	authToken, err := j.getJobAuthToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, streamURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+authToken)
+	q := req.URL.Query()
+	q.Set("follow", "true")
+	q.Set("output", "text")
+	if backfillLines > 0 {
+		q.Set("tailLines", strconv.Itoa(backfillLines))
+	}
+	req.URL.RawQuery = q.Encode()
+
+	resp, err := http.DefaultClient.Do(req) // nolint: bodyclose // body is closed in the goroutine
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		_ = resp.Body.Close()
+		return nil, fmt.Errorf("logstream: HTTP %s", resp.Status)
+	}
+
+	ch := make(chan LogEntry)
+	go func() {
+		defer close(ch)
+		defer resp.Body.Close()
+		scanner := bufio.NewScanner(resp.Body)
+		// Pulumi output lines can be long (especially Diagnostics blocks).
+		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if line == "" {
+				continue
+			}
+			select {
+			case ch <- LogEntry{Message: line}:
+			case <-ctx.Done():
+				return
+			}
+		}
+		if err := scanner.Err(); err != nil && ctx.Err() == nil {
+			select {
+			case ch <- LogEntry{Err: err}:
+			case <-ctx.Done():
+			}
+		}
+	}()
+	return ch, nil
+}
+
+// ReadJobLogs returns all log output captured for a job execution from Log Analytics.
+// Subject to a short ingestion delay (seconds to a couple of minutes on cold workspaces).
+func (j *Job) ReadJobLogs(ctx context.Context, executionName string) (string, error) {
+	defer term.Timing()()
+	return j.fetchLogsFromWorkspace(ctx, executionName)
+}
+
+// getLogAnalyticsToken returns a Bearer token for the Log Analytics query API.
+func (j *Job) getLogAnalyticsToken(ctx context.Context) (string, error) {
+	defer term.Timing()()
+	cred, err := j.NewCreds()
+	if err != nil {
+		return "", err
+	}
+	tok, err := cred.GetToken(ctx, policy.TokenRequestOptions{
+		Scopes: []string{"https://api.loganalytics.io/.default"},
+	})
+	if err != nil {
+		return "", err
+	}
+	return tok.Token, nil
+}
+
+// getLogWorkspaceCustomerID returns the customer ID (GUID) of the CD Log Analytics
+// workspace. This is what the Log Analytics query API addresses workspaces by.
+func (j *Job) getLogWorkspaceCustomerID(ctx context.Context) (string, error) {
+	defer term.Timing()()
+	cred, err := j.NewCreds()
+	if err != nil {
+		return "", err
+	}
+	wsClient, err := armoperationalinsights.NewWorkspacesClient(j.SubscriptionID, cred, nil)
+	if err != nil {
+		return "", fmt.Errorf("creating log analytics workspaces client: %w", err)
+	}
+	resp, err := wsClient.Get(ctx, j.ResourceGroup, cdLogWorkspaceName, nil)
+	if err != nil {
+		return "", fmt.Errorf("getting log analytics workspace: %w", err)
+	}
+	if resp.Properties == nil || resp.Properties.CustomerID == nil {
+		return "", errors.New("log analytics workspace has no customer ID")
+	}
+	return *resp.Properties.CustomerID, nil
+}
+
+// fetchLogsFromWorkspace queries Log Analytics for all console log entries belonging to
+// the given job execution, ordered by time. Returns empty string when the workspace has
+// no rows yet (first-time workspaces can take 2–5 minutes to ingest data).
+func (j *Job) fetchLogsFromWorkspace(ctx context.Context, executionName string) (string, error) {
+	defer term.Timing()()
+	workspaceID, err := j.getLogWorkspaceCustomerID(ctx)
+	if err != nil {
+		return "", err
+	}
+	return j.fetchLogsByWorkspaceID(ctx, workspaceID, executionName)
+}
+
+// fetchLogsByWorkspaceID is the lower half of fetchLogsFromWorkspace, kept separate
+// so tests can exercise it with a known workspace ID without needing the SDK
+// workspaces client to be mocked.
+func (j *Job) fetchLogsByWorkspaceID(ctx context.Context, workspaceID, executionName string) (string, error) {
+	defer term.Timing()()
+	token, err := j.getLogAnalyticsToken(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	// Union over both legacy Classic CustomLog (ContainerAppConsoleLogs_CL) and
+	// modern DCR-based (ContainerAppConsoleLogs) tables. ACA envs created with
+	// AppLogsConfiguration.Destination=log-analytics write to _CL; envs using
+	// destination=azure-monitor + a DiagnosticSetting write to the modern table.
+	// isfuzzy=true silently drops a missing table from the union so workspaces
+	// with only one of them still resolve. Column rename in the Classic branch
+	// matches the modern schema for the shared filter+projection below.
+	// Filter is on pod name ({executionName}-{randomsuffix}) — ContainerJobName_s
+	// / JobName is just "defang-cd" and can't disambiguate executions. Execution
+	// names are Azure-generated alphanumeric+hyphens — safe to inline.
+	query := fmt.Sprintf(
+		`union isfuzzy=true `+
+			`(ContainerAppConsoleLogs_CL `+
+			`   | extend ContainerName = ContainerName_s, ContainerGroupName = ContainerGroupName_s, Log = Log_s), `+
+			`(ContainerAppConsoleLogs) `+
+			`| where ContainerName == "%[1]s" and ContainerGroupName startswith "%[2]s-" `+
+			`| order by TimeGenerated asc `+
+			`| project TimeGenerated, Log`,
+		cdJobName, executionName,
+	)
+	body, err := json.Marshal(map[string]string{"query": query})
+	if err != nil {
+		return "", err
+	}
+
+	url := logAnalyticsEndpoint + "/v1/workspaces/" + workspaceID + "/query"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("log analytics query: HTTP %s", resp.Status)
+	}
+
+	var result struct {
+		Tables []struct {
+			Rows [][]any `json:"rows"`
+		} `json:"tables"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("decode log analytics response: %w", err)
+	}
+
+	var sb strings.Builder
+	if len(result.Tables) > 0 {
+		for _, row := range result.Tables[0].Rows {
+			if len(row) < 2 {
+				continue
+			}
+			ts, _ := row[0].(string)
+			line, _ := row[1].(string)
+			sb.WriteString(ts)
+			sb.WriteByte(' ')
+			sb.WriteString(line)
+			if !strings.HasSuffix(line, "\n") {
+				sb.WriteByte('\n')
+			}
+		}
+	}
+	return sb.String(), nil
+}

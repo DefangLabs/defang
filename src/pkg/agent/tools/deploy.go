@@ -31,7 +31,7 @@ func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployPa
 	}
 
 	term.Debug("Function invoked: cli.Connect")
-	client, err := GetClientWithRetry(ctx, cli, sc)
+	client, err := GetClientWithRetry(ctx, cli, sc.FabricAddr)
 	if err != nil {
 		var noBrowserErr auth.ErrNoBrowser
 		if errors.As(err, &noBrowserErr) {
@@ -64,7 +64,7 @@ func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployPa
 	deployResp, project, err := cli.ComposeUp(ctx, client, provider, sc.Stack, cliTypes.ComposeUpParams{
 		Project:    project,
 		UploadMode: compose.UploadModeDigest,
-		Mode:       modes.ModeAffordable,
+		Recipe:     modes.RecipeAffordable,
 	})
 	if err != nil {
 		err = fmt.Errorf("failed to compose up services: %w", err)

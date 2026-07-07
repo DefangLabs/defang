@@ -208,6 +208,7 @@ The Defang CLI recognizes the following environment variables:
 - `COMPOSE_PROJECT_NAME` - The name of the project to use; overrides the `name` in the Compose file
 - `DEFANG_ACCESS_TOKEN` - The access token to use for authentication; if not specified, uses token from `defang login`
 - `DEFANG_ALLOW_UPGRADE` - If set to `true`, allows upgrading the CD image and Pulumi version to the latest available; defaults to `false`, ie. previously deployed versions will be used to avoid unexpected upgrades
+- `DEFANG_AWS_APN_ID` - The AWS APN ID to use for attribution, eg. use `pc:123456789abcdefgh` for AWS Marketplace products
 - `DEFANG_BUILD_CONTEXT_LIMIT` - The maximum size of the build context when building container images; defaults to `100MiB`
 - `DEFANG_CD_BUCKET` - The S3 bucket to use for the BYOC CD pipeline; defaults to `defang-cd-bucket-…`
 - `DEFANG_CD_IMAGE` - The image to use for the Continuous Deployment (CD) pipeline; defaults to `public.ecr.aws/defang-io/cd:public-beta`
@@ -228,6 +229,7 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_PULUMI_DIFF` - If set to `true`, shows the Pulumi diff during deployments; defaults to `false`
 - `DEFANG_PULUMI_DIR` - Run Pulumi from this folder, instead of spawning a cloud task; requires `--debug` (BYOC only)
 - `DEFANG_PULUMI_VERSION` - Override the version of the Pulumi image to use (`aws` provider only)
+- `DEFANG_RECIPE` - The deployment mode / recipe to use; defaults to `AFFORDABLE`
 - `DEFANG_SUFFIX` - The suffix to use for all BYOC resources; defaults to the stack name, or `beta` if unset.
 - `DEFANG_WORKSPACE` - The workspace (name or ID) to use; preferred way to select which workspace the CLI uses
 - `NO_COLOR` - If set to any value, disables color output; by default, color output is enabled depending on the terminal
@@ -249,3 +251,26 @@ To get started quickly, install Nix and DirEnv, then create a `.envrc` file to a
 echo use flake >> .envrc
 direnv allow
 ```
+
+### Adding cloud support
+
+At a high-level, support for a specific cloud lives in three repositories:
+
+- In [this CLI repository](https://github.com/DefangLabs/defang)
+  - an implementation of the [client.Provider](src/pkg/cli/client/byoc) interface under the [`byoc` package](src/pkg/cli/client/byoc)
+  - low-level cloud helpers ("driver") under the [`clouds` package](src/pkg/clouds)
+    - authenticate with the cloud
+    - start a CD container (task/job)
+    - monitor the CD container's status and logs
+    - stream/query logs from deployed services
+    - set/list config (secrets/parameters)
+- In the [Defang Pulumi Provider repository](https://github.com/DefangLabs/pulumi-defang)
+  - Pulumi **component** resources under the `provider` folder
+    - `Project` component
+    - `Service` component
+    - `Postgres` component
+    - `Redis` component
+  - a Pulumi **custom** resource for `Build`
+  - an implementation of the `ConfigProvider` interface to read config (secrets/parameters) at deploy time
+- In the [Defang Docs repository](https://github.com/DefangLabs/defang-docs)
+  - under the [`providers` section](https://docs.defang.io/docs/providers), documentation for how to set up credentials and permissions for the cloud, and any cloud-specific features

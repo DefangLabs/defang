@@ -1,10 +1,4 @@
-{
-  "app": {
-    "command": null,
-    "entrypoint": null,
-    "image": "myapp:latest",
-    "networks": {
-      "default": null
-    }
-  }
-}
+app:
+    image: myapp:latest
+    networks:
+        default: null

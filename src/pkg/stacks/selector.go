@@ -5,9 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
+	"time"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
@@ -16,6 +15,7 @@ const CreateNewStack = "Create new stack"
 
 type Manager interface {
 	List(ctx context.Context) ([]ListItem, error)
+	Load(ctx context.Context, name string) (*Parameters, error)
 	Create(params Parameters) (string, error)
 }
 
@@ -25,11 +25,11 @@ type stackSelector struct {
 	wizard *Wizard
 }
 
-func NewSelector(ec elicitations.Controller, sm Manager) *stackSelector {
+func NewSelector(ec elicitations.Controller, sm Manager, recipeLister RecipeLister) *stackSelector {
 	return &stackSelector{
 		ec:     ec,
 		sm:     sm,
-		wizard: NewWizard(ec),
+		wizard: NewWizard(ec, recipeLister),
 	}
 }
 
@@ -54,7 +54,7 @@ func (ss *stackSelector) SelectStack(ctx context.Context, opts SelectStackOption
 			return nil, errors.New("no stacks available to select in this workspace")
 		}
 	}
-	labelMap := MakeStackSelectorLabels(stackList)
+	labelMap := makeStackSelectorLabels(stackList)
 	stackLabels := make([]string, 0, len(stackList)+1)
 	stackNames := make([]string, 0, len(stackList))
 	for _, stack := range stackList {
@@ -89,13 +89,11 @@ func (ss *stackSelector) SelectStack(ctx context.Context, opts SelectStackOption
 	}
 
 	// find the stack with the selected name in the list of stacks
-	for _, stack := range stackList {
-		if stack.Name == selectedName {
-			return &stack.Parameters, nil
-		}
+	stack, err := ss.sm.Load(ctx, selectedName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load stack %q: %w", selectedName, err)
 	}
-
-	return nil, fmt.Errorf("selected stack %q not found", selectedName)
+	return stack, nil
 }
 
 func (ss *stackSelector) createStack(ctx context.Context) (*Parameters, error) {
@@ -126,7 +124,7 @@ func printStacksInfoMessage(stacks []string) {
 	term.Printf("To skip this prompt, run this command with --stack=%s\n", "<stack_name>")
 }
 
-func MakeStackSelectorLabels(stacks []ListItem) map[string]string {
+func makeStackSelectorLabels(stacks []ListItem) map[string]string {
 	partsList := stackLabelParts(stacks)
 	partsList = reduceStackLabelParts(partsList)
 
@@ -139,28 +137,19 @@ func MakeStackSelectorLabels(stacks []ListItem) map[string]string {
 }
 
 func stackLabelParts(stacks []ListItem) [][]string {
-	partsList := make([][]string, 0, len(stacks))
-	for _, s := range stacks {
+	partsList := make([][]string, len(stacks))
+	for i, s := range stacks {
 		var deployedAt string
 		if !s.DeployedAt.IsZero() {
-			deployedAt = "last deployed " + s.DeployedAt.Format("Jan 2 2006")
+			deployedAt = "last deployed " + s.DeployedAt.Format(time.UnixDate)
 		}
-		provider := s.Provider
-		account := ""
-		switch provider {
-		case client.ProviderAWS:
-			account, _ = s.Variables["AWS_PROFILE"]
-		case client.ProviderGCP:
-			account, _ = s.Variables["GCP_PROJECT_ID"]
-		}
-		parts := []string{
+		partsList[i] = []string{
 			s.Name,
-			provider.String(),
+			s.Provider.String(),
+			s.Account,
 			s.Region,
-			account,
 			deployedAt,
 		}
-		partsList = append(partsList, parts)
 	}
 	return partsList
 }
@@ -205,5 +194,5 @@ func formatStackLabelParts(parts []string) string {
 	if len(nonEmptyParts) == 1 {
 		return nonEmptyParts[0]
 	}
-	return fmt.Sprintf("%s (%s)", nonEmptyParts[0], strings.Join(nonEmptyParts[1:], ", "))
+	return fmt.Sprintf("%s %v", nonEmptyParts[0], nonEmptyParts[1:])
 }

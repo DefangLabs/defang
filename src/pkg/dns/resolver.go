@@ -7,8 +7,10 @@ import (
 	"net"
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/miekg/dns"
 )
 
@@ -16,9 +18,108 @@ type Resolver interface {
 	LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error)
 	LookupCNAME(ctx context.Context, domain string) (string, error)
 	LookupNS(ctx context.Context, domain string) ([]*net.NS, error)
+	LookupTXT(ctx context.Context, domain string) ([]string, error)
 }
 
-type RootResolver struct{}
+// FabricResolverClient is the subset of the fabric gRPC API used to resolve DNS
+// records remotely.
+type FabricResolverClient interface {
+	ResolveIPAddr(context.Context, *defangv1.ResolveIPAddrRequest) (*defangv1.ResolveIPAddrResponse, error)
+	ResolveCNAME(context.Context, *defangv1.ResolveCNAMERequest) (*defangv1.ResolveCNAMEResponse, error)
+	ResolveNS(context.Context, *defangv1.ResolveNSRequest) (*defangv1.ResolveNSResponse, error)
+	ResolveTXT(context.Context, *defangv1.ResolveTXTRequest) (*defangv1.ResolveTXTResponse, error)
+}
+
+// FabricResolver performs DNS lookups via the fabric gRPC API. An empty
+// NSServer lets the server perform recursive resolution from the root.
+type FabricResolver struct {
+	Client   FabricResolverClient
+	NSServer string
+}
+
+func NewFabricResolverAt(client FabricResolverClient) func(string) Resolver {
+	return func(nsServer string) Resolver {
+		return &FabricResolver{Client: client, NSServer: nsServer}
+	}
+}
+
+func (r FabricResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
+	resp, err := r.Client.ResolveIPAddr(ctx, &defangv1.ResolveIPAddrRequest{
+		Domain:   domain,
+		NsServer: r.NSServer,
+	})
+	if err != nil {
+		return nil, err
+	}
+	ips := make([]net.IPAddr, 0, len(resp.IpAddrs))
+	for _, s := range resp.IpAddrs {
+		if ip := net.ParseIP(s); ip != nil {
+			ips = append(ips, net.IPAddr{IP: ip})
+		}
+	}
+	if len(ips) == 0 {
+		return nil, ErrNoSuchHost
+	}
+	return ips, nil
+}
+
+func (r FabricResolver) LookupCNAME(ctx context.Context, domain string) (string, error) {
+	resp, err := r.Client.ResolveCNAME(ctx, &defangv1.ResolveCNAMERequest{
+		Domain:   domain,
+		NsServer: r.NSServer,
+	})
+	if err != nil {
+		return "", err
+	}
+	if resp.Cname == "" {
+		return "", ErrNoSuchHost
+	}
+	return resp.Cname, nil
+}
+
+func (r FabricResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS, error) {
+	resp, err := r.Client.ResolveNS(ctx, &defangv1.ResolveNSRequest{
+		Domain:   domain,
+		NsServer: r.NSServer,
+	})
+	if err != nil {
+		return nil, err
+	}
+	nss := make([]*net.NS, 0, len(resp.Hosts))
+	for _, h := range resp.Hosts {
+		nss = append(nss, &net.NS{Host: h})
+	}
+	return nss, nil
+}
+
+func (r FabricResolver) LookupTXT(ctx context.Context, domain string) ([]string, error) {
+	resp, err := r.Client.ResolveTXT(ctx, &defangv1.ResolveTXTRequest{
+		Domain:   domain,
+		NsServer: r.NSServer,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(resp.Txts) == 0 {
+		return nil, ErrNoSuchHost
+	}
+	return resp.Txts, nil
+}
+
+// RootResolver performs recursive DNS resolution starting from the root
+// nameservers. Set ResolverAt to override how individual nameservers are
+// queried (e.g. to route through the Fabric gRPC API). A nil ResolverAt
+// falls back to DirectResolverAt.
+type RootResolver struct {
+	ResolverAt func(string) Resolver
+}
+
+func (r RootResolver) resolverFn() func(string) Resolver {
+	if r.ResolverAt != nil {
+		return r.ResolverAt
+	}
+	return DirectResolverAt
+}
 
 // https://en.wikipedia.org/wiki/Root_name_server
 var rootServers = []*net.NS{
@@ -61,21 +162,41 @@ func (r RootResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS, e
 	return r.getResolver(ctx, domain).LookupNS(ctx, domain)
 }
 
+func (r RootResolver) LookupTXT(ctx context.Context, domain string) ([]string, error) {
+	for range 10 {
+		txts, err := r.getResolver(ctx, domain).LookupTXT(ctx, domain)
+		if err != nil {
+			if cnameErr, ok := err.(ErrCNAMEFound); ok {
+				domain = cnameErr.CNAME()
+				continue
+			}
+			return nil, err
+		}
+		return txts, nil
+	}
+	return nil, errors.New("too many CNAME lookups")
+}
+
 func (r RootResolver) getResolver(ctx context.Context, domain string) Resolver {
-	ns, err := FindNSServers(ctx, domain)
+	resolverAt := r.resolverFn()
+	ns, err := FindNSServers(ctx, domain, resolverAt)
 	if err != nil {
 		return DirectResolver{}
 	}
-	return DirectResolver{NSServer: ns[pkg.RandomIndex(len(ns))].Host}
+	// Use the injected resolverAt for the authoritative lookup too, not just
+	// NS discovery — otherwise FabricResolver-injected callers would fall
+	// back to raw UDP for the actual A/CNAME/NS/TXT query, defeating the
+	// whole point of injection.
+	return resolverAt(ns[pkg.RandomIndex(len(ns))].Host)
 }
 
-func FindNSServers(ctx context.Context, domain string) ([]*net.NS, error) {
+func FindNSServers(ctx context.Context, domain string, resolverAt func(string) Resolver) ([]*net.NS, error) {
 	nsServers := rootServers
 	retries := 3
 	for {
 		index := pkg.RandomIndex(len(nsServers))
 		nsServer := nsServers[index].Host
-		ns, err := ResolverAt(nsServer).LookupNS(ctx, domain)
+		ns, err := resolverAt(nsServer).LookupNS(ctx, domain)
 		sort.Slice(ns, func(i, j int) bool { return ns[i].Host < ns[j].Host })
 		if err != nil {
 			if retries--; retries > 0 {
@@ -91,10 +212,11 @@ func FindNSServers(ctx context.Context, domain string) ([]*net.NS, error) {
 }
 
 func DirectResolverAt(nsServer string) Resolver {
+	if nsServer == "" {
+		return RootResolver{}
+	}
 	return DirectResolver{NSServer: nsServer}
 }
-
-var ResolverAt = DirectResolverAt
 
 var ErrNoSuchHost = &net.DNSError{Err: "no such host", IsNotFound: true}
 
@@ -174,6 +296,36 @@ func (r DirectResolver) LookupCNAME(ctx context.Context, domain string) (string,
 		}
 	}
 	return "", ErrNoSuchHost
+}
+
+func (r DirectResolver) LookupTXT(ctx context.Context, domain string) ([]string, error) {
+	res, err := r.query(ctx, domain, dns.TypeTXT)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []string
+	var cname string
+	// A single TXT response can be split into multiple "strings" on the wire
+	// (each ≤255 bytes); the convention is to concatenate them. miekg/dns
+	// already returns each record's strings as a []string in TXT.Txt, so we
+	// just join those and emit one entry per RR.
+	for _, rr := range res.Answer {
+		if t, ok := rr.(*dns.TXT); ok {
+			result = append(result, strings.Join(t.Txt, ""))
+		} else if cn, ok := rr.(*dns.CNAME); ok {
+			cname = cn.Target
+		}
+	}
+	if len(result) == 0 {
+		// No TXT record but a CNAME — surface it so RootResolver can
+		// follow the alias, matching LookupIPAddr's behavior.
+		if cname != "" {
+			return nil, ErrCNAMEFound(cname)
+		}
+		return nil, ErrNoSuchHost
+	}
+	return result, nil
 }
 
 func (r DirectResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS, error) {

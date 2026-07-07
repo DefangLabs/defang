@@ -36,9 +36,9 @@ func (m *MockListConfigCLI) Connect(ctx context.Context, fabricAddr string) (*cl
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockListConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient, stack string) client.Provider {
+func (m *MockListConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, fabric client.FabricClient, stack string) client.Provider {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
-	return nil // Mock provider
+	return client.MockProvider{}
 }
 
 func (m *MockListConfigCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
@@ -119,7 +119,7 @@ func TestHandleListConfigTool(t *testing.T) {
 					Names: []string{"DATABASE_URL"},
 				}
 			},
-			expectedTextContains: "Here is the list of config variables for the project \"test-project\": DATABASE_URL",
+			expectedTextContains: "Here is the list of config variables for the project \"test-project\" in stack \"test-stack\": DATABASE_URL",
 		},
 	}
 

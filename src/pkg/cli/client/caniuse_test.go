@@ -64,6 +64,12 @@ func TestCanIUseProvider(t *testing.T) {
 	ctx := t.Context()
 	term.SetDebug(testing.Verbose())
 
+	savedCliVersion := CliVersion
+	t.Cleanup(func() {
+		CliVersion = savedCliVersion
+	})
+	CliVersion = "v1.2.3"
+
 	tests := []struct {
 		name          string
 		projectName   string
@@ -254,6 +260,10 @@ func TestCanIUseProvider(t *testing.T) {
 			}
 			if fabric.lastReq.PreferPulumiVersion != tt.wantReqPulumi {
 				t.Errorf("request PulumiVersion = %q, want %q", fabric.lastReq.PreferPulumiVersion, tt.wantReqPulumi)
+			}
+
+			if fabric.lastReq.CliVersion != CliVersion {
+				t.Errorf("request CliVersion = %q, want %q", fabric.lastReq.CliVersion, CliVersion)
 			}
 		})
 	}

@@ -26,13 +26,8 @@ type Session struct {
 	Provider client.Provider
 }
 
-type LoaderOptions struct {
-	ProjectName      string
-	ComposeFilePaths []string
-}
-
 type SessionLoaderOptions struct {
-	LoaderOptions
+	compose.LoaderOptions
 	stacks.GetStackOpts
 }
 
@@ -59,7 +54,7 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 	provider := cli.NewProvider(ctx, stack.Provider, sl.client, stack.Name)
 	session := &Session{
 		Stack:    stack,
-		Loader:   sl.newLoader(),
+		Loader:   compose.NewLoaderFromOptions(sl.opts.LoaderOptions),
 		Provider: provider,
 	}
 
@@ -84,21 +79,14 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, str
 	}
 
 	// The only stack property that can be overridden via env/flag is Mode
-	if newMode := sl.opts.Default.Mode; newMode != modes.ModeUnspecified {
-		stack.Mode = newMode
+	if newMode := sl.opts.Default.Recipe; newMode != modes.RecipeUnspecified {
+		stack.Recipe = newMode
 	}
 
 	if err := stacks.LoadStackEnv(*stack, true); err != nil {
 		return nil, whence, fmt.Errorf("failed to load stack env: %w", err)
 	}
 	return stack, whence, nil
-}
-
-func (sl *SessionLoader) newLoader() client.Loader {
-	return compose.NewLoader(
-		compose.WithProjectName(sl.opts.ProjectName),
-		compose.WithPath(sl.opts.ComposeFilePaths...),
-	)
 }
 
 func printProviderMismatchWarnings(ctx context.Context, provider client.ProviderID) {
@@ -114,6 +102,9 @@ func printProviderMismatchWarnings(ctx context.Context, provider client.Provider
 		if env := pkg.GcpInEnv(); env != "" {
 			term.Warnf("GCP project environment variable was detected (%v); did you forget --provider=gcp or DEFANG_PROVIDER=gcp?", env)
 		}
+		if env := pkg.AzureInEnv(); env != "" {
+			term.Warnf("Azure environment variables were detected (%v); did you forget --provider=azure or DEFANG_PROVIDER=azure?", env)
+		}
 	}
 
 	switch provider {
@@ -128,6 +119,10 @@ func printProviderMismatchWarnings(ctx context.Context, provider client.Provider
 	case client.ProviderGCP:
 		if env := pkg.GcpInEnv(); env == "" {
 			term.Warnf("GCP provider was selected, but no GCP project environment variable is set (%v)", pkg.GCPProjectEnvVars)
+		}
+	case client.ProviderAzure:
+		if env := pkg.AzureInEnv(); env == "" {
+			term.Warn("Azure provider was selected, but no Azure environment variables are set")
 		}
 	}
 }

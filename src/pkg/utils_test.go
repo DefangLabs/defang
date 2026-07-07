@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -190,6 +191,74 @@ func TestShellQuote(t *testing.T) {
 		actual := ShellQuote(test.input...)
 		if actual != test.expected {
 			t.Errorf("Expected `%s` but got: `%s`", test.expected, actual)
+		}
+	}
+}
+
+func unsetAll(t *testing.T, keys ...string) {
+	t.Helper()
+	saved := map[string]string{}
+	for _, k := range keys {
+		if v, ok := os.LookupEnv(k); ok {
+			saved[k] = v
+			if err := os.Unsetenv(k); err != nil {
+				t.Fatalf("unsetenv %s: %v", k, err)
+			}
+		}
+	}
+	t.Cleanup(func() {
+		for k, v := range saved {
+			_ = os.Setenv(k, v) //nolint:usetesting // t.Setenv registers another cleanup; restore via os.Setenv
+		}
+	})
+}
+
+func TestAzureInEnv(t *testing.T) {
+	unsetAll(t, "AZURE_SUBSCRIPTION_ID", "AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET")
+	if got := AzureInEnv(); got != "" {
+		t.Errorf("AzureInEnv() with no vars set = %q, want empty", got)
+	}
+	t.Setenv("AZURE_CLIENT_ID", "abc")
+	if got := AzureInEnv(); got != "AZURE_CLIENT_ID" {
+		t.Errorf("AzureInEnv() = %q, want AZURE_CLIENT_ID", got)
+	}
+	t.Setenv("AZURE_SUBSCRIPTION_ID", "sub") // first in list, should win
+	if got := AzureInEnv(); got != "AZURE_SUBSCRIPTION_ID" {
+		t.Errorf("AzureInEnv() prefers AZURE_SUBSCRIPTION_ID, got %q", got)
+	}
+}
+
+func TestAwsInEnv(t *testing.T) {
+	unsetAll(t, "AWS_PROFILE", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_ROLE_ARN")
+	if got := AwsInEnv(); got != "" {
+		t.Errorf("AwsInEnv() with no vars set = %q, want empty", got)
+	}
+	t.Setenv("AWS_ROLE_ARN", "arn")
+	if got := AwsInEnv(); got != "AWS_ROLE_ARN" {
+		t.Errorf("AwsInEnv() = %q, want AWS_ROLE_ARN", got)
+	}
+}
+
+func TestDoInEnv(t *testing.T) {
+	unsetAll(t, "DIGITALOCEAN_ACCESS_TOKEN", "DIGITALOCEAN_TOKEN")
+	if got := DoInEnv(); got != "" {
+		t.Errorf("DoInEnv() with no vars = %q, want empty", got)
+	}
+	t.Setenv("DIGITALOCEAN_TOKEN", "x")
+	if got := DoInEnv(); got != "DIGITALOCEAN_TOKEN" {
+		t.Errorf("DoInEnv() = %q, want DIGITALOCEAN_TOKEN", got)
+	}
+}
+
+func TestGcpInEnv(t *testing.T) {
+	unsetAll(t, GCPProjectEnvVars...)
+	if got := GcpInEnv(); got != "" {
+		t.Errorf("GcpInEnv() with no vars = %q, want empty", got)
+	}
+	if len(GCPProjectEnvVars) > 0 {
+		t.Setenv(GCPProjectEnvVars[0], "proj")
+		if got := GcpInEnv(); got != GCPProjectEnvVars[0] {
+			t.Errorf("GcpInEnv() = %q, want %q", got, GCPProjectEnvVars[0])
 		}
 	}
 }

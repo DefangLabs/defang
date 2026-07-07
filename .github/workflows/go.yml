@@ -15,12 +15,13 @@ on:
 permissions:
   contents: read
   id-token: write # for GitHub id-token auth
+  actions: read # to query workflow runs for coverage baseline
 
 jobs:
   go-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - name: Set up Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
@@ -30,10 +31,13 @@ jobs:
 
       - name: Sanitize branch name for artifact
         id: branch
-        run: echo "name=$(echo '${{ github.ref_name }}' | tr '/' '-')" >> "$GITHUB_OUTPUT"
+        run: echo "name=$(echo '${{ github.ref_name }}' | tr '/' '-')" >>
+          "$GITHUB_OUTPUT"
 
       - name: Run Go unit tests
-        run: go test -race -test.short -v -coverprofile=coverage.out -covermode=atomic ./...
+        run:
+          go test -race -test.short -v -coverprofile=coverage.out -covermode=atomic
+          ./...
         working-directory: src
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # to avoid GH rate limits
@@ -51,35 +55,31 @@ jobs:
           path: src/coverage.txt
           overwrite: true
 
-      - name: Download main branch coverage
+      - name: Find merge-base run ID
         if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v')
-        uses: dawidd6/action-download-artifact@8305c0f1062bb0d184d09ef4493ecb9288447732 # v20
+        id: merge-base-run
+        continue-on-error: true # no baseline yet on first run
+        run: |
+          git fetch origin main --depth=50
+          MERGE_BASE=$(git merge-base HEAD origin/main)
+          echo "Merge base: $MERGE_BASE"
+          RUN_ID=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/go.yml/runs" \
+            -X GET -f branch=main -f per_page=100 \
+            --jq ".workflow_runs[] | select(.head_sha == \"$MERGE_BASE\" and .conclusion == \"success\") | .id" \
+            | head -1)
+          echo "run_id=${RUN_ID}" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download merge-base coverage
+        if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v') && steps.merge-base-run.outputs.run_id != ''
+        uses: dawidd6/action-download-artifact@b6e2e70617bc3265edd6dab6c906732b2f1ae151 # v21
         with:
           workflow: go.yml
-          branch: main
+          run_id: ${{ steps.merge-base-run.outputs.run_id }}
           name: coverage-main
           path: coverage-main
-        continue-on-error: true # no baseline yet on first run
-
-      - name: Check coverage regression
-        if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v')
-        run: |
-          if [ ! -f coverage-main/coverage.txt ]; then
-            echo "No main coverage baseline found, skipping comparison"
-            exit 0
-          fi
-          main_pct=$(grep '^total:' coverage-main/coverage.txt | awk '{print $3}' | tr -d '%')
-          curr_pct=$(grep '^total:' src/coverage.txt | awk '{print $3}' | tr -d '%')
-          if [ -z "$main_pct" ] || [ -z "$curr_pct" ]; then
-            echo "ERROR: Could not parse coverage percentages (main='$main_pct', current='$curr_pct')"
-            exit 1
-          fi
-          echo "Main: ${main_pct}%  Current branch: ${curr_pct}%"
-          if awk "BEGIN { exit !(${curr_pct} < ${main_pct}) }"; then
-            echo "ERROR: Coverage decreased from ${main_pct}% to ${curr_pct}%"
-            exit 1
-          fi
-          echo "Coverage OK (${curr_pct}% >= ${main_pct}%)"
+        continue-on-error: true # artifact may have expired
 
       - name: Verify Go modules
         working-directory: src
@@ -111,13 +111,33 @@ jobs:
         run: GOOS=windows go build ./cmd/cli
         working-directory: src
 
+      - name: Check coverage regression
+        if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v') && github.actor != 'dependabot[bot]'
+        run: |
+          if [ ! -f coverage-main/coverage.txt ]; then
+            echo "No main coverage baseline found, skipping comparison"
+            exit 0
+          fi
+          main_pct=$(grep '^total:' coverage-main/coverage.txt | awk '{print $3}' | tr -d '%')
+          curr_pct=$(grep '^total:' src/coverage.txt | awk '{print $3}' | tr -d '%')
+          if [ -z "$main_pct" ] || [ -z "$curr_pct" ]; then
+            echo "ERROR: Could not parse coverage percentages (main='$main_pct', current='$curr_pct')"
+            exit 1
+          fi
+          echo "Main: ${main_pct}%  Current branch: ${curr_pct}%"
+          if awk "BEGIN { exit !(${curr_pct} < ${main_pct}) }"; then
+            echo "ERROR: Coverage decreased from ${main_pct}% to ${curr_pct}%"
+            exit 1
+          fi
+          echo "Coverage OK (${curr_pct}% >= ${main_pct}%)"
+
   nix-shell-test:
     runs-on: ubuntu-latest
     needs: go-test
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - name: Install Nix
         uses: cachix/install-nix-action@616559265b40713947b9c190a8ff4b507b5df49b # v31
@@ -198,7 +218,7 @@ jobs:
   #         role-chaining: true
   #         role-to-assume: arn:aws:iam::426819183542:role/admin # adminUserRoleArn from defang-io/bootstrap stack
 
-  #     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+  #     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
   #     - name: Set up Go
   #       uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
@@ -216,7 +236,7 @@ jobs:
     env:
       COMPOSE_PROJECT_NAME: ${{ github.run_id }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - name: Set up Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
@@ -230,22 +250,33 @@ jobs:
 
       - name: Add dummy config
         id: add-dummy-config
-        run: echo blah | go run -race ./cmd/cli -C testdata/sanity config set --provider=defang -n dummy --debug
+        run: echo blah | go run -race ./cmd/cli -C testdata/sanity config set -n
+          dummy --provider=defang --debug
         working-directory: src
 
       - name: Run sanity tests UP
+        id: sanity-up
         continue-on-error: true # until we have multi-project support in playground
-        run: go run -race ./cmd/cli -C testdata/sanity compose up --provider=defang --debug
+        run: go run -race ./cmd/cli -C testdata/sanity compose up
+          --provider=defang --debug
         working-directory: src
 
       - name: Run sanity tests DOWN
         continue-on-error: true # until we have multi-project support in playground
-        run: go run -race ./cmd/cli -C testdata/sanity compose down --provider=defang --detach --debug
+        run: go run -race ./cmd/cli -C testdata/sanity compose down --detach
+          --provider=defang --debug
         working-directory: src
 
       - name: Remove dummy config
         if: steps.add-dummy-config.conclusion == 'success' # only clean up if the config was added
-        run: go run -race ./cmd/cli -C testdata/sanity config rm --provider=defang -n dummy --debug
+        run: go run -race ./cmd/cli -C testdata/sanity config rm -n dummy
+          --provider=defang --debug
+        working-directory: src
+
+      - name: Delete stack
+        if: steps.sanity-up.outcome == 'success' # only clean up if up was successful (outcome, not conclusion, because continue-on-error masks failures as conclusion=success)
+        run: go run -race ./cmd/cli -C testdata/sanity stack rm beta
+          --provider=defang --debug
         working-directory: src
 
   build-and-sign:
@@ -254,12 +285,13 @@ jobs:
     environment: release # must use environment to be able to authenticate with Azure Federated Identity for Trusted Signing
     needs: go-test
     runs-on: windows-latest
-    env: # from https://github.com/spiffe/spire/pull/5158
-      GOPATH: 'D:\golang\go'
-      GOCACHE: 'D:\golang\cache'
-      GOMODCACHE: 'D:\golang\modcache'
+    env:
+      # from https://github.com/spiffe/spire/pull/5158
+      GOPATH: "D:\\golang\\go"
+      GOCACHE: "D:\\golang\\cache"
+      GOMODCACHE: "D:\\golang\\modcache"
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - name: Set up Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
@@ -280,14 +312,20 @@ jobs:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
       - name: Run GoReleaser (Linux)
-        run: goreleaser release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' || '' }} ${{ github.event_name == 'schedule' && '--nightly' || ''}}
+        run:
+          goreleaser release --split ${{ !startsWith(github.ref, 'refs/tags/v') &&
+          '--snapshot' || '' }} ${{ github.event_name == 'schedule' &&
+          '--nightly' || ''}}
         working-directory: src
         env:
           GGOOS: linux
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
       - name: Run GoReleaser (Windows)
-        run: goreleaser release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' || '' }} ${{ github.event_name == 'schedule' && '--nightly' || ''}}
+        run:
+          goreleaser release --split ${{ !startsWith(github.ref, 'refs/tags/v') &&
+          '--snapshot' || '' }} ${{ github.event_name == 'schedule' &&
+          '--nightly' || ''}}
         working-directory: src
         env:
           GGOOS: windows
@@ -302,11 +340,12 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Trusted Signing
-        uses: Azure/trusted-signing-action@b443cf8ea4124818d2ea9f043cba29fc3ec47b16 # v1.2.0
+        uses: Azure/trusted-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
         with:
           endpoint: https://wus2.codesigning.azure.net/ # from Azure portal
           trusted-signing-account-name: DefangLabs # from Azure portal
-          certificate-profile-name: signed-binary${{ !startsWith(github.ref, 'refs/tags/v') && '-test' || '' }} # from Azure portal
+          certificate-profile-name: signed-binary${{ !startsWith(github.ref,
+            'refs/tags/v') && '-test' || '' }} # from Azure portal
           files-folder: ${{ github.workspace }}\src\dist
           files-folder-filter: exe # no dll
           files-folder-recurse: true
@@ -350,7 +389,7 @@ jobs:
     needs: go-test
     runs-on: macos-latest # for codesign and notarytool
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - name: Set up Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
@@ -367,7 +406,9 @@ jobs:
         with:
           distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
-          args: release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' || '' }} ${{ github.event_name == 'schedule' && '--nightly' || ''}}
+          args:
+            release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot'
+            || '' }} ${{ github.event_name == 'schedule' && '--nightly' || ''}}
           workdir: src
         env:
           GGOOS: darwin
@@ -398,7 +439,7 @@ jobs:
     permissions:
       contents: write # to upload archives as GitHub Releases
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
           fetch-depth: 0 # for release notes
 
@@ -448,7 +489,7 @@ jobs:
     needs:
       - go-release
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
@@ -464,7 +505,8 @@ jobs:
 
       - name: Build and push Docker images and manifests
         working-directory: src
-        run: make push-images ${{ startsWith(github.ref, 'refs/tags/v') && format('VERSION={0}', github.ref_name) || '' }}
+        run: make push-images ${{ startsWith(github.ref, 'refs/tags/v') &&
+          format('VERSION={0}', github.ref_name) || '' }}
   post-release:
     runs-on: ubuntu-latest
     needs: go-release
@@ -487,7 +529,7 @@ jobs:
           client-payload: '{"version": "${{ github.ref_name }}"}'
 
       - name: Checkout tag
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - name: Build npm package
         uses: ./.github/actions/npm-build
@@ -503,7 +545,8 @@ jobs:
 
   on-failure:
     runs-on: ubuntu-latest
-    if: failure() && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    if: failure() && (github.ref == 'refs/heads/main' || startsWith(github.ref,
+      'refs/tags/v'))
     needs: [go-release, post-release, nix-shell-test, push-docker]
     steps:
       - name: Slack Notification

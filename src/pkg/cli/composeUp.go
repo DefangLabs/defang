@@ -25,7 +25,7 @@ func (e ComposeError) Unwrap() error {
 type ComposeUpParams struct {
 	Project    *compose.Project
 	UploadMode compose.UploadMode
-	Mode       modes.Mode
+	Recipe     modes.Recipe
 }
 
 func checkDeploymentMode(prevMode, newMode modes.Mode) (modes.Mode, error) {
@@ -68,7 +68,7 @@ func checkDeploymentMode(prevMode, newMode modes.Mode) (modes.Mode, error) {
 func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.Provider, stack *stacks.Parameters, params ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	upload := params.UploadMode
 	project := params.Project
-	mode := params.Mode
+	recipe := params.Recipe
 
 	if dryrun.DoDryRun {
 		upload = compose.UploadModeIgnore
@@ -100,17 +100,17 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		return nil, project, err
 	}
 
-	if err := compose.ValidateProject(fixedProject, mode); err != nil {
+	if err := compose.ValidateProject(fixedProject, recipe); err != nil {
 		return nil, project, &ComposeError{err}
 	}
 
-	bytes, err := compose.MarshalYAML(fixedProject)
+	composeYaml, err := compose.MarshalYAML(fixedProject)
 	if err != nil {
 		return nil, project, err
 	}
 
 	if upload == compose.UploadModeIgnore {
-		term.Println(string(bytes))
+		term.Println(string(composeYaml))
 		return nil, project, dryrun.ErrDryRun
 	}
 
@@ -130,21 +130,33 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		}
 		// New project, no previous deployment mode to check
 	} else {
-		prevMode := modes.Mode(prevUpdate.Mode)
-		mode, err = checkDeploymentMode(prevMode, mode)
+		newMode, err := checkDeploymentMode(modes.Mode(prevUpdate.Mode), recipe.Mode())
 		// Ignore mode compatibility errors in estimation mode
 		if err != nil && upload != compose.UploadModeEstimate {
 			return nil, project, err
 		}
+		if newMode != modes.ModeUnspecified {
+			recipe = modes.FromMode(newMode.Value())
+		}
+	}
+
+	rresp, err := fabric.GetRecipe(ctx, &defangv1.GetRecipeRequest{Name: recipe.String()})
+	if err != nil {
+		return nil, project, fmt.Errorf("failed to get recipe for deployment mode %q: %w", recipe, err)
+	}
+	// Allow estimate/preview with an inactive recipe so teams can evaluate it before activating.
+	if !rresp.Recipe.GetActive() && upload != compose.UploadModeEstimate && upload != compose.UploadModePreview {
+		return nil, project, fmt.Errorf("recipe %q is not active", recipe)
 	}
 
 	deployRequest := &client.DeployRequest{
 		DeployRequest: defangv1.DeployRequest{
-			Mode:           mode.Value(),
+			Mode:           recipe.Mode().Value(),
 			Project:        project.Name,
-			Compose:        bytes,
+			Compose:        composeYaml,
 			DelegateDomain: delegateDomain.Zone,
 		},
+		Recipe: rresp.Recipe,
 	}
 
 	delegation, err := provider.PrepareDomainDelegation(ctx, client.PrepareDomainDelegationRequest{
@@ -199,13 +211,15 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 	err = putDeploymentAndStack(ctx, provider, fabric, stack, putDeploymentParams{
 		Action:       action,
 		ETag:         resp.Etag,
-		Mode:         mode.Value(),
+		Mode:         recipe.Mode().Value(),
 		ProjectName:  project.Name,
 		StatesUrl:    statesUrl,
 		EventsUrl:    eventsUrl,
 		ServiceInfos: resp.Services,
 		CdType:       resp.CdType,
 		CdId:         resp.CdId,
+		Compose:      composeYaml,
+		Recipe:       deployRequest.Recipe,
 	})
 	if err != nil {
 		term.Debug("Failed to record deployment:", err)

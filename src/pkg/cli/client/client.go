@@ -25,15 +25,22 @@ type FabricClient interface {
 	GetDelegateSubdomainZone(context.Context, *defangv1.GetDelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
 	GetFabricClient() defangv1connect.FabricControllerClient
 	GetPlaygroundProjectDomain(context.Context) (*defangv1.GetPlaygroundProjectDomainResponse, error)
+	GetRecipe(context.Context, *defangv1.GetRecipeRequest) (*defangv1.GetRecipeResponse, error)
 	GetRequestedTenant() types.TenantNameOrID
+	GetStack(context.Context, *defangv1.GetStackRequest) (*defangv1.GetStackResponse, error)
 	GetTenantName() types.TenantLabel
 	GetVersions(context.Context) (*defangv1.Version, error)
 	ListDeployments(context.Context, *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error)
+	ListRecipes(context.Context) (*defangv1.ListRecipesResponse, error)
 	ListStacks(context.Context, *defangv1.ListStacksRequest) (*defangv1.ListStacksResponse, error)
-	GetStack(context.Context, *defangv1.GetStackRequest) (*defangv1.GetStackResponse, error)
 	Preview(context.Context, *defangv1.PreviewRequest) (*defangv1.PreviewResponse, error)
 	PutDeployment(context.Context, *defangv1.PutDeploymentRequest) error
+	PutRecipe(context.Context, *defangv1.PutRecipeRequest) error
 	PutStack(context.Context, *defangv1.PutStackRequest) error
+	ResolveCNAME(context.Context, *defangv1.ResolveCNAMERequest) (*defangv1.ResolveCNAMEResponse, error)
+	ResolveIPAddr(context.Context, *defangv1.ResolveIPAddrRequest) (*defangv1.ResolveIPAddrResponse, error)
+	ResolveNS(context.Context, *defangv1.ResolveNSRequest) (*defangv1.ResolveNSResponse, error)
+	ResolveTXT(context.Context, *defangv1.ResolveTXTRequest) (*defangv1.ResolveTXTResponse, error)
 	RevokeToken(context.Context) error
 	SetOptions(context.Context, *defangv1.SetOptionsRequest) error
 	Token(context.Context, *defangv1.TokenRequest) (*defangv1.TokenResponse, error)

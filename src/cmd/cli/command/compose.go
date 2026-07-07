@@ -112,7 +112,7 @@ func makeComposeUpCmd() *cobra.Command {
 					Name:     stacks.MakeDefaultName(accountInfo.Provider, accountInfo.Region),
 					Provider: accountInfo.Provider,
 					Region:   accountInfo.Region,
-					Mode:     session.Stack.Mode,
+					Recipe:   session.Stack.Recipe,
 				})
 				if err != nil {
 					term.Debug("Failed to create stack:", err)
@@ -133,7 +133,7 @@ func makeComposeUpCmd() *cobra.Command {
 			deploy, project, err := cli.ComposeUp(ctx, global.Client, session.Provider, session.Stack, cli.ComposeUpParams{
 				Project:    project,
 				UploadMode: upload,
-				Mode:       session.Stack.Mode,
+				Recipe:     session.Stack.Recipe,
 			})
 			if err != nil {
 				composeErr := err
@@ -206,7 +206,6 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed; implies --build")
 	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // no-op, but keep for backwards compatibility
 	_ = composeUpCmd.Flags().MarkHidden("tail")
-	composeUpCmd.Flags().VarP(&global.Stack.Mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	composeUpCmd.Flags().Bool("build", false, "build images before starting services") // docker-compose compatibility
 	composeUpCmd.Flags().Bool("wait", true, "wait for services to be running|healthy") // docker-compose compatibility
 	_ = composeUpCmd.Flags().MarkHidden("wait")
@@ -243,7 +242,7 @@ func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.D
 			Name:     stackName,
 			Provider: accountInfo.Provider,
 			Region:   accountInfo.Region,
-			Mode:     global.Stack.Mode,
+			Recipe:   global.Stack.Recipe,
 		})
 		if err != nil {
 			term.Debugf("Failed to create stack %v", err)
@@ -255,7 +254,7 @@ func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.D
 }
 
 func printExistingDeployments(existingDeployments []*defangv1.Deployment) {
-	term.Info("This project was previously deployed to the following locations:")
+	term.Warn("This project was previously deployed to the following locations:")
 	deploymentStrings := make([]string, 0, len(existingDeployments))
 	for _, dep := range existingDeployments {
 		var providerId client.ProviderID
@@ -265,7 +264,9 @@ func printExistingDeployments(existingDeployments []*defangv1.Deployment) {
 	// sort and remove duplicates
 	slices.Sort(deploymentStrings)
 	deploymentStrings = slices.Compact(deploymentStrings)
-	term.Println(strings.Join(deploymentStrings, "\n"))
+	for _, depStr := range deploymentStrings {
+		term.Println(depStr)
+	}
 }
 
 func confirmDeploymentToNewLocation() (bool, error) {
@@ -288,7 +289,7 @@ func promptToCreateStack(ctx context.Context, targetDirectory string, params sta
 		return nil
 	}
 
-	err := PromptForStackParameters(ctx, &params)
+	err := promptForStackParameters(ctx, &params)
 	if err != nil {
 		return err
 	}
@@ -416,6 +417,11 @@ func makeComposeDownCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var detach, _ = cmd.Flags().GetBool("detach")
 			var allowUpgrade, _ = cmd.Flags().GetBool("allow-upgrade")
+			var remove, _ = cmd.Flags().GetBool("remove")
+
+			if remove && detach {
+				return errors.New("cannot use --remove with --detach: the stack can only be removed after the down completes")
+			}
 
 			session, err := newCommandSession(cmd)
 			if err != nil {
@@ -445,9 +451,13 @@ func makeComposeDownCmd() *cobra.Command {
 
 			term.Info("Deleted services, deployment ID", deployment)
 
+			// Captured here because err is reassigned below, leaving listConfigs unsafe to dereference later.
+			var configNames []string
 			listConfigs, err := session.Provider.ListConfig(cmd.Context(), &defangv1.ListConfigsRequest{Project: projectName})
 			if err == nil {
-				if len(listConfigs.Names) > 0 {
+				configNames = listConfigs.Names
+				if len(configNames) > 0 && !remove {
+					// With --remove these configs are deleted below, since they are stored per-stack.
 					term.Warn("Stored project configs are not deleted.")
 				}
 			} else {
@@ -474,9 +484,27 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 			term.Info("Done.")
-			if len(listConfigs.Names) > 0 {
-				printDefangHint("To delete stored project configs, run:", "config rm --project-name="+projectName+" "+strings.Join(listConfigs.Names, " "))
+
+			if len(configNames) > 0 {
+				if remove {
+					// Configs are stored per-stack, so they would be orphaned once the stack is gone: delete them first.
+					if err := cli.ConfigDelete(cmd.Context(), projectName, session.Provider, configNames...); err != nil {
+						return fmt.Errorf("failed to delete stored project configs: %w", err)
+					}
+					term.Info("Deleted stored project configs")
+				} else {
+					printDefangHint("To delete stored project configs, run:", "config rm --project-name="+projectName+" "+strings.Join(configNames, " "))
+				}
 			}
+
+			if remove {
+				// The down succeeded, so there is no active deployment left to confirm: remove without prompting.
+				if err := cli.RemoveStack(cmd.Context(), global.Client, session.Provider, ec, projectName, session.Stack.Name, true); err != nil {
+					return err
+				}
+				term.Infof("Removed stack %q", session.Stack.Name)
+			}
+
 			return nil
 		},
 	}
@@ -484,6 +512,7 @@ func makeComposeDownCmd() *cobra.Command {
 	composeDownCmd.Flags().Bool("tail", false, "tail the service logs after deleting") // no-op, but keep for backwards compatibility
 	_ = composeDownCmd.Flags().MarkHidden("tail")
 	composeDownCmd.Flags().Bool("allow-upgrade", pkg.GetenvBool("DEFANG_ALLOW_UPGRADE"), "allow upgrading the CD image and Pulumi version to the latest available")
+	composeDownCmd.Flags().Bool("remove", false, "delete the stack after a successful down")
 	return composeDownCmd
 }
 
@@ -522,7 +551,7 @@ func makeComposeConfigCmd() *cobra.Command {
 			if err != nil {
 				term.Warn("unable to load stack:", err, "- some information may not be up-to-date")
 				sessionx = &session.Session{
-					Loader:   configureLoaderForCommand(cmd),
+					Loader:   newLoaderForCommand(cmd),
 					Provider: client.NewPlaygroundProvider(global.Client, stacks.DefaultBeta),
 					Stack:    &stacks.Parameters{Name: stacks.DefaultBeta, Provider: client.ProviderDefang},
 				}
@@ -541,7 +570,7 @@ func makeComposeConfigCmd() *cobra.Command {
 			_, _, err = cli.ComposeUp(ctx, global.Client, sessionx.Provider, sessionx.Stack, cli.ComposeUpParams{
 				Project:    project,
 				UploadMode: compose.UploadModeIgnore,
-				Mode:       modes.ModeUnspecified,
+				Recipe:     modes.RecipeUnspecified,
 			})
 			if !errors.Is(err, dryrun.ErrDryRun) {
 				return err
@@ -686,8 +715,8 @@ func handleLogsCmd(cmd *cobra.Command, args []string) error {
 		servicesWithBuild := make([]string, 0, len(services)*2)
 		for _, service := range services {
 			servicesWithBuild = append(servicesWithBuild, service)
-			if !strings.HasSuffix(service, "-image") {
-				servicesWithBuild = append(servicesWithBuild, service+"-image")
+			if !strings.HasSuffix(service, logs.BuildServiceNameSuffix) {
+				servicesWithBuild = append(servicesWithBuild, service+logs.BuildServiceNameSuffix)
 			}
 		}
 		services = servicesWithBuild

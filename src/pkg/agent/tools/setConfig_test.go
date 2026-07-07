@@ -64,6 +64,10 @@ func (p *MockProvider) AccountInfo(context.Context) (*client.AccountInfo, error)
 	return &client.AccountInfo{}, nil
 }
 
+func (p *MockProvider) Authenticate(context.Context, bool) error {
+	return nil
+}
+
 func (m *MockSetConfigCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
 	m.LoadProjectNameCalled = true
 	if m.LoadProjectNameError != nil {

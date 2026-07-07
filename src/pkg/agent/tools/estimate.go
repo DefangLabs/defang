@@ -28,7 +28,7 @@ func HandleEstimateTool(ctx context.Context, loader client.Loader, params Estima
 	}
 
 	term.Debug("Function invoked: cli.Connect")
-	fabric, err := GetClientWithRetry(ctx, cli, sc)
+	fabric, err := GetClientWithRetry(ctx, cli, sc.FabricAddr)
 	if err != nil {
 		var noBrowserErr auth.ErrNoBrowser
 		if errors.As(err, &noBrowserErr) {
@@ -45,20 +45,16 @@ func HandleEstimateTool(ctx context.Context, loader client.Loader, params Estima
 		return "", err
 	}
 
-	var deploymentMode modes.Mode
-	err = deploymentMode.Set(params.DeploymentMode)
-	if err != nil {
-		return "", err
-	}
+	recipe := modes.ParseRecipe(params.DeploymentMode)
 
 	term.Debug("Function invoked: cli.RunEstimate")
-	estimate, err := cli.RunEstimate(ctx, project, fabric, defangProvider, providerID, params.Region, deploymentMode)
+	estimate, err := cli.RunEstimate(ctx, project, fabric, defangProvider, providerID, params.Region, recipe)
 	if err != nil {
 		return "", fmt.Errorf("failed to run estimate: %w", err)
 	}
 	term.Debugf("Estimate: %+v", estimate)
 
-	estimateText := cli.PrintEstimate(deploymentMode, estimate)
+	estimateText := cli.PrintEstimate(recipe, estimate)
 
 	return "Successfully estimated the cost of the project to " + providerID.Name() + ":\n" + estimateText, nil
 }
