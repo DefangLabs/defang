@@ -949,7 +949,7 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 				if svc.Err != nil {
 					// Non-fatal: warn (so the failure isn't silently swallowed) but keep
 					// reading the other sources rather than ending the whole tail.
-					term.Warnf("Could not read service logs for %q: %v", svc.AppName, svc.Err)
+					term.Debugf("Could not read service logs for %q: %v", svc.AppName, svc.Err)
 					continue
 				}
 				if !yield(&defangv1.TailResponse{
