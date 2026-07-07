@@ -306,7 +306,7 @@ func TestLoadStackEnv(t *testing.T) {
 			},
 			expectedEnv: map[string]string{
 				"DEFANG_PROVIDER":       "azure",
-				"AZURE_REGION":          "eastus",
+				"AZURE_LOCATION":        "eastus",
 				"AZURE_SUBSCRIPTION_ID": "my-azure-subscription",
 				"DEFANG_RECIPE":         "balanced",
 				"DEFANG_PREFIX":         "test",

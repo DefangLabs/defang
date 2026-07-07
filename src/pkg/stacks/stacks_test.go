@@ -220,7 +220,7 @@ func TestMarshal(t *testing.T) {
 				Region:   "us-central1",
 				Recipe:   modes.RecipeBalanced,
 			},
-			expectedContent: "DEFANG_RECIPE=\"balanced\"\nDEFANG_PROVIDER=\"gcp\"\nGOOGLE_REGION=\"us-central1\"",
+			expectedContent: "DEFANG_PROVIDER=\"gcp\"\nDEFANG_RECIPE=\"balanced\"\nGOOGLE_REGION=\"us-central1\"",
 		},
 		{
 			name: "AWS provider",
@@ -230,7 +230,7 @@ func TestMarshal(t *testing.T) {
 				Region:   "us-east-1",
 				Recipe:   modes.RecipeAffordable,
 			},
-			expectedContent: "AWS_REGION=\"us-east-1\"\nDEFANG_RECIPE=\"affordable\"\nDEFANG_PROVIDER=\"aws\"",
+			expectedContent: "AWS_REGION=\"us-east-1\"\nDEFANG_PROVIDER=\"aws\"\nDEFANG_RECIPE=\"affordable\"",
 		},
 		{
 			name: "Unspecified mode",
@@ -250,7 +250,7 @@ func TestMarshal(t *testing.T) {
 				Region:   "",
 				Recipe:   modes.RecipeAffordable,
 			},
-			expectedContent: "DEFANG_RECIPE=\"affordable\"\nDEFANG_PROVIDER=\"gcp\"",
+			expectedContent: "DEFANG_PROVIDER=\"gcp\"\nDEFANG_RECIPE=\"affordable\"",
 		},
 	}
 
@@ -304,7 +304,7 @@ DEFANG_MODE=STAGING
 			expectedParams: Parameters{
 				Provider: client.ProviderAzure,
 				Region:   "eastus",
-				Recipe:   "STAGING",
+				Recipe:   modes.RecipeBalanced,
 			},
 		},
 		{
@@ -323,15 +323,14 @@ DEFANG_RECIPE=affordable
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			params, err := parseContent(tt.content)
+			params, err := NewParametersFromContent(tt.name, []byte(tt.content))
 			if err != nil {
 				t.Errorf("Parse() error = %v", err)
 				return
 			}
-			regionEnvVarName := client.GetRegionVarName(tt.expectedParams.Provider)
-			assert.Equal(t, tt.expectedParams.Provider.String(), params["DEFANG_PROVIDER"])
-			assert.Equal(t, tt.expectedParams.Region, params[regionEnvVarName])
-			assert.Equal(t, tt.expectedParams.Recipe.String(), params["DEFANG_RECIPE"])
+			assert.Equal(t, tt.expectedParams.Provider, params.Provider)
+			assert.Equal(t, tt.expectedParams.Region, params.Region)
+			assert.Equal(t, tt.expectedParams.Recipe, params.Recipe)
 		})
 	}
 }

@@ -29,7 +29,7 @@ func TestHandleCurrentStackTool(t *testing.T) {
 					},
 				},
 			},
-			expected:      "This currently selected stack is \"test-stack\": AWS_PROFILE=\"default\"\nAWS_REGION=\"us-test-2\"\nDEFANG_RECIPE=\"affordable\"\nDEFANG_PROVIDER=\"aws\"",
+			expected:      "This currently selected stack is \"test-stack\": AWS_PROFILE=\"default\"\nAWS_REGION=\"us-test-2\"\nDEFANG_PROVIDER=\"aws\"\nDEFANG_RECIPE=\"affordable\"",
 			expectedError: false,
 		},
 	}
