@@ -45,7 +45,7 @@ func TestPreviewStops(t *testing.T) {
 				deploymentStatus: tt.err,
 			}
 
-			err := Preview(t.Context(), project, fabric, provider, ComposeUpParams{Mode: modes.ModeUnspecified, Project: project})
+			err := Preview(t.Context(), project, fabric, provider, ComposeUpParams{Recipe: modes.RecipeUnspecified, Project: project})
 			if err != nil {
 				if err.Error() != tt.wantError {
 					t.Errorf("got error: %v, want: %v", err, tt.wantError)
@@ -67,7 +67,7 @@ func TestPreviewStops(t *testing.T) {
 
 		provider := &mockDeployProvider{}
 
-		err := Preview(ctx, project, fabric, provider, ComposeUpParams{Mode: modes.ModeUnspecified, Project: project})
+		err := Preview(ctx, project, fabric, provider, ComposeUpParams{Recipe: modes.RecipeUnspecified, Project: project})
 		if err != nil {
 			t.Errorf("got error: %v, want nil", err)
 		}

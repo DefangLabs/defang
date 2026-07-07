@@ -25,11 +25,11 @@ type stackSelector struct {
 	wizard *Wizard
 }
 
-func NewSelector(ec elicitations.Controller, sm Manager) *stackSelector {
+func NewSelector(ec elicitations.Controller, sm Manager, recipeLister RecipeLister) *stackSelector {
 	return &stackSelector{
 		ec:     ec,
 		sm:     sm,
-		wizard: NewWizard(ec),
+		wizard: NewWizard(ec, recipeLister),
 	}
 }
 

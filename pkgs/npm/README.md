@@ -49,6 +49,7 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_PULUMI_DIFF` - If set to `true`, shows the Pulumi diff during deployments; defaults to `false`
 - `DEFANG_PULUMI_DIR` - Run Pulumi from this folder, instead of spawning a cloud task; requires `--debug` (BYOC only)
 - `DEFANG_PULUMI_VERSION` - Override the version of the Pulumi image to use (`aws` provider only)
+- `DEFANG_RECIPE` - The deployment mode / recipe to use; defaults to `AFFORDABLE`
 - `DEFANG_SUFFIX` - The suffix to use for all BYOC resources; defaults to the stack name, or `beta` if unset.
 - `DEFANG_WORKSPACE` - The workspace (name or ID) to use; preferred way to select which workspace the CLI uses
 - `NO_COLOR` - If set to any value, disables color output; by default, color output is enabled depending on the terminal

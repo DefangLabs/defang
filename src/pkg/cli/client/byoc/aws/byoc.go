@@ -228,6 +228,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		Mode:          req.Mode,
 		PulumiVersion: b.PulumiVersion,
 		Services:      serviceInfos,
+		Recipe:        req.Recipe,
 	})
 	if err != nil {
 		return nil, err

@@ -107,11 +107,11 @@ func NewGlobalConfig() *GlobalConfig {
 		}
 	}
 
-	mode := modes.ModeUnspecified
-	if fromEnv, ok := os.LookupEnv("DEFANG_MODE"); ok {
-		err := mode.Set(fromEnv)
+	recipe := modes.RecipeUnspecified
+	if key, fromEnv := pkg.GetFirstEnv("DEFANG_RECIPE", "DEFANG_MODE"); key != "" {
+		err := recipe.Set(fromEnv)
 		if err != nil {
-			term.Debugf("invalid DEFANG_MODE value: %v", err)
+			term.Debugf("invalid %s value: %v", key, err)
 		}
 	}
 
@@ -137,7 +137,7 @@ func NewGlobalConfig() *GlobalConfig {
 		Stack: stacks.Parameters{
 			Name:     pkg.Getenv("DEFANG_STACK", ""),
 			Provider: provider,
-			Mode:     mode,
+			Recipe:   recipe,
 			Region:   client.GetRegion(provider),
 		},
 		Verbose:         pkg.GetenvBool("DEFANG_VERBOSE"),
@@ -158,8 +158,8 @@ func (global *GlobalConfig) ToMap() map[string]string {
 	if regionVarName != "" && global.Stack.Region != "" {
 		m[regionVarName] = global.Stack.Region
 	}
-	if global.Stack.Mode != modes.ModeUnspecified {
-		m["DEFANG_MODE"] = global.Stack.Mode.String()
+	if global.Stack.Recipe != modes.RecipeUnspecified {
+		m["DEFANG_RECIPE"] = global.Stack.Recipe.String()
 	}
 	m["DEFANG_VERBOSE"] = strconv.FormatBool(global.Verbose)
 	return m

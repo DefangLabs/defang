@@ -48,6 +48,7 @@ type DeployRequest struct {
 	defangv1.DeployRequest
 	EventsUrl string
 	StatesUrl string
+	Recipe    *defangv1.Recipe
 }
 
 type DeployResponse struct {

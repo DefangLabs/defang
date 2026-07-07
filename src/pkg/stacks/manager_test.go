@@ -54,6 +54,10 @@ func (m *mockFabricClient) GetDefaultStack(ctx context.Context, req *defangv1.Ge
 	}, nil
 }
 
+func (m *mockFabricClient) ListRecipes(ctx context.Context) (*defangv1.ListRecipesResponse, error) {
+	return &defangv1.ListRecipesResponse{}, nil
+}
+
 func TestNewManager(t *testing.T) {
 	workingDir := "/tmp/test-dir"
 	mockClient := &mockFabricClient{}
@@ -89,7 +93,7 @@ func TestManager_CreateListLoad(t *testing.T) {
 		Variables: map[string]string{
 			"AWS_PROFILE": "default",
 		},
-		Mode: modes.ModeAffordable,
+		Recipe: modes.RecipeAffordable,
 	}
 
 	filename, err := manager.Create(params)
@@ -111,7 +115,7 @@ func TestManager_CreateListLoad(t *testing.T) {
 	assert.Equal(t, "teststack", stacks[0].Name, "Expected stack name 'teststack'")
 	assert.Equal(t, client.ProviderAWS, stacks[0].Provider, "Expected provider AWS")
 	assert.Equal(t, "us-east-1", stacks[0].Region, "Expected region 'us-east-1'")
-	assert.Equal(t, modes.ModeAffordable, stacks[0].Mode, "Expected mode 'AFFORDABLE'")
+	assert.Equal(t, modes.RecipeAffordable, stacks[0].Mode, "Expected mode 'AFFORDABLE'")
 
 	// Test loading a stack
 	loadedParams, err := manager.Load(t.Context(), "teststack")
@@ -120,7 +124,7 @@ func TestManager_CreateListLoad(t *testing.T) {
 	assert.Equal(t, client.ProviderAWS, loadedParams.Provider, "Expected provider AWS")
 	assert.Equal(t, "us-east-1", loadedParams.Region, "Expected region 'us-east-1'")
 	assert.Equal(t, "default", loadedParams.Variables["AWS_PROFILE"], "Expected AWS profile 'default'")
-	assert.Equal(t, modes.ModeAffordable, loadedParams.Mode, "Expected mode affordable")
+	assert.Equal(t, modes.RecipeAffordable, loadedParams.Recipe, "Expected mode affordable")
 }
 
 func TestManager_CreateGCPStack(t *testing.T) {
@@ -143,7 +147,7 @@ func TestManager_CreateGCPStack(t *testing.T) {
 		Variables: map[string]string{
 			"GCP_PROJECT_ID": "my-project",
 		},
-		Mode: modes.ModeBalanced,
+		Recipe: modes.RecipeBalanced,
 	}
 
 	filename, err := manager.Create(params)
@@ -157,7 +161,7 @@ func TestManager_CreateGCPStack(t *testing.T) {
 	require.NoError(t, err, "Load() failed")
 	assert.Equal(t, client.ProviderGCP, loadedParams.Provider, "Expected provider GCP")
 	assert.Equal(t, "my-project", loadedParams.Variables["GCP_PROJECT_ID"], "Expected GCP project ID 'my-project'")
-	assert.Equal(t, modes.ModeBalanced, loadedParams.Mode, "Expected mode balanced")
+	assert.Equal(t, modes.RecipeBalanced, loadedParams.Recipe, "Expected mode balanced")
 }
 
 func TestManager_CreateMultipleStacks(t *testing.T) {
@@ -181,7 +185,7 @@ func TestManager_CreateMultipleStacks(t *testing.T) {
 			Variables: map[string]string{
 				"AWS_PROFILE": "default",
 			},
-			Mode: modes.ModeAffordable,
+			Recipe: modes.RecipeAffordable,
 		},
 		{
 			Name:     "stack2",
@@ -190,13 +194,13 @@ func TestManager_CreateMultipleStacks(t *testing.T) {
 			Variables: map[string]string{
 				"GCP_PROJECT_ID": "project2",
 			},
-			Mode: modes.ModeHighAvailability,
+			Recipe: modes.RecipeHighAvailability,
 		},
 		{
 			Name:     "stack3",
 			Provider: client.ProviderDO,
 			Region:   "nyc1",
-			Mode:     modes.ModeBalanced,
+			Recipe:   modes.RecipeBalanced,
 		},
 	}
 
@@ -218,6 +222,60 @@ func TestManager_CreateMultipleStacks(t *testing.T) {
 		require.NoError(t, err, "Load() failed for stack %s", params.Name)
 		assert.Equal(t, params.Name, loadedParams.Name, "Expected name %s", params.Name)
 		assert.Equal(t, params.Provider, loadedParams.Provider, "Expected provider %s", params.Provider)
+	}
+}
+
+func TestGetFallbackStack(t *testing.T) {
+	tests := []struct {
+		name       string
+		defaults   Parameters
+		awsRegion  string
+		wantErr    bool
+		wantRegion string
+	}{
+		{
+			name:     "no provider errors",
+			defaults: Parameters{Provider: client.ProviderAuto},
+			wantErr:  true,
+		},
+		{
+			// The -P flag sets the provider after the region default was computed
+			// (while provider was still Auto), so region arrives empty and must be
+			// filled with the provider default.
+			name:       "provider set but region empty gets provider default",
+			defaults:   Parameters{Provider: client.ProviderAWS},
+			wantRegion: client.RegionDefaultAWS,
+		},
+		{
+			name:       "empty region falls back to AWS_REGION env",
+			defaults:   Parameters{Provider: client.ProviderAWS},
+			awsRegion:  "eu-west-1",
+			wantRegion: "eu-west-1",
+		},
+		{
+			name:       "explicit region is preserved",
+			defaults:   Parameters{Provider: client.ProviderAWS, Region: "ap-south-1"},
+			awsRegion:  "eu-west-1",
+			wantRegion: "ap-south-1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("AWS_REGION", tt.awsRegion) // registers restore of the original value
+			if tt.awsRegion == "" {
+				os.Unsetenv("AWS_REGION")
+			}
+
+			stack, _, err := GetFallbackStack(tt.defaults)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, DefaultBeta, stack.Name)
+			assert.Equal(t, tt.wantRegion, stack.Region)
+		})
 	}
 }
 
@@ -281,7 +339,7 @@ func TestManager_CreateDuplicateStack(t *testing.T) {
 		Name:     "duplicatestack",
 		Provider: client.ProviderAWS,
 		Region:   "us-east-1",
-		Mode:     modes.ModeAffordable,
+		Recipe:   modes.RecipeAffordable,
 	}
 
 	// Create the first stack
@@ -393,7 +451,7 @@ GOOGLE_REGION=us-central1
 		Variables: map[string]string{
 			"AWS_PROFILE": "default",
 		},
-		Mode: modes.ModeAffordable,
+		Recipe: modes.RecipeAffordable,
 	}
 	_, err = manager.Create(localParams)
 	require.NoError(t, err, "First Create() failed")
@@ -406,7 +464,7 @@ GOOGLE_REGION=us-central1
 		Variables: map[string]string{
 			"AWS_PROFILE": "default",
 		},
-		Mode: modes.ModeAffordable,
+		Recipe: modes.RecipeAffordable,
 	}
 	_, err = manager.Create(localOnlyParams)
 	require.NoError(t, err, "Create() failed")
@@ -430,7 +488,7 @@ GOOGLE_REGION=us-central1
 	}
 	assert.Equal(t, "us-east-1", sharedStack.Region, "Expected shared stack to use remote region us-east-1")
 	assert.Equal(t, client.ProviderAWS, sharedStack.Provider, "Expected shared stack to use provider aws")
-	assert.Equal(t, modes.ModeUnspecified, sharedStack.Mode, "Expected shared stack to use mode UNSPECIFIED")
+	assert.Equal(t, modes.RecipeUnspecified, sharedStack.Mode, "Expected shared stack to use mode UNSPECIFIED")
 	assert.Equal(t, "", sharedStack.Account, "Expected shared stack to have empty AWS_PROFILE variable")
 	assert.Equal(t, deployedAt.Local().Format(time.RFC3339), sharedStack.DeployedAt.Local().Format(time.RFC3339), "Expected shared stack to have deployment time from remote")
 
@@ -544,7 +602,7 @@ func TestManager_WorkingDirectoryMatches(t *testing.T) {
 		Variables: map[string]string{
 			"AWS_PROFILE": "default",
 		},
-		Mode: modes.ModeAffordable,
+		Recipe: modes.RecipeAffordable,
 	}
 
 	// Create should work
@@ -601,7 +659,7 @@ GOOGLE_REGION=us-central1
 		Variables: map[string]string{
 			"AWS_PROFILE": "default",
 		},
-		Mode: modes.ModeAffordable,
+		Recipe: modes.RecipeAffordable,
 	}
 
 	// Create should fail

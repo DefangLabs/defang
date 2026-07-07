@@ -23,7 +23,7 @@ func Test_configurationPrecedence(t *testing.T) {
 		HideUpdate:      false,
 		NonInteractive:  false, // set to false just for test instead of !term.IsTerminal() for consistency
 		Verbose:         false,
-		Stack:           stacks.Parameters{Provider: client.ProviderAuto, Mode: modes.ModeUnspecified},
+		Stack:           stacks.Parameters{Provider: client.ProviderAuto, Recipe: modes.RecipeUnspecified},
 		FabricAddr:      "",
 		TenantSelection: "",
 	}
@@ -61,7 +61,6 @@ func Test_configurationPrecedence(t *testing.T) {
 			flags.BoolVarP(&testConfig.Verbose, "verbose", "v", testConfig.Verbose, "verbose logging")
 			flags.BoolVar(&testConfig.Debug, "debug", testConfig.Debug, "debug logging for troubleshooting the CLI")
 			flags.BoolVar(&testConfig.NonInteractive, "non-interactive", testConfig.NonInteractive, "disable interactive prompts / no TTY")
-			flags.VarP(&testConfig.Stack.Mode, "mode", "m", "deployment mode")
 
 			// Set flags based on user input (these override env and stack file values)
 			for flagName, flagValue := range tt.flags {
@@ -109,8 +108,8 @@ func Test_configurationPrecedence(t *testing.T) {
 			if testConfig.Stack.Provider != tt.expected.Stack.Provider {
 				t.Errorf("expected Stack.Provider to be '%s', got '%s'", tt.expected.Stack.Provider, testConfig.Stack.Provider)
 			}
-			if testConfig.Stack.Mode != tt.expected.Stack.Mode {
-				t.Errorf("expected Stack.Mode to be '%s', got '%s'", tt.expected.Stack.Mode, testConfig.Stack.Mode)
+			if testConfig.Stack.Recipe != tt.expected.Stack.Recipe {
+				t.Errorf("expected Stack.Mode to be '%s', got '%s'", tt.expected.Stack.Recipe, testConfig.Stack.Recipe)
 			}
 			if testConfig.FabricAddr != tt.expected.FabricAddr {
 				t.Errorf("expected FabricAddr to be '%s', got '%s'", tt.expected.FabricAddr, testConfig.FabricAddr)
