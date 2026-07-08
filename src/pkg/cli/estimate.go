@@ -56,17 +56,18 @@ func GeneratePreview(ctx context.Context, project *compose.Project, fabric clien
 
 	term.Debugf("Fixedup project: %s", string(composeData))
 
-	rresp, err := fabric.GetRecipe(ctx, &defangv1.GetRecipeRequest{Name: recipe.String()})
+	recipeMsg, err := getRecipe(ctx, fabric, recipe)
 	if err != nil {
 		return "", fmt.Errorf("failed to get recipe for deployment mode %q: %w", recipe, err)
 	}
+	// Allow estimate/preview with an inactive recipe so teams can evaluate it before activating.
 	resp, err := fabric.Preview(ctx, &defangv1.PreviewRequest{
 		Provider:    estimateProviderID.Value(),
 		Mode:        recipe.Mode().Value(),
 		Region:      region,
 		Compose:     composeData,
 		ProjectName: project.Name,
-		Recipe:      rresp.Recipe,
+		Recipe:      recipeMsg,
 	})
 	if err != nil {
 		return "", err

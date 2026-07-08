@@ -135,17 +135,22 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		if err != nil && upload != compose.UploadModeEstimate {
 			return nil, project, err
 		}
-		if newMode != modes.ModeUnspecified {
+		// An unspecified recipe inherits the previous deployment's recipe (or mode).
+		if recipe == modes.RecipeUnspecified && prevUpdate.GetRecipe().GetName() != "" {
+			recipe = modes.ParseRecipe(prevUpdate.GetRecipe().GetName())
+		} else if newMode != modes.ModeUnspecified {
 			recipe = modes.FromMode(newMode.Value())
 		}
 	}
 
-	rresp, err := fabric.GetRecipe(ctx, &defangv1.GetRecipeRequest{Name: recipe.String()})
+	// An unspecified recipe (new project, no mode given) is left to the fabric to
+	// default; sending an empty recipe name to GetRecipe would be rejected.
+	recipeMsg, err := getRecipe(ctx, fabric, recipe)
 	if err != nil {
-		return nil, project, fmt.Errorf("failed to get recipe for deployment mode %q: %w", recipe, err)
+		return nil, project, err
 	}
 	// Allow estimate/preview with an inactive recipe so teams can evaluate it before activating.
-	if !rresp.Recipe.GetActive() && upload != compose.UploadModeEstimate && upload != compose.UploadModePreview {
+	if recipeMsg != nil && !recipeMsg.GetActive() && upload != compose.UploadModeEstimate && upload != compose.UploadModePreview {
 		return nil, project, fmt.Errorf("recipe %q is not active", recipe)
 	}
 
@@ -156,7 +161,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 			Compose:        composeYaml,
 			DelegateDomain: delegateDomain.Zone,
 		},
-		Recipe: rresp.Recipe,
+		Recipe: recipeMsg,
 	}
 
 	delegation, err := provider.PrepareDomainDelegation(ctx, client.PrepareDomainDelegationRequest{
@@ -233,4 +238,16 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		}
 	}
 	return resp.DeployResponse, project, nil
+}
+
+func getRecipe(ctx context.Context, fabric client.FabricClient, recipe modes.Recipe) (*defangv1.Recipe, error) {
+	if recipe == modes.RecipeUnspecified {
+		// An unspecified recipe is left to the fabric to default
+		return nil, nil
+	}
+	rresp, err := fabric.GetRecipe(ctx, &defangv1.GetRecipeRequest{Name: recipe.String()})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get recipe for deployment mode %q: %w", recipe, err)
+	}
+	return rresp.GetRecipe(), nil
 }

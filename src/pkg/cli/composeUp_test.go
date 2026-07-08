@@ -28,6 +28,7 @@ type mockDeployProvider struct {
 	subscribeStream   *client.MockWaitStream[defangv1.SubscribeResponse]
 	tailStream        *client.MockWaitStream[defangv1.TailResponse]
 	prevProjectUpdate *defangv1.ProjectUpdate
+	deployedRecipe    *defangv1.Recipe
 	lock              sync.Mutex
 }
 
@@ -35,10 +36,13 @@ func (d *mockDeployProvider) Deploy(ctx context.Context, req *client.DeployReque
 	return d.Preview(ctx, req)
 }
 
-func (*mockDeployProvider) Preview(ctx context.Context, req *client.DeployRequest) (*client.DeployResponse, error) {
+func (d *mockDeployProvider) Preview(ctx context.Context, req *client.DeployRequest) (*client.DeployResponse, error) {
 	if len(req.Compose) == 0 {
 		return nil, errors.New("DeployRequest needs Compose")
 	}
+	d.lock.Lock()
+	d.deployedRecipe = req.Recipe
+	d.lock.Unlock()
 
 	project, err := compose.LoadFromContent(ctx, req.Compose, "")
 	if err != nil {
@@ -394,6 +398,89 @@ func TestComposeUpStops(t *testing.T) {
 			var errDeploymentFailed client.ErrDeploymentFailed
 			if errors.As(err, &errDeploymentFailed) != tt.isErrDeploymentFailed {
 				t.Errorf("expected ErrDeploymentFailed: %v, got: %v", tt.isErrDeploymentFailed, err)
+			}
+		})
+	}
+}
+
+// TestComposeUpRecipe verifies how ComposeUp resolves the recipe sent to the
+// fabric: an unspecified recipe inherits the previous deployment's recipe/mode,
+// and a brand-new project with no recipe is left for the fabric to default
+// (rather than sending an empty recipe name, which the fabric rejects).
+func TestComposeUpRecipe(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK) // return 200 OK same as S3
+	}))
+	t.Cleanup(server.Close)
+
+	project := &compose.Project{
+		Name: "test-project",
+		Services: compose.Services{
+			"service1": compose.ServiceConfig{
+				Name:       "service1",
+				Image:      "test-image",
+				DomainName: "test-domain",
+			},
+		},
+	}
+
+	tests := []struct {
+		name       string
+		recipe     modes.Recipe
+		prevUpdate *defangv1.ProjectUpdate
+		wantRecipe string // recipe name in the DeployRequest; "" means unset (fabric defaults)
+	}{
+		{
+			name:       "unspecified recipe on a new project defers to the fabric",
+			recipe:     modes.RecipeUnspecified,
+			wantRecipe: "",
+		},
+		{
+			name:       "unspecified recipe inherits the previous recipe",
+			recipe:     modes.RecipeUnspecified,
+			prevUpdate: &defangv1.ProjectUpdate{Recipe: &defangv1.Recipe{Name: "BALANCED", Active: true}},
+			wantRecipe: "BALANCED",
+		},
+		{
+			// A custom recipe has no corresponding built-in mode, so it can only be
+			// preserved by carrying the previous recipe name forward (not via mode).
+			name:       "unspecified recipe inherits the previous custom recipe",
+			recipe:     modes.RecipeUnspecified,
+			prevUpdate: &defangv1.ProjectUpdate{Recipe: &defangv1.Recipe{Name: "FOO", Active: true}},
+			wantRecipe: "FOO",
+		},
+		{
+			name:       "unspecified recipe inherits the previous mode",
+			recipe:     modes.RecipeUnspecified,
+			prevUpdate: &defangv1.ProjectUpdate{Mode: defangv1.DeploymentMode_PRODUCTION},
+			wantRecipe: "HIGH_AVAILABILITY",
+		},
+		{
+			name:       "specified recipe is used as-is",
+			recipe:     modes.RecipeAffordable,
+			wantRecipe: "AFFORDABLE",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fabric := client.MockFabricClient{DelegateDomain: "example.com"}
+			provider := &mockDeployProvider{
+				MockProvider:      client.MockProvider{UploadUrl: server.URL + "/"},
+				prevProjectUpdate: tt.prevUpdate,
+			}
+			stack := &stacks.Parameters{Provider: client.ProviderDefang}
+
+			_, _, err := ComposeUp(t.Context(), fabric, provider, stack, ComposeUpParams{
+				Recipe:     tt.recipe,
+				Project:    project,
+				UploadMode: compose.UploadModeDigest,
+			})
+			if err != nil {
+				t.Fatalf("ComposeUp() failed: %v", err)
+			}
+			if got := provider.deployedRecipe.GetName(); got != tt.wantRecipe {
+				t.Errorf("DeployRequest recipe = %q, want %q", got, tt.wantRecipe)
 			}
 		})
 	}

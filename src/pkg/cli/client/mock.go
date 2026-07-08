@@ -239,6 +239,11 @@ func (m MockFabricClient) PutDeployment(ctx context.Context, req *defangv1.PutDe
 }
 
 func (m MockFabricClient) GetRecipe(ctx context.Context, req *defangv1.GetRecipeRequest) (*defangv1.GetRecipeResponse, error) {
+	// Mirror the fabric server, which rejects an empty recipe name; this catches
+	// callers that send an unspecified recipe.
+	if req.GetName() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("name is required"))
+	}
 	if m.Recipe != nil {
 		return &defangv1.GetRecipeResponse{Recipe: m.Recipe}, nil
 	}
