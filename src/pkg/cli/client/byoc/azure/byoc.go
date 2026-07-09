@@ -26,6 +26,7 @@ import (
 	azuredns "github.com/DefangLabs/defang/src/pkg/clouds/azure/dns"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/keyvault"
 	defanghttp "github.com/DefangLabs/defang/src/pkg/http"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -809,103 +810,122 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 		return nil, err
 	}
 
-	// Resolve the CD job execution for this request. The deploying process caches
-	// the run ID in memory; a standalone `defang logs` has none, so recover it by
-	// matching the request etag against each execution's recorded ETAG env var.
-	runID := b.cdRunID
+	// Honor the requested log types (a bitmask of CD/RUN/BUILD), like the other
+	// providers do. In particular `cd down`/refresh request CD logs only, so the
+	// service and build watchers below must not run against the project resource
+	// group — it is being (or already) torn down and would return ResourceGroupNotFound.
+	logType := logs.LogType(req.LogType)
+
+	// The etag labels CD, service, and build entries alike, so resolve it before
+	// branching on log type.
 	etag := b.cdEtag
 	if req.Etag != "" && req.Etag != b.cdEtag {
-		runID, etag = "", req.Etag
-	}
-	if runID == "" && etag != "" {
-		found, err := b.job.FindExecutionByEtag(ctx, etag)
-		if err != nil {
-			return nil, fmt.Errorf("failed to find CD deployment for etag %q: %w", etag, err)
-		}
-		runID = found
-	}
-	if runID == "" {
-		// Unknown or empty etag: no CD run to tail. Service and build logs are keyed
-		// by resource group rather than the CD execution, so still surface those.
-		term.Warnf("No CD logs found for etag %q; showing service and build logs only", req.Etag)
+		etag = req.Etag
 	}
 
-	// CD logs. cdCh stays nil when there's no CD run, which makes the select below skip
-	// it and treat the CD source as already drained. Follow streams line-by-line; the
-	// snapshot reads the whole buffered run content once.
+	// CD logs. cdCh stays nil when CD logs aren't requested or there's no CD run,
+	// which makes the select below skip it and treat the CD source as already
+	// drained. Follow streams line-by-line; the snapshot reads the whole buffered
+	// run content once.
 	type cdLogEntry struct {
 		line string
 		err  error
 	}
 	var cdCh chan cdLogEntry
-	if runID != "" {
-		cdCh = make(chan cdLogEntry)
-		if req.Follow {
-			logIter, err := b.job.TailJobLogs(ctx, runID)
+	if logType.Has(logs.LogTypeCD) {
+		// Resolve the CD job execution for this request. The deploying process caches
+		// the run ID in memory; a standalone `defang logs` has none, so recover it by
+		// matching the request etag against each execution's recorded ETAG env var.
+		runID := b.cdRunID
+		if req.Etag != "" && req.Etag != b.cdEtag {
+			runID = ""
+		}
+		if runID == "" && etag != "" {
+			found, err := b.job.FindExecutionByEtag(ctx, etag)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to find CD deployment for etag %q: %w", etag, err)
 			}
-			go func() {
-				defer close(cdCh)
-				for line, err := range logIter {
-					select {
-					case cdCh <- cdLogEntry{line: line, err: err}:
-					case <-ctx.Done():
+			runID = found
+		}
+		if runID == "" {
+			term.Warnf("No CD logs found for etag %q", req.Etag)
+		} else {
+			cdCh = make(chan cdLogEntry)
+			if req.Follow {
+				logIter, err := b.job.TailJobLogs(ctx, runID)
+				if err != nil {
+					return nil, err
+				}
+				go func() {
+					defer close(cdCh)
+					for line, err := range logIter {
+						select {
+						case cdCh <- cdLogEntry{line: line, err: err}:
+						case <-ctx.Done():
+							return
+						}
+					}
+				}()
+			} else {
+				content, err := b.job.ReadJobLogs(ctx, runID)
+				if err != nil {
+					return nil, err
+				}
+				go func() {
+					defer close(cdCh)
+					if content == "" {
 						return
 					}
-				}
-			}()
-		} else {
-			content, err := b.job.ReadJobLogs(ctx, runID)
-			if err != nil {
-				return nil, err
+					select {
+					case cdCh <- cdLogEntry{line: content}:
+					case <-ctx.Done():
+					}
+				}()
 			}
-			go func() {
-				defer close(cdCh)
-				if content == "" {
-					return
-				}
-				select {
-				case cdCh <- cdLogEntry{line: content}:
-				case <-ctx.Done():
-				}
-			}()
 		}
 	}
 
 	projectRG := b.projectResourceGroupName(req.Project)
 
-	// Service logs from the project's Container Apps and build logs from ACR both
-	// live in the PROJECT resource group (independent of the CD run). For a one-shot
-	// query, if that group doesn't exist the project isn't deployed under this
-	// name/stack — surface one clear message instead of letting both watchers fail
-	// with raw "ResourceGroupNotFound" errors. In follow mode we skip the check: the
-	// group may be created mid-session (deploy-then-tail), so the watchers poll for it.
+	// Service logs from the project's Container Apps (RUN) and build logs from ACR
+	// (BUILD) both live in the PROJECT resource group (independent of the CD run).
+	// For a one-shot query, if that group doesn't exist the project isn't deployed
+	// under this name/stack — surface one clear message instead of letting the
+	// watchers fail with raw "ResourceGroupNotFound" errors. In follow mode we skip
+	// the check: the group may be created mid-session (deploy-then-tail), so the
+	// watchers poll for it.
 	var acaCh <-chan aca.ServiceLogEntry
 	var buildCh <-chan acr.BuildLogEntry
-	startWatchers := true
-	if !req.Follow {
-		exists, err := b.driver.ResourceGroupExists(ctx, projectRG)
-		if err != nil {
-			return nil, err
+	wantRun := logType.Has(logs.LogTypeRun)
+	wantBuild := logType.Has(logs.LogTypeBuild)
+	if wantRun || wantBuild {
+		startWatchers := true
+		if !req.Follow {
+			exists, err := b.driver.ResourceGroupExists(ctx, projectRG)
+			if err != nil {
+				return nil, err
+			}
+			if !exists {
+				term.Warnf("No deployed services found for project %q on stack %q (resource group %q not found)", req.Project, b.PulumiStack, projectRG)
+				startWatchers = false
+			}
 		}
-		if !exists {
-			term.Warnf("No deployed services found for project %q on stack %q (resource group %q not found)", req.Project, b.PulumiStack, projectRG)
-			startWatchers = false
+		if startWatchers {
+			if wantRun {
+				acaClient := &aca.ContainerApp{
+					Azure:         b.driver.Azure,
+					ResourceGroup: projectRG,
+				}
+				acaCh = acaClient.WatchLogs(ctx, req.Follow)
+			}
+			if wantBuild {
+				buildWatcher := &acr.BuildLogWatcher{
+					Azure:         b.driver.Azure,
+					ResourceGroup: projectRG,
+				}
+				buildCh = buildWatcher.WatchBuildLogs(ctx, req.Follow)
+			}
 		}
-	}
-	if startWatchers {
-		acaClient := &aca.ContainerApp{
-			Azure:         b.driver.Azure,
-			ResourceGroup: projectRG,
-		}
-		acaCh = acaClient.WatchLogs(ctx, req.Follow)
-
-		buildWatcher := &acr.BuildLogWatcher{
-			Azure:         b.driver.Azure,
-			ResourceGroup: projectRG,
-		}
-		buildCh = buildWatcher.WatchBuildLogs(ctx, req.Follow)
 	}
 
 	return func(yield func(*defangv1.TailResponse, error) bool) {
