@@ -447,7 +447,7 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 	}
 
 	// svccfg.HealthCheck = &composeTypes.ServiceHealthCheckConfig{} TODO: add healthcheck
-	svccfg.Image = "litellm/litellm:v1.82.3-stable.patch.3"
+	svccfg.Image = "litellm/litellm:v1.92.0"
 	svccfg.Command = []string{"--drop_params", "--model", model, "--alias", alias}
 	if svccfg.Networks == nil {
 		// New compose-go versions do not create networks for "provider:" services, so we need to create it here

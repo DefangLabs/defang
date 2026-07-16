@@ -7,7 +7,7 @@ ai_model:
         - ai/model
     environment:
         LITELLM_MASTER_KEY: networkisalreadyprivate
-    image: litellm/litellm:v1.82.3-stable.patch.3
+    image: litellm/litellm:v1.92.0
     networks:
         model_provider_private: null
     ports:
@@ -53,7 +53,7 @@ my_model:
         - ai/model
     environment:
         LITELLM_MASTER_KEY: networkisalreadyprivate
-    image: litellm/litellm:v1.82.3-stable.patch.3
+    image: litellm/litellm:v1.92.0
     networks:
         model_provider_private: null
     ports:
