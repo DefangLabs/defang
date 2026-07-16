@@ -131,6 +131,12 @@ jobs:
           fi
           echo "Coverage OK (${curr_pct}% >= ${main_pct}%)"
 
+      # Sanity-check the GitHub OIDC login flow against Fabric on every push;
+      # moved here from the retired go-playground-test job.
+      - name: Login using GitHub token
+        run: go run -race ./cmd/cli login --debug
+        working-directory: src
+
   nix-shell-test:
     runs-on: ubuntu-latest
     needs: go-test
@@ -200,84 +206,77 @@ jobs:
             exit 1
           fi
 
-  # go-byoc-test:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Configure AWS Credentials for CI
-  #       uses: aws-actions/configure-aws-credentials@v4
-  #       with:
-  #         aws-region: us-west-2
-  #         output-credentials: true
-  #         role-to-assume: arn:aws:iam::488659951590:role/ci-role-d4fe904 # ciRoleArn from defang-io/infrastructure stack
-
-  #     - name: Configure AWS Credentials for Staging
-  #       uses: aws-actions/configure-aws-credentials@v4
-  #       with:
-  #         aws-region: us-west-2
-  #         role-duration-seconds: 1200
-  #         role-chaining: true
-  #         role-to-assume: arn:aws:iam::426819183542:role/admin # adminUserRoleArn from defang-io/bootstrap stack
-
-  #     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
-
-  #     - name: Set up Go
-  #       uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
-  #       with:
-  #         go-version-file: src/go.mod
-  #         cache-dependency-path: src/go.sum
-
-  #     - name: Run sanity tests
-  #       run: go run -race ./cmd/cli -C testdata/sanity compose up --debug
-  #       working-directory: src
-
-  go-playground-test:
+  # Replaces the retired go-playground-test job: the Playground was discontinued,
+  # so config/up/down sanity tests now run as BYOC smoketests (AWS + GCP) in
+  # DefangLabs/defang-mvp, built from this exact commit. The public CLI repo has
+  # no cloud credentials, hence the cross-repo workflow dispatch.
+  trigger-smoketests:
+    name: Trigger CLI smoketests (BYOC)
     runs-on: ubuntu-latest
     needs: go-test
-    env:
-      COMPOSE_PROJECT_NAME: ${{ github.run_id }}
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    concurrency:
+      group: smoketests-${{ github.ref }}
+      cancel-in-progress: false
+    environment: smoketest
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
-
-      - name: Set up Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+      - name: Trigger smoketests and await conclusion
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
-          go-version-file: src/go.mod
-          cache-dependency-path: src/go.sum
+          # If this token is expired, you can regenerate by following these steps:
+          # 1. Navigate to https://github.com/settings/personal-access-tokens/new
+          # 2. Fill out the form with the following values:
+          #   * Token name: defang-mvp-workflow-dispatch-token
+          #   * Description: This token will be used by a workflow in the `DefangLabs/defang` repository to trigger a workflow run in the `DefangLabs/defang-mvp` repository.
+          #   * Resource Owner: Defang Labs
+          #   * Expiration: 366 days
+          #   * Repositories:
+          #     * DefangLabs/defang-mvp
+          #   * Repository Permissions:
+          #     * Actions (read and write access)
+          #     * Metadata (read only)
+          # 3. Click "Generate token"
+          # 4. Copy the new token into the `DEFANG_MVP_ACTIONS_DISPATCH_TOKEN` secret in the `smoketest` environment
+          github-token: ${{ secrets.DEFANG_MVP_ACTIONS_DISPATCH_TOKEN }}
+          script: |
+            const owner = 'DefangLabs';
+            const repo = 'defang-mvp';
+            const workflow_id = 'cli-smoketests.yml';
+            const cliVersion = context.sha; // build the CLI from the exact commit under test
 
-      - name: Login using GitHub token
-        run: go run -race ./cmd/cli login --debug
-        working-directory: src
+            // Remember the newest existing run: createWorkflowDispatch does not
+            // return the new run's id, so we find ours by id > watermark plus the
+            // CLI version in the run name (see run-name in cli-smoketests.yml).
+            const { data: before } = await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id, per_page: 1 });
+            const watermark = before.workflow_runs[0]?.id ?? 0;
 
-      - name: Add dummy config
-        id: add-dummy-config
-        run: echo blah | go run -race ./cmd/cli -C testdata/sanity config set -n
-          dummy --provider=defang --debug
-        working-directory: src
+            await github.rest.actions.createWorkflowDispatch({
+              owner, repo, workflow_id, ref: 'main',
+              inputs: { 'sample-name': 'html-css-js', 'cli-version': cliVersion },
+            });
 
-      - name: Run sanity tests UP
-        id: sanity-up
-        continue-on-error: true # until we have multi-project support in playground
-        run: go run -race ./cmd/cli -C testdata/sanity compose up
-          --provider=defang --debug
-        working-directory: src
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-      - name: Run sanity tests DOWN
-        continue-on-error: true # until we have multi-project support in playground
-        run: go run -race ./cmd/cli -C testdata/sanity compose down --detach
-          --provider=defang --debug
-        working-directory: src
+            let run;
+            for (let i = 0; i < 30 && !run; i++) {
+              await sleep(10_000);
+              const { data } = await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id, event: 'workflow_dispatch', per_page: 30 });
+              run = data.workflow_runs.find((wr) => wr.id > watermark && wr.name.includes(cliVersion));
+            }
+            if (!run) {
+              throw new Error('Timed out waiting for the dispatched smoketest run to appear');
+            }
+            core.notice(`Awaiting smoketests: ${run.html_url}`);
 
-      - name: Remove dummy config
-        if: steps.add-dummy-config.conclusion == 'success' # only clean up if the config was added
-        run: go run -race ./cmd/cli -C testdata/sanity config rm -n dummy
-          --provider=defang --debug
-        working-directory: src
-
-      - name: Delete stack
-        if: steps.sanity-up.outcome == 'success' # only clean up if up was successful (outcome, not conclusion, because continue-on-error masks failures as conclusion=success)
-        run: go run -race ./cmd/cli -C testdata/sanity stack rm beta
-          --provider=defang --debug
-        working-directory: src
+            while (run.status !== 'completed') {
+              await sleep(30_000);
+              run = (await github.rest.actions.getWorkflowRun({ owner, repo, run_id: run.id })).data;
+            }
+            if (run.conclusion !== 'success') {
+              throw new Error(`Smoketests concluded '${run.conclusion}': ${run.html_url}`);
+            }
+            core.notice(`Smoketests passed: ${run.html_url}`);
 
   build-and-sign:
     name: Build app and sign files (with Trusted Signing)
@@ -434,7 +433,7 @@ jobs:
     needs:
       - build-and-sign-mac
       - build-and-sign
-      - go-playground-test
+      - trigger-smoketests
     runs-on: ubuntu-latest
     permissions:
       contents: write # to upload archives as GitHub Releases
