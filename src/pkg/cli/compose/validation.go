@@ -28,6 +28,12 @@ func (e ErrMissingConfig) Error() string {
 	return fmt.Sprintf("missing configs %q (https://s.defang.io/config)", ([]string)(e))
 }
 
+type ErrConfigInterpolationInBuildArgs []string
+
+func (e ErrConfigInterpolationInBuildArgs) Error() string {
+	return fmt.Sprintf("build args do not support config interpolation %q; set concrete values or define them in `.env` before deploying", ([]string)(e))
+}
+
 var ErrDockerfileNotFound = errors.New("dockerfile not found")
 
 func ValidateProject(project *composeTypes.Project, mode modes.Recipe) error {
@@ -184,6 +190,19 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		}
 		if svccfg.Build.Ulimits != nil {
 			term.Warnf("service %q: unsupported compose directive: build ulimits", svccfg.Name) // TODO: add support for build ulimits
+		}
+		// Defang config/secrets are scoped to runtime and CD interpolation; passing them to builders
+		// would risk leaking values through build logs, image layers, or build cache. Any interpolation
+		// left unresolved by local .env/Compose config loading must not reach the cloud builder.
+		var interpolatedArgs []string
+		for key, value := range svccfg.Build.Args {
+			if value != nil && len(DetectInterpolationVariables(*value)) > 0 {
+				interpolatedArgs = append(interpolatedArgs, fmt.Sprintf("%s.build.args.%s", svccfg.Name, key))
+			}
+		}
+		if len(interpolatedArgs) > 0 {
+			sort.Strings(interpolatedArgs)
+			return ErrConfigInterpolationInBuildArgs(interpolatedArgs)
 		}
 	}
 	for _, secret := range svccfg.Secrets {
