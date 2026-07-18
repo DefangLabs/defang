@@ -1,0 +1,12 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Unresolved config interpolation must be rejected before deploy: it would
+        # otherwise reach the cloud builder as a literal ${...} and fail there.
+        MY_APP_URL: ${MY_APP_URL}
+        # Concrete values and escaped dollars remain valid build args.
+        BASE_IMAGE: alpine
+        PRICE: $$5.00

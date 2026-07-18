@@ -1,0 +1,15 @@
+name: buildargs
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: alpine
+        MY_APP_URL: ${MY_APP_URL}
+        PRICE: $5.00
+    networks:
+      default: null
+networks:
+  default:
+    name: buildargs_default

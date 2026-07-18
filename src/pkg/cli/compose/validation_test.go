@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"slices"
 	"strings"
@@ -159,6 +160,82 @@ func TestValidateConfig(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestValidateBuildArgs(t *testing.T) {
+	oldTerm := term.DefaultTerm
+	t.Cleanup(func() { term.DefaultTerm = oldTerm })
+	term.DefaultTerm = term.NewTerm(os.Stdin, io.Discard, io.Discard)
+
+	newProject := func(args map[string]*string) *composeTypes.Project {
+		return &composeTypes.Project{
+			Services: composeTypes.Services{
+				"backend": composeTypes.ServiceConfig{
+					Name:  "backend",
+					Build: &composeTypes.BuildConfig{Context: ".", Args: args},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name    string
+		args    map[string]*string
+		wantBad []string // non-empty means we expect ErrConfigInterpolationInBuildArgs with these paths
+	}{
+		{
+			name: "concrete value is allowed",
+			args: map[string]*string{"MY_APP_URL": ptr.String("https://example.com")},
+		},
+		{
+			name: "nil value (passed from build environment) is allowed",
+			args: map[string]*string{"MY_APP_URL": nil},
+		},
+		{
+			name: "escaped dollar is allowed",
+			args: map[string]*string{"PRICE": ptr.String("$$5.00")},
+		},
+		{
+			name:    "unresolved curly interpolation is rejected",
+			args:    map[string]*string{"MY_APP_URL": ptr.String("${MY_APP_URL}")},
+			wantBad: []string{"backend.build.args.MY_APP_URL"},
+		},
+		{
+			name:    "unresolved bare interpolation is rejected",
+			args:    map[string]*string{"MY_APP_URL": ptr.String("$MY_APP_URL")},
+			wantBad: []string{"backend.build.args.MY_APP_URL"},
+		},
+		{
+			name:    "interpolation embedded in a larger value is rejected",
+			args:    map[string]*string{"URL": ptr.String("https://${HOST}/api")},
+			wantBad: []string{"backend.build.args.URL"},
+		},
+		{
+			name: "multiple offending args are all reported and sorted",
+			args: map[string]*string{
+				"B_URL": ptr.String("${B}"),
+				"A_URL": ptr.String("${A}"),
+			},
+			wantBad: []string{"backend.build.args.A_URL", "backend.build.args.B_URL"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateProject(newProject(tt.args), modes.RecipeAffordable)
+			var badArgs ErrConfigInterpolationInBuildArgs
+			if len(tt.wantBad) == 0 {
+				if errors.As(err, &badArgs) {
+					t.Fatalf("unexpected ErrConfigInterpolationInBuildArgs: %v", err)
+				}
+				return
+			}
+			if !errors.As(err, &badArgs) {
+				t.Fatalf("expected ErrConfigInterpolationInBuildArgs, got: %v", err)
+			}
+			assert.Equal(t, tt.wantBad, []string(badArgs))
+		})
+	}
 }
 
 func TestManagedStoreParams(t *testing.T) {
