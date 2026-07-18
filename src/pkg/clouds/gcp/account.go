@@ -10,11 +10,24 @@ import (
 	"regexp"
 	"strings"
 
+	"cloud.google.com/go/compute/metadata"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
 
 var FindGoogleDefaultCredentials func(ctx context.Context, scopes ...string) (*google.Credentials, error) = google.FindDefaultCredentials
+
+// getEmailFromMetadataServer returns the email of the service account this
+// workload runs as, read from the GCE metadata server. It is the canonical
+// identity of a keyless workload on Compute Engine, where the ambient access
+// token carries no email in tokeninfo (it lacks the userinfo.email scope).
+// A package var so tests can stub it; it errors when not running on GCE.
+var getEmailFromMetadataServer = func(ctx context.Context) (string, error) {
+	if !metadata.OnGCE() {
+		return "", errors.New("not running on GCE")
+	}
+	return metadata.EmailWithContext(ctx, "default")
+}
 
 // TODO: Possibly need to support google groups and domains type of principals
 // Currently we only support:
@@ -79,12 +92,21 @@ func (gcp Gcp) GetCurrentPrincipal(ctx context.Context) (string, error) {
 		}
 	}
 
-	// Last resort: query tokeninfo endpoint
+	// Next: ask the tokeninfo endpoint for the token's email (works for user
+	// and OAuth tokens minted with the email scope).
 	email, err := getEmailFromToken(ctx, token.AccessToken)
-	if err != nil {
-		return "", fmt.Errorf("failed to get email from token: %w", err)
+	if err == nil {
+		return getPrincipalFromEmail(email), nil
 	}
-	return getPrincipalFromEmail(email), nil
+
+	// Last resort: on GCE the ambient access token has no email in tokeninfo,
+	// so read the instance service account's email from the metadata server.
+	// This is what lets a keyless workload (e.g. a container deploying itself
+	// via its attached service account) resolve its own principal.
+	if mdEmail, mdErr := getEmailFromMetadataServer(ctx); mdErr == nil && mdEmail != "" {
+		return getPrincipalFromEmail(mdEmail), nil
+	}
+	return "", fmt.Errorf("failed to get email from token: %w", err)
 }
 
 func extractEmailFromIDToken(idToken string) (string, error) {
@@ -127,7 +149,10 @@ func parseServiceAccountFromURL(url string) (string, error) {
 	return "", fmt.Errorf("unable to parse service account from URL: %s", url)
 }
 
-func getEmailFromToken(ctx context.Context, accessToken string) (string, error) {
+// getEmailFromToken queries Google's tokeninfo endpoint for a token's email.
+// A package var so tests can exercise the metadata fallback without a network
+// round-trip.
+var getEmailFromToken = func(ctx context.Context, accessToken string) (string, error) {
 	url := "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=" + accessToken
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)

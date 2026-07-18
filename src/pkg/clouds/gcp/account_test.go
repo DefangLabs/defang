@@ -165,6 +165,75 @@ func (m *MockTokenSourceWithError) Token() (*oauth2.Token, error) {
 	return nil, errors.New("token error")
 }
 
+func TestGetCurrentPrincipalMetadataFallback(t *testing.T) {
+	// A GCE metadata access token is opaque: no id_token, and tokeninfo returns
+	// no email. Principal resolution must then fall back to the metadata
+	// server's service-account email — the identity a keyless self-deploying
+	// container runs as.
+	origFind := FindGoogleDefaultCredentials
+	origToken := getEmailFromToken
+	origMeta := getEmailFromMetadataServer
+	t.Cleanup(func() {
+		FindGoogleDefaultCredentials = origFind
+		getEmailFromToken = origToken
+		getEmailFromMetadataServer = origMeta
+	})
+
+	FindGoogleDefaultCredentials = func(ctx context.Context, scopes ...string) (*google.Credentials, error) {
+		return &google.Credentials{
+			JSON:        []byte(``),
+			TokenSource: &MockTokenSource{token: &oauth2.Token{AccessToken: "opaque-gce-token"}},
+		}, nil
+	}
+	getEmailFromToken = func(ctx context.Context, accessToken string) (string, error) {
+		return "", errors.New("no email found in token info")
+	}
+
+	tests := []struct {
+		name      string
+		metaEmail string
+		metaErr   error
+		want      string
+		wantErr   bool
+	}{
+		{
+			name:      "resolves service account from metadata server",
+			metaEmail: "svc@proj.iam.gserviceaccount.com",
+			want:      "serviceAccount:svc@proj.iam.gserviceaccount.com",
+		},
+		{
+			name:    "not on GCE falls through to the token error",
+			metaErr: errors.New("not running on GCE"),
+			wantErr: true,
+		},
+		{
+			name:    "empty metadata email falls through to the token error",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			getEmailFromMetadataServer = func(ctx context.Context) (string, error) {
+				return tt.metaEmail, tt.metaErr
+			}
+			var gcp Gcp
+			got, err := gcp.GetCurrentPrincipal(t.Context())
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got principal %q", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestExtractEmailFromIDToken(t *testing.T) {
 	t.Run("Valid ID token", func(t *testing.T) {
 		header := `{"typ":"JWT","alg":"HS256"}`
