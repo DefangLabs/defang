@@ -26,7 +26,7 @@
     "test": "tsx --tsconfig tsconfig.test.json mocha.ts"
   },
   "dependencies": {
-    "adm-zip": "^0.5.14",
+    "adm-zip": "^0.6.0",
     "tar": "^7.0.1"
   },
   "devDependencies": {
