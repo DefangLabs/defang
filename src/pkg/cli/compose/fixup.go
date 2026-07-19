@@ -247,7 +247,10 @@ func parsePortString(port string) (uint32, error) {
 	}
 }
 
-const liteLLMPort uint32 = 4000
+const (
+	liteLLMPort         uint32 = 4000
+	defaultLLMMemoryMiB        = 512
+)
 
 func fixupLLM(svccfg *composeTypes.ServiceConfig) {
 	// Strip tag/digest: only remove the suffix after ':' or '@' if it appears after the last '/'
@@ -412,17 +415,31 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 // the LiteLLM container (image, command, network, port), and derives LITELLM_MASTER_KEY.
 // Returns the resolved model string and the master key pointer.
 func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, model string, info *client.AccountInfo) (string, *string) {
-	// svccfg.Deploy.Resources.Reservations.Limits = &composeTypes.Resources{} TODO: avoid memory limits warning
 	if svccfg.Environment == nil {
 		svccfg.Environment = composeTypes.MappingWithEquals{}
 	}
+	if svccfg.Deploy == nil {
+		svccfg.Deploy = &composeTypes.DeployConfig{}
+	}
+	if svccfg.Deploy.Resources.Reservations == nil {
+		svccfg.Deploy.Resources.Reservations = &composeTypes.Resource{}
+	}
+	if svccfg.Deploy.Resources.Reservations.MemoryBytes == 0 {
+		svccfg.Deploy.Resources.Reservations.MemoryBytes = defaultLLMMemoryMiB * MiB
+	}
 
 	alias := model
+	switch model {
+	case "ai/chat-default", "ai/chat-large", "ai/embedding-default":
+		model = strings.TrimPrefix(model, "ai/")
+	}
 	switch info.Provider {
 	case client.ProviderAWS:
 		switch model {
 		case "chat-default":
 			model = "us.amazon.nova-2-lite-v1:0"
+		case "chat-large":
+			model = "us.anthropic.claude-sonnet-5"
 		case "embedding-default":
 			model = "amazon.titan-embed-text-v2:0"
 		}
@@ -431,9 +448,13 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 			svccfg.Environment["AWS_REGION"] = &info.Region
 		}
 	case client.ProviderGCP:
+		location := info.Region
 		switch model {
 		case "chat-default":
 			model = "gemini-2.5-flash"
+		case "chat-large":
+			model = "gemini-3.1-pro-preview"
+			location = "global"
 		case "embedding-default":
 			model = "gemini-embedding-001"
 		}
@@ -441,8 +462,8 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 		if info.AccountID != "" {
 			svccfg.Environment["VERTEXAI_PROJECT"] = &info.AccountID
 		}
-		if info.Region != "" {
-			svccfg.Environment["VERTEXAI_LOCATION"] = &info.Region
+		if location != "" {
+			svccfg.Environment["VERTEXAI_LOCATION"] = &location
 		}
 	}
 
@@ -528,6 +549,9 @@ func wireDependentServices(project *composeTypes.Project, svcName, urlVal, model
 			}
 			if _, ok := dependency.Environment[modelVar]; !ok && model != "" {
 				dependency.Environment[modelVar] = &model
+			}
+			if _, ok := dependency.Environment["OPENAI_API_KEY"]; !ok {
+				dependency.Environment["OPENAI_API_KEY"] = masterKey
 			}
 			// If the model is not already declared as a dependency, add it
 			if _, ok := dependency.DependsOn[svcName]; !ok {

@@ -5,6 +5,10 @@ ai_runner:
         - ai/smollm2
         - --alias
         - ai/smollm2
+    deploy:
+        resources:
+            reservations:
+                memory: "536870912"
     environment:
         DEBUG: "true"
         LITELLM_MASTER_KEY: networkisalreadyprivate

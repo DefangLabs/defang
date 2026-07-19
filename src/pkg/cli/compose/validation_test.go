@@ -162,6 +162,67 @@ func TestValidateConfig(t *testing.T) {
 	})
 }
 
+func TestValidateModelConfig(t *testing.T) {
+	oldTerm := term.DefaultTerm
+	t.Cleanup(func() { term.DefaultTerm = oldTerm })
+
+	tests := []struct {
+		name        string
+		model       string
+		configNames []string
+		wantMissing string
+		wantWarning string
+	}{
+		{
+			name:  "resolved model is valid",
+			model: "bedrock/anthropic.claude-sonnet-5",
+		},
+		{
+			name:        "undefined model config fails",
+			model:       "${UNDEFINED}",
+			wantMissing: "UNDEFINED",
+		},
+		{
+			name:        "defined model config warns and passes",
+			model:       "${SET_CONFIG_NAME}",
+			configNames: []string{"SET_CONFIG_NAME"},
+			wantWarning: "will be resolved by the CD at deploy time",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logs := new(bytes.Buffer)
+			term.DefaultTerm = term.NewTerm(os.Stdin, logs, logs)
+			project := &composeTypes.Project{
+				Services: composeTypes.Services{},
+				Models: map[string]composeTypes.ModelConfig{
+					"llm": {Model: tt.model},
+				},
+			}
+
+			err := ValidateProjectConfig(project, tt.configNames)
+			if tt.wantMissing == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				var missing ErrMissingModelConfig
+				if !errors.As(err, &missing) {
+					t.Fatalf("expected ErrMissingModelConfig, got: %v", err)
+				}
+				assert.Equal(t, []string{tt.wantMissing}, []string(missing))
+				assert.Contains(t, err.Error(), "define them in `.env`")
+				assert.Contains(t, err.Error(), "defang config set <NAME>")
+				assert.Contains(t, err.Error(), "chat-default/chat-large")
+			}
+			if tt.wantWarning != "" {
+				assert.Contains(t, logs.String(), tt.wantWarning)
+			}
+		})
+	}
+}
+
 func TestValidateBuildArgs(t *testing.T) {
 	oldTerm := term.DefaultTerm
 	t.Cleanup(func() { term.DefaultTerm = oldTerm })
