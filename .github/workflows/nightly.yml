@@ -19,13 +19,44 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Skip the build when nothing has changed since the previous nightly.
+      # The nightly release publishes a lightweight `nightly` tag at the commit
+      # it was built from (see .goreleaser.yml). If HEAD is that same commit,
+      # there are no new commits to release. Manual runs always build.
+      - name: Check for changes since last nightly
+        id: check
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual run; building regardless of changes."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git fetch --force origin 'refs/tags/nightly:refs/tags/nightly' 2>/dev/null; then
+            last_nightly="$(git rev-parse --verify 'nightly^{commit}')"
+            head_sha="$(git rev-parse --verify HEAD)"
+            echo "Last nightly commit: $last_nightly"
+            echo "Current HEAD:        $head_sha"
+            if [ "$last_nightly" = "$head_sha" ]; then
+              echo "No new commits since the last nightly; skipping build."
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "No existing nightly tag found; proceeding with build."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
         # Get go
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        if: steps.check.outputs.changed == 'true'
         with:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
         # Execute goreleaser nightly run (see .goreleaser.yml nightly for details)
       - uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
+        if: steps.check.outputs.changed == 'true'
         with:
           distribution: goreleaser-pro
           version: latest
