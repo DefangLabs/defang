@@ -381,7 +381,11 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			"x-defang-postgres",
 			"x-defang-mongodb",
 			"x-defang-llm",
-			"x-defang-autoscaling":
+			"x-defang-autoscaling",
+			// Consumed by the CD provider, not the CLI, but still valid and
+			// passed through unchanged; listed here so they don't warn.
+			"x-defang-policies",
+			"x-defang-aliases":
 			continue
 		default:
 			term.Warnf("service %q: unsupported compose extension: %q", svccfg.Name, k)
