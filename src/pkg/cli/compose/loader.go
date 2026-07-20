@@ -30,6 +30,10 @@ type Services = composeTypes.Services
 
 type BuildConfig = composeTypes.BuildConfig
 
+// composeEnvFilesEnvVar lists the env file(s) to load when no explicit env
+// file is set, matching `docker compose`'s COMPOSE_ENV_FILES (comma-separated).
+const composeEnvFilesEnvVar = "COMPOSE_ENV_FILES"
+
 type LoaderOptions struct {
 	ConfigPaths []string
 	ProjectName string
@@ -56,8 +60,9 @@ func WithProjectName(name string) LoaderOption {
 }
 
 // WithEnvFiles sets the env file(s) used to populate the project environment for
-// interpolation, mirroring `docker compose --env-file`. When empty, the default
-// PWD/.env file is loaded (if present).
+// interpolation, mirroring `docker compose --env-file`. When empty, the loader
+// falls back to the COMPOSE_ENV_FILES environment variable, and finally to the
+// default PWD/.env file (if present).
 func WithEnvFiles(paths ...string) LoaderOption {
 	return func(o *LoaderOptions) {
 		o.EnvFiles = paths
@@ -149,6 +154,18 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 		return !strings.HasPrefix(kv, "COMPOSE_") // only keep COMPOSE_* variables
 	})
 
+	// The explicit --env-file(s) win; otherwise fall back to COMPOSE_ENV_FILES,
+	// symmetric to how ConfigPaths overrides COMPOSE_FILE (cli.WithConfigFileEnv)
+	// below. Reading the env var here (at load time) rather than up front is what
+	// lets a value injected by the selected stack file (via LoadStackEnv) take
+	// effect, since the stack env is applied before the project is loaded.
+	envFiles := l.options.EnvFiles
+	if len(envFiles) == 0 {
+		if v := os.Getenv(composeEnvFilesEnvVar); v != "" {
+			envFiles = strings.Split(v, ",")
+		}
+	}
+
 	// Based on how docker compose setup its own project options
 	// https://github.com/docker/compose/blob/1a14fcb1e6645dd92f5a4f2da00071bd59c2e887/cmd/compose/compose.go#L326-L346
 	return cli.NewProjectOptions(l.options.ConfigPaths,
@@ -156,7 +173,7 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 		// -- DISABLED FOR DEFANG -- cli.WithOsEnv,
 		cli.WithEnv(onlyComposeEnv),
 		// Load the explicit --env-file(s), or PWD/.env if none were set
-		cli.WithEnvFiles(l.options.EnvFiles...),
+		cli.WithEnvFiles(envFiles...),
 		// read dot env file to populate project environment
 		cli.WithDotEnv,
 		// get compose file path set by COMPOSE_FILE
@@ -165,7 +182,7 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 		cli.WithDefaultConfigPath,
 		// Calling the 2 functions below the 2nd time as the loaded env in first call modifies the behavior of the 2nd call:
 		// .. and then, a project directory != PWD maybe has been set so let's load .env file
-		cli.WithEnvFiles(l.options.EnvFiles...),
+		cli.WithEnvFiles(envFiles...),
 		cli.WithDotEnv,
 		// eventually COMPOSE_PROFILES should have been set
 		// cli.WithDefaultProfiles(c.Profiles...), TODO: Support --profile to be added as param to this call

@@ -12,14 +12,16 @@ import (
 )
 
 func TestLoaderOptionsEnvFile(t *testing.T) {
+	// Only the --env-file flag is resolved here; the COMPOSE_ENV_FILES fallback
+	// is applied by the loader at project-load time (see compose.TestWithEnvFiles),
+	// so it can also pick up a value injected by the selected stack file.
 	tests := []struct {
-		name           string
-		flagValues     []string // values passed via --env-file
-		composeEnvFile string   // value of COMPOSE_ENV_FILES; "" means unset
-		expected       []string
+		name       string
+		flagValues []string // values passed via --env-file
+		expected   []string
 	}{
 		{
-			name:     "no env-file flag and no env var",
+			name:     "no env-file flag",
 			expected: nil,
 		},
 		{
@@ -32,28 +34,10 @@ func TestLoaderOptionsEnvFile(t *testing.T) {
 			flagValues: []string{"a.env", "b.env"},
 			expected:   []string{"a.env", "b.env"},
 		},
-		{
-			name:           "COMPOSE_ENV_FILES is used when the flag is absent",
-			composeEnvFile: "one.env,two.env",
-			expected:       []string{"one.env", "two.env"},
-		},
-		{
-			name:           "--env-file takes precedence over COMPOSE_ENV_FILES",
-			flagValues:     []string{"flag.env"},
-			composeEnvFile: "ignored.env",
-			expected:       []string{"flag.env"},
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.composeEnvFile != "" {
-				t.Setenv("COMPOSE_ENV_FILES", tt.composeEnvFile)
-			} else {
-				// Ensure a value inherited from the environment does not leak in.
-				os.Unsetenv("COMPOSE_ENV_FILES")
-			}
-
 			cmd := &cobra.Command{}
 			cmd.Flags().StringArray("file", nil, "")
 			cmd.Flags().String("project-name", "", "")

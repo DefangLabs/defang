@@ -187,3 +187,74 @@ services:
 		})
 	}
 }
+
+// TestWithEnvFilesFromEnvVar covers the COMPOSE_ENV_FILES fallback. This is the
+// path a stack file uses: LoadStackEnv sets COMPOSE_ENV_FILES in the process env
+// before the project is loaded, so resolving it here (rather than up front) is
+// what makes a stack-scoped env file take effect. Regression test for that bug.
+func TestWithEnvFilesFromEnvVar(t *testing.T) {
+	const composeYAML = `name: envfilevartest
+services:
+  web:
+    image: alpine
+    environment:
+      - GREETING=${GREETING}
+`
+	dir := t.TempDir()
+	writeFile := func(name, content string) string {
+		t.Helper()
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+
+	composePath := writeFile("compose.yaml", composeYAML)
+	writeFile(".env", "GREETING=from_dotenv\n")
+	stackEnv := writeFile("stack.env", "GREETING=from_stack\n")
+	flagEnv := writeFile("flag.env", "GREETING=from_flag\n")
+
+	tests := []struct {
+		name     string
+		envFiles []string // explicit --env-file (WithEnvFiles)
+		envVar   string   // COMPOSE_ENV_FILES; "" means unset
+		expected string
+	}{
+		{
+			name:     "COMPOSE_ENV_FILES is honored when no explicit env-file is set",
+			envVar:   stackEnv,
+			expected: "from_stack",
+		},
+		{
+			name:     "explicit env-file overrides COMPOSE_ENV_FILES",
+			envFiles: []string{flagEnv},
+			envVar:   stackEnv,
+			expected: "from_flag",
+		},
+		{
+			name:     "default .env is used when neither is set",
+			expected: "from_dotenv",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.envVar != "" {
+				t.Setenv(composeEnvFilesEnvVar, tt.envVar)
+			} else {
+				os.Unsetenv(composeEnvFilesEnvVar)
+			}
+			loader := NewLoader(WithPath(composePath), WithEnvFiles(tt.envFiles...))
+			p, err := loader.LoadProject(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := p.Services["web"].Environment["GREETING"]
+			if got == nil {
+				t.Fatal("environment variable GREETING not found")
+			}
+			assert.Equal(t, tt.expected, *got)
+		})
+	}
+}

@@ -96,20 +96,13 @@ func loaderOptionsForCommand(cmd *cobra.Command) compose.LoaderOptions {
 	}
 }
 
-// composeEnvFilesEnvVar lists the env file(s) to load when --env-file is not
-// passed, matching `docker compose`'s COMPOSE_ENV_FILES (comma-separated).
-const composeEnvFilesEnvVar = "COMPOSE_ENV_FILES"
-
-// envFilesForCommand resolves the --env-file flag, falling back to the
-// COMPOSE_ENV_FILES environment variable. The flag takes precedence, like
-// docker compose. Returns nil when neither is set, so the loader keeps its
-// default behavior of loading PWD/.env.
+// envFilesForCommand returns the --env-file flag value(s). The COMPOSE_ENV_FILES
+// fallback is resolved by the loader at project-load time (see compose.Loader),
+// so a value set by the selected stack file is also honored. Returns nil when
+// the flag is absent, letting the loader apply that fallback.
 func envFilesForCommand(cmd *cobra.Command) []string {
 	if envFiles, _ := cmd.Flags().GetStringArray("env-file"); len(envFiles) > 0 {
 		return envFiles
-	}
-	if envFiles := os.Getenv(composeEnvFilesEnvVar); envFiles != "" {
-		return strings.Split(envFiles, ",")
 	}
 	return nil
 }
