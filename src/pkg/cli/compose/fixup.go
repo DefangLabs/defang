@@ -250,7 +250,7 @@ func parsePortString(port string) (uint32, error) {
 const (
 	liteLLMPort         uint32 = 4000
 	defaultLLMCPUs             = 0.5
-	defaultLLMMemoryMiB        = 512
+	defaultLLMMemoryMiB        = 1024
 )
 
 func fixupLLM(svccfg *composeTypes.ServiceConfig) {
