@@ -225,6 +225,7 @@ type buildPoller func(ctx context.Context, opts ...gax.CallOption) (*cloudbuildp
 func pollBuildWithRetry(ctx context.Context, poll buildPoller) (*cloudbuildpb.Build, error) {
 	wait := pollBuildInitialWaitForTest
 	var lastErr error
+	authRetryUsed := false
 	for attempt := range pollBuildMaxAttempts {
 		if attempt > 0 {
 			term.Debugf("retrying cloudbuild poll (attempt %d/%d) after transient error: %v", attempt+1, pollBuildMaxAttempts, lastErr)
@@ -243,7 +244,16 @@ func pollBuildWithRetry(ctx context.Context, poll buildPoller) (*cloudbuildpb.Bu
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		if !isTransientPollError(err) {
+		switch {
+		case isTransientPollError(err):
+			// Retried within the shared attempt budget below.
+		case isTransientAuthError(err) && !authRetryUsed:
+			// A transient network failure while fetching per-RPC credentials
+			// surfaces as Unauthenticated even though the token is valid. Retry
+			// it once; a genuine credential rejection reports the same code, so
+			// we must not loop on it the way we do for the transient codes.
+			authRetryUsed = true
+		default:
 			return nil, err
 		}
 		lastErr = err
@@ -259,6 +269,31 @@ func isTransientPollError(err error) bool {
 	switch st.Code() {
 	case codes.DeadlineExceeded, codes.Unavailable, codes.Internal, codes.ResourceExhausted:
 		return true
+	}
+	return false
+}
+
+// isTransientAuthError reports whether err is a transient network failure in
+// the per-RPC credential fetch rather than a real credential rejection. Both
+// report codes.Unauthenticated, so we distinguish on the transport-level
+// markers gRPC includes when it could not even reach the token endpoint — e.g.
+// a 503 "upstream connect error" / "connection refused" from fabric while
+// refreshing the access token mid-poll.
+func isTransientAuthError(err error) bool {
+	st, ok := status.FromError(err)
+	if !ok || st.Code() != codes.Unauthenticated {
+		return false
+	}
+	msg := st.Message()
+	// Markers gRPC-go / the Envoy front door emit when the token endpoint was
+	// unreachable, as opposed to a token the endpoint actively rejected.
+	for _, marker := range []string{
+		"per-RPC creds failed",
+		"upstream connect error",
+	} {
+		if strings.Contains(msg, marker) {
+			return true
+		}
 	}
 	return false
 }
