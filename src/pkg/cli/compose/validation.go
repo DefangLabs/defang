@@ -523,6 +523,7 @@ func ValidateProjectConfig(composeProject *composeTypes.Project, listConfigNames
 
 	return nil
 }
+
 func validateManagedStore(managedStore any) (bool, error) {
 	switch managedStore := managedStore.(type) {
 	case nil:
