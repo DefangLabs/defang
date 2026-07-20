@@ -11,6 +11,47 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestLoaderOptionsEnvFile(t *testing.T) {
+	// Only the --env-file flag is resolved here; the COMPOSE_ENV_FILES fallback
+	// is applied by the loader at project-load time (see compose.TestWithEnvFiles),
+	// so it can also pick up a value injected by the selected stack file.
+	tests := []struct {
+		name       string
+		flagValues []string // values passed via --env-file
+		expected   []string
+	}{
+		{
+			name:     "no env-file flag",
+			expected: nil,
+		},
+		{
+			name:       "single --env-file",
+			flagValues: []string{"prod.env"},
+			expected:   []string{"prod.env"},
+		},
+		{
+			name:       "multiple --env-file",
+			flagValues: []string{"a.env", "b.env"},
+			expected:   []string{"a.env", "b.env"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := &cobra.Command{}
+			cmd.Flags().StringArray("file", nil, "")
+			cmd.Flags().String("project-name", "", "")
+			cmd.Flags().StringArray("env-file", nil, "")
+			for _, v := range tt.flagValues {
+				require.NoError(t, cmd.Flags().Set("env-file", v))
+			}
+
+			opts := loaderOptionsForCommand(cmd)
+			assert.Equal(t, tt.expected, opts.EnvFiles)
+		})
+	}
+}
+
 func TestNewStackManager(t *testing.T) {
 	tests := []struct {
 		name           string

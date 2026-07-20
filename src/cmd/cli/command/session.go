@@ -92,7 +92,19 @@ func loaderOptionsForCommand(cmd *cobra.Command) compose.LoaderOptions {
 	return compose.LoaderOptions{
 		ConfigPaths: configPaths,
 		ProjectName: projectName,
+		EnvFiles:    envFilesForCommand(cmd),
 	}
+}
+
+// envFilesForCommand returns the --env-file flag value(s). The COMPOSE_ENV_FILES
+// fallback is resolved by the loader at project-load time (see compose.Loader),
+// so a value set by the selected stack file is also honored. Returns nil when
+// the flag is absent, letting the loader apply that fallback.
+func envFilesForCommand(cmd *cobra.Command) []string {
+	if envFiles, _ := cmd.Flags().GetStringArray("env-file"); len(envFiles) > 0 {
+		return envFiles
+	}
+	return nil
 }
 
 func doubleCheckProjectName(projectName string) {
