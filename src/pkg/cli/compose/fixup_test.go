@@ -119,6 +119,28 @@ func TestMakeAccessGatewayServiceGCP(t *testing.T) {
 	})
 }
 
+func TestMakeAccessGatewayServiceAzure(t *testing.T) {
+	info := &client.AccountInfo{Provider: client.ProviderAzure}
+	tests := []struct {
+		model string
+		want  string
+	}{
+		{model: "chat-default", want: "azure/gpt-5-mini"},
+		{model: "embedding-default", want: "azure/text-embedding-3-small"},
+		{model: "azure/my-deployment", want: "azure/my-deployment"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.model, func(t *testing.T) {
+			proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
+			svccfg := newLLMService()
+			makeAccessGatewayService(&svccfg, proj, tt.model, info)
+
+			require.Equal(t, []string{"--drop_params", "--model", tt.want, "--alias", tt.model}, []string(svccfg.Command))
+		})
+	}
+}
+
 func TestAccessGatewayChatLarge(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -128,6 +150,7 @@ func TestAccessGatewayChatLarge(t *testing.T) {
 	}{
 		{name: "AWS", provider: client.ProviderAWS, wantModel: "bedrock/us.anthropic.claude-sonnet-5"},
 		{name: "GCP", provider: client.ProviderGCP, wantModel: "vertex_ai/gemini-3.1-pro-preview", wantLocation: "global"},
+		{name: "Azure", provider: client.ProviderAzure, wantModel: "azure/gpt-5"},
 	}
 
 	for _, tt := range tests {
@@ -144,7 +167,7 @@ func TestAccessGatewayChatLarge(t *testing.T) {
 			require.Equal(t, []string{"--drop_params", "--model", tt.wantModel, "--alias", "chat-large"}, []string(svccfg.Command))
 			if tt.provider == client.ProviderAWS {
 				assert.Equal(t, "us-central1", *svccfg.Environment["AWS_REGION"])
-			} else {
+			} else if tt.provider == client.ProviderGCP {
 				assert.Equal(t, "my-gcp-project", *svccfg.Environment["VERTEXAI_PROJECT"])
 				assert.Equal(t, tt.wantLocation, *svccfg.Environment["VERTEXAI_LOCATION"])
 			}

@@ -250,7 +250,7 @@ func parsePortString(port string) (uint32, error) {
 const (
 	liteLLMPort         uint32 = 4000
 	defaultLLMCPUs             = 0.5
-	defaultLLMMemoryMiB        = 512
+	defaultLLMMemoryMiB        = 1024 // 512 MiB OOMed during AWS E2E; use the next size up.
 )
 
 func fixupLLM(svccfg *composeTypes.ServiceConfig) {
@@ -465,6 +465,16 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 		if location != "" {
 			svccfg.Environment["VERTEXAI_LOCATION"] = &location
 		}
+	case client.ProviderAzure:
+		switch model {
+		case "chat-default":
+			model = "gpt-5-mini"
+		case "chat-large":
+			model = "gpt-5"
+		case "embedding-default":
+			model = "text-embedding-3-small"
+		}
+		model = modelWithProvider(model, "azure")
 	}
 
 	// svccfg.HealthCheck = &composeTypes.ServiceHealthCheckConfig{} TODO: add healthcheck
