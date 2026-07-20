@@ -37,7 +37,7 @@ func (e ErrConfigInterpolationInBuildArgs) Error() string {
 type ErrConfigInterpolationInModels []string
 
 func (e ErrConfigInterpolationInModels) Error() string {
-	return fmt.Sprintf("models do not support unresolved interpolation %q; set concrete values, define them in `.env` before deploying, or use a built-in alias (chat-default/chat-large)", ([]string)(e))
+	return fmt.Sprintf("models do not support unresolved interpolation %q; set concrete values, define them in `.env` before deploying, or use a built-in alias (chat-default, chat-large, embedding-default)", ([]string)(e))
 }
 
 var ErrDockerfileNotFound = errors.New("dockerfile not found")
@@ -457,8 +457,6 @@ func getResourceReservations(r composeTypes.Resources) *composeTypes.Resource {
 // Copied from shared/utils.ts but slightly modified to remove the negative-lookahead assertion
 var interpolationRegex = regexp.MustCompile(`(?i)\$(\$)|\$(?:{([^}]+)}|([_a-z][_a-z0-9]*))|([^$]+)`) // [1] escaped dollar, [2] curly braces, [3] variable name, [4] literal
 
-var modelInterpolationRegex = regexp.MustCompile(`\$\{([_a-zA-Z][_a-zA-Z0-9]*)[^}]*\}`)
-
 func DetectInterpolationVariables(value string) []string {
 	var names []string
 	// check for variables used during interpolation
@@ -475,26 +473,15 @@ func DetectInterpolationVariables(value string) []string {
 
 func ValidateProjectConfig(composeProject *composeTypes.Project, listConfigNames []string) error {
 	var modelInterpolations ErrConfigInterpolationInModels
-	modelNames := make([]string, 0, len(composeProject.Models))
-	for name := range composeProject.Models {
-		modelNames = append(modelNames, name)
+	for _, model := range composeProject.Models {
+		modelInterpolations = append(modelInterpolations, DetectInterpolationVariables(model.Model)...)
 	}
-	slices.Sort(modelNames)
-	for _, name := range modelNames {
-		modelInterpolations = appendModelInterpolations(modelInterpolations, composeProject.Models[name].Model)
-	}
-	serviceNames := make([]string, 0, len(composeProject.Services))
-	for name := range composeProject.Services {
-		serviceNames = append(serviceNames, name)
-	}
-	slices.Sort(serviceNames)
-	for _, name := range serviceNames {
-		service := composeProject.Services[name]
+	for _, service := range composeProject.Services {
 		if service.Provider == nil || service.Provider.Type != "model" {
 			continue
 		}
 		for _, model := range service.Provider.Options["model"] {
-			modelInterpolations = appendModelInterpolations(modelInterpolations, model)
+			modelInterpolations = append(modelInterpolations, DetectInterpolationVariables(model)...)
 		}
 	}
 	if len(modelInterpolations) > 0 {
@@ -536,16 +523,6 @@ func ValidateProjectConfig(composeProject *composeTypes.Project, listConfigNames
 
 	return nil
 }
-
-func appendModelInterpolations(interpolations ErrConfigInterpolationInModels, model string) ErrConfigInterpolationInModels {
-	for _, match := range modelInterpolationRegex.FindAllStringSubmatch(model, -1) {
-		if match[1] != "" {
-			interpolations = append(interpolations, match[1])
-		}
-	}
-	return interpolations
-}
-
 func validateManagedStore(managedStore any) (bool, error) {
 	switch managedStore := managedStore.(type) {
 	case nil:

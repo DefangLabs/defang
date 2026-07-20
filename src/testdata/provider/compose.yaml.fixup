@@ -9,7 +9,7 @@ ai_runner:
         resources:
             reservations:
                 cpus: 0.5
-                memory: "2147483648"
+                memory: "536870912"
     environment:
         DEBUG: "true"
         LITELLM_MASTER_KEY: networkisalreadyprivate

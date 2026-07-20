@@ -250,7 +250,7 @@ func parsePortString(port string) (uint32, error) {
 const (
 	liteLLMPort         uint32 = 4000
 	defaultLLMCPUs             = 0.5
-	defaultLLMMemoryMiB        = 2048
+	defaultLLMMemoryMiB        = 512
 )
 
 func fixupLLM(svccfg *composeTypes.ServiceConfig) {
@@ -433,10 +433,6 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 	}
 
 	alias := model
-	switch model {
-	case "ai/chat-default", "ai/chat-large", "ai/embedding-default":
-		model = strings.TrimPrefix(model, "ai/")
-	}
 	switch info.Provider {
 	case client.ProviderAWS:
 		switch model {

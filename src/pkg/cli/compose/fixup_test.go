@@ -119,29 +119,15 @@ func TestMakeAccessGatewayServiceGCP(t *testing.T) {
 	})
 }
 
-func TestAccessGatewayModelAliases(t *testing.T) {
+func TestAccessGatewayChatLarge(t *testing.T) {
 	tests := []struct {
 		name         string
 		provider     client.ProviderID
-		model        string
 		wantModel    string
-		wantAlias    string
 		wantLocation string
 	}{
-		{name: "AWS chat-default", provider: client.ProviderAWS, model: "chat-default", wantModel: "bedrock/us.amazon.nova-2-lite-v1:0", wantAlias: "chat-default"},
-		{name: "AWS ai/chat-default", provider: client.ProviderAWS, model: "ai/chat-default", wantModel: "bedrock/us.amazon.nova-2-lite-v1:0", wantAlias: "ai/chat-default"},
-		{name: "AWS embedding-default", provider: client.ProviderAWS, model: "embedding-default", wantModel: "bedrock/amazon.titan-embed-text-v2:0", wantAlias: "embedding-default"},
-		{name: "AWS ai/embedding-default", provider: client.ProviderAWS, model: "ai/embedding-default", wantModel: "bedrock/amazon.titan-embed-text-v2:0", wantAlias: "ai/embedding-default"},
-		{name: "AWS chat-large", provider: client.ProviderAWS, model: "chat-large", wantModel: "bedrock/us.anthropic.claude-sonnet-5", wantAlias: "chat-large"},
-		{name: "AWS ai/chat-large", provider: client.ProviderAWS, model: "ai/chat-large", wantModel: "bedrock/us.anthropic.claude-sonnet-5", wantAlias: "ai/chat-large"},
-		{name: "AWS non-alias ai model", provider: client.ProviderAWS, model: "ai/custom", wantModel: "ai/custom", wantAlias: "ai/custom"},
-		{name: "GCP chat-default", provider: client.ProviderGCP, model: "chat-default", wantModel: "vertex_ai/gemini-2.5-flash", wantAlias: "chat-default", wantLocation: "us-central1"},
-		{name: "GCP ai/chat-default", provider: client.ProviderGCP, model: "ai/chat-default", wantModel: "vertex_ai/gemini-2.5-flash", wantAlias: "ai/chat-default", wantLocation: "us-central1"},
-		{name: "GCP embedding-default", provider: client.ProviderGCP, model: "embedding-default", wantModel: "vertex_ai/gemini-embedding-001", wantAlias: "embedding-default", wantLocation: "us-central1"},
-		{name: "GCP ai/embedding-default", provider: client.ProviderGCP, model: "ai/embedding-default", wantModel: "vertex_ai/gemini-embedding-001", wantAlias: "ai/embedding-default", wantLocation: "us-central1"},
-		{name: "GCP chat-large", provider: client.ProviderGCP, model: "chat-large", wantModel: "vertex_ai/gemini-3.1-pro-preview", wantAlias: "chat-large", wantLocation: "global"},
-		{name: "GCP ai/chat-large", provider: client.ProviderGCP, model: "ai/chat-large", wantModel: "vertex_ai/gemini-3.1-pro-preview", wantAlias: "ai/chat-large", wantLocation: "global"},
-		{name: "GCP non-alias ai model", provider: client.ProviderGCP, model: "ai/custom", wantModel: "ai/custom", wantAlias: "ai/custom", wantLocation: "us-central1"},
+		{name: "AWS", provider: client.ProviderAWS, wantModel: "bedrock/us.anthropic.claude-sonnet-5"},
+		{name: "GCP", provider: client.ProviderGCP, wantModel: "vertex_ai/gemini-3.1-pro-preview", wantLocation: "global"},
 	}
 
 	for _, tt := range tests {
@@ -153,9 +139,9 @@ func TestAccessGatewayModelAliases(t *testing.T) {
 			}
 			proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
 			svccfg := newLLMService()
-			makeAccessGatewayService(&svccfg, proj, tt.model, info)
+			makeAccessGatewayService(&svccfg, proj, "chat-large", info)
 
-			require.Equal(t, []string{"--drop_params", "--model", tt.wantModel, "--alias", tt.wantAlias}, []string(svccfg.Command))
+			require.Equal(t, []string{"--drop_params", "--model", tt.wantModel, "--alias", "chat-large"}, []string(svccfg.Command))
 			if tt.provider == client.ProviderAWS {
 				assert.Equal(t, "us-central1", *svccfg.Environment["AWS_REGION"])
 			} else {
@@ -231,7 +217,7 @@ func TestMakeAccessGatewayServiceLiteLLMMasterKey(t *testing.T) {
 	})
 }
 
-func TestAccessGatewayMemoryDefault(t *testing.T) {
+func TestAccessGatewayResourceDefaults(t *testing.T) {
 	tests := []struct {
 		name       string
 		cpus       composeTypes.NanoCPUs

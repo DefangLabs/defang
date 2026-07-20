@@ -179,6 +179,11 @@ func TestValidateModelConfig(t *testing.T) {
 			want:  []string{"MODEL_NAME"},
 		},
 		{
+			name:  "unresolved unbraced model interpolation fails",
+			model: "$MODEL_NAME",
+			want:  []string{"MODEL_NAME"},
+		},
+		{
 			name:        "Defang config does not make model interpolation valid",
 			model:       "${MODEL_NAME}",
 			configNames: []string{"MODEL_NAME"},
@@ -208,7 +213,7 @@ func TestValidateModelConfig(t *testing.T) {
 			}
 			assert.Equal(t, tt.want, []string(interpolations))
 			assert.Contains(t, err.Error(), "define them in `.env`")
-			assert.Contains(t, err.Error(), "chat-default/chat-large")
+			assert.Contains(t, err.Error(), "chat-default, chat-large, embedding-default")
 		})
 	}
 
