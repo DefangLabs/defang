@@ -221,6 +221,26 @@ func TestValidateModelConfig(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("provider model config is validated", func(t *testing.T) {
+		project := &composeTypes.Project{
+			Services: composeTypes.Services{
+				"chat": {
+					Provider: &composeTypes.ServiceProviderConfig{
+						Type:    "model",
+						Options: map[string][]string{"model": {"${MODEL_NAME}"}},
+					},
+				},
+			},
+		}
+
+		err := ValidateProjectConfig(project, nil)
+		var missing ErrMissingModelConfig
+		if !errors.As(err, &missing) {
+			t.Fatalf("expected ErrMissingModelConfig, got: %v", err)
+		}
+		assert.Equal(t, []string{"MODEL_NAME"}, []string(missing))
+	})
 }
 
 func TestValidateBuildArgs(t *testing.T) {

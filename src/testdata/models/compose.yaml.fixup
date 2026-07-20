@@ -8,7 +8,8 @@ ai_model:
     deploy:
         resources:
             reservations:
-                memory: "536870912"
+                cpus: 0.5
+                memory: "2147483648"
     environment:
         LITELLM_MASTER_KEY: networkisalreadyprivate
     image: litellm/litellm:v1.92.0
@@ -60,7 +61,8 @@ my_model:
     deploy:
         resources:
             reservations:
-                memory: "536870912"
+                cpus: 0.5
+                memory: "2147483648"
     environment:
         LITELLM_MASTER_KEY: networkisalreadyprivate
     image: litellm/litellm:v1.92.0

@@ -481,13 +481,20 @@ func ValidateProjectConfig(composeProject *composeTypes.Project, listConfigNames
 	slices.Sort(modelNames)
 	for _, modelName := range modelNames {
 		model := composeProject.Models[modelName]
-		for _, match := range modelInterpolationRegex.FindAllStringSubmatch(model.Model, -1) {
-			name := match[1]
-			if slices.Contains(listConfigNames, name) {
-				term.Warnf("model %q uses config %q; its value will be resolved by the CD at deploy time", modelName, name)
-			} else {
-				missingModelConfigs = append(missingModelConfigs, name)
-			}
+		missingModelConfigs = appendMissingModelConfigs(missingModelConfigs, modelName, model.Model, listConfigNames)
+	}
+	serviceNames := make([]string, 0, len(composeProject.Services))
+	for name := range composeProject.Services {
+		serviceNames = append(serviceNames, name)
+	}
+	slices.Sort(serviceNames)
+	for _, serviceName := range serviceNames {
+		service := composeProject.Services[serviceName]
+		if service.Provider == nil || service.Provider.Type != "model" {
+			continue
+		}
+		for _, model := range service.Provider.Options["model"] {
+			missingModelConfigs = appendMissingModelConfigs(missingModelConfigs, serviceName, model, listConfigNames)
 		}
 	}
 	if len(missingModelConfigs) > 0 {
@@ -528,6 +535,18 @@ func ValidateProjectConfig(composeProject *composeTypes.Project, listConfigNames
 	}
 
 	return nil
+}
+
+func appendMissingModelConfigs(missing ErrMissingModelConfig, modelName, model string, listConfigNames []string) ErrMissingModelConfig {
+	for _, match := range modelInterpolationRegex.FindAllStringSubmatch(model, -1) {
+		name := match[1]
+		if slices.Contains(listConfigNames, name) {
+			term.Warnf("model %q uses config %q; its value will be resolved by the CD at deploy time", modelName, name)
+		} else {
+			missing = append(missing, name)
+		}
+	}
+	return missing
 }
 
 func validateManagedStore(managedStore any) (bool, error) {

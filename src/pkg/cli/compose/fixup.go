@@ -249,7 +249,8 @@ func parsePortString(port string) (uint32, error) {
 
 const (
 	liteLLMPort         uint32 = 4000
-	defaultLLMMemoryMiB        = 512
+	defaultLLMCPUs             = 0.5
+	defaultLLMMemoryMiB        = 2048
 )
 
 func fixupLLM(svccfg *composeTypes.ServiceConfig) {
@@ -424,6 +425,9 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 	if svccfg.Deploy.Resources.Reservations == nil {
 		svccfg.Deploy.Resources.Reservations = &composeTypes.Resource{}
 	}
+	if svccfg.Deploy.Resources.Reservations.NanoCPUs == 0 {
+		svccfg.Deploy.Resources.Reservations.NanoCPUs = defaultLLMCPUs
+	}
 	if svccfg.Deploy.Resources.Reservations.MemoryBytes == 0 {
 		svccfg.Deploy.Resources.Reservations.MemoryBytes = defaultLLMMemoryMiB * MiB
 	}
@@ -443,7 +447,9 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 		case "embedding-default":
 			model = "amazon.titan-embed-text-v2:0"
 		}
-		model = modelWithProvider(model, "bedrock")
+		if !hasConfigInterpolation(model) {
+			model = modelWithProvider(model, "bedrock")
+		}
 		if info.Region != "" {
 			svccfg.Environment["AWS_REGION"] = &info.Region
 		}
@@ -458,7 +464,9 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 		case "embedding-default":
 			model = "gemini-embedding-001"
 		}
-		model = modelWithProvider(model, "vertex_ai")
+		if !hasConfigInterpolation(model) {
+			model = modelWithProvider(model, "vertex_ai")
+		}
 		if info.AccountID != "" {
 			svccfg.Environment["VERTEXAI_PROJECT"] = &info.AccountID
 		}
@@ -577,6 +585,10 @@ func modelWithProvider(model, prefix string) string {
 		return model // already has a provider prefix
 	}
 	return prefix + "/" + model
+}
+
+func hasConfigInterpolation(value string) bool {
+	return strings.Contains(value, "${")
 }
 
 func GetImageRepo(image string) string {
