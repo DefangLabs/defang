@@ -248,9 +248,15 @@ func parsePortString(port string) (uint32, error) {
 }
 
 const (
-	liteLLMPort         uint32 = 4000
-	defaultLLMCPUs             = 0.5
-	defaultLLMMemoryMiB        = 1024
+	liteLLMPort uint32 = 4000
+	// Default LiteLLM gateway reservations, applied only when the user sets none.
+	// With no reservations, GCP placed the gateway on an e2-micro (1 shared vCPU /
+	// 1 GiB burstable) where LiteLLM OOM'd during startup; 0.5 vCPU / 512 MiB is
+	// the smallest field-proven shape (selects e2-small on GCP and started/served
+	// in both GCP and AWS E2E). Explicit reservations are always preserved.
+	// Evidence: PR 2175 review discussion.
+	defaultLLMCPUs      = 0.5
+	defaultLLMMemoryMiB = 1024
 )
 
 func fixupLLM(svccfg *composeTypes.ServiceConfig) {
@@ -465,6 +471,15 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 		if location != "" {
 			svccfg.Environment["VERTEXAI_LOCATION"] = &location
 		}
+	case client.ProviderAzure:
+		// Azure's managed-model provider (pulumi-defang defangazure) provisions an
+		// OpenAI-compatible AI Foundry account and creates a deployment named after
+		// the alias, picking the concrete model at deploy time from a region-aware
+		// preference list (models.go chatPreference/embeddingPreference). So unlike
+		// bedrock/vertex_ai we do NOT resolve or prefix the model here: the bare alias
+		// is wired to dependents as {SERVICE}_MODEL, which the provider uses as both
+		// the deployment name and the model routed to the OpenAI-compatible endpoint.
+		// The account key is injected as OPENAI_API_KEY by the provider.
 	}
 
 	// svccfg.HealthCheck = &composeTypes.ServiceHealthCheckConfig{} TODO: add healthcheck

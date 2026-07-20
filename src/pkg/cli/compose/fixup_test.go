@@ -119,6 +119,31 @@ func TestMakeAccessGatewayServiceGCP(t *testing.T) {
 	})
 }
 
+func TestMakeAccessGatewayServiceAzure(t *testing.T) {
+	// Azure's managed-model provider names the deployment after the alias and
+	// selects the concrete model itself, so the CLI passes the bare alias through
+	// unchanged (no bedrock/vertex_ai-style resolution or prefix) and sets no
+	// provider-specific environment; the provider injects OPENAI_API_KEY.
+	info := &client.AccountInfo{
+		Provider:  client.ProviderAzure,
+		Region:    "eastus",
+		AccountID: "my-azure-sub",
+	}
+
+	for _, alias := range []string{"chat-default", "chat-large", "embedding-default", "some-custom-model"} {
+		t.Run(alias, func(t *testing.T) {
+			proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
+			svccfg := newLLMService()
+			makeAccessGatewayService(&svccfg, proj, alias, info)
+
+			require.Equal(t, []string{"--drop_params", "--model", alias, "--alias", alias}, []string(svccfg.Command))
+			assert.NotContains(t, svccfg.Environment, "AWS_REGION")
+			assert.NotContains(t, svccfg.Environment, "VERTEXAI_PROJECT")
+			assert.NotContains(t, svccfg.Environment, "VERTEXAI_LOCATION")
+		})
+	}
+}
+
 func TestAccessGatewayChatLarge(t *testing.T) {
 	tests := []struct {
 		name         string
