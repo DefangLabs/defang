@@ -439,7 +439,7 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 		case "chat-default":
 			model = "us.amazon.nova-2-lite-v1:0"
 		case "chat-large":
-			model = "us.anthropic.claude-sonnet-5"
+			model = "zai.glm-5"
 		case "embedding-default":
 			model = "amazon.titan-embed-text-v2:0"
 		}
