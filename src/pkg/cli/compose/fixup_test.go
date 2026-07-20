@@ -134,7 +134,6 @@ func TestAccessGatewayModelAliases(t *testing.T) {
 		{name: "AWS ai/embedding-default", provider: client.ProviderAWS, model: "ai/embedding-default", wantModel: "bedrock/amazon.titan-embed-text-v2:0", wantAlias: "ai/embedding-default"},
 		{name: "AWS chat-large", provider: client.ProviderAWS, model: "chat-large", wantModel: "bedrock/us.anthropic.claude-sonnet-5", wantAlias: "chat-large"},
 		{name: "AWS ai/chat-large", provider: client.ProviderAWS, model: "ai/chat-large", wantModel: "bedrock/us.anthropic.claude-sonnet-5", wantAlias: "ai/chat-large"},
-		{name: "AWS config-backed model", provider: client.ProviderAWS, model: "${MODEL_NAME}", wantModel: "${MODEL_NAME}", wantAlias: "${MODEL_NAME}"},
 		{name: "AWS non-alias ai model", provider: client.ProviderAWS, model: "ai/custom", wantModel: "ai/custom", wantAlias: "ai/custom"},
 		{name: "GCP chat-default", provider: client.ProviderGCP, model: "chat-default", wantModel: "vertex_ai/gemini-2.5-flash", wantAlias: "chat-default", wantLocation: "us-central1"},
 		{name: "GCP ai/chat-default", provider: client.ProviderGCP, model: "ai/chat-default", wantModel: "vertex_ai/gemini-2.5-flash", wantAlias: "ai/chat-default", wantLocation: "us-central1"},
@@ -142,7 +141,6 @@ func TestAccessGatewayModelAliases(t *testing.T) {
 		{name: "GCP ai/embedding-default", provider: client.ProviderGCP, model: "ai/embedding-default", wantModel: "vertex_ai/gemini-embedding-001", wantAlias: "ai/embedding-default", wantLocation: "us-central1"},
 		{name: "GCP chat-large", provider: client.ProviderGCP, model: "chat-large", wantModel: "vertex_ai/gemini-3.1-pro-preview", wantAlias: "chat-large", wantLocation: "global"},
 		{name: "GCP ai/chat-large", provider: client.ProviderGCP, model: "ai/chat-large", wantModel: "vertex_ai/gemini-3.1-pro-preview", wantAlias: "ai/chat-large", wantLocation: "global"},
-		{name: "GCP config-backed model", provider: client.ProviderGCP, model: "${MODEL_NAME}", wantModel: "${MODEL_NAME}", wantAlias: "${MODEL_NAME}", wantLocation: "us-central1"},
 		{name: "GCP non-alias ai model", provider: client.ProviderGCP, model: "ai/custom", wantModel: "ai/custom", wantAlias: "ai/custom", wantLocation: "us-central1"},
 	}
 

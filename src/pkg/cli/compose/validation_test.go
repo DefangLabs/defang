@@ -163,37 +163,31 @@ func TestValidateConfig(t *testing.T) {
 }
 
 func TestValidateModelConfig(t *testing.T) {
-	oldTerm := term.DefaultTerm
-	t.Cleanup(func() { term.DefaultTerm = oldTerm })
-
 	tests := []struct {
 		name        string
 		model       string
 		configNames []string
-		wantMissing string
-		wantWarning string
+		want        []string
 	}{
 		{
-			name:  "resolved model is valid",
+			name:  "concrete model is valid",
 			model: "bedrock/anthropic.claude-sonnet-5",
 		},
 		{
-			name:        "undefined model config fails",
-			model:       "${UNDEFINED}",
-			wantMissing: "UNDEFINED",
+			name:  "unresolved model interpolation fails",
+			model: "${MODEL_NAME}",
+			want:  []string{"MODEL_NAME"},
 		},
 		{
-			name:        "defined model config warns and passes",
-			model:       "${SET_CONFIG_NAME}",
-			configNames: []string{"SET_CONFIG_NAME"},
-			wantWarning: "will be resolved by the CD at deploy time",
+			name:        "Defang config does not make model interpolation valid",
+			model:       "${MODEL_NAME}",
+			configNames: []string{"MODEL_NAME"},
+			want:        []string{"MODEL_NAME"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logs := new(bytes.Buffer)
-			term.DefaultTerm = term.NewTerm(os.Stdin, logs, logs)
 			project := &composeTypes.Project{
 				Services: composeTypes.Services{},
 				Models: map[string]composeTypes.ModelConfig{
@@ -202,44 +196,38 @@ func TestValidateModelConfig(t *testing.T) {
 			}
 
 			err := ValidateProjectConfig(project, tt.configNames)
-			if tt.wantMissing == "" {
+			if len(tt.want) == 0 {
 				if err != nil {
 					t.Fatal(err)
 				}
-			} else {
-				var missing ErrMissingModelConfig
-				if !errors.As(err, &missing) {
-					t.Fatalf("expected ErrMissingModelConfig, got: %v", err)
-				}
-				assert.Equal(t, []string{tt.wantMissing}, []string(missing))
-				assert.Contains(t, err.Error(), "define them in `.env`")
-				assert.Contains(t, err.Error(), "defang config set <NAME>")
-				assert.Contains(t, err.Error(), "chat-default/chat-large")
+				return
 			}
-			if tt.wantWarning != "" {
-				assert.Contains(t, logs.String(), tt.wantWarning)
+			var interpolations ErrConfigInterpolationInModels
+			if !errors.As(err, &interpolations) {
+				t.Fatalf("expected ErrConfigInterpolationInModels, got: %v", err)
 			}
+			assert.Equal(t, tt.want, []string(interpolations))
+			assert.Contains(t, err.Error(), "define them in `.env`")
+			assert.Contains(t, err.Error(), "chat-default/chat-large")
 		})
 	}
 
-	t.Run("provider model config is validated", func(t *testing.T) {
-		project := &composeTypes.Project{
-			Services: composeTypes.Services{
-				"chat": {
-					Provider: &composeTypes.ServiceProviderConfig{
-						Type:    "model",
-						Options: map[string][]string{"model": {"${MODEL_NAME}"}},
-					},
+	t.Run("deprecated provider model is also validated", func(t *testing.T) {
+		project := &composeTypes.Project{Services: composeTypes.Services{
+			"chat": {
+				Provider: &composeTypes.ServiceProviderConfig{
+					Type:    "model",
+					Options: map[string][]string{"model": {"${MODEL_NAME}"}},
 				},
 			},
-		}
+		}}
 
-		err := ValidateProjectConfig(project, nil)
-		var missing ErrMissingModelConfig
-		if !errors.As(err, &missing) {
-			t.Fatalf("expected ErrMissingModelConfig, got: %v", err)
+		err := ValidateProjectConfig(project, []string{"MODEL_NAME"})
+		var interpolations ErrConfigInterpolationInModels
+		if !errors.As(err, &interpolations) {
+			t.Fatalf("expected ErrConfigInterpolationInModels, got: %v", err)
 		}
-		assert.Equal(t, []string{"MODEL_NAME"}, []string(missing))
+		assert.Equal(t, []string{"MODEL_NAME"}, []string(interpolations))
 	})
 }
 

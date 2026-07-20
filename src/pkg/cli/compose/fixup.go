@@ -447,9 +447,7 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 		case "embedding-default":
 			model = "amazon.titan-embed-text-v2:0"
 		}
-		if !hasConfigInterpolation(model) {
-			model = modelWithProvider(model, "bedrock")
-		}
+		model = modelWithProvider(model, "bedrock")
 		if info.Region != "" {
 			svccfg.Environment["AWS_REGION"] = &info.Region
 		}
@@ -464,9 +462,7 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 		case "embedding-default":
 			model = "gemini-embedding-001"
 		}
-		if !hasConfigInterpolation(model) {
-			model = modelWithProvider(model, "vertex_ai")
-		}
+		model = modelWithProvider(model, "vertex_ai")
 		if info.AccountID != "" {
 			svccfg.Environment["VERTEXAI_PROJECT"] = &info.AccountID
 		}
@@ -585,10 +581,6 @@ func modelWithProvider(model, prefix string) string {
 		return model // already has a provider prefix
 	}
 	return prefix + "/" + model
-}
-
-func hasConfigInterpolation(value string) bool {
-	return strings.Contains(value, "${")
 }
 
 func GetImageRepo(image string) string {
