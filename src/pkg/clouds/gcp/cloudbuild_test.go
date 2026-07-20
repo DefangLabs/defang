@@ -77,6 +77,54 @@ func TestPollBuildWithRetry_GivesUpAfterMax(t *testing.T) {
 	}
 }
 
+func TestPollBuildWithRetry_RetriesOnTransientAuth(t *testing.T) {
+	prev := pollBuildInitialWaitForTest
+	pollBuildInitialWaitForTest = time.Microsecond
+	t.Cleanup(func() { pollBuildInitialWaitForTest = prev })
+
+	// A 503 from fabric while refreshing per-RPC creds surfaces as Unauthenticated.
+	authFlake := grpcstatus.Error(codes.Unauthenticated, "per-RPC creds failed due to error: credentials: status code 503: upstream connect error")
+	want := &cloudbuildpb.Build{Id: "ok"}
+	calls := 0
+	poll := func(ctx context.Context, _ ...gax.CallOption) (*cloudbuildpb.Build, error) {
+		calls++
+		if calls < 3 {
+			return nil, authFlake
+		}
+		return want, nil
+	}
+	got, err := pollBuildWithRetry(t.Context(), poll)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+	if calls != 3 {
+		t.Errorf("poll called %d times, want 3", calls)
+	}
+}
+
+func TestPollBuildWithRetry_GivesUpAfterMaxOnTransientAuth(t *testing.T) {
+	prev := pollBuildInitialWaitForTest
+	pollBuildInitialWaitForTest = time.Microsecond
+	t.Cleanup(func() { pollBuildInitialWaitForTest = prev })
+
+	authFlake := grpcstatus.Error(codes.Unauthenticated, "upstream connect error or disconnect/reset before headers")
+	calls := 0
+	poll := func(ctx context.Context, _ ...gax.CallOption) (*cloudbuildpb.Build, error) {
+		calls++
+		return nil, authFlake
+	}
+	_, err := pollBuildWithRetry(t.Context(), poll)
+	if !errors.Is(err, authFlake) {
+		t.Errorf("got error %v, want %v", err, authFlake)
+	}
+	if calls != pollBuildMaxAttempts {
+		t.Errorf("poll called %d times, want %d", calls, pollBuildMaxAttempts)
+	}
+}
+
 func TestPollBuildWithRetry_DoesNotRetryPermanent(t *testing.T) {
 	perm := grpcstatus.Error(codes.PermissionDenied, "denied")
 	calls := 0
@@ -151,6 +199,29 @@ func TestIsTransientPollError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isTransientPollError(tt.err); got != tt.want {
 				t.Errorf("isTransientPollError(%v) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsTransientAuthError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil", nil, false},
+		{"plain", errors.New("oops"), false},
+		{"bare unauthenticated", grpcstatus.Error(codes.Unauthenticated, "invalid token"), false},
+		{"per-RPC creds", grpcstatus.Error(codes.Unauthenticated, "per-RPC creds failed due to error"), true},
+		{"upstream connect", grpcstatus.Error(codes.Unauthenticated, "credentials: status code 503: upstream connect error"), true},
+		{"real fabric 503", grpcstatus.Error(codes.Unauthenticated, "transport: per-RPC creds failed due to error: credentials: status code 503: upstream connect error or disconnect/reset before headers. retried and the latest reset reason: remote connection failure, transport failure reason: delayed connect error: Connection refused"), true},
+		{"other code with marker", grpcstatus.Error(codes.Unavailable, "upstream connect error"), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isTransientAuthError(tt.err); got != tt.want {
+				t.Errorf("isTransientAuthError(%v) = %v, want %v", tt.err, got, tt.want)
 			}
 		})
 	}

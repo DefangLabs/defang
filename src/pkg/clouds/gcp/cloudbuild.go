@@ -243,7 +243,10 @@ func pollBuildWithRetry(ctx context.Context, poll buildPoller) (*cloudbuildpb.Bu
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		if !isTransientPollError(err) {
+		// isTransientAuthError covers the Unauthenticated variant where fetching
+		// per-RPC credentials hit a transient network failure; both classes share
+		// the pollBuildMaxAttempts budget.
+		if !isTransientPollError(err) && !isTransientAuthError(err) {
 			return nil, err
 		}
 		lastErr = err
@@ -259,6 +262,31 @@ func isTransientPollError(err error) bool {
 	switch st.Code() {
 	case codes.DeadlineExceeded, codes.Unavailable, codes.Internal, codes.ResourceExhausted:
 		return true
+	}
+	return false
+}
+
+// isTransientAuthError reports whether err is a transient network failure in
+// the per-RPC credential fetch rather than a real credential rejection. Both
+// report codes.Unauthenticated, so we distinguish on the transport-level
+// markers gRPC includes when it could not even reach the token endpoint — e.g.
+// a 503 "upstream connect error" / "connection refused" from fabric while
+// refreshing the access token mid-poll.
+func isTransientAuthError(err error) bool {
+	st, ok := status.FromError(err)
+	if !ok || st.Code() != codes.Unauthenticated {
+		return false
+	}
+	msg := st.Message()
+	// Markers gRPC-go / the Envoy front door emit when the token endpoint was
+	// unreachable, as opposed to a token the endpoint actively rejected.
+	for _, marker := range []string{
+		"per-RPC creds failed",
+		"upstream connect error",
+	} {
+		if strings.Contains(msg, marker) {
+			return true
+		}
 	}
 	return false
 }
