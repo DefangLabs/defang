@@ -256,7 +256,7 @@ const (
 	// in both GCP and AWS E2E). Explicit reservations are always preserved.
 	// Evidence: PR 2175 review discussion.
 	defaultLLMCPUs      = 0.5
-	defaultLLMMemoryMiB = 512
+	defaultLLMMemoryMiB = 1024
 )
 
 func fixupLLM(svccfg *composeTypes.ServiceConfig) {
