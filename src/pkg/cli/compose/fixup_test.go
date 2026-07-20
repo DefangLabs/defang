@@ -151,7 +151,7 @@ func TestAccessGatewayChatLarge(t *testing.T) {
 		wantModel    string
 		wantLocation string
 	}{
-		{name: "AWS", provider: client.ProviderAWS, wantModel: "bedrock/us.anthropic.claude-sonnet-5"},
+		{name: "AWS", provider: client.ProviderAWS, wantModel: "bedrock/zai.glm-5"},
 		{name: "GCP", provider: client.ProviderGCP, wantModel: "vertex_ai/gemini-3.1-pro-preview", wantLocation: "global"},
 	}
 
