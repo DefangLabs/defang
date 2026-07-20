@@ -211,6 +211,8 @@ func makeComposeUpCmd() *cobra.Command {
 	_ = composeUpCmd.Flags().MarkHidden("wait")
 	composeUpCmd.Flags().Int("wait-timeout", -1, "maximum duration to wait for the project to be running|healthy") // docker-compose compatibility
 	composeUpCmd.Flags().Bool("allow-upgrade", pkg.GetenvBool("DEFANG_ALLOW_UPGRADE"), "allow upgrading the CD image and Pulumi version to the latest available")
+	composeUpCmd.Flags().StringArray("env-file", nil, "compose environment file(s) for interpolation; defaults to .env") // docker-compose compatibility
+	_ = composeUpCmd.MarkFlagFilename("env-file")
 	return composeUpCmd
 }
 
@@ -783,7 +785,7 @@ services:
 	}
 	// Compose Command
 	// composeCmd.Flags().Bool("compatibility", false, "Run compose in backward compatibility mode"); TODO: Implement compose option
-	// composeCmd.Flags().String("env-file", "", "Specify an alternate environment file."); TODO: Implement compose option
+	// --env-file is implemented per-subcommand (see makeComposeUpCmd) and via the COMPOSE_ENV_FILES env var.
 	// composeCmd.Flags().Int("parallel", -1, "Control max parallelism, -1 for unlimited (default -1)"); TODO: Implement compose option
 	// composeCmd.Flags().String("profile", "", "Specify a profile to enable"); TODO: Implement compose option
 	// composeCmd.Flags().String("project-directory", "", "Specify an alternate working directory"); TODO: Implement compose option

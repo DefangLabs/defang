@@ -11,6 +11,63 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestLoaderOptionsEnvFile(t *testing.T) {
+	tests := []struct {
+		name           string
+		flagValues     []string // values passed via --env-file
+		composeEnvFile string   // value of COMPOSE_ENV_FILES; "" means unset
+		expected       []string
+	}{
+		{
+			name:     "no env-file flag and no env var",
+			expected: nil,
+		},
+		{
+			name:       "single --env-file",
+			flagValues: []string{"prod.env"},
+			expected:   []string{"prod.env"},
+		},
+		{
+			name:       "multiple --env-file",
+			flagValues: []string{"a.env", "b.env"},
+			expected:   []string{"a.env", "b.env"},
+		},
+		{
+			name:           "COMPOSE_ENV_FILES is used when the flag is absent",
+			composeEnvFile: "one.env,two.env",
+			expected:       []string{"one.env", "two.env"},
+		},
+		{
+			name:           "--env-file takes precedence over COMPOSE_ENV_FILES",
+			flagValues:     []string{"flag.env"},
+			composeEnvFile: "ignored.env",
+			expected:       []string{"flag.env"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.composeEnvFile != "" {
+				t.Setenv("COMPOSE_ENV_FILES", tt.composeEnvFile)
+			} else {
+				// Ensure a value inherited from the environment does not leak in.
+				os.Unsetenv("COMPOSE_ENV_FILES")
+			}
+
+			cmd := &cobra.Command{}
+			cmd.Flags().StringArray("file", nil, "")
+			cmd.Flags().String("project-name", "", "")
+			cmd.Flags().StringArray("env-file", nil, "")
+			for _, v := range tt.flagValues {
+				require.NoError(t, cmd.Flags().Set("env-file", v))
+			}
+
+			opts := loaderOptionsForCommand(cmd)
+			assert.Equal(t, tt.expected, opts.EnvFiles)
+		})
+	}
+}
+
 func TestNewStackManager(t *testing.T) {
 	tests := []struct {
 		name           string
