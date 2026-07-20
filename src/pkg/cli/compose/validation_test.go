@@ -311,3 +311,44 @@ func TestManagedStoreParams(t *testing.T) {
 		})
 	}
 }
+
+func TestServiceExtensionWarnings(t *testing.T) {
+	oldTerm := term.DefaultTerm
+	t.Cleanup(func() { term.DefaultTerm = oldTerm })
+
+	tests := []struct {
+		name        string
+		extension   string
+		value       any
+		wantWarning bool
+	}{
+		// Read by the CLI itself.
+		{"x-defang-llm is recognized", "x-defang-llm", true, false},
+		// Consumed only by the CD provider, but valid and passed through.
+		{"x-defang-policies is recognized", "x-defang-policies", []any{"arn:aws:iam::aws:policy/AdministratorAccess"}, false},
+		{"x-defang-aliases is recognized", "x-defang-aliases", map[string]any{"cluster": "urn:pulumi:stack::proj::aws:ecs/cluster:Cluster::c"}, false},
+		// Genuinely unknown extensions still warn.
+		{"unknown extension warns", "x-defang-bogus", true, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var out bytes.Buffer
+			term.DefaultTerm = term.NewTerm(os.Stdin, &out, &out)
+
+			svc := &composeTypes.ServiceConfig{
+				Name:       "svc",
+				Image:      "nginx",
+				Extensions: composeTypes.Extensions{tt.extension: tt.value},
+			}
+			project := &composeTypes.Project{Services: composeTypes.Services{"svc": *svc}}
+
+			if err := validateService(svc, project, modes.RecipeAffordable); err != nil {
+				t.Fatalf("validateService returned error: %v", err)
+			}
+
+			warned := strings.Contains(out.String(), `unsupported compose extension: "`+tt.extension+`"`)
+			assert.Equal(t, tt.wantWarning, warned, "term output: %q", out.String())
+		})
+	}
+}
