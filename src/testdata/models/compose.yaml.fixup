@@ -5,6 +5,11 @@ ai_model:
         - ai/model
         - --alias
         - ai/model
+    deploy:
+        resources:
+            reservations:
+                cpus: 0.5
+                memory: "1073741824"
     environment:
         LITELLM_MASTER_KEY: networkisalreadyprivate
     image: litellm/litellm:v1.92.0
@@ -23,6 +28,7 @@ modellist:
     environment:
         AI_MODEL_MODEL: ai/model
         AI_MODEL_URL: http://mock-ai-model:4000/v1/
+        OPENAI_API_KEY: networkisalreadyprivate
     image: app
     models:
         ai_model: null
@@ -38,6 +44,7 @@ modelmap:
     environment:
         AI_MODEL_MODEL: ai/model
         AI_MODEL_URL: http://mock-ai-model:4000/v1/
+        OPENAI_API_KEY: networkisalreadyprivate
     image: app
     models:
         ai_model: null
@@ -51,6 +58,11 @@ my_model:
         - ai/model
         - --alias
         - ai/model
+    deploy:
+        resources:
+            reservations:
+                cpus: 0.5
+                memory: "1073741824"
     environment:
         LITELLM_MASTER_KEY: networkisalreadyprivate
     image: litellm/litellm:v1.92.0
@@ -69,6 +81,7 @@ withendpoint:
     environment:
         MODEL_URL: http://mock-my-model:4000/v1/
         MY_MODEL_MODEL: ai/model
+        OPENAI_API_KEY: networkisalreadyprivate
     image: app
     models:
         my_model:
@@ -84,6 +97,7 @@ withmodelvar:
     environment:
         AI_MODEL_URL: http://mock-ai-model:4000/v1/
         MY_MODEL_NAME: ai/model
+        OPENAI_API_KEY: networkisalreadyprivate
     image: app
     models:
         ai_model:

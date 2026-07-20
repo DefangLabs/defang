@@ -162,6 +162,80 @@ func TestValidateConfig(t *testing.T) {
 	})
 }
 
+func TestValidateModelConfig(t *testing.T) {
+	tests := []struct {
+		name        string
+		model       string
+		configNames []string
+		want        []string
+	}{
+		{
+			name:  "concrete model is valid",
+			model: "bedrock/anthropic.claude-sonnet-5",
+		},
+		{
+			name:  "unresolved model interpolation fails",
+			model: "${MODEL_NAME}",
+			want:  []string{"MODEL_NAME"},
+		},
+		{
+			name:  "unresolved unbraced model interpolation fails",
+			model: "$MODEL_NAME",
+			want:  []string{"MODEL_NAME"},
+		},
+		{
+			name:        "Defang config does not make model interpolation valid",
+			model:       "${MODEL_NAME}",
+			configNames: []string{"MODEL_NAME"},
+			want:        []string{"MODEL_NAME"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			project := &composeTypes.Project{
+				Services: composeTypes.Services{},
+				Models: map[string]composeTypes.ModelConfig{
+					"llm": {Model: tt.model},
+				},
+			}
+
+			err := ValidateProjectConfig(project, tt.configNames)
+			if len(tt.want) == 0 {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			var interpolations ErrConfigInterpolationInModels
+			if !errors.As(err, &interpolations) {
+				t.Fatalf("expected ErrConfigInterpolationInModels, got: %v", err)
+			}
+			assert.Equal(t, tt.want, []string(interpolations))
+			assert.Contains(t, err.Error(), "define them in `.env`")
+			assert.Contains(t, err.Error(), "chat-default, chat-large, embedding-default")
+		})
+	}
+
+	t.Run("deprecated provider model is also validated", func(t *testing.T) {
+		project := &composeTypes.Project{Services: composeTypes.Services{
+			"chat": {
+				Provider: &composeTypes.ServiceProviderConfig{
+					Type:    "model",
+					Options: map[string][]string{"model": {"${MODEL_NAME}"}},
+				},
+			},
+		}}
+
+		err := ValidateProjectConfig(project, []string{"MODEL_NAME"})
+		var interpolations ErrConfigInterpolationInModels
+		if !errors.As(err, &interpolations) {
+			t.Fatalf("expected ErrConfigInterpolationInModels, got: %v", err)
+		}
+		assert.Equal(t, []string{"MODEL_NAME"}, []string(interpolations))
+	})
+}
+
 func TestValidateBuildArgs(t *testing.T) {
 	oldTerm := term.DefaultTerm
 	t.Cleanup(func() { term.DefaultTerm = oldTerm })

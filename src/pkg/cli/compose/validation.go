@@ -34,6 +34,12 @@ func (e ErrConfigInterpolationInBuildArgs) Error() string {
 	return fmt.Sprintf("build args do not support config interpolation %q; set concrete values or define them in `.env` before deploying", ([]string)(e))
 }
 
+type ErrConfigInterpolationInModels []string
+
+func (e ErrConfigInterpolationInModels) Error() string {
+	return fmt.Sprintf("models do not support unresolved interpolation %q; set concrete values, define them in `.env` before deploying, or use a built-in alias (chat-default, chat-large, embedding-default)", ([]string)(e))
+}
+
 var ErrDockerfileNotFound = errors.New("dockerfile not found")
 
 func ValidateProject(project *composeTypes.Project, mode modes.Recipe) error {
@@ -470,6 +476,23 @@ func DetectInterpolationVariables(value string) []string {
 }
 
 func ValidateProjectConfig(composeProject *composeTypes.Project, listConfigNames []string) error {
+	var modelInterpolations ErrConfigInterpolationInModels
+	for _, model := range composeProject.Models {
+		modelInterpolations = append(modelInterpolations, DetectInterpolationVariables(model.Model)...)
+	}
+	for _, service := range composeProject.Services {
+		if service.Provider == nil || service.Provider.Type != "model" {
+			continue
+		}
+		for _, model := range service.Provider.Options["model"] {
+			modelInterpolations = append(modelInterpolations, DetectInterpolationVariables(model)...)
+		}
+	}
+	if len(modelInterpolations) > 0 {
+		slices.Sort(modelInterpolations)
+		return slices.Compact(modelInterpolations)
+	}
+
 	var names []string
 	// make list of secrets
 	for _, service := range composeProject.Services {
