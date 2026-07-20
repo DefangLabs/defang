@@ -33,6 +33,7 @@ type BuildConfig = composeTypes.BuildConfig
 type LoaderOptions struct {
 	ConfigPaths []string
 	ProjectName string
+	EnvFiles    []string
 }
 
 type Loader struct {
@@ -51,6 +52,15 @@ func WithPath(paths ...string) LoaderOption {
 func WithProjectName(name string) LoaderOption {
 	return func(o *LoaderOptions) {
 		o.ProjectName = name
+	}
+}
+
+// WithEnvFiles sets the env file(s) used to populate the project environment for
+// interpolation, mirroring `docker compose --env-file`. When empty, the default
+// PWD/.env file is loaded (if present).
+func WithEnvFiles(paths ...string) LoaderOption {
+	return func(o *LoaderOptions) {
+		o.EnvFiles = paths
 	}
 }
 
@@ -145,8 +155,8 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 		// First apply os.Environment, always win
 		// -- DISABLED FOR DEFANG -- cli.WithOsEnv,
 		cli.WithEnv(onlyComposeEnv),
-		// Load PWD/.env if present and no explicit --env-file has been set
-		cli.WithEnvFiles(), // TODO: Support --env-file to be added as param to this call
+		// Load the explicit --env-file(s), or PWD/.env if none were set
+		cli.WithEnvFiles(l.options.EnvFiles...),
 		// read dot env file to populate project environment
 		cli.WithDotEnv,
 		// get compose file path set by COMPOSE_FILE
@@ -155,7 +165,7 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 		cli.WithDefaultConfigPath,
 		// Calling the 2 functions below the 2nd time as the loaded env in first call modifies the behavior of the 2nd call:
 		// .. and then, a project directory != PWD maybe has been set so let's load .env file
-		cli.WithEnvFiles(), // TODO: Support --env-file to be added as param to this call
+		cli.WithEnvFiles(l.options.EnvFiles...),
 		cli.WithDotEnv,
 		// eventually COMPOSE_PROFILES should have been set
 		// cli.WithDefaultProfiles(c.Profiles...), TODO: Support --profile to be added as param to this call
