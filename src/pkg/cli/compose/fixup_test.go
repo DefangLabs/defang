@@ -120,23 +120,26 @@ func TestMakeAccessGatewayServiceGCP(t *testing.T) {
 }
 
 func TestMakeAccessGatewayServiceAzure(t *testing.T) {
-	info := &client.AccountInfo{Provider: client.ProviderAzure}
-	tests := []struct {
-		model string
-		want  string
-	}{
-		{model: "chat-default", want: "azure/gpt-5-mini"},
-		{model: "embedding-default", want: "azure/text-embedding-3-small"},
-		{model: "azure/my-deployment", want: "azure/my-deployment"},
+	// Azure's managed-model provider names the deployment after the alias and
+	// selects the concrete model itself, so the CLI passes the bare alias through
+	// unchanged (no bedrock/vertex_ai-style resolution or prefix) and sets no
+	// provider-specific environment; the provider injects OPENAI_API_KEY.
+	info := &client.AccountInfo{
+		Provider:  client.ProviderAzure,
+		Region:    "eastus",
+		AccountID: "my-azure-sub",
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.model, func(t *testing.T) {
+	for _, alias := range []string{"chat-default", "chat-large", "embedding-default", "some-custom-model"} {
+		t.Run(alias, func(t *testing.T) {
 			proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
 			svccfg := newLLMService()
-			makeAccessGatewayService(&svccfg, proj, tt.model, info)
+			makeAccessGatewayService(&svccfg, proj, alias, info)
 
-			require.Equal(t, []string{"--drop_params", "--model", tt.want, "--alias", tt.model}, []string(svccfg.Command))
+			require.Equal(t, []string{"--drop_params", "--model", alias, "--alias", alias}, []string(svccfg.Command))
+			assert.NotContains(t, svccfg.Environment, "AWS_REGION")
+			assert.NotContains(t, svccfg.Environment, "VERTEXAI_PROJECT")
+			assert.NotContains(t, svccfg.Environment, "VERTEXAI_LOCATION")
 		})
 	}
 }
@@ -150,7 +153,6 @@ func TestAccessGatewayChatLarge(t *testing.T) {
 	}{
 		{name: "AWS", provider: client.ProviderAWS, wantModel: "bedrock/us.anthropic.claude-sonnet-5"},
 		{name: "GCP", provider: client.ProviderGCP, wantModel: "vertex_ai/gemini-3.1-pro-preview", wantLocation: "global"},
-		{name: "Azure", provider: client.ProviderAzure, wantModel: "azure/gpt-5"},
 	}
 
 	for _, tt := range tests {

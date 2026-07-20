@@ -466,15 +466,14 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 			svccfg.Environment["VERTEXAI_LOCATION"] = &location
 		}
 	case client.ProviderAzure:
-		switch model {
-		case "chat-default":
-			model = "gpt-5-mini"
-		case "chat-large":
-			model = "gpt-5"
-		case "embedding-default":
-			model = "text-embedding-3-small"
-		}
-		model = modelWithProvider(model, "azure")
+		// Azure's managed-model provider (pulumi-defang defangazure) provisions an
+		// OpenAI-compatible AI Foundry account and creates a deployment named after
+		// the alias, picking the concrete model at deploy time from a region-aware
+		// preference list (models.go chatPreference/embeddingPreference). So unlike
+		// bedrock/vertex_ai we do NOT resolve or prefix the model here: the bare alias
+		// is wired to dependents as {SERVICE}_MODEL, which the provider uses as both
+		// the deployment name and the model routed to the OpenAI-compatible endpoint.
+		// The account key is injected as OPENAI_API_KEY by the provider.
 	}
 
 	// svccfg.HealthCheck = &composeTypes.ServiceHealthCheckConfig{} TODO: add healthcheck
