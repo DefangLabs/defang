@@ -77,7 +77,7 @@ func TestPollBuildWithRetry_GivesUpAfterMax(t *testing.T) {
 	}
 }
 
-func TestPollBuildWithRetry_RetriesOnceOnTransientAuth(t *testing.T) {
+func TestPollBuildWithRetry_RetriesOnTransientAuth(t *testing.T) {
 	prev := pollBuildInitialWaitForTest
 	pollBuildInitialWaitForTest = time.Microsecond
 	t.Cleanup(func() { pollBuildInitialWaitForTest = prev })
@@ -88,7 +88,7 @@ func TestPollBuildWithRetry_RetriesOnceOnTransientAuth(t *testing.T) {
 	calls := 0
 	poll := func(ctx context.Context, _ ...gax.CallOption) (*cloudbuildpb.Build, error) {
 		calls++
-		if calls == 1 {
+		if calls < 3 {
 			return nil, authFlake
 		}
 		return want, nil
@@ -100,12 +100,12 @@ func TestPollBuildWithRetry_RetriesOnceOnTransientAuth(t *testing.T) {
 	if got != want {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
-	if calls != 2 {
-		t.Errorf("poll called %d times, want 2 (one retry)", calls)
+	if calls != 3 {
+		t.Errorf("poll called %d times, want 3", calls)
 	}
 }
 
-func TestPollBuildWithRetry_RetriesTransientAuthOnlyOnce(t *testing.T) {
+func TestPollBuildWithRetry_GivesUpAfterMaxOnTransientAuth(t *testing.T) {
 	prev := pollBuildInitialWaitForTest
 	pollBuildInitialWaitForTest = time.Microsecond
 	t.Cleanup(func() { pollBuildInitialWaitForTest = prev })
@@ -120,9 +120,8 @@ func TestPollBuildWithRetry_RetriesTransientAuthOnlyOnce(t *testing.T) {
 	if !errors.Is(err, authFlake) {
 		t.Errorf("got error %v, want %v", err, authFlake)
 	}
-	// One retry only: the second Unauthenticated is treated as a real rejection.
-	if calls != 2 {
-		t.Errorf("poll called %d times, want 2 (single retry then give up)", calls)
+	if calls != pollBuildMaxAttempts {
+		t.Errorf("poll called %d times, want %d", calls, pollBuildMaxAttempts)
 	}
 }
 

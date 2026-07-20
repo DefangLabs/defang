@@ -225,7 +225,6 @@ type buildPoller func(ctx context.Context, opts ...gax.CallOption) (*cloudbuildp
 func pollBuildWithRetry(ctx context.Context, poll buildPoller) (*cloudbuildpb.Build, error) {
 	wait := pollBuildInitialWaitForTest
 	var lastErr error
-	authRetryUsed := false
 	for attempt := range pollBuildMaxAttempts {
 		if attempt > 0 {
 			term.Debugf("retrying cloudbuild poll (attempt %d/%d) after transient error: %v", attempt+1, pollBuildMaxAttempts, lastErr)
@@ -244,16 +243,10 @@ func pollBuildWithRetry(ctx context.Context, poll buildPoller) (*cloudbuildpb.Bu
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		switch {
-		case isTransientPollError(err):
-			// Retried within the shared attempt budget below.
-		case isTransientAuthError(err) && !authRetryUsed:
-			// A transient network failure while fetching per-RPC credentials
-			// surfaces as Unauthenticated even though the token is valid. Retry
-			// it once; a genuine credential rejection reports the same code, so
-			// we must not loop on it the way we do for the transient codes.
-			authRetryUsed = true
-		default:
+		// isTransientAuthError covers the Unauthenticated variant where fetching
+		// per-RPC credentials hit a transient network failure; both classes share
+		// the pollBuildMaxAttempts budget.
+		if !isTransientPollError(err) && !isTransientAuthError(err) {
 			return nil, err
 		}
 		lastErr = err
