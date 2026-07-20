@@ -248,9 +248,9 @@ func parsePortString(port string) (uint32, error) {
 }
 
 const (
-	liteLLMPort         uint32 = 4000
-	defaultLLMCPUs             = 0.5
-	defaultLLMMemoryMiB        = 1024 // 512 MiB OOMed during AWS E2E; use the next size up.
+	liteLLMPort         = 4000
+	defaultLLMCPUs      = 0.5
+	defaultLLMMemoryMiB = 1024 // 512 MiB OOMed during AWS E2E; use the next size up.
 )
 
 func fixupLLM(svccfg *composeTypes.ServiceConfig) {
