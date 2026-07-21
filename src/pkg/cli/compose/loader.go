@@ -8,12 +8,14 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/consts"
 	"github.com/compose-spec/compose-go/v2/errdefs"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/template"
@@ -38,6 +40,11 @@ type LoaderOptions struct {
 	ConfigPaths []string
 	ProjectName string
 	EnvFiles    []string
+	// DefaultEnvFiles are candidate env files (names resolved against the project
+	// working directory) tried when no env file was set explicitly (via EnvFiles
+	// or COMPOSE_ENV_FILES). Files that don't exist are skipped, and later files
+	// override earlier ones. Unlike EnvFiles, these never fail on a missing file.
+	DefaultEnvFiles []string
 }
 
 type Loader struct {
@@ -165,6 +172,11 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 			envFiles = strings.Split(v, ",")
 		}
 	}
+	// Only when no env file was set explicitly, fall back to the default env files.
+	withEnvFiles := cli.WithEnvFiles(envFiles...)
+	if len(envFiles) == 0 && len(l.options.DefaultEnvFiles) > 0 {
+		withEnvFiles = withDefaultEnvFiles(l.options.DefaultEnvFiles)
+	}
 
 	// Based on how docker compose setup its own project options
 	// https://github.com/docker/compose/blob/1a14fcb1e6645dd92f5a4f2da00071bd59c2e887/cmd/compose/compose.go#L326-L346
@@ -172,8 +184,8 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 		// First apply os.Environment, always win
 		// -- DISABLED FOR DEFANG -- cli.WithOsEnv,
 		cli.WithEnv(onlyComposeEnv),
-		// Load the explicit --env-file(s), or PWD/.env if none were set
-		cli.WithEnvFiles(envFiles...),
+		// Load the explicit --env-file(s), or the convention-based/default .env files if none were set
+		withEnvFiles,
 		// read dot env file to populate project environment
 		cli.WithDotEnv,
 		// get compose file path set by COMPOSE_FILE
@@ -182,7 +194,7 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 		cli.WithDefaultConfigPath,
 		// Calling the 2 functions below the 2nd time as the loaded env in first call modifies the behavior of the 2nd call:
 		// .. and then, a project directory != PWD maybe has been set so let's load .env file
-		cli.WithEnvFiles(envFiles...),
+		withEnvFiles,
 		cli.WithDotEnv,
 		// eventually COMPOSE_PROFILES should have been set
 		// cli.WithDefaultProfiles(c.Profiles...), TODO: Support --profile to be added as param to this call
@@ -224,6 +236,43 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 			}
 		}),
 	)
+}
+
+// withDefaultEnvFiles selects the env files from the given candidate names,
+// resolved against the project working directory, so later files override
+// earlier ones. Unlike explicit --env-file values, files that don't exist are
+// skipped, mirroring how compose-go treats the default .env (see cli.WithEnvFiles).
+func withDefaultEnvFiles(names []string) cli.ProjectOptionsFn {
+	return func(o *cli.ProjectOptions) error {
+		if v, ok := os.LookupEnv(consts.ComposeDisableDefaultEnvFile); ok {
+			if disabled, err := strconv.ParseBool(v); err != nil {
+				return err
+			} else if disabled {
+				return nil
+			}
+		}
+
+		wd, err := o.GetWorkingDir()
+		if err != nil {
+			return err
+		}
+		var envFiles []string
+		for _, name := range slices.Compact(slices.Clone(names)) { // dedupe e.g. a stack named after its provider
+			path := filepath.Join(wd, name)
+			s, err := os.Stat(path)
+			if err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					continue // missing default env files are optional
+				}
+				return fmt.Errorf("default env file: %w", err)
+			}
+			if !s.IsDir() {
+				envFiles = append(envFiles, path)
+			}
+		}
+		o.EnvFiles = envFiles
+		return nil
+	}
 }
 
 func hasSubstitution(s, key string) bool {

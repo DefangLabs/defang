@@ -52,9 +52,11 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 	}
 	// load provider with selected stack
 	provider := cli.NewProvider(ctx, stack.Provider, sl.client, stack.Name)
+	loaderOptions := sl.opts.LoaderOptions
+	loaderOptions.DefaultEnvFiles = stackEnvFiles(stack)
 	session := &Session{
 		Stack:    stack,
-		Loader:   compose.NewLoaderFromOptions(sl.opts.LoaderOptions),
+		Loader:   compose.NewLoaderFromOptions(loaderOptions),
 		Provider: provider,
 	}
 
@@ -87,6 +89,20 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, str
 		return nil, whence, fmt.Errorf("failed to load stack env: %w", err)
 	}
 	return stack, whence, nil
+}
+
+// stackEnvFiles returns the env files loaded by convention for the selected
+// stack: .env, then .env.<provider>, then .env.<stack>, so the more specific
+// file overrides the more generic ones.
+func stackEnvFiles(stack *stacks.Parameters) []string {
+	envFiles := []string{".env"}
+	if stack.Provider != "" && stack.Provider != client.ProviderAuto {
+		envFiles = append(envFiles, ".env."+stack.Provider.String())
+	}
+	if stack.Name != "" {
+		envFiles = append(envFiles, ".env."+stack.Name)
+	}
+	return envFiles
 }
 
 func printProviderMismatchWarnings(ctx context.Context, provider client.ProviderID) {
