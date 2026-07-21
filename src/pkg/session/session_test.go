@@ -65,6 +65,26 @@ func (m *mockStacksManager) TargetDirectory() string {
 	return ""
 }
 
+func TestStackEnvFileSuffixes(t *testing.T) {
+	tests := []struct {
+		name     string
+		stack    stacks.Parameters
+		expected []string
+	}{
+		{"provider then stack name", stacks.Parameters{Name: "mystack", Provider: client.ProviderAWS}, []string{"aws", "mystack"}},
+		{"auto provider is skipped", stacks.Parameters{Name: "mystack", Provider: client.ProviderAuto}, []string{"mystack"}},
+		{"empty provider is skipped", stacks.Parameters{Name: "mystack"}, []string{"mystack"}},
+		{"empty stack name is skipped", stacks.Parameters{Provider: client.ProviderGCP}, []string{"gcp"}},
+		{"empty stack", stacks.Parameters{}, nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, stackEnvFileSuffixes(&tt.stack))
+		})
+	}
+}
+
 func TestPrintProviderMismatchWarnings(t *testing.T) {
 	tests := []struct {
 		name     string
