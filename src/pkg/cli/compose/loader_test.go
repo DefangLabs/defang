@@ -11,6 +11,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoader(t *testing.T) {
@@ -187,6 +188,41 @@ services:
 			}
 		})
 	}
+}
+
+func TestInterpolationEnv(t *testing.T) {
+	const composeYAML = `name: interpolationenvtest
+services:
+  web:
+    image: alpine
+    environment:
+      - PROVIDER=${DEFANG_PROVIDER}
+      - STACK=${DEFANG_STACK}
+      - ACCESS_TOKEN=${DEFANG_ACCESS_TOKEN}
+`
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	require.NoError(t, os.WriteFile(composePath, []byte(composeYAML), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env"), []byte("DEFANG_PROVIDER=dotenv\nDEFANG_STACK=dotenv\n"), 0o644))
+	t.Setenv("DEFANG_ACCESS_TOKEN", "secret")
+
+	loader := NewLoaderFromOptions(LoaderOptions{
+		ConfigPaths: []string{composePath},
+		InterpolationEnv: map[string]string{
+			"DEFANG_PROVIDER": "aws",
+			"DEFANG_STACK":    "production",
+		},
+	})
+	project, err := loader.LoadProject(t.Context())
+	require.NoError(t, err)
+
+	env := project.Services["web"].Environment
+	require.NotNil(t, env["PROVIDER"])
+	require.NotNil(t, env["STACK"])
+	require.NotNil(t, env["ACCESS_TOKEN"])
+	assert.Equal(t, "aws", *env["PROVIDER"])
+	assert.Equal(t, "production", *env["STACK"])
+	assert.Equal(t, "${DEFANG_ACCESS_TOKEN}", *env["ACCESS_TOKEN"])
 }
 
 // TestDefaultEnvFiles covers the convention-based env files: when no env file

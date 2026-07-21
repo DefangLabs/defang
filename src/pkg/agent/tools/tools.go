@@ -12,7 +12,7 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 			"services",
 			"List deployed services for the selected project stack in the current working directory",
 			func(ctx *ai.ToolContext, params ServicesParams) (string, error) {
-				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams, sc.Stack)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
@@ -23,7 +23,7 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 		ai.NewTool("deploy",
 			"Initiate deployment of the application stack defined in the docker-compose files in the current working directory",
 			func(ctx *ai.ToolContext, params DeployParams) (string, error) {
-				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams, sc.Stack)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
@@ -34,7 +34,7 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 		ai.NewTool("destroy",
 			"Destroy the deployed application in the selected stack, defined in the docker-compose files in the current working directory",
 			func(ctx *ai.ToolContext, params DestroyParams) (string, error) {
-				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams, sc.Stack)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
@@ -45,7 +45,7 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 		ai.NewTool("logs",
 			"Fetch logs for the application in the selected stack, in pages of up to 100 lines. You can use the 'since' and 'until' parameters to page through logs by time.",
 			func(ctx *ai.ToolContext, params LogsParams) (string, error) {
-				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams, sc.Stack)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
@@ -56,7 +56,7 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 		ai.NewTool("estimate",
 			"Estimate the cost of deploying a Defang project to AWS or GCP",
 			func(ctx *ai.ToolContext, params EstimateParams) (string, error) {
-				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams, sc.Stack)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
@@ -67,7 +67,7 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 		ai.NewTool("set_config",
 			"Set a config variable for the currently selected stack in the Defang project",
 			func(ctx *ai.ToolContext, params SetConfigParams) (string, error) {
-				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams, sc.Stack)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
@@ -114,7 +114,7 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 		ai.NewTool("remove_config",
 			"Remove a config variable from the currently selected stack in the Defang project",
 			func(ctx *ai.ToolContext, params RemoveConfigParams) (string, error) {
-				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams, sc.Stack)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
@@ -125,7 +125,7 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 		ai.NewTool("list_configs",
 			"List config variables for the currently selected stack in the Defang project",
 			func(ctx *ai.ToolContext, params ListConfigParams) (string, error) {
-				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams, sc.Stack)
 				if err != nil {
 					return "Failed to configure loader", err
 				}
@@ -136,7 +136,7 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 		ai.NewTool("project_name",
 			"Get the current project name",
 			func(ctx *ai.ToolContext, params ProjectNameParams) (string, error) {
-				loader, err := common.ConfigureAgentLoader(params.LoaderParams)
+				loader, err := common.ConfigureAgentLoader(params.LoaderParams, sc.Stack)
 				if err != nil {
 					return "Failed to configure loader", err
 				}

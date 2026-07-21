@@ -53,7 +53,11 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 	// load provider with selected stack
 	provider := cli.NewProvider(ctx, stack.Provider, sl.client, stack.Name)
 	loaderOptions := sl.opts.LoaderOptions
-	loaderOptions.DefaultEnvFiles = stackEnvFiles(stack)
+	loaderOptions.DefaultEnvFiles = StackEnvFiles(stack)
+	loaderOptions.InterpolationEnv = map[string]string{
+		"DEFANG_PROVIDER": stack.Provider.String(),
+		"DEFANG_STACK":    stack.Name,
+	}
 	session := &Session{
 		Stack:    stack,
 		Loader:   compose.NewLoaderFromOptions(loaderOptions),
@@ -91,10 +95,10 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, str
 	return stack, whence, nil
 }
 
-// stackEnvFiles returns the env files loaded by convention for the selected
+// StackEnvFiles returns the env files loaded by convention for the selected
 // stack: .env, then .env.<provider>, then .env.<stack>, so the more specific
 // file overrides the more generic ones.
-func stackEnvFiles(stack *stacks.Parameters) []string {
+func StackEnvFiles(stack *stacks.Parameters) []string {
 	envFiles := []string{".env"}
 	if stack.Provider != "" && stack.Provider != client.ProviderAuto {
 		envFiles = append(envFiles, ".env."+stack.Provider.String())

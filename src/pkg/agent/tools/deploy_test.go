@@ -39,6 +39,8 @@ type MockDeployCLI struct {
 	InteractiveLoginMCPError     error
 	ComposeUpResponse            *defangv1.DeployResponse
 	Project                      *compose.Project
+	DeployedProject              *compose.Project
+	UseRealLoader                bool
 	CallLog                      []string
 }
 
@@ -66,13 +68,17 @@ func (m *MockDeployCLI) ComposeUp(ctx context.Context, fabric *client.GrpcClient
 	if m.ComposeUpError != nil {
 		return nil, nil, m.ComposeUpError
 	}
-	return m.ComposeUpResponse, m.Project, nil
+	m.DeployedProject = params.Project
+	return m.ComposeUpResponse, params.Project, nil
 }
 
 func (m *MockDeployCLI) LoadProject(ctx context.Context, loader client.Loader) (*compose.Project, error) {
 	m.CallLog = append(m.CallLog, "LoadProject")
 	if m.LoadProjectError != nil {
 		return nil, m.LoadProjectError
+	}
+	if m.UseRealLoader {
+		return loader.LoadProject(ctx)
 	}
 	return m.Project, nil
 }
@@ -209,4 +215,44 @@ func TestHandleDeployTool(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHandleDeployToolReloadsProjectWithSelectedContext(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	require.NoError(t, os.Mkdir("app", 0o755))
+	require.NoError(t, os.WriteFile("app/compose.yaml", []byte(`name: agent-interpolation
+services:
+  web:
+    image: alpine
+    environment:
+      PROVIDER: ${DEFANG_PROVIDER}
+      STACK: ${DEFANG_STACK}
+`), 0o644))
+
+	loaderParams := common.LoaderParams{WorkingDirectory: "app"}
+	stack := &stacks.Parameters{Name: "production", Provider: client.ProviderAWS}
+	loader, err := common.ConfigureAgentLoader(loaderParams, stack)
+	require.NoError(t, err)
+	mockCLI := &MockDeployCLI{
+		UseRealLoader: true,
+		ComposeUpResponse: &defangv1.DeployResponse{
+			Etag: "test-etag",
+			Services: []*defangv1.ServiceInfo{
+				{Service: &defangv1.Service{Name: "web"}},
+			},
+		},
+	}
+
+	_, err = HandleDeployTool(t.Context(), loader, DeployParams{LoaderParams: loaderParams}, mockCLI, elicitations.NewController(&mockElicitationsClient{}), StackConfig{
+		FabricAddr: "test-cluster",
+		Stack:      stack,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, mockCLI.DeployedProject)
+	env := mockCLI.DeployedProject.Services["web"].Environment
+	require.NotNil(t, env["PROVIDER"])
+	require.NotNil(t, env["STACK"])
+	assert.Equal(t, "aws", *env["PROVIDER"])
+	assert.Equal(t, "production", *env["STACK"])
 }
