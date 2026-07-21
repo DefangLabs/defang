@@ -53,7 +53,7 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 	// load provider with selected stack
 	provider := cli.NewProvider(ctx, stack.Provider, sl.client, stack.Name)
 	loaderOptions := sl.opts.LoaderOptions
-	loaderOptions.EnvFileSuffixes = stackEnvFileSuffixes(stack)
+	loaderOptions.DefaultEnvFiles = stackEnvFiles(stack)
 	session := &Session{
 		Stack:    stack,
 		Loader:   compose.NewLoaderFromOptions(loaderOptions),
@@ -91,18 +91,18 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, str
 	return stack, whence, nil
 }
 
-// stackEnvFileSuffixes returns the env-file suffixes for the selected stack:
-// provider first, then stack name, so the more specific .env.<stack> file
-// overrides .env.<provider> (which in turn overrides the plain .env).
-func stackEnvFileSuffixes(stack *stacks.Parameters) []string {
-	var suffixes []string
+// stackEnvFiles returns the env files loaded by convention for the selected
+// stack: .env, then .env.<provider>, then .env.<stack>, so the more specific
+// file overrides the more generic ones.
+func stackEnvFiles(stack *stacks.Parameters) []string {
+	envFiles := []string{".env"}
 	if stack.Provider != "" && stack.Provider != client.ProviderAuto {
-		suffixes = append(suffixes, stack.Provider.String())
+		envFiles = append(envFiles, ".env."+stack.Provider.String())
 	}
 	if stack.Name != "" {
-		suffixes = append(suffixes, stack.Name)
+		envFiles = append(envFiles, ".env."+stack.Name)
 	}
-	return suffixes
+	return envFiles
 }
 
 func printProviderMismatchWarnings(ctx context.Context, provider client.ProviderID) {

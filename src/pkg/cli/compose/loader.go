@@ -40,11 +40,11 @@ type LoaderOptions struct {
 	ConfigPaths []string
 	ProjectName string
 	EnvFiles    []string
-	// EnvFileSuffixes selects env files by convention when no env file was set
-	// explicitly (via EnvFiles or COMPOSE_ENV_FILES): the default .env plus one
-	// .env.<suffix> per entry (e.g. the stack's provider and name), in order,
-	// so later files override earlier ones. Files that don't exist are skipped.
-	EnvFileSuffixes []string
+	// DefaultEnvFiles are candidate env files (names resolved against the project
+	// working directory) tried when no env file was set explicitly (via EnvFiles
+	// or COMPOSE_ENV_FILES). Files that don't exist are skipped, and later files
+	// override earlier ones. Unlike EnvFiles, these never fail on a missing file.
+	DefaultEnvFiles []string
 }
 
 type Loader struct {
@@ -172,11 +172,10 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 			envFiles = strings.Split(v, ",")
 		}
 	}
-	// Only when no env file was set explicitly, fall back to the convention-based
-	// default env files (.env plus .env.<provider>/.env.<stack>).
+	// Only when no env file was set explicitly, fall back to the default env files.
 	withEnvFiles := cli.WithEnvFiles(envFiles...)
-	if len(envFiles) == 0 && len(l.options.EnvFileSuffixes) > 0 {
-		withEnvFiles = withDefaultEnvFiles(l.options.EnvFileSuffixes)
+	if len(envFiles) == 0 && len(l.options.DefaultEnvFiles) > 0 {
+		withEnvFiles = withDefaultEnvFiles(l.options.DefaultEnvFiles)
 	}
 
 	// Based on how docker compose setup its own project options
@@ -239,11 +238,11 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 	)
 }
 
-// withDefaultEnvFiles selects env files by convention: the default .env plus one
-// .env.<suffix> per suffix, in order, so later files override earlier ones.
-// Unlike explicit --env-file values, files that don't exist are skipped,
-// mirroring how compose-go treats the default .env (see cli.WithEnvFiles).
-func withDefaultEnvFiles(suffixes []string) cli.ProjectOptionsFn {
+// withDefaultEnvFiles selects the env files from the given candidate names,
+// resolved against the project working directory, so later files override
+// earlier ones. Unlike explicit --env-file values, files that don't exist are
+// skipped, mirroring how compose-go treats the default .env (see cli.WithEnvFiles).
+func withDefaultEnvFiles(names []string) cli.ProjectOptionsFn {
 	return func(o *cli.ProjectOptions) error {
 		if v, ok := os.LookupEnv(consts.ComposeDisableDefaultEnvFile); ok {
 			if disabled, err := strconv.ParseBool(v); err != nil {
@@ -257,12 +256,8 @@ func withDefaultEnvFiles(suffixes []string) cli.ProjectOptionsFn {
 		if err != nil {
 			return err
 		}
-		names := []string{".env"}
-		for _, suffix := range suffixes {
-			names = append(names, ".env."+suffix)
-		}
 		var envFiles []string
-		for _, name := range slices.Compact(names) { // dedupe e.g. a stack named after its provider
+		for _, name := range slices.Compact(slices.Clone(names)) { // dedupe e.g. a stack named after its provider
 			path := filepath.Join(wd, name)
 			if s, err := os.Stat(path); err == nil && !s.IsDir() {
 				envFiles = append(envFiles, path)

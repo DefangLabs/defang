@@ -189,12 +189,12 @@ services:
 	}
 }
 
-// TestEnvFileSuffixes covers the convention-based env files: when no env file
-// is set explicitly (--env-file or COMPOSE_ENV_FILES), the loader layers .env
-// and one .env.<suffix> per EnvFileSuffixes entry (e.g. the stack's provider
-// and name), later files overriding earlier ones. Missing files are skipped.
-func TestEnvFileSuffixes(t *testing.T) {
-	const composeYAML = `name: envsuffixtest
+// TestDefaultEnvFiles covers the convention-based env files: when no env file
+// is set explicitly (--env-file or COMPOSE_ENV_FILES), the loader layers the
+// DefaultEnvFiles candidates (e.g. .env, .env.<provider>, .env.<stack>), later
+// files overriding earlier ones. Missing files are skipped.
+func TestDefaultEnvFiles(t *testing.T) {
+	const composeYAML = `name: envdefaultstest
 services:
   web:
     image: alpine
@@ -219,7 +219,7 @@ services:
 	writeFile(".env.mystack", "SOURCE=from_mystack\n")
 	flagEnv := writeFile("flag.env", "GREETING=from_flag\n")
 
-	// A sibling project without a base .env to verify suffix files load on their own.
+	// A sibling project without a base .env to verify the other default env files load on their own.
 	noDotenvDir := t.TempDir()
 	noDotenvCompose := filepath.Join(noDotenvDir, "compose.yaml")
 	if err := os.WriteFile(noDotenvCompose, []byte(composeYAML), 0o644); err != nil {
@@ -234,41 +234,41 @@ services:
 		composePath    string   // defaults to composePath
 		envFiles       []string // explicit --env-file (LoaderOptions.EnvFiles)
 		envVar         string   // COMPOSE_ENV_FILES; "" means unset
-		suffixes       []string
+		defaultFiles   []string
 		disableEnvFile bool // COMPOSE_DISABLE_ENV_FILE
 		expected       map[string]string
 	}{
 		{
-			name:     "suffix files layer over .env, most specific wins",
-			suffixes: []string{"aws", "mystack"},
-			expected: map[string]string{"BASE": "from_dotenv", "GREETING": "from_aws", "SOURCE": "from_mystack"},
+			name:         "default env files layer, most specific wins",
+			defaultFiles: []string{".env", ".env.aws", ".env.mystack"},
+			expected:     map[string]string{"BASE": "from_dotenv", "GREETING": "from_aws", "SOURCE": "from_mystack"},
 		},
 		{
-			name:     "missing suffix files are skipped",
-			suffixes: []string{"gcp", "mystack"},
-			expected: map[string]string{"BASE": "from_dotenv", "GREETING": "from_dotenv", "SOURCE": "from_mystack"},
+			name:         "missing default env files are skipped",
+			defaultFiles: []string{".env", ".env.gcp", ".env.mystack"},
+			expected:     map[string]string{"BASE": "from_dotenv", "GREETING": "from_dotenv", "SOURCE": "from_mystack"},
 		},
 		{
-			name:        "suffix files load even without a base .env",
-			composePath: noDotenvCompose,
-			suffixes:    []string{"aws", "mystack"},
-			expected:    map[string]string{"BASE": "${BASE}", "GREETING": "${GREETING}", "SOURCE": "from_mystack"},
+			name:         "stack env file loads even without a base .env",
+			composePath:  noDotenvCompose,
+			defaultFiles: []string{".env", ".env.aws", ".env.mystack"},
+			expected:     map[string]string{"BASE": "${BASE}", "GREETING": "${GREETING}", "SOURCE": "from_mystack"},
 		},
 		{
-			name:     "explicit env-file overrides the convention",
-			envFiles: []string{flagEnv},
-			suffixes: []string{"aws", "mystack"},
-			expected: map[string]string{"BASE": "${BASE}", "GREETING": "from_flag", "SOURCE": "${SOURCE}"},
+			name:         "explicit env-file overrides the convention",
+			envFiles:     []string{flagEnv},
+			defaultFiles: []string{".env", ".env.aws", ".env.mystack"},
+			expected:     map[string]string{"BASE": "${BASE}", "GREETING": "from_flag", "SOURCE": "${SOURCE}"},
 		},
 		{
-			name:     "COMPOSE_ENV_FILES overrides the convention",
-			envVar:   flagEnv,
-			suffixes: []string{"aws", "mystack"},
-			expected: map[string]string{"BASE": "${BASE}", "GREETING": "from_flag", "SOURCE": "${SOURCE}"},
+			name:         "COMPOSE_ENV_FILES overrides the convention",
+			envVar:       flagEnv,
+			defaultFiles: []string{".env", ".env.aws", ".env.mystack"},
+			expected:     map[string]string{"BASE": "${BASE}", "GREETING": "from_flag", "SOURCE": "${SOURCE}"},
 		},
 		{
 			name:           "COMPOSE_DISABLE_ENV_FILE disables the convention",
-			suffixes:       []string{"aws", "mystack"},
+			defaultFiles:   []string{".env", ".env.aws", ".env.mystack"},
 			disableEnvFile: true,
 			expected:       map[string]string{"BASE": "${BASE}", "GREETING": "${GREETING}", "SOURCE": "${SOURCE}"},
 		},
@@ -291,7 +291,7 @@ services:
 			loader := NewLoaderFromOptions(LoaderOptions{
 				ConfigPaths:     []string{path},
 				EnvFiles:        tt.envFiles,
-				EnvFileSuffixes: tt.suffixes,
+				DefaultEnvFiles: tt.defaultFiles,
 			})
 			p, err := loader.LoadProject(t.Context())
 			if err != nil {
@@ -309,9 +309,9 @@ services:
 		})
 	}
 
-	t.Run("duplicate suffixes are deduped", func(t *testing.T) {
+	t.Run("duplicate names are deduped", func(t *testing.T) {
 		// e.g. a stack named after its provider; the shared file must be loaded once
-		fn := withDefaultEnvFiles([]string{"aws", "aws"})
+		fn := withDefaultEnvFiles([]string{".env", ".env.aws", ".env.aws"})
 		o := &cli.ProjectOptions{WorkingDir: dir}
 		if err := fn(o); err != nil {
 			t.Fatal(err)
