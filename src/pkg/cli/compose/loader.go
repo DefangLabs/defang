@@ -259,7 +259,14 @@ func withDefaultEnvFiles(names []string) cli.ProjectOptionsFn {
 		var envFiles []string
 		for _, name := range slices.Compact(slices.Clone(names)) { // dedupe e.g. a stack named after its provider
 			path := filepath.Join(wd, name)
-			if s, err := os.Stat(path); err == nil && !s.IsDir() {
+			s, err := os.Stat(path)
+			if err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					continue // missing default env files are optional
+				}
+				return fmt.Errorf("default env file: %w", err)
+			}
+			if !s.IsDir() {
 				envFiles = append(envFiles, path)
 			}
 		}

@@ -309,6 +309,20 @@ services:
 		})
 	}
 
+	t.Run("stat errors other than not-exist are returned", func(t *testing.T) {
+		if os.Getuid() == 0 {
+			t.Skip("root ignores directory permissions")
+		}
+		unreadable := filepath.Join(t.TempDir(), "unreadable")
+		if err := os.Mkdir(unreadable, 0o000); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(unreadable, 0o755) }) // let TempDir cleanup succeed
+		fn := withDefaultEnvFiles([]string{".env"})
+		err := fn(&cli.ProjectOptions{WorkingDir: unreadable})
+		assert.ErrorContains(t, err, "default env file")
+	})
+
 	t.Run("duplicate names are deduped", func(t *testing.T) {
 		// e.g. a stack named after its provider; the shared file must be loaded once
 		fn := withDefaultEnvFiles([]string{".env", ".env.aws", ".env.aws"})
