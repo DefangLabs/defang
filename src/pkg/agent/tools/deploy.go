@@ -13,7 +13,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/modes"
-	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
@@ -22,14 +21,6 @@ type DeployParams struct {
 }
 
 func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
-	term.Debug("Function invoked: loader.LoadProject")
-	project, err := cli.LoadProject(ctx, loader)
-	if err != nil {
-		err = fmt.Errorf("failed to parse compose file: %w", err)
-
-		return "", fmt.Errorf("local deployment failed: %v. Please provide a valid compose file path.", err)
-	}
-
 	term.Debug("Function invoked: cli.Connect")
 	client, err := GetClientWithRetry(ctx, cli, sc.FabricAddr)
 	if err != nil {
@@ -40,15 +31,17 @@ func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployPa
 		return "", err
 	}
 
-	workingDir, _ := loader.ProjectWorkingDir(ctx)
-	sm, err := stacks.NewManager(client, workingDir, params.ProjectName, ec)
+	provider, loader, err := setupProviderAndLoader(ctx, loader, params.LoaderParams, cli, ec, client, sc)
 	if err != nil {
-		return "", fmt.Errorf("failed to create stack manager: %w", err)
+		return "", err
 	}
-	pp := NewProviderPreparer(cli, ec, client, sm)
-	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
+
+	term.Debug("Function invoked: loader.LoadProject")
+	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
-		return "", fmt.Errorf("failed to setup provider: %w", err)
+		err = fmt.Errorf("failed to parse compose file: %w", err)
+
+		return "", fmt.Errorf("local deployment failed: %v. Please provide a valid compose file path.", err)
 	}
 
 	err = cli.CanIUseProvider(ctx, client, provider, project.Name, len(project.Services))

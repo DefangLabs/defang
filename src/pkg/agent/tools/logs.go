@@ -12,7 +12,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/logs"
-	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
 )
@@ -51,15 +50,9 @@ func HandleLogsTool(ctx context.Context, loader client.Loader, params LogsParams
 		return "", err
 	}
 
-	workingDir, _ := loader.ProjectWorkingDir(ctx)
-	sm, err := stacks.NewManager(client, workingDir, params.ProjectName, ec)
+	provider, loader, err := setupProviderAndLoader(ctx, loader, params.LoaderParams, cli, ec, client, sc)
 	if err != nil {
-		return "", fmt.Errorf("failed to create stack manager: %w", err)
-	}
-	pp := NewProviderPreparer(cli, ec, client, sm)
-	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
-	if err != nil {
-		return "", fmt.Errorf("failed to setup provider: %w", err)
+		return "", err
 	}
 
 	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")

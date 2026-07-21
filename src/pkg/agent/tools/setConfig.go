@@ -11,7 +11,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
-	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
@@ -33,15 +32,9 @@ func HandleSetConfig(ctx context.Context, loader client.Loader, params SetConfig
 		return "", err
 	}
 
-	workingDir, _ := loader.ProjectWorkingDir(ctx)
-	sm, err := stacks.NewManager(client, workingDir, params.ProjectName, ec)
+	provider, loader, err := setupProviderAndLoader(ctx, loader, params.LoaderParams, cliInterface, ec, client, sc)
 	if err != nil {
-		return "", fmt.Errorf("failed to create stack manager: %w", err)
-	}
-	pp := NewProviderPreparer(cliInterface, ec, client, sm)
-	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
-	if err != nil {
-		return "", fmt.Errorf("failed to setup provider: %w", err)
+		return "", err
 	}
 
 	if params.ProjectName == "" {

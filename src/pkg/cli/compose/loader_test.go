@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -8,11 +9,59 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestResolveProjectWorkingDirDoesNotLoadOrCacheProject(t *testing.T) {
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	require.NoError(t, os.WriteFile(composePath, []byte("services: ["), 0o644))
+
+	loader := NewLoader(WithPath(composePath))
+	workingDir, err := loader.ResolveProjectWorkingDir(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, dir, workingDir)
+	assert.Nil(t, loader.cached)
+
+	require.NoError(t, os.WriteFile(composePath, []byte("services:\n  web:\n    image: alpine\n"), 0o644))
+	project, err := loader.LoadProject(t.Context())
+	require.NoError(t, err)
+	assert.Contains(t, project.Services, "web")
+
+	require.NoError(t, os.Remove(composePath))
+	workingDir, err = loader.ResolveProjectWorkingDir(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, dir, workingDir)
+}
+
+func TestResolveProjectWorkingDirDoesNotSuppressProjectWarnings(t *testing.T) {
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	require.NoError(t, os.WriteFile(composePath, []byte(`services:
+  web:
+    image: alpine
+    environment:
+      VALUE: ${IGNORED_VALUE}
+`), 0o644))
+	t.Setenv("IGNORED_VALUE", "ignored")
+
+	oldTerm := term.DefaultTerm
+	t.Cleanup(func() { term.DefaultTerm = oldTerm })
+	var output bytes.Buffer
+	term.DefaultTerm = term.NewTerm(os.Stdin, &output, &output)
+
+	loader := NewLoader(WithPath(composePath))
+	_, err := loader.ResolveProjectWorkingDir(t.Context())
+	require.NoError(t, err)
+	_, err = loader.LoadProject(t.Context())
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, strings.Count(output.String(), `Environment variable "IGNORED_VALUE" is ignored`))
+}
 
 func TestLoader(t *testing.T) {
 	testAllComposeFiles(t, func(t *testing.T, name, path string) {
