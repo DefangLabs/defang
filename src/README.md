@@ -62,3 +62,17 @@ The Defang CLI recognizes the following environment variables:
 Environment variables will be loaded from a `.defang` file in the current directory, if it exists. This file follows
 the same format as a `.env` file: `KEY=VALUE` pairs on each line, lines starting with `#` are treated as comments and ignored.
 
+### Compose interpolation
+
+After selecting a stack, the CLI makes the resolved `DEFANG_PROVIDER` and `DEFANG_STACK` values available for Compose
+interpolation. They are not injected into services automatically; reference them explicitly where needed:
+
+```yaml
+services:
+  app:
+    environment:
+      PUBLISH_PROVIDER: "${DEFANG_PROVIDER}"
+      PUBLISH_STACK: "${DEFANG_STACK}"
+```
+
+The resolved values take precedence over values with the same names in Compose env files.

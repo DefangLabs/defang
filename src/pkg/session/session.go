@@ -54,6 +54,10 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 	provider := cli.NewProvider(ctx, stack.Provider, sl.client, stack.Name)
 	loaderOptions := sl.opts.LoaderOptions
 	loaderOptions.DefaultEnvFiles = stackEnvFiles(stack)
+	loaderOptions.InterpolationEnv = map[string]string{
+		"DEFANG_PROVIDER": stack.Provider.String(),
+		"DEFANG_STACK":    stack.Name,
+	}
 	session := &Session{
 		Stack:    stack,
 		Loader:   compose.NewLoaderFromOptions(loaderOptions),

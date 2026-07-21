@@ -40,6 +40,9 @@ type LoaderOptions struct {
 	ConfigPaths []string
 	ProjectName string
 	EnvFiles    []string
+	// InterpolationEnv contains values supplied by the CLI for Compose
+	// interpolation. These values take precedence over values from env files.
+	InterpolationEnv map[string]string
 	// DefaultEnvFiles are candidate env files (names resolved against the project
 	// working directory) tried when no env file was set explicitly (via EnvFiles
 	// or COMPOSE_ENV_FILES). Files that don't exist are skipped, and later files
@@ -160,6 +163,10 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 	onlyComposeEnv := slices.DeleteFunc(os.Environ(), func(kv string) bool {
 		return !strings.HasPrefix(kv, "COMPOSE_") // only keep COMPOSE_* variables
 	})
+	interpolationEnv := composeTypes.NewMapping(onlyComposeEnv)
+	for name, value := range l.options.InterpolationEnv {
+		interpolationEnv[name] = value
+	}
 
 	// The explicit --env-file(s) win; otherwise fall back to COMPOSE_ENV_FILES,
 	// symmetric to how ConfigPaths overrides COMPOSE_FILE (cli.WithConfigFileEnv)
@@ -183,7 +190,7 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 	return cli.NewProjectOptions(l.options.ConfigPaths,
 		// First apply os.Environment, always win
 		// -- DISABLED FOR DEFANG -- cli.WithOsEnv,
-		cli.WithEnv(onlyComposeEnv),
+		cli.WithEnv(interpolationEnv.Values()),
 		// Load the explicit --env-file(s), or the convention-based/default .env files if none were set
 		withEnvFiles,
 		// read dot env file to populate project environment

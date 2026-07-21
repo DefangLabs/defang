@@ -3,11 +3,13 @@ package session
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/stretchr/testify/assert"
@@ -260,4 +262,39 @@ func TestLoadSession(t *testing.T) {
 			sm.AssertExpectations(t)
 		})
 	}
+}
+
+func TestLoadSessionSetsInterpolationEnv(t *testing.T) {
+	const composeYAML = `name: sessioninterpolationtest
+services:
+  web:
+    image: alpine
+    environment:
+      - PROVIDER=${DEFANG_PROVIDER}
+      - STACK=${DEFANG_STACK}
+`
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	require.NoError(t, os.WriteFile(composePath, []byte(composeYAML), 0o644))
+	t.Setenv("DEFANG_PROVIDER", "aws")
+
+	ctx := t.Context()
+	stack := &stacks.Parameters{Name: "production", Provider: client.ProviderDefang}
+	sm := &mockStacksManager{}
+	sm.On("GetStack", ctx, mock.Anything).Return(stack, "local", nil)
+	loader := NewSessionLoader(client.MockFabricClient{}, sm, SessionLoaderOptions{
+		LoaderOptions: compose.LoaderOptions{ConfigPaths: []string{composePath}},
+	})
+
+	session, err := loader.LoadSession(ctx)
+	require.NoError(t, err)
+	project, err := session.Loader.LoadProject(ctx)
+	require.NoError(t, err)
+
+	env := project.Services["web"].Environment
+	require.NotNil(t, env["PROVIDER"])
+	require.NotNil(t, env["STACK"])
+	assert.Equal(t, "defang", *env["PROVIDER"])
+	assert.Equal(t, "production", *env["STACK"])
+	sm.AssertExpectations(t)
 }
