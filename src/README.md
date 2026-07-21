@@ -44,13 +44,14 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_MODEL_ID` - The model ID of the LLM to use for the generate/debug AI integration (Pro users only)
 - `DEFANG_NO_CACHE` - If set to `true`, disables pull-through caching of container images; defaults to `false`
 - `DEFANG_PREFIX` - The prefix to use for all BYOC resources; defaults to `Defang`
-- `DEFANG_PROVIDER` - The name of the cloud provider to use, `auto` (default), `aws`, `digitalocean`, `gcp`, or `defang`
+- `DEFANG_PROVIDER` - The name of the cloud provider to use, `auto` (default), `aws`, `azure`, `digitalocean`, `gcp`, or `defang`
 - `DEFANG_PULUMI_BACKEND` - The Pulumi backend URL or `"pulumi-cloud"`; defaults to a self-hosted backend
 - `DEFANG_PULUMI_DEBUG` - If set to `true`, enables debug logging for Pulumi operations; defaults to `false`
 - `DEFANG_PULUMI_DIFF` - If set to `true`, shows the Pulumi diff during deployments; defaults to `false`
 - `DEFANG_PULUMI_DIR` - Run Pulumi from this folder, instead of spawning a cloud task; requires `--debug` (BYOC only)
 - `DEFANG_PULUMI_VERSION` - Override the version of the Pulumi image to use (`aws` provider only)
 - `DEFANG_RECIPE` - The deployment mode / recipe to use; defaults to `AFFORDABLE`
+- `DEFANG_STACK` - The name of the stack to use
 - `DEFANG_SUFFIX` - The suffix to use for all BYOC resources; defaults to the stack name, or `beta` if unset.
 - `DEFANG_WORKSPACE` - The workspace (name or ID) to use; preferred way to select which workspace the CLI uses
 - `NO_COLOR` - If set to any value, disables color output; by default, color output is enabled depending on the terminal
@@ -75,4 +76,5 @@ services:
       PUBLISH_STACK: "${DEFANG_STACK}"
 ```
 
-The resolved values take precedence over values with the same names in Compose env files.
+The resolved values take precedence over values with the same names in Compose env files. Fields that Compose must decode
+before stack selection should provide a default, such as `${DEFANG_PROVIDER:-auto}`.

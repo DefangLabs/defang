@@ -28,7 +28,7 @@ type LoaderParams struct {
 	ComposeFilePaths []string `json:"compose_file_paths,omitempty" jsonschema:"description=Optional: Paths to the compose files to use for the project. If not provided, defaults to the compose file in the working directory."`
 }
 
-func ConfigureAgentLoader(params LoaderParams) (*compose.Loader, error) {
+func ConfigureAgentLoader(params LoaderParams, opts ...compose.LoaderOption) (*compose.Loader, error) {
 	if params.WorkingDirectory == "" {
 		params.WorkingDirectory = "."
 	}
@@ -44,13 +44,13 @@ func ConfigureAgentLoader(params LoaderParams) (*compose.Loader, error) {
 	if projectName != "" {
 		term.Debugf("Project name provided: %s", projectName)
 		term.Debug("Function invoked: compose.NewLoader")
-		return compose.NewLoader(compose.WithProjectName(projectName)), nil
+		return compose.NewLoader(append(opts, compose.WithProjectName(projectName))...), nil
 	}
 	composeFilePaths := params.ComposeFilePaths
 	if len(composeFilePaths) > 0 {
 		term.Debugf("Compose file paths provided: %s", composeFilePaths)
 		term.Debug("Function invoked: compose.NewLoader")
-		return compose.NewLoader(compose.WithPath(composeFilePaths...)), nil
+		return compose.NewLoader(append(opts, compose.WithPath(composeFilePaths...))...), nil
 	}
 
 	//TODO: Talk about using both project name and compose file paths
@@ -60,5 +60,5 @@ func ConfigureAgentLoader(params LoaderParams) (*compose.Loader, error) {
 	// }
 
 	term.Debug("Function invoked: compose.NewLoader")
-	return compose.NewLoader(), nil
+	return compose.NewLoader(opts...), nil
 }
