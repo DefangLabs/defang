@@ -79,6 +79,12 @@ func WithEnvFiles(paths ...string) LoaderOption {
 	}
 }
 
+func WithDefaultEnvFiles(paths ...string) LoaderOption {
+	return func(o *LoaderOptions) {
+		o.DefaultEnvFiles = paths
+	}
+}
+
 // WithInterpolationEnv adds CLI-supplied values to the Compose interpolation
 // environment. These values take precedence over values from env files.
 func WithInterpolationEnv(env map[string]string) LoaderOption {

@@ -23,7 +23,7 @@ type DeployParams struct {
 
 func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
-	_, err := cli.LoadProject(ctx, loader)
+	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
 		err = fmt.Errorf("failed to parse compose file: %w", err)
 
@@ -49,20 +49,6 @@ func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployPa
 	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
-	}
-
-	finalLoaderParams := params.LoaderParams
-	finalLoaderParams.WorkingDirectory = workingDir
-	loader, err = common.ConfigureAgentLoader(finalLoaderParams, compose.WithInterpolationEnv(map[string]string{
-		"DEFANG_PROVIDER": sc.Stack.Provider.String(),
-		"DEFANG_STACK":    sc.Stack.Name,
-	}))
-	if err != nil {
-		return "", fmt.Errorf("failed to configure loader: %w", err)
-	}
-	project, err := cli.LoadProject(ctx, loader)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse compose file with selected stack: %w", err)
 	}
 
 	err = cli.CanIUseProvider(ctx, client, provider, project.Name, len(project.Services))

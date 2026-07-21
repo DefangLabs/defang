@@ -208,7 +208,6 @@ func TestHandleDeployTool(t *testing.T) {
 					"LoadProject",
 					"Connect(test-cluster)",
 					"NewProvider(aws)",
-					"LoadProject",
 					"CanIUseProvider",
 					"ComposeUp",
 				}
@@ -232,7 +231,8 @@ services:
 `), 0o644))
 
 	loaderParams := common.LoaderParams{WorkingDirectory: "app"}
-	loader, err := common.ConfigureAgentLoader(loaderParams)
+	stack := &stacks.Parameters{Name: "production", Provider: client.ProviderAWS}
+	loader, err := common.ConfigureAgentLoader(loaderParams, stack)
 	require.NoError(t, err)
 	mockCLI := &MockDeployCLI{
 		UseRealLoader: true,
@@ -243,7 +243,6 @@ services:
 			},
 		},
 	}
-	stack := &stacks.Parameters{Name: "production", Provider: client.ProviderAWS}
 
 	_, err = HandleDeployTool(t.Context(), loader, DeployParams{LoaderParams: loaderParams}, mockCLI, elicitations.NewController(&mockElicitationsClient{}), StackConfig{
 		FabricAddr: "test-cluster",
