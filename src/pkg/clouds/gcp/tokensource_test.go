@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/http"
 	"net/url"
 	"testing"
 	"time"
@@ -78,6 +79,25 @@ func TestRetryingTokenSource_GivesUpAfterMaxAttempts(t *testing.T) {
 	}
 }
 
+func TestRetryingTokenSource_RetriesOnServerError503(t *testing.T) {
+	want := &oauth2.Token{AccessToken: "ok"}
+	// A transient 503 from the STS/token endpoint arrives as a plain string error.
+	transient := errors.New("credentials: status code 503: upstream connect error")
+	stub := newStub(want, transient)
+
+	r := &retryingTokenSource{inner: stub, sleep: func(time.Duration) {}}
+	got, err := r.Token()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+	if stub.calls != 2 {
+		t.Errorf("inner.Token called %d times, want 2", stub.calls)
+	}
+}
+
 func TestRetryingTokenSource_DoesNotRetryPermanent(t *testing.T) {
 	perm := errors.New("invalid_grant: refresh token expired")
 	stub := newStub(nil, perm)
@@ -106,6 +126,17 @@ func TestIsTransientTokenError(t *testing.T) {
 		{"net op error", &net.OpError{Op: "dial", Err: errors.New("connection refused")}, true},
 		{"url error wrapping plain", &url.Error{Op: "Post", URL: "https://x", Err: errors.New("EOF")}, true},
 		{"permanent oauth", errors.New("invalid_grant"), false},
+		// STS / external-account exchange (WIF) reports a plain "status code N" error.
+		{"sts 503 string", errors.New("oauth2/google: status code 503: upstream connect error"), true},
+		{"auth 503 string", errors.New("credentials: status code 503: upstream connect error or disconnect/reset before headers"), true},
+		{"sts 429 string", errors.New("oauth2/google: status code 429: rate limited"), true},
+		{"sts 408 string", errors.New("oauth2/google: status code 408: request timeout"), true},
+		{"sts 400 string not retried", errors.New("oauth2/google: status code 400: invalid_request"), false},
+		{"sts 401 string not retried", errors.New("credentials: status code 401: unauthorized"), false},
+		// Standard OAuth2 refresh surfaces non-2xx as a typed RetrieveError.
+		{"retrieve error 503", &oauth2.RetrieveError{Response: &http.Response{StatusCode: 503}}, true},
+		{"retrieve error 429", &oauth2.RetrieveError{Response: &http.Response{StatusCode: 429}}, true},
+		{"retrieve error 400", &oauth2.RetrieveError{Response: &http.Response{StatusCode: 400}}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
