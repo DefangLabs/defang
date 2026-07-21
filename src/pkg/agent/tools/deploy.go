@@ -23,7 +23,7 @@ type DeployParams struct {
 
 func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
-	project, err := cli.LoadProject(ctx, loader)
+	_, err := cli.LoadProject(ctx, loader)
 	if err != nil {
 		err = fmt.Errorf("failed to parse compose file: %w", err)
 
@@ -60,7 +60,7 @@ func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployPa
 	if err != nil {
 		return "", fmt.Errorf("failed to configure loader: %w", err)
 	}
-	project, err = cli.LoadProject(ctx, loader)
+	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse compose file with selected stack: %w", err)
 	}
