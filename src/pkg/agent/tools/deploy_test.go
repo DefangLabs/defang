@@ -190,7 +190,6 @@ func TestHandleDeployTool(t *testing.T) {
 			tt.setupMock(mockCLI)
 
 			// Call the function
-			loader := &client.MockLoader{}
 			ec := elicitations.NewController(&mockElicitationsClient{
 				responses: map[string]string{
 					"strategy":     "profile",
@@ -206,7 +205,7 @@ func TestHandleDeployTool(t *testing.T) {
 					WorkingDirectory: ".",
 				},
 			}
-			result, err := HandleDeployTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
+			result, err := HandleDeployTool(t.Context(), params, mockCLI, ec, StackConfig{
 				FabricAddr: "test-cluster",
 				Stack:      &stack,
 			})
@@ -251,8 +250,6 @@ services:
 
 	loaderParams := common.LoaderParams{WorkingDirectory: "app"}
 	stack := &stacks.Parameters{Name: "production", Provider: client.ProviderAWS}
-	loader, err := common.ConfigureAgentLoader(loaderParams, stack)
-	require.NoError(t, err)
 	mockCLI := &MockDeployCLI{
 		UseRealLoader: true,
 		ComposeUpResponse: &defangv1.DeployResponse{
@@ -263,7 +260,7 @@ services:
 		},
 	}
 
-	_, err = HandleDeployTool(t.Context(), loader, DeployParams{LoaderParams: loaderParams}, mockCLI, elicitations.NewController(&mockElicitationsClient{}), StackConfig{
+	_, err := HandleDeployTool(t.Context(), DeployParams{LoaderParams: loaderParams}, mockCLI, elicitations.NewController(&mockElicitationsClient{}), StackConfig{
 		FabricAddr: "test-cluster",
 		Stack:      stack,
 	})
@@ -305,8 +302,6 @@ services:
 		ProjectName:      "agent-interpolation",
 	}
 	stack := &stacks.Parameters{Provider: client.ProviderAuto}
-	loader, err := common.ConfigureAgentLoader(loaderParams, stack)
-	require.NoError(t, err)
 	mockCLI := &MockDeployCLI{
 		Client:        fabric,
 		UseRealLoader: true,
@@ -321,7 +316,7 @@ services:
 		"stack": "production [aws us-test-2]",
 	}})
 
-	_, err = HandleDeployTool(t.Context(), loader, DeployParams{LoaderParams: loaderParams}, mockCLI, ec, StackConfig{
+	_, err := HandleDeployTool(t.Context(), DeployParams{LoaderParams: loaderParams}, mockCLI, ec, StackConfig{
 		FabricAddr: "test-cluster",
 		Stack:      stack,
 	})
@@ -365,8 +360,6 @@ services:
 
 	loaderParams := common.LoaderParams{WorkingDirectory: "app", ProjectName: "agent-interpolation"}
 	stack := &stacks.Parameters{Provider: client.ProviderAuto}
-	loader, err := common.ConfigureAgentLoader(loaderParams, stack)
-	require.NoError(t, err)
 	mockCLI := &MockDeployCLI{
 		Client:          newStackTestFabric(t),
 		UseRealLoader:   true,
@@ -383,7 +376,7 @@ services:
 		"TOKEN": "secret",
 	}})
 
-	_, err = HandleDeployTool(t.Context(), loader, DeployParams{LoaderParams: loaderParams}, mockCLI, ec, StackConfig{
+	_, err := HandleDeployTool(t.Context(), DeployParams{LoaderParams: loaderParams}, mockCLI, ec, StackConfig{
 		FabricAddr: "test-cluster",
 		Stack:      stack,
 	})

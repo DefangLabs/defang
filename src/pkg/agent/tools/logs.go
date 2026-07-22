@@ -2,14 +2,11 @@ package tools
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	"github.com/DefangLabs/defang/src/pkg/auth"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -23,7 +20,7 @@ type LogsParams struct {
 	Until        string `json:"until,omitempty" jsonschema:"description=Optional: Retrieve logs written before this time. Format as RFC3339 or duration (e.g., '2023-10-01T15:04:05Z' or '1h')."`
 }
 
-func HandleLogsTool(ctx context.Context, loader client.Loader, params LogsParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
+func HandleLogsTool(ctx context.Context, params LogsParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
 	var sinceTime, untilTime time.Time
 	var err error
 	now := time.Now()
@@ -40,19 +37,9 @@ func HandleLogsTool(ctx context.Context, loader client.Loader, params LogsParams
 		}
 	}
 
-	term.Debug("Function invoked: cli.Connect")
-	client, err := GetClientWithRetry(ctx, cli, sc.FabricAddr)
+	client, provider, loader, err := setupProviderAndLoader(ctx, params.LoaderParams, cli, ec, sc)
 	if err != nil {
-		var noBrowserErr auth.ErrNoBrowser
-		if errors.As(err, &noBrowserErr) {
-			return noBrowserErr.Error(), nil
-		}
-		return "", err
-	}
-
-	provider, loader, err := setupProviderAndLoader(ctx, loader, params.LoaderParams, cli, ec, client, sc)
-	if err != nil {
-		return "", err
+		return setupErrorResult(err)
 	}
 
 	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")

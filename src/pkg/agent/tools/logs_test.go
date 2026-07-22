@@ -53,7 +53,7 @@ func TestHandleLogsTool(t *testing.T) {
 	stack := &stacks.Parameters{Name: "production", Provider: client.ProviderAWS}
 	ec := elicitations.NewController(&mockElicitationsClient{})
 
-	result, err := HandleLogsTool(t.Context(), &client.MockLoader{}, LogsParams{
+	result, err := HandleLogsTool(t.Context(), LogsParams{
 		LoaderParams: common.LoaderParams{WorkingDirectory: "."},
 		DeploymentID: "deployment-123",
 		Since:        "1h",

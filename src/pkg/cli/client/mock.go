@@ -332,10 +332,6 @@ func (m MockLoader) ProjectWorkingDir(context.Context) (string, error) {
 	return ".", nil
 }
 
-func (m MockLoader) ResolveProjectWorkingDir(context.Context) (string, error) {
-	return ".", nil
-}
-
 func (m MockLoader) CreateProjectForDebug() (*composeTypes.Project, error) {
 	return &m.Project, m.Error
 }

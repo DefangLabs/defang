@@ -258,7 +258,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			os.Unsetenv("DEFANG_PROVIDER")
 			os.Unsetenv("AWS_PROFILE")
 			os.Unsetenv("AWS_REGION")
-			loader := &client.MockLoader{}
 			ec := elicitations.NewController(&mockElicitationsClient{
 				responses: map[string]string{
 					"strategy":     "profile",
@@ -274,7 +273,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 					WorkingDirectory: ".",
 				},
 			}
-			result, err := HandleServicesTool(t.Context(), loader, params, tt.mockCLI, ec, StackConfig{
+			result, err := HandleServicesTool(t.Context(), params, tt.mockCLI, ec, StackConfig{
 				FabricAddr: "test-cluster",
 				Stack:      &stack,
 			})
@@ -326,8 +325,6 @@ services:
 
 	loaderParams := common.LoaderParams{WorkingDirectory: "app", ProjectName: "agent-interpolation"}
 	stack := &stacks.Parameters{Provider: client.ProviderAuto}
-	loader, err := common.ConfigureAgentLoader(loaderParams, stack)
-	require.NoError(t, err)
 	mockCLI := &MockCLI{
 		MockClient:    newStackTestFabric(t),
 		MockProvider:  client.MockProvider{},
@@ -337,7 +334,7 @@ services:
 		"stack": "production [aws]",
 	}})
 
-	_, err = HandleServicesTool(t.Context(), loader, ServicesParams{LoaderParams: loaderParams}, mockCLI, ec, StackConfig{
+	_, err := HandleServicesTool(t.Context(), ServicesParams{LoaderParams: loaderParams}, mockCLI, ec, StackConfig{
 		FabricAddr: "test-cluster",
 		Stack:      stack,
 	})

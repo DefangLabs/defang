@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"errors"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -37,7 +36,7 @@ func newStackTestFabric(t *testing.T) *client.GrpcClient {
 	return client.NewGrpcClient(strings.TrimPrefix(server.URL, "http://"), "", types.TenantUnset)
 }
 
-func TestSetupProviderAndLoaderReusesLoaderWhenContextIsUnchanged(t *testing.T) {
+func TestSetupProviderAndLoaderKeepsUnchangedStack(t *testing.T) {
 	tests := []struct {
 		name      string
 		stack     stacks.Parameters
@@ -58,14 +57,13 @@ func TestSetupProviderAndLoaderReusesLoaderWhenContextIsUnchanged(t *testing.T) 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			loader := &client.MockLoader{}
 			ec := elicitations.NewController(&mockElicitationsClient{})
 			ec.SetSupported(tt.supported)
 			stack := tt.stack
 
-			_, finalLoader, err := setupProviderAndLoader(t.Context(), loader, common.LoaderParams{}, &MockDeployCLI{}, ec, &client.GrpcClient{}, StackConfig{Stack: &stack})
+			_, _, loader, err := setupProviderAndLoader(t.Context(), common.LoaderParams{}, &MockDeployCLI{}, ec, StackConfig{Stack: &stack})
 			require.NoError(t, err)
-			assert.Same(t, loader, finalLoader)
+			assert.NotNil(t, loader)
 			assert.Equal(t, tt.stack, stack)
 		})
 	}
@@ -131,17 +129,22 @@ services:
 			params := tt.params(root, app)
 			params.ProjectName = "agent-interpolation"
 			stack := &stacks.Parameters{Provider: client.ProviderAuto}
-			loader, err := common.ConfigureAgentLoader(params, stack)
-			require.NoError(t, err)
 			ec := elicitations.NewController(&mockElicitationsClient{responses: map[string]string{
 				"stack": "production [aws]",
 			}})
 
-			_, finalLoader, err := setupProviderAndLoader(t.Context(), loader, params, &MockDeployCLI{}, ec, newStackTestFabric(t), StackConfig{Stack: stack})
+			_, _, finalLoader, err := setupProviderAndLoader(t.Context(), params, &MockDeployCLI{Client: newStackTestFabric(t)}, ec, StackConfig{Stack: stack})
 			require.NoError(t, err)
 			project, err := finalLoader.LoadProject(t.Context())
 			require.NoError(t, err)
-			assert.Equal(t, app, project.WorkingDir)
+			// Resolve symlinks so the comparison is stable on macOS, where the
+			// temp dir is a /var -> /private/var symlink and os.Getwd may
+			// return either form.
+			wantDir, err := filepath.EvalSymlinks(app)
+			require.NoError(t, err)
+			gotDir, err := filepath.EvalSymlinks(project.WorkingDir)
+			require.NoError(t, err)
+			assert.Equal(t, wantDir, gotDir)
 			env := project.Services["web"].Environment
 			require.NotNil(t, env["PROVIDER"])
 			require.NotNil(t, env["STACK"])
@@ -149,28 +152,4 @@ services:
 			assert.Equal(t, "production", *env["STACK"])
 		})
 	}
-}
-
-type loaderWithoutResolver struct {
-	client.Loader
-}
-
-type failingResolverLoader struct {
-	client.Loader
-}
-
-func (failingResolverLoader) ResolveProjectWorkingDir(context.Context) (string, error) {
-	return "", errors.New("resolve failed")
-}
-
-func TestSetupProviderAndLoaderRejectsUnresolvableLoaders(t *testing.T) {
-	t.Chdir(t.TempDir())
-	stack := &stacks.Parameters{Name: "production", Provider: client.ProviderAWS}
-	ec := elicitations.NewController(&mockElicitationsClient{})
-
-	_, _, err := setupProviderAndLoader(t.Context(), loaderWithoutResolver{Loader: &client.MockLoader{}}, common.LoaderParams{}, &MockDeployCLI{}, ec, &client.GrpcClient{}, StackConfig{Stack: stack})
-	assert.EqualError(t, err, "loader tools.loaderWithoutResolver does not support resolving the project working directory")
-
-	_, _, err = setupProviderAndLoader(t.Context(), failingResolverLoader{Loader: &client.MockLoader{}}, common.LoaderParams{}, &MockDeployCLI{}, ec, &client.GrpcClient{}, StackConfig{Stack: stack})
-	assert.EqualError(t, err, "failed to get project working directory: resolve failed")
 }

@@ -7,73 +7,68 @@ import (
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	"github.com/DefangLabs/defang/src/pkg/auth"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 type DeployParams struct {
 	common.LoaderParams
 }
 
-func HandleDeployTool(ctx context.Context, loader client.Loader, params DeployParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
-	term.Debug("Function invoked: cli.Connect")
-	client, err := GetClientWithRetry(ctx, cli, sc.FabricAddr)
+func HandleDeployTool(ctx context.Context, params DeployParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
+	client, provider, loader, err := setupProviderAndLoader(ctx, params.LoaderParams, cli, ec, sc)
 	if err != nil {
-		var noBrowserErr auth.ErrNoBrowser
-		if errors.As(err, &noBrowserErr) {
-			return noBrowserErr.Error(), nil
+		return setupErrorResult(err)
+	}
+
+	// Retry loop so the missing-config elicitation can try again with the same
+	// loader (and its cached project).
+	var deployResp *defangv1.DeployResponse
+	for {
+		term.Debug("Function invoked: loader.LoadProject")
+		project, err := cli.LoadProject(ctx, loader)
+		if err != nil {
+			err = fmt.Errorf("failed to parse compose file: %w", err)
+
+			return "", fmt.Errorf("local deployment failed: %v. Please provide a valid compose file path.", err)
 		}
-		return "", err
-	}
 
-	provider, loader, err := setupProviderAndLoader(ctx, loader, params.LoaderParams, cli, ec, client, sc)
-	if err != nil {
-		return "", err
-	}
+		err = cli.CanIUseProvider(ctx, client, provider, project.Name, len(project.Services))
+		if err != nil {
+			return "", fmt.Errorf("failed to use provider: %w", err)
+		}
 
-	term.Debug("Function invoked: loader.LoadProject")
-	project, err := cli.LoadProject(ctx, loader)
-	if err != nil {
-		err = fmt.Errorf("failed to parse compose file: %w", err)
+		// Deploy the services
+		term.Debugf("Deploying services for project %s...", project.Name)
 
-		return "", fmt.Errorf("local deployment failed: %v. Please provide a valid compose file path.", err)
-	}
+		term.Debug("Function invoked: cli.ComposeUp")
+		// Use ComposeUp to deploy the services
+		deployResp, project, err = cli.ComposeUp(ctx, client, provider, sc.Stack, cliTypes.ComposeUpParams{
+			Project:    project,
+			UploadMode: compose.UploadModeDigest,
+			Recipe:     modes.RecipeAffordable,
+		})
+		if err != nil {
+			err = fmt.Errorf("failed to compose up services: %w", err)
 
-	err = cli.CanIUseProvider(ctx, client, provider, project.Name, len(project.Services))
-	if err != nil {
-		return "", fmt.Errorf("failed to use provider: %w", err)
-	}
+			var missing compose.ErrMissingConfig
+			if errors.As(err, &missing) && ec.IsSupported() {
+				err := requestMissingConfig(ctx, ec, cli, provider, project.Name, missing)
+				if err != nil {
+					return "", fmt.Errorf("failed to request missing config: %w", err)
+				}
 
-	// Deploy the services
-	term.Debugf("Deploying services for project %s...", project.Name)
-
-	term.Debug("Function invoked: cli.ComposeUp")
-	// Use ComposeUp to deploy the services
-	deployResp, project, err := cli.ComposeUp(ctx, client, provider, sc.Stack, cliTypes.ComposeUpParams{
-		Project:    project,
-		UploadMode: compose.UploadModeDigest,
-		Recipe:     modes.RecipeAffordable,
-	})
-	if err != nil {
-		err = fmt.Errorf("failed to compose up services: %w", err)
-
-		var missing compose.ErrMissingConfig
-		if errors.As(err, &missing) && ec.IsSupported() {
-			err := requestMissingConfig(ctx, ec, cli, provider, project.Name, missing)
-			if err != nil {
-				return "", fmt.Errorf("failed to request missing config: %w", err)
+				continue // try again
 			}
 
-			// try again
-			return HandleDeployTool(ctx, loader, params, cli, ec, sc)
+			return "", err
 		}
-
-		return "", err
+		break
 	}
 
 	if len(deployResp.Services) == 0 {
