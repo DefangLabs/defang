@@ -136,6 +136,7 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
 
 	b.driver.TokenStore = &tokenstore.LocalDirTokenStore{Dir: filepath.Join(client.StateDir, "providers", "aws")}
+	b.driver.ExistingBucket = os.Getenv("DEFANG_CD_BUCKET") // adopt an existing CD bucket; `cd install --bucket` overrides
 	return b
 }
 
