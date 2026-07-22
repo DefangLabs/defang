@@ -759,3 +759,26 @@ func TestAuthenticate_AWS(t *testing.T) {
 		}
 	})
 }
+
+func TestRegionFromEnv(t *testing.T) {
+	tests := []struct {
+		name          string
+		awsRegion     string
+		defaultRegion string
+		want          string
+	}{
+		{"AWS_REGION takes precedence over AWS_DEFAULT_REGION", "us-east-1", "us-west-2", "us-east-1"},
+		{"falls back to AWS_DEFAULT_REGION when AWS_REGION unset", "", "us-west-2", "us-west-2"},
+		{"AWS_REGION only", "eu-central-1", "", "eu-central-1"},
+		{"neither set", "", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("AWS_REGION", tt.awsRegion)
+			t.Setenv("AWS_DEFAULT_REGION", tt.defaultRegion)
+			if got := regionFromEnv(); got != tt.want {
+				t.Errorf("regionFromEnv() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
