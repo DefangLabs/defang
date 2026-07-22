@@ -144,7 +144,7 @@ func (b *ByocAws) Authenticate(ctx context.Context, interactive bool) error {
 }
 
 func (b *ByocAws) PrintCloudFormationTemplate() ([]byte, error) {
-	template, err := cfn.CreateTemplate(byoc.CdTaskPrefix)
+	template, err := cfn.CreateTemplate(byoc.CdTaskPrefix, "")
 	if err != nil {
 		return nil, err
 	}
