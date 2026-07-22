@@ -26,6 +26,23 @@ type buildspecBuild struct {
 	Commands []string `yaml:"commands"`
 }
 
+// environmentTypeForImage returns the CodeBuild environment type required to run
+// the given container image. The project is created as LINUX_CONTAINER (x86_64),
+// but some CD images are arm64 (e.g. the legacy public-cd-image-*-arm64 tag).
+// Running an arm64 image on an x86_64 environment fails at runtime with
+// "node: not found" / exit 127, so the environment type must match the image.
+//
+// The image architecture is inferred from the reference: a sha256 digest is
+// hexadecimal and cannot contain the letters in "arm64"/"aarch64", so a simple
+// substring check is unambiguous. Unknown/x86_64 images keep the project default.
+func environmentTypeForImage(image string) cbtypes.EnvironmentType {
+	lower := strings.ToLower(image)
+	if strings.Contains(lower, "arm64") || strings.Contains(lower, "aarch64") {
+		return cbtypes.EnvironmentTypeArmContainer
+	}
+	return cbtypes.EnvironmentTypeLinuxContainer
+}
+
 func buildspec(workingDir string, cmd ...string) (string, error) {
 	if workingDir == "" {
 		return "", errors.New("workingDir must not be empty")
@@ -82,6 +99,7 @@ func (a *AwsCodeBuild) Run(ctx context.Context, workingDir, image string, env ma
 	input := &codebuild.StartBuildInput{
 		ProjectName:                  ptr.String(a.ProjectName),
 		ImageOverride:                ptr.String(image),
+		EnvironmentTypeOverride:      environmentTypeForImage(image),
 		EnvironmentVariablesOverride: envOverrides,
 		BuildspecOverride:            ptr.String(spec),
 	}
