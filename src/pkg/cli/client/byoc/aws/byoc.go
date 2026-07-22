@@ -136,6 +136,7 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
 
 	b.driver.TokenStore = &tokenstore.LocalDirTokenStore{Dir: filepath.Join(client.StateDir, "providers", "aws")}
+	b.driver.ExistingBucket = os.Getenv("DEFANG_CD_BUCKET") // adopt an existing CD bucket; `cd install --bucket` overrides
 	return b
 }
 
@@ -144,11 +145,18 @@ func (b *ByocAws) Authenticate(ctx context.Context, interactive bool) error {
 }
 
 func (b *ByocAws) PrintCloudFormationTemplate() ([]byte, error) {
-	template, err := cfn.CreateTemplate(byoc.CdTaskPrefix)
+	template, err := cfn.CreateTemplate(byoc.CdTaskPrefix, "")
 	if err != nil {
 		return nil, err
 	}
 	return template.YAML()
+}
+
+// SetCDBucket makes the CD stack adopt an existing S3 bucket for deployment state
+// instead of creating a new one. Must be called before SetUpCD. Used by the
+// explicit `defang cd install --bucket` flag.
+func (b *ByocAws) SetCDBucket(name string) {
+	b.driver.ExistingBucket = name
 }
 
 func (b *ByocAws) SetUpCD(ctx context.Context, force bool) error {

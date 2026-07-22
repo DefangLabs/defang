@@ -187,6 +187,7 @@ func SetupCommands(version string) {
 	cdCmd.AddCommand(cdOutputsCmd)
 	cdCmd.AddCommand(cdPreviewCmd)
 	cdInstallCmd.Flags().Bool("force", false, "force the installation of the CD resources into the cluster (allow downgrades)")
+	cdInstallCmd.Flags().String("bucket", pkg.Getenv("DEFANG_CD_BUCKET", ""), "adopt an existing bucket for CD state instead of creating a new one (BYOC AWS/GCP/DigitalOcean; defaults to $DEFANG_CD_BUCKET)")
 	cdCmd.AddCommand(cdInstallCmd)
 	cdCmd.AddCommand(cdCloudformationCmd)
 

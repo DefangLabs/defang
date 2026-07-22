@@ -24,7 +24,12 @@ const TemplateRevision = 4 // bump this when the template changes!
 
 // CreateTemplate creates a parameterized CloudFormation template for the CD infrastructure.
 // Uses CodeBuild instead of ECS for running Pulumi deployments.
-func CreateTemplate(stack string) (*cloudformation.Template, error) {
+// CreateTemplate builds the CD CloudFormation template for the given stack name.
+// If existingBucket is non-empty, the template adopts that bucket for deployment
+// state instead of creating (and managing) its own S3 bucket, so the bucket
+// survives teardown/re-bootstrap cycles and is reused rather than orphaned
+// (see DefangLabs/defang#358 and #2192).
+func CreateTemplate(stack string, existingBucket string) (*cloudformation.Template, error) {
 	const oidcProviderDefaultAud = "sts.amazonaws.com"
 
 	defaultTags := []tags.Tag{
@@ -131,20 +136,27 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 	const _condOidcThumbprints = "OidcThumbprints"
 	template.Conditions[_condOidcThumbprints] = cloudformation.Not([]string{cloudformation.Equals(cloudformation.Join("", cloudformation.Ref(ParamsOidcProviderThumbprints)), "")})
 
-	// 1. S3 bucket (for deployment state)
-	const _bucket = "Bucket"
-	template.Resources[_bucket] = &s3.Bucket{
-		Tags:                            defaultTags,
-		AWSCloudFormationDeletionPolicy: policies.DeletionPolicy(cloudformation.If(_condRetainS3Bucket, "RetainExceptOnCreate", "Delete")),
-		VersioningConfiguration: &s3.Bucket_VersioningConfiguration{
-			Status: "Enabled",
-		},
-		PublicAccessBlockConfiguration: &s3.Bucket_PublicAccessBlockConfiguration{
-			BlockPublicAcls:       ptr.Bool(true),
-			BlockPublicPolicy:     ptr.Bool(true),
-			IgnorePublicAcls:      ptr.Bool(true),
-			RestrictPublicBuckets: ptr.Bool(true),
-		},
+	// 1. S3 bucket (for deployment state).
+	// When adopting an existing bucket, do NOT create a stack-managed bucket, so
+	// the bucket outlives this stack and is reused across teardown/re-bootstrap
+	// cycles instead of being orphaned. Otherwise create it (retained on delete).
+	bucketNameOutput := existingBucket
+	if existingBucket == "" {
+		const _bucket = "Bucket"
+		template.Resources[_bucket] = &s3.Bucket{
+			Tags:                            defaultTags,
+			AWSCloudFormationDeletionPolicy: policies.DeletionPolicy(cloudformation.If(_condRetainS3Bucket, "RetainExceptOnCreate", "Delete")),
+			VersioningConfiguration: &s3.Bucket_VersioningConfiguration{
+				Status: "Enabled",
+			},
+			PublicAccessBlockConfiguration: &s3.Bucket_PublicAccessBlockConfiguration{
+				BlockPublicAcls:       ptr.Bool(true),
+				BlockPublicPolicy:     ptr.Bool(true),
+				IgnorePublicAcls:      ptr.Bool(true),
+				RestrictPublicBuckets: ptr.Bool(true),
+			},
+		}
+		bucketNameOutput = cloudformation.Ref(_bucket)
 	}
 
 	// 2. CloudWatch log group
@@ -334,7 +346,7 @@ func CreateTemplate(stack string) (*cloudformation.Template, error) {
 	}
 	template.Outputs[OutputsBucketName] = cloudformation.Output{
 		Description: ptr.String("Name of the S3 bucket"),
-		Value:       cloudformation.Ref(_bucket),
+		Value:       bucketNameOutput,
 	}
 	template.Outputs[OutputsCodeBuildProjectName] = cloudformation.Output{
 		Description: ptr.String("Name of the CodeBuild project"),

@@ -85,6 +85,13 @@ func (b *ByocDo) Authenticate(ctx context.Context, interactive bool) error {
 	return nil
 }
 
+// SetCDBucket makes the CD stack adopt an existing Spaces bucket for deployment
+// state instead of creating a new one. Must be called before SetUpCD. Used by
+// the explicit `defang cd install --bucket` flag.
+func (b *ByocDo) SetCDBucket(name string) {
+	b.driver.BucketName = name
+}
+
 func (b *ByocDo) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
 	s3client, err := b.driver.CreateS3Client()
 	if err != nil {
