@@ -123,6 +123,7 @@ type ByocGcp struct {
 	driver gcpDriver
 
 	bucket               string
+	existingBucket       string // adopt this bucket instead of creating one (`cd install --bucket`)
 	cdServiceAccount     string
 	uploadServiceAccount string
 	delegateDomainZone   string
@@ -146,6 +147,13 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 
 func (b *ByocGcp) Authenticate(ctx context.Context, interactive bool) error {
 	return b.driver.Authenticate(ctx, interactive)
+}
+
+// SetCDBucket makes the CD stack adopt an existing GCS bucket for deployment
+// state instead of creating a new one. Must be called before SetUpCD. Used by
+// the explicit `defang cd install --bucket` flag.
+func (b *ByocGcp) SetCDBucket(name string) {
+	b.existingBucket = name
 }
 
 func getGcpRegion() string {
@@ -199,8 +207,11 @@ func (b *ByocGcp) SetUpCD(ctx context.Context, force bool) error {
 		return annotateGcpError(err)
 	}
 
-	// 2. Setup cd bucket
-	if bucket, err := b.driver.EnsureBucketExists(ctx, DefangCDProjectName, true); err != nil {
+	// 2. Setup cd bucket. Adopt an explicitly-provided bucket if set
+	// (`cd install --bucket`); otherwise find-or-create the CD bucket.
+	if b.existingBucket != "" {
+		b.bucket = b.existingBucket
+	} else if bucket, err := b.driver.EnsureBucketExists(ctx, DefangCDProjectName, true); err != nil {
 		return err
 	} else {
 		b.bucket = bucket

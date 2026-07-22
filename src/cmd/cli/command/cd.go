@@ -225,7 +225,7 @@ var cdInstallCmd = &cobra.Command{
 		if bucket, _ := cmd.Flags().GetString("bucket"); bucket != "" {
 			setter, ok := session.Provider.(interface{ SetCDBucket(string) })
 			if !ok {
-				return errors.New("--bucket is only supported for BYOC AWS")
+				return errors.New("--bucket is not supported for this provider (BYOC AWS, GCP, and DigitalOcean use an object-storage bucket for CD state; Azure does not)")
 			}
 			setter.SetCDBucket(bucket)
 		}
