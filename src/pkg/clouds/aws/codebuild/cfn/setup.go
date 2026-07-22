@@ -15,7 +15,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfnTypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/ptr"
 )
@@ -25,6 +24,12 @@ type AwsCfn struct {
 	stackName string
 	fillOnce  sync.Once
 	fillErr   error
+
+	// ExistingBucket, when set, makes the CD stack adopt that pre-existing S3
+	// bucket for deployment state instead of creating (and managing) its own.
+	// This is opt-in and only set from the explicit `defang cd install --bucket`
+	// flag — we deliberately do NOT auto-discover buckets (see #2192).
+	ExistingBucket string
 }
 
 const stackTimeout = time.Minute * 3
@@ -147,80 +152,10 @@ func (a *AwsCfn) createStackAndWait(ctx context.Context, templateBody string, pa
 	return a.fillWithOutputs(dso)
 }
 
-// bucketLister is the subset of the S3 API used to discover an existing CD state bucket.
-type bucketLister interface {
-	ListBuckets(context.Context, *s3.ListBucketsInput, ...func(*s3.Options)) (*s3.ListBucketsOutput, error)
-	GetBucketLocation(context.Context, *s3.GetBucketLocationInput, ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error)
-	GetBucketTagging(context.Context, *s3.GetBucketTaggingInput, ...func(*s3.Options)) (*s3.GetBucketTaggingOutput, error)
-}
-
-// findAdoptableBucket returns the name of a previously-created CD state bucket in
-// this account+region (identified by the `defang-cd-bucket-` prefix and the
-// stack-prefix tag), or "" if none exists. It errors if more than one candidate
-// is found, since adoption would be ambiguous. Adopting a retained bucket instead
-// of creating a new one is what keeps teardown/re-bootstrap from orphaning buckets.
-func findAdoptableBucket(ctx context.Context, client bucketLister, stackName string, region aws.Region) (string, error) {
-	lbo, err := client.ListBuckets(ctx, &s3.ListBucketsInput{})
-	if err != nil {
-		return "", err
-	}
-	prefix := stackName + "-bucket-"
-	var found []string
-	for _, b := range lbo.Buckets {
-		if b.Name == nil || !strings.HasPrefix(*b.Name, prefix) {
-			continue
-		}
-		// Only adopt a bucket in the target region (CD state is per-region).
-		loc, err := client.GetBucketLocation(ctx, &s3.GetBucketLocationInput{Bucket: b.Name})
-		if err != nil {
-			continue
-		}
-		bucketRegion := aws.Region(loc.LocationConstraint)
-		if bucketRegion == "" {
-			bucketRegion = "us-east-1" // S3 returns an empty LocationConstraint for us-east-1
-		}
-		if bucketRegion != region {
-			continue
-		}
-		// Confirm it is one of ours via the stack-prefix tag.
-		gto, err := client.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: b.Name})
-		if err != nil {
-			continue // no tags / access denied: treat as not ours
-		}
-		for _, t := range gto.TagSet {
-			if t.Key != nil && *t.Key == TagKeyPrefix && t.Value != nil && *t.Value == stackName {
-				found = append(found, *b.Name)
-				break
-			}
-		}
-	}
-	switch len(found) {
-	case 0:
-		return "", nil
-	case 1:
-		return found[0], nil
-	default:
-		return "", fmt.Errorf("found multiple %s state buckets in %s; cannot adopt automatically, remove the stale one(s): %v", stackName, region, found)
-	}
-}
-
-func (a *AwsCfn) findExistingBucket(ctx context.Context) (string, error) {
-	cfg, err := a.LoadConfig(ctx)
-	if err != nil {
-		return "", err
-	}
-	return findAdoptableBucket(ctx, s3.NewFromConfig(cfg), a.stackName, a.AwsCodeBuild.Region)
-}
-
 func (a *AwsCfn) SetUp(ctx context.Context, force bool) (bool, error) {
-	// Reuse a retained CD bucket from a previous stack if one exists, so
-	// teardown + re-bootstrap doesn't orphan buckets (see #358, #2192).
-	existingBucket, err := a.findExistingBucket(ctx)
-	if err != nil {
-		return false, err
-	}
-
-	template, err := CreateTemplate(a.stackName, existingBucket)
+	// Adopt a pre-existing bucket only when explicitly requested (via
+	// `defang cd install --bucket`); otherwise the stack manages its own bucket.
+	template, err := CreateTemplate(a.stackName, a.ExistingBucket)
 	if err != nil {
 		return false, fmt.Errorf("failed to create CloudFormation template: %w", err)
 	}

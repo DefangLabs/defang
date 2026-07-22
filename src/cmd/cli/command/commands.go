@@ -187,6 +187,7 @@ func SetupCommands(version string) {
 	cdCmd.AddCommand(cdOutputsCmd)
 	cdCmd.AddCommand(cdPreviewCmd)
 	cdInstallCmd.Flags().Bool("force", false, "force the installation of the CD resources into the cluster (allow downgrades)")
+	cdInstallCmd.Flags().String("bucket", "", "adopt an existing S3 bucket for CD state instead of creating a new one (BYOC AWS only)")
 	cdCmd.AddCommand(cdInstallCmd)
 	cdCmd.AddCommand(cdCloudformationCmd)
 

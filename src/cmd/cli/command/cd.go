@@ -222,6 +222,14 @@ var cdInstallCmd = &cobra.Command{
 			return err
 		}
 
+		if bucket, _ := cmd.Flags().GetString("bucket"); bucket != "" {
+			setter, ok := session.Provider.(interface{ SetCDBucket(string) })
+			if !ok {
+				return errors.New("--bucket is only supported for BYOC AWS")
+			}
+			setter.SetCDBucket(bucket)
+		}
+
 		force, _ := cmd.Flags().GetBool("force")
 		return cli.InstallCD(ctx, session.Provider, force)
 	},

@@ -151,6 +151,13 @@ func (b *ByocAws) PrintCloudFormationTemplate() ([]byte, error) {
 	return template.YAML()
 }
 
+// SetCDBucket makes the CD stack adopt an existing S3 bucket for deployment state
+// instead of creating a new one. Must be called before SetUpCD. Used by the
+// explicit `defang cd install --bucket` flag.
+func (b *ByocAws) SetCDBucket(name string) {
+	b.driver.ExistingBucket = name
+}
+
 func (b *ByocAws) SetUpCD(ctx context.Context, force bool) error {
 	if b.SetupDone {
 		return nil
