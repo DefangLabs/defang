@@ -262,8 +262,6 @@ func TestHandleSetConfig(t *testing.T) {
 			os.Unsetenv("AWS_PROFILE")
 			os.Unsetenv("AWS_REGION")
 
-			loader := &client.MockLoader{}
-
 			// Extract arguments with defaults for missing values
 			name := ""
 			if n, ok := tt.requestArgs["name"].(string); ok {
@@ -293,7 +291,7 @@ func TestHandleSetConfig(t *testing.T) {
 				Name:     "test-stack",
 				Provider: client.ProviderAWS,
 			}
-			result, err := HandleSetConfig(t.Context(), loader, params, tt.mockCLI, ec, StackConfig{
+			result, err := HandleSetConfig(t.Context(), params, tt.mockCLI, ec, StackConfig{
 				FabricAddr: tt.fabricAddr,
 				Stack:      &stack,
 			})

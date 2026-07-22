@@ -137,7 +137,6 @@ func TestHandleListConfigTool(t *testing.T) {
 			tt.setupMock(mockCLI)
 
 			// Call the function
-			loader := &client.MockLoader{}
 			ec := elicitations.NewController(&mockElicitationsClient{
 				responses: map[string]string{
 					"strategy":     "profile",
@@ -154,7 +153,7 @@ func TestHandleListConfigTool(t *testing.T) {
 					WorkingDirectory: ".",
 				},
 			}
-			result, err := HandleListConfigTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
+			result, err := HandleListConfigTool(t.Context(), params, mockCLI, ec, StackConfig{
 				FabricAddr: "test-cluster",
 				Stack:      &stack,
 			})

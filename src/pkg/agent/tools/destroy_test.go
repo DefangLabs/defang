@@ -137,7 +137,6 @@ func TestHandleDestroyTool(t *testing.T) {
 		},
 	}
 
-	loader := &client.MockLoader{}
 	stack := stacks.Parameters{
 		Name:     "test-stack",
 		Provider: client.ProviderAWS,
@@ -167,7 +166,7 @@ func TestHandleDestroyTool(t *testing.T) {
 					WorkingDirectory: ".",
 				},
 			}
-			result, err := HandleDestroyTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
+			result, err := HandleDestroyTool(t.Context(), params, mockCLI, ec, StackConfig{
 				FabricAddr: "test-cluster",
 				Stack:      &stack,
 			})

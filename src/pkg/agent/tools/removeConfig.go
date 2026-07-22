@@ -2,15 +2,11 @@ package tools
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	"github.com/DefangLabs/defang/src/pkg/auth"
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
-	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
@@ -20,26 +16,10 @@ type RemoveConfigParams struct {
 }
 
 // HandleRemoveConfigTool handles the remove config tool logic
-func HandleRemoveConfigTool(ctx context.Context, loader client.Loader, params RemoveConfigParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
-	term.Debug("Function invoked: cli.Connect")
-	client, err := GetClientWithRetry(ctx, cli, sc.FabricAddr)
+func HandleRemoveConfigTool(ctx context.Context, params RemoveConfigParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
+	_, provider, loader, err := setupProviderAndLoader(ctx, params.LoaderParams, cli, ec, sc)
 	if err != nil {
-		var noBrowserErr auth.ErrNoBrowser
-		if errors.As(err, &noBrowserErr) {
-			return noBrowserErr.Error(), nil
-		}
-		return "", err
-	}
-
-	workingDir, _ := loader.ProjectWorkingDir(ctx)
-	sm, err := stacks.NewManager(client, workingDir, params.ProjectName, ec)
-	if err != nil {
-		return "", fmt.Errorf("failed to create stack manager: %w", err)
-	}
-	pp := NewProviderPreparer(cli, ec, client, sm)
-	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
-	if err != nil {
-		return "", fmt.Errorf("failed to setup provider: %w", err)
+		return setupErrorResult(err)
 	}
 	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)

@@ -9,7 +9,6 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/stretchr/testify/assert"
@@ -151,9 +150,6 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			}
 
 			// Call the function
-			loader := &client.MockLoader{
-				Project: compose.Project{Name: "test-project"},
-			}
 			ec := elicitations.NewController(&mockElicitationsClient{
 				responses: map[string]string{
 					"strategy":     "profile",
@@ -165,7 +161,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				Name:     "test-stack",
 				Provider: client.ProviderAWS,
 			}
-			result, err := HandleRemoveConfigTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
+			result, err := HandleRemoveConfigTool(t.Context(), params, mockCLI, ec, StackConfig{
 				FabricAddr: "test-cluster",
 				Stack:      &stack,
 			})

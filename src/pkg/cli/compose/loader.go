@@ -142,6 +142,19 @@ func (l *Loader) ProjectWorkingDir(ctx context.Context) (string, error) {
 	return project.WorkingDir, nil
 }
 
+// ResolveProjectWorkingDir returns the project directory without parsing or caching the Compose project.
+func (l *Loader) ResolveProjectWorkingDir(context.Context) (string, error) {
+	if l.cached != nil {
+		return l.cached.WorkingDir, nil
+	}
+
+	projectOptions, err := l.newProjectOptions(true)
+	if err != nil {
+		return "", err
+	}
+	return projectOptions.GetWorkingDir()
+}
+
 func (l *Loader) loadProject(ctx context.Context, suppressWarn bool) (*Project, error) {
 	if l.cached != nil {
 		return l.cached, nil

@@ -12,45 +12,29 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 			"services",
 			"List deployed services for the selected project stack in the current working directory",
 			func(ctx *ai.ToolContext, params ServicesParams) (string, error) {
-				loader, err := common.ConfigureAgentLoader(params.LoaderParams, sc.Stack)
-				if err != nil {
-					return "Failed to configure loader", err
-				}
 				var cli CLIInterface = &DefaultToolCLI{}
-				return HandleServicesTool(ctx.Context, loader, params, cli, ec, sc)
+				return HandleServicesTool(ctx.Context, params, cli, ec, sc)
 			},
 		),
 		ai.NewTool("deploy",
 			"Initiate deployment of the application stack defined in the docker-compose files in the current working directory",
 			func(ctx *ai.ToolContext, params DeployParams) (string, error) {
-				loader, err := common.ConfigureAgentLoader(params.LoaderParams, sc.Stack)
-				if err != nil {
-					return "Failed to configure loader", err
-				}
 				cli := &DefaultToolCLI{}
-				return HandleDeployTool(ctx.Context, loader, params, cli, ec, sc)
+				return HandleDeployTool(ctx.Context, params, cli, ec, sc)
 			},
 		),
 		ai.NewTool("destroy",
 			"Destroy the deployed application in the selected stack, defined in the docker-compose files in the current working directory",
 			func(ctx *ai.ToolContext, params DestroyParams) (string, error) {
-				loader, err := common.ConfigureAgentLoader(params.LoaderParams, sc.Stack)
-				if err != nil {
-					return "Failed to configure loader", err
-				}
 				cli := &DefaultToolCLI{}
-				return HandleDestroyTool(ctx.Context, loader, params, cli, ec, sc)
+				return HandleDestroyTool(ctx.Context, params, cli, ec, sc)
 			},
 		),
 		ai.NewTool("logs",
 			"Fetch logs for the application in the selected stack, in pages of up to 100 lines. You can use the 'since' and 'until' parameters to page through logs by time.",
 			func(ctx *ai.ToolContext, params LogsParams) (string, error) {
-				loader, err := common.ConfigureAgentLoader(params.LoaderParams, sc.Stack)
-				if err != nil {
-					return "Failed to configure loader", err
-				}
 				cli := &DefaultToolCLI{}
-				return HandleLogsTool(ctx.Context, loader, params, cli, ec, sc)
+				return HandleLogsTool(ctx.Context, params, cli, ec, sc)
 			},
 		),
 		ai.NewTool("estimate",
@@ -67,12 +51,8 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 		ai.NewTool("set_config",
 			"Set a config variable for the currently selected stack in the Defang project",
 			func(ctx *ai.ToolContext, params SetConfigParams) (string, error) {
-				loader, err := common.ConfigureAgentLoader(params.LoaderParams, sc.Stack)
-				if err != nil {
-					return "Failed to configure loader", err
-				}
 				cli := &DefaultToolCLI{}
-				return HandleSetConfig(ctx.Context, loader, params, cli, ec, sc)
+				return HandleSetConfig(ctx.Context, params, cli, ec, sc)
 			},
 		),
 		ai.NewTool("select_stack",
@@ -114,23 +94,15 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 		ai.NewTool("remove_config",
 			"Remove a config variable from the currently selected stack in the Defang project",
 			func(ctx *ai.ToolContext, params RemoveConfigParams) (string, error) {
-				loader, err := common.ConfigureAgentLoader(params.LoaderParams, sc.Stack)
-				if err != nil {
-					return "Failed to configure loader", err
-				}
 				cli := &DefaultToolCLI{}
-				return HandleRemoveConfigTool(ctx.Context, loader, params, cli, ec, sc)
+				return HandleRemoveConfigTool(ctx.Context, params, cli, ec, sc)
 			},
 		),
 		ai.NewTool("list_configs",
 			"List config variables for the currently selected stack in the Defang project",
 			func(ctx *ai.ToolContext, params ListConfigParams) (string, error) {
-				loader, err := common.ConfigureAgentLoader(params.LoaderParams, sc.Stack)
-				if err != nil {
-					return "Failed to configure loader", err
-				}
 				cli := &DefaultToolCLI{}
-				return HandleListConfigTool(ctx.Context, loader, params, cli, ec, sc)
+				return HandleListConfigTool(ctx.Context, params, cli, ec, sc)
 			},
 		),
 		ai.NewTool("project_name",
