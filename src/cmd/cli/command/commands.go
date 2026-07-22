@@ -210,6 +210,13 @@ func SetupCommands(version string) {
 	})
 	RootCmd.AddCommand(tokenCmd)
 
+	// Identity commands
+	identityRegisterCmd.Flags().Duration("ttl", 0, "expiry of the registered key (default: no expiry)")
+	identityCmd.AddCommand(identityRegisterCmd)
+	identityCmd.AddCommand(identityListCmd)
+	identityCmd.AddCommand(identityRevokeCmd)
+	RootCmd.AddCommand(identityCmd)
+
 	// Login Command
 	loginCmd.Flags().Bool("training-opt-out", false, "Opt out of ML training (Pro users only)")
 	// loginCmd.Flags().Bool("skip-prompt", false, "skip the login prompt if already logged in"); TODO: Implement this

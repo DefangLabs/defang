@@ -162,6 +162,10 @@ func NewClient(clientID, issuer string) *client {
 	}
 }
 
+func (c client) Issuer() string {
+	return c.issuer
+}
+
 func (c client) GetPollRedirectURI() string {
 	return c.issuer + "/clients/auth"
 }
