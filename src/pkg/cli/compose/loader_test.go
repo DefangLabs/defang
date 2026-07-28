@@ -418,6 +418,26 @@ services:
 		expected := []string{filepath.Join(dir, ".env"), filepath.Join(dir, ".env.aws")}
 		assert.Equal(t, expected, o.EnvFiles)
 	})
+
+	t.Run("reports the resolved convention files once at debug level", func(t *testing.T) {
+		oldTerm := term.DefaultTerm
+		t.Cleanup(func() { term.DefaultTerm = oldTerm })
+		var output bytes.Buffer
+		term.DefaultTerm = term.NewTerm(os.Stdin, &output, &output)
+		term.DefaultTerm.SetDebug(true)
+
+		// .env and .env.mystack exist in dir; .env.gcp does not and must not be reported.
+		fn := withDefaultEnvFiles([]string{".env", ".env.gcp", ".env.mystack"})
+		o := &cli.ProjectOptions{WorkingDir: dir}
+		// newProjectOptions applies this option twice; the debug line must appear only once.
+		require.NoError(t, fn(o))
+		require.NoError(t, fn(o))
+
+		got := output.String()
+		assert.Equal(t, 1, strings.Count(got, "Loading environment file(s) by convention:"), "should log exactly once, got:\n%s", got)
+		assert.Contains(t, got, ".env, .env.mystack")
+		assert.NotContains(t, got, ".env.gcp")
+	})
 }
 
 // TestWithEnvFilesFromEnvVar covers the COMPOSE_ENV_FILES fallback. This is the
