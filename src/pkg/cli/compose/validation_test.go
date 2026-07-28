@@ -160,6 +160,37 @@ func TestValidateConfig(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("Reserved auto-populated vars are never reported as missing", func(t *testing.T) {
+		// Both bare (nil) declarations and interpolation of reserved vars must be ignored.
+		env := map[string]*string{
+			"COMPOSE_PROJECT_NAME": nil,
+			"DEFANG_PROVIDER":      nil,
+			"DEFANG_STACK":         nil,
+			"PUBLISH_STACK":        ptr.String("${DEFANG_STACK}"),
+		}
+		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
+
+		if err := ValidateProjectConfig(&testProject, []string{}); err != nil {
+			t.Fatalf("expected reserved vars to be excluded, got: %v", err)
+		}
+	})
+
+	t.Run("Reserved vars excluded alongside genuine missing config", func(t *testing.T) {
+		env := map[string]*string{
+			"DEFANG_STACK":    nil,                              // reserved (bare)
+			"DEFANG_PROVIDER": ptr.String("${DEFANG_PROVIDER}"), // reserved (interpolated)
+			"REAL_SECRET":     nil,                              // genuine missing config
+		}
+		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
+
+		var missing ErrMissingConfig
+		if err := ValidateProjectConfig(&testProject, []string{}); !errors.As(err, &missing) {
+			t.Fatalf("expected ErrMissingConfig, got: %v", err)
+		} else if len(missing) != 1 || missing[0] != "REAL_SECRET" {
+			t.Fatalf("expected only REAL_SECRET missing, got: %v", []string(missing))
+		}
+	})
 }
 
 func TestValidateModelConfig(t *testing.T) {

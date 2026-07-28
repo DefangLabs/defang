@@ -475,6 +475,17 @@ func DetectInterpolationVariables(value string) []string {
 	return names
 }
 
+// reservedConfigNames are variables that Defang and compose-go populate
+// automatically, so they must never be reported as missing config the user has
+// to set. COMPOSE_PROJECT_NAME is a compose-go built-in; DEFANG_PROVIDER and
+// DEFANG_STACK are injected into the Compose interpolation env once a stack is
+// selected (see pkg/session and pkg/agent/common).
+var reservedConfigNames = map[string]bool{
+	"COMPOSE_PROJECT_NAME": true,
+	"DEFANG_PROVIDER":      true,
+	"DEFANG_STACK":         true,
+}
+
 func ValidateProjectConfig(composeProject *composeTypes.Project, listConfigNames []string) error {
 	var modelInterpolations ErrConfigInterpolationInModels
 	for _, model := range composeProject.Models {
@@ -516,6 +527,9 @@ func ValidateProjectConfig(composeProject *composeTypes.Project, listConfigNames
 
 	errMissingConfig := ErrMissingConfig{}
 	for _, name := range names {
+		if reservedConfigNames[name] {
+			continue // auto-populated by Defang/compose-go; not user-provided config
+		}
 		if !slices.Contains(listConfigNames, name) {
 			errMissingConfig = append(errMissingConfig, name)
 		}
