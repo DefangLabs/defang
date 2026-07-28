@@ -4,6 +4,8 @@
 
 ### ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/Logos/Element_Wordmark_Slogan/JPG/Dark_Colour_Glow.jpg)
 
+[![MCP Toplist](https://mcptoplist.com/badge/mcp.so%2Fdefang%2FDefangLabs.svg)](https://mcptoplist.com/server/mcp.so%2Fdefang%2FDefangLabs)
+
 ## Develop Once, Deploy Anywhere.
 
 Take your app from Compose to a secure and scalable deployment on your favorite cloud in minutes.
