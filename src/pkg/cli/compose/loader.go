@@ -277,6 +277,9 @@ func (l *Loader) newProjectOptions(suppressWarn bool) (*cli.ProjectOptions, erro
 // earlier ones. Unlike explicit --env-file values, files that don't exist are
 // skipped, mirroring how compose-go treats the default .env (see cli.WithEnvFiles).
 func withDefaultEnvFiles(names []string) cli.ProjectOptionsFn {
+	// This option is applied more than once per load (see newProjectOptions), possibly
+	// against different working dirs, so avoid repeating an identical resolved set.
+	var lastLogged string
 	return func(o *cli.ProjectOptions) error {
 		if v, ok := os.LookupEnv(consts.ComposeDisableDefaultEnvFile); ok {
 			if disabled, err := strconv.ParseBool(v); err != nil {
@@ -291,6 +294,7 @@ func withDefaultEnvFiles(names []string) cli.ProjectOptionsFn {
 			return err
 		}
 		var envFiles []string
+		var loaded []string
 		for _, name := range slices.Compact(slices.Clone(names)) { // dedupe e.g. a stack named after its provider
 			path := filepath.Join(wd, name)
 			s, err := os.Stat(path)
@@ -302,9 +306,16 @@ func withDefaultEnvFiles(names []string) cli.ProjectOptionsFn {
 			}
 			if !s.IsDir() {
 				envFiles = append(envFiles, path)
+				loaded = append(loaded, name)
 			}
 		}
 		o.EnvFiles = envFiles
+		// These files are picked up implicitly by naming convention (.env, .env.<provider>,
+		// .env.<stack>); surface which ones matched to demystify the otherwise-silent load.
+		if key := strings.Join(loaded, ", "); key != "" && key != lastLogged {
+			lastLogged = key
+			term.Debugf("Loading environment file(s) by convention: %s", key)
+		}
 		return nil
 	}
 }
