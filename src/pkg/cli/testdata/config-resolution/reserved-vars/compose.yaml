@@ -1,0 +1,8 @@
+services:
+  service1:
+    image: nginx
+    environment:
+      COMPOSE_PROJECT_NAME: myproj
+      DEFANG_PROVIDER: aws
+      DEFANG_STACK: mystack
+      REAL_SECRET:

@@ -486,6 +486,12 @@ var reservedConfigNames = map[string]bool{
 	"DEFANG_STACK":         true,
 }
 
+// IsReservedConfigName reports whether name is auto-populated by Defang/compose-go
+// and therefore never a config the user has to set.
+func IsReservedConfigName(name string) bool {
+	return reservedConfigNames[name]
+}
+
 func ValidateProjectConfig(composeProject *composeTypes.Project, listConfigNames []string) error {
 	var modelInterpolations ErrConfigInterpolationInModels
 	for _, model := range composeProject.Models {
@@ -527,7 +533,7 @@ func ValidateProjectConfig(composeProject *composeTypes.Project, listConfigNames
 
 	errMissingConfig := ErrMissingConfig{}
 	for _, name := range names {
-		if reservedConfigNames[name] {
+		if IsReservedConfigName(name) {
 			continue // auto-populated by Defang/compose-go; not user-provided config
 		}
 		if !slices.Contains(listConfigNames, name) {

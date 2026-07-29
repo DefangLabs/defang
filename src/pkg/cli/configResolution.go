@@ -27,6 +27,7 @@ const (
 	SourceComposeFile   Source = "Compose"
 	SourceDefangConfig  Source = "Config"
 	SourceInterpolation Source = "Config (interpolated)"
+	SourceDefang        Source = "Defang"
 )
 
 func (s Source) String() string {
@@ -44,6 +45,16 @@ func maskTrailingConfigValue(value string) string {
 // determineConfigSource determines the source of an environment variable
 // and returns the appropriate source type and value to display.
 func determineConfigSource(envKey string, envValue *string, defangConfigs map[string]struct{}) (Source, string) {
+	// Variables that Defang/compose-go auto-populate are Defang-provided, not user
+	// config or compose-file values, so surface them as such (and never as missing config).
+	if compose.IsReservedConfigName(envKey) {
+		value := ""
+		if envValue != nil {
+			value = *envValue
+		}
+		return SourceDefang, value
+	}
+
 	// If the key itself is a defang config, mask it
 	if _, isDefangConfig := defangConfigs[envKey]; isDefangConfig {
 		return SourceDefangConfig, configMaskedValue

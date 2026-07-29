@@ -74,6 +74,42 @@ func TestPrintRedactedConfigResolutionSummary(t *testing.T) {
 	})
 }
 
+func TestDetermineConfigSource(t *testing.T) {
+	strPtr := func(s string) *string { return &s }
+	// DEFANG_STACK is deliberately also listed as a defang config to prove the
+	// reserved-name check takes precedence over the config check.
+	defangConfigs := map[string]struct{}{"SECRET_KEY": {}, "DEFANG_STACK": {}}
+
+	tests := []struct {
+		name       string
+		envKey     string
+		envValue   *string
+		wantSource Source
+		wantValue  string
+	}{
+		{"reserved provider", "DEFANG_PROVIDER", strPtr("aws"), SourceDefang, "aws"},
+		{"reserved project name", "COMPOSE_PROJECT_NAME", strPtr("myproj"), SourceDefang, "myproj"},
+		{"reserved wins over defang config", "DEFANG_STACK", strPtr("mystack"), SourceDefang, "mystack"},
+		{"reserved with nil value", "DEFANG_PROVIDER", nil, SourceDefang, ""},
+		{"defang config is masked", "SECRET_KEY", strPtr("supersecret"), SourceDefangConfig, configMaskedValue},
+		{"nil non-reserved is unset config", "API_TOKEN", nil, SourceDefangConfig, ""},
+		{"interpolated value", "DB_URL", strPtr("postgres://${DB_USER}@db"), SourceInterpolation, "postgres://${DB_USER}@db"},
+		{"plain compose value", "PORT", strPtr("8080"), SourceComposeFile, "8080"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotSource, gotValue := determineConfigSource(tt.envKey, tt.envValue, defangConfigs)
+			if gotSource != tt.wantSource {
+				t.Errorf("source = %q, want %q", gotSource, tt.wantSource)
+			}
+			if gotValue != tt.wantValue {
+				t.Errorf("value = %q, want %q", gotValue, tt.wantValue)
+			}
+		})
+	}
+}
+
 func testAllConfigResolutionFiles(t *testing.T, dir string, f func(t *testing.T, name, path string)) {
 	t.Helper()
 
