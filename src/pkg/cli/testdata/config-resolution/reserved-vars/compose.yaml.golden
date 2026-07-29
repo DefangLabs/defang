@@ -1,0 +1,7 @@
+[95m * Service environment variables resolution summary:
+[0m[1m
+SERVICE   ENVIRONMENT           SOURCE  VALUE[0m
+service1  COMPOSE_PROJECT_NAME  Defang  myproj   
+service1  DEFANG_PROVIDER       Defang  aws      
+service1  DEFANG_STACK          Defang  mystack  
+service1  REAL_SECRET           Config           
