@@ -1,10 +1,9 @@
 [![Go package](https://github.com/DefangLabs/defang/actions/workflows/go.yml/badge.svg?branch=main)](https://github.com/DefangLabs/defang/actions/workflows/go.yml)
 [![Discord](https://img.shields.io/discord/1233224785450897561)](https://s.defang.io/discord)
 ![GitHub Release](https://img.shields.io/github/v/release/DefangLabs/defang)
+[![MCP Toplist](https://mcptoplist.com/badge/mcp.so%2Fdefang%2FDefangLabs.svg)](https://mcptoplist.com/server/mcp.so%2Fdefang%2FDefangLabs)
 
 ### ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/Logos/Element_Wordmark_Slogan/JPG/Dark_Colour_Glow.jpg)
-
-[![MCP Toplist](https://mcptoplist.com/badge/mcp.so%2Fdefang%2FDefangLabs.svg)](https://mcptoplist.com/server/mcp.so%2Fdefang%2FDefangLabs)
 
 ## Develop Once, Deploy Anywhere.
 
