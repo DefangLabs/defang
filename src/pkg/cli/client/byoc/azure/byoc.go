@@ -1031,6 +1031,11 @@ func (b *ByocAzure) UpdateShardDomain(context.Context) error {
 // Apps managed certs are free, auto-renewing, and validated via CNAME — no
 // hosted-zone presence required (unlike AWS, where ZoneId triggers a different
 // path).
+//
+// Unlike AWS, no BYOD zone lookup happens here. The CD task finds the zone in
+// the user's cloud, where the deploy identity already has DNS read permission
+// and the subscription is known — see DefangLabs/pulumi-defang
+// provider/defangazure/azure/dnszone.go.
 func (b *ByocAzure) UpdateServiceInfo(_ context.Context, si *defangv1.ServiceInfo, _, _ string, service composeTypes.ServiceConfig) error {
 	if service.DomainName == "" {
 		return nil

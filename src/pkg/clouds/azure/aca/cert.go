@@ -43,11 +43,16 @@ const (
 // for `serviceName` in `resourceGroup`. Steps:
 //
 //  1. Find the ContainerApp by tag (defang-service: <serviceName>).
-//  2. Wait for DNS records (CNAME -> app FQDN, TXT asuid.<host> -> verificationId).
+//  2. Wait for DNS records: a routing record (subdomain → CNAME to app FQDN;
+//     apex → A record to the env IP) plus TXT asuid.<host> → verificationId.
 //  3. Register the custom hostname with bindingType: Disabled (validates asuid TXT).
-//  4. Issue a managed certificate via CNAME validation.
+//  4. Issue a managed certificate (subdomain → CNAME validation; apex → HTTP).
 //  5. Flip the customDomain to bindingType: SniEnabled, attaching the cert.
 //  6. Verify TLS is serving on https://<hostname>/.
+//
+// Apex domains (e.g. example.com) can't have a CNAME (RFC 1034), so they route
+// via an A record and validate over HTTP. Apex vs subdomain is detected from DNS
+// and from Azure's validation-method rejection — no caller hint is needed.
 //
 // Each ARM step is idempotent: re-running after a partial failure picks up
 // where it left off. resolverAt is used by step 2 to chase the DNS chain — pass
@@ -137,23 +142,32 @@ func findContainerAppByService(ctx context.Context, client *armappcontainers.Con
 	return nil, fmt.Errorf("no Container App in %s tagged %s=%s", rg, ServiceTagKey, serviceName)
 }
 
-// waitForBYODdns blocks until both the CNAME and asuid TXT records resolve
-// correctly, prompting the user once with the values to add.
+// waitForBYODdns blocks until a routing record and the asuid TXT record both
+// resolve, prompting the user once with the values to add.
+//
+// The routing record is a CNAME → app FQDN for a subdomain, or an A record for
+// an apex domain (no CNAME possible at the zone apex). Both are covered by
+// dns.CheckDomainDNSReady: it accepts a CNAME to expectedCname, or an A record
+// whose addresses match those of expectedCname — which for Container Apps is the
+// managed environment's static IP, exactly what an apex A record must point at.
+// So an apex domain is validated against the intended target, not merely
+// "resolves to something". The asuid TXT is always required.
 func waitForBYODdns(ctx context.Context, hostname, expectedCname, expectedTxt string, resolverAt func(string) dns.Resolver) error {
 	asuid := "asuid." + hostname
 	deadline := time.Now().Add(dnsWaitTimeout)
 	promptShown := false
 
 	for {
-		cnameOK := dns.CheckDomainDNSReady(ctx, hostname, []string{expectedCname}, resolverAt)
+		routeOK := dns.CheckDomainDNSReady(ctx, hostname, []string{expectedCname}, resolverAt)
 		txtOK, _ := dns.LookupTXTContains(ctx, asuid, expectedTxt, resolverAt(""))
-		if cnameOK && txtOK {
+		if routeOK && txtOK {
 			term.Infof("DNS records for %s verified", hostname)
 			return nil
 		}
 		if !promptShown {
 			term.Printf("Configure DNS records for %s:\n", hostname)
-			term.Printf("  CNAME  %s              ->  %s\n", hostname, expectedCname)
+			term.Printf("  CNAME  %s              ->  %s   (subdomain)\n", hostname, expectedCname)
+			term.Printf("  A      %s              ->  <Container Apps environment IP>   (apex)\n", hostname)
 			term.Printf("  TXT    asuid.%s        ->  %s\n", hostname, expectedTxt)
 			term.Infof("Waiting for DNS propagation (timeout %v)...", dnsWaitTimeout)
 			promptShown = true
@@ -270,12 +284,15 @@ func hasCustomDomain(app *armappcontainers.ContainerApp, hostname string) bool {
 	return false
 }
 
-// issueManagedCertificate creates the managed cert. CNAME validation is the
-// default and works for any hostname that has a CNAME (subdomains pointing at
-// the Container Apps FQDN). Apex domains can't have a CNAME (RFC 1034) and
-// Azure rejects CNAME validation with InvalidValidationMethod; in that case
-// we fall back to TXT validation, which requires the user to add a
-// _dnsauth.<hostname> TXT record with the validationToken Azure returns.
+// issueManagedCertificate creates the managed cert, choosing the validation
+// method to match the hostname's routing record. CNAME validation is the
+// default and works for subdomains pointing at the Container Apps FQDN. Apex
+// domains can't have a CNAME (RFC 1034), so Azure rejects CNAME validation with
+// InvalidValidationMethod — we detect that and retry with HTTP validation, which
+// Container Apps completes automatically once the apex A record points at the
+// env IP and the hostname is registered (no extra DNS record needed). If HTTP
+// also fails we fall back to TXT validation (the interactive _dnsauth dance,
+// usable from the CLI).
 func issueManagedCertificate(ctx context.Context, client *armappcontainers.ManagedCertificatesClient, rg, envName, certName, hostname, location string) (*armappcontainers.ManagedCertificate, error) {
 	resp, err := submitManagedCert(ctx, client, rg, envName, certName, hostname, location, armappcontainers.ManagedCertificateDomainControlValidationCNAME)
 	if err == nil {
@@ -284,7 +301,18 @@ func issueManagedCertificate(ctx context.Context, client *armappcontainers.Manag
 	if !isInvalidValidationMethod(err) {
 		return nil, fmt.Errorf("issuing managed certificate %s: %w", certName, err)
 	}
-	term.Infof("CNAME validation rejected for %s (apex domain); falling back to TXT validation", hostname)
+
+	// Apex domain: CNAME validation is impossible. HTTP validation needs no extra
+	// DNS record (the asuid TXT + A record already in place suffice), so it works
+	// unattended in the CD task — unlike TXT, which requires an interactive
+	// _dnsauth record.
+	term.Infof("CNAME validation rejected for %s (apex domain); using HTTP validation", hostname)
+	resp, err = submitManagedCert(ctx, client, rg, envName, certName, hostname, location, armappcontainers.ManagedCertificateDomainControlValidationHTTP)
+	if err == nil {
+		return resp, nil
+	}
+
+	term.Infof("HTTP validation failed for %s (%v); falling back to TXT validation", hostname, err)
 	return submitManagedCertTXT(ctx, client, rg, envName, certName, hostname, location)
 }
 
