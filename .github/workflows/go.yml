@@ -88,13 +88,18 @@ jobs:
           git diff --exit-code go.mod go.sum || { echo "Go modules are not up to date"; exit 1; }
 
       - name: Install protoc and plugins
+        working-directory: src
         run: |
           PROTOC_VERSION=32.1
           curl -fsSL "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip" -o protoc.zip
           sudo unzip -o protoc.zip -d /usr/local bin/protoc 'include/*'
           rm protoc.zip
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-          go install connectrpc.com/connect/cmd/protoc-gen-connect-go@latest
+          # Pin the generators to the versions this module already builds against.
+          # With @latest, "Verify Proto files" breaks on every upstream release: the
+          # regenerated files carry the new generator version in their header
+          # comment while the committed ones carry go.mod's.
+          go install "google.golang.org/protobuf/cmd/protoc-gen-go@$(go list -m -f '{{.Version}}' google.golang.org/protobuf)"
+          go install "connectrpc.com/connect/cmd/protoc-gen-connect-go@$(go list -m -f '{{.Version}}' connectrpc.com/connect)"
 
       - name: Verify Proto files
         working-directory: src
