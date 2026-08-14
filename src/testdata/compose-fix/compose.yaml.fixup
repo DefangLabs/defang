@@ -1,0 +1,36 @@
+{
+  "db": {
+    "command": null,
+    "entrypoint": null,
+    "image": "postgres:16",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 5432,
+        "protocol": "tcp"
+      }
+    ]
+  },
+  "web": {
+    "command": null,
+    "dns": [
+      "1.1.1.1"
+    ],
+    "entrypoint": null,
+    "image": "nginx",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "ingress",
+        "target": 8080,
+        "protocol": "tcp",
+        "app_protocol": "http"
+      }
+    ]
+  }
+}

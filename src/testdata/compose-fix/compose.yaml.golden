@@ -1,0 +1,23 @@
+name: compose-fix
+services:
+  db:
+    image: postgres:16
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 5432
+        protocol: tcp
+  web:
+    dns:
+      - 1.1.1.1
+    image: nginx
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8080
+        protocol: tcp
+networks:
+  default:
+    name: compose-fix_default

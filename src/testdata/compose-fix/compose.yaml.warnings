@@ -1,0 +1,3 @@
+ ! service "db": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "db": stateful service will lose data on restart; use a managed service instead
+Error: service "web": unsupported compose directive: dns
