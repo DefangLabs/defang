@@ -74,17 +74,55 @@ type DebugAgent interface {
 type Debugger struct {
 	agent    DebugAgent
 	surveyor Surveyor
+	// defaultPermission is the default answer to the "debug with AI?" prompt. Paid accounts
+	// default to yes so they flow into the agent (and its cleanup tooling) seamlessly.
+	defaultPermission bool
+	// interactive is false in environments without a user to prompt (e.g. CI). When false the
+	// debugger only runs if defaultPermission is true (paid), and does so without prompting.
+	interactive bool
 }
 
-func NewDebugger(ctx context.Context, fabricAddr string, stack *stacks.Parameters) (*Debugger, error) {
-	agent, err := agent.New(ctx, fabricAddr, stack)
+func NewDebugger(ctx context.Context, fabricAddr string, stack *stacks.Parameters, interactive bool) (*Debugger, error) {
+	var opts []agent.Option
+	if !interactive {
+		opts = append(opts, agent.WithNonInteractive())
+	}
+	agent, err := agent.New(ctx, fabricAddr, stack, opts...)
 	if err != nil {
 		return nil, err
 	}
+	// The paid-tier lookup is a network round-trip and only matters when there is no user to
+	// prompt, so skip it for interactive sessions (where the prompt default is always Yes).
+	defaultPermission := false
+	if !interactive {
+		defaultPermission = isPaidAccount(ctx, fabricAddr)
+	}
 	return &Debugger{
-		agent:    agent,
-		surveyor: &surveyor{},
+		agent:             agent,
+		surveyor:          &surveyor{},
+		defaultPermission: defaultPermission,
+		interactive:       interactive,
 	}, nil
+}
+
+// AutoApprove reports whether the debugger will run without an interactive prompt. This is true
+// for paid accounts and lets callers decide whether to invoke the debugger in non-interactive
+// environments (CI) or just print a hint.
+func (d *Debugger) AutoApprove() bool {
+	return d.defaultPermission
+}
+
+// isPaidAccount reports whether the signed-in account is on a paid plan. Any error falls back to
+// false so the prompt stays opt-in.
+func isPaidAccount(ctx context.Context, fabricAddr string) bool {
+	host := client.NormalizeHost(fabricAddr)
+	fabricClient := client.NewGrpcClient(host, client.GetExistingToken(host), "")
+	resp, err := fabricClient.WhoAmI(ctx)
+	if err != nil {
+		term.Debug("Could not determine subscription tier for debug prompt default:", err)
+		return false
+	}
+	return pkg.IsPaidTier(resp.Tier)
 }
 
 func (d *Debugger) DebugDeployment(ctx context.Context, debugConfig DebugConfig) error {
@@ -98,14 +136,14 @@ func (d *Debugger) DebugDeployment(ctx context.Context, debugConfig DebugConfig)
 
 func (d *Debugger) DebugDeploymentError(ctx context.Context, debugConfig DebugConfig, deployErr error) error {
 	return d.promptAndTrackDebugSession(func() error {
-		prompt := buildDeploymentDebugPrompt(debugConfig) + " The error encountered was: " + deployErr.Error()
+		prompt := buildDeploymentDebugPrompt(debugConfig) + " The error encountered was: " + truncateTail(deployErr.Error(), maxPromptErrorLen)
 		return d.agent.StartWithMessage(ctx, prompt)
 	}, "Debug Deployment Error", P("etag", debugConfig.Deployment), P("deployErr", deployErr))
 }
 
 func (d *Debugger) DebugComposeLoadError(ctx context.Context, debugConfig DebugConfig, loadErr error) error {
 	return d.promptAndTrackDebugSession(func() error {
-		prompt := "The following error occurred while loading the compose file. Help troubleshoot and recommend a solution.\n\n" + loadErr.Error()
+		prompt := "The following error occurred while loading the compose file. Help troubleshoot and recommend a solution.\n\n" + truncateTail(loadErr.Error(), maxPromptErrorLen)
 		return d.agent.StartWithMessage(ctx, prompt)
 	}, "Debug Load", P("etag", debugConfig.Deployment), P("composeErr", loadErr))
 }
@@ -129,19 +167,28 @@ func (d *Debugger) promptAndTrackDebugSession(fn func() error, eventName string,
 		return err
 	}
 
-	good, err := d.promptForFeedback()
-	if err != nil {
-		track.Evt(eventName+" Feedback Prompt Failed", append([]track.Property{P("reason", err)}, eventProperty...)...)
-		return err
+	if d.interactive {
+		feedback, err := d.promptForFeedback()
+		if err != nil {
+			track.Evt(eventName+" Feedback Prompt Failed", append([]track.Property{P("reason", err)}, eventProperty...)...)
+			return err
+		}
+		track.Evt(eventName+" Feedback Prompt Answered", append([]track.Property{P("feedback", feedback)}, eventProperty...)...)
 	}
-	track.Evt(eventName+" Feedback Prompt Answered", append([]track.Property{P("feedback", good)}, eventProperty...)...)
 	return nil
 }
 
 func (d *Debugger) promptForPermission() (bool, error) {
+	if !d.interactive {
+		// No user to prompt: proceed only if this account auto-approves (paid).
+		return d.defaultPermission, nil
+	}
 	var aiDebug bool
 	err := d.surveyor.AskOne(&survey.Confirm{
 		Message: "Would you like to debug this with the Defang AI Agent?",
+		// Default to Yes for everyone; the server selects an appropriate model per account, so
+		// there is no need to gate the prompt client-side.
+		Default: true,
 		Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
 	}, &aiDebug, survey.WithStdio(term.DefaultTerm.Stdio()))
 	if err != nil {
@@ -151,17 +198,17 @@ func (d *Debugger) promptForPermission() (bool, error) {
 	return aiDebug, err
 }
 
-func (d *Debugger) promptForFeedback() (bool, error) {
-	var good bool
-	err := d.surveyor.AskOne(&survey.Confirm{
+func (d *Debugger) promptForFeedback() (string, error) {
+	var feedback string
+	err := d.surveyor.AskOne(&survey.Input{
 		Message: "Was the debugging helpful?",
-		Help:    "Please provide feedback to help us improve the debugging experience.",
-	}, &good, survey.WithStdio(term.DefaultTerm.Stdio()))
+		Help:    "Your answer is sent to Defang to help us improve the debugging experience.",
+	}, &feedback, survey.WithStdio(term.DefaultTerm.Stdio()))
 	if err != nil {
-		return false, err
+		return "", err
 	}
 
-	return good, err
+	return feedback, err
 }
 
 func buildDeploymentDebugPrompt(debugConfig DebugConfig) string {
@@ -196,8 +243,33 @@ func buildDeploymentDebugPrompt(debugConfig DebugConfig) string {
 		prompt += fmt.Sprintf(
 			"The compose files are at %s. The compose file is as follows:\n\n%s",
 			debugConfig.Project.ComposeFiles,
-			yaml,
+			truncateHead(string(yaml), maxPromptComposeLen),
 		)
 	}
 	return prompt
+}
+
+// The initial prompt must always fit in the model context, no matter how big the project or the
+// deployment failure: cap each payload and let the agent page through the rest with its tools
+// (e.g. the logs tool fetches 100 lines per call).
+const (
+	maxPromptErrorLen   = 2048
+	maxPromptComposeLen = 8192
+)
+
+// truncateHead keeps the first max bytes of s; the start of a compose file (project and service
+// definitions) is the most useful part.
+func truncateHead(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "\n... (truncated; ask the user or use your tools for the rest)"
+}
+
+// truncateTail keeps the last max bytes of s; the end of an error is where the root cause lands.
+func truncateTail(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return "(truncated) ..." + s[len(s)-maxLen:]
 }
