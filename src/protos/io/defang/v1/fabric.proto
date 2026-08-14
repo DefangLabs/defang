@@ -869,6 +869,11 @@ message WhoAmIResponse {
   string tenant_id = 7;
   google.protobuf.Timestamp paid_until = 8;
   google.protobuf.Timestamp trial_until = 9;
+  // Base URL of the tenant's agent-identity issuer, e.g.
+  // "https://<tenant-id>.auth.defang.io". Empty when the deployment does not
+  // serve one. Clients MUST use this rather than deriving it from the tenant,
+  // so the URL shape stays a server-side decision.
+  string identity_issuer = 10;
 }
 
 message EstimateRequest {

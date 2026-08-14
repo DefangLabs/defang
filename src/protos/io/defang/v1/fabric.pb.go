@@ -6005,8 +6005,13 @@ type WhoAmIResponse struct {
 	TenantId          string                 `protobuf:"bytes,7,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
 	PaidUntil         *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=paid_until,json=paidUntil,proto3" json:"paid_until,omitempty"`
 	TrialUntil        *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=trial_until,json=trialUntil,proto3" json:"trial_until,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// Base URL of the tenant's agent-identity issuer, e.g.
+	// "https://<tenant-id>.auth.defang.io". Empty when the deployment does not
+	// serve one. Clients MUST use this rather than deriving it from the tenant,
+	// so the URL shape stays a server-side decision.
+	IdentityIssuer string `protobuf:"bytes,10,opt,name=identity_issuer,json=identityIssuer,proto3" json:"identity_issuer,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *WhoAmIResponse) Reset() {
@@ -6100,6 +6105,13 @@ func (x *WhoAmIResponse) GetTrialUntil() *timestamppb.Timestamp {
 		return x.TrialUntil
 	}
 	return nil
+}
+
+func (x *WhoAmIResponse) GetIdentityIssuer() string {
+	if x != nil {
+		return x.IdentityIssuer
+	}
+	return ""
 }
 
 type EstimateRequest struct {
@@ -6951,7 +6963,7 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\x05stack\x18\x02 \x01(\tR\x05stack\"X\n" +
 	"\x11SetOptionsRequest\x12(\n" +
 	"\x10training_opt_out\x18\x01 \x01(\bR\x0etrainingOptOut\x12\x19\n" +
-	"\bmodel_id\x18\x02 \x01(\tR\amodelId\"\xfc\x02\n" +
+	"\bmodel_id\x18\x02 \x01(\tR\amodelId\"\xa5\x03\n" +
 	"\x0eWhoAmIResponse\x12\x16\n" +
 	"\x06tenant\x18\x01 \x01(\tR\x06tenant\x12.\n" +
 	"\x13provider_account_id\x18\x02 \x01(\tR\x11providerAccountId\x12\x16\n" +
@@ -6963,7 +6975,9 @@ const file_io_defang_v1_fabric_proto_rawDesc = "" +
 	"\n" +
 	"paid_until\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tpaidUntil\x12;\n" +
 	"\vtrial_until\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"trialUntil\"\x84\x01\n" +
+	"trialUntil\x12'\n" +
+	"\x0fidentity_issuer\x18\n" +
+	" \x01(\tR\x0eidentityIssuer\"\x84\x01\n" +
 	"\x0fEstimateRequest\x122\n" +
 	"\bprovider\x18\x01 \x01(\x0e2\x16.io.defang.v1.ProviderR\bprovider\x12\x16\n" +
 	"\x06region\x18\x02 \x01(\tR\x06region\x12%\n" +
