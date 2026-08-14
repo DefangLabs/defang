@@ -91,10 +91,16 @@ func NewDebugger(ctx context.Context, fabricAddr string, stack *stacks.Parameter
 	if err != nil {
 		return nil, err
 	}
+	// The paid-tier lookup is a network round-trip and only matters when there is no user to
+	// prompt, so skip it for interactive sessions (where the prompt default is always Yes).
+	defaultPermission := false
+	if !interactive {
+		defaultPermission = isPaidAccount(ctx, fabricAddr)
+	}
 	return &Debugger{
 		agent:             agent,
 		surveyor:          &surveyor{},
-		defaultPermission: isPaidAccount(ctx, fabricAddr),
+		defaultPermission: defaultPermission,
 		interactive:       interactive,
 	}, nil
 }
@@ -130,14 +136,14 @@ func (d *Debugger) DebugDeployment(ctx context.Context, debugConfig DebugConfig)
 
 func (d *Debugger) DebugDeploymentError(ctx context.Context, debugConfig DebugConfig, deployErr error) error {
 	return d.promptAndTrackDebugSession(func() error {
-		prompt := buildDeploymentDebugPrompt(debugConfig) + " The error encountered was: " + deployErr.Error()
+		prompt := buildDeploymentDebugPrompt(debugConfig) + " The error encountered was: " + truncateTail(deployErr.Error(), maxPromptErrorLen)
 		return d.agent.StartWithMessage(ctx, prompt)
 	}, "Debug Deployment Error", P("etag", debugConfig.Deployment), P("deployErr", deployErr))
 }
 
 func (d *Debugger) DebugComposeLoadError(ctx context.Context, debugConfig DebugConfig, loadErr error) error {
 	return d.promptAndTrackDebugSession(func() error {
-		prompt := "The following error occurred while loading the compose file. Help troubleshoot and recommend a solution.\n\n" + loadErr.Error()
+		prompt := "The following error occurred while loading the compose file. Help troubleshoot and recommend a solution.\n\n" + truncateTail(loadErr.Error(), maxPromptErrorLen)
 		return d.agent.StartWithMessage(ctx, prompt)
 	}, "Debug Load", P("etag", debugConfig.Deployment), P("composeErr", loadErr))
 }
@@ -196,7 +202,7 @@ func (d *Debugger) promptForFeedback() (string, error) {
 	var feedback string
 	err := d.surveyor.AskOne(&survey.Input{
 		Message: "Was the debugging helpful?",
-		Help:    "Please provide feedback to help us improve the debugging experience.",
+		Help:    "Your answer is sent to Defang to help us improve the debugging experience.",
 	}, &feedback, survey.WithStdio(term.DefaultTerm.Stdio()))
 	if err != nil {
 		return "", err
@@ -237,8 +243,33 @@ func buildDeploymentDebugPrompt(debugConfig DebugConfig) string {
 		prompt += fmt.Sprintf(
 			"The compose files are at %s. The compose file is as follows:\n\n%s",
 			debugConfig.Project.ComposeFiles,
-			yaml,
+			truncateHead(string(yaml), maxPromptComposeLen),
 		)
 	}
 	return prompt
+}
+
+// The initial prompt must always fit in the model context, no matter how big the project or the
+// deployment failure: cap each payload and let the agent page through the rest with its tools
+// (e.g. the logs tool fetches 100 lines per call).
+const (
+	maxPromptErrorLen   = 2048
+	maxPromptComposeLen = 8192
+)
+
+// truncateHead keeps the first max bytes of s; the start of a compose file (project and service
+// definitions) is the most useful part.
+func truncateHead(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "\n... (truncated; ask the user or use your tools for the rest)"
+}
+
+// truncateTail keeps the last max bytes of s; the end of an error is where the root cause lands.
+func truncateTail(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return "(truncated) ..." + s[len(s)-maxLen:]
 }

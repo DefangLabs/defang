@@ -229,3 +229,26 @@ func TestDebugDeploymentNonInteractive(t *testing.T) {
 		})
 	}
 }
+
+func TestTruncatePromptPayloads(t *testing.T) {
+	tests := []struct {
+		name string
+		fn   func(string, int) string
+		in   string
+		max  int
+		want string
+	}{
+		{name: "head: short string unchanged", fn: truncateHead, in: "abc", max: 5, want: "abc"},
+		{name: "head: exact length unchanged", fn: truncateHead, in: "abcde", max: 5, want: "abcde"},
+		{name: "head: keeps the start", fn: truncateHead, in: "abcdefgh", max: 5, want: "abcde\n... (truncated; ask the user or use your tools for the rest)"},
+		{name: "tail: short string unchanged", fn: truncateTail, in: "abc", max: 5, want: "abc"},
+		{name: "tail: exact length unchanged", fn: truncateTail, in: "abcde", max: 5, want: "abcde"},
+		{name: "tail: keeps the end", fn: truncateTail, in: "abcdefgh", max: 5, want: "(truncated) ...defgh"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.fn(tt.in, tt.max))
+		})
+	}
+}
