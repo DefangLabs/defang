@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -244,11 +245,25 @@ func TestTruncatePromptPayloads(t *testing.T) {
 		{name: "tail: short string unchanged", fn: truncateTail, in: "abc", max: 5, want: "abc"},
 		{name: "tail: exact length unchanged", fn: truncateTail, in: "abcde", max: 5, want: "abcde"},
 		{name: "tail: keeps the end", fn: truncateTail, in: "abcdefgh", max: 5, want: "(truncated) ...defgh"},
+		// A multibyte character straddling the limit must be dropped whole: half a rune
+		// reaches the model as U+FFFD, and can break a strict JSON encoder on the way.
+		// "€" is 3 bytes, so limits 3, 4 and 5 each cut inside it from a different offset.
+		{name: "head: cut inside a rune drops it", fn: truncateHead, in: "ab€cd", max: 3,
+			want: "ab\n... (truncated; ask the user or use your tools for the rest)"},
+		{name: "head: cut one byte into a rune", fn: truncateHead, in: "ab€cd", max: 4,
+			want: "ab\n... (truncated; ask the user or use your tools for the rest)"},
+		{name: "head: cut on a rune boundary keeps it", fn: truncateHead, in: "ab€cd", max: 5,
+			want: "ab€\n... (truncated; ask the user or use your tools for the rest)"},
+		{name: "tail: cut inside a rune drops it", fn: truncateTail, in: "ab€cd", max: 3, want: "(truncated) ...cd"},
+		{name: "tail: cut one byte into a rune", fn: truncateTail, in: "ab€cd", max: 4, want: "(truncated) ...cd"},
+		{name: "tail: cut on a rune boundary keeps it", fn: truncateTail, in: "ab€cd", max: 5, want: "(truncated) ...€cd"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, tt.fn(tt.in, tt.max))
+			got := tt.fn(tt.in, tt.max)
+			assert.Equal(t, tt.want, got)
+			assert.True(t, utf8.ValidString(got), "truncation must not split a rune: %q", got)
 		})
 	}
 }

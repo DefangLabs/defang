@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
@@ -258,18 +259,38 @@ const (
 )
 
 // truncateHead keeps the first max bytes of s; the start of a compose file (project and service
-// definitions) is the most useful part.
+// definitions) is the most useful part. The cut is pulled back to a rune boundary, so a multibyte
+// character straddling the limit is dropped whole rather than sent to the model as U+FFFD.
 func truncateHead(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
 	}
-	return s[:maxLen] + "\n... (truncated; ask the user or use your tools for the rest)"
+	return s[:runeBoundaryBefore(s, maxLen)] + "\n... (truncated; ask the user or use your tools for the rest)"
 }
 
 // truncateTail keeps the last max bytes of s; the end of an error is where the root cause lands.
+// Like truncateHead, it cuts on a rune boundary, dropping at most three extra bytes.
 func truncateTail(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
 	}
-	return "(truncated) ..." + s[len(s)-maxLen:]
+	return "(truncated) ..." + s[runeBoundaryAfter(s, len(s)-maxLen):]
+}
+
+// runeBoundaryBefore returns the largest index <= i that starts a rune, so s[:i] never ends
+// mid-character. A UTF-8 rune is at most 4 bytes, so this backs up at most 3.
+func runeBoundaryBefore(s string, i int) int {
+	for i > 0 && !utf8.RuneStart(s[i]) {
+		i--
+	}
+	return i
+}
+
+// runeBoundaryAfter returns the smallest index >= i that starts a rune, so s[i:] never begins
+// mid-character. Moving forward (rather than back) keeps the result within maxLen bytes.
+func runeBoundaryAfter(s string, i int) int {
+	for i < len(s) && !utf8.RuneStart(s[i]) {
+		i++
+	}
+	return i
 }
