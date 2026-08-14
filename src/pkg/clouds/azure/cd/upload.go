@@ -12,9 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const prefix = "uploads/"
-
-func (d *Driver) CreateUploadURL(ctx context.Context, blobName string) (string, error) {
+func (d *Driver) CreateUploadURL(ctx context.Context, prefix string, blobName string) (string, error) {
 	if blobName == "" {
 		blobName = uuid.NewString()
 	} else {

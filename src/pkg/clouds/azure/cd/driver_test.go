@@ -197,7 +197,7 @@ func TestCreateUploadURLTooLong(t *testing.T) {
 	d := New("defang-cd", azure.LocationWestUS2)
 	d.SubscriptionID = "sub"
 	long := strings.Repeat("x", 65)
-	if _, err := d.CreateUploadURL(t.Context(), long); err == nil {
+	if _, err := d.CreateUploadURL(t.Context(), "uploads/", long); err == nil {
 		t.Error("CreateUploadURL should reject names > 64 chars")
 	}
 }
@@ -207,7 +207,7 @@ func TestCreateUploadURLStorageAccountSetupFails(t *testing.T) {
 	d := New("defang-cd", azure.LocationWestUS2)
 	d.SubscriptionID = "sub"
 	// No pre-populated StorageAccount — SetUpStorageAccount will be called and fail.
-	if _, err := d.CreateUploadURL(t.Context(), ""); err == nil {
+	if _, err := d.CreateUploadURL(t.Context(), "uploads/", ""); err == nil {
 		t.Error("CreateUploadURL should fail when setup fails")
 	}
 }
@@ -221,7 +221,7 @@ func TestCreateUploadURLWithStorageKeyEnv(t *testing.T) {
 	d.StorageAccount = "acct"
 	d.BlobContainerName = "uploads"
 
-	got, err := d.CreateUploadURL(t.Context(), "myblob")
+	got, err := d.CreateUploadURL(t.Context(), "uploads/", "myblob")
 	if err != nil {
 		t.Fatalf("CreateUploadURL: %v", err)
 	}
@@ -240,7 +240,7 @@ func TestCreateUploadURLSanitizesSlash(t *testing.T) {
 	d.StorageAccount = "acct"
 	d.BlobContainerName = "uploads"
 
-	got, err := d.CreateUploadURL(t.Context(), "sha256:abc/def")
+	got, err := d.CreateUploadURL(t.Context(), "uploads/", "sha256:abc/def")
 	if err != nil {
 		t.Fatalf("CreateUploadURL: %v", err)
 	}
@@ -320,7 +320,7 @@ func TestCreateUploadURLGenerateBlobName(t *testing.T) {
 	d.SubscriptionID = "sub"
 	d.StorageAccount = "acct"
 	d.BlobContainerName = "uploads"
-	url, err := d.CreateUploadURL(t.Context(), "")
+	url, err := d.CreateUploadURL(t.Context(), "uploads/", "")
 	if err != nil {
 		t.Fatalf("CreateUploadURL: %v", err)
 	}

@@ -199,7 +199,7 @@ func (b *ByocAzure) CreateUploadURL(ctx context.Context, req *defangv1.UploadURL
 		return nil, err
 	}
 
-	url, err := b.driver.CreateUploadURL(ctx, req.Digest)
+	url, err := b.driver.CreateUploadURL(ctx, byoc.UploadPrefix, req.Digest)
 	if err != nil {
 		return nil, err
 	}
@@ -547,7 +547,7 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 	if len(data) < 1000 {
 		payload = base64.StdEncoding.EncodeToString(data)
 	} else {
-		uploadURL, err := b.driver.CreateUploadURL(ctx, etag)
+		uploadURL, err := b.driver.CreateUploadURL(ctx, byoc.UploadPrefix, etag)
 		if err != nil {
 			return nil, err
 		}
