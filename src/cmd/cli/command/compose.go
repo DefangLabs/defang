@@ -78,8 +78,9 @@ func makeComposeUpCmd() *cobra.Command {
 				return err
 			}
 
-			ttl, _ := cmd.Flags().GetString("ttl")
-			if err := applyTTL(ttl, cmd.Flags().Changed("ttl")); err != nil {
+			ttlFlag, _ := cmd.Flags().GetString("ttl")
+			ttl, err := resolveTTL(ttlFlag, cmd.Flags().Changed("ttl"), time.Now())
+			if err != nil {
 				return err
 			}
 
@@ -140,6 +141,7 @@ func makeComposeUpCmd() *cobra.Command {
 				Project:    project,
 				UploadMode: upload,
 				Recipe:     session.Stack.Recipe,
+				TTL:        ttl,
 			})
 			if err != nil {
 				composeErr := err
@@ -219,23 +221,27 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().Bool("allow-upgrade", pkg.GetenvBool("DEFANG_ALLOW_UPGRADE"), "allow upgrading the CD image and Pulumi version to the latest available")
 	composeUpCmd.Flags().StringArray("env-file", nil, "compose environment file(s) for interpolation; defaults to .env") // docker-compose compatibility
 	_ = composeUpCmd.MarkFlagFilename("env-file")
-	composeUpCmd.Flags().String("ttl", "", `deployment time-to-live, after which the stack destroys itself (e.g. "12h" or "7d12h"); "never" cancels a previously set TTL`)
+	composeUpCmd.Flags().String("ttl", "", `time-to-live after which the deployment destroys itself (e.g. "12h", "7d12h" or a timestamp); reapplied on every deploy — put DEFANG_TTL in the stack file to make it stick`)
 	return composeUpCmd
 }
 
-// applyTTL makes the deployment TTL available to the BYOC providers through
-// the DEFANG_TTL environment variable, which they copy into the CD run's
-// environment (see byoc.AddTTLEnv). The --ttl flag wins over a DEFANG_TTL
-// stack-file variable, which LoadSession has already loaded into the process
-// environment. The effective value is syntax-checked here so a malformed TTL
-// fails before the CD task starts; the 1h..10y bounds are left to the CD.
-func applyTTL(ttlFlag string, flagSet bool) error {
-	if flagSet {
-		if err := os.Setenv(byoc.TTLEnvVar, ttlFlag); err != nil {
-			return err
-		}
+// resolveTTL picks the deployment TTL for this `up`: the --ttl flag wins;
+// otherwise the DEFANG_TTL variable of the selected stack file applies (it
+// reaches the process environment via LoadStackEnv when the session loads —
+// the single place the TTL is read from the environment). The value is
+// normalized (see byoc.ParseTTL) so a malformed TTL fails before the CD task
+// starts.
+//
+// Note the TTL is per-deploy, not persisted: the CD rebuilds its Pulumi stack
+// config from its environment on every run, so omitting both the flag and the
+// stack variable on a later `up` removes any scheduled self-destruct. The
+// stack file is the durable home for a TTL.
+func resolveTTL(ttlFlag string, flagSet bool, now time.Time) (string, error) {
+	ttl := ttlFlag
+	if !flagSet {
+		ttl = os.Getenv("DEFANG_TTL")
 	}
-	return byoc.ValidateTTL(os.Getenv(byoc.TTLEnvVar))
+	return byoc.ParseTTL(ttl, now)
 }
 
 func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.Deployment, accountInfo *client.AccountInfo, stackName string) (bool, error) {

@@ -274,6 +274,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		project:         project.Name,
 		statesUrl:       req.StatesUrl,
 		eventsUrl:       req.EventsUrl,
+		ttl:             req.TTL,
 	}
 
 	if b.needDockerHubCreds {
@@ -524,8 +525,6 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 		env["DEFANG_PULUMI_TARGETS"] = targets
 	}
 
-	byoc.AddTTLEnv(env)
-
 	if !term.StdoutCanColor() {
 		env["NO_COLOR"] = "1"
 	}
@@ -546,6 +545,7 @@ type cdCommand struct {
 
 	statesUrl string
 	eventsUrl string
+	ttl       string
 }
 
 func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild.BuildID, error) {
@@ -589,6 +589,8 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild
 	if cmd.eventsUrl != "" {
 		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
 	}
+
+	byoc.AddTTLEnv(env, cmd.ttl)
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging

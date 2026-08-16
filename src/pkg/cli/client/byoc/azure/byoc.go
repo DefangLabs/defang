@@ -433,7 +433,6 @@ func (b *ByocAzure) environment(projectName string) (map[string]string, error) {
 	if targets := os.Getenv("DEFANG_PULUMI_TARGETS"); targets != "" {
 		env["DEFANG_PULUMI_TARGETS"] = targets
 	}
-	byoc.AddTTLEnv(env)
 	if !term.StdoutCanColor() {
 		env["NO_COLOR"] = "1"
 	}
@@ -454,6 +453,7 @@ type cdCommand struct {
 	statesUrl      string
 	eventsUrl      string
 	delegateDomain string // forwarded to CD as DOMAIN; empty when deploying without delegation
+	ttl            string // forwarded to CD as DEFANG_TTL; empty when no TTL was given
 }
 
 func (b *ByocAzure) runCdCommand(ctx context.Context, cmd cdCommand) (string, error) {
@@ -483,6 +483,8 @@ func (b *ByocAzure) runCdCommand(ctx context.Context, cmd cdCommand) (string, er
 	if cmd.delegateDomain != "" {
 		env["DOMAIN"] = cmd.delegateDomain
 	}
+
+	byoc.AddTTLEnv(env, cmd.ttl)
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		// Run the cd binary locally from $DEFANG_PULUMI_DIR/cd instead of
@@ -575,6 +577,7 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 		statesUrl:      req.StatesUrl,
 		eventsUrl:      req.EventsUrl,
 		delegateDomain: req.DelegateDomain,
+		ttl:            req.TTL,
 	})
 	if err != nil {
 		return nil, err
