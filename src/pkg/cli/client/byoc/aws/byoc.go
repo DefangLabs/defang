@@ -524,6 +524,8 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 		env["DEFANG_PULUMI_TARGETS"] = targets
 	}
 
+	byoc.AddTTLEnv(env)
+
 	if !term.StdoutCanColor() {
 		env["NO_COLOR"] = "1"
 	}

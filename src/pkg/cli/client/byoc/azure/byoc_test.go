@@ -74,6 +74,28 @@ func TestServiceDNS(t *testing.T) {
 	}
 }
 
+func TestEnvironmentTTL(t *testing.T) {
+	b := newTestProvider(t, cloudazure.LocationWestUS2, "sub")
+
+	t.Setenv("DEFANG_TTL", "")
+	env, err := b.environment("myproj")
+	if err != nil {
+		t.Fatalf("environment: %v", err)
+	}
+	if _, ok := env["DEFANG_TTL"]; ok {
+		t.Error("DEFANG_TTL should be omitted from the CD env when no TTL was given")
+	}
+
+	t.Setenv("DEFANG_TTL", "7d12h")
+	env, err = b.environment("myproj")
+	if err != nil {
+		t.Fatalf("environment: %v", err)
+	}
+	if got := env["DEFANG_TTL"]; got != "7d12h" {
+		t.Errorf("env[DEFANG_TTL] = %q, want %q", got, "7d12h")
+	}
+}
+
 func TestGetPrivateDomain(t *testing.T) {
 	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
 	got := b.GetPrivateDomain("myproject")

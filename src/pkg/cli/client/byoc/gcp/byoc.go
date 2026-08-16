@@ -450,6 +450,8 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		pulumiBackendKey:           pulumiBackendValue, // TODO: make secret
 	}
 
+	byoc.AddTTLEnv(env)
+
 	if !term.StdoutCanColor() {
 		env["NO_COLOR"] = "1"
 	}

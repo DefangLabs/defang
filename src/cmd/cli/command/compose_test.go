@@ -95,3 +95,36 @@ func TestComposeConfig(t *testing.T) {
 		}
 	})
 }
+
+func TestApplyTTL(t *testing.T) {
+	tests := []struct {
+		name     string
+		stackTTL string // simulates a DEFANG_TTL stack-file variable loaded by LoadSession
+		flagTTL  string
+		flagSet  bool
+		wantEnv  string
+		wantErr  bool
+	}{
+		{name: "no TTL anywhere", wantEnv: ""},
+		{name: "stack file only", stackTTL: "7d", wantEnv: "7d"},
+		{name: "flag only", flagTTL: "12h", flagSet: true, wantEnv: "12h"},
+		{name: "flag wins over stack file", stackTTL: "7d", flagTTL: "12h", flagSet: true, wantEnv: "12h"},
+		{name: "flag never cancels stack file TTL", stackTTL: "7d", flagTTL: "never", flagSet: true, wantEnv: "never"},
+		{name: "invalid flag value", flagTTL: "1w", flagSet: true, wantErr: true},
+		{name: "invalid stack file value", stackTTL: "soon", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("DEFANG_TTL", tt.stackTTL)
+			err := applyTTL(tt.flagTTL, tt.flagSet)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("applyTTL() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil {
+				if got := os.Getenv("DEFANG_TTL"); got != tt.wantEnv {
+					t.Errorf("DEFANG_TTL = %q, want %q", got, tt.wantEnv)
+				}
+			}
+		})
+	}
+}

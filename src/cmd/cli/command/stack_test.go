@@ -314,6 +314,23 @@ func TestLoadStackEnv(t *testing.T) {
 			},
 		},
 		{
+			name: "With TTL",
+			parameters: stacks.Parameters{
+				Provider: client.ProviderAWS,
+				Region:   "us-west-2",
+				Recipe:   modes.RecipeAffordable,
+				Variables: map[string]string{
+					"DEFANG_TTL": "7d12h",
+				},
+			},
+			expectedEnv: map[string]string{
+				"DEFANG_PROVIDER": "aws",
+				"AWS_REGION":      "us-west-2",
+				"DEFANG_RECIPE":   "affordable",
+				"DEFANG_TTL":      "7d12h",
+			},
+		},
+		{
 			name: "With custom recipe",
 			parameters: stacks.Parameters{
 				Provider: client.ProviderAWS,
