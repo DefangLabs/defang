@@ -414,6 +414,7 @@ type cdCommand struct {
 	project        string
 	statesUrl      string
 	eventsUrl      string
+	ttl            string // forwarded to CD as DEFANG_TTL; empty when no TTL was given
 }
 
 type CloudBuildStep struct {
@@ -448,6 +449,10 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"REGION":                   b.driver.GetRegion(),
 		"STACK":                    b.PulumiStack,
 		pulumiBackendKey:           pulumiBackendValue, // TODO: make secret
+	}
+
+	if cmd.ttl != "" {
+		env["DEFANG_TTL"] = cmd.ttl
 	}
 
 	if !term.StdoutCanColor() {
@@ -605,6 +610,7 @@ func (b *ByocGcp) deploy(ctx context.Context, req *client.DeployRequest, command
 		project:        project.Name,
 		statesUrl:      req.StatesUrl,
 		eventsUrl:      req.EventsUrl,
+		ttl:            req.TTL,
 	}
 	buildId, err := b.runCdCommand(ctx, cdCmd)
 	if err != nil {

@@ -453,6 +453,7 @@ type cdCommand struct {
 	statesUrl      string
 	eventsUrl      string
 	delegateDomain string // forwarded to CD as DOMAIN; empty when deploying without delegation
+	ttl            string // forwarded to CD as DEFANG_TTL; empty when no TTL was given
 }
 
 func (b *ByocAzure) runCdCommand(ctx context.Context, cmd cdCommand) (string, error) {
@@ -481,6 +482,10 @@ func (b *ByocAzure) runCdCommand(ctx context.Context, cmd cdCommand) (string, er
 	// DNS records and managed certs land in the right zone. Mirrors AWS.
 	if cmd.delegateDomain != "" {
 		env["DOMAIN"] = cmd.delegateDomain
+	}
+
+	if cmd.ttl != "" {
+		env["DEFANG_TTL"] = cmd.ttl
 	}
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
@@ -574,6 +579,7 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 		statesUrl:      req.StatesUrl,
 		eventsUrl:      req.EventsUrl,
 		delegateDomain: req.DelegateDomain,
+		ttl:            req.TTL,
 	})
 	if err != nil {
 		return nil, err

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"time"
@@ -77,6 +78,12 @@ func makeComposeUpCmd() *cobra.Command {
 				return err
 			}
 
+			ttlFlag, _ := cmd.Flags().GetString("ttl")
+			ttl, err := resolveTTL(ttlFlag, cmd.Flags().Changed("ttl"), time.Now())
+			if err != nil {
+				return err
+			}
+
 			project, loadErr := session.Loader.LoadProject(ctx)
 			if loadErr != nil {
 				return handleInvalidComposeFileErr(ctx, loadErr)
@@ -134,6 +141,7 @@ func makeComposeUpCmd() *cobra.Command {
 				Project:    project,
 				UploadMode: upload,
 				Recipe:     session.Stack.Recipe,
+				TTL:        ttl,
 			})
 			if err != nil {
 				composeErr := err
@@ -213,7 +221,27 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().Bool("allow-upgrade", pkg.GetenvBool("DEFANG_ALLOW_UPGRADE"), "allow upgrading the CD image and Pulumi version to the latest available")
 	composeUpCmd.Flags().StringArray("env-file", nil, "compose environment file(s) for interpolation; defaults to .env") // docker-compose compatibility
 	_ = composeUpCmd.MarkFlagFilename("env-file")
+	composeUpCmd.Flags().String("ttl", "", `time-to-live after which the deployment destroys itself (e.g. "12h", "7d12h" or a timestamp)`)
 	return composeUpCmd
+}
+
+// resolveTTL picks the deployment TTL for this `up`: the --ttl flag wins;
+// otherwise the DEFANG_TTL variable of the selected stack file applies (it
+// reaches the process environment via LoadStackEnv when the session loads —
+// the single place the TTL is read from the environment). The value is
+// normalized (see byoc.ParseTTL) so a malformed TTL fails before the CD task
+// starts.
+//
+// Note the TTL is per-deploy, not persisted: the CD rebuilds its Pulumi stack
+// config from its environment on every run, so omitting both the flag and the
+// stack variable on a later `up` removes any scheduled self-destruct. The
+// stack file is the durable home for a TTL.
+func resolveTTL(ttlFlag string, flagSet bool, now time.Time) (string, error) {
+	ttl := ttlFlag
+	if !flagSet {
+		ttl = os.Getenv("DEFANG_TTL")
+	}
+	return byoc.ParseTTL(ttl, now)
 }
 
 func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.Deployment, accountInfo *client.AccountInfo, stackName string) (bool, error) {

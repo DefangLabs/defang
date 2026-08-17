@@ -29,6 +29,7 @@ type mockDeployProvider struct {
 	tailStream        *client.MockWaitStream[defangv1.TailResponse]
 	prevProjectUpdate *defangv1.ProjectUpdate
 	deployedRecipe    *defangv1.Recipe
+	deployedTTL       string
 	lock              sync.Mutex
 }
 
@@ -42,6 +43,7 @@ func (d *mockDeployProvider) Preview(ctx context.Context, req *client.DeployRequ
 	}
 	d.lock.Lock()
 	d.deployedRecipe = req.Recipe
+	d.deployedTTL = req.TTL
 	d.lock.Unlock()
 
 	project, err := compose.LoadFromContent(ctx, req.Compose, "")
@@ -153,6 +155,21 @@ func TestComposeUp(t *testing.T) {
 			if _, ok := proj.Services[service.Service.Name]; !ok {
 				t.Errorf("ComposeUp() failed: service %s not found", service.Service.Name)
 			}
+		}
+	})
+
+	t.Run("TTL is forwarded to the provider", func(t *testing.T) {
+		_, _, err := ComposeUp(t.Context(), mc, mp, stack, ComposeUpParams{
+			Recipe:     modes.RecipeAffordable,
+			Project:    proj,
+			UploadMode: compose.UploadModeDigest,
+			TTL:        "7d12h",
+		})
+		if err != nil {
+			t.Fatalf("ComposeUp() failed: %v", err)
+		}
+		if mp.deployedTTL != "7d12h" {
+			t.Errorf("DeployRequest.TTL = %q, want %q", mp.deployedTTL, "7d12h")
 		}
 	})
 

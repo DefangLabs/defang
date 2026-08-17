@@ -1,6 +1,8 @@
 package timeutils
 
 import (
+	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -8,8 +10,38 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// ParseTimeOrDuration parses a time string or duration string (e.g. 1h30m) and returns a time.Time.
-// At a minimum, this function supports RFC3339Nano, Go durations, and our own TimestampFormat (local).
+// ParseDuration parses a Go duration with an optional whole-days prefix,
+// like "12h", "7d" or "7d12h", because time.ParseDuration stops at hours.
+// With a days prefix the total must not come out negative; without one,
+// Go's sign rules apply.
+func ParseDuration(str string) (time.Duration, error) {
+	const day = 24 * time.Hour
+	s := str
+	var days time.Duration
+	if i := strings.IndexByte(s, 'd'); i > 0 {
+		n, err := strconv.ParseUint(s[:i], 10, 32)
+		if err != nil || time.Duration(n) > math.MaxInt64/day {
+			return 0, fmt.Errorf("invalid duration %q", str)
+		}
+		days = time.Duration(n) * day
+		s = s[i+1:]
+		if s == "" {
+			return days, nil
+		}
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, err
+	}
+	d += days
+	if days > 0 && d < 0 { // negative total, or int64 overflow
+		return 0, fmt.Errorf("invalid duration %q", str)
+	}
+	return d, nil
+}
+
+// ParseTimeOrDuration parses a time string or duration string (e.g. 1h30m or 7d) and returns a time.Time.
+// At a minimum, this function supports RFC3339Nano, Go durations with an optional whole-days prefix, and our own TimestampFormat (local).
 func ParseTimeOrDuration(str string, now time.Time) (time.Time, error) {
 	if str == "" {
 		return time.Time{}, nil
@@ -30,7 +62,7 @@ func ParseTimeOrDuration(str string, now time.Time) (time.Time, error) {
 		}
 		return sincet, nil
 	}
-	dur, err := time.ParseDuration(str)
+	dur, err := ParseDuration(str)
 	if err != nil {
 		// try as unix millis or seconds
 		if unix, parseErr := strconv.ParseFloat(str, 64); parseErr == nil && unix < 1e13 {

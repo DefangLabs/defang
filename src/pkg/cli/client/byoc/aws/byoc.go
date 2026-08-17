@@ -274,6 +274,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		project:         project.Name,
 		statesUrl:       req.StatesUrl,
 		eventsUrl:       req.EventsUrl,
+		ttl:             req.TTL,
 	}
 
 	if b.needDockerHubCreds {
@@ -544,6 +545,7 @@ type cdCommand struct {
 
 	statesUrl string
 	eventsUrl string
+	ttl       string
 }
 
 func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild.BuildID, error) {
@@ -586,6 +588,10 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild
 
 	if cmd.eventsUrl != "" {
 		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
+	}
+
+	if cmd.ttl != "" {
+		env["DEFANG_TTL"] = cmd.ttl
 	}
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {

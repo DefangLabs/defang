@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -94,4 +95,37 @@ func TestComposeConfig(t *testing.T) {
 			t.Fatalf("expected no error, got %v", err)
 		}
 	})
+}
+
+func TestResolveTTL(t *testing.T) {
+	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name     string
+		stackTTL string // simulates a DEFANG_TTL stack-file variable loaded by LoadSession
+		flagTTL  string
+		flagSet  bool
+		want     string
+		wantErr  bool
+	}{
+		{name: "no TTL anywhere", want: ""},
+		{name: "stack file only", stackTTL: "7d", want: "7d"},
+		{name: "flag only", flagTTL: "12h", flagSet: true, want: "12h"},
+		{name: "flag wins over stack file", stackTTL: "7d", flagTTL: "12h", flagSet: true, want: "12h"},
+		{name: "flag never cancels stack file TTL", stackTTL: "7d", flagTTL: "never", flagSet: true, want: "never"},
+		{name: "flag timestamp becomes a duration", flagTTL: "2026-08-17T12:00:00Z", flagSet: true, want: "24h0m0s"},
+		{name: "invalid flag value", flagTTL: "1w", flagSet: true, wantErr: true},
+		{name: "invalid stack file value", stackTTL: "soon", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("DEFANG_TTL", tt.stackTTL)
+			got, err := resolveTTL(tt.flagTTL, tt.flagSet, now)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("resolveTTL() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil && got != tt.want {
+				t.Errorf("resolveTTL() = %q, want %q", got, tt.want)
+			}
+		})
+	}
 }
