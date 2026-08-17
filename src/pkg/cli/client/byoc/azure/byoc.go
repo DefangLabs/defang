@@ -484,7 +484,9 @@ func (b *ByocAzure) runCdCommand(ctx context.Context, cmd cdCommand) (string, er
 		env["DOMAIN"] = cmd.delegateDomain
 	}
 
-	byoc.AddTTLEnv(env, cmd.ttl)
+	if cmd.ttl != "" {
+		env["DEFANG_TTL"] = cmd.ttl
+	}
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		// Run the cd binary locally from $DEFANG_PULUMI_DIR/cd instead of

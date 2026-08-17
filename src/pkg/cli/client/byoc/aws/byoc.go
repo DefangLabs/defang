@@ -590,7 +590,9 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild
 		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
 	}
 
-	byoc.AddTTLEnv(env, cmd.ttl)
+	if cmd.ttl != "" {
+		env["DEFANG_TTL"] = cmd.ttl
+	}
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging

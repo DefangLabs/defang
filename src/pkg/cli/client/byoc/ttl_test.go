@@ -41,6 +41,10 @@ func TestParseTTL(t *testing.T) {
 		{value: "1w", wantErr: true},
 		{value: "1.5d", wantErr: true},
 		{value: "-1d", wantErr: true},
+		// negative or zero durations are rejected (only "never"/"0" disable)
+		{value: "-1h", wantErr: true},
+		{value: "7d-1h", wantErr: true},
+		{value: "0h", wantErr: true},
 		{value: "d12h", wantErr: true},
 		{value: "7d1d", wantErr: true},
 		{value: "7dd", wantErr: true},
@@ -54,31 +58,6 @@ func TestParseTTL(t *testing.T) {
 			}
 			if err == nil && got != tt.want {
 				t.Errorf("ParseTTL(%q) = %q, want %q", tt.value, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestAddTTLEnv(t *testing.T) {
-	tests := []struct {
-		name    string
-		ttl     string
-		wantKey bool
-	}{
-		{name: "empty omits the key", ttl: "", wantKey: false},
-		{name: "duration is set", ttl: "7d12h", wantKey: true},
-		{name: "never is forwarded to cancel a scheduled self-destruct", ttl: "never", wantKey: true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			env := map[string]string{"OTHER": "x"}
-			AddTTLEnv(env, tt.ttl)
-			got, ok := env["DEFANG_TTL"]
-			if ok != tt.wantKey {
-				t.Fatalf("env[DEFANG_TTL] present = %v, want %v", ok, tt.wantKey)
-			}
-			if ok && got != tt.ttl {
-				t.Errorf("env[DEFANG_TTL] = %q, want %q", got, tt.ttl)
 			}
 		})
 	}
