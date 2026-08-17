@@ -12,11 +12,12 @@ import (
 
 // ParseDuration parses a Go duration with an optional whole-days prefix,
 // like "12h", "7d" or "7d12h", because time.ParseDuration stops at hours.
-// With a days prefix the total must not come out negative; without one,
-// Go's sign rules apply.
+// The input is trimmed and lowercased first (mirrors parseTTL in
+// pulumi-defang's cd/program/ttl.go). With a days prefix the total must not
+// come out negative; without one, Go's sign rules apply.
 func ParseDuration(str string) (time.Duration, error) {
 	const day = 24 * time.Hour
-	s := str
+	s := strings.ToLower(strings.TrimSpace(str))
 	var days time.Duration
 	if i := strings.IndexByte(s, 'd'); i > 0 {
 		n, err := strconv.ParseUint(s[:i], 10, 32)
