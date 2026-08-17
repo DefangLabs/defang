@@ -49,12 +49,16 @@ func TestParseDuration(t *testing.T) {
 		{str: "7d", want: 7 * 24 * time.Hour},
 		{str: "7d12h", want: 7*24*time.Hour + 12*time.Hour},
 		{str: "0d", want: 0},
-		{str: "-1h", want: -time.Hour}, // no days prefix: Go sign rules apply
+		{str: "-1h", want: -time.Hour},                   // no days prefix: Go sign rules apply
+		{str: "7d-1h", want: 7*24*time.Hour - time.Hour}, // negative remainder, positive total
+		{str: "106751d", want: 106751 * 24 * time.Hour},  // max representable whole days
 		{str: "", wantErr: true},
 		{str: "7", wantErr: true},
 		{str: "1.5d", wantErr: true},
 		{str: "-1d", wantErr: true},
-		{str: "7d-1h", wantErr: true}, // negative remainder after days prefix
+		{str: "1d-25h", wantErr: true},     // negative total with days prefix
+		{str: "106752d", wantErr: true},    // days alone overflow int64
+		{str: "106751d24h", wantErr: true}, // remainder pushes total past int64
 		{str: "d12h", wantErr: true},
 		{str: "7d1d", wantErr: true},
 		{str: "7dd", wantErr: true},

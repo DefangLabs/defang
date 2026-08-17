@@ -26,6 +26,7 @@ func TestParseTTL(t *testing.T) {
 		{value: "7d", want: "7d"},
 		{value: "7d12h", want: "7d12h"},
 		{value: "1d1h30m", want: "1d1h30m"},
+		{value: "7d-1h", want: "7d-1h"}, // positive total; the CD computes the same 167h
 		// out-of-bounds durations pass the syntax check; the CD enforces bounds
 		{value: "30m", want: "30m"},
 		{value: "9999d", want: "9999d"},
@@ -43,8 +44,9 @@ func TestParseTTL(t *testing.T) {
 		{value: "-1d", wantErr: true},
 		// negative or zero durations are rejected (only "never"/"0" disable)
 		{value: "-1h", wantErr: true},
-		{value: "7d-1h", wantErr: true},
+		{value: "1d-25h", wantErr: true},
 		{value: "0h", wantErr: true},
+		{value: "106752d", wantErr: true}, // days overflow int64
 		{value: "d12h", wantErr: true},
 		{value: "7d1d", wantErr: true},
 		{value: "7dd", wantErr: true},

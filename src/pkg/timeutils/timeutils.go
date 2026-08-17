@@ -2,6 +2,7 @@ package timeutils
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -10,26 +11,33 @@ import (
 )
 
 // ParseDuration parses a Go duration with an optional whole-days prefix,
-// like "12h", "7d" or "7d12h". A negative remainder after a days prefix
-// (like "7d-1h") is rejected; without the prefix, Go's sign rules apply.
+// like "12h", "7d" or "7d12h", because time.ParseDuration stops at hours.
+// With a days prefix the total must not come out negative; without one,
+// Go's sign rules apply.
 func ParseDuration(str string) (time.Duration, error) {
-	if i := strings.IndexByte(str, 'd'); i > 0 {
-		days, err := strconv.ParseUint(str[:i], 10, 32)
-		if err != nil {
+	const day = 24 * time.Hour
+	s := str
+	var days time.Duration
+	if i := strings.IndexByte(s, 'd'); i > 0 {
+		n, err := strconv.ParseUint(s[:i], 10, 32)
+		if err != nil || time.Duration(n) > math.MaxInt64/day {
 			return 0, fmt.Errorf("invalid duration %q", str)
 		}
-		dur := time.Duration(days) * 24 * time.Hour
-		rest := str[i+1:]
-		if rest == "" {
-			return dur, nil
+		days = time.Duration(n) * day
+		s = s[i+1:]
+		if s == "" {
+			return days, nil
 		}
-		rd, err := time.ParseDuration(rest)
-		if err != nil || rd < 0 {
-			return 0, fmt.Errorf("invalid duration %q", str)
-		}
-		return dur + rd, nil
 	}
-	return time.ParseDuration(str)
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, err
+	}
+	d += days
+	if days > 0 && d < 0 { // negative total, or int64 overflow
+		return 0, fmt.Errorf("invalid duration %q", str)
+	}
+	return d, nil
 }
 
 // ParseTimeOrDuration parses a time string or duration string (e.g. 1h30m or 7d) and returns a time.Time.
