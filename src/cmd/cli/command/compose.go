@@ -221,7 +221,7 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().Bool("allow-upgrade", pkg.GetenvBool("DEFANG_ALLOW_UPGRADE"), "allow upgrading the CD image and Pulumi version to the latest available")
 	composeUpCmd.Flags().StringArray("env-file", nil, "compose environment file(s) for interpolation; defaults to .env") // docker-compose compatibility
 	_ = composeUpCmd.MarkFlagFilename("env-file")
-	composeUpCmd.Flags().String("ttl", "", `time-to-live after which the deployment destroys itself (e.g. "12h", "7d12h" or a timestamp); reapplied on every deploy — put DEFANG_TTL in the stack file to make it stick`)
+	composeUpCmd.Flags().String("ttl", "", `time-to-live after which the deployment destroys itself (e.g. "12h", "7d12h" or a timestamp)`)
 	return composeUpCmd
 }
 
