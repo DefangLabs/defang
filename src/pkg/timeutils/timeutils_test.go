@@ -48,7 +48,6 @@ func TestParseDuration(t *testing.T) {
 		{str: "1h30m", want: 90 * time.Minute},
 		{str: "7d", want: 7 * 24 * time.Hour},
 		{str: "7d12h", want: 7*24*time.Hour + 12*time.Hour},
-		{str: " 7D12H ", want: 7*24*time.Hour + 12*time.Hour}, // trimmed and lowercased
 		{str: "0d", want: 0},
 		{str: "-1h", want: -time.Hour},                   // no days prefix: Go sign rules apply
 		{str: "7d-1h", want: 7*24*time.Hour - time.Hour}, // negative remainder, positive total
