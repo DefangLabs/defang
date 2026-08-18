@@ -208,6 +208,7 @@ func TestDebugDeploymentNonInteractive(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			stdout, stderr := term.SetupTestTerm(t)
 			mockAgent := &mockAgent{}
 			if tt.expectRun {
 				mockAgent.On("StartWithMessage", ctx, expectedPrompt).Return(nil)
@@ -224,8 +225,10 @@ func TestDebugDeploymentNonInteractive(t *testing.T) {
 
 			if tt.expectRun {
 				mockAgent.AssertCalled(t, "StartWithMessage", ctx, expectedPrompt)
+				assert.Contains(t, stdout.String()+stderr.String(), "AI-generated analysis may be inaccurate. Please verify it against the logs.")
 			} else {
 				mockAgent.AssertNotCalled(t, "StartWithMessage", mock.Anything, mock.Anything)
+				assert.NotContains(t, stdout.String()+stderr.String(), "AI-generated analysis may be inaccurate")
 			}
 		})
 	}
