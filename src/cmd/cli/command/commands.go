@@ -286,6 +286,11 @@ func SetupCommands(version string) {
 	debugCmd.Flags().StringVar(&global.ModelID, "model", global.ModelID, "LLM model to use for debugging (Pro users only)")
 	RootCmd.AddCommand(debugCmd)
 
+	// Cleanup Command
+	cleanupCmd.Flags().Bool("allow-upgrade", pkg.GetenvBool("DEFANG_ALLOW_UPGRADE"), "allow upgrading the CD image and Pulumi version to the latest available")
+	cleanupCmd.Flags().BoolP("yes", "y", false, "skip confirmation prompts and clean up everything found")
+	RootCmd.AddCommand(cleanupCmd)
+
 	// Tail Command
 	tailCmd := makeTailCmd()
 	RootCmd.AddCommand(tailCmd)

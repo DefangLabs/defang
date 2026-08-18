@@ -167,6 +167,7 @@ func (d *Debugger) promptAndTrackDebugSession(fn func() error, eventName string,
 	if err != nil {
 		return err
 	}
+	term.Warn("AI-generated analysis may be inaccurate. Please verify it against the logs.")
 
 	if d.interactive {
 		feedback, err := d.promptForFeedback()
