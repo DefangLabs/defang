@@ -15,7 +15,7 @@ jobs:
 
     steps:
       # Checkout the repository
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
@@ -55,7 +55,7 @@ jobs:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
         # Execute goreleaser nightly run (see .goreleaser.yml nightly for details)
-      - uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
+      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
         if: steps.check.outputs.changed == 'true'
         with:
           distribution: goreleaser-pro
@@ -69,7 +69,7 @@ jobs:
 
       - name: Slack Notification
         if: failure()
-        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2
         env:
           MSG_MINIMAL: actions url
           SLACK_COLOR: failure
