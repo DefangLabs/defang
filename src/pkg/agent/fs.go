@@ -3,9 +3,9 @@ package agent
 import (
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/firebase/genkit/go/ai"
 )
@@ -23,20 +23,36 @@ type ListFilesParams struct {
 	Path string `json:"path"`
 }
 
-func isSafePath(path string) bool {
-	cleaned := filepath.Clean(path)
-
-	// Reject absolute paths
-	if filepath.IsAbs(cleaned) {
-		return false
+// openCwdRoot returns a root-constrained name for path. The returned Root, rather
+// than this path conversion, enforces that filesystem operations cannot escape cwd.
+func openCwdRoot(path string) (*os.Root, string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, "", err
 	}
 
-	// Reject paths that traverse outside the current directory
-	if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
-		return false
+	root, err := os.OpenRoot(cwd)
+	if err != nil {
+		return nil, "", err
 	}
 
-	return true
+	if filepath.IsAbs(path) {
+		path, err = filepath.Rel(cwd, path)
+		if err != nil {
+			_ = root.Close()
+			return nil, "", err
+		}
+	}
+
+	return root, path, nil
+}
+
+func rootPathError(op, path string, err error) error {
+	var pathErr *os.PathError
+	if errors.As(err, &pathErr) {
+		return &os.PathError{Op: op, Path: path, Err: pathErr.Err}
+	}
+	return err
 }
 
 func CollectFsTools() []ai.Tool {
@@ -45,12 +61,15 @@ func CollectFsTools() []ai.Tool {
 			"read_file",
 			"Read the contents of a file from the local filesystem",
 			func(ctx *ai.ToolContext, params ReadFileParams) (string, error) {
-				if !isSafePath(params.Path) {
-					return "", errors.New("Accessing files outside the current working directory is not permitted")
-				}
-				bytes, err := os.ReadFile(params.Path)
+				root, path, err := openCwdRoot(params.Path)
 				if err != nil {
 					return "", err
+				}
+				defer root.Close()
+
+				bytes, err := root.ReadFile(path)
+				if err != nil {
+					return "", rootPathError("open", params.Path, err)
 				}
 				return string(bytes), nil
 			},
@@ -59,20 +78,27 @@ func CollectFsTools() []ai.Tool {
 			"find_files",
 			"Find files in a directory on the local filesystem matching a given pattern",
 			func(ctx *ai.ToolContext, params FindFilesParams) (string, error) {
-				if !isSafePath(params.Path) {
-					return "", errors.New("Accessing files outside the current working directory is not permitted")
+				root, path, err := openCwdRoot(params.Path)
+				if err != nil {
+					return "", err
 				}
+				defer root.Close()
+
 				var matches []string
-				err := filepath.Walk(params.Path, func(path string, info os.FileInfo, err error) error {
+				err = fs.WalkDir(root.FS(), filepath.ToSlash(path), func(path string, entry fs.DirEntry, err error) error {
 					if err != nil {
 						return err
 					}
-					matched, err := filepath.Match(params.Pattern, info.Name())
+					matched, err := filepath.Match(params.Pattern, entry.Name())
 					if err != nil {
 						return err
 					}
 					if matched {
-						matches = append(matches, path)
+						matchPath := filepath.FromSlash(path)
+						if filepath.IsAbs(params.Path) {
+							matchPath = filepath.Join(root.Name(), matchPath)
+						}
+						matches = append(matches, matchPath)
 					}
 					return nil
 				})
@@ -90,10 +116,13 @@ func CollectFsTools() []ai.Tool {
 			"list_files",
 			"List files in a directory on the local filesystem",
 			func(ctx *ai.ToolContext, params ListFilesParams) (string, error) {
-				if !isSafePath(params.Path) {
-					return "", errors.New("Accessing files outside the current working directory is not permitted")
+				root, path, err := openCwdRoot(params.Path)
+				if err != nil {
+					return "", err
 				}
-				entries, err := os.ReadDir(params.Path)
+				defer root.Close()
+
+				entries, err := fs.ReadDir(root.FS(), filepath.ToSlash(path))
 				if err != nil {
 					return "", err
 				}
