@@ -22,21 +22,26 @@ func TestParseTTL(t *testing.T) {
 		{value: "12h", want: "12h"},
 		{value: "90m", want: "90m"},
 		{value: "1h30m", want: "1h30m"},
+		{value: "1h", want: "1h"}, // exactly the minimum
 		// whole-days prefix passes through (the CD parses the same syntax)
 		{value: "7d", want: "7d"},
 		{value: "7d12h", want: "7d12h"},
 		{value: "1d1h30m", want: "1d1h30m"},
 		{value: "7d-1h", want: "7d-1h"}, // positive total; the CD computes the same 167h
-		// out-of-bounds durations pass the syntax check; the CD enforces bounds
-		{value: "30m", want: "30m"},
+		// below the CLI's minimum
+		{value: "30m", wantErr: true},
+		{value: "5m", wantErr: true},
+		// the CLI does not enforce a maximum; the CD does, as a typo guard
 		{value: "9999d", want: "9999d"},
 		// timestamps translate to the duration from now until then
 		{value: "2026-08-17T12:00:00Z", want: "24h0m0s"},
 		{value: "2026-08-16T13:30:00Z", want: "1h30m0s"},
-		{value: "1786968000", want: "24h0m0s"},         // unix seconds for 2026-08-17T12:00:00Z
-		{value: "2026-08-16T11:00:00Z", wantErr: true}, // in the past
-		{value: "2026-08-16T12:00:00Z", wantErr: true}, // now is not in the future
-		{value: "12", wantErr: true},                   // unix seconds in 1970
+		{value: "2026-08-16T13:00:00Z", want: "1h0m0s"}, // exactly the minimum
+		{value: "2026-08-16T12:30:00Z", wantErr: true},  // below the minimum
+		{value: "1786968000", want: "24h0m0s"},          // unix seconds for 2026-08-17T12:00:00Z
+		{value: "2026-08-16T11:00:00Z", wantErr: true},  // in the past
+		{value: "2026-08-16T12:00:00Z", wantErr: true},  // now is not in the future
+		{value: "12", wantErr: true},                    // unix seconds in 1970
 		// rejected syntax
 		{value: "abc", wantErr: true},
 		{value: "1w", wantErr: true},

@@ -8,6 +8,16 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
 )
 
+// minTTL is the shortest TTL the CLI accepts. The CD's self-destruct trigger
+// clock starts at deploy time, but resources can take 10+ minutes to finish
+// provisioning after that — a shorter TTL could tear the stack down while (or
+// right after) it comes up. This floor is enforced here, in the CLI, and
+// deliberately NOT in the CD (see parseTTL in pulumi-defang's
+// cd/program/ttl.go): the CD accepts any positive TTL so tests and manual CD
+// invocations that bypass this CLI check can use shorter durations to verify
+// the self-destruct trigger without waiting an hour.
+const minTTL = time.Hour
+
 // ParseTTL normalizes a deployment time-to-live for the CD program, which
 // reads it from the DEFANG_TTL env var of the CD run into its defang:ttl
 // stack config (see parseTTL in pulumi-defang's cd/program/ttl.go) to
@@ -19,10 +29,9 @@ import (
 //     (RFC3339, unix seconds/millis): translated to the duration from now
 //     until that moment, because the CD only accepts durations
 //
-// Only the syntax (and sign) is checked here, for fast feedback before the
-// CD task starts; the 1h..10y min/max bounds are deliberately NOT duplicated
-// on the CLI side — the CD enforces them authoritatively, so the rules
-// cannot drift.
+// The minTTL floor is enforced here; the CD's maxTTL remains the sole,
+// authoritative guard against typo'd far-future dates, so that rule cannot
+// drift between the two sides.
 func ParseTTL(value string, now time.Time) (string, error) {
 	s := strings.ToLower(strings.TrimSpace(value))
 	switch s {
@@ -30,8 +39,8 @@ func ParseTTL(value string, now time.Time) (string, error) {
 		return s, nil
 	}
 	if dur, err := timeutils.ParseDuration(s); err == nil {
-		if dur <= 0 {
-			return "", fmt.Errorf(`invalid TTL %q: must be positive (use "never" to disable)`, value)
+		if dur < minTTL {
+			return "", fmt.Errorf(`invalid TTL %q: must be at least %s (use "never" to disable)`, value, minTTL)
 		}
 		return s, nil
 	}
@@ -41,8 +50,8 @@ func ParseTTL(value string, now time.Time) (string, error) {
 		return "", fmt.Errorf(`invalid TTL %q: use a duration like "12h" or "7d", a timestamp, or "never"`, value)
 	}
 	ttl := ts.Sub(now)
-	if ttl <= 0 {
-		return "", fmt.Errorf("invalid TTL %q: timestamp is in the past", value)
+	if ttl < minTTL {
+		return "", fmt.Errorf(`invalid TTL %q: must be at least %s from now`, value, minTTL)
 	}
 	return ttl.String(), nil
 }
