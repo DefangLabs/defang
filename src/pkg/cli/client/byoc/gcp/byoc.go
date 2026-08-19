@@ -251,6 +251,7 @@ func (b *ByocGcp) SetUpCD(ctx context.Context, force bool) error {
 		"roles/datastore.owner",                 // For creating firestore database
 		"roles/logging.logWriter",               // For allowing cloudbuild to write logs
 		"roles/cloudscheduler.admin",            // For scheduling clean up jobs
+		"roles/storage.admin",                   // For creating the per-project build-artifacts bucket (pulumi-defang provider/defanggcp/gcp/artifact_registry.go); the bucket-scoped grant below only covers the CD's own fixed state bucket
 	}); err != nil {
 		return err
 	}
