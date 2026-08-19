@@ -58,8 +58,10 @@ const (
 //  7. Verify TLS is serving on https://<hostname>/.
 //
 // Apex domains (e.g. example.com) can't have a CNAME (RFC 1034), so they route
-// via an A record and validate over HTTP. Apex vs subdomain is detected from DNS
-// and from Azure's validation-method rejection — no caller hint is needed.
+// via an A record and validate over HTTP. The DNS-instructions print uses
+// dns.IsApexDomain (a static check on the name) to show the one relevant
+// record; the actual wait/validation logic still confirms apex-ness from live
+// DNS and from Azure's validation-method rejection — no caller hint is needed.
 //
 // Each ARM step is idempotent: re-running after a partial failure picks up
 // where it left off. resolverAt is used by steps 2 and 4 to chase the DNS chain
@@ -118,19 +120,30 @@ func IssueCert(ctx context.Context, cred azcore.TokenCredential, subscriptionID,
 		return nil
 	}
 
-	// Print every required record up front, in one block, even though TXT and
-	// the routing record are waited on separately below: the user is looking
-	// at their DNS dashboard right now, and wants to add everything needed in
+	// Print the records up front, in one block, even though TXT and the
+	// routing record are waited on separately below: the user is looking at
+	// their DNS dashboard right now, and wants to add everything needed in
 	// one sitting rather than being told about the routing record only after
 	// TXT has already propagated (lionello, PR review on #2222).
+	//
+	// Only one of CNAME/A ever applies to a given hostname — showing both, as
+	// if either could be added, misled the user into thinking they had a
+	// choice (lionello, PR review on #2222, r3816456453). dns.IsApexDomain is
+	// a static, DNS-lookup-free check on the name itself, so the right record
+	// can be picked before any DNS is configured; it's independent of the
+	// live-DNS apex detection dns.CheckDomainDNSReady and the managed-cert
+	// validation-method fallback (below) use once records exist.
 	asuid := "asuid." + hostname
 	txtOK, _ := dns.LookupTXTContains(ctx, asuid, vid, resolverAt(""))
 	routeOK := dns.CheckDomainDNSReady(ctx, hostname, []string{appFqdn}, resolverAt)
 	if !txtOK || !routeOK {
 		term.Printf("Configure DNS records for %s:\n", hostname)
-		term.Printf("  TXT    asuid.%s        ->  %s   (add this first — the hostname can register as soon as this is live)\n", hostname, vid)
-		term.Printf("  CNAME  %s              ->  %s   (subdomain; needed before the cert can be issued)\n", hostname, appFqdn)
-		term.Printf("  A      %s              ->  %s   (apex; needed before the cert can be issued)\n", hostname, fetchEnvironmentStaticIP(ctx, envsClient, resourceGroup, envName))
+		term.Printf("  TXT    asuid.%s  ->  %s   (add this first — the hostname can register as soon as this is live)\n", hostname, vid)
+		if dns.IsApexDomain(hostname) {
+			term.Printf("  A      %s  ->  %s   (needed before the cert can be issued)\n", hostname, fetchEnvironmentStaticIP(ctx, envsClient, resourceGroup, envName))
+		} else {
+			term.Printf("  CNAME  %s  ->  %s   (needed before the cert can be issued)\n", hostname, appFqdn)
+		}
 	}
 
 	deadline := time.Now().Add(dnsWaitTimeout)
