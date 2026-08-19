@@ -5,12 +5,15 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	armappcontainers "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appcontainers/armappcontainers/v3"
+
+	"github.com/DefangLabs/defang/src/pkg/dns"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -31,6 +34,64 @@ func appWithCustomDomains(names []string) *armappcontainers.ContainerApp {
 				},
 			},
 		},
+	}
+}
+
+// TestPendingRecords covers the non-apex branch and the nothing-to-do branch.
+// The apex branch needs a live ManagedEnvironments client to look up the env's
+// static IP; the apex-vs-subdomain decision itself is dns.IsApexDomain, which
+// is unit-tested in pkg/dns.
+func TestPendingRecords(t *testing.T) {
+	const (
+		hostname = "www.example.com"
+		appFqdn  = "app.westus.azurecontainerapps.io"
+		vid      = "VID123"
+	)
+	nsRecords := dns.DNSResponse{Records: []string{"ns1.example.com", "ns2.example.com"}}
+
+	tests := []struct {
+		name     string
+		resolver dns.MockResolver
+		want     []dns.RequiredRecord
+	}{
+		{
+			name:     "nothing configured yet",
+			resolver: dns.MockResolver{}, // every lookup fails: neither record exists
+			want: []dns.RequiredRecord{
+				{Type: "TXT", Name: "asuid." + hostname, Value: vid, Note: "add this first — the hostname can register as soon as this is live"},
+				{Type: "CNAME", Name: hostname, Value: appFqdn, Note: "needed before the cert can be issued"},
+			},
+		},
+		{
+			name: "routing record live but ownership TXT missing",
+			resolver: dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+				{Type: "NS", Domain: hostname}:    nsRecords,
+				{Type: "CNAME", Domain: hostname}: {Records: []string{appFqdn}},
+			}},
+			want: []dns.RequiredRecord{
+				{Type: "TXT", Name: "asuid." + hostname, Value: vid, Note: "add this first — the hostname can register as soon as this is live"},
+				{Type: "CNAME", Name: hostname, Value: appFqdn, Note: "needed before the cert can be issued"},
+			},
+		},
+		{
+			name: "both records live",
+			resolver: dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+				{Type: "TXT", Domain: "asuid." + hostname}: {Records: []string{vid}},
+				{Type: "NS", Domain: hostname}:             nsRecords,
+				{Type: "CNAME", Domain: hostname}:          {Records: []string{appFqdn}},
+			}},
+			want: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target := &certTarget{vid: vid, appFqdn: appFqdn}
+			got := target.pendingRecords(t.Context(), hostname, func(string) dns.Resolver { return tt.resolver })
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("pendingRecords = %+v, want %+v", got, tt.want)
+			}
+		})
 	}
 }
 
