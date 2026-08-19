@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -30,6 +31,56 @@ func appWithCustomDomains(names []string) *armappcontainers.ContainerApp {
 				},
 			},
 		},
+	}
+}
+
+func TestLockForAppSameKeySameMutex(t *testing.T) {
+	a := lockForApp("rg", "app")
+	b := lockForApp("rg", "app")
+	if a != b {
+		t.Error("lockForApp returned different mutexes for the same (rg, appName)")
+	}
+}
+
+func TestLockForAppDifferentKeysDifferentMutex(t *testing.T) {
+	if lockForApp("rg", "app1") == lockForApp("rg", "app2") {
+		t.Error("lockForApp returned the same mutex for different appNames")
+	}
+	if lockForApp("rg1", "app") == lockForApp("rg2", "app") {
+		t.Error("lockForApp returned the same mutex for different resource groups")
+	}
+}
+
+// TestLockForAppSerializesSameApp guards against the regression that caused
+// the 2026-08-19 defang.io outage: two hostnames on the same ContainerApp
+// (e.g. an apex domain and its www alias) are processed as concurrent
+// domainJobs (cli/cert.go runIssuerJobs), each calling addHostnameDisabled /
+// bindHostnameSniEnabled, which Get-modify-PATCH the same CustomDomains array.
+// Without appLock serializing that critical section per app, two concurrent
+// non-atomic increments on a value guarded by "the same lock" would race and
+// lose updates — exactly mirroring how a losing PATCH silently dropped a
+// sibling hostname's binding. This test asserts the lock actually provides
+// exclusion, not just that it returns a mutex.
+func TestLockForAppSerializesSameApp(t *testing.T) {
+	const goroutines = 50
+	counter := 0
+	var wg sync.WaitGroup
+	for range goroutines {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			mu := lockForApp("rg", "shared-app")
+			mu.Lock()
+			defer mu.Unlock()
+			// A non-atomic read-modify-write: only safe under mutual exclusion.
+			cur := counter
+			cur++
+			counter = cur
+		}()
+	}
+	wg.Wait()
+	if counter != goroutines {
+		t.Errorf("counter = %d, want %d (lost updates under concurrent access)", counter, goroutines)
 	}
 }
 
