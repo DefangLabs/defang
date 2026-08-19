@@ -163,17 +163,32 @@ func TestIsTerminal(t *testing.T) {
 	}
 }
 
-func TestDoJSON(t *testing.T) {
-	oldTerm := DefaultTerm
-	t.Cleanup(func() { DefaultTerm = oldTerm })
-	DefaultTerm = NewTerm(os.Stdin, &bytes.Buffer{}, &bytes.Buffer{})
+// TestPrintRoutingInJSONMode is a regression test: Print/Println/Printf/Printc
+// used to always write to stdout, so any of them reachable from a command
+// that also emits --json output (e.g. via a debug dump) would corrupt that
+// JSON payload. They must move to stderr in JSON mode, like Info/Warn do.
+func TestPrintRoutingInJSONMode(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	defaultTerm := NewTerm(os.Stdin, &stdout, &stderr)
 
-	if DoJSON() {
-		t.Error("Expected DoJSON() to default to false")
+	defaultTerm.Print("a")
+	defaultTerm.Println("b")
+	defaultTerm.Printf("%s", "c")
+	defaultTerm.Printc(InfoColor, "d")
+	if stdout.String() == "" || stderr.String() != "" {
+		t.Errorf("expected Print* to write to stdout when JSON mode is off; stdout=%q stderr=%q", stdout.String(), stderr.String())
 	}
-	SetJSON(true)
-	if !DoJSON() {
-		t.Error("Expected DoJSON() to return true after SetJSON(true)")
+
+	stdout.Reset()
+	stderr.Reset()
+	defaultTerm.SetJSON(true)
+
+	defaultTerm.Print("a")
+	defaultTerm.Println("b")
+	defaultTerm.Printf("%s", "c")
+	defaultTerm.Printc(InfoColor, "d")
+	if stdout.String() != "" || stderr.String() == "" {
+		t.Errorf("expected Print* to write to stderr when JSON mode is on; stdout=%q stderr=%q", stdout.String(), stderr.String())
 	}
 }
 func TestWarn(t *testing.T) {

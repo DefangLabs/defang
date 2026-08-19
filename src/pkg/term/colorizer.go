@@ -97,10 +97,6 @@ func (t *Term) DoDebug() bool {
 	return t.debug.Load()
 }
 
-func (t *Term) DoJSON() bool {
-	return t.json
-}
-
 func (t *Term) HasDarkBackground() bool {
 	return t.hasDarkBg
 }
@@ -199,20 +195,24 @@ func ensurePrefix(prefix prefixChars, s string) string {
 	return string(prefix) + s
 }
 
+// Printc, Print, Println, and Printf are for human-readable text; they write
+// to stderr instead of stdout when JSON mode is on, so they never corrupt a
+// command's --json payload. The only thing that belongs on stdout in JSON
+// mode is the JSON payload itself (see jsonTable in table.go).
 func (t *Term) Printc(c Color, v ...any) (int, error) {
-	return output(t.out, c, fmt.Sprint(v...))
+	return output(t.outOrErr(), c, fmt.Sprint(v...))
 }
 
 func (t *Term) Print(v ...any) (int, error) {
-	return fmt.Fprint(t.out, v...)
+	return fmt.Fprint(t.outOrErr(), v...)
 }
 
 func (t *Term) Println(v ...any) (int, error) {
-	return fmt.Fprintln(t.out, v...)
+	return fmt.Fprintln(t.outOrErr(), v...)
 }
 
 func (t *Term) Printf(format string, v ...any) (int, error) {
-	return fmt.Fprintf(t.out, format, v...)
+	return fmt.Fprintf(t.outOrErr(), format, v...)
 }
 
 func (t *Term) Debug(v ...any) (int, error) {
@@ -383,10 +383,6 @@ func SetJSON(json bool) {
 
 func DoDebug() bool {
 	return DefaultTerm.DoDebug()
-}
-
-func DoJSON() bool {
-	return DefaultTerm.DoJSON()
 }
 
 func HasDarkBackground() bool {
