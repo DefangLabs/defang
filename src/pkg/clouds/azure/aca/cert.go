@@ -189,21 +189,17 @@ func waitForBYODdns(ctx context.Context, envsClient *armappcontainers.ManagedEnv
 // static IP over ARM for display in the apex A-record instructions. This is a
 // JIT lookup done only once the DNS-not-ready prompt is about to be shown, so
 // the common case (DNS already configured) never pays for it. A lookup
-// failure, or a blank StaticIP (e.g. an environment still provisioning),
+// failure, or an empty StaticIP (e.g. an environment still provisioning),
 // falls back to a placeholder rather than failing cert issuance — the value
 // is purely informational; dns.CheckDomainDNSReady validates the actual DNS
 // state itself.
 func fetchEnvironmentStaticIP(ctx context.Context, envsClient *armappcontainers.ManagedEnvironmentsClient, resourceGroup, envName string) string {
-	const placeholder = "<Container Apps environment IP; check the Azure portal>"
 	env, err := envsClient.Get(ctx, resourceGroup, envName, nil)
-	if err != nil || env.Properties == nil || env.Properties.StaticIP == nil {
+	if err != nil || env.Properties == nil || env.Properties.StaticIP == nil || *env.Properties.StaticIP == "" {
 		term.Debugf("Could not fetch static IP for environment %s: %v", envName, err)
-		return placeholder
+		return "<Container Apps environment IP; check the Azure portal>"
 	}
-	if ip := strings.TrimSpace(*env.Properties.StaticIP); ip != "" {
-		return ip
-	}
-	return placeholder
+	return *env.Properties.StaticIP
 }
 
 // addHostnameDisabled PATCHes the ContainerApp to add (or no-op) a customDomain
