@@ -67,6 +67,10 @@ func IssueCert(ctx context.Context, cred azcore.TokenCredential, subscriptionID,
 	if err != nil {
 		return fmt.Errorf("creating managed certificates client: %w", err)
 	}
+	envsClient, err := armappcontainers.NewManagedEnvironmentsClient(subscriptionID, cred, nil)
+	if err != nil {
+		return fmt.Errorf("creating managed environments client: %w", err)
+	}
 
 	app, err := findContainerAppByService(ctx, appsClient, resourceGroup, serviceName)
 	if err != nil {
@@ -97,7 +101,7 @@ func IssueCert(ctx context.Context, cred azcore.TokenCredential, subscriptionID,
 		return nil
 	}
 
-	if err := waitForBYODdns(ctx, hostname, appFqdn, vid, resolverAt); err != nil {
+	if err := waitForBYODdns(ctx, envsClient, resourceGroup, envName, hostname, appFqdn, vid, resolverAt); err != nil {
 		return err
 	}
 
@@ -152,7 +156,7 @@ func findContainerAppByService(ctx context.Context, client *armappcontainers.Con
 // managed environment's static IP, exactly what an apex A record must point at.
 // So an apex domain is validated against the intended target, not merely
 // "resolves to something". The asuid TXT is always required.
-func waitForBYODdns(ctx context.Context, hostname, expectedCname, expectedTxt string, resolverAt func(string) dns.Resolver) error {
+func waitForBYODdns(ctx context.Context, envsClient *armappcontainers.ManagedEnvironmentsClient, resourceGroup, envName, hostname, expectedCname, expectedTxt string, resolverAt func(string) dns.Resolver) error {
 	asuid := "asuid." + hostname
 	deadline := time.Now().Add(dnsWaitTimeout)
 	promptShown := false
@@ -167,7 +171,7 @@ func waitForBYODdns(ctx context.Context, hostname, expectedCname, expectedTxt st
 		if !promptShown {
 			term.Printf("Configure DNS records for %s:\n", hostname)
 			term.Printf("  CNAME  %s              ->  %s   (subdomain)\n", hostname, expectedCname)
-			term.Printf("  A      %s              ->  <Container Apps environment IP>   (apex)\n", hostname)
+			term.Printf("  A      %s              ->  %s   (apex)\n", hostname, environmentStaticIP(ctx, envsClient, resourceGroup, envName))
 			term.Printf("  TXT    asuid.%s        ->  %s\n", hostname, expectedTxt)
 			term.Infof("Waiting for DNS propagation (timeout %v)...", dnsWaitTimeout)
 			promptShown = true
@@ -179,6 +183,21 @@ func waitForBYODdns(ctx context.Context, hostname, expectedCname, expectedTxt st
 			return err
 		}
 	}
+}
+
+// environmentStaticIP fetches the Container Apps environment's inbound static IP
+// for display in the apex A-record instructions. This is a JIT lookup done only
+// once the DNS-not-ready prompt is about to be shown, so the common case (DNS
+// already configured) never pays for it. A lookup failure falls back to a
+// placeholder rather than failing cert issuance — the value is purely
+// informational; dns.CheckDomainDNSReady validates the actual DNS state itself.
+func environmentStaticIP(ctx context.Context, envsClient *armappcontainers.ManagedEnvironmentsClient, resourceGroup, envName string) string {
+	env, err := envsClient.Get(ctx, resourceGroup, envName, nil)
+	if err != nil || env.Properties == nil || env.Properties.StaticIP == nil {
+		term.Debugf("Could not fetch static IP for environment %s: %v", envName, err)
+		return "<Container Apps environment IP; check the Azure portal>"
+	}
+	return *env.Properties.StaticIP
 }
 
 // addHostnameDisabled PATCHes the ContainerApp to add (or no-op) a customDomain
