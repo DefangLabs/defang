@@ -40,6 +40,140 @@ const (
 	tlsPollEvery   = 5 * time.Second
 )
 
+// certTarget is the ContainerApp-derived state both PreflightCert and
+// IssueCert need: which app to patch, the ownership token to publish, and the
+// FQDN / environment the routing record and managed cert hang off.
+type certTarget struct {
+	appsClient  *armappcontainers.ContainerAppsClient
+	certsClient *armappcontainers.ManagedCertificatesClient
+	envsClient  *armappcontainers.ManagedEnvironmentsClient
+
+	resourceGroup string
+	app           *armappcontainers.ContainerApp
+	appName       string
+	vid           string // CustomDomainVerificationID, published as the asuid TXT value
+	appFqdn       string
+	envName       string
+	certName      string
+}
+
+// resolveCertTarget locates the ContainerApp tagged for serviceName and derives
+// everything the cert flow needs from it.
+//
+// PreflightCert and IssueCert each call this rather than one passing an opaque
+// handle to the other: the two run in separate phases of a provider-generic CLI
+// flow (see cli/cert.go runIssuerJobs), and threading Azure state through that
+// flow would leak ARM types into it. The cost is one extra ContainerApps list
+// per hostname, which is negligible next to the DNS waits and the two
+// long-running ARM operations that follow.
+func resolveCertTarget(ctx context.Context, cred azcore.TokenCredential, subscriptionID, resourceGroup, serviceName, hostname string) (*certTarget, error) {
+	appsClient, err := armappcontainers.NewContainerAppsClient(subscriptionID, cred, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating container apps client: %w", err)
+	}
+	certsClient, err := armappcontainers.NewManagedCertificatesClient(subscriptionID, cred, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating managed certificates client: %w", err)
+	}
+	envsClient, err := armappcontainers.NewManagedEnvironmentsClient(subscriptionID, cred, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating managed environments client: %w", err)
+	}
+
+	app, err := findContainerAppByService(ctx, appsClient, resourceGroup, serviceName)
+	if err != nil {
+		return nil, err
+	}
+	appName := derefString(app.Name)
+	if app.Properties == nil ||
+		app.Properties.CustomDomainVerificationID == nil ||
+		app.Properties.Configuration == nil ||
+		app.Properties.Configuration.Ingress == nil ||
+		app.Properties.Configuration.Ingress.Fqdn == nil ||
+		app.Properties.ManagedEnvironmentID == nil {
+		return nil, fmt.Errorf("container app %q is missing required ingress/verificationId fields", appName)
+	}
+	envID := *app.Properties.ManagedEnvironmentID
+	envName := envID[strings.LastIndex(envID, "/")+1:]
+	return &certTarget{
+		appsClient:    appsClient,
+		certsClient:   certsClient,
+		envsClient:    envsClient,
+		resourceGroup: resourceGroup,
+		app:           app,
+		appName:       appName,
+		vid:           *app.Properties.CustomDomainVerificationID,
+		appFqdn:       *app.Properties.Configuration.Ingress.Fqdn,
+		envName:       envName,
+		certName:      managedCertName(envName, hostname),
+	}, nil
+}
+
+// PreflightCert reports the DNS records `hostname` still needs before a cert
+// can be issued for it, doing no provisioning work of its own. A nil result
+// means there is nothing for the user to do: either both records are already
+// live, or the hostname is already serving TLS.
+//
+// This exists so the caller can probe every hostname first and present all
+// pending records in one block, before any hostname starts waiting — a user
+// staring at their DNS dashboard wants the full list in one sitting, not one
+// domain's records at a time as each worker happens to reach them. IssueCert
+// therefore does *not* print the records; callers that want them shown must
+// run this first.
+func PreflightCert(ctx context.Context, cred azcore.TokenCredential, subscriptionID, resourceGroup, serviceName, hostname string, resolverAt func(string) dns.Resolver) ([]dns.RequiredRecord, error) {
+	target, err := resolveCertTarget(ctx, cred, subscriptionID, resourceGroup, serviceName, hostname)
+	if err != nil {
+		return nil, err
+	}
+	if alreadyServingTLS(ctx, target.certsClient, resourceGroup, target.envName, target.certName, target.app, hostname) {
+		return nil, nil
+	}
+	return target.pendingRecords(ctx, hostname, resolverAt), nil
+}
+
+// pendingRecords returns both records the hostname needs whenever either is
+// missing: TXT and the routing record are waited on separately, but the user
+// wants to add everything in one sitting rather than being told about the
+// routing record only after TXT has already propagated (lionello, PR review
+// on #2222).
+//
+// Only one of CNAME/A ever applies to a given hostname — showing both, as if
+// either could be added, misled the user into thinking they had a choice
+// (lionello, PR review on #2222, r3816456453). dns.IsApexDomain is a static,
+// DNS-lookup-free check on the name itself, so the right record can be picked
+// before any DNS is configured; it's independent of the live-DNS apex detection
+// dns.CheckDomainDNSReady and the managed-cert validation-method fallback use
+// once records exist.
+func (t *certTarget) pendingRecords(ctx context.Context, hostname string, resolverAt func(string) dns.Resolver) []dns.RequiredRecord {
+	txtOK, _ := dns.LookupTXTContains(ctx, "asuid."+hostname, t.vid, resolverAt(""))
+	routeOK := dns.CheckDomainDNSReady(ctx, hostname, []string{t.appFqdn}, resolverAt)
+	if txtOK && routeOK {
+		return nil
+	}
+	records := []dns.RequiredRecord{{
+		Type:  "TXT",
+		Name:  "asuid." + hostname,
+		Value: t.vid,
+		Note:  "add this first — the hostname can register as soon as this is live",
+	}}
+	if dns.IsApexDomain(hostname) {
+		records = append(records, dns.RequiredRecord{
+			Type:  "A",
+			Name:  hostname,
+			Value: fetchEnvironmentStaticIP(ctx, t.envsClient, t.resourceGroup, t.envName),
+			Note:  "needed before the cert can be issued",
+		})
+	} else {
+		records = append(records, dns.RequiredRecord{
+			Type:  "CNAME",
+			Name:  hostname,
+			Value: t.appFqdn,
+			Note:  "needed before the cert can be issued",
+		})
+	}
+	return records
+}
+
 // IssueCert provisions a TLS cert for `hostname` on the ContainerApp tagged
 // for `serviceName` in `resourceGroup`. Steps:
 //
@@ -58,10 +192,17 @@ const (
 //  7. Verify TLS is serving on https://<hostname>/.
 //
 // Apex domains (e.g. example.com) can't have a CNAME (RFC 1034), so they route
-// via an A record and validate over HTTP. The DNS-instructions print uses
-// dns.IsApexDomain (a static check on the name) to show the one relevant
-// record; the actual wait/validation logic still confirms apex-ness from live
-// DNS and from Azure's validation-method rejection — no caller hint is needed.
+// via an A record and validate over HTTP. The wait/validation logic confirms
+// apex-ness from live DNS and from Azure's validation-method rejection — no
+// caller hint is needed.
+//
+// The records the user must create are *not* printed here; call PreflightCert
+// for those, so a caller issuing for several hostnames can show them all in one
+// block before any of them starts waiting.
+//
+// Every user-facing progress line goes through log, which the CLI points at a
+// per-domain prefixed logger so concurrent hostnames stay readable; pass nil to
+// get plain term.Infof output.
 //
 // Each ARM step is idempotent: re-running after a partial failure picks up
 // where it left off. resolverAt is used by steps 2 and 4 to chase the DNS chain
@@ -77,101 +218,52 @@ const (
 // write, silently drops the other's just-added binding. appLock guards exactly
 // that critical section, per (resourceGroup, appName), while leaving DNS waits
 // and cert issuance (independent per hostname) fully parallel.
-func IssueCert(ctx context.Context, cred azcore.TokenCredential, subscriptionID, resourceGroup, serviceName, hostname string, resolverAt func(string) dns.Resolver) error {
-	appsClient, err := armappcontainers.NewContainerAppsClient(subscriptionID, cred, nil)
-	if err != nil {
-		return fmt.Errorf("creating container apps client: %w", err)
-	}
-	certsClient, err := armappcontainers.NewManagedCertificatesClient(subscriptionID, cred, nil)
-	if err != nil {
-		return fmt.Errorf("creating managed certificates client: %w", err)
-	}
-	envsClient, err := armappcontainers.NewManagedEnvironmentsClient(subscriptionID, cred, nil)
-	if err != nil {
-		return fmt.Errorf("creating managed environments client: %w", err)
+func IssueCert(ctx context.Context, cred azcore.TokenCredential, subscriptionID, resourceGroup, serviceName, hostname string, resolverAt func(string) dns.Resolver, log func(string, ...any)) error {
+	if log == nil {
+		log = func(format string, args ...any) { term.Infof(format, args...) }
 	}
 
-	app, err := findContainerAppByService(ctx, appsClient, resourceGroup, serviceName)
+	target, err := resolveCertTarget(ctx, cred, subscriptionID, resourceGroup, serviceName, hostname)
 	if err != nil {
 		return err
 	}
-	appName := derefString(app.Name)
-	if app.Properties == nil ||
-		app.Properties.CustomDomainVerificationID == nil ||
-		app.Properties.Configuration == nil ||
-		app.Properties.Configuration.Ingress == nil ||
-		app.Properties.Configuration.Ingress.Fqdn == nil ||
-		app.Properties.ManagedEnvironmentID == nil {
-		return fmt.Errorf("container app %q is missing required ingress/verificationId fields", appName)
-	}
-	vid := *app.Properties.CustomDomainVerificationID
-	appFqdn := *app.Properties.Configuration.Ingress.Fqdn
-	envID := *app.Properties.ManagedEnvironmentID
-	envName := envID[strings.LastIndex(envID, "/")+1:]
-	certName := managedCertName(envName, hostname)
 
 	// Short-circuit: if the hostname is already bound SniEnabled with a cert and
 	// that managed cert is in the Succeeded state, the host is already serving
 	// TLS — skip the DNS wait, the cert create-or-update, and the SNI re-bind.
 	// All of those are idempotent but run two long-running ARM operations per
 	// service on every deploy; this avoids that work when nothing changed.
-	if alreadyServingTLS(ctx, certsClient, resourceGroup, envName, certName, app, hostname) {
-		term.Debugf("Cert %s for %s already provisioned and bound; skipping issuance", certName, hostname)
+	if alreadyServingTLS(ctx, target.certsClient, resourceGroup, target.envName, target.certName, target.app, hostname) {
+		term.Debugf("Cert %s for %s already provisioned and bound; skipping issuance", target.certName, hostname)
 		return nil
 	}
 
-	// Print the records up front, in one block, even though TXT and the
-	// routing record are waited on separately below: the user is looking at
-	// their DNS dashboard right now, and wants to add everything needed in
-	// one sitting rather than being told about the routing record only after
-	// TXT has already propagated (lionello, PR review on #2222).
-	//
-	// Only one of CNAME/A ever applies to a given hostname — showing both, as
-	// if either could be added, misled the user into thinking they had a
-	// choice (lionello, PR review on #2222, r3816456453). dns.IsApexDomain is
-	// a static, DNS-lookup-free check on the name itself, so the right record
-	// can be picked before any DNS is configured; it's independent of the
-	// live-DNS apex detection dns.CheckDomainDNSReady and the managed-cert
-	// validation-method fallback (below) use once records exist.
-	asuid := "asuid." + hostname
-	txtOK, _ := dns.LookupTXTContains(ctx, asuid, vid, resolverAt(""))
-	routeOK := dns.CheckDomainDNSReady(ctx, hostname, []string{appFqdn}, resolverAt)
-	if !txtOK || !routeOK {
-		term.Printf("Configure DNS records for %s:\n", hostname)
-		term.Printf("  TXT    asuid.%s  ->  %s   (add this first — the hostname can register as soon as this is live)\n", hostname, vid)
-		if dns.IsApexDomain(hostname) {
-			term.Printf("  A      %s  ->  %s   (needed before the cert can be issued)\n", hostname, fetchEnvironmentStaticIP(ctx, envsClient, resourceGroup, envName))
-		} else {
-			term.Printf("  CNAME  %s  ->  %s   (needed before the cert can be issued)\n", hostname, appFqdn)
-		}
-	}
-
 	deadline := time.Now().Add(dnsWaitTimeout)
-	if err := waitForAsuidTXT(ctx, hostname, vid, deadline, resolverAt); err != nil {
+	if err := waitForAsuidTXT(ctx, hostname, target.vid, deadline, resolverAt, log); err != nil {
 		return err
 	}
 
-	term.Infof("Registering custom hostname %s on container app %s", hostname, appName)
-	if err := addHostnameDisabled(ctx, appsClient, resourceGroup, appName, hostname); err != nil {
+	log("registering custom hostname on container app %s…", target.appName)
+	if err := addHostnameDisabled(ctx, target.appsClient, resourceGroup, target.appName, hostname); err != nil {
 		return err
 	}
 
-	if err := waitForRoutingRecord(ctx, hostname, appFqdn, deadline, resolverAt); err != nil {
+	if err := waitForRoutingRecord(ctx, hostname, target.appFqdn, deadline, resolverAt, log); err != nil {
 		return err
 	}
 
-	term.Infof("Issuing managed certificate %s (this may take up to ~5 minutes)", certName)
-	issued, err := issueManagedCertificate(ctx, certsClient, resourceGroup, envName, certName, hostname, derefString(app.Location))
+	log("issuing managed certificate %s (may take up to ~5 minutes)…", target.certName)
+	issued, err := issueManagedCertificate(ctx, target.certsClient, resourceGroup, target.envName, target.certName, hostname, derefString(target.app.Location), log)
 	if err != nil {
 		return err
 	}
 
-	term.Infof("Binding cert to %s on %s", hostname, appName)
-	if err := bindHostnameSniEnabled(ctx, appsClient, resourceGroup, appName, hostname, derefString(issued.ID)); err != nil {
+	log("binding cert on container app %s…", target.appName)
+	if err := bindHostnameSniEnabled(ctx, target.appsClient, resourceGroup, target.appName, hostname, derefString(issued.ID)); err != nil {
 		return err
 	}
 
-	term.Infof("Waiting for TLS to come online on https://%s/", hostname)
+	log("waiting for TLS cert to come online…")
 	return waitForTLS(ctx, hostname, resolverAt(""))
 }
 
@@ -201,9 +293,9 @@ func findContainerAppByService(ctx context.Context, client *armappcontainers.Con
 // required only for hostname registration (addHostnameDisabled) — it does
 // not need traffic to route to Azure yet, so a caller can add just this
 // record ahead of a DNS cutover and have the hostname registered/verified in
-// advance. The record values themselves are printed once by the caller,
-// covering both this and the routing record in one block — see IssueCert.
-func waitForAsuidTXT(ctx context.Context, hostname, expectedTxt string, deadline time.Time, resolverAt func(string) dns.Resolver) error {
+// advance. The record values themselves are printed once by the caller's
+// pre-flight, covering both this and the routing record — see PreflightCert.
+func waitForAsuidTXT(ctx context.Context, hostname, expectedTxt string, deadline time.Time, resolverAt func(string) dns.Resolver, log func(string, ...any)) error {
 	asuid := "asuid." + hostname
 	waitingLogged := false
 
@@ -212,7 +304,7 @@ func waitForAsuidTXT(ctx context.Context, hostname, expectedTxt string, deadline
 			return nil
 		}
 		if !waitingLogged {
-			term.Infof("Waiting for the asuid TXT record on %s to propagate (timeout %v)...", hostname, time.Until(deadline).Round(time.Second))
+			log("waiting for the asuid TXT record to propagate (timeout %v)…", time.Until(deadline).Round(time.Second))
 			waitingLogged = true
 		}
 		if time.Now().After(deadline) {
@@ -235,18 +327,18 @@ func waitForAsuidTXT(ctx context.Context, hostname, expectedTxt string, deadline
 // managed environment's static IP, exactly what an apex A record must point at.
 // So an apex domain is validated against the intended target, not merely
 // "resolves to something". The record values themselves are printed once by
-// the caller, covering both this and the TXT record in one block — see
-// IssueCert.
-func waitForRoutingRecord(ctx context.Context, hostname, expectedCname string, deadline time.Time, resolverAt func(string) dns.Resolver) error {
+// the caller's pre-flight, covering both this and the TXT record — see
+// PreflightCert.
+func waitForRoutingRecord(ctx context.Context, hostname, expectedCname string, deadline time.Time, resolverAt func(string) dns.Resolver, log func(string, ...any)) error {
 	waitingLogged := false
 
 	for {
 		if dns.CheckDomainDNSReady(ctx, hostname, []string{expectedCname}, resolverAt) {
-			term.Infof("DNS records for %s verified", hostname)
+			log("DNS verified")
 			return nil
 		}
 		if !waitingLogged {
-			term.Infof("Waiting for the routing record on %s to propagate (timeout %v)...", hostname, time.Until(deadline).Round(time.Second))
+			log("waiting for the routing record to propagate (timeout %v)…", time.Until(deadline).Round(time.Second))
 			waitingLogged = true
 		}
 		if time.Now().After(deadline) {
@@ -412,7 +504,7 @@ func hasCustomDomain(app *armappcontainers.ContainerApp, hostname string) bool {
 // env IP and the hostname is registered (no extra DNS record needed). If HTTP
 // also fails we fall back to TXT validation (the interactive _dnsauth dance,
 // usable from the CLI).
-func issueManagedCertificate(ctx context.Context, client *armappcontainers.ManagedCertificatesClient, rg, envName, certName, hostname, location string) (*armappcontainers.ManagedCertificate, error) {
+func issueManagedCertificate(ctx context.Context, client *armappcontainers.ManagedCertificatesClient, rg, envName, certName, hostname, location string, log func(string, ...any)) (*armappcontainers.ManagedCertificate, error) {
 	resp, err := submitManagedCert(ctx, client, rg, envName, certName, hostname, location, armappcontainers.ManagedCertificateDomainControlValidationCNAME)
 	if err == nil {
 		return resp, nil
@@ -425,14 +517,14 @@ func issueManagedCertificate(ctx context.Context, client *armappcontainers.Manag
 	// DNS record (the asuid TXT + A record already in place suffice), so it works
 	// unattended in the CD task — unlike TXT, which requires an interactive
 	// _dnsauth record.
-	term.Infof("CNAME validation rejected for %s (apex domain); using HTTP validation", hostname)
+	log("CNAME validation rejected (apex domain); using HTTP validation")
 	resp, err = submitManagedCert(ctx, client, rg, envName, certName, hostname, location, armappcontainers.ManagedCertificateDomainControlValidationHTTP)
 	if err == nil {
 		return resp, nil
 	}
 
-	term.Infof("HTTP validation failed for %s (%v); falling back to TXT validation", hostname, err)
-	return submitManagedCertTXT(ctx, client, rg, envName, certName, hostname, location)
+	log("HTTP validation failed (%v); falling back to TXT validation", err)
+	return submitManagedCertTXT(ctx, client, rg, envName, certName, hostname, location, log)
 }
 
 // submitManagedCert creates the cert with the given validation method and
@@ -466,7 +558,7 @@ func submitManagedCert(ctx context.Context, client *armappcontainers.ManagedCert
 // initial PUT response includes a validationToken that we must surface
 // before Azure can complete validation; we GET the cert in a loop until the
 // token is populated, prompt once, then wait for ProvisioningState=Succeeded.
-func submitManagedCertTXT(ctx context.Context, client *armappcontainers.ManagedCertificatesClient, rg, envName, certName, hostname, location string) (*armappcontainers.ManagedCertificate, error) {
+func submitManagedCertTXT(ctx context.Context, client *armappcontainers.ManagedCertificatesClient, rg, envName, certName, hostname, location string, log func(string, ...any)) (*armappcontainers.ManagedCertificate, error) {
 	envelope := armappcontainers.ManagedCertificate{
 		Location: to.Ptr(location),
 		Properties: &armappcontainers.ManagedCertificateProperties{
@@ -510,10 +602,12 @@ func submitManagedCertTXT(ctx context.Context, client *armappcontainers.ManagedC
 		}
 	}
 
+	// Unlike the records from PreflightCert, this one can't be batched into the
+	// up-front block: Azure only mints the token once the PUT is in flight.
 	dnsauth := "_dnsauth." + hostname
-	term.Printf("Add TXT record for managed cert validation:\n")
-	term.Printf("  TXT  %s  ->  %s\n", dnsauth, token)
-	term.Infof("Waiting for %s and cert provisioning to finish (timeout ~5m)...", dnsauth)
+	log("configure one more DNS record for managed cert validation:")
+	log("  TXT    %s  ->  %s", dnsauth, token)
+	log("waiting for %s and cert provisioning to finish (timeout ~5m)…", dnsauth)
 
 	pollResp, err := poller.PollUntilDone(ctx, nil)
 	if err != nil {
@@ -590,11 +684,12 @@ func bindHostnameSniEnabled(ctx context.Context, client *armappcontainers.Contai
 	return nil
 }
 
+// waitForTLS is silent on success: the caller's "waiting for TLS cert to come
+// online…" line already framed the wait, and returning is the confirmation.
 func waitForTLS(ctx context.Context, hostname string, resolver dns.Resolver) error {
 	deadline := time.Now().Add(tlsWaitTimeout)
 	for {
 		if err := cert.CheckTLSCert(ctx, hostname, resolver); err == nil {
-			term.Infof("TLS cert for %s is online", hostname)
 			return nil
 		}
 		if time.Now().After(deadline) {

@@ -6,6 +6,17 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
+// RequiredRecord is one DNS record the user must create before a provider can
+// issue a certificate for a hostname. It lives here rather than in either the
+// CLI or a provider package so a provider's cert pre-flight can hand records
+// back to provider-generic CLI code without either side importing the other.
+type RequiredRecord struct {
+	Type  string // record type, e.g. "TXT", "CNAME", "A"
+	Name  string // fully-qualified record name
+	Value string // record value / target
+	Note  string // optional one-line hint on why or when the record is needed
+}
+
 func SafeLabel(fqn string) string {
 	return strings.ReplaceAll(strings.ToLower(fqn), ".", "-")
 }
