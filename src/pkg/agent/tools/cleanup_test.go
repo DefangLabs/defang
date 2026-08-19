@@ -83,9 +83,9 @@ func TestHandleCleanupTool(t *testing.T) {
 		expectCleaned  []string
 	}{
 		{
-			name:           "non-AWS provider is unsupported",
+			name:           "provider without OrphanCleaner is unsupported",
 			provider:       client.MockProvider{},
-			expectContains: []string{"only supported for AWS"},
+			expectContains: []string{"not supported for the selected provider"},
 		},
 		{
 			name:           "no orphans found",

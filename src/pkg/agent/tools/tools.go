@@ -31,7 +31,7 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 			},
 		),
 		ai.NewTool("cleanup_resources",
-			"Find and unblock AWS resources left behind after `defang down` that prevent Pulumi from finishing cleanup (load balancers and databases with deletion protection, leftover Route53 records, and non-empty ECR repositories). Performs the minimum action to unblock each (disable deletion protection, delete records, delete images) and confirms before each change. After running, run `defang down` again so Pulumi removes the resources.",
+			"Find and remove cloud resources left behind after `defang down` (on AWS: load balancers and databases with deletion protection, leftover Route53 records, and non-empty ECR repositories; on Azure: the project's resource group and the Key Vault inside it). Performs the minimum action needed for each (disable deletion protection, delete records, delete images, delete the resource group) and confirms before each change. After running, run `defang down` again so Pulumi can finish removing any AWS resources it was blocked from deleting.",
 			func(ctx *ai.ToolContext, params CleanupParams) (string, error) {
 				loader, err := common.ConfigureAgentLoader(params.LoaderParams, sc.Stack)
 				if err != nil {

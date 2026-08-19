@@ -51,7 +51,7 @@ func HandleCleanupTool(ctx context.Context, loader client.Loader, params Cleanup
 
 	cleaner, ok := provider.(client.OrphanCleaner)
 	if !ok {
-		return "Resource cleanup is currently only supported for AWS. The selected provider does not retain resources that need manual cleanup.", nil
+		return "Resource cleanup is not supported for the selected provider.", nil
 	}
 
 	orphans, err := cleaner.DiscoverOrphans(ctx, projectName)
@@ -59,11 +59,11 @@ func HandleCleanupTool(ctx context.Context, loader client.Loader, params Cleanup
 		return "", fmt.Errorf("failed to discover leftover resources: %w", err)
 	}
 	if len(orphans) == 0 {
-		return fmt.Sprintf("No leftover resources found for project %q that are blocking cleanup.", projectName), nil
+		return fmt.Sprintf("No leftover resources found for project %q.", projectName), nil
 	}
 
 	var report strings.Builder
-	fmt.Fprintf(&report, "Found %d leftover resource(s) for project %q blocking cleanup:\n", len(orphans), projectName)
+	fmt.Fprintf(&report, "Found %d leftover resource(s) for project %q:\n", len(orphans), projectName)
 
 	// Without interactive elicitation we cannot get confirmation for these destructive actions,
 	// so only report what was found and let the caller decide.
@@ -99,7 +99,7 @@ func HandleCleanupTool(ctx context.Context, loader client.Loader, params Cleanup
 
 	fmt.Fprintf(&report, "\n%d cleaned, %d skipped, %d failed.", cleaned, skipped, failed)
 	if cleaned > 0 {
-		report.WriteString(" Run `defang down` (or the destroy tool) so Pulumi can finish removing the now-unblocked resources.")
+		report.WriteString(" Run `defang down` (or the destroy tool) again so Pulumi can finish removing any resources it was previously blocked from deleting.")
 	}
 	return report.String(), nil
 }
