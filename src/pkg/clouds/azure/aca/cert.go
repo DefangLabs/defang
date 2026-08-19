@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -43,21 +44,37 @@ const (
 // for `serviceName` in `resourceGroup`. Steps:
 //
 //  1. Find the ContainerApp by tag (defang-service: <serviceName>).
-//  2. Wait for DNS records: a routing record (subdomain → CNAME to app FQDN;
-//     apex → A record to the env IP) plus TXT asuid.<host> → verificationId.
+//  2. Wait for TXT asuid.<host> → verificationId (ownership proof only; no
+//     routing record needed for this step).
 //  3. Register the custom hostname with bindingType: Disabled (validates asuid TXT).
-//  4. Issue a managed certificate (subdomain → CNAME validation; apex → HTTP).
-//  5. Flip the customDomain to bindingType: SniEnabled, attaching the cert.
-//  6. Verify TLS is serving on https://<hostname>/.
+//  4. Wait for the routing record: subdomain → CNAME to app FQDN, apex → A
+//     record to the env IP. Only needed now, ahead of cert issuance/binding —
+//     registering the hostname (steps 2-3) does not require live routing, so a
+//     caller that adds the asuid TXT record ahead of a DNS cutover lets Azure
+//     start validating ownership immediately instead of blocking on both
+//     records together.
+//  5. Issue a managed certificate (subdomain → CNAME validation; apex → HTTP).
+//  6. Flip the customDomain to bindingType: SniEnabled, attaching the cert.
+//  7. Verify TLS is serving on https://<hostname>/.
 //
 // Apex domains (e.g. example.com) can't have a CNAME (RFC 1034), so they route
 // via an A record and validate over HTTP. Apex vs subdomain is detected from DNS
 // and from Azure's validation-method rejection — no caller hint is needed.
 //
 // Each ARM step is idempotent: re-running after a partial failure picks up
-// where it left off. resolverAt is used by step 2 to chase the DNS chain — pass
-// dns.DirectResolverAt to query authoritative servers directly (CD task) or
-// dns.NewFabricResolverAt(client) to route through Fabric (CLI).
+// where it left off. resolverAt is used by steps 2 and 4 to chase the DNS chain
+// — pass dns.DirectResolverAt to query authoritative servers directly (CD task)
+// or dns.NewFabricResolverAt(client) to route through Fabric (CLI).
+//
+// Steps 3 and 6 read-modify-write the ContainerApp's CustomDomains array via
+// ARM's JSON Merge Patch, which replaces the array wholesale. A service can
+// have multiple hostnames (e.g. an apex domain plus a www alias) processed as
+// concurrent domainJobs (see cli/cert.go runIssuerJobs) that all target the
+// same ContainerApp — without serialization, two concurrent read-modify-writes
+// race: whichever PATCH lands last, built from a Get that predates the other's
+// write, silently drops the other's just-added binding. appLock guards exactly
+// that critical section, per (resourceGroup, appName), while leaving DNS waits
+// and cert issuance (independent per hostname) fully parallel.
 func IssueCert(ctx context.Context, cred azcore.TokenCredential, subscriptionID, resourceGroup, serviceName, hostname string, resolverAt func(string) dns.Resolver) error {
 	appsClient, err := armappcontainers.NewContainerAppsClient(subscriptionID, cred, nil)
 	if err != nil {
@@ -101,12 +118,17 @@ func IssueCert(ctx context.Context, cred azcore.TokenCredential, subscriptionID,
 		return nil
 	}
 
-	if err := waitForBYODdns(ctx, envsClient, resourceGroup, envName, hostname, appFqdn, vid, resolverAt); err != nil {
+	deadline := time.Now().Add(dnsWaitTimeout)
+	if err := waitForAsuidTXT(ctx, hostname, vid, deadline, resolverAt); err != nil {
 		return err
 	}
 
 	term.Infof("Registering custom hostname %s on container app %s", hostname, appName)
 	if err := addHostnameDisabled(ctx, appsClient, resourceGroup, appName, hostname); err != nil {
+		return err
+	}
+
+	if err := waitForRoutingRecord(ctx, envsClient, resourceGroup, envName, hostname, appFqdn, deadline, resolverAt); err != nil {
 		return err
 	}
 
@@ -146,8 +168,39 @@ func findContainerAppByService(ctx context.Context, client *armappcontainers.Con
 	return nil, fmt.Errorf("no Container App in %s tagged %s=%s", rg, ServiceTagKey, serviceName)
 }
 
-// waitForBYODdns blocks until a routing record and the asuid TXT record both
-// resolve, prompting the user once with the values to add.
+// waitForAsuidTXT blocks until the asuid.<hostname> TXT record (Azure's
+// domain-ownership proof) resolves, prompting the user once with the value to
+// add. Unlike the routing record, this is required only for hostname
+// registration (addHostnameDisabled) — it does not need traffic to route to
+// Azure yet, so a caller can add just this record ahead of a DNS cutover and
+// have the hostname registered/verified in advance.
+func waitForAsuidTXT(ctx context.Context, hostname, expectedTxt string, deadline time.Time, resolverAt func(string) dns.Resolver) error {
+	asuid := "asuid." + hostname
+	promptShown := false
+
+	for {
+		if txtOK, _ := dns.LookupTXTContains(ctx, asuid, expectedTxt, resolverAt("")); txtOK {
+			return nil
+		}
+		if !promptShown {
+			term.Printf("Configure DNS record for %s:\n", hostname)
+			term.Printf("  TXT    asuid.%s        ->  %s\n", hostname, expectedTxt)
+			term.Infof("Waiting for DNS propagation (timeout %v)...", time.Until(deadline).Round(time.Second))
+			promptShown = true
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timed out after %v waiting for the asuid TXT record on %s", dnsWaitTimeout, hostname)
+		}
+		if err := pkg.SleepWithContext(ctx, dnsPollEvery); err != nil {
+			return err
+		}
+	}
+}
+
+// waitForRoutingRecord blocks until the routing record resolves, prompting
+// the user once with the value to add. Required before cert issuance: CNAME
+// validation needs a live CNAME, and HTTP validation needs live routing to
+// reach the app for the challenge.
 //
 // The routing record is a CNAME → app FQDN for a subdomain, or an A record for
 // an apex domain (no CNAME possible at the zone apex). Both are covered by
@@ -155,29 +208,24 @@ func findContainerAppByService(ctx context.Context, client *armappcontainers.Con
 // whose addresses match those of expectedCname — which for Container Apps is the
 // managed environment's static IP, exactly what an apex A record must point at.
 // So an apex domain is validated against the intended target, not merely
-// "resolves to something". The asuid TXT is always required.
-func waitForBYODdns(ctx context.Context, envsClient *armappcontainers.ManagedEnvironmentsClient, resourceGroup, envName, hostname, expectedCname, expectedTxt string, resolverAt func(string) dns.Resolver) error {
-	asuid := "asuid." + hostname
-	deadline := time.Now().Add(dnsWaitTimeout)
+// "resolves to something".
+func waitForRoutingRecord(ctx context.Context, envsClient *armappcontainers.ManagedEnvironmentsClient, resourceGroup, envName, hostname, expectedCname string, deadline time.Time, resolverAt func(string) dns.Resolver) error {
 	promptShown := false
 
 	for {
-		routeOK := dns.CheckDomainDNSReady(ctx, hostname, []string{expectedCname}, resolverAt)
-		txtOK, _ := dns.LookupTXTContains(ctx, asuid, expectedTxt, resolverAt(""))
-		if routeOK && txtOK {
+		if dns.CheckDomainDNSReady(ctx, hostname, []string{expectedCname}, resolverAt) {
 			term.Infof("DNS records for %s verified", hostname)
 			return nil
 		}
 		if !promptShown {
-			term.Printf("Configure DNS records for %s:\n", hostname)
+			term.Printf("Configure DNS record for %s:\n", hostname)
 			term.Printf("  CNAME  %s              ->  %s   (subdomain)\n", hostname, expectedCname)
 			term.Printf("  A      %s              ->  %s   (apex)\n", hostname, fetchEnvironmentStaticIP(ctx, envsClient, resourceGroup, envName))
-			term.Printf("  TXT    asuid.%s        ->  %s\n", hostname, expectedTxt)
-			term.Infof("Waiting for DNS propagation (timeout %v)...", dnsWaitTimeout)
+			term.Infof("Waiting for DNS propagation (timeout %v)...", time.Until(deadline).Round(time.Second))
 			promptShown = true
 		}
 		if time.Now().After(deadline) {
-			return fmt.Errorf("timed out after %v waiting for DNS records on %s", dnsWaitTimeout, hostname)
+			return fmt.Errorf("timed out after %v waiting for the routing record on %s", dnsWaitTimeout, hostname)
 		}
 		if err := pkg.SleepWithContext(ctx, dnsPollEvery); err != nil {
 			return err
@@ -202,6 +250,24 @@ func fetchEnvironmentStaticIP(ctx context.Context, envsClient *armappcontainers.
 	return *env.Properties.StaticIP
 }
 
+// appLocks serializes the read-modify-write critical section in
+// addHostnameDisabled and bindHostnameSniEnabled per (resourceGroup, appName).
+// A single service can have multiple hostnames (e.g. an apex domain plus a
+// www alias) processed as concurrent domainJobs that all target the same
+// ContainerApp; without this, two concurrent Get-modify-PATCH sequences race
+// and the later PATCH — built from a Get that predates the other's write —
+// silently drops the other's just-added customDomain entry.
+var appLocks sync.Map // map[string]*sync.Mutex, keyed by rg+"/"+appName
+
+func lockForApp(rg, appName string) *sync.Mutex {
+	v, _ := appLocks.LoadOrStore(rg+"/"+appName, &sync.Mutex{})
+	mu, ok := v.(*sync.Mutex)
+	if !ok {
+		panic("appLocks: stored value is not a *sync.Mutex") // unreachable: only ever stores *sync.Mutex
+	}
+	return mu
+}
+
 // addHostnameDisabled PATCHes the ContainerApp to add (or no-op) a customDomain
 // entry with bindingType: Disabled. Disabled doesn't require a cert, but does
 // validate asuid TXT — that's why we wait for DNS first.
@@ -209,10 +275,17 @@ func fetchEnvironmentStaticIP(ctx context.Context, envsClient *armappcontainers.
 // Azure ARM uses JSON Merge Patch (RFC 7396) which replaces arrays wholesale,
 // so we must include every existing CustomDomain entry in the body or they
 // will be wiped out by the update. We re-Get the CA right before the PATCH
-// rather than reusing a snapshot from the caller: waitForBYODdns can block
-// for up to 30 minutes, during which another deploy could have added its own
-// customDomain entry, and a stale slice would silently drop that.
+// rather than reusing a snapshot from the caller: the DNS wait can block for
+// up to 30 minutes, during which another deploy could have added its own
+// customDomain entry, and a stale slice would silently drop that. The
+// Get-through-PATCH sequence is itself guarded by appLock so a concurrent
+// call for a sibling hostname on the same app can't interleave its own
+// Get-modify-PATCH in between and clobber this one.
 func addHostnameDisabled(ctx context.Context, client *armappcontainers.ContainerAppsClient, rg, appName, hostname string) error {
+	mu := lockForApp(rg, appName)
+	mu.Lock()
+	defer mu.Unlock()
+
 	cur, err := client.Get(ctx, rg, appName, nil)
 	if err != nil {
 		return fmt.Errorf("fetching app %s before hostname registration: %w", appName, err)
@@ -446,8 +519,13 @@ func isInvalidValidationMethod(err error) bool {
 // Azure ARM uses JSON Merge Patch (RFC 7396) which replaces arrays wholesale,
 // so we fetch the current state, update the matching entry in place, and send
 // the full CustomDomains array back. Otherwise every other custom domain on
-// the app would be dropped by the PATCH.
+// the app would be dropped by the PATCH. appLock guards this Get-modify-PATCH
+// the same way it does in addHostnameDisabled — see appLocks doc comment.
 func bindHostnameSniEnabled(ctx context.Context, client *armappcontainers.ContainerAppsClient, rg, appName, hostname, certID string) error {
+	mu := lockForApp(rg, appName)
+	mu.Lock()
+	defer mu.Unlock()
+
 	cur, err := client.Get(ctx, rg, appName, nil)
 	if err != nil {
 		return fmt.Errorf("fetching app %s before cert bind: %w", appName, err)
