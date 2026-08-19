@@ -118,6 +118,21 @@ func IssueCert(ctx context.Context, cred azcore.TokenCredential, subscriptionID,
 		return nil
 	}
 
+	// Print every required record up front, in one block, even though TXT and
+	// the routing record are waited on separately below: the user is looking
+	// at their DNS dashboard right now, and wants to add everything needed in
+	// one sitting rather than being told about the routing record only after
+	// TXT has already propagated (lionello, PR review on #2222).
+	asuid := "asuid." + hostname
+	txtOK, _ := dns.LookupTXTContains(ctx, asuid, vid, resolverAt(""))
+	routeOK := dns.CheckDomainDNSReady(ctx, hostname, []string{appFqdn}, resolverAt)
+	if !txtOK || !routeOK {
+		term.Printf("Configure DNS records for %s:\n", hostname)
+		term.Printf("  TXT    asuid.%s        ->  %s   (add this first — the hostname can register as soon as this is live)\n", hostname, vid)
+		term.Printf("  CNAME  %s              ->  %s   (subdomain; needed before the cert can be issued)\n", hostname, appFqdn)
+		term.Printf("  A      %s              ->  %s   (apex; needed before the cert can be issued)\n", hostname, fetchEnvironmentStaticIP(ctx, envsClient, resourceGroup, envName))
+	}
+
 	deadline := time.Now().Add(dnsWaitTimeout)
 	if err := waitForAsuidTXT(ctx, hostname, vid, deadline, resolverAt); err != nil {
 		return err
@@ -128,7 +143,7 @@ func IssueCert(ctx context.Context, cred azcore.TokenCredential, subscriptionID,
 		return err
 	}
 
-	if err := waitForRoutingRecord(ctx, envsClient, resourceGroup, envName, hostname, appFqdn, deadline, resolverAt); err != nil {
+	if err := waitForRoutingRecord(ctx, hostname, appFqdn, deadline, resolverAt); err != nil {
 		return err
 	}
 
@@ -169,24 +184,23 @@ func findContainerAppByService(ctx context.Context, client *armappcontainers.Con
 }
 
 // waitForAsuidTXT blocks until the asuid.<hostname> TXT record (Azure's
-// domain-ownership proof) resolves, prompting the user once with the value to
-// add. Unlike the routing record, this is required only for hostname
-// registration (addHostnameDisabled) — it does not need traffic to route to
-// Azure yet, so a caller can add just this record ahead of a DNS cutover and
-// have the hostname registered/verified in advance.
+// domain-ownership proof) resolves. Unlike the routing record, this is
+// required only for hostname registration (addHostnameDisabled) — it does
+// not need traffic to route to Azure yet, so a caller can add just this
+// record ahead of a DNS cutover and have the hostname registered/verified in
+// advance. The record values themselves are printed once by the caller,
+// covering both this and the routing record in one block — see IssueCert.
 func waitForAsuidTXT(ctx context.Context, hostname, expectedTxt string, deadline time.Time, resolverAt func(string) dns.Resolver) error {
 	asuid := "asuid." + hostname
-	promptShown := false
+	waitingLogged := false
 
 	for {
 		if txtOK, _ := dns.LookupTXTContains(ctx, asuid, expectedTxt, resolverAt("")); txtOK {
 			return nil
 		}
-		if !promptShown {
-			term.Printf("Configure DNS record for %s:\n", hostname)
-			term.Printf("  TXT    asuid.%s        ->  %s\n", hostname, expectedTxt)
-			term.Infof("Waiting for DNS propagation (timeout %v)...", time.Until(deadline).Round(time.Second))
-			promptShown = true
+		if !waitingLogged {
+			term.Infof("Waiting for the asuid TXT record on %s to propagate (timeout %v)...", hostname, time.Until(deadline).Round(time.Second))
+			waitingLogged = true
 		}
 		if time.Now().After(deadline) {
 			return fmt.Errorf("timed out after %v waiting for the asuid TXT record on %s", dnsWaitTimeout, hostname)
@@ -197,10 +211,9 @@ func waitForAsuidTXT(ctx context.Context, hostname, expectedTxt string, deadline
 	}
 }
 
-// waitForRoutingRecord blocks until the routing record resolves, prompting
-// the user once with the value to add. Required before cert issuance: CNAME
-// validation needs a live CNAME, and HTTP validation needs live routing to
-// reach the app for the challenge.
+// waitForRoutingRecord blocks until the routing record resolves. Required
+// before cert issuance: CNAME validation needs a live CNAME, and HTTP
+// validation needs live routing to reach the app for the challenge.
 //
 // The routing record is a CNAME → app FQDN for a subdomain, or an A record for
 // an apex domain (no CNAME possible at the zone apex). Both are covered by
@@ -208,21 +221,20 @@ func waitForAsuidTXT(ctx context.Context, hostname, expectedTxt string, deadline
 // whose addresses match those of expectedCname — which for Container Apps is the
 // managed environment's static IP, exactly what an apex A record must point at.
 // So an apex domain is validated against the intended target, not merely
-// "resolves to something".
-func waitForRoutingRecord(ctx context.Context, envsClient *armappcontainers.ManagedEnvironmentsClient, resourceGroup, envName, hostname, expectedCname string, deadline time.Time, resolverAt func(string) dns.Resolver) error {
-	promptShown := false
+// "resolves to something". The record values themselves are printed once by
+// the caller, covering both this and the TXT record in one block — see
+// IssueCert.
+func waitForRoutingRecord(ctx context.Context, hostname, expectedCname string, deadline time.Time, resolverAt func(string) dns.Resolver) error {
+	waitingLogged := false
 
 	for {
 		if dns.CheckDomainDNSReady(ctx, hostname, []string{expectedCname}, resolverAt) {
 			term.Infof("DNS records for %s verified", hostname)
 			return nil
 		}
-		if !promptShown {
-			term.Printf("Configure DNS record for %s:\n", hostname)
-			term.Printf("  CNAME  %s              ->  %s   (subdomain)\n", hostname, expectedCname)
-			term.Printf("  A      %s              ->  %s   (apex)\n", hostname, fetchEnvironmentStaticIP(ctx, envsClient, resourceGroup, envName))
-			term.Infof("Waiting for DNS propagation (timeout %v)...", time.Until(deadline).Round(time.Second))
-			promptShown = true
+		if !waitingLogged {
+			term.Infof("Waiting for the routing record on %s to propagate (timeout %v)...", hostname, time.Until(deadline).Round(time.Second))
+			waitingLogged = true
 		}
 		if time.Now().After(deadline) {
 			return fmt.Errorf("timed out after %v waiting for the routing record on %s", dnsWaitTimeout, hostname)
