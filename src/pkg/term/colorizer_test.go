@@ -162,6 +162,20 @@ func TestIsTerminal(t *testing.T) {
 		t.Error("Expected IsTerminal() to return false")
 	}
 }
+
+func TestDoJSON(t *testing.T) {
+	oldTerm := DefaultTerm
+	t.Cleanup(func() { DefaultTerm = oldTerm })
+	DefaultTerm = NewTerm(os.Stdin, &bytes.Buffer{}, &bytes.Buffer{})
+
+	if DoJSON() {
+		t.Error("Expected DoJSON() to default to false")
+	}
+	SetJSON(true)
+	if !DoJSON() {
+		t.Error("Expected DoJSON() to return true after SetJSON(true)")
+	}
+}
 func TestWarn(t *testing.T) {
 	tests := []struct {
 		msgs     []string

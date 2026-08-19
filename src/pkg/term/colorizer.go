@@ -97,6 +97,10 @@ func (t *Term) DoDebug() bool {
 	return t.debug.Load()
 }
 
+func (t *Term) DoJSON() bool {
+	return t.json
+}
+
 func (t *Term) HasDarkBackground() bool {
 	return t.hasDarkBg
 }
@@ -379,6 +383,10 @@ func SetJSON(json bool) {
 
 func DoDebug() bool {
 	return DefaultTerm.DoDebug()
+}
+
+func DoJSON() bool {
+	return DefaultTerm.DoJSON()
 }
 
 func HasDarkBackground() bool {

@@ -173,7 +173,7 @@ func (l *Loader) loadProject(ctx context.Context, suppressWarn bool) (*Project, 
 		return nil, err
 	}
 
-	if term.DoDebug() {
+	if term.DoDebug() && !term.DoJSON() {
 		b, _ := yaml.Marshal(project)
 		term.Println(string(b))
 	}
