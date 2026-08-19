@@ -609,7 +609,7 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild
 	}
 
 	// Prepend the entrypoint; CodeBuild runs buildspec commands in a shell, not via Docker ENTRYPOINT
-	args := append([]string{"node", "lib/index.js"}, cmd.command...)
+	args := append(cdEntrypoint(b.CDImage), cmd.command...)
 	return b.driver.Run(ctx, "/app", b.CDImage, env, args...)
 }
 
