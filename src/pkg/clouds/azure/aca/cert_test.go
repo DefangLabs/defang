@@ -74,6 +74,16 @@ func TestPendingRecords(t *testing.T) {
 			},
 		},
 		{
+			name: "ownership TXT live but routing record missing",
+			resolver: dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+				{Type: "TXT", Domain: "asuid." + hostname}: {Records: []string{vid}},
+			}},
+			want: []dns.RequiredRecord{
+				{Type: "TXT", Name: "asuid." + hostname, Value: vid, Note: "add this first — the hostname can register as soon as this is live"},
+				{Type: "CNAME", Name: hostname, Value: appFqdn, Note: "needed before the cert can be issued"},
+			},
+		},
+		{
 			name: "both records live",
 			resolver: dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
 				{Type: "TXT", Domain: "asuid." + hostname}: {Records: []string{vid}},
