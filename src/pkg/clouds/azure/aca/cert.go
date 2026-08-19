@@ -171,7 +171,7 @@ func waitForBYODdns(ctx context.Context, envsClient *armappcontainers.ManagedEnv
 		if !promptShown {
 			term.Printf("Configure DNS records for %s:\n", hostname)
 			term.Printf("  CNAME  %s              ->  %s   (subdomain)\n", hostname, expectedCname)
-			term.Printf("  A      %s              ->  %s   (apex)\n", hostname, environmentStaticIP(ctx, envsClient, resourceGroup, envName))
+			term.Printf("  A      %s              ->  %s   (apex)\n", hostname, fetchEnvironmentStaticIP(ctx, envsClient, resourceGroup, envName))
 			term.Printf("  TXT    asuid.%s        ->  %s\n", hostname, expectedTxt)
 			term.Infof("Waiting for DNS propagation (timeout %v)...", dnsWaitTimeout)
 			promptShown = true
@@ -185,19 +185,25 @@ func waitForBYODdns(ctx context.Context, envsClient *armappcontainers.ManagedEnv
 	}
 }
 
-// environmentStaticIP fetches the Container Apps environment's inbound static IP
-// for display in the apex A-record instructions. This is a JIT lookup done only
-// once the DNS-not-ready prompt is about to be shown, so the common case (DNS
-// already configured) never pays for it. A lookup failure falls back to a
-// placeholder rather than failing cert issuance — the value is purely
-// informational; dns.CheckDomainDNSReady validates the actual DNS state itself.
-func environmentStaticIP(ctx context.Context, envsClient *armappcontainers.ManagedEnvironmentsClient, resourceGroup, envName string) string {
+// fetchEnvironmentStaticIP fetches the Container Apps environment's inbound
+// static IP over ARM for display in the apex A-record instructions. This is a
+// JIT lookup done only once the DNS-not-ready prompt is about to be shown, so
+// the common case (DNS already configured) never pays for it. A lookup
+// failure, or a blank StaticIP (e.g. an environment still provisioning),
+// falls back to a placeholder rather than failing cert issuance — the value
+// is purely informational; dns.CheckDomainDNSReady validates the actual DNS
+// state itself.
+func fetchEnvironmentStaticIP(ctx context.Context, envsClient *armappcontainers.ManagedEnvironmentsClient, resourceGroup, envName string) string {
+	const placeholder = "<Container Apps environment IP; check the Azure portal>"
 	env, err := envsClient.Get(ctx, resourceGroup, envName, nil)
 	if err != nil || env.Properties == nil || env.Properties.StaticIP == nil {
 		term.Debugf("Could not fetch static IP for environment %s: %v", envName, err)
-		return "<Container Apps environment IP; check the Azure portal>"
+		return placeholder
 	}
-	return *env.Properties.StaticIP
+	if ip := strings.TrimSpace(*env.Properties.StaticIP); ip != "" {
+		return ip
+	}
+	return placeholder
 }
 
 // addHostnameDisabled PATCHes the ContainerApp to add (or no-op) a customDomain
