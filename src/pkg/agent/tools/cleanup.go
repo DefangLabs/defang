@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/auth"
+	cliPkg "github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
@@ -49,57 +49,22 @@ func HandleCleanupTool(ctx context.Context, loader client.Loader, params Cleanup
 		return "", fmt.Errorf("failed to use provider: %w", err)
 	}
 
-	cleaner, ok := provider.(client.OrphanCleaner)
-	if !ok {
-		return "Resource cleanup is not supported for the selected provider.", nil
-	}
-
-	orphans, err := cleaner.DiscoverOrphans(ctx, projectName)
+	result, err := cliPkg.Cleanup(ctx, provider, ec, projectName, cliPkg.CleanupOptions{})
 	if err != nil {
-		return "", fmt.Errorf("failed to discover leftover resources: %w", err)
+		if errors.Is(err, cliPkg.ErrCleanupUnsupported) {
+			return "Resource cleanup is not supported for the selected provider.", nil
+		}
+		return "", err
 	}
-	if len(orphans) == 0 {
+	if result.Found == 0 {
 		return fmt.Sprintf("No leftover resources found for project %q.", projectName), nil
 	}
 
-	var report strings.Builder
-	fmt.Fprintf(&report, "Found %d leftover resource(s) for project %q:\n", len(orphans), projectName)
-
-	// Without interactive elicitation we cannot get confirmation for these destructive actions,
-	// so only report what was found and let the caller decide.
-	if !ec.IsSupported() {
-		for _, o := range orphans {
-			fmt.Fprintf(&report, "- [%s] %s — would %s\n", o.Category, o.Name, o.Action)
-		}
-		report.WriteString("\nRe-run this tool in an interactive session to apply these changes, then run `defang down` so Pulumi can finish removing the resources.")
-		return report.String(), nil
+	report := result.Report
+	if result.ReportOnly {
+		report += "\nRe-run this tool in an interactive session to apply these changes, then run `defang down` so Pulumi can finish removing the resources."
+	} else if result.Cleaned > 0 {
+		report += " Run `defang down` (or the destroy tool) again so Pulumi can finish removing any resources it was previously blocked from deleting."
 	}
-
-	var cleaned, skipped, failed int
-	for _, o := range orphans {
-		confirm, err := ec.RequestEnum(ctx,
-			fmt.Sprintf("Cleanup will %s for %s %q. Proceed?", o.Action, o.Category, o.Name),
-			"confirm", []string{"no", "yes"})
-		if err != nil {
-			return "", fmt.Errorf("failed to confirm cleanup: %w", err)
-		}
-		if confirm != "yes" {
-			skipped++
-			fmt.Fprintf(&report, "- [%s] %s — skipped\n", o.Category, o.Name)
-			continue
-		}
-		if err := cleaner.CleanupOrphan(ctx, o); err != nil {
-			failed++
-			fmt.Fprintf(&report, "- [%s] %s — failed: %v\n", o.Category, o.Name, err)
-			continue
-		}
-		cleaned++
-		fmt.Fprintf(&report, "- [%s] %s — done (%s)\n", o.Category, o.Name, o.Action)
-	}
-
-	fmt.Fprintf(&report, "\n%d cleaned, %d skipped, %d failed.", cleaned, skipped, failed)
-	if cleaned > 0 {
-		report.WriteString(" Run `defang down` (or the destroy tool) again so Pulumi can finish removing any resources it was previously blocked from deleting.")
-	}
-	return report.String(), nil
+	return report, nil
 }

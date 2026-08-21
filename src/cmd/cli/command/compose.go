@@ -527,6 +527,7 @@ func makeComposeDownCmd() *cobra.Command {
 					return deploymentErr
 				}
 				handleTailAndMonitorErr(cmd.Context(), deploymentErr, debugger, debug.DebugConfig{
+					Operation:  debug.OperationTeardown,
 					Deployment: deployment,
 					ProviderID: &session.Stack.Provider,
 					Stack:      session.Stack.Name,

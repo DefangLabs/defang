@@ -21,7 +21,19 @@ import (
 
 var P = track.P
 
+// DebugOperation names the operation that failed. A failed teardown needs different advice from a
+// failed deployment: its symptom is cloud resources left behind rather than a service that will
+// not start, and the useful next step is the cleanup tool rather than the service logs.
+type DebugOperation int
+
+const (
+	OperationDeploy DebugOperation = iota
+	OperationTeardown
+	OperationCleanup
+)
+
 type DebugConfig struct {
+	Operation      DebugOperation
 	ProviderID     *client.ProviderID
 	Stack          string
 	Deployment     types.ETag
@@ -142,6 +154,15 @@ func (d *Debugger) DebugDeploymentError(ctx context.Context, debugConfig DebugCo
 	}, "Debug Deployment Error", P("etag", debugConfig.Deployment), P("deployErr", deployErr))
 }
 
+// DebugCleanupError hands a failed cleanup to the agent. Unlike DebugDeploymentError there is no
+// deployment to read logs from: the report of what failed is the whole input.
+func (d *Debugger) DebugCleanupError(ctx context.Context, debugConfig DebugConfig, cleanupErr error) error {
+	return d.promptAndTrackDebugSession(func() error {
+		prompt := buildDeploymentDebugPrompt(debugConfig) + " The cleanup reported: " + truncateTail(cleanupErr.Error(), maxPromptErrorLen)
+		return d.agent.StartWithMessage(ctx, prompt)
+	}, "Debug Cleanup Error", P("cleanupErr", cleanupErr))
+}
+
 func (d *Debugger) DebugComposeLoadError(ctx context.Context, debugConfig DebugConfig, loadErr error) error {
 	return d.promptAndTrackDebugSession(func() error {
 		prompt := "The following error occurred while loading the compose file. Help troubleshoot and recommend a solution.\n\n" + truncateTail(loadErr.Error(), maxPromptErrorLen)
@@ -214,7 +235,7 @@ func (d *Debugger) promptForFeedback() (string, error) {
 }
 
 func buildDeploymentDebugPrompt(debugConfig DebugConfig) string {
-	prompt := "An error occurred while deploying this project"
+	prompt := operationDescription(debugConfig.Operation)
 	if debugConfig.ProviderID == nil {
 		prompt += " with Defang."
 	} else {
@@ -222,6 +243,16 @@ func buildDeploymentDebugPrompt(debugConfig DebugConfig) string {
 	}
 
 	prompt += " Help troubleshoot and recommend a solution. Look at the logs to understand what happened."
+
+	// A teardown that fails is the moment resources get orphaned, and the agent has a tool for
+	// exactly that. Without this the model reaches for the deployment-shaped remedies instead.
+	if debugConfig.Operation != OperationDeploy {
+		prompt += " A failed teardown usually leaves cloud resources behind," +
+			" either because the deployment retains them or because another resource still references them," +
+			" and those leftovers can exhaust a cloud quota later." +
+			" Use the cleanup_resources tool to find them and remove what blocks the teardown," +
+			" then run the destroy tool again so the deployment can finish removing the rest."
+	}
 
 	if debugConfig.Deployment != "" {
 		prompt += fmt.Sprintf(" The deployment ID is %q.", debugConfig.Deployment)
@@ -249,6 +280,19 @@ func buildDeploymentDebugPrompt(debugConfig DebugConfig) string {
 		)
 	}
 	return prompt
+}
+
+// operationDescription opens the prompt by naming what the user was actually doing, so the model
+// does not read a teardown failure as a deployment failure.
+func operationDescription(op DebugOperation) string {
+	switch op {
+	case OperationTeardown:
+		return "An error occurred while tearing down this project"
+	case OperationCleanup:
+		return "An error occurred while cleaning up the cloud resources left behind by a teardown of this project"
+	default:
+		return "An error occurred while deploying this project"
+	}
 }
 
 // The initial prompt must always fit in the model context, no matter how big the project or the
