@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -206,6 +207,23 @@ func (b *ByocAws) Preview(ctx context.Context, req *client.DeployRequest) (*clie
 	return b.deploy(ctx, req, "preview")
 }
 
+// s3PayloadURI rewrites a virtual-hosted-style S3 URL (bucket.s3.region.amazonaws.com/key)
+// into s3://bucket/key. cd's fetchPayload only authenticates s3:// URIs, via the deploy
+// container's ambient AWS credentials; a bare https:// GET is unsigned, so a private bucket
+// 403s it. Mirrors the gs:// rewrite in gcp/byoc.go for the same reason. Non-S3 URLs (or ones
+// that fail to parse) pass through unchanged.
+func s3PayloadURI(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	bucket, rest, ok := strings.Cut(u.Host, ".s3.")
+	if !ok || !strings.HasSuffix(rest, "amazonaws.com") {
+		return rawURL
+	}
+	return "s3://" + bucket + u.Path
+}
+
 func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd string) (*client.DeployResponse, error) {
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
@@ -266,7 +284,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		if resp.StatusCode != 200 {
 			return nil, fmt.Errorf("unexpected status code during upload: %s", resp.Status)
 		}
-		payloadString = http.RemoveQueryParam(payloadUrl)
+		payloadString = s3PayloadURI(http.RemoveQueryParam(payloadUrl))
 	}
 
 	cdCmd := cdCommand{

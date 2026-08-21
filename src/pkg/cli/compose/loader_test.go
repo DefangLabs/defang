@@ -38,6 +38,44 @@ func TestResolveProjectWorkingDirDoesNotLoadOrCacheProject(t *testing.T) {
 	assert.Equal(t, dir, workingDir)
 }
 
+// TestLoadProjectDebugDumpNeverHitsStdoutInJSONMode is a regression test:
+// `defang services --json` with DEFANG_DEBUG=1 used to write the project's
+// YAML dump to stdout ahead of the JSON payload, corrupting it for callers
+// like `defang-github-action`'s deployment summary (jq: invalid numeric
+// literal). term.Println now routes to stderr in JSON mode, so the dump
+// must never appear on stdout, whether or not JSON mode is on.
+func TestLoadProjectDebugDumpNeverHitsStdoutInJSONMode(t *testing.T) {
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	require.NoError(t, os.WriteFile(composePath, []byte("services:\n  web:\n    image: alpine\n"), 0o644))
+
+	oldTerm := term.DefaultTerm
+	t.Cleanup(func() { term.DefaultTerm = oldTerm })
+
+	t.Run("debug alone dumps the project to stdout", func(t *testing.T) {
+		var stdout, stderr bytes.Buffer
+		term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
+		term.DefaultTerm.SetDebug(true)
+
+		_, err := NewLoader(WithPath(composePath)).LoadProject(t.Context())
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "services:")
+		assert.Empty(t, stderr.String())
+	})
+
+	t.Run("debug plus json moves the dump to stderr", func(t *testing.T) {
+		var stdout, stderr bytes.Buffer
+		term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
+		term.DefaultTerm.SetDebug(true)
+		term.DefaultTerm.SetJSON(true)
+
+		_, err := NewLoader(WithPath(composePath)).LoadProject(t.Context())
+		require.NoError(t, err)
+		assert.Empty(t, stdout.String())
+		assert.Contains(t, stderr.String(), "services:")
+	})
+}
+
 func TestResolveProjectWorkingDirDoesNotSuppressProjectWarnings(t *testing.T) {
 	dir := t.TempDir()
 	composePath := filepath.Join(dir, "compose.yaml")

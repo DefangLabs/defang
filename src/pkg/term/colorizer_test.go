@@ -162,6 +162,35 @@ func TestIsTerminal(t *testing.T) {
 		t.Error("Expected IsTerminal() to return false")
 	}
 }
+
+// TestPrintRoutingInJSONMode is a regression test: Print/Println/Printf/Printc
+// used to always write to stdout, so any of them reachable from a command
+// that also emits --json output (e.g. via a debug dump) would corrupt that
+// JSON payload. They must move to stderr in JSON mode, like Info/Warn do.
+func TestPrintRoutingInJSONMode(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	defaultTerm := NewTerm(os.Stdin, &stdout, &stderr)
+
+	defaultTerm.Print("a")
+	defaultTerm.Println("b")
+	defaultTerm.Printf("%s", "c")
+	defaultTerm.Printc(InfoColor, "d")
+	if stdout.String() == "" || stderr.String() != "" {
+		t.Errorf("expected Print* to write to stdout when JSON mode is off; stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	defaultTerm.SetJSON(true)
+
+	defaultTerm.Print("a")
+	defaultTerm.Println("b")
+	defaultTerm.Printf("%s", "c")
+	defaultTerm.Printc(InfoColor, "d")
+	if stdout.String() != "" || stderr.String() == "" {
+		t.Errorf("expected Print* to write to stderr when JSON mode is on; stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+}
 func TestWarn(t *testing.T) {
 	tests := []struct {
 		msgs     []string
