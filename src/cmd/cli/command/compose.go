@@ -358,9 +358,16 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 	}
 
 	term.Error("Error:", client.PrettyError(originalErr))
-	return debugger.DebugDeploymentError(ctx, debug.DebugConfig{
+	// The debugger runs for its side effect only. It returns nil once it has
+	// explained the failure, so returning its error here would turn a fatal
+	// deployment error into exit code 0 — a false-green CI deploy for every
+	// account that auto-approves the debugger.
+	if debugErr := debugger.DebugDeploymentError(ctx, debug.DebugConfig{
 		Project: project,
-	}, originalErr)
+	}, originalErr); debugErr != nil {
+		term.Debug("debugger failed:", debugErr)
+	}
+	return originalErr
 }
 
 func handleTooManyProjectsError(ctx context.Context, provider client.Provider, originalErr error) error {
