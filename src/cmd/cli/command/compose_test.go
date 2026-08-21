@@ -3,6 +3,7 @@ package command
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -10,6 +11,8 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -127,5 +130,72 @@ func TestResolveTTL(t *testing.T) {
 				t.Errorf("resolveTTL() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// stubDebugAgent stands in for the AI agent: it records that it ran and returns whatever the
+// test wants the debug session to end with.
+type stubDebugAgent struct {
+	called bool
+	err    error
+}
+
+func (s *stubDebugAgent) StartWithMessage(context.Context, string) error {
+	s.called = true
+	return s.err
+}
+
+// Regression for issue 2227: handleComposeUpErr used to return the DEBUGGER's error. The
+// debugger returns nil once it has explained the failure, so a fatal compose up error exited 0
+// and CI went green on a deploy that never happened.
+func TestHandleComposeUpErrKeepsTheDeploymentError(t *testing.T) {
+	prevNonInteractive := global.NonInteractive
+	global.NonInteractive = true
+	t.Cleanup(func() { global.NonInteractive = prevNonInteractive })
+
+	originalErr := errors.New(`service "fabric": port 50051: 'target' must be an integer between 1 and 32767`)
+
+	for _, tt := range []struct {
+		name     string
+		debugErr error
+	}{
+		{name: "debugger succeeds", debugErr: nil},
+		{name: "debugger fails", debugErr: errors.New("agent unavailable")},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			agent := &stubDebugAgent{err: tt.debugErr}
+			// defaultPermission=true is the paid/auto-approve account: the only one that
+			// reaches the debugger in CI, and so the only one that hit this bug.
+			debugger := debug.NewDebuggerForTest(agent, true, false)
+
+			err := handleComposeUpErr(context.Background(), debugger, &compose.Project{}, nil, originalErr)
+
+			if !agent.called {
+				t.Error("expected the debugger to run")
+			}
+			if !errors.Is(err, originalErr) {
+				t.Errorf("expected the original deployment error, got %v", err)
+			}
+		})
+	}
+}
+
+// A free-tier CI account never reaches the debugger; it must still get the error.
+func TestHandleComposeUpErrWithoutAutoApprove(t *testing.T) {
+	prevNonInteractive := global.NonInteractive
+	global.NonInteractive = true
+	t.Cleanup(func() { global.NonInteractive = prevNonInteractive })
+
+	originalErr := errors.New("boom")
+	agent := &stubDebugAgent{}
+	debugger := debug.NewDebuggerForTest(agent, false, false)
+
+	err := handleComposeUpErr(context.Background(), debugger, &compose.Project{}, nil, originalErr)
+
+	if agent.called {
+		t.Error("the debugger must not auto-run for a free-tier account")
+	}
+	if !errors.Is(err, originalErr) {
+		t.Errorf("expected the original deployment error, got %v", err)
 	}
 }

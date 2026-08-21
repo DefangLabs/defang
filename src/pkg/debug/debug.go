@@ -106,6 +106,18 @@ func NewDebugger(ctx context.Context, fabricAddr string, stack *stacks.Parameter
 	}, nil
 }
 
+// NewDebuggerForTest builds a Debugger around a stub agent. NewDebugger needs a live Fabric
+// connection, so tests in OTHER packages — the ones exercising how a caller handles what the
+// debugger returns — have no other way to get one.
+func NewDebuggerForTest(agent DebugAgent, defaultPermission, interactive bool) *Debugger {
+	return &Debugger{
+		agent:             agent,
+		surveyor:          &surveyor{},
+		defaultPermission: defaultPermission,
+		interactive:       interactive,
+	}
+}
+
 // AutoApprove reports whether the debugger will run without an interactive prompt. This is true
 // for paid accounts and lets callers decide whether to invoke the debugger in non-interactive
 // environments (CI) or just print a hint.
