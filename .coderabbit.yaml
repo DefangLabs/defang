@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# CodeRabbit is the approving reviewer on this repo.
+#
+# The DefangLabs org ruleset "Protect Default Branches" needs 1 approving review
+# on the default branch. Most PRs are now agent-authored, and human review is the
+# bottleneck. With request_changes_workflow, CodeRabbit requests changes when it
+# finds a problem, and approves when the problem is fixed. That keeps a gate on
+# main without a human in the loop.
+#
+# Managed as a set: keep this file the same in all DefangLabs repos.
+reviews:
+  request_changes_workflow: true
+
+  pre_merge_checks:
+    # The PR author can NOT dismiss a failed check; only a requested reviewer can.
+    # This stops an agent from waving through its own PR.
+    override_requested_reviewers_only: true
+    # Start every built-in check at "warning". Raise a check to "error" only when
+    # we want it to block a merge.
+    title:
+      mode: "warning"
+    description:
+      mode: "warning"
+    issue_assessment:
+      mode: "warning"
+    docstrings:
+      mode: "off"
