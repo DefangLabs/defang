@@ -26,6 +26,9 @@ type ComposeUpParams struct {
 	Project    *compose.Project
 	UploadMode compose.UploadMode
 	Recipe     modes.Recipe
+	// TTL is the normalized deployment time-to-live (see byoc.ParseTTL);
+	// empty when no TTL was given.
+	TTL string
 }
 
 func checkDeploymentMode(prevMode, newMode modes.Mode) (modes.Mode, error) {
@@ -162,6 +165,7 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 			DelegateDomain: delegateDomain.Zone,
 		},
 		Recipe: recipeMsg,
+		TTL:    params.TTL,
 	}
 
 	delegation, err := provider.PrepareDomainDelegation(ctx, client.PrepareDomainDelegationRequest{

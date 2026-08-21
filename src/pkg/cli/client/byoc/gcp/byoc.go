@@ -45,7 +45,6 @@ var _ client.Provider = (*ByocGcp)(nil)
 const (
 	DefangCDProjectName            = "defang-cd"
 	DefangUploadServiceAccountName = "defang-upload"
-	UploadPrefix                   = "uploads/"
 )
 
 var (
@@ -415,6 +414,7 @@ type cdCommand struct {
 	project        string
 	statesUrl      string
 	eventsUrl      string
+	ttl            string // forwarded to CD as DEFANG_TTL; empty when no TTL was given
 }
 
 type CloudBuildStep struct {
@@ -449,6 +449,10 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"REGION":                   b.driver.GetRegion(),
 		"STACK":                    b.PulumiStack,
 		pulumiBackendKey:           pulumiBackendValue, // TODO: make secret
+	}
+
+	if cmd.ttl != "" {
+		env["DEFANG_TTL"] = cmd.ttl
 	}
 
 	if !term.StdoutCanColor() {
@@ -523,7 +527,7 @@ func (b *ByocGcp) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 		return nil, err
 	}
 
-	url, err := b.driver.CreateUploadURL(ctx, b.bucket, path.Join(UploadPrefix, req.Digest), b.uploadServiceAccount)
+	url, err := b.driver.CreateUploadURL(ctx, b.bucket, path.Join(byoc.UploadPrefix, req.Digest), b.uploadServiceAccount)
 	if err != nil {
 		if strings.Contains(err.Error(), "Permission 'iam.serviceAccounts.signBlob' denied on resource") {
 			return nil, errors.New("current user does not have 'iam.serviceAccounts.signBlob' permission. If it has been recently added, please wait a few minutes then try again")
@@ -580,7 +584,7 @@ func (b *ByocGcp) deploy(ctx context.Context, req *client.DeployRequest, command
 	if len(data) < 1000 {
 		payload = base64.StdEncoding.EncodeToString(data)
 	} else {
-		payloadUrl, err := b.driver.CreateUploadURL(ctx, b.bucket, path.Join(UploadPrefix, etag), b.uploadServiceAccount)
+		payloadUrl, err := b.driver.CreateUploadURL(ctx, b.bucket, path.Join(byoc.UploadPrefix, etag), b.uploadServiceAccount)
 		if err != nil {
 			return nil, err
 		}
@@ -606,6 +610,7 @@ func (b *ByocGcp) deploy(ctx context.Context, req *client.DeployRequest, command
 		project:        project.Name,
 		statesUrl:      req.StatesUrl,
 		eventsUrl:      req.EventsUrl,
+		ttl:            req.TTL,
 	}
 	buildId, err := b.runCdCommand(ctx, cdCmd)
 	if err != nil {

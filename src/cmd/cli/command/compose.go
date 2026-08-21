@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"time"
@@ -77,6 +78,12 @@ func makeComposeUpCmd() *cobra.Command {
 				return err
 			}
 
+			ttlFlag, _ := cmd.Flags().GetString("ttl")
+			ttl, err := resolveTTL(ttlFlag, cmd.Flags().Changed("ttl"), time.Now())
+			if err != nil {
+				return err
+			}
+
 			project, loadErr := session.Loader.LoadProject(ctx)
 			if loadErr != nil {
 				return handleInvalidComposeFileErr(ctx, loadErr)
@@ -134,10 +141,11 @@ func makeComposeUpCmd() *cobra.Command {
 				Project:    project,
 				UploadMode: upload,
 				Recipe:     session.Stack.Recipe,
+				TTL:        ttl,
 			})
 			if err != nil {
 				composeErr := err
-				debugger, err := debug.NewDebugger(ctx, global.FabricAddr, session.Stack)
+				debugger, err := debug.NewDebugger(ctx, global.FabricAddr, session.Stack, !global.NonInteractive)
 				if err != nil {
 					return err
 				}
@@ -166,7 +174,7 @@ func makeComposeUpCmd() *cobra.Command {
 			serviceStates, err := cli.TailAndMonitor(ctx, project, session.Provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
 				deploymentErr := err
-				debugger, err := debug.NewDebugger(ctx, global.FabricAddr, session.Stack)
+				debugger, err := debug.NewDebugger(ctx, global.FabricAddr, session.Stack, !global.NonInteractive)
 				if err != nil {
 					term.Warn("Failed to initialize debugger:", err)
 					return deploymentErr
@@ -213,7 +221,27 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().Bool("allow-upgrade", pkg.GetenvBool("DEFANG_ALLOW_UPGRADE"), "allow upgrading the CD image and Pulumi version to the latest available")
 	composeUpCmd.Flags().StringArray("env-file", nil, "compose environment file(s) for interpolation; defaults to .env") // docker-compose compatibility
 	_ = composeUpCmd.MarkFlagFilename("env-file")
+	composeUpCmd.Flags().String("ttl", "", `time-to-live after which the deployment destroys itself (e.g. "12h", "7d12h" or a timestamp)`)
 	return composeUpCmd
+}
+
+// resolveTTL picks the deployment TTL for this `up`: the --ttl flag wins;
+// otherwise the DEFANG_TTL variable of the selected stack file applies (it
+// reaches the process environment via LoadStackEnv when the session loads —
+// the single place the TTL is read from the environment). The value is
+// normalized (see byoc.ParseTTL) so a malformed TTL fails before the CD task
+// starts.
+//
+// Note the TTL is per-deploy, not persisted: the CD rebuilds its Pulumi stack
+// config from its environment on every run, so omitting both the flag and the
+// stack variable on a later `up` removes any scheduled self-destruct. The
+// stack file is the durable home for a TTL.
+func resolveTTL(ttlFlag string, flagSet bool, now time.Time) (string, error) {
+	ttl := ttlFlag
+	if !flagSet {
+		ttl = os.Getenv("DEFANG_TTL")
+	}
+	return byoc.ParseTTL(ttl, now)
 }
 
 func confirmDeployment(targetDirectory string, existingDeployments []*defangv1.Deployment, accountInfo *client.AccountInfo, stackName string) (bool, error) {
@@ -308,7 +336,7 @@ func promptToCreateStack(ctx context.Context, targetDirectory string, params sta
 
 func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *compose.Project, provider client.Provider, originalErr error) error {
 	if errors.Is(originalErr, types.ErrComposeFileNotFound) {
-		// TODO: generate a compose file based on the current project
+		// TODO: suggest to generate a compose file based on the current project
 		printDefangHint("To start a new project, do:", "new")
 	}
 
@@ -321,7 +349,11 @@ func handleComposeUpErr(ctx context.Context, debugger *debug.Debugger, project *
 		return nil
 	}
 
-	if global.NonInteractive || errors.Is(originalErr, byoc.ErrLocalPulumiStopped) {
+	if errors.Is(originalErr, byoc.ErrLocalPulumiStopped) {
+		return originalErr
+	}
+	// In CI only paid accounts auto-run the debugger; others just get the error.
+	if global.NonInteractive && !debugger.AutoApprove() {
 		return originalErr
 	}
 
@@ -366,7 +398,9 @@ func handleTailAndMonitorErr(ctx context.Context, err error, debugger *debug.Deb
 			debugConfig.FailedServices = []string{errDeploymentFailed.Service}
 		}
 
-		if global.NonInteractive {
+		// In CI there is no one to prompt, so only paid accounts (which auto-approve) run the
+		// debugger automatically; everyone else gets a hint to debug interactively.
+		if global.NonInteractive && !debugger.AutoApprove() {
 			printDefangHint("To debug the deployment, do:", debugConfig.String())
 			return
 		}
@@ -483,7 +517,23 @@ func makeComposeDownCmd() *cobra.Command {
 					term.Warn("Unable to tail logs. Detaching.")
 					return nil
 				}
-				return err
+				// A failed destroy (e.g. CodeBuild exit status) is when resources get orphaned, so prompt
+				// the AI debugger just like `up` does; it can guide the user through cleanup.
+				// handleTailAndMonitorErr skips the prompt in non-interactive mode.
+				deploymentErr := err
+				debugger, dbgErr := debug.NewDebugger(cmd.Context(), global.FabricAddr, session.Stack, !global.NonInteractive)
+				if dbgErr != nil {
+					term.Warn("Failed to initialize debugger:", dbgErr)
+					return deploymentErr
+				}
+				handleTailAndMonitorErr(cmd.Context(), deploymentErr, debugger, debug.DebugConfig{
+					Deployment: deployment,
+					ProviderID: &session.Stack.Provider,
+					Stack:      session.Stack.Name,
+					Since:      since,
+					Until:      time.Now(),
+				})
+				return deploymentErr
 			}
 			term.Info("Done.")
 

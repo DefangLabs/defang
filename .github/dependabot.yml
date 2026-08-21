@@ -11,7 +11,3 @@ updates:
       github-actions:
         patterns:
           - "*"
-    ignore:
-      # Only major version bumps; security advisories always bypass ignore rules.
-      - dependency-name: "*"
-        update-types: ["version-update:semver-minor", "version-update:semver-patch"]

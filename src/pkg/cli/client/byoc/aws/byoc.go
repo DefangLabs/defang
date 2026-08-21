@@ -252,7 +252,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		payloadString = base64.StdEncoding.EncodeToString(data)
 		// TODO: consider making this a proper Data URL: "data:application/protobuf;base64,abcd…"
 	} else {
-		payloadUrl, err := b.driver.CreateUploadURL(ctx, etag)
+		payloadUrl, err := b.driver.CreateUploadURL(ctx, byoc.UploadPrefix, etag)
 		if err != nil {
 			return nil, err
 		}
@@ -278,6 +278,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		project:         project.Name,
 		statesUrl:       req.StatesUrl,
 		eventsUrl:       req.EventsUrl,
+		ttl:             req.TTL,
 	}
 
 	if b.needDockerHubCreds {
@@ -548,6 +549,7 @@ type cdCommand struct {
 
 	statesUrl string
 	eventsUrl string
+	ttl       string
 }
 
 func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild.BuildID, error) {
@@ -592,6 +594,10 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild
 		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
 	}
 
+	if cmd.ttl != "" {
+		env["DEFANG_TTL"] = cmd.ttl
+	}
+
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging
 		debugEnv := []string{"AWS_REGION=" + string(b.driver.Region)}
@@ -607,7 +613,7 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild
 	}
 
 	// Prepend the entrypoint; CodeBuild runs buildspec commands in a shell, not via Docker ENTRYPOINT
-	args := append([]string{"node", "lib/index.js"}, cmd.command...)
+	args := append(cdEntrypoint(b.CDImage), cmd.command...)
 	return b.driver.Run(ctx, "/app", b.CDImage, env, args...)
 }
 
@@ -708,7 +714,7 @@ func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 		return nil, err
 	}
 
-	url, err := b.driver.CreateUploadURL(ctx, req.Digest)
+	url, err := b.driver.CreateUploadURL(ctx, byoc.UploadPrefix, req.Digest)
 	if err != nil {
 		return nil, err
 	}

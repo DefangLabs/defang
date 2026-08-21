@@ -14,6 +14,7 @@ import (
 
 const (
 	CdTaskPrefix = "defang-cd" // WARNING: renaming this practically deletes the Pulumi state
+	UploadPrefix = "uploads/"
 )
 
 var (
