@@ -2,6 +2,7 @@ package codebuild
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -32,6 +33,14 @@ func GetBuildStatus(ctx context.Context, cfg aws.Config, buildID BuildID) (bool,
 func buildStatus(build cbtypes.Build) (bool, error) {
 	switch build.BuildStatus {
 	case cbtypes.StatusTypeInProgress:
+		// The top-level BuildStatus can lag a phase that has already failed: when
+		// the CodeBuild agent faults before our command runs (e.g. it cannot exec
+		// the shell), the build can sit at IN_PROGRESS until the project timeout
+		// (up to an hour) even though it is already doomed. Phases are sequential
+		// and never recover, so a failed phase means the build is done.
+		if err := failedPhaseError(build); err != nil {
+			return true, err
+		}
 		return false, nil
 	case cbtypes.StatusTypeSucceeded:
 		return true, io.EOF
@@ -43,6 +52,26 @@ func buildStatus(build cbtypes.Build) (bool, error) {
 		reason := getBuildPhaseErrorContexts(build)
 		return true, BuildFailure{Reason: reason}
 	}
+}
+
+// failedPhaseError returns a BuildFailure when any build phase has reached a
+// terminal failure state, or nil when none has. It lets us surface a doomed
+// build while its top-level BuildStatus still reads IN_PROGRESS, rather than
+// waiting for CodeBuild to finalize (or time out).
+func failedPhaseError(build cbtypes.Build) error {
+	for _, phase := range build.Phases {
+		switch phase.PhaseStatus {
+		case cbtypes.StatusTypeFailed, cbtypes.StatusTypeFault,
+			cbtypes.StatusTypeTimedOut, cbtypes.StatusTypeStopped:
+			reason := getBuildPhaseErrorContexts(build)
+			if reason == "" {
+				// No context message (e.g. an agent fault): fall back to naming the phase.
+				reason = fmt.Sprintf("build %s phase %s", phase.PhaseType, strings.ToLower(string(phase.PhaseStatus)))
+			}
+			return BuildFailure{Reason: reason}
+		}
+	}
+	return nil
 }
 
 func getBuildPhaseErrorContexts(build cbtypes.Build) string {

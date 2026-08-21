@@ -4,8 +4,46 @@ import (
 	"strings"
 	"testing"
 
+	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	"go.yaml.in/yaml/v4"
 )
+
+func TestEnvironmentTypeForImage(t *testing.T) {
+	tests := []struct {
+		name  string
+		image string
+		want  cbtypes.EnvironmentType
+	}{
+		{
+			name:  "arm64 public CD image with digest",
+			image: "public.ecr.aws/defang-io/cd:public-cd-image-fb20b70e-arm64@sha256:6cdb3f11e548700a673098642ed25e3fb50ebf3b39d533364f75d207bf66ea9b",
+			want:  cbtypes.EnvironmentTypeArmContainer,
+		},
+		{
+			name:  "x86_64 private CD image with digest",
+			image: "426819183542.dkr.ecr.us-west-2.amazonaws.com/cd:nodejs-cd-image-e87eefcf-x86_64@sha256:7efe4a59ed9d1c06f4bf396d76dbfb0f1d4784c289999bf88664fabe43409793",
+			want:  cbtypes.EnvironmentTypeLinuxContainer,
+		},
+		{
+			name:  "aarch64 spelling",
+			image: "public.ecr.aws/defang-io/cd:some-tag-aarch64",
+			want:  cbtypes.EnvironmentTypeArmContainer,
+		},
+		{
+			name:  "unknown arch defaults to linux",
+			image: "aws/codebuild/amazonlinux2-x86_64-standard:5.0",
+			want:  cbtypes.EnvironmentTypeLinuxContainer,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := environmentTypeForImage(tt.image); got != tt.want {
+				t.Errorf("environmentTypeForImage(%q) = %q, want %q", tt.image, got, tt.want)
+			}
+		})
+	}
+}
 
 func TestBuildspec(t *testing.T) {
 	tests := []struct {

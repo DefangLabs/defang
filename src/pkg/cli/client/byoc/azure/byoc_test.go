@@ -11,6 +11,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cloudazure "github.com/DefangLabs/defang/src/pkg/clouds/azure"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
@@ -267,7 +268,7 @@ func TestQueryLogsDiscoversRunByEtag(t *testing.T) {
 	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()
-	_, err := b.QueryLogs(ctx, &defangv1.TailRequest{Etag: "some-etag"})
+	_, err := b.QueryLogs(ctx, &defangv1.TailRequest{Etag: "some-etag", LogType: uint32(logs.LogTypeCD)})
 	if err == nil || !strings.Contains(err.Error(), "failed to find CD deployment for etag") {
 		t.Errorf("expected etag-lookup failure, got: %v", err)
 	}
@@ -282,9 +283,28 @@ func TestQueryLogsEtagMismatchTriggersLookup(t *testing.T) {
 	b.cdEtag = "etag-A"
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()
-	_, err := b.QueryLogs(ctx, &defangv1.TailRequest{Etag: "etag-B"})
+	_, err := b.QueryLogs(ctx, &defangv1.TailRequest{Etag: "etag-B", LogType: uint32(logs.LogTypeCD)})
 	if err == nil || !strings.Contains(err.Error(), "failed to find CD deployment for etag") {
 		t.Errorf("expected mismatched-etag lookup failure, got: %v", err)
+	}
+}
+
+func TestQueryLogsCDOnlySkipsProjectResourceGroup(t *testing.T) {
+	// `cd down`/refresh tail only CD logs. With no CD run to tail, QueryLogs must
+	// not start the service/build watchers nor probe the project resource group —
+	// which is being torn down and would fail with ResourceGroupNotFound. A working
+	// credential is provided so any stray project-RG call would reach Azure (and
+	// hang/fail) instead of short-circuiting on missing creds.
+	useFakeCred(t, "tok", nil)
+	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	it, err := b.QueryLogs(ctx, &defangv1.TailRequest{Project: "proj", Follow: false, LogType: uint32(logs.LogTypeCD)})
+	if err != nil {
+		t.Fatalf("QueryLogs returned error, want none: %v", err)
+	}
+	for _, err := range it {
+		t.Fatalf("expected no log entries for CD-only request without a run, got err=%v", err)
 	}
 }
 
@@ -415,7 +435,7 @@ func TestQueryLogsNonFollow(t *testing.T) {
 	// an error (not panic).
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()
-	_, err := b.QueryLogs(ctx, &defangv1.TailRequest{Etag: "etag", Follow: false})
+	_, err := b.QueryLogs(ctx, &defangv1.TailRequest{Etag: "etag", Follow: false, LogType: uint32(logs.LogTypeCD)})
 	if err == nil {
 		t.Error("QueryLogs non-follow should fail without real Azure workspace")
 	}
