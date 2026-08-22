@@ -193,45 +193,27 @@ func (s failSurveyor) AskOne(survey.Prompt, interface{}, ...survey.AskOpt) error
 	return nil
 }
 
+// A non-interactive debugger runs without prompting: callers only build one when they have already
+// decided to debug (e.g. an explicit `defang debug`), so there is nothing left to ask. It also must
+// not prompt for feedback afterwards.
 func TestDebugDeploymentNonInteractive(t *testing.T) {
 	ctx := t.Context()
 	const expectedPrompt = `An error occurred while deploying this project with Defang. Help troubleshoot and recommend a solution. Look at the logs to understand what happened. The deployment ID is "test-deployment".`
 
-	tests := []struct {
-		name        string
-		autoApprove bool
-		expectRun   bool
-	}{
-		{name: "paid account auto-runs without prompting", autoApprove: true, expectRun: true},
-		{name: "free account does not run", autoApprove: false, expectRun: false},
+	stdout, stderr := term.SetupTestTerm(t)
+	mockAgent := &mockAgent{}
+	mockAgent.On("StartWithMessage", ctx, expectedPrompt).Return(nil)
+	debugger := &Debugger{
+		agent:       mockAgent,
+		surveyor:    failSurveyor{t}, // must never be called when non-interactive
+		interactive: false,
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			stdout, stderr := term.SetupTestTerm(t)
-			mockAgent := &mockAgent{}
-			if tt.expectRun {
-				mockAgent.On("StartWithMessage", ctx, expectedPrompt).Return(nil)
-			}
-			debugger := &Debugger{
-				agent:             mockAgent,
-				surveyor:          failSurveyor{t}, // must never be called when non-interactive
-				defaultPermission: tt.autoApprove,
-				interactive:       false,
-			}
+	err := debugger.DebugDeployment(ctx, DebugConfig{Deployment: "test-deployment"})
+	assert.NoError(t, err)
 
-			err := debugger.DebugDeployment(ctx, DebugConfig{Deployment: "test-deployment"})
-			assert.NoError(t, err)
-
-			if tt.expectRun {
-				mockAgent.AssertCalled(t, "StartWithMessage", ctx, expectedPrompt)
-				assert.Contains(t, stdout.String()+stderr.String(), "AI-generated analysis may be inaccurate. Please verify it against the logs.")
-			} else {
-				mockAgent.AssertNotCalled(t, "StartWithMessage", mock.Anything, mock.Anything)
-				assert.NotContains(t, stdout.String()+stderr.String(), "AI-generated analysis may be inaccurate")
-			}
-		})
-	}
+	mockAgent.AssertCalled(t, "StartWithMessage", ctx, expectedPrompt)
+	assert.Contains(t, stdout.String()+stderr.String(), "AI-generated analysis may be inaccurate. Please verify it against the logs.")
 }
 
 func TestTruncatePromptPayloads(t *testing.T) {

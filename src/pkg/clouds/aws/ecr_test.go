@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
@@ -13,6 +14,7 @@ type mockECR struct {
 	repos        []ecrtypes.Repository
 	images       []ecrtypes.ImageIdentifier
 	deletedBatch [][]ecrtypes.ImageIdentifier
+	failures     []ecrtypes.ImageFailure
 }
 
 func (m *mockECR) DescribeRepositories(_ context.Context, _ *ecr.DescribeRepositoriesInput, _ ...func(*ecr.Options)) (*ecr.DescribeRepositoriesOutput, error) {
@@ -25,7 +27,7 @@ func (m *mockECR) ListImages(_ context.Context, _ *ecr.ListImagesInput, _ ...fun
 
 func (m *mockECR) BatchDeleteImage(_ context.Context, in *ecr.BatchDeleteImageInput, _ ...func(*ecr.Options)) (*ecr.BatchDeleteImageOutput, error) {
 	m.deletedBatch = append(m.deletedBatch, in.ImageIds)
-	return &ecr.BatchDeleteImageOutput{}, nil
+	return &ecr.BatchDeleteImageOutput{Failures: m.failures}, nil
 }
 
 func TestFindRepositoriesByPrefix(t *testing.T) {
@@ -53,5 +55,26 @@ func TestDeleteImagesBatches(t *testing.T) {
 	}
 	if len(svc.deletedBatch) != 2 || len(svc.deletedBatch[0]) != 100 || len(svc.deletedBatch[1]) != 50 {
 		t.Fatalf("expected batches of 100 and 50, got %v", svc.deletedBatch)
+	}
+}
+
+// BatchDeleteImage answers HTTP 200 with a per-image Failures list, so a leftover image would
+// otherwise look deleted and keep blocking the repository.
+func TestDeleteImagesReportsPerImageFailures(t *testing.T) {
+	svc := &mockECR{failures: []ecrtypes.ImageFailure{{
+		ImageId:       &ecrtypes.ImageIdentifier{ImageTag: ptr.String("v1")},
+		FailureCode:   ecrtypes.ImageFailureCodeImageReferencedByManifestList,
+		FailureReason: ptr.String("referenced by a manifest list"),
+	}}}
+	err := DeleteImages(t.Context(), "portal-production/kaniko-build", []ecrtypes.ImageIdentifier{
+		{ImageTag: ptr.String("v1")},
+	}, svc)
+	if err == nil {
+		t.Fatal("expected an error when BatchDeleteImage reports failures")
+	}
+	for _, want := range []string{"portal-production/kaniko-build", "v1", "referenced by a manifest list"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not mention %q", err, want)
+		}
 	}
 }

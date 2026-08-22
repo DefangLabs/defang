@@ -118,6 +118,15 @@ func TestHandleCleanupTool(t *testing.T) {
 			provider:  &mockCleanerProvider{discoverErr: errors.New("boom")},
 			expectErr: "failed to discover leftover resources: boom",
 		},
+		{
+			// A per-resource failure is reported rather than returned: the other resources were
+			// still cleaned, so the caller gets the report and the failed counter.
+			name:           "cleanup error is reported",
+			provider:       &mockCleanerProvider{orphans: twoOrphans[:1], cleanupErr: errors.New("cannot clean")},
+			confirm:        "yes",
+			expectContains: []string{"cannot clean", "0 cleaned, 0 skipped, 1 failed"},
+			expectCleaned:  nil,
+		},
 	}
 
 	for _, tt := range tests {

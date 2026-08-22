@@ -29,7 +29,10 @@ func HandleCleanupTool(ctx context.Context, loader client.Loader, params Cleanup
 		return "", err
 	}
 
-	workingDir, _ := loader.ProjectWorkingDir(ctx)
+	workingDir, err := loader.ProjectWorkingDir(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get project working directory: %w", err)
+	}
 	sm, err := stacks.NewManager(fabric, workingDir, params.ProjectName, ec)
 	if err != nil {
 		return "", fmt.Errorf("failed to create stack manager: %w", err)

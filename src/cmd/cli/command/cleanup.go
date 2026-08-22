@@ -98,19 +98,20 @@ networking. On Azure it removes the project resource group.`,
 // itself. Any failure to start the debugger is reported as a warning, because the caller is
 // already returning the cleanup error.
 func offerCleanupDebugger(cmd *cobra.Command, session *session.Session, result cli.CleanupResult) {
-	debugger, err := debug.NewDebugger(cmd.Context(), global.FabricAddr, session.Stack, !global.NonInteractive)
-	if err != nil {
-		term.Debugf("Failed to initialize debugger: %v", err)
-		return
-	}
 	debugConfig := debug.DebugConfig{
 		Operation:  debug.OperationCleanup,
 		ProviderID: &session.Stack.Provider,
 		Stack:      session.Stack.Name,
 	}
-	// In CI there is no one to prompt, so only accounts that auto-approve run the debugger; the
-	// rest get a hint, matching how a failed deployment behaves.
-	if global.NonInteractive && !debugger.AutoApprove() {
+	// There is no one to prompt in CI, so print a hint instead of building the debugger, matching
+	// how a failed deployment behaves.
+	if global.NonInteractive {
+		printDefangHint("To debug the failed cleanup, do:", debugConfig.String())
+		return
+	}
+	debugger, err := debug.NewDebugger(cmd.Context(), global.FabricAddr, session.Stack, true)
+	if err != nil {
+		term.Debugf("Failed to initialize debugger: %v", err)
 		printDefangHint("To debug the failed cleanup, do:", debugConfig.String())
 		return
 	}
