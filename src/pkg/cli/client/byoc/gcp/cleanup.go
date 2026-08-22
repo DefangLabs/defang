@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
@@ -33,19 +34,29 @@ type gcpOrphanDetail struct {
 	region      string // for categorySubnet: subnetwork deletes are regional
 }
 
-// networkNamePrefix returns the prefix of the project's VPC network name.
+// networkNamePrefixes returns the prefixes a project's VPC network name can have.
 //
-// The Pulumi program names the network after the compose project — logical name
-// `<project>-vpc` in provider/defanggcp/gcp/gcp.go — and Pulumi's auto-naming appends a random
-// suffix, giving `<project>-vpc-<hex>`. GCP networks and subnetworks have no labels field, so
-// unlike every other resource in the stack they cannot be found by the defang-project and
-// defang-stack labels that cd/program/gcp.go sets, and this name is the only handle.
+// GCP networks and subnetworks have no labels field, so unlike every other resource in the stack
+// they cannot be found by the defang-project and defang-stack labels that cd/program/gcp.go sets.
+// The name is the only handle, and there are two shapes of it:
 //
-// The name deliberately does not include the stack, so two stacks of one compose project produce
-// networks with the same prefix. That is why a prefix match alone never authorises a delete: see
-// the in-use check in DiscoverOrphans.
-func networkNamePrefix(projectName string) string {
-	return projectName + "-vpc"
+//   - Current. The CD sets `pulumi:autonaming` to `<lower(prefix)>-${project}-${stack}-${name}-${hex(7)}`
+//     (cd/config.go), and the program's logical name for the network is "vpc", so the physical
+//     name is `defang-<project>-<stack>-vpc-<hex7>`.
+//   - Legacy. The old CD named it `<project>-vpc-<hex>`, with neither prefix nor stack. Those are
+//     the networks most likely to have already leaked, so they must still be found.
+//
+// The legacy prefix carries no stack, so two stacks of one compose project share it. That is why
+// a prefix match alone never authorises a delete: see the in-use check in DiscoverOrphans.
+func (b *ByocGcp) networkNamePrefixes(projectName string) []string {
+	var prefix string
+	if b.Prefix != "" {
+		prefix = strings.ToLower(b.Prefix) + "-"
+	}
+	return []string{
+		prefix + projectName + "-" + b.PulumiStack + "-vpc",
+		projectName + "-vpc",
+	}
 }
 
 // DiscoverOrphans finds the GCP networking resources that `defang down` leaves behind. The Pulumi
@@ -64,9 +75,21 @@ func (b *ByocGcp) DiscoverOrphans(ctx context.Context, projectName string) ([]cl
 		resources = append(resources, r)
 	}
 
-	networks, err := b.driver.ListNetworksByPrefix(ctx, networkNamePrefix(projectName))
-	if err != nil {
-		return nil, err
+	// One network can match both prefixes only if the legacy shape is also the current one, but
+	// dedupe anyway: offering the same network twice would make the second pass fail on a 404.
+	seen := map[string]bool{}
+	var networks []*compute.Network
+	for _, prefix := range b.networkNamePrefixes(projectName) {
+		found, err := b.driver.ListNetworksByPrefix(ctx, prefix)
+		if err != nil {
+			return nil, err
+		}
+		for _, network := range found {
+			if !seen[network.Name] {
+				seen[network.Name] = true
+				networks = append(networks, network)
+			}
+		}
 	}
 
 	for _, network := range networks {
