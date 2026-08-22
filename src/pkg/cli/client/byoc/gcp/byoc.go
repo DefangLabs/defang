@@ -432,6 +432,14 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		return "", err
 	}
 	env := map[string]string{
+		// Cloud Build overrides the image's own HOME for every build step, so Pulumi looks for
+		// its plugin cache somewhere other than the /root/.pulumi/plugins the CD image ships.
+		// It finds nothing, and silently downloads both providers at deploy time instead —
+		// pulumi-gcp from the CDN and defang-gcp from the pluginDownloadURL the generated SDK
+		// carries, which resolves to the latest GitHub *release*. That made every deploy depend
+		// on the public internet and, worse, meant pinning DEFANG_CD_IMAGE pinned only the cd
+		// binary while the provider silently floated to whatever was released last.
+		"HOME":                     "/root",
 		"DEFANG_CD_IMAGE":          b.CDImage,                 // used by down/destroy to schedule cleanup job with the same image
 		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_JSON":              os.Getenv("DEFANG_JSON"),
