@@ -13,7 +13,16 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/smithy-go/ptr"
+
+	"github.com/DefangLabs/defang/src/pkg"
 )
+
+// tailIdleTimeout bounds how long TailLogGroup waits for the next Live Tail event before
+// treating the connection as stalled. CloudWatch Live Tail sessions can go quiet on a
+// half-dead connection (e.g. expired credentials) without ever closing or erroring, so
+// without this the read loop would otherwise block until the caller's own context deadline,
+// however long that is. See https://github.com/DefangLabs/defang/issues/2231.
+var tailIdleTimeout = 90 * time.Second
 
 // Task ARN						arn:aws:ecs:us-west-2:123456789012:task/CLUSTER_NAME/2cba912d5eb14ffd926f6992b054f3bf
 // Cluster ARN					arn:aws:ecs:us-west-2:123456789012:cluster/CLUSTER_NAME
@@ -72,23 +81,25 @@ func TailLogGroup(ctx context.Context, cwClient StartLiveTailAPI, input LogGroup
 	return func(yield func([]LogEvent, error) bool) {
 		defer stream.Close()
 		for {
-			select {
-			case e := <-stream.Events():
-				if err := stream.Err(); err != nil {
-					yield(nil, err)
+			e, recvErr := pkg.RecvWithIdleTimeout(ctx, stream.Events(), tailIdleTimeout)
+			// stream.Err() is the authoritative reason the channel closed (e.g. an
+			// AccessDeniedException from expired credentials); check it before trusting
+			// recvErr, which on a closed channel is just io.EOF with no detail.
+			if err := stream.Err(); err != nil {
+				yield(nil, err)
+				return
+			}
+			if recvErr != nil {
+				yield(nil, recvErr)
+				return
+			}
+			events, err := getLogEvents(e)
+			if err != nil {
+				if !yield(nil, err) {
 					return
 				}
-				events, err := getLogEvents(e)
-				if err != nil {
-					if !yield(nil, err) {
-						return
-					}
-				}
-				if !yield(events, nil) {
-					return
-				}
-			case <-ctx.Done():
-				yield(nil, ctx.Err())
+			}
+			if !yield(events, nil) {
 				return
 			}
 		}

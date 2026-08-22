@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -82,49 +83,34 @@ func TestUploadArchive(t *testing.T) {
 		}
 	})
 
-	t.Run("upload with zip", func(t *testing.T) {
-		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: uploadUrl}, testproj, &bytes.Buffer{}, ArchiveTypeZip, "")
-		if err != nil {
-			t.Fatalf("uploadContent() failed: %v", err)
-		}
-		var expectedPath = path + testproj + "/" + ArchiveTypeZip.Extension
-		if url != server.URL+expectedPath {
-			t.Errorf("Expected %v, got %v", server.URL+expectedPath, url)
-		}
-	})
-
-	t.Run("upload with tar", func(t *testing.T) {
-		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: uploadUrl}, testproj, &bytes.Buffer{}, ArchiveTypeGzip, "")
-		if err != nil {
-			t.Fatalf("uploadContent() failed: %v", err)
-		}
-		var expectedPath = path + testproj + "/" + ArchiveTypeGzip.Extension
-		if url != server.URL+expectedPath {
-			t.Errorf("Expected %v, got %v", server.URL+expectedPath, url)
-		}
-	})
-
-	t.Run("force upload tar without digest", func(t *testing.T) {
-		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: uploadUrl}, testproj, &bytes.Buffer{}, ArchiveTypeGzip, "")
-		if err != nil {
-			t.Fatalf("uploadArchive() failed: %v", err)
-		}
-		var expectedPath = path + testproj + "/" + ArchiveTypeGzip.Extension
-		if url != server.URL+expectedPath {
-			t.Errorf("Expected %v, got %v", server.URL+expectedPath, url)
-		}
-	})
-
-	t.Run("force upload zip without digest", func(t *testing.T) {
-		url, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: uploadUrl}, testproj, &bytes.Buffer{}, ArchiveTypeZip, "")
-		if err != nil {
-			t.Fatalf("uploadArchive() failed: %v", err)
-		}
-		var expectedPath = path + testproj + "/" + ArchiveTypeZip.Extension
-		if url != server.URL+expectedPath {
-			t.Errorf("Expected %v, got %v", server.URL+expectedPath, url)
-		}
-	})
+	// An empty digest is the "force" path: the caller wants a URL that has never
+	// been used, so a redeploy of identical source still rebuilds. These used to
+	// expect the bare extension (".tar.gz"), i.e. one shared blob for every forced
+	// upload — which is exactly what made forced deploys reuse a stale image.
+	for _, at := range []ArchiveType{ArchiveTypeGzip, ArchiveTypeZip} {
+		t.Run("force upload without digest"+at.Extension, func(t *testing.T) {
+			prefix := server.URL + path + testproj + "/"
+			first, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: uploadUrl}, testproj, &bytes.Buffer{}, at, "")
+			if err != nil {
+				t.Fatalf("uploadArchive() failed: %v", err)
+			}
+			second, err := uploadArchive(t.Context(), client.MockProvider{UploadUrl: uploadUrl}, testproj, &bytes.Buffer{}, at, "")
+			if err != nil {
+				t.Fatalf("uploadArchive() failed: %v", err)
+			}
+			if first == second {
+				t.Errorf("forced uploads reused %v; a repeated context URL makes the build a no-op", first)
+			}
+			for _, url := range []string{first, second} {
+				if url == prefix+at.Extension {
+					t.Errorf("forced upload used the shared fixed blob %v", url)
+				}
+				if !strings.HasPrefix(url, prefix) || !strings.HasSuffix(url, at.Extension) {
+					t.Errorf("Expected %v<unique>%v, got %v", prefix, at.Extension, url)
+				}
+			}
+		})
+	}
 }
 
 func TestWalkContextFolder(t *testing.T) {
@@ -183,10 +169,11 @@ func TestWalkContextFolder(t *testing.T) {
 
 func Test_getRemoteBuildContext(t *testing.T) {
 	tests := []struct {
-		name       string
-		uploadMode UploadMode
-		expectUrl  string
-		expectFile string
+		name        string
+		uploadMode  UploadMode
+		expectUrl   string
+		expectUrlRe string
+		expectFile  string
 	}{
 		{
 			name:       "Default UploadMode",
@@ -195,10 +182,12 @@ func Test_getRemoteBuildContext(t *testing.T) {
 			expectFile: "sha256-B+3Dq6U37SrlbnrfS4uIk3CDwrPJ+Q15TqUCPBEMQuA=.tar.gz",
 		},
 		{
-			name:       "Force UploadMode",
-			uploadMode: UploadModeForce,
-			expectUrl:  "https://mock-bucket.s3.amazonaws.com/project1/.tar.gz", // server decides name
-			expectFile: ".tar.gz",
+			// Force must never reuse a URL: a repeated name makes the build context
+			// identical to the previous deploy's, so the build is skipped and a stale
+			// image ships. The name is a fresh UUID, so match a pattern, not a literal.
+			name:        "Force UploadMode",
+			uploadMode:  UploadModeForce,
+			expectUrlRe: `^https://mock-bucket\.s3\.amazonaws\.com/project1/[0-9a-f-]{36}\.tar\.gz$`,
 		},
 		{
 			name:       "Digest UploadMode",
@@ -262,7 +251,12 @@ func Test_getRemoteBuildContext(t *testing.T) {
 			if err != nil {
 				t.Fatalf("getRemoteBuildContext() failed: %v", err)
 			}
-			if got := normalizer.Replace(url); got != tt.expectUrl {
+			got := normalizer.Replace(url)
+			if tt.expectUrlRe != "" {
+				if !regexp.MustCompile(tt.expectUrlRe).MatchString(got) {
+					t.Errorf("Expected URL matching %v, got: %v", tt.expectUrlRe, got)
+				}
+			} else if got != tt.expectUrl {
 				t.Errorf("Expected %v, got: %v", tt.expectUrl, got)
 			}
 			if tt.expectFile != "" {
@@ -434,5 +428,47 @@ func TestGetDockerIgnorePatterns(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestForceUploadURLIsUniquePerCall pins the property that actually matters for
+// UploadModeForce: two forced deploys of identical source must not reuse a URL.
+// They previously both landed on ".tar.gz", so the build context was unchanged
+// between deploys, the build was skipped as a no-op, and the old image kept
+// running while the deploy reported success.
+func TestForceUploadURLIsUniquePerCall(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.Copy(io.Discard, r.Body) //nolint:errcheck // discarding the upload body
+		r.Body.Close()
+		w.WriteHeader(200)
+	}))
+	t.Cleanup(server.Close)
+
+	context := "../../../testdata/testproj"
+	if err := standardizeDirMode(context); err != nil {
+		t.Fatalf("Failed to standardize directory modes: %v", err)
+	}
+	provider := client.MockProvider{UploadUrl: server.URL}
+
+	get := func() string {
+		url, err := getRemoteBuildContext(t.Context(), provider, "project1", "service1",
+			&types.BuildConfig{Context: context}, UploadModeForce)
+		if err != nil {
+			t.Fatalf("getRemoteBuildContext() failed: %v", err)
+		}
+		return url
+	}
+
+	first, second := get(), get()
+	if first == second {
+		t.Errorf("forced uploads reused the same URL %q; the build would be skipped as unchanged", first)
+	}
+	for _, u := range []string{first, second} {
+		if strings.HasSuffix(u, "/.tar.gz") {
+			t.Errorf("forced upload fell back to the shared fixed blob: %q", u)
+		}
+		if !strings.HasSuffix(u, ".tar.gz") {
+			t.Errorf("forced upload lost its archive extension: %q", u)
+		}
 	}
 }

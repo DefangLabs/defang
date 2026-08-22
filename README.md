@@ -134,6 +134,20 @@ Install the Defang CLI from one of the following sources:
     nix profile install github:DefangLabs/defang#defang-cli --refresh
     ```
 
+  Released tags are available from our [Cachix](https://cachix.org) binary cache, so
+  you can download the CLI instead of compiling it. If you have Cachix installed, run
+  `cachix use defanglabs`; otherwise add these lines to `/etc/nix/nix.conf` (or
+  `~/.config/nix/nix.conf` if you are a [trusted user](https://nix.dev/manual/nix/stable/command-ref/conf-file#conf-trusted-users)):
+
+  ```nix
+  extra-substituters = https://defanglabs.cachix.org
+  extra-trusted-public-keys = defanglabs.cachix.org-1:mTXLTfYprWDrIK50Kz34fhOTreeKlQRZFQcKL7HtHx0=
+  ```
+
+  Then install a tagged version, e.g. `nix profile install github:DefangLabs/defang/v3.14.1#defang-cli`.
+  The cache holds `x86_64-linux` and `aarch64-darwin` builds. Other platforms, and
+  builds from `main`, compile from source as before.
+
 - Using [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/):
 
   ```
@@ -235,6 +249,7 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_STACK` - The name of the stack to use
 - `DEFANG_SUFFIX` - The suffix to use for all BYOC resources; defaults to the stack name, or `beta` if unset.
 - `DEFANG_WORKSPACE` - The workspace (name or ID) to use; preferred way to select which workspace the CLI uses
+- `GCP_PROJECT_ID` - The Google Cloud project ID for the `gcp` provider; must be a real shell environment variable (e.g. `export GCP_PROJECT_ID=my-project-id`), not set via `defang config set`. Also recognized: `GOOGLE_PROJECT`, `GOOGLE_CLOUD_PROJECT`, `GCLOUD_PROJECT`, `CLOUDSDK_CORE_PROJECT`
 - `NO_COLOR` - If set to any value, disables color output; by default, color output is enabled depending on the terminal
 - `PULUMI_ACCESS_TOKEN` - The Pulumi access token to use for authentication to Pulumi Cloud; see `DEFANG_PULUMI_BACKEND`
 - `PULUMI_CONFIG_PASSPHRASE` - Passphrase used to generate a unique key for your stack, and configuration and encrypted state values

@@ -1,4 +1,17 @@
 {
+  # Prebuilt `defang-cli` for released tags, published by the publish-nix-cache
+  # job in go.yml straight to Cachix. Nix only honours these for trusted users
+  # (root, or a member of `trusted-users`); everyone else builds from source
+  # unless they add the same two lines to their own nix.conf — see the README.
+  nixConfig = {
+    extra-substituters = [
+      "https://defanglabs.cachix.org"
+    ];
+    extra-trusted-public-keys = [
+      "defanglabs.cachix.org-1:mTXLTfYprWDrIK50Kz34fhOTreeKlQRZFQcKL7HtHx0="
+    ];
+  };
+
   outputs =
     {
       self,

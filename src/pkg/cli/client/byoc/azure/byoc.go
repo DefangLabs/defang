@@ -26,6 +26,7 @@ import (
 	azuredns "github.com/DefangLabs/defang/src/pkg/clouds/azure/dns"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/keyvault"
 	defanghttp "github.com/DefangLabs/defang/src/pkg/http"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -800,6 +801,44 @@ func (b *ByocAzure) PutConfig(ctx context.Context, req *defangv1.PutConfigReques
 	return nil
 }
 
+// parseCDLogLine splits a raw CD job log line into its engine timestamp and message.
+// The CD job's pulumi wrapper writes lines like
+// "2026-04-28T23:43:03.965786510Z - worker deleting (0s)" to stdout, which would
+// otherwise show up as a second, near-duplicate timestamp next to the CLI's own
+// read-time column (#2079). When the line doesn't start with a parseable
+// timestamp, ts is the zero value and message is the line unchanged.
+func parseCDLogLine(line string) (ts time.Time, message string) {
+	head, rest, ok := strings.Cut(line, " ")
+	if !ok {
+		return time.Time{}, line
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, head)
+	if err != nil {
+		return time.Time{}, line
+	}
+	rest = strings.TrimSpace(rest)
+	rest = strings.TrimPrefix(rest, "-")
+	return parsed, strings.TrimSpace(rest)
+}
+
+// splitCDLogSnapshot splits a ReadJobLogs snapshot (one line per buffered CD log
+// entry, newline-separated) into individual lines, dropping blank lines. Each
+// returned line still carries its own leading engine timestamp for parseCDLogLine
+// to extract.
+func splitCDLogSnapshot(content string) []string {
+	if content == "" {
+		return nil
+	}
+	var lines []string
+	for _, line := range strings.Split(strings.TrimRight(content, "\n"), "\n") {
+		if line == "" {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return lines
+}
+
 // QueryLogs implements client.Provider. It merges three log sources for the project:
 // CD (deployment) logs from the Container Apps Job, service logs from the project's
 // Container Apps, and build logs from ACR. When req.Follow is set each source streams
@@ -808,6 +847,11 @@ func (b *ByocAzure) PutConfig(ctx context.Context, req *defangv1.PutConfigReques
 func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
 	const cdServiceName = "defang-cd"
 
+	logType := logs.LogType(req.LogType)
+	if logType == logs.LogTypeUnspecified {
+		logType = logs.LogTypeAll
+	}
+
 	// setUpLocation resolves AZURE_LOCATION/AZURE_SUBSCRIPTION_ID onto the driver and
 	// job (no API calls). The service and build watchers below use b.driver.Azure, so
 	// this must run even when there's no etag to look up a CD run by.
@@ -815,25 +859,35 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 		return nil, err
 	}
 
-	// Resolve the CD job execution for this request. The deploying process caches
-	// the run ID in memory; a standalone `defang logs` has none, so recover it by
-	// matching the request etag against each execution's recorded ETAG env var.
+	// etag tags every response entry (CD, service, and build alike), so it's resolved
+	// unconditionally; only the CD run LOOKUP below is gated on LogTypeCD.
 	runID := b.cdRunID
 	etag := b.cdEtag
 	if req.Etag != "" && req.Etag != b.cdEtag {
 		runID, etag = "", req.Etag
 	}
-	if runID == "" && etag != "" {
-		found, err := b.job.FindExecutionByEtag(ctx, etag)
-		if err != nil {
-			return nil, fmt.Errorf("failed to find CD deployment for etag %q: %w", etag, err)
+
+	// Resolve the CD job execution for this request. The deploying process caches
+	// the run ID in memory; a standalone `defang logs` has none, so recover it by
+	// matching the request etag against each execution's recorded ETAG env var.
+	// Skip this entirely when CD logs weren't requested (e.g. `defang cd preview`
+	// asking for build+CD only): a service/build-only tail shouldn't look up, or
+	// warn about, a CD run it was never going to show.
+	if logType.Has(logs.LogTypeCD) {
+		if runID == "" && etag != "" {
+			found, err := b.job.FindExecutionByEtag(ctx, etag)
+			if err != nil {
+				return nil, fmt.Errorf("failed to find CD deployment for etag %q: %w", etag, err)
+			}
+			runID = found
 		}
-		runID = found
-	}
-	if runID == "" {
-		// Unknown or empty etag: no CD run to tail. Service and build logs are keyed
-		// by resource group rather than the CD execution, so still surface those.
-		term.Warnf("No CD logs found for etag %q; showing service and build logs only", req.Etag)
+		if runID == "" {
+			// Unknown or empty etag: no CD run to tail. Service and build logs are keyed
+			// by resource group rather than the CD execution, so still surface those.
+			term.Warnf("No CD logs found for etag %q; showing service and build logs only", req.Etag)
+		}
+	} else {
+		runID = ""
 	}
 
 	// CD logs. cdCh stays nil when there's no CD run, which makes the select below skip
@@ -868,12 +922,16 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 			}
 			go func() {
 				defer close(cdCh)
-				if content == "" {
-					return
-				}
-				select {
-				case cdCh <- cdLogEntry{line: content}:
-				case <-ctx.Done():
+				// Each buffered line carries its own engine timestamp (see
+				// parseCDLogLine), so split the snapshot before sending: a single
+				// entry for the whole content would only parse the first line's
+				// timestamp and leave the rest embedded in the message (#2079).
+				for _, line := range splitCDLogSnapshot(content) {
+					select {
+					case cdCh <- cdLogEntry{line: line}:
+					case <-ctx.Done():
+						return
+					}
 				}
 			}()
 		}
@@ -889,8 +947,10 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 	// group may be created mid-session (deploy-then-tail), so the watchers poll for it.
 	var acaCh <-chan aca.ServiceLogEntry
 	var buildCh <-chan acr.BuildLogEntry
-	startWatchers := true
-	if !req.Follow {
+	wantRun := logType.Has(logs.LogTypeRun)
+	wantBuild := logType.Has(logs.LogTypeBuild)
+	startWatchers := wantRun || wantBuild
+	if startWatchers && !req.Follow {
 		exists, err := b.driver.ResourceGroupExists(ctx, projectRG)
 		if err != nil {
 			return nil, err
@@ -901,17 +961,21 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 		}
 	}
 	if startWatchers {
-		acaClient := &aca.ContainerApp{
-			Azure:         b.driver.Azure,
-			ResourceGroup: projectRG,
+		if wantRun {
+			acaClient := &aca.ContainerApp{
+				Azure:         b.driver.Azure,
+				ResourceGroup: projectRG,
+			}
+			acaCh = acaClient.WatchLogs(ctx, req.Follow)
 		}
-		acaCh = acaClient.WatchLogs(ctx, req.Follow)
 
-		buildWatcher := &acr.BuildLogWatcher{
-			Azure:         b.driver.Azure,
-			ResourceGroup: projectRG,
+		if wantBuild {
+			buildWatcher := &acr.BuildLogWatcher{
+				Azure:         b.driver.Azure,
+				ResourceGroup: projectRG,
+			}
+			buildCh = buildWatcher.WatchBuildLogs(ctx, req.Follow)
 		}
-		buildCh = buildWatcher.WatchBuildLogs(ctx, req.Follow)
 	}
 
 	return func(yield func(*defangv1.TailResponse, error) bool) {
@@ -935,12 +999,16 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 					}
 					continue
 				}
+				ts, message := parseCDLogLine(entry.line)
+				if ts.IsZero() {
+					ts = time.Now()
+				}
 				if !yield(&defangv1.TailResponse{
 					Entries: []*defangv1.LogEntry{{
-						Message:   entry.line,
+						Message:   message,
 						Service:   cdServiceName,
 						Etag:      etag,
-						Timestamp: timestamppb.Now(),
+						Timestamp: timestamppb.New(ts),
 					}},
 					Service: cdServiceName,
 					Etag:    etag,

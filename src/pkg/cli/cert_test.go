@@ -348,18 +348,40 @@ func (m *mockCertFabricClient) calls() int {
 // interface so GenerateLetsEncryptCert's `provider.(CertIssuer)` succeeds.
 // Captures every (project, service, hostname) tuple the SUT calls IssueCert
 // with, and lets the test inject an error per call. The mutex makes the call
-// log safe under the new parallel-worker dispatch.
+// log safe under the parallel-worker dispatch.
+//
+// events records both phases in call order so tests can assert the pre-flight
+// pass completes before any issuance starts without racing on terminal output.
 type mockCertIssuerProvider struct {
 	mockCertProvider
-	mu        sync.Mutex
-	issueErr  error
-	issueCall []string
+	mu           sync.Mutex
+	issueErr     error
+	issueCall    []string
+	events       []string
+	preflight    map[string][]dns.RequiredRecord // hostname -> records still missing
+	preflightErr error
+	onIssue      func(log func(string, ...any))
 }
 
-func (m *mockCertIssuerProvider) IssueCert(_ context.Context, projectName, serviceName, hostname string, _ func(string) dns.Resolver) error {
+func (m *mockCertIssuerProvider) PreflightCert(_ context.Context, _, _, hostname string, _ func(string) dns.Resolver) ([]dns.RequiredRecord, error) {
+	m.mu.Lock()
+	m.events = append(m.events, "preflight:"+hostname)
+	m.mu.Unlock()
+	if m.preflightErr != nil {
+		return nil, m.preflightErr
+	}
+	return m.preflight[hostname], nil
+}
+
+func (m *mockCertIssuerProvider) IssueCert(_ context.Context, projectName, serviceName, hostname string, _ func(string) dns.Resolver, log func(string, ...any)) error {
 	m.mu.Lock()
 	m.issueCall = append(m.issueCall, fmt.Sprintf("%s/%s/%s", projectName, serviceName, hostname))
+	m.events = append(m.events, "issue:"+hostname)
+	onIssue := m.onIssue
 	m.mu.Unlock()
+	if onIssue != nil {
+		onIssue(log)
+	}
 	return m.issueErr
 }
 
@@ -369,6 +391,12 @@ func (m *mockCertIssuerProvider) sortedCalls() []string {
 	out := slices.Clone(m.issueCall)
 	sort.Strings(out)
 	return out
+}
+
+func (m *mockCertIssuerProvider) orderedEvents() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.events)
 }
 
 func TestGenerateLetsEncryptCert(t *testing.T) {
@@ -743,6 +771,141 @@ func TestRunIssuerJobs_ParallelMultipleDomains(t *testing.T) {
 	}
 	if got := provider.sortedCalls(); !slices.Equal(got, want) {
 		t.Errorf("issued = %v, want %v (any order)", got, want)
+	}
+}
+
+// TestRunIssuerJobs_PreflightsBeforeIssuing pins the two-phase shape: every
+// domain is pre-flighted before any domain starts issuing, so the batched DNS
+// instructions can't be printed after a worker has already begun waiting. A
+// pre-flight failure must not abort or skip issuance — phase 2 re-does the
+// discovery and reports the error against its own domain.
+func TestRunIssuerJobs_PreflightsBeforeIssuing(t *testing.T) {
+	tests := []struct {
+		name         string
+		preflightErr error
+	}{
+		{name: "preflight succeeds"},
+		{name: "preflight fails", preflightErr: errors.New("container app not found")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider := &mockCertIssuerProvider{
+				mockCertProvider: mockCertProvider{
+					services: &defangv1.GetServicesResponse{
+						Services: []*defangv1.ServiceInfo{
+							{Service: &defangv1.Service{Name: "web"}, UseAcmeCert: true, Domainname: "a.example.com"},
+							{Service: &defangv1.Service{Name: "api"}, UseAcmeCert: true, Domainname: "b.example.com"},
+						},
+					},
+				},
+				preflightErr: tt.preflightErr,
+			}
+			project := &compose.Project{
+				Name: "two",
+				Services: compose.Services{
+					"web": {Name: "web", DomainName: "a.example.com"},
+					"api": {Name: "api", DomainName: "b.example.com"},
+				},
+			}
+			if err := GenerateLetsEncryptCert(t.Context(), project, &mockCertFabricClient{}, provider); err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			events := provider.orderedEvents()
+			if len(events) != 4 {
+				t.Fatalf("expected 2 preflights + 2 issues, got %v", events)
+			}
+			for i, e := range events {
+				wantPrefix := "issue:"
+				if i < 2 {
+					wantPrefix = "preflight:"
+				}
+				if !strings.HasPrefix(e, wantPrefix) {
+					t.Errorf("event %d = %q, want a %q event (all preflights must precede all issues): %v", i, e, wantPrefix, events)
+				}
+			}
+		})
+	}
+}
+
+// TestRunIssuerJobs_PrefixesIssuerOutput asserts the logger handed to IssueCert
+// is the same per-domain prefixed logger the workers use, so provider-internal
+// progress lines are attributed like every other line. Single domain keeps the
+// terminal buffer single-writer.
+func TestRunIssuerJobs_PrefixesIssuerOutput(t *testing.T) {
+	stdout, _ := term.SetupTestTerm(t)
+	provider := &mockCertIssuerProvider{
+		mockCertProvider: mockCertProvider{
+			services: &defangv1.GetServicesResponse{
+				Services: []*defangv1.ServiceInfo{
+					{Service: &defangv1.Service{Name: "web"}, UseAcmeCert: true, Domainname: "a.example.com"},
+				},
+			},
+		},
+		onIssue: func(log func(string, ...any)) { log("registering custom hostname") },
+	}
+	project := &compose.Project{
+		Name:     "one",
+		Services: compose.Services{"web": {Name: "web", DomainName: "a.example.com"}},
+	}
+	if err := GenerateLetsEncryptCert(t.Context(), project, &mockCertFabricClient{}, provider); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	got := stripANSI(stdout.String())
+	if !strings.Contains(got, "[a.example.com] registering custom hostname") {
+		t.Errorf("issuer output not domain-prefixed:\n%s", got)
+	}
+}
+
+func TestPrintGroupedRecords(t *testing.T) {
+	jobs := []domainJob{
+		{serviceName: "web", domain: "example.com"},
+		{serviceName: "api", domain: "ready.example.com"},
+		{serviceName: "web", domain: "www.example.com"},
+	}
+	pending := map[string][]dns.RequiredRecord{
+		"example.com": {
+			{Type: "TXT", Name: "asuid.example.com", Value: "VID123", Note: "add this first"},
+			{Type: "A", Name: "example.com", Value: "20.1.2.3"},
+		},
+		"www.example.com": {
+			{Type: "CNAME", Name: "www.example.com", Value: "app.westus.azurecontainerapps.io"},
+		},
+	}
+
+	stdout, _ := term.SetupTestTerm(t)
+	printGroupedRecords(jobs, pending, maxDomainLen(jobs))
+	lines := strings.Split(strings.TrimRight(stripANSI(stdout.String()), "\n"), "\n")
+
+	if len(lines) != 4 {
+		t.Fatalf("expected 1 header + 3 record lines, got %d:\n%s", len(lines), strings.Join(lines, "\n"))
+	}
+	if !strings.Contains(lines[0], "Configure the following DNS record(s):") {
+		t.Errorf("missing single grouped header, got %q", lines[0])
+	}
+	// Source order of jobs, not map order; the already-ready domain is omitted.
+	wantPrefixes := []string{" * [example.com]", " * [example.com]", " * [www.example.com]"}
+	for i, want := range wantPrefixes {
+		if !strings.HasPrefix(lines[i+1], want) {
+			t.Errorf("line %d = %q, want prefix %q", i+1, lines[i+1], want)
+		}
+	}
+	if strings.Contains(stripANSI(stdout.String()), "ready.example.com") {
+		t.Error("domain with no pending records should not appear in the block")
+	}
+	if !strings.Contains(lines[1], "(add this first)") {
+		t.Errorf("note not rendered: %q", lines[1])
+	}
+	if strings.Contains(lines[2], "(") {
+		t.Errorf("empty note should render nothing: %q", lines[2])
+	}
+	// The arrow column is padded across the whole block, not per domain, so
+	// records for different domains still line up as one table.
+	cols := make([]int, len(lines)-1)
+	for i, l := range lines[1:] {
+		cols[i] = strings.Index(l, "->")
+	}
+	if cols[0] != cols[1] || cols[1] != cols[2] {
+		t.Errorf("arrow column not aligned across domains: %v\n%s", cols, strings.Join(lines[1:], "\n"))
 	}
 }
 

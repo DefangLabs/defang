@@ -3,6 +3,7 @@ package azure
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cloudazure "github.com/DefangLabs/defang/src/pkg/clouds/azure"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
@@ -418,6 +420,157 @@ func TestQueryLogsNonFollow(t *testing.T) {
 	_, err := b.QueryLogs(ctx, &defangv1.TailRequest{Etag: "etag", Follow: false})
 	if err == nil {
 		t.Error("QueryLogs non-follow should fail without real Azure workspace")
+	}
+}
+
+func TestParseCDLogLine(t *testing.T) {
+	tests := []struct {
+		name        string
+		line        string
+		wantTs      string // RFC3339Nano, empty means zero time
+		wantMessage string
+	}{
+		{
+			name:        "timestamp with dash separator",
+			line:        "2026-04-28T23:43:03.965786510Z - worker deleting (0s)",
+			wantTs:      "2026-04-28T23:43:03.965786510Z",
+			wantMessage: "worker deleting (0s)",
+		},
+		{
+			name:        "timestamp with extra spaces around dash",
+			line:        "2026-04-28T23:43:03.965786510Z  -  worker deleting (0s)",
+			wantTs:      "2026-04-28T23:43:03.965786510Z",
+			wantMessage: "worker deleting (0s)",
+		},
+		{
+			name:        "timestamp with no dash",
+			line:        "2026-04-28T23:43:03.965786510Z worker deleting (0s)",
+			wantTs:      "2026-04-28T23:43:03.965786510Z",
+			wantMessage: "worker deleting (0s)",
+		},
+		{
+			name:        "no leading timestamp",
+			line:        "worker deleting (0s)",
+			wantTs:      "",
+			wantMessage: "worker deleting (0s)",
+		},
+		{
+			name:        "empty line",
+			line:        "",
+			wantTs:      "",
+			wantMessage: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts, message := parseCDLogLine(tt.line)
+			var wantTs time.Time
+			if tt.wantTs != "" {
+				var err error
+				wantTs, err = time.Parse(time.RFC3339Nano, tt.wantTs)
+				if err != nil {
+					t.Fatalf("bad test fixture: %v", err)
+				}
+			}
+			if !ts.Equal(wantTs) {
+				t.Errorf("ts = %v, want %v", ts, wantTs)
+			}
+			if message != tt.wantMessage {
+				t.Errorf("message = %q, want %q", message, tt.wantMessage)
+			}
+		})
+	}
+}
+
+func TestSplitCDLogSnapshot(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    []string
+	}{
+		{
+			name:    "empty content",
+			content: "",
+			want:    nil,
+		},
+		{
+			name:    "single line no trailing newline",
+			content: "2026-04-28T23:43:03.000000000Z - worker deleting (0s)",
+			want:    []string{"2026-04-28T23:43:03.000000000Z - worker deleting (0s)"},
+		},
+		{
+			name: "multiple lines, each keeping its own timestamp",
+			content: "2026-04-28T23:43:03.000000000Z - worker deleting (0s)\n" +
+				"2026-04-28T23:43:04.000000000Z - ManagedEnvironment mastra-extended deleting (0s)\n",
+			want: []string{
+				"2026-04-28T23:43:03.000000000Z - worker deleting (0s)",
+				"2026-04-28T23:43:04.000000000Z - ManagedEnvironment mastra-extended deleting (0s)",
+			},
+		},
+		{
+			name:    "blank lines are dropped",
+			content: "line-one\n\nline-two\n",
+			want:    []string{"line-one", "line-two"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := splitCDLogSnapshot(tt.content)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("splitCDLogSnapshot(%q) = %v, want %v", tt.content, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestQueryLogsRoutesByLogType(t *testing.T) {
+	// `defang cd preview` (and any other CD-only tail) asks for LogTypeBuild|LogTypeCD;
+	// QueryLogs must not also start the service-log (ACA) watcher for it, which is what
+	// made #2259 tail the whole project's running logs instead of just the CD task's
+	// own output. Conversely, a service/build-only tail must not look up or warn about
+	// a CD run it was never going to show, even when the request etag is unmatched.
+	tests := []struct {
+		name        string
+		setup       func(b *ByocAzure)
+		req         *defangv1.TailRequest
+		wantErr     string // substring that must appear in the error
+		unwantedErr string // substring that must NOT appear in the error
+	}{
+		{
+			name: "CD-only skips the service resource-group check",
+			setup: func(b *ByocAzure) {
+				b.cdRunID = "run-1"
+				b.cdEtag = "etag"
+			},
+			req:         &defangv1.TailRequest{Etag: "etag", Follow: false, LogType: uint32(logs.LogTypeCD)},
+			wantErr:     "getting log analytics workspace",
+			unwantedErr: "checking resource group",
+		},
+		{
+			name:        "Run-only skips the CD run lookup",
+			req:         &defangv1.TailRequest{Etag: "some-etag", Follow: false, LogType: uint32(logs.LogTypeRun)},
+			wantErr:     "checking resource group",
+			unwantedErr: "failed to find CD deployment",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			useFakeCred(t, "", errors.New("denied"))
+			b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
+			if tt.setup != nil {
+				tt.setup(b)
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+			defer cancel()
+			_, err := b.QueryLogs(ctx, tt.req)
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("expected error containing %q, got: %v", tt.wantErr, err)
+			}
+			if err != nil && strings.Contains(err.Error(), tt.unwantedErr) {
+				t.Errorf("error should not contain %q, got: %v", tt.unwantedErr, err)
+			}
+		})
 	}
 }
 

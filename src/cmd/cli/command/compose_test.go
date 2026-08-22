@@ -3,6 +3,7 @@ package command
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -10,6 +11,8 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/debug"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -127,5 +130,85 @@ func TestResolveTTL(t *testing.T) {
 				t.Errorf("resolveTTL() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// stubDebugAgent stands in for the AI agent: it records that it ran and returns whatever the
+// test wants the debug session to end with.
+type stubDebugAgent struct {
+	called bool
+	err    error
+}
+
+func (s *stubDebugAgent) StartWithMessage(context.Context, string) error {
+	s.called = true
+	return s.err
+}
+
+// stubDebuggerFactory hands handleComposeUpErr a debugger built around agent, and records whether
+// it was asked for one at all. The debugger itself is built non-interactive so it never prompts:
+// what is under test is how the CALLER treats the debugger's result, not the prompt.
+func stubDebuggerFactory(agent debug.DebugAgent, built *bool) debuggerFactory {
+	return func(context.Context) (*debug.Debugger, error) {
+		*built = true
+		return debug.NewDebuggerForTest(agent, false), nil
+	}
+}
+
+// Regression for issue 2227: handleComposeUpErr used to return the DEBUGGER's error. The
+// debugger returns nil once it has explained the failure, so a fatal compose up error exited 0
+// and CI went green on a deploy that never happened.
+func TestHandleComposeUpErrKeepsTheDeploymentError(t *testing.T) {
+	prevNonInteractive := global.NonInteractive
+	global.NonInteractive = false // a user is present, so the debugger is offered
+	t.Cleanup(func() { global.NonInteractive = prevNonInteractive })
+
+	originalErr := errors.New(`service "fabric": port 50051: 'target' must be an integer between 1 and 32767`)
+
+	for _, tt := range []struct {
+		name     string
+		debugErr error
+	}{
+		{name: "debugger succeeds", debugErr: nil},
+		{name: "debugger fails", debugErr: errors.New("agent unavailable")},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			agent := &stubDebugAgent{err: tt.debugErr}
+			built := false
+
+			err := handleComposeUpErr(context.Background(), stubDebuggerFactory(agent, &built), &compose.Project{}, nil, originalErr)
+
+			if !agent.called {
+				t.Error("expected the debugger to run")
+			}
+			if !errors.Is(err, originalErr) {
+				t.Errorf("expected the original deployment error, got %v", err)
+			}
+		})
+	}
+}
+
+// In CI there is nobody to prompt, so the debugger must not even be BUILT: constructing one
+// connects to the agent and costs Fabric round-trips to reach a prompt that cannot happen. The
+// original error still has to come back.
+func TestHandleComposeUpErrNonInteractiveSkipsTheDebugger(t *testing.T) {
+	prevNonInteractive := global.NonInteractive
+	global.NonInteractive = true
+	t.Cleanup(func() { global.NonInteractive = prevNonInteractive })
+
+	originalErr := errors.New("boom")
+	agent := &stubDebugAgent{}
+	built := false
+
+	err := handleComposeUpErr(context.Background(), stubDebuggerFactory(agent, &built), &compose.Project{}, nil, originalErr)
+
+	if built {
+		t.Error("the debugger must not be built when there is no user to prompt")
+	}
+	if agent.called {
+		t.Error("the debugger must not run in a non-interactive session")
+	}
+	if !errors.Is(err, originalErr) {
+		t.Errorf("expected the original deployment error, got %v", err)
 	}
 }

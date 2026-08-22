@@ -16,6 +16,7 @@ import (
 	"iter"
 
 	"connectrpc.com/connect"
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	awscodebuild "github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
@@ -38,6 +39,7 @@ func TestIsTransientError(t *testing.T) {
 	}{
 		{"nil", nil, false},
 		{"eof", io.EOF, false},
+		{"idle timeout", pkg.ErrIdleTimeout, true},
 		{"connect unavailable", connect.NewError(connect.CodeUnavailable, errors.New("unavailable")), true},
 		{"connect internal non-wire", connect.NewError(connect.CodeInternal, errors.New("internal")), true},
 		{"connect permission denied", connect.NewError(connect.CodePermissionDenied, errors.New("denied")), false},

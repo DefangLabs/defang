@@ -38,6 +38,13 @@ func TokenStorageName(fabricAddr string) string {
 	return host
 }
 
+// UsingAccessTokenEnv reports whether DEFANG_ACCESS_TOKEN is set. Such a token is minted
+// by `defang token` for a single, fixed workspace, so unlike an interactive login it cannot
+// be redirected to a different workspace via --workspace/DEFANG_WORKSPACE.
+func UsingAccessTokenEnv() bool {
+	return os.Getenv("DEFANG_ACCESS_TOKEN") != ""
+}
+
 func GetExistingToken(fabricAddr string) string {
 	var accessToken = os.Getenv("DEFANG_ACCESS_TOKEN")
 

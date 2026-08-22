@@ -78,6 +78,18 @@ func TestDebugDeployment(t *testing.T) {
 			expectedPrompt: "An error occurred while deploying this project to AWS with Defang. Help troubleshoot and recommend a solution. Look at the logs to understand what happened. The deployment ID is \"test-deployment\". The services that failed to deploy are: [backend]. The deployment started at 2025-01-02 03:04:05 +0000 UTC. The deployment finished at 2025-01-02 04:05:06 +0000 UTC.The compose files are at []. The compose file is as follows:\n\nservices: {}\n",
 			permission:     true,
 		},
+		{
+			// compose down never loads a compose.Project, so it can only pass a resolved
+			// name (issue #2248: the agent's logs tool omitted project_name and failed
+			// once the account had more than one deployed project).
+			name: "With ProjectName but no Project",
+			debugConfig: DebugConfig{
+				Deployment:  "test-deployment",
+				ProjectName: "component-registry",
+			},
+			expectedPrompt: "An error occurred while deploying this project with Defang. Help troubleshoot and recommend a solution. Look at the logs to understand what happened. The deployment ID is \"test-deployment\". The project name is \"component-registry\"; pass it explicitly to your tools.",
+			permission:     true,
+		},
 	}
 
 	for _, tt := range tests {
