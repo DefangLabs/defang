@@ -144,7 +144,7 @@ func makeComposeUpCmd() *cobra.Command {
 				TTL:        ttl,
 			})
 			if err != nil {
-				return handleComposeUpErr(ctx, session.Stack, project, session.Provider, err)
+				return handleComposeUpErr(ctx, interactiveDebugger(session.Stack), project, session.Provider, err)
 			}
 
 			if len(deploy.Services) == 0 {
@@ -168,7 +168,7 @@ func makeComposeUpCmd() *cobra.Command {
 			tailOptions := newTailOptionsForDeploy(session.Stack.Name, deploy.Etag, since, global.Verbose)
 			serviceStates, err := cli.TailAndMonitor(ctx, project, session.Provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
-				handleTailAndMonitorErr(ctx, err, session.Stack, debug.DebugConfig{
+				handleTailAndMonitorErr(ctx, err, interactiveDebugger(session.Stack), debug.DebugConfig{
 					Deployment: deploy.Etag,
 					Project:    project,
 					ProviderID: &session.Stack.Provider,
@@ -323,7 +323,20 @@ func promptToCreateStack(ctx context.Context, targetDirectory string, params sta
 	return nil
 }
 
-func handleComposeUpErr(ctx context.Context, stack *stacks.Parameters, project *compose.Project, provider client.Provider, originalErr error) error {
+// debuggerFactory builds the AI debugger on demand. The error paths below only call it once they
+// know they will use it, so a non-interactive run never pays for the agent connection (nor the
+// Fabric round-trips behind it) to reach a prompt that cannot happen.
+type debuggerFactory func(context.Context) (*debug.Debugger, error)
+
+// interactiveDebugger is the production factory: it always builds an interactive debugger, because
+// the callers skip it entirely when there is no user to prompt.
+func interactiveDebugger(stack *stacks.Parameters) debuggerFactory {
+	return func(ctx context.Context) (*debug.Debugger, error) {
+		return debug.NewDebugger(ctx, global.FabricAddr, stack, true)
+	}
+}
+
+func handleComposeUpErr(ctx context.Context, newDebugger debuggerFactory, project *compose.Project, provider client.Provider, originalErr error) error {
 	if errors.Is(originalErr, types.ErrComposeFileNotFound) {
 		// TODO: suggest to generate a compose file based on the current project
 		printDefangHint("To start a new project, do:", "new")
@@ -347,16 +360,23 @@ func handleComposeUpErr(ctx context.Context, stack *stacks.Parameters, project *
 		return originalErr
 	}
 
-	debugger, err := debug.NewDebugger(ctx, global.FabricAddr, stack, true)
+	debugger, err := newDebugger(ctx)
 	if err != nil {
 		term.Warn("Failed to initialize debugger:", err)
 		return originalErr
 	}
 
 	term.Error("Error:", client.PrettyError(originalErr))
-	return debugger.DebugDeploymentError(ctx, debug.DebugConfig{
+	// The debugger runs for its side effect only. It returns nil once it has
+	// explained the failure, so returning its error here would turn a fatal
+	// deployment error into exit code 0 — a false-green CI deploy for every
+	// account that auto-approves the debugger.
+	if debugErr := debugger.DebugDeploymentError(ctx, debug.DebugConfig{
 		Project: project,
-	}, originalErr)
+	}, originalErr); debugErr != nil {
+		term.Debug("debugger failed:", debugErr)
+	}
+	return originalErr
 }
 
 func handleTooManyProjectsError(ctx context.Context, provider client.Provider, originalErr error) error {
@@ -385,7 +405,7 @@ func handleTooManyProjectsError(ctx context.Context, provider client.Provider, o
 	return nil
 }
 
-func handleTailAndMonitorErr(ctx context.Context, err error, stack *stacks.Parameters, debugConfig debug.DebugConfig) {
+func handleTailAndMonitorErr(ctx context.Context, err error, newDebugger debuggerFactory, debugConfig debug.DebugConfig) {
 	var errDeploymentFailed client.ErrDeploymentFailed
 	if errors.As(err, &errDeploymentFailed) {
 		// Tail got canceled because of deployment failure: prompt to show the debugger
@@ -400,7 +420,7 @@ func handleTailAndMonitorErr(ctx context.Context, err error, stack *stacks.Param
 			return
 		}
 
-		debugger, dbgErr := debug.NewDebugger(ctx, global.FabricAddr, stack, true)
+		debugger, dbgErr := newDebugger(ctx)
 		if dbgErr != nil {
 			term.Warn("Failed to initialize debugger:", dbgErr)
 			printDefangHint("To debug the deployment, do:", debugConfig.String())
@@ -522,7 +542,7 @@ func makeComposeDownCmd() *cobra.Command {
 				// A failed destroy (e.g. CodeBuild exit status) is when resources get orphaned, so prompt
 				// the AI debugger just like `up` does; it can guide the user through cleanup.
 				// handleTailAndMonitorErr skips the prompt in non-interactive mode.
-				handleTailAndMonitorErr(cmd.Context(), err, session.Stack, debug.DebugConfig{
+				handleTailAndMonitorErr(cmd.Context(), err, interactiveDebugger(session.Stack), debug.DebugConfig{
 					Operation:  debug.OperationTeardown,
 					Deployment: deployment,
 					ProviderID: &session.Stack.Provider,

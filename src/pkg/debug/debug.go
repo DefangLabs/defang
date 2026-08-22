@@ -108,6 +108,17 @@ func NewDebugger(ctx context.Context, fabricAddr string, stack *stacks.Parameter
 	}, nil
 }
 
+// NewDebuggerForTest builds a Debugger around a stub agent. NewDebugger needs a live Fabric
+// connection, so tests in OTHER packages — the ones exercising how a caller handles what the
+// debugger returns — have no other way to get one.
+func NewDebuggerForTest(agent DebugAgent, interactive bool) *Debugger {
+	return &Debugger{
+		agent:       agent,
+		surveyor:    &surveyor{},
+		interactive: interactive,
+	}
+}
+
 func (d *Debugger) DebugDeployment(ctx context.Context, debugConfig DebugConfig) error {
 	if debugConfig.Deployment == "" {
 		return errors.New("no information to use for debugger")
