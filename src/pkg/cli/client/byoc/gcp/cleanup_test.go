@@ -247,17 +247,48 @@ func TestCleanupOrphanRejectsUnknownID(t *testing.T) {
 	}
 }
 
-func TestNetworkNamePrefix(t *testing.T) {
-	// The prefix must match Pulumi's auto-naming of the logical name projectName+"-vpc", and must
-	// not match a different project whose name merely starts the same way.
-	prefix := networkNamePrefix("html-css-js")
-	for _, name := range []string{"html-css-js-vpc-e99e23a", "html-css-js-vpc"} {
-		if !strings.HasPrefix(name, prefix) {
-			t.Errorf("%q should match prefix %q", name, prefix)
+func TestNetworkNamePrefixes(t *testing.T) {
+	// Both naming shapes must be found. The current one comes from the CD's autonaming pattern
+	// "<lower(prefix)>-${project}-${stack}-${name}-${hex(7)}"; a live cycle against
+	// defang-playground-dev produced "defang-cdtest-min-local1-vpc-be420a3". The legacy CD used
+	// "<project>-vpc-<hex>", and those are the networks most likely to have already leaked.
+	b := &ByocGcp{}
+	b.ByocBaseClient = &byoc.ByocBaseClient{Prefix: "Defang", PulumiStack: "local1"}
+
+	matches := func(name string) bool {
+		for _, prefix := range b.networkNamePrefixes("html-css-js") {
+			if strings.HasPrefix(name, prefix) {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, name := range []string{
+		"defang-html-css-js-local1-vpc-be420a3", // current
+		"html-css-js-vpc-e99e23a",               // legacy
+		"html-css-js-vpc",
+	} {
+		if !matches(name) {
+			t.Errorf("%q should have matched one of %q", name, b.networkNamePrefixes("html-css-js"))
 		}
 	}
-	if strings.HasPrefix("html-vpc-abc", prefix) {
-		t.Error("prefix must not match a shorter sibling project name")
+
+	// A prefix must not reach a shorter sibling project, nor another stack's network under the
+	// current naming — the stack sits between the project and "vpc" precisely so it cannot.
+	for _, name := range []string{
+		"html-vpc-abc",
+		"defang-html-css-js-other-vpc-be420a3",
+	} {
+		if matches(name) {
+			t.Errorf("%q should not have matched any of %q", name, b.networkNamePrefixes("html-css-js"))
+		}
+	}
+
+	// An empty prefix must not produce a leading hyphen.
+	b.ByocBaseClient = &byoc.ByocBaseClient{PulumiStack: "local1"}
+	if got := b.networkNamePrefixes("html-css-js")[0]; got != "html-css-js-local1-vpc" {
+		t.Errorf("empty prefix produced %q", got)
 	}
 }
 
