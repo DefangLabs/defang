@@ -38,23 +38,29 @@ type gcpOrphanDetail struct {
 //
 // GCP networks and subnetworks have no labels field, so unlike every other resource in the stack
 // they cannot be found by the defang-project and defang-stack labels that cd/program/gcp.go sets.
-// The name is the only handle, and there are two shapes of it:
+// The name is the only handle, and three shapes of it exist in live projects — all three were
+// observed side by side in defang-playground-dev:
 //
 //   - Current. The CD sets `pulumi:autonaming` to `<lower(prefix)>-${project}-${stack}-${name}-${hex(7)}`
-//     (cd/config.go), and the program's logical name for the network is "vpc", so the physical
-//     name is `defang-<project>-<stack>-vpc-<hex7>`.
-//   - Legacy. The old CD named it `<project>-vpc-<hex>`, with neither prefix nor stack. Those are
-//     the networks most likely to have already leaked, so they must still be found.
+//     (cd/config.go) and the program's logical name for the network is "vpc", giving
+//     `defang-<project>-<stack>-vpc-<hex7>`.
+//   - Same autonaming, older logical name. The program used to call the network `<project>-vpc`,
+//     so `${name}` carried the project too: `defang-<project>-<stack>-<project>-vpc-<hex7>`.
+//   - Legacy CD. `<project>-vpc-<hex>`, with neither prefix nor stack.
 //
-// The legacy prefix carries no stack, so two stacks of one compose project share it. That is why
-// a prefix match alone never authorises a delete: see the in-use check in DiscoverOrphans.
+// The last two are the shapes most likely to have already leaked, so missing them would miss the
+// backlog this command exists to clear. The legacy prefix carries no stack, so two stacks of one
+// compose project share it — which is why a prefix match alone never authorises a delete: see the
+// in-use check in DiscoverOrphans.
 func (b *ByocGcp) networkNamePrefixes(projectName string) []string {
 	var prefix string
 	if b.Prefix != "" {
 		prefix = strings.ToLower(b.Prefix) + "-"
 	}
+	stackPrefix := prefix + projectName + "-" + b.PulumiStack + "-"
 	return []string{
-		prefix + projectName + "-" + b.PulumiStack + "-vpc",
+		stackPrefix + "vpc",
+		stackPrefix + projectName + "-vpc",
 		projectName + "-vpc",
 	}
 }
