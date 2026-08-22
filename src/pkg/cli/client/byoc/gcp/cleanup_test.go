@@ -265,8 +265,9 @@ func TestNetworkNamePrefixes(t *testing.T) {
 	}
 
 	for _, name := range []string{
-		"defang-html-css-js-local1-vpc-be420a3", // current
-		"html-css-js-vpc-e99e23a",               // legacy
+		"defang-html-css-js-local1-vpc-be420a3",             // current
+		"defang-html-css-js-local1-html-css-js-vpc-3731162", // older logical name
+		"html-css-js-vpc-e99e23a",                           // legacy CD
 		"html-css-js-vpc",
 	} {
 		if !matches(name) {
