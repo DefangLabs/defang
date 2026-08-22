@@ -2,12 +2,14 @@ package gcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"path"
 
 	run "cloud.google.com/go/run/apiv2"
 	"cloud.google.com/go/run/apiv2/runpb"
+	"google.golang.org/api/iterator"
 )
 
 const (
@@ -90,4 +92,54 @@ func FixupGcpConfig(vCpu float32, memoryMiB uint64) (cpu float64, memory uint) {
 		cpu = 2
 	}
 	return cpu, memory
+}
+
+// GetCloudRunNetworkUsage returns the names of Cloud Run services in the driver's region that
+// have Direct VPC egress into the given network or one of its subnetworks. Cloud Run is the main
+// consumer of the project VPC and it is not a compute resource, so it does not appear in the
+// compute aggregated lists that GetNetworkUsage walks.
+func (gcp Gcp) GetCloudRunNetworkUsage(ctx context.Context, networkSelfLink string, subnetworkSelfLinks []string) ([]string, error) {
+	client, err := run.NewServicesClient(ctx, gcp.Options...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cloud run services client: %w", err)
+	}
+	defer client.Close()
+
+	it := client.ListServices(ctx, &runpb.ListServicesRequest{
+		Parent: fmt.Sprintf("projects/%s/locations/%s", gcp.ProjectId, gcp.Region),
+	})
+	var names []string
+	for {
+		svc, err := it.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to list cloud run services: %w", err)
+		}
+		if svc.GetTemplate().GetVpcAccess() == nil {
+			continue
+		}
+		for _, nic := range svc.GetTemplate().GetVpcAccess().GetNetworkInterfaces() {
+			if usesNetwork(nic, networkSelfLink, subnetworkSelfLinks) {
+				names = append(names, path.Base(svc.GetName()))
+				break
+			}
+		}
+	}
+	return names, nil
+}
+
+// usesNetwork reports whether a Cloud Run network interface points at the network or any of its
+// subnetworks. Either field may be empty: Cloud Run derives the missing one from the other.
+func usesNetwork(nic *runpb.VpcAccess_NetworkInterface, networkSelfLink string, subnetworkSelfLinks []string) bool {
+	if sameResource(nic.GetNetwork(), networkSelfLink) {
+		return true
+	}
+	for _, sub := range subnetworkSelfLinks {
+		if sameResource(nic.GetSubnetwork(), sub) {
+			return true
+		}
+	}
+	return false
 }

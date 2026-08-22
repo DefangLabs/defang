@@ -61,6 +61,10 @@ type ByocAws struct {
 	cdBuildId awscodebuild.BuildID // for GetDeploymentStatus
 
 	needDockerHubCreds bool
+
+	// orphans maps an OrphanResource.ID to the cloud details needed to clean it up. It is
+	// (re)populated by DiscoverOrphans and read by CleanupOrphan.
+	orphans map[string]orphanDetail
 }
 
 var _ client.Provider = (*ByocAws)(nil)

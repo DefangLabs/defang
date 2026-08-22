@@ -21,7 +21,19 @@ import (
 
 var P = track.P
 
+// DebugOperation names the operation that failed. A failed teardown needs different advice from a
+// failed deployment: its symptom is cloud resources left behind rather than a service that will
+// not start, and the useful next step is the cleanup tool rather than the service logs.
+type DebugOperation int
+
+const (
+	OperationDeploy DebugOperation = iota
+	OperationTeardown
+	OperationCleanup
+)
+
 type DebugConfig struct {
+	Operation      DebugOperation
 	ProviderID     *client.ProviderID
 	Stack          string
 	Deployment     types.ETag
@@ -75,11 +87,8 @@ type DebugAgent interface {
 type Debugger struct {
 	agent    DebugAgent
 	surveyor Surveyor
-	// defaultPermission is the default answer to the "debug with AI?" prompt. Paid accounts
-	// default to yes so they flow into the agent (and its cleanup tooling) seamlessly.
-	defaultPermission bool
-	// interactive is false in environments without a user to prompt (e.g. CI). When false the
-	// debugger only runs if defaultPermission is true (paid), and does so without prompting.
+	// interactive is false in environments without a user to prompt (e.g. CI). Callers decide
+	// whether to build a debugger at all there; once built, it runs without prompting.
 	interactive bool
 }
 
@@ -92,50 +101,22 @@ func NewDebugger(ctx context.Context, fabricAddr string, stack *stacks.Parameter
 	if err != nil {
 		return nil, err
 	}
-	// The paid-tier lookup is a network round-trip and only matters when there is no user to
-	// prompt, so skip it for interactive sessions (where the prompt default is always Yes).
-	defaultPermission := false
-	if !interactive {
-		defaultPermission = isPaidAccount(ctx, fabricAddr)
-	}
 	return &Debugger{
-		agent:             agent,
-		surveyor:          &surveyor{},
-		defaultPermission: defaultPermission,
-		interactive:       interactive,
+		agent:       agent,
+		surveyor:    &surveyor{},
+		interactive: interactive,
 	}, nil
 }
 
 // NewDebuggerForTest builds a Debugger around a stub agent. NewDebugger needs a live Fabric
 // connection, so tests in OTHER packages — the ones exercising how a caller handles what the
 // debugger returns — have no other way to get one.
-func NewDebuggerForTest(agent DebugAgent, defaultPermission, interactive bool) *Debugger {
+func NewDebuggerForTest(agent DebugAgent, interactive bool) *Debugger {
 	return &Debugger{
-		agent:             agent,
-		surveyor:          &surveyor{},
-		defaultPermission: defaultPermission,
-		interactive:       interactive,
+		agent:       agent,
+		surveyor:    &surveyor{},
+		interactive: interactive,
 	}
-}
-
-// AutoApprove reports whether the debugger will run without an interactive prompt. This is true
-// for paid accounts and lets callers decide whether to invoke the debugger in non-interactive
-// environments (CI) or just print a hint.
-func (d *Debugger) AutoApprove() bool {
-	return d.defaultPermission
-}
-
-// isPaidAccount reports whether the signed-in account is on a paid plan. Any error falls back to
-// false so the prompt stays opt-in.
-func isPaidAccount(ctx context.Context, fabricAddr string) bool {
-	host := client.NormalizeHost(fabricAddr)
-	fabricClient := client.NewGrpcClient(host, client.GetExistingToken(host), "")
-	resp, err := fabricClient.WhoAmI(ctx)
-	if err != nil {
-		term.Debug("Could not determine subscription tier for debug prompt default:", err)
-		return false
-	}
-	return pkg.IsPaidTier(resp.Tier)
 }
 
 func (d *Debugger) DebugDeployment(ctx context.Context, debugConfig DebugConfig) error {
@@ -152,6 +133,15 @@ func (d *Debugger) DebugDeploymentError(ctx context.Context, debugConfig DebugCo
 		prompt := buildDeploymentDebugPrompt(debugConfig) + " The error encountered was: " + truncateTail(deployErr.Error(), maxPromptErrorLen)
 		return d.agent.StartWithMessage(ctx, prompt)
 	}, "Debug Deployment Error", P("etag", debugConfig.Deployment), P("deployErr", deployErr))
+}
+
+// DebugCleanupError hands a failed cleanup to the agent. Unlike DebugDeploymentError there is no
+// deployment to read logs from: the report of what failed is the whole input.
+func (d *Debugger) DebugCleanupError(ctx context.Context, debugConfig DebugConfig, cleanupErr error) error {
+	return d.promptAndTrackDebugSession(func() error {
+		prompt := buildDeploymentDebugPrompt(debugConfig) + " The cleanup reported: " + truncateTail(cleanupErr.Error(), maxPromptErrorLen)
+		return d.agent.StartWithMessage(ctx, prompt)
+	}, "Debug Cleanup Error", P("cleanupErr", cleanupErr))
 }
 
 func (d *Debugger) DebugComposeLoadError(ctx context.Context, debugConfig DebugConfig, loadErr error) error {
@@ -187,15 +177,19 @@ func (d *Debugger) promptAndTrackDebugSession(fn func() error, eventName string,
 			track.Evt(eventName+" Feedback Prompt Failed", append([]track.Property{P("reason", err)}, eventProperty...)...)
 			return err
 		}
-		track.Evt(eventName+" Feedback Prompt Answered", append([]track.Property{P("feedback", feedback)}, eventProperty...)...)
+		// The prompt tells the user their answer is sent to Defang, so the text is tracked, but it
+		// is free-form: cap it so an accidental paste (a log dump, a stack trace) does not end up
+		// in analytics wholesale.
+		track.Evt(eventName+" Feedback Prompt Answered", append([]track.Property{P("feedback", truncateHead(feedback, maxFeedbackLen))}, eventProperty...)...)
 	}
 	return nil
 }
 
 func (d *Debugger) promptForPermission() (bool, error) {
 	if !d.interactive {
-		// No user to prompt: proceed only if this account auto-approves (paid).
-		return d.defaultPermission, nil
+		// No user to prompt. Reaching here means the caller already decided to debug (e.g. an
+		// explicit `defang debug`), so proceed without asking.
+		return true, nil
 	}
 	var aiDebug bool
 	err := d.surveyor.AskOne(&survey.Confirm{
@@ -226,7 +220,7 @@ func (d *Debugger) promptForFeedback() (string, error) {
 }
 
 func buildDeploymentDebugPrompt(debugConfig DebugConfig) string {
-	prompt := "An error occurred while deploying this project"
+	prompt := operationDescription(debugConfig.Operation)
 	if debugConfig.ProviderID == nil {
 		prompt += " with Defang."
 	} else {
@@ -234,6 +228,16 @@ func buildDeploymentDebugPrompt(debugConfig DebugConfig) string {
 	}
 
 	prompt += " Help troubleshoot and recommend a solution. Look at the logs to understand what happened."
+
+	// A teardown that fails is the moment resources get orphaned, and the agent has a tool for
+	// exactly that. Without this the model reaches for the deployment-shaped remedies instead.
+	if debugConfig.Operation != OperationDeploy {
+		prompt += " A failed teardown usually leaves cloud resources behind," +
+			" either because the deployment retains them or because another resource still references them," +
+			" and those leftovers can exhaust a cloud quota later." +
+			" Use the cleanup_resources tool to find them and remove what blocks the teardown," +
+			" then run the destroy tool again so the deployment can finish removing the rest."
+	}
 
 	if debugConfig.Deployment != "" {
 		prompt += fmt.Sprintf(" The deployment ID is %q.", debugConfig.Deployment)
@@ -263,12 +267,27 @@ func buildDeploymentDebugPrompt(debugConfig DebugConfig) string {
 	return prompt
 }
 
+// operationDescription opens the prompt by naming what the user was actually doing, so the model
+// does not read a teardown failure as a deployment failure.
+func operationDescription(op DebugOperation) string {
+	switch op {
+	case OperationTeardown:
+		return "An error occurred while tearing down this project"
+	case OperationCleanup:
+		return "An error occurred while cleaning up the cloud resources left behind by a teardown of this project"
+	default:
+		return "An error occurred while deploying this project"
+	}
+}
+
 // The initial prompt must always fit in the model context, no matter how big the project or the
 // deployment failure: cap each payload and let the agent page through the rest with its tools
 // (e.g. the logs tool fetches 100 lines per call).
 const (
 	maxPromptErrorLen   = 2048
 	maxPromptComposeLen = 8192
+	// maxFeedbackLen caps the free-form survey answer that is sent to analytics.
+	maxFeedbackLen = 1024
 )
 
 // truncateHead keeps the first max bytes of s; the start of a compose file (project and service

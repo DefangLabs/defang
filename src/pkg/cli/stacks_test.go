@@ -257,7 +257,7 @@ func TestRemoveStack(t *testing.T) {
 		remover := &mockStacksRemover{}
 		ec := &mockElicitationsController{}
 		ec.On("IsSupported").Return(true)
-		ec.On("RequestEnum", ctx, mock.AnythingOfType("string"), "confirm", []string{"yes", "no"}).Return("no", nil)
+		ec.On("RequestEnum", ctx, mock.AnythingOfType("string"), "confirm", []string{"no", "yes"}).Return("no", nil)
 
 		err := RemoveStack(ctx, remover, activeDeployment, ec, "my-project", "mystack", false)
 		assert.ErrorContains(t, err, "cancelled")
@@ -273,7 +273,7 @@ func TestRemoveStack(t *testing.T) {
 		remover := &mockStacksRemover{}
 		ec := &mockElicitationsController{}
 		ec.On("IsSupported").Return(true)
-		ec.On("RequestEnum", ctx, mock.AnythingOfType("string"), "confirm", []string{"yes", "no"}).Return("yes", nil)
+		ec.On("RequestEnum", ctx, mock.AnythingOfType("string"), "confirm", []string{"no", "yes"}).Return("yes", nil)
 		remover.On("DeleteStack", ctx, mock.AnythingOfType("*defangv1.DeleteStackRequest")).Return(nil)
 
 		err = RemoveStack(ctx, remover, activeDeployment, ec, "my-project", "mystack", false)
