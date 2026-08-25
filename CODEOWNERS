@@ -1,11 +1,11 @@
 # Default owners for everything
-*       @jordanstephens
+*       @defangdevs
 
 # GitHub actions and repo configuration
 /.github/**       @raphaeltm
 
 # Go command line tool
-/src/**       @lionello @jordanstephens
+/src/**       @lionello @defangdevs
 
 # Packaging with Nix
 /pkgs/defang/**   @lionello
