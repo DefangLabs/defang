@@ -1,4 +1,17 @@
 {
+  # Prebuilt `defang-cli` for released tags, published by the nix-cache-push
+  # workflow in DefangLabs/defang-mvp. Nix only honours these for trusted users
+  # (root, or a member of `trusted-users`); everyone else builds from source
+  # unless they add the same two lines to their own nix.conf — see the README.
+  nixConfig = {
+    extra-substituters = [
+      "https://defang-public-readonly.s3.us-west-2.amazonaws.com/nix-cache"
+    ];
+    extra-trusted-public-keys = [
+      "defang.io-1:G9XiaHDves1Jygn9Kbj4FO6BpfuH/1eevUNiDqb6Nyw="
+    ];
+  };
+
   outputs =
     {
       self,

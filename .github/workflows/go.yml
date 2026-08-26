@@ -283,6 +283,67 @@ jobs:
             }
             core.notice(`Smoketests passed: ${run.html_url}`);
 
+  # Publish the Nix binary cache for this tag, so `nix run github:DefangLabs/defang`
+  # downloads the CLI instead of compiling it. The push needs write access to the
+  # public S3 bucket and this repo has no cloud credentials, so — like the
+  # smoketests above — it runs in DefangLabs/defang-mvp via workflow dispatch.
+  trigger-nix-cache:
+    name: Publish Nix binary cache
+    runs-on: ubuntu-latest
+    needs: nix-shell-test # the cached derivation is the one that job just built
+    if: startsWith(github.ref, 'refs/tags/v') # only released versions are cached
+    concurrency:
+      group: nix-cache-${{ github.ref }}
+      cancel-in-progress: false
+    environment: smoketest # for DEFANG_MVP_ACTIONS_DISPATCH_TOKEN
+    timeout-minutes: 60
+    steps:
+      - name: Trigger the cache push and await conclusion
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          # Same token as trigger-smoketests: it already grants Actions
+          # read+write on DefangLabs/defang-mvp, which is all a dispatch needs.
+          github-token: ${{ secrets.DEFANG_MVP_ACTIONS_DISPATCH_TOKEN }}
+          script: |
+            const owner = 'DefangLabs';
+            const repo = 'defang-mvp';
+            const workflow_id = 'nix-cache-push.yml';
+            const cliVersion = context.ref.replace('refs/tags/', ''); // the flake is fetched by tag
+
+            // Same watermark trick as trigger-smoketests: createWorkflowDispatch
+            // does not return the new run's id, so we find ours by id > watermark
+            // plus the CLI version in the run name (see run-name in nix-cache-push.yml).
+            const { data: before } = await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id, per_page: 1 });
+            const watermark = before.workflow_runs[0]?.id ?? 0;
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner, repo, workflow_id, ref: 'main',
+              inputs: { 'cli-version': cliVersion },
+            });
+
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+            let run;
+            for (let i = 0; i < 30 && !run; i++) {
+              await sleep(10_000);
+              const { data } = await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id, event: 'workflow_dispatch', per_page: 30 });
+              // endsWith, not includes: v1.2.3 is a substring of v1.2.30.
+              run = data.workflow_runs.find((wr) => wr.id > watermark && wr.name.endsWith(`@ ${cliVersion}`));
+            }
+            if (!run) {
+              throw new Error('Timed out waiting for the dispatched cache run to appear');
+            }
+            core.notice(`Awaiting Nix cache push: ${run.html_url}`);
+
+            while (run.status !== 'completed') {
+              await sleep(30_000);
+              run = (await github.rest.actions.getWorkflowRun({ owner, repo, run_id: run.id })).data;
+            }
+            if (run.conclusion !== 'success') {
+              throw new Error(`Nix cache push concluded '${run.conclusion}': ${run.html_url}`);
+            }
+            core.notice(`Nix cache published: ${run.html_url}`);
+
   build-and-sign:
     name: Build app and sign files (with Trusted Signing)
     if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' # only run this step on tagged commits or the main branch
@@ -551,7 +612,7 @@ jobs:
     runs-on: ubuntu-latest
     if: failure() && (github.ref == 'refs/heads/main' || startsWith(github.ref,
       'refs/tags/v'))
-    needs: [go-release, post-release, nix-shell-test, push-docker]
+    needs: [go-release, post-release, nix-shell-test, push-docker, trigger-nix-cache]
     steps:
       - name: Slack Notification
         uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2
