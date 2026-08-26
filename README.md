@@ -134,6 +134,20 @@ Install the Defang CLI from one of the following sources:
     nix profile install github:DefangLabs/defang#defang-cli --refresh
     ```
 
+  Released tags are available from our [Cachix](https://cachix.org) binary cache, so
+  you can download the CLI instead of compiling it. If you have Cachix installed, run
+  `cachix use defanglabs`; otherwise add these lines to `/etc/nix/nix.conf` (or
+  `~/.config/nix/nix.conf` if you are a [trusted user](https://nix.dev/manual/nix/stable/command-ref/conf-file#conf-trusted-users)):
+
+  ```
+  extra-substituters = https://defanglabs.cachix.org
+  extra-trusted-public-keys = defanglabs.cachix.org-1:mTXLTfYprWDrIK50Kz34fhOTreeKlQRZFQcKL7HtHx0=
+  ```
+
+  Then install a tagged version, e.g. `nix profile install github:DefangLabs/defang/v3.14.1#defang-cli`.
+  The cache holds `x86_64-linux` and `aarch64-darwin` builds. Other platforms, and
+  builds from `main`, compile from source as before.
+
 - Using [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/):
 
   ```
