@@ -300,6 +300,12 @@ jobs:
         include:
           - system: x86_64-linux
             runs-on: ubuntu-latest
+          - system: aarch64-linux
+            # GitHub-hosted arm64 runner (GA for public repos) — this is the
+            # architecture agent-box's deployed fleet actually runs (Graviton
+            # EC2, see defangdevs/agent-box#373): without this leg, Cachix
+            # never has an artifact that box's first-boot nix build can hit.
+            runs-on: ubuntu-24.04-arm
           - system: aarch64-darwin
             runs-on: macos-15
     timeout-minutes: 30
