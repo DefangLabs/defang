@@ -139,7 +139,7 @@ Install the Defang CLI from one of the following sources:
   `cachix use defanglabs`; otherwise add these lines to `/etc/nix/nix.conf` (or
   `~/.config/nix/nix.conf` if you are a [trusted user](https://nix.dev/manual/nix/stable/command-ref/conf-file#conf-trusted-users)):
 
-  ```
+  ```nix
   extra-substituters = https://defanglabs.cachix.org
   extra-trusted-public-keys = defanglabs.cachix.org-1:mTXLTfYprWDrIK50Kz34fhOTreeKlQRZFQcKL7HtHx0=
   ```
