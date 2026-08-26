@@ -275,6 +275,11 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(up)
 
 	estimateCmd := makeEstimateCmd()
+	// Cleanup
+	cleanupCmd.Flags().Bool("dry-run", false, "list the leftover resources without changing anything")
+	cleanupCmd.Flags().BoolP("yes", "y", false, "remove the leftover resources without confirming each one")
+	RootCmd.AddCommand(cleanupCmd)
+
 	RootCmd.AddCommand(estimateCmd)
 
 	// Debug Command

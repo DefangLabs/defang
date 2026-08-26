@@ -145,12 +145,22 @@ func (s *stubDebugAgent) StartWithMessage(context.Context, string) error {
 	return s.err
 }
 
+// stubDebuggerFactory hands handleComposeUpErr a debugger built around agent, and records whether
+// it was asked for one at all. The debugger itself is built non-interactive so it never prompts:
+// what is under test is how the CALLER treats the debugger's result, not the prompt.
+func stubDebuggerFactory(agent debug.DebugAgent, built *bool) debuggerFactory {
+	return func(context.Context) (*debug.Debugger, error) {
+		*built = true
+		return debug.NewDebuggerForTest(agent, false), nil
+	}
+}
+
 // Regression for issue 2227: handleComposeUpErr used to return the DEBUGGER's error. The
 // debugger returns nil once it has explained the failure, so a fatal compose up error exited 0
 // and CI went green on a deploy that never happened.
 func TestHandleComposeUpErrKeepsTheDeploymentError(t *testing.T) {
 	prevNonInteractive := global.NonInteractive
-	global.NonInteractive = true
+	global.NonInteractive = false // a user is present, so the debugger is offered
 	t.Cleanup(func() { global.NonInteractive = prevNonInteractive })
 
 	originalErr := errors.New(`service "fabric": port 50051: 'target' must be an integer between 1 and 32767`)
@@ -164,11 +174,9 @@ func TestHandleComposeUpErrKeepsTheDeploymentError(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			agent := &stubDebugAgent{err: tt.debugErr}
-			// defaultPermission=true is the paid/auto-approve account: the only one that
-			// reaches the debugger in CI, and so the only one that hit this bug.
-			debugger := debug.NewDebuggerForTest(agent, true, false)
+			built := false
 
-			err := handleComposeUpErr(context.Background(), debugger, &compose.Project{}, nil, originalErr)
+			err := handleComposeUpErr(context.Background(), stubDebuggerFactory(agent, &built), &compose.Project{}, nil, originalErr)
 
 			if !agent.called {
 				t.Error("expected the debugger to run")
@@ -180,20 +188,25 @@ func TestHandleComposeUpErrKeepsTheDeploymentError(t *testing.T) {
 	}
 }
 
-// A free-tier CI account never reaches the debugger; it must still get the error.
-func TestHandleComposeUpErrWithoutAutoApprove(t *testing.T) {
+// In CI there is nobody to prompt, so the debugger must not even be BUILT: constructing one
+// connects to the agent and costs Fabric round-trips to reach a prompt that cannot happen. The
+// original error still has to come back.
+func TestHandleComposeUpErrNonInteractiveSkipsTheDebugger(t *testing.T) {
 	prevNonInteractive := global.NonInteractive
 	global.NonInteractive = true
 	t.Cleanup(func() { global.NonInteractive = prevNonInteractive })
 
 	originalErr := errors.New("boom")
 	agent := &stubDebugAgent{}
-	debugger := debug.NewDebuggerForTest(agent, false, false)
+	built := false
 
-	err := handleComposeUpErr(context.Background(), debugger, &compose.Project{}, nil, originalErr)
+	err := handleComposeUpErr(context.Background(), stubDebuggerFactory(agent, &built), &compose.Project{}, nil, originalErr)
 
+	if built {
+		t.Error("the debugger must not be built when there is no user to prompt")
+	}
 	if agent.called {
-		t.Error("the debugger must not auto-run for a free-tier account")
+		t.Error("the debugger must not run in a non-interactive session")
 	}
 	if !errors.Is(err, originalErr) {
 		t.Errorf("expected the original deployment error, got %v", err)
