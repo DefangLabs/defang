@@ -80,6 +80,7 @@ require (
 	go.yaml.in/yaml/v4 v4.0.0-rc.4
 	golang.org/x/crypto v0.52.0
 	golang.org/x/mod v0.36.0
+	golang.org/x/net v0.55.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sys v0.45.0
 	golang.org/x/term v0.43.0
@@ -158,7 +159,6 @@ require (
 	go.opentelemetry.io/contrib/detectors/gcp v1.43.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.69.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.44.0 // indirect
-	golang.org/x/net v0.55.0 // indirect
 	google.golang.org/genai v1.30.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	gopkg.in/ini.v1 v1.66.2 // indirect

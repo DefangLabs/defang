@@ -100,8 +100,21 @@ func newCertHTTPClient(r dns.Resolver) HTTPClient {
 // CNAME→fabric→ACME redirect dance used on AWS BYOD / Playground. Azure
 // implements this so `defang cert generate` can drive the Container Apps
 // hostname-add + managed-cert + SniEnabled-bind sequence end-to-end.
+//
+// The two methods mirror the two phases of runACMEJobs: PreflightCert only
+// probes and reports, so every domain's outstanding records can be printed in
+// one block up front, and IssueCert then does the work, routing all of its
+// user-facing output through the per-domain logger it is handed.
 type CertIssuer interface {
-	IssueCert(ctx context.Context, projectName, serviceName, hostname string, resolverAt func(string) dns.Resolver) error
+	// PreflightCert reports the DNS records hostname still needs before a cert
+	// can be issued, without provisioning anything. An empty result means
+	// there is nothing for the user to configure. Because the caller prints
+	// these, IssueCert must not print them again.
+	PreflightCert(ctx context.Context, projectName, serviceName, hostname string, resolverAt func(string) dns.Resolver) ([]dns.RequiredRecord, error)
+	// IssueCert provisions and binds the cert, emitting every user-facing
+	// progress line through log rather than printing directly, so concurrent
+	// per-domain workers don't interleave unattributed output.
+	IssueCert(ctx context.Context, projectName, serviceName, hostname string, resolverAt func(string) dns.Resolver, log func(string, ...any)) error
 }
 
 // domainJob is one (service, domain, targets) tuple processed by a worker.
@@ -191,11 +204,26 @@ func getDomainTargets(serviceInfo *defangv1.ServiceInfo, service compose.Service
 	}
 }
 
-// runIssuerJobs runs the provider-driven cert issuance in parallel. Per-domain
-// state transitions are emitted via a per-domain prefixed logger so the log
-// stream remains readable across concurrent workers.
+// runIssuerJobs runs the provider-driven cert issuance in the same two phases
+// as runACMEJobs:
+// Phase 1 — pre-flight every domain in parallel and print the union of the
+// records still missing as one block, so the user configures them all in a
+// single DNS-console sitting instead of learning about them one worker at a
+// time.
+// Phase 2 — parallel per-domain workers, each emitting state transitions
+// through a prefixed logger so the log stream stays readable.
 func runIssuerJobs(ctx context.Context, projectName string, jobs []domainJob, fab client.FabricClient, issuer CertIssuer) error {
 	pad := maxDomainLen(jobs)
+	resolverAt := dns.NewFabricResolverAt(fab)
+
+	// Phase 1: pre-flight.
+	pending := preflightIssuerDNS(ctx, projectName, jobs, issuer, resolverAt)
+	if len(pending) > 0 {
+		printGroupedRecords(jobs, pending, pad)
+		term.Infof("Awaiting DNS record setup and propagation for %d domain(s)…", len(pending))
+	}
+
+	// Phase 2: parallel workers.
 	eg, gctx := errgroup.WithContext(ctx)
 	eg.SetLimit(maxCertWorkers)
 	var (
@@ -208,7 +236,7 @@ func runIssuerJobs(ctx context.Context, projectName string, jobs []domainJob, fa
 		eg.Go(func() error {
 			start := time.Now()
 			log("issuing cert…")
-			if err := issuer.IssueCert(gctx, projectName, job.serviceName, job.domain, dns.NewFabricResolverAt(fab)); err != nil {
+			if err := issuer.IssueCert(gctx, projectName, job.serviceName, job.domain, resolverAt, log); err != nil {
 				log("failed: %v", err)
 				errMu.Lock()
 				errs = append(errs, fmt.Errorf("%v: %w", job.domain, err))
@@ -318,6 +346,69 @@ func printGroupedCNAMEs(jobs []domainJob, pad int) {
 	term.Infof("Configure the following DNS record(s) (CNAME or ALIAS; any listed target per row works):")
 	for _, j := range jobs {
 		term.Printf("  %-*s  ->  %s\n", pad, j.domain, strings.Join(j.targets, " or "))
+	}
+}
+
+// preflightIssuerDNS asks the provider, once per domain and in parallel, which
+// DNS records are still missing. A pre-flight error is not fatal: this phase is
+// purely presentational, and the domain's worker re-does the same discovery in
+// phase 2 where the failure can be attributed and reported properly.
+func preflightIssuerDNS(ctx context.Context, projectName string, jobs []domainJob, issuer CertIssuer, resolverAt func(string) dns.Resolver) map[string][]dns.RequiredRecord {
+	pending := make(map[string][]dns.RequiredRecord, len(jobs))
+	var mu sync.Mutex
+	eg, gctx := errgroup.WithContext(ctx)
+	eg.SetLimit(maxCertWorkers)
+	for _, j := range jobs {
+		job := j
+		eg.Go(func() error {
+			records, err := issuer.PreflightCert(gctx, projectName, job.serviceName, job.domain, resolverAt)
+			if err != nil {
+				term.Debugf("Pre-flight cert check for %v failed: %v", job.domain, err)
+				return nil
+			}
+			if len(records) == 0 {
+				return nil
+			}
+			mu.Lock()
+			pending[job.domain] = records
+			mu.Unlock()
+			return nil
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return nil // ignore errors, this should never happen
+	}
+	return pending
+}
+
+// printGroupedRecords prints every pending record across every domain in a
+// single block, iterating jobs (not the map) so sibling hostnames stay in a
+// stable, source order. Rows carry the same [domain] prefix the phase-2 workers
+// use, and the name column is padded across the whole block so the arrows line
+// up as one table rather than one table per domain.
+func printGroupedRecords(jobs []domainJob, pending map[string][]dns.RequiredRecord, pad int) {
+	namePad := 0
+	for _, records := range pending {
+		for _, r := range records {
+			if len(r.Name) > namePad {
+				namePad = len(r.Name)
+			}
+		}
+	}
+	term.Infof("Configure the following DNS record(s):")
+	for _, j := range jobs {
+		records, ok := pending[j.domain]
+		if !ok {
+			continue
+		}
+		log := newDomainLogger(j.domain, pad)
+		for _, r := range records {
+			note := ""
+			if r.Note != "" {
+				note = "  (" + r.Note + ")"
+			}
+			log("%-5s  %-*s  ->  %s%s", r.Type, namePad, r.Name, r.Value, note)
+		}
 	}
 }
 

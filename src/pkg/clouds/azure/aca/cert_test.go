@@ -5,11 +5,15 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	armappcontainers "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appcontainers/armappcontainers/v3"
+
+	"github.com/DefangLabs/defang/src/pkg/dns"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -30,6 +34,124 @@ func appWithCustomDomains(names []string) *armappcontainers.ContainerApp {
 				},
 			},
 		},
+	}
+}
+
+// TestPendingRecords covers the non-apex branch and the nothing-to-do branch.
+// The apex branch needs a live ManagedEnvironments client to look up the env's
+// static IP; the apex-vs-subdomain decision itself is dns.IsApexDomain, which
+// is unit-tested in pkg/dns.
+func TestPendingRecords(t *testing.T) {
+	const (
+		hostname = "www.example.com"
+		appFqdn  = "app.westus.azurecontainerapps.io"
+		vid      = "VID123"
+	)
+	nsRecords := dns.DNSResponse{Records: []string{"ns1.example.com", "ns2.example.com"}}
+
+	tests := []struct {
+		name     string
+		resolver dns.MockResolver
+		want     []dns.RequiredRecord
+	}{
+		{
+			name:     "nothing configured yet",
+			resolver: dns.MockResolver{}, // every lookup fails: neither record exists
+			want: []dns.RequiredRecord{
+				{Type: "TXT", Name: "asuid." + hostname, Value: vid, Note: "add this first — the hostname can register as soon as this is live"},
+				{Type: "CNAME", Name: hostname, Value: appFqdn, Note: "needed before the cert can be issued"},
+			},
+		},
+		{
+			name: "routing record live but ownership TXT missing",
+			resolver: dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+				{Type: "NS", Domain: hostname}:    nsRecords,
+				{Type: "CNAME", Domain: hostname}: {Records: []string{appFqdn}},
+			}},
+			want: []dns.RequiredRecord{
+				{Type: "TXT", Name: "asuid." + hostname, Value: vid, Note: "add this first — the hostname can register as soon as this is live"},
+				{Type: "CNAME", Name: hostname, Value: appFqdn, Note: "needed before the cert can be issued"},
+			},
+		},
+		{
+			name: "ownership TXT live but routing record missing",
+			resolver: dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+				{Type: "TXT", Domain: "asuid." + hostname}: {Records: []string{vid}},
+			}},
+			want: []dns.RequiredRecord{
+				{Type: "TXT", Name: "asuid." + hostname, Value: vid, Note: "add this first — the hostname can register as soon as this is live"},
+				{Type: "CNAME", Name: hostname, Value: appFqdn, Note: "needed before the cert can be issued"},
+			},
+		},
+		{
+			name: "both records live",
+			resolver: dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+				{Type: "TXT", Domain: "asuid." + hostname}: {Records: []string{vid}},
+				{Type: "NS", Domain: hostname}:             nsRecords,
+				{Type: "CNAME", Domain: hostname}:          {Records: []string{appFqdn}},
+			}},
+			want: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target := &certTarget{vid: vid, appFqdn: appFqdn}
+			got := target.pendingRecords(t.Context(), hostname, func(string) dns.Resolver { return tt.resolver })
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("pendingRecords = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLockForAppSameKeySameMutex(t *testing.T) {
+	a := lockForApp("rg", "app")
+	b := lockForApp("rg", "app")
+	if a != b {
+		t.Error("lockForApp returned different mutexes for the same (rg, appName)")
+	}
+}
+
+func TestLockForAppDifferentKeysDifferentMutex(t *testing.T) {
+	if lockForApp("rg", "app1") == lockForApp("rg", "app2") {
+		t.Error("lockForApp returned the same mutex for different appNames")
+	}
+	if lockForApp("rg1", "app") == lockForApp("rg2", "app") {
+		t.Error("lockForApp returned the same mutex for different resource groups")
+	}
+}
+
+// TestLockForAppSerializesSameApp guards against the regression that caused
+// the 2026-08-19 defang.io outage: two hostnames on the same ContainerApp
+// (e.g. an apex domain and its www alias) are processed as concurrent
+// domainJobs (cli/cert.go runIssuerJobs), each calling addHostnameDisabled /
+// bindHostnameSniEnabled, which Get-modify-PATCH the same CustomDomains array.
+// Without appLock serializing that critical section per app, two concurrent
+// non-atomic increments on a value guarded by "the same lock" would race and
+// lose updates — exactly mirroring how a losing PATCH silently dropped a
+// sibling hostname's binding. This test asserts the lock actually provides
+// exclusion, not just that it returns a mutex.
+func TestLockForAppSerializesSameApp(t *testing.T) {
+	const goroutines = 50
+	counter := 0
+	var wg sync.WaitGroup
+	for range goroutines {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			mu := lockForApp("rg", "shared-app")
+			mu.Lock()
+			defer mu.Unlock()
+			// A non-atomic read-modify-write: only safe under mutual exclusion.
+			cur := counter
+			cur++
+			counter = cur
+		}()
+	}
+	wg.Wait()
+	if counter != goroutines {
+		t.Errorf("counter = %d, want %d (lost updates under concurrent access)", counter, goroutines)
 	}
 }
 
