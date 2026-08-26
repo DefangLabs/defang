@@ -1,0 +1,15 @@
+name: Publish Nix binary cache (manual)
+
+# On-demand escape hatch: re-run ONLY the Cachix build+push (e.g. to backfill
+# a newly added matrix leg) without cutting a throwaway release tag and
+# without exposing the rest of go.yml (nix-shell-test's contents:write
+# vendorHash push, the tag-gated release jobs) to manual dispatch. The
+# `release` environment's deployment-branch policy (main, v*) still applies,
+# so this only actually reaches Cachix when dispatched from main or a tag.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  publish-nix-cache:
+    uses: ./.github/workflows/publish-nix-cache.yml
+    secrets: inherit

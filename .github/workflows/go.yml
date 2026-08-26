@@ -11,11 +11,6 @@ on:
       - "Makefile"
       - "pkgs/**"
       - "src/**"
-  # Manual escape hatch for publish-nix-cache: re-push an existing tag's Nix
-  # closures (e.g. after adding a matrix leg) without cutting a new release.
-  # The `release` environment's deployment-branch policy (main, v*) still
-  # gates it, so this only actually reaches Cachix when dispatched on main.
-  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -293,51 +288,20 @@ jobs:
   # substituter protocol, so this pushes straight from CI with no cloud credentials
   # and no second repo — unlike trigger-smoketests above, which has to dispatch into
   # DefangLabs/defang-mvp because that's where the cloud credentials live.
+  #
+  # The actual build+push steps live in publish-nix-cache.yml (a workflow_call
+  # target) so publish-nix-cache-manual.yml can invoke the exact same job
+  # on demand — e.g. to backfill a matrix leg — WITHOUT exposing the rest of
+  # this workflow (nix-shell-test's contents:write vendorHash push, the
+  # tag-gated release jobs) to manual dispatch. A bare `workflow_dispatch:` on
+  # this file would have made ALL of that manually re-runnable against any
+  # existing tag, not just the cache publish.
   publish-nix-cache:
-    name: Publish Nix binary cache (${{ matrix.system }})
-    runs-on: ${{ matrix.runs-on }}
+    name: Publish Nix binary cache
     needs: nix-shell-test # cache the derivation that job just proved builds
-    # Released tags are cached automatically; workflow_dispatch is the manual
-    # escape hatch (only takes effect from main — see the release environment
-    # branch policy above trigger note).
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    environment: release # for CACHIX_AUTH_TOKEN
-    strategy:
-      fail-fast: false # a broken macOS runner should not withhold the Linux cache
-      matrix:
-        include:
-          - system: x86_64-linux
-            runs-on: ubuntu-latest
-          - system: aarch64-linux
-            # GitHub-hosted arm64 runner (GA for public repos) — this is the
-            # architecture agent-box's deployed fleet actually runs (Graviton
-            # EC2, see defangdevs/agent-box#373): without this leg, Cachix
-            # never has an artifact that box's first-boot nix build can hit.
-            runs-on: ubuntu-24.04-arm
-          - system: aarch64-darwin
-            runs-on: macos-15
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false # this job never pushes back to the repo
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
-
-      - name: Set up Cachix
-        uses: cachix/cachix-action@02b16339eddcf6ea27126a830c7f1992855cae13 # v17
-        with:
-          # Public cache; public key is committed in flake.nix and the README.
-          name: defanglabs
-          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-
-      - name: Build and push defang-cli
-        # cachix-action installs a post-build hook above, so this push is
-        # automatic: every output the build realises gets signed and uploaded.
-        run: nix build .#defang-cli --print-out-paths
+    if: startsWith(github.ref, 'refs/tags/v') # only released versions are cached
+    uses: ./.github/workflows/publish-nix-cache.yml
+    secrets: inherit
 
   build-and-sign:
     name: Build app and sign files (with Trusted Signing)
