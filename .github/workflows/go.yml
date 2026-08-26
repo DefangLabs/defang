@@ -301,10 +301,12 @@ jobs:
           - system: x86_64-linux
             runs-on: ubuntu-latest
           - system: aarch64-darwin
-            runs-on: macos-14
+            runs-on: macos-15
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false # this job never pushes back to the repo
 
       - name: Install Nix
         uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
@@ -589,7 +591,7 @@ jobs:
 
   on-failure:
     runs-on: ubuntu-latest
-    if: failure() && (github.ref == 'refs/heads/main' || startsWith(github.ref,
+    if: always() && failure() && (github.ref == 'refs/heads/main' || startsWith(github.ref,
       'refs/tags/v'))
     needs:
       [go-release, post-release, nix-shell-test, push-docker, publish-nix-cache]
