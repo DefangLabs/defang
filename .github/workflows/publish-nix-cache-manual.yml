@@ -9,6 +9,9 @@ name: Publish Nix binary cache (manual)
 on:
   workflow_dispatch: {}
 
+permissions:
+  contents: read # checkout only; this job never pushes back to the repo
+
 jobs:
   publish-nix-cache:
     uses: ./.github/workflows/publish-nix-cache.yml
