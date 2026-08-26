@@ -137,7 +137,7 @@ Install the Defang CLI from one of the following sources:
   Released tags are available from our binary cache, so you can download the CLI
   instead of compiling it. Add these lines to `/etc/nix/nix.conf` (or
   `~/.config/nix/nix.conf` if you are a [trusted user](https://nix.dev/manual/nix/stable/command-ref/conf-file#conf-trusted-users)),
-  then install a tagged version such as `github:DefangLabs/defang/v1.1.9#defang-cli`:
+  then install a tagged version such as `github:DefangLabs/defang/v3.14.1#defang-cli`:
 
   ```
   extra-substituters = https://defang-public-readonly.s3.us-west-2.amazonaws.com/nix-cache
