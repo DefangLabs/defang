@@ -3,86 +3,140 @@ package pkg
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 	"time"
 )
 
-func TestRecvWithIdleTimeout_Value(t *testing.T) {
-	ch := make(chan int, 1)
-	ch <- 42
-
-	v, err := RecvWithIdleTimeout(context.Background(), ch, time.Minute)
-	if err != nil {
-		t.Fatalf("RecvWithIdleTimeout() error = %v, want nil", err)
+func TestRecvWithIdleTimeout(t *testing.T) {
+	tests := []struct {
+		name    string
+		makeCh  func() <-chan int
+		ctx     func() context.Context
+		timeout time.Duration
+		want    int
+		wantErr error
+	}{
+		{
+			name: "value",
+			makeCh: func() <-chan int {
+				ch := make(chan int, 1)
+				ch <- 42
+				return ch
+			},
+			ctx:     context.Background,
+			timeout: time.Minute,
+			want:    42,
+		},
+		{
+			name: "closed channel",
+			makeCh: func() <-chan int {
+				ch := make(chan int)
+				close(ch)
+				return ch
+			},
+			ctx:     context.Background,
+			timeout: time.Minute,
+			wantErr: io.EOF,
+		},
+		{
+			name:    "idle timeout",
+			makeCh:  func() <-chan int { return make(chan int) }, // never sent to
+			ctx:     context.Background,
+			timeout: 10 * time.Millisecond,
+			wantErr: ErrIdleTimeout,
+		},
+		{
+			name:   "context canceled",
+			makeCh: func() <-chan int { return make(chan int) },
+			ctx: func() context.Context {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				return ctx
+			},
+			timeout: time.Minute,
+			wantErr: context.Canceled,
+		},
 	}
-	if v != 42 {
-		t.Fatalf("RecvWithIdleTimeout() = %d, want 42", v)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := RecvWithIdleTimeout(tt.ctx(), tt.makeCh(), tt.timeout)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("RecvWithIdleTimeout() error = %v, want %v", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("RecvWithIdleTimeout() error = %v, want nil", err)
+			}
+			if got != tt.want {
+				t.Fatalf("RecvWithIdleTimeout() = %d, want %d", got, tt.want)
+			}
+		})
 	}
 }
 
-func TestRecvWithIdleTimeout_Idle(t *testing.T) {
-	ch := make(chan int) // never sent to
-
-	_, err := RecvWithIdleTimeout(context.Background(), ch, 10*time.Millisecond)
-	if !errors.Is(err, ErrIdleTimeout) {
-		t.Fatalf("RecvWithIdleTimeout() error = %v, want ErrIdleTimeout", err)
-	}
-}
-
-func TestRecvWithIdleTimeout_ContextCanceled(t *testing.T) {
-	ch := make(chan int)
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	_, err := RecvWithIdleTimeout(ctx, ch, time.Minute)
-	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("RecvWithIdleTimeout() error = %v, want context.Canceled", err)
-	}
-}
-
-func TestCallWithIdleTimeout_Value(t *testing.T) {
-	v, err := CallWithIdleTimeout(context.Background(), time.Minute, func() (int, error) {
-		return 7, nil
-	})
-	if err != nil {
-		t.Fatalf("CallWithIdleTimeout() error = %v, want nil", err)
-	}
-	if v != 7 {
-		t.Fatalf("CallWithIdleTimeout() = %d, want 7", v)
-	}
-}
-
-func TestCallWithIdleTimeout_PropagatesError(t *testing.T) {
-	wantErr := errors.New("boom")
-	_, err := CallWithIdleTimeout(context.Background(), time.Minute, func() (int, error) {
-		return 0, wantErr
-	})
-	if !errors.Is(err, wantErr) {
-		t.Fatalf("CallWithIdleTimeout() error = %v, want %v", err, wantErr)
-	}
-}
-
-func TestCallWithIdleTimeout_Idle(t *testing.T) {
+func TestCallWithIdleTimeout(t *testing.T) {
+	errBoom := errors.New("boom")
 	block := make(chan struct{}) // never closed
-	_, err := CallWithIdleTimeout(context.Background(), 10*time.Millisecond, func() (int, error) {
-		<-block
-		return 0, nil
-	})
-	if !errors.Is(err, ErrIdleTimeout) {
-		t.Fatalf("CallWithIdleTimeout() error = %v, want ErrIdleTimeout", err)
+
+	tests := []struct {
+		name    string
+		fn      func() (int, error)
+		ctx     func() context.Context
+		timeout time.Duration
+		want    int
+		wantErr error
+	}{
+		{
+			name:    "value",
+			fn:      func() (int, error) { return 7, nil },
+			ctx:     context.Background,
+			timeout: time.Minute,
+			want:    7,
+		},
+		{
+			name:    "propagated error",
+			fn:      func() (int, error) { return 0, errBoom },
+			ctx:     context.Background,
+			timeout: time.Minute,
+			wantErr: errBoom,
+		},
+		{
+			name:    "idle timeout",
+			fn:      func() (int, error) { <-block; return 0, nil },
+			ctx:     context.Background,
+			timeout: 10 * time.Millisecond,
+			wantErr: ErrIdleTimeout,
+		},
+		{
+			name: "context canceled",
+			fn:   func() (int, error) { <-block; return 0, nil },
+			ctx: func() context.Context {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				return ctx
+			},
+			timeout: time.Minute,
+			wantErr: context.Canceled,
+		},
 	}
-}
-
-func TestCallWithIdleTimeout_ContextCanceled(t *testing.T) {
-	block := make(chan struct{}) // never closed
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	_, err := CallWithIdleTimeout(ctx, time.Minute, func() (int, error) {
-		<-block
-		return 0, nil
-	})
-	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("CallWithIdleTimeout() error = %v, want context.Canceled", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := CallWithIdleTimeout(tt.ctx(), tt.timeout, tt.fn)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("CallWithIdleTimeout() error = %v, want %v", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("CallWithIdleTimeout() error = %v, want nil", err)
+			}
+			if got != tt.want {
+				t.Fatalf("CallWithIdleTimeout() = %d, want %d", got, tt.want)
+			}
+		})
 	}
 }

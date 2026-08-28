@@ -81,13 +81,16 @@ func TailLogGroup(ctx context.Context, cwClient StartLiveTailAPI, input LogGroup
 	return func(yield func([]LogEvent, error) bool) {
 		defer stream.Close()
 		for {
-			e, err := pkg.RecvWithIdleTimeout(ctx, stream.Events(), tailIdleTimeout)
-			if err != nil {
+			e, recvErr := pkg.RecvWithIdleTimeout(ctx, stream.Events(), tailIdleTimeout)
+			// stream.Err() is the authoritative reason the channel closed (e.g. an
+			// AccessDeniedException from expired credentials); check it before trusting
+			// recvErr, which on a closed channel is just io.EOF with no detail.
+			if err := stream.Err(); err != nil {
 				yield(nil, err)
 				return
 			}
-			if err := stream.Err(); err != nil {
-				yield(nil, err)
+			if recvErr != nil {
+				yield(nil, recvErr)
 				return
 			}
 			events, err := getLogEvents(e)

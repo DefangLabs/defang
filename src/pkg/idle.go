@@ -3,6 +3,7 @@ package pkg
 import (
 	"context"
 	"errors"
+	"io"
 	"time"
 )
 
@@ -14,15 +15,19 @@ import (
 var ErrIdleTimeout = errors.New("idle timeout: no data received")
 
 // RecvWithIdleTimeout receives a single value from ch, returning ErrIdleTimeout if nothing
-// arrives within d, or ctx.Err() if ctx is done first. Use this for channel-based reads
-// (e.g. an AWS SDK EventStream's Events() channel) where wrapping the read in a goroutine
-// would be wasteful.
+// arrives within d, or ctx.Err() if ctx is done first. If ch is closed (and drained), it
+// returns io.EOF, matching the two-value receive form's "ok" signal rather than silently
+// handing back T's zero value forever. Use this for channel-based reads (e.g. an AWS SDK
+// EventStream's Events() channel) where wrapping the read in a goroutine would be wasteful.
 func RecvWithIdleTimeout[T any](ctx context.Context, ch <-chan T, d time.Duration) (T, error) {
 	var zero T
 	timer := time.NewTimer(d)
 	defer timer.Stop()
 	select {
-	case v := <-ch:
+	case v, ok := <-ch:
+		if !ok {
+			return zero, io.EOF
+		}
 		return v, nil
 	case <-ctx.Done():
 		return zero, ctx.Err()
