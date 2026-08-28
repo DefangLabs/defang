@@ -226,6 +226,13 @@ func isTransientError(err error) bool {
 		return true
 	}
 
+	// A stalled stream that produced no data and no error within the idle window; reconnect
+	// so a genuinely dead connection (e.g. expired credentials) gets a chance to fail fast on
+	// the fresh call instead of hanging until the caller's own context deadline.
+	if errors.Is(err, pkg.ErrIdleTimeout) {
+		return true
+	}
+
 	// GCP grpc transient errors
 	if st, ok := status.FromError(err); ok {
 		transientCodes := []codes.Code{codes.Unavailable, codes.Internal, codes.ResourceExhausted}
