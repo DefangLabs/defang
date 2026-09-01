@@ -659,8 +659,16 @@ func modelWithProvider(model, prefix string) string {
 	return prefix + "/" + model
 }
 
+// GetImageRepo returns the lowercase repository of an image reference, without
+// its tag or digest: minio/minio, minio/minio:latest and
+// minio/minio@sha256:<digest> all yield "minio/minio", so the managed-service
+// image checks below recognize a digest-pinned image too. A colon inside the
+// registry host is a port, not a tag.
 func GetImageRepo(image string) string {
-	repo, _, _ := strings.Cut(image, ":")
+	repo, _, _ := strings.Cut(image, "@") // strip the digest, if any
+	if i := strings.LastIndex(repo, ":"); i > strings.LastIndex(repo, "/") {
+		repo = repo[:i] // strip the tag, but keep a registry port
+	}
 	return strings.ToLower(repo)
 }
 

@@ -359,3 +359,26 @@ func TestModelWithProvider(t *testing.T) {
 	assert.Equal(t, "vertex_ai/gemini-2.5-flash", modelWithProvider("gemini-2.5-flash", "vertex_ai"))
 	assert.Equal(t, "vertex_ai/gemini-2.5-flash", modelWithProvider("vertex_ai/gemini-2.5-flash", "vertex_ai"))
 }
+
+func TestGetImageRepo(t *testing.T) {
+	tests := []struct {
+		image string
+		want  string
+	}{
+		{image: "minio/minio", want: "minio/minio"},
+		{image: "minio/minio:RELEASE.2024-01-01T00-00-00Z", want: "minio/minio"},
+		{image: "minio/minio@sha256:0000000000000000000000000000000000000000000000000000000000000000", want: "minio/minio"},
+		{image: "minio/minio:latest@sha256:0000000000000000000000000000000000000000000000000000000000000000", want: "minio/minio"},
+		{image: "MinIO/MinIO", want: "minio/minio"},
+		{image: "registry.example.com:5000/minio/minio", want: "registry.example.com:5000/minio/minio"},
+		{image: "registry.example.com:5000/minio/minio:latest", want: "registry.example.com:5000/minio/minio"},
+		{image: "", want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.image, func(t *testing.T) {
+			if got := GetImageRepo(tt.image); got != tt.want {
+				t.Errorf("GetImageRepo(%q) = %q, want %q", tt.image, got, tt.want)
+			}
+		})
+	}
+}

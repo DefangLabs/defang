@@ -26,6 +26,14 @@ buzzpreset:
         OBJS_URL: http://custom-endpoint:9000
     networks:
         default: null
+digestpin:
+    image: minio/minio@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    networks:
+        default: null
+    ports:
+        - mode: host
+          target: 9000
+          protocol: tcp
 noext:
     image: minio/minio
     networks:

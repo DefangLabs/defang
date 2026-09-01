@@ -20,6 +20,9 @@ services:
     x-defang-s3:
       bucket: no-ports-bucket
 
+  digestpin:
+    image: minio/minio@sha256:0000000000000000000000000000000000000000000000000000000000000000
+
   noext:
     image: minio/minio
     ports:

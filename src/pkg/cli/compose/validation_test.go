@@ -498,6 +498,13 @@ func TestValidateS3Store(t *testing.T) {
 			wantErr: `'bucket' "-buzz-media" must use only lowercase letters, digits and hyphens, and start/end with a letter or digit`,
 		},
 		{
+			name: "ends with hyphen",
+			extension: map[string]any{
+				"bucket": "buzz-media-",
+			},
+			wantErr: `'bucket' "buzz-media-" must use only lowercase letters, digits and hyphens, and start/end with a letter or digit`,
+		},
+		{
 			name: "invalid downtime",
 			extension: map[string]any{
 				"bucket":         "buzz-media-prod",

@@ -22,6 +22,10 @@ services:
       OBJS_URL: http://custom-endpoint:9000
     networks:
       default: null
+  digestpin:
+    image: minio/minio@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    networks:
+      default: null
   noext:
     image: minio/minio
     networks:
