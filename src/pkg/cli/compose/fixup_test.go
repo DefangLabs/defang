@@ -1,11 +1,13 @@
 package compose
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/aws/smithy-go/ptr"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -378,6 +380,92 @@ func TestGetImageRepo(t *testing.T) {
 		t.Run(tt.image, func(t *testing.T) {
 			if got := GetImageRepo(tt.image); got != tt.want {
 				t.Errorf("GetImageRepo(%q) = %q, want %q", tt.image, got, tt.want)
+			}
+		})
+	}
+}
+
+// s3RegionProvider is a MockProvider whose AccountInfo carries a region, so the
+// region-present branch of fixupS3Service can be exercised: the shared
+// MockProvider reports none.
+type s3RegionProvider struct {
+	client.MockProvider
+	region string
+}
+
+func (p s3RegionProvider) AccountInfo(context.Context) (*client.AccountInfo, error) {
+	return &client.AccountInfo{Provider: client.ProviderAWS, Region: p.region}, nil
+}
+
+func TestFixupS3ServiceRegion(t *testing.T) {
+	tests := []struct {
+		name       string
+		region     string
+		preset     *string
+		wantRegion *string // nil = the var must not be injected at all
+	}{
+		{
+			name:       "provider reports a region",
+			region:     "eu-west-2",
+			wantRegion: ptr.String("eu-west-2"),
+		},
+		{
+			// No region means AccountInfo failed or reported none. Guessing one
+			// would override the SDK's own resolution with a value that breaks
+			// SigV4 whenever the guess is wrong, so inject nothing.
+			name:       "provider reports no region",
+			region:     "",
+			wantRegion: nil,
+		},
+		{
+			name:       "author's own value wins over the provider's",
+			region:     "eu-west-2",
+			preset:     ptr.String("ap-south-1"),
+			wantRegion: ptr.String("ap-south-1"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dependent := composeTypes.ServiceConfig{
+				Name:        "app",
+				DependsOn:   composeTypes.DependsOnConfig{"objs": composeTypes.ServiceDependency{}},
+				Environment: composeTypes.MappingWithEquals{},
+			}
+			if tt.preset != nil {
+				dependent.Environment["OBJS_REGION"] = tt.preset
+			}
+			project := &composeTypes.Project{Services: composeTypes.Services{"app": dependent}}
+			anchor := composeTypes.ServiceConfig{
+				Name:       "objs",
+				Image:      "minio/minio",
+				Extensions: map[string]any{"x-defang-s3": map[string]any{"bucket": "buzz-media-prod"}},
+			}
+
+			provider := s3RegionProvider{region: tt.region}
+			info, err := provider.AccountInfo(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := fixupS3Service(&anchor, project, provider, info, UploadModeIgnore); err != nil {
+				t.Fatal(err)
+			}
+
+			env := project.Services["app"].Environment
+			got, ok := env["OBJS_REGION"]
+			if tt.wantRegion == nil {
+				if ok {
+					t.Errorf("OBJS_REGION = %q, want it not to be injected", *got)
+				}
+			} else if !ok {
+				t.Errorf("OBJS_REGION not injected, want %q", *tt.wantRegion)
+			} else if *got != *tt.wantRegion {
+				t.Errorf("OBJS_REGION = %q, want %q", *got, *tt.wantRegion)
+			}
+
+			// The bucket is injected either way; only the region is conditional.
+			if bucket, ok := env["OBJS_BUCKET"]; !ok || *bucket != "buzz-media-prod" {
+				t.Errorf("OBJS_BUCKET = %v, want %q", bucket, "buzz-media-prod")
 			}
 		})
 	}

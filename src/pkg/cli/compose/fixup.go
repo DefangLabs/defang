@@ -259,11 +259,6 @@ const (
 
 	defaultLLMCPUs      = 0.5
 	defaultLLMMemoryMiB = 2048 // 1024 MiB OOMed during AWS E2E; use the next size up.
-
-	// defaultS3Region is injected when the app doesn't set one itself and the
-	// provider doesn't report a region (SigV4 needs one). A real deployment
-	// uses AccountInfo.Region, since the bucket lives where the app deploys.
-	defaultS3Region = "us-east-1"
 )
 
 func fixupLLM(svccfg *composeTypes.ServiceConfig) {
@@ -339,12 +334,16 @@ func fixupS3Service(svccfg *composeTypes.ServiceConfig, project *composeTypes.Pr
 		return err
 	}
 
-	region := accountInfo.Region
-	if region == "" {
-		region = defaultS3Region
-	}
+	// Inject no region when the provider didn't report one: AccountInfo may
+	// simply have failed (FixupServices treats that as non-fatal and carries on
+	// with a zero value), and a guessed region is worse than none. It would
+	// override the SDK's own resolution with a value that is wrong whenever the
+	// deployment isn't in that guess, and SigV4 then fails at runtime against a
+	// bucket in the real region. Absent, the SDK resolves the region itself from
+	// the task environment. This mirrors configureAccessGateway, which sets
+	// AWS_REGION only when info.Region is non-empty.
 	envName := strings.ToUpper(svccfg.Name) // TODO: handle characters that are not allowed in env vars, like '-'
-	wireS3DependentServices(project, svccfg.Name, bucket, region, envName+"_BUCKET", envName+"_REGION")
+	wireS3DependentServices(project, svccfg.Name, bucket, accountInfo.Region, envName+"_BUCKET", envName+"_REGION")
 	return nil
 }
 
@@ -371,7 +370,7 @@ func wireS3DependentServices(project *composeTypes.Project, svcName, bucket, reg
 		if _, ok := dependency.Environment[bucketEnvVar]; !ok {
 			dependency.Environment[bucketEnvVar] = &bucket
 		}
-		if _, ok := dependency.Environment[regionEnvVar]; !ok {
+		if _, ok := dependency.Environment[regionEnvVar]; !ok && region != "" {
 			dependency.Environment[regionEnvVar] = &region
 		}
 		project.Services[name] = dependency

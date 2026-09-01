@@ -8,7 +8,6 @@ buzz:
             required: true
     environment:
         OBJS_BUCKET: buzz-media-prod
-        OBJS_REGION: us-east-1
     networks:
         default: null
 buzzpreset:
@@ -21,7 +20,6 @@ buzzpreset:
             required: true
     environment:
         OBJS_BUCKET: my-own-bucket
-        OBJS_REGION: us-east-1
         OBJS_URL: http://custom-endpoint:9000
     networks:
         default: null
