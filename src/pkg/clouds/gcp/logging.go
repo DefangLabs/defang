@@ -5,12 +5,21 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	logging "cloud.google.com/go/logging/apiv2"
 	"cloud.google.com/go/logging/apiv2/loggingpb"
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"google.golang.org/api/iterator"
 )
+
+// tailIdleTimeout bounds how long the tailer waits for the next TailLogEntries response
+// before treating the stream as stalled. A half-dead gRPC stream (e.g. a reconnect that
+// lands on a connection that never delivers data) can block on Recv() forever without ever
+// erroring, so without this the read loop would otherwise block until the caller's own
+// context deadline, however long that is. See https://github.com/DefangLabs/defang/issues/2231.
+var tailIdleTimeout = 90 * time.Second
 
 func (gcp Gcp) NewTailer(ctx context.Context) (Tailer, error) {
 	client, err := logging.NewClient(ctx, gcp.Options...)
@@ -56,7 +65,7 @@ func (t *gcpLoggingTailer) Start(ctx context.Context, query string) error {
 
 func (t *gcpLoggingTailer) Next(ctx context.Context) (*loggingpb.LogEntry, error) {
 	if len(t.cache) == 0 {
-		resp, err := t.tleClient.Recv()
+		resp, err := pkg.CallWithIdleTimeout(ctx, tailIdleTimeout, t.tleClient.Recv)
 		if err != nil {
 			return nil, err
 		}
