@@ -351,6 +351,15 @@ func fixupS3Service(svccfg *composeTypes.ServiceConfig, project *composeTypes.Pr
 // wireS3DependentServices injects the bucket/region env vars into every
 // service that depends_on svcName. It never overwrites a value the author
 // already set, including an endpoint they point somewhere themselves.
+//
+// Why two variables rather than one <SVC>_URL, as model providers get: an S3
+// endpoint URL cannot carry the bucket. Every mainstream S3 client takes the
+// bucket as a per-call API parameter, not as client config, so it has to
+// arrive as a variable of its own. The region is separate for the same
+// reason — SigV4 needs it, and non-AWS clients don't read AWS_REGION by
+// themselves. The endpoint is the one value the CLI does not inject at all:
+// on AWS it should be absent, so the SDK uses its own default, and where a
+// cloud does need one, only the provider knows it (see fixupS3Service).
 func wireS3DependentServices(project *composeTypes.Project, svcName, bucket, region, bucketEnvVar, regionEnvVar string) {
 	for name, dependency := range project.Services {
 		if _, ok := dependency.DependsOn[svcName]; !ok {
