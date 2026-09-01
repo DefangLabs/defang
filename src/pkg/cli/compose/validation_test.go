@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"slices"
@@ -412,6 +413,114 @@ func TestManagedStoreParams(t *testing.T) {
 				if val != tt.wantValue {
 					t.Fatalf("unexpected value: %v, expected: %v", val, tt.wantValue)
 				}
+			}
+		})
+	}
+}
+
+func TestValidateS3Store(t *testing.T) {
+	tests := []struct {
+		name       string
+		extension  any
+		wantBucket string
+		wantErr    string
+	}{
+		{
+			name: "sanity check",
+			extension: map[string]any{
+				"bucket": "buzz-media-prod",
+			},
+			wantBucket: "buzz-media-prod",
+		},
+		{
+			name: "with allow-downtime",
+			extension: map[string]any{
+				"bucket":         "buzz-media-prod",
+				"allow-downtime": true,
+			},
+			wantBucket: "buzz-media-prod",
+		},
+		{
+			name:      "missing bucket",
+			extension: map[string]any{},
+			wantErr:   "'x-defang-s3' requires a 'bucket' name",
+		},
+		{
+			name:      "shorthand true",
+			extension: true,
+			wantErr:   "'x-defang-s3' requires a 'bucket' name",
+		},
+		{
+			name:      "nil",
+			extension: nil,
+			wantErr:   "'x-defang-s3' requires a 'bucket' name",
+		},
+		{
+			name: "non-string bucket",
+			extension: map[string]any{
+				"bucket": 123,
+			},
+			wantErr: "'bucket' must be a string",
+		},
+		{
+			name: "too short",
+			extension: map[string]any{
+				"bucket": "ab",
+			},
+			wantErr: `'bucket' "ab" must be between 3 and 63 characters`,
+		},
+		{
+			name: "too long",
+			extension: map[string]any{
+				"bucket": strings.Repeat("a", 64),
+			},
+			wantErr: fmt.Sprintf("'bucket' %q must be between 3 and 63 characters", strings.Repeat("a", 64)),
+		},
+		{
+			name: "contains dot",
+			extension: map[string]any{
+				"bucket": "buzz.media.prod",
+			},
+			wantErr: `'bucket' "buzz.media.prod" must not contain dots`,
+		},
+		{
+			name: "uppercase",
+			extension: map[string]any{
+				"bucket": "Buzz-Media",
+			},
+			wantErr: `'bucket' "Buzz-Media" must use only lowercase letters, digits and hyphens, and start/end with a letter or digit`,
+		},
+		{
+			name: "starts with hyphen",
+			extension: map[string]any{
+				"bucket": "-buzz-media",
+			},
+			wantErr: `'bucket' "-buzz-media" must use only lowercase letters, digits and hyphens, and start/end with a letter or digit`,
+		},
+		{
+			name: "invalid downtime",
+			extension: map[string]any{
+				"bucket":         "buzz-media-prod",
+				"allow-downtime": "abc",
+			},
+			wantErr: "'allow-downtime' must be a boolean",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bucket, err := validateS3Store(tt.extension)
+			if tt.wantErr != "" {
+				if err == nil || err.Error() != tt.wantErr {
+					t.Fatalf("expected error %q, got: %v", tt.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if bucket != tt.wantBucket {
+				t.Fatalf("unexpected bucket: %v, expected: %v", bucket, tt.wantBucket)
 			}
 		})
 	}

@@ -1,0 +1,37 @@
+services:
+  objs:
+    image: minio/minio
+    x-defang-s3:
+      bucket: buzz-media-prod
+    ports:
+      - target: 9000
+        mode: host
+
+  wrongimage:
+    image: example
+    x-defang-s3:
+      bucket: wrong-image-bucket
+    ports:
+      - target: 9000
+        mode: host
+
+  noports:
+    image: minio/minio
+    x-defang-s3:
+      bucket: no-ports-bucket
+
+  noext:
+    image: minio/minio
+    ports:
+      - target: 9000
+        mode: host
+
+  buzz:
+    build: .
+    depends_on: [objs]
+
+  buzzpreset:
+    build: .
+    depends_on: [objs]
+    environment:
+      OBJS_URL: http://custom-endpoint:9000

@@ -1,0 +1,66 @@
+buzz:
+    build:
+        context: .
+        dockerfile: '*Railpack'
+    depends_on:
+        objs:
+            condition: service_started
+            required: true
+    environment:
+        OBJS_BUCKET: buzz-media-prod
+        OBJS_REGION: us-east-1
+        OBJS_URL: http://mock-objs:9000
+    networks:
+        default: null
+buzzpreset:
+    build:
+        context: .
+        dockerfile: '*Railpack'
+    depends_on:
+        objs:
+            condition: service_started
+            required: true
+    environment:
+        OBJS_BUCKET: buzz-media-prod
+        OBJS_REGION: us-east-1
+        OBJS_URL: http://custom-endpoint:9000
+    networks:
+        default: null
+noext:
+    image: minio/minio
+    networks:
+        default: null
+    ports:
+        - mode: host
+          target: 9000
+          protocol: tcp
+noports:
+    image: minio/minio
+    networks:
+        default: null
+    ports:
+        - mode: host
+          target: 9000
+          protocol: tcp
+    x-defang-s3:
+        bucket: no-ports-bucket
+objs:
+    image: minio/minio
+    networks:
+        default: null
+    ports:
+        - mode: host
+          target: 9000
+          protocol: tcp
+    x-defang-s3:
+        bucket: buzz-media-prod
+wrongimage:
+    image: example
+    networks:
+        default: null
+    ports:
+        - mode: host
+          target: 9000
+          protocol: tcp
+    x-defang-s3:
+        bucket: wrong-image-bucket

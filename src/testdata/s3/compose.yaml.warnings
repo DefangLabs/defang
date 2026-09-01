@@ -1,0 +1,8 @@
+ ! service "buzz": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "buzzpreset": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "noext": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "noext": stateful service will lose data on restart; use a managed service instead
+ ! service "noports": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "objs": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "wrongimage": managed S3 service should use a minio image
+ ! service "wrongimage": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors

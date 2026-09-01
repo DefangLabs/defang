@@ -72,6 +72,13 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 			}
 		}
 
+		_, managedS3 := svccfg.Extensions["x-defang-s3"]
+		if managedS3 || IsMinioRepo(repo) {
+			if err := fixupS3Service(&svccfg, project, provider, upload); err != nil {
+				return fmt.Errorf("service %q: %w", svccfg.Name, err)
+			}
+		}
+
 		if len(svccfg.Name) > 16 {
 			term.Warnf("service %q: service name is longer than 16 characters, you may run into issues with resource name length", svccfg.Name)
 		}
@@ -249,9 +256,15 @@ func parsePortString(port string) (uint32, error) {
 
 const (
 	liteLLMPort uint32 = 4000
+	minioPort   uint32 = 9000
 
 	defaultLLMCPUs      = 0.5
 	defaultLLMMemoryMiB = 2048 // 1024 MiB OOMed during AWS E2E; use the next size up.
+
+	// defaultS3Region is injected when the app doesn't set one itself. Locally
+	// MinIO ignores region entirely; this only becomes load-bearing once a
+	// cloud provider wires the extension to a real bucket (SigV4 needs it).
+	defaultS3Region = "us-east-1"
 )
 
 func fixupLLM(svccfg *composeTypes.ServiceConfig) {
@@ -298,6 +311,63 @@ func fixupPostgresService(svccfg *composeTypes.ServiceConfig, provider client.Pr
 		fixupIngressPorts(svccfg)
 	}
 	return nil
+}
+
+// fixupS3Service gives the MinIO anchor a host port (so it gets a CNAME
+// locally / in BYOC, same as postgres/redis/mongo) and, when x-defang-s3 is
+// declared, wires the endpoint/bucket/region into every service that
+// depends_on it — mirroring the model-provider convention in
+// wireDependentServices, since a real cloud bucket can't be reached by CNAME
+// (global bucket-name uniqueness, and TLS SNI won't match a private name).
+func fixupS3Service(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, provider client.Provider, upload UploadMode) error {
+	s3Extension, managedS3 := svccfg.Extensions["x-defang-s3"]
+	if _, ok := provider.(*client.PlaygroundProvider); ok && managedS3 && upload != UploadModeEstimate {
+		term.Warnf("service %q: managed S3 is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
+	}
+	if len(svccfg.Ports) == 0 {
+		term.Debugf("service %q: adding S3 host port %d", svccfg.Name, minioPort)
+		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: minioPort, Mode: Mode_HOST, Protocol: Protocol_TCP}}
+	} else {
+		fixupIngressPorts(svccfg)
+	}
+
+	if !managedS3 {
+		return nil
+	}
+
+	bucket, err := validateS3Store(s3Extension)
+	if err != nil {
+		return err
+	}
+
+	envName := strings.ToUpper(svccfg.Name) // TODO: handle characters that are not allowed in env vars, like '-'
+	urlVal := fmt.Sprintf("http://%s:%d", svccfg.Name, minioPort)
+	wireS3DependentServices(project, svccfg.Name, urlVal, bucket, defaultS3Region, envName+"_URL", envName+"_BUCKET", envName+"_REGION")
+	return nil
+}
+
+// wireS3DependentServices injects endpoint/bucket/region env vars into every
+// service that depends_on svcName. It never overwrites a value the author
+// already set.
+func wireS3DependentServices(project *composeTypes.Project, svcName, urlVal, bucket, region, endpointEnvVar, bucketEnvVar, regionEnvVar string) {
+	for name, dependency := range project.Services {
+		if _, ok := dependency.DependsOn[svcName]; !ok {
+			continue
+		}
+		if dependency.Environment == nil {
+			dependency.Environment = make(composeTypes.MappingWithEquals)
+		}
+		if _, ok := dependency.Environment[endpointEnvVar]; !ok {
+			dependency.Environment[endpointEnvVar] = &urlVal
+		}
+		if _, ok := dependency.Environment[bucketEnvVar]; !ok {
+			dependency.Environment[bucketEnvVar] = &bucket
+		}
+		if _, ok := dependency.Environment[regionEnvVar]; !ok {
+			dependency.Environment[regionEnvVar] = &region
+		}
+		project.Services[name] = dependency
+	}
 }
 
 func fixupMongoService(svccfg *composeTypes.ServiceConfig, provider client.Provider, upload UploadMode) error {
@@ -633,4 +703,8 @@ func IsRedisRepo(repo string) bool {
 
 func IsMongoRepo(repo string) bool {
 	return strings.HasSuffix(repo, "mongo")
+}
+
+func IsMinioRepo(repo string) bool {
+	return strings.HasSuffix(repo, "minio")
 }
