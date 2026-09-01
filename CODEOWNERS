@@ -2,7 +2,7 @@
 *       @defangdevs
 
 # GitHub actions and repo configuration
-/.github/**       @raphaeltm
+/.github/**       @defangdevs
 
 # Go command line tool
 /src/**       @lionello @defangdevs
