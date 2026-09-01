@@ -9,7 +9,6 @@ buzz:
     environment:
         OBJS_BUCKET: buzz-media-prod
         OBJS_REGION: us-east-1
-        OBJS_URL: http://mock-objs:9000
     networks:
         default: null
 buzzpreset:
@@ -21,7 +20,7 @@ buzzpreset:
             condition: service_started
             required: true
     environment:
-        OBJS_BUCKET: buzz-media-prod
+        OBJS_BUCKET: my-own-bucket
         OBJS_REGION: us-east-1
         OBJS_URL: http://custom-endpoint:9000
     networks:
@@ -46,10 +45,6 @@ noports:
     image: minio/minio
     networks:
         default: null
-    ports:
-        - mode: host
-          target: 9000
-          protocol: tcp
     x-defang-s3:
         bucket: no-ports-bucket
 objs:

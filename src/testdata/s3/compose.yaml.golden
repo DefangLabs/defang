@@ -19,6 +19,7 @@ services:
         condition: service_started
         required: true
     environment:
+      OBJS_BUCKET: my-own-bucket
       OBJS_URL: http://custom-endpoint:9000
     networks:
       default: null
@@ -26,6 +27,10 @@ services:
     image: minio/minio@sha256:0000000000000000000000000000000000000000000000000000000000000000
     networks:
       default: null
+    ports:
+      - mode: ingress
+        target: 9000
+        protocol: tcp
   noext:
     image: minio/minio
     networks:

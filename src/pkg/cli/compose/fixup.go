@@ -74,7 +74,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 
 		_, managedS3 := svccfg.Extensions["x-defang-s3"]
 		if managedS3 || IsMinioRepo(repo) {
-			if err := fixupS3Service(&svccfg, project, provider, upload); err != nil {
+			if err := fixupS3Service(&svccfg, project, provider, accountInfo, upload); err != nil {
 				return fmt.Errorf("service %q: %w", svccfg.Name, err)
 			}
 		}
@@ -256,14 +256,13 @@ func parsePortString(port string) (uint32, error) {
 
 const (
 	liteLLMPort uint32 = 4000
-	minioPort   uint32 = 9000
 
 	defaultLLMCPUs      = 0.5
 	defaultLLMMemoryMiB = 2048 // 1024 MiB OOMed during AWS E2E; use the next size up.
 
-	// defaultS3Region is injected when the app doesn't set one itself. Locally
-	// MinIO ignores region entirely; this only becomes load-bearing once a
-	// cloud provider wires the extension to a real bucket (SigV4 needs it).
+	// defaultS3Region is injected when the app doesn't set one itself and the
+	// provider doesn't report a region (SigV4 needs one). A real deployment
+	// uses AccountInfo.Region, since the bucket lives where the app deploys.
 	defaultS3Region = "us-east-1"
 )
 
@@ -313,23 +312,23 @@ func fixupPostgresService(svccfg *composeTypes.ServiceConfig, provider client.Pr
 	return nil
 }
 
-// fixupS3Service gives the MinIO anchor a host port (so it gets a CNAME
-// locally / in BYOC, same as postgres/redis/mongo) and, when x-defang-s3 is
-// declared, wires the endpoint/bucket/region into every service that
-// depends_on it — mirroring the model-provider convention in
-// wireDependentServices, since a real cloud bucket can't be reached by CNAME
-// (global bucket-name uniqueness, and TLS SNI won't match a private name).
-func fixupS3Service(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, provider client.Provider, upload UploadMode) error {
+// fixupS3Service wires the bucket and region into every service that
+// depends_on the MinIO anchor, mirroring the model-provider convention in
+// wireDependentServices.
+//
+// Unlike postgres/redis/mongo, this deliberately adds no host port. That HACK
+// exists only to earn the service a CNAME, and a CNAME cannot carry an S3
+// endpoint: bucket names are globally unique, and TLS SNI would not match a
+// private name. The endpoint is the provider's to supply, because only it
+// knows the shape — native S3/GCS on AWS and GCP (where the SDK's own default
+// endpoint is usually right), and the s3proxy service, on its own port, on
+// Azure. So the CLI never synthesizes one.
+func fixupS3Service(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, provider client.Provider, accountInfo *client.AccountInfo, upload UploadMode) error {
 	s3Extension, managedS3 := svccfg.Extensions["x-defang-s3"]
 	if _, ok := provider.(*client.PlaygroundProvider); ok && managedS3 && upload != UploadModeEstimate {
 		term.Warnf("service %q: managed S3 is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 	}
-	if len(svccfg.Ports) == 0 {
-		term.Debugf("service %q: adding S3 host port %d", svccfg.Name, minioPort)
-		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: minioPort, Mode: Mode_HOST, Protocol: Protocol_TCP}}
-	} else {
-		fixupIngressPorts(svccfg)
-	}
+	fixupIngressPorts(svccfg) // the anchor is not a public endpoint
 
 	if !managedS3 {
 		return nil
@@ -340,25 +339,25 @@ func fixupS3Service(svccfg *composeTypes.ServiceConfig, project *composeTypes.Pr
 		return err
 	}
 
+	region := accountInfo.Region
+	if region == "" {
+		region = defaultS3Region
+	}
 	envName := strings.ToUpper(svccfg.Name) // TODO: handle characters that are not allowed in env vars, like '-'
-	urlVal := fmt.Sprintf("http://%s:%d", svccfg.Name, minioPort)
-	wireS3DependentServices(project, svccfg.Name, urlVal, bucket, defaultS3Region, envName+"_URL", envName+"_BUCKET", envName+"_REGION")
+	wireS3DependentServices(project, svccfg.Name, bucket, region, envName+"_BUCKET", envName+"_REGION")
 	return nil
 }
 
-// wireS3DependentServices injects endpoint/bucket/region env vars into every
+// wireS3DependentServices injects the bucket/region env vars into every
 // service that depends_on svcName. It never overwrites a value the author
-// already set.
-func wireS3DependentServices(project *composeTypes.Project, svcName, urlVal, bucket, region, endpointEnvVar, bucketEnvVar, regionEnvVar string) {
+// already set, including an endpoint they point somewhere themselves.
+func wireS3DependentServices(project *composeTypes.Project, svcName, bucket, region, bucketEnvVar, regionEnvVar string) {
 	for name, dependency := range project.Services {
 		if _, ok := dependency.DependsOn[svcName]; !ok {
 			continue
 		}
 		if dependency.Environment == nil {
 			dependency.Environment = make(composeTypes.MappingWithEquals)
-		}
-		if _, ok := dependency.Environment[endpointEnvVar]; !ok {
-			dependency.Environment[endpointEnvVar] = &urlVal
 		}
 		if _, ok := dependency.Environment[bucketEnvVar]; !ok {
 			dependency.Environment[bucketEnvVar] = &bucket
