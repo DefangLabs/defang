@@ -75,6 +75,7 @@ func WaitServiceState(
 					return serviceStates, pollErr
 				}
 				if done {
+					term.Debugf("WaitServiceState: GetServices poll observed target state during reconnect; not resuming the stream")
 					return serviceStates, nil
 				}
 
