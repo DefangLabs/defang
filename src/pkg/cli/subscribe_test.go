@@ -325,8 +325,10 @@ func TestWaitServiceStateStreamReceive(t *testing.T) {
 type mockStalledStreamProvider struct {
 	client.MockProvider
 	client.RetryDelayer
-	servicesResp *defangv1.GetServicesResponse
-	getServicesN int
+	servicesResp    *defangv1.GetServicesResponse
+	servicesErr     error
+	failFirstNPolls int
+	getServicesN    int
 }
 
 func (m *mockStalledStreamProvider) Subscribe(
@@ -340,67 +342,118 @@ func (m *mockStalledStreamProvider) Subscribe(
 
 func (m *mockStalledStreamProvider) GetServices(context.Context, *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
 	m.getServicesN++
+	if m.getServicesN <= m.failFirstNPolls {
+		return nil, m.servicesErr
+	}
 	return m.servicesResp, nil
 }
 
 func TestWaitServiceStatePollFallbackOnStalledStream(t *testing.T) {
-	t.Run("poll observes target state that the stream can never see again", func(t *testing.T) {
-		ctx := t.Context()
-		provider := &mockStalledStreamProvider{
-			RetryDelayer: client.RetryDelayer{Delay: 1 * time.Millisecond},
+	tests := []struct {
+		name                string
+		servicesResp        *defangv1.GetServicesResponse
+		servicesErr         error
+		failFirstNPolls     int
+		ctxTimeout          time.Duration // 0 means no deadline
+		wantErrDeployFailed bool
+		wantCtxErr          bool
+		wantStates          ServiceStates
+	}{
+		{
+			name: "poll observes target state that the stream can never see again",
 			servicesResp: &defangv1.GetServicesResponse{
 				Services: []*defangv1.ServiceInfo{
-					{
-						Service: &defangv1.Service{Name: "service1"},
-						Etag:    "EtagSomething",
-						State:   defangv1.ServiceState_DEPLOYMENT_COMPLETED,
-					},
+					{Service: &defangv1.Service{Name: "service1"}, Etag: "EtagSomething", State: defangv1.ServiceState_DEPLOYMENT_COMPLETED},
 				},
 			},
-		}
-		ss, err := WaitServiceState(
-			ctx, provider,
-			defangv1.ServiceState_DEPLOYMENT_COMPLETED,
-			"testproject",
-			"EtagSomething",
-			[]string{"service1"},
-		)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		want := ServiceStates{"service1": defangv1.ServiceState_DEPLOYMENT_COMPLETED}
-		if !reflect.DeepEqual(ss, want) {
-			t.Errorf("expected service states %v, got: %v", want, ss)
-		}
-		if provider.getServicesN == 0 {
-			t.Error("expected GetServices to be polled at least once")
-		}
-	})
+			wantStates: ServiceStates{"service1": defangv1.ServiceState_DEPLOYMENT_COMPLETED},
+		},
+		{
+			name: "poll ignores services with a mismatched etag",
+			servicesResp: &defangv1.GetServicesResponse{
+				Services: []*defangv1.ServiceInfo{
+					{Service: &defangv1.Service{Name: "service1"}, Etag: "SomeOtherEtag", State: defangv1.ServiceState_DEPLOYMENT_COMPLETED},
+				},
+			},
+			ctxTimeout: 20 * time.Millisecond,
+			wantCtxErr: true,
+		},
+		{
+			name:            "poll error is not fatal; polling continues on later reconnects",
+			servicesErr:     errors.New("transient GetServices failure"),
+			failFirstNPolls: 2,
+			servicesResp: &defangv1.GetServicesResponse{
+				Services: []*defangv1.ServiceInfo{
+					{Service: &defangv1.Service{Name: "service1"}, Etag: "EtagSomething", State: defangv1.ServiceState_DEPLOYMENT_COMPLETED},
+				},
+			},
+			wantStates: ServiceStates{"service1": defangv1.ServiceState_DEPLOYMENT_COMPLETED},
+		},
+		{
+			name: "poll observes a BUILD_FAILED state",
+			servicesResp: &defangv1.GetServicesResponse{
+				Services: []*defangv1.ServiceInfo{
+					{Service: &defangv1.Service{Name: "service1"}, Etag: "EtagSomething", State: defangv1.ServiceState_BUILD_FAILED, Status: "build failed"},
+				},
+			},
+			wantErrDeployFailed: true,
+			wantStates:          ServiceStates{"service1": defangv1.ServiceState_BUILD_FAILED},
+		},
+		{
+			name: "poll observes a DEPLOYMENT_FAILED state",
+			servicesResp: &defangv1.GetServicesResponse{
+				Services: []*defangv1.ServiceInfo{
+					{Service: &defangv1.Service{Name: "service1"}, Etag: "EtagSomething", State: defangv1.ServiceState_DEPLOYMENT_FAILED, Status: "deploy failed"},
+				},
+			},
+			wantErrDeployFailed: true,
+			wantStates:          ServiceStates{"service1": defangv1.ServiceState_DEPLOYMENT_FAILED},
+		},
+	}
 
-	t.Run("poll ignores services with a mismatched etag", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
-		defer cancel()
-		provider := &mockStalledStreamProvider{
-			RetryDelayer: client.RetryDelayer{Delay: 1 * time.Millisecond},
-			servicesResp: &defangv1.GetServicesResponse{
-				Services: []*defangv1.ServiceInfo{
-					{
-						Service: &defangv1.Service{Name: "service1"},
-						Etag:    "SomeOtherEtag",
-						State:   defangv1.ServiceState_DEPLOYMENT_COMPLETED,
-					},
-				},
-			},
-		}
-		_, err := WaitServiceState(
-			ctx, provider,
-			defangv1.ServiceState_DEPLOYMENT_COMPLETED,
-			"testproject",
-			"EtagSomething",
-			[]string{"service1"},
-		)
-		if err == nil {
-			t.Fatal("expected an error once the context deadline is exceeded, got nil")
-		}
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := t.Context()
+			if tt.ctxTimeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, tt.ctxTimeout)
+				defer cancel()
+			}
+			provider := &mockStalledStreamProvider{
+				RetryDelayer:    client.RetryDelayer{Delay: 1 * time.Millisecond},
+				servicesResp:    tt.servicesResp,
+				servicesErr:     tt.servicesErr,
+				failFirstNPolls: tt.failFirstNPolls,
+			}
+			ss, err := WaitServiceState(
+				ctx, provider,
+				defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+				"testproject",
+				"EtagSomething",
+				[]string{"service1"},
+			)
+
+			switch {
+			case tt.wantCtxErr:
+				if err == nil {
+					t.Fatal("expected an error once the context deadline is exceeded, got nil")
+				}
+			case tt.wantErrDeployFailed:
+				if !errors.As(err, &client.ErrDeploymentFailed{}) {
+					t.Fatalf("expected ErrDeploymentFailed, got: %v", err)
+				}
+			default:
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			}
+
+			if tt.wantStates != nil && !reflect.DeepEqual(ss, tt.wantStates) {
+				t.Errorf("expected service states %v, got: %v", tt.wantStates, ss)
+			}
+			if tt.failFirstNPolls > 0 && provider.getServicesN <= tt.failFirstNPolls {
+				t.Errorf("expected polling to continue past the initial error(s), got %d GetServices calls", provider.getServicesN)
+			}
+		})
+	}
 }
