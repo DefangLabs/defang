@@ -264,6 +264,12 @@ func (m *mockSubscribeProviderForReconnectTest) Subscribe(
 	}, nil
 }
 
+// GetServices returns no services, so the reconnect-time poll never short-circuits
+// these tests: they exercise the stream-reconnect path itself, not the poll fallback.
+func (m *mockSubscribeProviderForReconnectTest) GetServices(context.Context, *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
+	return &defangv1.GetServicesResponse{}, nil
+}
+
 func TestWaitServiceStateStreamReceive(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -311,4 +317,90 @@ func TestWaitServiceStateStreamReceive(t *testing.T) {
 			}
 		})
 	}
+}
+
+// mockStalledStreamProvider's Subscribe always returns a transient error, simulating a log-tail
+// stream that never delivers the health-transition event (e.g. because it happened before the
+// stream reconnected, #2241). GetServices reports the true current state, independent of the stream.
+type mockStalledStreamProvider struct {
+	client.MockProvider
+	client.RetryDelayer
+	servicesResp *defangv1.GetServicesResponse
+	getServicesN int
+}
+
+func (m *mockStalledStreamProvider) Subscribe(
+	_ context.Context,
+	_ *defangv1.SubscribeRequest,
+) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {
+	return func(yield func(*defangv1.SubscribeResponse, error) bool) {
+		yield(nil, connect.NewError(connect.CodeUnavailable, errors.New("idle timeout: no data received")))
+	}, nil
+}
+
+func (m *mockStalledStreamProvider) GetServices(context.Context, *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
+	m.getServicesN++
+	return m.servicesResp, nil
+}
+
+func TestWaitServiceStatePollFallbackOnStalledStream(t *testing.T) {
+	t.Run("poll observes target state that the stream can never see again", func(t *testing.T) {
+		ctx := t.Context()
+		provider := &mockStalledStreamProvider{
+			RetryDelayer: client.RetryDelayer{Delay: 1 * time.Millisecond},
+			servicesResp: &defangv1.GetServicesResponse{
+				Services: []*defangv1.ServiceInfo{
+					{
+						Service: &defangv1.Service{Name: "service1"},
+						Etag:    "EtagSomething",
+						State:   defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+					},
+				},
+			},
+		}
+		ss, err := WaitServiceState(
+			ctx, provider,
+			defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+			"testproject",
+			"EtagSomething",
+			[]string{"service1"},
+		)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		want := ServiceStates{"service1": defangv1.ServiceState_DEPLOYMENT_COMPLETED}
+		if !reflect.DeepEqual(ss, want) {
+			t.Errorf("expected service states %v, got: %v", want, ss)
+		}
+		if provider.getServicesN == 0 {
+			t.Error("expected GetServices to be polled at least once")
+		}
+	})
+
+	t.Run("poll ignores services with a mismatched etag", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
+		defer cancel()
+		provider := &mockStalledStreamProvider{
+			RetryDelayer: client.RetryDelayer{Delay: 1 * time.Millisecond},
+			servicesResp: &defangv1.GetServicesResponse{
+				Services: []*defangv1.ServiceInfo{
+					{
+						Service: &defangv1.Service{Name: "service1"},
+						Etag:    "SomeOtherEtag",
+						State:   defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+					},
+				},
+			},
+		}
+		_, err := WaitServiceState(
+			ctx, provider,
+			defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+			"testproject",
+			"EtagSomething",
+			[]string{"service1"},
+		)
+		if err == nil {
+			t.Fatal("expected an error once the context deadline is exceeded, got nil")
+		}
+	})
 }
