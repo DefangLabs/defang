@@ -421,6 +421,65 @@ func TestQueryLogsNonFollow(t *testing.T) {
 	}
 }
 
+func TestParseCDLogLine(t *testing.T) {
+	tests := []struct {
+		name        string
+		line        string
+		wantTs      string // RFC3339Nano, empty means zero time
+		wantMessage string
+	}{
+		{
+			name:        "timestamp with dash separator",
+			line:        "2026-04-28T23:43:03.965786510Z - worker deleting (0s)",
+			wantTs:      "2026-04-28T23:43:03.965786510Z",
+			wantMessage: "worker deleting (0s)",
+		},
+		{
+			name:        "timestamp with extra spaces around dash",
+			line:        "2026-04-28T23:43:03.965786510Z  -  worker deleting (0s)",
+			wantTs:      "2026-04-28T23:43:03.965786510Z",
+			wantMessage: "worker deleting (0s)",
+		},
+		{
+			name:        "timestamp with no dash",
+			line:        "2026-04-28T23:43:03.965786510Z worker deleting (0s)",
+			wantTs:      "2026-04-28T23:43:03.965786510Z",
+			wantMessage: "worker deleting (0s)",
+		},
+		{
+			name:        "no leading timestamp",
+			line:        "worker deleting (0s)",
+			wantTs:      "",
+			wantMessage: "worker deleting (0s)",
+		},
+		{
+			name:        "empty line",
+			line:        "",
+			wantTs:      "",
+			wantMessage: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts, message := parseCDLogLine(tt.line)
+			var wantTs time.Time
+			if tt.wantTs != "" {
+				var err error
+				wantTs, err = time.Parse(time.RFC3339Nano, tt.wantTs)
+				if err != nil {
+					t.Fatalf("bad test fixture: %v", err)
+				}
+			}
+			if !ts.Equal(wantTs) {
+				t.Errorf("ts = %v, want %v", ts, wantTs)
+			}
+			if message != tt.wantMessage {
+				t.Errorf("message = %q, want %q", message, tt.wantMessage)
+			}
+		})
+	}
+}
+
 func TestCdCommandMissingCDImage(t *testing.T) {
 	// setUpForConfig needs to succeed for CdCommand to reach the CDImage check.
 	// Easier: exercise the setUpLocation-fails path which happens first.
