@@ -820,6 +820,24 @@ func parseCDLogLine(line string) (ts time.Time, message string) {
 	return parsed, strings.TrimSpace(rest)
 }
 
+// splitCDLogSnapshot splits a ReadJobLogs snapshot (one line per buffered CD log
+// entry, newline-separated) into individual lines, dropping blank lines. Each
+// returned line still carries its own leading engine timestamp for parseCDLogLine
+// to extract.
+func splitCDLogSnapshot(content string) []string {
+	if content == "" {
+		return nil
+	}
+	var lines []string
+	for _, line := range strings.Split(strings.TrimRight(content, "\n"), "\n") {
+		if line == "" {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return lines
+}
+
 // QueryLogs implements client.Provider. It merges three log sources for the project:
 // CD (deployment) logs from the Container Apps Job, service logs from the project's
 // Container Apps, and build logs from ACR. When req.Follow is set each source streams
@@ -888,12 +906,16 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 			}
 			go func() {
 				defer close(cdCh)
-				if content == "" {
-					return
-				}
-				select {
-				case cdCh <- cdLogEntry{line: content}:
-				case <-ctx.Done():
+				// Each buffered line carries its own engine timestamp (see
+				// parseCDLogLine), so split the snapshot before sending: a single
+				// entry for the whole content would only parse the first line's
+				// timestamp and leave the rest embedded in the message (#2079).
+				for _, line := range splitCDLogSnapshot(content) {
+					select {
+					case cdCh <- cdLogEntry{line: line}:
+					case <-ctx.Done():
+						return
+					}
 				}
 			}()
 		}

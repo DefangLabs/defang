@@ -3,6 +3,7 @@ package azure
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -475,6 +476,47 @@ func TestParseCDLogLine(t *testing.T) {
 			}
 			if message != tt.wantMessage {
 				t.Errorf("message = %q, want %q", message, tt.wantMessage)
+			}
+		})
+	}
+}
+
+func TestSplitCDLogSnapshot(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    []string
+	}{
+		{
+			name:    "empty content",
+			content: "",
+			want:    nil,
+		},
+		{
+			name:    "single line no trailing newline",
+			content: "2026-04-28T23:43:03.000000000Z - worker deleting (0s)",
+			want:    []string{"2026-04-28T23:43:03.000000000Z - worker deleting (0s)"},
+		},
+		{
+			name: "multiple lines, each keeping its own timestamp",
+			content: "2026-04-28T23:43:03.000000000Z - worker deleting (0s)\n" +
+				"2026-04-28T23:43:04.000000000Z - ManagedEnvironment mastra-extended deleting (0s)\n",
+			want: []string{
+				"2026-04-28T23:43:03.000000000Z - worker deleting (0s)",
+				"2026-04-28T23:43:04.000000000Z - ManagedEnvironment mastra-extended deleting (0s)",
+			},
+		},
+		{
+			name:    "blank lines are dropped",
+			content: "line-one\n\nline-two\n",
+			want:    []string{"line-one", "line-two"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := splitCDLogSnapshot(tt.content)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("splitCDLogSnapshot(%q) = %v, want %v", tt.content, got, tt.want)
 			}
 		})
 	}
