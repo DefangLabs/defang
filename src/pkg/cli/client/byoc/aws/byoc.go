@@ -30,6 +30,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/dockerhub"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
+	"github.com/DefangLabs/defang/src/pkg/stackpath"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
@@ -908,16 +909,16 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 		}
 	}
 	if logType.Has(logs.LogTypeBuild) && projectName != "" {
-		buildsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "builds")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service
+		buildsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, stackpath.LogGroupBuilds)), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service
 		term.Debug("Query builds logs", buildsTail.LogGroupARN, filter)
 		groups = append(groups, buildsTail)
-		ecsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "ecs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
+		ecsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, stackpath.LogGroupECS)), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
 		term.Debug("Query ecs events logs", ecsTail.LogGroupARN, filter)
 		groups = append(groups, ecsTail)
 	}
 	// Tail services
 	if logType.Has(logs.LogTypeRun) && projectName != "" {
-		servicesTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "logs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts
+		servicesTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, stackpath.LogGroupServices)), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts
 		if service != "" && etag != "" {
 			servicesTail.LogStreamNamePrefix = service + "/" + service + "_" + etag
 		}
@@ -1029,9 +1030,9 @@ func (b *ByocAws) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 
 func (b *ByocAws) getSubscribeLogGroupInputs(projectName string) []cw.LogGroupInput {
 	var groups []cw.LogGroupInput
-	buildsARN := b.makeLogGroupARN(b.StackDir(projectName, "builds"))
+	buildsARN := b.makeLogGroupARN(b.StackDir(projectName, stackpath.LogGroupBuilds))
 	groups = append(groups, cw.LogGroupInput{LogGroupARN: buildsARN})
-	ecsARN := b.makeLogGroupARN(b.StackDir(projectName, "ecs"))
+	ecsARN := b.makeLogGroupARN(b.StackDir(projectName, stackpath.LogGroupECS))
 	groups = append(groups, cw.LogGroupInput{LogGroupARN: ecsARN})
 	return groups
 }
