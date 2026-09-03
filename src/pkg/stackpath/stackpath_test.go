@@ -32,6 +32,10 @@ func TestIsLogGroup(t *testing.T) {
 		{"arn", "arn:aws:logs:us-west-2:123:log-group:/Defang/myproject/beta/ecs", LogGroupECS, true},
 		{"wrong group", "/Defang/myproject/beta/builds", LogGroupECS, false},
 		{"suffix must follow a slash", "/Defang/myproject/beta/notecs", LogGroupECS, false},
+		// A lone segment is not a log group identifier: every shape CloudWatch
+		// produces carries the full StackDir path. Matching it would weaken the
+		// slash guard above for no reachable caller.
+		{"lone segment is not an identifier", "ecs", LogGroupECS, false},
 		{"builds", "/Defang/myproject/beta/builds", LogGroupBuilds, true},
 	}
 	for _, tt := range tests {

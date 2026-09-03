@@ -39,10 +39,19 @@ func StackDir(prefix, projectName, stack, name string) string {
 	return strings.Join(append(segments, projectName, stack, name), "/")
 }
 
-// IsLogGroup reports whether logGroupIdentifier names the well-known log group
-// name, which is true when it ends in "/" + name. The identifier may be a bare
-// log group name, an ARN, or the "<account>:<name>" form CloudWatch returns in
-// a live tail, so only the trailing segment can be compared.
+// IsLogGroup reports whether logGroupIdentifier refers to the well-known log
+// group name, which is true when it ends in "/" + name.
+//
+// A CloudWatch identifier reaches this in one of three shapes, and every one of
+// them carries the full StackDir path, never a lone segment:
+//
+//	/Defang/myproject/beta/ecs                                        log group name
+//	arn:aws:logs:us-west-2:123:log-group:/Defang/myproject/beta/ecs   ARN
+//	123:/Defang/myproject/beta/ecs                                    live tail
+//
+// Only the trailing segment is comparable across the three, and the leading
+// slash is required so that a group whose name merely ends in the same letters
+// ("…/beta/notecs") does not match.
 func IsLogGroup(logGroupIdentifier, name string) bool {
 	return strings.HasSuffix(logGroupIdentifier, "/"+name)
 }
