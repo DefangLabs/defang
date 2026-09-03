@@ -625,5 +625,6 @@ func IsComputeService(service *composeTypes.ServiceConfig) bool {
 	return service.Extensions["x-defang-static-files"] == nil &&
 		service.Extensions["x-defang-redis"] == nil &&
 		service.Extensions["x-defang-mongodb"] == nil &&
+		service.Extensions["x-defang-s3"] == nil &&
 		service.Extensions["x-defang-postgres"] == nil
 }

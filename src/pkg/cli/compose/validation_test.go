@@ -573,3 +573,36 @@ func TestServiceExtensionWarnings(t *testing.T) {
 		})
 	}
 }
+
+// A managed service is not a container, so the CLI must not wait for an ECS
+// service (or Cloud Run service, or container app) that the provider never
+// creates for it. x-defang-s3 joins that set now that the AWS provider turns
+// the MinIO anchor into a bucket (DefangLabs/pulumi-defang#518).
+func TestIsComputeService(t *testing.T) {
+	tests := []struct {
+		extension string
+		want      bool
+	}{
+		{extension: "", want: true},
+		{extension: "x-defang-llm", want: true},
+		{extension: "x-defang-postgres", want: false},
+		{extension: "x-defang-redis", want: false},
+		{extension: "x-defang-mongodb", want: false},
+		{extension: "x-defang-s3", want: false},
+		{extension: "x-defang-static-files", want: false},
+	}
+
+	for _, tt := range tests {
+		name := tt.extension
+		if name == "" {
+			name = "no extensions"
+		}
+		t.Run(name, func(t *testing.T) {
+			svc := &composeTypes.ServiceConfig{Name: "svc", Image: "nginx"}
+			if tt.extension != "" {
+				svc.Extensions = composeTypes.Extensions{tt.extension: true}
+			}
+			assert.Equal(t, tt.want, IsComputeService(svc))
+		})
+	}
+}
