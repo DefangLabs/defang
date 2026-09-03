@@ -12,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/dns"
+	"github.com/DefangLabs/defang/src/pkg/stackpath"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -248,14 +249,11 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 	return si, nil
 }
 
-// stackDir returns a stack-qualified path, like the Pulumi TS function `stackDir`
+// StackDir returns a stack-qualified path, like the Pulumi TS function `stackDir`.
+// The path shape is shared with the Pulumi provider; see pkg/stackpath.
 func (b *ByocBaseClient) StackDir(projectName, name string) string {
 	pkg.Ensure(projectName != "", "ProjectName not set")
-	prefix := []string{""} // for leading slash
-	if b.Prefix != "" {
-		prefix = []string{"", b.Prefix}
-	}
-	return strings.Join(append(prefix, projectName, b.PulumiStack, name), "/") // same as shared/common.ts
+	return stackpath.StackDir(b.Prefix, projectName, b.PulumiStack, name)
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
