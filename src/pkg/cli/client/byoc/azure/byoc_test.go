@@ -3,6 +3,7 @@ package azure
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -418,6 +419,106 @@ func TestQueryLogsNonFollow(t *testing.T) {
 	_, err := b.QueryLogs(ctx, &defangv1.TailRequest{Etag: "etag", Follow: false})
 	if err == nil {
 		t.Error("QueryLogs non-follow should fail without real Azure workspace")
+	}
+}
+
+func TestParseCDLogLine(t *testing.T) {
+	tests := []struct {
+		name        string
+		line        string
+		wantTs      string // RFC3339Nano, empty means zero time
+		wantMessage string
+	}{
+		{
+			name:        "timestamp with dash separator",
+			line:        "2026-04-28T23:43:03.965786510Z - worker deleting (0s)",
+			wantTs:      "2026-04-28T23:43:03.965786510Z",
+			wantMessage: "worker deleting (0s)",
+		},
+		{
+			name:        "timestamp with extra spaces around dash",
+			line:        "2026-04-28T23:43:03.965786510Z  -  worker deleting (0s)",
+			wantTs:      "2026-04-28T23:43:03.965786510Z",
+			wantMessage: "worker deleting (0s)",
+		},
+		{
+			name:        "timestamp with no dash",
+			line:        "2026-04-28T23:43:03.965786510Z worker deleting (0s)",
+			wantTs:      "2026-04-28T23:43:03.965786510Z",
+			wantMessage: "worker deleting (0s)",
+		},
+		{
+			name:        "no leading timestamp",
+			line:        "worker deleting (0s)",
+			wantTs:      "",
+			wantMessage: "worker deleting (0s)",
+		},
+		{
+			name:        "empty line",
+			line:        "",
+			wantTs:      "",
+			wantMessage: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts, message := parseCDLogLine(tt.line)
+			var wantTs time.Time
+			if tt.wantTs != "" {
+				var err error
+				wantTs, err = time.Parse(time.RFC3339Nano, tt.wantTs)
+				if err != nil {
+					t.Fatalf("bad test fixture: %v", err)
+				}
+			}
+			if !ts.Equal(wantTs) {
+				t.Errorf("ts = %v, want %v", ts, wantTs)
+			}
+			if message != tt.wantMessage {
+				t.Errorf("message = %q, want %q", message, tt.wantMessage)
+			}
+		})
+	}
+}
+
+func TestSplitCDLogSnapshot(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    []string
+	}{
+		{
+			name:    "empty content",
+			content: "",
+			want:    nil,
+		},
+		{
+			name:    "single line no trailing newline",
+			content: "2026-04-28T23:43:03.000000000Z - worker deleting (0s)",
+			want:    []string{"2026-04-28T23:43:03.000000000Z - worker deleting (0s)"},
+		},
+		{
+			name: "multiple lines, each keeping its own timestamp",
+			content: "2026-04-28T23:43:03.000000000Z - worker deleting (0s)\n" +
+				"2026-04-28T23:43:04.000000000Z - ManagedEnvironment mastra-extended deleting (0s)\n",
+			want: []string{
+				"2026-04-28T23:43:03.000000000Z - worker deleting (0s)",
+				"2026-04-28T23:43:04.000000000Z - ManagedEnvironment mastra-extended deleting (0s)",
+			},
+		},
+		{
+			name:    "blank lines are dropped",
+			content: "line-one\n\nline-two\n",
+			want:    []string{"line-one", "line-two"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := splitCDLogSnapshot(tt.content)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("splitCDLogSnapshot(%q) = %v, want %v", tt.content, got, tt.want)
+			}
+		})
 	}
 }
 

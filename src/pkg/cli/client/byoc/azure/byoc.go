@@ -800,6 +800,44 @@ func (b *ByocAzure) PutConfig(ctx context.Context, req *defangv1.PutConfigReques
 	return nil
 }
 
+// parseCDLogLine splits a raw CD job log line into its engine timestamp and message.
+// The CD job's pulumi wrapper writes lines like
+// "2026-04-28T23:43:03.965786510Z - worker deleting (0s)" to stdout, which would
+// otherwise show up as a second, near-duplicate timestamp next to the CLI's own
+// read-time column (#2079). When the line doesn't start with a parseable
+// timestamp, ts is the zero value and message is the line unchanged.
+func parseCDLogLine(line string) (ts time.Time, message string) {
+	head, rest, ok := strings.Cut(line, " ")
+	if !ok {
+		return time.Time{}, line
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, head)
+	if err != nil {
+		return time.Time{}, line
+	}
+	rest = strings.TrimSpace(rest)
+	rest = strings.TrimPrefix(rest, "-")
+	return parsed, strings.TrimSpace(rest)
+}
+
+// splitCDLogSnapshot splits a ReadJobLogs snapshot (one line per buffered CD log
+// entry, newline-separated) into individual lines, dropping blank lines. Each
+// returned line still carries its own leading engine timestamp for parseCDLogLine
+// to extract.
+func splitCDLogSnapshot(content string) []string {
+	if content == "" {
+		return nil
+	}
+	var lines []string
+	for _, line := range strings.Split(strings.TrimRight(content, "\n"), "\n") {
+		if line == "" {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return lines
+}
+
 // QueryLogs implements client.Provider. It merges three log sources for the project:
 // CD (deployment) logs from the Container Apps Job, service logs from the project's
 // Container Apps, and build logs from ACR. When req.Follow is set each source streams
@@ -868,12 +906,16 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 			}
 			go func() {
 				defer close(cdCh)
-				if content == "" {
-					return
-				}
-				select {
-				case cdCh <- cdLogEntry{line: content}:
-				case <-ctx.Done():
+				// Each buffered line carries its own engine timestamp (see
+				// parseCDLogLine), so split the snapshot before sending: a single
+				// entry for the whole content would only parse the first line's
+				// timestamp and leave the rest embedded in the message (#2079).
+				for _, line := range splitCDLogSnapshot(content) {
+					select {
+					case cdCh <- cdLogEntry{line: line}:
+					case <-ctx.Done():
+						return
+					}
 				}
 			}()
 		}
@@ -935,12 +977,16 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 					}
 					continue
 				}
+				ts, message := parseCDLogLine(entry.line)
+				if ts.IsZero() {
+					ts = time.Now()
+				}
 				if !yield(&defangv1.TailResponse{
 					Entries: []*defangv1.LogEntry{{
-						Message:   entry.line,
+						Message:   message,
 						Service:   cdServiceName,
 						Etag:      etag,
-						Timestamp: timestamppb.Now(),
+						Timestamp: timestamppb.New(ts),
 					}},
 					Service: cdServiceName,
 					Etag:    etag,
