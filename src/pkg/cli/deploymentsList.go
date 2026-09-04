@@ -50,7 +50,7 @@ func DeploymentsList(ctx context.Context, client client.FabricClient, params Lis
 		if params.ProjectName == "" {
 			_, err = term.Warnf("No%s deployments found; use --workspace to specify a different workspace", active)
 		} else {
-			_, err = term.Warnf("No%s deployments found for project %q", active, params.ProjectName)
+			_, err = term.Warnf("No%s deployments found for project %q; use --workspace to specify a different workspace", active, params.ProjectName)
 		}
 		return err
 	}

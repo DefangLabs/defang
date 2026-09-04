@@ -293,6 +293,13 @@ func TestManager_LoadNonexistentStack(t *testing.T) {
 	assert.Error(t, err, "Load() should return error for nonexistent stack")
 }
 
+func TestErrNotExist_Error(t *testing.T) {
+	// A stack can be missing simply because the wrong workspace is selected, so
+	// the message has to say which workspace it looked in; see issue 2247.
+	err := &ErrNotExist{ProjectName: "website-production", StackName: "beta"}
+	assert.Equal(t, `stack "beta" does not exist for project "website-production" in this workspace`, err.Error())
+}
+
 func TestManager_CreateInvalidStackName(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := t.TempDir()
