@@ -282,7 +282,7 @@ type ErrNotExist struct {
 }
 
 func (e *ErrNotExist) Error() string {
-	return fmt.Sprintf("stack %q does not exist for project %q; use --workspace to specify a different workspace", e.StackName, e.ProjectName)
+	return fmt.Sprintf("stack %q does not exist for project %q in this workspace", e.StackName, e.ProjectName)
 }
 
 type ErrDefaultStackNotSet struct {
