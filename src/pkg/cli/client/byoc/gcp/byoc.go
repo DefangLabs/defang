@@ -360,7 +360,7 @@ func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[state.
 func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
 	projectId := getGcpProjectID()
 	if projectId == "" {
-		return nil, fmt.Errorf("GCP project ID must be set via one of: %v; use 'gcloud projects list' to see available project ids", pkg.GCPProjectEnvVars)
+		return nil, fmt.Errorf("GCP project ID must be set via one of these shell environment variables (not `defang config set`, which needs this to already be set): %v; use 'gcloud projects list' to see available project ids", pkg.GCPProjectEnvVars)
 	}
 
 	// check whether the ADC is logged in by trying to get the current account email
