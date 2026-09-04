@@ -249,6 +249,7 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_STACK` - The name of the stack to use
 - `DEFANG_SUFFIX` - The suffix to use for all BYOC resources; defaults to the stack name, or `beta` if unset.
 - `DEFANG_WORKSPACE` - The workspace (name or ID) to use; preferred way to select which workspace the CLI uses
+- `GCP_PROJECT_ID` - The Google Cloud project ID for the `gcp` provider; must be a real shell environment variable (e.g. `export GCP_PROJECT_ID=my-project-id`), not set via `defang config set`. Also recognized: `GOOGLE_PROJECT`, `GOOGLE_CLOUD_PROJECT`, `GCLOUD_PROJECT`, `CLOUDSDK_CORE_PROJECT`
 - `NO_COLOR` - If set to any value, disables color output; by default, color output is enabled depending on the terminal
 - `PULUMI_ACCESS_TOKEN` - The Pulumi access token to use for authentication to Pulumi Cloud; see `DEFANG_PULUMI_BACKEND`
 - `PULUMI_CONFIG_PASSPHRASE` - Passphrase used to generate a unique key for your stack, and configuration and encrypted state values
