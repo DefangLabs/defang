@@ -355,6 +355,23 @@ func TestCDReplicaStatus(t *testing.T) {
 			wantSuccess: false,
 			wantMsg:     "OOMKilled",
 		},
+		{
+			name:    "waiting while pulling the image yields no terminal status",
+			resp:    `{"value":[{"properties":{"containers":[{"name":"defang-cd","runningState":"Waiting","runningStateDetails":"ContainerCreating"}]}}]}`,
+			wantNil: true,
+		},
+		{
+			name:        "waiting on image pull backoff is a failure",
+			resp:        `{"value":[{"properties":{"containers":[{"name":"defang-cd","runningState":"Waiting","runningStateDetails":"Back-off pulling image \"defang-cd\": ImagePullBackOff"}]}}]}`,
+			wantSuccess: false,
+			wantMsg:     `Back-off pulling image "defang-cd": ImagePullBackOff`,
+		},
+		{
+			name:        "waiting on crash loop is a failure",
+			resp:        `{"value":[{"properties":{"containers":[{"name":"defang-cd","runningState":"Waiting","runningStateDetails":"CrashLoopBackOff"}]}}]}`,
+			wantSuccess: false,
+			wantMsg:     "CrashLoopBackOff",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

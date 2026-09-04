@@ -822,33 +822,73 @@ func (j *Job) getCDContainerLogStreamURL(ctx context.Context, executionName stri
 }
 
 // cdReplicaStatus derives a terminal JobStatus from the execution's replica
-// container when it has terminated, or returns nil when the container is still
-// running or not present yet. The execution-level Status (JobsExecutions list)
-// can lag the container indefinitely, leaving the CLI polling forever; the
-// container's own Terminated state plus its exit code is the timely signal.
+// container, or returns nil when the container is still legitimately starting or
+// not present yet. The execution-level Status (JobsExecutions list) can lag the
+// container indefinitely, leaving the CLI polling forever; the container's own
+// state is the timely signal. Two terminal cases are recognized:
+//   - Terminated: the container ran and exited (classified by exit code).
+//   - Waiting on a permanent error (image pull backoff, crash loop, etc.): the
+//     container will never reach Running, so report it as failed now instead of
+//     hanging until the job's timeout. Transient waiting (pulling the image,
+//     container creating) returns nil so healthy startups aren't misreported.
 func (j *Job) cdReplicaStatus(ctx context.Context, executionName string) (*JobStatus, error) {
 	containers, err := j.listCDReplicaContainers(ctx, executionName)
 	if err != nil {
 		return nil, err
 	}
 	for _, c := range containers {
-		if c.RunningState != "Terminated" {
-			continue
+		switch c.RunningState {
+		case "Terminated":
+			status := &JobStatus{ExecutionName: executionName}
+			// Classify by the container's exit code. A clean success normally
+			// surfaces via the execution-level Status, so an exit code we cannot
+			// parse here is treated as a failure and surfaced with its details
+			// rather than being silently reported as success.
+			if code, ok := parseExitCode(c.RunningStateDetails); ok && code == 0 {
+				status.Status = armappcontainersv3.JobExecutionRunningStateSucceeded
+			} else {
+				status.Status = armappcontainersv3.JobExecutionRunningStateFailed
+				status.ErrorMessage = c.RunningStateDetails
+			}
+			return status, nil
+		case "Waiting":
+			if isTerminalWaitingFailure(c.RunningStateDetails) {
+				return &JobStatus{
+					ExecutionName: executionName,
+					Status:        armappcontainersv3.JobExecutionRunningStateFailed,
+					ErrorMessage:  c.RunningStateDetails,
+				}, nil
+			}
 		}
-		status := &JobStatus{ExecutionName: executionName}
-		// Classify by the container's exit code. A clean success normally
-		// surfaces via the execution-level Status, so an exit code we cannot
-		// parse here is treated as a failure and surfaced with its details
-		// rather than being silently reported as success.
-		if code, ok := parseExitCode(c.RunningStateDetails); ok && code == 0 {
-			status.Status = armappcontainersv3.JobExecutionRunningStateSucceeded
-		} else {
-			status.Status = armappcontainersv3.JobExecutionRunningStateFailed
-			status.ErrorMessage = c.RunningStateDetails
-		}
-		return status, nil
 	}
 	return nil, nil
+}
+
+// waitingFailureMarkers are substrings that appear in a Waiting container's
+// runningStateDetails when it has hit a permanent startup failure and will never
+// reach Running. Matched case-insensitively. Transient reasons (ContainerCreating,
+// PodInitializing, plain "pulling image") are deliberately excluded.
+var waitingFailureMarkers = []string{
+	"ImagePullBackOff",
+	"ErrImagePull",
+	"Back-off pulling image",
+	"CrashLoopBackOff",
+	"CreateContainerError",
+	"CreateContainerConfigError",
+	"InvalidImageName",
+	"ErrImageNeverPull",
+}
+
+// isTerminalWaitingFailure reports whether a Waiting container's details indicate
+// a permanent failure rather than normal in-progress startup.
+func isTerminalWaitingFailure(details string) bool {
+	lower := strings.ToLower(details)
+	for _, m := range waitingFailureMarkers {
+		if strings.Contains(lower, strings.ToLower(m)) {
+			return true
+		}
+	}
+	return false
 }
 
 // exitCodeRe extracts the numeric exit code from a replica container's free-form

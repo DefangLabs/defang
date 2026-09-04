@@ -131,6 +131,81 @@ func TestBuildStatus_InProgress(t *testing.T) {
 	}
 }
 
+func TestBuildStatus_InProgressWithFailedPhase(t *testing.T) {
+	// The CodeBuild agent faulted mid-build but the top-level BuildStatus still
+	// reads IN_PROGRESS. We must report the build as done+failed so the tail
+	// doesn't hang until the project timeout.
+	build := cbtypes.Build{
+		BuildStatus: cbtypes.StatusTypeInProgress,
+		Phases: []cbtypes.BuildPhase{
+			{PhaseType: cbtypes.BuildPhaseTypeDownloadSource, PhaseStatus: cbtypes.StatusTypeSucceeded},
+			{
+				PhaseType:   cbtypes.BuildPhaseTypeBuild,
+				PhaseStatus: cbtypes.StatusTypeFailed,
+				Contexts: []cbtypes.PhaseContext{
+					{StatusCode: aws.String("COMMAND_EXECUTION_ERROR"), Message: aws.String("fork/exec /bin/bash: no such file or directory")},
+				},
+			},
+			{PhaseType: cbtypes.BuildPhaseTypeCompleted},
+		},
+	}
+
+	done, err := buildStatus(build)
+	if !done {
+		t.Error("expected done=true for in-progress build with a failed phase")
+	}
+	bf, ok := err.(BuildFailure)
+	if !ok {
+		t.Fatalf("expected BuildFailure, got %T", err)
+	}
+	if bf.Reason != "fork/exec /bin/bash: no such file or directory" {
+		t.Errorf("reason = %q, want the phase context message", bf.Reason)
+	}
+}
+
+func TestBuildStatus_InProgressWithFaultedPhaseNoContext(t *testing.T) {
+	// An agent fault may carry no context message; fall back to naming the phase
+	// rather than returning an empty reason.
+	build := cbtypes.Build{
+		BuildStatus: cbtypes.StatusTypeInProgress,
+		Phases: []cbtypes.BuildPhase{
+			{PhaseType: cbtypes.BuildPhaseTypeProvisioning, PhaseStatus: cbtypes.StatusTypeFault},
+			{PhaseType: cbtypes.BuildPhaseTypeCompleted},
+		},
+	}
+
+	done, err := buildStatus(build)
+	if !done {
+		t.Error("expected done=true for in-progress build with a faulted phase")
+	}
+	bf, ok := err.(BuildFailure)
+	if !ok {
+		t.Fatalf("expected BuildFailure, got %T", err)
+	}
+	if bf.Reason != "build PROVISIONING phase fault" {
+		t.Errorf("reason = %q, want the phase-name fallback", bf.Reason)
+	}
+}
+
+func TestBuildStatus_InProgressHealthy(t *testing.T) {
+	// A normal in-progress build (no failed phase) must keep waiting.
+	build := cbtypes.Build{
+		BuildStatus: cbtypes.StatusTypeInProgress,
+		Phases: []cbtypes.BuildPhase{
+			{PhaseType: cbtypes.BuildPhaseTypeDownloadSource, PhaseStatus: cbtypes.StatusTypeSucceeded},
+			{PhaseType: cbtypes.BuildPhaseTypeBuild, PhaseStatus: cbtypes.StatusTypeInProgress},
+		},
+	}
+
+	done, err := buildStatus(build)
+	if done {
+		t.Error("expected done=false for a healthy in-progress build")
+	}
+	if err != nil {
+		t.Errorf("expected nil error, got %v", err)
+	}
+}
+
 func TestBuildStatus_TimedOut(t *testing.T) {
 	done, err := buildStatus(cbtypes.Build{BuildStatus: cbtypes.StatusTypeTimedOut})
 	if !done {
