@@ -27,8 +27,12 @@ type DebugConfig struct {
 	Deployment     types.ETag
 	FailedServices []string
 	Project        *compose.Project
-	Since          time.Time
-	Until          time.Time
+	// ProjectName is used when the caller only resolved a project name (e.g. `compose down`,
+	// which never loads a full compose.Project). Ignored when Project is set, which already
+	// carries the name.
+	ProjectName string
+	Since       time.Time
+	Until       time.Time
 }
 
 func (dc DebugConfig) String() string {
@@ -47,6 +51,8 @@ func (dc DebugConfig) String() string {
 		if dc.Project.WorkingDir != "" {
 			cmd += " --cwd=" + dc.Project.WorkingDir
 		}
+	} else if dc.ProjectName != "" {
+		cmd += " --project-name=" + dc.ProjectName
 	}
 	if dc.Stack != "" {
 		cmd += " --stack=" + dc.Stack
@@ -259,6 +265,13 @@ func buildDeploymentDebugPrompt(debugConfig DebugConfig) string {
 			debugConfig.Project.ComposeFiles,
 			truncateHead(string(yaml), maxPromptComposeLen),
 		)
+	} else if debugConfig.ProjectName != "" {
+		// There is no compose.Project to point the agent at (e.g. `compose down`), so state the
+		// project name explicitly: the current directory may have no compose file at all, or may
+		// contain a different project, and the account can have multiple deployed projects.
+		// Without this the agent's tool calls (e.g. logs) omit project_name and fail once more
+		// than one project exists.
+		prompt += fmt.Sprintf(" The project name is %q; pass it explicitly to your tools.", debugConfig.ProjectName)
 	}
 	return prompt
 }
