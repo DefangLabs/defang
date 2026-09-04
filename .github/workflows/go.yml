@@ -11,6 +11,10 @@ on:
       - "Makefile"
       - "pkgs/**"
       - "src/**"
+  workflow_dispatch: # so nix-shell-test can re-trigger this workflow for a
+    # vendorHash-fix commit it pushes with GITHUB_TOKEN: GitHub never starts
+    # a new on:push run for a push made with GITHUB_TOKEN, so without this
+    # the fixed commit becomes a PR head that go-test/nix-shell-test never ran
 
 permissions:
   contents: read
@@ -147,6 +151,7 @@ jobs:
     needs: go-test
     permissions:
       contents: write
+      actions: write # to re-trigger this workflow after pushing a vendorHash fix
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -194,12 +199,54 @@ jobs:
               git config user.name "github-actions[bot]"
               git config user.email "github-actions[bot]@users.noreply.github.com"
 
-              # Commit and push the change
+              # Commit the change
               git add pkgs/defang/cli.nix
               git commit -m "Update Nix vendorHash to $NEW_HASH"
-              git push
+
+              # A concurrent push to this branch (a human commit, or another
+              # nix-shell-test run fixing the same hash) can land while this
+              # job was verifying, so a bare `git push` races: it gets
+              # rejected as non-fast-forward and turns an otherwise healthy
+              # branch red. Rebase onto the latest tip and retry a few times
+              # before giving up.
+              pushed=false
+              for attempt in 1 2 3 4 5; do
+                if git push; then
+                  pushed=true
+                  break
+                fi
+
+                echo "Push rejected (attempt $attempt/5); fetching origin/$GITHUB_REF_NAME"
+                git fetch origin "$GITHUB_REF_NAME"
+
+                if git diff --quiet "origin/$GITHUB_REF_NAME" -- pkgs/defang/cli.nix; then
+                  echo "vendorHash already fixed on origin/$GITHUB_REF_NAME; nothing to push"
+                  pushed=true
+                  break
+                fi
+
+                if ! git rebase "origin/$GITHUB_REF_NAME"; then
+                  echo "❌ Rebase conflict while retrying the vendorHash push"
+                  git rebase --abort
+                  exit 1
+                fi
+                sleep $((RANDOM % 5 + 1))
+              done
+
+              if [ "$pushed" != true ]; then
+                echo "❌ Failed to push vendorHash update after multiple retries"
+                exit 1
+              fi
 
               echo "✅ Updated vendorHash and committed the change"
+
+              # The push above used GITHUB_TOKEN, so it will NOT start a new
+              # on:push run of this workflow (GitHub's anti-recursion rule) -
+              # the fixed commit would otherwise become a PR head that
+              # go-test/nix-shell-test never actually ran against. Dispatch
+              # a fresh run explicitly so the real head commit gets tested.
+              echo "Triggering a fresh CI run for the corrected commit"
+              gh workflow run go.yml --ref "$GITHUB_REF_NAME"
             else
               echo "❌ Verification failed after updating hash"
               exit 1
@@ -210,6 +257,8 @@ jobs:
             tail -20 /tmp/nix-test-output.log
             exit 1
           fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # Replaces the retired go-playground-test job: the Playground was discontinued,
   # so config/up/down sanity tests now run as BYOC smoketests (AWS + GCP) in
