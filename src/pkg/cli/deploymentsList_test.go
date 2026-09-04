@@ -150,6 +150,29 @@ func TestActiveDeployments(t *testing.T) {
 		}
 	})
 
+	t.Run("no active deployments for project", func(t *testing.T) {
+		fabricServer.testDeploymentsData = nil
+		stdout, _ := term.SetupTestTerm(t)
+
+		err := DeploymentsList(ctx, grpcClient, ListDeploymentsParams{
+			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
+			ProjectName: "website-production",
+			Limit:       10,
+		})
+		if err != nil {
+			t.Fatalf("DeploymentsList() error = %v", err)
+		}
+
+		// The project may simply live in another workspace, so this branch needs
+		// the same --workspace hint as the workspace-wide one; see issue 2247.
+		receivedOutput := stdout.String()
+		expectedOutput := `No active deployments found for project "website-production"; use --workspace to specify a different workspace`
+
+		if !strings.Contains(receivedOutput, expectedOutput) {
+			t.Errorf("Expected %s to contain %s", receivedOutput, expectedOutput)
+		}
+	})
+
 	activeDeployments := []*defangv1.Deployment{
 		{Project: "projectAA", Provider: defangv1.Provider_AWS, Region: "us-east-1"},
 		{Project: "projectAB", Provider: defangv1.Provider_AWS, Region: "us-east-2"},
