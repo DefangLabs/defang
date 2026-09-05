@@ -151,60 +151,52 @@ func TestConnect(t *testing.T) {
 		}
 	})
 
-	t.Run("access token workspace mismatch errors", func(t *testing.T) {
-		const serverTenant = "server-tenant"
-		handler := &mockWhoAmI{tenant: serverTenant, tenantID: "server-id"}
-		_, h := defangv1connect.NewFabricControllerHandler(handler)
-		server := httptest.NewServer(h)
-		t.Cleanup(server.Close)
-		t.Setenv("DEFANG_ACCESS_TOKEN", "some-fixed-workspace-token")
-
-		_, err := ConnectWithTenant(ctx, strings.TrimPrefix(server.URL, "http://"), "tenant2")
-		if err == nil {
-			t.Fatal("expected an error, got nil")
-		}
-		if !strings.Contains(err.Error(), `"tenant2"`) || !strings.Contains(err.Error(), `"server-tenant"`) {
-			t.Errorf("expected error to mention both workspaces, got: %v", err)
-		}
-	})
-
-	t.Run("access token workspace match by name is allowed", func(t *testing.T) {
-		const serverTenant = "server-tenant"
-		handler := &mockWhoAmI{tenant: serverTenant, tenantID: "server-id"}
-		_, h := defangv1connect.NewFabricControllerHandler(handler)
-		server := httptest.NewServer(h)
-		t.Cleanup(server.Close)
-		t.Setenv("DEFANG_ACCESS_TOKEN", "some-fixed-workspace-token")
-
-		g, err := ConnectWithTenant(ctx, strings.TrimPrefix(server.URL, "http://"), serverTenant)
-		if err != nil {
-			t.Fatalf("expected %v, got: %v", nil, err)
-		}
-		if g.GetTenantName() != serverTenant {
-			t.Errorf("expected tenant %q, got %q", serverTenant, g.GetTenantName())
-		}
-	})
-
-	t.Run("access token workspace match by id is allowed", func(t *testing.T) {
+	t.Run("access token workspace validation", func(t *testing.T) {
 		const serverTenant = "server-tenant"
 		const serverTenantID = "server-id"
-		handler := &mockWhoAmI{tenant: serverTenant, tenantID: serverTenantID}
-		_, h := defangv1connect.NewFabricControllerHandler(handler)
-		server := httptest.NewServer(h)
-		t.Cleanup(server.Close)
-		t.Setenv("DEFANG_ACCESS_TOKEN", "some-fixed-workspace-token")
 
-		g, err := ConnectWithTenant(ctx, strings.TrimPrefix(server.URL, "http://"), serverTenantID)
-		if err != nil {
-			t.Fatalf("expected %v, got: %v", nil, err)
+		cases := []struct {
+			name         string
+			requested    types.TenantNameOrID
+			wantErrParts []string // non-empty means an error is expected containing all of these
+		}{
+			{name: "mismatch errors", requested: "tenant2", wantErrParts: []string{`"tenant2"`, `"server-tenant"`}},
+			{name: "match by name is allowed", requested: serverTenant},
+			{name: "match by id is allowed", requested: serverTenantID},
 		}
-		if g.GetTenantName() != serverTenant {
-			t.Errorf("expected tenant %q, got %q", serverTenant, g.GetTenantName())
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				handler := &mockWhoAmI{tenant: serverTenant, tenantID: serverTenantID}
+				_, h := defangv1connect.NewFabricControllerHandler(handler)
+				server := httptest.NewServer(h)
+				t.Cleanup(server.Close)
+				t.Setenv("DEFANG_ACCESS_TOKEN", "some-fixed-workspace-token")
+
+				g, err := ConnectWithTenant(ctx, strings.TrimPrefix(server.URL, "http://"), tc.requested)
+				if len(tc.wantErrParts) > 0 {
+					if err == nil {
+						t.Fatal("expected an error, got nil")
+					}
+					for _, want := range tc.wantErrParts {
+						if !strings.Contains(err.Error(), want) {
+							t.Errorf("expected error to mention %q, got: %v", want, err)
+						}
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("expected %v, got: %v", nil, err)
+				}
+				if g.GetTenantName() != serverTenant {
+					t.Errorf("expected tenant %q, got %q", serverTenant, g.GetTenantName())
+				}
+			})
 		}
 	})
 
 	t.Run("no access token means mismatch is not an error", func(t *testing.T) {
-		t.Parallel()
+		t.Setenv("DEFANG_ACCESS_TOKEN", "") // clear any token inherited from the environment
 		const serverTenant = "server-tenant"
 		handler := &mockWhoAmI{tenant: serverTenant, tenantID: "server-id"}
 		_, h := defangv1connect.NewFabricControllerHandler(handler)
