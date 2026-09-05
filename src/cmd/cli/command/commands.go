@@ -27,6 +27,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -420,7 +421,14 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		global.Client, err = cli.ConnectWithTenant(ctx, global.FabricAddr, global.TenantSelection)
+		requestedTenant := global.TenantSelection
+		if isWorkspaceListCommand(cmd) {
+			// `workspace ls` exists to discover workspaces, including ones other than the
+			// access token's own; it reconciles the actual current workspace itself via
+			// WhoAmI, so a mismatch here must not be treated as an error.
+			requestedTenant = types.TenantUnset
+		}
+		global.Client, err = cli.ConnectWithTenant(ctx, global.FabricAddr, requestedTenant)
 		if err != nil {
 			if connect.CodeOf(err) != connect.CodeUnauthenticated {
 				return err
@@ -489,6 +497,10 @@ func isCompletionCommand(cmd *cobra.Command) bool {
 
 func isUpgradeCommand(cmd *cobra.Command) bool {
 	return cmd.Name() == "upgrade"
+}
+
+func isWorkspaceListCommand(cmd *cobra.Command) bool {
+	return cmd.Name() == "workspace" || (cmd.Parent() != nil && cmd.Parent().Name() == "workspace")
 }
 
 func canIUseProvider(ctx context.Context, provider client.Provider, projectName string, serviceCount int, allowUpgrade bool) error {

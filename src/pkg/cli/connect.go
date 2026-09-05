@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
@@ -28,6 +29,15 @@ func ConnectWithTenant(ctx context.Context, fabricAddr string, requestedTenant t
 	if err != nil {
 		term.Debug("Unable to validate tenant with server:", err)
 		return grpcClient, err
+	}
+
+	// A DEFANG_ACCESS_TOKEN is minted for one fixed workspace; the server always resolves it
+	// to that workspace regardless of the tenant header, so a mismatched --workspace/
+	// DEFANG_WORKSPACE would otherwise be silently ignored. Fail instead of proceeding on the
+	// wrong workspace.
+	if requestedTenant.IsSet() && client.UsingAccessTokenEnv() &&
+		string(requestedTenant) != resp.Tenant && string(requestedTenant) != resp.TenantId {
+		return nil, fmt.Errorf("requested workspace %q does not match workspace %q associated with the DEFANG_ACCESS_TOKEN in use", requestedTenant, resp.Tenant)
 	}
 
 	grpcClient.Tenant = types.TenantLabel(resp.Tenant)

@@ -151,6 +151,67 @@ func TestConnect(t *testing.T) {
 		}
 	})
 
+	t.Run("access token workspace validation", func(t *testing.T) {
+		const serverTenant = "server-tenant"
+		const serverTenantID = "server-id"
+
+		cases := []struct {
+			name         string
+			requested    types.TenantNameOrID
+			wantErrParts []string // non-empty means an error is expected containing all of these
+		}{
+			{name: "mismatch errors", requested: "tenant2", wantErrParts: []string{`"tenant2"`, `"server-tenant"`}},
+			{name: "match by name is allowed", requested: serverTenant},
+			{name: "match by id is allowed", requested: serverTenantID},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				handler := &mockWhoAmI{tenant: serverTenant, tenantID: serverTenantID}
+				_, h := defangv1connect.NewFabricControllerHandler(handler)
+				server := httptest.NewServer(h)
+				t.Cleanup(server.Close)
+				t.Setenv("DEFANG_ACCESS_TOKEN", "some-fixed-workspace-token")
+
+				g, err := ConnectWithTenant(ctx, strings.TrimPrefix(server.URL, "http://"), tc.requested)
+				if len(tc.wantErrParts) > 0 {
+					if err == nil {
+						t.Fatal("expected an error, got nil")
+					}
+					for _, want := range tc.wantErrParts {
+						if !strings.Contains(err.Error(), want) {
+							t.Errorf("expected error to mention %q, got: %v", want, err)
+						}
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("expected %v, got: %v", nil, err)
+				}
+				if g.GetTenantName() != serverTenant {
+					t.Errorf("expected tenant %q, got %q", serverTenant, g.GetTenantName())
+				}
+			})
+		}
+	})
+
+	t.Run("no access token means mismatch is not an error", func(t *testing.T) {
+		t.Setenv("DEFANG_ACCESS_TOKEN", "") // clear any token inherited from the environment
+		const serverTenant = "server-tenant"
+		handler := &mockWhoAmI{tenant: serverTenant, tenantID: "server-id"}
+		_, h := defangv1connect.NewFabricControllerHandler(handler)
+		server := httptest.NewServer(h)
+		t.Cleanup(server.Close)
+
+		g, err := ConnectWithTenant(ctx, strings.TrimPrefix(server.URL, "http://"), "tenant2")
+		if err != nil {
+			t.Fatalf("expected %v, got: %v", nil, err)
+		}
+		if g.GetTenantName() != serverTenant {
+			t.Errorf("expected tenant %q, got %q", serverTenant, g.GetTenantName())
+		}
+	})
+
 	t.Run("legacy cluster prefix ignored", func(t *testing.T) {
 		t.Parallel()
 		handler := &mockWhoAmI{tenant: "server-tenant"}
