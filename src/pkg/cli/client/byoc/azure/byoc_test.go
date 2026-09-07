@@ -12,6 +12,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cloudazure "github.com/DefangLabs/defang/src/pkg/clouds/azure"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
@@ -517,6 +518,57 @@ func TestSplitCDLogSnapshot(t *testing.T) {
 			got := splitCDLogSnapshot(tt.content)
 			if !slices.Equal(got, tt.want) {
 				t.Errorf("splitCDLogSnapshot(%q) = %v, want %v", tt.content, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestQueryLogsRoutesByLogType(t *testing.T) {
+	// `defang cd preview` (and any other CD-only tail) asks for LogTypeBuild|LogTypeCD;
+	// QueryLogs must not also start the service-log (ACA) watcher for it, which is what
+	// made #2259 tail the whole project's running logs instead of just the CD task's
+	// own output. Conversely, a service/build-only tail must not look up or warn about
+	// a CD run it was never going to show, even when the request etag is unmatched.
+	tests := []struct {
+		name        string
+		setup       func(b *ByocAzure)
+		req         *defangv1.TailRequest
+		wantErr     string // substring that must appear in the error
+		unwantedErr string // substring that must NOT appear in the error
+	}{
+		{
+			name: "CD-only skips the service resource-group check",
+			setup: func(b *ByocAzure) {
+				b.cdRunID = "run-1"
+				b.cdEtag = "etag"
+			},
+			req:         &defangv1.TailRequest{Etag: "etag", Follow: false, LogType: uint32(logs.LogTypeCD)},
+			wantErr:     "getting log analytics workspace",
+			unwantedErr: "checking resource group",
+		},
+		{
+			name:        "Run-only skips the CD run lookup",
+			req:         &defangv1.TailRequest{Etag: "some-etag", Follow: false, LogType: uint32(logs.LogTypeRun)},
+			wantErr:     "checking resource group",
+			unwantedErr: "failed to find CD deployment",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			useFakeCred(t, "", errors.New("denied"))
+			b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
+			if tt.setup != nil {
+				tt.setup(b)
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+			defer cancel()
+			_, err := b.QueryLogs(ctx, tt.req)
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("expected error containing %q, got: %v", tt.wantErr, err)
+			}
+			if err != nil && strings.Contains(err.Error(), tt.unwantedErr) {
+				t.Errorf("error should not contain %q, got: %v", tt.unwantedErr, err)
 			}
 		})
 	}
