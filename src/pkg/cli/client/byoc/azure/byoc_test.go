@@ -523,39 +523,54 @@ func TestSplitCDLogSnapshot(t *testing.T) {
 	}
 }
 
-func TestQueryLogsCDOnlySkipsServiceWatchers(t *testing.T) {
+func TestQueryLogsRoutesByLogType(t *testing.T) {
 	// `defang cd preview` (and any other CD-only tail) asks for LogTypeBuild|LogTypeCD;
-	// requesting bare LogTypeCD here isolates that QueryLogs must not also start the
-	// service-log (ACA) watcher, which is what made #2259 tail the whole project's
-	// running logs instead of just the CD task's own output.
-	useFakeCred(t, "", errors.New("denied"))
-	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
-	b.cdRunID = "run-1"
-	b.cdEtag = "etag"
-	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
-	defer cancel()
-	_, err := b.QueryLogs(ctx, &defangv1.TailRequest{Etag: "etag", Follow: false, LogType: uint32(logs.LogTypeCD)})
-	if err == nil || !strings.Contains(err.Error(), "getting log analytics workspace") {
-		t.Errorf("expected CD-log lookup failure, got: %v", err)
+	// QueryLogs must not also start the service-log (ACA) watcher for it, which is what
+	// made #2259 tail the whole project's running logs instead of just the CD task's
+	// own output. Conversely, a service/build-only tail must not look up or warn about
+	// a CD run it was never going to show, even when the request etag is unmatched.
+	tests := []struct {
+		name        string
+		setup       func(b *ByocAzure)
+		req         *defangv1.TailRequest
+		wantErr     string // substring that must appear in the error
+		unwantedErr string // substring that must NOT appear in the error
+	}{
+		{
+			name: "CD-only skips the service resource-group check",
+			setup: func(b *ByocAzure) {
+				b.cdRunID = "run-1"
+				b.cdEtag = "etag"
+			},
+			req:         &defangv1.TailRequest{Etag: "etag", Follow: false, LogType: uint32(logs.LogTypeCD)},
+			wantErr:     "getting log analytics workspace",
+			unwantedErr: "checking resource group",
+		},
+		{
+			name:        "Run-only skips the CD run lookup",
+			req:         &defangv1.TailRequest{Etag: "some-etag", Follow: false, LogType: uint32(logs.LogTypeRun)},
+			wantErr:     "checking resource group",
+			unwantedErr: "failed to find CD deployment",
+		},
 	}
-	if strings.Contains(err.Error(), "checking resource group") {
-		t.Errorf("CD-only request should never touch the service resource group, got: %v", err)
-	}
-}
 
-func TestQueryLogsRunOnlySkipsCDLookup(t *testing.T) {
-	// A request for LogTypeRun only (no CD bit) must not look up or warn about a CD
-	// run, even when the request etag doesn't match anything cached.
-	useFakeCred(t, "", errors.New("denied"))
-	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
-	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
-	defer cancel()
-	_, err := b.QueryLogs(ctx, &defangv1.TailRequest{Etag: "some-etag", Follow: false, LogType: uint32(logs.LogTypeRun)})
-	if err == nil || !strings.Contains(err.Error(), "checking resource group") {
-		t.Errorf("expected resource-group check failure, got: %v", err)
-	}
-	if strings.Contains(err.Error(), "failed to find CD deployment") {
-		t.Errorf("Run-only request should never look up a CD deployment, got: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			useFakeCred(t, "", errors.New("denied"))
+			b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
+			if tt.setup != nil {
+				tt.setup(b)
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+			defer cancel()
+			_, err := b.QueryLogs(ctx, tt.req)
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("expected error containing %q, got: %v", tt.wantErr, err)
+			}
+			if err != nil && strings.Contains(err.Error(), tt.unwantedErr) {
+				t.Errorf("error should not contain %q, got: %v", tt.unwantedErr, err)
+			}
+		})
 	}
 }
 

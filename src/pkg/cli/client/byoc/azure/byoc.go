@@ -859,19 +859,21 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 		return nil, err
 	}
 
+	// etag tags every response entry (CD, service, and build alike), so it's resolved
+	// unconditionally; only the CD run LOOKUP below is gated on LogTypeCD.
+	runID := b.cdRunID
+	etag := b.cdEtag
+	if req.Etag != "" && req.Etag != b.cdEtag {
+		runID, etag = "", req.Etag
+	}
+
 	// Resolve the CD job execution for this request. The deploying process caches
 	// the run ID in memory; a standalone `defang logs` has none, so recover it by
 	// matching the request etag against each execution's recorded ETAG env var.
 	// Skip this entirely when CD logs weren't requested (e.g. `defang cd preview`
-	// asking for build+CD only): a service/build-only tail shouldn't warn about a
-	// CD run it was never going to show.
-	var runID, etag string
+	// asking for build+CD only): a service/build-only tail shouldn't look up, or
+	// warn about, a CD run it was never going to show.
 	if logType.Has(logs.LogTypeCD) {
-		runID = b.cdRunID
-		etag = b.cdEtag
-		if req.Etag != "" && req.Etag != b.cdEtag {
-			runID, etag = "", req.Etag
-		}
 		if runID == "" && etag != "" {
 			found, err := b.job.FindExecutionByEtag(ctx, etag)
 			if err != nil {
@@ -884,6 +886,8 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 			// by resource group rather than the CD execution, so still surface those.
 			term.Warnf("No CD logs found for etag %q; showing service and build logs only", req.Etag)
 		}
+	} else {
+		runID = ""
 	}
 
 	// CD logs. cdCh stays nil when there's no CD run, which makes the select below skip
