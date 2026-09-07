@@ -26,6 +26,7 @@ import (
 	azuredns "github.com/DefangLabs/defang/src/pkg/clouds/azure/dns"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/keyvault"
 	defanghttp "github.com/DefangLabs/defang/src/pkg/http"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -846,6 +847,11 @@ func splitCDLogSnapshot(content string) []string {
 func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
 	const cdServiceName = "defang-cd"
 
+	logType := logs.LogType(req.LogType)
+	if logType == logs.LogTypeUnspecified {
+		logType = logs.LogTypeAll
+	}
+
 	// setUpLocation resolves AZURE_LOCATION/AZURE_SUBSCRIPTION_ID onto the driver and
 	// job (no API calls). The service and build watchers below use b.driver.Azure, so
 	// this must run even when there's no etag to look up a CD run by.
@@ -856,22 +862,28 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 	// Resolve the CD job execution for this request. The deploying process caches
 	// the run ID in memory; a standalone `defang logs` has none, so recover it by
 	// matching the request etag against each execution's recorded ETAG env var.
-	runID := b.cdRunID
-	etag := b.cdEtag
-	if req.Etag != "" && req.Etag != b.cdEtag {
-		runID, etag = "", req.Etag
-	}
-	if runID == "" && etag != "" {
-		found, err := b.job.FindExecutionByEtag(ctx, etag)
-		if err != nil {
-			return nil, fmt.Errorf("failed to find CD deployment for etag %q: %w", etag, err)
+	// Skip this entirely when CD logs weren't requested (e.g. `defang cd preview`
+	// asking for build+CD only): a service/build-only tail shouldn't warn about a
+	// CD run it was never going to show.
+	var runID, etag string
+	if logType.Has(logs.LogTypeCD) {
+		runID = b.cdRunID
+		etag = b.cdEtag
+		if req.Etag != "" && req.Etag != b.cdEtag {
+			runID, etag = "", req.Etag
 		}
-		runID = found
-	}
-	if runID == "" {
-		// Unknown or empty etag: no CD run to tail. Service and build logs are keyed
-		// by resource group rather than the CD execution, so still surface those.
-		term.Warnf("No CD logs found for etag %q; showing service and build logs only", req.Etag)
+		if runID == "" && etag != "" {
+			found, err := b.job.FindExecutionByEtag(ctx, etag)
+			if err != nil {
+				return nil, fmt.Errorf("failed to find CD deployment for etag %q: %w", etag, err)
+			}
+			runID = found
+		}
+		if runID == "" {
+			// Unknown or empty etag: no CD run to tail. Service and build logs are keyed
+			// by resource group rather than the CD execution, so still surface those.
+			term.Warnf("No CD logs found for etag %q; showing service and build logs only", req.Etag)
+		}
 	}
 
 	// CD logs. cdCh stays nil when there's no CD run, which makes the select below skip
@@ -931,8 +943,10 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 	// group may be created mid-session (deploy-then-tail), so the watchers poll for it.
 	var acaCh <-chan aca.ServiceLogEntry
 	var buildCh <-chan acr.BuildLogEntry
-	startWatchers := true
-	if !req.Follow {
+	wantRun := logType.Has(logs.LogTypeRun)
+	wantBuild := logType.Has(logs.LogTypeBuild)
+	startWatchers := wantRun || wantBuild
+	if startWatchers && !req.Follow {
 		exists, err := b.driver.ResourceGroupExists(ctx, projectRG)
 		if err != nil {
 			return nil, err
@@ -943,17 +957,21 @@ func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (i
 		}
 	}
 	if startWatchers {
-		acaClient := &aca.ContainerApp{
-			Azure:         b.driver.Azure,
-			ResourceGroup: projectRG,
+		if wantRun {
+			acaClient := &aca.ContainerApp{
+				Azure:         b.driver.Azure,
+				ResourceGroup: projectRG,
+			}
+			acaCh = acaClient.WatchLogs(ctx, req.Follow)
 		}
-		acaCh = acaClient.WatchLogs(ctx, req.Follow)
 
-		buildWatcher := &acr.BuildLogWatcher{
-			Azure:         b.driver.Azure,
-			ResourceGroup: projectRG,
+		if wantBuild {
+			buildWatcher := &acr.BuildLogWatcher{
+				Azure:         b.driver.Azure,
+				ResourceGroup: projectRG,
+			}
+			buildCh = buildWatcher.WatchBuildLogs(ctx, req.Follow)
 		}
-		buildCh = buildWatcher.WatchBuildLogs(ctx, req.Follow)
 	}
 
 	return func(yield func(*defangv1.TailResponse, error) bool) {

@@ -12,6 +12,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cloudazure "github.com/DefangLabs/defang/src/pkg/clouds/azure"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
@@ -519,6 +520,42 @@ func TestSplitCDLogSnapshot(t *testing.T) {
 				t.Errorf("splitCDLogSnapshot(%q) = %v, want %v", tt.content, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestQueryLogsCDOnlySkipsServiceWatchers(t *testing.T) {
+	// `defang cd preview` (and any other CD-only tail) asks for LogTypeBuild|LogTypeCD;
+	// requesting bare LogTypeCD here isolates that QueryLogs must not also start the
+	// service-log (ACA) watcher, which is what made #2259 tail the whole project's
+	// running logs instead of just the CD task's own output.
+	useFakeCred(t, "", errors.New("denied"))
+	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
+	b.cdRunID = "run-1"
+	b.cdEtag = "etag"
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	_, err := b.QueryLogs(ctx, &defangv1.TailRequest{Etag: "etag", Follow: false, LogType: uint32(logs.LogTypeCD)})
+	if err == nil || !strings.Contains(err.Error(), "getting log analytics workspace") {
+		t.Errorf("expected CD-log lookup failure, got: %v", err)
+	}
+	if strings.Contains(err.Error(), "checking resource group") {
+		t.Errorf("CD-only request should never touch the service resource group, got: %v", err)
+	}
+}
+
+func TestQueryLogsRunOnlySkipsCDLookup(t *testing.T) {
+	// A request for LogTypeRun only (no CD bit) must not look up or warn about a CD
+	// run, even when the request etag doesn't match anything cached.
+	useFakeCred(t, "", errors.New("denied"))
+	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	_, err := b.QueryLogs(ctx, &defangv1.TailRequest{Etag: "some-etag", Follow: false, LogType: uint32(logs.LogTypeRun)})
+	if err == nil || !strings.Contains(err.Error(), "checking resource group") {
+		t.Errorf("expected resource-group check failure, got: %v", err)
+	}
+	if strings.Contains(err.Error(), "failed to find CD deployment") {
+		t.Errorf("Run-only request should never look up a CD deployment, got: %v", err)
 	}
 }
 
