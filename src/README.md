@@ -1,4 +1,4 @@
-## Develop Once, Deploy Anywhere.
+## Deploy any app or agent to any cloud.
 
 Take your app from Compose to a secure and scalable deployment on your favorite cloud in minutes.
 

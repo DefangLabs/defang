@@ -5,7 +5,7 @@
 
 ### ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/Logos/Element_Wordmark_Slogan/JPG/Dark_Colour_Glow.jpg)
 
-## Develop Once, Deploy Anywhere.
+## Deploy any app or agent to any cloud.
 
 Take your app from Compose to a secure and scalable deployment on your favorite cloud in minutes.
 
