@@ -122,6 +122,15 @@ no-diff:
 	@# check that there are no uncommitted changes (staged or unstaged)
 	git diff --quiet HEAD --
 
+.PHONY: test-nix
+test-nix:
+	@# catch a stale pkgs/defang/cli.nix vendorHash before it's baked into a
+	@# release tag, where the CI auto-fix has no branch to push a fix to.
+	@# The root target silently no-ops without nix, which would make this
+	@# gate a no-op too, so require nix here instead of skipping quietly.
+	@command -v nix >/dev/null || { echo "❌ nix is required to cut a release (it gates pkgs/defang/cli.nix's vendorHash)"; exit 1; }
+	$(MAKE) -C .. test-nix
+
 .PHONY: pull
 pull:
 	git pull
@@ -152,13 +161,13 @@ push-tags:
 	git push origin 'refs/tags/v*'
 
 .PHONY: patch-release
-patch-release: pull test no-diff increment-patch-version push-tags
+patch-release: pull test test-nix no-diff increment-patch-version push-tags
 
 .PHONY: minor-release
-minor-release: pull test no-diff increment-minor-version push-tags
+minor-release: pull test test-nix no-diff increment-minor-version push-tags
 
 .PHONY: major-release
-major-release: pull test no-diff increment-major-version push-tags
+major-release: pull test test-nix no-diff increment-major-version push-tags
 
 .PHONY: release
 release:
