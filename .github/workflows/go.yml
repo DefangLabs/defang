@@ -223,9 +223,18 @@ jobs:
               # before giving up.
               pushed=false
               for attempt in 1 2 3 4 5; do
-                if git push; then
-                  pushed=true
-                  break
+                PUSH_OUTPUT=$(git push 2>&1) && { pushed=true; break; }
+                echo "$PUSH_OUTPUT"
+
+                # GITHUB_TOKEN can never push a ref whose commit range
+                # touches .github/workflows/* (e.g. this PR also edits a
+                # workflow file) - there's no permission to grant for this,
+                # "workflows" isn't a valid permission scope - so retrying
+                # would just fail identically 5 times. Fail fast instead.
+                if echo "$PUSH_OUTPUT" | grep -q "without \`workflows\` permission"; then
+                  echo "❌ GITHUB_TOKEN can't push this vendorHash fix: this branch's commit range touches a workflow file, which GITHUB_TOKEN is never allowed to push regardless of granted permissions."
+                  echo "Fix vendorHash on pkgs/defang/cli.nix manually and push it with your own credentials."
+                  exit 1
                 fi
 
                 echo "Push rejected (attempt $attempt/5); fetching origin/$GITHUB_REF_NAME"
