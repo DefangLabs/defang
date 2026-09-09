@@ -160,14 +160,37 @@ increment-major-version:
 push-tags:
 	git push origin 'refs/tags/v*'
 
+## Each release target invokes its steps as separate $(MAKE) calls in its
+## recipe, not as prerequisites, so they run strictly in order even under
+## `make -j`: prerequisites of one target have no ordering guarantee under
+## parallel make, but recipe lines within a single target always run
+## sequentially.
 .PHONY: patch-release
-patch-release: pull test test-nix no-diff increment-patch-version push-tags
+patch-release:
+	$(MAKE) pull
+	$(MAKE) test
+	$(MAKE) test-nix
+	$(MAKE) no-diff
+	$(MAKE) increment-patch-version
+	$(MAKE) push-tags
 
 .PHONY: minor-release
-minor-release: pull test test-nix no-diff increment-minor-version push-tags
+minor-release:
+	$(MAKE) pull
+	$(MAKE) test
+	$(MAKE) test-nix
+	$(MAKE) no-diff
+	$(MAKE) increment-minor-version
+	$(MAKE) push-tags
 
 .PHONY: major-release
-major-release: pull test test-nix no-diff increment-major-version push-tags
+major-release:
+	$(MAKE) pull
+	$(MAKE) test
+	$(MAKE) test-nix
+	$(MAKE) no-diff
+	$(MAKE) increment-major-version
+	$(MAKE) push-tags
 
 .PHONY: release
 release:
