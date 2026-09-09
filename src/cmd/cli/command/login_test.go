@@ -10,6 +10,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
+	"github.com/DefangLabs/defang/src/pkg/track"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/spf13/cobra"
 )
@@ -66,7 +67,11 @@ func TestPrintActiveWorkspace(t *testing.T) {
 	clusterURL := setupLoginTestServers(t)
 
 	oldGlobal := global
-	t.Cleanup(func() { global = oldGlobal })
+	oldTracker := track.Tracker
+	t.Cleanup(func() {
+		global = oldGlobal
+		track.Tracker = oldTracker
+	})
 	global.Stack.Name = "" // prevent loading stack files
 	global.FabricAddr = strings.TrimPrefix(clusterURL, "http://")
 	global.HasTty = true
@@ -97,6 +102,30 @@ func TestPrintActiveWorkspace(t *testing.T) {
 
 		if output := stdout.String(); !strings.Contains(output, "Workspace One") {
 			t.Fatalf("expected selected workspace name in output, got: %q", output)
+		}
+	})
+
+	t.Run("userinfo fetch failure falls back to the raw tenant id", func(t *testing.T) {
+		stdout.Reset()
+		global.TenantSelection = ""
+
+		failingUserinfo := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// A 4xx status (unlike 5xx) isn't retried by the retryablehttp client underneath
+			// auth.FetchUserInfo, keeping this test fast.
+			http.Error(w, "userinfo unavailable", http.StatusBadRequest)
+		}))
+		t.Cleanup(failingUserinfo.Close)
+
+		originalAuthClient := auth.OpenAuthClient
+		auth.OpenAuthClient = auth.NewClient("testclient", failingUserinfo.URL)
+		t.Cleanup(func() { auth.OpenAuthClient = originalAuthClient })
+
+		cmd := &cobra.Command{}
+		cmd.SetContext(t.Context())
+		printActiveWorkspace(cmd)
+
+		if output := stdout.String(); !strings.Contains(output, "ws-2") {
+			t.Fatalf("expected fallback to the raw tenant id in output, got: %q", output)
 		}
 	})
 }
