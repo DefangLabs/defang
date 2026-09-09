@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
@@ -15,6 +16,41 @@ const albDeletionProtectionKey = "deletion_protection.enabled"
 type ELBv2API interface {
 	DescribeLoadBalancers(ctx context.Context, params *elbv2.DescribeLoadBalancersInput, optFns ...func(*elbv2.Options)) (*elbv2.DescribeLoadBalancersOutput, error)
 	ModifyLoadBalancerAttributes(ctx context.Context, params *elbv2.ModifyLoadBalancerAttributesInput, optFns ...func(*elbv2.Options)) (*elbv2.ModifyLoadBalancerAttributesOutput, error)
+}
+
+// maxLoadBalancerArnsPerCall is the DescribeLoadBalancers LoadBalancerArns limit (AWS API constraint).
+const maxLoadBalancerArnsPerCall = 20
+
+// FindLoadBalancersByArns returns the load balancers identified by the given ARNs. An ARN that no
+// longer exists is omitted rather than treated as an error, since tag data can lag a deletion.
+func FindLoadBalancersByArns(ctx context.Context, arns []string, svc ELBv2API) ([]elbv2types.LoadBalancer, error) {
+	var found []elbv2types.LoadBalancer
+	for start := 0; start < len(arns); start += maxLoadBalancerArnsPerCall {
+		end := min(start+maxLoadBalancerArnsPerCall, len(arns))
+		batch := arns[start:end]
+		out, err := svc.DescribeLoadBalancers(ctx, &elbv2.DescribeLoadBalancersInput{LoadBalancerArns: batch})
+		if err == nil {
+			found = append(found, out.LoadBalancers...)
+			continue
+		}
+		var notFound *elbv2types.LoadBalancerNotFoundException
+		if !errors.As(err, &notFound) {
+			return nil, err
+		}
+		// One or more ARNs in this batch no longer exist; a single stale ARN fails the whole
+		// batch call, so retry individually rather than lose the rest of the batch.
+		for _, arn := range batch {
+			single, err := svc.DescribeLoadBalancers(ctx, &elbv2.DescribeLoadBalancersInput{LoadBalancerArns: []string{arn}})
+			if err != nil {
+				if errors.As(err, &notFound) {
+					continue
+				}
+				return nil, err
+			}
+			found = append(found, single.LoadBalancers...)
+		}
+	}
+	return found, nil
 }
 
 // FindLoadBalancersByPrefix returns the load balancers whose name starts with prefix.

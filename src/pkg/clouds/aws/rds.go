@@ -14,6 +14,31 @@ type RDSAPI interface {
 	ModifyDBInstance(ctx context.Context, params *rds.ModifyDBInstanceInput, optFns ...func(*rds.Options)) (*rds.ModifyDBInstanceOutput, error)
 }
 
+// FindDBInstancesByArns returns the DB instances identified by the given ARNs. An ARN that no
+// longer exists is simply absent from the result, matching DescribeDBInstances' own behavior for
+// the db-instance-id filter (it never errors on a stale value).
+func FindDBInstancesByArns(ctx context.Context, arns []string, svc RDSAPI) ([]rdstypes.DBInstance, error) {
+	if len(arns) == 0 {
+		return nil, nil
+	}
+	var found []rdstypes.DBInstance
+	var marker *string
+	for {
+		out, err := svc.DescribeDBInstances(ctx, &rds.DescribeDBInstancesInput{
+			Filters: []rdstypes.Filter{{Name: ptr.String("db-instance-id"), Values: arns}},
+			Marker:  marker,
+		})
+		if err != nil {
+			return nil, err
+		}
+		found = append(found, out.DBInstances...)
+		if out.Marker == nil {
+			return found, nil
+		}
+		marker = out.Marker
+	}
+}
+
 // FindDBInstancesByPrefix returns the DB instances whose identifier starts with prefix.
 // Note: this covers standalone RDS instances; Aurora clusters are not handled here.
 func FindDBInstancesByPrefix(ctx context.Context, prefix string, svc RDSAPI) ([]rdstypes.DBInstance, error) {

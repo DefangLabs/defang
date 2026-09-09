@@ -48,13 +48,14 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ecrpublic v1.38.7
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.58.8
 	github.com/aws/aws-sdk-go-v2/service/rds v1.124.4
+	github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi v1.36.2
 	github.com/aws/aws-sdk-go-v2/service/route53 v1.37.1
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.103.3
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.40.5
 	github.com/aws/aws-sdk-go-v2/service/servicequotas v1.25.5
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.44.7
 	github.com/aws/aws-sdk-go-v2/service/sts v1.43.3
-	github.com/aws/smithy-go v1.27.8
+	github.com/aws/smithy-go v1.28.1
 	github.com/awslabs/goformation/v7 v7.14.9
 	github.com/compose-spec/compose-go/v2 v2.10.1
 	github.com/digitalocean/godo v1.131.1

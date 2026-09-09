@@ -49,6 +49,73 @@ func TestFindLoadBalancersByPrefix(t *testing.T) {
 	}
 }
 
+// mockELBv2ByArn simulates DescribeLoadBalancers(LoadBalancerArns:...): the real API fails the
+// whole call with LoadBalancerNotFoundException if any requested ARN doesn't exist, so this
+// mock does the same rather than silently filtering.
+type mockELBv2ByArn struct {
+	byArn map[string]elbv2types.LoadBalancer
+	calls [][]string
+}
+
+func (m *mockELBv2ByArn) DescribeLoadBalancers(_ context.Context, in *elbv2.DescribeLoadBalancersInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeLoadBalancersOutput, error) {
+	m.calls = append(m.calls, in.LoadBalancerArns)
+	var found []elbv2types.LoadBalancer
+	for _, arn := range in.LoadBalancerArns {
+		lb, ok := m.byArn[arn]
+		if !ok {
+			return nil, &elbv2types.LoadBalancerNotFoundException{Message: ptr.String(arn)}
+		}
+		found = append(found, lb)
+	}
+	return &elbv2.DescribeLoadBalancersOutput{LoadBalancers: found}, nil
+}
+
+func (m *mockELBv2ByArn) ModifyLoadBalancerAttributes(_ context.Context, _ *elbv2.ModifyLoadBalancerAttributesInput, _ ...func(*elbv2.Options)) (*elbv2.ModifyLoadBalancerAttributesOutput, error) {
+	return &elbv2.ModifyLoadBalancerAttributesOutput{}, nil
+}
+
+func TestFindLoadBalancersByArns(t *testing.T) {
+	svc := &mockELBv2ByArn{byArn: map[string]elbv2types.LoadBalancer{
+		"arn:a": lb("a"),
+		"arn:b": lb("b"),
+	}}
+	found, err := FindLoadBalancersByArns(t.Context(), []string{"arn:a", "arn:b"}, svc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(found) != 2 {
+		t.Fatalf("expected 2 load balancers, got %d", len(found))
+	}
+}
+
+func TestFindLoadBalancersByArns_StaleArnDoesNotHideTheRest(t *testing.T) {
+	svc := &mockELBv2ByArn{byArn: map[string]elbv2types.LoadBalancer{
+		"arn:a": lb("a"),
+		// "arn:stale" deliberately absent: it existed when tagged but was deleted since.
+	}}
+	found, err := FindLoadBalancersByArns(t.Context(), []string{"arn:a", "arn:stale"}, svc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(found) != 1 || *found[0].LoadBalancerName != "a" {
+		t.Fatalf("expected only the live load balancer, got %+v", found)
+	}
+}
+
+func TestFindLoadBalancersByArns_Empty(t *testing.T) {
+	svc := &mockELBv2ByArn{}
+	found, err := FindLoadBalancersByArns(t.Context(), nil, svc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(found) != 0 {
+		t.Fatalf("expected no load balancers, got %+v", found)
+	}
+	if len(svc.calls) != 0 {
+		t.Fatalf("expected no API calls for an empty ARN list, got %d", len(svc.calls))
+	}
+}
+
 func TestSetALBDeletionProtection(t *testing.T) {
 	svc := &mockELBv2{}
 	if err := SetALBDeletionProtection(t.Context(), "arn", false, svc); err != nil {

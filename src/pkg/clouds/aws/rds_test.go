@@ -37,6 +37,53 @@ func TestFindDBInstancesByPrefix(t *testing.T) {
 	}
 }
 
+// mockRDSByArn simulates DescribeDBInstances(Filters:[db-instance-id=...]).
+type mockRDSByArn struct {
+	byArn map[string]rdstypes.DBInstance
+}
+
+func (m *mockRDSByArn) DescribeDBInstances(_ context.Context, in *rds.DescribeDBInstancesInput, _ ...func(*rds.Options)) (*rds.DescribeDBInstancesOutput, error) {
+	var found []rdstypes.DBInstance
+	for _, f := range in.Filters {
+		if ptr.ToString(f.Name) != "db-instance-id" {
+			continue
+		}
+		for _, arn := range f.Values {
+			if inst, ok := m.byArn[arn]; ok {
+				found = append(found, inst)
+			}
+		}
+	}
+	return &rds.DescribeDBInstancesOutput{DBInstances: found}, nil
+}
+
+func (m *mockRDSByArn) ModifyDBInstance(_ context.Context, _ *rds.ModifyDBInstanceInput, _ ...func(*rds.Options)) (*rds.ModifyDBInstanceOutput, error) {
+	return &rds.ModifyDBInstanceOutput{}, nil
+}
+
+func TestFindDBInstancesByArns(t *testing.T) {
+	svc := &mockRDSByArn{byArn: map[string]rdstypes.DBInstance{
+		"arn:a": {DBInstanceIdentifier: ptr.String("a")},
+	}}
+	found, err := FindDBInstancesByArns(t.Context(), []string{"arn:a", "arn:stale"}, svc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(found) != 1 || *found[0].DBInstanceIdentifier != "a" {
+		t.Fatalf("expected only the live instance, got %+v", found)
+	}
+}
+
+func TestFindDBInstancesByArns_Empty(t *testing.T) {
+	found, err := FindDBInstancesByArns(t.Context(), nil, &mockRDSByArn{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(found) != 0 {
+		t.Fatalf("expected no instances, got %+v", found)
+	}
+}
+
 func TestSetDBInstanceDeletionProtection(t *testing.T) {
 	svc := &mockRDS{}
 	if err := SetDBInstanceDeletionProtection(t.Context(), "db", false, svc); err != nil {

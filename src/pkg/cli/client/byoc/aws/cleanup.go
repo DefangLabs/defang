@@ -12,7 +12,10 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
+	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
+	rgt "github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 )
@@ -81,36 +84,75 @@ func (b *ByocAws) DiscoverOrphans(ctx context.Context, projectName string) ([]cl
 	base := b.resourceBaseName(projectName)
 	lowerBase := strings.ToLower(base) // ALB/RDS names are lowercased
 
+	// Every resource the CD creates on AWS carries defang:project/defang:stack tags
+	// (pulumi-defang cd/program/aws.go, via the provider's DefaultTags), which is exact
+	// regardless of naming. Prefer that over a name guess: the Go CD's ALB autonaming has gone
+	// through several shapes, none of which include the b.Prefix this file used to assume (see
+	// the fallback below), so a name-only match can miss the exact resource cleanup exists to
+	// unblock. Name-prefix matching still runs as a fallback for pre-tagging deployments.
+	rgtClient := rgt.NewFromConfig(cfg)
+	taggedArns, err := aws.FindResourceArnsByTags(ctx, map[string]string{
+		"defang:project": projectName,
+		"defang:stack":   b.PulumiStack,
+	}, []string{"elasticloadbalancing:loadbalancer", "rds:db"}, rgtClient)
+	if err != nil {
+		warn(err, "could not look up tagged resources")
+	}
+
 	// ALBs: any leftover load balancer is unblocked by disabling deletion protection (idempotent).
+	elbClient := elbv2.NewFromConfig(cfg)
+	seenALB := map[string]bool{}
+	var lbs []elbv2types.LoadBalancer
+	if tagged, err := aws.FindLoadBalancersByArns(ctx, arnsForService(taggedArns, "elasticloadbalancing"), elbClient); err != nil {
+		warn(err, "could not describe tagged load balancers")
+	} else {
+		lbs = append(lbs, tagged...)
+	}
 	albPrefix := lowerBase
 	if len(albPrefix) > maxALBNameLen {
 		albPrefix = albPrefix[:maxALBNameLen]
 	}
-	elbClient := elbv2.NewFromConfig(cfg)
-	if lbs, err := aws.FindLoadBalancersByPrefix(ctx, albPrefix, elbClient); err != nil {
+	if prefixed, err := aws.FindLoadBalancersByPrefix(ctx, albPrefix, elbClient); err != nil {
 		warn(err, "could not list load balancers")
 	} else {
-		for _, lb := range lbs {
-			add("alb:"+*lb.LoadBalancerArn, client.OrphanResource{
-				Category: "alb",
-				Name:     *lb.LoadBalancerName,
-				Action:   "disable deletion protection so 'defang down' can delete the load balancer",
-			}, orphanDetail{category: "alb", lbArn: *lb.LoadBalancerArn})
+		lbs = append(lbs, prefixed...)
+	}
+	for _, lb := range lbs {
+		if lb.LoadBalancerArn == nil || seenALB[*lb.LoadBalancerArn] {
+			continue
 		}
+		seenALB[*lb.LoadBalancerArn] = true
+		add("alb:"+*lb.LoadBalancerArn, client.OrphanResource{
+			Category: "alb",
+			Name:     *lb.LoadBalancerName,
+			Action:   "disable deletion protection so 'defang down' can delete the load balancer",
+		}, orphanDetail{category: "alb", lbArn: *lb.LoadBalancerArn})
 	}
 
 	// RDS: same as ALBs; disabling deletion protection is idempotent.
 	rdsClient := rds.NewFromConfig(cfg)
-	if insts, err := aws.FindDBInstancesByPrefix(ctx, lowerBase, rdsClient); err != nil {
+	seenRDS := map[string]bool{}
+	var insts []rdstypes.DBInstance
+	if tagged, err := aws.FindDBInstancesByArns(ctx, arnsForService(taggedArns, "rds"), rdsClient); err != nil {
+		warn(err, "could not describe tagged RDS instances")
+	} else {
+		insts = append(insts, tagged...)
+	}
+	if prefixed, err := aws.FindDBInstancesByPrefix(ctx, lowerBase, rdsClient); err != nil {
 		warn(err, "could not list RDS instances")
 	} else {
-		for _, inst := range insts {
-			add("rds:"+*inst.DBInstanceIdentifier, client.OrphanResource{
-				Category: "rds",
-				Name:     *inst.DBInstanceIdentifier,
-				Action:   "disable deletion protection so 'defang down' can delete the database",
-			}, orphanDetail{category: "rds", dbID: *inst.DBInstanceIdentifier})
+		insts = append(insts, prefixed...)
+	}
+	for _, inst := range insts {
+		if inst.DBInstanceIdentifier == nil || seenRDS[*inst.DBInstanceIdentifier] {
+			continue
 		}
+		seenRDS[*inst.DBInstanceIdentifier] = true
+		add("rds:"+*inst.DBInstanceIdentifier, client.OrphanResource{
+			Category: "rds",
+			Name:     *inst.DBInstanceIdentifier,
+			Action:   "disable deletion protection so 'defang down' can delete the database",
+		}, orphanDetail{category: "rds", dbID: *inst.DBInstanceIdentifier})
 	}
 
 	// ECR: a non-empty repository blocks deletion (RepositoryNotEmptyException); deleting its
@@ -216,4 +258,17 @@ func isApexManagedRecord(rec r53types.ResourceRecordSet, zoneName string) bool {
 		return false
 	}
 	return rec.Name != nil && dns.Normalize(*rec.Name) == dns.Normalize(zoneName)
+}
+
+// arnsForService returns the ARNs belonging to the given AWS service (e.g. "rds",
+// "elasticloadbalancing"), out of a list that may mix services.
+func arnsForService(arns []string, service string) []string {
+	var filtered []string
+	for _, arn := range arns {
+		// arn:partition:service:region:account-id:resource
+		if parts := strings.SplitN(arn, ":", 4); len(parts) >= 3 && parts[2] == service {
+			filtered = append(filtered, arn)
+		}
+	}
+	return filtered
 }
