@@ -183,6 +183,18 @@ jobs:
 
             echo "Found new hash: $NEW_HASH"
 
+            # A tag checkout is a detached HEAD with no branch to push a fix
+            # commit to (there's no `origin/<tag>` remote-tracking ref to
+            # rebase against either), and tags shouldn't be amended anyway.
+            # Fail with an actionable message instead of the confusing git
+            # errors that follow from treating $GITHUB_REF_NAME as a branch.
+            if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+              echo "❌ vendorHash is stale for tag $GITHUB_REF_NAME (needs $NEW_HASH), but a tag has no branch to push a fix to."
+              echo "This is likely nixpkgs channel drift (nix_path uses the floating nixos-unstable channel), not a real code change."
+              echo "Fix vendorHash on the branch this tag was cut from and re-cut the release."
+              exit 1
+            fi
+
             # Update the vendorHash in cli.nix
             OLD_HASH=$(grep -oP 'vendorHash = "\Ksha256-[A-Za-z0-9+/]+=*' pkgs/defang/cli.nix)
             echo "Old hash: $OLD_HASH"
