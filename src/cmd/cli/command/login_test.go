@@ -20,6 +20,7 @@ import (
 // client.UsingAccessTokenEnv).
 func setupLoginTestServers(t *testing.T) (clusterURL string) {
 	t.Helper()
+	t.Setenv("DEFANG_ACCESS_TOKEN", "") // GetExistingToken prefers this env var over TokenStore
 
 	mockService := &mockFabricService{tenantId: "ws-2"}
 	_, handler := defangv1.NewFabricControllerHandler(mockService)
