@@ -32,9 +32,16 @@ type r53Mock struct {
 	delegationSets []types.DelegationSet
 }
 
+// Called on the rollback path of createUsableDelegationSet, so it reports success; no test here
+// asserts on the deletion itself.
 func (r r53Mock) DeleteReusableDelegationSet(ctx context.Context, params *route53.DeleteReusableDelegationSetInput, optFns ...func(*route53.Options)) (*route53.DeleteReusableDelegationSetOutput, error) {
-	// TODO: implement if needed
-	return nil, nil
+	return &route53.DeleteReusableDelegationSetOutput{}, nil
+}
+
+// Panics rather than reporting success: no test in this file expects a record mutation, so a call
+// here means the code under test took an unintended path, which a nil error would hide.
+func (r r53Mock) ChangeResourceRecordSets(ctx context.Context, params *route53.ChangeResourceRecordSetsInput, optFns ...func(*route53.Options)) (*route53.ChangeResourceRecordSetsOutput, error) {
+	panic("unexpected ChangeResourceRecordSets call")
 }
 
 func (r r53Mock) ListTagsForResource(ctx context.Context, params *route53.ListTagsForResourceInput, optFns ...func(*route53.Options)) (*route53.ListTagsForResourceOutput, error) {

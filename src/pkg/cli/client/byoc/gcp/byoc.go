@@ -32,6 +32,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"go.yaml.in/yaml/v4"
+	compute "google.golang.org/api/compute/v1"
 	gcpdns "google.golang.org/api/dns/v1"
 	"google.golang.org/api/googleapi"
 	auditpb "google.golang.org/genproto/googleapis/cloud/audit"
@@ -114,6 +115,24 @@ type gcpDriver interface {
 	RunCloudBuild(ctx context.Context, args gcp.CloudBuildArgs) (string, error)
 	SignBytes(ctx context.Context, b []byte, name string) ([]byte, error)
 	GcpLogsClient
+	gcpNetworkCleaner
+}
+
+// gcpNetworkCleaner is the subset of the driver used by cleanup.go to remove the networking
+// resources that `defang down` retains. Split out from gcpDriver so a test can implement just
+// these without the rest of the surface.
+type gcpNetworkCleaner interface {
+	ListNetworksByPrefix(ctx context.Context, prefix string) ([]*compute.Network, error)
+	ListSubnetworks(ctx context.Context, network *compute.Network) ([]*compute.Subnetwork, error)
+	ListInstanceTemplatesForNetwork(ctx context.Context, networkSelfLink string) ([]*compute.InstanceTemplate, error)
+	ListPeeringRangesForNetwork(ctx context.Context, networkSelfLink string) ([]*compute.Address, error)
+	GetNetworkUsage(ctx context.Context, networkSelfLink string) (gcp.NetworkUsage, error)
+	GetCloudRunNetworkUsage(ctx context.Context, networkSelfLink string, subnetworkSelfLinks []string) ([]string, error)
+	RemoveNetworkPeering(ctx context.Context, networkName, peeringName string) error
+	DeleteInstanceTemplate(ctx context.Context, name string) error
+	DeleteGlobalAddress(ctx context.Context, name string) error
+	DeleteSubnetwork(ctx context.Context, region, name string) error
+	DeleteNetwork(ctx context.Context, name string) error
 }
 
 type ByocGcp struct {
@@ -128,6 +147,10 @@ type ByocGcp struct {
 	delegateDomainZone   string
 
 	cdBuildId string
+
+	// orphans maps the OrphanResource IDs handed out by the most recent DiscoverOrphans call to
+	// the GCP handles CleanupOrphan needs. See cleanup.go.
+	orphans map[string]gcpOrphanDetail
 }
 
 func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack string) *ByocGcp {

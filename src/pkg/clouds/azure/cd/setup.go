@@ -100,14 +100,20 @@ func (d *Driver) SetUpResourceGroup(ctx context.Context) error {
 }
 
 func (d *Driver) TearDown(ctx context.Context) error {
+	return d.DeleteResourceGroup(ctx, d.resourceGroupName)
+}
+
+// DeleteResourceGroup deletes the named resource group and waits for the operation to finish.
+// Deleting the group cascades to everything still inside it (e.g. a project's Key Vault).
+func (d *Driver) DeleteResourceGroup(ctx context.Context, name string) error {
 	defer term.Timing()()
 	rgClient, err := d.newResourceGroupClient()
 	if err != nil {
 		return err
 	}
-	deletePoller, err := rgClient.BeginDelete(ctx, d.resourceGroupName, nil)
+	deletePoller, err := rgClient.BeginDelete(ctx, name, nil)
 	if err != nil {
-		return fmt.Errorf("failed to delete resource group: %w", err)
+		return fmt.Errorf("failed to delete resource group %q: %w", name, err)
 	}
 	_, err = deletePoller.PollUntilDone(ctx, azure.PollOptions)
 	return err

@@ -132,7 +132,7 @@ Are you sure you want to delete it?`,
 	answer, err := ec.RequestEnum(ctx,
 		prompt,
 		"confirm",
-		[]string{"yes", "no"},
+		[]string{"no", "yes"},
 	)
 	if err != nil {
 		return false, err
