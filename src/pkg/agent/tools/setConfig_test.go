@@ -113,6 +113,9 @@ func TestHandleSetConfigRefusesWhenNotConfirmable(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `refusing to set config variable "test-config"`)
+	assert.False(t, mockCLI.ConnectCalled, "no connect should happen when the write is refused")
+	assert.False(t, mockCLI.NewProviderCalled, "no provider setup should happen when the write is refused")
+	assert.False(t, mockCLI.LoadProjectNameCalled, "no project name lookup should happen when the write is refused")
 	assert.False(t, mockCLI.ConfigSetCalled, "no config write should happen when the write is refused")
 }
 
