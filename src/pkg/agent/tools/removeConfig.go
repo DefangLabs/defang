@@ -17,6 +17,10 @@ type RemoveConfigParams struct {
 
 // HandleRemoveConfigTool handles the remove config tool logic
 func HandleRemoveConfigTool(ctx context.Context, params RemoveConfigParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
+	if err := requireConfirmable(ec, fmt.Sprintf("remove config variable %q", params.Name)); err != nil {
+		return "", err
+	}
+
 	_, provider, loader, err := setupProviderAndLoader(ctx, params.LoaderParams, cli, ec, sc)
 	if err != nil {
 		return setupErrorResult(err)

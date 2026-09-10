@@ -64,6 +64,27 @@ func (m *MockRemoveConfigCLI) InteractiveLoginMCP(ctx context.Context, fabricAdd
 	return nil
 }
 
+func TestHandleRemoveConfigToolRefusesWhenNotConfirmable(t *testing.T) {
+	t.Chdir("testdata")
+	os.Unsetenv("DEFANG_PROVIDER")
+	os.Unsetenv("AWS_PROFILE")
+	os.Unsetenv("AWS_REGION")
+
+	mockCLI := &MockRemoveConfigCLI{CallLog: []string{}}
+	ec := elicitations.NewController(&mockElicitationsClient{})
+	ec.SetSupported(false)
+
+	stack := stacks.Parameters{Name: "test-stack", Provider: client.ProviderAWS}
+	_, err := HandleRemoveConfigTool(t.Context(), RemoveConfigParams{Name: "DATABASE_URL"}, mockCLI, ec, StackConfig{
+		FabricAddr: "test-cluster",
+		Stack:      &stack,
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `refusing to remove config variable "DATABASE_URL"`)
+	assert.Empty(t, mockCLI.CallLog, "no CLI calls should be made when the write is refused")
+}
+
 func TestHandleRemoveConfigTool(t *testing.T) {
 	tests := []struct {
 		name                 string
