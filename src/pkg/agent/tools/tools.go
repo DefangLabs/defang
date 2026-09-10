@@ -6,16 +6,17 @@ import (
 	"github.com/firebase/genkit/go/ai"
 )
 
-func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
+// mutatingTools are only handed to the model when ec.IsSupported() — i.e. when
+// there is a user who could be asked to confirm a change. Where that isn't known
+// synchronously (e.g. the MCP server negotiates elicitation support per-connection
+// after tools are already registered), requireConfirmable in each handler is the
+// actual enforcement; leaving these out here is the defense that also applies where
+// support is known up front, such as the non-interactive CI debugger.
+func mutatingTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
+	if !ec.IsSupported() {
+		return nil
+	}
 	return []ai.Tool{
-		ai.NewTool(
-			"services",
-			"List deployed services for the selected project stack in the current working directory",
-			func(ctx *ai.ToolContext, params ServicesParams) (string, error) {
-				var cli CLIInterface = &DefaultToolCLI{}
-				return HandleServicesTool(ctx.Context, params, cli, ec, sc)
-			},
-		),
 		ai.NewTool("deploy",
 			"Initiate deployment of the application stack defined in the docker-compose files in the current working directory",
 			func(ctx *ai.ToolContext, params DeployParams) (string, error) {
@@ -28,6 +29,33 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 			func(ctx *ai.ToolContext, params DestroyParams) (string, error) {
 				cli := &DefaultToolCLI{}
 				return HandleDestroyTool(ctx.Context, params, cli, ec, sc)
+			},
+		),
+		ai.NewTool("set_config",
+			"Set a config variable for the currently selected stack in the Defang project",
+			func(ctx *ai.ToolContext, params SetConfigParams) (string, error) {
+				cli := &DefaultToolCLI{}
+				return HandleSetConfig(ctx.Context, params, cli, ec, sc)
+			},
+		),
+		ai.NewTool("remove_config",
+			"Remove a config variable from the currently selected stack in the Defang project",
+			func(ctx *ai.ToolContext, params RemoveConfigParams) (string, error) {
+				cli := &DefaultToolCLI{}
+				return HandleRemoveConfigTool(ctx.Context, params, cli, ec, sc)
+			},
+		),
+	}
+}
+
+func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
+	toolList := []ai.Tool{
+		ai.NewTool(
+			"services",
+			"List deployed services for the selected project stack in the current working directory",
+			func(ctx *ai.ToolContext, params ServicesParams) (string, error) {
+				var cli CLIInterface = &DefaultToolCLI{}
+				return HandleServicesTool(ctx.Context, params, cli, ec, sc)
 			},
 		),
 		ai.NewTool("logs",
@@ -46,13 +74,6 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 				}
 				cli := &DefaultToolCLI{}
 				return HandleEstimateTool(ctx.Context, loader, params, cli, sc)
-			},
-		),
-		ai.NewTool("set_config",
-			"Set a config variable for the currently selected stack in the Defang project",
-			func(ctx *ai.ToolContext, params SetConfigParams) (string, error) {
-				cli := &DefaultToolCLI{}
-				return HandleSetConfig(ctx.Context, params, cli, ec, sc)
 			},
 		),
 		ai.NewTool("select_stack",
@@ -91,13 +112,6 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 				return HandleCurrentStackTool(ctx.Context, sc)
 			},
 		),
-		ai.NewTool("remove_config",
-			"Remove a config variable from the currently selected stack in the Defang project",
-			func(ctx *ai.ToolContext, params RemoveConfigParams) (string, error) {
-				cli := &DefaultToolCLI{}
-				return HandleRemoveConfigTool(ctx.Context, params, cli, ec, sc)
-			},
-		),
 		ai.NewTool("list_configs",
 			"List config variables for the currently selected stack in the Defang project",
 			func(ctx *ai.ToolContext, params ListConfigParams) (string, error) {
@@ -116,4 +130,5 @@ func CollectDefangTools(ec elicitations.Controller, sc StackConfig) []ai.Tool {
 			},
 		),
 	}
+	return append(toolList, mutatingTools(ec, sc)...)
 }
