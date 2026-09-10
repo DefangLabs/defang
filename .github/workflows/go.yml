@@ -346,7 +346,7 @@ jobs:
               for (let i = 0; i < 30 && !run; i++) {
                 await sleep(10_000);
                 const { data } = await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id, event: 'workflow_dispatch', per_page: 30 });
-                run = data.workflow_runs.find((wr) => wr.id > watermark && wr.name.includes(cliVersion));
+                run = data.workflow_runs.find((wr) => wr.id > watermark && wr.display_title.includes(cliVersion));
               }
               if (!run) {
                 throw new Error('Timed out waiting for the dispatched smoketest run to appear');
