@@ -16,6 +16,10 @@ type DestroyParams struct {
 }
 
 func HandleDestroyTool(ctx context.Context, params DestroyParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
+	if err := requireConfirmable(ec, "destroy the deployed project"); err != nil {
+		return "", err
+	}
+
 	client, provider, loader, err := setupProviderAndLoader(ctx, params.LoaderParams, cli, ec, sc)
 	if err != nil {
 		return setupErrorResult(err)

@@ -21,6 +21,10 @@ type DeployParams struct {
 }
 
 func HandleDeployTool(ctx context.Context, params DeployParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
+	if err := requireConfirmable(ec, "deploy the project"); err != nil {
+		return "", err
+	}
+
 	client, provider, loader, err := setupProviderAndLoader(ctx, params.LoaderParams, cli, ec, sc)
 	if err != nil {
 		return setupErrorResult(err)

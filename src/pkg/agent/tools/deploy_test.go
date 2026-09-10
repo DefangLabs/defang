@@ -235,6 +235,27 @@ func TestHandleDeployTool(t *testing.T) {
 	}
 }
 
+func TestHandleDeployToolRefusesWhenNotConfirmable(t *testing.T) {
+	t.Chdir("testdata")
+	os.Unsetenv("DEFANG_PROVIDER")
+	os.Unsetenv("AWS_PROFILE")
+	os.Unsetenv("AWS_REGION")
+
+	mockCLI := &MockDeployCLI{}
+	ec := elicitations.NewController(&mockElicitationsClient{})
+	ec.SetSupported(false)
+
+	stack := &stacks.Parameters{Name: "production", Provider: client.ProviderAWS}
+	_, err := HandleDeployTool(t.Context(), DeployParams{}, mockCLI, ec, StackConfig{
+		FabricAddr: "test-cluster",
+		Stack:      stack,
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "refusing to deploy the project")
+	assert.Empty(t, mockCLI.CallLog, "no CLI calls should be made when the write is refused")
+}
+
 func TestHandleDeployToolUsesPreselectedContext(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)

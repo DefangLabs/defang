@@ -20,6 +20,10 @@ type SetConfigParams struct {
 }
 
 func HandleSetConfig(ctx context.Context, params SetConfigParams, cliInterface CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
+	if err := requireConfirmable(ec, fmt.Sprintf("set config variable %q", params.Name)); err != nil {
+		return "", err
+	}
+
 	_, provider, loader, err := setupProviderAndLoader(ctx, params.LoaderParams, cliInterface, ec, sc)
 	if err != nil {
 		return setupErrorResult(err)

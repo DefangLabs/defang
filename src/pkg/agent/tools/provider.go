@@ -12,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 )
 
 const CreateNewStack = "Create new stack"
@@ -111,6 +112,21 @@ func setupProviderAndLoader(ctx context.Context, params common.LoaderParams, cli
 	}
 
 	return fabric, provider, loader, nil
+}
+
+// requireConfirmable guards a mutating tool (deploy, destroy, set_config,
+// remove_config) against running unattended. ec.IsSupported() is false only
+// when there is no user to elicit a response from (e.g. the CI-auto-invoked
+// debugger); in that case a misdiagnosis has no one to catch it before it
+// mutates live state, so the tool must refuse instead of proceeding on a
+// default. Interactive sessions and any run where elicitation is otherwise
+// supported are unaffected.
+func requireConfirmable(ec elicitations.Controller, action string) error {
+	if ec.IsSupported() {
+		return nil
+	}
+	track.Evt("Debug Write Refused", track.P("action", action))
+	return fmt.Errorf("refusing to %s: no user available to confirm this change; rerun interactively or make the change yourself", action)
 }
 
 // setupErrorResult converts a setupProviderAndLoader error into a tool result:
