@@ -1,9 +1,7 @@
 package command
 
 import (
-	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli"
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -58,15 +56,7 @@ func printActiveWorkspace(cmd *cobra.Command) {
 	global.Client = fabric
 	track.Tracker = fabric
 
-	var userInfo *auth.UserInfo
-	if global.HasTty {
-		token := client.GetExistingToken(global.FabricAddr)
-		if userInfo, err = auth.FetchUserInfo(ctx, token); err != nil {
-			term.Debug("Workspace information unavailable:", err)
-		}
-	}
-
-	data, err := cli.Whoami(ctx, fabric, nil, userInfo, global.TenantSelection)
+	data, err := cli.FetchAccountInfo(ctx, fabric, nil, global.FabricAddr, global.TenantSelection, global.HasTty)
 	if err != nil {
 		term.Debug("Unable to determine active workspace:", err)
 		return
