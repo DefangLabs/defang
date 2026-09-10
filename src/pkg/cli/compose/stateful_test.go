@@ -29,6 +29,11 @@ func TestIsStatefulImage(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "Stateful image pinned by digest",
+			image:    "minio/minio@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+			expected: true,
+		},
+		{
 			name:     "Stateless image",
 			image:    "alpine:latest",
 			expected: false,

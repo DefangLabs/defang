@@ -72,6 +72,13 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 			}
 		}
 
+		_, managedS3 := svccfg.Extensions["x-defang-s3"]
+		if managedS3 || IsMinioRepo(repo) {
+			if err := fixupS3Service(&svccfg, project, provider, accountInfo, upload); err != nil {
+				return fmt.Errorf("service %q: %w", svccfg.Name, err)
+			}
+		}
+
 		if len(svccfg.Name) > 16 {
 			term.Warnf("service %q: service name is longer than 16 characters, you may run into issues with resource name length", svccfg.Name)
 		}
@@ -298,6 +305,76 @@ func fixupPostgresService(svccfg *composeTypes.ServiceConfig, provider client.Pr
 		fixupIngressPorts(svccfg)
 	}
 	return nil
+}
+
+// fixupS3Service wires the bucket and region into every service that
+// depends_on the MinIO anchor, mirroring the model-provider convention in
+// wireDependentServices.
+//
+// Unlike postgres/redis/mongo, this deliberately adds no host port. That HACK
+// exists only to earn the service a CNAME, and a CNAME cannot carry an S3
+// endpoint: bucket names are globally unique, and TLS SNI would not match a
+// private name. The endpoint is the provider's to supply, because only it
+// knows the shape — native S3/GCS on AWS and GCP (where the SDK's own default
+// endpoint is usually right), and the s3proxy service, on its own port, on
+// Azure. So the CLI never synthesizes one.
+func fixupS3Service(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, provider client.Provider, accountInfo *client.AccountInfo, upload UploadMode) error {
+	s3Extension, managedS3 := svccfg.Extensions["x-defang-s3"]
+	if _, ok := provider.(*client.PlaygroundProvider); ok && managedS3 && upload != UploadModeEstimate {
+		term.Warnf("service %q: managed S3 is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
+	}
+	fixupIngressPorts(svccfg) // the anchor is not a public endpoint
+
+	if !managedS3 {
+		return nil
+	}
+
+	bucket, err := validateS3Store(s3Extension)
+	if err != nil {
+		return err
+	}
+
+	// Inject no region when the provider didn't report one: AccountInfo may
+	// simply have failed (FixupServices treats that as non-fatal and carries on
+	// with a zero value), and a guessed region is worse than none. It would
+	// override the SDK's own resolution with a value that is wrong whenever the
+	// deployment isn't in that guess, and SigV4 then fails at runtime against a
+	// bucket in the real region. Absent, the SDK resolves the region itself from
+	// the task environment. This mirrors configureAccessGateway, which sets
+	// AWS_REGION only when info.Region is non-empty.
+	envName := strings.ToUpper(svccfg.Name) // TODO: handle characters that are not allowed in env vars, like '-'
+	wireS3DependentServices(project, svccfg.Name, bucket, accountInfo.Region, envName+"_BUCKET", envName+"_REGION")
+	return nil
+}
+
+// wireS3DependentServices injects the bucket/region env vars into every
+// service that depends_on svcName. It never overwrites a value the author
+// already set, including an endpoint they point somewhere themselves.
+//
+// Why two variables rather than one <SVC>_URL, as model providers get: an S3
+// endpoint URL cannot carry the bucket. Every mainstream S3 client takes the
+// bucket as a per-call API parameter, not as client config, so it has to
+// arrive as a variable of its own. The region is separate for the same
+// reason — SigV4 needs it, and non-AWS clients don't read AWS_REGION by
+// themselves. The endpoint is the one value the CLI does not inject at all:
+// on AWS it should be absent, so the SDK uses its own default, and where a
+// cloud does need one, only the provider knows it (see fixupS3Service).
+func wireS3DependentServices(project *composeTypes.Project, svcName, bucket, region, bucketEnvVar, regionEnvVar string) {
+	for name, dependency := range project.Services {
+		if _, ok := dependency.DependsOn[svcName]; !ok {
+			continue
+		}
+		if dependency.Environment == nil {
+			dependency.Environment = make(composeTypes.MappingWithEquals)
+		}
+		if _, ok := dependency.Environment[bucketEnvVar]; !ok {
+			dependency.Environment[bucketEnvVar] = &bucket
+		}
+		if _, ok := dependency.Environment[regionEnvVar]; !ok && region != "" {
+			dependency.Environment[regionEnvVar] = &region
+		}
+		project.Services[name] = dependency
+	}
 }
 
 func fixupMongoService(svccfg *composeTypes.ServiceConfig, provider client.Provider, upload UploadMode) error {
@@ -589,8 +666,16 @@ func modelWithProvider(model, prefix string) string {
 	return prefix + "/" + model
 }
 
+// GetImageRepo returns the lowercase repository of an image reference, without
+// its tag or digest: minio/minio, minio/minio:latest and
+// minio/minio@sha256:<digest> all yield "minio/minio", so the managed-service
+// image checks below recognize a digest-pinned image too. A colon inside the
+// registry host is a port, not a tag.
 func GetImageRepo(image string) string {
-	repo, _, _ := strings.Cut(image, ":")
+	repo, _, _ := strings.Cut(image, "@") // strip the digest, if any
+	if i := strings.LastIndex(repo, ":"); i > strings.LastIndex(repo, "/") {
+		repo = repo[:i] // strip the tag, but keep a registry port
+	}
 	return strings.ToLower(repo)
 }
 
@@ -633,4 +718,8 @@ func IsRedisRepo(repo string) bool {
 
 func IsMongoRepo(repo string) bool {
 	return strings.HasSuffix(repo, "mongo")
+}
+
+func IsMinioRepo(repo string) bool {
+	return strings.HasSuffix(repo, "minio")
 }
