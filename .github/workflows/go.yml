@@ -295,7 +295,7 @@ jobs:
       group: smoketests-${{ github.ref }}
       cancel-in-progress: false
     environment: smoketest
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - name: Trigger smoketests and await conclusion
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -321,33 +321,53 @@ jobs:
             const workflow_id = 'cli-smoketests.yml';
             const cliVersion = context.sha; // build the CLI from the exact commit under test
 
-            // Remember the newest existing run: createWorkflowDispatch does not
-            // return the new run's id, so we find ours by id > watermark plus the
-            // CLI version in the run name (see run-name in cli-smoketests.yml).
-            const { data: before } = await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id, per_page: 1 });
-            const watermark = before.workflow_runs[0]?.id ?? 0;
-
-            await github.rest.actions.createWorkflowDispatch({
-              owner, repo, workflow_id, ref: 'main',
-              inputs: { 'sample-name': 'html-css-js', 'cli-version': cliVersion },
-            });
-
             const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-            let run;
-            for (let i = 0; i < 30 && !run; i++) {
-              await sleep(10_000);
-              const { data } = await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id, event: 'workflow_dispatch', per_page: 30 });
-              run = data.workflow_runs.find((wr) => wr.id > watermark && wr.name.includes(cliVersion));
-            }
-            if (!run) {
-              throw new Error('Timed out waiting for the dispatched smoketest run to appear');
-            }
-            core.notice(`Awaiting smoketests: ${run.html_url}`);
+            // cli-smoketests.yml's deployment_smoketests job shares one concurrency
+            // group per provider+sample across every caller (this workflow on every
+            // ref, plus pulumi-up.yml). With cancel-in-progress:false, GitHub still
+            // cancels a *queued* run when a third dispatch arrives while one is
+            // running and one is already queued - it keeps only the running run and
+            // the newest queued one. That cancellation says nothing about this
+            // commit's CLI, so retry the dispatch instead of failing outright.
+            async function dispatchAndAwait() {
+              // Remember the newest existing run: createWorkflowDispatch does not
+              // return the new run's id, so we find ours by id > watermark plus the
+              // CLI version in the run name (see run-name in cli-smoketests.yml).
+              const { data: before } = await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id, per_page: 1 });
+              const watermark = before.workflow_runs[0]?.id ?? 0;
 
-            while (run.status !== 'completed') {
-              await sleep(30_000);
-              run = (await github.rest.actions.getWorkflowRun({ owner, repo, run_id: run.id })).data;
+              await github.rest.actions.createWorkflowDispatch({
+                owner, repo, workflow_id, ref: 'main',
+                inputs: { 'sample-name': 'html-css-js', 'cli-version': cliVersion },
+              });
+
+              let run;
+              for (let i = 0; i < 30 && !run; i++) {
+                await sleep(10_000);
+                const { data } = await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id, event: 'workflow_dispatch', per_page: 30 });
+                run = data.workflow_runs.find((wr) => wr.id > watermark && wr.name.includes(cliVersion));
+              }
+              if (!run) {
+                throw new Error('Timed out waiting for the dispatched smoketest run to appear');
+              }
+              core.notice(`Awaiting smoketests: ${run.html_url}`);
+
+              while (run.status !== 'completed') {
+                await sleep(30_000);
+                run = (await github.rest.actions.getWorkflowRun({ owner, repo, run_id: run.id })).data;
+              }
+              return run;
+            }
+
+            const maxAttempts = 2;
+            let run;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              run = await dispatchAndAwait();
+              if (run.conclusion !== 'cancelled') {
+                break;
+              }
+              core.notice(`Smoketests were cancelled, likely superseded by a concurrent dispatch to the same provider/sample concurrency group: ${run.html_url} (attempt ${attempt}/${maxAttempts})`);
             }
             if (run.conclusion !== 'success') {
               throw new Error(`Smoketests concluded '${run.conclusion}': ${run.html_url}`);
