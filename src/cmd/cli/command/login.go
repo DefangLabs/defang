@@ -62,7 +62,7 @@ func printActiveWorkspace(cmd *cobra.Command) {
 		return
 	}
 
-	if data.Workspace != "" {
+	if data.Workspace != "" && !global.Json {
 		term.Infof("Using workspace %q\n", data.Workspace)
 	}
 }
