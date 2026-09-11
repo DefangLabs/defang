@@ -105,6 +105,26 @@ func TestPrintActiveWorkspace(t *testing.T) {
 		}
 	})
 
+	t.Run("json mode omits the workspace message", func(t *testing.T) {
+		stdout.Reset()
+		global.TenantSelection = ""
+
+		oldJSON := global.Json
+		global.Json = true
+		t.Cleanup(func() { global.Json = oldJSON })
+
+		cmd := &cobra.Command{}
+		cmd.SetContext(t.Context())
+		printActiveWorkspace(cmd)
+
+		if global.Client == nil {
+			t.Fatal("expected global.Client to be reconnected with the new token")
+		}
+		if output := stdout.String(); output != "" {
+			t.Fatalf("expected no output in json mode, got: %q", output)
+		}
+	})
+
 	t.Run("userinfo fetch failure falls back to the raw tenant id", func(t *testing.T) {
 		stdout.Reset()
 		global.TenantSelection = ""
