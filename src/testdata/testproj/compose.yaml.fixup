@@ -3,7 +3,7 @@ dfnx:
         context: .
         dockerfile: Dockerfile
         args:
-            DNS: mock-dfnx
+            DNS: dfnx.tests.tenant2.defang.app
         target: testproj
     deploy:
         resources:
