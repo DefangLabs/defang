@@ -86,8 +86,9 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 		}
 
 		// Fixup ports, which affects service name replacement by ReplaceServiceNameWithDNS below
+		allowUDPIngress := accountInfo.Provider == client.ProviderAzure
 		for i, port := range svccfg.Ports {
-			svccfg.Ports[i] = fixupPort(port)
+			svccfg.Ports[i] = fixupPort(port, allowUDPIngress)
 		}
 
 		// Ignore "build" config if we have "image", unless in --build or --force mode
@@ -594,7 +595,10 @@ func GetImageRepo(image string) string {
 	return strings.ToLower(repo)
 }
 
-func fixupPort(port composeTypes.ServicePortConfig) composeTypes.ServicePortConfig {
+// fixupPort normalizes defaults and preserves UDP ingress only when the selected
+// provider has an ingress implementation for it. Other providers retain the
+// established UDP host-mode fallback.
+func fixupPort(port composeTypes.ServicePortConfig, allowUDPIngress bool) composeTypes.ServicePortConfig {
 	switch port.Mode {
 	case "":
 		term.Warnf(
@@ -605,12 +609,17 @@ func fixupPort(port composeTypes.ServicePortConfig) composeTypes.ServicePortConf
 		fallthrough
 	case Mode_INGRESS:
 		// This code is unnecessarily complex because compose-go silently converts short `ports:` syntax to ingress+tcp
-		if port.Published != "" {
-			term.Debugf("port %d: ignoring 'published: %s' in 'ingress' mode", port.Target, port.Published)
-		}
-		if port.Protocol != Protocol_UDP && port.AppProtocol == "" {
-			// TCP ingress is not supported; assuming HTTP (add 'app_protocol: http' to silence)"
-			port.AppProtocol = "http"
+		if port.Protocol == Protocol_UDP && !allowUDPIngress {
+			term.Warnf("port %d: UDP ports default to 'host' mode (add 'mode: host' to silence)", port.Target)
+			port.Mode = Mode_HOST
+		} else {
+			if port.Published != "" {
+				term.Debugf("port %d: ignoring 'published: %s' in 'ingress' mode", port.Target, port.Published)
+			}
+			if port.Protocol != Protocol_UDP && port.AppProtocol == "" {
+				// TCP ingress is not supported; assuming HTTP (add 'app_protocol: http' to silence)"
+				port.AppProtocol = "http"
+			}
 		}
 	case Mode_HOST:
 		// no-op
