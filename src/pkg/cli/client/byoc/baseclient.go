@@ -215,11 +215,16 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 
 	hasHost := false
 	hasIngress := false
+	serviceEndpoints := make(map[string]struct{}, len(service.Ports))
 	if _, ok := service.Extensions["x-defang-static-files"]; !ok {
 		for _, port := range service.Ports {
 			hasIngress = hasIngress || port.Mode == compose.Mode_INGRESS
 			hasHost = hasHost || port.Mode == compose.Mode_HOST
-			si.Endpoints = append(si.Endpoints, b.GetEndpoint(service.Name, projectName, delegateDomain, &port))
+			endpoint := b.GetEndpoint(service.Name, projectName, delegateDomain, &port)
+			if _, exists := serviceEndpoints[endpoint]; !exists {
+				serviceEndpoints[endpoint] = struct{}{}
+				si.Endpoints = append(si.Endpoints, endpoint)
+			}
 		}
 	} else {
 		si.PublicFqdn = b.GetPublicFqdn(projectName, delegateDomain, service.Name)
