@@ -38,9 +38,43 @@ func TestValidateService(t *testing.T) {
 			wantErr: "port 33333 is out of range",
 		},
 		{
-			name:    "ingress with UDP",
-			service: &types.ServiceConfig{Name: "test", Image: "asdf", Ports: []types.ServicePortConfig{{Target: 53, Mode: "ingress", Protocol: "udp"}}},
-			wantErr: "`mode: ingress` is not supported by `protocol: udp`",
+			name:    "ingress with UDP is supported",
+			service: &types.ServiceConfig{Name: "test", Image: "asdf", Ports: []types.ServicePortConfig{{Target: 53, Mode: Mode_INGRESS, Protocol: Protocol_UDP}}},
+		},
+		{
+			name: "same target with TCP and UDP",
+			service: &types.ServiceConfig{
+				Name:  "dns",
+				Image: "asdf",
+				Ports: []types.ServicePortConfig{
+					{Target: 53, Mode: Mode_INGRESS, Protocol: Protocol_TCP},
+					{Target: 53, Mode: Mode_INGRESS, Protocol: Protocol_UDP},
+				},
+			},
+		},
+		{
+			name: "duplicate UDP target",
+			service: &types.ServiceConfig{
+				Name:  "dns",
+				Image: "asdf",
+				Ports: []types.ServicePortConfig{
+					{Target: 53, Mode: Mode_HOST, Protocol: Protocol_UDP},
+					{Target: 53, Mode: Mode_HOST, Protocol: Protocol_UDP},
+				},
+			},
+			wantErr: "duplicate target port 53/udp",
+		},
+		{
+			name: "omitted protocol duplicates TCP target",
+			service: &types.ServiceConfig{
+				Name:  "dns",
+				Image: "asdf",
+				Ports: []types.ServicePortConfig{
+					{Target: 53, Mode: Mode_HOST},
+					{Target: 53, Mode: Mode_HOST, Protocol: Protocol_TCP},
+				},
+			},
+			wantErr: "duplicate target port 53/tcp",
 		},
 		{
 			name: "invalid healthcheck interval",
