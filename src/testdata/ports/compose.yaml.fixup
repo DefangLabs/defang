@@ -50,7 +50,7 @@ short-udp:
     networks:
         default: null
     ports:
-        - mode: host
+        - mode: ingress
           target: 84
           protocol: udp
 short-udp-published:
@@ -58,7 +58,7 @@ short-udp-published:
     networks:
         default: null
     ports:
-        - mode: host
+        - mode: ingress
           target: 85
           published: "8085"
           protocol: udp

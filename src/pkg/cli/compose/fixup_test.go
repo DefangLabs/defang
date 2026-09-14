@@ -45,23 +45,18 @@ func TestFixup(t *testing.T) {
 }
 
 func TestFixupPortUDPMode(t *testing.T) {
-	port := composeTypes.ServicePortConfig{
+	explicitIngress := fixupPort(composeTypes.ServicePortConfig{
 		Target: 53, Mode: Mode_INGRESS, Protocol: Protocol_UDP,
-	}
+	})
+	assert.Equal(t, Mode_INGRESS, explicitIngress.Mode)
+	assert.Empty(t, explicitIngress.AppProtocol)
 
-	azureIngress := fixupPort(port, true)
-	assert.Equal(t, Mode_INGRESS, azureIngress.Mode)
-	assert.Empty(t, azureIngress.AppProtocol)
-
-	legacyFallback := fixupPort(port, false)
-	assert.Equal(t, Mode_HOST, legacyFallback.Mode)
-
-	unspecified := fixupPort(composeTypes.ServicePortConfig{Target: 53, Protocol: Protocol_UDP}, true)
+	unspecified := fixupPort(composeTypes.ServicePortConfig{Target: 53, Protocol: Protocol_UDP})
 	assert.Equal(t, Mode_INGRESS, unspecified.Mode)
 
 	explicitHost := fixupPort(composeTypes.ServicePortConfig{
 		Target: 53, Mode: Mode_HOST, Protocol: Protocol_UDP,
-	}, true)
+	})
 	assert.Equal(t, Mode_HOST, explicitHost.Mode)
 }
 
