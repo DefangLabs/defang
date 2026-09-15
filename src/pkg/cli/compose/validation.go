@@ -248,9 +248,9 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		return fmt.Errorf("service %q: %w", svccfg.Name, err)
 	}
 	if svccfg.HealthCheck == nil || svccfg.HealthCheck.Disable {
-		// Show a warning when we have ingress ports but no explicit healthcheck
+		// Show a warning when we have HTTP/TCP ingress ports but no explicit healthcheck.
 		for _, port := range svccfg.Ports {
-			if port.Mode == Mode_INGRESS {
+			if port.Mode == Mode_INGRESS && port.Protocol != Protocol_UDP {
 				term.Warnf("service %q: ingress port %d without healthcheck; defaults to GET / HTTP/1.1", svccfg.Name, port.Target)
 				break
 			}

@@ -3,7 +3,7 @@ dfnx:
         context: .
         dockerfile: Dockerfile
         args:
-            DNS: mock-dfnx
+            DNS: dfnx.tests.tenant2.defang.app
         target: testproj
     deploy:
         resources:
@@ -35,7 +35,7 @@ dfnx:
           target: 1234
           protocol: tcp
           app_protocol: http
-        - mode: host
+        - mode: ingress
           target: 4567
           protocol: udp
     restart: unless-stopped

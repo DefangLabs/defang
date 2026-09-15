@@ -25,22 +25,28 @@ func ValidateService(service *types.ServiceConfig) error {
 
 	// hasHost := false
 	hasIngress := false
-	uniquePorts := make(map[uint32]bool)
+	type portKey struct {
+		target   uint32
+		protocol string
+	}
+	uniquePorts := make(map[portKey]bool)
 	for _, port := range service.Ports {
 		if port.Target < 1 || port.Target > 32767 {
 			return fmt.Errorf("port %d is out of range", port.Target) // CodeInvalidArgument
 		}
 		if port.Mode == Mode_INGRESS {
 			hasIngress = true
-			if port.Protocol == Protocol_UDP {
-				return fmt.Errorf("`mode: ingress` is not supported by `protocol: %s`", port.Protocol) // CodeInvalidArgument
-			}
 		}
-		if uniquePorts[port.Target] {
-			return fmt.Errorf("duplicate target port %d", port.Target) // CodeInvalidArgument
+		protocol := Protocol_TCP
+		if port.Protocol == Protocol_UDP {
+			protocol = Protocol_UDP
+		}
+		key := portKey{target: port.Target, protocol: protocol}
+		if uniquePorts[key] {
+			return fmt.Errorf("duplicate target port %d/%s", port.Target, protocol) // CodeInvalidArgument
 		}
 		// hasHost = hasHost || port.Mode == v1.Mode_HOST
-		uniquePorts[port.Target] = true
+		uniquePorts[key] = true
 	}
 
 	if service.DomainName != "" {

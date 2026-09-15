@@ -44,6 +44,22 @@ func TestFixup(t *testing.T) {
 	})
 }
 
+func TestFixupPortUDPMode(t *testing.T) {
+	explicitIngress := fixupPort(composeTypes.ServicePortConfig{
+		Target: 53, Mode: Mode_INGRESS, Protocol: Protocol_UDP,
+	})
+	assert.Equal(t, Mode_INGRESS, explicitIngress.Mode)
+	assert.Empty(t, explicitIngress.AppProtocol)
+
+	unspecified := fixupPort(composeTypes.ServicePortConfig{Target: 53, Protocol: Protocol_UDP})
+	assert.Equal(t, Mode_INGRESS, unspecified.Mode)
+
+	explicitHost := fixupPort(composeTypes.ServicePortConfig{
+		Target: 53, Mode: Mode_HOST, Protocol: Protocol_UDP,
+	})
+	assert.Equal(t, Mode_HOST, explicitHost.Mode)
+}
+
 func newLLMService() composeTypes.ServiceConfig {
 	return composeTypes.ServiceConfig{
 		Name:        "llm",
