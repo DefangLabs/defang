@@ -27,14 +27,35 @@ type PulumiState struct {
 }
 
 // Resource is the non-secret part of a Pulumi resource needed to navigate the
-// component graph. Inputs and outputs are deliberately not retained here.
+// component graph and (via Inputs) extract the tenant label. It doubles as
+// the JSON decoding target for entries in the state file's resource list, so
+// most fields carry json tags; Name has no state-file counterpart and is
+// filled in from the URN after decoding. Other inputs and outputs are
+// deliberately not retained here.
 type Resource struct {
-	URN      string
-	Parent   string
-	Type     string
-	Name     string
-	ID       string
-	Modified time.Time
+	URN      string    `json:"urn"`
+	Parent   string    `json:"parent"`
+	Type     string    `json:"type"`
+	ID       string    `json:"id"`
+	Modified time.Time `json:"modified"`
+	Name     string    `json:"-"`
+
+	Inputs struct {
+		DefaultLabels string            `json:",omitempty"` // GCP provider default labels; JSON-encoded
+		DefaultTags   string            `json:",omitempty"` // AWS provider default tags; JSON-encoded
+		Tags          map[string]string `json:",omitempty"` // Azure: per-resource tags stamped by DefaultTagsTransformation
+	} `json:"inputs,omitempty"`
+}
+
+// urnName returns the resource-name segment of a Pulumi URN of the form
+// "urn:pulumi:<stack>::<project>::<type>::<name>", or "" if urn doesn't have
+// that shape.
+func urnName(urn string) string {
+	parts := strings.Split(urn, "::")
+	if len(parts) < 4 {
+		return ""
+	}
+	return parts[len(parts)-1]
 }
 
 // Descendants returns all resources parented, directly or indirectly, by urn.
@@ -92,17 +113,7 @@ func ParsePulumiStateFile(ctx context.Context, obj BucketObj, objLoader func(ctx
 		Checkpoint struct {
 			Stack  string // "organization/project/stack"
 			Latest struct {
-				Resources []struct {
-					URN      string    `json:"urn"`
-					Parent   string    `json:"parent"`
-					Type     string    `json:"type"`
-					ID       string    `json:"id"`
-					Modified time.Time `json:"modified"`
-					Inputs   struct {
-						DefaultLabels string `json:",omitempty"` // only GCP provider; stored as JSON
-						DefaultTags   string `json:",omitempty"` // only AWS provider; stored as JSON
-					}
-				} `json:",omitempty"`
+				Resources         []Resource `json:",omitempty"`
 				PendingOperations []struct {
 					Resource struct {
 						Urn string
@@ -115,42 +126,39 @@ func ParsePulumiStateFile(ctx context.Context, obj BucketObj, objLoader func(ctx
 		return nil, fmt.Errorf("failed to decode Pulumi state %q: %w", obj.Name(), err)
 	}
 
+	if state.Version != 3 {
+		term.Debug("Skipping Pulumi state with unsupported version", state.Version)
+		return nil, nil
+	}
+
 	orgProjStack := strings.Split(state.Checkpoint.Stack, "/")
 	if len(orgProjStack) != 3 {
 		return nil, fmt.Errorf("invalid Pulumi stack name %q in state file %q", state.Checkpoint.Stack, obj.Name())
 	}
 	stack := PulumiState{
-		Project: orgProjStack[1],
-		Name:    path.Base(stackFile), // legacy logic to derive stack name from file name
+		Project:   orgProjStack[1],
+		Name:      path.Base(stackFile), // legacy logic to derive stack name from file name
+		Resources: state.Checkpoint.Latest.Resources,
 	}
-	for _, resource := range state.Checkpoint.Latest.Resources {
-		parts := strings.Split(resource.URN, "::")
-		name := ""
-		if len(parts) >= 4 {
-			name = parts[len(parts)-1]
-		}
-		stack.Resources = append(stack.Resources, Resource{
-			URN: resource.URN, Parent: resource.Parent, Type: resource.Type,
-			Name: name, ID: resource.ID, Modified: resource.Modified,
-		})
+	for i := range stack.Resources {
+		stack.Resources[i].Name = urnName(stack.Resources[i].URN)
 	}
-	if state.Version != 3 {
-		term.Debug("Skipping Pulumi state with version", state.Version)
-	} else if len(state.Checkpoint.Latest.PendingOperations) > 0 {
+
+	if len(state.Checkpoint.Latest.PendingOperations) > 0 {
 		for _, op := range state.Checkpoint.Latest.PendingOperations {
-			parts := strings.Split(op.Resource.Urn, "::") // prefix::project::type::resource => {urn:provider:stack}::{project}::{plugin:file:class}::{name}
-			if len(parts) < 4 {
+			name := urnName(op.Resource.Urn)
+			if name == "" {
 				term.Debug("Skipping pending operation with malformed URN:", op.Resource.Urn)
 				continue
 			}
-			stack.Pending = append(stack.Pending, parts[3])
+			stack.Pending = append(stack.Pending, name)
 		}
-	} else if len(state.Checkpoint.Latest.Resources) == 0 {
+	} else if len(stack.Resources) == 0 {
 		return nil, nil // skip: no resources and no pending operations
 	}
 
 	// Try to extract tenant label from resource inputs; TODO: get this from stack config instead
-	for _, res := range state.Checkpoint.Latest.Resources {
+	for _, res := range stack.Resources {
 		if res.Inputs.DefaultLabels != "" {
 			var labels struct {
 				DefangOrg string `json:"defang-org,omitempty"`
@@ -169,6 +177,9 @@ func ParsePulumiStateFile(ctx context.Context, obj BucketObj, objLoader func(ctx
 				stack.Workspace = types.TenantLabel(tags.Tags.DefangOrg)
 				break
 			}
+		} else if org := res.Inputs.Tags["defang-org"]; org != "" {
+			stack.Workspace = types.TenantLabel(org)
+			break
 		}
 	}
 	return &stack, nil

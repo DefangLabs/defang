@@ -6,10 +6,16 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	cloudazure "github.com/DefangLabs/defang/src/pkg/clouds/azure"
 )
+
+// maxBackendInstances is the maximum number of VM instances Azure allows in a
+// single scale set, so it's also an upper bound on a Standard Load Balancer's
+// backend pool. See https://learn.microsoft.com/azure/virtual-machine-scale-sets/virtual-machine-scale-sets-placement-groups.
+const maxBackendInstances = 1000
 
 // HealthClient reads the per-backend health probe metric emitted by Standard
 // Load Balancer. It does not inspect application traffic.
@@ -32,6 +38,12 @@ func (c *HealthClient) AllBackendsHealthy(ctx context.Context, resourceID string
 			time.Now().UTC().Add(-5*time.Minute).Format(time.RFC3339),
 			time.Now().UTC().Format(time.RFC3339))},
 		"$filter": {"BackendIPAddress eq '*'"},
+		// top defaults to 10 whenever $filter is set; a Standard Load
+		// Balancer backend pool can hold far more instances than that, and
+		// an omitted unhealthy series would make this method return a false
+		// positive. maxBackendInstances is Azure's own VMSS instance-count
+		// ceiling, so this always covers the full backend pool.
+		"top": {strconv.Itoa(maxBackendInstances)},
 	}
 	endpoint := cloudazure.ManagementEndpoint + resourceID + "/providers/microsoft.insights/metrics?" + query.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)

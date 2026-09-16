@@ -215,7 +215,16 @@ func pollService(ctx context.Context, in subscribeInputs, service string, out ch
 				switch {
 				case hasVMSS && loadBalancerID != "" &&
 					(vmssModified.IsZero() || !vmssModified.Before(in.since.Add(-5*time.Second))):
-					pollLoadBalancer(ctx, in.loadBalancers, service, loadBalancerID, vmssModified, out)
+					// A checkpoint can omit Modified; passing a zero time to
+					// AllBackendsHealthy would disable its freshness filter
+					// entirely and let it accept samples from before this
+					// deployment started. Fall back to the deployment's own
+					// start time instead.
+					since := vmssModified
+					if since.IsZero() {
+						since = in.since
+					}
+					pollLoadBalancer(ctx, in.loadBalancers, service, loadBalancerID, since, out)
 					return
 				case hasContainerApp:
 					wg.Add(1)

@@ -41,9 +41,18 @@ func TestParsePulumiStateFile(t *testing.T) {
 			expected: "unit-test/gcp {t1234567}",
 		},
 		{
+			name:     "Azure",
+			obj:      mockObj{"testdata/azure.json"},
+			expected: "unit-test/azure {t1234567}",
+		},
+		{
 			name:     "Pending operations",
 			obj:      mockObj{"testdata/pending.json"},
 			expected: `unit-test/pending {defang} (pending "*.unit-test.defang.defang.appValidation" "*.unit-test.defang.defang.appValidation" "*.unit-test.defang.defang.appValidation")`,
+		},
+		{
+			name: "Unsupported version",
+			obj:  mockObj{"testdata/unsupported-version.json"},
 		},
 	}
 
