@@ -1,8 +1,10 @@
 package command
 
 import (
+	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
 )
@@ -24,6 +26,8 @@ var loginCmd = &cobra.Command{
 				return err
 			}
 
+			printActiveWorkspace(cmd)
+
 			printDefangHint("To generate a sample service, do:", "generate")
 		}
 
@@ -36,4 +40,29 @@ var loginCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+// printActiveWorkspace shows which workspace will be used by default after a successful
+// interactive login. The client built before login has no access token yet, so reconnect
+// to pick up the one InteractiveLogin just saved.
+func printActiveWorkspace(cmd *cobra.Command) {
+	ctx := cmd.Context()
+
+	fabric, err := cli.ConnectWithTenant(ctx, global.FabricAddr, global.TenantSelection)
+	if err != nil {
+		term.Debug("Unable to determine active workspace:", err)
+		return
+	}
+	global.Client = fabric
+	track.Tracker = fabric
+
+	data, err := cli.FetchAccountInfo(ctx, fabric, nil, global.FabricAddr, global.TenantSelection, global.HasTty)
+	if err != nil {
+		term.Debug("Unable to determine active workspace:", err)
+		return
+	}
+
+	if data.Workspace != "" && !global.Json {
+		term.Infof("Using workspace %q\n", data.Workspace)
+	}
 }

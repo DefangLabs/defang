@@ -1,7 +1,6 @@
 package command
 
 import (
-	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -28,19 +27,7 @@ var whoamiCmd = &cobra.Command{
 			provider = session.Provider
 		}
 
-		token := client.GetExistingToken(global.FabricAddr)
-
-		var userInfo *auth.UserInfo
-		// Skip userinfo fetch in non-interactive mode (CI environments)
-		if global.HasTty {
-			userInfo, err = auth.FetchUserInfo(ctx, token)
-			if err != nil {
-				// Either the auth service is down, or we're using a Fabric JWT: skip workspace information
-				term.Warn("Workspace information unavailable:", err)
-			}
-		}
-
-		data, err := cli.Whoami(ctx, global.Client, provider, userInfo, global.TenantSelection)
+		data, err := cli.FetchAccountInfo(ctx, global.Client, provider, global.FabricAddr, global.TenantSelection, global.HasTty)
 		if err != nil {
 			return err
 		}
