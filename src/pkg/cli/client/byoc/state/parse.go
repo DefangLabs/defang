@@ -7,6 +7,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -22,6 +23,37 @@ type PulumiState struct {
 	Name      string
 	Workspace types.TenantLabel
 	Pending   []string
+	Resources []Resource
+}
+
+// Resource is the non-secret part of a Pulumi resource needed to navigate the
+// component graph. Inputs and outputs are deliberately not retained here.
+type Resource struct {
+	URN      string
+	Parent   string
+	Type     string
+	Name     string
+	ID       string
+	Modified time.Time
+}
+
+// Descendants returns all resources parented, directly or indirectly, by urn.
+func (ps PulumiState) Descendants(urn string) []Resource {
+	parents := map[string]bool{urn: true}
+	var descendants []Resource
+	for {
+		added := false
+		for _, resource := range ps.Resources {
+			if !parents[resource.URN] && parents[resource.Parent] {
+				parents[resource.URN] = true
+				descendants = append(descendants, resource)
+				added = true
+			}
+		}
+		if !added {
+			return descendants
+		}
+	}
 }
 
 func (ps PulumiState) String() string {
@@ -61,7 +93,12 @@ func ParsePulumiStateFile(ctx context.Context, obj BucketObj, objLoader func(ctx
 			Stack  string // "organization/project/stack"
 			Latest struct {
 				Resources []struct {
-					Inputs struct {
+					URN      string    `json:"urn"`
+					Parent   string    `json:"parent"`
+					Type     string    `json:"type"`
+					ID       string    `json:"id"`
+					Modified time.Time `json:"modified"`
+					Inputs   struct {
 						DefaultLabels string `json:",omitempty"` // only GCP provider; stored as JSON
 						DefaultTags   string `json:",omitempty"` // only AWS provider; stored as JSON
 					}
@@ -85,6 +122,17 @@ func ParsePulumiStateFile(ctx context.Context, obj BucketObj, objLoader func(ctx
 	stack := PulumiState{
 		Project: orgProjStack[1],
 		Name:    path.Base(stackFile), // legacy logic to derive stack name from file name
+	}
+	for _, resource := range state.Checkpoint.Latest.Resources {
+		parts := strings.Split(resource.URN, "::")
+		name := ""
+		if len(parts) >= 4 {
+			name = parts[len(parts)-1]
+		}
+		stack.Resources = append(stack.Resources, Resource{
+			URN: resource.URN, Parent: resource.Parent, Type: resource.Type,
+			Name: name, ID: resource.ID, Modified: resource.Modified,
+		})
 	}
 	if state.Version != 3 {
 		term.Debug("Skipping Pulumi state with version", state.Version)

@@ -9,6 +9,7 @@ import (
 
 	armappcontainersv3 "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appcontainers/armappcontainers/v3"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerregistry/armcontainerregistry"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/aca"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/acr"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -51,6 +52,24 @@ type fakeRunsClient struct {
 	mu      sync.Mutex
 	updates [][]acr.RunInfo
 	calls   int
+}
+
+type fakeStateClient struct {
+	state *state.PulumiState
+}
+
+func (f *fakeStateClient) GetPulumiState(context.Context) (*state.PulumiState, error) {
+	return f.state, nil
+}
+
+type fakeLoadBalancerClient struct {
+	healthy bool
+	calls   int
+}
+
+func (f *fakeLoadBalancerClient) AllBackendsHealthy(context.Context, string, time.Time) (bool, error) {
+	f.calls++
+	return f.healthy, nil
 }
 
 func (f *fakeRunsClient) ListRunsSince(_ context.Context, _ time.Time) ([]acr.RunInfo, error) {
@@ -141,6 +160,38 @@ func TestSubscribe_RevisionFailedTerminates(t *testing.T) {
 	finals := finalStates(got, []string{"web"})
 	if finals["web"] != defangv1.ServiceState_DEPLOYMENT_FAILED {
 		t.Errorf("web final state = %v, want DEPLOYMENT_FAILED", finals["web"])
+	}
+}
+
+func TestSubscribe_VMSSCompletesFromLoadBalancerHealth(t *testing.T) {
+	const serviceURN = "urn:pulumi:production::project::defang-azure:index:Service::dns"
+	revisions := &fakeRevisionsClient{}
+	loadBalancer := &fakeLoadBalancerClient{healthy: true}
+	got := drain(t, t.Context(), subscribeInputs{
+		etag:      "vmss1",
+		services:  []string{"dns"},
+		since:     time.Now(),
+		revisions: revisions,
+		runs:      &fakeRunsClient{},
+		state: &fakeStateClient{state: &state.PulumiState{Resources: []state.Resource{
+			{URN: serviceURN, Type: azureServiceType, Name: "dns"},
+			{URN: serviceURN + "$vmss", Parent: serviceURN, Type: azureVMScaleSetType, Name: "dns", ID: "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/dns"},
+			{URN: serviceURN + "$lb", Parent: serviceURN, Type: azureLoadBalancerType, Name: "dns", ID: "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/dns"},
+		}}},
+		loadBalancers: loadBalancer,
+	})
+
+	finals := finalStates(got, []string{"dns"})
+	if finals["dns"] != defangv1.ServiceState_DEPLOYMENT_COMPLETED {
+		t.Fatalf("dns final state = %v, want DEPLOYMENT_COMPLETED; events: %+v", finals["dns"], got)
+	}
+	if loadBalancer.calls == 0 {
+		t.Error("load balancer health was not queried")
+	}
+	revisions.mu.Lock()
+	defer revisions.mu.Unlock()
+	if len(revisions.calls) != 0 {
+		t.Errorf("Container Apps revisions were queried for VMSS service: %v", revisions.calls)
 	}
 }
 

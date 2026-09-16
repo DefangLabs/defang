@@ -70,3 +70,18 @@ func TestParsePulumiStateFile(t *testing.T) {
 		})
 	}
 }
+
+func TestPulumiStateDescendants(t *testing.T) {
+	state := PulumiState{Resources: []Resource{
+		{URN: "project", Type: "defang-azure:index:Project"},
+		{URN: "service", Parent: "project", Type: "defang-azure:index:Service"},
+		{URN: "vmss", Parent: "service", Type: "azure-native:compute:VirtualMachineScaleSet"},
+		{URN: "extension", Parent: "vmss", Type: "azure-native:compute:VirtualMachineScaleSetExtension"},
+		{URN: "other", Parent: "project", Type: "azure-native:app:ContainerApp"},
+	}}
+
+	got := state.Descendants("service")
+	if len(got) != 2 || got[0].URN != "vmss" || got[1].URN != "extension" {
+		t.Fatalf("Descendants(service) = %+v", got)
+	}
+}
