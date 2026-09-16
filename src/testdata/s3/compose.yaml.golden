@@ -1,0 +1,70 @@
+name: s3
+services:
+  buzz:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      objs:
+        condition: service_started
+        required: true
+    networks:
+      default: null
+  buzzpreset:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      objs:
+        condition: service_started
+        required: true
+    environment:
+      OBJS_BUCKET: my-own-bucket
+      OBJS_URL: http://custom-endpoint:9000
+    networks:
+      default: null
+  digestpin:
+    image: minio/minio@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 9000
+        protocol: tcp
+  noext:
+    image: minio/minio
+    networks:
+      default: null
+    ports:
+      - mode: host
+        target: 9000
+        protocol: tcp
+  noports:
+    image: minio/minio
+    networks:
+      default: null
+    x-defang-s3:
+      bucket: no-ports-bucket
+  objs:
+    image: minio/minio
+    networks:
+      default: null
+    ports:
+      - mode: host
+        target: 9000
+        protocol: tcp
+    x-defang-s3:
+      bucket: buzz-media-prod
+  wrongimage:
+    image: example
+    networks:
+      default: null
+    ports:
+      - mode: host
+        target: 9000
+        protocol: tcp
+    x-defang-s3:
+      bucket: wrong-image-bucket
+networks:
+  default:
+    name: s3_default
