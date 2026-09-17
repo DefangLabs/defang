@@ -121,7 +121,7 @@ func TestMakeAccessGatewayServiceGCP(t *testing.T) {
 		svccfg := newLLMService()
 		makeAccessGatewayService(&svccfg, proj, "chat-default", info)
 
-		require.Equal(t, []string{"--drop_params", "--model", "vertex_ai/gemini-2.5-flash", "--alias", "chat-default"}, []string(svccfg.Command))
+		require.Equal(t, []string{"--drop_params", "--model", "vertex_ai/gemini-3.5-flash", "--alias", "chat-default"}, []string(svccfg.Command))
 		assert.Equal(t, "my-gcp-project", *svccfg.Environment["VERTEXAI_PROJECT"])
 		assert.Equal(t, "us-central1", *svccfg.Environment["VERTEXAI_LOCATION"])
 	})
@@ -372,6 +372,6 @@ func TestFixupLLM(t *testing.T) {
 func TestModelWithProvider(t *testing.T) {
 	assert.Equal(t, "bedrock/my-model", modelWithProvider("my-model", "bedrock"))
 	assert.Equal(t, "bedrock/my-model", modelWithProvider("bedrock/my-model", "bedrock"))
-	assert.Equal(t, "vertex_ai/gemini-2.5-flash", modelWithProvider("gemini-2.5-flash", "vertex_ai"))
-	assert.Equal(t, "vertex_ai/gemini-2.5-flash", modelWithProvider("vertex_ai/gemini-2.5-flash", "vertex_ai"))
+	assert.Equal(t, "vertex_ai/gemini-3.5-flash", modelWithProvider("gemini-3.5-flash", "vertex_ai"))
+	assert.Equal(t, "vertex_ai/gemini-3.5-flash", modelWithProvider("vertex_ai/gemini-3.5-flash", "vertex_ai"))
 }
