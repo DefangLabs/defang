@@ -5,13 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"path"
 	"sync"
 	"time"
 
 	armappcontainersv3 "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appcontainers/armappcontainers/v3"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerregistry/armcontainerregistry"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/aca"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/acr"
+	"github.com/DefangLabs/defang/src/pkg/clouds/azure/loadbalancer"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -32,9 +35,18 @@ type subscribeRunsClient interface {
 	ListRunsSince(ctx context.Context, since time.Time) ([]acr.RunInfo, error)
 }
 
-// Subscribe implements client.Provider. It polls two Azure event sources
-// (ACR Task runs for builds, Container Apps Revisions for deployment) and
-// multiplexes their state transitions into a SubscribeResponse stream.
+type subscribeStateClient interface {
+	GetPulumiState(ctx context.Context) (*state.PulumiState, error)
+}
+
+type subscribeLoadBalancerClient interface {
+	AllBackendsHealthy(ctx context.Context, resourceID string, since time.Time) (bool, error)
+}
+
+// Subscribe implements client.Provider. It polls ACR Task runs for builds and
+// uses the Pulumi component graph to select the deployment signal actually
+// materialized for each service: a Container Apps revision or VMSS load
+// balancer health.
 //
 // CD-job state is intentionally NOT polled here. The CLI's TailAndMonitor
 // (pkg/cli/tailAndMonitor.go) runs WaitForCdTaskExit in parallel, which
@@ -68,6 +80,11 @@ func (b *ByocAzure) Subscribe(ctx context.Context, req *defangv1.SubscribeReques
 	projectRG := b.projectResourceGroupName(req.Project)
 	revisions := &aca.ContainerApp{Azure: b.driver.Azure, ResourceGroup: projectRG}
 	runs := &acr.RunsLister{Azure: b.driver.Azure, ResourceGroup: projectRG}
+	loadBalancers := &loadbalancer.HealthClient{Azure: b.driver.Azure}
+	stateReader := &azureStateReader{
+		download: b.driver.DownloadBlob,
+		blobName: path.Join(".pulumi/stacks", req.Project, b.PulumiStack+".json"),
+	}
 
 	since := b.cdStart
 	if since.IsZero() {
@@ -75,20 +92,24 @@ func (b *ByocAzure) Subscribe(ctx context.Context, req *defangv1.SubscribeReques
 	}
 
 	return subscribe(ctx, subscribeInputs{
-		etag:      etag,
-		services:  req.Services,
-		since:     since,
-		revisions: revisions,
-		runs:      runs,
+		etag:          etag,
+		services:      req.Services,
+		since:         since,
+		revisions:     revisions,
+		runs:          runs,
+		state:         stateReader,
+		loadBalancers: loadBalancers,
 	}), nil
 }
 
 type subscribeInputs struct {
-	etag      string
-	services  []string
-	since     time.Time
-	revisions subscribeRevisionsClient
-	runs      subscribeRunsClient
+	etag          string
+	services      []string
+	since         time.Time
+	revisions     subscribeRevisionsClient
+	runs          subscribeRunsClient
+	state         subscribeStateClient
+	loadBalancers subscribeLoadBalancerClient
 }
 
 func subscribe(ctx context.Context, in subscribeInputs) iter.Seq2[*defangv1.SubscribeResponse, error] {
@@ -104,7 +125,7 @@ func subscribe(ctx context.Context, in subscribeInputs) iter.Seq2[*defangv1.Subs
 
 		for _, service := range in.services {
 			wg.Add(1)
-			go pollRevision(ctx, in.revisions, service, in.etag, eventCh, &wg)
+			go pollService(ctx, in, service, eventCh, &wg)
 		}
 
 		go func() {
@@ -116,6 +137,138 @@ func subscribe(ctx context.Context, in subscribeInputs) iter.Seq2[*defangv1.Subs
 			if !yield(resp, nil) {
 				return
 			}
+		}
+	}
+}
+
+type blobObject struct {
+	name string
+	size int64
+}
+
+func (o blobObject) Name() string { return o.name }
+func (o blobObject) Size() int64  { return o.size }
+
+type azureStateReader struct {
+	download func(context.Context, string) ([]byte, error)
+	blobName string
+}
+
+func (r *azureStateReader) GetPulumiState(ctx context.Context) (*state.PulumiState, error) {
+	data, err := r.download(ctx, r.blobName)
+	if err != nil {
+		return nil, err
+	}
+	return state.ParsePulumiStateFile(ctx, blobObject{name: r.blobName, size: int64(len(data))},
+		func(context.Context, string) ([]byte, error) { return data, nil })
+}
+
+const (
+	azureServiceType      = "defang-azure:index:Service"
+	azureContainerAppType = "azure-native:app:ContainerApp"
+	azureVMScaleSetType   = "azure-native:compute:VirtualMachineScaleSet"
+	azureLoadBalancerType = "azure-native:network:LoadBalancer"
+)
+
+func pollService(ctx context.Context, in subscribeInputs, service string, out chan<- *defangv1.SubscribeResponse, wg *sync.WaitGroup) {
+	defer wg.Done()
+	// Kept for narrow unit callers; production always supplies the state reader.
+	if in.state == nil {
+		wg.Add(1)
+		pollRevision(ctx, in.revisions, service, in.etag, out, wg)
+		return
+	}
+
+	ticker := time.NewTicker(subscribePollInterval)
+	defer ticker.Stop()
+	for {
+		pulumiState, err := in.state.GetPulumiState(ctx)
+		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+			term.Debugf("Subscribe: reading Pulumi state for %q: %v", service, err)
+		} else if pulumiState != nil {
+			var component *state.Resource
+			for i := range pulumiState.Resources {
+				resource := &pulumiState.Resources[i]
+				if resource.Type == azureServiceType && resource.Name == service {
+					component = resource
+					break
+				}
+			}
+			if component != nil {
+				var hasContainerApp, hasVMSS bool
+				var vmssModified time.Time
+				var loadBalancerID string
+				for _, resource := range pulumiState.Descendants(component.URN) {
+					switch resource.Type {
+					case azureContainerAppType:
+						hasContainerApp = true
+					case azureVMScaleSetType:
+						hasVMSS = true
+						vmssModified = resource.Modified
+					case azureLoadBalancerType:
+						loadBalancerID = resource.ID
+					}
+				}
+				switch {
+				case hasVMSS && loadBalancerID != "" &&
+					(vmssModified.IsZero() || !vmssModified.Before(in.since.Add(-5*time.Second))):
+					// A checkpoint can omit Modified; passing a zero time to
+					// AllBackendsHealthy would disable its freshness filter
+					// entirely and let it accept samples from before this
+					// deployment started. Fall back to the deployment's own
+					// start time instead.
+					since := vmssModified
+					if since.IsZero() {
+						since = in.since
+					}
+					pollLoadBalancer(ctx, in.loadBalancers, service, loadBalancerID, since, out)
+					return
+				case hasContainerApp:
+					wg.Add(1)
+					pollRevision(ctx, in.revisions, service, in.etag, out, wg)
+					return
+				}
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+func pollLoadBalancer(ctx context.Context, c subscribeLoadBalancerClient, service, resourceID string, since time.Time, out chan<- *defangv1.SubscribeResponse) {
+	ticker := time.NewTicker(subscribePollInterval)
+	defer ticker.Stop()
+	status := "waiting for load balancer health"
+	select {
+	case out <- &defangv1.SubscribeResponse{Name: service, Status: status, State: defangv1.ServiceState_DEPLOYMENT_PENDING}:
+	case <-ctx.Done():
+		return
+	}
+	for {
+		healthy, err := c.AllBackendsHealthy(ctx, resourceID, since)
+		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+			term.Debugf("Subscribe: load balancer %q health error: %v", resourceID, err)
+		} else if healthy {
+			select {
+			case out <- &defangv1.SubscribeResponse{Name: service, Status: "healthy", State: defangv1.ServiceState_DEPLOYMENT_COMPLETED}:
+			case <-ctx.Done():
+			}
+			return
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
 		}
 	}
 }

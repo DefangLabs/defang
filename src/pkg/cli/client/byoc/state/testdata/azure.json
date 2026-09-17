@@ -1,0 +1,65 @@
+{
+  "version": 3,
+  "checkpoint": {
+    "stack": "organization/unit-test/azure",
+    "latest": {
+      "manifest": {
+        "time": "2025-11-14T19:29:41.431348571Z",
+        "magic": "ebe3b71ffbd5a95eec1b5cb82516892f944b47f36c5b1ed4f716a76cb5fce31a",
+        "version": "v3.187.0"
+      },
+      "secrets_providers": {
+        "type": "passphrase",
+        "state": {
+          "salt": "v1:xnONJLrleCY=:v1:3hF0KWStpJ3Af3H1:RBxtQgxO8GY9vfTVyNc3+pjCadogEA=="
+        }
+      },
+      "resources": [
+        {
+          "urn": "urn:pulumi:azure::unit-test::pulumi:pulumi:Stack::unit-test-azure",
+          "custom": false,
+          "type": "pulumi:pulumi:Stack",
+          "outputs": {
+            "state": "projects/unit-test/azure/project.pb"
+          },
+          "created": "2024-08-28T23:23:57.977166686Z",
+          "modified": "2024-08-28T23:23:57.977166686Z"
+        },
+        {
+          "urn": "urn:pulumi:azure::unit-test::pulumi:providers:azure-native::default",
+          "custom": true,
+          "id": "08e6a947-d40a-4bec-8f2a-c2f07f5de744",
+          "type": "pulumi:providers:azure-native",
+          "inputs": {
+            "location": "eastus"
+          },
+          "created": "2025-01-07T17:45:18.63300098Z",
+          "modified": "2025-11-14T19:21:02.933443892Z"
+        },
+        {
+          "urn": "urn:pulumi:azure::unit-test::azure-native:resources:ResourceGroup::unit-test-azure",
+          "custom": true,
+          "id": "/subscriptions/sub/resourceGroups/unit-test-azure",
+          "type": "azure-native:resources:ResourceGroup",
+          "inputs": {
+            "tags": {
+              "defang-org": "t1234567",
+              "defang-project": "unit-test",
+              "defang-stack": "azure"
+            }
+          },
+          "outputs": {
+            "tags": {
+              "defang-org": "t1234567",
+              "defang-project": "unit-test",
+              "defang-stack": "azure"
+            }
+          },
+          "created": "2024-08-28T23:26:38.477022211Z",
+          "modified": "2025-11-14T19:21:26.203903716Z"
+        }
+      ],
+      "metadata": {}
+    }
+  }
+}
