@@ -453,6 +453,7 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 		switch model {
 		case "chat-default":
 			model = "gemini-3.5-flash"
+			location = "global"
 		case "chat-large":
 			model = "gemini-3.1-pro-preview"
 			location = "global"

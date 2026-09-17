@@ -123,7 +123,7 @@ func TestMakeAccessGatewayServiceGCP(t *testing.T) {
 
 		require.Equal(t, []string{"--drop_params", "--model", "vertex_ai/gemini-3.5-flash", "--alias", "chat-default"}, []string(svccfg.Command))
 		assert.Equal(t, "my-gcp-project", *svccfg.Environment["VERTEXAI_PROJECT"])
-		assert.Equal(t, "us-central1", *svccfg.Environment["VERTEXAI_LOCATION"])
+		assert.Equal(t, "global", *svccfg.Environment["VERTEXAI_LOCATION"])
 	})
 
 	t.Run("embedding-default model", func(t *testing.T) {
