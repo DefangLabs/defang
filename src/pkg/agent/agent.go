@@ -69,12 +69,12 @@ func New(ctx context.Context, fabricAddr string, stack *stacks.Parameters, opts 
 			option.WithHeader("x-defang-llm-session-id", sessionID),
 		},
 	}
-	defaultModel := "google/gemini-2.5-flash"
+	defaultModel := "google/gemini-3.5-flash"
 
 	if os.Getenv("GOOGLE_API_KEY") != "" {
 		aiProvider = "googleai"
 		providerPlugin = &googlegenai.GoogleAI{}
-		defaultModel = "gemini-2.5-flash"
+		defaultModel = "gemini-3.5-flash"
 	}
 
 	model := pkg.Getenv("DEFANG_MODEL_ID", defaultModel)
