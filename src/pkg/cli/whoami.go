@@ -64,3 +64,23 @@ func Whoami(ctx context.Context, fabric client.FabricClient, maybeProvider clien
 
 	return showData, nil
 }
+
+// FetchAccountInfo fetches userinfo from the auth service when hasTty is true, then resolves the
+// account/workspace info for fabric. This is the shared sequence behind both the `whoami` command
+// and the post-login workspace summary shown by `login`.
+func FetchAccountInfo(ctx context.Context, fabric client.FabricClient, maybeProvider client.Provider, fabricAddr string, tenantSelection types.TenantNameOrID, hasTty bool) (ShowAccountData, error) {
+	var userInfo *auth.UserInfo
+	// Skip userinfo fetch in non-interactive mode (CI environments)
+	if hasTty {
+		token := client.GetExistingToken(fabricAddr)
+		info, err := auth.FetchUserInfo(ctx, token)
+		if err != nil {
+			// Either the auth service is down, or we're using a Fabric JWT: skip workspace information
+			term.Warn("Workspace information unavailable:", err)
+		} else {
+			userInfo = info
+		}
+	}
+
+	return Whoami(ctx, fabric, maybeProvider, userInfo, tenantSelection)
+}
