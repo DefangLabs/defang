@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"slices"
@@ -417,6 +418,121 @@ func TestManagedStoreParams(t *testing.T) {
 	}
 }
 
+func TestValidateS3Store(t *testing.T) {
+	tests := []struct {
+		name       string
+		extension  any
+		wantBucket string
+		wantErr    string
+	}{
+		{
+			name: "sanity check",
+			extension: map[string]any{
+				"bucket": "buzz-media-prod",
+			},
+			wantBucket: "buzz-media-prod",
+		},
+		{
+			name: "with allow-downtime",
+			extension: map[string]any{
+				"bucket":         "buzz-media-prod",
+				"allow-downtime": true,
+			},
+			wantBucket: "buzz-media-prod",
+		},
+		{
+			name:      "missing bucket",
+			extension: map[string]any{},
+			wantErr:   "'x-defang-s3' requires a 'bucket' name",
+		},
+		{
+			name:      "shorthand true",
+			extension: true,
+			wantErr:   "'x-defang-s3' requires a 'bucket' name",
+		},
+		{
+			name:      "nil",
+			extension: nil,
+			wantErr:   "'x-defang-s3' requires a 'bucket' name",
+		},
+		{
+			name: "non-string bucket",
+			extension: map[string]any{
+				"bucket": 123,
+			},
+			wantErr: "'bucket' must be a string",
+		},
+		{
+			name: "too short",
+			extension: map[string]any{
+				"bucket": "ab",
+			},
+			wantErr: `'bucket' "ab" must be between 3 and 63 characters`,
+		},
+		{
+			name: "too long",
+			extension: map[string]any{
+				"bucket": strings.Repeat("a", 64),
+			},
+			wantErr: fmt.Sprintf("'bucket' %q must be between 3 and 63 characters", strings.Repeat("a", 64)),
+		},
+		{
+			name: "contains dot",
+			extension: map[string]any{
+				"bucket": "buzz.media.prod",
+			},
+			wantErr: `'bucket' "buzz.media.prod" must not contain dots`,
+		},
+		{
+			name: "uppercase",
+			extension: map[string]any{
+				"bucket": "Buzz-Media",
+			},
+			wantErr: `'bucket' "Buzz-Media" must use only lowercase letters, digits and hyphens, and start/end with a letter or digit`,
+		},
+		{
+			name: "starts with hyphen",
+			extension: map[string]any{
+				"bucket": "-buzz-media",
+			},
+			wantErr: `'bucket' "-buzz-media" must use only lowercase letters, digits and hyphens, and start/end with a letter or digit`,
+		},
+		{
+			name: "ends with hyphen",
+			extension: map[string]any{
+				"bucket": "buzz-media-",
+			},
+			wantErr: `'bucket' "buzz-media-" must use only lowercase letters, digits and hyphens, and start/end with a letter or digit`,
+		},
+		{
+			name: "invalid downtime",
+			extension: map[string]any{
+				"bucket":         "buzz-media-prod",
+				"allow-downtime": "abc",
+			},
+			wantErr: "'allow-downtime' must be a boolean",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bucket, err := validateS3Store(tt.extension)
+			if tt.wantErr != "" {
+				if err == nil || err.Error() != tt.wantErr {
+					t.Fatalf("expected error %q, got: %v", tt.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if bucket != tt.wantBucket {
+				t.Fatalf("unexpected bucket: %v, expected: %v", bucket, tt.wantBucket)
+			}
+		})
+	}
+}
+
 func TestServiceExtensionWarnings(t *testing.T) {
 	oldTerm := term.DefaultTerm
 	t.Cleanup(func() { term.DefaultTerm = oldTerm })
@@ -454,6 +570,39 @@ func TestServiceExtensionWarnings(t *testing.T) {
 
 			warned := strings.Contains(out.String(), `unsupported compose extension: "`+tt.extension+`"`)
 			assert.Equal(t, tt.wantWarning, warned, "term output: %q", out.String())
+		})
+	}
+}
+
+// A managed service is not a container, so the CLI must not wait for an ECS
+// service (or Cloud Run service, or container app) that the provider never
+// creates for it. x-defang-s3 joins that set now that the AWS provider turns
+// the MinIO anchor into a bucket (DefangLabs/pulumi-defang#518).
+func TestIsComputeService(t *testing.T) {
+	tests := []struct {
+		extension string
+		want      bool
+	}{
+		{extension: "", want: true},
+		{extension: "x-defang-llm", want: true},
+		{extension: "x-defang-postgres", want: false},
+		{extension: "x-defang-redis", want: false},
+		{extension: "x-defang-mongodb", want: false},
+		{extension: "x-defang-s3", want: false},
+		{extension: "x-defang-static-files", want: false},
+	}
+
+	for _, tt := range tests {
+		name := tt.extension
+		if name == "" {
+			name = "no extensions"
+		}
+		t.Run(name, func(t *testing.T) {
+			svc := &composeTypes.ServiceConfig{Name: "svc", Image: "nginx"}
+			if tt.extension != "" {
+				svc.Extensions = composeTypes.Extensions{tt.extension: true}
+			}
+			assert.Equal(t, tt.want, IsComputeService(svc))
 		})
 	}
 }
