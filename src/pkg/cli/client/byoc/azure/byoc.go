@@ -801,6 +801,16 @@ func (b *ByocAzure) PutConfig(ctx context.Context, req *defangv1.PutConfigReques
 	return nil
 }
 
+// cdLogTimestampLayouts are the leading-timestamp formats parseCDLogLine
+// recognizes. The CD job's pulumi wrapper writes full RFC3339Nano timestamps,
+// but Azure's own logStreamEndpoint injects its "Connecting to container"
+// banner with the same layout minus the trailing zone designator (e.g.
+// "2026-09-16T11:25:39.178105928" with no "Z"), which RFC3339Nano rejects outright (#2275).
+var cdLogTimestampLayouts = []string{
+	time.RFC3339Nano,
+	"2006-01-02T15:04:05.999999999",
+}
+
 // parseCDLogLine splits a raw CD job log line into its engine timestamp and message.
 // The CD job's pulumi wrapper writes lines like
 // "2026-04-28T23:43:03.965786510Z - worker deleting (0s)" to stdout, which would
@@ -812,7 +822,14 @@ func parseCDLogLine(line string) (ts time.Time, message string) {
 	if !ok {
 		return time.Time{}, line
 	}
-	parsed, err := time.Parse(time.RFC3339Nano, head)
+	var parsed time.Time
+	var err error
+	for _, layout := range cdLogTimestampLayouts {
+		parsed, err = time.ParseInLocation(layout, head, time.UTC)
+		if err == nil {
+			break
+		}
+	}
 	if err != nil {
 		return time.Time{}, line
 	}

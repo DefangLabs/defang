@@ -455,6 +455,20 @@ func TestParseCDLogLine(t *testing.T) {
 			wantMessage: "worker deleting (0s)",
 		},
 		{
+			// Azure's logStreamEndpoint injects this banner with a timestamp
+			// in the same layout minus the trailing zone designator (#2275).
+			name:        "connecting banner timestamp with no zone designator",
+			line:        "2026-09-16T11:25:39.178105928 Connecting to the container 'defang-cd'...",
+			wantTs:      "2026-09-16T11:25:39.178105928Z",
+			wantMessage: "Connecting to the container 'defang-cd'...",
+		},
+		{
+			name:        "connecting banner timestamp with seconds precision only",
+			line:        "2026-04-04T16:15:01 Connecting to the container 'app'...",
+			wantTs:      "2026-04-04T16:15:01Z",
+			wantMessage: "Connecting to the container 'app'...",
+		},
+		{
 			name:        "empty line",
 			line:        "",
 			wantTs:      "",
