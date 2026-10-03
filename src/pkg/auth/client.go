@@ -162,6 +162,19 @@ func NewClient(clientID, issuer string) *client {
 	}
 }
 
+// IsOpenAuthAccessToken reports whether token is an unexpired token issued by the
+// configured OpenAuth server. Tokens without an expiry are accepted for compatibility.
+// This only identifies the token; the Fabric server still verifies its signature and
+// workspace membership before accepting it as an assertion.
+func IsOpenAuthAccessToken(token string) bool {
+	var claims jwt.RegisteredClaims
+	if _, _, err := new(jwt.Parser).ParseUnverified(token, &claims); err != nil {
+		return false
+	}
+	return claims.Issuer == OpenAuthClient.issuer &&
+		(claims.ExpiresAt == nil || claims.ExpiresAt.After(time.Now()))
+}
+
 func (c client) GetPollRedirectURI() string {
 	return c.issuer + "/clients/auth"
 }
