@@ -19,14 +19,13 @@ var tokenCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var s, _ = cmd.Flags().GetString("scope")
 		var expires, _ = cmd.Flags().GetDuration("expires")
-		var reuseLogin, _ = cmd.Flags().GetBool("reuse-login")
 		var save, _ = cmd.Flags().GetBool("save")
 		if save && client.UsingAccessTokenEnv() {
 			return errors.New("cannot save access token while DEFANG_ACCESS_TOKEN is set; unset it and try again")
 		}
 
 		var assertion string
-		if reuseLogin {
+		if global.NonInteractive {
 			token := client.GetExistingToken(global.FabricAddr)
 			if auth.IsOpenAuthAccessToken(token) {
 				assertion = token

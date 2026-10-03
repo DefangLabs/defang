@@ -14,7 +14,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func TestTokenReuseLoginAndSave(t *testing.T) {
+func TestTokenNonInteractiveReusesLoginAndSaves(t *testing.T) {
 	stdout, _ := term.SetupTestTerm(t)
 	term.DefaultTerm.ForceColor(false)
 
@@ -46,7 +46,6 @@ func TestTokenReuseLoginAndSave(t *testing.T) {
 	oldGlobal := global
 	t.Cleanup(func() {
 		global = oldGlobal
-		_ = tokenCmd.Flags().Set("reuse-login", "false")
 		_ = tokenCmd.Flags().Set("save", "false")
 	})
 	global.Stack.Name = ""
@@ -56,7 +55,6 @@ func TestTokenReuseLoginAndSave(t *testing.T) {
 		"--workspace", "workspace-id",
 		"--scope", "admin",
 		"--expires", "8760h",
-		"--reuse-login",
 		"--save",
 		"--non-interactive",
 	}, server.URL)
