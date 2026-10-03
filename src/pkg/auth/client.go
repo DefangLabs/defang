@@ -162,6 +162,17 @@ func NewClient(clientID, issuer string) *client {
 	}
 }
 
+// IsOpenAuthAccessToken reports whether token was issued by the configured OpenAuth
+// server. It only identifies the token; the Fabric server still verifies its signature,
+// expiry, and workspace membership before accepting it as an assertion.
+func IsOpenAuthAccessToken(token string) bool {
+	var claims jwt.RegisteredClaims
+	if _, _, err := new(jwt.Parser).ParseUnverified(token, &claims); err != nil {
+		return false
+	}
+	return claims.Issuer == OpenAuthClient.issuer
+}
+
 func (c client) GetPollRedirectURI() string {
 	return c.issuer + "/clients/auth"
 }

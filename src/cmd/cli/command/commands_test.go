@@ -43,6 +43,7 @@ type mockFabricService struct {
 	defangv1connect.UnimplementedFabricControllerHandler
 	canIUseIsCalled bool
 	tenantId        string
+	tokenRequest    *defangv1.TokenRequest
 }
 
 func (m *mockFabricService) CanIUse(ctx context.Context, canUseReq *connect.Request[defangv1.CanIUseRequest]) (*connect.Response[defangv1.CanIUseResponse], error) {
@@ -59,6 +60,11 @@ func (m *mockFabricService) GetVersion(context.Context, *connect.Request[emptypb
 
 func (m *mockFabricService) CheckToS(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[emptypb.Empty], error) {
 	return connect.NewResponse(&emptypb.Empty{}), nil
+}
+
+func (m *mockFabricService) Token(_ context.Context, req *connect.Request[defangv1.TokenRequest]) (*connect.Response[defangv1.TokenResponse], error) {
+	m.tokenRequest = req.Msg
+	return connect.NewResponse(&defangv1.TokenResponse{AccessToken: "defang_generated"}), nil
 }
 
 func (m *mockFabricService) WhoAmI(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.WhoAmIResponse], error) {

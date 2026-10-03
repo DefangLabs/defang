@@ -201,6 +201,8 @@ func SetupCommands(version string) {
 
 	// Token command
 	tokenCmd.Flags().Duration("expires", 24*time.Hour, "validity duration of the token")
+	tokenCmd.Flags().Bool("reuse-login", false, "reuse the current OpenAuth login when available")
+	tokenCmd.Flags().Bool("save", false, "save the token as the current Defang credential instead of printing it")
 	tokenCmd.Flags().String("scope", "", fmt.Sprintf("scope of the token; one of %v (required)", scope.All())) // TODO: make it an Option
 	_ = tokenCmd.MarkFlagRequired("scope")
 	tokenCmd.RegisterFlagCompletionFunc("scope", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

@@ -8,8 +8,43 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/browser"
 )
+
+func TestIsOpenAuthAccessToken(t *testing.T) {
+	originalClient := OpenAuthClient
+	OpenAuthClient = NewClient("defang-cli", "https://auth.example.com")
+	t.Cleanup(func() { OpenAuthClient = originalClient })
+
+	makeToken := func(t *testing.T, issuer string) string {
+		t.Helper()
+		token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{Issuer: issuer}).SignedString([]byte("test-key"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return token
+	}
+
+	tests := []struct {
+		name  string
+		token string
+		want  bool
+	}{
+		{name: "configured issuer", token: makeToken(t, "https://auth.example.com"), want: true},
+		{name: "different issuer", token: makeToken(t, "https://other.example.com"), want: false},
+		{name: "fabric access token", token: "defang_example", want: false},
+		{name: "empty", token: "", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsOpenAuthAccessToken(tt.token); got != tt.want {
+				t.Fatalf("IsOpenAuthAccessToken() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
 func TestAuthorize(t *testing.T) {
 	const issuer = "https://auth.defang.io"
