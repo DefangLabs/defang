@@ -41,3 +41,19 @@ func TestPrettyError(t *testing.T) {
 		})
 	}
 }
+
+func TestPrettyError_PreservesSentinelForErrorsIs(t *testing.T) {
+	sentinel := errors.New("rate limited")
+	cerr := connect.NewError(connect.CodeResourceExhausted, sentinel)
+	wrapped := fmt.Errorf("deploying project %q: %w", "myproject", cerr)
+
+	got := PrettyError(wrapped)
+
+	if !errors.Is(got, sentinel) {
+		t.Errorf("errors.Is(PrettyError(err), sentinel) = false, want true")
+	}
+	want := `deploying project "myproject": rate limited`
+	if got.Error() != want {
+		t.Errorf("PrettyError() = %q, want %q", got.Error(), want)
+	}
+}

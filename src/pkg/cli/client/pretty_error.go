@@ -16,14 +16,28 @@ func PrettyError(err error) error {
 		term.Debug("Server error:", cerr)
 		// Replace just the connect error's own "<code>: <message>" text with its
 		// bare message, keeping any outer context (e.g. which recipe or project
-		// the call was for) that wraps it.
-		err = errors.New(strings.Replace(err.Error(), cerr.Error(), cerr.Message(), 1))
+		// the call was for) that wraps it. Unwrap still reaches whatever error
+		// the connect.Error itself wrapped, so errors.Is/As keep working.
+		err = &prettyError{
+			msg: strings.Replace(err.Error(), cerr.Error(), cerr.Message(), 1),
+			err: errors.Unwrap(cerr),
+		}
 	}
 	if IsNetworkError(err) {
 		return fmt.Errorf("%w; please check network settings and try again", err)
 	}
 	return err
 }
+
+// prettyError carries a display message distinct from its wrapped error's own
+// Error() text, while still exposing that error through Unwrap.
+type prettyError struct {
+	msg string
+	err error
+}
+
+func (e *prettyError) Error() string { return e.msg }
+func (e *prettyError) Unwrap() error { return e.err }
 
 func IsNetworkError(err error) bool {
 	if err == nil {
