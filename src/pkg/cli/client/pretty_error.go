@@ -14,7 +14,10 @@ func PrettyError(err error) error {
 	var cerr *connect.Error
 	if errors.As(err, &cerr) {
 		term.Debug("Server error:", cerr)
-		err = errors.Unwrap(cerr)
+		// Replace just the connect error's own "<code>: <message>" text with its
+		// bare message, keeping any outer context (e.g. which recipe or project
+		// the call was for) that wraps it.
+		err = errors.New(strings.Replace(err.Error(), cerr.Error(), cerr.Message(), 1))
 	}
 	if IsNetworkError(err) {
 		return fmt.Errorf("%w; please check network settings and try again", err)
