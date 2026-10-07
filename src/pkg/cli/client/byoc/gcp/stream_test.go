@@ -153,14 +153,10 @@ func TestServerStream_Start(t *testing.T) {
 			}
 
 			mockGcpLogsClient := &MockGcpLogsClient{
-				lister: &MockGcpLoggingLister{
-					logEntries: logEntries,
-				},
-				tailer: &MockGcpLoggingTailer{},
+				listEntries: logEntries,
 			}
 
 			stream := NewServerStream(
-				ctx,
 				mockGcpLogsClient,
 				getLogEntryParser(ctx, mockGcpLogsClient),
 				restoreServiceName,
@@ -169,9 +165,9 @@ func TestServerStream_Start(t *testing.T) {
 
 			var logs iter.Seq2[*defangv1.TailResponse, error]
 			if tt.direction == head {
-				logs = stream.Head(tt.limit)
+				logs = stream.Head(ctx, tt.limit)
 			} else {
-				logs = stream.Tail(tt.limit)
+				logs = stream.Tail(ctx, tt.limit)
 			}
 
 			var collectedMessages []string
@@ -188,10 +184,27 @@ func TestServerStream_Start(t *testing.T) {
 	}
 }
 
-// TestServerStream_Follow_SkipsNilEntries verifies that Follow() skips nil entries
-// returned by the tailer (heartbeat or suppression-info responses from GCP) and
+// batchTailMock overrides TailLogEntries to yield a fixed sequence of batches, letting a
+// test express the heartbeat/suppression-info case as an empty batch between real ones.
+type batchTailMock struct {
+	MockGcpLogsClient
+	batches [][]*loggingpb.LogEntry
+}
+
+func (m *batchTailMock) TailLogEntries(ctx context.Context, query string) (iter.Seq2[[]*loggingpb.LogEntry, error], error) {
+	return func(yield func([]*loggingpb.LogEntry, error) bool) {
+		for _, batch := range m.batches {
+			if !yield(batch, nil) {
+				return
+			}
+		}
+	}, nil
+}
+
+// TestServerStream_Follow_SkipsEmptyBatches verifies that Follow() skips empty batches
+// yielded by TailLogEntries (heartbeat or suppression-info responses from GCP) and
 // continues yielding real log entries without error.
-func TestServerStream_Follow_SkipsNilEntries(t *testing.T) {
+func TestServerStream_Follow_SkipsEmptyBatches(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 
@@ -212,17 +225,12 @@ func TestServerStream_Follow_SkipsNilEntries(t *testing.T) {
 		Timestamp: timestamppb.Now(),
 	}
 
-	tailerEntries := []*loggingpb.LogEntry{
-		nil, // heartbeat — must be skipped
-		realEntry,
-		nil, // suppression info — must be skipped
-		cancelEntry,
-	}
-
-	mockClient := &MockGcpLogsClient{
-		lister: &MockGcpLoggingLister{},
-		tailer: &MockGcpLoggingTailer{
-			MockGcpLoggingLister: MockGcpLoggingLister{logEntries: tailerEntries},
+	mockClient := &batchTailMock{
+		batches: [][]*loggingpb.LogEntry{
+			{}, // heartbeat — must be skipped
+			{realEntry},
+			{}, // suppression info — must be skipped
+			{cancelEntry},
 		},
 	}
 
@@ -234,10 +242,10 @@ func TestServerStream_Follow_SkipsNilEntries(t *testing.T) {
 			return entry
 		})
 
-	stream := NewServerStream(ctx, mockClient, getLogEntryParser(ctx, mockClient), restoreServiceName)
+	stream := NewServerStream(mockClient, getLogEntryParser(ctx, mockClient), restoreServiceName)
 	stream.query = NewLogQuery(mockClient.GetProjectID())
 
-	seq, err := stream.Follow(time.Time{}) // zero start → skip listing, go straight to tail
+	seq, err := stream.Follow(ctx, time.Time{}) // zero start → skip listing, go straight to tail
 	assert.NoError(t, err)
 
 	var messages []string
@@ -254,7 +262,7 @@ func TestServerStream_Follow_SkipsNilEntries(t *testing.T) {
 	}
 
 	assert.Equal(t, []string{"real log", "cancel"}, messages,
-		"Follow() should skip nil tailer entries and yield real entries")
+		"Follow() should skip empty batches and yield real entries")
 }
 
 // activityParserMock wraps MockGcpLogsClient with a configurable GetInstanceGroupManagerLabels.
