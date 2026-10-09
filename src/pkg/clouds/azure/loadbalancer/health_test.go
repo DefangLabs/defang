@@ -26,6 +26,8 @@ func TestAllBackendsHealthy(t *testing.T) {
 	}{
 		{"all healthy", `{"value":[{"timeseries":[{"data":[{"average":100,"timeStamp":"2026-09-16T18:15:00Z"}]},{"data":[{"average":100,"timeStamp":"2026-09-16T18:15:00Z"}]}]}]}`, true},
 		{"one unhealthy", `{"value":[{"timeseries":[{"data":[{"average":100,"timeStamp":"2026-09-16T18:15:00Z"}]},{"data":[{"average":0,"timeStamp":"2026-09-16T18:15:00Z"}]}]}]}`, false},
+		{"retired backend has no sample", `{"value":[{"timeseries":[{"data":[{"average":100,"timeStamp":"2026-09-16T18:15:00Z"}]},{"data":[{"timeStamp":"2026-09-16T18:15:00Z"}]}]}]}`, true},
+		{"all backends have no sample", `{"value":[{"timeseries":[{"data":[{"timeStamp":"2026-09-16T18:15:00Z"}]}]}]}`, false},
 		{"stale healthy sample", `{"value":[{"timeseries":[{"data":[{"average":100,"timeStamp":"2026-09-16T18:13:00Z"}]}]}]}`, false},
 		{"no samples", `{"value":[{"timeseries":[]}]}`, false},
 	}

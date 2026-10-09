@@ -77,6 +77,7 @@ func (c *HealthClient) AllBackendsHealthy(ctx context.Context, resourceID string
 	if len(metrics.Value) == 0 || len(metrics.Value[0].Timeseries) == 0 {
 		return false, nil
 	}
+	checked := 0
 	for _, series := range metrics.Value[0].Timeseries {
 		var latest *float64
 		for _, point := range series.Data {
@@ -84,9 +85,18 @@ func (c *HealthClient) AllBackendsHealthy(ctx context.Context, resourceID string
 				latest = point.Average
 			}
 		}
-		if latest == nil || *latest < 100 {
+		// Azure retains the dimension for a VMSS backend after rolling updates
+		// replace the instance, but emits timestamp-only points for that retired
+		// backend. It is not an unhealthy active backend, so do not let that
+		// stale dimension block completion. A dimension with a numeric sample is
+		// still authoritative: a value below 100 means its probe is unhealthy.
+		if latest == nil {
+			continue
+		}
+		checked++
+		if *latest < 100 {
 			return false, nil
 		}
 	}
-	return true, nil
+	return checked > 0, nil
 }
