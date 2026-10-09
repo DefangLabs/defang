@@ -552,10 +552,8 @@ jobs:
         env:
           GGOOS: darwin
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
-          MACOS_CERTIFICATE_NAME: ${{ secrets.MACOS_CERTIFICATE_NAME }}
           MACOS_P12_BASE64: ${{ secrets.MACOS_P12_BASE64 }}
           MACOS_P12_PASSWORD: ${{ secrets.MACOS_P12_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
           MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
           MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
           MACOS_NOTARIZATION_APP_PW: ${{ secrets.MACOS_NOTARIZATION_APP_PW }}
@@ -566,6 +564,30 @@ jobs:
           name: dist-mac
           path: src/dist
           if-no-files-found: error
+
+      - name: Report macOS notarization submissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          found=false
+          while IFS= read -r -d '' file; do
+            found=true
+            echo "::group::$file"
+            cat "$file"
+            echo "::endgroup::"
+          done < <(find src/dist -type f -name '*.notary.json' -print0)
+          if [ "$found" != true ]; then
+            echo "No notarization response files found"
+            exit 1
+          fi
+
+      - name: Upload macOS notarization submissions
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: macos-notarization-submissions
+          path: src/dist/**/*.notary.json
+          if-no-files-found: error
+          retention-days: 30
 
   go-release:
     if: startsWith(github.ref, 'refs/tags/v') # only run this step on tagged commits

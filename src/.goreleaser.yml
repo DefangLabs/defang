@@ -12,9 +12,6 @@ builds:
       - arm64
     flags:
       - -trimpath
-    hooks:
-      post:
-        - ./bin/codesign.sh "{{ .Path }}"
 
   - id: defang-linux
     main: ./cmd/cli
@@ -46,9 +43,19 @@ universal_binaries:
     ids:
       - defang-mac
     replace: true
-    hooks:
-      post:
-        - ./bin/codesign.sh "{{ .Path }}"
+
+# GoReleaser Pro signs macOS binaries through its cross-platform signer. This
+# keeps signing inside GoReleaser and avoids one temporary keychain per binary,
+# which races when GoReleaser signs the amd64 and arm64 builds concurrently.
+notarize:
+  macos:
+    - enabled: '{{ and (not .IsSnapshot) (not .IsNightly) (isEnvSet "MACOS_P12_BASE64") }}'
+      ids:
+        - defang-mac
+        - defang-macfat
+      sign:
+        certificate: "{{ .Env.MACOS_P12_BASE64 }}"
+        password: "{{ .Env.MACOS_P12_PASSWORD }}"
 
 archives:
   - id: defang-archive
@@ -63,17 +70,6 @@ archives:
       after:
         - echo '{{ printf "%#v" (index .Artifacts 1) }}'
         - '{{ if eq .Os "darwin" }}./bin/notarize.sh "dist/darwin/defang_{{ .Version }}_macOS.zip"{{ else }}true{{ end }}'
-
-# notarize:
-#   macos:
-#     - enabled: true
-#       sign:
-#         certificate: "{{ .Env.MACOS_P12_BASE64 }}"
-#         password: "{{ .Env.MACOS_P12_PASSWORD }}"
-#       notarize:
-#         issuer_id: "{{ .Env.MACOS_NOTARIZATION_APPLE_ID }}"
-#         key: "{{ .Env.MACOS_NOTARIZATION_APP_PW }}" TODO: this should be a base64 .p8 key file
-#         key_id: "{{ .Env.MACOS_NOTARIZATION_TEAM_ID }}"
 
 release:
   github:
