@@ -29,4 +29,14 @@ fi
 
 [ "$ACTIONS_STEP_DEBUG" = 'true' ] || [ "$DEBUG" = 'true' ] && set -x
 
-xcrun notarytool submit "$1" --apple-id "$MACOS_NOTARIZATION_APPLE_ID" --team-id "$MACOS_NOTARIZATION_TEAM_ID" --password "$MACOS_NOTARIZATION_APP_PW"
+NOTARY_RESPONSE="$1.notary.json"
+echo "Saving Apple notarization submission response to $NOTARY_RESPONSE"
+
+# Keep this asynchronous so a slow Apple review does not consume a macOS
+# runner. The response contains the submission ID and initial status for a
+# later `notarytool info` check.
+xcrun notarytool submit "$1" \
+  --apple-id "$MACOS_NOTARIZATION_APPLE_ID" \
+  --team-id "$MACOS_NOTARIZATION_TEAM_ID" \
+  --password "$MACOS_NOTARIZATION_APP_PW" \
+  --output-format json > "$NOTARY_RESPONSE"
