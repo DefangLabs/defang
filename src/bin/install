@@ -289,7 +289,10 @@ _install_completion_script() {
 if [ "$CI" != "1" ]; then
     _install_completion_script "$SHELL" || true
     CURRENT_SHELL=${0#-}
-    [ "$CURRENT_SHELL" != "$SHELL" ] && _install_completion_script "$CURRENT_SHELL" || true
+    # Compare basenames: $SHELL is usually an absolute path (e.g. /bin/zsh) while
+    # $0 is usually a bare name (e.g. zsh, or -zsh for a login shell), so a raw
+    # string comparison treats the same shell as different and runs this twice.
+    [ "$(basename "$CURRENT_SHELL")" != "$(basename "$SHELL")" ] && _install_completion_script "$CURRENT_SHELL" || true
 fi
 
 # Cleanup: Remove the temporary directory
