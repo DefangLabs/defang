@@ -1,9 +1,10 @@
 {
-  buildGo125Module,
+  buildGo126Module,
+  go_1_26_10,
   installShellFiles,
   lib,
 }:
-buildGo125Module {
+(buildGo126Module.override { go = go_1_26_10; }) {
   pname = "defang-cli";
   version = "git";
   src = lib.cleanSource ../../src;
