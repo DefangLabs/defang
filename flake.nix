@@ -38,7 +38,7 @@
               git
               gnumake
               gnused # force Linux `sed` everywhere
-              go_1_25 # must match GO_VERSION in Dockerfile
+              go_1_26 # must match GO_VERSION in Dockerfile
               golangci-lint
               google-cloud-sdk
               gopls
