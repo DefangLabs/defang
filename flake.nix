@@ -24,6 +24,13 @@
         pkgs = import nixpkgs {
           inherit system;
         };
+        go_1_26_10 = pkgs.go_1_26.overrideAttrs (_: {
+          version = "1.26.10";
+          src = pkgs.fetchurl {
+            url = "https://go.dev/dl/go1.26.10.src.tar.gz";
+            hash = "sha256-/WPog7ovK/ypPBZGsx6+9j4rHk0rMXyXidl2po2B828=";
+          };
+        });
       in
       {
         devShell =
@@ -38,7 +45,7 @@
               git
               gnumake
               gnused # force Linux `sed` everywhere
-              go_1_25 # must match GO_VERSION in Dockerfile
+              go_1_26_10 # must match GO_VERSION in Dockerfile
               golangci-lint
               google-cloud-sdk
               gopls
@@ -65,7 +72,7 @@
               fi
             '';
           };
-        packages.defang-cli = pkgs.callPackage ./pkgs/defang/cli.nix { };
+        packages.defang-cli = pkgs.callPackage ./pkgs/defang/cli.nix { inherit go_1_26_10; };
         packages.defang-bin = pkgs.callPackage ./pkgs/defang { };
       }
     );
