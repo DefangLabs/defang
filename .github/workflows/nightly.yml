@@ -48,6 +48,18 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # goreleaser cross-compiles 6 binaries (darwin/linux/windows x amd64/arm64)
+      # in one job; ubuntu-latest ships with Android/.NET/Haskell toolchains
+      # preinstalled that eat most of the runner's free disk, which is what the
+      # Go linker's "disk quota exceeded" means here. Drop what this build
+      # never uses before it needs the space.
+      - name: Free disk space
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
         # Get go
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v6
         if: steps.check.outputs.changed == 'true'
