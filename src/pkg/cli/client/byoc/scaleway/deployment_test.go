@@ -66,6 +66,56 @@ func TestSubscribeKeepsObservingServicesAfterCDSucceeds(t *testing.T) {
 	}
 }
 
+func TestSubscribeWaitsForEmptyStackBootstrap(t *testing.T) {
+	t.Parallel()
+	provider := newTestProvider("prod")
+	provider.cdRunID, provider.cdEtag = "run-id", "attempt"
+	encoded, err := testDeployment("actual-uuid").Encode()
+	require.NoError(t, err)
+	state, err := json.Marshal(map[string]any{"version": 3, "deployment": map[string]any{
+		"resources": []any{map[string]any{"outputs": map[string]any{deployment.OutputName: encoded}}},
+	}})
+	require.NoError(t, err)
+	var reads atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path != "/defang-cd-prod/.pulumi/stacks/demo/prod.json" {
+			http.NotFound(w, req)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if reads.Add(1) == 1 {
+			_, _ = fmt.Fprint(w, `{"version":0,"checkpoint":{"stack":"organization/demo/prod"}}`)
+			return
+		}
+		_, _ = w.Write(state)
+	}))
+	t.Cleanup(server.Close)
+	provider.s3Client = s3.New(s3.Options{Region: "fr-par", BaseEndpoint: aws.String(server.URL), UsePathStyle: true,
+		Credentials: credentials.NewStaticCredentialsProvider("access", "secret", "")})
+	provider.client.HTTPClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Path == "/serverless-jobs/v1alpha2/regions/fr-par/job-runs/run-id" {
+			return jsonResponse(`{"id":"run-id","state":"succeeded"}`), nil
+		}
+		assert.Equal(t, "/containers/v1beta1/regions/fr-par/containers/actual-uuid", req.URL.Path)
+		return jsonResponse(`{"id":"actual-uuid","status":"ready"}`), nil
+	})}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	sequence, err := provider.Subscribe(ctx, &defangv1.SubscribeRequest{
+		Project: "demo", Etag: "attempt", Services: []string{"app"},
+	})
+	require.NoError(t, err)
+	var events []*defangv1.SubscribeResponse
+	for event, err := range sequence {
+		require.NoError(t, err)
+		events = append(events, event)
+	}
+	assert.Equal(t, int32(2), reads.Load())
+	require.Len(t, events, 1)
+	assert.Equal(t, "app", events[0].Name)
+	assert.Equal(t, defangv1.ServiceState_DEPLOYMENT_COMPLETED, events[0].State)
+}
+
 func TestSubscribeDoesNotTreatOldMetadataOrCDNameAsServiceSuccess(t *testing.T) {
 	t.Parallel()
 	provider := newTestProvider("prod")

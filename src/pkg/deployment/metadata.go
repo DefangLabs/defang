@@ -60,19 +60,44 @@ func ReadState(data []byte, provider, project, stack, etag string) (*Metadata, e
 		Resources []resource `json:"resources"`
 	}
 	var state struct {
-		Version    int      `json:"version"`
-		Deployment snapshot `json:"deployment"`
-		Checkpoint struct {
-			Latest snapshot `json:"latest"`
+		Version    *int            `json:"version"`
+		Deployment json.RawMessage `json:"deployment"`
+		Checkpoint *struct {
+			Stack  string          `json:"stack"`
+			Latest json.RawMessage `json:"latest"`
 		} `json:"checkpoint"`
 	}
 	if err := json.Unmarshal(data, &state); err != nil {
 		return nil, fmt.Errorf("decoding deployment state: %w", err)
 	}
-	if state.Version != 3 {
-		return nil, fmt.Errorf("unsupported Pulumi state version %d; update Defang and retry", state.Version)
+	version := 0
+	if state.Version != nil {
+		version = *state.Version
 	}
-	resources := append(state.Checkpoint.Latest.Resources, state.Deployment.Resources...)
+	var checkpoint json.RawMessage
+	if state.Checkpoint != nil {
+		checkpoint = state.Checkpoint.Latest
+		// Pulumi briefly saves this empty checkpoint while creating a stack,
+		// before replacing it with the first version-three snapshot.
+		if state.Version != nil && version == 0 && state.Checkpoint.Stack != "" &&
+			len(checkpoint) == 0 && len(state.Deployment) == 0 {
+			return nil, ErrNotFound
+		}
+	}
+	if version != 3 {
+		return nil, fmt.Errorf("unsupported Pulumi state version %d; update Defang and retry", version)
+	}
+	var resources []resource
+	for _, raw := range []json.RawMessage{checkpoint, state.Deployment} {
+		if len(raw) == 0 {
+			continue
+		}
+		var s snapshot
+		if err := json.Unmarshal(raw, &s); err != nil {
+			return nil, fmt.Errorf("decoding deployment state: %w", err)
+		}
+		resources = append(resources, s.Resources...)
+	}
 	var candidates []Metadata
 	for _, r := range resources {
 		if r.Delete || r.PendingReplacement {
