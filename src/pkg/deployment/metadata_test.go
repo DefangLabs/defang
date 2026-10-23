@@ -37,6 +37,8 @@ func TestReadState(t *testing.T) {
 		{name: "ambiguous attempts", resources: []map[string]any{resource(metadata("old", "web", "old-id", false), false), resource(metadata("new", "other", "new-id", false), false)}, wantErr: true},
 		{name: "unknown output", resources: []map[string]any{{"outputs": map[string]any{OutputName: "04da6b54-80e4-46f7-96ec-b56ff0331ba9"}}}, missing: true},
 		{name: "secret output stays opaque", resources: []map[string]any{{"outputs": map[string]any{OutputName: map[string]any{"ciphertext": "secret"}}}}, missing: true},
+		{name: "non-string output", resources: []map[string]any{{"outputs": map[string]any{OutputName: 123}}}, missing: true},
+		{name: "malformed metadata", resources: []map[string]any{{"outputs": map[string]any{OutputName: "{"}}}, wantErr: true},
 		{name: "legacy deployment", missing: true},
 		{name: "future contract", resources: []map[string]any{resource(future, false)}, wantErr: true},
 	}
@@ -60,8 +62,8 @@ func TestReadState(t *testing.T) {
 					continue
 				}
 				if tt.wantErr {
-					if err == nil {
-						t.Fatal("expected error")
+					if err == nil || errors.Is(err, ErrNotFound) {
+						t.Fatalf("expected non-ErrNotFound error, got %v", err)
 					}
 					continue
 				}
