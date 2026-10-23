@@ -6,24 +6,25 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
-
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 )
 
-// CreateRandomConfigValue generates a value suitable for the selected provider.
-func CreateRandomConfigValue(provider client.ProviderID) string {
-	return createRandomConfigValue(provider == client.ProviderScaleway)
-}
+// SymbolPolicy specifies the permitted character classes for a generated value.
+type SymbolPolicy uint8
 
-// Some managed databases require symbols as well as upper/lowercase and digits.
-// Rejection sampling preserves randomness without adding a predictable prefix.
-func createRandomConfigValue(requireSymbols bool) string {
+const (
+	SymbolsExcluded SymbolPolicy = iota
+	SymbolsRequired
+)
+
+// CreateRandomConfigValue generates a random value with the requested symbol policy.
+// Rejection sampling satisfies character requirements without adding a fixed prefix.
+func CreateRandomConfigValue(policy SymbolPolicy) string {
 	symbols := regexp.MustCompile("[^a-zA-Z0-9]")
 	for {
 		key := make([]byte, 32)
 		rand.Read(key)
 		value := base64.RawURLEncoding.EncodeToString(key)
-		if !requireSymbols {
+		if policy == SymbolsExcluded {
 			return symbols.ReplaceAllString(value, "")
 		}
 		if symbols.MatchString(value) && strings.ContainsFunc(value, unicode.IsUpper) &&

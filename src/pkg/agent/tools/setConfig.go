@@ -24,7 +24,7 @@ type SetConfigParams struct {
 
 func HandleSetConfig(ctx context.Context, loader client.Loader, params SetConfigParams, cliInterface CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
 	term.Debug("Function invoked: cli.Connect")
-	client, err := GetClientWithRetry(ctx, cliInterface, sc.FabricAddr)
+	fabric, err := GetClientWithRetry(ctx, cliInterface, sc.FabricAddr)
 	if err != nil {
 		var noBrowserErr auth.ErrNoBrowser
 		if errors.As(err, &noBrowserErr) {
@@ -34,11 +34,11 @@ func HandleSetConfig(ctx context.Context, loader client.Loader, params SetConfig
 	}
 
 	workingDir, _ := loader.ProjectWorkingDir(ctx)
-	sm, err := stacks.NewManager(client, workingDir, params.ProjectName, ec)
+	sm, err := stacks.NewManager(fabric, workingDir, params.ProjectName, ec)
 	if err != nil {
 		return "", fmt.Errorf("failed to create stack manager: %w", err)
 	}
-	pp := NewProviderPreparer(cliInterface, ec, client, sm)
+	pp := NewProviderPreparer(cliInterface, ec, fabric, sm)
 	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup provider: %w", err)
@@ -62,7 +62,11 @@ func HandleSetConfig(ctx context.Context, loader client.Loader, params SetConfig
 		if params.Value != "" {
 			return "", errors.New("Both 'random' and 'value' parameters provided; please provide only one")
 		}
-		value = cli.CreateRandomConfigValue(sc.Stack.Provider)
+		policy := cli.SymbolsExcluded
+		if sc.Stack.Provider == client.ProviderScaleway {
+			policy = cli.SymbolsRequired
+		}
+		value = cli.CreateRandomConfigValue(policy)
 		term.Debug("Generated random value for config")
 	}
 
