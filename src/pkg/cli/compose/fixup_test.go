@@ -375,3 +375,51 @@ func TestModelWithProvider(t *testing.T) {
 	assert.Equal(t, "vertex_ai/gemini-3.5-flash", modelWithProvider("gemini-3.5-flash", "vertex_ai"))
 	assert.Equal(t, "vertex_ai/gemini-3.5-flash", modelWithProvider("vertex_ai/gemini-3.5-flash", "vertex_ai"))
 }
+
+func TestFixupImageAndBuildPullPolicy(t *testing.T) {
+	tests := []struct {
+		name       string
+		pullPolicy string
+		upload     UploadMode
+		wantBuild  bool
+	}{
+		{
+			name:       "image with build and no pull_policy uses published image",
+			pullPolicy: "",
+			upload:     UploadModeIgnore,
+			wantBuild:  false,
+		},
+		{
+			name:       "image with build and pull_policy build keeps build",
+			pullPolicy: composeTypes.PullPolicyBuild,
+			upload:     UploadModeIgnore,
+			wantBuild:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			proj := &composeTypes.Project{
+				Name: "test",
+				Services: composeTypes.Services{
+					"app": composeTypes.ServiceConfig{
+						Name:       "app",
+						Image:      "example/app:latest",
+						Build:      &composeTypes.BuildConfig{Context: "."},
+						PullPolicy: tt.pullPolicy,
+					},
+				},
+			}
+
+			err := FixupServices(t.Context(), &client.MockProvider{}, proj, tt.upload)
+			require.NoError(t, err)
+
+			svc := proj.Services["app"]
+			if tt.wantBuild {
+				assert.NotNil(t, svc.Build, "expected build config to be preserved")
+			} else {
+				assert.Nil(t, svc.Build, "expected build config to be dropped in favor of the published image")
+			}
+		})
+	}
+}
