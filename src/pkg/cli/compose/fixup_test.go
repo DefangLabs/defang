@@ -1,7 +1,6 @@
 package compose
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -10,6 +9,7 @@ import (
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestFixup(t *testing.T) {
@@ -33,8 +33,7 @@ func TestFixup(t *testing.T) {
 			services[svc.Name] = svc
 		}
 
-		// Convert the protobuf services to pretty JSON for comparison (YAML would include all the zero values)
-		actual, err := json.MarshalIndent(services, "", "  ")
+		actual, err := yaml.Marshal(services)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -43,6 +42,22 @@ func TestFixup(t *testing.T) {
 			t.Error(err)
 		}
 	})
+}
+
+func TestFixupPortUDPMode(t *testing.T) {
+	explicitIngress := fixupPort(composeTypes.ServicePortConfig{
+		Target: 53, Mode: Mode_INGRESS, Protocol: Protocol_UDP,
+	})
+	assert.Equal(t, Mode_INGRESS, explicitIngress.Mode)
+	assert.Empty(t, explicitIngress.AppProtocol)
+
+	unspecified := fixupPort(composeTypes.ServicePortConfig{Target: 53, Protocol: Protocol_UDP})
+	assert.Equal(t, Mode_INGRESS, unspecified.Mode)
+
+	explicitHost := fixupPort(composeTypes.ServicePortConfig{
+		Target: 53, Mode: Mode_HOST, Protocol: Protocol_UDP,
+	})
+	assert.Equal(t, Mode_HOST, explicitHost.Mode)
 }
 
 func newLLMService() composeTypes.ServiceConfig {
@@ -106,9 +121,9 @@ func TestMakeAccessGatewayServiceGCP(t *testing.T) {
 		svccfg := newLLMService()
 		makeAccessGatewayService(&svccfg, proj, "chat-default", info)
 
-		require.Equal(t, []string{"--drop_params", "--model", "vertex_ai/gemini-2.5-flash", "--alias", "chat-default"}, []string(svccfg.Command))
+		require.Equal(t, []string{"--drop_params", "--model", "vertex_ai/gemini-3.5-flash", "--alias", "chat-default"}, []string(svccfg.Command))
 		assert.Equal(t, "my-gcp-project", *svccfg.Environment["VERTEXAI_PROJECT"])
-		assert.Equal(t, "us-central1", *svccfg.Environment["VERTEXAI_LOCATION"])
+		assert.Equal(t, "global", *svccfg.Environment["VERTEXAI_LOCATION"])
 	})
 
 	t.Run("embedding-default model", func(t *testing.T) {
@@ -118,6 +133,64 @@ func TestMakeAccessGatewayServiceGCP(t *testing.T) {
 
 		require.Equal(t, []string{"--drop_params", "--model", "vertex_ai/gemini-embedding-001", "--alias", "embedding-default"}, []string(svccfg.Command))
 	})
+}
+
+func TestMakeAccessGatewayServiceAzure(t *testing.T) {
+	// Azure's managed-model provider names the deployment after the alias and
+	// selects the concrete model itself, so the CLI passes the bare alias through
+	// unchanged (no bedrock/vertex_ai-style resolution or prefix) and sets no
+	// provider-specific environment; the provider injects OPENAI_API_KEY.
+	info := &client.AccountInfo{
+		Provider:  client.ProviderAzure,
+		Region:    "eastus",
+		AccountID: "my-azure-sub",
+	}
+
+	for _, alias := range []string{"chat-default", "chat-large", "embedding-default", "some-custom-model"} {
+		t.Run(alias, func(t *testing.T) {
+			proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
+			svccfg := newLLMService()
+			makeAccessGatewayService(&svccfg, proj, alias, info)
+
+			require.Equal(t, []string{"--drop_params", "--model", alias, "--alias", alias}, []string(svccfg.Command))
+			assert.NotContains(t, svccfg.Environment, "AWS_REGION")
+			assert.NotContains(t, svccfg.Environment, "VERTEXAI_PROJECT")
+			assert.NotContains(t, svccfg.Environment, "VERTEXAI_LOCATION")
+		})
+	}
+}
+
+func TestAccessGatewayChatLarge(t *testing.T) {
+	tests := []struct {
+		name         string
+		provider     client.ProviderID
+		wantModel    string
+		wantLocation string
+	}{
+		{name: "AWS", provider: client.ProviderAWS, wantModel: "bedrock/zai.glm-5"},
+		{name: "GCP", provider: client.ProviderGCP, wantModel: "vertex_ai/gemini-3.1-pro-preview", wantLocation: "global"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			info := &client.AccountInfo{
+				Provider:  tt.provider,
+				Region:    "us-central1",
+				AccountID: "my-gcp-project",
+			}
+			proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
+			svccfg := newLLMService()
+			makeAccessGatewayService(&svccfg, proj, "chat-large", info)
+
+			require.Equal(t, []string{"--drop_params", "--model", tt.wantModel, "--alias", "chat-large"}, []string(svccfg.Command))
+			if tt.provider == client.ProviderAWS {
+				assert.Equal(t, "us-central1", *svccfg.Environment["AWS_REGION"])
+			} else if tt.provider == client.ProviderGCP {
+				assert.Equal(t, "my-gcp-project", *svccfg.Environment["VERTEXAI_PROJECT"])
+				assert.Equal(t, tt.wantLocation, *svccfg.Environment["VERTEXAI_LOCATION"])
+			}
+		})
+	}
 }
 
 func TestMakeAccessGatewayServiceLiteLLMMasterKey(t *testing.T) {
@@ -152,6 +225,27 @@ func TestMakeAccessGatewayServiceLiteLLMMasterKey(t *testing.T) {
 
 		assert.Equal(t, "sk-my-secret-key", *svccfg.Environment["LITELLM_MASTER_KEY"])
 	})
+	t.Run("models binding injects OPENAI_API_KEY into consuming service", func(t *testing.T) {
+		masterKey := "model-binding-key"
+		proj := &composeTypes.Project{
+			Networks: map[string]composeTypes.NetworkConfig{},
+			Services: composeTypes.Services{
+				"app": {
+					Name:     "app",
+					Image:    "myapp",
+					Models:   map[string]*composeTypes.ServiceModelConfig{"llm": nil},
+					Networks: map[string]*composeTypes.ServiceNetworkConfig{},
+				},
+			},
+		}
+		svccfg := newLLMService()
+		svccfg.Environment["LITELLM_MASTER_KEY"] = &masterKey
+		makeAccessGatewayService(&svccfg, proj, "ai/model", info)
+
+		app := proj.Services["app"]
+		require.Contains(t, app.Environment, "OPENAI_API_KEY")
+		assert.Equal(t, masterKey, *app.Environment["OPENAI_API_KEY"])
+	})
 
 	t.Run("existing LITELLM_MASTER_KEY on service is preserved", func(t *testing.T) {
 		proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
@@ -162,6 +256,50 @@ func TestMakeAccessGatewayServiceLiteLLMMasterKey(t *testing.T) {
 
 		assert.Equal(t, "existing-master-key", *svccfg.Environment["LITELLM_MASTER_KEY"])
 	})
+}
+
+func TestAccessGatewayResourceDefaults(t *testing.T) {
+	tests := []struct {
+		name       string
+		cpus       composeTypes.NanoCPUs
+		memory     composeTypes.UnitBytes
+		wantCPUs   composeTypes.NanoCPUs
+		wantMemory composeTypes.UnitBytes
+	}{
+		{
+			name:       "unset resources get defaults",
+			wantCPUs:   defaultLLMCPUs,
+			wantMemory: defaultLLMMemoryMiB * MiB,
+		},
+		{
+			name:       "existing resources are preserved",
+			cpus:       1,
+			memory:     1024 * MiB,
+			wantCPUs:   1,
+			wantMemory: 1024 * MiB,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
+			svccfg := newLLMService()
+			if tt.cpus != 0 || tt.memory != 0 {
+				svccfg.Deploy = &composeTypes.DeployConfig{
+					Resources: composeTypes.Resources{
+						Reservations: &composeTypes.Resource{NanoCPUs: tt.cpus, MemoryBytes: tt.memory},
+					},
+				}
+			}
+
+			makeAccessGatewayService(&svccfg, proj, "ai/model", &client.AccountInfo{})
+
+			require.NotNil(t, svccfg.Deploy)
+			require.NotNil(t, svccfg.Deploy.Resources.Reservations)
+			assert.Equal(t, tt.wantCPUs, svccfg.Deploy.Resources.Reservations.NanoCPUs)
+			assert.Equal(t, tt.wantMemory, svccfg.Deploy.Resources.Reservations.MemoryBytes)
+		})
+	}
 }
 
 func TestFixupLLM(t *testing.T) {
@@ -234,6 +372,54 @@ func TestFixupLLM(t *testing.T) {
 func TestModelWithProvider(t *testing.T) {
 	assert.Equal(t, "bedrock/my-model", modelWithProvider("my-model", "bedrock"))
 	assert.Equal(t, "bedrock/my-model", modelWithProvider("bedrock/my-model", "bedrock"))
-	assert.Equal(t, "vertex_ai/gemini-2.5-flash", modelWithProvider("gemini-2.5-flash", "vertex_ai"))
-	assert.Equal(t, "vertex_ai/gemini-2.5-flash", modelWithProvider("vertex_ai/gemini-2.5-flash", "vertex_ai"))
+	assert.Equal(t, "vertex_ai/gemini-3.5-flash", modelWithProvider("gemini-3.5-flash", "vertex_ai"))
+	assert.Equal(t, "vertex_ai/gemini-3.5-flash", modelWithProvider("vertex_ai/gemini-3.5-flash", "vertex_ai"))
+}
+
+func TestFixupImageAndBuildPullPolicy(t *testing.T) {
+	tests := []struct {
+		name       string
+		pullPolicy string
+		upload     UploadMode
+		wantBuild  bool
+	}{
+		{
+			name:       "image with build and no pull_policy uses published image",
+			pullPolicy: "",
+			upload:     UploadModeIgnore,
+			wantBuild:  false,
+		},
+		{
+			name:       "image with build and pull_policy build keeps build",
+			pullPolicy: composeTypes.PullPolicyBuild,
+			upload:     UploadModeIgnore,
+			wantBuild:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			proj := &composeTypes.Project{
+				Name: "test",
+				Services: composeTypes.Services{
+					"app": composeTypes.ServiceConfig{
+						Name:       "app",
+						Image:      "example/app:latest",
+						Build:      &composeTypes.BuildConfig{Context: "."},
+						PullPolicy: tt.pullPolicy,
+					},
+				},
+			}
+
+			err := FixupServices(t.Context(), &client.MockProvider{}, proj, tt.upload)
+			require.NoError(t, err)
+
+			svc := proj.Services["app"]
+			if tt.wantBuild {
+				assert.NotNil(t, svc.Build, "expected build config to be preserved")
+			} else {
+				assert.Nil(t, svc.Build, "expected build config to be dropped in favor of the published image")
+			}
+		})
+	}
 }

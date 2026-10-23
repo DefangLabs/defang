@@ -20,6 +20,13 @@ services:
         endpoint_var: MODEL_URL
     networks:
       default: null
+  withmodelvar:
+    image: app
+    models:
+      ai_model:
+        model_var: MY_MODEL_NAME
+    networks:
+      default: null
 networks:
   default:
     name: models_default

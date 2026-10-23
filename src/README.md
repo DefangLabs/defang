@@ -23,11 +23,13 @@ The Defang Command-Line Interface [(CLI)](https://docs.defang.io/docs/getting-st
 The Defang CLI recognizes the following environment variables:
 
 - `COMPOSE_DISABLE_ENV_FILE` - Whether to disable loading environment variables from a `.env` file in the current directory; defaults to `false`
+- `COMPOSE_ENV_FILES` - A comma-separated list of environment file(s) to use for interpolation instead of `.env`; overridden by the `--env-file` flag
 - `COMPOSE_FILE` - The Compose file(s) to use; defaults to `compose.yaml`, `compose.yml`, `docker-compose.yaml`, or `docker-compose.yml` in the current directory
 - `COMPOSE_PATH_SEPARATOR` - The path separator to use for `COMPOSE_FILE`; defaults to `:` on Unix/MacOS and `;` on Windows
 - `COMPOSE_PROJECT_NAME` - The name of the project to use; overrides the `name` in the Compose file
 - `DEFANG_ACCESS_TOKEN` - The access token to use for authentication; if not specified, uses token from `defang login`
 - `DEFANG_ALLOW_UPGRADE` - If set to `true`, allows upgrading the CD image and Pulumi version to the latest available; defaults to `false`, ie. previously deployed versions will be used to avoid unexpected upgrades
+- `DEFANG_AWS_APN_ID` - The AWS APN ID to use for attribution, eg. use `pc:123456789abcdefgh` for AWS Marketplace products
 - `DEFANG_BUILD_CONTEXT_LIMIT` - The maximum size of the build context when building container images; defaults to `100MiB`
 - `DEFANG_CD_BUCKET` - The S3 bucket to use for the BYOC CD pipeline; defaults to `defang-cd-bucket-…`
 - `DEFANG_CD_IMAGE` - The image to use for the Continuous Deployment (CD) pipeline; defaults to `public.ecr.aws/defang-io/cd:public-beta`
@@ -42,14 +44,17 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_MODEL_ID` - The model ID of the LLM to use for the generate/debug AI integration (Pro users only)
 - `DEFANG_NO_CACHE` - If set to `true`, disables pull-through caching of container images; defaults to `false`
 - `DEFANG_PREFIX` - The prefix to use for all BYOC resources; defaults to `Defang`
-- `DEFANG_PROVIDER` - The name of the cloud provider to use, `auto` (default), `aws`, `digitalocean`, `gcp`, or `defang`
+- `DEFANG_PROVIDER` - The name of the cloud provider to use, `auto` (default), `aws`, `azure`, `digitalocean`, `gcp`, or `defang`
 - `DEFANG_PULUMI_BACKEND` - The Pulumi backend URL or `"pulumi-cloud"`; defaults to a self-hosted backend
 - `DEFANG_PULUMI_DEBUG` - If set to `true`, enables debug logging for Pulumi operations; defaults to `false`
 - `DEFANG_PULUMI_DIFF` - If set to `true`, shows the Pulumi diff during deployments; defaults to `false`
 - `DEFANG_PULUMI_DIR` - Run Pulumi from this folder, instead of spawning a cloud task; requires `--debug` (BYOC only)
 - `DEFANG_PULUMI_VERSION` - Override the version of the Pulumi image to use (`aws` provider only)
+- `DEFANG_RECIPE` - The deployment mode / recipe to use; defaults to `AFFORDABLE`
+- `DEFANG_STACK` - The name of the stack to use
 - `DEFANG_SUFFIX` - The suffix to use for all BYOC resources; defaults to the stack name, or `beta` if unset.
 - `DEFANG_WORKSPACE` - The workspace (name or ID) to use; preferred way to select which workspace the CLI uses
+- `GCP_PROJECT_ID` - The Google Cloud project ID for the `gcp` provider; must be a real shell environment variable (e.g. `export GCP_PROJECT_ID=my-project-id`), not set via `defang config set`. Also recognized: `GOOGLE_PROJECT`, `GOOGLE_CLOUD_PROJECT`, `GCLOUD_PROJECT`, `CLOUDSDK_CORE_PROJECT`
 - `NO_COLOR` - If set to any value, disables color output; by default, color output is enabled depending on the terminal
 - `PULUMI_ACCESS_TOKEN` - The Pulumi access token to use for authentication to Pulumi Cloud; see `DEFANG_PULUMI_BACKEND`
 - `PULUMI_CONFIG_PASSPHRASE` - Passphrase used to generate a unique key for your stack, and configuration and encrypted state values
@@ -59,3 +64,18 @@ The Defang CLI recognizes the following environment variables:
 Environment variables will be loaded from a `.defang` file in the current directory, if it exists. This file follows
 the same format as a `.env` file: `KEY=VALUE` pairs on each line, lines starting with `#` are treated as comments and ignored.
 
+### Compose interpolation
+
+After selecting a stack, the CLI makes the resolved `DEFANG_PROVIDER` and `DEFANG_STACK` values available for Compose
+interpolation. They are not injected into services automatically; reference them explicitly where needed:
+
+```yaml
+services:
+  app:
+    environment:
+      PUBLISH_PROVIDER: "${DEFANG_PROVIDER}"
+      PUBLISH_STACK: "${DEFANG_STACK}"
+```
+
+The resolved values take precedence over values with the same names in Compose env files. Fields that Compose must decode
+before stack selection should provide a default, such as `${DEFANG_PROVIDER:-auto}`.

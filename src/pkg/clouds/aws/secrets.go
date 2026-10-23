@@ -101,13 +101,14 @@ func (a *Aws) PutSecret(ctx context.Context, name, value string) error {
 
 	svc := NewSsmFromConfig(cfg)
 
-	// Call ssm:PutParameter
 	_, err = svc.PutParameter(ctx, &ssm.PutParameterInput{
 		Overwrite: ptr.Bool(true),
 		Type:      types.ParameterTypeSecureString,
 		Name:      secretId,
 		Value:     secretString,
-		// SecretString: secretString,
+		// Intelligent-Tiering keeps values <=4KB in the free Standard tier and
+		// automatically promotes larger values to the (paid) Advanced tier.
+		Tier: types.ParameterTierIntelligentTiering,
 	})
 	if err != nil {
 		return err

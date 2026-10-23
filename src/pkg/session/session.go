@@ -52,9 +52,15 @@ func (sl *SessionLoader) LoadSession(ctx context.Context) (*Session, error) {
 	}
 	// load provider with selected stack
 	provider := cli.NewProvider(ctx, stack.Provider, sl.client, stack.Name)
+	loaderOptions := sl.opts.LoaderOptions
+	loaderOptions.DefaultEnvFiles = StackEnvFiles(stack)
+	loaderOptions.InterpolationEnv = map[string]string{
+		"DEFANG_PROVIDER": stack.Provider.String(),
+		"DEFANG_STACK":    stack.Name,
+	}
 	session := &Session{
 		Stack:    stack,
-		Loader:   compose.NewLoaderFromOptions(sl.opts.LoaderOptions),
+		Loader:   compose.NewLoaderFromOptions(loaderOptions),
 		Provider: provider,
 	}
 
@@ -79,14 +85,28 @@ func (sl *SessionLoader) loadStack(ctx context.Context) (*stacks.Parameters, str
 	}
 
 	// The only stack property that can be overridden via env/flag is Mode
-	if newMode := sl.opts.Default.Mode; newMode != modes.ModeUnspecified {
-		stack.Mode = newMode
+	if newMode := sl.opts.Default.Recipe; newMode != modes.RecipeUnspecified {
+		stack.Recipe = newMode
 	}
 
 	if err := stacks.LoadStackEnv(*stack, true); err != nil {
 		return nil, whence, fmt.Errorf("failed to load stack env: %w", err)
 	}
 	return stack, whence, nil
+}
+
+// StackEnvFiles returns the env files loaded by convention for the selected
+// stack: .env, then .env.<provider>, then .env.<stack>, so the more specific
+// file overrides the more generic ones.
+func StackEnvFiles(stack *stacks.Parameters) []string {
+	envFiles := []string{".env"}
+	if stack.Provider != "" && stack.Provider != client.ProviderAuto {
+		envFiles = append(envFiles, ".env."+stack.Provider.String())
+	}
+	if stack.Name != "" {
+		envFiles = append(envFiles, ".env."+stack.Name)
+	}
+	return envFiles
 }
 
 func printProviderMismatchWarnings(ctx context.Context, provider client.ProviderID) {

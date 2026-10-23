@@ -24,6 +24,12 @@ const (
 	LogTypeAll         LogType = math.MaxUint32
 )
 
+// BuildServiceNameSuffix is appended to a service name to refer to that
+// service's build logs (e.g. "web-image" is the build for "web"). Build logs
+// have no service of their own, so callers strip this suffix to recover the
+// underlying service name.
+const BuildServiceNameSuffix = "-image"
+
 var AllLogTypes = []LogType{
 	LogTypeCD,
 	LogTypeRun,

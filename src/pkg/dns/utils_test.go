@@ -37,3 +37,26 @@ func TestNormalize(t *testing.T) {
 		}
 	}
 }
+
+func TestIsApexDomain(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"example.com", true},
+		{"EXAMPLE.COM", true},
+		{"example.com.", true},
+		{"example.co.uk", true},
+		{"www.example.com", false},
+		{"shop.example.co.uk", false},
+		{"a.b.example.com", false},
+		{"com", false},
+	}
+
+	for _, test := range tests {
+		result := IsApexDomain(test.input)
+		if result != test.expected {
+			t.Errorf("IsApexDomain(%q) = %v; want %v", test.input, result, test.expected)
+		}
+	}
+}

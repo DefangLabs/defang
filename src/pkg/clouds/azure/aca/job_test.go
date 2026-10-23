@@ -11,6 +11,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	armappcontainersv3 "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appcontainers/armappcontainers/v3"
 	cloudazure "github.com/DefangLabs/defang/src/pkg/clouds/azure"
 )
@@ -300,6 +301,95 @@ func TestGetCDContainerLogStreamURLHTTPError(t *testing.T) {
 	j := newTestJob()
 	if _, err := j.getCDContainerLogStreamURL(t.Context(), "exec-1"); err == nil {
 		t.Error("expected error for 401")
+	}
+}
+
+func TestParseExitCode(t *testing.T) {
+	tests := []struct {
+		details  string
+		wantCode int
+		wantOK   bool
+	}{
+		{"Container 'defang-cd' was terminated with exit code '0'", 0, true},
+		{"Container 'defang-cd' was terminated with exit code '1'", 1, true},
+		{"terminated with exit code: 137", 137, true},
+		{"ExitCode 2", 0, false}, // missing space; not matched
+		{"Completed", 0, false},
+		{"", 0, false},
+	}
+	for _, tt := range tests {
+		code, ok := parseExitCode(tt.details)
+		if ok != tt.wantOK || (ok && code != tt.wantCode) {
+			t.Errorf("parseExitCode(%q) = (%d, %v), want (%d, %v)", tt.details, code, ok, tt.wantCode, tt.wantOK)
+		}
+	}
+}
+
+func TestCDReplicaStatus(t *testing.T) {
+	tests := []struct {
+		name        string
+		resp        string
+		wantNil     bool
+		wantSuccess bool
+		wantMsg     string
+	}{
+		{
+			name:    "still running yields no terminal status",
+			resp:    `{"value":[{"properties":{"containers":[{"name":"defang-cd","runningState":"Running"}]}}]}`,
+			wantNil: true,
+		},
+		{
+			name:        "terminated with exit code 0 is success",
+			resp:        `{"value":[{"properties":{"containers":[{"name":"defang-cd","runningState":"Terminated","runningStateDetails":"terminated with exit code '0'"}]}}]}`,
+			wantSuccess: true,
+		},
+		{
+			name:        "terminated with non-zero exit code is failure",
+			resp:        `{"value":[{"properties":{"containers":[{"name":"defang-cd","runningState":"Terminated","runningStateDetails":"terminated with exit code '1'"}]}}]}`,
+			wantSuccess: false,
+			wantMsg:     "terminated with exit code '1'",
+		},
+		{
+			name:        "terminated without a parseable exit code is treated as failure",
+			resp:        `{"value":[{"properties":{"containers":[{"name":"defang-cd","runningState":"Terminated","runningStateDetails":"OOMKilled"}]}}]}`,
+			wantSuccess: false,
+			wantMsg:     "OOMKilled",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(tt.resp))
+			}))
+			defer srv.Close()
+
+			useFakeCred(t, "arm", nil)
+			useTestEndpoints(t, srv.URL, "")
+
+			j := newTestJob()
+			status, err := j.cdReplicaStatus(t.Context(), "exec-1")
+			if err != nil {
+				t.Fatalf("cdReplicaStatus: %v", err)
+			}
+			if tt.wantNil {
+				if status != nil {
+					t.Fatalf("expected nil status, got %+v", status)
+				}
+				return
+			}
+			if status == nil {
+				t.Fatal("expected terminal status, got nil")
+			}
+			if !status.IsTerminal() {
+				t.Errorf("status %q should be terminal", status.Status)
+			}
+			if status.IsSuccess() != tt.wantSuccess {
+				t.Errorf("IsSuccess() = %v, want %v (status %q)", status.IsSuccess(), tt.wantSuccess, status.Status)
+			}
+			if status.ErrorMessage != tt.wantMsg {
+				t.Errorf("ErrorMessage = %q, want %q", status.ErrorMessage, tt.wantMsg)
+			}
+		})
 	}
 }
 
@@ -639,6 +729,37 @@ func TestFetchLogsFromWorkspaceSDKError(t *testing.T) {
 	// the SDK (will fail), then bails.
 	if _, err := j.fetchLogsFromWorkspace(t.Context(), "exec"); err == nil {
 		t.Error("expected error from fetchLogsFromWorkspace")
+	}
+}
+
+func TestTemplateHasEtag(t *testing.T) {
+	tmplWith := func(envs ...*armappcontainersv3.EnvironmentVar) *armappcontainersv3.JobExecutionTemplate {
+		return &armappcontainersv3.JobExecutionTemplate{
+			Containers: []*armappcontainersv3.JobExecutionContainer{{Env: envs}},
+		}
+	}
+	etagVar := &armappcontainersv3.EnvironmentVar{Name: to.Ptr(EnvVarEtag), Value: to.Ptr("etag-A")}
+	otherVar := &armappcontainersv3.EnvironmentVar{Name: to.Ptr("DEFANG_MODE"), Value: to.Ptr("development")}
+	secretRef := &armappcontainersv3.EnvironmentVar{Name: to.Ptr(EnvVarEtag), SecretRef: to.Ptr("etag")}
+
+	tests := []struct {
+		name string
+		tmpl *armappcontainersv3.JobExecutionTemplate
+		etag string
+		want bool
+	}{
+		{"match", tmplWith(otherVar, etagVar), "etag-A", true},
+		{"different value", tmplWith(etagVar), "etag-B", false},
+		{"no etag var", tmplWith(otherVar), "etag-A", false},
+		{"nil template", nil, "etag-A", false},
+		{"value-less etag var", tmplWith(secretRef), "etag-A", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := templateHasEtag(tt.tmpl, tt.etag); got != tt.want {
+				t.Errorf("templateHasEtag() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 

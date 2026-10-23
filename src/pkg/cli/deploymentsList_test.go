@@ -36,7 +36,6 @@ func (mockListDeploymentsHandler) ListDeployments(ctx context.Context, req *conn
 				Project:           "test",
 				Provider:          defangv1.Provider_DEFANG,
 				ProviderAccountId: "1234567890",
-				ProviderString:    "playground",
 				Region:            "us-test-2",
 				Timestamp:         timestamppb.New(time.Time{}),
 				Mode:              defangv1.DeploymentMode_MODE_UNSPECIFIED,
@@ -145,6 +144,29 @@ func TestActiveDeployments(t *testing.T) {
 
 		receivedOutput := stdout.String()
 		expectedOutput := "No active deployments found; use --workspace to specify a different workspace"
+
+		if !strings.Contains(receivedOutput, expectedOutput) {
+			t.Errorf("Expected %s to contain %s", receivedOutput, expectedOutput)
+		}
+	})
+
+	t.Run("no active deployments for project", func(t *testing.T) {
+		fabricServer.testDeploymentsData = nil
+		stdout, _ := term.SetupTestTerm(t)
+
+		err := DeploymentsList(ctx, grpcClient, ListDeploymentsParams{
+			ListType:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
+			ProjectName: "website-production",
+			Limit:       10,
+		})
+		if err != nil {
+			t.Fatalf("DeploymentsList() error = %v", err)
+		}
+
+		// The project may simply live in another workspace, so this branch needs
+		// the same --workspace hint as the workspace-wide one; see issue 2247.
+		receivedOutput := stdout.String()
+		expectedOutput := `No active deployments found for project "website-production"; use --workspace to specify a different workspace`
 
 		if !strings.Contains(receivedOutput, expectedOutput) {
 			t.Errorf("Expected %s to contain %s", receivedOutput, expectedOutput)

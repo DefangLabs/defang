@@ -45,8 +45,8 @@ type EmbedderRef struct {
 
 var (
 	supportedModels = map[string]ai.ModelOptions{
-		"google/gemini-2.5-flash": {
-			Label:    "Gemini 2.5 Flash",
+		"google/gemini-3.5-flash": {
+			Label:    "Gemini 3.5 Flash",
 			Versions: []string{},
 			Supports: &ai.ModelSupports{
 				Multiturn:  true,

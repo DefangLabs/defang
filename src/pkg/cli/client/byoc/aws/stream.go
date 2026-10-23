@@ -11,6 +11,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/logs"
+	"github.com/DefangLabs/defang/src/pkg/stackpath"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -44,7 +45,7 @@ func (p *logEventParser) parseEvents(events []cw.LogEvent) *defangv1.TailRespons
 	case first.LogGroupIdentifier == nil || first.LogStreamName == nil:
 		response.Service = "alb"
 		// response.Host = TODO: we can get the ALB IP from the bucket object name
-	case strings.HasSuffix(*first.LogGroupIdentifier, "/ecs"):
+	case stackpath.IsLogGroup(*first.LogGroupIdentifier, stackpath.LogGroupECS):
 		// ECS lifecycle events. LogStreams: "f0b805a8-fa74-3212-b6ce-a981c011d337"
 		parseECSEventRecords = true
 	case strings.Contains(*first.LogGroupIdentifier, ":"+byoc.CdTaskPrefix):
@@ -52,7 +53,7 @@ func (p *logEventParser) parseEvents(events []cw.LogEvent) *defangv1.TailRespons
 		// LogStreams: "crun/main/0f2a8ccde0374239bdd04f5e07d8c523"
 		response.Host = "pulumi"
 		response.Service = "cd"
-	case strings.HasSuffix(*first.LogGroupIdentifier, "/builds") && codeBuildPrefixRegex.MatchString(*first.LogStreamName):
+	case stackpath.IsLogGroup(*first.LogGroupIdentifier, stackpath.LogGroupBuilds) && codeBuildPrefixRegex.MatchString(*first.LogStreamName):
 		response.Host = "codebuild"
 		response.Service = "cd"
 		parseCodeBuildRecords = true

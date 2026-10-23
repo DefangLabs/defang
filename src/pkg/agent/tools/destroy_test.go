@@ -74,6 +74,27 @@ func (m *MockDestroyCLI) InteractiveLoginMCP(ctx context.Context, fabricAddr str
 	return nil
 }
 
+func TestHandleDestroyToolRefusesWhenNotConfirmable(t *testing.T) {
+	t.Chdir("testdata")
+	os.Unsetenv("DEFANG_PROVIDER")
+	os.Unsetenv("AWS_PROFILE")
+	os.Unsetenv("AWS_REGION")
+
+	mockCLI := &MockDestroyCLI{CallLog: []string{}}
+	ec := elicitations.NewController(&mockElicitationsClient{})
+	ec.SetSupported(false)
+
+	stack := stacks.Parameters{Name: "test-stack", Provider: client.ProviderAWS}
+	_, err := HandleDestroyTool(t.Context(), DestroyParams{}, mockCLI, ec, StackConfig{
+		FabricAddr: "test-cluster",
+		Stack:      &stack,
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "refusing to destroy the deployed project")
+	assert.Empty(t, mockCLI.CallLog, "no CLI calls should be made when the write is refused")
+}
+
 func TestHandleDestroyTool(t *testing.T) {
 	tests := []struct {
 		name                 string
@@ -137,7 +158,6 @@ func TestHandleDestroyTool(t *testing.T) {
 		},
 	}
 
-	loader := &client.MockLoader{}
 	stack := stacks.Parameters{
 		Name:     "test-stack",
 		Provider: client.ProviderAWS,
@@ -167,7 +187,7 @@ func TestHandleDestroyTool(t *testing.T) {
 					WorkingDirectory: ".",
 				},
 			}
-			result, err := HandleDestroyTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
+			result, err := HandleDestroyTool(t.Context(), params, mockCLI, ec, StackConfig{
 				FabricAddr: "test-cluster",
 				Stack:      &stack,
 			})

@@ -9,11 +9,8 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	"github.com/DefangLabs/defang/src/pkg/auth"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
-	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
@@ -21,26 +18,10 @@ type ServicesParams struct {
 	common.LoaderParams
 }
 
-func HandleServicesTool(ctx context.Context, loader client.Loader, params ServicesParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
-	term.Debug("Function invoked: cli.Connect")
-	client, err := GetClientWithRetry(ctx, cli, sc.FabricAddr)
+func HandleServicesTool(ctx context.Context, params ServicesParams, cli CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
+	_, provider, loader, err := setupProviderAndLoader(ctx, params.LoaderParams, cli, ec, sc)
 	if err != nil {
-		var noBrowserErr auth.ErrNoBrowser
-		if errors.As(err, &noBrowserErr) {
-			return noBrowserErr.Error(), nil
-		}
-		return "", err
-	}
-
-	workingDir, _ := loader.ProjectWorkingDir(ctx)
-	sm, err := stacks.NewManager(client, workingDir, params.ProjectName, ec)
-	if err != nil {
-		return "", fmt.Errorf("failed to create stack manager: %w", err)
-	}
-	pp := NewProviderPreparer(cli, ec, client, sm)
-	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
-	if err != nil {
-		return "", fmt.Errorf("failed to setup provider: %w", err)
+		return setupErrorResult(err)
 	}
 	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)

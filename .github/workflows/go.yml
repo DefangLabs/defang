@@ -11,19 +11,24 @@ on:
       - "Makefile"
       - "pkgs/**"
       - "src/**"
+  workflow_dispatch: # so nix-shell-test can re-trigger this workflow for a
+    # vendorHash-fix commit it pushes with GITHUB_TOKEN: GitHub never starts
+    # a new on:push run for a push made with GITHUB_TOKEN, so without this
+    # the fixed commit becomes a PR head that go-test/nix-shell-test never ran
 
 permissions:
   contents: read
   id-token: write # for GitHub id-token auth
+  actions: read # to query workflow runs for coverage baseline
 
 jobs:
   go-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v6
         with:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
@@ -34,7 +39,8 @@ jobs:
           "$GITHUB_OUTPUT"
 
       - name: Run Go unit tests
-        run: go test -race -test.short -v -coverprofile=coverage.out -covermode=atomic
+        run:
+          go test -race -test.short -v -coverprofile=coverage.out -covermode=atomic
           ./...
         working-directory: src
         env:
@@ -47,21 +53,37 @@ jobs:
         working-directory: src
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: coverage-${{ steps.branch.outputs.name }}
           path: src/coverage.txt
           overwrite: true
 
-      - name: Download main branch coverage
+      - name: Find merge-base run ID
         if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v')
-        uses: dawidd6/action-download-artifact@8305c0f1062bb0d184d09ef4493ecb9288447732 # v20
+        id: merge-base-run
+        continue-on-error: true # no baseline yet on first run
+        run: |
+          git fetch origin main --depth=50
+          MERGE_BASE=$(git merge-base HEAD origin/main)
+          echo "Merge base: $MERGE_BASE"
+          RUN_ID=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/go.yml/runs" \
+            -X GET -f branch=main -f per_page=100 \
+            --jq ".workflow_runs[] | select(.head_sha == \"$MERGE_BASE\" and .conclusion == \"success\") | .id" \
+            | head -1)
+          echo "run_id=${RUN_ID}" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download merge-base coverage
+        if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v') && steps.merge-base-run.outputs.run_id != ''
+        uses: dawidd6/action-download-artifact@d63b86af1b34672e53c440b1b83979861906bad7 # v24
         with:
           workflow: go.yml
-          branch: main
+          run_id: ${{ steps.merge-base-run.outputs.run_id }}
           name: coverage-main
           path: coverage-main
-        continue-on-error: true # no baseline yet on first run
+        continue-on-error: true # artifact may have expired
 
       - name: Verify Go modules
         working-directory: src
@@ -76,6 +98,10 @@ jobs:
           curl -fsSL "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip" -o protoc.zip
           sudo unzip -o protoc.zip -d /usr/local bin/protoc 'include/*'
           rm protoc.zip
+          # Pin the generators to the versions this module already builds against.
+          # With @latest, "Verify Proto files" breaks on every upstream release: the
+          # regenerated files carry the new generator version in their header
+          # comment while the committed ones carry go.mod's.
           go install "google.golang.org/protobuf/cmd/protoc-gen-go@$(go list -m -f '{{.Version}}' google.golang.org/protobuf)"
           go install "connectrpc.com/connect/cmd/protoc-gen-connect-go@$(go list -m -f '{{.Version}}' connectrpc.com/connect)"
 
@@ -95,7 +121,7 @@ jobs:
         working-directory: src
 
       - name: Check coverage regression
-        if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v')
+        if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v') && github.actor != 'dependabot[bot]'
         run: |
           if [ ! -f coverage-main/coverage.txt ]; then
             echo "No main coverage baseline found, skipping comparison"
@@ -125,11 +151,13 @@ jobs:
     needs: go-test
     permissions:
       contents: write
+      actions: write # to re-trigger this workflow after pushing a vendorHash fix
+      pull-requests: write # to open a PR when a ruleset blocks pushing the fix directly
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install Nix
-        uses: cachix/install-nix-action@616559265b40713947b9c190a8ff4b507b5df49b # v31
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
         with:
           nix_path: nixpkgs=channel:nixos-unstable
 
@@ -156,6 +184,18 @@ jobs:
 
             echo "Found new hash: $NEW_HASH"
 
+            # A tag checkout is a detached HEAD with no branch to push a fix
+            # commit to (there's no `origin/<tag>` remote-tracking ref to
+            # rebase against either), and tags shouldn't be amended anyway.
+            # Fail with an actionable message instead of the confusing git
+            # errors that follow from treating $GITHUB_REF_NAME as a branch.
+            if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+              echo "❌ vendorHash is stale for tag $GITHUB_REF_NAME (needs $NEW_HASH), but a tag has no branch to push a fix to."
+              echo "This is likely nixpkgs channel drift (nix_path uses the floating nixos-unstable channel), not a real code change."
+              echo "Fix vendorHash on the branch this tag was cut from and re-cut the release."
+              exit 1
+            fi
+
             # Update the vendorHash in cli.nix
             OLD_HASH=$(grep -oP 'vendorHash = "\Ksha256-[A-Za-z0-9+/]+=*' pkgs/defang/cli.nix)
             echo "Old hash: $OLD_HASH"
@@ -172,12 +212,87 @@ jobs:
               git config user.name "github-actions[bot]"
               git config user.email "github-actions[bot]@users.noreply.github.com"
 
-              # Commit and push the change
+              # Commit the change
               git add pkgs/defang/cli.nix
               git commit -m "Update Nix vendorHash to $NEW_HASH"
-              git push
+
+              # A concurrent push to this branch (a human commit, or another
+              # nix-shell-test run fixing the same hash) can land while this
+              # job was verifying, so a bare `git push` races: it gets
+              # rejected as non-fast-forward and turns an otherwise healthy
+              # branch red. Rebase onto the latest tip and retry a few times
+              # before giving up.
+              pushed=false
+              for attempt in 1 2 3 4 5; do
+                PUSH_OUTPUT=$(git push 2>&1) && { pushed=true; break; }
+                echo "$PUSH_OUTPUT"
+
+                # GITHUB_TOKEN can never push a ref whose commit range
+                # touches .github/workflows/* (e.g. this PR also edits a
+                # workflow file) - there's no permission to grant for this,
+                # "workflows" isn't a valid permission scope - so retrying
+                # would just fail identically 5 times. Fail fast instead.
+                if echo "$PUSH_OUTPUT" | grep -q "without \`workflows\` permission"; then
+                  echo "❌ GITHUB_TOKEN can't push this vendorHash fix: this branch's commit range touches a workflow file, which GITHUB_TOKEN is never allowed to push regardless of granted permissions."
+                  echo "Fix vendorHash on pkgs/defang/cli.nix manually and push it with your own credentials."
+                  exit 1
+                fi
+
+                # A ruleset requiring PRs on this branch (e.g. main) rejects
+                # every direct push outright - rebasing and retrying would
+                # just fail identically 5 times. Open a PR with the fix
+                # instead so a human can review and merge it.
+                if echo "$PUSH_OUTPUT" | grep -q "GH013" &&
+                  echo "$PUSH_OUTPUT" | grep -Fq "Changes must be made through a pull request."; then
+                  echo "❌ Direct push blocked by a repository ruleset (GH013) - $GITHUB_REF_NAME requires changes via a pull request."
+                  FIX_BRANCH="ci/nix-vendorhash-fix-$GITHUB_RUN_ID"
+                  git push origin "HEAD:refs/heads/$FIX_BRANCH"
+                  PR_URL=$(gh pr create \
+                    --base "$GITHUB_REF_NAME" \
+                    --head "$FIX_BRANCH" \
+                    --title "Update Nix vendorHash to $NEW_HASH" \
+                    --body "Auto-generated by the nix-shell-test job on $GITHUB_REF_NAME after a Go module change made the recorded vendorHash stale. Direct push to $GITHUB_REF_NAME is blocked by a repository ruleset, so this PR needs a manual review and merge.")
+                  echo "Opened $PR_URL - merge it to fix nix-shell-test on $GITHUB_REF_NAME."
+                  # The push above used GITHUB_TOKEN, so it won't trigger this
+                  # workflow's own `on: push` (GitHub's anti-recursion rule),
+                  # and go.yml has no pull_request trigger either - so without
+                  # this, the fix would sit in an unreviewed, untested PR.
+                  gh workflow run go.yml --ref "$FIX_BRANCH"
+                  exit 1
+                fi
+
+                echo "Push rejected (attempt $attempt/5); fetching origin/$GITHUB_REF_NAME"
+                git fetch origin "$GITHUB_REF_NAME"
+
+                if git show "origin/$GITHUB_REF_NAME:pkgs/defang/cli.nix" |
+                  grep -qE "^  vendorHash = \"$NEW_HASH\";$"; then
+                  echo "vendorHash already fixed on origin/$GITHUB_REF_NAME; nothing to push"
+                  pushed=true
+                  break
+                fi
+
+                if ! git rebase "origin/$GITHUB_REF_NAME"; then
+                  echo "❌ Rebase conflict while retrying the vendorHash push"
+                  git rebase --abort
+                  exit 1
+                fi
+                sleep $((RANDOM % 5 + 1))
+              done
+
+              if [ "$pushed" != true ]; then
+                echo "❌ Failed to push vendorHash update after multiple retries"
+                exit 1
+              fi
 
               echo "✅ Updated vendorHash and committed the change"
+
+              # The push above used GITHUB_TOKEN, so it will NOT start a new
+              # on:push run of this workflow (GitHub's anti-recursion rule) -
+              # the fixed commit would otherwise become a PR head that
+              # go-test/nix-shell-test never actually ran against. Dispatch
+              # a fresh run explicitly so the real head commit gets tested.
+              echo "Triggering a fresh CI run for the corrected commit"
+              gh workflow run go.yml --ref "$GITHUB_REF_NAME"
             else
               echo "❌ Verification failed after updating hash"
               exit 1
@@ -188,6 +303,8 @@ jobs:
             tail -20 /tmp/nix-test-output.log
             exit 1
           fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # Replaces the retired go-playground-test job: the Playground was discontinued,
   # so config/up/down sanity tests now run as BYOC smoketests (AWS + GCP) in
@@ -202,7 +319,7 @@ jobs:
       group: smoketests-${{ github.ref }}
       cancel-in-progress: false
     environment: smoketest
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - name: Trigger smoketests and await conclusion
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -228,38 +345,78 @@ jobs:
             const workflow_id = 'cli-smoketests.yml';
             const cliVersion = context.sha; // build the CLI from the exact commit under test
 
-            // Remember the newest existing run: createWorkflowDispatch does not
-            // return the new run's id, so we find ours by id > watermark plus the
-            // CLI version in the run name (see run-name in cli-smoketests.yml).
-            const { data: before } = await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id, per_page: 1 });
-            const watermark = before.workflow_runs[0]?.id ?? 0;
-
-            await github.rest.actions.createWorkflowDispatch({
-              owner, repo, workflow_id, ref: 'main',
-              inputs: { 'sample-name': 'html-css-js', 'cli-version': cliVersion },
-            });
-
             const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-            let run;
-            for (let i = 0; i < 30 && !run; i++) {
-              await sleep(10_000);
-              const { data } = await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id, event: 'workflow_dispatch', per_page: 30 });
-              run = data.workflow_runs.find((wr) => wr.id > watermark && wr.name.includes(cliVersion));
-            }
-            if (!run) {
-              throw new Error('Timed out waiting for the dispatched smoketest run to appear');
-            }
-            core.notice(`Awaiting smoketests: ${run.html_url}`);
+            // cli-smoketests.yml's deployment_smoketests job shares one concurrency
+            // group per provider+sample across every caller (this workflow on every
+            // ref, plus pulumi-up.yml). With cancel-in-progress:false, GitHub still
+            // cancels a *queued* run when a third dispatch arrives while one is
+            // running and one is already queued - it keeps only the running run and
+            // the newest queued one. That cancellation says nothing about this
+            // commit's CLI, so retry the dispatch instead of failing outright.
+            async function dispatchAndAwait() {
+              // Remember the newest existing run: createWorkflowDispatch does not
+              // return the new run's id, so we find ours by id > watermark plus the
+              // CLI version in the run name (see run-name in cli-smoketests.yml).
+              const { data: before } = await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id, per_page: 1 });
+              const watermark = before.workflow_runs[0]?.id ?? 0;
 
-            while (run.status !== 'completed') {
-              await sleep(30_000);
-              run = (await github.rest.actions.getWorkflowRun({ owner, repo, run_id: run.id })).data;
+              await github.rest.actions.createWorkflowDispatch({
+                owner, repo, workflow_id, ref: 'main',
+                inputs: { 'sample-name': 'html-css-js', 'cli-version': cliVersion },
+              });
+
+              let run;
+              for (let i = 0; i < 30 && !run; i++) {
+                await sleep(10_000);
+                const { data } = await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id, event: 'workflow_dispatch', per_page: 30 });
+                run = data.workflow_runs.find((wr) => wr.id > watermark && wr.display_title.includes(cliVersion));
+              }
+              if (!run) {
+                throw new Error('Timed out waiting for the dispatched smoketest run to appear');
+              }
+              core.notice(`Awaiting smoketests: ${run.html_url}`);
+
+              while (run.status !== 'completed') {
+                await sleep(30_000);
+                run = (await github.rest.actions.getWorkflowRun({ owner, repo, run_id: run.id })).data;
+              }
+              return run;
+            }
+
+            const maxAttempts = 2;
+            let run;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              run = await dispatchAndAwait();
+              if (run.conclusion !== 'cancelled') {
+                break;
+              }
+              core.notice(`Smoketests were cancelled, likely superseded by a concurrent dispatch to the same provider/sample concurrency group: ${run.html_url} (attempt ${attempt}/${maxAttempts})`);
             }
             if (run.conclusion !== 'success') {
               throw new Error(`Smoketests concluded '${run.conclusion}': ${run.html_url}`);
             }
             core.notice(`Smoketests passed: ${run.html_url}`);
+
+  # Publish the Nix binary cache for this tag, so `nix run github:DefangLabs/defang`
+  # downloads the CLI instead of compiling it. Cachix owns storage, signing, and the
+  # substituter protocol, so this pushes straight from CI with no cloud credentials
+  # and no second repo — unlike trigger-smoketests above, which has to dispatch into
+  # DefangLabs/defang-mvp because that's where the cloud credentials live.
+  #
+  # The actual build+push steps live in publish-nix-cache.yml (a workflow_call
+  # target) so publish-nix-cache-manual.yml can invoke the exact same job
+  # on demand — e.g. to backfill a matrix leg — WITHOUT exposing the rest of
+  # this workflow (nix-shell-test's contents:write vendorHash push, the
+  # tag-gated release jobs) to manual dispatch. A bare `workflow_dispatch:` on
+  # this file would have made ALL of that manually re-runnable against any
+  # existing tag, not just the cache publish.
+  publish-nix-cache:
+    name: Publish Nix binary cache
+    needs: nix-shell-test # cache the derivation that job just proved builds
+    if: startsWith(github.ref, 'refs/tags/v') # only released versions are cached
+    uses: ./.github/workflows/publish-nix-cache.yml
+    secrets: inherit
 
   build-and-sign:
     name: Build app and sign files (with Trusted Signing)
@@ -273,10 +430,10 @@ jobs:
       GOCACHE: "D:\\golang\\cache"
       GOMODCACHE: "D:\\golang\\modcache"
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v6
         with:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
@@ -286,7 +443,7 @@ jobs:
         working-directory: src
 
       - name: Install GoReleaser Pro
-        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
         with:
           distribution: goreleaser-pro
           install-only: true
@@ -294,7 +451,8 @@ jobs:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
       - name: Run GoReleaser (Linux)
-        run: goreleaser release --split ${{ !startsWith(github.ref, 'refs/tags/v') &&
+        run:
+          goreleaser release --split ${{ !startsWith(github.ref, 'refs/tags/v') &&
           '--snapshot' || '' }} ${{ github.event_name == 'schedule' &&
           '--nightly' || ''}}
         working-directory: src
@@ -303,7 +461,8 @@ jobs:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
       - name: Run GoReleaser (Windows)
-        run: goreleaser release --split ${{ !startsWith(github.ref, 'refs/tags/v') &&
+        run:
+          goreleaser release --split ${{ !startsWith(github.ref, 'refs/tags/v') &&
           '--snapshot' || '' }} ${{ github.event_name == 'schedule' &&
           '--nightly' || ''}}
         working-directory: src
@@ -313,14 +472,14 @@ jobs:
 
       # From https://github.com/Azure/trusted-signing-action/pull/37
       - name: Azure login
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Trusted Signing
-        uses: Azure/trusted-signing-action@b443cf8ea4124818d2ea9f043cba29fc3ec47b16 # v1.2.0
+        uses: Azure/trusted-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
         with:
           endpoint: https://wus2.codesigning.azure.net/ # from Azure portal
           trusted-signing-account-name: DefangLabs # from Azure portal
@@ -356,7 +515,7 @@ jobs:
         working-directory: src\dist\windows
 
       - name: Upload dist-win folder
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: dist-win
           path: src/dist
@@ -369,10 +528,10 @@ jobs:
     needs: go-test
     runs-on: macos-latest # for codesign and notarytool
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v6
         with:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
@@ -382,30 +541,53 @@ jobs:
       #   working-directory: src
 
       - name: Run GoReleaser (macOS)
-        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
         with:
           distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
-          args: release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot'
+          args:
+            release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot'
             || '' }} ${{ github.event_name == 'schedule' && '--nightly' || ''}}
           workdir: src
         env:
           GGOOS: darwin
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
-          MACOS_CERTIFICATE_NAME: ${{ secrets.MACOS_CERTIFICATE_NAME }}
           MACOS_P12_BASE64: ${{ secrets.MACOS_P12_BASE64 }}
           MACOS_P12_PASSWORD: ${{ secrets.MACOS_P12_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
           MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
           MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
           MACOS_NOTARIZATION_APP_PW: ${{ secrets.MACOS_NOTARIZATION_APP_PW }}
 
       - name: Upload dist-mac folder
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: dist-mac
           path: src/dist
           if-no-files-found: error
+
+      - name: Report macOS notarization submissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          found=false
+          while IFS= read -r -d '' file; do
+            found=true
+            echo "::group::$file"
+            cat "$file"
+            echo "::endgroup::"
+          done < <(find src/dist -type f -name '*.notary.json' -print0)
+          if [ "$found" != true ]; then
+            echo "No notarization response files found"
+            exit 1
+          fi
+
+      - name: Upload macOS notarization submissions
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: macos-notarization-submissions
+          path: src/dist/**/*.notary.json
+          if-no-files-found: error
+          retention-days: 30
 
   go-release:
     if: startsWith(github.ref, 'refs/tags/v') # only run this step on tagged commits
@@ -418,12 +600,12 @@ jobs:
     permissions:
       contents: write # to upload archives as GitHub Releases
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0 # for release notes
 
       - name: Install Nix (for nix-prefetch-url)
-        uses: cachix/install-nix-action@616559265b40713947b9c190a8ff4b507b5df49b # v31
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
 
       - name: Download dist-mac folder
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -441,13 +623,13 @@ jobs:
         run: ls -lR src/dist
 
       - name: Set up Go # not sure why this is needed for release
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v6
         with:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
         with:
           distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
@@ -468,19 +650,19 @@ jobs:
     needs:
       - go-release
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Set up QEMU (for multi-arch builds)
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
 
       - name: Build and push Docker images and manifests
         working-directory: src
@@ -497,7 +679,7 @@ jobs:
           token: ${{ secrets.DOCS_ACTION_TRIGGER_TOKEN }}
           repository: DefangLabs/defang-docs
           event-type: cli-autodoc
-          client-payload: "{\"version\": \"${{ github.ref_name }}\"}"
+          client-payload: '{"version": "${{ github.ref_name }}"}'
 
       - name: Trigger Homebrew Formula Update
         uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4
@@ -505,10 +687,10 @@ jobs:
           token: ${{ secrets.HOMEBREW_ACTION_TRIGGER_TOKEN }}
           repository: DefangLabs/homebrew-defang
           event-type: update-homebrew-formula
-          client-payload: "{\"version\": \"${{ github.ref_name }}\"}"
+          client-payload: '{"version": "${{ github.ref_name }}"}'
 
       - name: Checkout tag
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Build npm package
         uses: ./.github/actions/npm-build
@@ -524,12 +706,13 @@ jobs:
 
   on-failure:
     runs-on: ubuntu-latest
-    if: failure() && (github.ref == 'refs/heads/main' || startsWith(github.ref,
+    if: always() && failure() && (github.ref == 'refs/heads/main' || startsWith(github.ref,
       'refs/tags/v'))
-    needs: [ go-release, post-release, nix-shell-test, push-docker ]
+    needs:
+      [go-release, post-release, nix-shell-test, push-docker, publish-nix-cache]
     steps:
       - name: Slack Notification
-        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2
         env:
           MSG_MINIMAL: actions url
           SLACK_COLOR: failure

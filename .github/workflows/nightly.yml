@@ -10,22 +10,72 @@ permissions:
 
 jobs:
   goreleaser-nightly:
-    runs-on: ubuntu-latest
+    # Pinned off ubuntu-latest: GitHub's rollout to ubuntu-26.04 makes /tmp a
+    # RAM-backed tmpfs with a ~7.8G per-user quota (actions/runner-images#14777).
+    # goreleaser's Go linker writes its large cross-compiled binaries there and
+    # hits that quota ("disk quota exceeded") despite the root disk having
+    # plenty of free space - see the two consecutive failed Nightly Build runs
+    # on 2026-10-21/22. Same class of break as DefangLabs/portal#1119.
+    runs-on: ubuntu-24.04
     environment: release
 
     steps:
       # Checkout the repository
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
+      # Skip the build when nothing has changed since the previous nightly.
+      # The nightly release publishes a lightweight `nightly` tag at the commit
+      # it was built from (see .goreleaser.yml). If HEAD is that same commit,
+      # there are no new commits to release. Manual runs always build.
+      - name: Check for changes since last nightly
+        id: check
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual run; building regardless of changes."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git fetch --force origin 'refs/tags/nightly:refs/tags/nightly' 2>/dev/null; then
+            last_nightly="$(git rev-parse --verify 'nightly^{commit}')"
+            head_sha="$(git rev-parse --verify HEAD)"
+            echo "Last nightly commit: $last_nightly"
+            echo "Current HEAD:        $head_sha"
+            if [ "$last_nightly" = "$head_sha" ]; then
+              echo "No new commits since the last nightly; skipping build."
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "No existing nightly tag found; proceeding with build."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # goreleaser cross-compiles 6 binaries (darwin/linux/windows x amd64/arm64)
+      # in one job; the runner ships with Android/.NET/Haskell toolchains
+      # preinstalled that eat most of the root disk's free space. Drop what
+      # this build never uses before it needs the space. (The actual nightly
+      # outage this guarded against was unrelated to root-disk space - see the
+      # ubuntu-24.04 pin above - but this is still worth keeping.)
+      - name: Free disk space
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
         # Get go
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v6
+        if: steps.check.outputs.changed == 'true'
         with:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
         # Execute goreleaser nightly run (see .goreleaser.yml nightly for details)
-      - uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
+      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
+        if: steps.check.outputs.changed == 'true'
         with:
           distribution: goreleaser-pro
           version: latest
@@ -38,7 +88,7 @@ jobs:
 
       - name: Slack Notification
         if: failure()
-        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2
         env:
           MSG_MINIMAL: actions url
           SLACK_COLOR: failure

@@ -13,6 +13,11 @@ services:
     models:
       my_model:
         endpoint_var: MODEL_URL
+  withmodelvar:
+    image: app
+    models:
+      ai_model:
+        model_var: MY_MODEL_NAME
 
 models:
   ai_model:

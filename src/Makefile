@@ -119,8 +119,17 @@ zips: defang_linux_amd64.zip defang_darwin.zip
 
 .PHONY: no-diff
 no-diff:
-	@# check that there are no uncommitted changes
-	git diff-index --quiet HEAD --
+	@# check that there are no uncommitted changes (staged or unstaged)
+	git diff --quiet HEAD --
+
+.PHONY: test-nix
+test-nix:
+	@# catch a stale pkgs/defang/cli.nix vendorHash before it's baked into a
+	@# release tag, where the CI auto-fix has no branch to push a fix to.
+	@# The root target silently no-ops without nix, which would make this
+	@# gate a no-op too, so require nix here instead of skipping quietly.
+	@command -v nix >/dev/null || { echo "❌ nix is required to cut a release (it gates pkgs/defang/cli.nix's vendorHash)"; exit 1; }
+	$(MAKE) -C .. test-nix
 
 .PHONY: pull
 pull:
@@ -151,14 +160,37 @@ increment-major-version:
 push-tags:
 	git push origin 'refs/tags/v*'
 
+## Each release target invokes its steps as separate $(MAKE) calls in its
+## recipe, not as prerequisites, so they run strictly in order even under
+## `make -j`: prerequisites of one target have no ordering guarantee under
+## parallel make, but recipe lines within a single target always run
+## sequentially.
 .PHONY: patch-release
-patch-release: pull test no-diff increment-patch-version push-tags
+patch-release:
+	$(MAKE) pull
+	$(MAKE) test
+	$(MAKE) test-nix
+	$(MAKE) no-diff
+	$(MAKE) increment-patch-version
+	$(MAKE) push-tags
 
 .PHONY: minor-release
-minor-release: pull test no-diff increment-minor-version push-tags
+minor-release:
+	$(MAKE) pull
+	$(MAKE) test
+	$(MAKE) test-nix
+	$(MAKE) no-diff
+	$(MAKE) increment-minor-version
+	$(MAKE) push-tags
 
 .PHONY: major-release
-major-release: pull test no-diff increment-major-version push-tags
+major-release:
+	$(MAKE) pull
+	$(MAKE) test
+	$(MAKE) test-nix
+	$(MAKE) no-diff
+	$(MAKE) increment-major-version
+	$(MAKE) push-tags
 
 .PHONY: release
 release:
@@ -217,3 +249,7 @@ snapshot:
 	  --snapshot \
 	  --clean \
 	  --skip=publish,announce,sign,notarize,validate
+
+.PHONY: ensure
+ensure: ## Run go mod tidy
+	find . -name 'go.mod' -execdir go mod tidy \;

@@ -7,9 +7,50 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/browser"
 )
+
+func TestIsOpenAuthAccessToken(t *testing.T) {
+	originalClient := OpenAuthClient
+	OpenAuthClient = NewClient("defang-cli", "https://auth.example.com")
+	t.Cleanup(func() { OpenAuthClient = originalClient })
+
+	makeToken := func(t *testing.T, issuer string, expiresAt *jwt.NumericDate) string {
+		t.Helper()
+		token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
+			Issuer:    issuer,
+			ExpiresAt: expiresAt,
+		}).SignedString([]byte("test-key"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return token
+	}
+
+	tests := []struct {
+		name  string
+		token string
+		want  bool
+	}{
+		{name: "configured issuer without expiry", token: makeToken(t, "https://auth.example.com", nil), want: true},
+		{name: "configured issuer before expiry", token: makeToken(t, "https://auth.example.com", jwt.NewNumericDate(time.Now().Add(time.Hour))), want: true},
+		{name: "configured issuer after expiry", token: makeToken(t, "https://auth.example.com", jwt.NewNumericDate(time.Now().Add(-time.Hour))), want: false},
+		{name: "different issuer", token: makeToken(t, "https://other.example.com", nil), want: false},
+		{name: "fabric access token", token: "defang_example", want: false},
+		{name: "empty", token: "", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsOpenAuthAccessToken(tt.token); got != tt.want {
+				t.Fatalf("IsOpenAuthAccessToken() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
 func TestAuthorize(t *testing.T) {
 	const issuer = "https://auth.defang.io"

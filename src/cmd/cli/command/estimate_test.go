@@ -124,11 +124,12 @@ func TestPrintEstimate(t *testing.T) {
 	}
 
 	stdout, _ := term.SetupTestTerm(t)
-	cli.PrintEstimate(modes.ModeAffordable, estimate, term.DefaultTerm)
+	cli.PrintEstimate(modes.RecipeAffordable, estimate, term.DefaultTerm)
 
 	expectedOutput := `
 Estimate for Deployment Mode: AFFORDABLE
 
+Available on all tiers.
 This mode is optimized for low cost and rapid iteration. Your application
 will be deployed with spot instances. Databases will be provisioned using
 resources optimized for burstable memory. Deployments are replaced entirely on

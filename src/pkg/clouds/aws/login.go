@@ -114,13 +114,21 @@ func (p *awsOAuthCredentialsProvider) toCredentials() awssdk.Credentials {
 //  3. Interactive browser-based OAuth login
 //
 // On success, a.Credentials is set so that subsequent calls to LoadConfig() use them.
+// regionFromEnv resolves the AWS region from the environment using the same
+// precedence as the AWS SDK: AWS_REGION takes priority over AWS_DEFAULT_REGION.
+// (Previously AWS_DEFAULT_REGION won, which silently ignored an AWS_REGION
+// override and made cross-region CD commands target the wrong region.)
+func regionFromEnv() string {
+	if region := os.Getenv("AWS_REGION"); region != "" {
+		return region
+	}
+	return os.Getenv("AWS_DEFAULT_REGION")
+}
+
 func (a *Aws) Authenticate(ctx context.Context, interactive bool) error {
 	// Resolve region before doing anything that requires it
 	if a.Region == "" {
-		region := os.Getenv("AWS_DEFAULT_REGION")
-		if region == "" {
-			region = os.Getenv("AWS_REGION")
-		}
+		region := regionFromEnv()
 		if region == "" {
 			return errors.New("AWS region required for login: set AWS_REGION or AWS_DEFAULT_REGION")
 		}

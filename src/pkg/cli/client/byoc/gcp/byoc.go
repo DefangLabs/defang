@@ -26,6 +26,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -44,7 +45,6 @@ var _ client.Provider = (*ByocGcp)(nil)
 const (
 	DefangCDProjectName            = "defang-cd"
 	DefangUploadServiceAccountName = "defang-upload"
-	UploadPrefix                   = "uploads/"
 )
 
 var (
@@ -122,6 +122,7 @@ type ByocGcp struct {
 	driver gcpDriver
 
 	bucket               string
+	existingBucket       string // adopt this bucket instead of creating one (`cd install --bucket`)
 	cdServiceAccount     string
 	uploadServiceAccount string
 	delegateDomainZone   string
@@ -139,12 +140,20 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 		TokenStore: &tokenstore.LocalDirTokenStore{Dir: filepath.Join(client.StateDir, "providers", "gcp")},
 	}}
 	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
+	b.existingBucket = os.Getenv("DEFANG_CD_BUCKET") // adopt an existing CD bucket; `cd install --bucket` overrides
 
 	return b
 }
 
 func (b *ByocGcp) Authenticate(ctx context.Context, interactive bool) error {
 	return b.driver.Authenticate(ctx, interactive)
+}
+
+// SetCDBucket makes the CD stack adopt an existing GCS bucket for deployment
+// state instead of creating a new one. Must be called before SetUpCD. Used by
+// the explicit `defang cd install --bucket` flag.
+func (b *ByocGcp) SetCDBucket(name string) {
+	b.existingBucket = name
 }
 
 func getGcpRegion() string {
@@ -198,8 +207,11 @@ func (b *ByocGcp) SetUpCD(ctx context.Context, force bool) error {
 		return annotateGcpError(err)
 	}
 
-	// 2. Setup cd bucket
-	if bucket, err := b.driver.EnsureBucketExists(ctx, DefangCDProjectName, true); err != nil {
+	// 2. Setup cd bucket. Adopt an explicitly-provided bucket if set
+	// (`cd install --bucket`); otherwise find-or-create the CD bucket.
+	if b.existingBucket != "" {
+		b.bucket = b.existingBucket
+	} else if bucket, err := b.driver.EnsureBucketExists(ctx, DefangCDProjectName, true); err != nil {
 		return err
 	} else {
 		b.bucket = bucket
@@ -348,7 +360,7 @@ func (b *ByocGcp) CdList(ctx context.Context, _allRegions bool) (iter.Seq[state.
 func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
 	projectId := getGcpProjectID()
 	if projectId == "" {
-		return nil, fmt.Errorf("GCP project ID must be set via one of: %v; use 'gcloud projects list' to see available project ids", pkg.GCPProjectEnvVars)
+		return nil, fmt.Errorf("GCP project ID must be set via a shell environment variable (not `defang config set`): one of %v; use 'gcloud projects list' to see available project ids", pkg.GCPProjectEnvVars)
 	}
 
 	// check whether the ADC is logged in by trying to get the current account email
@@ -398,10 +410,11 @@ type cdCommand struct {
 	command        []string
 	delegateDomain string
 	etag           types.ETag
-	mode           defangv1.DeploymentMode
+	recipe         modes.Recipe
 	project        string
 	statesUrl      string
 	eventsUrl      string
+	ttl            string // forwarded to CD as DEFANG_TTL; empty when no TTL was given
 }
 
 type CloudBuildStep struct {
@@ -419,10 +432,18 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		return "", err
 	}
 	env := map[string]string{
+		// Cloud Build overrides the image's own HOME for every build step, so Pulumi looks for
+		// its plugin cache somewhere other than the /root/.pulumi/plugins the CD image ships.
+		// It finds nothing, and silently downloads both providers at deploy time instead —
+		// pulumi-gcp from the CDN and defang-gcp from the pluginDownloadURL the generated SDK
+		// carries, which resolves to the latest GitHub *release*. That made every deploy depend
+		// on the public internet and, worse, meant pinning DEFANG_CD_IMAGE pinned only the cd
+		// binary while the provider silently floated to whatever was released last.
+		"HOME":                     "/root",
 		"DEFANG_CD_IMAGE":          b.CDImage,                 // used by down/destroy to schedule cleanup job with the same image
 		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_JSON":              os.Getenv("DEFANG_JSON"),
-		"DEFANG_MODE":              strings.ToLower(cmd.mode.String()),
+		"DEFANG_MODE":              strings.ToLower(cmd.recipe.Mode().String()),
 		"DEFANG_ORG":               string(b.TenantLabel),
 		"DEFANG_PREFIX":            b.Prefix,
 		"DEFANG_PULUMI_DEBUG":      os.Getenv("DEFANG_PULUMI_DEBUG"),
@@ -436,6 +457,10 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"REGION":                   b.driver.GetRegion(),
 		"STACK":                    b.PulumiStack,
 		pulumiBackendKey:           pulumiBackendValue, // TODO: make secret
+	}
+
+	if cmd.ttl != "" {
+		env["DEFANG_TTL"] = cmd.ttl
 	}
 
 	if !term.StdoutCanColor() {
@@ -510,7 +535,7 @@ func (b *ByocGcp) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 		return nil, err
 	}
 
-	url, err := b.driver.CreateUploadURL(ctx, b.bucket, path.Join(UploadPrefix, req.Digest), b.uploadServiceAccount)
+	url, err := b.driver.CreateUploadURL(ctx, b.bucket, path.Join(byoc.UploadPrefix, req.Digest), b.uploadServiceAccount)
 	if err != nil {
 		if strings.Contains(err.Error(), "Permission 'iam.serviceAccounts.signBlob' denied on resource") {
 			return nil, errors.New("current user does not have 'iam.serviceAccounts.signBlob' permission. If it has been recently added, please wait a few minutes then try again")
@@ -557,6 +582,7 @@ func (b *ByocGcp) deploy(ctx context.Context, req *client.DeployRequest, command
 		Mode:          req.Mode,
 		PulumiVersion: b.PulumiVersion,
 		Services:      serviceInfos,
+		Recipe:        req.Recipe,
 	})
 	if err != nil {
 		return nil, err
@@ -566,7 +592,7 @@ func (b *ByocGcp) deploy(ctx context.Context, req *client.DeployRequest, command
 	if len(data) < 1000 {
 		payload = base64.StdEncoding.EncodeToString(data)
 	} else {
-		payloadUrl, err := b.driver.CreateUploadURL(ctx, b.bucket, path.Join(UploadPrefix, etag), b.uploadServiceAccount)
+		payloadUrl, err := b.driver.CreateUploadURL(ctx, b.bucket, path.Join(byoc.UploadPrefix, etag), b.uploadServiceAccount)
 		if err != nil {
 			return nil, err
 		}
@@ -588,10 +614,11 @@ func (b *ByocGcp) deploy(ctx context.Context, req *client.DeployRequest, command
 		command:        []string{command, payload},
 		delegateDomain: req.DelegateDomain,
 		etag:           etag,
-		mode:           req.Mode,
+		recipe:         modes.Recipe(req.RecipeName),
 		project:        project.Name,
 		statesUrl:      req.StatesUrl,
 		eventsUrl:      req.EventsUrl,
+		ttl:            req.TTL,
 	}
 	buildId, err := b.runCdCommand(ctx, cdCmd)
 	if err != nil {

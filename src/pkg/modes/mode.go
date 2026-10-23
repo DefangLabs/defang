@@ -9,6 +9,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
+// Deprecated: use Recipe instead of deployment Mode
 type Mode defangv1.DeploymentMode
 
 const (
@@ -72,6 +73,7 @@ func (b Mode) Value() defangv1.DeploymentMode {
 	return defangv1.DeploymentMode(b)
 }
 
+// Deprecated: query active Recipes instead of deployment Mode
 func AllDeploymentModes() []string {
 	var modes []string
 	for _, i := range slices.Sorted(maps.Keys(defangv1.DeploymentMode_name)) {

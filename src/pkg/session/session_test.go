@@ -3,11 +3,13 @@ package session
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/stretchr/testify/assert"
@@ -63,6 +65,26 @@ func (m *mockStacksManager) GetStack(ctx context.Context, opts stacks.GetStackOp
 
 func (m *mockStacksManager) TargetDirectory() string {
 	return ""
+}
+
+func TestStackEnvFiles(t *testing.T) {
+	tests := []struct {
+		name     string
+		stack    stacks.Parameters
+		expected []string
+	}{
+		{"provider then stack name", stacks.Parameters{Name: "mystack", Provider: client.ProviderAWS}, []string{".env", ".env.aws", ".env.mystack"}},
+		{"auto provider is skipped", stacks.Parameters{Name: "mystack", Provider: client.ProviderAuto}, []string{".env", ".env.mystack"}},
+		{"empty provider is skipped", stacks.Parameters{Name: "mystack"}, []string{".env", ".env.mystack"}},
+		{"empty stack name is skipped", stacks.Parameters{Provider: client.ProviderGCP}, []string{".env", ".env.gcp"}},
+		{"empty stack", stacks.Parameters{}, []string{".env"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, StackEnvFiles(&tt.stack))
+		})
+	}
 }
 
 func TestPrintProviderMismatchWarnings(t *testing.T) {
@@ -151,20 +173,20 @@ func TestLoadSession(t *testing.T) {
 			options: SessionLoaderOptions{
 				GetStackOpts: stacks.GetStackOpts{
 					Default: stacks.Parameters{
-						Name: "existingstack",
-						Mode: modes.ModeAffordable,
+						Name:   "existingstack",
+						Recipe: modes.RecipeAffordable,
 					},
 				},
 			},
 			existingStack: &stacks.Parameters{
 				Name:     "existingstack",
 				Provider: client.ProviderAWS,
-				Mode:     modes.ModeBalanced,
+				Recipe:   modes.RecipeBalanced,
 			},
 			expectedStack: &stacks.Parameters{
 				Name:     "existingstack",
 				Provider: client.ProviderAWS,
-				Mode:     modes.ModeAffordable,
+				Recipe:   modes.RecipeAffordable,
 				Variables: map[string]string{
 					"DEFANG_PROVIDER": "aws",
 					"DEFANG_MODE":     "affordable",
@@ -226,7 +248,7 @@ func TestLoadSession(t *testing.T) {
 			require.NotNil(t, session.Stack)
 			assert.Equal(t, tt.expectedStack.Name, session.Stack.Name)
 			assert.Equal(t, tt.expectedStack.Provider, session.Stack.Provider)
-			assert.Equal(t, tt.expectedStack.Mode, session.Stack.Mode)
+			assert.Equal(t, tt.expectedStack.Recipe, session.Stack.Recipe)
 
 			// Verify environment variables
 			for key, expectedValue := range tt.expectedEnv {
@@ -240,4 +262,39 @@ func TestLoadSession(t *testing.T) {
 			sm.AssertExpectations(t)
 		})
 	}
+}
+
+func TestLoadSessionSetsInterpolationEnv(t *testing.T) {
+	const composeYAML = `name: sessioninterpolationtest
+services:
+  web:
+    image: alpine
+    environment:
+      - PROVIDER=${DEFANG_PROVIDER}
+      - STACK=${DEFANG_STACK}
+`
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	require.NoError(t, os.WriteFile(composePath, []byte(composeYAML), 0o644))
+	t.Setenv("DEFANG_PROVIDER", "aws")
+
+	ctx := t.Context()
+	stack := &stacks.Parameters{Name: "production", Provider: client.ProviderDefang}
+	sm := &mockStacksManager{}
+	sm.On("GetStack", ctx, mock.Anything).Return(stack, "local", nil)
+	loader := NewSessionLoader(client.MockFabricClient{}, sm, SessionLoaderOptions{
+		LoaderOptions: compose.LoaderOptions{ConfigPaths: []string{composePath}},
+	})
+
+	session, err := loader.LoadSession(ctx)
+	require.NoError(t, err)
+	project, err := session.Loader.LoadProject(ctx)
+	require.NoError(t, err)
+
+	env := project.Services["web"].Environment
+	require.NotNil(t, env["PROVIDER"])
+	require.NotNil(t, env["STACK"])
+	assert.Equal(t, "defang", *env["PROVIDER"])
+	assert.Equal(t, "production", *env["STACK"])
+	sm.AssertExpectations(t)
 }

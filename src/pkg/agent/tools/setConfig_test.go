@@ -95,6 +95,30 @@ func (m *MockSetConfigCLI) InteractiveLoginMCP(ctx context.Context, fabricAddr s
 	return nil
 }
 
+func TestHandleSetConfigRefusesWhenNotConfirmable(t *testing.T) {
+	t.Chdir("testdata")
+	os.Unsetenv("DEFANG_PROVIDER")
+	os.Unsetenv("AWS_PROFILE")
+	os.Unsetenv("AWS_REGION")
+
+	mockCLI := &MockSetConfigCLI{}
+	ec := elicitations.NewController(&mockElicitationsClient{})
+	ec.SetSupported(false)
+
+	stack := stacks.Parameters{Name: "test-stack", Provider: client.ProviderAWS}
+	_, err := HandleSetConfig(t.Context(), SetConfigParams{Name: "test-config", Value: "test-value"}, mockCLI, ec, StackConfig{
+		FabricAddr: "test-cluster",
+		Stack:      &stack,
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `refusing to set config variable "test-config"`)
+	assert.False(t, mockCLI.ConnectCalled, "no connect should happen when the write is refused")
+	assert.False(t, mockCLI.NewProviderCalled, "no provider setup should happen when the write is refused")
+	assert.False(t, mockCLI.LoadProjectNameCalled, "no project name lookup should happen when the write is refused")
+	assert.False(t, mockCLI.ConfigSetCalled, "no config write should happen when the write is refused")
+}
+
 func TestHandleSetConfig(t *testing.T) {
 	// Common test data
 	const (
@@ -262,8 +286,6 @@ func TestHandleSetConfig(t *testing.T) {
 			os.Unsetenv("AWS_PROFILE")
 			os.Unsetenv("AWS_REGION")
 
-			loader := &client.MockLoader{}
-
 			// Extract arguments with defaults for missing values
 			name := ""
 			if n, ok := tt.requestArgs["name"].(string); ok {
@@ -293,7 +315,7 @@ func TestHandleSetConfig(t *testing.T) {
 				Name:     "test-stack",
 				Provider: client.ProviderAWS,
 			}
-			result, err := HandleSetConfig(t.Context(), loader, params, tt.mockCLI, ec, StackConfig{
+			result, err := HandleSetConfig(t.Context(), params, tt.mockCLI, ec, StackConfig{
 				FabricAddr: tt.fabricAddr,
 				Stack:      &stack,
 			})

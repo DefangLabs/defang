@@ -20,16 +20,16 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func RunEstimate(ctx context.Context, project *compose.Project, client client.FabricClient, previewProvider client.Provider, estimateProviderID client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
-	term.Debugf("Running estimate for project %s in region %s with mode %s", project.Name, region, mode)
-	preview, err := GeneratePreview(ctx, project, client, previewProvider, estimateProviderID, mode, region)
+func RunEstimate(ctx context.Context, project *compose.Project, fabric client.FabricClient, previewProvider client.Provider, estimateProviderID client.ProviderID, region string, recipe modes.Recipe) (*defangv1.EstimateResponse, error) {
+	term.Debugf("Running estimate for project %s in region %s with mode %s", project.Name, region, recipe)
+	preview, err := GeneratePreview(ctx, project, fabric, previewProvider, estimateProviderID, recipe, region)
 	if err != nil {
 		return nil, err
 	}
 
 	term.Info("Preparing estimate")
 
-	estimate, err := client.Estimate(ctx, &defangv1.EstimateRequest{
+	estimate, err := fabric.Estimate(ctx, &defangv1.EstimateRequest{
 		Provider:      estimateProviderID.Value(),
 		Region:        region,
 		PulumiPreview: []byte(preview),
@@ -40,7 +40,7 @@ func RunEstimate(ctx context.Context, project *compose.Project, client client.Fa
 	return estimate, nil
 }
 
-func GeneratePreview(ctx context.Context, project *compose.Project, client client.FabricClient, previewProvider client.Provider, estimateProviderID client.ProviderID, mode modes.Mode, region string) (string, error) {
+func GeneratePreview(ctx context.Context, project *compose.Project, fabric client.FabricClient, previewProvider client.Provider, estimateProviderID client.ProviderID, recipe modes.Recipe, region string) (string, error) {
 	os.Setenv("DEFANG_JSON", "1")             // HACK: always show JSON output for estimate
 	since := time.Now().Add(-1 * time.Minute) // fetch logs since one minute ago to account for clock drift
 
@@ -56,12 +56,18 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 
 	term.Debugf("Fixedup project: %s", string(composeData))
 
-	resp, err := client.Preview(ctx, &defangv1.PreviewRequest{
+	recipeMsg, err := getRecipe(ctx, fabric, recipe)
+	if err != nil {
+		return "", fmt.Errorf("failed to get recipe for deployment mode %q: %w", recipe, err)
+	}
+	// Allow estimate/preview with an inactive recipe so teams can evaluate it before activating.
+	resp, err := fabric.Preview(ctx, &defangv1.PreviewRequest{
 		Provider:    estimateProviderID.Value(),
-		Mode:        mode.Value(),
+		Mode:        recipe.Mode().Value(),
 		Region:      region,
 		Compose:     composeData,
 		ProjectName: project.Name,
+		Recipe:      recipeMsg,
 	})
 	if err != nil {
 		return "", err
@@ -95,6 +101,7 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 }
 
 var affordableModeEstimateSummary = `
+Available on all tiers.
 This mode is optimized for low cost and rapid iteration. Your application
 will be deployed with spot instances. Databases will be provisioned using
 resources optimized for burstable memory. Deployments are replaced entirely on
@@ -103,34 +110,33 @@ Services will be exposed directly to the public internet for easy debugging.
 This mode emphasizes affordability over availability.`
 
 var balancedModeEstimateSummary = `
+Requires Pro tier.
 This mode strikes a balance between cost and availability. Your application
 will be deployed with spot instances. Databases will be provisioned using
 resources optimized for production. Services in the "internal" network will
 be deployed to a private subnet with a NAT gateway for outbound internet access.`
 
 var highAvailabilityModeEstimateSummary = `
+Requires Enterprise tier.
 This mode prioritizes availability. Your application
 will be deployed with on-demand instances in multiple availability zones.
 Databases will be provisioned using resources optimized for production.
 Services in the "internal" network will be deployed to a private subnet with a
 NAT gateway for outbound internet access.`
 
-func PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse, term *term.Term) {
+func PrintEstimate(mode modes.Recipe, estimate *defangv1.EstimateResponse, term *term.Term) {
 	subtotal := (*money.Money)(estimate.Subtotal)
 	tableItems := prepareEstimateLineItemTableItems(estimate.LineItems)
 	term.Println("")
+	term.Println("Estimate for Deployment Mode:", mode)
 	switch mode {
-	case modes.ModeAffordable:
-		term.Println("Estimate for Deployment Mode: AFFORDABLE")
+	case modes.RecipeAffordable:
 		term.Println(affordableModeEstimateSummary)
-	case modes.ModeBalanced:
-		term.Println("Estimate for Deployment Mode: BALANCED")
+	case modes.RecipeBalanced:
 		term.Println(balancedModeEstimateSummary)
-	case modes.ModeHighAvailability:
-		term.Println("Estimate for Deployment Mode: HIGH_AVAILABILITY")
+	case modes.RecipeHighAvailability:
 		term.Println(highAvailabilityModeEstimateSummary)
 	default:
-		panic("unexpected mode")
 	}
 
 	term.Table(tableItems, "Cost", "Quantity", "Service", "Description")

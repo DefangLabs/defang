@@ -24,6 +24,12 @@ type AwsCfn struct {
 	stackName string
 	fillOnce  sync.Once
 	fillErr   error
+
+	// ExistingBucket, when set, makes the CD stack adopt that pre-existing S3
+	// bucket for deployment state instead of creating (and managing) its own.
+	// This is opt-in and only set from the explicit `defang cd install --bucket`
+	// flag — we deliberately do NOT auto-discover buckets (see #2192).
+	ExistingBucket string
 }
 
 const stackTimeout = time.Minute * 3
@@ -115,6 +121,11 @@ func (a *AwsCfn) createStackAndWait(ctx context.Context, templateBody string, pa
 		return err
 	}
 
+	// A new stack has no previous parameter values; drop UsePreviousValue params so the template defaults apply.
+	parameters = slices.DeleteFunc(slices.Clone(parameters), func(p cfnTypes.Parameter) bool {
+		return p.UsePreviousValue != nil && *p.UsePreviousValue
+	})
+
 	_, err = cfn.CreateStack(ctx, &cloudformation.CreateStackInput{
 		Capabilities:                []cfnTypes.Capability{cfnTypes.CapabilityCapabilityNamedIam},
 		EnableTerminationProtection: ptr.Bool(true),
@@ -142,7 +153,9 @@ func (a *AwsCfn) createStackAndWait(ctx context.Context, templateBody string, pa
 }
 
 func (a *AwsCfn) SetUp(ctx context.Context, force bool) (bool, error) {
-	template, err := CreateTemplate(a.stackName)
+	// Adopt a pre-existing bucket only when explicitly requested (via
+	// `defang cd install --bucket`); otherwise the stack manages its own bucket.
+	template, err := CreateTemplate(a.stackName, a.ExistingBucket)
 	if err != nil {
 		return false, fmt.Errorf("failed to create CloudFormation template: %w", err)
 	}

@@ -1,5 +1,5 @@
 # Build stage
-ARG GO_VERSION=1.24
+ARG GO_VERSION=1.26.10
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS builder
 
 # These two are automatically set by docker buildx
@@ -45,5 +45,4 @@ EXPOSE 47071
 ENTRYPOINT ["defang"]
 
 CMD ["--help"]
-
 

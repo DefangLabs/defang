@@ -38,7 +38,7 @@ func (DefaultToolCLI) ConfigSet(ctx context.Context, projectName string, provide
 	return err
 }
 
-func (DefaultToolCLI) RunEstimate(ctx context.Context, project *compose.Project, fabric *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
+func (DefaultToolCLI) RunEstimate(ctx context.Context, project *compose.Project, fabric *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Recipe) (*defangv1.EstimateResponse, error) {
 	return cli.RunEstimate(ctx, project, fabric, provider, providerId, region, mode)
 }
 
@@ -76,7 +76,7 @@ func (DefaultToolCLI) GetServices(ctx context.Context, projectName string, provi
 	return cli.GetServices(ctx, projectName, provider)
 }
 
-func (DefaultToolCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string {
+func (DefaultToolCLI) PrintEstimate(mode modes.Recipe, estimate *defangv1.EstimateResponse) string {
 	stdout := new(bytes.Buffer)
 	captureTerm := term.NewTerm(
 		os.Stdin,

@@ -16,7 +16,7 @@ import (
 func setupWorkspaceTestServers(t *testing.T) (clusterURL string) {
 	t.Helper()
 
-	mockService := &mockFabricService{}
+	mockService := &mockFabricService{tenantId: "ws-2"}
 	_, handler := defangv1.NewFabricControllerHandler(mockService)
 
 	fabricServer := httptest.NewServer(handler)
@@ -58,7 +58,7 @@ func TestWorkspaceListJSON(t *testing.T) {
 
 	// Reset stack name to prevent loading stack files
 	global.Stack.Name = ""
-	global.Tenant = "ws-2"
+	global.TenantSelection = "ws-2"
 
 	if err := testCommand(t, []string{"workspace", "ls", "--json", "--non-interactive"}, clusterURL); err != nil {
 		t.Fatalf("workspace ls --json failed: %v", err)
@@ -87,7 +87,7 @@ func TestWorkspaceListVerboseTable(t *testing.T) {
 	oldGlobal := global
 	t.Cleanup(func() { global = oldGlobal })
 
-	global.Tenant = "Workspace One"
+	global.TenantSelection = "Workspace One"
 	// Reset stack name to prevent loading stack files
 	global.Stack.Name = ""
 

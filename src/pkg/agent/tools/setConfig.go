@@ -7,11 +7,9 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
-	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
-	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
@@ -22,26 +20,14 @@ type SetConfigParams struct {
 	Random bool   `json:"random,omitempty" jsonschema:"description=Generate a secure randomly generated value for config (default: false)"`
 }
 
-func HandleSetConfig(ctx context.Context, loader client.Loader, params SetConfigParams, cliInterface CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
-	term.Debug("Function invoked: cli.Connect")
-	fabric, err := GetClientWithRetry(ctx, cliInterface, sc.FabricAddr)
-	if err != nil {
-		var noBrowserErr auth.ErrNoBrowser
-		if errors.As(err, &noBrowserErr) {
-			return noBrowserErr.Error(), nil
-		}
+func HandleSetConfig(ctx context.Context, params SetConfigParams, cliInterface CLIInterface, ec elicitations.Controller, sc StackConfig) (string, error) {
+	if err := requireConfirmable(ec, fmt.Sprintf("set config variable %q", params.Name)); err != nil {
 		return "", err
 	}
 
-	workingDir, _ := loader.ProjectWorkingDir(ctx)
-	sm, err := stacks.NewManager(fabric, workingDir, params.ProjectName, ec)
+	_, provider, loader, err := setupProviderAndLoader(ctx, params.LoaderParams, cliInterface, ec, sc)
 	if err != nil {
-		return "", fmt.Errorf("failed to create stack manager: %w", err)
-	}
-	pp := NewProviderPreparer(cliInterface, ec, fabric, sm)
-	_, provider, err := pp.SetupProvider(ctx, sc.Stack)
-	if err != nil {
-		return "", fmt.Errorf("failed to setup provider: %w", err)
+		return setupErrorResult(err)
 	}
 
 	if params.ProjectName == "" {

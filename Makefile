@@ -1,16 +1,13 @@
 .PHONY: install-git-hooks
 install-git-hooks:
-	printf "#!/bin/sh\nmake pre-commit" > .git/hooks/pre-commit
-	chmod +x .git/hooks/pre-commit
-	printf "#!/bin/sh\nmake pre-push" > .git/hooks/pre-push
-	chmod +x .git/hooks/pre-push
+	git config core.hooksPath scripts
 
 .PHONY: pre-commit
 pre-commit:
 	@if git diff --cached --name-only | grep -q '^src/'; then $(MAKE) -C src lint; fi
 
 .PHONY: pre-push
-pre-push: pkgs/npm/README.md src/README.md test test-nix
+pre-push: pkgs/npm/README.md src/README.md test
 
 .PHONY: test
 test:
@@ -25,7 +22,7 @@ pkgs/npm/README.md src/README.md: README.md
 	@awk '/^## Defang CLI/{p=1} (/^## /||/^### /){if(p&&!/^## Defang CLI/){exit}} p' $< >> src/README.md
 	@awk '/^## Getting started/{p=1} (/^## /||/^### /){if(p&&!/^## Getting started/){exit}} p' $< >> src/README.md
 	@awk '/^## Support/{p=1} (/^## /||/^### /){if(p&&!/^## Support/){exit}} p' $< >> src/README.md
-	@awk '/^## Environment Variables/{p=1} (/^## /||/^### /){if(p&&!/^## Environment Variables/){exit}} p' $< >> src/README.md
+	@awk '/^## Environment Variables/{p=1} /^## /{if(p&&!/^## Environment Variables/){exit}} p' $< | sed '$${/^$$/d;}' >> src/README.md
 	@cp src/README.md pkgs/npm/README.md
 	@git diff --quiet $@ || (git add $@ && echo 'README files synced. Please add the changes to your commit.' && false)
 

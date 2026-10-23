@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -29,11 +30,9 @@ type mockSurveyor struct {
 }
 
 func (s *mockSurveyor) AskOne(q survey.Prompt, response interface{}, opts ...survey.AskOpt) error {
-	b, ok := response.(*bool)
-	if !ok {
-		panic("response must be a *bool for this mock")
+	if boolptr, ok := response.(*bool); ok {
+		*boolptr = s.response
 	}
-	*b = s.response
 	return nil
 }
 
@@ -79,6 +78,18 @@ func TestDebugDeployment(t *testing.T) {
 			expectedPrompt: "An error occurred while deploying this project to AWS with Defang. Help troubleshoot and recommend a solution. Look at the logs to understand what happened. The deployment ID is \"test-deployment\". The services that failed to deploy are: [backend]. The deployment started at 2025-01-02 03:04:05 +0000 UTC. The deployment finished at 2025-01-02 04:05:06 +0000 UTC.The compose files are at []. The compose file is as follows:\n\nservices: {}\n",
 			permission:     true,
 		},
+		{
+			// compose down never loads a compose.Project, so it can only pass a resolved
+			// name (issue #2248: the agent's logs tool omitted project_name and failed
+			// once the account had more than one deployed project).
+			name: "With ProjectName but no Project",
+			debugConfig: DebugConfig{
+				Deployment:  "test-deployment",
+				ProjectName: "component-registry",
+			},
+			expectedPrompt: "An error occurred while deploying this project with Defang. Help troubleshoot and recommend a solution. Look at the logs to understand what happened. The deployment ID is \"test-deployment\". The project name is \"component-registry\"; pass it explicitly to your tools.",
+			permission:     true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -86,8 +97,9 @@ func TestDebugDeployment(t *testing.T) {
 			response: tt.permission,
 		}
 		debugger := &Debugger{
-			agent:    mockAgent,
-			surveyor: mockSurveyor,
+			agent:       mockAgent,
+			surveyor:    mockSurveyor,
+			interactive: true,
 		}
 		t.Run(tt.name, func(t *testing.T) {
 			mockAgent.ExpectedCalls = nil
@@ -142,8 +154,9 @@ func TestDebugComposeLoadError(t *testing.T) {
 			response: tt.permission,
 		}
 		debugger := &Debugger{
-			agent:    mockAgent,
-			surveyor: mockSurveyor,
+			agent:       mockAgent,
+			surveyor:    mockSurveyor,
+			interactive: true,
 		}
 		t.Run(tt.name, func(t *testing.T) {
 			mockAgent.ExpectedCalls = nil
@@ -179,6 +192,93 @@ func TestDebugComposeLoadError(t *testing.T) {
 			} else {
 				mockAgent.AssertNotCalled(t, "StartWithMessage", mock.Anything, mock.Anything)
 			}
+		})
+	}
+}
+
+// failSurveyor fails the test if any prompt is attempted; used to prove the non-interactive path
+// never prompts.
+type failSurveyor struct{ t *testing.T }
+
+func (s failSurveyor) AskOne(survey.Prompt, interface{}, ...survey.AskOpt) error {
+	s.t.Fatal("non-interactive debugger must not prompt")
+	return nil
+}
+
+func TestDebugDeploymentNonInteractive(t *testing.T) {
+	ctx := t.Context()
+	const expectedPrompt = `An error occurred while deploying this project with Defang. Help troubleshoot and recommend a solution. Look at the logs to understand what happened. The deployment ID is "test-deployment".`
+
+	tests := []struct {
+		name        string
+		autoApprove bool
+		expectRun   bool
+	}{
+		{name: "paid account auto-runs without prompting", autoApprove: true, expectRun: true},
+		{name: "free account does not run", autoApprove: false, expectRun: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stdout, stderr := term.SetupTestTerm(t)
+			mockAgent := &mockAgent{}
+			if tt.expectRun {
+				mockAgent.On("StartWithMessage", ctx, expectedPrompt).Return(nil)
+			}
+			debugger := &Debugger{
+				agent:             mockAgent,
+				surveyor:          failSurveyor{t}, // must never be called when non-interactive
+				defaultPermission: tt.autoApprove,
+				interactive:       false,
+			}
+
+			err := debugger.DebugDeployment(ctx, DebugConfig{Deployment: "test-deployment"})
+			assert.NoError(t, err)
+
+			if tt.expectRun {
+				mockAgent.AssertCalled(t, "StartWithMessage", ctx, expectedPrompt)
+				assert.Contains(t, stdout.String()+stderr.String(), "AI-generated analysis may be inaccurate. Please verify it against the logs.")
+			} else {
+				mockAgent.AssertNotCalled(t, "StartWithMessage", mock.Anything, mock.Anything)
+				assert.NotContains(t, stdout.String()+stderr.String(), "AI-generated analysis may be inaccurate")
+			}
+		})
+	}
+}
+
+func TestTruncatePromptPayloads(t *testing.T) {
+	tests := []struct {
+		name string
+		fn   func(string, int) string
+		in   string
+		max  int
+		want string
+	}{
+		{name: "head: short string unchanged", fn: truncateHead, in: "abc", max: 5, want: "abc"},
+		{name: "head: exact length unchanged", fn: truncateHead, in: "abcde", max: 5, want: "abcde"},
+		{name: "head: keeps the start", fn: truncateHead, in: "abcdefgh", max: 5, want: "abcde\n... (truncated; ask the user or use your tools for the rest)"},
+		{name: "tail: short string unchanged", fn: truncateTail, in: "abc", max: 5, want: "abc"},
+		{name: "tail: exact length unchanged", fn: truncateTail, in: "abcde", max: 5, want: "abcde"},
+		{name: "tail: keeps the end", fn: truncateTail, in: "abcdefgh", max: 5, want: "(truncated) ...defgh"},
+		// A multibyte character straddling the limit must be dropped whole: half a rune
+		// reaches the model as U+FFFD, and can break a strict JSON encoder on the way.
+		// "€" is 3 bytes, so limits 3, 4 and 5 each cut inside it from a different offset.
+		{name: "head: cut inside a rune drops it", fn: truncateHead, in: "ab€cd", max: 3,
+			want: "ab\n... (truncated; ask the user or use your tools for the rest)"},
+		{name: "head: cut one byte into a rune", fn: truncateHead, in: "ab€cd", max: 4,
+			want: "ab\n... (truncated; ask the user or use your tools for the rest)"},
+		{name: "head: cut on a rune boundary keeps it", fn: truncateHead, in: "ab€cd", max: 5,
+			want: "ab€\n... (truncated; ask the user or use your tools for the rest)"},
+		{name: "tail: cut inside a rune drops it", fn: truncateTail, in: "ab€cd", max: 3, want: "(truncated) ...cd"},
+		{name: "tail: cut one byte into a rune", fn: truncateTail, in: "ab€cd", max: 4, want: "(truncated) ...cd"},
+		{name: "tail: cut on a rune boundary keeps it", fn: truncateTail, in: "ab€cd", max: 5, want: "(truncated) ...€cd"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.fn(tt.in, tt.max)
+			assert.Equal(t, tt.want, got)
+			assert.True(t, utf8.ValidString(got), "truncation must not split a rune: %q", got)
 		})
 	}
 }

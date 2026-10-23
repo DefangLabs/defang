@@ -3,6 +3,8 @@ package azure
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,7 +12,9 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cloudazure "github.com/DefangLabs/defang/src/pkg/clouds/azure"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 type fakeCred struct {
@@ -85,6 +89,8 @@ func TestProjectResourceGroupName(t *testing.T) {
 	if err := b.setUpLocation(); err != nil {
 		t.Fatalf("setUpLocation: %v", err)
 	}
+	// The RG must match what Pulumi creates: {Prefix}-{project}-{stack}, using the bare
+	// project name (the stack is a separate axis, not baked into the project name).
 	got := b.projectResourceGroupName("myapp")
 	want := "Defang-myapp-test-stack"
 	if got != want {
@@ -177,29 +183,48 @@ func TestGetServiceEmptyProjectNotFound(t *testing.T) {
 	}
 }
 
-func TestPrepareDomainDelegationNil(t *testing.T) {
+func TestPrepareDomainDelegationEmptyDomain(t *testing.T) {
+	// No delegate domain means nothing to delegate: return (nil, nil) without
+	// touching Azure, so callers treat the deployment as having no delegation.
 	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
 	resp, err := b.PrepareDomainDelegation(t.Context(), client.PrepareDomainDelegationRequest{})
 	if err != nil {
 		t.Errorf("PrepareDomainDelegation err: %v", err)
 	}
 	if resp != nil {
-		t.Errorf("PrepareDomainDelegation response = %v, want nil (TODO)", resp)
+		t.Errorf("PrepareDomainDelegation response = %v, want nil for empty domain", resp)
 	}
 }
 
-func TestSubscribe(t *testing.T) {
+func TestPrepareDomainDelegationCredError(t *testing.T) {
+	// A non-empty delegate domain drives real ARM calls (resource group +
+	// DNS zone); a failing credential must surface as an error rather than a
+	// silent success.
+	useFakeCred(t, "", errors.New("denied"))
 	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
-	seq, err := b.Subscribe(t.Context(), &defangv1.SubscribeRequest{})
-	if err != nil {
-		t.Fatalf("Subscribe err: %v", err)
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	_, err := b.PrepareDomainDelegation(ctx, client.PrepareDomainDelegationRequest{
+		Project:        "proj",
+		DelegateDomain: "proj-test-stack.tenant.example.com",
+	})
+	if err == nil {
+		t.Error("PrepareDomainDelegation should surface ARM error")
 	}
-	if seq == nil {
-		t.Fatal("Subscribe returned nil seq")
+}
+
+func TestHasDelegatedSubdomain(t *testing.T) {
+	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
+	if !b.HasDelegatedSubdomain() {
+		t.Error("HasDelegatedSubdomain() = false, want true now that Azure delegates a subdomain zone")
 	}
-	// The TODO stub simply yields nothing — iterating should finish immediately.
-	for range seq {
-		t.Error("Subscribe iterator yielded unexpectedly")
+}
+
+func TestSubscribeNoActiveDeployment(t *testing.T) {
+	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
+	_, err := b.Subscribe(t.Context(), &defangv1.SubscribeRequest{})
+	if err == nil {
+		t.Fatal("Subscribe should error when no Deploy / CdCommand has run yet")
 	}
 }
 
@@ -236,23 +261,32 @@ func TestGetProjectUpdateCredError(t *testing.T) {
 	}
 }
 
-func TestQueryLogsUnknownEtag(t *testing.T) {
+func TestQueryLogsDiscoversRunByEtag(t *testing.T) {
+	// A standalone `defang logs` has no cached cdRunID, so QueryLogs must look the
+	// CD run up by etag. When that lookup can't reach Azure it surfaces the error
+	// (rather than the old "no matching CD deployment" rejection).
+	useFakeCred(t, "", errors.New("denied"))
 	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
-	// cdRunID is empty — QueryLogs should reject the request rather than panic.
-	_, err := b.QueryLogs(t.Context(), &defangv1.TailRequest{Etag: "some-etag"})
-	if err == nil {
-		t.Error("QueryLogs should reject when cdRunID is empty")
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	_, err := b.QueryLogs(ctx, &defangv1.TailRequest{Etag: "some-etag"})
+	if err == nil || !strings.Contains(err.Error(), "failed to find CD deployment for etag") {
+		t.Errorf("expected etag-lookup failure, got: %v", err)
 	}
-	var _ = errors.New // silence unused when build tag trims
 }
 
-func TestQueryLogsEtagMismatch(t *testing.T) {
+func TestQueryLogsEtagMismatchTriggersLookup(t *testing.T) {
+	// A request etag that differs from the cached run no longer rejects outright;
+	// it falls back to discovering the matching run by etag.
+	useFakeCred(t, "", errors.New("denied"))
 	b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
 	b.cdRunID = "run-1"
 	b.cdEtag = "etag-A"
-	_, err := b.QueryLogs(t.Context(), &defangv1.TailRequest{Etag: "etag-B"})
-	if err == nil {
-		t.Error("QueryLogs should reject etag mismatch")
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	_, err := b.QueryLogs(ctx, &defangv1.TailRequest{Etag: "etag-B"})
+	if err == nil || !strings.Contains(err.Error(), "failed to find CD deployment for etag") {
+		t.Errorf("expected mismatched-etag lookup failure, got: %v", err)
 	}
 }
 
@@ -389,6 +423,171 @@ func TestQueryLogsNonFollow(t *testing.T) {
 	}
 }
 
+func TestParseCDLogLine(t *testing.T) {
+	tests := []struct {
+		name        string
+		line        string
+		wantTs      string // RFC3339Nano, empty means zero time
+		wantMessage string
+	}{
+		{
+			name:        "timestamp with dash separator",
+			line:        "2026-04-28T23:43:03.965786510Z - worker deleting (0s)",
+			wantTs:      "2026-04-28T23:43:03.965786510Z",
+			wantMessage: "worker deleting (0s)",
+		},
+		{
+			name:        "timestamp with extra spaces around dash",
+			line:        "2026-04-28T23:43:03.965786510Z  -  worker deleting (0s)",
+			wantTs:      "2026-04-28T23:43:03.965786510Z",
+			wantMessage: "worker deleting (0s)",
+		},
+		{
+			name:        "timestamp with no dash",
+			line:        "2026-04-28T23:43:03.965786510Z worker deleting (0s)",
+			wantTs:      "2026-04-28T23:43:03.965786510Z",
+			wantMessage: "worker deleting (0s)",
+		},
+		{
+			name:        "no leading timestamp",
+			line:        "worker deleting (0s)",
+			wantTs:      "",
+			wantMessage: "worker deleting (0s)",
+		},
+		{
+			// Azure's logStreamEndpoint injects this banner with a timestamp
+			// in the same layout minus the trailing zone designator (#2275).
+			name:        "connecting banner timestamp with no zone designator",
+			line:        "2026-09-16T11:25:39.178105928 Connecting to the container 'defang-cd'...",
+			wantTs:      "2026-09-16T11:25:39.178105928Z",
+			wantMessage: "Connecting to the container 'defang-cd'...",
+		},
+		{
+			name:        "connecting banner timestamp with seconds precision only",
+			line:        "2026-04-04T16:15:01 Connecting to the container 'app'...",
+			wantTs:      "2026-04-04T16:15:01Z",
+			wantMessage: "Connecting to the container 'app'...",
+		},
+		{
+			name:        "empty line",
+			line:        "",
+			wantTs:      "",
+			wantMessage: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts, message := parseCDLogLine(tt.line)
+			var wantTs time.Time
+			if tt.wantTs != "" {
+				var err error
+				wantTs, err = time.Parse(time.RFC3339Nano, tt.wantTs)
+				if err != nil {
+					t.Fatalf("bad test fixture: %v", err)
+				}
+			}
+			if !ts.Equal(wantTs) {
+				t.Errorf("ts = %v, want %v", ts, wantTs)
+			}
+			if message != tt.wantMessage {
+				t.Errorf("message = %q, want %q", message, tt.wantMessage)
+			}
+		})
+	}
+}
+
+func TestSplitCDLogSnapshot(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    []string
+	}{
+		{
+			name:    "empty content",
+			content: "",
+			want:    nil,
+		},
+		{
+			name:    "single line no trailing newline",
+			content: "2026-04-28T23:43:03.000000000Z - worker deleting (0s)",
+			want:    []string{"2026-04-28T23:43:03.000000000Z - worker deleting (0s)"},
+		},
+		{
+			name: "multiple lines, each keeping its own timestamp",
+			content: "2026-04-28T23:43:03.000000000Z - worker deleting (0s)\n" +
+				"2026-04-28T23:43:04.000000000Z - ManagedEnvironment mastra-extended deleting (0s)\n",
+			want: []string{
+				"2026-04-28T23:43:03.000000000Z - worker deleting (0s)",
+				"2026-04-28T23:43:04.000000000Z - ManagedEnvironment mastra-extended deleting (0s)",
+			},
+		},
+		{
+			name:    "blank lines are dropped",
+			content: "line-one\n\nline-two\n",
+			want:    []string{"line-one", "line-two"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := splitCDLogSnapshot(tt.content)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("splitCDLogSnapshot(%q) = %v, want %v", tt.content, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestQueryLogsRoutesByLogType(t *testing.T) {
+	// `defang cd preview` (and any other CD-only tail) asks for LogTypeBuild|LogTypeCD;
+	// QueryLogs must not also start the service-log (ACA) watcher for it, which is what
+	// made #2259 tail the whole project's running logs instead of just the CD task's
+	// own output. Conversely, a service/build-only tail must not look up or warn about
+	// a CD run it was never going to show, even when the request etag is unmatched.
+	tests := []struct {
+		name        string
+		setup       func(b *ByocAzure)
+		req         *defangv1.TailRequest
+		wantErr     string // substring that must appear in the error
+		unwantedErr string // substring that must NOT appear in the error
+	}{
+		{
+			name: "CD-only skips the service resource-group check",
+			setup: func(b *ByocAzure) {
+				b.cdRunID = "run-1"
+				b.cdEtag = "etag"
+			},
+			req:         &defangv1.TailRequest{Etag: "etag", Follow: false, LogType: uint32(logs.LogTypeCD)},
+			wantErr:     "getting log analytics workspace",
+			unwantedErr: "checking resource group",
+		},
+		{
+			name:        "Run-only skips the CD run lookup",
+			req:         &defangv1.TailRequest{Etag: "some-etag", Follow: false, LogType: uint32(logs.LogTypeRun)},
+			wantErr:     "checking resource group",
+			unwantedErr: "failed to find CD deployment",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			useFakeCred(t, "", errors.New("denied"))
+			b := newTestProvider(t, cloudazure.LocationEastUS, "sub")
+			if tt.setup != nil {
+				tt.setup(b)
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+			defer cancel()
+			_, err := b.QueryLogs(ctx, tt.req)
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("expected error containing %q, got: %v", tt.wantErr, err)
+			}
+			if err != nil && strings.Contains(err.Error(), tt.unwantedErr) {
+				t.Errorf("error should not contain %q, got: %v", tt.unwantedErr, err)
+			}
+		})
+	}
+}
+
 func TestCdCommandMissingCDImage(t *testing.T) {
 	// setUpForConfig needs to succeed for CdCommand to reach the CDImage check.
 	// Easier: exercise the setUpLocation-fails path which happens first.
@@ -437,5 +636,36 @@ func TestBuildCdEnv(t *testing.T) {
 	}
 	if _, ok := env["PULUMI_CONFIG_PASSPHRASE"]; !ok {
 		t.Error("PULUMI_CONFIG_PASSPHRASE missing")
+	}
+}
+
+// TestUpdateServiceInfo verifies the byoc.ServiceInfoUpdater contract:
+// services with a non-empty `domainname` get UseAcmeCert flipped on so the
+// downstream cert-gen flow picks them up; services without one are left
+// untouched.
+func TestUpdateServiceInfo(t *testing.T) {
+	tests := []struct {
+		name           string
+		domainName     string
+		initialUseAcme bool
+		wantUseAcme    bool
+	}{
+		{name: "with domainname enables acme", domainName: "x.example.com", wantUseAcme: true},
+		{name: "without domainname is no-op", domainName: "", wantUseAcme: false},
+		{name: "without domainname preserves prior true", domainName: "", initialUseAcme: true, wantUseAcme: true},
+		{name: "with domainname keeps already-true", domainName: "x.example.com", initialUseAcme: true, wantUseAcme: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newTestProvider(t, cloudazure.LocationWestUS3, "sub-id")
+			si := &defangv1.ServiceInfo{UseAcmeCert: tt.initialUseAcme}
+			svc := composeTypes.ServiceConfig{DomainName: tt.domainName}
+			if err := b.UpdateServiceInfo(t.Context(), si, "proj", "etag", svc); err != nil {
+				t.Fatalf("UpdateServiceInfo: %v", err)
+			}
+			if si.UseAcmeCert != tt.wantUseAcme {
+				t.Errorf("UseAcmeCert = %v, want %v", si.UseAcmeCert, tt.wantUseAcme)
+			}
+		})
 	}
 }

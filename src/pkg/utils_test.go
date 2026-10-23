@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -20,6 +21,30 @@ func TestGetenvBool(t *testing.T) {
 	t.Setenv("FOO", "false")
 	if GetenvBool("FOO") {
 		t.Errorf("GetenvBool(FOO) = true, want false")
+	}
+}
+
+func TestSubscriptionTierToString(t *testing.T) {
+	tests := []struct {
+		name string
+		tier defangv1.SubscriptionTier
+		want string
+	}{
+		{"unspecified", defangv1.SubscriptionTier_SUBSCRIPTION_TIER_UNSPECIFIED, "Starter"},
+		{"hobby", defangv1.SubscriptionTier_HOBBY, "Starter"},
+		{"personal", defangv1.SubscriptionTier_PERSONAL, "Personal (Legacy)"},
+		{"pro", defangv1.SubscriptionTier_PRO, "Pro"},
+		{"team", defangv1.SubscriptionTier_TEAM, "Enterprise"},
+		{"expired", defangv1.SubscriptionTier_EXPIRED, "Expired"},
+		{"unknown", defangv1.SubscriptionTier(999), "Unknown"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := SubscriptionTierToString(tt.tier); got != tt.want {
+				t.Errorf("SubscriptionTierToString(%v) = %q, want %q", tt.tier, got, tt.want)
+			}
+		})
 	}
 }
 

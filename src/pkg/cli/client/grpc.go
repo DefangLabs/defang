@@ -222,3 +222,16 @@ func (g GrpcClient) ResolveNS(ctx context.Context, req *defangv1.ResolveNSReques
 func (g GrpcClient) ResolveTXT(ctx context.Context, req *defangv1.ResolveTXTRequest) (*defangv1.ResolveTXTResponse, error) {
 	return getMsg(g.client.ResolveTXT(ctx, connect.NewRequest(req)))
 }
+
+func (g GrpcClient) PutRecipe(ctx context.Context, req *defangv1.PutRecipeRequest) error {
+	_, err := g.client.PutRecipe(ctx, connect.NewRequest(req))
+	return err
+}
+
+func (g GrpcClient) GetRecipe(ctx context.Context, req *defangv1.GetRecipeRequest) (*defangv1.GetRecipeResponse, error) {
+	return getMsg(g.client.GetRecipe(ctx, connect.NewRequest(req)))
+}
+
+func (g GrpcClient) ListRecipes(ctx context.Context) (*defangv1.ListRecipesResponse, error) {
+	return getMsg(g.client.ListRecipes(ctx, connect.NewRequest(&defangv1.ListRecipesRequest{})))
+}

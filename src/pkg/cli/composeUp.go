@@ -25,7 +25,10 @@ func (e ComposeError) Unwrap() error {
 type ComposeUpParams struct {
 	Project    *compose.Project
 	UploadMode compose.UploadMode
-	Mode       modes.Mode
+	Recipe     modes.Recipe
+	// TTL is the normalized deployment time-to-live (see byoc.ParseTTL);
+	// empty when no TTL was given.
+	TTL string
 }
 
 func checkDeploymentMode(prevMode, newMode modes.Mode) (modes.Mode, error) {
@@ -68,7 +71,7 @@ func checkDeploymentMode(prevMode, newMode modes.Mode) (modes.Mode, error) {
 func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.Provider, stack *stacks.Parameters, params ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	upload := params.UploadMode
 	project := params.Project
-	mode := params.Mode
+	recipe := params.Recipe
 
 	if dryrun.DoDryRun {
 		upload = compose.UploadModeIgnore
@@ -100,17 +103,17 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		return nil, project, err
 	}
 
-	if err := compose.ValidateProject(fixedProject, mode); err != nil {
+	if err := compose.ValidateProject(fixedProject, recipe); err != nil {
 		return nil, project, &ComposeError{err}
 	}
 
-	bytes, err := compose.MarshalYAML(fixedProject)
+	composeYaml, err := compose.MarshalYAML(fixedProject)
 	if err != nil {
 		return nil, project, err
 	}
 
 	if upload == compose.UploadModeIgnore {
-		term.Println(string(bytes))
+		term.Println(string(composeYaml))
 		return nil, project, dryrun.ErrDryRun
 	}
 
@@ -130,21 +133,39 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		}
 		// New project, no previous deployment mode to check
 	} else {
-		prevMode := modes.Mode(prevUpdate.Mode)
-		mode, err = checkDeploymentMode(prevMode, mode)
+		newMode, err := checkDeploymentMode(modes.Mode(prevUpdate.Mode), recipe.Mode())
 		// Ignore mode compatibility errors in estimation mode
 		if err != nil && upload != compose.UploadModeEstimate {
 			return nil, project, err
 		}
+		// An unspecified recipe inherits the previous deployment's recipe (or mode).
+		if recipe == modes.RecipeUnspecified && prevUpdate.GetRecipe().GetName() != "" {
+			recipe = modes.ParseRecipe(prevUpdate.GetRecipe().GetName())
+		} else if newMode != modes.ModeUnspecified {
+			recipe = modes.FromMode(newMode.Value())
+		}
+	}
+
+	// An unspecified recipe (new project, no mode given) is left to the fabric to
+	// default; sending an empty recipe name to GetRecipe would be rejected.
+	recipeMsg, err := getRecipe(ctx, fabric, recipe)
+	if err != nil {
+		return nil, project, err
+	}
+	// Allow estimate/preview with an inactive recipe so teams can evaluate it before activating.
+	if recipeMsg != nil && !recipeMsg.GetActive() && upload != compose.UploadModeEstimate && upload != compose.UploadModePreview {
+		return nil, project, fmt.Errorf("recipe %q is not active", recipe)
 	}
 
 	deployRequest := &client.DeployRequest{
 		DeployRequest: defangv1.DeployRequest{
-			Mode:           mode.Value(),
+			Mode:           recipe.Mode().Value(),
 			Project:        project.Name,
-			Compose:        bytes,
+			Compose:        composeYaml,
 			DelegateDomain: delegateDomain.Zone,
 		},
+		Recipe: recipeMsg,
+		TTL:    params.TTL,
 	}
 
 	delegation, err := provider.PrepareDomainDelegation(ctx, client.PrepareDomainDelegationRequest{
@@ -199,13 +220,15 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 	err = putDeploymentAndStack(ctx, provider, fabric, stack, putDeploymentParams{
 		Action:       action,
 		ETag:         resp.Etag,
-		Mode:         mode.Value(),
+		Mode:         recipe.Mode().Value(),
 		ProjectName:  project.Name,
 		StatesUrl:    statesUrl,
 		EventsUrl:    eventsUrl,
 		ServiceInfos: resp.Services,
 		CdType:       resp.CdType,
 		CdId:         resp.CdId,
+		Compose:      composeYaml,
+		Recipe:       deployRequest.Recipe,
 	})
 	if err != nil {
 		term.Debug("Failed to record deployment:", err)
@@ -219,4 +242,16 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 		}
 	}
 	return resp.DeployResponse, project, nil
+}
+
+func getRecipe(ctx context.Context, fabric client.FabricClient, recipe modes.Recipe) (*defangv1.Recipe, error) {
+	if recipe == modes.RecipeUnspecified {
+		// An unspecified recipe is left to the fabric to default
+		return nil, nil
+	}
+	rresp, err := fabric.GetRecipe(ctx, &defangv1.GetRecipeRequest{Name: recipe.String()})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get recipe for deployment mode %q: %w", recipe, err)
+	}
+	return rresp.GetRecipe(), nil
 }

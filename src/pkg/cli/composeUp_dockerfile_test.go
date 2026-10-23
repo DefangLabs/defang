@@ -53,7 +53,7 @@ func TestComposeUp_DockerfileValidation(t *testing.T) {
 			_, _, err = ComposeUp(ctx, mockFabric, mockProvider, stack, ComposeUpParams{
 				Project:    project,
 				UploadMode: compose.UploadModeDigest, // This should trigger validation
-				Mode:       modes.ModeUnspecified,
+				Recipe:     modes.RecipeUnspecified,
 			})
 
 			if tt.expectError {
@@ -96,7 +96,7 @@ func TestComposeUp_DockerfileValidationSkipped(t *testing.T) {
 	_, _, err = ComposeUp(ctx, mockFabric, mockProvider, stack, ComposeUpParams{
 		Project:    project,
 		UploadMode: compose.UploadModeIgnore, // Should skip validation
-		Mode:       modes.ModeUnspecified,
+		Recipe:     modes.RecipeUnspecified,
 	})
 
 	// Should not get Dockerfile validation error
@@ -108,7 +108,7 @@ func TestComposeUp_DockerfileValidationSkipped(t *testing.T) {
 	_, _, err = ComposeUp(ctx, mockFabric, mockProvider, stack, ComposeUpParams{
 		Project:    project,
 		UploadMode: compose.UploadModeEstimate, // Should skip validation
-		Mode:       modes.ModeUnspecified,
+		Recipe:     modes.RecipeUnspecified,
 	})
 
 	// Should not get Dockerfile validation error

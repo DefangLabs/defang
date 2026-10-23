@@ -737,3 +737,38 @@ func TestDeriveBuildID(t *testing.T) {
 		})
 	}
 }
+
+func TestS3PayloadURI(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "regional virtual-hosted-style URL rewritten to s3 scheme",
+			in:   "https://defang-cd-bucket-cybpbzz8hzm7.s3.us-west-2.amazonaws.com/uploads/t7jl0wwq4cz9",
+			want: "s3://defang-cd-bucket-cybpbzz8hzm7/uploads/t7jl0wwq4cz9",
+		},
+		{
+			name: "legacy virtual-hosted-style URL (no region) rewritten to s3 scheme",
+			in:   "https://defang-cd-bucket-cybpbzz8hzm7.s3.amazonaws.com/uploads/t7jl0wwq4cz9",
+			want: "s3://defang-cd-bucket-cybpbzz8hzm7/uploads/t7jl0wwq4cz9",
+		},
+		{
+			name: "non-S3 URL passes through unchanged",
+			in:   "https://example.com/uploads/t7jl0wwq4cz9",
+			want: "https://example.com/uploads/t7jl0wwq4cz9",
+		},
+		{
+			name: "base64 payload passes through unchanged",
+			in:   "cGF5bG9hZA==",
+			want: "cGF5bG9hZA==",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, s3PayloadURI(tt.in))
+		})
+	}
+}

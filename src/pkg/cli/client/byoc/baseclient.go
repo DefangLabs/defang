@@ -12,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/dns"
+	"github.com/DefangLabs/defang/src/pkg/stackpath"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -43,6 +44,7 @@ type CanIUseConfig struct {
 	AllowScaling  bool
 	CDImage       string
 	PulumiVersion string
+	AwsApnId      string
 }
 
 type ByocBaseClient struct {
@@ -74,7 +76,7 @@ func (b *ByocBaseClient) GetStackName() string {
 }
 
 // HasDelegatedSubdomain returns true by default; providers that do not yet
-// implement domain delegation (Azure, DO) override this to return false.
+// implement domain delegation (DO) override this to return false.
 func (b *ByocBaseClient) HasDelegatedSubdomain() bool {
 	return true
 }
@@ -84,6 +86,7 @@ func (b *ByocBaseClient) SetCanIUseConfig(quotas *defangv1.CanIUseResponse) {
 	b.CanIUseConfig.AllowScaling = quotas.AllowScaling
 	b.CanIUseConfig.CDImage = quotas.CdImage
 	b.CanIUseConfig.PulumiVersion = quotas.PulumiVersion
+	b.CanIUseConfig.AwsApnId = quotas.AwsApnId
 }
 
 // getServiceLabel returns a DNS-safe label for the given service
@@ -128,7 +131,7 @@ func (e ErrNoPermission) Error() string {
 func (b *ByocBaseClient) GetServiceInfos(ctx context.Context, projectName, delegateDomain, etag string, services map[string]composeTypes.ServiceConfig) ([]*defangv1.ServiceInfo, error) {
 	numGPUS := compose.GetNumOfGPUs(services)
 	if numGPUS > 0 && !b.AllowGPU {
-		return nil, ErrNoPermission("usage of GPUs. Please upgrade on https://s.defang.io/subscription")
+		return nil, ErrNoPermission("GPU access requires a Pro subscription. Upgrade at https://s.defang.io/subscription")
 	}
 
 	serviceInfoMap := make(map[string]*Node)
@@ -212,11 +215,16 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 
 	hasHost := false
 	hasIngress := false
+	serviceEndpoints := make(map[string]struct{}, len(service.Ports))
 	if _, ok := service.Extensions["x-defang-static-files"]; !ok {
 		for _, port := range service.Ports {
 			hasIngress = hasIngress || port.Mode == compose.Mode_INGRESS
 			hasHost = hasHost || port.Mode == compose.Mode_HOST
-			si.Endpoints = append(si.Endpoints, b.GetEndpoint(service.Name, projectName, delegateDomain, &port))
+			endpoint := b.GetEndpoint(service.Name, projectName, delegateDomain, &port)
+			if _, exists := serviceEndpoints[endpoint]; !exists {
+				serviceEndpoints[endpoint] = struct{}{}
+				si.Endpoints = append(si.Endpoints, endpoint)
+			}
 		}
 	} else {
 		si.PublicFqdn = b.GetPublicFqdn(projectName, delegateDomain, service.Name)
@@ -246,14 +254,11 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 	return si, nil
 }
 
-// stackDir returns a stack-qualified path, like the Pulumi TS function `stackDir`
+// StackDir returns a stack-qualified path, like the Pulumi TS function `stackDir`.
+// The path shape is shared with the Pulumi provider; see pkg/stackpath.
 func (b *ByocBaseClient) StackDir(projectName, name string) string {
 	pkg.Ensure(projectName != "", "ProjectName not set")
-	prefix := []string{""} // for leading slash
-	if b.Prefix != "" {
-		prefix = []string{"", b.Prefix}
-	}
-	return strings.Join(append(prefix, projectName, b.PulumiStack, name), "/") // same as shared/common.ts
+	return stackpath.StackDir(b.Prefix, projectName, b.PulumiStack, name)
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC

@@ -22,6 +22,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/go-units"
+	"github.com/google/uuid"
 	"github.com/moby/patternmatcher"
 	"github.com/moby/patternmatcher/ignorefile"
 )
@@ -236,7 +237,9 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 		digest = calcDigest(buffer.Bytes())
 		return fmt.Sprintf("s3://cd-preview/%s%s", digest, archiveType.Extension), nil
 	case UploadModeForce:
-		// Force: empty digest = always upload the tarball (to a random URL), triggering a new build
+		// Force: leave the digest empty so uploadArchive picks a fresh, never-used
+		// name, which makes the build context URL differ from the previous deploy's
+		// and stops the build being skipped as unchanged.
 	default:
 		panic("unexpected UploadMode value")
 	}
@@ -251,8 +254,19 @@ func calcDigest(data []byte) string {
 }
 
 func uploadArchive(ctx context.Context, provider client.Provider, projectName string, body io.Reader, archiveType ArchiveType, digest string) (string, error) {
+	// An empty digest is UploadModeForce asking for a URL that has never been used,
+	// so the build is never skipped as unchanged. The provider drivers do randomize,
+	// but only when the WHOLE blob name is empty — appending the extension first
+	// made the name ".tar.gz", which is not empty, so every forced upload landed on
+	// that one fixed blob. The context URL was then identical between deploys and
+	// the build was skipped, silently shipping a stale image. Generate the unique
+	// name here instead, keeping the extension so the archive type stays visible.
+	name := digest
+	if name == "" {
+		name = uuid.NewString()
+	}
 	// Upload the archive to the fabric controller storage; TODO: use a streaming API
-	ureq := &defangv1.UploadURLRequest{Digest: digest + archiveType.Extension, Project: projectName}
+	ureq := &defangv1.UploadURLRequest{Digest: name + archiveType.Extension, Project: projectName}
 	res, err := provider.CreateUploadURL(ctx, ureq)
 	if err != nil {
 		return "", err

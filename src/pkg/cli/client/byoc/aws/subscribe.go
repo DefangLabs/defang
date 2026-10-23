@@ -8,6 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/codebuild"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
+	"github.com/DefangLabs/defang/src/pkg/stackpath"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -40,9 +41,9 @@ func parseSubscribeEvent(evt cw.LogEvent, etag types.ETag, services []string) *d
 	}
 
 	switch {
-	case strings.HasSuffix(*evt.LogGroupIdentifier, "/ecs"):
+	case stackpath.IsLogGroup(*evt.LogGroupIdentifier, stackpath.LogGroupECS):
 		return parseECSSubscribeEvent(evt, etag, services)
-	case strings.HasSuffix(*evt.LogGroupIdentifier, "/builds") &&
+	case stackpath.IsLogGroup(*evt.LogGroupIdentifier, stackpath.LogGroupBuilds) &&
 		evt.LogStreamName != nil &&
 		codeBuildPrefixRegex.MatchString(*evt.LogStreamName):
 		return parseCodebuildSubscribeEvent(evt, etag, services)

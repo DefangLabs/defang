@@ -9,7 +9,6 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/stretchr/testify/assert"
@@ -63,6 +62,27 @@ func (m *MockRemoveConfigCLI) InteractiveLoginMCP(ctx context.Context, fabricAdd
 		return m.InteractiveLoginMCPError
 	}
 	return nil
+}
+
+func TestHandleRemoveConfigToolRefusesWhenNotConfirmable(t *testing.T) {
+	t.Chdir("testdata")
+	os.Unsetenv("DEFANG_PROVIDER")
+	os.Unsetenv("AWS_PROFILE")
+	os.Unsetenv("AWS_REGION")
+
+	mockCLI := &MockRemoveConfigCLI{CallLog: []string{}}
+	ec := elicitations.NewController(&mockElicitationsClient{})
+	ec.SetSupported(false)
+
+	stack := stacks.Parameters{Name: "test-stack", Provider: client.ProviderAWS}
+	_, err := HandleRemoveConfigTool(t.Context(), RemoveConfigParams{Name: "DATABASE_URL"}, mockCLI, ec, StackConfig{
+		FabricAddr: "test-cluster",
+		Stack:      &stack,
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `refusing to remove config variable "DATABASE_URL"`)
+	assert.Empty(t, mockCLI.CallLog, "no CLI calls should be made when the write is refused")
 }
 
 func TestHandleRemoveConfigTool(t *testing.T) {
@@ -151,9 +171,6 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			}
 
 			// Call the function
-			loader := &client.MockLoader{
-				Project: compose.Project{Name: "test-project"},
-			}
 			ec := elicitations.NewController(&mockElicitationsClient{
 				responses: map[string]string{
 					"strategy":     "profile",
@@ -165,7 +182,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				Name:     "test-stack",
 				Provider: client.ProviderAWS,
 			}
-			result, err := HandleRemoveConfigTool(t.Context(), loader, params, mockCLI, ec, StackConfig{
+			result, err := HandleRemoveConfigTool(t.Context(), params, mockCLI, ec, StackConfig{
 				FabricAddr: "test-cluster",
 				Stack:      &stack,
 			})

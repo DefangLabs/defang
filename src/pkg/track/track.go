@@ -3,6 +3,7 @@ package track
 import (
 	"strings"
 	"sync"
+	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -35,6 +36,14 @@ var trackWG = sync.WaitGroup{}
 //	client := "vscode"
 //	track.Evt("MCP Setup Client:", track.P("client", client))
 func Evt(name string, props ...Property) {
+	// Tests shouldn't send real telemetry, and the goroutine spawned below
+	// outlives the calling test — its background term.Debug reads then race
+	// the next test's term.SetupTestTerm swap of DefaultTerm. testing.Testing()
+	// (Go 1.21+) is the standard idiom for safely detecting test context from
+	// non-test code.
+	if testing.Testing() {
+		return
+	}
 	if disableAnalytics {
 		return
 	}

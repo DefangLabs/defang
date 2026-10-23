@@ -3,23 +3,22 @@ package cli
 import (
 	"context"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
-
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 type ShowAccountData struct {
-	Provider       client.ProviderID         `json:"provider"`
-	SubscriberTier defangv1.SubscriptionTier `json:"subscriberTier"`
-	Region         string                    `json:"region"`
-	Workspace      string                    `json:"workspace"`
-	Tenant         string                    `json:"tenant,omitempty"` // this is the subdomain
-	TenantID       string                    `json:"tenantId,omitempty"`
-	Email          string                    `json:"email"`
-	Name           string                    `json:"name"`
+	Provider       client.ProviderID `json:"provider"`
+	SubscriberTier string            `json:"subscriberTier"`
+	Region         string            `json:"region"`
+	Workspace      string            `json:"workspace"`
+	Tenant         string            `json:"tenant,omitempty"` // this is the subdomain
+	TenantID       string            `json:"tenantId,omitempty"`
+	Email          string            `json:"email"`
+	Name           string            `json:"name"`
 }
 
 func Whoami(ctx context.Context, fabric client.FabricClient, maybeProvider client.Provider, userInfo *auth.UserInfo, tenantSelection types.TenantNameOrID) (ShowAccountData, error) {
@@ -36,7 +35,7 @@ func Whoami(ctx context.Context, fabric client.FabricClient, maybeProvider clien
 	term.Debug("User ID: " + resp.UserId)
 	showData := ShowAccountData{
 		Region:         resp.Region,
-		SubscriberTier: resp.Tier,
+		SubscriberTier: pkg.SubscriptionTierToString(resp.Tier),
 		Tenant:         resp.Tenant,
 		TenantID:       resp.TenantId,
 		Workspace:      ResolveWorkspaceName(userInfo, tenantSelection),
@@ -64,4 +63,24 @@ func Whoami(ctx context.Context, fabric client.FabricClient, maybeProvider clien
 	}
 
 	return showData, nil
+}
+
+// FetchAccountInfo fetches userinfo from the auth service when hasTty is true, then resolves the
+// account/workspace info for fabric. This is the shared sequence behind both the `whoami` command
+// and the post-login workspace summary shown by `login`.
+func FetchAccountInfo(ctx context.Context, fabric client.FabricClient, maybeProvider client.Provider, fabricAddr string, tenantSelection types.TenantNameOrID, hasTty bool) (ShowAccountData, error) {
+	var userInfo *auth.UserInfo
+	// Skip userinfo fetch in non-interactive mode (CI environments)
+	if hasTty {
+		token := client.GetExistingToken(fabricAddr)
+		info, err := auth.FetchUserInfo(ctx, token)
+		if err != nil {
+			// Either the auth service is down, or we're using a Fabric JWT: skip workspace information
+			term.Warn("Workspace information unavailable:", err)
+		} else {
+			userInfo = info
+		}
+	}
+
+	return Whoami(ctx, fabric, maybeProvider, userInfo, tenantSelection)
 }

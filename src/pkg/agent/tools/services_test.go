@@ -27,6 +27,8 @@ type MockCLI struct {
 	MockClient                       *client.GrpcClient
 	MockProvider                     client.Provider
 	MockProjectName                  string
+	LoadedProject                    *compose.Project
+	UseRealLoader                    bool
 
 	GetServicesError    error
 	MockServices        []cli.ServiceLineItem
@@ -49,6 +51,14 @@ func (m *MockCLI) NewProvider(ctx context.Context, providerId client.ProviderID,
 func (m *MockCLI) LoadProjectNameWithFallback(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
 	if m.LoadProjectNameWithFallbackError != nil {
 		return "", m.LoadProjectNameWithFallbackError
+	}
+	if m.UseRealLoader {
+		project, err := loader.LoadProject(ctx)
+		if err != nil {
+			return "", err
+		}
+		m.LoadedProject = project
+		return project.Name, nil
 	}
 	if m.MockProjectName != "" {
 		return m.MockProjectName, nil
@@ -102,11 +112,11 @@ func (m *MockCLI) LoadProject(ctx context.Context, loader client.Loader) (*compo
 	return nil, nil
 }
 
-func (m *MockCLI) PrintEstimate(mode modes.Mode, estimate *defangv1.EstimateResponse) string {
+func (m *MockCLI) PrintEstimate(mode modes.Recipe, estimate *defangv1.EstimateResponse) string {
 	return ""
 }
 
-func (m *MockCLI) RunEstimate(ctx context.Context, project *compose.Project, fabric *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Mode) (*defangv1.EstimateResponse, error) {
+func (m *MockCLI) RunEstimate(ctx context.Context, project *compose.Project, fabric *client.GrpcClient, provider client.Provider, providerId client.ProviderID, region string, mode modes.Recipe) (*defangv1.EstimateResponse, error) {
 	return nil, nil
 }
 
@@ -248,7 +258,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			os.Unsetenv("DEFANG_PROVIDER")
 			os.Unsetenv("AWS_PROFILE")
 			os.Unsetenv("AWS_REGION")
-			loader := &client.MockLoader{}
 			ec := elicitations.NewController(&mockElicitationsClient{
 				responses: map[string]string{
 					"strategy":     "profile",
@@ -264,7 +273,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 					WorkingDirectory: ".",
 				},
 			}
-			result, err := HandleServicesTool(t.Context(), loader, params, tt.mockCLI, ec, StackConfig{
+			result, err := HandleServicesTool(t.Context(), params, tt.mockCLI, ec, StackConfig{
 				FabricAddr: "test-cluster",
 				Stack:      &stack,
 			})
@@ -292,4 +301,51 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHandleServicesToolUsesSelectedStackLoader(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	require.NoError(t, os.MkdirAll("app/.defang", 0o755))
+	require.NoError(t, os.WriteFile("app/.defang/production", []byte("DEFANG_PROVIDER=aws\n"), 0o644))
+	require.NoError(t, os.WriteFile("app/.env.production", []byte("STACK_ENV=selected\n"), 0o644))
+	require.NoError(t, os.WriteFile("app/compose.yaml", []byte(`name: agent-interpolation
+services:
+  web:
+    image: alpine
+    environment:
+      PROVIDER: ${DEFANG_PROVIDER}
+      STACK: ${DEFANG_STACK}
+      STACK_ENV: ${STACK_ENV}
+`), 0o644))
+	t.Cleanup(func() {
+		os.Unsetenv("DEFANG_PROVIDER")
+		os.Unsetenv("DEFANG_STACK")
+	})
+
+	loaderParams := common.LoaderParams{WorkingDirectory: "app", ProjectName: "agent-interpolation"}
+	stack := &stacks.Parameters{Provider: client.ProviderAuto}
+	mockCLI := &MockCLI{
+		MockClient:    newStackTestFabric(t),
+		MockProvider:  client.MockProvider{},
+		UseRealLoader: true,
+	}
+	ec := elicitations.NewController(&mockElicitationsClient{responses: map[string]string{
+		"stack": "production [aws]",
+	}})
+
+	_, err := HandleServicesTool(t.Context(), ServicesParams{LoaderParams: loaderParams}, mockCLI, ec, StackConfig{
+		FabricAddr: "test-cluster",
+		Stack:      stack,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, mockCLI.LoadedProject)
+	env := mockCLI.LoadedProject.Services["web"].Environment
+	require.NotNil(t, env["PROVIDER"])
+	require.NotNil(t, env["STACK"])
+	require.NotNil(t, env["STACK_ENV"])
+	assert.Equal(t, "aws", *env["PROVIDER"])
+	assert.Equal(t, "production", *env["STACK"])
+	assert.Equal(t, "selected", *env["STACK_ENV"])
+	assert.Equal(t, "agent-interpolation", mockCLI.GetServicesProject)
 }

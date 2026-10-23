@@ -13,11 +13,14 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/dns"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composetypes "github.com/compose-spec/compose-go/v2/types"
 )
@@ -228,6 +231,90 @@ func TestHttpClient(t *testing.T) {
 	}
 }
 
+// concurrentResolver is a thread-safe MockResolver replacement for the
+// dnsCache race test: each goroutine's transport calls LookupIPAddr, so the
+// resolver itself must not race either.
+type concurrentResolver struct {
+	mu    sync.Mutex
+	calls int
+}
+
+func (r *concurrentResolver) LookupIPAddr(_ context.Context, _ string) ([]net.IPAddr, error) {
+	r.mu.Lock()
+	r.calls++
+	r.mu.Unlock()
+	return []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}}, nil
+}
+func (r *concurrentResolver) LookupCNAME(context.Context, string) (string, error) {
+	return "", nil
+}
+func (r *concurrentResolver) LookupNS(context.Context, string) ([]*net.NS, error) {
+	return nil, nil
+}
+func (r *concurrentResolver) LookupTXT(context.Context, string) ([]string, error) {
+	return nil, nil
+}
+
+// TestCertHTTPClient_DNSCacheConcurrent guards the parallel-cert-gen change:
+// newCertHTTPClient's DialContext closure reads/writes the package-level
+// dnsCache, and the orchestrator now drives multiple workers through
+// triggerCertGen concurrently. Without the mutex around dnsCache this test
+// fails under `-race` (concurrent map writes); with it, it passes cleanly.
+func TestCertHTTPClient_DNSCacheConcurrent(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "ok")
+	}))
+	defer ts.Close()
+
+	_, port, err := net.SplitHostPort(strings.TrimPrefix(ts.URL, "http://"))
+	if err != nil {
+		t.Fatalf("split server addr: %v", err)
+	}
+
+	// Reset the package cache so this test sees its own writes, and restore
+	// it on exit so we don't leak state into TestHttpClient.
+	dnsCacheMu.Lock()
+	saved := dnsCache
+	dnsCache = make(map[string]DNSResult)
+	dnsCacheMu.Unlock()
+	t.Cleanup(func() {
+		dnsCacheMu.Lock()
+		dnsCache = saved
+		dnsCacheMu.Unlock()
+	})
+
+	// Use distinct hosts per goroutine so the DialContext does a cache miss
+	// → LookupIPAddr → cache write on every call, maximizing chances of
+	// catching a race on writes.
+	const N = 16
+	resolver := &concurrentResolver{}
+	tc := newCertHTTPClient(resolver)
+
+	var wg sync.WaitGroup
+	errs := make([]error, N)
+	for i := range N {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			url := fmt.Sprintf("http://host-%d.test:%s/", i, port)
+			req, _ := http.NewRequest("GET", url, nil)
+			resp, err := tc.Do(req)
+			if err != nil {
+				errs[i] = err
+				return
+			}
+			resp.Body.Close()
+		}(i)
+	}
+	wg.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Errorf("goroutine %d: %v", i, err)
+		}
+	}
+}
+
 type mockCertProvider struct {
 	client.MockProvider
 	services *defangv1.GetServicesResponse
@@ -240,12 +327,76 @@ func (m *mockCertProvider) GetServices(ctx context.Context, req *defangv1.GetSer
 
 type mockCertFabricClient struct {
 	client.MockFabricClient
+	mu             sync.Mutex
 	verifyDNSCalls int
 }
 
 func (m *mockCertFabricClient) VerifyDNSSetup(ctx context.Context, req *defangv1.VerifyDNSSetupRequest) error {
+	m.mu.Lock()
 	m.verifyDNSCalls++
+	m.mu.Unlock()
 	return nil // DNS verified successfully
+}
+
+func (m *mockCertFabricClient) calls() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.verifyDNSCalls
+}
+
+// mockCertIssuerProvider extends mockCertProvider with the CertIssuer
+// interface so GenerateLetsEncryptCert's `provider.(CertIssuer)` succeeds.
+// Captures every (project, service, hostname) tuple the SUT calls IssueCert
+// with, and lets the test inject an error per call. The mutex makes the call
+// log safe under the parallel-worker dispatch.
+//
+// events records both phases in call order so tests can assert the pre-flight
+// pass completes before any issuance starts without racing on terminal output.
+type mockCertIssuerProvider struct {
+	mockCertProvider
+	mu           sync.Mutex
+	issueErr     error
+	issueCall    []string
+	events       []string
+	preflight    map[string][]dns.RequiredRecord // hostname -> records still missing
+	preflightErr error
+	onIssue      func(log func(string, ...any))
+}
+
+func (m *mockCertIssuerProvider) PreflightCert(_ context.Context, _, _, hostname string, _ func(string) dns.Resolver) ([]dns.RequiredRecord, error) {
+	m.mu.Lock()
+	m.events = append(m.events, "preflight:"+hostname)
+	m.mu.Unlock()
+	if m.preflightErr != nil {
+		return nil, m.preflightErr
+	}
+	return m.preflight[hostname], nil
+}
+
+func (m *mockCertIssuerProvider) IssueCert(_ context.Context, projectName, serviceName, hostname string, _ func(string) dns.Resolver, log func(string, ...any)) error {
+	m.mu.Lock()
+	m.issueCall = append(m.issueCall, fmt.Sprintf("%s/%s/%s", projectName, serviceName, hostname))
+	m.events = append(m.events, "issue:"+hostname)
+	onIssue := m.onIssue
+	m.mu.Unlock()
+	if onIssue != nil {
+		onIssue(log)
+	}
+	return m.issueErr
+}
+
+func (m *mockCertIssuerProvider) sortedCalls() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := slices.Clone(m.issueCall)
+	sort.Strings(out)
+	return out
+}
+
+func (m *mockCertIssuerProvider) orderedEvents() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.events)
 }
 
 func TestGenerateLetsEncryptCert(t *testing.T) {
@@ -321,7 +472,7 @@ func TestGenerateLetsEncryptCert(t *testing.T) {
 		}
 	})
 
-	t.Run("calls generateCert for UseAcmeCert service", func(t *testing.T) {
+	t.Run("calls ACME workflow for UseAcmeCert service", func(t *testing.T) {
 		fabricClient := &mockCertFabricClient{}
 		provider := &mockCertProvider{
 			services: &defangv1.GetServicesResponse{
@@ -348,17 +499,436 @@ func TestGenerateLetsEncryptCert(t *testing.T) {
 				},
 			},
 		}
-		// Use short timeout so generateCert doesn't block on TLS/HTTP waits
+		// Short ctx ensures we don't block on the real 10-minute waitForTLS.
+		// With preflight returning verified, the worker proceeds to the post-
+		// verification stages and the deadline trips during the propagation
+		// sleep — so the error is expected. The point of the test is that
+		// the preflight RPC actually ran (i.e. we reached the ACME path).
 		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 		defer cancel()
 		err := GenerateLetsEncryptCert(ctx, project, fabricClient, provider)
-		if err != nil {
-			t.Errorf("expected no error, got: %v", err)
+		if err == nil {
+			t.Error("expected deadline-related error from the short ctx, got nil")
+		} else if !strings.Contains(err.Error(), "example.com") {
+			t.Errorf("error should name the failing domain, got: %v", err)
 		}
-		if fabricClient.verifyDNSCalls == 0 {
-			t.Error("expected VerifyDNSSetup to be called (generateCert was reached)")
+		if fabricClient.calls() == 0 {
+			t.Error("expected VerifyDNSSetup to be called (ACME path was reached)")
 		}
 	})
+
+	// CertIssuer dispatch: when the provider implements CertIssuer, the legacy
+	// fabric/ACME path (VerifyDNSSetup + generateCert) is bypassed entirely and
+	// IssueCert is invoked once per domain (the service domainname plus any
+	// default-network aliases).
+	t.Run("dispatches to CertIssuer when provider implements it", func(t *testing.T) {
+		fabricClient := &mockCertFabricClient{}
+		provider := &mockCertIssuerProvider{
+			mockCertProvider: mockCertProvider{
+				services: &defangv1.GetServicesResponse{
+					Services: []*defangv1.ServiceInfo{
+						{
+							Service:     &defangv1.Service{Name: "web"},
+							UseAcmeCert: true,
+							Domainname:  "example.com",
+						},
+					},
+				},
+			},
+		}
+		project := &compose.Project{
+			Name: "myproj",
+			Services: compose.Services{
+				"web": {
+					Name:       "web",
+					DomainName: "example.com",
+					Networks: map[string]*composetypes.ServiceNetworkConfig{
+						"default": {Aliases: []string{"alias.example.com"}},
+					},
+				},
+			},
+		}
+		err := GenerateLetsEncryptCert(t.Context(), project, fabricClient, provider)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		// Order-insensitive: workers run in parallel so the calls can land in
+		// either order. Set membership is what we care about.
+		want := []string{"myproj/web/alias.example.com", "myproj/web/example.com"}
+		if got := provider.sortedCalls(); !slices.Equal(got, want) {
+			t.Errorf("IssueCert calls = %v, want %v (any order)", got, want)
+		}
+		// Issuer path is short-circuited — the ACME codepath (which calls
+		// VerifyDNSSetup) must not run.
+		if fabricClient.calls() != 0 {
+			t.Errorf("VerifyDNSSetup should not be called when CertIssuer is used (got %d calls)", fabricClient.calls())
+		}
+	})
+
+	// IssueCert errors must surface — they used to be silently swallowed.
+	// Each failure is collected and joined into the returned error so the
+	// CLI exit code reflects the issuance outcome.
+	t.Run("aggregates IssueCert errors", func(t *testing.T) {
+		provider := &mockCertIssuerProvider{
+			mockCertProvider: mockCertProvider{
+				services: &defangv1.GetServicesResponse{
+					Services: []*defangv1.ServiceInfo{
+						{
+							Service:     &defangv1.Service{Name: "web"},
+							UseAcmeCert: true,
+							Domainname:  "example.com",
+						},
+					},
+				},
+			},
+			issueErr: errors.New("dns timeout"),
+		}
+		project := &compose.Project{
+			Name: "myproj",
+			Services: compose.Services{
+				"web": {Name: "web", DomainName: "example.com"},
+			},
+		}
+		err := GenerateLetsEncryptCert(t.Context(), project, &mockCertFabricClient{}, provider)
+		if err == nil {
+			t.Fatal("expected error when IssueCert fails")
+		}
+		if !strings.Contains(err.Error(), "dns timeout") {
+			t.Errorf("error %q should mention the underlying IssueCert error", err)
+		}
+		if !strings.Contains(err.Error(), "example.com") {
+			t.Errorf("error %q should name the failing domain", err)
+		}
+	})
+}
+
+// preflightFabricClient lets a test program responses per-domain so we can
+// drive the preflight-bucketing logic without touching the network.
+type preflightFabricClient struct {
+	client.MockFabricClient
+	mu        sync.Mutex
+	responses map[string]error // domain -> err returned from VerifyDNSSetup
+	calls     []string         // captured domains, in call order
+}
+
+func (m *preflightFabricClient) VerifyDNSSetup(_ context.Context, req *defangv1.VerifyDNSSetupRequest) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.calls = append(m.calls, req.Domain)
+	if err, ok := m.responses[req.Domain]; ok {
+		return err
+	}
+	return nil
+}
+
+func TestPreflightDNS(t *testing.T) {
+	jobs := []domainJob{
+		{serviceName: "web", domain: "ok.example.com", targets: []string{"def-abc"}},
+		{serviceName: "web", domain: "bad.example.com", targets: []string{"def-abc"}},
+		{serviceName: "api", domain: "also-ok.example.com", targets: []string{"def-xyz"}},
+	}
+	fab := &preflightFabricClient{responses: map[string]error{
+		"bad.example.com": errors.New("not ready"),
+	}}
+
+	verified := preflightDNS(t.Context(), jobs, fab)
+
+	if !verified["ok.example.com"] || !verified["also-ok.example.com"] {
+		t.Errorf("expected ok and also-ok to be verified, got %v", verified)
+	}
+	if verified["bad.example.com"] {
+		t.Errorf("expected bad to not be verified, got %v", verified)
+	}
+	if got, want := len(fab.calls), len(jobs); got != want {
+		t.Errorf("VerifyDNSSetup calls = %d, want %d (once per job)", got, want)
+	}
+}
+
+func TestCollectDomainJobs(t *testing.T) {
+	tests := []struct {
+		name     string
+		services []*defangv1.ServiceInfo
+		project  *compose.Project
+		want     []string // domains, in order
+	}{
+		{
+			name: "skips UseAcmeCert=false",
+			services: []*defangv1.ServiceInfo{
+				{Service: &defangv1.Service{Name: "web"}, UseAcmeCert: false, Domainname: "skip.example.com"},
+			},
+			project: &compose.Project{Services: compose.Services{
+				"web": {Name: "web", DomainName: "skip.example.com"},
+			}},
+			want: nil,
+		},
+		{
+			name: "skips service not in project",
+			services: []*defangv1.ServiceInfo{
+				{Service: &defangv1.Service{Name: "ghost"}, UseAcmeCert: true, Domainname: "ghost.example.com"},
+			},
+			project: &compose.Project{Services: compose.Services{}},
+			want:    nil,
+		},
+		{
+			name: "skips when deployed Domainname is empty",
+			services: []*defangv1.ServiceInfo{
+				{Service: &defangv1.Service{Name: "web"}, UseAcmeCert: true, Domainname: ""},
+			},
+			project: &compose.Project{Services: compose.Services{
+				"web": {Name: "web", DomainName: "wishful.example.com"},
+			}},
+			want: nil,
+		},
+		{
+			name: "flattens primary domain plus default-network aliases",
+			services: []*defangv1.ServiceInfo{
+				{Service: &defangv1.Service{Name: "web"}, UseAcmeCert: true, Domainname: "web.example.com"},
+			},
+			project: &compose.Project{Services: compose.Services{
+				"web": {Name: "web", DomainName: "web.example.com", Networks: map[string]*composetypes.ServiceNetworkConfig{
+					"default": {Aliases: []string{"alt.example.com", "third.example.com"}},
+				}},
+			}},
+			want: []string{"web.example.com", "alt.example.com", "third.example.com"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			jobs := collectDomainJobs(tt.project, tt.services)
+			got := make([]string, len(jobs))
+			for i, j := range jobs {
+				got[i] = j.domain
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("domains = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNewDomainLogger_PrefixAlignment(t *testing.T) {
+	stdout, _ := term.SetupTestTerm(t)
+
+	// Pad to the longest domain so columns line up across workers.
+	pad := len("longest.example.com")
+	short := newDomainLogger("a.example.com", pad)
+	long := newDomainLogger("longest.example.com", pad)
+	short("hello")
+	long("hello")
+
+	got := stripANSI(stdout.String())
+	// Each line should start with a bracketed domain followed by enough
+	// spaces that the message column lines up.
+	lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 output lines, got %d: %q", len(lines), got)
+	}
+	if !strings.HasPrefix(lines[0], " * [a.example.com]") {
+		t.Errorf("short line missing bracket prefix: %q", lines[0])
+	}
+	if !strings.HasPrefix(lines[1], " * [longest.example.com]") {
+		t.Errorf("long line missing bracket prefix: %q", lines[1])
+	}
+	// Find the "hello" column on both lines — they must match for alignment.
+	col0 := strings.Index(lines[0], "hello")
+	col1 := strings.Index(lines[1], "hello")
+	if col0 != col1 {
+		t.Errorf("message column not aligned: %d vs %d (%q / %q)", col0, col1, lines[0], lines[1])
+	}
+}
+
+// TestRunIssuerJobs_ParallelMultipleDomains exercises the parallel issuer
+// path: with N>1 jobs, IssueCert must be called for every job (set-equality)
+// and concurrency cap must not deadlock.
+func TestRunIssuerJobs_ParallelMultipleDomains(t *testing.T) {
+	provider := &mockCertIssuerProvider{
+		mockCertProvider: mockCertProvider{
+			services: &defangv1.GetServicesResponse{
+				Services: []*defangv1.ServiceInfo{
+					{Service: &defangv1.Service{Name: "web"}, UseAcmeCert: true, Domainname: "a.example.com"},
+					{Service: &defangv1.Service{Name: "api"}, UseAcmeCert: true, Domainname: "b.example.com"},
+					{Service: &defangv1.Service{Name: "admin"}, UseAcmeCert: true, Domainname: "c.example.com"},
+				},
+			},
+		},
+	}
+	project := &compose.Project{
+		Name: "multi",
+		Services: compose.Services{
+			"web":   {Name: "web", DomainName: "a.example.com"},
+			"api":   {Name: "api", DomainName: "b.example.com"},
+			"admin": {Name: "admin", DomainName: "c.example.com"},
+		},
+	}
+	if err := GenerateLetsEncryptCert(t.Context(), project, &mockCertFabricClient{}, provider); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	want := []string{
+		"multi/admin/c.example.com",
+		"multi/api/b.example.com",
+		"multi/web/a.example.com",
+	}
+	if got := provider.sortedCalls(); !slices.Equal(got, want) {
+		t.Errorf("issued = %v, want %v (any order)", got, want)
+	}
+}
+
+// TestRunIssuerJobs_PreflightsBeforeIssuing pins the two-phase shape: every
+// domain is pre-flighted before any domain starts issuing, so the batched DNS
+// instructions can't be printed after a worker has already begun waiting. A
+// pre-flight failure must not abort or skip issuance — phase 2 re-does the
+// discovery and reports the error against its own domain.
+func TestRunIssuerJobs_PreflightsBeforeIssuing(t *testing.T) {
+	tests := []struct {
+		name         string
+		preflightErr error
+	}{
+		{name: "preflight succeeds"},
+		{name: "preflight fails", preflightErr: errors.New("container app not found")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider := &mockCertIssuerProvider{
+				mockCertProvider: mockCertProvider{
+					services: &defangv1.GetServicesResponse{
+						Services: []*defangv1.ServiceInfo{
+							{Service: &defangv1.Service{Name: "web"}, UseAcmeCert: true, Domainname: "a.example.com"},
+							{Service: &defangv1.Service{Name: "api"}, UseAcmeCert: true, Domainname: "b.example.com"},
+						},
+					},
+				},
+				preflightErr: tt.preflightErr,
+			}
+			project := &compose.Project{
+				Name: "two",
+				Services: compose.Services{
+					"web": {Name: "web", DomainName: "a.example.com"},
+					"api": {Name: "api", DomainName: "b.example.com"},
+				},
+			}
+			if err := GenerateLetsEncryptCert(t.Context(), project, &mockCertFabricClient{}, provider); err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			events := provider.orderedEvents()
+			if len(events) != 4 {
+				t.Fatalf("expected 2 preflights + 2 issues, got %v", events)
+			}
+			for i, e := range events {
+				wantPrefix := "issue:"
+				if i < 2 {
+					wantPrefix = "preflight:"
+				}
+				if !strings.HasPrefix(e, wantPrefix) {
+					t.Errorf("event %d = %q, want a %q event (all preflights must precede all issues): %v", i, e, wantPrefix, events)
+				}
+			}
+		})
+	}
+}
+
+// TestRunIssuerJobs_PrefixesIssuerOutput asserts the logger handed to IssueCert
+// is the same per-domain prefixed logger the workers use, so provider-internal
+// progress lines are attributed like every other line. Single domain keeps the
+// terminal buffer single-writer.
+func TestRunIssuerJobs_PrefixesIssuerOutput(t *testing.T) {
+	stdout, _ := term.SetupTestTerm(t)
+	provider := &mockCertIssuerProvider{
+		mockCertProvider: mockCertProvider{
+			services: &defangv1.GetServicesResponse{
+				Services: []*defangv1.ServiceInfo{
+					{Service: &defangv1.Service{Name: "web"}, UseAcmeCert: true, Domainname: "a.example.com"},
+				},
+			},
+		},
+		onIssue: func(log func(string, ...any)) { log("registering custom hostname") },
+	}
+	project := &compose.Project{
+		Name:     "one",
+		Services: compose.Services{"web": {Name: "web", DomainName: "a.example.com"}},
+	}
+	if err := GenerateLetsEncryptCert(t.Context(), project, &mockCertFabricClient{}, provider); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	got := stripANSI(stdout.String())
+	if !strings.Contains(got, "[a.example.com] registering custom hostname") {
+		t.Errorf("issuer output not domain-prefixed:\n%s", got)
+	}
+}
+
+func TestPrintGroupedRecords(t *testing.T) {
+	jobs := []domainJob{
+		{serviceName: "web", domain: "example.com"},
+		{serviceName: "api", domain: "ready.example.com"},
+		{serviceName: "web", domain: "www.example.com"},
+	}
+	pending := map[string][]dns.RequiredRecord{
+		"example.com": {
+			{Type: "TXT", Name: "asuid.example.com", Value: "VID123", Note: "add this first"},
+			{Type: "A", Name: "example.com", Value: "20.1.2.3"},
+		},
+		"www.example.com": {
+			{Type: "CNAME", Name: "www.example.com", Value: "app.westus.azurecontainerapps.io"},
+		},
+	}
+
+	stdout, _ := term.SetupTestTerm(t)
+	printGroupedRecords(jobs, pending, maxDomainLen(jobs))
+	lines := strings.Split(strings.TrimRight(stripANSI(stdout.String()), "\n"), "\n")
+
+	if len(lines) != 4 {
+		t.Fatalf("expected 1 header + 3 record lines, got %d:\n%s", len(lines), strings.Join(lines, "\n"))
+	}
+	if !strings.Contains(lines[0], "Configure the following DNS record(s):") {
+		t.Errorf("missing single grouped header, got %q", lines[0])
+	}
+	// Source order of jobs, not map order; the already-ready domain is omitted.
+	wantPrefixes := []string{" * [example.com]", " * [example.com]", " * [www.example.com]"}
+	for i, want := range wantPrefixes {
+		if !strings.HasPrefix(lines[i+1], want) {
+			t.Errorf("line %d = %q, want prefix %q", i+1, lines[i+1], want)
+		}
+	}
+	if strings.Contains(stripANSI(stdout.String()), "ready.example.com") {
+		t.Error("domain with no pending records should not appear in the block")
+	}
+	if !strings.Contains(lines[1], "(add this first)") {
+		t.Errorf("note not rendered: %q", lines[1])
+	}
+	if strings.Contains(lines[2], "(") {
+		t.Errorf("empty note should render nothing: %q", lines[2])
+	}
+	// The arrow column is padded across the whole block, not per domain, so
+	// records for different domains still line up as one table.
+	cols := make([]int, len(lines)-1)
+	for i, l := range lines[1:] {
+		cols[i] = strings.Index(l, "->")
+	}
+	if cols[0] != cols[1] || cols[1] != cols[2] {
+		t.Errorf("arrow column not aligned across domains: %v\n%s", cols, strings.Join(lines[1:], "\n"))
+	}
+}
+
+// stripANSI removes the colour escape sequences that term.Infof prepends so
+// tests can assert on the post-formatting plain text. The escapes are simple
+// CSI sequences (ESC `[` … `m`) which is all we generate.
+func stripANSI(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); {
+		if s[i] == 0x1b && i+1 < len(s) && s[i+1] == '[' {
+			j := i + 2
+			for j < len(s) && s[j] != 'm' {
+				j++
+			}
+			if j < len(s) {
+				i = j + 1
+				continue
+			}
+		}
+		b.WriteByte(s[i])
+		i++
+	}
+	return b.String()
 }
 
 func TestGetDomainTargets(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -402,4 +403,39 @@ func TestGetServices(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, res.Services)
 	})
+}
+
+// mockCdDriver captures the Cloud Build steps runCdCommand submits. The embedded interface
+// satisfies the rest of the surface, so any unexpected call panics rather than silently
+// returning a zero value.
+type mockCdDriver struct {
+	gcpDriver
+	steps string
+}
+
+func (m *mockCdDriver) GetProjectID() gcp.ProjectId { return "test-project" }
+func (m *mockCdDriver) GetRegion() string           { return "us-central1" }
+func (m *mockCdDriver) RunCloudBuild(ctx context.Context, args gcp.CloudBuildArgs) (string, error) {
+	m.steps = args.Steps
+	return "build-1", nil
+}
+
+// Cloud Build replaces the image's own HOME for every build step, which sends Pulumi looking for
+// its plugin cache outside /root/.pulumi/plugins. It then finds none of the providers the CD
+// image ships and downloads them at deploy time instead — pulumi-gcp from the CDN and defang-gcp
+// from the generated SDK's pluginDownloadURL, i.e. the latest GitHub release. Verified against a
+// real build: `pulumi plugin ls` in a Cloud Build step reports "TOTAL plugin cache size: 0 B"
+// without this, and 369 MB with it.
+func TestRunCdCommandSetsHome(t *testing.T) {
+	driver := &mockCdDriver{}
+	b := &ByocGcp{driver: driver}
+	b.ByocBaseClient = &byoc.ByocBaseClient{PulumiStack: "beta"}
+	b.bucket = "test-bucket"
+
+	if _, err := b.runCdCommand(t.Context(), cdCommand{project: "testproj", command: []string{"up"}}); err != nil {
+		t.Fatalf("runCdCommand() error = %v", err)
+	}
+	if !strings.Contains(driver.steps, "HOME=/root") {
+		t.Errorf("the CD step must pin HOME to the image's plugin cache; got steps:\n%s", driver.steps)
+	}
 }

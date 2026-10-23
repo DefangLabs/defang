@@ -1,13 +1,14 @@
 {
-  buildGo124Module,
+  buildGo126Module,
+  go_1_26_10,
   installShellFiles,
   lib,
 }:
-buildGo124Module {
+(buildGo126Module.override { go = go_1_26_10; }) {
   pname = "defang-cli";
   version = "git";
   src = lib.cleanSource ../../src;
-  vendorHash = "sha256-RDLJgsMv0iRbIiNWENOoV4JDcgjzD+4Hbi0vJiUxTzU=";
+  vendorHash = "sha256-nEKl8y8Rrqce88unHKS6YSKnw+gbCMQbedUSgvx5haU=";
 
   subPackages = [ "cmd/cli" ];
 

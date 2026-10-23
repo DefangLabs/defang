@@ -1,6 +1,7 @@
 [![Go package](https://github.com/DefangLabs/defang/actions/workflows/go.yml/badge.svg?branch=main)](https://github.com/DefangLabs/defang/actions/workflows/go.yml)
 [![Discord](https://img.shields.io/discord/1233224785450897561)](https://s.defang.io/discord)
 ![GitHub Release](https://img.shields.io/github/v/release/DefangLabs/defang)
+[![MCP Toplist](https://mcptoplist.com/badge/mcp.so%2Fdefang%2FDefangLabs.svg)](https://mcptoplist.com/server/mcp.so%2Fdefang%2FDefangLabs)
 
 ### ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/Logos/Element_Wordmark_Slogan/JPG/Dark_Colour_Glow.jpg)
 
@@ -133,6 +134,20 @@ Install the Defang CLI from one of the following sources:
     nix profile install github:DefangLabs/defang#defang-cli --refresh
     ```
 
+  Released tags are available from our [Cachix](https://cachix.org) binary cache, so
+  you can download the CLI instead of compiling it. If you have Cachix installed, run
+  `cachix use defanglabs`; otherwise add these lines to `/etc/nix/nix.conf` (or
+  `~/.config/nix/nix.conf` if you are a [trusted user](https://nix.dev/manual/nix/stable/command-ref/conf-file#conf-trusted-users)):
+
+  ```nix
+  extra-substituters = https://defanglabs.cachix.org
+  extra-trusted-public-keys = defanglabs.cachix.org-1:mTXLTfYprWDrIK50Kz34fhOTreeKlQRZFQcKL7HtHx0=
+  ```
+
+  Then install a tagged version, e.g. `nix profile install github:DefangLabs/defang/v3.14.1#defang-cli`.
+  The cache holds `x86_64-linux` and `aarch64-darwin` builds. Other platforms, and
+  builds from `main`, compile from source as before.
+
 - Using [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/):
 
   ```
@@ -203,11 +218,13 @@ Invoke-Expression -Command (defang completion powershell | Out-String)
 The Defang CLI recognizes the following environment variables:
 
 - `COMPOSE_DISABLE_ENV_FILE` - Whether to disable loading environment variables from a `.env` file in the current directory; defaults to `false`
+- `COMPOSE_ENV_FILES` - A comma-separated list of environment file(s) to use for interpolation instead of `.env`; overridden by the `--env-file` flag
 - `COMPOSE_FILE` - The Compose file(s) to use; defaults to `compose.yaml`, `compose.yml`, `docker-compose.yaml`, or `docker-compose.yml` in the current directory
 - `COMPOSE_PATH_SEPARATOR` - The path separator to use for `COMPOSE_FILE`; defaults to `:` on Unix/MacOS and `;` on Windows
 - `COMPOSE_PROJECT_NAME` - The name of the project to use; overrides the `name` in the Compose file
 - `DEFANG_ACCESS_TOKEN` - The access token to use for authentication; if not specified, uses token from `defang login`
 - `DEFANG_ALLOW_UPGRADE` - If set to `true`, allows upgrading the CD image and Pulumi version to the latest available; defaults to `false`, ie. previously deployed versions will be used to avoid unexpected upgrades
+- `DEFANG_AWS_APN_ID` - The AWS APN ID to use for attribution, eg. use `pc:123456789abcdefgh` for AWS Marketplace products
 - `DEFANG_BUILD_CONTEXT_LIMIT` - The maximum size of the build context when building container images; defaults to `100MiB`
 - `DEFANG_CD_BUCKET` - The S3 bucket to use for the BYOC CD pipeline; defaults to `defang-cd-bucket-…`
 - `DEFANG_CD_IMAGE` - The image to use for the Continuous Deployment (CD) pipeline; defaults to `public.ecr.aws/defang-io/cd:public-beta`
@@ -222,14 +239,17 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_MODEL_ID` - The model ID of the LLM to use for the generate/debug AI integration (Pro users only)
 - `DEFANG_NO_CACHE` - If set to `true`, disables pull-through caching of container images; defaults to `false`
 - `DEFANG_PREFIX` - The prefix to use for all BYOC resources; defaults to `Defang`
-- `DEFANG_PROVIDER` - The name of the cloud provider to use, `auto` (default), `aws`, `digitalocean`, `gcp`, or `defang`
+- `DEFANG_PROVIDER` - The name of the cloud provider to use, `auto` (default), `aws`, `azure`, `digitalocean`, `gcp`, or `defang`
 - `DEFANG_PULUMI_BACKEND` - The Pulumi backend URL or `"pulumi-cloud"`; defaults to a self-hosted backend
 - `DEFANG_PULUMI_DEBUG` - If set to `true`, enables debug logging for Pulumi operations; defaults to `false`
 - `DEFANG_PULUMI_DIFF` - If set to `true`, shows the Pulumi diff during deployments; defaults to `false`
 - `DEFANG_PULUMI_DIR` - Run Pulumi from this folder, instead of spawning a cloud task; requires `--debug` (BYOC only)
 - `DEFANG_PULUMI_VERSION` - Override the version of the Pulumi image to use (`aws` provider only)
+- `DEFANG_RECIPE` - The deployment mode / recipe to use; defaults to `AFFORDABLE`
+- `DEFANG_STACK` - The name of the stack to use
 - `DEFANG_SUFFIX` - The suffix to use for all BYOC resources; defaults to the stack name, or `beta` if unset.
 - `DEFANG_WORKSPACE` - The workspace (name or ID) to use; preferred way to select which workspace the CLI uses
+- `GCP_PROJECT_ID` - The Google Cloud project ID for the `gcp` provider; must be a real shell environment variable (e.g. `export GCP_PROJECT_ID=my-project-id`), not set via `defang config set`. Also recognized: `GOOGLE_PROJECT`, `GOOGLE_CLOUD_PROJECT`, `GCLOUD_PROJECT`, `CLOUDSDK_CORE_PROJECT`
 - `NO_COLOR` - If set to any value, disables color output; by default, color output is enabled depending on the terminal
 - `PULUMI_ACCESS_TOKEN` - The Pulumi access token to use for authentication to Pulumi Cloud; see `DEFANG_PULUMI_BACKEND`
 - `PULUMI_CONFIG_PASSPHRASE` - Passphrase used to generate a unique key for your stack, and configuration and encrypted state values
@@ -238,6 +258,22 @@ The Defang CLI recognizes the following environment variables:
 
 Environment variables will be loaded from a `.defang` file in the current directory, if it exists. This file follows
 the same format as a `.env` file: `KEY=VALUE` pairs on each line, lines starting with `#` are treated as comments and ignored.
+
+### Compose interpolation
+
+After selecting a stack, the CLI makes the resolved `DEFANG_PROVIDER` and `DEFANG_STACK` values available for Compose
+interpolation. They are not injected into services automatically; reference them explicitly where needed:
+
+```yaml
+services:
+  app:
+    environment:
+      PUBLISH_PROVIDER: "${DEFANG_PROVIDER}"
+      PUBLISH_STACK: "${DEFANG_STACK}"
+```
+
+The resolved values take precedence over values with the same names in Compose env files. Fields that Compose must decode
+before stack selection should provide a default, such as `${DEFANG_PROVIDER:-auto}`.
 
 ## Development
 
@@ -249,3 +285,26 @@ To get started quickly, install Nix and DirEnv, then create a `.envrc` file to a
 echo use flake >> .envrc
 direnv allow
 ```
+
+### Adding cloud support
+
+At a high-level, support for a specific cloud lives in three repositories:
+
+- In [this CLI repository](https://github.com/DefangLabs/defang)
+  - an implementation of the [client.Provider](src/pkg/cli/client/byoc) interface under the [`byoc` package](src/pkg/cli/client/byoc)
+  - low-level cloud helpers ("driver") under the [`clouds` package](src/pkg/clouds)
+    - authenticate with the cloud
+    - start a CD container (task/job)
+    - monitor the CD container's status and logs
+    - stream/query logs from deployed services
+    - set/list config (secrets/parameters)
+- In the [Defang Pulumi Provider repository](https://github.com/DefangLabs/pulumi-defang)
+  - Pulumi **component** resources under the `provider` folder
+    - `Project` component
+    - `Service` component
+    - `Postgres` component
+    - `Redis` component
+  - a Pulumi **custom** resource for `Build`
+  - an implementation of the `ConfigProvider` interface to read config (secrets/parameters) at deploy time
+- In the [Defang Docs repository](https://github.com/DefangLabs/defang-docs)
+  - under the [`providers` section](https://docs.defang.io/docs/providers), documentation for how to set up credentials and permissions for the cloud, and any cloud-specific features

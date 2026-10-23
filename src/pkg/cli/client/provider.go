@@ -48,6 +48,12 @@ type DeployRequest struct {
 	defangv1.DeployRequest
 	EventsUrl string
 	StatesUrl string
+	Recipe    *defangv1.Recipe
+	// TTL is the deployment time-to-live, forwarded to the CD run as the
+	// DEFANG_TTL env var so the deployed stack schedules its own destruction.
+	// Empty means no TTL was given; only the BYOC providers running the
+	// multi-cloud CD (AWS, Azure, GCP) consume it.
+	TTL string
 }
 
 type DeployResponse struct {

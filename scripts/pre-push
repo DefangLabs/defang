@@ -1,0 +1,3 @@
+#!/bin/sh
+# Pre-push hook: run tests before pushing
+make pre-push

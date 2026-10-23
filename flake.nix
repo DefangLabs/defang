@@ -1,4 +1,17 @@
 {
+  # Prebuilt `defang-cli` for released tags, published by the publish-nix-cache
+  # job in go.yml straight to Cachix. Nix only honours these for trusted users
+  # (root, or a member of `trusted-users`); everyone else builds from source
+  # unless they add the same two lines to their own nix.conf — see the README.
+  nixConfig = {
+    extra-substituters = [
+      "https://defanglabs.cachix.org"
+    ];
+    extra-trusted-public-keys = [
+      "defanglabs.cachix.org-1:mTXLTfYprWDrIK50Kz34fhOTreeKlQRZFQcKL7HtHx0="
+    ];
+  };
+
   outputs =
     {
       self,
@@ -11,6 +24,13 @@
         pkgs = import nixpkgs {
           inherit system;
         };
+        go_1_26_10 = pkgs.go_1_26.overrideAttrs (_: {
+          version = "1.26.10";
+          src = pkgs.fetchurl {
+            url = "https://go.dev/dl/go1.26.10.src.tar.gz";
+            hash = "sha256-/WPog7ovK/ypPBZGsx6+9j4rHk0rMXyXidl2po2B828=";
+          };
+        });
       in
       {
         devShell =
@@ -25,7 +45,7 @@
               git
               gnumake
               gnused # force Linux `sed` everywhere
-              go_1_24 # must match GO_VERSION in Dockerfile
+              go_1_26_10 # must match GO_VERSION in Dockerfile
               golangci-lint
               google-cloud-sdk
               gopls
@@ -52,7 +72,7 @@
               fi
             '';
           };
-        packages.defang-cli = pkgs.callPackage ./pkgs/defang/cli.nix { };
+        packages.defang-cli = pkgs.callPackage ./pkgs/defang/cli.nix { inherit go_1_26_10; };
         packages.defang-bin = pkgs.callPackage ./pkgs/defang { };
       }
     );

@@ -76,6 +76,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 			term.Warnf("service %q: service name is longer than 16 characters, you may run into issues with resource name length", svccfg.Name)
 		}
 
+		// beta docker compose model runner syntax
 		if svccfg.Provider != nil && svccfg.Provider.Type == "model" && svccfg.Image == "" && svccfg.Build == nil {
 			fixupModelProvider(&svccfg, project, accountInfo)
 		}
@@ -89,9 +90,9 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 			svccfg.Ports[i] = fixupPort(port)
 		}
 
-		// Ignore "build" config if we have "image", unless in --build or --force mode
-		if svccfg.Image != "" && svccfg.Build != nil && upload != UploadModeDigest && upload != UploadModeForce {
-			term.Warnf("service %q: using published image instead of rebuilding; pass --build to build and publish a new image", svccfg.Name)
+		// Ignore "build" config if we have "image", unless in --build/--force mode or pull_policy: build
+		if svccfg.Image != "" && svccfg.Build != nil && svccfg.PullPolicy != composeTypes.PullPolicyBuild && upload != UploadModeDigest && upload != UploadModeForce {
+			term.Warnf("service %q: using published image instead of rebuilding; pass --build, or set pull_policy: build, to build and publish a new image", svccfg.Name)
 			svccfg.Build = nil
 		}
 
@@ -99,10 +100,15 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 		project.Services[svccfg.Name] = svccfg
 	}
 
+	// modern docker compose model runner syntax
 	for name, model := range project.Models {
 		model.Name = name // ensure the model has a name
 		svccfg := fixupModel(model, project, accountInfo)
-		project.Services[svccfg.Name] = svccfg
+		if svccfg.Extensions == nil {
+			svccfg.Extensions = make(map[string]interface{})
+		}
+		svccfg.Extensions["x-defang-llm"] = true
+		project.Services[svccfg.Name] = *svccfg
 	}
 
 	svcNameReplacer := NewServiceNameReplacer(ctx, provider, project)
@@ -241,7 +247,12 @@ func parsePortString(port string) (uint32, error) {
 	}
 }
 
-const liteLLMPort uint32 = 4000
+const (
+	liteLLMPort uint32 = 4000
+
+	defaultLLMCPUs      = 0.5
+	defaultLLMMemoryMiB = 2048 // 1024 MiB OOMed during AWS E2E; use the next size up.
+)
 
 func fixupLLM(svccfg *composeTypes.ServiceConfig) {
 	// Strip tag/digest: only remove the suffix after ':' or '@' if it appears after the last '/'
@@ -367,18 +378,23 @@ func fixupIngressPorts(svccfg *composeTypes.ServiceConfig) {
 // Declare a private network for the model provider
 const modelProviderNetwork = "model_provider_private"
 
-// fixupModel converts a top-level model declaration into a service config.
-func fixupModel(model composeTypes.ModelConfig, project *composeTypes.Project, info *client.AccountInfo) composeTypes.ServiceConfig {
+func fixupModel(model composeTypes.ModelConfig, project *composeTypes.Project, info *client.AccountInfo) *composeTypes.ServiceConfig {
+	if model.ContextSize != 0 {
+		term.Warnf("model %q: context_size is a Docker Model Runner parameter and is not supported for cloud deployments", model.Name)
+	}
+	if len(model.RuntimeFlags) > 0 {
+		term.Warnf("model %q: runtime_flags is a Docker Model Runner parameter and is not supported for cloud deployments", model.Name)
+	}
 	svccfg := &composeTypes.ServiceConfig{
 		Name:       model.Name,
 		Extensions: model.Extensions,
 	}
-	makeAccessGatewayService(svccfg, project, model.Model, info) // TODO: pass other model options too
-
-	return *svccfg
+	makeAccessGatewayService(svccfg, project, model.Model, info)
+	return svccfg
 }
 
 func fixupModelProvider(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, info *client.AccountInfo) {
+	term.Warnf("service %q: 'provider: type: model' is deprecated; use a top-level 'models:' entry instead", svccfg.Name)
 	var model string
 	if modelVals := svccfg.Provider.Options["model"]; len(modelVals) == 1 {
 		model = modelVals[0]
@@ -390,9 +406,9 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 	// Local Docker sets [SERVICE]_URL and [SERVICE]_MODEL environment variables on the dependent services
 	envName := strings.ToUpper(svccfg.Name) // TODO: handle characters that are not allowed in env vars, like '-'
 	endpointEnvVar := envName + "_URL"
+	urlVal := "http://" + svccfg.Name + ":" + strconv.FormatUint(uint64(liteLLMPort), 10) + "/v1/"
 	modelEnvVar := envName + "_MODEL"
 
-	urlVal := "http://" + svccfg.Name + ":" + strconv.FormatUint(uint64(liteLLMPort), 10) + "/v1/"
 	resolvedModel, masterKey := configureAccessGateway(svccfg, project, model, info)
 	wireDependentServices(project, svccfg.Name, urlVal, resolvedModel, masterKey, endpointEnvVar, modelEnvVar)
 }
@@ -401,9 +417,20 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 // the LiteLLM container (image, command, network, port), and derives LITELLM_MASTER_KEY.
 // Returns the resolved model string and the master key pointer.
 func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, model string, info *client.AccountInfo) (string, *string) {
-	// svccfg.Deploy.Resources.Reservations.Limits = &composeTypes.Resources{} TODO: avoid memory limits warning
 	if svccfg.Environment == nil {
 		svccfg.Environment = composeTypes.MappingWithEquals{}
+	}
+	if svccfg.Deploy == nil {
+		svccfg.Deploy = &composeTypes.DeployConfig{}
+	}
+	if svccfg.Deploy.Resources.Reservations == nil {
+		svccfg.Deploy.Resources.Reservations = &composeTypes.Resource{}
+	}
+	if svccfg.Deploy.Resources.Reservations.NanoCPUs == 0 {
+		svccfg.Deploy.Resources.Reservations.NanoCPUs = defaultLLMCPUs
+	}
+	if svccfg.Deploy.Resources.Reservations.MemoryBytes == 0 {
+		svccfg.Deploy.Resources.Reservations.MemoryBytes = defaultLLMMemoryMiB * MiB
 	}
 
 	alias := model
@@ -412,6 +439,8 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 		switch model {
 		case "chat-default":
 			model = "us.amazon.nova-2-lite-v1:0"
+		case "chat-large":
+			model = "zai.glm-5"
 		case "embedding-default":
 			model = "amazon.titan-embed-text-v2:0"
 		}
@@ -420,9 +449,14 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 			svccfg.Environment["AWS_REGION"] = &info.Region
 		}
 	case client.ProviderGCP:
+		location := info.Region
 		switch model {
 		case "chat-default":
-			model = "gemini-2.5-flash"
+			model = "gemini-3.5-flash"
+			location = "global"
+		case "chat-large":
+			model = "gemini-3.1-pro-preview"
+			location = "global"
 		case "embedding-default":
 			model = "gemini-embedding-001"
 		}
@@ -430,13 +464,22 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 		if info.AccountID != "" {
 			svccfg.Environment["VERTEXAI_PROJECT"] = &info.AccountID
 		}
-		if info.Region != "" {
-			svccfg.Environment["VERTEXAI_LOCATION"] = &info.Region
+		if location != "" {
+			svccfg.Environment["VERTEXAI_LOCATION"] = &location
 		}
+	case client.ProviderAzure:
+		// Azure's managed-model provider (pulumi-defang defangazure) provisions an
+		// OpenAI-compatible AI Foundry account and creates a deployment named after
+		// the alias, picking the concrete model at deploy time from a region-aware
+		// preference list (models.go chatPreference/embeddingPreference). So unlike
+		// bedrock/vertex_ai we do NOT resolve or prefix the model here: the bare alias
+		// is wired to dependents as {SERVICE}_MODEL, which the provider uses as both
+		// the deployment name and the model routed to the OpenAI-compatible endpoint.
+		// The account key is injected as OPENAI_API_KEY by the provider.
 	}
 
 	// svccfg.HealthCheck = &composeTypes.ServiceHealthCheckConfig{} TODO: add healthcheck
-	svccfg.Image = "litellm/litellm:v1.82.3-stable.patch.3"
+	svccfg.Image = "litellm/litellm:v1.92.0"
 	svccfg.Command = []string{"--drop_params", "--model", model, "--alias", alias}
 	if svccfg.Networks == nil {
 		// New compose-go versions do not create networks for "provider:" services, so we need to create it here
@@ -518,6 +561,9 @@ func wireDependentServices(project *composeTypes.Project, svcName, urlVal, model
 			if _, ok := dependency.Environment[modelVar]; !ok && model != "" {
 				dependency.Environment[modelVar] = &model
 			}
+			if _, ok := dependency.Environment["OPENAI_API_KEY"]; !ok {
+				dependency.Environment["OPENAI_API_KEY"] = masterKey
+			}
 			// If the model is not already declared as a dependency, add it
 			if _, ok := dependency.DependsOn[svcName]; !ok {
 				if dependency.DependsOn == nil {
@@ -552,21 +598,20 @@ func GetImageRepo(image string) string {
 func fixupPort(port composeTypes.ServicePortConfig) composeTypes.ServicePortConfig {
 	switch port.Mode {
 	case "":
-		term.Warnf("port %d: no 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)", port.Target)
+		term.Warnf(
+			"port %d: no 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)",
+			port.Target,
+		)
+		port.Mode = Mode_INGRESS
 		fallthrough
 	case Mode_INGRESS:
 		// This code is unnecessarily complex because compose-go silently converts short `ports:` syntax to ingress+tcp
-		if port.Protocol == Protocol_UDP {
-			term.Warnf("port %d: UDP ports default to 'host' mode (add 'mode: host' to silence)", port.Target)
-			port.Mode = Mode_HOST
-		} else {
-			if port.Published != "" {
-				term.Debugf("port %d: ignoring 'published: %s' in 'ingress' mode", port.Target, port.Published)
-			}
-			if port.AppProtocol == "" {
-				// TCP ingress is not supported; assuming HTTP (add 'app_protocol: http' to silence)"
-				port.AppProtocol = "http"
-			}
+		if port.Published != "" {
+			term.Debugf("port %d: ignoring 'published: %s' in 'ingress' mode", port.Target, port.Published)
+		}
+		if port.Protocol != Protocol_UDP && port.AppProtocol == "" {
+			// TCP ingress is not supported; assuming HTTP (add 'app_protocol: http' to silence)"
+			port.AppProtocol = "http"
 		}
 	case Mode_HOST:
 		// no-op

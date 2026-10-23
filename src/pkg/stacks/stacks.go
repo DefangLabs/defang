@@ -18,7 +18,7 @@ import (
 type Parameters struct {
 	Name      string
 	Provider  client.ProviderID
-	Mode      modes.Mode
+	Recipe    modes.Recipe
 	Region    string
 	Variables map[string]string
 }
@@ -49,8 +49,8 @@ func (sp Parameters) ToMap() map[string]string {
 			vars[regionVarName] = sp.Region
 		}
 	}
-	if sp.Mode != modes.ModeUnspecified {
-		vars["DEFANG_MODE"] = strings.ToLower(sp.Mode.String())
+	if sp.Recipe != modes.RecipeUnspecified {
+		vars["DEFANG_RECIPE"] = strings.ToLower(sp.Recipe.String())
 	}
 	return vars
 }
@@ -69,18 +69,17 @@ func paramsFromMap(variables map[string]string) (*Parameters, error) {
 		regionVarName := client.GetRegionVarName(provider) // FIXME: GCP supports 5 different region vars
 		region = variables[regionVarName]
 	}
-	var mode modes.Mode
-	if val, ok := variables["DEFANG_MODE"]; ok {
-		err := mode.Set(val)
-		if err != nil {
-			return nil, fmt.Errorf("invalid DEFANG_MODE value: %w", err)
-		}
+	var recipe modes.Recipe
+	if val, ok := variables["DEFANG_RECIPE"]; ok {
+		recipe = modes.ParseRecipe(val)
+	} else if val, ok := variables["DEFANG_MODE"]; ok {
+		recipe = modes.ParseRecipe(val)
 	}
 	return &Parameters{
 		Variables: variables,
 		Provider:  provider,
 		Region:    region,
-		Mode:      mode,
+		Recipe:    recipe,
 	}, nil
 }
 
@@ -157,7 +156,10 @@ func (p *Parameters) Account() string {
 
 // for shell printing for converting to string format of StackParameters
 type ListItem struct {
-	Parameters
+	Name       string
+	Provider   client.ProviderID
+	Mode       modes.Recipe
+	Region     string
 	Account    string
 	Default    bool
 	DeployedAt time.Time
@@ -192,8 +194,11 @@ func ListInDirectory(workingDirectory string) ([]ListItem, error) {
 			continue
 		}
 		stacks = append(stacks, ListItem{
-			Parameters: *params,
-			Account:    params.Account(),
+			Name:     params.Name,
+			Provider: params.Provider,
+			Mode:     params.Recipe,
+			Region:   params.Region,
+			Account:  params.Account(),
 		})
 	}
 

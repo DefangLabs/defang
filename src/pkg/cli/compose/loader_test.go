@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -8,9 +9,97 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestResolveProjectWorkingDirDoesNotLoadOrCacheProject(t *testing.T) {
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	require.NoError(t, os.WriteFile(composePath, []byte("services: ["), 0o644))
+
+	loader := NewLoader(WithPath(composePath))
+	workingDir, err := loader.ResolveProjectWorkingDir(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, dir, workingDir)
+	assert.Nil(t, loader.cached)
+
+	require.NoError(t, os.WriteFile(composePath, []byte("services:\n  web:\n    image: alpine\n"), 0o644))
+	project, err := loader.LoadProject(t.Context())
+	require.NoError(t, err)
+	assert.Contains(t, project.Services, "web")
+
+	require.NoError(t, os.Remove(composePath))
+	workingDir, err = loader.ResolveProjectWorkingDir(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, dir, workingDir)
+}
+
+// TestLoadProjectDebugDumpNeverHitsStdoutInJSONMode is a regression test:
+// `defang services --json` with DEFANG_DEBUG=1 used to write the project's
+// YAML dump to stdout ahead of the JSON payload, corrupting it for callers
+// like `defang-github-action`'s deployment summary (jq: invalid numeric
+// literal). term.Println now routes to stderr in JSON mode, so the dump
+// must never appear on stdout, whether or not JSON mode is on.
+func TestLoadProjectDebugDumpNeverHitsStdoutInJSONMode(t *testing.T) {
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	require.NoError(t, os.WriteFile(composePath, []byte("services:\n  web:\n    image: alpine\n"), 0o644))
+
+	oldTerm := term.DefaultTerm
+	t.Cleanup(func() { term.DefaultTerm = oldTerm })
+
+	t.Run("debug alone dumps the project to stdout", func(t *testing.T) {
+		var stdout, stderr bytes.Buffer
+		term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
+		term.DefaultTerm.SetDebug(true)
+
+		_, err := NewLoader(WithPath(composePath)).LoadProject(t.Context())
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "services:")
+		assert.Empty(t, stderr.String())
+	})
+
+	t.Run("debug plus json moves the dump to stderr", func(t *testing.T) {
+		var stdout, stderr bytes.Buffer
+		term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
+		term.DefaultTerm.SetDebug(true)
+		term.DefaultTerm.SetJSON(true)
+
+		_, err := NewLoader(WithPath(composePath)).LoadProject(t.Context())
+		require.NoError(t, err)
+		assert.Empty(t, stdout.String())
+		assert.Contains(t, stderr.String(), "services:")
+	})
+}
+
+func TestResolveProjectWorkingDirDoesNotSuppressProjectWarnings(t *testing.T) {
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	require.NoError(t, os.WriteFile(composePath, []byte(`services:
+  web:
+    image: alpine
+    environment:
+      VALUE: ${IGNORED_VALUE}
+`), 0o644))
+	t.Setenv("IGNORED_VALUE", "ignored")
+
+	oldTerm := term.DefaultTerm
+	t.Cleanup(func() { term.DefaultTerm = oldTerm })
+	var output bytes.Buffer
+	term.DefaultTerm = term.NewTerm(os.Stdin, &output, &output)
+
+	loader := NewLoader(WithPath(composePath))
+	_, err := loader.ResolveProjectWorkingDir(t.Context())
+	require.NoError(t, err)
+	_, err = loader.LoadProject(t.Context())
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, strings.Count(output.String(), `Environment variable "IGNORED_VALUE" is ignored`))
+}
 
 func TestLoader(t *testing.T) {
 	testAllComposeFiles(t, func(t *testing.T, name, path string) {
@@ -114,4 +203,348 @@ func TestComposeEnv(t *testing.T) {
 	assert.Equal(t, "env_project_name", p.Name)
 	assert.Len(t, p.Services, 2)
 	assert.Equal(t, types.NewMappingWithEquals([]string{"A=${A}"}), p.Services["service1"].Environment)
+}
+
+func TestWithEnvFiles(t *testing.T) {
+	// A minimal project whose interpolation depends on env-file values.
+	const composeYAML = `name: envfiletest
+services:
+  web:
+    image: alpine
+    environment:
+      - GREETING=${GREETING}
+      - SOURCE=${SOURCE}
+`
+	dir := t.TempDir()
+	writeFile := func(name, content string) string {
+		t.Helper()
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+
+	composePath := writeFile("compose.yaml", composeYAML)
+	// The default .env sits next to the compose file and is loaded when no --env-file is given.
+	writeFile(".env", "GREETING=from_dotenv\nSOURCE=default\n")
+	// The explicit env-file only defines GREETING.
+	prodEnv := writeFile("prod.env", "GREETING=from_prod\n")
+	// A second env-file to verify multiple --env-file values merge (last wins for duplicates).
+	extraEnv := writeFile("extra.env", "SOURCE=from_extra\n")
+
+	tests := []struct {
+		name     string
+		envFiles []string
+		expected map[string]string
+	}{
+		{
+			name:     "default .env is used when no env-file is given",
+			envFiles: nil,
+			expected: map[string]string{"GREETING": "from_dotenv", "SOURCE": "default"},
+		},
+		{
+			name:     "explicit env-file overrides the default .env",
+			envFiles: []string{prodEnv},
+			// SOURCE is absent from prod.env and the default .env is no longer
+			// loaded, so it stays unresolved for resolution later by CD.
+			expected: map[string]string{"GREETING": "from_prod", "SOURCE": "${SOURCE}"},
+		},
+		{
+			name:     "multiple env-files are merged",
+			envFiles: []string{prodEnv, extraEnv},
+			expected: map[string]string{"GREETING": "from_prod", "SOURCE": "from_extra"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			loader := NewLoader(WithPath(composePath), WithEnvFiles(tt.envFiles...))
+			p, err := loader.LoadProject(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			env := p.Services["web"].Environment
+			for k, want := range tt.expected {
+				got := env[k]
+				if got == nil {
+					t.Errorf("environment variable %q not found", k)
+					continue
+				}
+				assert.Equal(t, want, *got, "environment variable %q", k)
+			}
+		})
+	}
+}
+
+func TestInterpolationEnv(t *testing.T) {
+	const composeYAML = `name: interpolationenvtest
+services:
+  web:
+    image: alpine
+    environment:
+      - PROVIDER=${DEFANG_PROVIDER}
+      - STACK=${DEFANG_STACK}
+      - ACCESS_TOKEN=${DEFANG_ACCESS_TOKEN}
+`
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	require.NoError(t, os.WriteFile(composePath, []byte(composeYAML), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env"), []byte("DEFANG_PROVIDER=dotenv\nDEFANG_STACK=dotenv\n"), 0o644))
+	t.Setenv("DEFANG_ACCESS_TOKEN", "secret")
+
+	loader := NewLoaderFromOptions(LoaderOptions{
+		ConfigPaths: []string{composePath},
+		InterpolationEnv: map[string]string{
+			"DEFANG_PROVIDER": "aws",
+			"DEFANG_STACK":    "production",
+		},
+	})
+	project, err := loader.LoadProject(t.Context())
+	require.NoError(t, err)
+
+	env := project.Services["web"].Environment
+	require.NotNil(t, env["PROVIDER"])
+	require.NotNil(t, env["STACK"])
+	require.NotNil(t, env["ACCESS_TOKEN"])
+	assert.Equal(t, "aws", *env["PROVIDER"])
+	assert.Equal(t, "production", *env["STACK"])
+	assert.Equal(t, "${DEFANG_ACCESS_TOKEN}", *env["ACCESS_TOKEN"])
+}
+
+// TestDefaultEnvFiles covers the convention-based env files: when no env file
+// is set explicitly (--env-file or COMPOSE_ENV_FILES), the loader layers the
+// DefaultEnvFiles candidates (e.g. .env, .env.<provider>, .env.<stack>), later
+// files overriding earlier ones. Missing files are skipped.
+func TestDefaultEnvFiles(t *testing.T) {
+	const composeYAML = `name: envdefaultstest
+services:
+  web:
+    image: alpine
+    environment:
+      - BASE=${BASE}
+      - GREETING=${GREETING}
+      - SOURCE=${SOURCE}
+`
+	dir := t.TempDir()
+	writeFile := func(name, content string) string {
+		t.Helper()
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+
+	composePath := writeFile("compose.yaml", composeYAML)
+	writeFile(".env", "BASE=from_dotenv\nGREETING=from_dotenv\nSOURCE=from_dotenv\n")
+	writeFile(".env.aws", "GREETING=from_aws\nSOURCE=from_aws\n")
+	writeFile(".env.mystack", "SOURCE=from_mystack\n")
+	flagEnv := writeFile("flag.env", "GREETING=from_flag\n")
+
+	// A sibling project without a base .env to verify the other default env files load on their own.
+	noDotenvDir := t.TempDir()
+	noDotenvCompose := filepath.Join(noDotenvDir, "compose.yaml")
+	if err := os.WriteFile(noDotenvCompose, []byte(composeYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(noDotenvDir, ".env.mystack"), []byte("SOURCE=from_mystack\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name           string
+		composePath    string   // defaults to composePath
+		envFiles       []string // explicit --env-file (LoaderOptions.EnvFiles)
+		envVar         string   // COMPOSE_ENV_FILES; "" means unset
+		defaultFiles   []string
+		disableEnvFile bool // COMPOSE_DISABLE_ENV_FILE
+		expected       map[string]string
+	}{
+		{
+			name:         "default env files layer, most specific wins",
+			defaultFiles: []string{".env", ".env.aws", ".env.mystack"},
+			expected:     map[string]string{"BASE": "from_dotenv", "GREETING": "from_aws", "SOURCE": "from_mystack"},
+		},
+		{
+			name:         "missing default env files are skipped",
+			defaultFiles: []string{".env", ".env.gcp", ".env.mystack"},
+			expected:     map[string]string{"BASE": "from_dotenv", "GREETING": "from_dotenv", "SOURCE": "from_mystack"},
+		},
+		{
+			name:         "stack env file loads even without a base .env",
+			composePath:  noDotenvCompose,
+			defaultFiles: []string{".env", ".env.aws", ".env.mystack"},
+			expected:     map[string]string{"BASE": "${BASE}", "GREETING": "${GREETING}", "SOURCE": "from_mystack"},
+		},
+		{
+			name:         "explicit env-file overrides the convention",
+			envFiles:     []string{flagEnv},
+			defaultFiles: []string{".env", ".env.aws", ".env.mystack"},
+			expected:     map[string]string{"BASE": "${BASE}", "GREETING": "from_flag", "SOURCE": "${SOURCE}"},
+		},
+		{
+			name:         "COMPOSE_ENV_FILES overrides the convention",
+			envVar:       flagEnv,
+			defaultFiles: []string{".env", ".env.aws", ".env.mystack"},
+			expected:     map[string]string{"BASE": "${BASE}", "GREETING": "from_flag", "SOURCE": "${SOURCE}"},
+		},
+		{
+			name:           "COMPOSE_DISABLE_ENV_FILE disables the convention",
+			defaultFiles:   []string{".env", ".env.aws", ".env.mystack"},
+			disableEnvFile: true,
+			expected:       map[string]string{"BASE": "${BASE}", "GREETING": "${GREETING}", "SOURCE": "${SOURCE}"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.envVar != "" {
+				t.Setenv(composeEnvFilesEnvVar, tt.envVar)
+			} else {
+				os.Unsetenv(composeEnvFilesEnvVar)
+			}
+			if tt.disableEnvFile {
+				t.Setenv("COMPOSE_DISABLE_ENV_FILE", "1")
+			}
+			path := tt.composePath
+			if path == "" {
+				path = composePath
+			}
+			loader := NewLoaderFromOptions(LoaderOptions{
+				ConfigPaths:     []string{path},
+				EnvFiles:        tt.envFiles,
+				DefaultEnvFiles: tt.defaultFiles,
+			})
+			p, err := loader.LoadProject(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			env := p.Services["web"].Environment
+			for k, want := range tt.expected {
+				got := env[k]
+				if got == nil {
+					t.Errorf("environment variable %q not found", k)
+					continue
+				}
+				assert.Equal(t, want, *got, "environment variable %q", k)
+			}
+		})
+	}
+
+	t.Run("stat errors other than not-exist are returned", func(t *testing.T) {
+		if os.Getuid() == 0 {
+			t.Skip("root ignores directory permissions")
+		}
+		unreadable := filepath.Join(t.TempDir(), "unreadable")
+		if err := os.Mkdir(unreadable, 0o000); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(unreadable, 0o755) }) // let TempDir cleanup succeed
+		fn := withDefaultEnvFiles([]string{".env"})
+		err := fn(&cli.ProjectOptions{WorkingDir: unreadable})
+		assert.ErrorContains(t, err, "default env file")
+	})
+
+	t.Run("duplicate names are deduped", func(t *testing.T) {
+		// e.g. a stack named after its provider; the shared file must be loaded once
+		fn := withDefaultEnvFiles([]string{".env", ".env.aws", ".env.aws"})
+		o := &cli.ProjectOptions{WorkingDir: dir}
+		if err := fn(o); err != nil {
+			t.Fatal(err)
+		}
+		expected := []string{filepath.Join(dir, ".env"), filepath.Join(dir, ".env.aws")}
+		assert.Equal(t, expected, o.EnvFiles)
+	})
+
+	t.Run("reports the resolved convention files once at debug level", func(t *testing.T) {
+		oldTerm := term.DefaultTerm
+		t.Cleanup(func() { term.DefaultTerm = oldTerm })
+		var output bytes.Buffer
+		term.DefaultTerm = term.NewTerm(os.Stdin, &output, &output)
+		term.DefaultTerm.SetDebug(true)
+
+		// .env and .env.mystack exist in dir; .env.gcp does not and must not be reported.
+		fn := withDefaultEnvFiles([]string{".env", ".env.gcp", ".env.mystack"})
+		o := &cli.ProjectOptions{WorkingDir: dir}
+		// newProjectOptions applies this option twice; the debug line must appear only once.
+		require.NoError(t, fn(o))
+		require.NoError(t, fn(o))
+
+		got := output.String()
+		assert.Equal(t, 1, strings.Count(got, "Loading environment file(s) by convention:"), "should log exactly once, got:\n%s", got)
+		assert.Contains(t, got, ".env, .env.mystack")
+		assert.NotContains(t, got, ".env.gcp")
+	})
+}
+
+// TestWithEnvFilesFromEnvVar covers the COMPOSE_ENV_FILES fallback. This is the
+// path a stack file uses: LoadStackEnv sets COMPOSE_ENV_FILES in the process env
+// before the project is loaded, so resolving it here (rather than up front) is
+// what makes a stack-scoped env file take effect. Regression test for that bug.
+func TestWithEnvFilesFromEnvVar(t *testing.T) {
+	const composeYAML = `name: envfilevartest
+services:
+  web:
+    image: alpine
+    environment:
+      - GREETING=${GREETING}
+`
+	dir := t.TempDir()
+	writeFile := func(name, content string) string {
+		t.Helper()
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+
+	composePath := writeFile("compose.yaml", composeYAML)
+	writeFile(".env", "GREETING=from_dotenv\n")
+	stackEnv := writeFile("stack.env", "GREETING=from_stack\n")
+	flagEnv := writeFile("flag.env", "GREETING=from_flag\n")
+
+	tests := []struct {
+		name     string
+		envFiles []string // explicit --env-file (WithEnvFiles)
+		envVar   string   // COMPOSE_ENV_FILES; "" means unset
+		expected string
+	}{
+		{
+			name:     "COMPOSE_ENV_FILES is honored when no explicit env-file is set",
+			envVar:   stackEnv,
+			expected: "from_stack",
+		},
+		{
+			name:     "explicit env-file overrides COMPOSE_ENV_FILES",
+			envFiles: []string{flagEnv},
+			envVar:   stackEnv,
+			expected: "from_flag",
+		},
+		{
+			name:     "default .env is used when neither is set",
+			expected: "from_dotenv",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.envVar != "" {
+				t.Setenv(composeEnvFilesEnvVar, tt.envVar)
+			} else {
+				os.Unsetenv(composeEnvFilesEnvVar)
+			}
+			loader := NewLoader(WithPath(composePath), WithEnvFiles(tt.envFiles...))
+			p, err := loader.LoadProject(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := p.Services["web"].Environment["GREETING"]
+			if got == nil {
+				t.Fatal("environment variable GREETING not found")
+			}
+			assert.Equal(t, tt.expected, *got)
+		})
+	}
 }

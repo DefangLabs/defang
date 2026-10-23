@@ -1,41 +1,24 @@
-{
-  "railpack-long": {
-    "build": {
-      "context": ".",
-      "dockerfile": "*Railpack"
-    },
-    "command": [
-      "exec node index.js"
-    ],
-    "entrypoint": null,
-    "networks": {
-      "default": null
-    }
-  },
-  "railpack-short": {
-    "build": {
-      "context": ".",
-      "dockerfile": "*Railpack"
-    },
-    "command": [
-      "npm start"
-    ],
-    "entrypoint": null,
-    "networks": {
-      "default": null
-    }
-  },
-  "railpackwithdockerfile": {
-    "build": {
-      "context": ".",
-      "dockerfile": "*Railpack"
-    },
-    "command": [
-      "something \"with space\" \"${PORT}\""
-    ],
-    "entrypoint": null,
-    "networks": {
-      "default": null
-    }
-  }
-}
+railpack-long:
+    build:
+        context: .
+        dockerfile: '*Railpack'
+    command:
+        - exec node index.js
+    networks:
+        default: null
+railpack-short:
+    build:
+        context: .
+        dockerfile: '*Railpack'
+    command:
+        - npm start
+    networks:
+        default: null
+railpackwithdockerfile:
+    build:
+        context: .
+        dockerfile: '*Railpack'
+    command:
+        - something "with space" "${PORT}"
+    networks:
+        default: null

@@ -28,9 +28,21 @@ func (e ErrMissingConfig) Error() string {
 	return fmt.Sprintf("missing configs %q (https://s.defang.io/config)", ([]string)(e))
 }
 
+type ErrConfigInterpolationInBuildArgs []string
+
+func (e ErrConfigInterpolationInBuildArgs) Error() string {
+	return fmt.Sprintf("build args do not support config interpolation %q; set concrete values or define them in `.env` before deploying", ([]string)(e))
+}
+
+type ErrConfigInterpolationInModels []string
+
+func (e ErrConfigInterpolationInModels) Error() string {
+	return fmt.Sprintf("models do not support unresolved interpolation %q; set concrete values, define them in `.env` before deploying, or use a built-in alias (chat-default, chat-large, embedding-default)", ([]string)(e))
+}
+
 var ErrDockerfileNotFound = errors.New("dockerfile not found")
 
-func ValidateProject(project *composeTypes.Project, mode modes.Mode) error {
+func ValidateProject(project *composeTypes.Project, mode modes.Recipe) error {
 	if project == nil {
 		return errors.New("no project found")
 	}
@@ -57,7 +69,7 @@ func ValidateProject(project *composeTypes.Project, mode modes.Mode) error {
 	return errors.Join(errs...)
 }
 
-func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, mode modes.Mode) error {
+func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, mode modes.Recipe) error {
 	if svccfg.ReadOnly {
 		term.Debugf("service %q: unsupported compose directive: read_only", svccfg.Name)
 	}
@@ -185,6 +197,19 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		if svccfg.Build.Ulimits != nil {
 			term.Warnf("service %q: unsupported compose directive: build ulimits", svccfg.Name) // TODO: add support for build ulimits
 		}
+		// Defang config/secrets are scoped to runtime and CD interpolation; passing them to builders
+		// would risk leaking values through build logs, image layers, or build cache. Any interpolation
+		// left unresolved by local .env/Compose config loading must not reach the cloud builder.
+		var interpolatedArgs []string
+		for key, value := range svccfg.Build.Args {
+			if value != nil && len(DetectInterpolationVariables(*value)) > 0 {
+				interpolatedArgs = append(interpolatedArgs, fmt.Sprintf("%s.build.args.%s", svccfg.Name, key))
+			}
+		}
+		if len(interpolatedArgs) > 0 {
+			sort.Strings(interpolatedArgs)
+			return ErrConfigInterpolationInBuildArgs(interpolatedArgs)
+		}
 	}
 	for _, secret := range svccfg.Secrets {
 		if !pkg.IsValidSecretName(secret.Source) {
@@ -223,9 +248,9 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		return fmt.Errorf("service %q: %w", svccfg.Name, err)
 	}
 	if svccfg.HealthCheck == nil || svccfg.HealthCheck.Disable {
-		// Show a warning when we have ingress ports but no explicit healthcheck
+		// Show a warning when we have HTTP/TCP ingress ports but no explicit healthcheck.
 		for _, port := range svccfg.Ports {
-			if port.Mode == Mode_INGRESS {
+			if port.Mode == Mode_INGRESS && port.Protocol != Protocol_UDP {
 				term.Warnf("service %q: ingress port %d without healthcheck; defaults to GET / HTTP/1.1", svccfg.Name, port.Target)
 				break
 			}
@@ -291,7 +316,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			replicas = *svccfg.Deploy.Replicas
 		}
 	}
-	if mode == modes.ModeHighAvailability && replicas < 2 && svccfg.Extensions["x-defang-autoscaling"] == nil {
+	if mode == modes.RecipeHighAvailability && replicas < 2 && svccfg.Extensions["x-defang-autoscaling"] == nil {
 		term.Warnf("service %q: high-availability mode requires at least 2 replicas or x-defang-autoscaling", svccfg.Name)
 	}
 	if reservations == nil || reservations.MemoryBytes == 0 {
@@ -362,7 +387,11 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			"x-defang-postgres",
 			"x-defang-mongodb",
 			"x-defang-llm",
-			"x-defang-autoscaling":
+			"x-defang-autoscaling",
+			// Consumed by the CD provider, not the CLI, but still valid and
+			// passed through unchanged; listed here so they don't warn.
+			"x-defang-policies",
+			"x-defang-aliases":
 			continue
 		default:
 			term.Warnf("service %q: unsupported compose extension: %q", svccfg.Name, k)
@@ -446,7 +475,41 @@ func DetectInterpolationVariables(value string) []string {
 	return names
 }
 
+// reservedConfigNames are variables that Defang and compose-go populate
+// automatically, so they must never be reported as missing config the user has
+// to set. COMPOSE_PROJECT_NAME is a compose-go built-in; DEFANG_PROVIDER and
+// DEFANG_STACK are injected into the Compose interpolation env once a stack is
+// selected (see pkg/session and pkg/agent/common).
+var reservedConfigNames = map[string]bool{
+	"COMPOSE_PROJECT_NAME": true,
+	"DEFANG_PROVIDER":      true,
+	"DEFANG_STACK":         true,
+}
+
+// IsReservedConfigName reports whether name is auto-populated by Defang/compose-go
+// and therefore never a config the user has to set.
+func IsReservedConfigName(name string) bool {
+	return reservedConfigNames[name]
+}
+
 func ValidateProjectConfig(composeProject *composeTypes.Project, listConfigNames []string) error {
+	var modelInterpolations ErrConfigInterpolationInModels
+	for _, model := range composeProject.Models {
+		modelInterpolations = append(modelInterpolations, DetectInterpolationVariables(model.Model)...)
+	}
+	for _, service := range composeProject.Services {
+		if service.Provider == nil || service.Provider.Type != "model" {
+			continue
+		}
+		for _, model := range service.Provider.Options["model"] {
+			modelInterpolations = append(modelInterpolations, DetectInterpolationVariables(model)...)
+		}
+	}
+	if len(modelInterpolations) > 0 {
+		slices.Sort(modelInterpolations)
+		return slices.Compact(modelInterpolations)
+	}
+
 	var names []string
 	// make list of secrets
 	for _, service := range composeProject.Services {
@@ -470,6 +533,9 @@ func ValidateProjectConfig(composeProject *composeTypes.Project, listConfigNames
 
 	errMissingConfig := ErrMissingConfig{}
 	for _, name := range names {
+		if IsReservedConfigName(name) {
+			continue // auto-populated by Defang/compose-go; not user-provided config
+		}
 		if !slices.Contains(listConfigNames, name) {
 			errMissingConfig = append(errMissingConfig, name)
 		}

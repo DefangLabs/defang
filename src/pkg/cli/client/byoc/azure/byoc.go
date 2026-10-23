@@ -23,12 +23,15 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/aca"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/acr"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/cd"
+	azuredns "github.com/DefangLabs/defang/src/pkg/clouds/azure/dns"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/keyvault"
 	defanghttp "github.com/DefangLabs/defang/src/pkg/http"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -42,6 +45,16 @@ type ByocAzure struct {
 	kv      *keyvault.KeyVault
 	cdRunID string
 	cdEtag  string
+	cdStart time.Time
+
+	// delegateDomainZone contains the delegate domain whose public DNS zone
+	// PrepareDomainDelegation created, mirroring the GCP provider's
+	// ByocGcp.delegateDomainZone field. Currently informational only — set on
+	// success, not yet read elsewhere. The GCP provider follows the same
+	// pattern: the destroy path relies on the project resource group teardown
+	// to remove the zone rather than tracking it explicitly. Kept here as a
+	// hook for a future cleanup path that needs to know which zone to delete.
+	delegateDomainZone string
 }
 
 var _ client.Provider = (*ByocAzure)(nil)
@@ -68,6 +81,7 @@ func (b *ByocAzure) CdCommand(ctx context.Context, req client.CdCommandRequest) 
 	}
 
 	etag := types.NewEtag()
+	cdStart := time.Now()
 	execName, err := b.runCdCommand(ctx, cdCommand{
 		command:   []string{string(req.Command)},
 		etag:      etag,
@@ -80,6 +94,7 @@ func (b *ByocAzure) CdCommand(ctx context.Context, req client.CdCommandRequest) 
 	}
 	b.cdRunID = execName
 	b.cdEtag = etag
+	b.cdStart = cdStart
 	return &client.CdCommandResponse{
 		CdId:   execName,
 		CdType: defangv1.CdType_CD_TYPE_AZURE_ACA_JOBID,
@@ -168,6 +183,9 @@ func (b *ByocAzure) CdList(ctx context.Context, _ bool) (iter.Seq[state.Info], e
 
 // AccountInfo implements client.Provider.
 func (b *ByocAzure) AccountInfo(context.Context) (*client.AccountInfo, error) {
+	if err := b.setUpLocation(); err != nil {
+		return nil, fmt.Errorf("AccountInfo: %w", err)
+	}
 	return &client.AccountInfo{
 		AccountID: b.driver.SubscriptionID,
 		Provider:  client.ProviderAzure,
@@ -182,7 +200,7 @@ func (b *ByocAzure) CreateUploadURL(ctx context.Context, req *defangv1.UploadURL
 		return nil, err
 	}
 
-	url, err := b.driver.CreateUploadURL(ctx, req.Digest)
+	url, err := b.driver.CreateUploadURL(ctx, byoc.UploadPrefix, req.Digest)
 	if err != nil {
 		return nil, err
 	}
@@ -253,9 +271,10 @@ func (b *ByocAzure) syncJobToCdLocation() {
 }
 
 // projectResourceGroupName returns the resource group name for project-specific resources
-// (App Configuration store and deployed services).
-// Format: defang-{project}-{stack}-{location}, e.g. "defang-myapp-test-westus2".
-// This group is owned by one project+stack and is separate from the shared CD resource group.
+// (Key Vault config store and deployed services). It must match what the Pulumi Azure
+// program creates: {Prefix}-{project}-{stack}, e.g. "Defang-portal-production" for the
+// bare project name "portal" on stack "production". This group is separate from the
+// shared CD resource group.
 func (b *ByocAzure) projectResourceGroupName(projectName string) string {
 	return b.Prefix + "-" + projectName + "-" + b.PulumiStack
 }
@@ -428,12 +447,14 @@ func (b *ByocAzure) Deploy(ctx context.Context, req *client.DeployRequest) (*cli
 }
 
 type cdCommand struct {
-	command   []string
-	etag      types.ETag
-	mode      defangv1.DeploymentMode
-	project   string
-	statesUrl string
-	eventsUrl string
+	command        []string
+	etag           types.ETag
+	mode           defangv1.DeploymentMode
+	project        string
+	statesUrl      string
+	eventsUrl      string
+	delegateDomain string // forwarded to CD as DOMAIN; empty when deploying without delegation
+	ttl            string // forwarded to CD as DEFANG_TTL; empty when no TTL was given
 }
 
 func (b *ByocAzure) runCdCommand(ctx context.Context, cmd cdCommand) (string, error) {
@@ -444,7 +465,7 @@ func (b *ByocAzure) runCdCommand(ctx context.Context, cmd cdCommand) (string, er
 		return "", err
 	}
 	if cmd.etag != "" {
-		env["ETAG"] = cmd.etag
+		env[aca.EnvVarEtag] = cmd.etag
 	}
 	env["DEFANG_MODE"] = strings.ToLower(cmd.mode.String())
 
@@ -454,6 +475,18 @@ func (b *ByocAzure) runCdCommand(ctx context.Context, cmd cdCommand) (string, er
 
 	if cmd.eventsUrl != "" {
 		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
+	}
+
+	// DOMAIN is the project delegate domain (e.g. "myproj-stack.tenant.defang.app");
+	// the CD program reads it and sets defang:domain Pulumi config, which the
+	// Azure inline program forwards to ProjectInputs.Domain so per-service
+	// DNS records and managed certs land in the right zone. Mirrors AWS.
+	if cmd.delegateDomain != "" {
+		env["DOMAIN"] = cmd.delegateDomain
+	}
+
+	if cmd.ttl != "" {
+		env["DEFANG_TTL"] = cmd.ttl
 	}
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
@@ -506,6 +539,7 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 		Mode:          req.Mode,
 		PulumiVersion: b.PulumiVersion,
 		Services:      serviceInfos,
+		Recipe:        req.Recipe,
 	})
 	if err != nil {
 		return nil, err
@@ -519,7 +553,7 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 	if len(data) < 1000 {
 		payload = base64.StdEncoding.EncodeToString(data)
 	} else {
-		uploadURL, err := b.driver.CreateUploadURL(ctx, etag)
+		uploadURL, err := b.driver.CreateUploadURL(ctx, byoc.UploadPrefix, etag)
 		if err != nil {
 			return nil, err
 		}
@@ -537,19 +571,23 @@ func (b *ByocAzure) deploy(ctx context.Context, req *client.DeployRequest, verb 
 		payload = defanghttp.RemoveQueryParam(uploadURL) // managed identity provides blob read access
 	}
 
+	cdStart := time.Now()
 	execName, err := b.runCdCommand(ctx, cdCommand{
-		command:   []string{verb, payload},
-		etag:      etag,
-		mode:      req.Mode,
-		project:   project.Name,
-		statesUrl: req.StatesUrl,
-		eventsUrl: req.EventsUrl,
+		command:        []string{verb, payload},
+		etag:           etag,
+		mode:           req.Mode,
+		project:        project.Name,
+		statesUrl:      req.StatesUrl,
+		eventsUrl:      req.EventsUrl,
+		delegateDomain: req.DelegateDomain,
+		ttl:            req.TTL,
 	})
 	if err != nil {
 		return nil, err
 	}
 	b.cdRunID = execName
 	b.cdEtag = etag
+	b.cdStart = cdStart
 	return &client.DeployResponse{
 		CdId:   execName,
 		CdType: defangv1.CdType_CD_TYPE_AZURE_ACA_JOBID,
@@ -699,17 +737,48 @@ func (b *ByocAzure) ListConfig(ctx context.Context, req *defangv1.ListConfigsReq
 	return &defangv1.Secrets{Names: names}, nil
 }
 
-// PrepareDomainDelegation implements client.Provider.
-func (b *ByocAzure) PrepareDomainDelegation(context.Context, client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
-	return nil, nil // TODO: implement domain delegation for Azure
+// PrepareDomainDelegation implements client.Provider. It creates a public
+// Azure DNS zone for the delegate domain and returns the zone's authoritative
+// name servers so Fabric can point NS records at it, mirroring the GCP
+// provider. The zone lives in the per-project-stack resource group so it is
+// owned by this deployment and torn down with it. Azure has no equivalent of
+// Route53's reusable delegation sets, so DelegationSetId is left empty (as
+// with GCP).
+func (b *ByocAzure) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
+	defer term.Timing()()
+	if req.DelegateDomain == "" {
+		return nil, nil // no delegate domain configured; nothing to delegate
+	}
+	if err := b.setUpLocation(); err != nil {
+		return nil, err
+	}
+	term.Debugf("Preparing domain delegation for %s", req.DelegateDomain)
+
+	// The zone needs a home before it can be created. On a fresh deploy Pulumi
+	// has not created the project resource group yet, so ensure it exists
+	// (idempotent CreateOrUpdate) the same way config setup does.
+	rgName := b.projectResourceGroupName(req.Project)
+	if err := b.driver.CreateResourceGroup(ctx, rgName); err != nil {
+		return nil, err
+	}
+
+	nameServers, err := azuredns.New(rgName, b.driver.Azure).EnsureZoneExists(ctx, req.DelegateDomain)
+	if err != nil {
+		return nil, err
+	}
+	b.delegateDomainZone = req.DelegateDomain
+	term.Debugf("Zone %s ready with nameservers %v", req.DelegateDomain, nameServers)
+	return &client.PrepareDomainDelegationResponse{
+		NameServers: nameServers,
+	}, nil
 }
 
-// HasDelegatedSubdomain implements client.Provider. Azure does not yet
-// implement domain delegation, so there is no subdomain zone to delete on
-// destroy. Flip to true (or remove the override) once PrepareDomainDelegation
-// is wired up.
+// HasDelegatedSubdomain implements client.Provider. Azure delegates a
+// subdomain zone during deploy (PrepareDomainDelegation +
+// CreateDelegateSubdomainZone), so the matching DeleteSubdomainZone must run
+// on destroy.
 func (*ByocAzure) HasDelegatedSubdomain() bool {
-	return false
+	return true
 }
 
 // Preview implements client.Provider.
@@ -732,154 +801,287 @@ func (b *ByocAzure) PutConfig(ctx context.Context, req *defangv1.PutConfigReques
 	return nil
 }
 
-// QueryLogs implements client.Provider.
-// Only CD container logs are supported; service logs are not yet implemented.
+// cdLogTimestampLayouts are the leading-timestamp formats parseCDLogLine
+// recognizes. The CD job's pulumi wrapper writes full RFC3339Nano timestamps,
+// but Azure's own logStreamEndpoint injects its "Connecting to container"
+// banner with the same layout minus the trailing zone designator (e.g.
+// "2026-09-16T11:25:39.178105928" with no "Z"), which RFC3339Nano rejects outright (#2275).
+var cdLogTimestampLayouts = []string{
+	time.RFC3339Nano,
+	"2006-01-02T15:04:05.999999999",
+}
+
+// parseCDLogLine splits a raw CD job log line into its engine timestamp and message.
+// The CD job's pulumi wrapper writes lines like
+// "2026-04-28T23:43:03.965786510Z - worker deleting (0s)" to stdout, which would
+// otherwise show up as a second, near-duplicate timestamp next to the CLI's own
+// read-time column (#2079). When the line doesn't start with a parseable
+// timestamp, ts is the zero value and message is the line unchanged.
+func parseCDLogLine(line string) (ts time.Time, message string) {
+	head, rest, ok := strings.Cut(line, " ")
+	if !ok {
+		return time.Time{}, line
+	}
+	var parsed time.Time
+	var err error
+	for _, layout := range cdLogTimestampLayouts {
+		parsed, err = time.ParseInLocation(layout, head, time.UTC)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		return time.Time{}, line
+	}
+	rest = strings.TrimSpace(rest)
+	rest = strings.TrimPrefix(rest, "-")
+	return parsed, strings.TrimSpace(rest)
+}
+
+// splitCDLogSnapshot splits a ReadJobLogs snapshot (one line per buffered CD log
+// entry, newline-separated) into individual lines, dropping blank lines. Each
+// returned line still carries its own leading engine timestamp for parseCDLogLine
+// to extract.
+func splitCDLogSnapshot(content string) []string {
+	if content == "" {
+		return nil
+	}
+	var lines []string
+	for _, line := range strings.Split(strings.TrimRight(content, "\n"), "\n") {
+		if line == "" {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return lines
+}
+
+// QueryLogs implements client.Provider. It merges three log sources for the project:
+// CD (deployment) logs from the Container Apps Job, service logs from the project's
+// Container Apps, and build logs from ACR. When req.Follow is set each source streams
+// live; otherwise each returns a one-shot snapshot and the iterator ends once all are
+// drained.
 func (b *ByocAzure) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
-	// Match the request etag to the stored CD etag so we tail the correct run.
-	if b.cdRunID == "" || (req.Etag != "" && req.Etag != b.cdEtag) {
-		return nil, fmt.Errorf("QueryLogs: no matching CD deployment for etag %q", req.Etag)
+	const cdServiceName = "defang-cd"
+
+	logType := logs.LogType(req.LogType)
+	if logType == logs.LogTypeUnspecified {
+		logType = logs.LogTypeAll
 	}
 
-	const cdServiceName = "defang-cd"
-	etag := b.cdEtag
+	// setUpLocation resolves AZURE_LOCATION/AZURE_SUBSCRIPTION_ID onto the driver and
+	// job (no API calls). The service and build watchers below use b.driver.Azure, so
+	// this must run even when there's no etag to look up a CD run by.
+	if err := b.setUpLocation(); err != nil {
+		return nil, err
+	}
 
-	if req.Follow {
-		logIter, err := b.job.TailJobLogs(ctx, b.cdRunID)
+	// etag tags every response entry (CD, service, and build alike), so it's resolved
+	// unconditionally; only the CD run LOOKUP below is gated on LogTypeCD.
+	runID := b.cdRunID
+	etag := b.cdEtag
+	if req.Etag != "" && req.Etag != b.cdEtag {
+		runID, etag = "", req.Etag
+	}
+
+	// Resolve the CD job execution for this request. The deploying process caches
+	// the run ID in memory; a standalone `defang logs` has none, so recover it by
+	// matching the request etag against each execution's recorded ETAG env var.
+	// Skip this entirely when CD logs weren't requested (e.g. `defang cd preview`
+	// asking for build+CD only): a service/build-only tail shouldn't look up, or
+	// warn about, a CD run it was never going to show.
+	if logType.Has(logs.LogTypeCD) {
+		if runID == "" && etag != "" {
+			found, err := b.job.FindExecutionByEtag(ctx, etag)
+			if err != nil {
+				return nil, fmt.Errorf("failed to find CD deployment for etag %q: %w", etag, err)
+			}
+			runID = found
+		}
+		if runID == "" {
+			// Unknown or empty etag: no CD run to tail. Service and build logs are keyed
+			// by resource group rather than the CD execution, so still surface those.
+			term.Warnf("No CD logs found for etag %q; showing service and build logs only", req.Etag)
+		}
+	} else {
+		runID = ""
+	}
+
+	// CD logs. cdCh stays nil when there's no CD run, which makes the select below skip
+	// it and treat the CD source as already drained. Follow streams line-by-line; the
+	// snapshot reads the whole buffered run content once.
+	type cdLogEntry struct {
+		line string
+		err  error
+	}
+	var cdCh chan cdLogEntry
+	if runID != "" {
+		cdCh = make(chan cdLogEntry)
+		if req.Follow {
+			logIter, err := b.job.TailJobLogs(ctx, runID)
+			if err != nil {
+				return nil, err
+			}
+			go func() {
+				defer close(cdCh)
+				for line, err := range logIter {
+					select {
+					case cdCh <- cdLogEntry{line: line, err: err}:
+					case <-ctx.Done():
+						return
+					}
+				}
+			}()
+		} else {
+			content, err := b.job.ReadJobLogs(ctx, runID)
+			if err != nil {
+				return nil, err
+			}
+			go func() {
+				defer close(cdCh)
+				// Each buffered line carries its own engine timestamp (see
+				// parseCDLogLine), so split the snapshot before sending: a single
+				// entry for the whole content would only parse the first line's
+				// timestamp and leave the rest embedded in the message (#2079).
+				for _, line := range splitCDLogSnapshot(content) {
+					select {
+					case cdCh <- cdLogEntry{line: line}:
+					case <-ctx.Done():
+						return
+					}
+				}
+			}()
+		}
+	}
+
+	projectRG := b.projectResourceGroupName(req.Project)
+
+	// Service logs from the project's Container Apps and build logs from ACR both
+	// live in the PROJECT resource group (independent of the CD run). For a one-shot
+	// query, if that group doesn't exist the project isn't deployed under this
+	// name/stack — surface one clear message instead of letting both watchers fail
+	// with raw "ResourceGroupNotFound" errors. In follow mode we skip the check: the
+	// group may be created mid-session (deploy-then-tail), so the watchers poll for it.
+	var acaCh <-chan aca.ServiceLogEntry
+	var buildCh <-chan acr.BuildLogEntry
+	wantRun := logType.Has(logs.LogTypeRun)
+	wantBuild := logType.Has(logs.LogTypeBuild)
+	startWatchers := wantRun || wantBuild
+	if startWatchers && !req.Follow {
+		exists, err := b.driver.ResourceGroupExists(ctx, projectRG)
 		if err != nil {
 			return nil, err
 		}
-
-		// Run ACR log iterator in a goroutine so we can select over it and ACA logs.
-		type cdLogEntry struct {
-			line string
-			err  error
+		if !exists {
+			term.Warnf("No deployed services found for project %q on stack %q (resource group %q not found)", req.Project, b.PulumiStack, projectRG)
+			startWatchers = false
 		}
-		cdCh := make(chan cdLogEntry)
-		go func() {
-			defer close(cdCh)
-			for line, err := range logIter {
-				select {
-				case cdCh <- cdLogEntry{line: line, err: err}:
-				case <-ctx.Done():
-					return
-				}
+	}
+	if startWatchers {
+		if wantRun {
+			acaClient := &aca.ContainerApp{
+				Azure:         b.driver.Azure,
+				ResourceGroup: projectRG,
 			}
-		}()
-
-		projectRG := b.projectResourceGroupName(req.Project)
-
-		// Watch Container App logs from the PROJECT resource group.
-		acaClient := &aca.ContainerApp{
-			Azure:         b.driver.Azure,
-			ResourceGroup: projectRG,
+			acaCh = acaClient.WatchLogs(ctx, req.Follow)
 		}
-		acaCh := acaClient.WatchLogs(ctx)
 
-		// Watch ACR build logs from the PROJECT resource group.
-		buildWatcher := &acr.BuildLogWatcher{
-			Azure:         b.driver.Azure,
-			ResourceGroup: projectRG,
-		}
-		buildCh := buildWatcher.WatchBuildLogs(ctx)
-
-		return func(yield func(*defangv1.TailResponse, error) bool) {
-			for {
-				select {
-				case entry, ok := <-cdCh:
-					if !ok {
-						cdCh = nil
-						continue
-					}
-					if entry.err != nil {
-						if !yield(nil, entry.err) {
-							return
-						}
-						continue
-					}
-					if !yield(&defangv1.TailResponse{
-						Entries: []*defangv1.LogEntry{{
-							Message:   entry.line,
-							Service:   cdServiceName,
-							Etag:      etag,
-							Timestamp: timestamppb.Now(),
-						}},
-						Service: cdServiceName,
-						Etag:    etag,
-					}, nil) {
-						return
-					}
-				case svc, ok := <-acaCh:
-					if !ok {
-						acaCh = nil
-						continue
-					}
-					if svc.Err != nil {
-						term.Debugf("Container Apps log error for %q: %v", svc.AppName, svc.Err)
-						continue
-					}
-					if !yield(&defangv1.TailResponse{
-						Entries: []*defangv1.LogEntry{{
-							Message:   svc.Message,
-							Service:   svc.AppName,
-							Etag:      etag,
-							Timestamp: timestamppb.Now(),
-						}},
-						Service: svc.AppName,
-						Etag:    etag,
-					}, nil) {
-						return
-					}
-				case build, ok := <-buildCh:
-					if !ok {
-						buildCh = nil
-						continue
-					}
-					if build.Err != nil {
-						term.Debugf("ACR build log error for %q: %v", build.Service, build.Err)
-						continue
-					}
-					if !yield(&defangv1.TailResponse{
-						Entries: []*defangv1.LogEntry{{
-							Message:   build.Line,
-							Service:   build.Service + "-build",
-							Etag:      etag,
-							Stderr:    true, // show build logs even when not verbose
-							Timestamp: timestamppb.Now(),
-						}},
-						Service: build.Service + "-build",
-						Etag:    etag,
-					}, nil) {
-						return
-					}
-				case <-ctx.Done():
-					return
-				}
-				if cdCh == nil && acaCh == nil && buildCh == nil {
-					return
-				}
+		if wantBuild {
+			buildWatcher := &acr.BuildLogWatcher{
+				Azure:         b.driver.Azure,
+				ResourceGroup: projectRG,
 			}
-		}, nil
+			buildCh = buildWatcher.WatchBuildLogs(ctx, req.Follow)
+		}
 	}
 
-	// Non-follow: return a snapshot of current log content.
-	content, err := b.job.ReadJobLogs(ctx, b.cdRunID)
-	if err != nil {
-		return nil, err
-	}
 	return func(yield func(*defangv1.TailResponse, error) bool) {
-		if content == "" {
-			return
+		for {
+			// Check for completion at the top: a closed source is set to nil below, and
+			// selecting over all-nil channels would block forever (the non-follow case
+			// where every source drains). In follow mode the channels stay open until
+			// ctx is cancelled.
+			if cdCh == nil && acaCh == nil && buildCh == nil {
+				return
+			}
+			select {
+			case entry, ok := <-cdCh:
+				if !ok {
+					cdCh = nil
+					continue
+				}
+				if entry.err != nil {
+					if !yield(nil, entry.err) {
+						return
+					}
+					continue
+				}
+				ts, message := parseCDLogLine(entry.line)
+				if ts.IsZero() {
+					ts = time.Now()
+				}
+				if !yield(&defangv1.TailResponse{
+					Entries: []*defangv1.LogEntry{{
+						Message:   message,
+						Service:   cdServiceName,
+						Etag:      etag,
+						Timestamp: timestamppb.New(ts),
+					}},
+					Service: cdServiceName,
+					Etag:    etag,
+				}, nil) {
+					return
+				}
+			case svc, ok := <-acaCh:
+				if !ok {
+					acaCh = nil
+					continue
+				}
+				if svc.Err != nil {
+					// Non-fatal: warn (so the failure isn't silently swallowed) but keep
+					// reading the other sources rather than ending the whole tail.
+					term.Debugf("Could not read service logs for %q: %v", svc.AppName, svc.Err)
+					continue
+				}
+				if !yield(&defangv1.TailResponse{
+					Entries: []*defangv1.LogEntry{{
+						Message:   svc.Message,
+						Service:   svc.AppName,
+						Etag:      etag,
+						Timestamp: timestamppb.Now(),
+					}},
+					Service: svc.AppName,
+					Etag:    etag,
+				}, nil) {
+					return
+				}
+			case build, ok := <-buildCh:
+				if !ok {
+					buildCh = nil
+					continue
+				}
+				if build.Err != nil {
+					// Non-fatal: warn but keep reading the other sources (see above).
+					term.Warnf("Could not read build logs for %q: %v", build.Service, build.Err)
+					continue
+				}
+				if !yield(&defangv1.TailResponse{
+					Entries: []*defangv1.LogEntry{{
+						Message:   build.Line,
+						Service:   build.Service + "-build",
+						Etag:      etag,
+						Stderr:    true, // show build logs even when not verbose
+						Timestamp: timestamppb.Now(),
+					}},
+					Service: build.Service + "-build",
+					Etag:    etag,
+				}, nil) {
+					return
+				}
+			case <-ctx.Done():
+				return
+			}
 		}
-		yield(&defangv1.TailResponse{
-			Entries: []*defangv1.LogEntry{{
-				Message:   content,
-				Service:   cdServiceName,
-				Etag:      etag,
-				Timestamp: timestamppb.Now(),
-			}},
-			Service: cdServiceName,
-			Etag:    etag,
-		}, nil)
 	}, nil
 }
 
@@ -897,13 +1099,6 @@ func (b *ByocAzure) ServiceDNS(host string) string {
 	return host
 }
 
-// Subscribe implements client.Provider.
-func (b *ByocAzure) Subscribe(context.Context, *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {
-	return func(yield func(*defangv1.SubscribeResponse, error) bool) {
-		// TODO: Implement subscription to deployment events for Azure
-	}, nil
-}
-
 // TearDown implements client.Provider.
 func (b *ByocAzure) TearDown(ctx context.Context) error {
 	defer term.Timing()()
@@ -919,4 +1114,23 @@ func (b *ByocAzure) TearDownCD(context.Context) error {
 // UpdateShardDomain implements client.DNSResolver.
 func (b *ByocAzure) UpdateShardDomain(context.Context) error {
 	return fmt.Errorf("UpdateShardDomain: %w", errors.ErrUnsupported)
+}
+
+// UpdateServiceInfo implements byoc.ServiceInfoUpdater. When a service has a
+// `domainname` set in compose, mark it for managed-cert issuance so
+// `defang cert generate` picks it up via the CertIssuer path. Azure Container
+// Apps managed certs are free, auto-renewing, and validated via CNAME — no
+// hosted-zone presence required (unlike AWS, where ZoneId triggers a different
+// path).
+//
+// Unlike AWS, no BYOD zone lookup happens here. The CD task finds the zone in
+// the user's cloud, where the deploy identity already has DNS read permission
+// and the subscription is known — see DefangLabs/pulumi-defang
+// provider/defangazure/azure/dnszone.go.
+func (b *ByocAzure) UpdateServiceInfo(_ context.Context, si *defangv1.ServiceInfo, _, _ string, service composeTypes.ServiceConfig) error {
+	if service.DomainName == "" {
+		return nil
+	}
+	si.UseAcmeCert = true
+	return nil
 }

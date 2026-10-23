@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -177,5 +178,35 @@ func TestGetServiceInfosWithTestData(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestGetServiceInfosDeduplicatesDualProtocolEndpoint(t *testing.T) {
+	testProvider := NewMockGetServiceInfosProvider("")
+	serviceInfos, err := testProvider.GetServiceInfos(
+		t.Context(),
+		"test-project",
+		"test-delegate-domain",
+		"test-etag",
+		map[string]composeTypes.ServiceConfig{
+			"dns": {
+				Name:  "dns",
+				Image: "test-image",
+				Ports: []composeTypes.ServicePortConfig{
+					{Target: 53, Mode: compose.Mode_INGRESS, Protocol: compose.Protocol_TCP},
+					{Target: 53, Mode: compose.Mode_INGRESS, Protocol: compose.Protocol_UDP},
+				},
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(serviceInfos) != 1 {
+		t.Fatalf("expected one service info, got %d", len(serviceInfos))
+	}
+	want := []string{"dns--53.test-delegate-domain"}
+	if got := serviceInfos[0].Endpoints; !slices.Equal(got, want) {
+		t.Errorf("endpoints = %v, want %v", got, want)
 	}
 }

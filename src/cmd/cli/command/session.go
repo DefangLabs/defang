@@ -37,7 +37,7 @@ func newCommandSessionWithOpts(cmd *cobra.Command, opts commandSessionOpts) (*se
 	options := session.SessionLoaderOptions{
 		LoaderOptions: loaderOptionsForCommand(cmd),
 		GetStackOpts: stacks.GetStackOpts{
-			Interactive: !global.NonInteractive,
+			Interactive: global.Interactive(),
 			Default:     global.Stack,
 			SelectStackOptions: stacks.SelectStackOptions{
 				AllowStackCreation: opts.AllowStackCreation,
@@ -57,7 +57,7 @@ func newCommandSessionWithOpts(cmd *cobra.Command, opts commandSessionOpts) (*se
 		return nil, err
 	}
 	if opts.CheckAccountInfo {
-		if err := session.Provider.Authenticate(ctx, !global.NonInteractive); err != nil {
+		if err := session.Provider.Authenticate(ctx, global.Interactive()); err != nil {
 			return nil, fmt.Errorf("failed to authenticate with provider %q: %w", session.Stack.Provider, err)
 		}
 		_, err = session.Provider.AccountInfo(ctx)
@@ -92,7 +92,19 @@ func loaderOptionsForCommand(cmd *cobra.Command) compose.LoaderOptions {
 	return compose.LoaderOptions{
 		ConfigPaths: configPaths,
 		ProjectName: projectName,
+		EnvFiles:    envFilesForCommand(cmd),
 	}
+}
+
+// envFilesForCommand returns the --env-file flag value(s). The COMPOSE_ENV_FILES
+// fallback is resolved by the loader at project-load time (see compose.Loader),
+// so a value set by the selected stack file is also honored. Returns nil when
+// the flag is absent, letting the loader apply that fallback.
+func envFilesForCommand(cmd *cobra.Command) []string {
+	if envFiles, _ := cmd.Flags().GetStringArray("env-file"); len(envFiles) > 0 {
+		return envFiles
+	}
+	return nil
 }
 
 func doubleCheckProjectName(projectName string) {
@@ -174,7 +186,7 @@ func handleInvalidComposeFileErr(ctx context.Context, loadErr error) error {
 		return fmt.Errorf("%w; original error: %w", err, loadErr)
 	}
 
-	debugger, err := debug.NewDebugger(ctx, global.FabricAddr, &stacks.Parameters{})
+	debugger, err := debug.NewDebugger(ctx, global.FabricAddr, &stacks.Parameters{}, !global.NonInteractive)
 	if err != nil {
 		return fmt.Errorf("%w; original error: %w", err, loadErr)
 	}

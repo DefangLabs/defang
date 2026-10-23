@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"connectrpc.com/connect"
@@ -17,9 +18,9 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/dns"
-	"github.com/DefangLabs/defang/src/pkg/spinner"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"golang.org/x/sync/errgroup"
 )
 
 type HTTPClient interface {
@@ -32,11 +33,20 @@ type DNSResult struct {
 }
 
 var (
+	// dnsCacheMu guards dnsCache. Workers now run in parallel (see
+	// runACMEJobs), so newCertHTTPClient's DialContext closure — captured by
+	// every worker's HTTP client — can race on this map without it.
+	dnsCacheMu       sync.RWMutex
 	dnsCache         = make(map[string]DNSResult)
 	dnsCacheDuration = 1 * time.Minute
 
 	httpRetryDelayBase = 5 * time.Second
 )
+
+// maxCertWorkers caps concurrent per-domain cert workers. Per-domain work is
+// mostly idle wait (DNS propagation, ACME issuance), so the cap exists to keep
+// the log stream readable rather than for throughput.
+const maxCertWorkers = 8
 
 func newCertHTTPClient(r dns.Resolver) HTTPClient {
 	return &http.Client{
@@ -48,7 +58,9 @@ func newCertHTTPClient(r dns.Resolver) HTTPClient {
 				if err != nil {
 					return nil, err
 				}
+				dnsCacheMu.RLock()
 				cached, ok := dnsCache[host]
+				dnsCacheMu.RUnlock()
 				var ips []net.IPAddr
 				if ok && cached.Expiry.After(time.Now()) {
 					ips = cached.IPs
@@ -57,9 +69,13 @@ func newCertHTTPClient(r dns.Resolver) HTTPClient {
 					if err != nil {
 						return nil, err
 					}
-					// Keep 1min of dns cache to avoid spamming root dns servers
+					// Keep 1min of dns cache to avoid spamming root dns servers.
+					// A racing concurrent lookup may overwrite this entry with
+					// fresh data — that's fine; both writes are valid.
 					expiry := time.Now().Add(dnsCacheDuration)
+					dnsCacheMu.Lock()
 					dnsCache[host] = DNSResult{ips, expiry}
+					dnsCacheMu.Unlock()
 				}
 
 				dialer := &net.Dialer{}
@@ -79,44 +95,98 @@ func newCertHTTPClient(r dns.Resolver) HTTPClient {
 	}
 }
 
-func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, client client.FabricClient, provider client.Provider) error {
+// CertIssuer is implemented by providers that issue and bind TLS certificates
+// directly against their cloud's API rather than going through the
+// CNAME→fabric→ACME redirect dance used on AWS BYOD / Playground. Azure
+// implements this so `defang cert generate` can drive the Container Apps
+// hostname-add + managed-cert + SniEnabled-bind sequence end-to-end.
+//
+// The two methods mirror the two phases of runACMEJobs: PreflightCert only
+// probes and reports, so every domain's outstanding records can be printed in
+// one block up front, and IssueCert then does the work, routing all of its
+// user-facing output through the per-domain logger it is handed.
+type CertIssuer interface {
+	// PreflightCert reports the DNS records hostname still needs before a cert
+	// can be issued, without provisioning anything. An empty result means
+	// there is nothing for the user to configure. Because the caller prints
+	// these, IssueCert must not print them again.
+	PreflightCert(ctx context.Context, projectName, serviceName, hostname string, resolverAt func(string) dns.Resolver) ([]dns.RequiredRecord, error)
+	// IssueCert provisions and binds the cert, emitting every user-facing
+	// progress line through log rather than printing directly, so concurrent
+	// per-domain workers don't interleave unattributed output.
+	IssueCert(ctx context.Context, projectName, serviceName, hostname string, resolverAt func(string) dns.Resolver, log func(string, ...any)) error
+}
+
+// domainJob is one (service, domain, targets) tuple processed by a worker.
+// targets are pre-normalized at collection time so workers can read them
+// concurrently without each performing their own in-place normalization.
+type domainJob struct {
+	serviceName string
+	domain      string
+	targets     []string
+}
+
+func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, fab client.FabricClient, provider client.Provider) error {
 	term.Debugf("Generating TLS cert for project %q", project.Name)
 
 	services, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: project.Name})
 	if err != nil {
 		return err
 	}
-
 	if len(services.Services) == 0 {
 		return fmt.Errorf("no services found for project %q; deployment may not be finished yet", project.Name)
 	}
 
-	cnt := 0
-	for _, serviceInfo := range services.Services {
-		if !serviceInfo.UseAcmeCert {
-			continue
-		}
-		if service, ok := project.Services[serviceInfo.Service.Name]; ok {
-			if service.DomainName != serviceInfo.Domainname {
-				term.Warnf("service %q: domainname %q in compose file does not match deployed value %q", service.Name, service.DomainName, serviceInfo.Domainname)
-			}
-			cnt++
-			targets := getDomainTargets(serviceInfo, service)
-			domains := []string{service.DomainName}
-			if defaultNetwork := service.Networks["default"]; defaultNetwork != nil {
-				domains = append(domains, defaultNetwork.Aliases...)
-			}
-			term.Debugf("Found service %v with domains %v and targets %v", service.Name, domains, targets)
-			for _, domain := range domains {
-				generateCert(ctx, domain, targets, client, dns.FabricResolver{Client: client})
-			}
-		}
-	}
-	if cnt == 0 {
+	issuer, _ := provider.(CertIssuer)
+	jobs := collectDomainJobs(project, services.Services)
+	if len(jobs) == 0 {
 		term.Infof("No `domainname` found in compose file; no HTTPS cert generation needed")
+		return nil
 	}
 
-	return nil
+	if issuer != nil {
+		return runIssuerJobs(ctx, project.Name, jobs, fab, issuer)
+	}
+	return runACMEJobs(ctx, jobs, fab)
+}
+
+// collectDomainJobs flattens services into per-domain work items. Validation
+// warnings (domain mismatch, missing domainname) are emitted here so they
+// appear once, up-front, before any parallel worker output.
+func collectDomainJobs(project *compose.Project, services []*defangv1.ServiceInfo) []domainJob {
+	var jobs []domainJob
+	for _, si := range services {
+		if !si.UseAcmeCert {
+			continue
+		}
+		svc, ok := project.Services[si.Service.Name]
+		if !ok {
+			continue
+		}
+		if svc.DomainName != si.Domainname {
+			term.Warnf("service %q: domainname %q in compose file does not match deployed value %q, will use the deployed value", svc.Name, svc.DomainName, si.Domainname)
+		}
+		if si.Domainname == "" {
+			term.Warnf("service %q: `domainname` is deployed without a domainname, skipping cert generation", svc.Name)
+			continue
+		}
+		// Pre-normalize once so the worker's wait loop can read the slice
+		// without racing other workers on shared backing storage.
+		rawTargets := getDomainTargets(si, svc)
+		targets := make([]string, len(rawTargets))
+		for i, t := range rawTargets {
+			targets[i] = dns.Normalize(t)
+		}
+
+		domains := []string{si.Domainname}
+		if defaultNetwork := svc.Networks["default"]; defaultNetwork != nil {
+			domains = append(domains, defaultNetwork.Aliases...)
+		}
+		for _, d := range domains {
+			jobs = append(jobs, domainJob{serviceName: svc.Name, domain: d, targets: targets})
+		}
+	}
+	return jobs
 }
 
 func getDomainTargets(serviceInfo *defangv1.ServiceInfo, service compose.ServiceConfig) []string {
@@ -134,78 +204,339 @@ func getDomainTargets(serviceInfo *defangv1.ServiceInfo, service compose.Service
 	}
 }
 
-func generateCert(ctx context.Context, domain string, targets []string, client client.FabricClient, r dns.Resolver) {
-	term.Infof("Checking DNS setup for %v", domain)
-	if err := waitForCNAME(ctx, domain, targets, client); err != nil {
-		term.Errorf("Error waiting for CNAME: %v", err)
-		return
+// runIssuerJobs runs the provider-driven cert issuance in the same two phases
+// as runACMEJobs:
+// Phase 1 — pre-flight every domain in parallel and print the union of the
+// records still missing as one block, so the user configures them all in a
+// single DNS-console sitting instead of learning about them one worker at a
+// time.
+// Phase 2 — parallel per-domain workers, each emitting state transitions
+// through a prefixed logger so the log stream stays readable.
+func runIssuerJobs(ctx context.Context, projectName string, jobs []domainJob, fab client.FabricClient, issuer CertIssuer) error {
+	pad := maxDomainLen(jobs)
+	resolverAt := dns.NewFabricResolverAt(fab)
+
+	// Phase 1: pre-flight.
+	pending := preflightIssuerDNS(ctx, projectName, jobs, issuer, resolverAt)
+	if len(pending) > 0 {
+		printGroupedRecords(jobs, pending, pad)
+		term.Infof("Awaiting DNS record setup and propagation for %d domain(s)…", len(pending))
 	}
 
-	term.Infof("%v DNS is properly configured!", domain)
-	if err := cert.CheckTLSCert(ctx, domain, r); err == nil {
-		term.Infof("TLS cert for %v is already ready", domain)
-		return
+	// Phase 2: parallel workers.
+	eg, gctx := errgroup.WithContext(ctx)
+	eg.SetLimit(maxCertWorkers)
+	var (
+		errMu sync.Mutex
+		errs  []error
+	)
+	for _, j := range jobs {
+		job := j
+		log := newDomainLogger(job.domain, pad)
+		eg.Go(func() error {
+			start := time.Now()
+			log("issuing cert…")
+			if err := issuer.IssueCert(gctx, projectName, job.serviceName, job.domain, resolverAt, log); err != nil {
+				log("failed: %v", err)
+				errMu.Lock()
+				errs = append(errs, fmt.Errorf("%v: %w", job.domain, err))
+				errMu.Unlock()
+				return nil // don't abort sibling workers
+			}
+			log("cert issued ✓ (%s)", time.Since(start).Round(time.Second))
+			return nil
+		})
 	}
-	if err := pkg.SleepWithContext(ctx, 5*time.Second); err != nil { // slight delay to ensure DNS to propagate
-		term.Errorf("Error waiting for DNS propagation: %v", err)
-		return
+	if err := eg.Wait(); err != nil {
+		return err
 	}
-	term.Infof("Triggering cert generation for %v", domain)
-	if err := triggerCertGeneration(ctx, domain, r); err != nil {
-		term.Errorf("Error triggering cert generation, please try again")
-		return
+	if len(errs) > 0 {
+		return fmt.Errorf("certificate issuance failed for one or more domains; verify DNS records and retry `defang cert generate`: %w", errors.Join(errs...))
 	}
-
-	term.Infof("Waiting for TLS cert to be online for %v, this could take a few minutes", domain)
-	if err := waitForTLS(ctx, domain, r); err != nil {
-		term.Errorf("Error waiting for TLS to be online: %v", err)
-		// FIXME: Add more info on how to debug, possibly provided by the server side to avoid client type detection here
-		return
-	}
-
-	term.Infof("TLS cert for %v is ready\n", domain)
+	return nil
 }
 
-func triggerCertGeneration(ctx context.Context, domain string, r dns.Resolver) error {
-	doSpinner := term.StdoutCanColor() && term.IsTerminal()
-	if doSpinner {
-		term.HideCursor()
-		defer term.ShowCursor()
+// runACMEJobs runs the fabric/ACME redirect-dance flow in two phases:
+// Phase 1 — sequential pre-flight VerifyDNSSetup across all domains, then a
+// single grouped CNAME/ALIAS instruction block for the ones not yet ready,
+// so the user can configure every record in one DNS-console sitting.
+// Phase 2 — parallel per-domain workers (DNS wait, cert trigger, TLS wait)
+// emitting one prefixed status line per state transition.
+func runACMEJobs(ctx context.Context, jobs []domainJob, fab client.FabricClient) error {
+	pad := maxDomainLen(jobs)
 
-		spin := spinner.New()
-		cancelSpinner := spin.Start(ctx)
-		defer cancelSpinner()
+	// Phase 1: pre-flight.
+	verified := preflightDNS(ctx, jobs, fab)
+	var needsSetup []domainJob
+	for _, j := range jobs {
+		if verified[j.domain] {
+			newDomainLogger(j.domain, pad)("DNS already configured")
+		} else {
+			needsSetup = append(needsSetup, j)
+		}
 	}
-	// Our own retry logic uses the root resolver to prevent cached DNS and retry on all non-200 errors
-	if err := getWithRetries(ctx, fmt.Sprintf("http://%v", domain), 5, newCertHTTPClient(r)); err != nil { // Retry incase of DNS error
-		// Ignore possible tls error as cert attachment may take time
-		term.Debugf("Error triggering cert generation: %v", err)
+	if len(needsSetup) > 0 {
+		printGroupedCNAMEs(needsSetup, pad)
+		term.Infof("Awaiting DNS record setup and propagation for %d domain(s)…", len(needsSetup))
+	}
+
+	// Phase 2: parallel workers.
+	eg, gctx := errgroup.WithContext(ctx)
+	eg.SetLimit(maxCertWorkers)
+	var (
+		errMu sync.Mutex
+		errs  []error
+	)
+	for _, j := range jobs {
+		job := j
+		alreadyVerified := verified[job.domain]
+		log := newDomainLogger(job.domain, pad)
+		eg.Go(func() error {
+			if err := runACMEForDomain(gctx, job, fab, log, alreadyVerified); err != nil {
+				log("failed: %v", err)
+				errMu.Lock()
+				errs = append(errs, fmt.Errorf("%v: %w", job.domain, err))
+				errMu.Unlock()
+			}
+			return nil
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("certificate issuance failed for one or more domains; verify DNS records and retry `defang cert generate`: %w", errors.Join(errs...))
+	}
+	return nil
+}
+
+// preflightDNS asks the server to verify each domain's CNAME/ALIAS setup once,
+// returning the set of domains the server is happy with. Negative results
+// (CodeFailedPrecondition) and RPC failures are both treated as "not yet
+// verified" — the per-domain worker will keep retrying and supplement with
+// local DNS checks.
+func preflightDNS(ctx context.Context, jobs []domainJob, fab client.FabricClient) map[string]bool {
+	verified := make(map[string]bool, len(jobs))
+	var mu sync.Mutex
+	eg, gctx := errgroup.WithContext(ctx)
+	eg.SetLimit(maxCertWorkers)
+	for _, j := range jobs {
+		job := j
+		eg.Go(func() error {
+			if err := fab.VerifyDNSSetup(gctx, &defangv1.VerifyDNSSetupRequest{Domain: job.domain, Targets: job.targets}); err == nil {
+				mu.Lock()
+				verified[job.domain] = true
+				mu.Unlock()
+			} else {
+				term.Debugf("Pre-flight DNS verification for %v not yet ready: %v", job.domain, err)
+			}
+			return nil
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return nil // ignore errors, this should never happen
+	}
+	return verified
+}
+
+// printGroupedCNAMEs prints every pending domain's record on its own line, in
+// a single block. Padding aligns the arrow column so multi-domain projects
+// read like a small table.
+func printGroupedCNAMEs(jobs []domainJob, pad int) {
+	term.Infof("Configure the following DNS record(s) (CNAME or ALIAS; any listed target per row works):")
+	for _, j := range jobs {
+		term.Printf("  %-*s  ->  %s\n", pad, j.domain, strings.Join(j.targets, " or "))
+	}
+}
+
+// preflightIssuerDNS asks the provider, once per domain and in parallel, which
+// DNS records are still missing. A pre-flight error is not fatal: this phase is
+// purely presentational, and the domain's worker re-does the same discovery in
+// phase 2 where the failure can be attributed and reported properly.
+func preflightIssuerDNS(ctx context.Context, projectName string, jobs []domainJob, issuer CertIssuer, resolverAt func(string) dns.Resolver) map[string][]dns.RequiredRecord {
+	pending := make(map[string][]dns.RequiredRecord, len(jobs))
+	var mu sync.Mutex
+	eg, gctx := errgroup.WithContext(ctx)
+	eg.SetLimit(maxCertWorkers)
+	for _, j := range jobs {
+		job := j
+		eg.Go(func() error {
+			records, err := issuer.PreflightCert(gctx, projectName, job.serviceName, job.domain, resolverAt)
+			if err != nil {
+				term.Debugf("Pre-flight cert check for %v failed: %v", job.domain, err)
+				return nil
+			}
+			if len(records) == 0 {
+				return nil
+			}
+			mu.Lock()
+			pending[job.domain] = records
+			mu.Unlock()
+			return nil
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return nil // ignore errors, this should never happen
+	}
+	return pending
+}
+
+// printGroupedRecords prints every pending record across every domain in a
+// single block, iterating jobs (not the map) so sibling hostnames stay in a
+// stable, source order. Rows carry the same [domain] prefix the phase-2 workers
+// use, and the name column is padded across the whole block so the arrows line
+// up as one table rather than one table per domain.
+func printGroupedRecords(jobs []domainJob, pending map[string][]dns.RequiredRecord, pad int) {
+	namePad := 0
+	for _, records := range pending {
+		for _, r := range records {
+			if len(r.Name) > namePad {
+				namePad = len(r.Name)
+			}
+		}
+	}
+	term.Infof("Configure the following DNS record(s):")
+	for _, j := range jobs {
+		records, ok := pending[j.domain]
+		if !ok {
+			continue
+		}
+		log := newDomainLogger(j.domain, pad)
+		for _, r := range records {
+			note := ""
+			if r.Note != "" {
+				note = "  (" + r.Note + ")"
+			}
+			log("%-5s  %-*s  ->  %s%s", r.Type, namePad, r.Name, r.Value, note)
+		}
+	}
+}
+
+// runACMEForDomain runs the per-domain ACME flow: wait for DNS, probe for an
+// existing cert, trigger generation, wait for the cert to come online. All
+// inline progress goes through log so concurrent workers don't fight for the
+// TTY. If alreadyVerified, the DNS wait step is skipped — Phase 1 just saw it.
+func runACMEForDomain(ctx context.Context, job domainJob, fab client.FabricClient, log func(string, ...any), alreadyVerified bool) error {
+	r := dns.FabricResolver{Client: fab}
+	start := time.Now()
+
+	if !alreadyVerified {
+		if err := waitForDNSVerified(ctx, job.domain, job.targets, fab, log); err != nil {
+			return fmt.Errorf("waiting for DNS verification: %w", err)
+		}
+		log("DNS verified")
+	}
+
+	if err := cert.CheckTLSCert(ctx, job.domain, r); err == nil {
+		log("TLS cert already ready (%s)", time.Since(start).Round(time.Second))
+		return nil
+	}
+	if err := pkg.SleepWithContext(ctx, 5*time.Second); err != nil {
+		return fmt.Errorf("waiting for DNS propagation: %w", err)
+	}
+
+	log("triggering cert generation…")
+	if err := triggerCertGen(ctx, job.domain, r); err != nil {
+		return fmt.Errorf("triggering cert generation: %w", err)
+	}
+
+	log("waiting for TLS cert to come online…")
+	if err := waitForTLSReady(ctx, job.domain, r); err != nil {
+		return fmt.Errorf("waiting for TLS to come online: %w", err)
+	}
+	log("TLS online ✓ (%s)", time.Since(start).Round(time.Second))
+	return nil
+}
+
+// waitForDNSVerified blocks until the server-side or local DNS check confirms
+// the record is in place, or ctx expires. Quiet by design — the caller logs
+// state transitions; this function only logs the propagation caveat because
+// it materially changes user expectations (the server is happy but the local
+// DNS may still be stale).
+func waitForDNSVerified(ctx context.Context, domain string, targets []string, fab client.FabricClient, log func(string, ...any)) error {
+	serverSideVerified := false
+	serverVerifyRpcFailure := 0
+	propagationNoted := false
+
+	verify := func() bool {
+		if !serverSideVerified {
+			err := fab.VerifyDNSSetup(ctx, &defangv1.VerifyDNSSetupRequest{Domain: domain, Targets: targets})
+			switch {
+			case err == nil:
+				serverSideVerified = true
+			case isNegativeVerify(err):
+				// Server says "not yet" — it's authoritative, so keep polling it.
+				term.Debugf("Server side DNS verification for %v negative: %v", domain, err)
+			default:
+				// Transient RPC failure: keep re-probing the server on later
+				// ticks (a recovered fabric is picked up) but, once it has been
+				// unreachable enough times, fall back to local DNS below so a
+				// server outage doesn't block issuance indefinitely.
+				serverVerifyRpcFailure++
+				term.Debugf("Server side DNS verification request for %v failed (%d): %v", domain, serverVerifyRpcFailure, err)
+			}
+		}
+		if serverSideVerified || serverVerifyRpcFailure >= 3 {
+			locallyVerified := dns.CheckDomainDNSReady(ctx, domain, targets, dns.NewFabricResolverAt(fab))
+			if serverSideVerified && !locallyVerified {
+				if !propagationNoted {
+					log("DNS verified server-side; local caches still propagating (may take a few minutes)")
+					propagationNoted = true
+				}
+				return true // server-side trust wins; cert work can proceed
+			}
+			return locallyVerified
+		}
+		return false
+	}
+
+	if verify() {
+		return nil
+	}
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			if verify() {
+				return nil
+			}
+		}
+	}
+}
+
+func isNegativeVerify(err error) bool {
+	cerr := new(connect.Error)
+	return errors.As(err, &cerr) && cerr.Code() == connect.CodeFailedPrecondition
+}
+
+// triggerCertGen sends the HTTP GET that nudges the fabric into running the
+// ACME challenge for this domain. No spinner: callers running concurrently
+// would clobber the TTY; the worker's prefixed log line is the progress signal.
+func triggerCertGen(ctx context.Context, domain string, r dns.Resolver) error {
+	if err := getWithRetries(ctx, fmt.Sprintf("http://%v", domain), 5, newCertHTTPClient(r)); err != nil {
+		term.Debugf("Error triggering cert generation for %v: %v", domain, err)
 		return err
 	}
 	return nil
 }
 
-func waitForTLS(ctx context.Context, domain string, r dns.Resolver) error {
+// waitForTLSReady polls https://domain on a 3s ticker until the TLS handshake
+// succeeds or the 10-minute budget is exhausted. The outer ctx still bounds
+// the total wait.
+func waitForTLSReady(ctx context.Context, domain string, r dns.Resolver) error {
 	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
-	timeout, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	deadline, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
-
-	doSpinner := term.StdoutCanColor() && term.IsTerminal()
-	if doSpinner {
-		term.HideCursor()
-		defer term.ShowCursor()
-
-		spin := spinner.New()
-		cancelSpinner := spin.Start(ctx)
-		defer cancelSpinner()
-	}
 	for {
 		select {
-		case <-timeout.Done():
-			return timeout.Err()
+		case <-deadline.Done():
+			return deadline.Err()
 		case <-ticker.C:
-			if err := cert.CheckTLSCert(timeout, domain, r); err == nil {
+			if err := cert.CheckTLSCert(deadline, domain, r); err == nil {
 				return nil
 			} else {
 				term.Debugf("Error checking TLS cert for %v: %v", domain, err)
@@ -214,75 +545,27 @@ func waitForTLS(ctx context.Context, domain string, r dns.Resolver) error {
 	}
 }
 
-func waitForCNAME(ctx context.Context, domain string, targets []string, client client.FabricClient) error {
-	for i, target := range targets {
-		targets[i] = dns.Normalize(target)
-	}
-
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-
-	serverSideVerified := false
-	serverVerifyRpcFailure := 0
-	doSpinner := term.StdoutCanColor() && term.IsTerminal()
-	if doSpinner {
-		term.HideCursor()
-		defer term.ShowCursor()
-
-		spin := spinner.New()
-		cancelSpinner := spin.Start(ctx)
-		defer cancelSpinner()
-	}
-
-	verifyDNS := func() error {
-		if !serverSideVerified && serverVerifyRpcFailure < 3 {
-			if err := client.VerifyDNSSetup(ctx, &defangv1.VerifyDNSSetupRequest{Domain: domain, Targets: targets}); err == nil {
-				term.Debugf("Server side DNS verification for %v successful", domain)
-				serverSideVerified = true
-			} else {
-				if cerr := new(connect.Error); errors.As(err, &cerr) && cerr.Code() == connect.CodeFailedPrecondition {
-					term.Debugf("Server side DNS verification negative result: %v", cerr.Message())
-				} else {
-					term.Debugf("Server side DNS verification request for %v failed: %v", domain, err)
-					serverVerifyRpcFailure++
-				}
-			}
-			if serverVerifyRpcFailure >= 3 {
-				term.Warnf("Server side DNS verification for %v failed multiple times, skipping server side DNS verification.", domain)
-			}
+// maxDomainLen returns the longest domain across jobs, used to right-pad
+// per-domain log prefixes so columns line up. Returns 0 when there are no
+// jobs (callers handle that earlier, but be defensive).
+func maxDomainLen(jobs []domainJob) int {
+	n := 0
+	for _, j := range jobs {
+		if len(j.domain) > n {
+			n = len(j.domain)
 		}
-		if serverSideVerified || serverVerifyRpcFailure >= 3 {
-			fabricResolverAt := func(nsServer string) dns.Resolver {
-				return dns.FabricResolver{Client: client, NSServer: nsServer}
-			}
-			locallyVerified := dns.CheckDomainDNSReady(ctx, domain, targets, fabricResolverAt)
-			if serverSideVerified && !locallyVerified {
-				term.Warnf("DNS settings for %v are verified, but changes may take a few minutes to propagate due to caching.", domain)
-				return nil
-			}
-			if locallyVerified {
-				return nil
-			}
-		}
-		return errors.New("not verified")
 	}
+	return n
+}
 
-	if err := verifyDNS(); err == nil {
-		return nil
-	}
-	term.Infof("Configure a CNAME or ALIAS record for the domain name: %v", domain)
-	term.Printf("  %v  -> %v\n", domain, strings.Join(targets, " or "))
-	term.Infof("Awaiting DNS record setup and propagation... This may take a while.")
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-			if err := verifyDNS(); err == nil {
-				return nil
-			}
-		}
+// newDomainLogger returns a closure that prefixes every line with [domain]
+// padded to a fixed width so concurrent workers' output reads as a clean
+// stream of per-domain events. term.Infof writes one Fprintf per call, which
+// is goroutine-safe for our single-line events.
+func newDomainLogger(domain string, pad int) func(format string, args ...any) {
+	prefix := "[" + domain + "]" + strings.Repeat(" ", pad-len(domain)+1)
+	return func(format string, args ...any) {
+		term.Infof(prefix+format, args...)
 	}
 }
 

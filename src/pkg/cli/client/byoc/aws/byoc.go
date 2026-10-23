@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -29,6 +30,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/dockerhub"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
+	"github.com/DefangLabs/defang/src/pkg/stackpath"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/timeutils"
 	"github.com/DefangLabs/defang/src/pkg/tokenstore"
@@ -136,6 +138,7 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantLabel, stack st
 	b.ByocBaseClient = byoc.NewByocBaseClient(tenantName, b, stack)
 
 	b.driver.TokenStore = &tokenstore.LocalDirTokenStore{Dir: filepath.Join(client.StateDir, "providers", "aws")}
+	b.driver.ExistingBucket = os.Getenv("DEFANG_CD_BUCKET") // adopt an existing CD bucket; `cd install --bucket` overrides
 	return b
 }
 
@@ -144,11 +147,18 @@ func (b *ByocAws) Authenticate(ctx context.Context, interactive bool) error {
 }
 
 func (b *ByocAws) PrintCloudFormationTemplate() ([]byte, error) {
-	template, err := cfn.CreateTemplate(byoc.CdTaskPrefix)
+	template, err := cfn.CreateTemplate(byoc.CdTaskPrefix, "")
 	if err != nil {
 		return nil, err
 	}
 	return template.YAML()
+}
+
+// SetCDBucket makes the CD stack adopt an existing S3 bucket for deployment state
+// instead of creating a new one. Must be called before SetUpCD. Used by the
+// explicit `defang cd install --bucket` flag.
+func (b *ByocAws) SetCDBucket(name string) {
+	b.driver.ExistingBucket = name
 }
 
 func (b *ByocAws) SetUpCD(ctx context.Context, force bool) error {
@@ -194,6 +204,23 @@ func (b *ByocAws) Preview(ctx context.Context, req *client.DeployRequest) (*clie
 	return b.deploy(ctx, req, "preview")
 }
 
+// s3PayloadURI rewrites a virtual-hosted-style S3 URL (bucket.s3.region.amazonaws.com/key)
+// into s3://bucket/key. cd's fetchPayload only authenticates s3:// URIs, via the deploy
+// container's ambient AWS credentials; a bare https:// GET is unsigned, so a private bucket
+// 403s it. Mirrors the gs:// rewrite in gcp/byoc.go for the same reason. Non-S3 URLs (or ones
+// that fail to parse) pass through unchanged.
+func s3PayloadURI(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	bucket, rest, ok := strings.Cut(u.Host, ".s3.")
+	if !ok || !strings.HasSuffix(rest, "amazonaws.com") {
+		return rawURL
+	}
+	return "s3://" + bucket + u.Path
+}
+
 func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd string) (*client.DeployResponse, error) {
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
@@ -228,6 +255,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		Mode:          req.Mode,
 		PulumiVersion: b.PulumiVersion,
 		Services:      serviceInfos,
+		Recipe:        req.Recipe,
 	})
 	if err != nil {
 		return nil, err
@@ -239,7 +267,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		payloadString = base64.StdEncoding.EncodeToString(data)
 		// TODO: consider making this a proper Data URL: "data:application/protobuf;base64,abcd…"
 	} else {
-		payloadUrl, err := b.driver.CreateUploadURL(ctx, etag)
+		payloadUrl, err := b.driver.CreateUploadURL(ctx, byoc.UploadPrefix, etag)
 		if err != nil {
 			return nil, err
 		}
@@ -253,7 +281,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		if resp.StatusCode != 200 {
 			return nil, fmt.Errorf("unexpected status code during upload: %s", resp.Status)
 		}
-		payloadString = http.RemoveQueryParam(payloadUrl)
+		payloadString = s3PayloadURI(http.RemoveQueryParam(payloadUrl))
 	}
 
 	cdCmd := cdCommand{
@@ -265,6 +293,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *client.DeployRequest, cmd str
 		project:         project.Name,
 		statesUrl:       req.StatesUrl,
 		eventsUrl:       req.EventsUrl,
+		ttl:             req.TTL,
 	}
 
 	if b.needDockerHubCreds {
@@ -488,6 +517,7 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	env := map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
@@ -534,6 +564,7 @@ type cdCommand struct {
 
 	statesUrl string
 	eventsUrl string
+	ttl       string
 }
 
 func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild.BuildID, error) {
@@ -541,6 +572,11 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild
 	env, err := b.environment(cmd.project)
 	if err != nil {
 		return nil, err
+	}
+
+	// APN attribution is set by Fabric via CanIUse; allow a local env override for ISVs.
+	if awsApnId := pkg.Getenv("DEFANG_AWS_APN_ID", b.CanIUseConfig.AwsApnId); awsApnId != "" {
+		env["DEFANG_AWS_APN_ID"] = awsApnId
 	}
 	if cmd.delegationSetId != "" {
 		env["DELEGATION_SET_ID"] = cmd.delegationSetId
@@ -573,6 +609,10 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild
 		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
 	}
 
+	if cmd.ttl != "" {
+		env["DEFANG_TTL"] = cmd.ttl
+	}
+
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging
 		debugEnv := []string{"AWS_REGION=" + string(b.driver.Region)}
@@ -588,7 +628,7 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCommand) (awscodebuild
 	}
 
 	// Prepend the entrypoint; CodeBuild runs buildspec commands in a shell, not via Docker ENTRYPOINT
-	args := append([]string{"node", "lib/index.js"}, cmd.command...)
+	args := append(cdEntrypoint(b.CDImage), cmd.command...)
 	return b.driver.Run(ctx, "/app", b.CDImage, env, args...)
 }
 
@@ -689,7 +729,7 @@ func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 		return nil, err
 	}
 
-	url, err := b.driver.CreateUploadURL(ctx, req.Digest)
+	url, err := b.driver.CreateUploadURL(ctx, byoc.UploadPrefix, req.Digest)
 	if err != nil {
 		return nil, err
 	}
@@ -869,16 +909,16 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 		}
 	}
 	if logType.Has(logs.LogTypeBuild) && projectName != "" {
-		buildsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "builds")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service
+		buildsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, stackpath.LogGroupBuilds)), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service
 		term.Debug("Query builds logs", buildsTail.LogGroupARN, filter)
 		groups = append(groups, buildsTail)
-		ecsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "ecs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
+		ecsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, stackpath.LogGroupECS)), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
 		term.Debug("Query ecs events logs", ecsTail.LogGroupARN, filter)
 		groups = append(groups, ecsTail)
 	}
 	// Tail services
 	if logType.Has(logs.LogTypeRun) && projectName != "" {
-		servicesTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "logs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts
+		servicesTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, stackpath.LogGroupServices)), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts
 		if service != "" && etag != "" {
 			servicesTail.LogStreamNamePrefix = service + "/" + service + "_" + etag
 		}
@@ -990,9 +1030,9 @@ func (b *ByocAws) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 
 func (b *ByocAws) getSubscribeLogGroupInputs(projectName string) []cw.LogGroupInput {
 	var groups []cw.LogGroupInput
-	buildsARN := b.makeLogGroupARN(b.StackDir(projectName, "builds"))
+	buildsARN := b.makeLogGroupARN(b.StackDir(projectName, stackpath.LogGroupBuilds))
 	groups = append(groups, cw.LogGroupInput{LogGroupARN: buildsARN})
-	ecsARN := b.makeLogGroupARN(b.StackDir(projectName, "ecs"))
+	ecsARN := b.makeLogGroupARN(b.StackDir(projectName, stackpath.LogGroupECS))
 	groups = append(groups, cw.LogGroupInput{LogGroupARN: ecsARN})
 	return groups
 }

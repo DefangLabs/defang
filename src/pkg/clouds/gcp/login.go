@@ -134,6 +134,7 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 			term.Warnf("GitHub Actions OIDC token is missing required permissions on project %q: %v\nPlease ensure your workload identity provider and github actions permissions are set up correctly: https://docs.defang.com/defang-byoc/gcp/github-actions\n", gcp.ProjectId, err)
 		} else {
 			term.Debug("GitHub Actions OIDC token has required permissions")
+			tokenSource = wrapTokenSource(tokenSource)
 			gcp.Options = append(gcp.Options, option.WithTokenSource(tokenSource))
 			gcp.TokenSource = tokenSource
 			gcp.Principal = principal
@@ -149,6 +150,7 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 		term.Warnf("failed to load stored credentials: %v", err)
 	} else if tokenSource != nil {
 		term.Debug("found valid stored credentials with required permissions")
+		tokenSource = wrapTokenSource(tokenSource)
 		gcp.Options = append(gcp.Options, option.WithTokenSource(tokenSource))
 		gcp.TokenSource = tokenSource
 		return nil
@@ -177,6 +179,7 @@ func (gcp *Gcp) tryInteractiveLogin(ctx context.Context, n int) error {
 			term.Warn("Please try logging in again with an account that has the required permissions.")
 			continue
 		}
+		tokenSource = wrapTokenSource(tokenSource)
 		gcp.Options = append(gcp.Options, option.WithTokenSource(tokenSource))
 		gcp.TokenSource = tokenSource
 		currentToken, err := tokenSource.Token()
