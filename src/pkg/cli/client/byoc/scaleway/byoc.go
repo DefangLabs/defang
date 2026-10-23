@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"iter"
 	"os"
-	"regexp"
+	"strconv"
 	"strings"
 	"time"
+
+	"sort"
 
 	"connectrpc.com/connect"
 	pkg "github.com/DefangLabs/defang/src/pkg"
@@ -20,6 +22,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/scaleway"
+	"github.com/DefangLabs/defang/src/pkg/clouds/scaleway/contract"
+	"github.com/DefangLabs/defang/src/pkg/deployment"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -104,10 +108,7 @@ func (b *ByocScaleway) bucketName() string {
 }
 
 func (b *ByocScaleway) getSecretName(projectName, name string) string {
-	// Scaleway secret names must match ^[_a-zA-Z0-9]([-_.a-zA-Z0-9]*[_a-zA-Z0-9])?$
-	// Replace path separators from StackDir (e.g., "/Defang/project/stack/KEY") with underscores.
-	s := strings.TrimLeft(b.StackDir(projectName, name), "/")
-	return strings.ReplaceAll(s, "/", "_")
+	return contract.ConfigName(b.Prefix, projectName, b.PulumiStack, name)
 }
 
 func (b *ByocScaleway) environment(projectName string) (map[string]string, error) {
@@ -260,7 +261,7 @@ func (b *ByocScaleway) createCDSecretReferences(ctx context.Context, jobDefID st
 		}
 		refs = append(refs, scaleway.JobSecretRef{
 			SecretManagerID:      secret.ID,
-			SecretManagerVersion: fmt.Sprint(version.Revision),
+			SecretManagerVersion: strconv.Itoa(version.Revision),
 			EnvVarName:           key,
 		})
 	}
@@ -372,7 +373,7 @@ func (b *ByocScaleway) deploy(ctx context.Context, req *client.DeployRequest, cm
 		payloadString = base64.StdEncoding.EncodeToString(data)
 	} else {
 		bucket := b.bucketName()
-		key := fmt.Sprintf("uploads/%s", etag)
+		key := "uploads/" + etag
 		if err := scaleway.PutObject(ctx, b.s3Client, bucket, key, bytes.NewReader(data)); err != nil {
 			return nil, fmt.Errorf("uploading deploy payload: %w", err)
 		}
@@ -434,6 +435,15 @@ func (b *ByocScaleway) GetProjectUpdate(ctx context.Context, projectName string)
 
 // GetServices implements the Provider interface.
 func (b *ByocScaleway) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
+	services, err := b.getServicesFromState(ctx, req.Project)
+	if err == nil {
+		return services, nil
+	}
+	if !errors.Is(err, errMetadataNotFound) {
+		return nil, err
+	}
+	// Deployments made with older CD images retain their recorded status.
+	// No physical names or live health can be inferred from project.pb.
 	projUpdate, err := b.GetProjectUpdate(ctx, req.Project)
 	if err != nil {
 		if errors.Is(err, client.ErrNotExist) {
@@ -554,7 +564,7 @@ func (b *ByocScaleway) CreateUploadURL(ctx context.Context, req *defangv1.Upload
 	}
 
 	bucket := b.bucketName()
-	key := fmt.Sprintf("uploads/%s", req.Digest)
+	key := "uploads/" + req.Digest
 	url, err := scaleway.CreatePresignedUploadURL(ctx, b.s3Client, bucket, key, 15*time.Minute)
 	if err != nil {
 		return nil, scaleway.AnnotateScalewayError(err, "creating upload URL")
@@ -783,7 +793,7 @@ func (o s3Obj) Name() string { return o.name }
 func (o s3Obj) Size() int64  { return o.size }
 
 func (b *ByocScaleway) GetPrivateDomain(projectName string) string {
-	return fmt.Sprintf("%s.internal", projectName)
+	return projectName + ".internal"
 }
 
 // GetDeploymentStatus checks the status of the CD job run.
@@ -914,18 +924,13 @@ func (b *ByocScaleway) QueryLogs(ctx context.Context, req *defangv1.TailRequest)
 	if err := b.ensureCockpitToken(ctx); err != nil {
 		return nil, err
 	}
-
-	query := b.buildLogQuery(req)
-	etag := req.Etag
-	if etag == "" {
-		etag = b.cdEtag
-	}
-
 	if req.Follow {
-		return b.followLogs(ctx, query, etag, req), nil
+		return b.followLogs(ctx, req), nil
 	}
-
-	// Non-follow: single query
+	queries, metadata, err := b.logQueries(ctx, req)
+	if err != nil {
+		return nil, err
+	}
 	var start, end time.Time
 	if req.Since.IsValid() {
 		start = req.Since.AsTime()
@@ -933,28 +938,38 @@ func (b *ByocScaleway) QueryLogs(ctx context.Context, req *defangv1.TailRequest)
 	if req.Until.IsValid() {
 		end = req.Until.AsTime()
 	}
-
-	limit := int(req.Limit)
-	if limit == 0 {
-		limit = 100
-	}
-
-	entries, err := scaleway.QueryLoki(ctx, b.cockpitToken, b.cockpitLogsEndpoint, query, start, end, limit)
+	entries, err := b.queryLogEntries(ctx, queries, start, end, req.Limit)
 	if err != nil {
-		return nil, fmt.Errorf("querying logs: %w", err)
+		return nil, err
 	}
-
 	return func(yield func(*defangv1.TailResponse, error) bool) {
 		for _, entry := range entries {
-			resp := lokiEntryToTailResponse(entry, etag)
-			if resp == nil {
-				continue
-			}
-			if !yield(resp, nil) {
+			response := deploymentLogResponse(entry, req.Etag, metadata)
+			if response != nil && !yield(response, nil) {
 				return
 			}
 		}
 	}, nil
+}
+
+func (b *ByocScaleway) queryLogEntries(ctx context.Context, queries []string, start, end time.Time, limit int32) ([]scaleway.LokiEntry, error) {
+	n := int(limit)
+	if n <= 0 {
+		n = 100
+	}
+	var entries []scaleway.LokiEntry
+	for _, query := range queries {
+		batch, err := scaleway.QueryLoki(ctx, b.cockpitToken, b.cockpitLogsEndpoint, query, start, end, n)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, batch...)
+	}
+	sort.SliceStable(entries, func(i, j int) bool { return entries[i].Timestamp.Before(entries[j].Timestamp) })
+	if len(entries) > n {
+		entries = entries[:n]
+	}
+	return entries, nil
 }
 
 // ensureCockpitToken lazily creates a Cockpit token for Loki queries.
@@ -963,7 +978,7 @@ func (b *ByocScaleway) ensureCockpitToken(ctx context.Context) error {
 		return nil
 	}
 
-	const tokenName = "defang-cd-logs"
+	const tokenName = "defang-cd-logs" //nolint:gosec // Public resource name, not a token value.
 
 	token, err := b.client.CreateCockpitToken(ctx, tokenName, b.projectID)
 	if err != nil {
@@ -1005,75 +1020,129 @@ func (b *ByocScaleway) ensureCockpitToken(ctx context.Context) error {
 	return nil
 }
 
-// buildLogQuery constructs a LogQL query for Scaleway Cockpit Loki.
-func (b *ByocScaleway) buildLogQuery(req *defangv1.TailRequest) string {
+// logQueries resolves runtime log selectors from provisioning outputs. CD logs
+// remain available before application resources or their state exist.
+func (b *ByocScaleway) logQueries(ctx context.Context, req *defangv1.TailRequest) ([]string, *deployment.Metadata, error) {
 	logType := logs.LogType(req.LogType)
-
-	if len(req.Services) > 0 {
-		if len(req.Services) == 1 {
-			return fmt.Sprintf(`{resource_type="serverless_container",resource_name=~".*-%s"}`, regexp.QuoteMeta(req.Services[0]))
+	var metadata *deployment.Metadata
+	if logType.Has(logs.LogTypeRun) || len(req.Services) > 0 {
+		var err error
+		metadata, err = b.readDeployment(ctx, req.Project, req.Etag)
+		if err != nil && !errors.Is(err, deployment.ErrNotFound) {
+			return nil, nil, err
 		}
-		services := make([]string, len(req.Services))
-		for i, service := range req.Services {
-			services[i] = regexp.QuoteMeta(service)
+		if errors.Is(err, deployment.ErrNotFound) && !logType.Has(logs.LogTypeCD) {
+			return nil, nil, fmt.Errorf("service log locations are not available; deploy this project with the updated Scaleway CD image first: %w", err)
 		}
-		return fmt.Sprintf(`{resource_type="serverless_container",resource_name=~".*-(%s)"}`, strings.Join(services, "|"))
 	}
-
-	if logType.Has(logs.LogTypeCD) || logType == logs.LogTypeUnspecified {
-		return fmt.Sprintf(`{job_definition_name=%q}`, b.cdJobName())
-	}
-
-	return fmt.Sprintf(`{job_definition_name=~"%s.*"}`, byoc.CdTaskPrefix)
+	queries, err := b.buildLogQueries(req, metadata)
+	return queries, metadata, err
 }
 
-// followLogs polls Loki for new log entries in a loop.
-func (b *ByocScaleway) followLogs(ctx context.Context, query, etag string, req *defangv1.TailRequest) iter.Seq2[*defangv1.TailResponse, error] {
+func (b *ByocScaleway) buildLogQueries(req *defangv1.TailRequest, metadata *deployment.Metadata) ([]string, error) {
+	logType := logs.LogType(req.LogType)
+	var queries []string
+	if metadata != nil {
+		names := append([]string(nil), req.Services...)
+		if len(names) == 0 {
+			for name := range metadata.Services {
+				names = append(names, name)
+			}
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			service, ok := metadata.Services[name]
+			if !ok {
+				return nil, fmt.Errorf("service %q was not found in this deployment; check the service name and try again", name)
+			}
+			if len(service.LogLabels) == 0 {
+				continue
+			}
+			var labels []string
+			for key, value := range service.LogLabels {
+				labels = append(labels, fmt.Sprintf("%s=%q", key, value))
+			}
+			sort.Strings(labels)
+			queries = append(queries, "{"+strings.Join(labels, ",")+"}")
+		}
+	}
+	if logType.Has(logs.LogTypeCD) || (logType == logs.LogTypeUnspecified && len(req.Services) == 0) {
+		queries = append(queries, fmt.Sprintf(`{job_definition_name=%q}`, b.cdJobName()))
+	}
+	if logType.Has(logs.LogTypeBuild) {
+		// Build jobs use the shared CD prefix; runtime queries never use name patterns.
+		queries = append(queries, fmt.Sprintf(`{job_definition_name=~"%s.*"}`, byoc.CdTaskPrefix))
+	}
+	if req.Pattern != "" {
+		for i := range queries {
+			queries[i] += fmt.Sprintf(" |= %q", req.Pattern)
+		}
+	}
+	return queries, nil
+}
+
+func (b *ByocScaleway) followLogs(ctx context.Context, req *defangv1.TailRequest) iter.Seq2[*defangv1.TailResponse, error] {
 	return func(yield func(*defangv1.TailResponse, error) bool) {
 		start := time.Now()
 		if req.Since.IsValid() {
 			start = req.Since.AsTime()
 		}
-
-		const maxConsecutiveErrors = 5
-		consecutiveErrors := 0
-
+		// Loki timestamps are inclusive. Track the boundary batch so equal-timestamp
+		// records from different services are not dropped between polls.
+		seen := map[string]bool{}
 		for {
-			entries, err := scaleway.QueryLoki(ctx, b.cockpitToken, b.cockpitLogsEndpoint, query, start, time.Time{}, 100)
+			queries, metadata, err := b.logQueries(ctx, req)
 			if err != nil {
-				consecutiveErrors++
-				if consecutiveErrors >= maxConsecutiveErrors {
-					yield(nil, fmt.Errorf("giving up after %d consecutive log query failures: %w", maxConsecutiveErrors, err))
-					return
-				}
-				if !yield(nil, err) {
-					return
-				}
-			} else {
-				consecutiveErrors = 0
+				yield(nil, err)
+				return
 			}
-
+			entries, err := b.queryLogEntries(ctx, queries, start, time.Time{}, req.Limit)
+			if err != nil {
+				yield(nil, err)
+				return
+			}
 			for _, entry := range entries {
-				if !entry.Timestamp.After(start) {
-					continue // skip already-seen entries
-				}
-				resp := lokiEntryToTailResponse(entry, etag)
-				if resp == nil {
-					start = entry.Timestamp
+				key := entry.Timestamp.String() + fmt.Sprint(entry.Labels) + entry.Line
+				if entry.Timestamp.Before(start) || seen[key] {
 					continue
 				}
-				if !yield(resp, nil) {
+				if entry.Timestamp.After(start) {
+					start = entry.Timestamp
+					clear(seen)
+				}
+				seen[key] = true
+				response := deploymentLogResponse(entry, req.Etag, metadata)
+				if response != nil && !yield(response, nil) {
 					return
 				}
-				start = entry.Timestamp
 			}
-
 			if err := pkg.SleepWithContext(ctx, 2*time.Second); err != nil {
 				yield(nil, err)
 				return
 			}
 		}
 	}
+}
+
+func deploymentLogResponse(entry scaleway.LokiEntry, etag string, metadata *deployment.Metadata) *defangv1.TailResponse {
+	response := lokiEntryToTailResponse(entry, etag)
+	if response == nil || metadata == nil {
+		return response
+	}
+	parsed, _ := parseScalewayLogEntry(entry)
+	for name, service := range metadata.Services {
+		id := service.LogLabels["resource_id"]
+		if id != "" && parsed.Labels["resource_id"] == id {
+			response.Service = name
+			response.Etag = metadata.Etag
+			for _, line := range response.Entries {
+				line.Service = name
+				line.Etag = metadata.Etag
+			}
+			return response
+		}
+	}
+	return response
 }
 
 type scalewayLogPayload struct {

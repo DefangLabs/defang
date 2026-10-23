@@ -39,11 +39,6 @@ type listSecretsResponse struct {
 	TotalCount int      `json:"total_count"`
 }
 
-type listSecretVersionsResponse struct {
-	Versions   []SecretVersion `json:"versions"`
-	TotalCount int             `json:"total_count"`
-}
-
 // CreateSecret creates a new secret in Scaleway Secret Manager.
 // Returns the secret and a nil error on success. If the secret already exists
 // (Scaleway returns 400 with "cannot have same secret name"), the error wraps
@@ -174,7 +169,7 @@ func (c *Client) ListSecrets(ctx context.Context, projectID, prefix string) ([]S
 
 // DeleteSecret permanently deletes a secret and all its versions.
 func (c *Client) DeleteSecret(ctx context.Context, secretID string) error {
-	url := c.regionURL("secret-manager", "v1beta1") + fmt.Sprintf("/secrets/%s", secretID)
+	url := c.regionURL("secret-manager", "v1beta1") + "/secrets/" + secretID
 	if err := c.doRequestJSON(ctx, "DELETE", url, nil, nil); err != nil {
 		return AnnotateScalewayError(err, fmt.Sprintf("deleting secret %q", secretID))
 	}

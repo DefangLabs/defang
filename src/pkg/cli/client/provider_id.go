@@ -10,12 +10,12 @@ import (
 type ProviderID string
 
 const (
-	ProviderAuto   ProviderID = "auto"
-	ProviderAWS    ProviderID = "aws"
-	ProviderAzure  ProviderID = "azure"
-	ProviderDefang ProviderID = "defang"
-	ProviderDO     ProviderID = "digitalocean"
-	ProviderGCP    ProviderID = "gcp"
+	ProviderAuto     ProviderID = "auto"
+	ProviderAWS      ProviderID = "aws"
+	ProviderAzure    ProviderID = "azure"
+	ProviderDefang   ProviderID = "defang"
+	ProviderDO       ProviderID = "digitalocean"
+	ProviderGCP      ProviderID = "gcp"
 	ProviderScaleway ProviderID = "scaleway"
 )
 

@@ -2,6 +2,7 @@ package scaleway
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 )
@@ -56,10 +57,10 @@ func NewClientFromEnv() (*Client, error) {
 	region := os.Getenv("SCW_DEFAULT_REGION")
 
 	if accessKey == "" || secretKey == "" {
-		return nil, fmt.Errorf("SCW_ACCESS_KEY and SCW_SECRET_KEY must be set (https://www.scaleway.com/en/docs/identity-and-access-management/iam/how-to/create-api-keys/)")
+		return nil, errors.New("SCW_ACCESS_KEY and SCW_SECRET_KEY must be set (https://www.scaleway.com/en/docs/identity-and-access-management/iam/how-to/create-api-keys/)")
 	}
 	if projectID == "" {
-		return nil, fmt.Errorf("SCW_DEFAULT_PROJECT_ID must be set (https://www.scaleway.com/en/docs/identity-and-access-management/organizations-and-projects/how-to/create-a-project/)")
+		return nil, errors.New("SCW_DEFAULT_PROJECT_ID must be set (https://www.scaleway.com/en/docs/identity-and-access-management/organizations-and-projects/how-to/create-a-project/)")
 	}
 	if region == "" {
 		region = "fr-par"

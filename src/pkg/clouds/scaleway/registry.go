@@ -66,7 +66,7 @@ func (c *Client) EnsureRegistryNamespaceExists(ctx context.Context, name, projec
 	}
 
 	// Create the namespace
-	createURL := fmt.Sprintf("%s/namespaces", baseURL)
+	createURL := baseURL + "/namespaces"
 	body := map[string]any{
 		"name":       name,
 		"project_id": projectID,

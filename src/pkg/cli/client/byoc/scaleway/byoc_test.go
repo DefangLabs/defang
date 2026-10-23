@@ -14,6 +14,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	cloudscaleway "github.com/DefangLabs/defang/src/pkg/clouds/scaleway"
+	"github.com/DefangLabs/defang/src/pkg/deployment"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -54,23 +55,31 @@ func TestCdLogQueryUsesScopedJobName(t *testing.T) {
 	client := &ByocScaleway{}
 	client.ByocBaseClient = byoc.NewByocBaseClient("", client, "tenant/project/prod")
 
-	query := client.buildLogQuery(&defangv1.TailRequest{})
+	queries, err := client.buildLogQueries(&defangv1.TailRequest{}, nil)
+	require.NoError(t, err)
 
-	assert.Equal(t, `{job_definition_name="defang-cd-tenant-project-prod"}`, query)
+	assert.Equal(t, []string{`{job_definition_name="defang-cd-tenant-project-prod"}`}, queries)
 }
 
-func TestServiceLogQueryUsesServerlessContainerNames(t *testing.T) {
+func TestServiceLogQueryUsesProvisionedResourceIDs(t *testing.T) {
 	t.Parallel()
 
 	client := &ByocScaleway{}
 	client.ByocBaseClient = byoc.NewByocBaseClient("", client, "tenant/project/prod")
 
-	query := client.buildLogQuery(&defangv1.TailRequest{
-		LogType:  uint32(logs.LogTypeAll),
+	queries, err := client.buildLogQueries(&defangv1.TailRequest{
+		LogType:  uint32(logs.LogTypeRun),
 		Services: []string{"app", "api.v1"},
-	})
+	}, &deployment.Metadata{Services: map[string]deployment.Service{
+		"app":    {ID: "fr-par/random-uuid", Name: "renamed-container", LogLabels: map[string]string{"resource_id": "random-uuid", "resource_type": "serverless_container"}},
+		"api.v1": {ID: "fr-par/another-uuid", LogLabels: map[string]string{"resource_id": "another-uuid", "resource_type": "serverless_container"}},
+	}})
+	require.NoError(t, err)
 
-	assert.Equal(t, `{resource_type="serverless_container",resource_name=~".*-(app|api\.v1)"}`, query)
+	assert.Equal(t, []string{
+		`{resource_id="another-uuid",resource_type="serverless_container"}`,
+		`{resource_id="random-uuid",resource_type="serverless_container"}`,
+	}, queries)
 }
 
 func TestEnvironmentIncludesPulumiAndScalewayContext(t *testing.T) {
