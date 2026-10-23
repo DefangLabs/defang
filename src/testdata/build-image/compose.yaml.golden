@@ -7,6 +7,14 @@ services:
     image: myapp:latest
     networks:
       default: null
+  app-build:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: myapp:latest
+    networks:
+      default: null
+    pull_policy: build
 networks:
   default:
     name: build-image_default
