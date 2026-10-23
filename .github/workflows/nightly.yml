@@ -10,7 +10,13 @@ permissions:
 
 jobs:
   goreleaser-nightly:
-    runs-on: ubuntu-latest
+    # Pinned off ubuntu-latest: GitHub's rollout to ubuntu-26.04 makes /tmp a
+    # RAM-backed tmpfs with a ~7.8G per-user quota (actions/runner-images#14777).
+    # goreleaser's Go linker writes its large cross-compiled binaries there and
+    # hits that quota ("disk quota exceeded") despite the root disk having
+    # plenty of free space - see the two consecutive failed Nightly Build runs
+    # on 2026-10-21/22. Same class of break as DefangLabs/portal#1119.
+    runs-on: ubuntu-24.04
     environment: release
 
     steps:
@@ -49,10 +55,11 @@ jobs:
           fi
 
       # goreleaser cross-compiles 6 binaries (darwin/linux/windows x amd64/arm64)
-      # in one job; ubuntu-latest ships with Android/.NET/Haskell toolchains
-      # preinstalled that eat most of the runner's free disk, which is what the
-      # Go linker's "disk quota exceeded" means here. Drop what this build
-      # never uses before it needs the space.
+      # in one job; the runner ships with Android/.NET/Haskell toolchains
+      # preinstalled that eat most of the root disk's free space. Drop what
+      # this build never uses before it needs the space. (The actual nightly
+      # outage this guarded against was unrelated to root-disk space - see the
+      # ubuntu-24.04 pin above - but this is still worth keeping.)
       - name: Free disk space
         if: steps.check.outputs.changed == 'true'
         run: |
