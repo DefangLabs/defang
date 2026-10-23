@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"path"
 	"slices"
 
@@ -40,7 +41,7 @@ func (b *ByocScaleway) readDeployment(ctx context.Context, project, etag string)
 }
 
 func (b *ByocScaleway) getServicesFromState(ctx context.Context, project string) (*defangv1.GetServicesResponse, error) {
-	metadata, err := b.readDeployment(ctx, project, "")
+	metadata, err := b.readDeployment(ctx, project, b.cdEtag)
 	if err != nil {
 		return nil, err
 	}
@@ -53,14 +54,20 @@ func (b *ByocScaleway) getServicesFromState(ctx context.Context, project string)
 	for _, name := range names {
 		service := metadata.Services[name]
 		info := &defangv1.ServiceInfo{
-			Service: &defangv1.Service{Name: name},
-			Project: project,
-			Etag:    metadata.Etag,
-			Status:  "unknown",
-			State:   defangv1.ServiceState_NOT_SPECIFIED,
+			Service:         &defangv1.Service{Name: name},
+			Project:         project,
+			Etag:            metadata.Etag,
+			Status:          "unknown",
+			State:           defangv1.ServiceState_NOT_SPECIFIED,
+			HealthcheckPath: service.HealthcheckPath,
 		}
 		if service.Endpoint != "" {
 			info.Endpoints = []string{service.Endpoint}
+			if endpoint, err := url.Parse(service.Endpoint); err == nil && endpoint.Host != "" && (endpoint.Scheme == "https" || endpoint.Scheme == "http") {
+				info.PublicFqdn = endpoint.Host
+			} else if service.Kind != deployment.KindContainer {
+				info.PrivateFqdn = service.Endpoint
+			}
 		}
 		if service.Kind == deployment.KindContainer {
 			container, err := b.client.GetContainer(ctx, service.ID)

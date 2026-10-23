@@ -41,9 +41,12 @@ CD also exports that summary as a stack output. These outputs exclude credential
 and database connection strings.
 
 The CLI reads these outputs from the current Pulumi checkpoint. Individual
-component outputs support discovery during partial deployments; resources pending
-deletion or replacement are excluded. A selected deployment ID prevents mixing
-attempts. Unknown contract versions require a CLI update.
+component outputs support discovery during partial deployments when a deployment
+ID is selected or the current CLI process started the deployment. Otherwise,
+readback uses the last completed summary, including while an update is in
+progress. Resources pending deletion or replacement are excluded. A selected
+deployment ID prevents mixing attempts. Unknown contract versions require a CLI
+update.
 
 Runtime logs use the published selectors, with records mapped back to Compose
 service names. Container status is queried from Scaleway using the published ID;
@@ -52,8 +55,8 @@ health is reported as unknown. CD job completion remains a separate signal.
 
 When outputs are absent, service readback falls back to `project.pb`. Runtime log
 discovery requires redeploying with a CD image that publishes these outputs. CD
-logs remain available before application state exists. Build logs retain the
-preview implementation's existing job-prefix selector.
+logs remain available before application state exists. Build log discovery is
+not yet supported; build-only requests direct users to Scaleway Cockpit.
 
 Config names are needed before provisioning, so both sides use the shared
 `contract.ConfigName` and `contract.ConfigPrefix` helpers rather than discovering

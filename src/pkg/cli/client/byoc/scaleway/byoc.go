@@ -978,7 +978,7 @@ func (b *ByocScaleway) ensureCockpitToken(ctx context.Context) error {
 		return nil
 	}
 
-	const tokenName = "defang-cd-logs" //nolint:gosec // Public resource name, not a token value.
+	tokenName := b.cdJobName() + "-logs"
 
 	token, err := b.client.CreateCockpitToken(ctx, tokenName, b.projectID)
 	if err != nil {
@@ -1069,9 +1069,8 @@ func (b *ByocScaleway) buildLogQueries(req *defangv1.TailRequest, metadata *depl
 	if logType.Has(logs.LogTypeCD) || (logType == logs.LogTypeUnspecified && len(req.Services) == 0) {
 		queries = append(queries, fmt.Sprintf(`{job_definition_name=%q}`, b.cdJobName()))
 	}
-	if logType.Has(logs.LogTypeBuild) {
-		// Build jobs use the shared CD prefix; runtime queries never use name patterns.
-		queries = append(queries, fmt.Sprintf(`{job_definition_name=~"%s.*"}`, byoc.CdTaskPrefix))
+	if logType == logs.LogTypeBuild {
+		return nil, errors.New("Scaleway build logs are not available through Defang yet; view them in Scaleway Cockpit")
 	}
 	if req.Pattern != "" {
 		for i := range queries {
@@ -1083,37 +1082,48 @@ func (b *ByocScaleway) buildLogQueries(req *defangv1.TailRequest, metadata *depl
 
 func (b *ByocScaleway) followLogs(ctx context.Context, req *defangv1.TailRequest) iter.Seq2[*defangv1.TailResponse, error] {
 	return func(yield func(*defangv1.TailResponse, error) bool) {
-		start := time.Now()
+		initial := time.Now()
 		if req.Since.IsValid() {
-			start = req.Since.AsTime()
+			initial = req.Since.AsTime()
 		}
-		// Loki timestamps are inclusive. Track the boundary batch so equal-timestamp
-		// records from different services are not dropped between polls.
-		seen := map[string]bool{}
+		type cursor struct {
+			start time.Time
+			seen  map[string]bool
+		}
+		cursors := map[string]*cursor{}
 		for {
 			queries, metadata, err := b.logQueries(ctx, req)
 			if err != nil {
 				yield(nil, err)
 				return
 			}
-			entries, err := b.queryLogEntries(ctx, queries, start, time.Time{}, req.Limit)
-			if err != nil {
-				yield(nil, err)
-				return
-			}
-			for _, entry := range entries {
-				key := entry.Timestamp.String() + fmt.Sprint(entry.Labels) + entry.Line
-				if entry.Timestamp.Before(start) || seen[key] {
-					continue
+			for _, query := range queries {
+				current := cursors[query]
+				if current == nil {
+					// New resources may have emitted startup logs before their metadata
+					// appeared. Each selector starts at the original requested time.
+					current = &cursor{start: initial, seen: map[string]bool{}}
+					cursors[query] = current
 				}
-				if entry.Timestamp.After(start) {
-					start = entry.Timestamp
-					clear(seen)
-				}
-				seen[key] = true
-				response := deploymentLogResponse(entry, req.Etag, metadata)
-				if response != nil && !yield(response, nil) {
+				entries, err := b.queryLogEntries(ctx, []string{query}, current.start, time.Time{}, req.Limit)
+				if err != nil {
+					yield(nil, err)
 					return
+				}
+				for _, entry := range entries {
+					key := entry.Timestamp.String() + fmt.Sprint(entry.Labels) + entry.Line
+					if entry.Timestamp.Before(current.start) || current.seen[key] {
+						continue
+					}
+					if entry.Timestamp.After(current.start) {
+						current.start = entry.Timestamp
+						clear(current.seen)
+					}
+					current.seen[key] = true
+					response := deploymentLogResponse(entry, req.Etag, metadata)
+					if response != nil && !yield(response, nil) {
+						return
+					}
 				}
 			}
 			if err := pkg.SleepWithContext(ctx, 2*time.Second); err != nil {

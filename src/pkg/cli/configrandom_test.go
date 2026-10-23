@@ -92,3 +92,17 @@ func TestCreateRandomConfigValueScaleway(t *testing.T) {
 		}
 	}
 }
+
+func TestCreateRandomConfigValueWithoutSymbols(t *testing.T) {
+	for range 10 {
+		value := createRandomConfigValue(false)
+		if len(value) < 32 {
+			t.Fatalf("generated value is too short: %d", len(value))
+		}
+		for _, char := range value {
+			if !unicode.IsLetter(char) && !unicode.IsDigit(char) {
+				t.Errorf("unexpected special symbol %q", char)
+			}
+		}
+	}
+}

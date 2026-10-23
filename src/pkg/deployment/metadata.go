@@ -32,11 +32,12 @@ type Metadata struct {
 }
 
 type Service struct {
-	Kind      ServiceKind       `json:"kind"`
-	ID        string            `json:"id"`
-	Name      string            `json:"name"`
-	Endpoint  string            `json:"endpoint,omitempty"`
-	LogLabels map[string]string `json:"logLabels,omitempty"`
+	Kind            ServiceKind       `json:"kind"`
+	ID              string            `json:"id"`
+	Name            string            `json:"name"`
+	Endpoint        string            `json:"endpoint,omitempty"`
+	LogLabels       map[string]string `json:"logLabels,omitempty"`
+	HealthcheckPath string            `json:"healthcheckPath,omitempty"`
 }
 
 var ErrNotFound = errors.New("deployment metadata not found")
@@ -109,7 +110,7 @@ func ReadState(data []byte, provider, project, stack, etag string) (*Metadata, e
 	result.Services = map[string]Service{}
 	for _, m := range candidates {
 		if m.Etag != result.Etag {
-			return nil, errors.New("deployment state contains multiple attempts; select a deployment with --etag")
+			return nil, errors.New("deployment state contains multiple attempts; wait for the deployment to finish and retry")
 		}
 		for name, service := range m.Services {
 			if service.ID != "" && service.ID != "04da6b54-80e4-46f7-96ec-b56ff0331ba9" {

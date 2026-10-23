@@ -301,9 +301,9 @@ func TestEnsureCockpitTokenIgnoresConcurrentDelete(t *testing.T) {
 			if createAttempts == 1 {
 				return statusResponse(http.StatusConflict, `{"message":"token already exists"}`), nil
 			}
-			return jsonResponse(`{"id":"new-token","name":"defang-cd-logs","secret_key":"secret"}`), nil
+			return jsonResponse(`{"id":"new-token","name":"defang-cd-prod-logs","secret_key":"secret"}`), nil
 		case req.Method == http.MethodGet && req.URL.Path == "/cockpit/v1/regions/fr-par/tokens":
-			return jsonResponse(`{"tokens":[{"id":"old-token","name":"defang-cd-logs"}]}`), nil
+			return jsonResponse(`{"tokens":[{"id":"old-token","name":"defang-cd-prod-logs"}]}`), nil
 		case req.Method == http.MethodDelete && req.URL.Path == "/cockpit/v1/regions/fr-par/tokens/old-token":
 			return statusResponse(http.StatusNotFound, `{"message":"token was already deleted"}`), nil
 		case req.Method == http.MethodGet && req.URL.Path == "/cockpit/v1/regions/fr-par/data-sources":

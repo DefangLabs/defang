@@ -1,10 +1,13 @@
 package scaleway
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,6 +20,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func serveDeployment(t *testing.T, provider *ByocScaleway, metadata deployment.Metadata) {
@@ -50,6 +54,9 @@ func TestGetServicesUsesPhysicalIDAndObservedStatus(t *testing.T) {
 	t.Parallel()
 	provider := newTestProvider("prod")
 	metadata := testDeployment("actual-uuid")
+	app := metadata.Services["app"]
+	app.HealthcheckPath = "/health"
+	metadata.Services["app"] = app
 	metadata.Services["db"] = deployment.Service{Kind: "postgres", ID: "fr-par/db-id", Name: "db"}
 	serveDeployment(t, provider, metadata)
 	provider.client.HTTPClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
@@ -63,8 +70,64 @@ func TestGetServicesUsesPhysicalIDAndObservedStatus(t *testing.T) {
 	assert.Equal(t, "error", response.Services[0].Status)
 	assert.Equal(t, defangv1.ServiceState_DEPLOYMENT_FAILED, response.Services[0].State)
 	assert.Equal(t, []string{"https://app.example"}, response.Services[0].Endpoints)
+	assert.Equal(t, "app.example", response.Services[0].PublicFqdn)
+	assert.Equal(t, "/health", response.Services[0].HealthcheckPath)
 	assert.Equal(t, "unknown", response.Services[1].Status)
 	assert.Equal(t, defangv1.ServiceState_NOT_SPECIFIED, response.Services[1].State)
+}
+
+func TestFollowLogsReadsStartupBeforeMetadataAppears(t *testing.T) {
+	t.Parallel()
+	provider := newTestProvider("prod")
+	metadata := testDeployment("container-id")
+	metadata.Summary = false
+	encoded, err := metadata.Encode()
+	require.NoError(t, err)
+	var available atomic.Bool
+	stateServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path != "/defang-cd-prod/.pulumi/stacks/demo/prod.json" {
+			http.NotFound(w, req)
+			return
+		}
+		resources := []any{}
+		if available.Load() {
+			resources = append(resources, map[string]any{"outputs": map[string]any{deployment.OutputName: encoded}})
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"version": 3, "deployment": map[string]any{"resources": resources}})
+	}))
+	defer stateServer.Close()
+	provider.s3Client = s3.New(s3.Options{Region: "fr-par", BaseEndpoint: aws.String(stateServer.URL), UsePathStyle: true,
+		Credentials: credentials.NewStaticCredentialsProvider("access", "secret", "")})
+	initial := time.Now().Add(-time.Minute)
+	startup := initial.Add(10 * time.Second)
+	cdTime := initial.Add(20 * time.Second)
+	logsServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		timestamp, line, labels := cdTime, "deploying", map[string]string{"job_definition_name": "defang-cd-prod"}
+		if req.URL.Query().Get("query") == `{resource_id="container-id",resource_type="serverless_container"}` {
+			assert.LessOrEqual(t, req.URL.Query().Get("start"), strconv.FormatInt(startup.UnixNano(), 10))
+			timestamp, line, labels = startup, "startup", map[string]string{"resource_id": "container-id"}
+		} else {
+			available.Store(true)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": "success", "data": map[string]any{
+			"result": []any{map[string]any{"stream": labels, "values": [][]string{{strconv.FormatInt(timestamp.UnixNano(), 10), line}}}},
+		}})
+	}))
+	defer logsServer.Close()
+	provider.cockpitToken, provider.cockpitLogsEndpoint = "secret", logsServer.URL
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	stream, err := provider.QueryLogs(ctx, &defangv1.TailRequest{Project: "demo", Etag: "attempt", Follow: true,
+		LogType: uint32(logs.LogTypeAll), Since: timestamppb.New(initial)})
+	require.NoError(t, err)
+	for response, err := range stream {
+		require.NoError(t, err)
+		if response.Entries[0].Message == "startup" {
+			assert.Equal(t, "app", response.Service)
+			return
+		}
+	}
+	t.Fatal("startup log was lost when metadata appeared")
 }
 
 func TestLogQueriesDoNotMixProjectsWithSameServiceName(t *testing.T) {
@@ -78,6 +141,13 @@ func TestLogQueriesDoNotMixProjectsWithSameServiceName(t *testing.T) {
 	assert.NotContains(t, first[0], "resource_name")
 	_, err = provider.buildLogQueries(&defangv1.TailRequest{Services: []string{"typo"}}, ptrMetadata(testDeployment("id")))
 	require.Error(t, err)
+	all, err := provider.buildLogQueries(&defangv1.TailRequest{LogType: uint32(logs.LogTypeAll)}, ptrMetadata(testDeployment("project-one-id")))
+	require.NoError(t, err)
+	require.Len(t, all, 2)
+	assert.Equal(t, `{job_definition_name="defang-cd-prod"}`, all[1])
+	assert.NotContains(t, all[1], "=~")
+	_, err = provider.buildLogQueries(&defangv1.TailRequest{LogType: uint32(logs.LogTypeBuild)}, nil)
+	require.ErrorContains(t, err, "Scaleway Cockpit")
 }
 
 func ptrMetadata(m deployment.Metadata) *deployment.Metadata { return &m }
