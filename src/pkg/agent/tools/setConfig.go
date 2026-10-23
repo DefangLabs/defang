@@ -8,6 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/agent/common"
 	"github.com/DefangLabs/defang/src/pkg/cli"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
@@ -47,7 +48,12 @@ func HandleSetConfig(ctx context.Context, params SetConfigParams, cliInterface C
 		if params.Value != "" {
 			return "", errors.New("Both 'random' and 'value' parameters provided; please provide only one")
 		}
-		value = cli.CreateRandomConfigValue()
+		policy := cli.SymbolsExcluded
+		// Scaleway managed PostgreSQL requires a symbol in generated passwords.
+		if sc.Stack.Provider == client.ProviderScaleway {
+			policy = cli.SymbolsRequired
+		}
+		value = cli.CreateRandomConfigValue(policy)
 		term.Debug("Generated random value for config")
 	}
 
