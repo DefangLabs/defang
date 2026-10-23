@@ -78,6 +78,9 @@ func (b *ByocScaleway) getServicesFromState(ctx context.Context, project string)
 				info.Status = "not found"
 			} else {
 				info.Status = container.Status
+				if container.ErrorMessage != "" {
+					info.Status += ": " + container.ErrorMessage
+				}
 				switch container.Status {
 				case "ready":
 					info.State = defangv1.ServiceState_DEPLOYMENT_COMPLETED

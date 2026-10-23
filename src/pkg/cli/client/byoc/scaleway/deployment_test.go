@@ -23,6 +23,70 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+func TestSubscribeKeepsObservingServicesAfterCDSucceeds(t *testing.T) {
+	for _, terminal := range []string{"ready", "error"} {
+		t.Run(terminal, func(t *testing.T) {
+			t.Parallel()
+			provider := newTestProvider("prod")
+			provider.cdRunID, provider.cdEtag = "run-id", "attempt"
+			metadata := testDeployment("actual-uuid")
+			metadata.Summary = false // A component can be available before the project summary.
+			serveDeployment(t, provider, metadata)
+			var polls int
+			provider.client.HTTPClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				if req.URL.Path == "/serverless-jobs/v1alpha2/regions/fr-par/job-runs/run-id" {
+					return jsonResponse(`{"id":"run-id","state":"succeeded"}`), nil
+				}
+				assert.Equal(t, "/containers/v1beta1/regions/fr-par/containers/actual-uuid", req.URL.Path)
+				polls++
+				if polls == 1 {
+					return jsonResponse(`{"id":"actual-uuid","status":"pending"}`), nil
+				}
+				return jsonResponse(`{"id":"actual-uuid","status":"` + terminal + `","error_message":"image was not found"}`), nil
+			})}
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			sequence, err := provider.Subscribe(ctx, &defangv1.SubscribeRequest{Project: "demo", Etag: "attempt", Services: []string{"app"}})
+			require.NoError(t, err)
+			var events []*defangv1.SubscribeResponse
+			for event, err := range sequence {
+				require.NoError(t, err)
+				events = append(events, event)
+			}
+			require.Len(t, events, 2)
+			assert.Equal(t, "app", events[0].Name)
+			assert.Equal(t, defangv1.ServiceState_DEPLOYMENT_PENDING, events[0].State)
+			want := defangv1.ServiceState_DEPLOYMENT_COMPLETED
+			if terminal == "error" {
+				want = defangv1.ServiceState_DEPLOYMENT_FAILED
+				assert.Contains(t, events[1].Status, "image was not found")
+			}
+			assert.Equal(t, want, events[1].State)
+		})
+	}
+}
+
+func TestSubscribeDoesNotTreatOldMetadataOrCDNameAsServiceSuccess(t *testing.T) {
+	t.Parallel()
+	provider := newTestProvider("prod")
+	provider.cdRunID, provider.cdEtag = "run-id", "new-attempt"
+	serveDeployment(t, provider, testDeployment("old-id"))
+	provider.client.HTTPClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		assert.Equal(t, "/serverless-jobs/v1alpha2/regions/fr-par/job-runs/run-id", req.URL.Path)
+		return jsonResponse(`{"id":"run-id","state":"succeeded"}`), nil
+	})}
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+	sequence, err := provider.Subscribe(ctx, &defangv1.SubscribeRequest{Project: "demo", Etag: "new-attempt", Services: []string{"cd"}})
+	require.NoError(t, err)
+	var observedError error
+	for event, err := range sequence {
+		assert.Nil(t, event, "a CD job update must not satisfy a logical service named cd")
+		observedError = err
+	}
+	require.ErrorIs(t, observedError, context.DeadlineExceeded)
+}
+
 func serveDeployment(t *testing.T, provider *ByocScaleway, metadata deployment.Metadata) {
 	t.Helper()
 	encoded, err := metadata.Encode()

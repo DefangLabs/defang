@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"iter"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -872,6 +873,7 @@ func (b *ByocScaleway) Subscribe(ctx context.Context, req *defangv1.SubscribeReq
 	runID := b.cdRunID
 	return func(yield func(*defangv1.SubscribeResponse, error) bool) {
 		var lastState string
+		lastServices := map[string]*defangv1.SubscribeResponse{}
 		for {
 			run, err := b.client.GetJobRun(ctx, runID)
 			if err != nil {
@@ -879,7 +881,7 @@ func (b *ByocScaleway) Subscribe(ctx context.Context, req *defangv1.SubscribeReq
 				return
 			}
 
-			if run.State != lastState {
+			if len(req.Services) == 0 && run.State != lastState {
 				lastState = run.State
 				state := jobRunStateToServiceState(run.State)
 				if !yield(&defangv1.SubscribeResponse{
@@ -889,12 +891,54 @@ func (b *ByocScaleway) Subscribe(ctx context.Context, req *defangv1.SubscribeReq
 				}, nil) {
 					return
 				}
+			}
 
-				// Stop on terminal states
-				if state == defangv1.ServiceState_DEPLOYMENT_COMPLETED ||
-					state == defangv1.ServiceState_DEPLOYMENT_FAILED {
+			if run.State == "failed" || run.State == "interrupted" {
+				if len(req.Services) > 0 {
+					reason := run.ErrorMessage
+					if reason == "" {
+						reason = run.Reason
+					}
+					yield(nil, client.ErrDeploymentFailed{Message: fmt.Sprintf("Deployment task %s: %s", run.State, reason)})
+				}
+				return
+			}
+			complete := len(req.Services) == 0
+			if len(req.Services) > 0 {
+				// CD completion alone does not establish container readiness. Read
+				// only this attempt's published identities, including partial outputs.
+				observed, err := b.getServicesFromState(ctx, req.Project)
+				if err != nil && !errors.Is(err, errMetadataNotFound) {
+					yield(nil, err)
 					return
 				}
+				ready := 0
+				if observed != nil {
+					for _, service := range observed.Services {
+						name := service.Service.Name
+						if !slices.Contains(req.Services, name) {
+							continue
+						}
+						event := &defangv1.SubscribeResponse{Name: name, Status: service.Status, State: service.State}
+						previous := lastServices[name]
+						if previous == nil || previous.State != event.State || previous.Status != event.Status {
+							lastServices[name] = event
+							if !yield(event, nil) {
+								return
+							}
+						}
+						if service.State == defangv1.ServiceState_DEPLOYMENT_FAILED {
+							return
+						}
+						if service.State == defangv1.ServiceState_DEPLOYMENT_COMPLETED {
+							ready++
+						}
+					}
+				}
+				complete = ready == len(req.Services)
+			}
+			if run.State == "succeeded" && complete {
+				return
 			}
 
 			if err := pkg.SleepWithContext(ctx, 2*time.Second); err != nil {
