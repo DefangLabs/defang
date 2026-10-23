@@ -79,3 +79,35 @@ func TestReadState(t *testing.T) {
 		})
 	}
 }
+
+func TestReadStateEmptyStackBootstrap(t *testing.T) {
+	for _, tt := range []struct {
+		name, data string
+		missing    bool
+	}{
+		// Literal prod.json.bak from Pulumi 3.268.0 stack init against a file backend.
+		{"initial checkpoint", `{"version":0,"checkpoint":{"stack":"organization/bootstrap-repro/prod"}}`, true},
+		{"version three without metadata", `{"version":3,"checkpoint":{"stack":"prod","latest":null}}`, true},
+		{"missing version", `{"checkpoint":{"stack":"prod"}}`, false},
+		{"null version", `{"version":null,"checkpoint":{"stack":"prod"}}`, false},
+		{"missing checkpoint", `{"version":0}`, false},
+		{"missing stack", `{"version":0,"checkpoint":{}}`, false},
+		{"empty stack", `{"version":0,"checkpoint":{"stack":""}}`, false},
+		{"explicit null snapshot", `{"version":0,"checkpoint":{"stack":"prod","latest":null}}`, false},
+		{"snapshot present", `{"version":0,"checkpoint":{"stack":"prod","latest":{"resources":[]}}}`, false},
+		{"export present", `{"version":0,"checkpoint":{"stack":"prod"},"deployment":{}}`, false},
+		{"explicit null export", `{"version":0,"checkpoint":{"stack":"prod"},"deployment":null}`, false},
+		{"future version", `{"version":4,"checkpoint":{"stack":"prod"}}`, false},
+		{"malformed JSON", `{"version":0,`, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ReadState([]byte(tt.data), "scaleway", "demo", "prod", "attempt")
+			if got != nil || err == nil {
+				t.Fatalf("expected no usable metadata, got %+v, %v", got, err)
+			}
+			if errors.Is(err, ErrNotFound) != tt.missing {
+				t.Fatalf("metadata missing=%v, got %v", tt.missing, err)
+			}
+		})
+	}
+}
