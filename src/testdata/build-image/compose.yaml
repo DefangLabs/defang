@@ -2,3 +2,7 @@ services:
   app:
     image: myapp:latest
     build: .
+  app-build:
+    image: myapp:latest
+    build: .
+    pull_policy: build
