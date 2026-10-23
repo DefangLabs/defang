@@ -63,6 +63,7 @@ func HandleSetConfig(ctx context.Context, loader client.Loader, params SetConfig
 			return "", errors.New("Both 'random' and 'value' parameters provided; please provide only one")
 		}
 		policy := cli.SymbolsExcluded
+		// Scaleway managed PostgreSQL requires a symbol in generated passwords.
 		if sc.Stack.Provider == client.ProviderScaleway {
 			policy = cli.SymbolsRequired
 		}
