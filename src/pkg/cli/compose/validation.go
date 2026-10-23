@@ -375,7 +375,18 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		}
 	}
 
-	if !managedRedis && !managedPostgres && !managedMongodb && isStatefulImage(svccfg.Image) {
+	s3Extension, managedS3 := svccfg.Extensions["x-defang-s3"]
+	if managedS3 {
+		// Ensure the repo is a valid MinIO repo
+		if !IsMinioRepo(repo) {
+			term.Warnf("service %q: managed S3 service should use a minio image", svccfg.Name)
+		}
+		if _, err = validateS3Store(s3Extension); err != nil {
+			return fmt.Errorf("service %q: %w", svccfg.Name, err)
+		}
+	}
+
+	if !managedRedis && !managedPostgres && !managedMongodb && !managedS3 && isStatefulImage(svccfg.Image) {
 		term.Warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
 	}
 
@@ -386,6 +397,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			"x-defang-redis",
 			"x-defang-postgres",
 			"x-defang-mongodb",
+			"x-defang-s3",
 			"x-defang-llm",
 			"x-defang-autoscaling",
 			// Consumed by the CD provider, not the CLI, but still valid and
@@ -568,6 +580,43 @@ func validateManagedStore(managedStore any) (bool, error) {
 	}
 }
 
+var bucketNameRegex = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*[a-z0-9]$`)
+
+// validateS3Store requires a declared bucket name: bucket names must be
+// globally unique, and the CLI injects the endpoint/bucket into dependent
+// services' env before anything is provisioned, so a generated name isn't
+// known yet. No dots — a dot breaks the wildcard TLS cert on virtual-hosted
+// S3 endpoints.
+func validateS3Store(managedStore any) (string, error) {
+	m, ok := managedStore.(map[string]any)
+	if !ok {
+		return "", errors.New("'x-defang-s3' requires a 'bucket' name")
+	}
+	b, ok := m["bucket"]
+	if !ok {
+		return "", errors.New("'x-defang-s3' requires a 'bucket' name")
+	}
+	bucket, ok := b.(string)
+	if !ok {
+		return "", errors.New("'bucket' must be a string")
+	}
+	if len(bucket) < 3 || len(bucket) > 63 {
+		return "", fmt.Errorf("'bucket' %q must be between 3 and 63 characters", bucket)
+	}
+	if strings.Contains(bucket, ".") {
+		return "", fmt.Errorf("'bucket' %q must not contain dots", bucket)
+	}
+	if !bucketNameRegex.MatchString(bucket) {
+		return "", fmt.Errorf("'bucket' %q must use only lowercase letters, digits and hyphens, and start/end with a letter or digit", bucket)
+	}
+	if downtime, ok := m["allow-downtime"]; ok {
+		if _, ok := downtime.(bool); !ok {
+			return "", errors.New("'allow-downtime' must be a boolean")
+		}
+	}
+	return bucket, nil
+}
+
 func IsComputeService(service *composeTypes.ServiceConfig) bool {
 	if service.Extensions == nil {
 		return true
@@ -576,5 +625,6 @@ func IsComputeService(service *composeTypes.ServiceConfig) bool {
 	return service.Extensions["x-defang-static-files"] == nil &&
 		service.Extensions["x-defang-redis"] == nil &&
 		service.Extensions["x-defang-mongodb"] == nil &&
+		service.Extensions["x-defang-s3"] == nil &&
 		service.Extensions["x-defang-postgres"] == nil
 }
