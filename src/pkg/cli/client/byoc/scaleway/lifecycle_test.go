@@ -93,6 +93,7 @@ func TestDeployAndPreviewPassPayloadToCD(t *testing.T) {
 	for _, preview := range []bool{false, true} {
 		t.Run(map[bool]string{false: "up", true: "preview"}[preview], func(t *testing.T) {
 			provider := newTestProvider("prod")
+			recipe := &defangv1.Recipe{Name: "affordable", PulumiConfig: "config:\n  defang-scaleway:log-retention-days: 2\n"}
 			provider.SetupDone = true
 			provider.jobDefID = "existing-job"
 			provider.client.HTTPClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
@@ -108,6 +109,7 @@ func TestDeployAndPreviewPassPayloadToCD(t *testing.T) {
 				require.NoError(t, err)
 				var update defangv1.ProjectUpdate
 				require.NoError(t, proto.Unmarshal(payload, &update))
+				assert.True(t, proto.Equal(recipe, update.Recipe), "CD must receive the selected recipe")
 				assert.Equal(t, "app", update.Services[0].Service.Name)
 				assert.Equal(t, update.Etag, body.Env["DEFANG_ETAG"])
 				assert.Equal(t, "demo", body.Env["PROJECT"])
@@ -115,6 +117,7 @@ func TestDeployAndPreviewPassPayloadToCD(t *testing.T) {
 				return jsonResponse(`{"job_runs":[{"id":"run-id","state":"queued"}]}`), nil
 			})}
 			req := &client.DeployRequest{DeployRequest: defangv1.DeployRequest{Compose: []byte("name: demo\nservices:\n  app:\n    image: nginx:alpine\n")}}
+			req.Recipe = recipe
 			var response *client.DeployResponse
 			var err error
 			if preview {

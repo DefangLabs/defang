@@ -363,6 +363,7 @@ func (b *ByocScaleway) deploy(ctx context.Context, req *client.DeployRequest, cm
 		Etag:          etag,
 		Mode:          req.Mode,
 		PulumiVersion: b.PulumiVersion,
+		Recipe:        req.Recipe,
 		Services:      serviceInfos,
 	})
 	if err != nil {
@@ -1085,6 +1086,9 @@ func (b *ByocScaleway) logQueries(ctx context.Context, req *defangv1.TailRequest
 
 func (b *ByocScaleway) buildLogQueries(req *defangv1.TailRequest, metadata *deployment.Metadata) ([]string, error) {
 	logType := logs.LogType(req.LogType)
+	if logType == logs.LogTypeBuild {
+		return nil, errors.New("Scaleway build logs are not available through Defang yet; view them in Scaleway Cockpit")
+	}
 	var queries []string
 	if metadata != nil {
 		names := append([]string(nil), req.Services...)
@@ -1097,6 +1101,13 @@ func (b *ByocScaleway) buildLogQueries(req *defangv1.TailRequest, metadata *depl
 		for _, name := range names {
 			service, ok := metadata.Services[name]
 			if !ok {
+				// The CLI adds build aliases for ALL logs. They have no runtime
+				// selector; preserve a real service with that suffix above.
+				base := strings.TrimSuffix(name, logs.BuildServiceNameSuffix)
+				_, baseExists := metadata.Services[base]
+				if baseExists && base != name && logType.Has(logs.LogTypeBuild) && slices.Contains(names, base) {
+					continue
+				}
 				return nil, fmt.Errorf("service %q was not found in this deployment; check the service name and try again", name)
 			}
 			if len(service.LogLabels) == 0 {
@@ -1112,9 +1123,6 @@ func (b *ByocScaleway) buildLogQueries(req *defangv1.TailRequest, metadata *depl
 	}
 	if logType.Has(logs.LogTypeCD) || (logType == logs.LogTypeUnspecified && len(req.Services) == 0) {
 		queries = append(queries, fmt.Sprintf(`{job_definition_name=%q}`, b.cdJobName()))
-	}
-	if logType == logs.LogTypeBuild {
-		return nil, errors.New("Scaleway build logs are not available through Defang yet; view them in Scaleway Cockpit")
 	}
 	if req.Pattern != "" {
 		for i := range queries {

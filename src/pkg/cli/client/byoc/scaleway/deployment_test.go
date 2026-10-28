@@ -266,6 +266,44 @@ func TestLogQueriesDoNotMixProjectsWithSameServiceName(t *testing.T) {
 
 func ptrMetadata(m deployment.Metadata) *deployment.Metadata { return &m }
 
+func TestLogQueriesHandleBuildAliases(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name     string
+		services []string
+		logType  logs.LogType
+		wantErr  string
+		wantLen  int
+	}{
+		{"all includes build alias", []string{"app", "app-image"}, logs.LogTypeAll, "", 2},
+		{"standalone build alias", []string{"app-image"}, logs.LogTypeAll, "not found", 0},
+		{"unknown build alias", []string{"missing-image"}, logs.LogTypeAll, "not found", 0},
+		{"run does not accept build alias", []string{"app-image"}, logs.LogTypeRun, "not found", 0},
+		{"build gives supported guidance", []string{"app-image"}, logs.LogTypeBuild, "Scaleway Cockpit", 0},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			provider := newTestProvider("prod")
+			queries, err := provider.buildLogQueries(&defangv1.TailRequest{
+				Services: tt.services, LogType: uint32(tt.logType),
+			}, ptrMetadata(testDeployment("id")))
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, queries, tt.wantLen)
+		})
+	}
+	provider := newTestProvider("prod")
+	metadata := testDeployment("id")
+	metadata.Services["app-image"] = deployment.Service{Name: "app-image", LogLabels: map[string]string{"resource_id": "real-image-service"}}
+	queries, err := provider.buildLogQueries(&defangv1.TailRequest{
+		Services: []string{"app-image"}, LogType: uint32(logs.LogTypeAll),
+	}, &metadata)
+	require.NoError(t, err)
+	assert.Equal(t, `{resource_id="real-image-service"}`, queries[0])
+}
+
 func TestQueryLogsUsesStateAndRestoresComposeServiceName(t *testing.T) {
 	t.Parallel()
 	provider := newTestProvider("prod")
