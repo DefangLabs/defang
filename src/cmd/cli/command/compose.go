@@ -198,6 +198,20 @@ func makeComposeUpCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// Provisioning may assign endpoints that were unknown when Deploy
+			// returned. Refresh only records from the attempt we just monitored.
+			if observed, err := cli.GetServices(ctx, project.Name, session.Provider); err == nil {
+				for i, service := range services {
+					for _, current := range observed {
+						if current.Service == service.Service && current.Deployment == deploy.Etag {
+							services[i] = current
+							break
+						}
+					}
+				}
+			} else {
+				term.Debug("Unable to refresh deployed service endpoints:", err)
+			}
 
 			// Print the current service states of the deployment
 			err = cli.PrintServiceStatesAndEndpoints(services)

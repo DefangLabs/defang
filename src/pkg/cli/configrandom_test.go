@@ -2,6 +2,7 @@ package cli
 
 import (
 	"testing"
+	"unicode"
 
 	"github.com/DefangLabs/secret-detector/pkg/scanner"
 )
@@ -27,7 +28,7 @@ func TestCreateRandomConfigValue(t *testing.T) {
 	var testIterations = 5
 	for range testIterations {
 		// call the function to create a random config
-		randomConfig := CreateRandomConfigValue()
+		randomConfig := CreateRandomConfigValue(SymbolsExcluded)
 
 		// store generated configs as unique keys in a map
 		uniqueConfigList[randomConfig] = true
@@ -51,5 +52,56 @@ func TestCreateRandomConfigValue(t *testing.T) {
 	numOfUniqueConfigs := len(uniqueConfigList)
 	if numOfUniqueConfigs < testIterations {
 		t.Errorf("generated result was not unique: expected numOfUniqueConfigs to be %d, but got %d", testIterations, numOfUniqueConfigs)
+	}
+}
+
+func TestCreateRandomConfigValueWithSymbols(t *testing.T) {
+	for range 10 {
+		value := CreateRandomConfigValue(SymbolsRequired)
+
+		if len(value) < 8 || len(value) > 128 {
+			t.Errorf("random value requiring symbols length %d is outside 8-128 range: %q", len(value), value)
+		}
+
+		var hasUpper, hasLower, hasDigit, hasSpecial bool
+		for _, r := range value {
+			switch {
+			case unicode.IsUpper(r):
+				hasUpper = true
+			case unicode.IsLower(r):
+				hasLower = true
+			case unicode.IsDigit(r):
+				hasDigit = true
+			case !unicode.IsLetter(r) && !unicode.IsDigit(r):
+				hasSpecial = true
+			}
+		}
+
+		if !hasUpper {
+			t.Errorf("random value requiring symbols missing uppercase: %q", value)
+		}
+		if !hasLower {
+			t.Errorf("random value requiring symbols missing lowercase: %q", value)
+		}
+		if !hasDigit {
+			t.Errorf("random value requiring symbols missing digit: %q", value)
+		}
+		if !hasSpecial {
+			t.Errorf("random value requiring symbols missing special character: %q", value)
+		}
+	}
+}
+
+func TestCreateRandomConfigValueWithoutSymbols(t *testing.T) {
+	for range 10 {
+		value := CreateRandomConfigValue(SymbolsExcluded)
+		if len(value) < 32 {
+			t.Fatalf("generated value is too short: %d", len(value))
+		}
+		for _, char := range value {
+			if !unicode.IsLetter(char) && !unicode.IsDigit(char) {
+				t.Errorf("unexpected special symbol %q", char)
+			}
+		}
 	}
 }

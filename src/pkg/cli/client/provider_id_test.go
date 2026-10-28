@@ -62,6 +62,18 @@ func TestProvider(t *testing.T) {
 			want:     ProviderAuto,
 			wantErr:  false,
 		},
+		{
+			name:     "valid provider scaleway",
+			provider: "scaleway",
+			want:     ProviderScaleway,
+			wantErr:  false,
+		},
+		{
+			name:     "valid provider Scaleway",
+			provider: "Scaleway",
+			want:     ProviderScaleway,
+			wantErr:  false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
