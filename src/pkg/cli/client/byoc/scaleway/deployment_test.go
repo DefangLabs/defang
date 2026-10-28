@@ -276,6 +276,7 @@ func TestLogQueriesHandleBuildAliases(t *testing.T) {
 		wantLen  int
 	}{
 		{"all includes build alias", []string{"app", "app-image"}, logs.LogTypeAll, "", 2},
+		{"standalone build alias", []string{"app-image"}, logs.LogTypeAll, "not found", 0},
 		{"unknown build alias", []string{"missing-image"}, logs.LogTypeAll, "not found", 0},
 		{"run does not accept build alias", []string{"app-image"}, logs.LogTypeRun, "not found", 0},
 		{"build gives supported guidance", []string{"app-image"}, logs.LogTypeBuild, "Scaleway Cockpit", 0},

@@ -1104,7 +1104,8 @@ func (b *ByocScaleway) buildLogQueries(req *defangv1.TailRequest, metadata *depl
 				// The CLI adds build aliases for ALL logs. They have no runtime
 				// selector; preserve a real service with that suffix above.
 				base := strings.TrimSuffix(name, logs.BuildServiceNameSuffix)
-				if _, exists := metadata.Services[base]; exists && base != name && logType.Has(logs.LogTypeBuild) {
+				_, baseExists := metadata.Services[base]
+				if baseExists && base != name && logType.Has(logs.LogTypeBuild) && slices.Contains(names, base) {
 					continue
 				}
 				return nil, fmt.Errorf("service %q was not found in this deployment; check the service name and try again", name)
