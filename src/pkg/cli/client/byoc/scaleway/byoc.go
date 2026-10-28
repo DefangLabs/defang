@@ -363,6 +363,7 @@ func (b *ByocScaleway) deploy(ctx context.Context, req *client.DeployRequest, cm
 		Etag:          etag,
 		Mode:          req.Mode,
 		PulumiVersion: b.PulumiVersion,
+		Recipe:        req.Recipe,
 		Services:      serviceInfos,
 	})
 	if err != nil {
