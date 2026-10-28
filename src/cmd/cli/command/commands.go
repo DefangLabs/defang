@@ -214,7 +214,10 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(tokenCmd)
 
 	// Identity commands
-	identityRegisterCmd.Flags().Duration("ttl", 0, "expiry of the registered key (default: no expiry)")
+	identityCmd.PersistentFlags().String("tenant", "", "id.defang.io tenant (default: $DEFANG_ID_TENANT)")
+	identityRegisterCmd.Flags().Duration("ttl", 0, "expiry of the key (default: no expiry)")
+	identityRegisterCmd.Flags().String("label", "", "label shown in the key list (default: this machine's hostname)")
+	identityCmd.AddCommand(identityClaimCmd)
 	identityCmd.AddCommand(identityRegisterCmd)
 	identityCmd.AddCommand(identityListCmd)
 	identityCmd.AddCommand(identityRevokeCmd)

@@ -88,13 +88,13 @@ func TestPublicJWKIsMinimalRSA(t *testing.T) {
 	}
 }
 
-func TestPopJWT(t *testing.T) {
+func TestProofJWT(t *testing.T) {
 	key, err := LoadOrGenerateKey(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	now := time.Now()
-	signed, err := key.PopJWT(now)
+	signed, err := key.ProofJWT(now, "https://acme.id.defang.io")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,9 +105,12 @@ func TestPopJWT(t *testing.T) {
 			t.Fatal("not an RSA key")
 		}
 		return public, nil
-	}, jwt.WithValidMethods([]string{"RS256"}))
+	}, jwt.WithValidMethods([]string{"RS256"}), jwt.WithAudience("https://acme.id.defang.io/keys"), jwt.WithExpirationRequired())
 	if err != nil {
-		t.Fatalf("PoP JWT does not verify with its own public key: %v", err)
+		t.Fatalf("proof does not verify with its own public key: %v", err)
+	}
+	if parsed.Header["typ"] != ProofType {
+		t.Errorf("typ = %v, want %v", parsed.Header["typ"], ProofType)
 	}
 
 	claims, ok := parsed.Claims.(jwt.MapClaims)

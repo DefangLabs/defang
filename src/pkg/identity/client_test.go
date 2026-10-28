@@ -10,29 +10,70 @@ import (
 	"time"
 )
 
-func TestTenantURL(t *testing.T) {
+func TestIssuerURL(t *testing.T) {
 	tests := []struct {
 		name    string
-		issuer  string
+		domain  string
 		tenant  string
 		want    string
 		wantErr bool
 	}{
-		{"basic", "https://auth.defang.io", "acme", "https://acme.auth.defang.io", false},
-		{"strips path", "https://auth.defang.io/base", "acme", "https://acme.auth.defang.io", false},
-		{"empty tenant", "https://auth.defang.io", "", "", true},
-		{"no scheme", "auth.defang.io", "acme", "", true},
+		{"default domain", "", "acme", "https://acme.id.defang.io", false},
+		{"custom domain", "id.example.test", "acme", "https://acme.id.example.test", false},
+		{"empty tenant", "", "", "", true},
+		{"uppercase", "", "Acme", "", true},
+		{"too short", "", "ab", "", true},
+		{"double hyphen", "", "a--b", "", true},
+		{"nested", "", "a.b", "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := TenantURL(tt.issuer, tt.tenant)
+			got, err := IssuerURL(tt.domain, tt.tenant)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
 			}
 			if got != tt.want {
-				t.Errorf("TenantURL() = %q, want %q", got, tt.want)
+				t.Errorf("IssuerURL() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// fakeService records which virtual host each request was meant for, the way
+// id.defang.io routes on the tenant subdomain.
+func fakeService(t *testing.T, handler func(host string, w http.ResponseWriter, r *http.Request)) {
+	t.Helper()
+	var host string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if auth := r.Header.Get("Authorization"); auth != "Bearer test-token" {
+			t.Errorf("Authorization = %q", auth)
+		}
+		handler(host, w, r)
+	}))
+	t.Cleanup(server.Close)
+	original := baseURL
+	baseURL = func(h string) string {
+		host = h
+		return server.URL
+	}
+	t.Cleanup(func() { baseURL = original })
+}
+
+func TestClaimTenant(t *testing.T) {
+	fakeService(t, func(host string, w http.ResponseWriter, r *http.Request) {
+		if host != "id.defang.io" || r.Method != http.MethodPost || r.URL.Path != "/tenants" {
+			t.Errorf("unexpected request: %s %s %s", host, r.Method, r.URL.Path)
+		}
+		var body map[string]string
+		json.NewDecoder(r.Body).Decode(&body)
+		json.NewEncoder(w).Encode(map[string]string{"name": body["name"], "issuer": "https://" + body["name"] + ".id.defang.io"})
+	})
+	tenant, err := NewClient("", "test-token").ClaimTenant(context.Background(), "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tenant.Issuer != "https://acme.id.defang.io" {
+		t.Errorf("tenant = %+v", tenant)
 	}
 }
 
@@ -41,56 +82,41 @@ func TestClientRegister(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	var gotBody map[string]any
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/keys" {
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
-		}
-		if auth := r.Header.Get("Authorization"); auth != "Bearer test-token" {
-			t.Errorf("Authorization = %q", auth)
+	fakeService(t, func(host string, w http.ResponseWriter, r *http.Request) {
+		if host != "acme.id.defang.io" || r.Method != http.MethodPost || r.URL.Path != "/keys" {
+			t.Errorf("unexpected request: %s %s %s", host, r.Method, r.URL.Path)
 		}
 		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
 			t.Errorf("body: %v", err)
 		}
-		json.NewEncoder(w).Encode(map[string]any{
-			"kid":    "thumb123",
-			"sub":    "defang:project:app:stack:prod",
-			"issuer": "https://acme.auth.defang.io",
-		})
-	}))
-	defer server.Close()
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{"kid": "thumb123", "issuer": "https://acme.id.defang.io"})
+	})
 
-	registryClient := NewClient(server.URL, "test-token")
-	popJwt, err := key.PopJWT(time.Now())
+	proof, err := key.ProofJWT(time.Now(), "https://acme.id.defang.io")
 	if err != nil {
 		t.Fatal(err)
 	}
-	registered, err := registryClient.Register(context.Background(), RegisterRequest{
-		ProjectID: "app",
-		StackID:   "prod",
-		JWK:       key.PublicJWK(),
-		PopJWT:    popJwt,
+	registered, err := NewClient("", "test-token").Register(context.Background(), "acme", RegisterRequest{
+		JWK:   key.PublicJWK(),
+		Proof: proof,
+		Label: "laptop",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if registered.Kid != "thumb123" || registered.Subject != "defang:project:app:stack:prod" {
+	if registered.Kid != "thumb123" || registered.Issuer != "https://acme.id.defang.io" {
 		t.Errorf("unexpected response: %+v", registered)
 	}
-
-	if gotBody["project_id"] != "app" || gotBody["stack_id"] != "prod" {
-		t.Errorf("request body project/stack = %v/%v", gotBody["project_id"], gotBody["stack_id"])
+	if gotBody["label"] != "laptop" || gotBody["proof"] == "" {
+		t.Errorf("request body = %v", gotBody)
 	}
-	if _, hasTtl := gotBody["ttl_seconds"]; hasTtl {
+	if _, hasTTL := gotBody["ttl_seconds"]; hasTTL {
 		t.Error("ttl_seconds should be omitted when zero")
 	}
-	jwk, _ := gotBody["jwk"].(map[string]any)
-	if jwk["kty"] != "RSA" {
+	if jwk, _ := gotBody["jwk"].(map[string]any); jwk["kty"] != "RSA" {
 		t.Errorf("jwk = %v", gotBody["jwk"])
-	}
-	if gotBody["pop_jwt"] == "" {
-		t.Error("missing pop_jwt")
 	}
 }
 
@@ -101,20 +127,18 @@ func TestClientErrors(t *testing.T) {
 		body    string
 		wantErr string
 	}{
-		{"conflict with message", http.StatusConflict, `{"error":"key already registered for project \"other\""}`, "key already registered"},
+		{"error with message", http.StatusBadRequest, `{"error":"invalid_key","message":"RSA keys must be at least 2048 bits"}`, "invalid_key: RSA keys must be at least 2048 bits"},
+		{"not found explains itself", http.StatusNotFound, `{"error":"not_found"}`, "you do not own it"},
 		// 400, not 5xx: the retrying HTTP client would replay a 5xx for ~15s
 		{"plain error body", http.StatusBadRequest, "boom", "unexpected status"},
-		{"unauthorized", http.StatusUnauthorized, `{"error":"invalid access token"}`, "invalid access token"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			fakeService(t, func(_ string, w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(tt.status)
 				w.Write([]byte(tt.body))
-			}))
-			defer server.Close()
-
-			_, err := NewClient(server.URL, "token").List(context.Background())
+			})
+			_, err := NewClient("", "test-token").List(context.Background(), "acme")
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("err = %v, want containing %q", err, tt.wantErr)
 			}
@@ -123,12 +147,15 @@ func TestClientErrors(t *testing.T) {
 }
 
 func TestClientListAndRevoke(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	fakeService(t, func(host string, w http.ResponseWriter, r *http.Request) {
+		if host != "acme.id.defang.io" {
+			t.Errorf("host = %s", host)
+		}
 		switch r.Method + " " + r.URL.Path {
 		case "GET /keys":
 			json.NewEncoder(w).Encode(map[string]any{
 				"keys": []map[string]any{
-					{"kid": "k1", "sub": "defang:project:app:stack:prod", "project_id": "app", "stack_id": "prod", "created": 1700000000},
+					{"kid": "k1", "alg": "RS256", "label": "laptop", "active": true, "created_at": "2026-10-28T00:00:00Z", "expires_at": nil, "revoked_at": nil},
 				},
 			})
 		case "DELETE /keys/k1":
@@ -136,23 +163,16 @@ func TestClientListAndRevoke(t *testing.T) {
 		default:
 			http.NotFound(w, r)
 		}
-	}))
-	defer server.Close()
-
-	registryClient := NewClient(server.URL, "token")
-
-	keys, err := registryClient.List(context.Background())
+	})
+	registryClient := NewClient("", "test-token")
+	keys, err := registryClient.List(context.Background(), "acme")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(keys) != 1 || keys[0].Kid != "k1" || keys[0].ProjectID != "app" {
+	if len(keys) != 1 || keys[0].Kid != "k1" || !keys[0].Active || keys[0].Label == nil || *keys[0].Label != "laptop" {
 		t.Errorf("keys = %+v", keys)
 	}
-
-	if err := registryClient.Revoke(context.Background(), "k1"); err != nil {
-		t.Errorf("revoke: %v", err)
-	}
-	if err := registryClient.Revoke(context.Background(), "missing"); err == nil {
-		t.Error("expected error revoking unknown kid")
+	if err := registryClient.Revoke(context.Background(), "acme", "k1"); err != nil {
+		t.Fatal(err)
 	}
 }
