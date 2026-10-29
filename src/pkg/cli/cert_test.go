@@ -703,6 +703,16 @@ func TestCollectDomainJobs(t *testing.T) {
 			}},
 			want: []string{"id.example.com"},
 		},
+		{
+			name: "skips a wildcard domainname",
+			services: []*defangv1.ServiceInfo{
+				{Service: &defangv1.Service{Name: "id"}, UseAcmeCert: true, Domainname: "*.id.example.com"},
+			},
+			project: &compose.Project{Services: compose.Services{
+				"id": {Name: "id", DomainName: "*.id.example.com"},
+			}},
+			want: nil,
+		},
 	}
 
 	for _, tt := range tests {

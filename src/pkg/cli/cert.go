@@ -140,7 +140,7 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, fab 
 	issuer, _ := provider.(CertIssuer)
 	jobs := collectDomainJobs(project, services.Services)
 	if len(jobs) == 0 {
-		term.Infof("No `domainname` found in compose file; no HTTPS cert generation needed")
+		term.Infof("No `domainname` needs a cert from this command; no HTTPS cert generation needed")
 		return nil
 	}
 
