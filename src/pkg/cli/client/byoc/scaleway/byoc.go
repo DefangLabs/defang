@@ -30,6 +30,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/smithy-go"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -656,8 +657,21 @@ func (b *ByocScaleway) TearDownCD(ctx context.Context) error {
 		errs = append(errs, err)
 	} else {
 		for _, def := range defs {
-			if def.Name == byoc.CdTaskPrefix {
+			if (def.Name == byoc.CdTaskPrefix || def.Name == b.cdJobName()) && def.ID != b.jobDefID {
 				if err := b.client.DeleteJobDefinition(ctx, def.ID); err != nil {
+					errs = append(errs, err)
+				}
+			}
+		}
+	}
+
+	tokens, err := b.client.ListCockpitTokens(ctx, b.projectID)
+	if err != nil {
+		errs = append(errs, err)
+	} else {
+		for _, token := range tokens {
+			if token.Name == b.cdJobName()+"-logs" {
+				if err := b.client.DeleteCockpitToken(ctx, token.ID); err != nil {
 					errs = append(errs, err)
 				}
 			}
@@ -748,6 +762,10 @@ func (b *ByocScaleway) CdList(ctx context.Context, _ bool) (iter.Seq[state.Info]
 	term.Debug("Listing stacks in bucket:", bucket, prefix)
 	keys, err := scaleway.ListObjectKeys(ctx, b.s3Client, bucket, prefix)
 	if err != nil {
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchBucket" {
+			return slices.Values([]state.Info(nil)), nil
+		}
 		return nil, scaleway.AnnotateScalewayError(err, "listing Pulumi stacks")
 	}
 

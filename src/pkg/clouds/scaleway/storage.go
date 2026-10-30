@@ -2,6 +2,7 @@ package scaleway
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 )
 
 // S3Endpoint returns the S3-compatible endpoint for a Scaleway region.
@@ -110,6 +112,10 @@ func ListObjectKeys(ctx context.Context, client *s3.Client, bucket, prefix strin
 func EmptyAndDeleteBucket(ctx context.Context, client *s3.Client, bucket string) error {
 	keys, err := ListObjectKeys(ctx, client, bucket, "")
 	if err != nil {
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchBucket" {
+			return nil
+		}
 		return err
 	}
 	for len(keys) > 0 {
@@ -134,6 +140,10 @@ func EmptyAndDeleteBucket(ctx context.Context, client *s3.Client, bucket string)
 		keys = keys[len(batch):]
 	}
 	if _, err := client.DeleteBucket(ctx, &s3.DeleteBucketInput{Bucket: aws.String(bucket)}); err != nil {
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchBucket" {
+			return nil
+		}
 		return fmt.Errorf("deleting bucket %q: %w", bucket, err)
 	}
 	return nil
