@@ -333,6 +333,15 @@ func TestSubscribeRejectsMissingOrMismatchedRun(t *testing.T) {
 	require.ErrorIs(t, err, errors.ErrUnsupported)
 }
 
+func TestCdListRequiresAuth(t *testing.T) {
+	t.Parallel()
+
+	provider := newTestProvider("prod")
+	provider.s3Client = nil
+	_, err := provider.CdList(context.Background(), false)
+	require.EqualError(t, err, "not authenticated; call Authenticate first")
+}
+
 func TestAccountInfoRequiresAuthAndUsesClientContext(t *testing.T) {
 	t.Parallel()
 

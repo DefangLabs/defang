@@ -216,6 +216,12 @@ func makeStackRemoveCmd() *cobra.Command {
 				return fmt.Errorf("could not load stack parameters: %w", err)
 			}
 			provider := cli.NewProvider(ctx, stack.Provider, global.Client, stack.Name)
+			if !force {
+				// RemoveStack lists deployments through the provider, which needs credentials
+				if err := authenticateProvider(ctx, provider); err != nil {
+					return fmt.Errorf("%w; use --force to remove the stack without checking for active deployments", err)
+				}
+			}
 			return cli.RemoveStack(ctx, global.Client, provider, ec, projectName, name, force)
 		},
 	}
