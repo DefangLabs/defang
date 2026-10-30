@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"io"
+	"iter"
 	"os"
 	"strings"
 	"testing"
@@ -53,16 +53,26 @@ func TestSetUpCD(t *testing.T) {
 }
 
 type MockGcpLogsClient struct {
-	lister gcp.Lister
-	tailer gcp.Tailer
+	listEntries []*loggingpb.LogEntry
+	tailEntries []*loggingpb.LogEntry
 }
 
-func (m MockGcpLogsClient) ListLogEntries(ctx context.Context, query string, order gcp.Order) (gcp.Lister, error) {
-	return m.lister, nil
+// mockEntryIter yields entries as a single batch, matching how a real list/tail call
+// would yield whatever it had buffered.
+func mockEntryIter(entries []*loggingpb.LogEntry) iter.Seq2[[]*loggingpb.LogEntry, error] {
+	return func(yield func([]*loggingpb.LogEntry, error) bool) {
+		if !yield(entries, nil) {
+			return
+		}
+	}
 }
 
-func (m MockGcpLogsClient) NewTailer(ctx context.Context) (gcp.Tailer, error) {
-	return m.tailer, nil
+func (m MockGcpLogsClient) ListLogEntries(ctx context.Context, query string, order gcp.Order) (iter.Seq2[[]*loggingpb.LogEntry, error], error) {
+	return mockEntryIter(m.listEntries), nil
+}
+
+func (m MockGcpLogsClient) TailLogEntries(ctx context.Context, query string) (iter.Seq2[[]*loggingpb.LogEntry, error], error) {
+	return mockEntryIter(m.tailEntries), nil
 }
 func (m MockGcpLogsClient) GetExecutionEnv(ctx context.Context, executionName string) (map[string]string, error) {
 	return nil, nil
@@ -81,35 +91,6 @@ func (m MockGcpLogsClient) GetBuildInfo(ctx context.Context, buildId string) (*g
 
 func (m MockGcpLogsClient) GetInstanceGroupManagerLabels(ctx context.Context, project, region, name string) (map[string]string, error) {
 	return nil, nil
-}
-
-type MockGcpLoggingLister struct {
-	logEntries []*loggingpb.LogEntry
-}
-
-func (m *MockGcpLoggingLister) Next() (*loggingpb.LogEntry, error) {
-	if len(m.logEntries) > 0 {
-		entry := m.logEntries[0]
-		m.logEntries = m.logEntries[1:]
-		return entry, nil
-	}
-	return nil, io.EOF
-}
-
-type MockGcpLoggingTailer struct {
-	MockGcpLoggingLister
-}
-
-func (m *MockGcpLoggingTailer) Close() error {
-	return nil
-}
-
-func (m *MockGcpLoggingTailer) Start(ctx context.Context, query string) error {
-	return nil
-}
-
-func (m *MockGcpLoggingTailer) Next(ctx context.Context) (*loggingpb.LogEntry, error) {
-	return m.MockGcpLoggingLister.Next()
 }
 
 func TestGetLogStream(t *testing.T) {
@@ -181,10 +162,7 @@ func TestGetLogStream(t *testing.T) {
 			b := NewByocProvider(ctx, "testTenantID", "")
 			b.cdBuildId = tt.cdBuildId
 
-			driver := &MockGcpLogsClient{
-				lister: &MockGcpLoggingLister{},
-				tailer: &MockGcpLoggingTailer{},
-			}
+			driver := &MockGcpLogsClient{}
 
 			logStream := b.getLogStream(ctx, driver, tt.req)
 
