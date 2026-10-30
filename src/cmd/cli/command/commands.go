@@ -213,6 +213,16 @@ func SetupCommands(version string) {
 	})
 	RootCmd.AddCommand(tokenCmd)
 
+	// Identity commands
+	identityCmd.PersistentFlags().String("tenant", "", "id.defang.io tenant (default: $DEFANG_ID_TENANT)")
+	identityRegisterCmd.Flags().Duration("ttl", 0, "expiry of the key (default: no expiry)")
+	identityRegisterCmd.Flags().String("label", "", "label shown in the key list (default: this machine's hostname)")
+	identityCmd.AddCommand(identityClaimCmd)
+	identityCmd.AddCommand(identityRegisterCmd)
+	identityCmd.AddCommand(identityListCmd)
+	identityCmd.AddCommand(identityRevokeCmd)
+	RootCmd.AddCommand(identityCmd)
+
 	// Login Command
 	loginCmd.Flags().Bool("training-opt-out", false, "Opt out of ML training (Pro users only)")
 	// loginCmd.Flags().Bool("skip-prompt", false, "skip the login prompt if already logged in"); TODO: Implement this
