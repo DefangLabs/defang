@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -122,4 +123,18 @@ func TestStoragePermissionFailuresArePreserved(t *testing.T) {
 	require.ErrorContains(t, err, "AccessDenied")
 	require.ErrorContains(t, EmptyAndDeleteBucket(t.Context(), client, "state"), "AccessDenied")
 	require.ErrorContains(t, EnsureBucketExists(t.Context(), client, "state", "fr-par"), "AccessDenied")
+}
+
+func TestStorageCleanupAllowsMissingBucket(t *testing.T) {
+	for _, deletedDuringCleanup := range []bool{false, true} {
+		t.Run(strconv.FormatBool(deletedDuringCleanup), func(t *testing.T) {
+			client := storageClient(func(req *http.Request) (*http.Response, error) {
+				if req.Method == http.MethodGet && deletedDuringCleanup {
+					return storageResponse(http.StatusOK, `<ListBucketResult/>`), nil
+				}
+				return storageResponse(http.StatusNotFound, `<Error><Code>NoSuchBucket</Code></Error>`), nil
+			})
+			require.NoError(t, EmptyAndDeleteBucket(t.Context(), client, "state"))
+		})
+	}
 }
