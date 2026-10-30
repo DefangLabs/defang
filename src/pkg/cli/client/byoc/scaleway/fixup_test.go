@@ -23,7 +23,7 @@ func fixupTestProvider(t *testing.T) *ByocScaleway {
 
 func TestScalewayFixupConsumesRemoteModelsBeforeSharedFixups(t *testing.T) {
 	for _, model := range []struct{ input, resolved string }{
-		{"chat-default", "llama-3.3-70b-instruct"},
+		{"chat-default", "qwen3-235b-a22b-instruct-2507"},
 		{"embedding-default", "bge-multilingual-gemma2"},
 		{"custom/model", "custom/model"},
 	} {
