@@ -155,24 +155,36 @@ func TestLegacyProjectReadbackAndServiceLookup(t *testing.T) {
 }
 
 func TestCDTeardownFiltersUnrelatedResourcesAndCollectsFailures(t *testing.T) {
-	for _, fail := range []bool{false, true} {
-		t.Run(map[bool]string{false: "success", true: "failures"}[fail], func(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		cached, fail bool
+	}{
+		{name: "fresh client"},
+		{name: "cached client", cached: true},
+		{name: "fresh client errors", fail: true},
+		{name: "cached client errors", cached: true, fail: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			// TearDownCD writes to the process-wide terminal warning collector.
 			provider := newTestProvider("prod")
-			provider.jobDefID = "current-job"
+			if tc.cached {
+				provider.jobDefID = "current-job"
+			}
 			var deleted []string
 			provider.client.HTTPClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 				if req.Method == http.MethodDelete {
 					assert.NotContains(t, req.URL.Path, "unrelated")
 					deleted = append(deleted, req.URL.Path)
-					if fail {
+					if tc.fail {
 						return statusResponse(http.StatusForbidden, `{"message":"denied"}`), nil
 					}
 					return jsonResponse(`{}`), nil
 				}
 				switch {
 				case strings.HasSuffix(req.URL.Path, "/job-definitions"):
-					return jsonResponse(`{"job_definitions":[{"id":"legacy-job","name":"defang-cd"},{"id":"unrelated","name":"different-job"}]}`), nil
+					return jsonResponse(`{"job_definitions":[{"id":"legacy-job","name":"defang-cd"},{"id":"current-job","name":"defang-cd-prod"},{"id":"unrelated-stack","name":"defang-cd-other"}]}`), nil
+				case strings.HasSuffix(req.URL.Path, "/tokens"):
+					return jsonResponse(`{"tokens":[{"id":"cd-token","name":"defang-cd-prod-logs"},{"id":"unrelated-token","name":"defang-cd-other-logs"}]}`), nil
 				case strings.Contains(req.URL.Path, "/secret-manager/"):
 					prefix := provider.cdSecretName("")
 					return jsonResponse(`{"secrets":[{"id":"cd-secret","name":"` + prefix + `SCW_SECRET_KEY"},{"id":"unrelated","name":"app-config"}]}`), nil
@@ -196,12 +208,14 @@ func TestCDTeardownFiltersUnrelatedResourcesAndCollectsFailures(t *testing.T) {
 					return jsonResponse(""), nil
 				})}})
 			err := provider.TearDownCD(t.Context())
-			if fail {
+			if tc.fail {
 				require.ErrorContains(t, err, "denied")
 			} else {
 				require.NoError(t, err)
 			}
-			assert.Len(t, deleted, 6, "cleanup should continue through independent resources even after a failure")
+			assert.Len(t, deleted, 7, "cleanup should continue through independent resources even after a failure")
+			assert.Contains(t, deleted, "/serverless-jobs/v1alpha2/regions/fr-par/job-definitions/current-job")
+			assert.Contains(t, deleted, "/cockpit/v1/regions/fr-par/tokens/cd-token")
 		})
 	}
 }
@@ -296,6 +310,29 @@ func TestDomainDelegationUsesExistingZoneAndFallsBackToNativeDomain(t *testing.T
 			} else {
 				require.NotNil(t, result)
 				assert.Equal(t, []string{"ns.example"}, result.NameServers)
+			}
+		})
+	}
+}
+
+func TestCdListMissingBucketAndPermissionErrors(t *testing.T) {
+	for _, tc := range []struct {
+		code   string
+		status int
+	}{{"NoSuchBucket", http.StatusNotFound}, {"AccessDenied", http.StatusForbidden}} {
+		t.Run(tc.code, func(t *testing.T) {
+			provider := newTestProvider("prod")
+			provider.s3Client = s3.New(s3.Options{Region: "fr-par", BaseEndpoint: aws.String("https://storage.example"), UsePathStyle: true, Credentials: credentials.NewStaticCredentialsProvider("access", "secret", ""), HTTPClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				return statusResponse(tc.status, "<Error><Code>"+tc.code+"</Code></Error>"), nil
+			})}})
+			sequence, err := provider.CdList(t.Context(), false)
+			if tc.code == "AccessDenied" {
+				require.ErrorContains(t, err, "AccessDenied")
+				return
+			}
+			require.NoError(t, err)
+			for range sequence {
+				t.Fatal("missing bucket must have no stacks")
 			}
 		})
 	}
