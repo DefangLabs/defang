@@ -645,7 +645,10 @@ func TestComposeUpVerifiesModelContract(t *testing.T) {
 			if tt.wantErr != nil {
 				require.Nil(t, provider.deployed, "nothing may be uploaded to an engine that cannot resolve the request")
 			} else if tt.upload == compose.UploadModeDigest && tt.project.Models != nil {
-				require.Contains(t, string(provider.deployed), "x-defang-llm:\n      model: chat-default\n")
+				deployed, err := compose.LoadFromContent(t.Context(), provider.deployed, "")
+				require.NoError(t, err)
+				require.Equal(t, "chat-default", deployed.Models["llm"].Model, "the request reaches the CD engine as written")
+				require.Empty(t, deployed.Services["llm"].Command, "the CD engine routes the gateway")
 			}
 		})
 	}

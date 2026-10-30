@@ -21,7 +21,9 @@ services:
       chat:
         model_var: WORKER_CHAT_MODEL
       exact:
-  large:
+  large: # the deprecated syntax; its settings carry over to the gateway
+    environment:
+      LITELLM_LOG: DEBUG
     provider:
       type: model
       options:

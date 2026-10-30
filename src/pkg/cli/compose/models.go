@@ -7,84 +7,150 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
-	"go.yaml.in/yaml/v4"
 )
 
-// LLMExtension is the object form of x-defang-llm on a managed model service.
-// The CD engine resolves Model through the deployment's recipe and injects the
-// application-facing model name into each binding that it supplies, so the CLI
-// never maps a request to a cloud-specific model.
-type LLMExtension struct {
-	// Model is the request exactly as written in Compose.
-	Model    string         `yaml:"model" json:"model"`
-	Bindings []ModelBinding `yaml:"bindings,omitempty" json:"bindings,omitempty"`
+// DirectModelProvider is implemented by providers that serve managed models
+// from a public OpenAI-compatible endpoint, so no model gateway is deployed.
+type DirectModelProvider interface {
+	DirectModelEndpoint() string
 }
-
-// ModelBinding records how one consumer service receives a managed model.
-type ModelBinding struct {
-	Consumer    string `yaml:"consumer" json:"consumer"`
-	ModelVar    string `yaml:"model_var" json:"model_var"`
-	EndpointVar string `yaml:"endpoint_var" json:"endpoint_var"`
-	// Supplied lists the values Defang provides; a value the user set
-	// explicitly is left out and must not be changed.
-	Supplied []string `yaml:"supplied,omitempty" json:"supplied,omitempty"`
-}
-
-const (
-	suppliedModel    = "model"
-	suppliedEndpoint = "endpoint"
-)
 
 var errNoModel = errors.New("no model specified")
 
-// ParseLLMExtension decodes an x-defang-llm value. It returns nil for the
-// scalar form (`x-defang-llm: true`), which marks a user-managed LLM service.
-func ParseLLMExtension(value any) (*LLMExtension, error) {
-	switch v := value.(type) {
-	case nil, bool:
-		return nil, nil
-	case LLMExtension:
-		return &v, nil
-	case *LLMExtension:
-		return v, nil
-	}
-	// After a YAML round trip the extension is a generic map.
-	data, err := yaml.Marshal(value)
-	if err != nil {
-		return nil, fmt.Errorf("invalid x-defang-llm: %w", err)
-	}
-	var ext LLMExtension
-	if err := yaml.Unmarshal(data, &ext); err != nil {
-		return nil, fmt.Errorf("invalid x-defang-llm: %w", err)
-	}
-	if ext.Model == "" {
-		return nil, nil
-	}
-	return &ext, nil
-}
+type modelMode int
 
-// HasModelRequests reports whether the project asks the CD engine to resolve a
-// managed model, which only engines implementing the model contract can do.
-func HasModelRequests(project *composeTypes.Project) (bool, error) {
-	for name, service := range project.Services {
-		ext, err := ParseLLMExtension(service.Extensions["x-defang-llm"])
-		if err != nil {
-			return false, fmt.Errorf("service %q: %w", name, err)
+const (
+	// modelModeLiteral routes the gateway to the model name as written; the
+	// Playground has no BYOC CD engine that could resolve it.
+	modelModeLiteral modelMode = iota
+	// modelModeGateway leaves the gateway's routing to the CD engine, which
+	// resolves models.<name>.model through the deployment's recipe.
+	modelModeGateway
+	// modelModeDirect deploys nothing for a model; the CD engine writes the
+	// resolved model ID into each consumer variable that is unset.
+	modelModeDirect
+)
+
+// fixupModels turns model requests into the payload the CD engine expects.
+// On BYOC clouds the request stays in the top-level models: section and every
+// consumer's services.*.models entry names both of its variables, so the CD
+// engine never derives a variable name itself.
+func fixupModels(provider client.Provider, project *composeTypes.Project, info *client.AccountInfo) error {
+	mode := modelModeLiteral
+	var directEndpoint string
+	switch info.Provider {
+	case client.ProviderAWS, client.ProviderGCP, client.ProviderAzure:
+		mode = modelModeGateway
+	case client.ProviderDO:
+		if hasModels(project) {
+			return errors.New("managed models are not supported on DigitalOcean; deploy your own model gateway as a regular service instead")
 		}
-		if ext != nil {
-			return true, nil
+		return nil
+	default:
+		if direct, ok := provider.(DirectModelProvider); ok {
+			mode, directEndpoint = modelModeDirect, direct.DirectModelEndpoint()
 		}
 	}
-	return false, nil
+
+	// The deprecated syntax becomes a top-level models: entry, so the CD engine
+	// only ever sees one form.
+	gatewayBase := map[string]composeTypes.ServiceConfig{}
+	for _, name := range slices.Sorted(maps.Keys(project.Services)) {
+		svccfg := project.Services[name]
+		if !isModelProviderService(&svccfg) {
+			continue
+		}
+		term.Warnf("service %q: 'provider: type: model' is deprecated; use a top-level 'models:' entry instead", name)
+		model := providerServiceModel(&svccfg)
+		if mode == modelModeLiteral {
+			project.Services[name] = makeLiteralGateway(svccfg, project, model)
+			continue
+		}
+		if model == "" {
+			return fmt.Errorf("service %q: %w", name, errNoModel)
+		}
+		if _, exists := project.Models[name]; exists {
+			return fmt.Errorf("service %q: a top-level model has the same name", name)
+		}
+		if project.Models == nil {
+			project.Models = make(map[string]composeTypes.ModelConfig)
+		}
+		project.Models[name] = composeTypes.ModelConfig{Model: model}
+		delete(project.Services, name)
+		gatewayBase[name] = svccfg // keeps the user's settings for the gateway
+	}
+
+	for _, name := range slices.Sorted(maps.Keys(project.Models)) {
+		model := project.Models[name]
+		model.Name = name
+		warnUnsupportedModelOptions(model)
+		if mode != modelModeLiteral && model.Model == "" {
+			return fmt.Errorf("model %q: %w", name, errNoModel)
+		}
+		switch mode {
+		case modelModeLiteral:
+			svccfg := makeLiteralGateway(composeTypes.ServiceConfig{Name: name, Extensions: maps.Clone(model.Extensions)}, project, model.Model)
+			if _, ok := svccfg.Extensions["x-defang-llm"]; !ok {
+				svccfg.Extensions["x-defang-llm"] = true
+			}
+			project.Services[name] = svccfg
+		case modelModeGateway:
+			svccfg, ok := gatewayBase[name]
+			if !ok {
+				svccfg = composeTypes.ServiceConfig{Name: name, Extensions: maps.Clone(model.Extensions)}
+			}
+			masterKey := configureAccessGateway(&svccfg, project)
+			switch info.Provider {
+			case client.ProviderAWS:
+				if info.Region != "" {
+					svccfg.Environment["AWS_REGION"] = &info.Region
+				}
+			case client.ProviderGCP:
+				// The Vertex location depends on the resolved model, so the CD engine sets VERTEXAI_LOCATION.
+				if info.AccountID != "" {
+					svccfg.Environment["VERTEXAI_PROJECT"] = &info.AccountID
+				}
+			}
+			if svccfg.Extensions == nil {
+				svccfg.Extensions = make(composeTypes.Extensions)
+			}
+			if _, ok := svccfg.Extensions["x-defang-llm"]; !ok {
+				svccfg.Extensions["x-defang-llm"] = true
+			}
+			project.Services[name] = svccfg
+			appModel := applicationModelName(model.Model)
+			wireModelConsumers(project, name, modelWiring{endpoint: gatewayURL(name), model: &appModel, apiKey: masterKey, explicit: true})
+		case modelModeDirect:
+			wireModelConsumers(project, name, modelWiring{endpoint: directEndpoint, direct: true, explicit: true})
+		}
+	}
+	return nil
 }
 
-// IsVirtualModelService reports whether svccfg only describes a model served
-// by the cloud provider, so no container runs for it.
-func IsVirtualModelService(svccfg *composeTypes.ServiceConfig) bool {
-	_, llm := svccfg.Extensions["x-defang-llm"]
-	return llm && svccfg.Image == "" && svccfg.Build == nil
+func hasModels(project *composeTypes.Project) bool {
+	if len(project.Models) > 0 {
+		return true
+	}
+	for _, svccfg := range project.Services {
+		if isModelProviderService(&svccfg) {
+			return true
+		}
+	}
+	return false
+}
+
+// applicationModelName is the model name a consumer sends to the gateway. The
+// CD engine serves the same name, so both sides normalize exactly the
+// Docker-style spellings of the built-in aliases and nothing else.
+func applicationModelName(model string) string {
+	switch model {
+	case "ai/chat-default", "ai/chat-large", "ai/embedding-default":
+		return strings.TrimPrefix(model, "ai/")
+	}
+	return model
 }
 
 func isModelProviderService(svccfg *composeTypes.ServiceConfig) bool {
@@ -107,112 +173,88 @@ func warnUnsupportedModelOptions(model composeTypes.ModelConfig) {
 	}
 }
 
-// FixupDirectModels turns every model request into a virtual model service for
-// a provider that serves models from a public OpenAI-compatible endpoint. No
-// gateway runs: consumers call endpointURL directly with the OPENAI_API_KEY
-// config, and the CD engine injects the resolved model ID.
-func FixupDirectModels(project *composeTypes.Project, endpointURL string) error {
-	for name, service := range project.Services {
-		if !isModelProviderService(&service) {
-			continue
-		}
-		term.Warnf("service %q: 'provider: type: model' is deprecated; use a top-level 'models:' entry instead", name)
-		if err := addDirectModelService(project, name, providerServiceModel(&service), endpointURL); err != nil {
-			return fmt.Errorf("service %q: %w", name, err)
-		}
+func makeLiteralGateway(svccfg composeTypes.ServiceConfig, project *composeTypes.Project, model string) composeTypes.ServiceConfig {
+	if svccfg.Extensions == nil {
+		svccfg.Extensions = make(composeTypes.Extensions)
 	}
-	for name, model := range project.Models {
-		model.Name = name
-		warnUnsupportedModelOptions(model)
-		if err := addDirectModelService(project, name, model.Model, endpointURL); err != nil {
-			return fmt.Errorf("model %q: %w", name, err)
-		}
-		delete(project.Models, name)
+	masterKey := configureAccessGateway(&svccfg, project)
+	svccfg.Command = []string{"--drop_params", "--model", model, "--alias", model}
+	var modelVal *string
+	if model != "" {
+		modelVal = &model
 	}
-	return nil
-}
-
-func addDirectModelService(project *composeTypes.Project, name, model, endpointURL string) error {
-	if model == "" {
-		return errNoModel
-	}
-	bindings := bindModelConsumers(project, name, modelWiring{endpoint: endpointURL, direct: true})
-	project.Services[name] = composeTypes.ServiceConfig{
-		Name:       name,
-		Extensions: composeTypes.Extensions{"x-defang-llm": LLMExtension{Model: model, Bindings: bindings}},
-	}
-	return nil
+	wireModelConsumers(project, svccfg.Name, modelWiring{endpoint: gatewayURL(svccfg.Name), model: modelVal, apiKey: masterKey})
+	return svccfg
 }
 
 type modelWiring struct {
 	endpoint string
-	// model is the value written to the model variable; nil leaves it for the
-	// CD engine to inject.
+	// model is written to unset model variables; nil leaves them to the CD engine.
 	model *string
-	// apiKey is written to OPENAI_API_KEY when unset; nil references Defang config.
+	// apiKey is written to an unset OPENAI_API_KEY; nil references Defang config.
 	apiKey *string
-	// direct endpoints run no gateway, so consumers neither join the private
-	// model network nor depend on the (virtual) model service.
+	// direct endpoints run no gateway: consumers neither join the private model
+	// network nor depend on the model.
 	direct bool
+	// explicit records both variable names in the consumer's models: entry.
+	explicit bool
 }
 
-// bindModelConsumers wires every service that uses the model service svcName,
-// either through depends_on (deprecated syntax) or a service-level models:
-// entry, and returns one binding per wired variable pair. Local Docker sets
-// [SERVICE]_URL and [SERVICE]_MODEL by default.
-func bindModelConsumers(project *composeTypes.Project, svcName string, w modelWiring) []ModelBinding {
+// wireModelConsumers wires every service that uses the model svcName, either
+// through depends_on (deprecated syntax) or a services.*.models entry. Local
+// Docker sets [SERVICE]_URL and [SERVICE]_MODEL by default.
+func wireModelConsumers(project *composeTypes.Project, svcName string, w modelWiring) {
 	envName := strings.ToUpper(svcName) // TODO: handle characters that are not allowed in env vars, like '-'
 	defaultEndpointVar, defaultModelVar := envName+"_URL", envName+"_MODEL"
 
-	var bindings []ModelBinding
-	for _, name := range slices.Sorted(maps.Keys(project.Services)) {
-		consumer := project.Services[name]
-		changed := false
-
-		if _, ok := consumer.DependsOn[svcName]; ok {
-			bindings = append(bindings, bindModelConsumer(&consumer, name, defaultEndpointVar, defaultModelVar, w))
-			if w.direct {
-				delete(consumer.DependsOn, svcName)
-			}
-			changed = true
+	for name, consumer := range project.Services {
+		_, dependent := consumer.DependsOn[svcName]
+		modelDep, modelConsumer := consumer.Models[svcName]
+		if !dependent && !modelConsumer {
+			continue
 		}
 
-		if modelDep, ok := consumer.Models[svcName]; ok {
-			endpointVar, modelVar := defaultEndpointVar, defaultModelVar
-			if modelDep != nil && modelDep.EndpointVariable != "" {
-				endpointVar = modelDep.EndpointVariable
-			}
-			if modelDep != nil && modelDep.ModelVariable != "" {
-				modelVar = modelDep.ModelVariable
-			}
-			binding := bindModelConsumer(&consumer, name, endpointVar, modelVar, w)
-			if !slices.ContainsFunc(bindings, func(b ModelBinding) bool {
-				return b.Consumer == name && b.EndpointVar == endpointVar && b.ModelVar == modelVar
-			}) {
-				bindings = append(bindings, binding)
-			}
-			if w.direct {
-				delete(consumer.Models, svcName)
-			} else if _, ok := consumer.DependsOn[svcName]; !ok {
-				if consumer.DependsOn == nil {
-					consumer.DependsOn = make(map[string]composeTypes.ServiceDependency)
-				}
-				consumer.DependsOn[svcName] = composeTypes.ServiceDependency{
-					Condition: composeTypes.ServiceConditionStarted,
-					Required:  true,
-				}
-			}
-			changed = true
+		if dependent {
+			wireModelVariables(&consumer, defaultEndpointVar, defaultModelVar, w)
 		}
 
-		if changed {
-			project.Services[name] = consumer
+		endpointVar, modelVar := defaultEndpointVar, defaultModelVar
+		if modelDep != nil && modelDep.EndpointVariable != "" {
+			endpointVar = modelDep.EndpointVariable
 		}
+		if modelDep != nil && modelDep.ModelVariable != "" {
+			modelVar = modelDep.ModelVariable
+		}
+		if modelConsumer {
+			wireModelVariables(&consumer, endpointVar, modelVar, w)
+		}
+		if w.explicit {
+			if consumer.Models == nil {
+				consumer.Models = make(map[string]*composeTypes.ServiceModelConfig)
+			}
+			binding := composeTypes.ServiceModelConfig{EndpointVariable: endpointVar, ModelVariable: modelVar}
+			if modelDep != nil {
+				binding.Extensions = modelDep.Extensions
+			}
+			consumer.Models[svcName] = &binding
+		}
+
+		if w.direct {
+			delete(consumer.DependsOn, svcName)
+		} else if _, ok := consumer.DependsOn[svcName]; !ok {
+			if consumer.DependsOn == nil {
+				consumer.DependsOn = make(map[string]composeTypes.ServiceDependency)
+			}
+			consumer.DependsOn[svcName] = composeTypes.ServiceDependency{
+				Condition: composeTypes.ServiceConditionStarted,
+				Required:  true,
+			}
+		}
+		project.Services[name] = consumer
 	}
-	return bindings
 }
 
-func bindModelConsumer(consumer *composeTypes.ServiceConfig, name, endpointVar, modelVar string, w modelWiring) ModelBinding {
+func wireModelVariables(consumer *composeTypes.ServiceConfig, endpointVar, modelVar string, w modelWiring) {
 	if consumer.Environment == nil {
 		consumer.Environment = make(composeTypes.MappingWithEquals)
 	}
@@ -222,19 +264,13 @@ func bindModelConsumer(consumer *composeTypes.ServiceConfig, name, endpointVar, 
 		}
 		consumer.Networks[modelProviderNetwork] = nil
 	}
-	binding := ModelBinding{Consumer: name, ModelVar: modelVar, EndpointVar: endpointVar}
-	if _, ok := consumer.Environment[modelVar]; !ok {
-		binding.Supplied = append(binding.Supplied, suppliedModel)
-		if w.model != nil {
-			consumer.Environment[modelVar] = w.model
-		}
-	}
 	if _, ok := consumer.Environment[endpointVar]; !ok {
-		binding.Supplied = append(binding.Supplied, suppliedEndpoint)
 		consumer.Environment[endpointVar] = &w.endpoint
+	}
+	if _, ok := consumer.Environment[modelVar]; !ok && w.model != nil {
+		consumer.Environment[modelVar] = w.model
 	}
 	if _, ok := consumer.Environment["OPENAI_API_KEY"]; !ok {
 		consumer.Environment["OPENAI_API_KEY"] = w.apiKey
 	}
-	return binding
 }

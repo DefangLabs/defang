@@ -2,9 +2,7 @@ package compose
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -78,13 +76,6 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 			term.Warnf("service %q: service name is longer than 16 characters, you may run into issues with resource name length", svccfg.Name)
 		}
 
-		// beta docker compose model runner syntax
-		if isModelProviderService(&svccfg) {
-			if err := fixupModelProvider(&svccfg, project, accountInfo); err != nil {
-				return fmt.Errorf("service %q: %w", svccfg.Name, err)
-			}
-		}
-
 		if _, llm := svccfg.Extensions["x-defang-llm"]; llm {
 			fixupLLM(&svccfg)
 		}
@@ -104,14 +95,9 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 		project.Services[svccfg.Name] = svccfg
 	}
 
-	// modern docker compose model runner syntax
-	for name, model := range project.Models {
-		model.Name = name // ensure the model has a name
-		svccfg, err := fixupModel(model, project, accountInfo)
-		if err != nil {
-			return fmt.Errorf("model %q: %w", name, err)
-		}
-		project.Services[svccfg.Name] = *svccfg
+	// both the top-level models: and the deprecated "provider: type: model" syntax
+	if err := fixupModels(provider, project, accountInfo); err != nil {
+		return err
 	}
 
 	svcNameReplacer := NewServiceNameReplacer(ctx, provider, project)
@@ -380,68 +366,6 @@ func fixupIngressPorts(svccfg *composeTypes.ServiceConfig) {
 
 // Declare a private network for the model provider
 const modelProviderNetwork = "model_provider_private"
-
-func fixupModel(model composeTypes.ModelConfig, project *composeTypes.Project, info *client.AccountInfo) (*composeTypes.ServiceConfig, error) {
-	warnUnsupportedModelOptions(model)
-	svccfg := &composeTypes.ServiceConfig{
-		Name:       model.Name,
-		Extensions: maps.Clone(model.Extensions),
-	}
-	if err := makeAccessGatewayService(svccfg, project, model.Model, info); err != nil {
-		return nil, err
-	}
-	if _, ok := svccfg.Extensions["x-defang-llm"]; !ok {
-		svccfg.Extensions["x-defang-llm"] = true
-	}
-	return svccfg, nil
-}
-
-func fixupModelProvider(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, info *client.AccountInfo) error {
-	term.Warnf("service %q: 'provider: type: model' is deprecated; use a top-level 'models:' entry instead", svccfg.Name)
-	return makeAccessGatewayService(svccfg, project, providerServiceModel(svccfg), info)
-}
-
-// makeAccessGatewayService turns svccfg into the LiteLLM gateway for a model and
-// wires its consumers. On BYOC clouds the CD engine resolves the request through
-// the deployment's recipe and configures the gateway's routing, so the CLI only
-// records the request and its bindings.
-func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, model string, info *client.AccountInfo) error {
-	if svccfg.Extensions == nil {
-		svccfg.Extensions = make(composeTypes.Extensions)
-	}
-	switch info.Provider {
-	case client.ProviderAWS, client.ProviderGCP, client.ProviderAzure:
-		if model == "" {
-			return errNoModel
-		}
-		masterKey := configureAccessGateway(svccfg, project)
-		switch info.Provider {
-		case client.ProviderAWS:
-			if info.Region != "" {
-				svccfg.Environment["AWS_REGION"] = &info.Region
-			}
-		case client.ProviderGCP:
-			// The Vertex location depends on the resolved model, so the CD engine sets VERTEXAI_LOCATION.
-			if info.AccountID != "" {
-				svccfg.Environment["VERTEXAI_PROJECT"] = &info.AccountID
-			}
-		}
-		bindings := bindModelConsumers(project, svccfg.Name, modelWiring{endpoint: gatewayURL(svccfg.Name), apiKey: masterKey})
-		svccfg.Extensions["x-defang-llm"] = LLMExtension{Model: model, Bindings: bindings}
-	case client.ProviderDO:
-		return errors.New("managed models are not supported on DigitalOcean; deploy your own model gateway as a regular service instead")
-	default:
-		// The Playground has no BYOC CD engine to resolve requests, so the gateway serves the literal model name.
-		masterKey := configureAccessGateway(svccfg, project)
-		svccfg.Command = []string{"--drop_params", "--model", model, "--alias", model}
-		var modelVal *string
-		if model != "" {
-			modelVal = &model
-		}
-		bindModelConsumers(project, svccfg.Name, modelWiring{endpoint: gatewayURL(svccfg.Name), model: modelVal, apiKey: masterKey})
-	}
-	return nil
-}
 
 func gatewayURL(svcName string) string {
 	return "http://" + svcName + ":" + strconv.FormatUint(uint64(liteLLMPort), 10) + "/v1/"
